@@ -309,6 +309,33 @@ export function getErrorMessageFromCode(
       return '환전 요청이 거절되었습니다.';
     case ERROR_CODE.RANKING_SNAPSHOT_CHANGED:
       return '랭킹 정보가 갱신되었습니다. 다시 불러와주세요.';
+    case ERROR_CODE.TRADING_ACCOUNT_NOT_FOUND:
+      return '선택한 투자 계정을 찾을 수 없습니다. 계정 목록을 새로 불러옵니다.';
+    case ERROR_CODE.TRADING_ACCOUNT_NOT_ACTIVE:
+      return '현재 계정 상태에서는 이 작업을 할 수 없습니다.';
+    // 준비 중인 기능: 데이터 손상이 아니므로 문의를 안내하지 않는다.
+    case ERROR_CODE.GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED:
+      return '일반 투자 계정의 매매 기능은 아직 준비 중입니다.';
+    case ERROR_CODE.GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED:
+      return '일반 투자 계정의 환전 기능은 아직 준비 중입니다.';
+    // 구조적 무결성 오류: 빈 데이터로 위장하지 않고 재시도/문의를 안내한다.
+    case ERROR_CODE.TRADING_ACCOUNT_INTEGRITY:
+    case ERROR_CODE.TRADING_ACCOUNT_SCOPE_MISMATCH:
+    case ERROR_CODE.TRADING_SCOPE_REPAIR_REQUIRED:
+    case ERROR_CODE.TRADING_ACCOUNT_LINK_INTEGRITY:
+    case ERROR_CODE.FINANCIAL_SCOPE_REPAIR_REQUIRED:
+    case ERROR_CODE.FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH:
+    case ERROR_CODE.GENERAL_ACCOUNT_INTEGRITY:
+    case ERROR_CODE.GENERAL_PERFORMANCE_NOT_INITIALIZED:
+    case ERROR_CODE.GENERAL_PERFORMANCE_INTEGRITY:
+    case ERROR_CODE.GENERAL_PERFORMANCE_DISCONTINUITY:
+    case ERROR_CODE.SEASON_RANKING_SCOPE_REPAIR_REQUIRED:
+    case ERROR_CODE.SEASON_RANKING_SCOPE_MISMATCH:
+    case ERROR_CODE.SEASON_RANKING_SOURCE_SCOPE_REPAIR_REQUIRED:
+    case ERROR_CODE.SEASON_RANKING_SOURCE_SCOPE_MISMATCH:
+    case ERROR_CODE.FINAL_RESULTS_INTEGRITY:
+    case ERROR_CODE.AD_REWARD_CLAIM_INTEGRITY:
+      return '계정 데이터에 문제가 발견되어 안전하게 조회를 중단했습니다. 잠시 후 다시 시도하고, 계속되면 고객센터에 문의해주세요.';
     default:
       return options?.fallbackToGeneric === false
         ? null

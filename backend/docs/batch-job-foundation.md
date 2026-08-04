@@ -315,6 +315,72 @@ decided per account AFTER the lock and shared by both rows it writes. Accounts
 closed mid-run are counted in `excludedClosed` with the racing subset broken out
 as `skippedClosedDuringRun`, and no row of any kind is written for them.
 
+## 작업 8 보완 — settlement 입력 scope · 결과 정합성 · settled 보호 · 전체 계정 종료
+
+### `season-settlement`
+
+**입력 scope (§A-1).** The rows a final ranking is COMPUTED FROM are now
+verified against the same participant → season-account map the daily ranking job
+uses, built once from the eligible-participant read (no N+1). Both paths are
+covered: `findEquityHistory()` (live valuation) and
+`calculateFinalValuationsFromDailySnapshots()` (fallback) each select
+`tradingAccountId`, `cumulativeExternalFundingKrw`, `investmentPnlKrw`,
+`timeWeightedReturnFactor` and run `assertRankingSourceSnapshotScopes`.
+
+- null scope → `SEASON_RANKING_SOURCE_SCOPE_REPAIR_REQUIRED` (500)
+- other account, or a season row carrying general-mode performance columns →
+  `SEASON_RANKING_SOURCE_SCOPE_MISMATCH` (500)
+
+The job fails CLOSED, not partially: no final ranking row is written, no
+participant gets a final rank or tier, and the season stays `ended`. Excluding
+the damaged row would not be neutral — a missing equity low lowers that
+participant's max drawdown (tie-break #2) and a missing snapshot shifts every
+rank below them. These codes are deliberately NOT collapsed into the 503
+`FINAL_VALUATION_FAILED` retry path, because retrying cannot fix a scope fault.
+
+**Existing final ranking reuse (§A-2).** When settlement REUSES an existing
+final ranking, that ranking row is the authority for the participant's whole
+confirmed result, not just its rank. `totalAssetKrw`, `totalReturnRate`,
+`maxDrawdown`, `totalFillCount`, `currentRank`, `finalRank`, and the policy
+`finalTier` are all written from it. Set coverage is checked first (no duplicate
+participant, no missing eligible participant, no ineligible extra), and the
+stored results are re-read from the database and compared to the ranking
+immediately before the `settled` transition. Any disagreement is
+`FINAL_RESULTS_INTEGRITY` (409) and rolls back the participant updates, the
+account closures, and the status change together. A clean replay is idempotent
+and adds no ranking row.
+
+**Settled seasons (§A-5).** Status is now a first-class input:
+
+| state | behaviour |
+| --- | --- |
+| `ended`, no final ranking | new settlement |
+| `ended`, final ranking present | verified reuse |
+| `settled`, complete final ranking | verified idempotent replay |
+| `settled`, NO final ranking | `FINAL_RESULTS_INTEGRITY` (409) |
+| `settled`, partial final ranking | `FINAL_RESULTS_INTEGRITY` (409) |
+
+A settled season never has its final valuation recomputed from current wallets
+and prices, never gets a new settlement snapshot, and never gets a new final
+ranking row. The check runs both before and under the season row lock. Recovery
+is investigation plus restoring the final ranking, not a re-run.
+
+### `final-tier-assignment`
+
+**Every season account (§A-6).** The job checked only the accounts that appear
+in the final ranking, which covers active/finished/rewarded participants. It
+therefore passed a settled season in which an `excluded` or `registered`
+participant still held an `active` account. It now reads EVERY SeasonParticipant
+of the season in one `seasonId` relation query and requires each linked account
+to exist, be `mode=season`, be owned by the participant's user, back-link to that
+participant, be `status=closed`, and carry a non-null `closedAt`. Anything else
+is `SEASON_ACCOUNT_CLOSE_INCOMPLETE` (409).
+
+This job still never closes an account. Closure is atomic with settlement, and a
+job that quietly closed the stragglers would produce a season whose accounts are
+closed without the transaction that is supposed to have closed them. The
+operator re-runs `season-settlement`.
+
 ## Future Work
 
 Cron scheduling, provider ingestion, daily snapshot automation, ranking overwrite/regeneration, settlement extensions beyond final tier assignment, true competition tie rank, reward amount policy, and actual payment/point/delivery/external fulfillment remain separate gates.

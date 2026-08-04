@@ -18,6 +18,7 @@ import {
   SEASON_RANKING_SCOPE_SELECT,
   type SeasonRankingScopeRow,
 } from './season-ranking-scope';
+import { assertSeasonRankingSetScope } from './season-ranking-set-scope';
 
 export type RankingQuery = {
   seasonId?: string;
@@ -237,6 +238,17 @@ export class RankingService {
           : this.notJoinedMyRanking(),
       });
     }
+
+    // 작업 8 보완 §A-4: the ENTIRE selected snapshot is verified before any page
+    // of it is counted or served. Verifying only the requested page let damage
+    // outside the window return a clean 200 — including on `top10`, whose ten
+    // rows say nothing about the ninety below them.
+    await assertSeasonRankingSetScope(this.prisma, {
+      seasonId: season.id,
+      rankType: parsedQuery.rankType,
+      rankingDate: selectedRanking.rankingDate,
+      capturedAt: selectedRanking.capturedAt,
+    });
 
     const where = {
       seasonId: season.id,

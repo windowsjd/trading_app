@@ -852,11 +852,19 @@ async function testSettlementRollback() {
   await createDailySnapshot(fixture.participants[0], settlementDate, '12000000', '20');
   await createDailySnapshot(fixture.participants[1], settlementDate, '11000000', '10');
 
-  // Break the link AFTER the snapshots exist, so the failure happens inside the
-  // settlement transaction rather than during its preconditions.
+  // Break the link of an EXCLUDED participant, AFTER the snapshots exist.
+  //
+  // Excluded participants are not settlement-ELIGIBLE, so 작업 8 보완 §A-1's
+  // pre-transaction participant scope map never sees this one — the failure
+  // therefore happens where it is meant to, inside the settlement transaction,
+  // at the season-wide account link check that runs before any write.
   await prisma.seasonParticipant.update({
     where: { id: fixture.participants[1].id },
-    data: { tradingAccountId: null },
+    data: {
+      participantStatus: 'excluded',
+      excludedAt: new Date(),
+      tradingAccountId: null,
+    },
   });
 
   let rollbackCode = null;
@@ -903,7 +911,11 @@ async function testSettlementRollback() {
   // Restore the link so cleanup can proceed.
   await prisma.seasonParticipant.update({
     where: { id: fixture.participants[1].id },
-    data: { tradingAccountId: fixture.participants[1].accountId },
+    data: {
+      participantStatus: 'active',
+      excludedAt: null,
+      tradingAccountId: fixture.participants[1].accountId,
+    },
   });
 
   console.log('  [5] settlement all-or-nothing rollback ok');
@@ -1071,6 +1083,518 @@ async function testRepairScript() {
 
 // ===========================================================================
 
+// ===========================================================================
+// 8) 작업 8 보완 (§A-1 · §A-2 · §A-3 · §A-5 · §A-6) against real rows.
+// ===========================================================================
+
+/** §A-1: a damaged SETTLEMENT input fails the whole settlement. */
+async function testSettlementSourceScope() {
+  const endAt = new Date(Date.now() - 3_600_000);
+
+  for (const damage of ['null', 'mismatch', 'general-columns']) {
+    // Three participants, two snapshots: the third account exists but owns no
+    // row on this date, so the "mismatch" case can point at a REAL other
+    // account without colliding with the (account, date) unique.
+    const fixture = await createSeasonWithParticipants({
+      participantCount: 3,
+      status: 'ended',
+      startAt: new Date(endAt.getTime() - 86_400_000),
+      endAt,
+    });
+    const settlementDate = dateOnly('2026-08-10');
+    await createDailySnapshot(fixture.participants[0], settlementDate, '12000000', '20');
+    const target = await createDailySnapshot(
+      fixture.participants[1],
+      settlementDate,
+      '11000000',
+      '10',
+    );
+
+    if (damage === 'null') {
+      await prisma.$executeRaw\`
+        UPDATE "daily_portfolio_snapshots" SET "trading_account_id" = NULL WHERE "id" = \${target.id}
+      \`;
+    } else if (damage === 'mismatch') {
+      await prisma.$executeRaw\`
+        UPDATE "daily_portfolio_snapshots"
+        SET "trading_account_id" = \${fixture.participants[2].accountId}
+        WHERE "id" = \${target.id}
+      \`;
+    } else {
+      await prisma.$executeRaw\`
+        UPDATE "daily_portfolio_snapshots"
+        SET "cumulative_external_funding_krw" = 1,
+            "investment_pnl_krw" = 0,
+            "time_weighted_return_factor" = 1
+        WHERE "id" = \${target.id}
+      \`;
+    }
+
+    let code = null;
+    try {
+      await runJob(settlementJob, {
+        seasonId: fixture.seasonId,
+        settlementDate: '2026-08-10',
+      });
+    } catch (error) {
+      code = errorCode(error);
+    }
+    assert.equal(
+      code,
+      damage === 'null'
+        ? 'SEASON_RANKING_SOURCE_SCOPE_REPAIR_REQUIRED'
+        : 'SEASON_RANKING_SOURCE_SCOPE_MISMATCH',
+      'settlement source damage (' + damage + ') must fail closed',
+    );
+
+    // Fail-CLOSED, not fail-partial: the healthy participant is not settled
+    // on its own, and the season stays \`ended\`.
+    assert.equal(
+      await prisma.seasonRanking.count({
+        where: { seasonId: fixture.seasonId, rankType: 'final' },
+      }),
+      0,
+      'no final ranking may be produced from a damaged input set',
+    );
+    const season = await prisma.season.findUniqueOrThrow({
+      where: { id: fixture.seasonId },
+      select: { status: true },
+    });
+    assert.equal(season.status, 'ended');
+    const healthy = await prisma.seasonParticipant.findUniqueOrThrow({
+      where: { id: fixture.participants[0].id },
+      select: { finalRank: true, finalTier: true },
+    });
+    assert.equal(healthy.finalRank, null);
+    assert.equal(healthy.finalTier, null);
+  }
+
+  console.log('  [8a] settlement source scope fail-closed ok');
+}
+
+/** §A-2: a reused final ranking is the authority for the whole result. */
+async function testExistingFinalRankingReuse() {
+  const endAt = new Date(Date.now() - 3_600_000);
+  const fixture = await createSeasonWithParticipants({
+    participantCount: 2,
+    status: 'ended',
+    startAt: new Date(endAt.getTime() - 86_400_000),
+    endAt,
+  });
+  const settlementDate = dateOnly('2026-08-11');
+  await createDailySnapshot(fixture.participants[0], settlementDate, '12000000', '20');
+  await createDailySnapshot(fixture.participants[1], settlementDate, '11000000', '10');
+
+  const first = await runJob(settlementJob, {
+    seasonId: fixture.seasonId,
+    settlementDate: '2026-08-11',
+  });
+  assert.equal(first.data.run.status, 'succeeded');
+
+  const rankings = await prisma.seasonRanking.findMany({
+    where: { seasonId: fixture.seasonId, rankType: 'final' },
+    orderBy: { rank: 'asc' },
+    select: {
+      id: true,
+      rank: true,
+      seasonParticipantId: true,
+      totalAssetKrw: true,
+      returnRate: true,
+      maxDrawdown: true,
+      totalFillCount: true,
+    },
+  });
+  assert.equal(rankings.length, 2);
+
+  // Drift the participant AWAY from its final ranking on every financial
+  // field, then replay. The reuse path must restore all of them.
+  await prisma.seasonParticipant.update({
+    where: { id: rankings[0].seasonParticipantId },
+    data: {
+      totalAssetKrw: '1',
+      totalReturnRate: '-99',
+      maxDrawdown: '77',
+      totalFillCount: 123,
+      currentRank: 9,
+      finalRank: null,
+      finalTier: null,
+    },
+  });
+
+  const replay = await runJob(settlementJob, {
+    seasonId: fixture.seasonId,
+    settlementDate: '2026-08-11',
+  });
+  assert.equal(replay.data.run.status, 'succeeded');
+
+  const repaired = await prisma.seasonParticipant.findUniqueOrThrow({
+    where: { id: rankings[0].seasonParticipantId },
+    select: {
+      totalAssetKrw: true,
+      totalReturnRate: true,
+      maxDrawdown: true,
+      totalFillCount: true,
+      currentRank: true,
+      finalRank: true,
+      finalTier: true,
+    },
+  });
+  assert.equal(repaired.totalAssetKrw.toString(), rankings[0].totalAssetKrw.toString());
+  assert.equal(repaired.totalReturnRate.toString(), rankings[0].returnRate.toString());
+  assert.equal(repaired.maxDrawdown.toString(), rankings[0].maxDrawdown.toString());
+  assert.equal(repaired.totalFillCount, rankings[0].totalFillCount);
+  assert.equal(repaired.currentRank, rankings[0].rank);
+  assert.equal(repaired.finalRank, rankings[0].rank);
+  assert.ok(repaired.finalTier, 'finalTier must be assigned');
+
+  // Idempotent: no NEW ranking row appeared.
+  assert.equal(
+    await prisma.seasonRanking.count({
+      where: { seasonId: fixture.seasonId, rankType: 'final' },
+    }),
+    2,
+    'a replay must not add ranking rows',
+  );
+
+  // A final ranking that no longer covers every eligible participant is
+  // refused rather than settled around.
+  await prisma.seasonRanking.delete({ where: { id: rankings[1].id } });
+  let coverageCode = null;
+  try {
+    await runJob(settlementJob, {
+      seasonId: fixture.seasonId,
+      settlementDate: '2026-08-11',
+    });
+  } catch (error) {
+    coverageCode = errorCode(error);
+  }
+  assert.ok(
+    coverageCode === 'FINAL_RESULTS_INTEGRITY' ||
+      coverageCode === 'MISSING_FINAL_RANKINGS',
+    'a partial final ranking must not be reused, got ' + coverageCode,
+  );
+
+  console.log('  [8b] existing final ranking reuse consistency ok');
+}
+
+/** §A-3: routine refresh must not delete a damaged ranking set. */
+async function testRefreshDoesNotDeleteDamagedRankings() {
+  const now = new Date();
+  const fixture = await createSeasonWithParticipants({
+    participantCount: 2,
+    status: 'active',
+    startAt: new Date(now.getTime() - 3_600_000),
+    endAt: new Date(now.getTime() + 86_400_000),
+  });
+
+  await refresh.refreshCurrentRankingForSeason(fixture.seasonId, {
+    capturedAt: now,
+  });
+  const before = await prisma.seasonRanking.findMany({
+    where: { seasonId: fixture.seasonId, rankType: 'daily' },
+    orderBy: { rank: 'asc' },
+    select: { id: true, rank: true, seasonParticipantId: true },
+  });
+  assert.equal(before.length, 2);
+
+  // A season account that is NOT part of this ranking set, so the "mismatch"
+  // case does not collide with the (season, rankType, date, account) unique.
+  const bystanderUserId = await createUser('rank-bystander');
+  const bystanderAccount = await prisma.tradingAccount.create({
+    data: {
+      userId: bystanderUserId,
+      mode: 'season',
+      status: 'active',
+      initialCapitalKrw: '10000000',
+      openedAt: now,
+    },
+    select: { id: true },
+  });
+
+  for (const damage of ['null', 'mismatch']) {
+    if (damage === 'null') {
+      await prisma.$executeRaw\`
+        UPDATE "season_rankings" SET "trading_account_id" = NULL WHERE "id" = \${before[0].id}
+      \`;
+    } else {
+      await prisma.$executeRaw\`
+        UPDATE "season_rankings"
+        SET "trading_account_id" = \${bystanderAccount.id}
+        WHERE "id" = \${before[0].id}
+      \`;
+    }
+
+    const ranksBefore = await prisma.seasonParticipant.findMany({
+      where: { seasonId: fixture.seasonId },
+      orderBy: { id: 'asc' },
+      select: { id: true, currentRank: true },
+    });
+
+    let code = null;
+    try {
+      await refresh.refreshCurrentRankingForSeason(fixture.seasonId, {
+        capturedAt: new Date(now.getTime() + 60_000),
+      });
+    } catch (error) {
+      code = errorCode(error);
+    }
+    assert.equal(
+      code,
+      damage === 'null'
+        ? 'SEASON_RANKING_SCOPE_REPAIR_REQUIRED'
+        : 'SEASON_RANKING_SCOPE_MISMATCH',
+      'refresh must refuse to delete a damaged set (' + damage + ')',
+    );
+
+    // The damaged rows are STILL THERE — routine refresh did not launder them.
+    const after = await prisma.seasonRanking.findMany({
+      where: { seasonId: fixture.seasonId, rankType: 'daily' },
+      orderBy: { rank: 'asc' },
+      select: { id: true, rank: true },
+    });
+    assert.equal(after.length, 2, 'damaged ranking rows must survive');
+    assert.deepEqual(
+      after.map((row) => row.id).sort(),
+      before.map((row) => row.id).sort(),
+      'the same ranking rows must remain, not recreated ones',
+    );
+    const ranksAfter = await prisma.seasonParticipant.findMany({
+      where: { seasonId: fixture.seasonId },
+      orderBy: { id: 'asc' },
+      select: { id: true, currentRank: true },
+    });
+    assert.deepEqual(
+      ranksAfter,
+      ranksBefore,
+      'participant.currentRank must not move when the refresh aborts',
+    );
+  }
+
+  // A general account linked into the set is refused too.
+  const generalUserId = await createUser('general-rank');
+  const generalAccount = await prisma.tradingAccount.create({
+    data: {
+      userId: generalUserId,
+      mode: 'general',
+      status: 'active',
+      initialCapitalKrw: '10000000',
+      openedAt: now,
+    },
+    select: { id: true },
+  });
+  await prisma.$executeRaw\`
+    UPDATE "season_rankings" SET "trading_account_id" = \${generalAccount.id} WHERE "id" = \${before[0].id}
+  \`;
+  let generalCode = null;
+  try {
+    await refresh.refreshCurrentRankingForSeason(fixture.seasonId, {
+      capturedAt: new Date(now.getTime() + 120_000),
+    });
+  } catch (error) {
+    generalCode = errorCode(error);
+  }
+  assert.equal(generalCode, 'SEASON_RANKING_SCOPE_MISMATCH');
+
+  // Repaired set: the normal delete-and-recreate policy resumes.
+  await prisma.$executeRaw\`
+    UPDATE "season_rankings"
+    SET "trading_account_id" = \${fixture.participants[0].accountId}
+    WHERE "id" = \${before[0].id} AND "season_participant_id" = \${fixture.participants[0].id}
+  \`;
+  await prisma.seasonRanking.deleteMany({
+    where: { seasonId: fixture.seasonId, rankType: 'daily' },
+  });
+  const healthy = await refresh.refreshCurrentRankingForSeason(fixture.seasonId, {
+    capturedAt: new Date(now.getTime() + 180_000),
+  });
+  assert.equal(healthy.skipped, false);
+  assert.equal(healthy.rankingsCreated, 2);
+
+  console.log('  [8c] refresh refuses to delete a damaged ranking set ok');
+}
+
+/** §A-5: a settled season never receives a newly computed final ranking. */
+async function testSettledWithoutFinalRanking() {
+  const endAt = new Date(Date.now() - 3_600_000);
+  const fixture = await createSeasonWithParticipants({
+    participantCount: 2,
+    status: 'ended',
+    startAt: new Date(endAt.getTime() - 86_400_000),
+    endAt,
+  });
+  const settlementDate = dateOnly('2026-08-12');
+  await createDailySnapshot(fixture.participants[0], settlementDate, '12000000', '20');
+  await createDailySnapshot(fixture.participants[1], settlementDate, '11000000', '10');
+
+  await runJob(settlementJob, {
+    seasonId: fixture.seasonId,
+    settlementDate: '2026-08-12',
+  });
+  const settled = await prisma.season.findUniqueOrThrow({
+    where: { id: fixture.seasonId },
+    select: { status: true },
+  });
+  assert.equal(settled.status, 'settled');
+
+  // settled + COMPLETE final ranking → verified idempotent replay.
+  const replay = await runJob(settlementJob, {
+    seasonId: fixture.seasonId,
+    settlementDate: '2026-08-12',
+  });
+  assert.equal(replay.data.run.status, 'succeeded');
+  assert.equal(
+    await prisma.seasonRanking.count({
+      where: { seasonId: fixture.seasonId, rankType: 'final' },
+    }),
+    2,
+  );
+
+  // settled + PARTIAL final ranking → refused.
+  const rows = await prisma.seasonRanking.findMany({
+    where: { seasonId: fixture.seasonId, rankType: 'final' },
+    orderBy: { rank: 'asc' },
+    select: { id: true },
+  });
+  await prisma.seasonRanking.delete({ where: { id: rows[1].id } });
+  let partialCode = null;
+  try {
+    await runJob(settlementJob, {
+      seasonId: fixture.seasonId,
+      settlementDate: '2026-08-12',
+    });
+  } catch (error) {
+    partialCode = errorCode(error);
+  }
+  assert.equal(partialCode, 'FINAL_RESULTS_INTEGRITY');
+
+  // settled + NO final ranking → refused, and nothing is recomputed.
+  await prisma.seasonRanking.deleteMany({
+    where: { seasonId: fixture.seasonId, rankType: 'final' },
+  });
+  const equityBefore = await prisma.equitySnapshot.count({
+    where: { seasonParticipantId: fixture.participants[0].id },
+  });
+  let emptyCode = null;
+  try {
+    await runJob(settlementJob, {
+      seasonId: fixture.seasonId,
+      settlementDate: '2026-08-12',
+    });
+  } catch (error) {
+    emptyCode = errorCode(error);
+  }
+  assert.equal(emptyCode, 'FINAL_RESULTS_INTEGRITY');
+  assert.equal(
+    await prisma.seasonRanking.count({
+      where: { seasonId: fixture.seasonId, rankType: 'final' },
+    }),
+    0,
+    'a settled season must not get a freshly computed final ranking',
+  );
+  assert.equal(
+    await prisma.equitySnapshot.count({
+      where: { seasonParticipantId: fixture.participants[0].id },
+    }),
+    equityBefore,
+    'no new settlement snapshot may be created for a settled season',
+  );
+
+  console.log('  [8d] settled-without-final-ranking blocked ok');
+}
+
+/** §A-6: final tier assignment checks EVERY season account. */
+async function testFinalTierChecksEveryAccount() {
+  const endAt = new Date(Date.now() - 3_600_000);
+  const fixture = await createSeasonWithParticipants({
+    participantCount: 3,
+    status: 'ended',
+    startAt: new Date(endAt.getTime() - 86_400_000),
+    endAt,
+  });
+  // participant[2] is EXCLUDED: never in the final ranking.
+  await prisma.seasonParticipant.update({
+    where: { id: fixture.participants[2].id },
+    data: { participantStatus: 'excluded', excludedAt: new Date() },
+  });
+
+  const settlementDate = dateOnly('2026-08-13');
+  await createDailySnapshot(fixture.participants[0], settlementDate, '12000000', '20');
+  await createDailySnapshot(fixture.participants[1], settlementDate, '11000000', '10');
+
+  await runJob(settlementJob, {
+    seasonId: fixture.seasonId,
+    settlementDate: '2026-08-13',
+  });
+
+  // Clear the assigned results so the job has work to do, then reopen the
+  // EXCLUDED participant's account — which no final ranking row mentions.
+  await prisma.seasonParticipant.updateMany({
+    where: { seasonId: fixture.seasonId },
+    data: { finalRank: null, finalTier: null },
+  });
+  await prisma.tradingAccount.update({
+    where: { id: fixture.participants[2].accountId },
+    data: { status: 'active', closedAt: null },
+  });
+
+  let excludedCode = null;
+  try {
+    await runJob(finalTierJob, {
+      seasonId: fixture.seasonId,
+      rankingDate: '2026-08-13',
+    });
+  } catch (error) {
+    excludedCode = errorCode(error);
+  }
+  assert.equal(
+    excludedCode,
+    'SEASON_ACCOUNT_CLOSE_INCOMPLETE',
+    'an excluded participant with a live account must block final tier assignment',
+  );
+  const untouched = await prisma.seasonParticipant.findUniqueOrThrow({
+    where: { id: fixture.participants[0].id },
+    select: { finalTier: true },
+  });
+  assert.equal(untouched.finalTier, null, 'no tier may be assigned while blocked');
+  // The job never closes an account itself.
+  const stillOpen = await prisma.tradingAccount.findUniqueOrThrow({
+    where: { id: fixture.participants[2].accountId },
+    select: { status: true, closedAt: true },
+  });
+  assert.equal(stillOpen.status, 'active');
+  assert.equal(stillOpen.closedAt, null);
+
+  // closedAt = null on a "closed" account is refused too.
+  await prisma.tradingAccount.update({
+    where: { id: fixture.participants[2].accountId },
+    data: { status: 'closed', closedAt: null },
+  });
+  let closedAtCode = null;
+  try {
+    await runJob(finalTierJob, {
+      seasonId: fixture.seasonId,
+      rankingDate: '2026-08-13',
+    });
+  } catch (error) {
+    closedAtCode = errorCode(error);
+  }
+  assert.equal(closedAtCode, 'SEASON_ACCOUNT_CLOSE_INCOMPLETE');
+
+  // Everything properly closed → the job runs.
+  await prisma.tradingAccount.update({
+    where: { id: fixture.participants[2].accountId },
+    data: { status: 'closed', closedAt: endAt },
+  });
+  const ok = await runJob(finalTierJob, {
+    seasonId: fixture.seasonId,
+    rankingDate: '2026-08-13',
+  });
+  assert.equal(ok.data.run.status, 'succeeded');
+  assert.equal(ok.data.run.resultPayloadJson.participants.assigned, 2);
+
+  console.log('  [8e] final tier checks every season account ok');
+}
+
 async function cleanup() {
   // Order matters: ranking rows and snapshots reference participants and
   // accounts with onDelete: Restrict.
@@ -1118,6 +1642,11 @@ async function main() {
     await testSettlementRollback();
     await testRefreshVsSettlement();
     await testRepairScript();
+    await testSettlementSourceScope();
+    await testExistingFinalRankingReuse();
+    await testRefreshDoesNotDeleteDamagedRankings();
+    await testSettledWithoutFinalRanking();
+    await testFinalTierChecksEveryAccount();
     console.log('season ranking scope ok');
   } finally {
     await cleanup();

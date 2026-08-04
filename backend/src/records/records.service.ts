@@ -30,6 +30,7 @@ import {
   assertSeasonRankingScopeForParticipant,
   SEASON_RANKING_SCOPE_SELECT,
 } from '../ranking/season-ranking-scope';
+import { assertSeasonRankingSetScope } from '../ranking/season-ranking-set-scope';
 import { requireSeasonSnapshotParticipantId } from '../portfolio/season-snapshot-scope';
 import {
   calculateMaxDrawdownPercent,
@@ -1479,6 +1480,18 @@ export class RecordsService {
         participant.seasonRankings[0],
         participant.dailyPortfolioSnapshots[0],
       );
+    // 작업 8 보완 §A-4: this response publishes a tier and a percentile derived
+    // from the whole snapshot, so the whole snapshot is verified — not only the
+    // one row belonging to the user being viewed.
+    if (ranking) {
+      await assertSeasonRankingSetScope(this.prisma, {
+        seasonId: season.id,
+        rankType: ranking.rankType,
+        rankingDate: ranking.rankingDate,
+        capturedAt: ranking.capturedAt,
+      });
+    }
+
     const rankingTotal = ranking
       ? await this.prisma.seasonRanking.count({
           where: {

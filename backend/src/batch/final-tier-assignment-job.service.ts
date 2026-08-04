@@ -163,7 +163,7 @@ export class FinalTierAssignmentJobService {
       );
     }
 
-    this.assertSettledSeasonAccountsClosed(seasonId, rows);
+    await this.assertEverySeasonAccountClosed(seasonId);
     this.assertFinalResultConsistency(rows, policy);
 
     const assignments = rows.map((row) =>
@@ -288,28 +288,78 @@ export class FinalTierAssignmentJobService {
   }
 
   /**
-   * A settled season must not still be holding live accounts. This job runs
-   * only on settled seasons, so finding one means settlement's account closure
-   * was rolled back or bypassed (작업 8 §16).
+   * EVERY season account of a settled season must be closed — not just the ones
+   * that made it into the final ranking (작업 8 보완 §A-6).
+   *
+   * The previous check walked the final ranking rows, which cover only
+   * active/finished/rewarded participants. `excluded` and `registered`
+   * participants are deliberately absent from the final ranking, yet settlement
+   * closes THEIR accounts too (§14.2). Checking only the ranked ones therefore
+   * declared the season's accounts closed while an excluded participant could
+   * still be holding an `active` account: a settled season with a tradable
+   * account in it, and nothing downstream that would notice.
+   *
+   * One relation query keyed on `seasonId` — no per-participant lookup.
+   *
+   * This job never CLOSES anything. Closure is atomic with the rest of
+   * settlement (final ranking, participant results, season status), and a job
+   * that quietly closed the stragglers would produce a season whose accounts
+   * are closed without the transaction that is supposed to have closed them.
+   * The recovery is to re-run the settlement job.
    */
-  private assertSettledSeasonAccountsClosed(
+  private async assertEverySeasonAccountClosed(
     seasonId: string,
-    rows: readonly FinalRankingRow[],
-  ): void {
-    for (const row of rows) {
-      const account = row.seasonParticipant.tradingAccount;
-      if (!account) {
-        continue; // already reported by assertSeasonRankingScopes
-      }
-      if (
-        account.status !== TradingAccountStatus.closed ||
-        account.closedAt === null
-      ) {
+  ): Promise<void> {
+    const participants = await this.prisma.seasonParticipant.findMany({
+      where: { seasonId },
+      orderBy: [{ userId: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        userId: true,
+        participantStatus: true,
+        tradingAccountId: true,
+        tradingAccount: {
+          select: {
+            id: true,
+            mode: true,
+            status: true,
+            userId: true,
+            closedAt: true,
+            seasonParticipant: { select: { id: true } },
+          },
+        },
+      },
+    });
+
+    for (const participant of participants) {
+      const fail = (detail: string): never =>
         this.throwJobError(
           HttpStatus.CONFLICT,
           'SEASON_ACCOUNT_CLOSE_INCOMPLETE',
-          `Season ${seasonId} is settled but trading account ${account.id} is status="${account.status}" with closedAt=${account.closedAt?.toISOString() ?? 'null'}; re-run the season settlement job.`,
+          `Season ${seasonId} is settled but participant ${participant.id} (${participant.participantStatus}) ${detail}; re-run the season settlement job — final tier assignment never closes accounts itself.`,
         );
+
+      const account = participant.tradingAccount;
+      if (!participant.tradingAccountId || !account) {
+        fail('has no trading account link');
+        continue;
+      }
+      if (account.mode !== TradingAccountMode.season) {
+        fail(`is linked to a "${account.mode}" account (${account.id})`);
+      }
+      if (account.userId !== participant.userId) {
+        fail(`is linked to account ${account.id}, owned by a different user`);
+      }
+      if (account.seasonParticipant?.id !== participant.id) {
+        fail(
+          `is linked to account ${account.id}, which points back at participant ${account.seasonParticipant?.id ?? 'none'}`,
+        );
+      }
+      if (account.status !== TradingAccountStatus.closed) {
+        fail(`still holds account ${account.id} at status="${account.status}"`);
+      }
+      if (account.closedAt === null) {
+        fail(`holds account ${account.id} with closedAt=null`);
       }
     }
   }

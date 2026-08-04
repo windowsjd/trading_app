@@ -489,10 +489,19 @@ describe('FinalTierAssignmentJobService', () => {
   it('refuses to assign tiers while a settled season still holds an open account', async () => {
     const { service, prisma } = createService();
     mockSeason(prisma, SeasonStatus.settled);
-    const row = finalRanking('sp-1', 'user-1', 1);
-    row.seasonParticipant.tradingAccount.status = 'active';
-    row.seasonParticipant.tradingAccount.closedAt = null;
-    mockFinalRankings(prisma, [row, finalRanking('sp-2', 'user-2', 2)]);
+    mockFinalRankings(prisma, [
+      finalRanking('sp-1', 'user-1', 1),
+      finalRanking('sp-2', 'user-2', 2),
+    ]);
+    // 작업 8 보완 §A-6: account state comes from the season-wide participant
+    // read, not from the final ranking rows.
+    mockSeasonAccountParticipants([
+      seasonAccountParticipant('sp-1', 'user-1', {
+        status: 'active',
+        closedAt: null,
+      }),
+      seasonAccountParticipant('sp-2', 'user-2'),
+    ]);
 
     await expect(
       service.run({ seasonId: 'season-1', rankingDate }),
@@ -661,6 +670,167 @@ describe('FinalTierAssignmentJobService', () => {
 
     expect(result.topAssignments).toHaveLength(10);
   });
+
+  // ----------------------------------------------------------- 작업 8 보완
+  // §A-6: EVERY season account is checked, including participants that never
+  // appear in a final ranking. Checking only ranked participants let an
+  // excluded or registered participant keep a live account in a settled season.
+
+  describe('§A-6 every season account closed', () => {
+    const rankedSeason = (prisma: PrismaMock) => {
+      mockSeason(prisma, SeasonStatus.settled);
+      mockFinalRankings(prisma, [
+        finalRanking('sp-1', 'user-1', 1),
+        finalRanking('sp-2', 'user-2', 2),
+      ]);
+    };
+
+    const expectBlocked = (service: FinalTierAssignmentJobService) =>
+      expect(
+        service.run({ seasonId: 'season-1', rankingDate }),
+      ).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        response: { error: { code: 'SEASON_ACCOUNT_CLOSE_INCOMPLETE' } },
+      });
+
+    it('blocks when an EXCLUDED participant, absent from the final ranking, still holds an active account', async () => {
+      const { service, prisma } = createService();
+      rankedSeason(prisma);
+      mockSeasonAccountParticipants([
+        seasonAccountParticipant('sp-1', 'user-1'),
+        seasonAccountParticipant('sp-2', 'user-2'),
+        seasonAccountParticipant('sp-x', 'user-x', {
+          participantStatus: 'excluded',
+          status: 'active',
+          closedAt: null,
+        }),
+      ]);
+
+      await expectBlocked(service);
+      expect(prisma.__tx.seasonParticipant.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('blocks when a REGISTERED participant account is suspended', async () => {
+      const { service, prisma } = createService();
+      rankedSeason(prisma);
+      mockSeasonAccountParticipants([
+        seasonAccountParticipant('sp-1', 'user-1'),
+        seasonAccountParticipant('sp-2', 'user-2'),
+        seasonAccountParticipant('sp-r', 'user-r', {
+          participantStatus: 'registered',
+          status: 'suspended',
+        }),
+      ]);
+
+      await expectBlocked(service);
+      expect(prisma.__tx.seasonParticipant.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('blocks when an account reads as closed but carries closedAt = null', async () => {
+      const { service, prisma } = createService();
+      rankedSeason(prisma);
+      mockSeasonAccountParticipants([
+        seasonAccountParticipant('sp-1', 'user-1', { closedAt: null }),
+        seasonAccountParticipant('sp-2', 'user-2'),
+      ]);
+
+      await expectBlocked(service);
+    });
+
+    it('blocks when a participant and its account disagree about the owner', async () => {
+      const { service, prisma } = createService();
+      rankedSeason(prisma);
+      mockSeasonAccountParticipants([
+        seasonAccountParticipant('sp-1', 'user-1', {
+          accountUserId: 'someone-else',
+        }),
+        seasonAccountParticipant('sp-2', 'user-2'),
+      ]);
+
+      await expectBlocked(service);
+    });
+
+    it('blocks when a GENERAL account is linked to a season participant', async () => {
+      const { service, prisma } = createService();
+      rankedSeason(prisma);
+      mockSeasonAccountParticipants([
+        seasonAccountParticipant('sp-1', 'user-1', { mode: 'general' }),
+        seasonAccountParticipant('sp-2', 'user-2'),
+      ]);
+
+      await expectBlocked(service);
+    });
+
+    it('blocks when the account back-link points at another participant', async () => {
+      const { service, prisma } = createService();
+      rankedSeason(prisma);
+      mockSeasonAccountParticipants([
+        seasonAccountParticipant('sp-1', 'user-1', {
+          backLinkParticipantId: 'sp-9',
+        }),
+        seasonAccountParticipant('sp-2', 'user-2'),
+      ]);
+
+      await expectBlocked(service);
+    });
+
+    it('refuses instead of closing the account itself', async () => {
+      const { service, prisma } = createService();
+      rankedSeason(prisma);
+      mockSeasonAccountParticipants([
+        seasonAccountParticipant('sp-1', 'user-1', {
+          status: 'active',
+          closedAt: null,
+        }),
+        seasonAccountParticipant('sp-2', 'user-2'),
+      ]);
+
+      await expectBlocked(service);
+      // This job has no tradingAccount writer at all: closure stays atomic
+      // with settlement, and the recovery is to re-run that job.
+      expect(
+        (prisma as unknown as Record<string, unknown>).tradingAccount,
+      ).toBeUndefined();
+    });
+
+    it('proceeds when every participant of the season, ranked or not, is closed', async () => {
+      const { service, prisma } = createService();
+      rankedSeason(prisma);
+      mockSeasonAccountParticipants([
+        seasonAccountParticipant('sp-1', 'user-1'),
+        seasonAccountParticipant('sp-2', 'user-2'),
+        seasonAccountParticipant('sp-x', 'user-x', {
+          participantStatus: 'excluded',
+        }),
+        seasonAccountParticipant('sp-r', 'user-r', {
+          participantStatus: 'registered',
+        }),
+      ]);
+
+      const result = await runAndGetResult(service, {
+        seasonId: 'season-1',
+        rankingDate,
+      });
+
+      expect(result.participants.assigned).toBe(2);
+    });
+
+    it('checks every participant with ONE seasonId query, not one per participant', async () => {
+      const { service, prisma } = createService();
+      rankedSeason(prisma);
+      mockSeasonAccountParticipants([
+        seasonAccountParticipant('sp-1', 'user-1'),
+        seasonAccountParticipant('sp-2', 'user-2'),
+      ]);
+
+      await runAndGetResult(service, { seasonId: 'season-1', rankingDate });
+
+      expect(prisma.seasonParticipant.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.seasonParticipant.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { seasonId: 'season-1' } }),
+      );
+    });
+  });
 });
 
 function createService() {
@@ -694,6 +864,9 @@ function createPrismaMock() {
       updateMany: jest.fn(),
     },
     seasonParticipant: {
+      // 작업 8 보완 §A-6: EVERY participant of the settled season, whatever its
+      // status, is checked for a closed season account.
+      findMany: jest.fn(() => Promise.resolve(finalTierSeasonParticipants())),
       updateMany: jest.fn(),
       update: jest.fn(),
       create: jest.fn(),
@@ -840,11 +1013,88 @@ function mockSeason(
   });
 }
 
+/**
+ * EVERY participant of the settled season, whatever its status (작업 8 보완 §A-6).
+ *
+ * Deliberately a SEPARATE fixture from the final ranking rows: the whole point
+ * of §A-6 is that `excluded` and `registered` participants never appear in a
+ * final ranking, yet their season accounts must still be closed.
+ */
+type SeasonAccountParticipantFixture = {
+  id: string;
+  userId: string;
+  participantStatus: string;
+  tradingAccountId: string | null;
+  tradingAccount: {
+    id: string;
+    mode: string;
+    status: string;
+    userId: string;
+    closedAt: Date | null;
+    seasonParticipant: { id: string } | null;
+  } | null;
+};
+
+let seasonAccountParticipants: SeasonAccountParticipantFixture[] = [];
+
+function finalTierSeasonParticipants() {
+  return seasonAccountParticipants;
+}
+
+function seasonAccountParticipant(
+  id: string,
+  userId: string,
+  options: {
+    participantStatus?: string;
+    mode?: string;
+    status?: string;
+    closedAt?: Date | null;
+    accountUserId?: string;
+    backLinkParticipantId?: string;
+  } = {},
+): SeasonAccountParticipantFixture {
+  const accountId = `account-of-${id}`;
+
+  return {
+    id,
+    userId,
+    participantStatus: options.participantStatus ?? 'finished',
+    tradingAccountId: accountId,
+    tradingAccount: {
+      id: accountId,
+      mode: options.mode ?? 'season',
+      status: options.status ?? 'closed',
+      userId: options.accountUserId ?? userId,
+      closedAt:
+        options.closedAt === undefined
+          ? new Date('2026-05-21T00:00:00.000Z')
+          : options.closedAt,
+      seasonParticipant: { id: options.backLinkParticipantId ?? id },
+    },
+  };
+}
+
+function mockSeasonAccountParticipants(
+  participants: SeasonAccountParticipantFixture[],
+) {
+  seasonAccountParticipants = participants;
+}
+
 function mockFinalRankings(
   prisma: PrismaMock,
   rankings: ReturnType<typeof finalRanking>[],
 ) {
   prisma.seasonRanking.findMany.mockResolvedValue(rankings);
+  // Default: every ranked participant's account is properly closed, so §A-6
+  // passes unless a test deliberately breaks one.
+  mockSeasonAccountParticipants(
+    rankings.map((ranking) =>
+      seasonAccountParticipant(
+        ranking.seasonParticipantId,
+        ranking.seasonParticipant.userId,
+      ),
+    ),
+  );
 }
 
 function finalRanking(

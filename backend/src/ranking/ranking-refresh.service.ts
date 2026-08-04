@@ -18,7 +18,11 @@ import {
   buildRankingParticipantScopes,
   RANKING_PARTICIPANT_SCOPE_SELECT,
 } from './ranking-source-scope';
-import { resolveSeasonRankingAccountScopes } from './season-ranking-scope';
+import {
+  assertSeasonRankingScopes,
+  resolveSeasonRankingAccountScopes,
+  SEASON_RANKING_SCOPE_SELECT,
+} from './season-ranking-scope';
 import { lockSeasonForWrite } from './season-write-lock';
 
 type RankableParticipant = {
@@ -339,6 +343,33 @@ export class RankingRefreshService {
         // would resurrect a leaderboard that has already been closed out.
         return { wrote: false as const };
       }
+
+      // 작업 8 보완 §A-3: VERIFY THE SET THIS REFRESH IS ABOUT TO DESTROY.
+      //
+      // The refresh policy is delete-then-recreate, and the recreate always
+      // produces correctly scoped rows. That combination silently LAUNDERS
+      // damage: a row left with a null scope by an old writer, or one pointing
+      // at the wrong account, disappears on the next five-minute tick and comes
+      // back looking healthy. The repair script then reports nothing to fix,
+      // and the deploy-boundary damage it exists to count is gone — along with
+      // any chance of learning which accounts were affected.
+      //
+      // So the existing set is read and verified BEFORE anything is deleted and
+      // before any participant's `currentRank` is touched. A damaged set stops
+      // the refresh with the same structured code the readers use; an operator
+      // repairs it, and only then does routine refreshing resume.
+      const existingRankings = await tx.seasonRanking.findMany({
+        where: {
+          seasonId: input.seasonId,
+          rankType: CURRENT_RANK_TYPE,
+          rankingDate: input.rankingDate,
+        },
+        select: {
+          ...SEASON_RANKING_SCOPE_SELECT,
+          id: true,
+        },
+      });
+      assertSeasonRankingScopes(existingRankings);
 
       if (input.createEquitySnapshots) {
         const bucketStart = floorToFiveMinuteBucket(input.capturedAt);

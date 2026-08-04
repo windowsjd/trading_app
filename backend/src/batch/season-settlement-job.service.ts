@@ -32,6 +32,12 @@ import {
   calculateReachedReturnAt,
 } from '../ranking/ranking-refresh.service';
 import {
+  assertRankingSourceSnapshotScopes,
+  buildRankingParticipantScopes,
+  RANKING_PARTICIPANT_SCOPE_SELECT,
+  rankingSourceScopeErrorCodes,
+} from '../ranking/ranking-source-scope';
+import {
   assertSeasonRankingScopes,
   resolveSeasonRankingAccountScopes,
   SEASON_RANKING_SCOPE_SELECT,
@@ -66,8 +72,16 @@ const FINAL_TIER_CUTOFF_RULES = [
 
 type SettlementParticipant = {
   id: string;
+  seasonId: string;
   userId: string;
   totalFillCount: number;
+  /** Verified into a non-null scope by `buildRankingParticipantScopes`. */
+  tradingAccountId: string | null;
+  tradingAccount: {
+    id: string;
+    mode: TradingAccountMode;
+    userId: string;
+  } | null;
 };
 
 type SettlementSeason = {
@@ -125,6 +139,21 @@ type ExistingFinalRankingRow = {
       userId: string;
     } | null;
   };
+};
+
+/**
+ * The confirmed result one participant must end the settlement with, taken
+ * from the final ranking row that produced it (작업 8 보완 §A-2). Both paths
+ * supply it: freshly computed rows carry formatted strings, reused rows carry
+ * `Prisma.Decimal`s, and the comparison is decimal-valued either way.
+ */
+type SettlementFinalResultExpectation = {
+  seasonParticipantId: string;
+  rank: number;
+  totalAssetKrw: Prisma.Decimal | string;
+  returnRate: Prisma.Decimal | string;
+  maxDrawdown: Prisma.Decimal | string;
+  totalFillCount: number;
 };
 
 /**
@@ -228,6 +257,18 @@ export class SeasonSettlementJobService {
       settlementDate,
     );
 
+    // §A-5: a settled season's results are already fixed. Anything other than
+    // "a complete final ranking is present" is a data-integrity fault, NEVER a
+    // reason to compute a new one.
+    if (season.status === SeasonStatus.settled) {
+      this.assertSettledSeasonFinalResultsPresent({
+        seasonId,
+        settlementDateText,
+        participants,
+        existingFinalRankings,
+      });
+    }
+
     if (existingFinalRankings.length > 0) {
       return this.handleExistingFinalRankings({
         season,
@@ -240,11 +281,26 @@ export class SeasonSettlementJobService {
       });
     }
 
+    // Verified participant → season account map, built ONCE from the list the
+    // job already loaded (작업 8 보완 §A-1). No per-participant account lookup.
+    const participantScopes = buildRankingParticipantScopes(
+      seasonId,
+      participants,
+    );
+
     const finalValuations = await this.calculateFinalValuations({
       participants,
+      participantScopes,
       settlementAt: season.endAt,
       settlementDate,
     }).catch((error) => {
+      // A scope fault is not a transient valuation outage: collapsing it into
+      // 503 FINAL_VALUATION_FAILED would tell the operator to retry a job that
+      // can only ever fail until the repair scripts run.
+      if (this.isRankingSourceScopeError(error)) {
+        throw error;
+      }
+
       this.failWithResult(
         HttpStatus.SERVICE_UNAVAILABLE,
         'FINAL_VALUATION_FAILED',
@@ -367,6 +423,87 @@ export class SeasonSettlementJobService {
   }
 
   /**
+   * §A-5: what a `settled` season is allowed to be missing — nothing.
+   *
+   * `ended` + no final ranking is a first settlement, and `ended` + a final
+   * ranking is a verified reuse. `settled` is different in kind: the result has
+   * already been published, accounts are closed, and tiers may already be
+   * assigned. Re-deriving a final valuation from TODAY's wallets and prices
+   * would silently replace a published leaderboard with a different one, so a
+   * settled season that cannot show its complete final ranking stops here
+   * instead of manufacturing a replacement.
+   *
+   * Deliberately NOT auto-repaired: a settled season missing final rows means
+   * either the settlement transaction was partially rolled back or the rows
+   * were deleted, and neither is something a routine job re-derives.
+   */
+  private assertSettledSeasonFinalResultsPresent(input: {
+    seasonId: string;
+    settlementDateText: string;
+    participants: readonly SettlementParticipant[];
+    existingFinalRankings: readonly ExistingFinalRankingRow[];
+  }): void {
+    const fail = (detail: string): never =>
+      this.throwJobError(
+        HttpStatus.CONFLICT,
+        'FINAL_RESULTS_INTEGRITY',
+        `Season ${input.seasonId} is already settled but ${detail}. A settled season's final result is never recomputed from current wallets or prices; investigate and restore the final ranking instead of re-running settlement.`,
+      );
+
+    if (input.existingFinalRankings.length === 0) {
+      fail(
+        `has no final ranking rows for rankingDate ${input.settlementDateText}`,
+      );
+    }
+
+    const rankedParticipantIds = new Set(
+      input.existingFinalRankings.map((row) => row.seasonParticipantId),
+    );
+    if (rankedParticipantIds.size !== input.existingFinalRankings.length) {
+      fail('has duplicate final ranking rows for the same participant');
+    }
+
+    const missing = input.participants.filter(
+      (participant) => !rankedParticipantIds.has(participant.id),
+    );
+    if (missing.length > 0) {
+      fail(
+        `has ${missing.length} eligible participant(s) with no final ranking row (first: ${missing[0].id})`,
+      );
+    }
+
+    const eligibleIds = new Set(
+      input.participants.map((participant) => participant.id),
+    );
+    const extra = input.existingFinalRankings.filter(
+      (row) => !eligibleIds.has(row.seasonParticipantId),
+    );
+    if (extra.length > 0) {
+      fail(
+        `has ${extra.length} final ranking row(s) whose participant is no longer eligible (first: ${extra[0].seasonParticipantId})`,
+      );
+    }
+  }
+
+  /** True for the structured ranking-INPUT scope faults raised by §A-1. */
+  private isRankingSourceScopeError(error: unknown): boolean {
+    if (!(error instanceof HttpException)) {
+      return false;
+    }
+
+    const body = error.getResponse();
+    const code =
+      typeof body === 'object' && body !== null
+        ? ((body as { error?: { code?: unknown } }).error?.code ?? null)
+        : null;
+
+    return (
+      typeof code === 'string' &&
+      (Object.values(rankingSourceScopeErrorCodes) as string[]).includes(code)
+    );
+  }
+
+  /**
    * Settlement precondition: no submitted limit-buy order and no wallet
    * with a non-zero reservation may remain for the season. Open
    * reservations mean cash is still fenced off and final valuations would
@@ -414,6 +551,13 @@ export class SeasonSettlementJobService {
     }
   }
 
+  /**
+   * Eligible participants AND their account scope in ONE query (작업 8 보완 §A-1).
+   *
+   * Settlement's own valuation inputs — equity history and the daily-snapshot
+   * fallback — are measured against this map, exactly like the daily ranking
+   * job's inputs are. The account id is never looked up per participant.
+   */
   private async findEligibleParticipants(
     seasonId: string,
   ): Promise<SettlementParticipant[]> {
@@ -426,8 +570,7 @@ export class SeasonSettlementJobService {
       },
       orderBy: [{ userId: 'asc' }, { id: 'asc' }],
       select: {
-        id: true,
-        userId: true,
+        ...RANKING_PARTICIPANT_SCOPE_SELECT,
         totalFillCount: true,
       },
     });
@@ -435,6 +578,7 @@ export class SeasonSettlementJobService {
 
   private async calculateFinalValuations(input: {
     participants: readonly SettlementParticipant[];
+    participantScopes: ReadonlyMap<string, string>;
     settlementAt: Date;
     settlementDate: Date;
   }): Promise<FinalValuation[]> {
@@ -451,7 +595,10 @@ export class SeasonSettlementJobService {
           input.settlementAt,
           'season_settlement',
         );
-      const history = await this.findEquityHistory(participant.id);
+      const history = await this.findEquityHistory(
+        participant.id,
+        input.participantScopes,
+      );
       const currentPoint = {
         totalAssetKrw: new Prisma.Decimal(valuation.totalAssetKrw),
         returnRate: new Prisma.Decimal(valuation.returnRate),
@@ -487,8 +634,18 @@ export class SeasonSettlementJobService {
     return finalValuations;
   }
 
+  /**
+   * Daily-snapshot settlement fallback.
+   *
+   * Every row is scope-verified before ANY of it is valued (작업 8 보완 §A-1).
+   * A mis-scoped row is not skipped: dropping one participant's snapshot both
+   * removes them from the final ranking and shifts every rank below them, and
+   * a season row carrying general-mode TWR columns would contribute a return
+   * rate that is not the season's initial-capital return at all.
+   */
   private async calculateFinalValuationsFromDailySnapshots(input: {
     participants: readonly SettlementParticipant[];
+    participantScopes: ReadonlyMap<string, string>;
     settlementAt: Date;
     settlementDate: Date;
   }): Promise<FinalValuation[]> {
@@ -504,7 +661,12 @@ export class SeasonSettlementJobService {
         },
       },
       select: {
+        id: true,
         seasonParticipantId: true,
+        tradingAccountId: true,
+        cumulativeExternalFundingKrw: true,
+        investmentPnlKrw: true,
+        timeWeightedReturnFactor: true,
         totalAssetKrw: true,
         returnRate: true,
         krwCash: true,
@@ -519,6 +681,13 @@ export class SeasonSettlementJobService {
         },
       },
     });
+
+    assertRankingSourceSnapshotScopes({
+      kind: 'daily portfolio snapshot',
+      rows: snapshots,
+      participantScopes: input.participantScopes,
+    });
+
     const fillCountByParticipant = new Map(
       input.participants.map((participant) => [
         participant.id,
@@ -554,21 +723,45 @@ export class SeasonSettlementJobService {
     });
   }
 
+  /**
+   * Max-drawdown / reached-return history for ONE participant, scope-verified
+   * before use (작업 8 보완 §A-1).
+   *
+   * The same reasoning as the daily ranking job applies with more force here,
+   * because these numbers become FINAL: silently excluding a mis-scoped low
+   * point LOWERS this participant's max drawdown, which is tie-break #2, and
+   * can permanently promote them over a competitor.
+   */
   private async findEquityHistory(
     seasonParticipantId: string,
+    participantScopes: ReadonlyMap<string, string>,
   ): Promise<EquityHistoryPoint[]> {
-    return this.prisma.equitySnapshot.findMany({
+    const rows = await this.prisma.equitySnapshot.findMany({
       where: {
         seasonParticipantId,
       },
       orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
       select: {
+        id: true,
+        seasonParticipantId: true,
+        tradingAccountId: true,
+        cumulativeExternalFundingKrw: true,
+        investmentPnlKrw: true,
+        timeWeightedReturnFactor: true,
         totalAssetKrw: true,
         returnRate: true,
         capturedAt: true,
         createdAt: true,
       },
     });
+
+    assertRankingSourceSnapshotScopes({
+      kind: 'equity snapshot',
+      rows,
+      participantScopes,
+    });
+
+    return rows;
   }
 
   private buildFinalRankingRows(
@@ -642,12 +835,33 @@ export class SeasonSettlementJobService {
         input.seasonId,
         input.settlementDate,
       );
+      const eligibleAccountParticipants = accountParticipants.filter(
+        (participant) =>
+          SETTLEMENT_PARTICIPANT_STATUSES.includes(
+            participant.participantStatus,
+          ),
+      );
+
+      // §A-5 again, now under the lock: the pre-lock check read a status that
+      // another settlement run may have advanced to `settled` since.
+      if (season.status === SeasonStatus.settled && existingRows.length === 0) {
+        this.throwJobError(
+          HttpStatus.CONFLICT,
+          'FINAL_RESULTS_INTEGRITY',
+          `Season ${input.seasonId} became settled with no final ranking rows for this settlementDate; a settled season never receives a newly computed final ranking.`,
+        );
+      }
 
       if (existingRows.length > 0) {
         // Idempotent replay. The existing rows are re-verified rather than
         // trusted: assigning participant results from a mis-scoped final
         // ranking would hand one account another's placement (작업 8 §14.5).
         assertSeasonRankingScopes(existingRows);
+        this.assertExistingFinalRankingSetCovers(
+          input.seasonId,
+          existingRows,
+          eligibleAccountParticipants,
+        );
 
         const assigned = await this.assignFinalResultsForExistingRows(
           tx,
@@ -667,6 +881,7 @@ export class SeasonSettlementJobService {
           settlementDate: input.settlementDate,
           expectedParticipants: existingRows.length,
           accountParticipants,
+          finalRankingRows: existingRows,
         });
 
         return {
@@ -830,6 +1045,7 @@ export class SeasonSettlementJobService {
         settlementDate: input.settlementDate,
         expectedParticipants: input.finalRows.length,
         accountParticipants,
+        finalRankingRows: input.finalRows,
       });
 
       return {
@@ -1165,6 +1381,70 @@ export class SeasonSettlementJobService {
     });
   }
 
+  /**
+   * §A-2: the final ranking set must COVER the eligible participants exactly.
+   *
+   * `handleExistingFinalRankings` only compared counts read before the lock, so
+   * a set with one duplicate participant and one missing participant had the
+   * right length and passed. Reusing it would then leave the missing
+   * participant with no final result at all while the season flipped to
+   * settled — the exact half-finished state settlement exists to prevent.
+   */
+  private assertExistingFinalRankingSetCovers(
+    seasonId: string,
+    existingRows: readonly ExistingFinalRankingRow[],
+    eligibleParticipants: readonly SettlementAccountParticipant[],
+  ): void {
+    const fail = (detail: string): never =>
+      this.throwJobError(
+        HttpStatus.CONFLICT,
+        'FINAL_RESULTS_INTEGRITY',
+        `Season ${seasonId} cannot reuse its existing final ranking: ${detail}. Settlement never completes a partially-covered final ranking.`,
+      );
+
+    const rankedIds = new Set(
+      existingRows.map((row) => row.seasonParticipantId),
+    );
+    if (rankedIds.size !== existingRows.length) {
+      fail('the same participant occupies more than one final ranking row');
+    }
+
+    const eligibleIds = new Set(
+      eligibleParticipants.map((participant) => participant.id),
+    );
+    const missing = eligibleParticipants.filter(
+      (participant) => !rankedIds.has(participant.id),
+    );
+    if (missing.length > 0) {
+      fail(
+        `${missing.length} eligible participant(s) have no final ranking row (first: ${missing[0].id})`,
+      );
+    }
+
+    const extra = existingRows.filter(
+      (row) => !eligibleIds.has(row.seasonParticipantId),
+    );
+    if (extra.length > 0) {
+      fail(
+        `${extra.length} final ranking row(s) belong to a participant that is not eligible for settlement (first: ${extra[0].seasonParticipantId})`,
+      );
+    }
+  }
+
+  /**
+   * §A-2: when an existing final ranking is REUSED, that ranking row is the
+   * authority for the participant's confirmed result — not just for its rank.
+   *
+   * Previously only `finalRank`, `finalTier`, and `currentRank` were aligned,
+   * so a participant could be settled carrying a `totalAssetKrw`,
+   * `totalReturnRate`, `maxDrawdown`, or `totalFillCount` left over from the
+   * last live refresh while the leaderboard published different numbers. Users
+   * saw one figure on their own record card and another on the ranking, both
+   * "final", with nothing in the data saying which was right.
+   *
+   * Writing all six from the ranking row is idempotent: a replay of an already
+   * consistent season writes the values it already has.
+   */
   private async assignFinalResultsForExistingRows(
     tx: Prisma.TransactionClient,
     seasonId: string,
@@ -1180,6 +1460,10 @@ export class SeasonSettlementJobService {
           seasonId,
         },
         data: {
+          totalAssetKrw: row.totalAssetKrw,
+          totalReturnRate: row.returnRate,
+          maxDrawdown: row.maxDrawdown,
+          totalFillCount: row.totalFillCount,
           finalRank: row.rank,
           finalTier,
           currentRank: row.rank,
@@ -1191,6 +1475,113 @@ export class SeasonSettlementJobService {
     return assignedParticipantIds;
   }
 
+  /**
+   * §A-2 final gate: the numbers a participant will be settled with must EQUAL
+   * the final ranking row they came from, re-read from the database inside this
+   * transaction rather than assumed from what was just written.
+   *
+   * Both settlement paths land here — the freshly computed one and the reuse
+   * one — so "some fields match and some do not" can never be reported as a
+   * completed settlement. Any disagreement throws, which rolls back the
+   * participant updates, the account closures, and the status transition
+   * together.
+   */
+  private async assertParticipantResultsMatchFinalRanking(
+    tx: Prisma.TransactionClient,
+    input: {
+      seasonId: string;
+      finalRankingRows: readonly SettlementFinalResultExpectation[];
+    },
+  ): Promise<void> {
+    if (input.finalRankingRows.length === 0) {
+      return;
+    }
+
+    const stored = await tx.seasonParticipant.findMany({
+      where: {
+        seasonId: input.seasonId,
+        id: {
+          in: input.finalRankingRows.map((row) => row.seasonParticipantId),
+        },
+      },
+      select: {
+        id: true,
+        totalAssetKrw: true,
+        totalReturnRate: true,
+        maxDrawdown: true,
+        totalFillCount: true,
+        currentRank: true,
+        finalRank: true,
+        finalTier: true,
+      },
+    });
+    const storedById = new Map(stored.map((row) => [row.id, row]));
+
+    const fail = (participantId: string, detail: string): never =>
+      this.throwJobError(
+        HttpStatus.CONFLICT,
+        'FINAL_RESULTS_INTEGRITY',
+        `Season participant ${participantId} would be settled with ${detail}. The whole settlement is rolled back rather than publishing a result the final ranking contradicts.`,
+      );
+
+    for (const row of input.finalRankingRows) {
+      const participant = storedById.get(row.seasonParticipantId);
+      if (!participant) {
+        fail(
+          row.seasonParticipantId,
+          'no participant row for its final ranking',
+        );
+        continue;
+      }
+
+      const expectedTier = this.assignFinalTier(
+        row.rank,
+        input.finalRankingRows.length,
+      );
+      const mismatches: string[] = [];
+
+      if (!decimalEquals(participant.totalAssetKrw, row.totalAssetKrw)) {
+        mismatches.push(
+          `totalAssetKrw=${participant.totalAssetKrw.toString()} vs ranking ${row.totalAssetKrw.toString()}`,
+        );
+      }
+      if (!decimalEquals(participant.totalReturnRate, row.returnRate)) {
+        mismatches.push(
+          `totalReturnRate=${participant.totalReturnRate.toString()} vs ranking ${row.returnRate.toString()}`,
+        );
+      }
+      if (!decimalEquals(participant.maxDrawdown, row.maxDrawdown)) {
+        mismatches.push(
+          `maxDrawdown=${participant.maxDrawdown.toString()} vs ranking ${row.maxDrawdown.toString()}`,
+        );
+      }
+      if (participant.totalFillCount !== row.totalFillCount) {
+        mismatches.push(
+          `totalFillCount=${participant.totalFillCount} vs ranking ${row.totalFillCount}`,
+        );
+      }
+      if (participant.currentRank !== row.rank) {
+        mismatches.push(
+          `currentRank=${participant.currentRank ?? 'null'} vs ranking ${row.rank}`,
+        );
+      }
+      if (participant.finalRank !== row.rank) {
+        mismatches.push(
+          `finalRank=${participant.finalRank ?? 'null'} vs ranking ${row.rank}`,
+        );
+      }
+      if (participant.finalTier !== expectedTier) {
+        mismatches.push(
+          `finalTier=${participant.finalTier ?? 'null'} vs policy "${expectedTier}"`,
+        );
+      }
+
+      if (mismatches.length > 0) {
+        fail(row.seasonParticipantId, mismatches.join(', '));
+      }
+    }
+  }
+
   private async transitionSeasonToSettledIfReady(
     tx: Prisma.TransactionClient,
     input: {
@@ -1198,8 +1589,14 @@ export class SeasonSettlementJobService {
       settlementDate: Date;
       expectedParticipants: number;
       accountParticipants: readonly SettlementAccountParticipant[];
+      finalRankingRows: readonly SettlementFinalResultExpectation[];
     },
   ): Promise<boolean> {
+    await this.assertParticipantResultsMatchFinalRanking(tx, {
+      seasonId: input.seasonId,
+      finalRankingRows: input.finalRankingRows,
+    });
+
     const accountIds = input.accountParticipants
       .map((participant) => participant.tradingAccountId)
       .filter((id): id is string => id !== null);
@@ -1484,6 +1881,22 @@ export class SeasonSettlementJobService {
       status,
     );
   }
+}
+
+/**
+ * Value equality, not representation equality: `"1000"`, `"1000.00000000"` and
+ * `Decimal(1000)` are the same settled amount, and a scale difference between
+ * the participant column and the ranking column must not read as a mismatch.
+ */
+function decimalEquals(
+  left: Prisma.Decimal | string | null,
+  right: Prisma.Decimal | string,
+): boolean {
+  if (left === null) {
+    return false;
+  }
+
+  return new Prisma.Decimal(left).equals(new Prisma.Decimal(right));
 }
 
 function appendCurrentPoint(

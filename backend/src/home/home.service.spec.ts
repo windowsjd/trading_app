@@ -110,6 +110,8 @@ describe('HomeService', () => {
       },
       seasonRanking: {
         findFirst: jest.fn(),
+        // 작업 8 보완 §A-4 whole-set scope preflight.
+        findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),

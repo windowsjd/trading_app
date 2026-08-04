@@ -1,6 +1,8 @@
 import React, { PropsWithChildren, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+import { TradingAccountProvider } from '../features/tradingAccount/TradingAccountContext';
+
 export default function AppProviders({ children }: PropsWithChildren) {
   const [queryClient] = useState(
     () =>
@@ -21,7 +23,9 @@ export default function AppProviders({ children }: PropsWithChildren) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {children}
+      {/* The selected trading account is app-wide state: it decides which
+          account EVERY financial screen is about (작업 9 §B-1). */}
+      <TradingAccountProvider>{children}</TradingAccountProvider>
     </QueryClientProvider>
   );
 }

@@ -19,6 +19,7 @@ import { TEST_IDS } from '../../constants/testIds';
 import { getMe, updateMe } from '../../features/me/api';
 import { logout as logoutSession } from '../../features/auth/api';
 import { clearTokens, getRefreshToken } from '../../services/storage/tokenStorage';
+import { clearTradingAccountSession } from '../../features/tradingAccount/TradingAccountContext';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -75,6 +76,10 @@ export default function SettingsScreen({ navigation }: Props) {
       // Local logout should still complete if the server cannot be reached.
     } finally {
       await clearTokens();
+      // The selected account and every account-scoped financial entry are
+      // dropped with the session (작업 9 §B-2): the next user on this device
+      // must never see the previous user's accountId or their cached balances.
+      await clearTradingAccountSession(queryClient, meQuery.data?.id ?? null);
     }
 
     rootNavigation.reset({

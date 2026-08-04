@@ -263,6 +263,8 @@ describe('RecordsService', () => {
     seasonRanking: {
       count: jest.fn(),
       findFirst: jest.fn(),
+      // 작업 8 보완 §A-4 whole-set scope preflight.
+      findMany: jest.fn().mockResolvedValue([]),
     },
     fxExecuteRequest: {
       create: jest.fn(),

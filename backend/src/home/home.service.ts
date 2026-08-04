@@ -20,6 +20,7 @@ import {
   assertSeasonRankingScope,
   SEASON_RANKING_SCOPE_SELECT,
 } from '../ranking/season-ranking-scope';
+import { assertSeasonRankingSetScope } from '../ranking/season-ranking-set-scope';
 import {
   buildAdminManualFallbackDecision,
   isPositiveDecimal,
@@ -458,6 +459,15 @@ export class HomeService {
         reward,
       };
     }
+
+    // 작업 8 보완 §A-4: `totalParticipants` is a WHOLE-SET number — it is the
+    // denominator this user's standing is expressed against — so the whole set
+    // is verified, not just this user's own row.
+    await assertSeasonRankingSetScope(this.prisma, {
+      seasonId,
+      rankType: SeasonRankingType.final,
+      rankingDate: ranking.rankingDate,
+    });
 
     const totalParticipants = await this.prisma.seasonRanking.count({
       where: {
@@ -1000,6 +1010,14 @@ export class HomeService {
     }
 
     assertSeasonRankingScope(ranking);
+
+    // Whole-set preflight for the same reason as the final-result section: the
+    // rank shown here is meaningless without the set it is a rank within.
+    await assertSeasonRankingSetScope(this.prisma, {
+      seasonId,
+      rankType: ranking.rankType,
+      rankingDate: ranking.rankingDate,
+    });
 
     const rankedParticipants = await this.prisma.seasonRanking.count({
       where: {

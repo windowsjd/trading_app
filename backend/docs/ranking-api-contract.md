@@ -255,6 +255,49 @@ totalFillCount asc → target-return reach time → userId → seasonParticipant
 with sequential ranks (1, 2, 3, 4) and no competition ties. Season returnRate is
 still the initial-capital ratio, never TWR. Tier ratios are unchanged.
 
+### Whole-set preflight (작업 8 보완 §A-4)
+
+Verifying "the rows this response loaded" is the wrong granularity for a
+PAGINATED leaderboard. Before 작업 8 보완, a 100-row season with a null scope on
+rank 87 returned a clean 200 for page 1, and `scope=top10` verified ten rows
+while reporting a `percentile` computed from a `total` counted over the damaged
+set.
+
+`assertSeasonRankingSetScope()` (`src/ranking/season-ranking-set-scope.ts`) now
+runs BEFORE the page query, over the whole ranking set identified by
+`(seasonId, rankType, rankingDate, capturedAt)`:
+
+- it loads only the SCOPE columns, never the public payload — one narrow indexed
+  read bounded by the season's participant count;
+- it does NOT apply the public participant filter. A hidden or excluded
+  participant's damaged row is still damage, and the ranks around it are still
+  the ranks this response publishes;
+- one damaged row anywhere in the set fails the WHOLE set, including page 1 and
+  `scope=top10`;
+- `pagination.total` is not recounted over the healthy remainder and ranks are
+  not reassigned;
+- a set with no rows at all still verifies successfully and keeps the existing
+  `unavailable` contract.
+
+The same preflight guards every reader that publishes a whole-set-derived number
+(`totalParticipants`, percentile, tier): `GET /api/v1/ranking`, the HomeService
+ranking and final-result sections, and the RecordsService public season summary.
+Operator paths that read ONE participant's row keep their per-row verification
+and do not load the leaderboard.
+
+### Ranking writers (작업 8 보완 §A-3)
+
+`RankingRefreshService` replaces the current-ranking set with
+delete-then-recreate. Because the recreate always produces correctly scoped
+rows, that combination used to LAUNDER damage: a null or mismatched row vanished
+on the next five-minute tick and came back looking healthy, leaving the repair
+script with nothing to report.
+
+The refresh now reads and verifies the existing set under the season row lock,
+BEFORE any delete and before any `participant.currentRank` update. A damaged set
+aborts the refresh with the codes above, and the damaged rows survive for the
+operator to repair. Only a clean set is replaced.
+
 ## Not Implemented
 
 - Ranking calculation in the API request path.

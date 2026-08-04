@@ -142,5 +142,20 @@ export const TEST_IDS = {
     saveNickname: 'settings-save-nickname',
     logout: 'settings-logout',
   },
-  
+
+  tradingAccount: {
+    switcherTrigger: 'trading-account-switcher-trigger',
+    switcherSheet: 'trading-account-switcher-sheet',
+    switcherStatus: 'trading-account-switcher-status',
+    switcherLoading: 'trading-account-switcher-loading',
+    switcherError: 'trading-account-switcher-error',
+    switcherRetry: 'trading-account-switcher-retry',
+    switcherEmpty: 'trading-account-switcher-empty',
+    switcherOption: (accountId: string) =>
+      `trading-account-switcher-option-${accountId}`,
+    integrityError: 'trading-account-integrity-error',
+    capabilityNotice: 'trading-account-capability-notice',
+    generalSummary: 'trading-account-general-summary',
+    seasonSummary: 'trading-account-season-summary',
+  },
 } as const;

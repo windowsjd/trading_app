@@ -12,6 +12,210 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: SeasonRanking·정산 무결성 잔여 결함 보완 + 프런트엔드 TradingAccount 계정 전환 (2026-08-04, 작업 8 보완 + 작업 9, WORK-ID SEASON-RANKING-HARDENING-AND-FRONTEND-ACCOUNT-SWITCH-V1)
+
+**기준 커밋** `813e3043c0f363450ae8396ab29b174d0ca52dce`
+(작업 시작 시 `origin/main` HEAD와 동일함을 `git fetch`로 확인. 이후 변경사항 없음.)
+
+**목적**
+
+두 범위를 함께 수행한다. ① 작업 8이 랭킹 writer/reader를 fail-closed로 만들면서
+남긴 6곳의 결함 — 정산 **입력** snapshot, 기존 final ranking **재사용** 시의 결과
+정합성, routine refresh의 **삭제** 경로, pagination **밖**의 손상, settled 시즌의
+final ranking **부재**, final ranking에 **없는** participant의 계정 종료 — 을 모두
+닫는다. ② 작업 9: 기존 account-scoped API 위에 프런트엔드 계정 전환을 구현하고,
+시즌 계정과 일반 계정의 데이터·캐시·화면 상태가 섞이지 않게 한다.
+
+**작업 8 보완 (A)**
+
+- **A-1 정산 입력 scope.** `SeasonSettlementJobService`의 두 경로가 모두 검증된
+  participant→account map(`buildRankingParticipantScopes`, eligible participant
+  조회에서 **한 번** 생성, N+1 없음)을 기준으로 입력을 검사한다.
+  `findEquityHistory()`와 `calculateFinalValuationsFromDailySnapshots()`가
+  `tradingAccountId`·`cumulativeExternalFundingKrw`·`investmentPnlKrw`·
+  `timeWeightedReturnFactor`를 select하고 `assertRankingSourceSnapshotScopes`로
+  검증한다. null → `SEASON_RANKING_SOURCE_SCOPE_REPAIR_REQUIRED`, 다른 account
+  또는 일반계정 성과 컬럼 → `SEASON_RANKING_SOURCE_SCOPE_MISMATCH`. 손상된 행만
+  빼고 나머지로 계산하지 않는다 — 하나라도 손상되면 ranking row 0개, participant
+  결과 없음, 시즌 `ended` 유지다. 제외는 중립적이지 않다: equity 저점이 빠지면
+  MDD(tie-break #2)가 낮아지고 snapshot이 빠지면 그 아래 순위가 전부 올라간다.
+  이 코드는 기존 503 `FINAL_VALUATION_FAILED` 재시도 경로로 **뭉개지지 않는다**
+  (재시도로 고칠 수 없는 상태를 "잠시 후 다시"로 안내하면 안 되기 때문).
+- **A-2 기존 final ranking 재사용 정합성.** 재사용 시 그 ranking row가 확정
+  결과의 기준이다. 이전에는 `finalRank`·`finalTier`·`currentRank`만 맞춰서,
+  participant가 마지막 live refresh의 `totalAssetKrw`·`totalReturnRate`·
+  `maxDrawdown`·`totalFillCount`를 들고 settled 되었다 — 리더보드와 내 기록
+  카드가 서로 다른 "확정" 숫자를 보여주는 상태였다. 이제 6개 값을 모두 ranking
+  row에서 쓰고, `assertExistingFinalRankingSetCovers()`가 집합 정합성(중복·누락·
+  비-eligible)을 먼저 보고, settled 전환 직전에
+  `assertParticipantResultsMatchFinalRanking()`이 **DB에서 다시 읽어** 7개 값을
+  대조한다(Decimal 값 비교). 불일치는 `FINAL_RESULTS_INTEGRITY`(409)이고
+  participant 갱신·account 종료·season 전환이 전부 rollback된다.
+- **A-3 손상 ranking 삭제 방지.** `replaceCurrentRankings()`가 season row lock
+  이후, delete 이전에 기존 set을 scope 컬럼으로 읽고 검증한다. delete-then-recreate
+  정책이 손상을 **세탁**했다: null·mismatch 행이 5분 tick마다 사라지고 정상처럼
+  다시 생겨서 repair 스크립트가 고칠 것이 없다고 보고했다. 손상 시
+  `deleteMany`·`create`·`participant.update`(currentRank) 중 어느 것도 실행되지
+  않는다.
+- **A-4 전체 set preflight.** 신규 `src/ranking/season-ranking-set-scope.ts`.
+  `(seasonId, rankType, rankingDate, capturedAt)`로 식별되는 set 전체를 페이지
+  조회 **전에** 검증한다(scope 컬럼만, 공개 payload 미적재). 이전에는 100행 중
+  87위가 null이어도 1페이지가 200이었고 `scope=top10`은 10행만 보고 손상된 set
+  기준 `total`로 percentile을 냈다. 공개 WHERE(숨김·excluded)를 적용하지 않는다 —
+  숨겨진 행의 손상도 손상이고 그 주변 순위는 이 응답이 게시하는 순위다. 적용:
+  `RankingService`, `HomeService`(ranking·finalResult), `RecordsService`
+  (public season summary) — 즉 전체 set에서 파생된 값을 내는 모든 경로. 단일
+  participant만 읽는 운영자 경로는 row 검증 유지, leaderboard 미적재.
+- **A-5 settled + final ranking 부재 차단.** lock 전후 두 번, 상태를 명시적으로
+  구분한다. `settled` + 없음/일부 → `FINAL_RESULTS_INTEGRITY`(409). settled에서
+  현재 wallet·가격으로 재계산하지 않고, 새 settlement snapshot·final ranking을
+  만들지 않는다. 이미 게시된 리더보드를 다른 것으로 조용히 갈아끼우지 않기 위함이다.
+- **A-6 전체 시즌계정 종료 검증.** `FinalTierAssignmentJob`이 `seasonId` 기준
+  관계 조회 1회로 **모든** participant(excluded·registered 포함)의 계정을 검사한다
+  (존재·`mode=season`·userId 일치·역방향 link·`status=closed`·`closedAt != null`).
+  이전에는 final ranking 행만 순회해서, excluded participant가 active 계정을 그대로
+  들고 있는 settled 시즌을 통과시켰다. 이 job은 계정을 **닫지 않는다** — 종료는
+  정산과 원자적이어야 하고, 안내는 정산 재실행이다.
+- **A-7 재점검.** writer 5종 전원 dual-write·link 없으면 write 없음·기존
+  null/mismatch 자동 수정 없음. reader 7종 전원 scope select+검증·빈 결과로
+  숨기지 않음·`tradingAccountId` 미노출. `repair-ranking-scope`만 scope를 채운다.
+
+**작업 9 (B)**
+
+프레임워크·라우팅·서버 상태 라이브러리는 기존 그대로다(Expo + React Native,
+React Navigation, `@tanstack/react-query`, axios, AsyncStorage). **신규 전역 상태
+라이브러리나 query 라이브러리를 추가하지 않았고, 기존 API 주소와 응답 계약을
+변경하지 않았으며, 존재하지 않는 endpoint를 만들지 않았다.**
+
+- **단일 source of truth.** `TradingAccountProvider`. 소유 계정 목록은 server
+  state로 react-query에, 선택된 id만 `useState` + AsyncStorage.
+- **선택 정책**(순수 함수): 저장값(소유 중) → 참가 중 active season → active
+  general → 가장 최근 개설 → 명시적 empty state. 소유 목록에 없는 저장값은
+  버린다(공유 기기에서 이전 사용자 id로 404를 반복하지 않기 위해).
+- **사용자별 격리.** 키는 `selectedTradingAccountId:<userId>`. 로그아웃 시
+  선택값과 `['tradingAccount']`·`['me']` 캐시를 **remove**한다(invalidate가
+  아니다: invalidate된 항목은 refetch 중에도 읽히므로 다음 사용자의 첫 프레임에
+  이전 사용자 잔고가 뜰 수 있다). userId가 바뀌면 메모리 선택값을 먼저 버린다.
+- **query key.** `QUERY_KEYS.tradingAccount.*`가 **accountId를 key에 직접**
+  담는다. mode만 담으면 시즌이 다른 두 season 계정이 한 캐시 항목을 공유한다.
+  accountId가 resource 바로 뒤에 오므로 A의 prefix가 A의 모든 항목을 덮으면서
+  B의 항목과는 절대 prefix-match하지 않는다 — A의 mutation이 B의 정상 캐시를
+  건드릴 수 없다. `normalizeFilterKey()`가 `undefined`/`null`/`''`/누락을 한
+  토큰으로 정규화하고 key를 정렬한다.
+- **전환 안전성.** `selectAccount()`가 이전 account의 in-flight query를 취소하고,
+  key 자체가 바뀌므로 늦게 도착한 응답은 이전 key의 캐시로 들어간다 — 새 화면을
+  덮어쓸 경로가 구조적으로 없다. 전체 캐시를 비우지 않는다.
+- **mode 분리.** 라벨은 응답의 `returnRateMethod`에서 읽는다(선택 계정 mode에서
+  추론하지 않는다). general은 `time_weighted` + `initialFundingKrw`·
+  `cumulativeExternalFundingKrw`·`cumulativeAdRewardKrw`·`investmentPnlKrw`와
+  "외부 자금 유입은 투자 수익이 아니다" 명시, 시즌 랭킹·등급·보상 UI 미표시.
+  season은 `initial_capital`과 기존 시즌 UI 유지. 성과 unavailable을 **0%로
+  위장하지 않는다**.
+- **capability.** mode·status 두 사실에서 파생된 작은 레코드. status를 mode보다
+  **먼저** 본다 — 종료된 general 계정은 "준비 중"이 아니라 "종료"다. 서버 게이트를
+  완화하는 경로는 없다. 취소는 예약 해제이므로 suspended/closed에서도 허용(백엔드
+  계약과 동일). 일반계정 매매·환전은 준비 중으로 표시하고 요청 자체를 보내지 않는다.
+- **오류.** 구조적 무결성 코드 16종은 빈 데이터가 아니라 전용 오류 상태로 간다.
+  `GENERAL_ACCOUNT_*_NOT_IMPLEMENTED`는 무결성 집합에 넣지 않는다(준비 중 안내이지
+  손상이 아니다). 선택 계정 404는 존재를 노출하지 않고 목록 재조회 + fallback.
+  일시적 가격·환율 unavailable은 기존 `sectionErrors` 계약 유지.
+- **레이아웃.** 계정명·상태·모드를 한 줄 말줄임표가 아니라 **줄바꿈**으로 처리하고,
+  상태 배지는 `flexShrink: 0`으로 절대 사라지지 않는다. 잘린 시즌명은 옆 계정과
+  구분할 수 없고, 사라진 "종료" 배지는 종료 계정을 운영 중으로 오인하게 만든다.
+
+**변경 파일**
+
+백엔드 (신규 1 · 수정 6 + 스펙 5):
+`src/ranking/season-ranking-set-scope.ts`(신규),
+`src/batch/season-settlement-job.service.ts`,
+`src/batch/final-tier-assignment-job.service.ts`,
+`src/ranking/ranking-refresh.service.ts`, `src/ranking/ranking.service.ts`,
+`src/home/home.service.ts`, `src/records/records.service.ts`,
++ 각 `.spec.ts`와 `src/ranking/season-ranking-scope.integration.spec.ts`.
+
+프런트엔드 (신규 10 · 수정 7):
+`src/features/tradingAccount/{api,accountSelection,capabilities,accountDisplay,
+selectionStorage,integrityErrors,TradingAccountContext}.ts(x)`,
+`src/components/tradingAccount/AccountSwitcher.tsx`,
+`src/features/tradingAccount/*.test.ts`, `src/constants/queryKeys.test.ts`,
+`docs/trading-account-switching.md`(신규);
+`src/constants/{queryKeys,testIds}.ts`, `src/app/AppProviders.tsx`,
+`src/screens/home/PortfolioScreen.tsx`, `src/screens/my/{MyScreen,SettingsScreen}.tsx`,
+`src/models/enums/errorCode.ts`, `src/services/api/errorMapper.ts`.
+
+문서: `HANDOVER.md`, `backend/docs/trading-modes-and-accounts.md`(§8-B),
+`backend/docs/ranking-api-contract.md`, `backend/docs/batch-job-foundation.md`,
+`frontend/docs/trading-account-switching.md`.
+
+**데이터 및 API 계약**
+
+- **migration 없음.** 새 DB 컬럼이 필요하지 않았다. `prisma migrate status`는
+  50개 적용 완료 + drift 없음. 기존 rank·금액·수익률·MDD·fill count·participant
+  결과를 재계산하는 migration은 만들지 않았다.
+- 기존 API 주소·응답 계약 변경 없음. 랭킹 pagination·near_me·top10·capturedAt
+  고정 계약, 계산식·MDD·tier 비율·순위 규칙 전부 그대로다.
+- 신규 오류 코드는 `FINAL_RESULTS_INTEGRITY`(409) 하나이며, 나머지는 기존
+  구조화 코드를 재사용한다.
+- `tradingAccountId`는 여전히 nullable(transitional)이고 공개 응답에 노출되지 않는다.
+
+**테스트 결과**
+
+| 명령 | 결과 |
+| --- | --- |
+| `prisma format` / `validate` / `generate` | 통과 |
+| `prisma migrate status` | 50 migrations, drift 없음 |
+| backend `tsc --noEmit -p tsconfig.build.json` | 통과 |
+| backend `nest build` | 통과 |
+| backend `jest` | 182 suites, **2550 passed** / 36 skipped (기준선 2512 → +38) |
+| backend PG 통합 (`TRADING_ACCOUNT_DB_INTEGRATION=1`) | 통과 — 8개 구간 전부 |
+| backend `jest --config test/jest-e2e.json` | 63 fail / 59 pass — **기준선과 동일** |
+| backend `eslint` | 943 problems (기준선 937, +6은 전부 spec 파일) |
+| frontend `tsc --noEmit` | 통과 |
+| frontend `node --test` | **338 passed** (기준선 290 → +48) |
+| frontend `expo export --platform web` | 통과 (831 modules) |
+
+**기준선 실패**
+
+- **backend e2e 63건.** 기준 커밋 `813e3043`에 worktree를 만들어 같은 명령으로
+  재현했다: 63 fail / 59 pass로 **개수와 실패 테스트 이름 집합이 완전히 동일**
+  (`comm -13` 결과 신규 실패 0건). 원인은 `.env.local`의 streaming/스케줄러
+  플래그가 `/readiness` 페이로드를 바꾸고 JWT 설정 차이가 인증 테스트를
+  연쇄 실패시키는 환경 문제이며, 이번 변경과 무관하다.
+- **backend eslint.** 기준선에서 이미 937 problems(926 errors)로 clean하지 않다.
+  이번 변경으로 943이 되었고 증가분 6건은 전부 spec 파일의 기존 mock `any`
+  패턴이다. 프로덕션 소스 파일은 한 건도 늘지 않았고 prettier는 clean이다.
+- **frontend `lint` 스크립트 없음.** `package.json`에 `typecheck`/`test`/`check`만
+  있고 eslint 설정이 없다. 대신 typecheck·test·production build를 모두 돌렸다.
+
+**배포 순서**
+
+작업 8의 배포 순서(§8-A.16)가 그대로 유효하다. 이번 작업은 migration이 없으므로
+추가 절차가 없지만, **A-3 때문에 순서가 더 중요해졌다**: 구버전 writer가 살아 있는
+동안 만들어진 null-scope ranking 행이 있으면 이제 current refresh가 그 시즌에서
+멈춘다(이전에는 조용히 지우고 새로 만들었다).
+
+1. 구버전 writer를 **완전히** 종료한다.
+2. `pnpm trading-accounts:repair-links --apply`
+3. `pnpm trading-accounts:repair-ranking-scope --apply` (기본 dry-run 먼저)
+4. 신버전 배포. routine API/job은 repair 스크립트 역할을 대신하지 않는다 — A-3이
+   그 경계를 코드로 강제한다.
+
+**남은 제한사항**
+
+- `SeasonRanking.tradingAccountId`는 아직 nullable이다. NOT NULL 강화는 repair가
+  모든 환경에서 수렴한 뒤의 별도 작업(작업 10)이다.
+- A-3 이후, 손상된 ranking set이 있는 시즌은 repair 전까지 current ranking이
+  갱신되지 않는다. 이것은 의도된 fail-closed이며 운영 알림이 필요하다.
+- 프런트엔드는 `PortfolioScreen`을 account-scoped로 전환했다. 지갑·주문 목록·
+  주문 상세·포지션 화면은 query-key factory와 account-scoped API 계층이 준비되어
+  있으나 화면 전환은 아직 하지 않았다(기존 시즌 동작 그대로 유지, 회귀 없음).
+- 일반계정 거래·환전은 backend에서 여전히 미구현이고 프런트는 준비 중으로만
+  표시한다. 광고 provider 연동과 실제 reward 지급도 그대로 닫혀 있다.
+- e2e 실행 환경(`.env.local` 플래그)이 정리되지 않아 e2e는 여전히 기준선 실패를
+  안고 있다.
+
+---
+
 ### 작업 단위: 일반계정 동시성 보완 + SeasonRanking TradingAccount scope 전환 (2026-08-04, 작업 6·7 잔여 + 작업 8, WORK-ID GENERAL-PERFORMANCE-CONCURRENCY-AND-SEASON-RANKING-V1)
 
 **기준 커밋** `16cb244d7743a96c9566bed32b01e41704def381`
@@ -1583,6 +1787,50 @@ cd frontend && npm run typecheck && npm test
 ---
 
 ## 2. 최신 작업 시간순 기록
+
+### 2026-08-04 — SeasonRanking·정산 무결성 잔여 결함 보완 + 프런트엔드 계정 전환 (작업 8 보완 + 작업 9)
+
+- **정산이 손상된 입력으로 final ranking을 만들지 않는다.** 정산의 두 valuation
+  경로(live equity history, daily snapshot fallback)가 이제 랭킹 job과 같은
+  participant→account map으로 입력 scope를 검증한다. 손상된 행만 빼고 계산하지
+  않는다 — 빠진 equity 저점은 MDD를 낮추고(tie-break #2), 빠진 snapshot은 그 아래
+  순위를 전부 한 칸씩 올린다. scope 오류는 재시도로 고칠 수 없으므로 503
+  `FINAL_VALUATION_FAILED`로 뭉개지 않고 구조화 코드로 통과시킨다.
+- **재사용된 final ranking이 확정 결과의 기준이 되었다.** 이전에는 rank·tier만
+  맞춰서 participant가 마지막 live refresh의 금액·수익률·MDD·체결수를 들고
+  settled 되었다 — 리더보드와 내 기록 카드가 서로 다른 "확정" 숫자를 보여줬다.
+  이제 6개 값을 ranking row에서 쓰고, settled 직전에 DB에서 다시 읽어 대조하며,
+  불일치는 전체 rollback이다. 집합 정합성(중복·누락)도 개수 비교가 아니라
+  실제 집합으로 검사한다.
+- **routine refresh가 손상 랭킹을 지워 숨기지 않는다.** delete-then-recreate
+  정책이 null·mismatch 행을 5분마다 세탁해서 repair 스크립트가 고칠 것이 없다고
+  보고하고 있었다. 이제 삭제 전에 기존 set을 검증하고, 손상 시 delete·create·
+  currentRank 갱신 중 어느 것도 실행하지 않는다.
+- **pagination 밖의 손상이 감지된다.** 100행 중 87위가 null scope여도 1페이지는
+  200이었고 top10은 10행만 보고 손상된 set 기준으로 percentile을 냈다. 이제
+  `(seasonId, rankType, rankingDate, capturedAt)` set 전체를 scope 컬럼만으로
+  preflight한다. 공개 WHERE를 적용하지 않는다 — 숨겨진 행의 손상도 손상이고
+  그 주변 순위는 이 응답이 게시하는 순위다.
+- **settled 시즌이 새 final ranking을 받지 않는다.** settled + 부재/일부는
+  `FINAL_RESULTS_INTEGRITY`다. 이미 게시된 리더보드를 현재 지갑·가격으로 다시
+  계산한 다른 리더보드로 조용히 갈아끼우지 않는다.
+- **excluded/registered participant의 계정 종료도 검사한다.** final tier job이
+  final ranking 행만 순회해서, excluded participant가 active 계정을 그대로 들고
+  있는 settled 시즌을 통과시켰다. 이제 seasonId 기준 1회 조회로 전원을 본다.
+  이 job은 계정을 닫지 않는다 — 종료는 정산과 원자적이어야 한다.
+- **프런트엔드 계정 전환(작업 9).** 기존 스택(Expo·react-query·AsyncStorage)에
+  얹은 작은 context 하나가 단일 source of truth다. 신규 상태 라이브러리 없음,
+  기존 API 주소 변경 없음. 모든 금융 query key에 accountId가 직접 들어가고
+  (mode만 넣으면 시즌이 다른 두 계정이 캐시를 공유한다), key가 바뀌는 구조 덕에
+  느린 이전 응답이 새 계정 화면을 덮어쓸 경로가 없다. 선택값은 userId로 격리하고
+  로그아웃 시 캐시를 invalidate가 아니라 remove한다. general/season 수익률 의미를
+  응답의 `returnRateMethod`로 구분하고, 성과 unavailable을 0%로 위장하지 않으며,
+  구조적 무결성 500을 빈 포트폴리오로 숨기지 않는다.
+- **검증.** backend 2550 unit(+38) 통과, PG 통합 8구간 통과, frontend 338(+48)
+  통과 + production build 통과. e2e 63건 실패는 기준 커밋 worktree에서 같은
+  명령으로 재현했고 실패 테스트 이름 집합이 완전히 동일하다(신규 실패 0건).
+- **migration 없음.**
+
 
 ### 2026-08-04 — 일반계정 동시성 보완 + SeasonRanking TradingAccount scope 전환 (작업 6·7 잔여 + 작업 8)
 

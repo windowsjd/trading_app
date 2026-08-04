@@ -32,7 +32,7 @@ jest.mock('../generated/prisma/client', () => {
   };
 });
 
-import { HttpException } from '@nestjs/common';
+import { HttpException, HttpStatus } from '@nestjs/common';
 import {
   ParticipantStatus,
   Prisma,
@@ -160,6 +160,22 @@ describe('RankingService', () => {
     },
   });
 
+  /**
+   * 작업 8 보완 §A-4: `getRanking` now issues TWO `seasonRanking.findMany` calls
+   * — the whole-set scope preflight first, then the paginated window. Tests
+   * queue both; by default the set and the page are the same rows, and a test
+   * that wants damage OUTSIDE the window passes a wider `setRows`.
+   */
+  const mockRankingRows = (
+    prisma: ReturnType<typeof createPrisma>,
+    pageRows: unknown[],
+    setRows: unknown[] = pageRows,
+  ) => {
+    prisma.seasonRanking.findMany
+      .mockResolvedValueOnce(setRows)
+      .mockResolvedValueOnce(pageRows);
+  };
+
   const rankingRow = (rank: number, seasonParticipantId = `sp-${rank}`) => {
     const day = Math.min(rank, 9).toString().padStart(2, '0');
     const userId = `user-${rank}`;
@@ -198,10 +214,7 @@ describe('RankingService', () => {
       rankingHiddenAt: null,
     });
     prisma.seasonRanking.count.mockResolvedValueOnce(2);
-    prisma.seasonRanking.findMany.mockResolvedValueOnce([
-      rankingRow(1),
-      rankingRow(2),
-    ]);
+    mockRankingRows(prisma, [rankingRow(1), rankingRow(2)]);
     const myScope = rankingScopeFor('sp-2', 'user-2');
     prisma.seasonRanking.findUnique.mockResolvedValueOnce({
       ...myScope,
@@ -297,7 +310,7 @@ describe('RankingService', () => {
       rankingHiddenAt: new Date('2026-05-07T00:20:00.000Z'),
     });
     prisma.seasonRanking.count.mockResolvedValueOnce(1);
-    prisma.seasonRanking.findMany.mockResolvedValueOnce([rankingRow(1)]);
+    mockRankingRows(prisma, [rankingRow(1)]);
 
     const response = await service.getRanking('user-2', {});
 
@@ -434,7 +447,7 @@ describe('RankingService', () => {
     });
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
     prisma.seasonRanking.count.mockResolvedValueOnce(1);
-    prisma.seasonRanking.findMany.mockResolvedValueOnce([rankingRow(1)]);
+    mockRankingRows(prisma, [rankingRow(1)]);
 
     const response = await service.getRanking('user-x', {});
 
@@ -475,7 +488,8 @@ describe('RankingService', () => {
         finalTier: null,
       },
     });
-    prisma.seasonRanking.findMany.mockResolvedValueOnce(
+    mockRankingRows(
+      prisma,
       Array.from({ length: 10 }, (_, index) => rankingRow(index + 1)),
     );
 
@@ -535,7 +549,8 @@ describe('RankingService', () => {
         finalTier: null,
       },
     });
-    prisma.seasonRanking.findMany.mockResolvedValueOnce(
+    mockRankingRows(
+      prisma,
       Array.from({ length: 10 }, (_, index) => rankingRow(index + 45)),
     );
 
@@ -591,7 +606,7 @@ describe('RankingService', () => {
         finalTier: 'diamond',
       },
     });
-    prisma.seasonRanking.findMany.mockResolvedValueOnce([
+    mockRankingRows(prisma, [
       {
         ...rankingRow(11, 'sp-11'),
         seasonParticipant: {
@@ -727,5 +742,125 @@ describe('RankingService', () => {
     await expect(service.getRanking(undefined, {})).rejects.toBeInstanceOf(
       HttpException,
     );
+  });
+
+  // ----------------------------------------------------------- 작업 8 보완
+  // §A-4: the WHOLE selected snapshot is verified, not just the page. A
+  // damaged row outside the pagination window used to leave the visible pages
+  // returning a clean 200 over a leaderboard nobody had checked.
+
+  describe('§A-4 whole-set scope preflight', () => {
+    const damagedRow = (rank: number, overrides: Record<string, unknown>) => ({
+      ...rankingRow(rank),
+      ...overrides,
+    });
+
+    const setupHundredRowSeason = (
+      prisma: ReturnType<typeof createPrisma>,
+      damaged: unknown,
+    ) => {
+      mockCurrentSeason(prisma);
+      prisma.seasonRanking.findFirst.mockResolvedValueOnce({
+        rankingDate,
+        capturedAt,
+      });
+      prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+      prisma.seasonRanking.count.mockResolvedValue(100);
+
+      const page = Array.from({ length: 50 }, (_, index) =>
+        rankingRow(index + 1),
+      );
+      const wholeSet = [
+        ...Array.from({ length: 99 }, (_, index) => rankingRow(index + 1)),
+        damaged,
+      ];
+      mockRankingRows(prisma, page, wholeSet);
+    };
+
+    it('fails the FIRST page when row 100 has a null trading account scope', async () => {
+      const { service, prisma } = createService();
+      setupHundredRowSeason(
+        prisma,
+        damagedRow(100, { tradingAccountId: null }),
+      );
+
+      await expect(
+        service.getRanking('user-x', { limit: '50', offset: '0' }),
+      ).rejects.toMatchObject({
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        response: {
+          error: { code: 'SEASON_RANKING_SCOPE_REPAIR_REQUIRED' },
+        },
+      });
+    });
+
+    it('fails top10 when a row outside the top ten is mis-scoped', async () => {
+      const { service, prisma } = createService();
+      setupHundredRowSeason(
+        prisma,
+        damagedRow(100, { tradingAccountId: 'account-sp-1' }),
+      );
+
+      await expect(
+        service.getRanking('user-x', { scope: 'top10' }),
+      ).rejects.toMatchObject({
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        response: { error: { code: 'SEASON_RANKING_SCOPE_MISMATCH' } },
+      });
+    });
+
+    it('preflights the whole snapshot key before the page query', async () => {
+      const { service, prisma } = createService();
+      mockCurrentSeason(prisma);
+      mockAvailableRanking(prisma);
+
+      await service.getRanking('user-2', {});
+
+      expect(prisma.seasonRanking.findMany.mock.calls[0][0]).toMatchObject({
+        where: {
+          seasonId: 'season-1',
+          rankType: SeasonRankingType.daily,
+          rankingDate,
+          capturedAt,
+        },
+      });
+      // The preflight carries NO pagination and NO public participant filter:
+      // it is about the set, not about what this caller can see.
+      expect(
+        prisma.seasonRanking.findMany.mock.calls[0][0].skip,
+      ).toBeUndefined();
+      expect(
+        prisma.seasonRanking.findMany.mock.calls[0][0].take,
+      ).toBeUndefined();
+      expect(
+        prisma.seasonRanking.findMany.mock.calls[0][0].where.seasonParticipant,
+      ).toBeUndefined();
+    });
+
+    it('never exposes tradingAccountId in the public payload of a healthy set', async () => {
+      const { service, prisma } = createService();
+      mockCurrentSeason(prisma);
+      mockAvailableRanking(prisma);
+
+      const response = await service.getRanking('user-2', {});
+
+      expect(JSON.stringify(response)).not.toContain('tradingAccountId');
+      expect(JSON.stringify(response)).not.toContain('account-sp-');
+      expect(response.data.state).toBe('available');
+      expect(response.data.rankings).toHaveLength(2);
+    });
+
+    it('keeps the unavailable contract when the snapshot has no rows at all', async () => {
+      const { service, prisma } = createService();
+      mockCurrentSeason(prisma);
+      prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
+      prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+
+      const response = await service.getRanking('user-x', {});
+
+      expect(response.data.state).toBe('unavailable');
+      expect(response.data.reason).toBe('RANKING_UNAVAILABLE');
+      expect(prisma.seasonRanking.findMany).not.toHaveBeenCalled();
+    });
   });
 });

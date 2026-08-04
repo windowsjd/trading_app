@@ -669,6 +669,441 @@ describe('SeasonSettlementJobService', () => {
     expect(prisma.dailyPortfolioSnapshot.upsert).not.toHaveBeenCalled();
     expect(prisma.dailyPortfolioSnapshot.deleteMany).not.toHaveBeenCalled();
   });
+
+  // ------------------------------------------------------------- 작업 8 보완
+  // §A-1: the rows a final ranking is COMPUTED FROM are scope-verified, and a
+  // damaged input fails the whole settlement rather than excluding one row.
+
+  describe('§A-1 settlement source snapshot scope', () => {
+    const settleWithSnapshots = (
+      snapshots: Array<ReturnType<typeof snapshot>>,
+    ) => {
+      const { service, prisma } = createService();
+      mockSeason(prisma, SeasonStatus.ended);
+      mockParticipants(prisma, [
+        { id: 'sp-1', userId: 'user-1' },
+        { id: 'sp-2', userId: 'user-2' },
+      ]);
+      mockExistingRankings(prisma, []);
+      mockSnapshots(prisma, snapshots);
+      prisma.__tx.seasonRanking.findMany.mockResolvedValue([]);
+      prisma.__tx.seasonRanking.create.mockResolvedValue({ id: 'ranking-1' });
+
+      return { service, prisma };
+    };
+
+    it('fails closed when a fallback daily snapshot has no trading account scope', async () => {
+      const damaged = snapshot('sp-1', 'user-1', '1000.00000000');
+      damaged.tradingAccountId = null as unknown as string;
+      const { service, prisma } = settleWithSnapshots([
+        damaged,
+        snapshot('sp-2', 'user-2', '2000.00000000'),
+      ]);
+
+      await expect(
+        service.run({ seasonId: 'season-1', settlementDate }),
+      ).rejects.toMatchObject({
+        response: {
+          error: {
+            code: 'SEASON_RANKING_SOURCE_SCOPE_REPAIR_REQUIRED',
+          },
+        },
+      });
+      // Not "settle the other one": no ranking row and no status change at all.
+      expect(prisma.__tx.seasonRanking.create).not.toHaveBeenCalled();
+      expect(prisma.__tx.season.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('fails closed when a fallback daily snapshot belongs to another account', async () => {
+      const damaged = snapshot('sp-1', 'user-1', '1000.00000000');
+      damaged.tradingAccountId = 'account-of-sp-2';
+      const { service, prisma } = settleWithSnapshots([
+        damaged,
+        snapshot('sp-2', 'user-2', '2000.00000000'),
+      ]);
+
+      await expect(
+        service.run({ seasonId: 'season-1', settlementDate }),
+      ).rejects.toMatchObject({
+        response: {
+          error: { code: 'SEASON_RANKING_SOURCE_SCOPE_MISMATCH' },
+        },
+      });
+      expect(prisma.__tx.seasonRanking.create).not.toHaveBeenCalled();
+    });
+
+    it('fails closed when a season daily snapshot carries general-mode performance columns', async () => {
+      const damaged = snapshot('sp-1', 'user-1', '1000.00000000');
+      damaged.timeWeightedReturnFactor = new Prisma.Decimal(
+        '1.05000000',
+      ) as unknown as null;
+      const { service, prisma } = settleWithSnapshots([
+        damaged,
+        snapshot('sp-2', 'user-2', '2000.00000000'),
+      ]);
+
+      await expect(
+        service.run({ seasonId: 'season-1', settlementDate }),
+      ).rejects.toMatchObject({
+        response: {
+          error: { code: 'SEASON_RANKING_SOURCE_SCOPE_MISMATCH' },
+        },
+      });
+      expect(prisma.__tx.seasonRanking.create).not.toHaveBeenCalled();
+    });
+
+    it('selects the scope columns on the fallback daily snapshot read', async () => {
+      const { service, prisma } = settleWithSnapshots([
+        snapshot('sp-1', 'user-1', '1000.00000000'),
+        snapshot('sp-2', 'user-2', '2000.00000000'),
+      ]);
+      prisma.__tx.season.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.run({ seasonId: 'season-1', settlementDate });
+
+      expect(prisma.dailyPortfolioSnapshot.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: expect.objectContaining({
+            tradingAccountId: true,
+            cumulativeExternalFundingKrw: true,
+            investmentPnlKrw: true,
+            timeWeightedReturnFactor: true,
+          }),
+        }),
+      );
+    });
+
+    it('fails closed when a live-valuation equity snapshot has no trading account scope', async () => {
+      const valuationService = {
+        calculateSeasonParticipantValuation: jest.fn().mockResolvedValue({
+          totalAssetKrw: '1000.00000000',
+          returnRate: '0.00000000',
+          krwCash: '1000.00000000',
+          usdCashKrw: '0.00000000',
+          domesticStockValueKrw: '0.00000000',
+          usStockValueKrw: '0.00000000',
+          cryptoValueKrw: '0.00000000',
+        }),
+      };
+      const { service, prisma } = createService(valuationService);
+      mockSeason(prisma, SeasonStatus.ended);
+      mockParticipants(prisma, [{ id: 'sp-1', userId: 'user-1' }]);
+      mockExistingRankings(prisma, []);
+      prisma.equitySnapshot.findMany.mockResolvedValue([
+        {
+          id: 'equity-1',
+          seasonParticipantId: 'sp-1',
+          tradingAccountId: null,
+          cumulativeExternalFundingKrw: null,
+          investmentPnlKrw: null,
+          timeWeightedReturnFactor: null,
+          totalAssetKrw: new Prisma.Decimal('900.00000000'),
+          returnRate: new Prisma.Decimal('-10.00000000'),
+          capturedAt: new Date('2026-05-20T00:00:00.000Z'),
+          createdAt: new Date('2026-05-20T00:00:00.000Z'),
+        },
+      ]);
+
+      await expect(
+        service.run({ seasonId: 'season-1', settlementDate }),
+      ).rejects.toMatchObject({
+        response: {
+          error: {
+            // NOT collapsed into 503 FINAL_VALUATION_FAILED: retrying cannot
+            // fix a scope fault, only the repair scripts can.
+            code: 'SEASON_RANKING_SOURCE_SCOPE_REPAIR_REQUIRED',
+          },
+        },
+      });
+      expect(prisma.__tx.seasonRanking.create).not.toHaveBeenCalled();
+    });
+
+    it('produces the unchanged final ranking when every source snapshot is correctly scoped', async () => {
+      const { service, prisma } = settleWithSnapshots([
+        snapshot('sp-1', 'user-1', '1000.00000000', '0.00000000'),
+        snapshot('sp-2', 'user-2', '2000.00000000', '10.00000000'),
+      ]);
+      prisma.__tx.season.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await runAndGetResult(service, {
+        seasonId: 'season-1',
+        settlementDate,
+      });
+
+      expect(result.topRanks.map((row) => row.seasonParticipantId)).toEqual([
+        'sp-2',
+        'sp-1',
+      ]);
+      expect(result.topRanks.map((row) => row.rank)).toEqual([1, 2]);
+      expect(result.season.updated).toBe(true);
+    });
+  });
+
+  // §A-2: a REUSED final ranking is the authority for the whole confirmed
+  // result, not only for the rank.
+
+  describe('§A-2 existing final ranking reuse consistency', () => {
+    const reuseSetup = () => {
+      const { service, prisma } = createService();
+      mockSeason(prisma, SeasonStatus.ended);
+      mockParticipants(prisma, [
+        { id: 'sp-1', userId: 'user-1' },
+        { id: 'sp-2', userId: 'user-2' },
+      ]);
+      mockExistingRankings(prisma, [
+        existingRanking('ranking-1', 'sp-1', 'user-1', 1),
+        existingRanking('ranking-2', 'sp-2', 'user-2', 2),
+      ]);
+      prisma.__tx.season.updateMany.mockResolvedValue({ count: 1 });
+
+      return { service, prisma };
+    };
+
+    it('copies every financial result from the final ranking onto the participant', async () => {
+      const { service, prisma } = reuseSetup();
+
+      await service.run({ seasonId: 'season-1', settlementDate });
+
+      const call = (
+        prisma.__tx.seasonParticipant.updateMany.mock.calls as Array<
+          [{ where: { id?: string }; data: Record<string, unknown> }]
+        >
+      ).find(([input]) => input.where.id === 'sp-1');
+      expect(call).toBeDefined();
+      expect(call![0].data).toEqual({
+        totalAssetKrw: new Prisma.Decimal('1000.00000000'),
+        totalReturnRate: new Prisma.Decimal('0.00000000'),
+        maxDrawdown: new Prisma.Decimal('0.00000000'),
+        totalFillCount: 0,
+        finalRank: 1,
+        finalTier: 'master',
+        currentRank: 1,
+      });
+    });
+
+    it('rolls the whole settlement back when a participant result disagrees with its final ranking', async () => {
+      const { service, prisma } = reuseSetup();
+      // The write lands, but something else has left sp-2 with a different
+      // totalAssetKrw by the time the pre-settled re-verification reads it.
+      prisma.__tx.seasonParticipant.findMany.mockImplementation(
+        (args: { select?: Record<string, unknown> }) => {
+          if (!args.select?.finalTier) {
+            return Promise.resolve(settlementAccountParticipants());
+          }
+
+          return Promise.resolve([
+            {
+              id: 'sp-1',
+              totalAssetKrw: new Prisma.Decimal('1000.00000000'),
+              totalReturnRate: new Prisma.Decimal('0'),
+              maxDrawdown: new Prisma.Decimal('0'),
+              totalFillCount: 0,
+              currentRank: 1,
+              finalRank: 1,
+              finalTier: 'master',
+            },
+            {
+              id: 'sp-2',
+              totalAssetKrw: new Prisma.Decimal('999999.00000000'),
+              totalReturnRate: new Prisma.Decimal('0'),
+              maxDrawdown: new Prisma.Decimal('0'),
+              totalFillCount: 0,
+              currentRank: 2,
+              finalRank: 2,
+              finalTier: 'silver',
+            },
+          ]);
+        },
+      );
+
+      await expect(
+        service.run({ seasonId: 'season-1', settlementDate }),
+      ).rejects.toMatchObject({
+        response: { error: { code: 'FINAL_RESULTS_INTEGRITY' } },
+      });
+      expect(prisma.__tx.season.updateMany).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['maxDrawdown', { maxDrawdown: new Prisma.Decimal('7.00000000') }],
+      ['totalFillCount', { totalFillCount: 42 }],
+      ['finalTier', { finalTier: 'bronze' }],
+      ['half-assigned finalTier', { finalTier: null }],
+    ])(
+      'refuses to settle when the stored %s disagrees with the final ranking',
+      async (_label, override) => {
+        const { service, prisma } = reuseSetup();
+        prisma.__tx.seasonParticipant.findMany.mockImplementation(
+          (args: { select?: Record<string, unknown> }) => {
+            if (!args.select?.finalTier) {
+              return Promise.resolve(settlementAccountParticipants());
+            }
+
+            return Promise.resolve([
+              {
+                id: 'sp-1',
+                totalAssetKrw: new Prisma.Decimal('1000.00000000'),
+                totalReturnRate: new Prisma.Decimal('0'),
+                maxDrawdown: new Prisma.Decimal('0'),
+                totalFillCount: 0,
+                currentRank: 1,
+                finalRank: 1,
+                finalTier: 'master',
+                ...override,
+              },
+              {
+                id: 'sp-2',
+                totalAssetKrw: new Prisma.Decimal('1000.00000000'),
+                totalReturnRate: new Prisma.Decimal('0'),
+                maxDrawdown: new Prisma.Decimal('0'),
+                totalFillCount: 0,
+                currentRank: 2,
+                finalRank: 2,
+                finalTier: 'silver',
+              },
+            ]);
+          },
+        );
+
+        await expect(
+          service.run({ seasonId: 'season-1', settlementDate }),
+        ).rejects.toMatchObject({
+          response: { error: { code: 'FINAL_RESULTS_INTEGRITY' } },
+        });
+        expect(prisma.__tx.season.updateMany).not.toHaveBeenCalled();
+      },
+    );
+
+    it('refuses to reuse a final ranking that does not cover every eligible participant', async () => {
+      const { service, prisma } = createService();
+      mockSeason(prisma, SeasonStatus.ended);
+      mockParticipants(prisma, [
+        { id: 'sp-1', userId: 'user-1' },
+        { id: 'sp-2', userId: 'user-2' },
+      ]);
+      // Two rows, right COUNT — so the pre-lock `participants.length -
+      // existing.length` check sees 0 missing — but sp-2 has no row and a
+      // no-longer-eligible sp-3 has one. Exactly what a count-only check lets
+      // through, and it would have settled sp-2 with no final result at all.
+      mockExistingRankings(prisma, [
+        existingRanking('ranking-1', 'sp-1', 'user-1', 1),
+        existingRanking('ranking-3', 'sp-3', 'user-3', 2),
+      ]);
+
+      await expect(
+        service.run({ seasonId: 'season-1', settlementDate }),
+      ).rejects.toMatchObject({
+        response: { error: { code: 'FINAL_RESULTS_INTEGRITY' } },
+      });
+      expect(prisma.__tx.season.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('is idempotent: a clean re-run adds no ranking row and produces the same result', async () => {
+      const { service, prisma } = reuseSetup();
+
+      const first = await runAndGetResult(service, {
+        seasonId: 'season-1',
+        settlementDate,
+      });
+      const second = await runAndGetResult(service, {
+        seasonId: 'season-1',
+        settlementDate,
+      });
+
+      expect(prisma.__tx.seasonRanking.create).not.toHaveBeenCalled();
+      expect(first.finalRankings.existing).toBe(2);
+      expect(second.finalRankings.existing).toBe(2);
+      expect(second.assignedFinalTierParticipantIds).toEqual(
+        first.assignedFinalTierParticipantIds,
+      );
+      expect(second.topRanks).toEqual(first.topRanks);
+    });
+  });
+
+  // §A-5: a settled season never gets a NEW final ranking.
+
+  describe('§A-5 settled season without a final ranking', () => {
+    it('refuses to compute a new final ranking for a settled season with no final rows', async () => {
+      const { service, prisma } = createService();
+      mockSeason(prisma, SeasonStatus.settled);
+      mockParticipants(prisma, [{ id: 'sp-1', userId: 'user-1' }]);
+      mockExistingRankings(prisma, []);
+      mockSnapshots(prisma, [snapshot('sp-1', 'user-1', '1000.00000000')]);
+
+      await expect(
+        service.run({ seasonId: 'season-1', settlementDate }),
+      ).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        response: { error: { code: 'FINAL_RESULTS_INTEGRITY' } },
+      });
+      // No recomputation, no snapshot, no ranking row.
+      expect(prisma.dailyPortfolioSnapshot.findMany).not.toHaveBeenCalled();
+      expect(prisma.__tx.equitySnapshot.create).not.toHaveBeenCalled();
+      expect(prisma.__tx.seasonRanking.create).not.toHaveBeenCalled();
+    });
+
+    it('refuses when a settled season has final rankings for only some participants', async () => {
+      const { service, prisma } = createService();
+      mockSeason(prisma, SeasonStatus.settled);
+      mockParticipants(prisma, [
+        { id: 'sp-1', userId: 'user-1' },
+        { id: 'sp-2', userId: 'user-2' },
+      ]);
+      mockExistingRankings(prisma, [
+        existingRanking('ranking-1', 'sp-1', 'user-1', 1),
+      ]);
+
+      await expect(
+        service.run({ seasonId: 'season-1', settlementDate }),
+      ).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        response: { error: { code: 'FINAL_RESULTS_INTEGRITY' } },
+      });
+      expect(prisma.__tx.seasonRanking.create).not.toHaveBeenCalled();
+    });
+
+    it('replays idempotently for a settled season with a complete final ranking', async () => {
+      const { service, prisma } = createService();
+      mockSeason(prisma, SeasonStatus.settled);
+      mockParticipants(prisma, [
+        { id: 'sp-1', userId: 'user-1' },
+        { id: 'sp-2', userId: 'user-2' },
+      ]);
+      mockExistingRankings(prisma, [
+        existingRanking('ranking-1', 'sp-1', 'user-1', 1),
+        existingRanking('ranking-2', 'sp-2', 'user-2', 2),
+      ]);
+      prisma.__tx.season.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await runAndGetResult(service, {
+        seasonId: 'season-1',
+        settlementDate,
+      });
+
+      expect(prisma.__tx.seasonRanking.create).not.toHaveBeenCalled();
+      expect(result.finalRankings.existing).toBe(2);
+      expect(result.message).toContain('already settled');
+    });
+
+    it('still allows a first settlement for an ended season with no final ranking', async () => {
+      const { service, prisma } = createService();
+      mockSeason(prisma, SeasonStatus.ended);
+      mockParticipants(prisma, [{ id: 'sp-1', userId: 'user-1' }]);
+      mockExistingRankings(prisma, []);
+      mockSnapshots(prisma, [snapshot('sp-1', 'user-1', '1000.00000000')]);
+      prisma.__tx.seasonRanking.findMany.mockResolvedValue([]);
+      prisma.__tx.seasonRanking.create.mockResolvedValue({ id: 'ranking-1' });
+      prisma.__tx.season.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await runAndGetResult(service, {
+        seasonId: 'season-1',
+        settlementDate,
+      });
+
+      expect(prisma.__tx.seasonRanking.create).toHaveBeenCalledTimes(1);
+      expect(result.season.updated).toBe(true);
+    });
+  });
 });
 
 function createService(portfolioValuationService?: {
@@ -690,6 +1125,7 @@ function createService(portfolioValuationService?: {
 }
 
 function createPrismaMock() {
+  settlementParticipantResults = new Map();
   const tx = {
     // The season row lock taken first inside the settlement transaction
     // (작업 8 §13.3 / §14.1).
@@ -718,11 +1154,28 @@ function createPrismaMock() {
       findUnique: jest.fn(async (args: { where: { id: string } }) => ({
         tradingAccountId: `account-of-${args.where.id}`,
       })),
-      // Two different reads hit this delegate: the season-wide account list
-      // (`where.seasonId`) and the ranking scope resolution (`where.id.in`).
+      // THREE different reads hit this delegate now: the season-wide account
+      // list (`where.seasonId` alone), the ranking scope resolution
+      // (`where.id.in`), and the 작업 8 보완 §A-2 final-result read-back
+      // (`select.finalTier`), which must see what this transaction just wrote.
       findMany: jest.fn(
-        (args: { where: { id?: { in: string[] }; seasonId?: string } }) => {
+        (args: {
+          where: { id?: { in: string[] }; seasonId?: string };
+          select?: Record<string, unknown>;
+        }) => {
           const ids = args.where.id?.in;
+
+          if (args.select?.finalTier) {
+            return Promise.resolve(
+              (ids ?? [...settlementParticipantResults.keys()]).flatMap(
+                (id) => {
+                  const stored = settlementParticipantResults.get(id);
+                  return stored ? [{ id, ...stored }] : [];
+                },
+              ),
+            );
+          }
+
           const rows = settlementAccountParticipants();
           return Promise.resolve(
             ids
@@ -733,8 +1186,20 @@ function createPrismaMock() {
           );
         },
       ),
-      update: jest.fn(),
-      updateMany: jest.fn(),
+      update: jest.fn(
+        (args: { where: { id: string }; data: Record<string, unknown> }) => {
+          recordSettlementParticipantResult(args.where.id, args.data);
+          return Promise.resolve({ id: args.where.id });
+        },
+      ),
+      updateMany: jest.fn(
+        (args: { where: { id?: string }; data: Record<string, unknown> }) => {
+          if (args.where.id) {
+            recordSettlementParticipantResult(args.where.id, args.data);
+          }
+          return Promise.resolve({ count: 1 });
+        },
+      ),
       count: jest.fn().mockResolvedValue(0),
     },
     equitySnapshot: {
@@ -914,6 +1379,69 @@ function settlementAccountParticipants() {
   return accountParticipants;
 }
 
+/**
+ * What the settlement transaction has written onto each participant so far.
+ *
+ * 작업 8 보완 §A-2 re-reads the participant results inside the transaction and
+ * refuses to settle when they disagree with the final ranking, so the mock has
+ * to behave like a transaction: writes are visible to the later read.
+ */
+type StoredParticipantResult = {
+  totalAssetKrw: Prisma.Decimal;
+  totalReturnRate: Prisma.Decimal;
+  maxDrawdown: Prisma.Decimal;
+  totalFillCount: number;
+  currentRank: number | null;
+  finalRank: number | null;
+  finalTier: string | null;
+};
+
+let settlementParticipantResults = new Map<string, StoredParticipantResult>();
+
+function emptyParticipantResult(): StoredParticipantResult {
+  return {
+    totalAssetKrw: new Prisma.Decimal(0),
+    totalReturnRate: new Prisma.Decimal(0),
+    maxDrawdown: new Prisma.Decimal(0),
+    totalFillCount: 0,
+    currentRank: null,
+    finalRank: null,
+    finalTier: null,
+  };
+}
+
+function recordSettlementParticipantResult(
+  id: string,
+  data: Record<string, unknown>,
+) {
+  const stored =
+    settlementParticipantResults.get(id) ?? emptyParticipantResult();
+  const decimal = (value: unknown, fallback: Prisma.Decimal) =>
+    value === undefined ? fallback : new Prisma.Decimal(value as string);
+
+  settlementParticipantResults.set(id, {
+    totalAssetKrw: decimal(data.totalAssetKrw, stored.totalAssetKrw),
+    totalReturnRate: decimal(data.totalReturnRate, stored.totalReturnRate),
+    maxDrawdown: decimal(data.maxDrawdown, stored.maxDrawdown),
+    totalFillCount:
+      data.totalFillCount === undefined
+        ? stored.totalFillCount
+        : (data.totalFillCount as number),
+    currentRank:
+      data.currentRank === undefined
+        ? stored.currentRank
+        : (data.currentRank as number | null),
+    finalRank:
+      data.finalRank === undefined
+        ? stored.finalRank
+        : (data.finalRank as number | null),
+    finalTier:
+      data.finalTier === undefined
+        ? stored.finalTier
+        : (data.finalTier as string | null),
+  });
+}
+
 function accountParticipant(
   id: string,
   userId: string,
@@ -955,9 +1483,21 @@ function mockParticipants(
   prisma: PrismaMock,
   participants: Array<{ id: string; userId: string }>,
 ) {
+  // Settlement resolves the participant → season account map from THIS query
+  // (작업 8 보완 §A-1), so the fixture carries the scope columns every ranking
+  // participant read selects.
   prisma.seasonParticipant.findMany.mockResolvedValue(
     participants.map((participant) => ({
       totalFillCount: 0,
+      seasonId: 'season-1',
+      participantStatus: 'active',
+      tradingAccountId: `account-of-${participant.id}`,
+      tradingAccount: {
+        id: `account-of-${participant.id}`,
+        mode: 'season',
+        status: 'active',
+        userId: participant.userId,
+      },
       ...participant,
     })),
   );
@@ -985,8 +1525,9 @@ function mockExistingRankings(
       rankings.length + prisma.__tx.seasonRanking.create.mock.calls.length,
   );
   prisma.__tx.seasonParticipant.count.mockResolvedValue(0);
-  prisma.__tx.seasonParticipant.update.mockResolvedValue({ id: 'sp-updated' });
-  prisma.__tx.seasonParticipant.updateMany.mockResolvedValue({ count: 1 });
+  // update/updateMany keep the stateful transaction implementation from
+  // createPrismaMock: 작업 8 보완 §A-2 reads the participant results back inside
+  // the same transaction, so a flat mockResolvedValue would hide the write.
 }
 
 function snapshot(
@@ -997,7 +1538,15 @@ function snapshot(
   capturedAt = new Date('2026-05-21T00:00:10.000Z'),
 ) {
   return {
+    id: `snapshot-${seasonParticipantId}`,
     seasonParticipantId,
+    // Ranking-input scope columns (작업 8 보완 §A-1): a season daily snapshot is
+    // scoped to its participant's season account and carries NO general-mode
+    // performance column.
+    tradingAccountId: `account-of-${seasonParticipantId}`,
+    cumulativeExternalFundingKrw: null,
+    investmentPnlKrw: null,
+    timeWeightedReturnFactor: null,
     snapshotDate: new Date('2026-05-21T00:00:00.000Z'),
     totalAssetKrw: new Prisma.Decimal(totalAssetKrw),
     returnRate: new Prisma.Decimal(returnRate),

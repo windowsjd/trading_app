@@ -6,7 +6,7 @@ import {
   SafeAreaView,
   Pressable,
 } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { MyScreenProps } from '../../app/navigation/types';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
@@ -19,6 +19,7 @@ import { getHomeDashboard } from '../../features/home/api';
 import { getHomeRankingDisplay } from '../../features/home/mapper';
 import { getMySeasonRecords } from '../../features/record/api';
 import { clearTokens, getRefreshToken } from '../../services/storage/tokenStorage';
+import { clearTradingAccountSession } from '../../features/tradingAccount/TradingAccountContext';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -27,6 +28,7 @@ type Props = MyScreenProps;
 
 export default function MyScreen({ navigation }: Props) {
   const rootNavigation = useRootNavigation();
+  const queryClient = useQueryClient();
 
   const meQuery = useQuery({
     queryKey: QUERY_KEYS.me,
@@ -69,6 +71,10 @@ export default function MyScreen({ navigation }: Props) {
       // Local logout should still complete if the server cannot be reached.
     } finally {
       await clearTokens();
+      // The selected account and every account-scoped financial entry are
+      // dropped with the session (작업 9 §B-2): the next user on this device
+      // must never see the previous user's accountId or their cached balances.
+      await clearTradingAccountSession(queryClient, meQuery.data?.id ?? null);
     }
 
     rootNavigation.reset({
