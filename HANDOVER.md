@@ -12,6 +12,239 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 프런트엔드 계정 scope 완성 + 릴리스 하드닝 (2026-08-04, 작업 9 보완 + 작업 10, WORK-ID FRONTEND-ACCOUNT-SCOPE-COMPLETION-AND-RELEASE-HARDENING-V1)
+
+**기준 커밋** `0a837c8c291ec22b290e82a711c4444b25b23259`
+(`git fetch` 후 `origin/main` HEAD와 동일함을 확인. 이후 새 커밋 없음.)
+**최종 커밋** 이 작업 단위 기록을 담은 커밋 자신 — `git log -1` 참조.
+(로컬 커밋 1개. 이 환경에는 push 자격증명이 없어 origin에 올리지 못했다.)
+
+**목적**
+
+작업 9가 만든 계정 선택 계층을 **모든 현재 금융 화면과 mutation까지** 확장하고
+(A), 그 위에서 backend·frontend·DB·배치·운영 도구·핵심 흐름을 최종 점검한다(B).
+핵심 목표 하나: *사용자가 보고 있는 계정과 실제로 조회·주문·환전되는 계정이
+달라지는 경로를 남기지 않는다.*
+
+**작업 9 보완 (A)**
+
+- **A-2 주문 흐름을 계정에 결속.** `Order` route param에 `accountId`를
+  **필수**로 추가했다. OrderScreen은 진입 시점의 route accountId를 끝까지
+  쓰고 `selectedAccountId`를 다시 읽지 않는다. 다른 탭에서 계정을 바꾸면
+  "선택된 계정"이 조용히 달라지고, 제출 시점에 그것을 읽으면 시즌 계정으로 받은
+  견적이 일반 계정 create로 나간다. 선택이 route 계정에서 벗어나면
+  (`resolveAccountBinding` → `account_changed`) 견적·idempotency key·수량·
+  지정가·성공 상태를 모두 버리고 화면을 막은 뒤 재진입을 안내한다 — 새 계정으로
+  자동 전환하지 **않는다**. 소유 목록에 없는 route accountId는 unknown id와
+  타인 id를 구분하지 않고(백엔드가 의도적으로 같은 404) 동일하게 처리한다.
+- **A-3 AssetDetail.** 시세·캔들·종목 정보는 공용 캐시 그대로. position만
+  `tradingAccount.positions(accountId, …)` 키로 전환했고, 매수/매도 게이트는
+  전역 `getCurrentSeason()`이 아니라 **선택 계정의** capability에서 나온다
+  (그 계정의 `season.seasonStatus` 포함). 매도는 그 계정의 실제 보유 수량만
+  본다. 계정이 바뀌면 키가 바뀌므로 이전 계정 수량이 남을 구조가 없다.
+- **A-4 Wallet/FX.** WalletFxScreen·WalletTransactionsScreen을 account-scoped
+  로 전환. 계정 변경 시 견적·idempotency key·금액·성공 결과를 초기화한다
+  (`useEffect([accountId])`). 일반계정은 `GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`
+  준비 중 화면을 보여주고 **요청을 보내지 않는다**. 공개 환율
+  (`/fx/rates/current`)은 공용이므로 계정 키를 붙이지 않았다.
+- **A-5 주문 목록·취소.** RecordOrderListScreen은 route `seasonId`로부터
+  **그 시즌의 계정**을 찾아 account-scoped orders API를 쓴다. 전역 선택 계정을
+  쓰면 이 시즌 화면에 일반계정 주문이 뜨고 취소 버튼이 엉뚱한 계정을 겨눈다.
+  응답 row 모양이 다르므로(`asset` 중첩) `toRecordOrderItem`으로 한 번만
+  평탄화한다. 종료된 시즌 계정도 읽기는 그대로 되고, 열린 주문이 없으니 취소는
+  자연히 비활성이다.
+- **A-6 Home.** 선택 계정 mode로 분기한다. season 계정은 기존 시즌 대시보드
+  그대로, general 계정은 신규 `GeneralAccountHome`(TWR·총자산·최초 지급 자본·
+  누적 외부자금·누적 광고보상·투자손익·지갑·보유 종목, 시즌 UI 없음). general
+  계정일 때 `/home` 요청 자체를 보내지 않는다 — 그건 시즌 참가에 대한 질문이다.
+  수익률 라벨은 응답의 `returnRateMethod`에서 읽고, 성과 unavailable을 0%로
+  위장하지 않는다. 모든 시즌 blocked 상태에도 AccountSwitcher를 남겨서
+  "시즌이 종료되었습니다"가 막다른 길이 되지 않게 했다.
+- **A-7 로그인 lifecycle.** 로그인/가입 성공 시 `beginSession()`이 (1) 이전
+  사용자 캐시 clear → (2) 응답의 user를 `QUERY_KEYS.me`에 seed → (3) 계정 목록
+  invalidate 순으로 실행한다. Provider의 계정 query는 `enabled: !!userId`라
+  seed가 없으면 로그인 전 401에 머물고 앱 재실행 전까지 switcher가 비어 있었다.
+- **A-8 로그아웃·세션 만료.** 로그아웃을 `useLogout()` 하나로 통합하고
+  (MyScreen·SettingsScreen에 복사본이 둘 있었다) `queryClient.clear()`로 **전체**
+  캐시를 지운다. 기존 구현은 `['tradingAccount']`·`['me']`만 지워서
+  `['wallet']`·`['positions']`·`['portfolio']`·`['order']`·`['home','dashboard']`
+  ·`['record']`·`['ranking']`이 다음 사용자 세션으로 넘어갔다. invalidate가 아니라
+  **remove**인 이유: invalidate된 항목은 refetch 중에도 읽히고, 그 창이 정확히
+  다음 사용자의 첫 렌더다. refresh token 실패도 이제 같은 정리를 한다 —
+  `sessionExpiry.ts`(단일 콜백, 이벤트 버스 아님)가 앱 루트에 알리고 캐시를
+  비운 뒤 로그인으로 reset한다.
+- **A-9 fallback 정책 결함 수정.** `isParticipatingSeasonAccount`가 계정 status만
+  보고 **season status를 보지 않았다**. 정산 대기(`ended`)나 종료 처리 실패로
+  active로 남은 `settled` 시즌 계정이 살아있는 general 계정을 이겼다. 이제
+  `season.seasonStatus === 'active'`를 함께 요구한다. 그런 계정도 규칙 4
+  (가장 최근 개설)로 여전히 도달 가능하다 — 읽을 수 있는 기록이지, 착지점이
+  아닐 뿐이다.
+- **A-10 응답 accountId 대조.** `assertAccountScope(endpoint, expected, payload)`
+  를 account-scoped 호출 전체에 적용했다. 응답이 `tradingAccountId`를 **보냈고**
+  그것이 요청과 다르면 값이 화면·캐시·mutation 성공에 도달하지 못하고 구조적
+  무결성 오류가 된다. 필드가 **없는** 응답은 위반이 아니다(주문 상세·create·
+  cancel·FX는 legacy row 모양이고 경로가 이미 계정을 지목했다). 로그는 endpoint와
+  두 id **뿐** — 다른 계정의 payload를 로그로 옮기는 건 같은 유출이다(테스트로
+  고정).
+- **A-11 mutation wrapper + targeted invalidation.** 실제 backend route 기준으로
+  order quote/create/cancel, FX quote/execute, ad reward claim wrapper를 추가했다
+  (accountId가 **첫 인자**라 호출 시점에 대상이 정해진다). 무효화는
+  `invalidation.ts`가 담당하며 **그 계정 키만** 건드린다. `tradingAccount.all`
+  전체 무효화는 다른 계정의 멀쩡한 캐시를 버리는 것이고, 공용 시세·캔들·종목
+  상세는 주문으로 바뀌지 않으므로 건드리지 않는다. cancel은 position을,
+  FX는 position을 무효화하지 않는다(체결이 아니므로 보유가 변하지 않는다).
+- **A-12 legacy 사용처 정리.** 현재 금융 화면의 legacy current-participant 호출
+  **0개**. 죽은 wrapper(`getWallets`·`quoteOrder`·`createOrder`·`cancelOrder`·
+  `quoteFx`·`executeFx`·`getWalletTransactions`·`getPortfolio*`)를 제거했다.
+  남긴 것: 시즌 라우팅용 `getCurrentSeason`(Splash/Login/Signup/SeasonJoin/
+  Ranking/RecordSeasonList), 공개 환율, 기록용 season API, 모든 타입과 mapper.
+  시즌 참가 성공 시 계정 목록을 invalidate하도록 고쳤다 — 참가는 **새 계정을
+  만든다**. SeasonJoin이 막다른 길이 되지 않도록, 계정을 이미 가진 사용자에게는
+  "홈으로 이동"을 제공한다.
+
+**작업 10 (B)**
+
+- **B-3 e2e 기준선을 원인별로 정리했다.** 기준 커밋 4건 실패 → **0건**, 그리고
+  이제 **환경변수 없이** 통과한다(이전에는 `JWT_ACCESS_SECRET=test-secret` 필요,
+  없으면 62건 실패).
+  - *토큰 62건(공통 원인 수정).* 테스트가 하드코딩 `'test-secret'`으로 서명하고
+    앱은 `.env`/`.env.development` 값으로 검증했다. 이제 앱의 ConfigService에서
+    실제 secret을 읽어 서명한다. 미문서화 환경변수 의존이 사라졌다.
+  - *readiness(환경 의존).* `.env.local`의 `SCHEDULER_MARKET_CANDLE_SYNC_ENABLED=true`
+    가 `scheduler.enabled`를 true로 만들어 개발 머신마다 실패했다. 캘린더 연도를
+    이미 고정하던 것과 같은 방식으로 `SCHEDULER_*`/`ENABLE_*`도 고정했다
+    (`getOpsSchedulerConfig()`는 요청마다 process.env를 읽는다). 추가로 prisma
+    mock에 `marketSessionOverride`가 없어 override 로더 cold start가 실패,
+    readiness가 늘 `degraded`였다.
+  - *wallets 500(obsolete fixture).* wallet fixture에 `reservedAmount`가 없어
+    `balanceAmount.sub(undefined)`가 던졌다. 예약금 컬럼 도입 이전 fixture다.
+  - *home settled 500(obsolete fixture).* 작업 8 A-4의 전체 set preflight
+    (`seasonRanking.findMany`)가 mock되지 않았다.
+  - *orders cancel 401(obsolete test).* cancel route가 **생겼는데** 테스트는
+    route-level 404(무인증)를 기대하고 있었다. 실제 계약(404 `ORDER_NOT_FOUND`
+    masking, 쓰기 없음)으로 고쳤다.
+  - 부수 발견: e2e의 `OpsJobName` mock에 `limit_order_*` 3개가 빠져 있어 세 개의
+    computed key가 모두 문자열 `"undefined"`가 되고 readiness가 가짜 job 하나를
+    보고했다. **실제 enum은 정상**이라 제품 결함은 아니다.
+- **B-4 동시성·멱등성.** DB 통합 20 suite 전부 통과(실패 0). 일반계정 동시 생성/
+  최초 지급, 광고 claim 동일 키 동시 요청, market·limit 주문 멱등 replay,
+  cancel 중복, FX 동일 키 + 동시 초과지출, ranking refresh↔settlement 직렬화,
+  daily snapshot↔광고 지급 동시 실행, ops job lock을 포함한다.
+- **B-5 무결성 audit.** 6개 도구 dry-run 모두 findings **0**. 다만 그 실행은 빈
+  DB 위였다 — 0을 신뢰하려면 0이 아닐 때 0이 아니라고 말하는지 알아야 한다.
+  coverage가 없던 두 도구(`repair-snapshot-scope`, `audit-general-accounts`)에
+  손상 주입 통합 테스트를 추가했다(신규
+  `src/portfolio/snapshot-scope-audit.integration.spec.ts`): 탐지 → dry-run 무기입
+  → apply가 추론 가능한 행만 복구 → 추론 불가 행은 보고만 하고 **건드리지 않음**
+  → 재실행 멱등 → non-null mismatch는 절대 덮어쓰지 않고 exit 1 → audit은
+  read-only. 나머지 4개 도구는 기존 suite가 이미 같은 주입 검증을 한다.
+- **B-6 Prisma.** format/validate/generate/migrate status 모두 정상, 미적용
+  migration 없음. **이번 작업의 migration은 0건**이다. `migrate diff`가 보고하는
+  `equity_snapshots` 3건은 **index 이름 차이뿐**이며(마이그레이션 SQL의 명시적
+  이름 vs Prisma의 자동 명명) 구조 차이가 아니다. 기준 커밋에도 동일하게 존재한다.
+- **B-7 오류 계약.** 프런트에 누락된 3종을 채웠다. `ORDER_NOT_FOUND`(취소 흐름이
+  "알 수 없는 서버 오류 code=…"를 보여주고 있었다), `FINAL_TIER_ASSIGNMENT_CONFLICT`
+  (무결성 집합에 추가), `AD_REWARD_PROVIDER_UNAVAILABLE`(**일시적 외부 의존**이므로
+  손상과 다른 문구 — 고객센터 문의를 안내하지 않는다). 클라이언트 측
+  scope mismatch도 `classifyAccountError`가 integrity로 분류하도록 고쳤다(그전엔
+  generic 오류로 빠졌다).
+- **B-8 레이아웃.** ErrorState/BlockedState가 `flex:1 + center`라 큰 글꼴에서
+  긴 메시지(가장 긴 것이 하필 무결성 안내다)를 잘랐다 → ScrollView + `flexGrow:1`.
+  CTAButton에 `paddingHorizontal`·`textAlign:center`·`lineHeight` 추가(줄바꿈은
+  되지만 가장자리에 붙었다). 새 화면은 badge를 `flexShrink:0` 트랙에, 제목은
+  `minWidth:0`으로 줄바꿈, 금액은 `flexShrink:1`+`lineHeight`. 렌더러가 없는
+  프로젝트라 `accountLayout.test.ts`가 (1) 데이터가 미리 잘리지 않음 (2) 의존하는
+  스타일이 실제로 존재함을 고정한다.
+- **B-9 성능.** account switch는 전체 캐시를 비우지 않고 나가는 계정의 in-flight
+  query만 취소한다(전체 clear는 로그아웃뿐). Home(general)과 Portfolio가 같은
+  `tradingAccount.portfolio(accountId)` 키를 쓰므로 중복 요청이 없다.
+  RecordOrderList가 유일하게 pagination 중복 제거가 없었다 — 열린 지정가가 있으면
+  4초마다 폴링하고 offset 기반이라 같은 주문이 두 페이지에 나올 수 있다 →
+  orderId 기준 dedupe 추가.
+- **B-10 보안·격리.** 프런트 `console.*` 호출은 전부 2개뿐이고 그중 금융 관련은
+  scope mismatch 로그 하나(3개 필드만, 테스트로 고정). 토큰·idempotency key·광고
+  proof·이메일을 로그하지 않는다. refresh 호출은 `apiClient`가 아니라 별도
+  axios라 Authorization header가 붙지 않는다. 로그아웃·세션 만료 모두 캐시를
+  제거한다.
+- **B-12 정리.** 중복 로그아웃 2곳 → 1곳. 죽은 legacy wrapper와 그에 딸린
+  helper·타입·import 제거. `--noUnusedLocals` 기준 features/screens/services에
+  미사용 심볼 **0개**.
+
+**변경 파일**
+
+frontend 신규 12: `features/auth/session.ts`·`sessionCache.ts`·`useLogout.ts`,
+`features/tradingAccount/accountScope.ts`·`accountBinding.ts`·`invalidation.ts`,
+`features/record/accountOrders.ts`, `screens/home/GeneralAccountHome.tsx`,
+`services/api/sessionExpiry.ts`, `app/navigation/navigationRef.ts` (+테스트 5종).
+frontend 수정 20: App providers/navigator/types, tradingAccount api·selection·
+integrityErrors, wallet api·mapper, order·portfolio·position api, errorCode·
+errorMapper, ErrorState·BlockedState·CTAButton, 그리고 화면 8종.
+backend 수정 1: `test/app.e2e-spec.ts`(테스트만). backend 신규 1:
+`src/portfolio/snapshot-scope-audit.integration.spec.ts`.
+**backend 제품 코드 변경 0줄, migration 0건.**
+
+**검증 결과 (기준 커밋 → 최종)**
+
+| 명령 | 기준 | 최종 |
+| --- | --- | --- |
+| `backend: tsc -p tsconfig.build.json` | 통과 | 통과 |
+| `backend: nest build` | 통과 | 통과 (7.3s) |
+| `backend: jest` (unit) | 2550 pass / 0 fail / 36 skip | 동일 |
+| `backend: jest --testPathPatterns=integration` (DB opt-in) | 20 pass / 0 fail | 20 pass / 0 fail (+1 신규 suite) |
+| `backend: test:e2e` | 118 pass / **4 fail** (그리고 `JWT_ACCESS_SECRET` 필요) | **122 pass / 0 fail**, 환경변수 불필요 |
+| `backend: eslint --no-fix` | 934 errors / 11 warnings (기존 부채) | 동일 (내가 만든 증가분 0) |
+| `prisma format/validate/generate/migrate status` | 통과 / drift 없음 | 동일 |
+| `frontend: tsc --noEmit` | 통과 | 통과 |
+| `frontend: npm test` | 338 pass / 0 fail | **414 pass / 0 fail** |
+| `frontend: expo export --platform web` | 통과 | 통과 (839 modules) |
+
+**재현 명령**
+
+```bash
+# DB 통합 (opt-in). PostgreSQL은 UTC여야 한다.
+cd backend && DATABASE_URL=... TRADING_ACCOUNT_DB_INTEGRATION=1 \
+  SEASON_JOIN_DB_INTEGRATION=1 FX_EXECUTE_DB_INTEGRATION=1 \
+  ORDER_EXECUTE_DB_INTEGRATION=1 LIMIT_ORDER_RESERVATION_DB_INTEGRATION=1 \
+  LIMIT_ORDER_MATCHING_DB_INTEGRATION=1 LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION=1 \
+  MVP_FLOW_DB_SMOKE=1 OPS_JOB_LOCK_DB_SMOKE=1 AUTH_DB_SMOKE=1 \
+  npx jest --runInBand --testPathPatterns=integration
+
+# e2e — 추가 환경변수 없이 그대로 실행된다 (이번 작업에서 고침)
+cd backend && pnpm test:e2e
+
+cd frontend && npm run check   # typecheck + 414 tests
+```
+
+**기준선 실패 / 남은 부채**
+
+- backend eslint 934 errors는 **기준 커밋에서 이미 존재**하는 부채다(대부분
+  spec 파일의 `no-unsafe-*`). 이번 작업이 늘린 양은 0이며, 손댄 파일은
+  기준선과 같은 수치로 되돌려 놓았다.
+- candle/provider/Redis 계열 18개 opt-in 테스트는 외부 provider가 필요해
+  이번에도 skip이다(기준선과 동일, 의도된 opt-in).
+- `equity_snapshots` index 이름 drift는 기준선부터 존재하는 이름-only 차이다.
+
+**운영 배포 순서**
+
+migration이 없고 backend 제품 코드가 그대로이므로 **frontend만 배포하면 된다**.
+그래도 순서는 지킨다: (1) `prisma migrate status` — 미적용 0 확인,
+(2) repair 5종 + `audit-general` dry-run → findings 0 확인(0이면 apply 하지 않는다),
+(3) backend 재배포는 선택(변경 없음), (4) frontend 배포,
+(5) 스모크: 로그인 → 계정 자동 선택 → season/general 전환 → 주문·취소·지갑 반영
+→ 일반계정 거래·환전 차단 → 로그아웃 후 다른 사용자 캐시 격리.
+
+**남은 제한사항**
+
+- 일반계정 주문·환전은 여전히 backend 미구현이며, 프런트 차단은 UX용일 뿐
+  서버 게이트가 그대로 권위를 갖는다.
+- 광고 provider 어댑터 없음(기본 비활성). eligibility/claim 화면은 아직 없고,
+  claim wrapper와 무효화 경로만 준비되어 있다.
+- 주문 **상세** 전용 화면은 여전히 없다(백엔드 route는 있다). 목록이 상세 정보를
+  같이 보여주므로 이번엔 화면을 새로 만들지 않았다.
+- `SeasonRanking.tradingAccountId`는 계획대로 nullable 유지.
+
+---
+
 ### 작업 단위: SeasonRanking·정산 무결성 잔여 결함 보완 + 프런트엔드 TradingAccount 계정 전환 (2026-08-04, 작업 8 보완 + 작업 9, WORK-ID SEASON-RANKING-HARDENING-AND-FRONTEND-ACCOUNT-SWITCH-V1)
 
 **기준 커밋** `813e3043c0f363450ae8396ab29b174d0ca52dce`
@@ -1787,6 +2020,44 @@ cd frontend && npm run typecheck && npm test
 ---
 
 ## 2. 최신 작업 시간순 기록
+
+### 2026-08-04 — 프런트엔드 계정 scope 완성 + 릴리스 하드닝 (작업 9 보완 + 작업 10)
+
+- **주문 화면이 "선택된 계정"을 다시 읽지 않는다.** `Order` route에 `accountId`를
+  필수로 넣고, 진입 시점의 그 값만 쓴다. 다른 탭에서 계정을 바꾸면 선택이 조용히
+  달라지는데, 제출 시점에 그걸 읽으면 시즌 계정으로 받은 견적이 일반 계정 create로
+  나간다. 선택이 벗어나면 견적·idempotency key·입력·성공 상태를 버리고 화면을 막은
+  뒤 재진입을 안내한다 — 자동으로 새 계정을 따라가지 않는다.
+- **거래 가능 여부가 전역 시즌이 아니라 그 계정에서 나온다.** AssetDetail·Order가
+  `getCurrentSeason()` 대신 선택 계정의 capability(그 계정의 `season.seasonStatus`
+  포함)를 본다. 앱에 활성 시즌이 있는 것과, 지금 보고 있는 계정이 거래 가능한
+  것은 다른 질문이다.
+- **fallback이 죽은 시즌을 살아있는 일반계정보다 우선하던 결함.**
+  `isParticipatingSeasonAccount`가 계정 status만 보고 season status를 보지 않아서,
+  정산 대기(`ended`)나 종료 처리 실패로 active로 남은 `settled` 계정이 이겼다.
+  사용자는 거래도 못 하는 얼어붙은 순위에 착지하고, 정작 쓸 수 있는 계정은 한 탭
+  건너에 있었다.
+- **로그아웃이 다른 사용자의 금융 캐시를 남기고 있었다.** 기존 구현은
+  `['tradingAccount']`·`['me']`만 지웠고 `['wallet']`·`['positions']`·
+  `['portfolio']`·`['order']`·`['home','dashboard']`·`['record']`·`['ranking']`이
+  살아남았다. 이제 `queryClient.clear()`로 전부 지운다. 열거식 allowlist는 다음에
+  키가 하나 늘 때 조용히 불완전해진다. invalidate가 아니라 remove인 이유는
+  invalidate된 항목이 refetch 중에도 읽히고, 그 창이 정확히 다음 사용자의 첫
+  렌더이기 때문이다. refresh token 실패도 같은 정리를 하도록 연결했다.
+- **로그인 직후 계정 목록이 뜨지 않던 문제.** Provider의 계정 query는
+  `enabled: !!userId`인데 `me`가 로그인 전 401에 머물러 있었다. 로그인 응답의
+  user를 `me`에 seed하고 목록을 invalidate한다.
+- **e2e 4건 실패 → 0건, 그리고 환경변수 없이 통과.** 62건을 401로 만들던
+  `JWT_ACCESS_SECRET` 의존이 원인이었다(테스트는 하드코딩 secret으로 서명,
+  앱은 `.env` 값으로 검증). 앱의 ConfigService에서 실제 secret을 읽어 서명하도록
+  공통 원인을 고쳤다. 나머지는 obsolete fixture 3건(예약금 컬럼 이전 wallet,
+  작업 8 set preflight 미mock, 생기기 전의 cancel route)과 개발 머신의
+  `.env.local` 스케줄러 설정에 의존하던 readiness 1건.
+- **audit 도구가 "0 findings"라고 말할 자격.** 6개 도구 dry-run은 모두 0이었지만
+  빈 DB 위였다. coverage가 없던 두 도구에 손상 주입 테스트를 추가했다 — 탐지,
+  dry-run 무기입, 추론 가능한 행만 복구, 추론 불가 행은 보고만, 재실행 멱등,
+  non-null mismatch는 절대 덮어쓰지 않음, audit은 read-only.
+- backend 제품 코드 변경 0줄, migration 0건. frontend 414 tests(기준 338).
 
 ### 2026-08-04 — SeasonRanking·정산 무결성 잔여 결함 보완 + 프런트엔드 계정 전환 (작업 8 보완 + 작업 9)
 

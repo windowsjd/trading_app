@@ -12,14 +12,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { MyStackParamList } from '../../app/navigation/types';
-import { useRootNavigation } from '../../app/navigation/navigationHooks';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 
 import { getMe, updateMe } from '../../features/me/api';
-import { logout as logoutSession } from '../../features/auth/api';
-import { clearTokens, getRefreshToken } from '../../services/storage/tokenStorage';
-import { clearTradingAccountSession } from '../../features/tradingAccount/TradingAccountContext';
+import { useLogout } from '../../features/auth/useLogout';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -27,7 +24,6 @@ import ErrorState from '../../components/states/ErrorState';
 type Props = NativeStackScreenProps<MyStackParamList, 'Settings'>;
 
 export default function SettingsScreen({ navigation }: Props) {
-  const rootNavigation = useRootNavigation();
   const queryClient = useQueryClient();
 
   const meQuery = useQuery({
@@ -67,31 +63,10 @@ export default function SettingsScreen({ navigation }: Props) {
     });
   };
 
-  const onLogout = async () => {
-    const refreshToken = await getRefreshToken();
-
-    try {
-      await logoutSession(refreshToken);
-    } catch {
-      // Local logout should still complete if the server cannot be reached.
-    } finally {
-      await clearTokens();
-      // The selected account and every account-scoped financial entry are
-      // dropped with the session (작업 9 §B-2): the next user on this device
-      // must never see the previous user's accountId or their cached balances.
-      await clearTradingAccountSession(queryClient, meQuery.data?.id ?? null);
-    }
-
-    rootNavigation.reset({
-      index: 0,
-      routes: [
-        {
-          name: 'AuthStack',
-          params: { screen: 'Login' },
-        },
-      ],
-    });
-  };
+  // One shared implementation (작업 10 §B-12): it clears the WHOLE query cache,
+  // not just the account-scoped keys, so no legacy financial entry survives
+  // into the next user's session.
+  const onLogout = useLogout();
 
   if (meQuery.isLoading) {
     return <FullPageLoading message="설정 정보를 불러오는 중입니다." />;

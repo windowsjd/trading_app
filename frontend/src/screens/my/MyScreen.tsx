@@ -6,20 +6,18 @@ import {
   SafeAreaView,
   Pressable,
 } from 'react-native';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
 import type { MyScreenProps } from '../../app/navigation/types';
-import { useRootNavigation } from '../../app/navigation/navigationHooks';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 
 import { getMe } from '../../features/me/api';
-import { logout as logoutSession } from '../../features/auth/api';
+import { useLogout } from '../../features/auth/useLogout';
 import { getHomeDashboard } from '../../features/home/api';
 import { getHomeRankingDisplay } from '../../features/home/mapper';
 import { getMySeasonRecords } from '../../features/record/api';
-import { clearTokens, getRefreshToken } from '../../services/storage/tokenStorage';
-import { clearTradingAccountSession } from '../../features/tradingAccount/TradingAccountContext';
+import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -27,8 +25,15 @@ import ErrorState from '../../components/states/ErrorState';
 type Props = MyScreenProps;
 
 export default function MyScreen({ navigation }: Props) {
-  const rootNavigation = useRootNavigation();
-  const queryClient = useQueryClient();
+  /**
+   * Rank and tier are SEASON facts (작업 10 §A-12). A user whose selected
+   * account is their general account has neither, and the season dashboard
+   * request is about current-season participation they do not have — so it is
+   * not issued, and the two rows are not rendered as "-", which would read as
+   * "you are unranked" rather than "this does not apply".
+   */
+  const { selectedAccount, isLoading: accountsLoading } = useTradingAccount();
+  const showsSeasonUi = selectedAccount?.mode === 'season';
 
   const meQuery = useQuery({
     queryKey: QUERY_KEYS.me,
@@ -38,6 +43,7 @@ export default function MyScreen({ navigation }: Props) {
   const homeQuery = useQuery({
     queryKey: QUERY_KEYS.home.dashboard,
     queryFn: getHomeDashboard,
+    enabled: !accountsLoading && showsSeasonUi,
   });
 
   const recordsQuery = useQuery({
@@ -46,60 +52,45 @@ export default function MyScreen({ navigation }: Props) {
   });
 
   const viewState = useMemo(() => {
-    if (meQuery.isLoading || homeQuery.isLoading || recordsQuery.isLoading) {
+    if (
+      accountsLoading ||
+      meQuery.isLoading ||
+      (showsSeasonUi && homeQuery.isLoading) ||
+      recordsQuery.isLoading
+    ) {
       return 'my_loading';
     }
-    if (!meQuery.data || !homeQuery.data || !recordsQuery.data) {
+    if (!meQuery.data || !recordsQuery.data) {
       return 'my_error';
     }
     return 'my_ready';
   }, [
+    accountsLoading,
+    showsSeasonUi,
     meQuery.isLoading,
     homeQuery.isLoading,
     recordsQuery.isLoading,
     meQuery.data,
-    homeQuery.data,
     recordsQuery.data,
   ]);
 
-  const onLogout = async () => {
-    const refreshToken = await getRefreshToken();
-
-    try {
-      await logoutSession(refreshToken);
-    } catch {
-      // Local logout should still complete if the server cannot be reached.
-    } finally {
-      await clearTokens();
-      // The selected account and every account-scoped financial entry are
-      // dropped with the session (작업 9 §B-2): the next user on this device
-      // must never see the previous user's accountId or their cached balances.
-      await clearTradingAccountSession(queryClient, meQuery.data?.id ?? null);
-    }
-
-    rootNavigation.reset({
-      index: 0,
-      routes: [
-        {
-          name: 'AuthStack',
-          params: { screen: 'Login' },
-        },
-      ],
-    });
-  };
+  // One shared implementation (작업 10 §B-12): it clears the WHOLE query cache,
+  // not just the account-scoped keys, so no legacy financial entry survives
+  // into the next user's session.
+  const onLogout = useLogout();
 
   if (viewState === 'my_loading') {
     return <FullPageLoading message="내 정보를 불러오는 중입니다." />;
   }
 
-  if (viewState === 'my_error' || !meQuery.data || !homeQuery.data || !recordsQuery.data) {
+  if (viewState === 'my_error' || !meQuery.data || !recordsQuery.data) {
     return (
       <ErrorState
         title="내 정보를 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
         onRetry={() => {
           meQuery.refetch();
-          homeQuery.refetch();
+          if (showsSeasonUi) homeQuery.refetch();
           recordsQuery.refetch();
         }}
       />
@@ -107,8 +98,9 @@ export default function MyScreen({ navigation }: Props) {
   }
 
   const me = meQuery.data;
-  const home = homeQuery.data;
-  const ranking = getHomeRankingDisplay(home.ranking);
+  const ranking = showsSeasonUi
+    ? getHomeRankingDisplay(homeQuery.data?.ranking)
+    : null;
   const seasonCount = recordsQuery.data.items.length;
 
   return (
@@ -117,10 +109,18 @@ export default function MyScreen({ navigation }: Props) {
         <View style={styles.card}>
           <Text style={styles.title}>{me.nickname}</Text>
           <Text style={styles.helper}>이메일 {me.email}</Text>
-          <Text style={styles.helper}>현재 등급 {ranking.tier}</Text>
-          <Text style={styles.helper}>
-            현재 순위 {ranking.rank === '-' ? '-' : `#${ranking.rank}`}
-          </Text>
+          {ranking ? (
+            <>
+              <Text style={styles.helper}>현재 등급 {ranking.tier}</Text>
+              <Text style={styles.helper}>
+                현재 순위 {ranking.rank === '-' ? '-' : `#${ranking.rank}`}
+              </Text>
+            </>
+          ) : (
+            <Text style={styles.helper}>
+              일반 투자 계정에는 시즌 등급과 순위가 없습니다.
+            </Text>
+          )}
           <Text style={styles.helper}>참여 시즌 수 {seasonCount}</Text>
         </View>
 

@@ -21,6 +21,23 @@
   see `docs/general-account-and-ad-rewards-api-contract.md`. General-mode FX
   is still NOT implemented (409 `GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`).
 
+## Client status (작업 10)
+
+The frontend uses these routes for all current wallet, ledger and FX screens;
+the legacy `/api/v1/wallets`, `/api/v1/wallets/transactions` and `/api/v1/fx/*`
+surfaces are no longer called by any screen (they remain implemented). The
+public `GET /api/v1/fx/rates/current` is still used directly and keeps an
+account-free cache key — it is market data, not account data.
+
+An account change in the client clears the FX quote, its idempotency key, the
+entered amount and the success result before anything can be replayed, so the
+`QUOTE_MISMATCH` guard below should not be reachable from the app's own UI; it
+remains the server-side backstop.
+
+General accounts are shown a 준비 중 state and the client does not send the
+request at all, so `GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED` is a server gate the UI
+mirrors rather than one users collect by pressing a button.
+
 ## Common Rules
 - Authentication required on every route (401 `UNAUTHORIZED` without a valid
   token). User identity is `request.user.userId`.

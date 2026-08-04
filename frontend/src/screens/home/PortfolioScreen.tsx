@@ -84,11 +84,6 @@ type PortfolioPositionRow = {
   returnRate: string;
 };
 
-function displayValue(value?: string | number | null) {
-  if (value === null || value === undefined || value === '') return '-';
-  return String(value);
-}
-
 function formatKrwChartValue(value: number) {
   return `${formatKrw(value)}원`;
 }
@@ -146,7 +141,6 @@ export default function PortfolioScreen({ navigation }: Props) {
   const rootNavigation = useRootNavigation();
   const {
     selectedAccountId,
-    selectedAccount,
     capabilities,
     isLoading: accountsLoading,
     isEmpty: noAccounts,

@@ -292,6 +292,14 @@ export function getErrorMessageFromCode(
       return '견적 유효 시간이 지났습니다. 다시 견적을 받아주세요.';
     case ERROR_CODE.QUOTE_MISMATCH:
       return '견적과 요청 내용이 일치하지 않습니다. 다시 견적을 받아주세요.';
+    case ERROR_CODE.ORDER_NOT_FOUND:
+      // Unknown id and another account's id are the same answer by design;
+      // the copy therefore states neither.
+      return '주문을 찾을 수 없습니다. 목록을 새로고침한 뒤 다시 확인해주세요.';
+    case ERROR_CODE.AD_REWARD_PROVIDER_UNAVAILABLE:
+      // Temporary and retryable — deliberately worded unlike an integrity
+      // failure, which asks the user to contact support.
+      return '광고 제공자와 연결할 수 없습니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.RATE_CHANGED_REQUOTE_REQUIRED:
       return '가격 또는 환율이 변경되었습니다. 다시 견적을 받아주세요.';
     case ERROR_CODE.IDEMPOTENCY_REQUIRED:

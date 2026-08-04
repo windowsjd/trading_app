@@ -6,8 +6,23 @@ import type {
   PercentString,
   SectionState,
 } from '../../models/dto/common';
-import type { WalletBalanceDto } from '../wallet/api';
+import type {
+  FxExecuteDto,
+  FxExecuteRequestDto,
+  FxQuoteDto,
+  FxQuoteRequestDto,
+  WalletBalanceDto,
+  WalletTransactionDto,
+} from '../wallet/api';
 import type { PositionItemDto } from '../position/api';
+import type {
+  CancelOrderDto,
+  CreateOrderDto,
+  CreateOrderRequestDto,
+  OrderQuoteDto,
+  OrderQuoteRequestDto,
+} from '../order/api';
+import { assertAccountScope } from './accountScope';
 
 /**
  * Account-scoped API surface (작업 9).
@@ -185,7 +200,13 @@ export async function getTradingAccount(accountId: string) {
     accountPath(accountId),
   );
 
-  return response.data.data;
+  // The detail payload identifies itself with `id`, not `tradingAccountId`, so
+  // it is cross-checked here rather than through the shared helper.
+  return assertAccountScope(
+    'GET /trading-accounts/:accountId',
+    accountId,
+    { ...response.data.data, tradingAccountId: response.data.data.id },
+  ) as TradingAccountDto;
 }
 
 export async function getTradingAccountPortfolio(accountId: string) {
@@ -193,7 +214,11 @@ export async function getTradingAccountPortfolio(accountId: string) {
     ApiSuccessResponse<TradingAccountPortfolioDto>
   >(accountPath(accountId, '/portfolio'));
 
-  return response.data.data;
+  return assertAccountScope(
+    'GET /trading-accounts/:accountId/portfolio',
+    accountId,
+    response.data.data,
+  );
 }
 
 export async function getTradingAccountEquity(
@@ -204,7 +229,11 @@ export async function getTradingAccountEquity(
     ApiSuccessResponse<TradingAccountEquityDto>
   >(accountPath(accountId, '/portfolio/equity'), { params: { range } });
 
-  return response.data.data;
+  return assertAccountScope(
+    'GET /trading-accounts/:accountId/portfolio/equity',
+    accountId,
+    response.data.data,
+  );
 }
 
 export async function getTradingAccountWallets(accountId: string) {
@@ -212,7 +241,49 @@ export async function getTradingAccountWallets(accountId: string) {
     ApiSuccessResponse<TradingAccountWalletsDto>
   >(accountPath(accountId, '/wallets'));
 
-  return response.data.data;
+  return assertAccountScope(
+    'GET /trading-accounts/:accountId/wallets',
+    accountId,
+    response.data.data,
+  );
+}
+
+export interface TradingAccountWalletTransactionsDto {
+  tradingAccountId: string;
+  filters?: Record<string, unknown>;
+  items: WalletTransactionDto[];
+  pagination: OffsetPagination;
+}
+
+export interface TradingAccountWalletTransactionsParams {
+  currency?: string;
+  direction?: string;
+  txType?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export async function getTradingAccountWalletTransactions(
+  accountId: string,
+  params: TradingAccountWalletTransactionsParams = {},
+) {
+  const response = await apiClient.get<
+    ApiSuccessResponse<TradingAccountWalletTransactionsDto>
+  >(accountPath(accountId, '/wallet-transactions'), {
+    params: {
+      ...(params.currency ? { currency: params.currency } : {}),
+      ...(params.direction ? { direction: params.direction } : {}),
+      ...(params.txType ? { txType: params.txType } : {}),
+      limit: params.limit ?? 20,
+      offset: params.offset ?? 0,
+    },
+  });
+
+  return assertAccountScope(
+    'GET /trading-accounts/:accountId/wallet-transactions',
+    accountId,
+    response.data.data,
+  );
 }
 
 export interface TradingAccountPositionsParams {
@@ -237,7 +308,35 @@ export async function getTradingAccountPositions(
     },
   });
 
-  return response.data.data;
+  return assertAccountScope(
+    'GET /trading-accounts/:accountId/positions',
+    accountId,
+    response.data.data,
+  );
+}
+
+/**
+ * The one position this screen is about, from an account-scoped read.
+ *
+ * Kept next to the request rather than reusing the legacy
+ * `getPositionForAsset` so there is no shape in which a legacy
+ * (current-participant) positions response can be fed to an account-scoped
+ * screen (작업 10 §A-3).
+ */
+export function findAccountPosition(
+  positions: TradingAccountPositionsDto | null | undefined,
+  assetId: string,
+): PositionItemDto | null {
+  return (
+    positions?.positions.find((position) => position.assetId === assetId) ?? null
+  );
+}
+
+export function getAccountPositionQuantity(
+  positions: TradingAccountPositionsDto | null | undefined,
+  assetId: string,
+) {
+  return findAccountPosition(positions, assetId)?.quantity ?? '0';
 }
 
 export interface TradingAccountOrdersParams {
@@ -264,7 +363,17 @@ export async function getTradingAccountOrders(
     },
   });
 
-  return response.data.data;
+  return assertAccountScope(
+    'GET /trading-accounts/:accountId/orders',
+    accountId,
+    response.data.data,
+  );
+}
+
+export interface TradingAccountOrderDetailDto {
+  order: Record<string, unknown>;
+  execution?: Record<string, unknown> | null;
+  tradingAccountId?: string;
 }
 
 export async function getTradingAccountOrder(
@@ -272,10 +381,14 @@ export async function getTradingAccountOrder(
   orderId: string,
 ) {
   const response = await apiClient.get<
-    ApiSuccessResponse<Record<string, unknown>>
+    ApiSuccessResponse<TradingAccountOrderDetailDto>
   >(accountPath(accountId, `/orders/${encodeURIComponent(orderId)}`));
 
-  return response.data.data;
+  return assertAccountScope(
+    'GET /trading-accounts/:accountId/orders/:orderId',
+    accountId,
+    response.data.data,
+  );
 }
 
 export async function getAdRewardEligibility(accountId: string) {
@@ -283,7 +396,11 @@ export async function getAdRewardEligibility(accountId: string) {
     ApiSuccessResponse<AdRewardEligibilityDto>
   >(accountPath(accountId, '/ad-rewards/eligibility'));
 
-  return response.data.data;
+  return assertAccountScope(
+    'GET /trading-accounts/:accountId/ad-rewards/eligibility',
+    accountId,
+    response.data.data,
+  );
 }
 
 export async function getAdRewardClaims(
@@ -300,5 +417,129 @@ export async function getAdRewardClaims(
     params: { limit: params.limit ?? 20, offset: params.offset ?? 0 },
   });
 
-  return response.data.data;
+  return assertAccountScope(
+    'GET /trading-accounts/:accountId/ad-rewards/claims',
+    accountId,
+    response.data.data,
+  );
+}
+
+/* ------------------------------------------------------------------------ *
+ * Account-scoped MUTATIONS (작업 10 §A-11)
+ *
+ * These are the existing 작업 4·5·6 routes; nothing here invents an endpoint.
+ * Each takes the accountId as its FIRST argument rather than reading a
+ * selected account from context, so the account a mutation acts on is decided
+ * by the caller at the moment the flow started — not by whatever happens to be
+ * selected when the request finally goes out. That distinction is the whole
+ * protection against a switch mid-flow moving a user's money in the wrong
+ * account.
+ *
+ * The request bodies are identical to the legacy surfaces (same service cores
+ * server-side); only the path differs.
+ * ------------------------------------------------------------------------ */
+
+export async function quoteTradingAccountOrder(
+  accountId: string,
+  payload: OrderQuoteRequestDto,
+) {
+  const response = await apiClient.post<ApiSuccessResponse<OrderQuoteDto>>(
+    accountPath(accountId, '/orders/quote'),
+    payload,
+  );
+
+  return assertAccountScope(
+    'POST /trading-accounts/:accountId/orders/quote',
+    accountId,
+    response.data.data,
+  );
+}
+
+export async function createTradingAccountOrder(
+  accountId: string,
+  payload: CreateOrderRequestDto,
+) {
+  const response = await apiClient.post<ApiSuccessResponse<CreateOrderDto>>(
+    accountPath(accountId, '/orders'),
+    payload,
+  );
+
+  return assertAccountScope(
+    'POST /trading-accounts/:accountId/orders',
+    accountId,
+    response.data.data,
+  );
+}
+
+/**
+ * Cancel releases a reservation, so the backend deliberately allows it on
+ * suspended and closed accounts too — blocking it client-side would strand a
+ * user's own money behind a screen they can still read.
+ */
+export async function cancelTradingAccountOrder(
+  accountId: string,
+  orderId: string,
+) {
+  const response = await apiClient.post<ApiSuccessResponse<CancelOrderDto>>(
+    accountPath(accountId, `/orders/${encodeURIComponent(orderId)}/cancel`),
+  );
+
+  return assertAccountScope(
+    'POST /trading-accounts/:accountId/orders/:orderId/cancel',
+    accountId,
+    response.data.data,
+  );
+}
+
+export async function quoteTradingAccountFx(
+  accountId: string,
+  payload: FxQuoteRequestDto,
+) {
+  const response = await apiClient.post<ApiSuccessResponse<FxQuoteDto>>(
+    accountPath(accountId, '/fx/quote'),
+    payload,
+  );
+
+  return assertAccountScope(
+    'POST /trading-accounts/:accountId/fx/quote',
+    accountId,
+    response.data.data,
+  );
+}
+
+export async function executeTradingAccountFx(
+  accountId: string,
+  payload: FxExecuteRequestDto,
+) {
+  const response = await apiClient.post<ApiSuccessResponse<FxExecuteDto>>(
+    accountPath(accountId, '/fx/execute'),
+    payload,
+  );
+
+  return assertAccountScope(
+    'POST /trading-accounts/:accountId/fx/execute',
+    accountId,
+    response.data.data,
+  );
+}
+
+export interface AdRewardClaimRequestDto {
+  idempotencyKey: string;
+  provider?: string;
+  proof?: string;
+}
+
+export async function claimAdReward(
+  accountId: string,
+  payload: AdRewardClaimRequestDto,
+) {
+  const response = await apiClient.post<
+    ApiSuccessResponse<Record<string, unknown>>
+  >(accountPath(accountId, '/ad-rewards/claim'), payload);
+
+  return assertAccountScope(
+    'POST /trading-accounts/:accountId/ad-rewards/claim',
+    accountId,
+    response.data.data,
+  );
 }

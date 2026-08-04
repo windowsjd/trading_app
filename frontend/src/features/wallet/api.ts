@@ -134,19 +134,6 @@ export interface FxExecuteDto {
 
 export type WalletTransactionDirection = 'credit' | 'debit';
 
-type BackendWalletTransactionDto = {
-  id: string;
-  currencyCode: WalletCurrency;
-  direction: string;
-  txType: string;
-  referenceType: string;
-  referenceId: string | null;
-  amount: MoneyString;
-  balanceAfter: MoneyString;
-  occurredAt: IsoDateTimeString;
-  createdAt: IsoDateTimeString;
-};
-
 export interface WalletTransactionDto {
   transactionId: string;
   walletId?: string;
@@ -184,80 +171,7 @@ export interface GetWalletTransactionsParams {
   txType?: string;
 }
 
-type BackendWalletTransactionsResponseDto = {
-  state: WalletState;
-  season: WalletSeasonDto | null;
-  participant: WalletParticipantDto | null;
-  filters?: {
-    currency: WalletCurrency | null;
-    direction: WalletTransactionDirection | null;
-    txType: string | null;
-  };
-  transactions: BackendWalletTransactionDto[];
-  pagination: OffsetPagination;
-  reason?: string;
-  message?: string;
-};
 
-function normalizeWalletTransaction(
-  item: BackendWalletTransactionDto | WalletTransactionDto,
-): WalletTransactionDto {
-  return {
-    transactionId: 'transactionId' in item ? item.transactionId : item.id,
-    walletId: 'walletId' in item ? item.walletId : undefined,
-    currencyCode: item.currencyCode,
-    direction: item.direction === 'credit' ? 'credit' : 'debit',
-    txType: item.txType,
-    referenceType: item.referenceType ?? null,
-    referenceId: item.referenceId ?? null,
-    amount: item.amount,
-    balanceAfter: item.balanceAfter,
-    occurredAt: item.occurredAt,
-    createdAt: item.createdAt,
-  };
-}
-
-function buildFallbackPagination(
-  limit: number,
-  offset: number,
-  returned: number,
-): OffsetPagination {
-  return {
-    limit,
-    offset,
-    total: offset + returned,
-    returned,
-    nextOffset: returned >= limit ? offset + returned : null,
-  };
-}
-
-function normalizeWalletTransactions(
-  data: BackendWalletTransactionsResponseDto,
-  limit: number,
-  offset: number,
-): WalletTransactionsDto {
-  const items = data.transactions.map(normalizeWalletTransaction);
-
-  return {
-    state: data.state,
-    season: data.season,
-    participant: data.participant,
-    filters: data.filters,
-    items,
-    pagination:
-      data.pagination ?? buildFallbackPagination(limit, offset, items.length),
-    reason: data.reason,
-    message: data.message,
-  };
-}
-
-export async function getWallets() {
-  const response = await apiClient.get<ApiSuccessResponse<WalletsDto>>(
-    '/wallets',
-  );
-
-  return response.data.data;
-}
 
 export async function getCurrentFxRate(
   baseCurrency: WalletCurrency = 'USD',
@@ -278,46 +192,5 @@ export async function getCurrentFxRate(
   return response.data.data;
 }
 
-export async function quoteFx(payload: FxQuoteRequestDto) {
-  const response = await apiClient.post<ApiSuccessResponse<FxQuoteDto>>(
-    '/fx/quote',
-    payload,
-  );
 
-  return response.data.data;
-}
 
-export async function executeFx(payload: FxExecuteRequestDto) {
-  const response = await apiClient.post<ApiSuccessResponse<FxExecuteDto>>(
-    '/fx/execute',
-    payload,
-  );
-
-  return response.data.data;
-}
-
-export async function getWalletTransactions(
-  params: GetWalletTransactionsParams = {},
-) {
-  const limit = params.limit ?? 20;
-  const offset = params.offset ?? 0;
-  const searchParams = new URLSearchParams();
-
-  if (params.currency) {
-    searchParams.set('currency', params.currency);
-  }
-  if (params.direction) {
-    searchParams.set('direction', params.direction);
-  }
-  if (params.txType) {
-    searchParams.set('txType', params.txType);
-  }
-  searchParams.set('limit', String(limit));
-  searchParams.set('offset', String(offset));
-
-  const response = await apiClient.get<
-    ApiSuccessResponse<BackendWalletTransactionsResponseDto>
-  >(`/wallets/transactions?${searchParams.toString()}`);
-
-  return normalizeWalletTransactions(response.data.data, limit, offset);
-}

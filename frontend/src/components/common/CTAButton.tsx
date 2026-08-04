@@ -52,7 +52,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#111',
     borderRadius: 12,
     paddingVertical: 14,
+    // Horizontal padding so a long Korean label does not run to the edges, and
+    // no numberOfLines so it wraps instead of being cut (작업 10 §B-8).
+    paddingHorizontal: 16,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   disabled: {
     opacity: 0.45,
@@ -63,5 +67,7 @@ const styles = StyleSheet.create({
   text: {
     color: '#fff',
     fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 21,
   },
 });

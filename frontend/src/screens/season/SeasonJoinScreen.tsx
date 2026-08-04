@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { SeasonJoinScreenProps } from '../../app/navigation/types';
 import { getCurrentSeason, joinSeason } from '../../features/season/api';
+import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import {
   toSeasonJoinViewState,
 } from '../../features/season/mapper';
@@ -65,6 +66,17 @@ export default function SeasonJoinScreen({ navigation }: Props) {
     });
   };
 
+  /**
+   * Season entry is not the only way into the app any more (작업 10 §A-12).
+   *
+   * Login routes here whenever there is no joinable-and-joined season, which
+   * for a user who holds a general account is a dead end: they own a usable
+   * account and the season screen has nothing to offer them. If they own ANY
+   * account, the screen offers a way home instead of only a retry button.
+   */
+  const { accounts } = useTradingAccount();
+  const hasUsableAccount = accounts.length > 0;
+
   const seasonQuery = useQuery({
     queryKey: QUERY_KEYS.season.current,
     queryFn: getCurrentSeason,
@@ -74,10 +86,16 @@ export default function SeasonJoinScreen({ navigation }: Props) {
     mutationFn: (seasonId: string) => joinSeason(seasonId),
     onSuccess: async () => {
       setJoinErrorCode(null);
+      // Joining a season CREATES a new season TradingAccount (작업 10 §A-12).
+      // The owned-account list must be refetched or the switcher will not show
+      // the account the user just opened, and the selection policy cannot land
+      // on it.
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.season.current }),
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.tradingAccount.list,
+        }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.home.dashboard }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.wallet.balances }),
       ]);
 
       resetToHome();
@@ -96,10 +114,14 @@ export default function SeasonJoinScreen({ navigation }: Props) {
         code === ERROR_CODE.SEASON_NOT_ACTIVE ||
         code === ERROR_CODE.SEASON_NOT_FOUND
       ) {
+        // SEASON_ALREADY_JOINED means the account exists already; the list is
+        // refetched for the same reason as on success.
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: QUERY_KEYS.season.current }),
+          queryClient.invalidateQueries({
+            queryKey: QUERY_KEYS.tradingAccount.list,
+          }),
           queryClient.invalidateQueries({ queryKey: QUERY_KEYS.home.dashboard }),
-          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.wallet.balances }),
         ]);
         await seasonQuery.refetch();
       }
@@ -140,7 +162,14 @@ export default function SeasonJoinScreen({ navigation }: Props) {
   }
 
   if (viewState === 'season_not_configured_view') {
-    return (
+    return hasUsableAccount ? (
+      <BlockedState
+        title="현재 진행 중인 시즌이 없습니다."
+        message="시즌이 열리면 참가할 수 있습니다. 보유한 계정은 홈에서 계속 사용할 수 있습니다."
+        actionLabel="홈으로 이동"
+        onAction={resetToHome}
+      />
+    ) : (
       <ErrorState
         title="현재 시즌이 설정되지 않았습니다."
         message="시즌이 열리면 참가할 수 있습니다."

@@ -19,9 +19,14 @@ import {
   type AssetChartTimeframe,
   type AssetDetailPriceDto,
 } from "../../features/asset/api";
-import { getPositionForAsset, getPositions } from "../../features/position/api";
-import { getCurrentSeason } from "../../features/season/api";
-import { toSeasonDomainState } from "../../features/season/mapper";
+import {
+  findAccountPosition,
+  getTradingAccountPositions,
+} from "../../features/tradingAccount/api";
+import { useTradingAccount } from "../../features/tradingAccount/TradingAccountContext";
+import { CAPABILITY_BLOCK_MESSAGE } from "../../features/tradingAccount/capabilities";
+import { getIntegrityErrorMessage } from "../../features/tradingAccount/integrityErrors";
+import { getAccountDisplay } from "../../features/tradingAccount/accountDisplay";
 import { useAssetTicker } from "../../features/asset/useAssetTicker";
 import { selectDisplayPrice } from "../../features/asset/displayPricePolicy";
 import { useAssetCandle } from "../../features/asset/useAssetCandle";
@@ -70,10 +75,19 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
     useState<AssetChartTimeframe>(DEFAULT_ASSET_CHART_TIMEFRAME);
   const assetTickerWsUrl = useMemo(() => buildWsUrl("/api/v1/ws"), []);
 
-  const seasonQuery = useQuery({
-    queryKey: QUERY_KEYS.season.current,
-    queryFn: getCurrentSeason,
-  });
+  // Market data is PUBLIC and shared by every account and every user, so asset
+  // detail, price and candles keep their account-free cache keys (작업 10 §A-3).
+  // Only the two user-owned facts below — what I hold and what I may do — are
+  // account-scoped.
+  const {
+    selectedAccountId,
+    selectedAccount,
+    capabilities,
+    isLoading: accountsLoading,
+    isEmpty: noAccounts,
+  } = useTradingAccount();
+  const accountId = selectedAccountId ?? "";
+  const hasAccount = !!selectedAccountId;
 
   const detailQuery = useQuery({
     queryKey: QUERY_KEYS.asset.detail(assetId),
@@ -81,8 +95,15 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
   });
 
   const positionQuery = useQuery({
-    queryKey: QUERY_KEYS.position.list({ assetId, limit: 20, offset: 0 }),
-    queryFn: () => getPositions({ assetId, limit: 20, offset: 0 }),
+    queryKey: QUERY_KEYS.tradingAccount.positions(accountId, {
+      assetId,
+      limit: 20,
+    }),
+    queryFn: () =>
+      getTradingAccountPositions(accountId, { assetId, limit: 20, offset: 0 }),
+    // No accountId, no financial request. An account-less call would either be
+    // a legacy current-participant read or a 404 — both wrong here.
+    enabled: hasAccount,
   });
 
   const candlesQuery = useQuery({
@@ -141,12 +162,15 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
 
   const { asset } = detailQuery.data;
   const price = asset.price;
-  const position = getPositionForAsset(positionQuery.data, assetId);
+  // The quantity shown, and the quantity 매도 is gated on, both come from the
+  // SELECTED account's position read. Because the query key carries the
+  // accountId, a switch produces a different query with no data rather than the
+  // previous account's holdings under the new account's heading.
+  const position = findAccountPosition(positionQuery.data, assetId);
   const hasPosition = Number(position?.quantity ?? "0") > 0;
-  const seasonState = seasonQuery.data
-    ? toSeasonDomainState(seasonQuery.data)
+  const accountDisplay = selectedAccount
+    ? getAccountDisplay(selectedAccount)
     : null;
-  const canTradeSeason = seasonState === "season_active_joined";
   const priceAvailable = isPriceAvailable(price);
   const livePriceAvailable = !!latestTicker?.priceLocal;
   const orderPriceAvailable = priceAvailable || livePriceAvailable;
@@ -201,17 +225,27 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
     selectedTimeframe.limit,
   );
 
-  const seasonBlockedReason = seasonQuery.isLoading
-    ? "시즌 상태를 확인하는 중입니다."
-    : seasonQuery.isError || !seasonQuery.data
-      ? "시즌 상태를 확인할 수 없어 주문을 잠시 막았습니다."
-      : seasonState === "season_active_not_joined"
-        ? "시즌에 참가해야 거래할 수 있습니다."
-        : seasonState === "season_ended_unsettled"
-          ? "정산 중에는 거래할 수 없습니다."
-          : !canTradeSeason
-            ? "현재 거래 가능한 시즌이 아닙니다."
-            : null;
+  /**
+   * Trading permission comes from the SELECTED account, not from a global
+   * `getCurrentSeason()` (작업 10 §A-3). Those are different questions: the app
+   * can be in the middle of an active season while the account the user is
+   * looking at is their general account, a settled season's account, or a
+   * suspended one. The season fact that matters is the one attached to THIS
+   * account, which `getTradingAccountCapabilities` already reads from
+   * `account.season.seasonStatus`.
+   */
+  const accountBlockedReason = accountsLoading
+    ? "계정 정보를 확인하는 중입니다."
+    : noAccounts || !capabilities
+      ? "거래 가능한 계정이 없습니다."
+      : capabilities.tradeBlockReason
+        ? CAPABILITY_BLOCK_MESSAGE[capabilities.tradeBlockReason]
+        : null;
+
+  // Server-detected damage is never presented as "you hold nothing".
+  const positionIntegrityMessage = positionQuery.isError
+    ? getIntegrityErrorMessage(positionQuery.error)
+    : null;
 
   const assetHardBlockedReason = !asset.isActive ? "비활성 자산입니다." : null;
 
@@ -229,14 +263,30 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
               "KRW 환산 시세를 사용할 수 없습니다. 서버 견적에서 최종 확인됩니다.")
             : null;
 
-  const buyBlockedReason = seasonBlockedReason ?? assetHardBlockedReason;
+  const buyBlockedReason = accountBlockedReason ?? assetHardBlockedReason;
   const sellBlockedReason =
     buyBlockedReason ??
     (positionQuery.isError
       ? "보유 수량을 확인할 수 없어 매도할 수 없습니다."
-      : !hasPosition
-        ? "보유 수량이 없어 매도할 수 없습니다."
-        : null);
+      : positionQuery.isLoading
+        ? "보유 수량을 확인하는 중입니다."
+        : // 매도 is gated on THIS account's real quantity — never on a cached
+          // number from a previously selected account.
+          !hasPosition
+          ? "보유 수량이 없어 매도할 수 없습니다."
+          : null);
+
+  const openOrderScreen = (side: "buy" | "sell") => {
+    if (!selectedAccountId) return;
+    // The account is pinned into the route: the order flow targets the account
+    // that was selected when the button was pressed, whatever happens to the
+    // selection afterwards (작업 10 §A-2).
+    navigation.navigate("Order", {
+      assetId,
+      side,
+      accountId: selectedAccountId,
+    });
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -313,14 +363,18 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
             <Text style={styles.helper}>{tradingNote}</Text>
           ) : null}
           {buyBlockedReason ? (
-            <View style={styles.inlineWarning}>
+            <View
+              testID={TEST_IDS.tradingAccount.capabilityNotice}
+              style={styles.inlineWarning}
+            >
               <Text style={styles.inlineWarningText}>{buyBlockedReason}</Text>
-              {seasonState === "season_active_not_joined" ? (
+              {capabilities?.isSeason &&
+              capabilities.tradeBlockReason === "season_not_active" ? (
                 <Pressable
                   style={styles.retryButton}
                   onPress={() => rootNavigation.navigate("SeasonJoin")}
                 >
-                  <Text style={styles.retryText}>시즌 참가하기</Text>
+                  <Text style={styles.retryText}>시즌 안내 보기</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -344,9 +398,38 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.label}>내 포지션</Text>
-          {positionQuery.isLoading ? (
+          {/* WHICH account these holdings belong to is stated on the card
+              itself: a quantity with no account next to it is not an answer to
+              "do I own this" when the user holds several accounts. */}
+          <Text style={styles.label}>
+            내 포지션
+            {accountDisplay ? ` · ${accountDisplay.title}` : ""}
+          </Text>
+          {accountDisplay ? (
+            <Text style={styles.accountBadge}>
+              {accountDisplay.statusLabel}
+            </Text>
+          ) : null}
+          {!hasAccount ? (
+            <InlineEmptyState
+              title="계정이 없습니다."
+              message="계정을 개설하면 보유 현황을 볼 수 있습니다."
+            />
+          ) : positionQuery.isLoading ? (
             <SectionSkeleton lines={4} />
+          ) : positionIntegrityMessage ? (
+            <>
+              <InlineEmptyState
+                title="보유 내역을 안전하게 표시할 수 없습니다."
+                message={positionIntegrityMessage}
+              />
+              <Pressable
+                style={styles.retryButton}
+                onPress={() => positionQuery.refetch()}
+              >
+                <Text style={styles.retryText}>포지션 다시 시도</Text>
+              </Pressable>
+            </>
           ) : positionQuery.isError ? (
             <>
               <InlineEmptyState
@@ -466,18 +549,14 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
             label="매수"
             state={buyBlockedReason ? "blocked" : "enabled"}
             style={styles.flex}
-            onPress={() =>
-              navigation.navigate("Order", { assetId, side: "buy" })
-            }
+            onPress={() => openOrderScreen("buy")}
           />
           <CTAButton
             testID={TEST_IDS.assetDetail.sellButton}
             label="매도"
             state={sellBlockedReason ? "blocked" : "enabled"}
             style={styles.flex}
-            onPress={() =>
-              navigation.navigate("Order", { assetId, side: "sell" })
-            }
+            onPress={() => openOrderScreen("sell")}
           />
         </View>
 
@@ -506,6 +585,20 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, color: "#666" },
   value: { fontSize: 20, fontWeight: "700" },
   helper: { fontSize: 14, color: "#444" },
+  // Its own line and its own track: a status that can be shrunk away by a long
+  // season name is a status that reads as "운영 중" when it is not.
+  accountBadge: {
+    alignSelf: "flex-start",
+    flexShrink: 0,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#333",
+    backgroundColor: "#ececec",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    overflow: "hidden",
+  },
   debug: { fontSize: 11, color: "#9aa0a6", marginTop: 6 },
   errorText: { fontSize: 14, color: "#c62828" },
   chip: {

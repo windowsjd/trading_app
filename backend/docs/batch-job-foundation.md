@@ -384,3 +384,22 @@ operator re-runs `season-settlement`.
 ## Future Work
 
 Cron scheduling, provider ingestion, daily snapshot automation, ranking overwrite/regeneration, settlement extensions beyond final tier assignment, true competition tie rank, reward amount policy, and actual payment/point/delivery/external fulfillment remain separate gates.
+
+
+## Verification status (작업 10)
+
+No contract or job change. Re-verified against PostgreSQL:
+
+- `src/ops/ops-job-lock.integration.spec.ts` — job locking.
+- `src/portfolio/general-performance-hardening.integration.spec.ts` — the
+  general-account daily snapshot job's per-account atomicity, its idempotency,
+  a concurrent run leaving exactly one daily row, and its serialisation against
+  a concurrent ad payout on the same `trading_accounts` row lock.
+- `src/batch/*` unit suites unchanged and passing.
+
+Scheduler readiness note: `getOpsSchedulerConfig()` reads `process.env` per
+request, and ANY enabled job flips `scheduler.enabled` to true. The readiness
+contract test pins `SCHEDULER_*` / `ENABLE_*` for the duration of its assertion
+(작업 10) — before that it failed on any developer machine whose `.env.local`
+enabled the candle sync, which is a normal local setup and not a readiness
+fault.

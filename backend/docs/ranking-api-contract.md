@@ -305,3 +305,18 @@ operator to repair. Only a clean set is replaced.
 - Scheduler/batch execution inside this read API request path; automatic generation is handled by the ops scheduler.
 - Advanced ranking filters, periods, season history views, reward/settlement integration.
 - General-mode ranking, and any combined season + general ranking.
+
+
+## Verification status (작업 10)
+
+No contract change. Re-verified against PostgreSQL as part of the release
+hardening pass:
+
+- `src/ranking/season-ranking-scope.integration.spec.ts` passes — ranking scope
+  dual-write/verification, the full-set preflight, `repair-ranking-scope`
+  injected-damage detection, and the ranking-refresh ↔ settlement season-row
+  serialisation.
+- `SeasonRanking.tradingAccountId` stays **nullable** by design; no migration
+  was added and no NOT NULL tightening was attempted.
+- Client-side: `accountId` is not exposed in any public ranking payload, and the
+  frontend never derives an account from a ranking row.

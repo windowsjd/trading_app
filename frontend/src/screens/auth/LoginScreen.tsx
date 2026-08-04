@@ -7,7 +7,7 @@ import {
   StyleSheet,
   SafeAreaView,
 } from 'react-native';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import type { LoginScreenProps } from '../../app/navigation/types';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
@@ -16,6 +16,7 @@ import {
   resetToSeasonJoin,
 } from '../../app/navigation/seasonRouting';
 import { login } from '../../features/auth/api';
+import { beginSession } from '../../features/auth/session';
 import { clearTokens, saveTokens } from '../../services/storage/tokenStorage';
 import { getCurrentSeason } from '../../features/season/api';
 import {
@@ -51,6 +52,7 @@ function getBlockedAuthMessage(state: AuthViewState | null) {
 
 export default function LoginScreen({ navigation }: LoginScreenProps) {
   const rootNavigation = useRootNavigation();
+  const queryClient = useQueryClient();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -78,6 +80,13 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
         setSubmitError(getBlockedAuthMessage(nextBlockedState));
         return;
       }
+
+      // Install THIS user's session before anything reads the cache: the
+      // previous user's entries are dropped, `me` is seeded from the login
+      // response (so the account provider stops sitting on its pre-login 401),
+      // and the owned-account list is fetched for the new user — all without an
+      // app restart (작업 10 §A-7).
+      await beginSession(queryClient, result.user);
 
       try {
         const season = await getCurrentSeason();

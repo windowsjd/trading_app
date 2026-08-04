@@ -67,6 +67,13 @@ jest.mock('../src/generated/prisma/client', () => {
       market_candle_retention: 'market_candle_retention',
       market_candle_sync: 'market_candle_sync',
       market_candle_reconciliation: 'market_candle_reconciliation',
+      // These three were missing here while the real enum has them. Every
+      // `[OpsJobName.limit_order_*]` computed key then evaluated to the STRING
+      // "undefined", so the readiness payload reported one bogus
+      // `"undefined": false` job instead of the three real ones.
+      limit_order_matcher: 'limit_order_matcher',
+      limit_order_candle_reconciliation: 'limit_order_candle_reconciliation',
+      limit_order_matching: 'limit_order_matching',
     },
     OpsJobRunStatus: {
       running: 'running',
@@ -186,6 +193,7 @@ jest.mock('../src/prisma/prisma.service', () => ({
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { WsAdapter } from '@nestjs/platform-ws';
 import request from 'supertest';
 import { App } from 'supertest/types';
@@ -284,6 +292,16 @@ type PrismaMock = {
   operatorAuditLog: {
     create: jest.Mock;
   };
+  /**
+   * The stock-market calendar's override layer loads at startup and, until its
+   * FIRST successful load, readiness is deliberately degraded with
+   * MARKET_SESSION_OVERRIDE_UNAVAILABLE. Without this model on the mock the
+   * load threw, every run reported `degraded`, and the readiness contract test
+   * failed for a reason that had nothing to do with readiness.
+   */
+  marketSessionOverride: {
+    findMany: jest.Mock;
+  };
   season: {
     findFirst: jest.Mock;
     findUnique: jest.Mock;
@@ -346,6 +364,17 @@ type PrismaMock = {
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
   let jwtService: JwtService;
+  /**
+   * The secret the APP resolved, read back from its own ConfigService.
+   *
+   * These tests used to sign with a hardcoded 'test-secret' while the app
+   * verified with whatever `.env` / `.env.development` provided, so 62 of them
+   * 401'd on any checkout that has those files — which is every developer
+   * machine — and only passed when the runner happened to export
+   * JWT_ACCESS_SECRET=test-secret. Signing with the app's own secret makes the
+   * suite correct in every environment and removes the undocumented variable.
+   */
+  let accessTokenSecret: string;
   let prisma: PrismaMock;
 
   const originalJwtAccessSecret = process.env.JWT_ACCESS_SECRET;
@@ -384,18 +413,26 @@ describe('AppController (e2e)', () => {
     joinedAt: now,
     initialCapitalKrw: new Prisma.Decimal('10000000.00000000'),
   };
+  // `reservedAmount` is not optional: the wallet readers derive
+  // `availableAmount = balanceAmount - reservedAmount` with Prisma.Decimal, so a
+  // fixture without it makes `.sub(undefined)` throw and the endpoint answer 500.
+  // It arrived with limit-order reservations; these fixtures predated it.
   const krwWallet = {
     id: 'wallet-krw-1',
     seasonParticipantId: participant.id,
+    tradingAccountId: 'trading-account-1',
     currencyCode: 'KRW',
     balanceAmount: new Prisma.Decimal('10000000.00000000'),
+    reservedAmount: new Prisma.Decimal('0.00000000'),
     updatedAt: now,
   };
   const usdWallet = {
     id: 'wallet-usd-1',
     seasonParticipantId: participant.id,
+    tradingAccountId: 'trading-account-1',
     currencyCode: 'USD',
     balanceAmount: new Prisma.Decimal('0.00000000'),
+    reservedAmount: new Prisma.Decimal('0.00000000'),
     updatedAt: now,
   };
   const refreshToken = 'r'.repeat(64);
@@ -545,6 +582,12 @@ describe('AppController (e2e)', () => {
           createdAt: now,
         }),
       },
+      // An empty override set is a SUCCESSFUL load: the store leaves
+      // fail-closed mode and the calendar behaves exactly as it does with no
+      // overrides configured, which is the state this suite means to test.
+      marketSessionOverride: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       season: {
         findFirst: jest.fn(),
         findUnique: jest.fn(),
@@ -618,6 +661,11 @@ describe('AppController (e2e)', () => {
       .compile();
 
     jwtService = moduleFixture.get(JwtService);
+    accessTokenSecret =
+      moduleFixture
+        .get(ConfigService)
+        .get<string>('JWT_ACCESS_SECRET')
+        ?.trim() ?? 'test-secret';
     app = moduleFixture.createNestApplication();
     app.useWebSocketAdapter(new WsAdapter(app));
     await app.init();
@@ -656,7 +704,7 @@ describe('AppController (e2e)', () => {
         sub: userId,
       },
       {
-        secret: 'test-secret',
+        secret: accessTokenSecret,
         expiresIn: '15m',
       },
     );
@@ -941,6 +989,19 @@ describe('AppController (e2e)', () => {
     const priorThrough = process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR;
     process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR = '2026';
     process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR = '2026';
+    // The scheduler flags are pinned for the same reason as the calendar
+    // range: this asserts the readiness CONTRACT, not one machine's config.
+    // `getOpsSchedulerConfig()` reads process.env per request, and any single
+    // enabled job flips `scheduler.enabled` to true — so a developer whose
+    // .env.local runs the candle sync (a normal local setup) saw this test
+    // fail for a reason that has nothing to do with readiness.
+    const priorScheduler = { ...process.env };
+    for (const key of Object.keys(process.env)) {
+      if (key.startsWith('SCHEDULER_') || key.startsWith('ENABLE_')) {
+        delete process.env[key];
+      }
+    }
+    process.env.SCHEDULER_ENABLED = 'false';
     try {
       await request(app.getHttpServer())
         .get('/readiness')
@@ -971,6 +1032,19 @@ describe('AppController (e2e)', () => {
           );
         });
     } finally {
+      for (const key of Object.keys(process.env)) {
+        if (key.startsWith('SCHEDULER_') || key.startsWith('ENABLE_')) {
+          delete process.env[key];
+        }
+      }
+      for (const [key, value] of Object.entries(priorScheduler)) {
+        if (
+          (key.startsWith('SCHEDULER_') || key.startsWith('ENABLE_')) &&
+          value !== undefined
+        ) {
+          process.env[key] = value;
+        }
+      }
       if (priorFrom === undefined) {
         delete process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR;
       } else {
@@ -1329,7 +1403,7 @@ describe('AppController (e2e)', () => {
         sub: user.id,
       },
       {
-        secret: 'test-secret',
+        secret: accessTokenSecret,
         expiresIn: '15m',
       },
     );
@@ -3003,6 +3077,29 @@ describe('AppController (e2e)', () => {
       capturedAt: new Date('2026-05-31T00:00:30.000Z'),
     });
     prisma.seasonRanking.count.mockResolvedValueOnce(1);
+    // 작업 8 A-4: the reader verifies the WHOLE ranking set's scope columns
+    // before paging, so `findMany` must answer too. Leaving it unmocked made
+    // the settled branch throw and answer 500 — a fixture gap, not a product
+    // fault: the same set is what the response's rank and percentile come from.
+    prisma.seasonRanking.findMany.mockResolvedValueOnce([
+      {
+        id: 'ranking-final-1',
+        seasonId: season.id,
+        seasonParticipantId: participant.id,
+        tradingAccountId: 'trading-account-1',
+        seasonParticipant: {
+          id: participant.id,
+          seasonId: season.id,
+          userId: user.id,
+          tradingAccountId: 'trading-account-1',
+          tradingAccount: {
+            id: 'trading-account-1',
+            mode: 'season',
+            userId: user.id,
+          },
+        },
+      },
+    ]);
     prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([]);
     const token = await createValidAccessToken();
 
@@ -3119,7 +3216,7 @@ describe('AppController (e2e)', () => {
         sub: user.id,
       },
       {
-        secret: 'test-secret',
+        secret: accessTokenSecret,
         expiresIn: '15m',
       },
     );
@@ -3835,21 +3932,35 @@ describe('AppController (e2e)', () => {
       },
     },
     {
+      // The cancel route EXISTS now (limit-order reservations). This case used
+      // to assert a route-level 404 with no auth, which only held while the
+      // endpoint was missing; with a valid token it reached the guard and
+      // returned 401. The real contract is the masking one: an unknown orderId
+      // and another user's orderId are the same 404 ORDER_NOT_FOUND, and
+      // nothing is written on the way there.
       label: 'POST /api/v1/orders/:orderId/cancel',
       path: '/api/v1/orders/order-1/cancel',
       body: undefined,
       expectedStatus: 404,
-      authExpected: false,
-      setup: () => undefined,
+      authExpected: true,
+      setup: () => {
+        mockActiveUser();
+        mockActiveSeason();
+        mockJoinedParticipant();
+        // Reuse the shared helper rather than a second copy of the same
+        // passthrough — `resetPrismaMocks()` above cleared the default.
+        mockTransactionPassthrough();
+        prisma.$queryRaw.mockResolvedValueOnce([]);
+        prisma.order.findFirst.mockResolvedValueOnce(null);
+      },
       assertBody: (body: Record<string, unknown>) => {
         expect(body).toMatchObject({
           success: false,
           error: {
-            code: 'NOT_FOUND',
+            code: 'ORDER_NOT_FOUND',
           },
         });
-        expect(prisma.order.findFirst).not.toHaveBeenCalled();
-        expectNoWriteMutationCalls();
+        expectNoModelWriteMutationCalls();
       },
     },
     {

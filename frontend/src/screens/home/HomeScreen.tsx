@@ -35,6 +35,10 @@ import {
   getAssetNameDisplay,
 } from '../../utils/format';
 
+import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
+import AccountSwitcher from '../../components/tradingAccount/AccountSwitcher';
+import GeneralAccountHome from './GeneralAccountHome';
+
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import BlockedState from '../../components/states/BlockedState';
@@ -159,10 +163,36 @@ function getSectionErrorMessage(
 
 export default function HomeScreen({ navigation }: Props) {
   const rootNavigation = useRootNavigation();
+  const {
+    selectedAccount,
+    capabilities,
+    isLoading: accountsLoading,
+    isEmpty: noAccounts,
+  } = useTradingAccount();
+
+  /**
+   * Home means two different things depending on the selected account
+   * (작업 10 §A-6).
+   *
+   * A SEASON account gets the season dashboard it always had: season name and
+   * status, season return, live rank, tier, and the season CTAs, on the
+   * existing `/home` contract.
+   *
+   * A GENERAL account gets an account-scoped portfolio summary with a
+   * time-weighted return and its funding breakdown, and NO season UI at all.
+   * The season dashboard's "현재 진행 중인 시즌이 없습니다" screen would be
+   * simply false there — a general account is not waiting for a season.
+   *
+   * The season dashboard request is not even issued for a general account: it
+   * is about the current season's participation, which a general account does
+   * not have.
+   */
+  const isGeneralAccount = selectedAccount?.mode === 'general';
 
   const homeQuery = useQuery({
     queryKey: QUERY_KEYS.home.dashboard,
     queryFn: getHomeDashboard,
+    enabled: !accountsLoading && !isGeneralAccount,
   });
 
   const home = homeQuery.data;
@@ -202,12 +232,57 @@ export default function HomeScreen({ navigation }: Props) {
     homeQuery.refetch();
   };
 
+  if (accountsLoading) {
+    return <FullPageLoading message="홈 정보를 불러오는 중입니다." />;
+  }
+
+  // No accounts at all: an explicit empty state with the switcher, never a
+  // season screen and never a zero-value portfolio.
+  if (noAccounts || !selectedAccount) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.content}>
+          <AccountSwitcher />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (isGeneralAccount) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.switcherHeader}>
+          <AccountSwitcher />
+        </View>
+        <GeneralAccountHome
+          account={selectedAccount}
+          capabilities={capabilities}
+          onOpenLedger={() => navigation.navigate('WalletTransactions')}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  /**
+   * Every season state below keeps the switcher on screen (작업 10 §A-6). A
+   * user whose season has ended must be able to reach their general account
+   * from Home; without the switcher, "시즌이 종료되었습니다" is a dead end.
+   */
+  const withSwitcher = (children: React.ReactNode) => (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.switcherHeader}>
+        <AccountSwitcher />
+      </View>
+      {children}
+    </SafeAreaView>
+  );
+
   if (viewState === 'home_loading') {
     return <FullPageLoading message="홈 정보를 불러오는 중입니다." />;
   }
 
   if (viewState === 'home_error') {
-    return (
+    return withSwitcher(
       <ErrorState
         title="홈 정보를 불러오지 못했습니다."
         message="네트워크 또는 일시적 서버 오류일 수 있습니다."
@@ -217,7 +292,7 @@ export default function HomeScreen({ navigation }: Props) {
   }
 
   if (viewState === 'home_no_current_season') {
-    return (
+    return withSwitcher(
       <BlockedState
         title="현재 진행 중인 시즌이 없습니다."
         message="시즌이 열리면 홈에서 참가와 거래 상태를 확인할 수 있습니다."
@@ -228,7 +303,7 @@ export default function HomeScreen({ navigation }: Props) {
   }
 
   if (viewState === 'home_active_not_joined') {
-    return (
+    return withSwitcher(
       <BlockedState
         title="아직 이번 시즌에 참가하지 않았습니다."
         message="시즌에 참가해야 포트폴리오, 수익률, 거래 기능을 사용할 수 있습니다."
@@ -239,7 +314,7 @@ export default function HomeScreen({ navigation }: Props) {
   }
 
   if (viewState === 'home_upcoming') {
-    return (
+    return withSwitcher(
       <BlockedState
         title="시즌 시작 전입니다."
         message="시즌 시작 전에는 거래와 환전이 비활성입니다."
@@ -250,7 +325,7 @@ export default function HomeScreen({ navigation }: Props) {
   }
 
   if (viewState === 'home_ended_unsettled') {
-    return (
+    return withSwitcher(
       <BlockedState
         title="시즌 정산 중입니다."
         message="정산 중에는 거래와 환전이 차단됩니다."
@@ -259,7 +334,7 @@ export default function HomeScreen({ navigation }: Props) {
   }
 
   if (viewState === 'home_settled_not_joined') {
-    return (
+    return withSwitcher(
       <BlockedState
         title="시즌이 종료되었습니다."
         message="참가 기록이 없어 최종 결과가 없습니다. 다음 시즌을 기다려주세요."
@@ -276,6 +351,8 @@ export default function HomeScreen({ navigation }: Props) {
           testID={TEST_IDS.home.screen}
           contentContainerStyle={styles.content}
         >
+          <AccountSwitcher />
+
           <View testID={TEST_IDS.home.summaryCard} style={styles.card}>
             {hasSectionErrors ? (
               <View style={styles.warningBox}>
@@ -345,6 +422,10 @@ export default function HomeScreen({ navigation }: Props) {
         testID={TEST_IDS.home.screen}
         contentContainerStyle={styles.content}
       >
+        {/* Which account this dashboard is about — always visible, so the
+            numbers below are never anonymous. */}
+        <AccountSwitcher />
+
         {viewState === 'home_partial_error' || hasSectionErrors ? (
           <View style={styles.warningBox}>
             <Text style={styles.warningTitle}>일부 정보 지연</Text>
@@ -584,6 +665,7 @@ export default function HomeScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
+  switcherHeader: { paddingHorizontal: 16, paddingTop: 16 },
   content: { padding: 16, gap: 12, paddingBottom: 24 },
   row: { flexDirection: 'row', gap: 12 },
   flex: { flex: 1 },

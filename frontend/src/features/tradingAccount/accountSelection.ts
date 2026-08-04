@@ -71,15 +71,30 @@ function isActive(account: SelectableAccount) {
 }
 
 /**
- * An `excluded` participant is not competing, so their season account is not
- * preferred over a general account — it is still readable, just not the
- * natural landing place.
+ * The season the user is actually COMPETING IN right now (작업 10 §A-9).
+ *
+ * All five facts must hold together:
+ *   - the account is a season account,
+ *   - the account itself is active,
+ *   - it has a season link at all,
+ *   - THAT SEASON IS STILL RUNNING, and
+ *   - the participant is genuinely participating (`excluded` is not).
+ *
+ * The season-status condition is the one that was missing. Season accounts are
+ * closed by settlement, but an `ended` season sits between "trading stopped"
+ * and "settled", and a settled season whose close-out failed leaves an active
+ * account behind by definition of the failure. Preferring either over a live
+ * general account lands the user on a frozen leaderboard position, with no
+ * trading possible, while the account they can actually use sits one tap away.
+ * "Most recently opened" (rule 4) still reaches those accounts — they are
+ * readable history, just not the natural landing place.
  */
 function isParticipatingSeasonAccount(account: SelectableAccount) {
   return (
     account.mode === 'season' &&
     isActive(account) &&
     !!account.season &&
+    account.season.seasonStatus === 'active' &&
     SEASON_PARTICIPATING_STATUSES.has(account.season.participantStatus)
   );
 }

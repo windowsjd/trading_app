@@ -25,7 +25,18 @@ export type MarketStackParamList = {
   Market: undefined;
   MarketSearch: undefined;
   AssetDetail: { assetId: string };
-  Order: { assetId: string; side?: 'buy' | 'sell' };
+  /**
+   * `accountId` is REQUIRED, not optional (작업 10 §A-2).
+   *
+   * An order flow is about exactly one account, decided when the user opened
+   * the screen. If the screen instead read "whichever account is selected right
+   * now", a switch made while a quote was on screen would silently retarget the
+   * next create — the user would press 주문 on numbers quoted for their season
+   * account and move money in their general one. Carrying the id in the route
+   * makes the target immutable for the life of the screen, and makes a
+   * mismatch with the current selection detectable rather than invisible.
+   */
+  Order: { assetId: string; accountId: string; side?: 'buy' | 'sell' };
 };
 
 export type RankingStackParamList = {

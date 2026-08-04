@@ -23,12 +23,22 @@ import type { RecordStackParamList } from '../../app/navigation/types';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 import {
-  getMySeasonOrders,
   getRecordOrderDisplay,
   isOpenLimitBuyOrder,
   shouldPollSubmittedLimitOrders,
 } from '../../features/record/api';
-import { cancelOrder } from '../../features/order/api';
+import { toRecordOrderItems } from '../../features/record/accountOrders';
+import {
+  cancelTradingAccountOrder,
+  getTradingAccountOrders,
+} from '../../features/tradingAccount/api';
+import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
+import { getAccountDisplay } from '../../features/tradingAccount/accountDisplay';
+import { getIntegrityErrorMessage } from '../../features/tradingAccount/integrityErrors';
+import {
+  invalidateAfterOrderCancel,
+  invalidateAfterOrderCreate,
+} from '../../features/tradingAccount/invalidation';
 import {
   getApiErrorCode,
   getErrorMessageFromCode,
@@ -45,6 +55,29 @@ export default function RecordOrderListScreen({ route }: Props) {
   const { seasonId } = route.params;
   const [filter, setFilter] = useState<Filter>('all');
   const queryClient = useQueryClient();
+  const { accounts, isLoading: accountsLoading } = useTradingAccount();
+
+  /**
+   * The account is derived from the SEASON this screen is about — not from the
+   * globally selected account (작업 10 §A-5).
+   *
+   * The screen is reached from one season's record, so the orders it shows
+   * belong to that season's account. Using the current selection instead would
+   * list a general account's orders (or another season's) under this season's
+   * heading, and would aim the cancel button at the wrong account.
+   *
+   * Reads are status-blind by contract, so an ended or settled season's closed
+   * account still shows its full history here — read-only, with cancel
+   * naturally unavailable because nothing is open.
+   */
+  const seasonAccount =
+    accounts.find(
+      (account) =>
+        account.mode === 'season' && account.season?.seasonId === seasonId,
+    ) ?? null;
+  const accountId = seasonAccount?.id ?? '';
+  const hasAccount = !!seasonAccount;
+  const accountDisplay = seasonAccount ? getAccountDisplay(seasonAccount) : null;
   const isFocused = useIsFocused();
   const [appState, setAppState] = useState<AppStateStatus>(
     AppState.currentState,
@@ -60,21 +93,20 @@ export default function RecordOrderListScreen({ route }: Props) {
   }, []);
 
   const cancelMutation = useMutation({
-    mutationFn: cancelOrder,
+    // Cancel names the account explicitly. The backend classifies a foreign
+    // account's order as 404 and the caller's OWN order with a broken scope as
+    // a structured 500 — neither is silently swallowed here.
+    mutationFn: (orderId: string) =>
+      cancelTradingAccountOrder(accountId, orderId),
     retry: false,
     onSuccess: async () => {
       setCancelingOrderId(null);
-      // The released reservation affects wallets/home/portfolio, and the
-      // canceled state must show up across order/record lists.
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.record.all }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.wallet.balances }),
-        queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.wallet.transactionsAll,
-        }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.home.dashboard }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.portfolio.all }),
-      ]);
+      // Only THIS account's orders/wallets/portfolio, plus the season record
+      // and dashboard views that are keyed by season rather than by account
+      // (작업 10 §A-11). Positions are untouched: a cancel never fills.
+      await invalidateAfterOrderCancel(queryClient, accountId, {
+        seasonUi: true,
+      });
     },
     onError: (error) => {
       setCancelingOrderId(null);
@@ -102,24 +134,22 @@ export default function RecordOrderListScreen({ route }: Props) {
   };
 
   const ordersQuery = useInfiniteQuery({
-    queryKey: QUERY_KEYS.record.seasonOrders({
-      seasonId,
-      limit: 20,
-      offset: 0,
+    queryKey: QUERY_KEYS.tradingAccount.orders(accountId, {
       side,
+      limit: 20,
     }),
     queryFn: ({ pageParam }) =>
-      getMySeasonOrders({
-        seasonId,
+      getTradingAccountOrders(accountId, {
+        side,
         limit: 20,
         offset: pageParam,
-        side,
       }),
     getNextPageParam: (lastPage) => lastPage.pagination.nextOffset ?? undefined,
     initialPageParam: 0,
+    enabled: hasAccount,
     refetchInterval: (query) => {
       const pages = query.state.data?.pages ?? [];
-      const pageItems = pages.flatMap((page) => page.items);
+      const pageItems = pages.flatMap((page) => toRecordOrderItems(page));
       return shouldPollSubmittedLimitOrders({
         isFocused,
         appState,
@@ -131,11 +161,27 @@ export default function RecordOrderListScreen({ route }: Props) {
     refetchIntervalInBackground: false,
   });
 
-  const items = useMemo(
-    () => ordersQuery.data?.pages.flatMap((page) => page.items) ?? [],
-    [ordersQuery.data],
-  );
-  const hasOpenLimit = useMemo(() => items.some(isOpenLimitBuyOrder), [items]);
+  /**
+   * De-duplicated by orderId, like the portfolio and ledger lists (작업 10
+   * §B-9).
+   *
+   * This list POLLS every 4s while an open limit order exists, and its
+   * pagination is offset-based. An order that fills between two page fetches
+   * shifts the window, so the same row can arrive on two pages — which in a
+   * FlatList means duplicate keys and a row rendered twice.
+   */
+  const items = useMemo(() => {
+    const byOrderId = new Map<string, ReturnType<typeof toRecordOrderItems>[number]>();
+
+    ordersQuery.data?.pages.forEach((page) => {
+      toRecordOrderItems(page).forEach((item) => {
+        const key = item.orderId ?? item.id;
+        if (key) byOrderId.set(key, item);
+      });
+    });
+
+    return Array.from(byOrderId.values());
+  }, [ordersQuery.data]);
 
   useEffect(() => {
     const terminalTransitionObserved = items.some((item) => {
@@ -146,16 +192,13 @@ export default function RecordOrderListScreen({ route }: Props) {
         !isOpenLimitBuyOrder(item)
       );
     });
-    if (terminalTransitionObserved) {
-      void Promise.all([
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.order.myList() }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.record.all }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.wallet.balances }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.position.all }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.home.dashboard }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.portfolio.all }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ranking.all }),
-      ]);
+    if (terminalTransitionObserved && accountId) {
+      // A limit order reached a terminal state while we were polling: it either
+      // filled (position + cash changed) or was released. Same account-scoped
+      // refresh as a create, so no other account's cache is disturbed.
+      void invalidateAfterOrderCreate(queryClient, accountId, {
+        seasonUi: true,
+      });
     }
     previousOpenLimitIds.current = new Set(
       items
@@ -163,7 +206,7 @@ export default function RecordOrderListScreen({ route }: Props) {
         .map((item) => item.orderId ?? item.id)
         .filter((orderId): orderId is string => Boolean(orderId)),
     );
-  }, [items, queryClient]);
+  }, [items, queryClient, accountId]);
 
   const viewState = useMemo(() => {
     if (ordersQuery.isLoading) return 'record_orders_loading';
@@ -178,15 +221,35 @@ export default function RecordOrderListScreen({ route }: Props) {
     items.length,
   ]);
 
-  if (viewState === 'record_orders_loading') {
+  if (accountsLoading || (hasAccount && viewState === 'record_orders_loading')) {
     return <FullPageLoading message="거래 내역을 불러오는 중입니다." />;
   }
+
+  // No owned account for this season. Not an empty list — an empty list would
+  // claim the user made no trades that season, which this does not know.
+  if (!hasAccount) {
+    return (
+      <ErrorState
+        title="이 시즌의 계정을 찾을 수 없습니다."
+        message="계정 정보를 다시 불러온 뒤 시도해주세요. 계속되면 고객센터에 문의해주세요."
+        onRetry={() => ordersQuery.refetch()}
+      />
+    );
+  }
+
+  const integrityMessage = ordersQuery.isError
+    ? getIntegrityErrorMessage(ordersQuery.error)
+    : null;
 
   if (viewState === 'record_orders_error') {
     return (
       <ErrorState
-        title="거래 내역을 불러오지 못했습니다."
-        message="잠시 후 다시 시도해주세요."
+        title={
+          integrityMessage
+            ? '거래 내역을 안전하게 표시할 수 없습니다.'
+            : '거래 내역을 불러오지 못했습니다.'
+        }
+        message={integrityMessage ?? '잠시 후 다시 시도해주세요.'}
         onRetry={() => ordersQuery.refetch()}
       />
     );
@@ -206,7 +269,15 @@ export default function RecordOrderListScreen({ route }: Props) {
         }}
         onEndReachedThreshold={0.4}
         ListHeaderComponent={
-          <View style={styles.filterRow}>
+          <View>
+            {/* Which account's orders these are. The season name doubles as
+                the account name here — they are the same thing. */}
+            {accountDisplay ? (
+              <Text style={styles.accountHeader}>
+                {accountDisplay.title} · {accountDisplay.statusLabel}
+              </Text>
+            ) : null}
+            <View style={styles.filterRow}>
             <FilterChip
               testID={TEST_IDS.record.orderFilterAll}
               active={filter === 'all'}
@@ -225,6 +296,7 @@ export default function RecordOrderListScreen({ route }: Props) {
               label="매도"
               onPress={() => setFilter('sell')}
             />
+            </View>
           </View>
         }
         ListEmptyComponent={
@@ -361,6 +433,13 @@ function FilterChip({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
+  accountHeader: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#333',
+    paddingBottom: 8,
+    lineHeight: 20,
+  },
   content: { padding: 16, paddingBottom: 24 },
   filterRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   chip: {

@@ -1,6 +1,4 @@
-import { apiClient } from '../../services/api/client';
 import type {
-  ApiSuccessResponse,
   BpsString,
   IsoDateTimeString,
   MoneyString,
@@ -196,23 +194,7 @@ export interface CreateOrderDto {
   executionPolicy?: LimitOrderExecutionPolicyDto;
 }
 
-export async function quoteOrder(payload: OrderQuoteRequestDto) {
-  const response = await apiClient.post<ApiSuccessResponse<OrderQuoteDto>>(
-    '/orders/quote',
-    payload,
-  );
 
-  return response.data.data;
-}
-
-export async function createOrder(payload: CreateOrderRequestDto) {
-  const response = await apiClient.post<ApiSuccessResponse<CreateOrderDto>>(
-    '/orders',
-    payload,
-  );
-
-  return response.data.data;
-}
 
 export interface CancelOrderDto {
   order: CreatedOrderDto;
@@ -225,11 +207,3 @@ export interface CancelOrderDto {
   };
 }
 
-/** Cancels a submitted limit-buy order and releases its cash reservation. */
-export async function cancelOrder(orderId: string) {
-  const response = await apiClient.post<ApiSuccessResponse<CancelOrderDto>>(
-    `/orders/${orderId}/cancel`,
-  );
-
-  return response.data.data;
-}

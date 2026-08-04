@@ -1,6 +1,18 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { getAccessToken, getRefreshToken, saveTokens, clearTokens } from '../storage/tokenStorage';
 import { API_BASE_URL } from '../../constants/env';
+import { notifySessionExpired } from './sessionExpiry';
+
+/**
+ * Dropping the tokens is only half of an expiry: the query cache still holds
+ * the previous session's balances, orders, and positions, and every mounted
+ * screen would keep rendering them (작업 10 §A-8). Announcing it lets the app
+ * root clear that cache and return to login.
+ */
+async function endExpiredSession() {
+  await clearTokens();
+  notifySessionExpired();
+}
 
 type RefreshResponse = {
   success: true;
@@ -51,7 +63,7 @@ async function refreshAccessToken(): Promise<string | null> {
       const refreshToken = await getRefreshToken();
 
       if (!refreshToken) {
-        await clearTokens();
+        await endExpiredSession();
         return null;
       }
 
@@ -64,7 +76,7 @@ async function refreshAccessToken(): Promise<string | null> {
       const tokens = getRefreshTokens(response.data.data);
 
       if (!tokens) {
-        await clearTokens();
+        await endExpiredSession();
         return null;
       }
 
@@ -72,7 +84,7 @@ async function refreshAccessToken(): Promise<string | null> {
 
       return tokens.accessToken;
     } catch {
-      await clearTokens();
+      await endExpiredSession();
       return null;
     } finally {
       isRefreshing = false;

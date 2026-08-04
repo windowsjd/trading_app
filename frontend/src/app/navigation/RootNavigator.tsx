@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import type { RootStackParamList } from './types';
+import { rootNavigationRef } from './navigationRef';
 import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
 import SplashScreen from '../../screens/auth/SplashScreen';
@@ -12,7 +13,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={rootNavigationRef}>
       <Stack.Navigator
         id="RootStack"
         initialRouteName="Splash"

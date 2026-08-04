@@ -14,11 +14,15 @@ import type { WalletTransactionsScreenProps } from '../../app/navigation/types';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 import {
-  getWalletTransactions,
   type WalletCurrency,
   type WalletTransactionDirection,
   type WalletTransactionDto,
 } from '../../features/wallet/api';
+import { getTradingAccountWalletTransactions } from '../../features/tradingAccount/api';
+import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
+import { getAccountDisplay } from '../../features/tradingAccount/accountDisplay';
+import { getIntegrityErrorMessage } from '../../features/tradingAccount/integrityErrors';
+import AccountSwitcher from '../../components/tradingAccount/AccountSwitcher';
 import { formatMoney } from '../../utils/format';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
@@ -74,11 +78,6 @@ function getTransactionKey(item: WalletTransactionDto) {
   return item.transactionId;
 }
 
-function displayValue(value?: string | number | null) {
-  if (value === null || value === undefined || value === '') return '-';
-  return String(value);
-}
-
 function getDirectionLabel(direction: WalletTransactionDirection) {
   return direction === 'credit' ? '입금' : '출금';
 }
@@ -111,6 +110,20 @@ function getSignedAmount(item: WalletTransactionDto) {
 }
 
 export default function WalletTransactionsScreen({ route }: Props) {
+  // The ledger belongs to ONE account (작업 10 §A-4). Reads are status-blind by
+  // contract, so a closed or suspended account's history stays fully readable.
+  const {
+    selectedAccountId,
+    selectedAccount,
+    isLoading: accountsLoading,
+    isEmpty: noAccounts,
+  } = useTradingAccount();
+  const accountId = selectedAccountId ?? '';
+  const hasAccount = !!selectedAccountId;
+  const accountDisplay = selectedAccount
+    ? getAccountDisplay(selectedAccount)
+    : null;
+
   const [currencyFilter, setCurrencyFilter] = useState<CurrencyFilter>(
     route.params?.currencyCode ?? 'all',
   );
@@ -123,15 +136,14 @@ export default function WalletTransactionsScreen({ route }: Props) {
   const txType = txTypeFilter === 'all' ? undefined : txTypeFilter;
 
   const transactionsQuery = useInfiniteQuery({
-    queryKey: QUERY_KEYS.wallet.transactions({
+    queryKey: QUERY_KEYS.tradingAccount.walletTransactions(accountId, {
       currency,
       direction,
       txType,
       limit: PAGE_SIZE,
-      offset: 0,
     }),
     queryFn: ({ pageParam }) =>
-      getWalletTransactions({
+      getTradingAccountWalletTransactions(accountId, {
         currency,
         direction,
         txType,
@@ -141,6 +153,7 @@ export default function WalletTransactionsScreen({ route }: Props) {
     getNextPageParam: (lastPage) =>
       lastPage.pagination.nextOffset ?? undefined,
     initialPageParam: 0,
+    enabled: hasAccount,
   });
 
   const items = useMemo(() => {
@@ -155,15 +168,33 @@ export default function WalletTransactionsScreen({ route }: Props) {
     return Array.from(byId.values());
   }, [transactionsQuery.data]);
 
-  if (transactionsQuery.isLoading) {
+  if (accountsLoading || (hasAccount && transactionsQuery.isLoading)) {
     return <FullPageLoading message="지갑 원장을 불러오는 중입니다." />;
   }
+
+  if (noAccounts || !hasAccount) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.content}>
+          <AccountSwitcher />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const integrityMessage = transactionsQuery.isError
+    ? getIntegrityErrorMessage(transactionsQuery.error)
+    : null;
 
   if (transactionsQuery.isError) {
     return (
       <ErrorState
-        title="지갑 원장을 불러오지 못했습니다."
-        message="잠시 후 다시 시도해주세요."
+        title={
+          integrityMessage
+            ? '원장을 안전하게 표시할 수 없습니다.'
+            : '지갑 원장을 불러오지 못했습니다.'
+        }
+        message={integrityMessage ?? '잠시 후 다시 시도해주세요.'}
         onRetry={() => transactionsQuery.refetch()}
       />
     );
@@ -193,6 +224,13 @@ export default function WalletTransactionsScreen({ route }: Props) {
         ListHeaderComponent={
           <View style={styles.header}>
             <Text style={styles.title}>지갑 원장</Text>
+            {/* Whose ledger this is. Without it, two accounts' histories are
+                indistinguishable once the numbers are on screen. */}
+            {accountDisplay ? (
+              <Text style={styles.accountHeader}>
+                {accountDisplay.title} · {accountDisplay.statusLabel}
+              </Text>
+            ) : null}
 
             <View style={styles.filterGroup}>
               <Text style={styles.label}>통화</Text>
@@ -321,6 +359,13 @@ function FilterChip({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
+  accountHeader: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#333',
+    paddingBottom: 8,
+    lineHeight: 20,
+  },
   content: { padding: 16, paddingBottom: 24 },
   header: {
     gap: 14,

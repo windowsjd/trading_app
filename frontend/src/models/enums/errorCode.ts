@@ -64,6 +64,10 @@ export const ERROR_CODE = {
   ORDER_RESERVATION_INCONSISTENT: 'ORDER_RESERVATION_INCONSISTENT',
   ORDER_NOT_CANCELABLE: 'ORDER_NOT_CANCELABLE',
   ORDER_CANCEL_CONFLICT: 'ORDER_CANCEL_CONFLICT',
+  // The order-masking 404: an unknown orderId and another account's orderId
+  // are deliberately the same response. Without this entry the cancel flow
+  // rendered "알 수 없는 서버 오류입니다. code=ORDER_NOT_FOUND" (작업 10 §B-7).
+  ORDER_NOT_FOUND: 'ORDER_NOT_FOUND',
 
   // TradingAccount surface (작업 9). The integrity codes are listed so a
   // generic error screen renders real Korean copy instead of
@@ -92,6 +96,13 @@ export const ERROR_CODE = {
   GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED:
     'GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED',
   GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED: 'GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED',
+  // Settlement produced a tier assignment that disagrees with the final
+  // ranking. Structural damage, and routed to the integrity state.
+  FINAL_TIER_ASSIGNMENT_CONFLICT: 'FINAL_TIER_ASSIGNMENT_CONFLICT',
+  // A TRANSIENT external dependency, NOT damage and NOT a capability limit:
+  // the ad provider could not be reached. It must not share copy with either
+  // (작업 10 §B-7).
+  AD_REWARD_PROVIDER_UNAVAILABLE: 'AD_REWARD_PROVIDER_UNAVAILABLE',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODE)[keyof typeof ERROR_CODE];

@@ -7,7 +7,7 @@ import {
   StyleSheet,
   SafeAreaView,
 } from 'react-native';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import type { SignupScreenProps } from '../../app/navigation/types';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
@@ -16,6 +16,7 @@ import {
   resetToSeasonJoin,
 } from '../../app/navigation/seasonRouting';
 import { signup } from '../../features/auth/api';
+import { beginSession } from '../../features/auth/session';
 import { getCurrentSeason } from '../../features/season/api';
 import { clearTokens, saveTokens } from '../../services/storage/tokenStorage';
 import {
@@ -57,6 +58,8 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
+  const queryClient = useQueryClient();
+
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [blockedAuthState, setBlockedAuthState] =
@@ -80,6 +83,10 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
         setSubmitError(getBlockedAuthMessage(nextBlockedState));
         return;
       }
+
+      // Same session install as login (작업 10 §A-7): the account list must be
+      // available immediately, without an app restart.
+      await beginSession(queryClient, result.user);
 
       try {
         const season = await getCurrentSeason();

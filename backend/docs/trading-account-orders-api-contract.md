@@ -11,6 +11,24 @@ return the same rows and produce the same financial effects (measured by the
 opt-in PostgreSQL integration suite
 `src/seasons/trading-account-trading-scope.integration.spec.ts`).
 
+## Client status (작업 10)
+
+The frontend consumes these routes exclusively for current orders and
+positions; no current financial screen calls the legacy
+`/api/v1/orders` / `/api/v1/positions` surfaces any more (those stay
+implemented and contract-tested for compatibility). Two client-side
+conventions matter when reading a bug report:
+
+- the order screen binds to ONE accountId, captured when the user entered it
+  and never re-read from the selected account, so a mid-flow account switch
+  cannot retarget a create;
+- the client cross-checks any `tradingAccountId` a response carries against the
+  requested one and refuses to render or commit a mismatch. Responses that do
+  not carry the field (order detail, create, cancel) are accepted as-is — the
+  path named the account and the server re-verified ownership.
+
+See `frontend/docs/trading-account-switching.md`.
+
 ## Common Rules
 
 - Auth required on every route (401 `UNAUTHORIZED` without a valid token).

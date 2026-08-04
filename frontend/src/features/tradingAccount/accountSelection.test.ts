@@ -180,3 +180,96 @@ describe('sortAccountsForDisplay', () => {
     );
   });
 });
+
+describe('selection never prefers a season that is no longer running (작업 10 §A-9)', () => {
+  // The regression this closes: `isParticipatingSeasonAccount` checked the
+  // ACCOUNT's status but not the SEASON's, so an ended season whose account had
+  // not been closed yet outranked a live general account. The user landed on a
+  // frozen leaderboard position they could not trade from.
+  const cases: Array<{ seasonStatus: string; label: string }> = [
+    { seasonStatus: 'ended', label: 'ended (settlement pending)' },
+    { seasonStatus: 'settled', label: 'settled' },
+    { seasonStatus: 'upcoming', label: 'upcoming' },
+  ];
+
+  for (const { seasonStatus, label } of cases) {
+    it(`does not prefer a still-active account of a ${label} season over an active general account`, () => {
+      const accounts = [
+        seasonAccount('s-stale', {
+          status: 'active',
+          seasonStatus,
+          openedAt: '2026-06-01T00:00:00.000Z',
+        }),
+        generalAccount('g1', { openedAt: '2026-01-01T00:00:00.000Z' }),
+      ];
+
+      assert.deepEqual(selectTradingAccountId(accounts, null), {
+        accountId: 'g1',
+        reason: 'active_general',
+      });
+    });
+  }
+
+  it('still prefers a genuinely active season over an active general account', () => {
+    const accounts = [
+      seasonAccount('s-live', { seasonStatus: 'active' }),
+      generalAccount('g1', { openedAt: '2026-07-01T00:00:00.000Z' }),
+    ];
+
+    assert.deepEqual(selectTradingAccountId(accounts, null), {
+      accountId: 's-live',
+      reason: 'active_season',
+    });
+  });
+
+  it('a stale season account is still REACHABLE as the most recent fallback', () => {
+    // It is readable history, just not the landing place. With no general
+    // account it must still be selected rather than leaving an empty state.
+    const accounts = [
+      seasonAccount('s-ended', { status: 'active', seasonStatus: 'ended' }),
+    ];
+
+    assert.deepEqual(selectTradingAccountId(accounts, null), {
+      accountId: 's-ended',
+      reason: 'most_recent',
+    });
+  });
+
+  it('keeps a stored CLOSED account: an explicit choice outranks the policy', () => {
+    const accounts = [
+      seasonAccount('s-closed', { status: 'closed', seasonStatus: 'settled' }),
+      generalAccount('g1'),
+    ];
+
+    assert.deepEqual(selectTradingAccountId(accounts, 's-closed'), {
+      accountId: 's-closed',
+      reason: 'stored',
+    });
+  });
+
+  it('drops a stored id the user does not own and falls back by policy', () => {
+    const accounts = [
+      seasonAccount('s-live'),
+      generalAccount('g1'),
+    ];
+
+    assert.deepEqual(selectTradingAccountId(accounts, 'someone-elses-account'), {
+      accountId: 's-live',
+      reason: 'active_season',
+    });
+  });
+});
+
+describe('display ordering follows the same season-liveness rule', () => {
+  it('ranks an ended season account below the active general account', () => {
+    const accounts = [
+      seasonAccount('s-ended', { status: 'active', seasonStatus: 'ended' }),
+      generalAccount('g1'),
+    ];
+
+    assert.deepEqual(
+      sortAccountsForDisplay(accounts).map((account) => account.id),
+      ['g1', 's-ended'],
+    );
+  });
+});

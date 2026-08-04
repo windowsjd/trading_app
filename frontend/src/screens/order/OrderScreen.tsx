@@ -19,21 +19,30 @@ import {
   getAssetDetail,
   type AssetDetailPriceDto,
 } from '../../features/asset/api';
-import { getPositions, getPositionQuantity } from '../../features/position/api';
-import { getCurrentSeason } from '../../features/season/api';
-import { toSeasonDomainState } from '../../features/season/mapper';
 import { isTradableMarketStatus } from '../../features/asset/mapper';
+import type { OrderQuoteDto } from '../../features/order/api';
 import {
-  quoteOrder,
-  createOrder,
-  type OrderQuoteDto,
-} from '../../features/order/api';
+  createTradingAccountOrder,
+  getAccountPositionQuantity,
+  getTradingAccountPositions,
+  getTradingAccountWallets,
+  quoteTradingAccountOrder,
+} from '../../features/tradingAccount/api';
+import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
+import { CAPABILITY_BLOCK_MESSAGE } from '../../features/tradingAccount/capabilities';
+import {
+  resolveAccountBinding,
+  shouldResetBoundFlow,
+} from '../../features/tradingAccount/accountBinding';
+import { getAccountDisplay } from '../../features/tradingAccount/accountDisplay';
+import { getIntegrityErrorMessage } from '../../features/tradingAccount/integrityErrors';
+import { invalidateAfterOrderCreate } from '../../features/tradingAccount/invalidation';
 import {
   captureOrderSuccess,
   clearOrderSuccess,
   EMPTY_ORDER_SUCCESS_STATE,
 } from '../../features/order/successState';
-import { getWallets, type WalletCurrency } from '../../features/wallet/api';
+import { type WalletCurrency } from '../../features/wallet/api';
 import {
   getWalletAvailableAmount,
   getWalletBalanceAmount,
@@ -87,11 +96,6 @@ const IDEMPOTENCY_CONFLICT_MESSAGE =
   '이미 다른 내용으로 처리 중인 요청입니다. 새 견적을 받아 다시 시도해주세요.';
 const BUY_FEE_BUFFER = 0.002;
 const RATIO_BUTTONS = [0.25, 0.5, 0.75, 1] as const;
-
-function displayValue(value?: string | number | boolean | null) {
-  if (value === null || value === undefined || value === '') return '-';
-  return String(value);
-}
 
 function isPriceAvailable(price?: AssetDetailPriceDto | null) {
   return price?.state === 'available' && !!price.currentPrice;
@@ -154,9 +158,44 @@ function getRatioLabel(ratio: (typeof RATIO_BUTTONS)[number]) {
 }
 
 export default function OrderScreen({ route, navigation }: Props) {
-  const { assetId, side = 'buy' } = route.params;
+  /**
+   * The order's target account is the one carried IN THE ROUTE (작업 10 §A-2).
+   *
+   * Not `useTradingAccount().selectedAccountId`. The distinction is the whole
+   * safety property of this screen: a quote, an idempotency key, and a create
+   * form only mean anything relative to one account, and if the user switches
+   * accounts in another tab while this screen is mounted, "the selected
+   * account" silently becomes a different one. Reading it at submit time would
+   * send a season account's quote to a general account's create.
+   *
+   * So the id is fixed at navigation time and never re-read. What the screen
+   * DOES watch is whether the selection has since moved away from it — see
+   * `accountChangedAway` below, which stops the flow instead of continuing it
+   * against a stale target.
+   */
+  const { assetId, accountId, side = 'buy' } = route.params;
   const rootNavigation = useRootNavigation();
   const queryClient = useQueryClient();
+  const {
+    accounts,
+    selectedAccountId,
+    isLoading: accountsLoading,
+  } = useTradingAccount();
+
+  // Ownership is re-checked against the freshly fetched owned list, and the
+  // binding also reports whether the selection has moved on. A route param is
+  // user-reachable state; it is not evidence of ownership.
+  const binding = resolveAccountBinding({
+    boundAccountId: accountId,
+    accounts,
+    selectedAccountId,
+    accountsLoading,
+  });
+  const routeAccount = binding.state === 'bound' ? binding.account : null;
+  const capabilities = binding.state === 'bound' ? binding.capabilities : null;
+  const accountDisplay = routeAccount ? getAccountDisplay(routeAccount) : null;
+  const accountKnown = binding.state === 'bound';
+  const accountChangedAway = shouldResetBoundFlow(binding);
 
   const [quantity, setQuantity] = useState('');
   // Limit orders are buy-only in phase 1; the toggle is hidden entirely
@@ -189,25 +228,25 @@ export default function OrderScreen({ route, navigation }: Props) {
     limitPrice: '',
   });
 
-  const seasonQuery = useQuery({
-    queryKey: QUERY_KEYS.season.current,
-    queryFn: getCurrentSeason,
-  });
-
   const assetQuery = useQuery({
     queryKey: QUERY_KEYS.asset.detail(assetId),
     queryFn: () => getAssetDetail(assetId),
   });
 
   const positionQuery = useQuery({
-    queryKey: QUERY_KEYS.position.list({ assetId, limit: 20, offset: 0 }),
-    queryFn: () => getPositions({ assetId, limit: 20, offset: 0 }),
+    queryKey: QUERY_KEYS.tradingAccount.positions(accountId, {
+      assetId,
+      limit: 20,
+    }),
+    queryFn: () =>
+      getTradingAccountPositions(accountId, { assetId, limit: 20, offset: 0 }),
+    enabled: !!accountId,
   });
 
   const walletsQuery = useQuery({
-    queryKey: QUERY_KEYS.wallet.balances,
-    queryFn: getWallets,
-    enabled: side === 'buy',
+    queryKey: QUERY_KEYS.tradingAccount.wallets(accountId),
+    queryFn: () => getTradingAccountWallets(accountId),
+    enabled: !!accountId && side === 'buy',
   });
 
   useEffect(() => {
@@ -232,7 +271,10 @@ export default function OrderScreen({ route, navigation }: Props) {
   }, [quoteData]);
 
   const quoteMutation = useMutation({
-    mutationFn: quoteOrder,
+    // The accountId is closed over from the ROUTE, so every quote this screen
+    // issues names the same account for as long as the screen exists.
+    mutationFn: (payload: Parameters<typeof quoteTradingAccountOrder>[1]) =>
+      quoteTradingAccountOrder(accountId, payload),
     retry: false,
     onSuccess: (result, variables) => {
       const latestInput = latestQuoteInputRef.current;
@@ -279,7 +321,8 @@ export default function OrderScreen({ route, navigation }: Props) {
   });
 
   const createMutation = useMutation({
-    mutationFn: createOrder,
+    mutationFn: (payload: Parameters<typeof createTradingAccountOrder>[1]) =>
+      createTradingAccountOrder(accountId, payload),
     retry: false,
     onSuccess: async (result) => {
       if (!isOrderSuccess(result)) {
@@ -297,24 +340,12 @@ export default function OrderScreen({ route, navigation }: Props) {
       setFieldError(null);
       setDomainError(null);
 
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.asset.detail(assetId),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.position.list({ assetId, limit: 20, offset: 0 }),
-        }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.position.all }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.home.dashboard }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.wallet.balances }),
-        queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.wallet.transactionsAll,
-        }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ranking.all }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.portfolio.all }),
-        // Order history lists must show the new submitted limit order.
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.record.all }),
-      ]);
+      // ONLY this account's entries (작업 10 §A-11). Another account's cache is
+      // still correct — the order could not have touched it — and market data
+      // is shared, so neither is thrown away here.
+      await invalidateAfterOrderCreate(queryClient, accountId, {
+        seasonUi: capabilities?.isSeason ?? false,
+      });
     },
     onError: (error) => {
       const code = getApiErrorCode(error);
@@ -355,6 +386,36 @@ export default function OrderScreen({ route, navigation }: Props) {
     createMutation.reset();
   };
 
+  /**
+   * The selection moved to a different account while this screen was open
+   * (작업 10 §A-2).
+   *
+   * Everything held here was produced for the route account: the quote (which
+   * the server pinned to that account and will refuse for another), its
+   * idempotency key, the typed quantity and limit price, and the success sheet.
+   * None of it transfers. It is all dropped, and `accountChangedAway` then
+   * renders a blocking notice instead of a live form — re-entering from the
+   * asset screen is the only way to order on the new account, which is exactly
+   * the point: the user picks the account, the screen never picks one for them.
+   */
+  useEffect(() => {
+    if (!accountChangedAway) return;
+
+    setQuantity('');
+    setLimitPrice('');
+    setFieldError(null);
+    setDomainError(null);
+    setQuoteData(null);
+    setExecuteIdempotencyKey(null);
+    setOrderDomainState(null);
+    setSuccessState(clearOrderSuccess());
+    quoteMutation.reset();
+    createMutation.reset();
+    // Mutation objects are recreated every render; depending on them here would
+    // re-run this on every render instead of only when the account changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountChangedAway]);
+
   const limitPriceInvalidReason = useMemo(
     () => (orderType === 'limit' ? validateLimitPrice(limitPrice) : null),
     [orderType, limitPrice],
@@ -385,23 +446,25 @@ export default function OrderScreen({ route, navigation }: Props) {
 
   const asset = assetQuery.data?.asset;
   const price = asset?.price;
-  const seasonState = seasonQuery.data
-    ? toSeasonDomainState(seasonQuery.data)
-    : null;
-  const canTradeSeason = seasonState === 'season_active_joined';
-  const positionQuantity = getPositionQuantity(positionQuery.data, assetId);
+  const positionQuantity = getAccountPositionQuantity(
+    positionQuery.data,
+    assetId,
+  );
 
-  const seasonBlockedReason = seasonQuery.isLoading
-    ? '시즌 상태를 확인하는 중입니다.'
-    : seasonQuery.isError || !seasonQuery.data
-      ? '시즌 상태를 확인할 수 없어 주문을 잠시 막았습니다.'
-      : seasonState === 'season_active_not_joined'
-        ? '시즌에 참가해야 거래할 수 있습니다.'
-        : seasonState === 'season_ended_unsettled'
-          ? '정산 중에는 거래할 수 없습니다.'
-          : !canTradeSeason
-            ? '현재 거래 가능한 시즌이 아닙니다.'
-            : null;
+  /**
+   * Every gate below is about the ROUTE account. A general account is 준비 중
+   * (and the request is never sent, so the user does not collect a 409 per
+   * press); suspended/closed accounts cannot open new orders; a season account
+   * needs its own season to be active — not merely for some season somewhere to
+   * be running.
+   */
+  const accountBlockedReason = accountsLoading
+    ? '계정 정보를 확인하는 중입니다.'
+    : !routeAccount
+      ? '이 주문 화면의 계정을 찾을 수 없습니다. 계정을 다시 선택해주세요.'
+      : capabilities?.tradeBlockReason
+        ? CAPABILITY_BLOCK_MESSAGE[capabilities.tradeBlockReason]
+        : null;
 
   const assetHardBlockedReason =
     asset && !asset.isActive ? '비활성 자산입니다.' : null;
@@ -428,7 +491,7 @@ export default function OrderScreen({ route, navigation }: Props) {
           : null;
 
   const preOrderBlockedReason =
-    seasonBlockedReason ?? assetHardBlockedReason ?? sellBlockedReason;
+    accountBlockedReason ?? assetHardBlockedReason ?? sellBlockedReason;
 
   const settlementCurrency = isWalletCurrency(asset?.settlementCurrency)
     ? asset.settlementCurrency
@@ -630,8 +693,38 @@ export default function OrderScreen({ route, navigation }: Props) {
     });
   };
 
-  if (assetQuery.isLoading) {
+  if (assetQuery.isLoading || accountsLoading) {
     return <FullPageLoading message="주문 화면을 준비하는 중입니다." />;
+  }
+
+  /**
+   * The account changed under this screen. Nothing here can be reused, so the
+   * screen refuses to continue rather than quietly retargeting: the user goes
+   * back and re-enters from the account they are now on (작업 10 §A-2).
+   */
+  if (accountChangedAway) {
+    return (
+      <ErrorState
+        title="선택한 계정이 변경되었습니다."
+        message={`이 주문 화면은 이전 계정(${accountDisplay?.title ?? '알 수 없음'}) 기준으로 열렸습니다. 새 계정으로 주문하려면 이전 화면으로 돌아가 다시 시작해주세요.`}
+        onRetry={() => navigation.goBack()}
+        actionLabel="이전 화면으로"
+      />
+    );
+  }
+
+  // A route accountId the owned list does not contain: unknown id, another
+  // user's id, or an account that has left the list. Identical treatment, no
+  // probing (the backend deliberately makes them indistinguishable).
+  if (!accountKnown) {
+    return (
+      <ErrorState
+        title="주문 계정을 확인할 수 없습니다."
+        message="계정 정보를 다시 불러온 뒤 종목 화면에서 다시 시도해주세요."
+        onRetry={() => navigation.goBack()}
+        actionLabel="이전 화면으로"
+      />
+    );
   }
 
   if (assetQuery.isError || !assetQuery.data || !asset) {
@@ -646,6 +739,12 @@ export default function OrderScreen({ route, navigation }: Props) {
 
   const isUsdSettlement = asset.settlementCurrency === 'USD';
   const assetNameDisplay = getAssetNameDisplay(asset);
+  const positionIntegrityMessage = positionQuery.isError
+    ? getIntegrityErrorMessage(positionQuery.error)
+    : null;
+  const walletIntegrityMessage = walletsQuery.isError
+    ? getIntegrityErrorMessage(walletsQuery.error)
+    : null;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -653,6 +752,26 @@ export default function OrderScreen({ route, navigation }: Props) {
         testID={TEST_IDS.order.screen}
         contentContainerStyle={styles.content}
       >
+        {/* Which account this order will move money in, stated before any
+            number on the screen. The order flow is bound to it for its whole
+            life, so it is a fact about the screen, not a live selector. */}
+        {accountDisplay ? (
+          <View style={styles.accountCard}>
+            <View style={styles.accountHeaderRow}>
+              <Text style={styles.accountTitle}>{accountDisplay.title}</Text>
+              <Text style={styles.accountBadge}>
+                {accountDisplay.statusLabel}
+              </Text>
+            </View>
+            {accountDisplay.subtitle ? (
+              <Text style={styles.helper}>{accountDisplay.subtitle}</Text>
+            ) : null}
+            <Text style={styles.helper}>
+              이 주문은 위 계정에서 실행됩니다.
+            </Text>
+          </View>
+        ) : null}
+
         <View style={styles.card}>
           <Text style={styles.title}>{assetNameDisplay.primary}</Text>
           {assetNameDisplay.secondary ? (
@@ -683,8 +802,23 @@ export default function OrderScreen({ route, navigation }: Props) {
           <Text style={styles.helper}>
             거래 상태 {asset.tradable ? '거래 가능' : '거래 제한'}
           </Text>
+          {/* Server-detected damage is its own message, never folded into a
+              transient "잠시 후 다시" or shown as a zero balance. */}
+          {positionIntegrityMessage ?? walletIntegrityMessage ? (
+            <Text
+              testID={TEST_IDS.tradingAccount.integrityError}
+              style={styles.errorText}
+            >
+              {positionIntegrityMessage ?? walletIntegrityMessage}
+            </Text>
+          ) : null}
           {preOrderBlockedReason ? (
-            <Text style={styles.errorText}>{preOrderBlockedReason}</Text>
+            <Text
+              testID={TEST_IDS.tradingAccount.capabilityNotice}
+              style={styles.errorText}
+            >
+              {preOrderBlockedReason}
+            </Text>
           ) : null}
           {assetWarningReason ? (
             <Text style={styles.warningText}>{assetWarningReason}</Text>
@@ -1080,8 +1214,42 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700' },
   label: { fontSize: 13, color: '#666' },
   helper: { fontSize: 14, color: '#444' },
-  errorText: { fontSize: 14, color: '#c62828' },
-  warningText: { fontSize: 14, color: '#7a4b00' },
+  errorText: { fontSize: 14, color: '#c62828', lineHeight: 20 },
+  warningText: { fontSize: 14, color: '#7a4b00', lineHeight: 20 },
+  accountCard: {
+    borderWidth: 1,
+    borderColor: '#d5dced',
+    borderRadius: 14,
+    padding: 14,
+    backgroundColor: '#f4f7fd',
+    gap: 6,
+  },
+  // The name WRAPS and the badge keeps its own track: a season name is
+  // user-supplied text of any length, and a "종료" badge that gets squeezed out
+  // makes a closed account read as a live one.
+  accountHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  accountTitle: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 22,
+  },
+  accountBadge: {
+    flexShrink: 0,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#333',
+    backgroundColor: '#e3e8f2',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    overflow: 'hidden',
+  },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',

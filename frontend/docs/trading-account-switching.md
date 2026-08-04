@@ -1,7 +1,9 @@
-# Frontend TradingAccount Switching (작업 9)
+# Frontend TradingAccount Switching (작업 9 + 작업 10)
 
 Reference for the account-selection layer added by WORK-ID
-`SEASON-RANKING-HARDENING-AND-FRONTEND-ACCOUNT-SWITCH-V1`.
+`SEASON-RANKING-HARDENING-AND-FRONTEND-ACCOUNT-SWITCH-V1` and completed across
+every current financial screen and mutation by
+`FRONTEND-ACCOUNT-SCOPE-COMPLETION-AND-RELEASE-HARDENING-V1` (작업 10).
 
 Backend contracts this depends on:
 `backend/docs/trading-accounts-api-contract.md`,
@@ -28,8 +30,32 @@ plus one AsyncStorage entry.
 | `features/tradingAccount/selectionStorage.ts` | per-user AsyncStorage persistence |
 | `features/tradingAccount/integrityErrors.ts` | structural-error classification |
 | `features/tradingAccount/TradingAccountContext.tsx` | the single source of truth |
+| `features/tradingAccount/accountScope.ts` | response↔request accountId cross-check (작업 10) |
+| `features/tradingAccount/accountBinding.ts` | is this mutation flow still safe to continue (작업 10) |
+| `features/tradingAccount/invalidation.ts` | which cache entries a mutation refreshes (작업 10) |
+| `features/auth/sessionCache.ts` / `session.ts` / `useLogout.ts` | the session boundary (작업 10) |
+| `services/api/sessionExpiry.ts` | the one seam from a dead refresh token to teardown (작업 10) |
+| `features/record/accountOrders.ts` | account-scoped order row → record row shape (작업 10) |
+| `screens/home/GeneralAccountHome.tsx` | Home for a general account (작업 10) |
 | `components/tradingAccount/AccountSwitcher.tsx` | switcher UI |
 | `constants/queryKeys.ts` → `QUERY_KEYS.tradingAccount.*` | account-scoped cache keys |
+
+## Which screen uses which account (작업 10)
+
+| Screen | accountId source | Endpoints |
+| --- | --- | --- |
+| Home (season) | selected | legacy `/home` — season participation, unchanged |
+| Home (general) | selected | `/trading-accounts/:id/portfolio`, `/wallets`, `/positions` |
+| Portfolio | selected | `/portfolio`, `/portfolio/equity`, `/positions` |
+| AssetDetail | selected (positions only) | `/positions`; price/candles stay public |
+| Order | **route param**, fixed at entry | `/orders/quote`, `/orders`, `/positions`, `/wallets` |
+| Wallet FX | selected | `/wallets`, `/fx/quote`, `/fx/execute`; public `/fx/rates/current` |
+| Wallet ledger | selected | `/wallet-transactions` |
+| Order list + cancel | the account **of that record's season** | `/orders`, `/orders/:orderId/cancel` |
+
+Market data (asset detail, price, candles, market list) keeps account-free cache
+keys: those rows are identical for every account and every user, and an order
+changes what the user OWNS, not what a share is worth.
 
 ## Selection policy
 
@@ -37,7 +63,8 @@ plus one AsyncStorage entry.
 
 1. the stored id, **if it is still in the owned list** (`stored`)
 2. the season the user is actually competing in — `mode=season`,
-   `status=active`, participant not `excluded` (`active_season`)
+   `status=active`, **`season.seasonStatus=active`**, participant not
+   `excluded` (`active_season`)
 3. their active general account (`active_general`)
 4. the most recently opened readable account (`most_recent`)
 5. `null` — an explicit empty state, never a fabricated account (`none`)
@@ -47,6 +74,15 @@ account left the list, the token now belongs to a different user, or the id was
 never valid. Ties on `openedAt` break on `id` so selection never depends on
 input order.
 
+The season-status condition in rule 2 was missing until 작업 10. Season accounts
+are closed by settlement, but an `ended` season sits between "trading stopped"
+and "settled", and a settled season whose close-out failed leaves an active
+account behind by definition of the failure. Either one outranked a live general
+account, landing the user on a frozen leaderboard position they could not trade
+from while the account they could actually use sat one tap away. Those accounts
+are still reachable through rule 4 — readable history, just not the landing
+place.
+
 ## Per-user persistence and logout
 
 The storage key is `selectedTradingAccountId:<userId>`. With a single global key,
@@ -54,12 +90,35 @@ user A logs out, user B logs in, and B's first financial screen requests A's
 accountId — the server correctly answers 404, but B sees an error on their own
 portfolio.
 
-On logout `clearTradingAccountSession(queryClient, userId)`:
+On logout `useLogout()` → `endSession()`:
 
-- **removes** (not invalidates) `['tradingAccount']` and `['me']` — an
-  invalidated entry is still readable while its refetch is in flight, so the
-  next user's first frame could render the previous user's balances;
-- clears the stored selection for that user.
+- **clears the WHOLE query cache** (`queryClient.clear()`), not a key list.
+  Until 작업 10 this removed only `['tradingAccount']` and `['me']`, so
+  `['wallet']`, `['positions']`, `['portfolio']`, `['order']`,
+  `['home','dashboard']`, `['record']` and `['ranking']` survived into the next
+  user's session. An enumerated allowlist silently stops being complete the next
+  time a feature adds a key; `clear()` cannot be defeated that way and drops the
+  mutation cache in the same call. The cost is one cold market fetch on the next
+  login.
+- **removes**, never invalidates — an invalidated entry is still readable while
+  its refetch is in flight, and that window is exactly the next user's first
+  frame;
+- clears the stored selection for that user, and the tokens.
+
+There is now ONE logout. It used to be copy-pasted into MyScreen and
+SettingsScreen, and both copies had the same gap.
+
+A failed token refresh runs the same teardown. `services/api/sessionExpiry.ts`
+is a single nullable callback — not an event bus, not an emitter — set once by
+the app root: one producer (the 401 refresh path), one consumer, fired at most
+once per session. Before it, an expired session cleared the TOKENS and left
+every mounted screen rendering a full portfolio for a session the server had
+already stopped honouring.
+
+On login/signup `beginSession()` runs in this order: clear → seed `me` from the
+login response → invalidate the account list. The middle step is what makes the
+switcher appear without an app restart: the provider gates its account query on
+`enabled: !!userId`, so without it the provider sat on its pre-login 401.
 
 The provider also drops the in-memory selection first whenever the userId
 changes, so no render can hand a new user the previous user's accountId.
@@ -102,6 +161,63 @@ correctness is structural: the key CHANGES on a switch rather than being
 invalidated, so react-query treats the new account as a different query with no
 data, and a slow response from the old account resolves into the OLD key's
 entry. There is no path for it to repaint the new account's screen.
+
+### Mutations and targeted invalidation (작업 10)
+
+`features/tradingAccount/invalidation.ts` decides what a successful mutation
+refreshes. Two rules:
+
+1. **Only the acting account.** `['tradingAccount','wallets',A]` matches all of
+   A's wallet entries and cannot prefix-match B's. A blanket
+   `QUERY_KEYS.tradingAccount.all` would discard B's still-correct cache and
+   make every switch back to B a cold load, for a mutation that provably could
+   not have touched it.
+2. **Never shared market data.** An order changes what the user owns, not what a
+   share is worth; invalidating prices/candles here would replace a live chart
+   with a spinner as a side effect of buying.
+
+| Mutation | Refreshes | Deliberately not |
+| --- | --- | --- |
+| create order | orders, positions, wallets, portfolio(+equity) | market data |
+| cancel order | orders, wallets, portfolio | **positions** — a cancel never fills |
+| FX execute | wallets, portfolio(+equity) | **positions** — cash moved, nothing was bought |
+| ad reward claim | ad rewards, wallets, portfolio | season UI (general-only) |
+
+Season-keyed views (`record`, `ranking`, `home.dashboard`) are refreshed only
+for season accounts; they have no per-account key to be selective about.
+
+### Binding a mutation flow to one account (작업 10)
+
+`resolveAccountBinding()` answers "is this flow still safe to continue" for the
+Order screen, from the id it was ENTERED with:
+
+| State | Meaning | Screen |
+| --- | --- | --- |
+| `loading` | owned list not in yet | spinner |
+| `account_changed` | the selection moved elsewhere | stop; drop quote/key/inputs/success; ask to re-enter |
+| `unknown_account` | route id not owned (unknown id and another user's id are the same answer) | error, no probing |
+| `bound` | proceed, with that account's capabilities | the form |
+
+Following the selection would be the bug: the quote was priced for the old
+account, the server pins quotes to the account that issued them, and the amounts
+were chosen against the old account's balances. Pressing 주문 would then move
+money in an account the numbers on screen were never about.
+
+### Response↔request accountId cross-check (작업 10)
+
+`assertAccountScope(endpoint, expectedAccountId, payload)` wraps every
+account-scoped call. When the response carries a `tradingAccountId` and it
+differs from the requested one, the value never reaches a screen, a cache write,
+or a mutation success — it becomes a structural integrity error.
+
+A response WITHOUT the field is not a violation: order detail, create, cancel
+and the FX rows return the legacy shape, the path already named the account, and
+the server re-verifies ownership per request. Treating absence as mismatch would
+break all of them for no safety gain.
+
+The log line carries the endpoint and the two ids and nothing else. The payload
+that triggered it belongs to another account; putting balances or orders into a
+log to explain an isolation failure is the same leak somewhere else.
 
 ## Mode-specific presentation
 
@@ -174,7 +290,20 @@ variable-length Korean text, and a season name is user-supplied content:
 
 ## Tests
 
-`node --test` (no Jest in this project). Coverage: selection policy and
-fallbacks, per-user storage isolation, cache separation and cross-account
-invalidation safety, filter normalisation, mode/status capabilities, display
-naming with long Korean season names, and error classification.
+`node --test` (no Jest in this project). 414 tests as of 작업 10 (was 338).
+
+Coverage: selection policy and fallbacks including the ended/settled/upcoming
+season cases; per-user storage isolation; cache separation and cross-account
+invalidation safety (every mutation asserted not to touch account B or shared
+market data); filter normalisation; mode/status capabilities; display naming
+with long Korean season names; error classification; response-scope mismatch
+(including that the log carries no payload); the session boundary (a full clear,
+clear-before-seed ordering, and that the previous user's portfolio is
+unreadable afterwards); order-flow account binding; the record-order row
+adapter; and layout invariants.
+
+Layout has no renderer here, so `accountLayout.test.ts` asserts the two things
+that can be checked without one, and that are the two that broke in practice:
+the data is never pre-truncated, and the styles long text depends on
+(`flexShrink: 0` badge tracks, `minWidth: 0` wrapping titles, `lineHeight`,
+ScrollView on the error states, no `numberOfLines={1}`) are actually present.

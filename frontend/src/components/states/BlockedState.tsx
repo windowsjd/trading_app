@@ -1,5 +1,11 @@
 import React from 'react';
-import { SafeAreaView, View, Text, Pressable, StyleSheet } from 'react-native';
+import {
+  SafeAreaView,
+  ScrollView,
+  Text,
+  Pressable,
+  StyleSheet,
+} from 'react-native';
 
 interface BlockedStateProps {
   title?: string;
@@ -16,7 +22,7 @@ export default function BlockedState({
 }: BlockedStateProps) {
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.center}>
+      <ScrollView contentContainerStyle={styles.center}>
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.message}>{message}</Text>
 
@@ -25,15 +31,25 @@ export default function BlockedState({
             <Text style={styles.buttonText}>{actionLabel}</Text>
           </Pressable>
         ) : null}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
+/**
+ * The message is the whole point of this screen, so it must be fully readable
+ * at any font scale (작업 10 §B-8).
+ *
+ * `flex: 1` + `justifyContent: 'center'` centres nicely at default sizes and
+ * CLIPS at large accessibility scales — the longest copy here is the structural
+ * integrity message, which is exactly the one a user must be able to read and
+ * report. A ScrollView whose content is centred while it fits and scrolls when
+ * it does not keeps both behaviours.
+ */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   center: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,

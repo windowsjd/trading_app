@@ -4,7 +4,7 @@ import type {
   FxRateDto,
   WalletBalanceDto,
   WalletCurrency,
-  WalletsDto,
+  WalletState,
 } from './api';
 import { ERROR_CODE } from '../../models/enums/errorCode.ts';
 import type { WalletFxViewState } from '../../models/enums/viewState';
@@ -15,7 +15,7 @@ import {
   isRequoteRequiredError,
 } from '../../services/api/errorMapper.ts';
 import { formatSourceMetadata } from '../../models/dto/common.ts';
-import { formatCurrency, formatKrw, formatMoney } from '../../utils/format.ts';
+import { formatCurrency, formatMoney } from '../../utils/format.ts';
 
 type WalletQueryState = {
   isLoading?: boolean;
@@ -56,8 +56,20 @@ function isUnavailableState(state?: string | null) {
   );
 }
 
+/**
+ * The four balance readers below take only what they actually use — a
+ * `wallets` array — so the SAME functions serve the legacy
+ * (current-participant) payload and the account-scoped
+ * `/trading-accounts/:id/wallets` payload, which carries `tradingAccountId`
+ * instead of the season/participant envelope (작업 10 §A-4). Duplicating them
+ * per surface would be two copies of the reserved/available fallback rules.
+ */
+export type WalletBalanceSource = {
+  wallets?: WalletBalanceDto[] | null;
+};
+
 export function getWalletByCurrency(
-  walletsDto: WalletsDto | null | undefined,
+  walletsDto: WalletBalanceSource | null | undefined,
   currencyCode: WalletCurrency,
 ): WalletBalanceDto | null {
   return (
@@ -68,7 +80,7 @@ export function getWalletByCurrency(
 }
 
 export function getWalletBalanceAmount(
-  walletsDto: WalletsDto | null | undefined,
+  walletsDto: WalletBalanceSource | null | undefined,
   currencyCode: WalletCurrency,
 ) {
   const wallet = getWalletByCurrency(walletsDto, currencyCode);
@@ -77,7 +89,7 @@ export function getWalletBalanceAmount(
 
 /** Cash locked by submitted limit-buy orders ('0' when absent). */
 export function getWalletReservedAmount(
-  walletsDto: WalletsDto | null | undefined,
+  walletsDto: WalletBalanceSource | null | undefined,
   currencyCode: WalletCurrency,
 ) {
   const wallet = getWalletByCurrency(walletsDto, currencyCode);
@@ -90,7 +102,7 @@ export function getWalletReservedAmount(
  * predate the reservation fields.
  */
 export function getWalletAvailableAmount(
-  walletsDto: WalletsDto | null | undefined,
+  walletsDto: WalletBalanceSource | null | undefined,
   currencyCode: WalletCurrency,
 ) {
   const wallet = getWalletByCurrency(walletsDto, currencyCode);
@@ -233,8 +245,18 @@ export function isFxQuoteExpiredCode(code?: string | null) {
   return isQuoteExpiredError(code);
 }
 
+/**
+ * The account-scoped wallets read has NO `state` field: it either returns the
+ * wallets (200) or fails closed with a structured error, so a payload in hand
+ * IS the available state (작업 10 §A-4). The legacy participant-scoped payload
+ * still carries `state` and keeps its existing blocked/unavailable meanings.
+ */
+export type WalletStateSource = WalletBalanceSource & {
+  state?: WalletState;
+};
+
 export function getWalletViewState(
-  walletsDto?: WalletsDto | null,
+  walletsDto?: WalletStateSource | null,
   fxRateDto?: FxRateDto | null,
   queryState?: WalletQueryState,
 ): WalletFxViewState {

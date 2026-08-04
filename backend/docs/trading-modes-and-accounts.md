@@ -1873,3 +1873,45 @@ microservice, 일반계정용 가짜 SeasonParticipant, 시즌/일반 wallet·po
 5. 광고 제공자 선정 → `AdRewardVerifier` 구현체를 `AdRewardsModule`에 등록(additive) + 운영 설정값 확정 + sandbox 검증
 6. 시간가중수익률 계산 + 외부자금 유입 경계 스냅샷 (`initial_grant`/`ad_reward` 원장을 외부 유입으로 분리)
 7. tradingAccountId NOT NULL 강화·seasonParticipantId 제거(작업 10)는 스냅샷 전환과 구버전 writer 완전 종료 이후에만 검토
+
+
+## Frontend account scope (작업 10)
+
+The account-selection layer added in 작업 9 now covers **every current financial
+screen and mutation**. The rules that matter to this document:
+
+- The server still stores no "current account" anywhere. Selection is frontend
+  state and every request names its accountId in the path.
+- A mutation flow (order, FX) binds to ONE accountId captured when the user
+  entered it. If the selection moves while the flow is open, the client drops
+  the quote, its idempotency key and the inputs and refuses to continue rather
+  than retargeting — a quote is pinned server-side to the account that issued
+  it, and the amounts were chosen against that account's balances.
+- Account fallback requires the SEASON to be active, not merely the account.
+  An `ended` (settlement pending) or failed-to-close `settled` season account
+  no longer outranks a live general account.
+- General-mode trading and FX are presented as 준비 중 and the request is not
+  sent. This mirrors the server gate; it never relaxes it.
+
+Full detail: `frontend/docs/trading-account-switching.md`.
+
+## Recovery tool coverage (작업 10)
+
+Every repair/audit tool now has an injected-damage integration test, not just a
+clean-run one. A tool that reports "0 findings" is only meaningful if it is
+known to report non-zero when there is something to find:
+
+| Tool | Injected-damage coverage |
+| --- | --- |
+| `trading-accounts:repair-links` | `src/seasons/trading-account-link.integration.spec.ts` |
+| `trading-accounts:repair-financial-scope` | `src/seasons/trading-account-financial-scope.integration.spec.ts` |
+| `trading-accounts:repair-trading-scope` | `src/seasons/trading-account-trading-scope.integration.spec.ts` |
+| `trading-accounts:repair-ranking-scope` | `src/ranking/season-ranking-scope.integration.spec.ts` |
+| `trading-accounts:repair-snapshot-scope` | `src/portfolio/snapshot-scope-audit.integration.spec.ts` (작업 10) |
+| `trading-accounts:audit-general` | `src/portfolio/snapshot-scope-audit.integration.spec.ts` (작업 10) |
+
+Each asserts the same shape: damage is detected, a dry-run writes nothing,
+`--apply` repairs only what can be inferred, a row with nothing to infer from is
+REPORTED rather than guessed at, a non-null mismatch is never auto-overwritten,
+re-running is idempotent, remaining damage exits non-zero, and `audit-general`
+never writes.

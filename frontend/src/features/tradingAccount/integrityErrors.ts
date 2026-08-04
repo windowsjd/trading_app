@@ -1,4 +1,5 @@
 import { getApiErrorInfo } from '../../services/api/errorMapper.ts';
+import { isTradingAccountScopeMismatchError } from './accountScope.ts';
 
 /**
  * Structural integrity errors are NOT empty data (작업 9 §B-9).
@@ -42,6 +43,9 @@ export const TRADING_ACCOUNT_INTEGRITY_CODES = [
   'SEASON_RANKING_SOURCE_SCOPE_REPAIR_REQUIRED',
   'SEASON_RANKING_SOURCE_SCOPE_MISMATCH',
   'FINAL_RESULTS_INTEGRITY',
+  // Settlement wrote a tier that disagrees with the final ranking: the two
+  // published numbers contradict each other, which is damage, not absence.
+  'FINAL_TIER_ASSIGNMENT_CONFLICT',
   'AD_REWARD_CLAIM_INTEGRITY',
 ] as const;
 
@@ -85,6 +89,12 @@ export function isCapabilityLimitCode(code?: string | null) {
  * and falls back. It never probes to find out which of the two it was.
  */
 export function classifyAccountError(error: unknown): AccountErrorKind {
+  // A response that named a DIFFERENT account is detected client-side, so it
+  // never carries a server error envelope. It is still exactly the same kind of
+  // fault as the server-detected scope codes below and gets the same
+  // fail-closed treatment — not a generic "잠시 후 다시 시도" (작업 10 §A-10).
+  if (isTradingAccountScopeMismatchError(error)) return 'integrity';
+
   const info = getApiErrorInfo(error);
 
   if (info.status === 401) return 'unauthorized';

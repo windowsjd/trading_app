@@ -15,13 +15,21 @@ import { useRootNavigation } from '../../app/navigation/navigationHooks';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 import {
-  executeFx,
   getCurrentFxRate,
-  getWallets,
-  quoteFx,
   type FxExecuteDto,
   type FxQuoteDto,
 } from '../../features/wallet/api';
+import {
+  executeTradingAccountFx,
+  getTradingAccountWallets,
+  quoteTradingAccountFx,
+} from '../../features/tradingAccount/api';
+import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
+import { CAPABILITY_BLOCK_MESSAGE } from '../../features/tradingAccount/capabilities';
+import { getAccountDisplay } from '../../features/tradingAccount/accountDisplay';
+import { getIntegrityErrorMessage } from '../../features/tradingAccount/integrityErrors';
+import { invalidateAfterFx } from '../../features/tradingAccount/invalidation';
+import AccountSwitcher from '../../components/tradingAccount/AccountSwitcher';
 import {
   calculateUsdBalanceKrw,
   getFxQuoteDisplay,
@@ -87,6 +95,29 @@ function getFxDomainErrorMessage(code?: string | null) {
 export default function WalletFxScreen({ navigation }: Props) {
   const queryClient = useQueryClient();
   const rootNavigation = useRootNavigation();
+  const {
+    selectedAccountId,
+    selectedAccount,
+    capabilities,
+    isLoading: accountsLoading,
+    isEmpty: noAccounts,
+  } = useTradingAccount();
+
+  /**
+   * FX is bound to the account being viewed (작업 10 §A-4).
+   *
+   * `fxAccountId` is captured per render from the selection, but every quote
+   * and execute closes over the id that produced THEM — and, more importantly,
+   * an account change wipes the quote, its idempotency key, the amount, and the
+   * success result before any of them can be replayed against a different
+   * account. A quote issued for one account is refused by the server for
+   * another (`QUOTE_MISMATCH`); this makes sure the client never even tries.
+   */
+  const accountId = selectedAccountId ?? '';
+  const hasAccount = !!selectedAccountId;
+  const accountDisplay = selectedAccount
+    ? getAccountDisplay(selectedAccount)
+    : null;
 
   const [fromCurrency, setFromCurrency] = useState<Currency>('KRW');
   const [amount, setAmount] = useState('');
@@ -108,8 +139,9 @@ export default function WalletFxScreen({ navigation }: Props) {
   });
 
   const walletsQuery = useQuery({
-    queryKey: QUERY_KEYS.wallet.balances,
-    queryFn: getWallets,
+    queryKey: QUERY_KEYS.tradingAccount.wallets(accountId),
+    queryFn: () => getTradingAccountWallets(accountId),
+    enabled: hasAccount,
   });
 
   const rateQuery = useQuery({
@@ -123,7 +155,8 @@ export default function WalletFxScreen({ navigation }: Props) {
   });
 
   const quoteMutation = useMutation({
-    mutationFn: quoteFx,
+    mutationFn: (payload: Parameters<typeof quoteTradingAccountFx>[1]) =>
+      quoteTradingAccountFx(accountId, payload),
     retry: false,
     onSuccess: (result, variables) => {
       const latestInput = latestQuoteInputRef.current;
@@ -166,7 +199,8 @@ export default function WalletFxScreen({ navigation }: Props) {
   });
 
   const executeMutation = useMutation({
-    mutationFn: executeFx,
+    mutationFn: (payload: Parameters<typeof executeTradingAccountFx>[1]) =>
+      executeTradingAccountFx(accountId, payload),
     retry: false,
     onSuccess: async (result) => {
       setSuccessData(result);
@@ -176,16 +210,16 @@ export default function WalletFxScreen({ navigation }: Props) {
       setFieldError(null);
       setDomainError(null);
 
+      // This account's wallets, ledger and valuation only — another account's
+      // cash cannot have moved (작업 10 §A-11). The public FX rate is refreshed
+      // because the executed rate is new market information.
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.wallet.balances }),
-        queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.wallet.transactionsAll,
+        invalidateAfterFx(queryClient, accountId, {
+          seasonUi: capabilities?.isSeason ?? false,
         }),
         queryClient.invalidateQueries({
           queryKey: QUERY_KEYS.wallet.fxRate(FX_RATE_PARAMS),
         }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.home.dashboard }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ranking.all }),
       ]);
     },
     onError: (error) => {
@@ -263,6 +297,29 @@ export default function WalletFxScreen({ navigation }: Props) {
 
     return () => clearInterval(intervalId);
   }, [quoteData]);
+
+  /**
+   * The account changed: every piece of in-flight FX state describes the old
+   * one (작업 10 §A-4).
+   *
+   * The quote is pinned server-side to the account that issued it, the
+   * idempotency key identifies a request against THAT account, and the amount
+   * was chosen against that account's balances. Carrying any of it over would
+   * at best produce a QUOTE_MISMATCH and at worst let a user press 환전 on
+   * numbers from a different account.
+   */
+  useEffect(() => {
+    setAmount('');
+    setFieldError(null);
+    setDomainError(null);
+    setQuoteData(null);
+    setExecuteIdempotencyKey(null);
+    setFxDomainState(null);
+    setSuccessData(null);
+    // Mutation objects are new every render; depending on them would re-run
+    // this constantly instead of only on an account change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountId]);
 
   const quoteExpired = useMemo(
     () => (quoteData ? isFxQuoteExpired(quoteData, quoteNow) : false),
@@ -397,8 +454,77 @@ export default function WalletFxScreen({ navigation }: Props) {
     });
   };
 
-  if (viewState === 'wallet_loading') {
+  if (accountsLoading || (hasAccount && viewState === 'wallet_loading')) {
     return <FullPageLoading message="지갑 정보를 불러오는 중입니다." />;
+  }
+
+  if (noAccounts || !hasAccount) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.content}>
+          <AccountSwitcher />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  /**
+   * General-mode FX is not implemented and suspended/closed accounts cannot
+   * exchange (작업 10 §A-4). This is 준비 중 / 제한 안내, NOT damage — and the
+   * request is never sent, so the user does not collect a 409 per press. The
+   * server gate is unchanged and still authoritative.
+   */
+  const exchangeBlockMessage =
+    capabilities && !capabilities.canExchange && capabilities.exchangeBlockReason
+      ? CAPABILITY_BLOCK_MESSAGE[capabilities.exchangeBlockReason]
+      : null;
+
+  if (exchangeBlockMessage) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView contentContainerStyle={styles.content}>
+          <AccountSwitcher />
+          <View
+            testID={TEST_IDS.tradingAccount.capabilityNotice}
+            style={styles.card}
+          >
+            <Text style={styles.label}>환전</Text>
+            <Text style={styles.blockedTitle}>
+              {capabilities?.isGeneral ? '준비 중입니다.' : '환전이 제한된 계정입니다.'}
+            </Text>
+            <Text style={styles.blockedMessage}>{exchangeBlockMessage}</Text>
+            <CTAButton
+              label="원장 보기"
+              onPress={() =>
+                navigation.navigate('WalletTransactions', {
+                  currencyCode: fromCurrency,
+                })
+              }
+            />
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // Server-detected damage never renders as an empty or zero wallet.
+  const walletIntegrityMessage = walletsQuery.isError
+    ? getIntegrityErrorMessage(walletsQuery.error)
+    : null;
+
+  if (walletIntegrityMessage) {
+    return (
+      <SafeAreaView style={styles.container} testID={TEST_IDS.tradingAccount.integrityError}>
+        <View style={styles.content}>
+          <AccountSwitcher />
+          <ErrorState
+            title="지갑 데이터를 안전하게 표시할 수 없습니다."
+            message={walletIntegrityMessage}
+            onRetry={retryWalletLookup}
+          />
+        </View>
+      </SafeAreaView>
+    );
   }
 
   if (viewState === 'wallet_not_joined') {
@@ -446,8 +572,12 @@ export default function WalletFxScreen({ navigation }: Props) {
         testID={TEST_IDS.walletFx.screen}
         contentContainerStyle={styles.content}
       >
+        <AccountSwitcher />
+
         <View style={styles.card}>
-          <Text style={styles.label}>지갑 요약</Text>
+          <Text style={styles.label}>
+            지갑 요약{accountDisplay ? ` · ${accountDisplay.title}` : ''}
+          </Text>
           <Text style={styles.value}>KRW Wallet {formatKrw(krwWallet)}</Text>
           <Text style={styles.value}>USD Wallet {formatUsd(usdWallet)}</Text>
           <Text style={styles.helper}>USD 환산 KRW {formatKrw(usdBalanceKrw)}</Text>
@@ -651,6 +781,10 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, color: '#666' },
   value: { fontSize: 16, fontWeight: '700' },
   helper: { fontSize: 14, color: '#444' },
+  // Full text, wrapped: a capability notice that is cut to one ellipsised line
+  // stops explaining why the button is gone.
+  blockedTitle: { fontSize: 17, fontWeight: '700', lineHeight: 24 },
+  blockedMessage: { fontSize: 14, color: '#444', lineHeight: 21 },
   errorText: { fontSize: 14, color: '#c62828' },
   input: {
     borderWidth: 1,

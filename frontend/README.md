@@ -15,6 +15,26 @@ Tests run under Node's type-stripping test runner, so test-reachable modules
 must be free of React Native imports and their relative imports need explicit
 `.ts` extensions.
 
+## Trading accounts
+
+Every current financial screen and mutation is scoped to ONE trading account,
+named in the request path. Which screen reads which account, how a mutation flow
+is bound to the account it started on, what a logout clears and why, and the
+targeted cache-invalidation rules are all in
+`docs/trading-account-switching.md`. Read it before touching a financial screen:
+"the selected account" and "the account this flow is about" are deliberately
+different things, and conflating them is how a season account's quote ends up
+creating an order in a general account.
+
+Current implementation status:
+
+- season + general accounts: portfolio, equity, wallets, ledger, positions,
+  orders, order cancel, FX — all account-scoped;
+- general-mode trading and FX are 준비 중 in the UI because they are not
+  implemented in the backend; the client does not send those requests;
+- ad rewards have client wrappers and cache invalidation but no screen yet, and
+  no provider adapter exists (disabled by default).
+
 ## Realtime prices
 
 - One shared authenticated WebSocket per app session
