@@ -1,6 +1,4 @@
 import type { RootNavigationProp } from './types';
-import type { CurrentSeasonDto } from '../../models/dto/season';
-import { toSeasonEntryRoute } from '../../features/season/mapper';
 
 const homeRoute = {
   name: 'MainTabs' as const,
@@ -36,14 +34,14 @@ export function resetToSeasonJoin(navigation: RootNavigationProp) {
   });
 }
 
-export function resetToSeasonEntry(
-  navigation: RootNavigationProp,
-  season: CurrentSeasonDto | null | undefined,
-) {
-  if (toSeasonEntryRoute(season) === 'season_join') {
-    resetToSeasonJoin(navigation);
-    return;
-  }
-
-  resetToHome(navigation);
+/**
+ * Where a user with NO trading account lands (작업 11 §3.3).
+ *
+ * The same screen as season join, under the name that says what it is for. It
+ * offers both ways to start — open a general account, or join a season if one
+ * is open — and it is reached because the user owns nothing, never because the
+ * server happens to have no active season.
+ */
+export function resetToAccountSetup(navigation: RootNavigationProp) {
+  resetToSeasonJoin(navigation);
 }

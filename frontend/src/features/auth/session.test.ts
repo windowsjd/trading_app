@@ -53,7 +53,9 @@ function fakeQueryClient() {
 /** Every financial entry a signed-in user accumulates, legacy keys included. */
 function seedFinancialCache(client: ReturnType<typeof fakeQueryClient>) {
   client.seed(QUERY_KEYS.me, { id: 'user-a', nickname: '사용자 A' });
-  client.seed(QUERY_KEYS.tradingAccount.list, { accounts: [{ id: 'acc-a' }] });
+  client.seed(QUERY_KEYS.tradingAccount.list('user-a'), {
+    accounts: [{ id: 'acc-a' }],
+  });
   client.seed(QUERY_KEYS.tradingAccount.portfolio('acc-a'), {
     summary: { totalAssetKrw: '12345678' },
   });
@@ -64,7 +66,6 @@ function seedFinancialCache(client: ReturnType<typeof fakeQueryClient>) {
   client.seed(QUERY_KEYS.position.all, []);
   client.seed(QUERY_KEYS.portfolio.overview, {});
   client.seed(QUERY_KEYS.order.myList(), {});
-  client.seed(QUERY_KEYS.home.dashboard, { summary: {} });
   client.seed(QUERY_KEYS.record.seasons({ limit: 20 }), {});
   client.seed(QUERY_KEYS.ranking.all, []);
 }
@@ -106,7 +107,6 @@ describe('session boundary', () => {
         undefined,
       );
       assert.equal(client.read(QUERY_KEYS.wallet.balances), undefined);
-      assert.equal(client.read(QUERY_KEYS.home.dashboard), undefined);
       assert.equal(client.read(QUERY_KEYS.me), undefined);
     });
 
@@ -161,7 +161,7 @@ describe('session boundary', () => {
 
       assert.ok(
         client.ops.includes(
-          `invalidate:${JSON.stringify(QUERY_KEYS.tradingAccount.list)}`,
+          `invalidate:${JSON.stringify(QUERY_KEYS.tradingAccount.list(USER_B.id))}`,
         ),
       );
     });

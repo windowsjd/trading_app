@@ -157,5 +157,6 @@ export const TEST_IDS = {
     capabilityNotice: 'trading-account-capability-notice',
     generalSummary: 'trading-account-general-summary',
     seasonSummary: 'trading-account-season-summary',
+    setupPanel: 'trading-account-setup-panel',
   },
 } as const;

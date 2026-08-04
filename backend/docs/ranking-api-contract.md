@@ -320,3 +320,22 @@ hardening pass:
   was added and no NOT NULL tightening was attempted.
 - Client-side: `accountId` is not exposed in any public ranking payload, and the
   frontend never derives an account from a ranking row.
+
+## Client usage — `seasonId` is now explicit (작업 11)
+
+`GET /api/v1/ranking` already accepted `seasonId`; the frontend never sent it and
+took the current-season default everywhere. That default is wrong on any screen
+that is about a SELECTED ACCOUNT: a user looking at a settled season's account
+saw this season's rank printed beside last season's name.
+
+- Home (season account) and the My screen now send
+  `seasonId=<the selected account's seasonId>`, plus `rankType=final` when that
+  season is `settled` and `daily` otherwise. Asking for the wrong `rankType`
+  returns an empty ranking, which reads as "you are unranked".
+- The public ranking tab still omits `seasonId` — "whatever season is current"
+  is genuinely its question.
+- The frontend cache key carries the `seasonId`, so the two callers cannot share
+  one entry.
+
+No response shape changed, and `tradingAccountId` remains absent from every
+public ranking payload.

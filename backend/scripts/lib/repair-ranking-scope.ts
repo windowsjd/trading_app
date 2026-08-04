@@ -231,7 +231,9 @@ export async function repairRankingScope(
  * Every branch here is a case where guessing would attach a ranking to an
  * account that may not be the one that produced it.
  */
-function describeBlockedNullScope(row: NullScopeRow): RankingScopeFailure | null {
+function describeBlockedNullScope(
+  row: NullScopeRow,
+): RankingScopeFailure | null {
   if (!row.participant_season_id) {
     return {
       rankingId: row.id,
@@ -414,7 +416,7 @@ export async function auditRankingAndSettlement(
 
   await add(
     'FINAL_RANKING_PARTICIPANT_RANK_MISMATCH',
-    "settled participant(s) store a finalRank that differs from their final ranking row.",
+    'settled participant(s) store a finalRank that differs from their final ranking row.',
     prisma.$queryRaw`
       SELECT count(*)::int AS n
       FROM "season_rankings" sr

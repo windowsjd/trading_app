@@ -12,6 +12,181 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 가상 트레이딩 계정 UX 완성 + 릴리스 하드닝 (2026-08-05, 작업 9 잔여 + 작업 10 보완, WORK-ID VIRTUAL-TRADING-ACCOUNT-UX-AND-RELEASE-HARDENING-V1)
+
+**기준 커밋** `0a837c8c291ec22b290e82a711c4444b25b23259` (= 지시받은 기준이자
+`git fetch` 시점의 `origin/main`).
+**시작 시점 로컬 HEAD** `8d855cf600e1a6ea8263a13b2b6e43432dc139dc` — 직전 작업
+(WORK-ID `FRONTEND-ACCOUNT-SCOPE-COMPLETION-AND-RELEASE-HARDENING-V1`)의 커밋이
+**푸시되지 않은 채** 로컬에만 있었다. 미커밋 변경은 없었다(working tree clean).
+그 커밋을 초기화하거나 되돌리지 않고, 먼저 기준선으로 재검증한 뒤(backend
+typecheck·build·2550 unit / frontend typecheck·414 tests 전부 통과) 그 위에
+이번 작업을 쌓았다. **이 환경에는 여전히 push 자격증명이 없어 origin에 올리지
+못했다. 최종 origin/main은 `0a837c8c` 그대로이며, 로컬이 2 커밋 앞선다.**
+
+**이번 작업이 남아 있던 이유**
+
+직전 작업은 "현재 금융 화면"을 계정 scope로 옮겼지만, 계정을 *고르기 전*과
+*시즌 홈*에는 손대지 않았다. 그 두 곳에 같은 결함이 남아 있었다: 화면이 말하는
+계정과 서버가 답하는 계정이 다르다.
+
+**A. 앱 진입이 시즌에 묶여 있었다 (§3)**
+
+Splash·Login·Signup이 각각 `getCurrentSeason()`을 호출하고 그 답으로 라우팅했다.
+이건 서로 다른 두 질문을 하나로 합친 것이다 — *참가할 시즌이 있는가*(서버의
+성질)와 *이 사용자가 쓸 계정이 있는가*(사용자의 성질). 일반계정을 가지고 있고
+모든 시즌이 끝난 사용자는 멀쩡히 쓸 수 있는 앱을 두고 시즌 화면으로 보내졌다.
+
+이제 진입은 **소유 계정 목록**으로 결정한다: 토큰 → `me` seed → 
+`tradingAccount.list(userId)` 조회 → 계정이 있으면 MainTabs, 없으면 계정 개설
+화면. 판단은 순수 함수(`features/auth/entry.ts`)이고 I/O는 `useEnterApp()`
+하나로 모았다. 목록 조회 **실패는 "계정 없음"으로 취급하지 않는다** — 네트워크
+장애를 빈 목록으로 보고하면 사용자가 계정을 하나 더 만들게 된다.
+
+**B. 계정이 하나도 없는 사용자에게 출구가 없었다 (§3.3)**
+
+`POST /trading-accounts/general`은 작업 6에서 구현됐지만 UI가 없었다. 계정이
+없는 사용자는 모든 금융 화면이 비어 있고 모든 경로가 시즌 화면으로 돌아왔다.
+`AccountSetupPanel`이 두 입구(일반계정 개설 / 시즌 참가)를 제공한다. 개설은
+**명시적 press의 POST 뿐** — 개설은 초기 자본을 지급하고 지갑과 원장 행을
+쓴다. GET·화면 mount·네비게이션이 그걸 하게 두면, 돈을 만드는 읽기가 되고
+재시도 한 번이면 버그와 구분되지 않는다. 서버가 멱등하므로 두 번 눌러도 하나다.
+
+**C. 시즌 홈이 "현재 시즌"을 읽고 있었다 (§10.1·§12)**
+
+HomeScreen은 legacy `/home`을 호출했다. 그 엔드포인트는 *현재* 시즌의
+participant를 서버에서 스스로 찾는다. 즉 선택 계정이 현재 시즌 계정일 때만
+맞고, 그 외에는 한 시즌의 이름 아래 다른 시즌의 돈을 보여준다. 그리고 선택
+정책 규칙 4(가장 최근 개설)가 정산된 시즌 계정에 착지할 수 있고, 사용자는
+switcher에서 아무 계정이나 고를 수 있으므로 이건 도달 가능한 경로다.
+
+신규 `SeasonAccountHome`이 계정 scope 읽기(`/portfolio`, `/portfolio/equity`,
+`/wallets`, `/positions`)와 **명시적 `seasonId`를 준 랭킹**(`/ranking?seasonId=`)
+으로 같은 화면을 만든다. `rankType`은 정산된 시즌이면 `final`, 아니면 `daily` —
+틀리게 물으면 빈 랭킹이 오고 그건 "순위 없음"으로 읽힌다. MyScreen의 등급·순위도
+같은 경로로 바꿨다. HomeScreen은 이제 선택 계정 mode로 분기하는 얇은 화면이다
+(계정 없음 / general / season). `features/home/*`는 사용처가 사라져 삭제했고
+`QUERY_KEYS.home.dashboard`도 함께 없앴다. **backend `/api/v1/home`은 그대로
+남아 있고 계약도 바뀌지 않았다** — 클라이언트가 쓰지 않을 뿐이다.
+
+**D. 계정 목록 캐시가 사용자별로 분리되어 있지 않았다 (§3.1)**
+
+`['tradingAccount','list']` 하나를 두 사용자가 공유했다. 로그아웃이 캐시를
+비우지만, 이 목록은 로그인 직후 **가장 먼저 읽는** 항목이기도 하다. 이전 항목이
+사라지기 전에 seed·refetch하는 경로가 하나라도 있으면 B가 A의 계정 목록을 받고,
+거기서 고른 계정으로 account-scoped 조회를 날린다. 이제 키가
+`['tradingAccount','list',userId]`라서 B의 키는 애초에 쓰인 적이 없다.
+userId 없이 무효화해야 하는 호출부(시즌 참가 등)를 위해 `listAll` prefix를
+남겼다. 랭킹 키에도 `seasonId`를 넣었다 — Home은 계정의 시즌을 명시하고 공개
+랭킹 탭은 "현재"를 뜻하므로, 한 항목을 공유하면 이번 시즌 순위가 지난 시즌
+이름 옆에 찍힌다.
+
+**E. legacy 호출 회귀 가드 (§12)**
+
+`features/tradingAccount/legacyFinancialCalls.test.ts`: legacy
+implicit-account 금융 함수는 **정의도 import도 금지**, 지정한 금융 화면은
+account-scoped surface를 반드시 읽어야 하며, `getCurrentSeason`은 시즌 전용
+4개 파일에서만 허용한다. 주석은 스캔 전에 제거한다(제거 이유를 설명한 주석이
+가드를 울리면 주석을 지우게 된다). **위반을 주입해 실제로 실패하는 것을
+확인했다** — 실패할 수 없는 가드는 아무것도 증명하지 않는다. 남아 있던 dead
+legacy 코드(`getPositions`·`getPositionForAsset`·`getPositionQuantity`,
+`toSeasonEntryRoute`)도 삭제했고 타입만 남겼다.
+
+**F. migration drift가 실제로 존재했다 (§24)**
+
+`prisma migrate diff --exit-code`가 **2를 반환**했다. `equity_snapshots`의
+index 3개를 migration SQL은 명시적으로 이름 지었는데 `schema.prisma`가 `map:`
+으로 고정하지 않아, Prisma가 자기 기본 이름(63바이트 절단본)을 계산하고 rename
+으로 보고했다. 직전 기록은 이를 "이름만 다른 무해한 차이"로 남겼지만, **기존
+CI의 drift gate가 바로 그 명령을 쓰고 있으므로 그 job은 오늘 main에서 실패
+상태였다**(push 자격증명이 없어 hosted CI가 한 번도 돌지 않아 드러나지 않았다).
+`map:`으로 3개를 고정해 drift를 0으로 만들었다. **migration은 추가하지 않았다** —
+DB는 이미 옳았고 schema 선언만 DB를 따라가지 않았다. schema contract spec에
+"명시적으로 이름 지은 index는 `map:`으로 고정되어야 한다"를 추가했다.
+
+**G. candle lint gate가 닫혀 있었다 (§17 부수)**
+
+`lint:candles:check`가 **17 errors로 실패**하고 있었다. 기준 커밋
+`0a837c8c`에서도 동일하므로 이번 작업이 만든 것이 아니다. 원인은 이
+gate의 glob이 `scripts/lib` 전체를 덮는데, 작업 7·8·10에서 그 디렉터리에
+candle과 무관한 repair/audit 헬퍼가 들어왔기 때문이다. drift gate와 같은
+이유로(hosted CI 미실행) 드러나지 않았다. **빨간 gate는 읽히지 않는다** —
+17건을 모두 고쳤다: raw 쿼리 5곳을 assertion 대신 `$queryRawUnsafe<T>` 제네릭으로
+(eslint `--fix`는 이 assertion을 "불필요"로 보고 지워서 더 나쁜 오류를 만들었다 —
+되돌리고 손으로 했다), prettier 6건 자동 수정, `jest.requireActual`에 타입 인자
+명시, 남은 jest mock 표면 4건은 사유를 적은 지역 disable. 로직 변경 없음은
+통합 12 suite + repair dry-run 6종 재실행으로 확인했다.
+
+**H. CI (§17)**
+
+기존 4 job(backend quality / frontend quality / limit-order DB / candle
+fixture)에 2개를 추가하고 2개를 보강했다.
+
+- **Core account PostgreSQL integration (신규)** — PG16 + Redis7, `TZ=UTC`,
+  migrate deploy → status → **drift gate**, 계정·소유권·링크·financial scope·
+  trading scope·general account·order replay/cancel scope·general performance·
+  snapshot scope·ranking scope·season join·auth·ops lock 12 suite를
+  `--runInBand`로, 이어서 repair 5종 + `audit-general` dry-run.
+- **Release-critical E2E (신규)** — `pnpm test:e2e`, **환경변수 없이**.
+- Backend quality에 `lint:accounts:check` 추가(계정 계층 product 파일 한정).
+  spec 파일은 제외한다 — 저장소의 기존 lint 부채 ~900건이 거의 전부 spec의
+  `no-unsafe-*`이고, 그걸 함께 묶으면 이 규칙이 무엇도 지키기 전에 무관한 오류
+  900건을 먼저 고쳐야 한다. 이 게이트를 0으로 만들기 위해 product 오류 2건을
+  고쳤다(미사용 import 삭제, 의도적인 control-char 정규식에 사유 있는 disable).
+- Frontend quality에 `npm run export:web` 추가 — `tsc --noEmit`은 타입을
+  증명하지만 모든 모듈이 실제로 resolve되고 앱이 빌드되는지는 번들만 증명한다.
+
+**I. 텍스트 잘림 (§20)**
+
+렌더러가 없는 프로젝트이므로 새 화면 2개(`SeasonAccountHome`,
+`AccountSetupPanel`)를 기존 `accountLayout.test.ts` 규약에 추가했다: 시즌명·
+금액의 `lineHeight`/`flexShrink`, 순위·등급 2단 카드의 `minWidth: 0`,
+setup 화면의 ScrollView + `flexGrow: 1`, `numberOfLines` 없음. 자동 렌더링
+검수는 하지 않았다(§20의 폭·font scale 실측은 여전히 수동 검수 항목).
+
+**변경 파일**
+
+frontend 신규 4: `features/auth/entry.ts`·`useEnterApp.ts`,
+`components/tradingAccount/AccountSetupPanel.tsx`,
+`screens/home/SeasonAccountHome.tsx` (+테스트 2: `entry.test.ts`,
+`legacyFinancialCalls.test.ts`). frontend 삭제 2: `features/home/api.ts`·
+`mapper.ts`. frontend 수정 17. backend 수정 10: `prisma/schema.prisma`(map 3개),
+`general-performance-schema.spec.ts`, `ad-reward.service.ts`(주석 1줄),
+`general-account-integrity.ts`(미사용 import), `package.json`(lint script),
+그리고 candle gate를 닫히게 하던 `scripts/lib` 5파일(lint 수정만).
+docs 7, CI 1. **backend 제품 로직 변경 0줄, migration 0건.**
+
+**검증 결과 (이 환경에서 실제 실행)**
+
+| 명령 | 결과 |
+| --- | --- |
+| `backend: pnpm typecheck` / `pnpm build` | PASS |
+| `backend: pnpm test` (unit) | PASS — 2551 pass / 37 skip |
+| `backend: 통합 (PG16, --runInBand)` | PASS — 21 suite (신규 CI job의 12 suite 포함), 실패 0 |
+| `backend: pnpm test:e2e` (환경변수 없음) | PASS — 122/122 |
+| `backend: prisma format/validate/generate/migrate status` | PASS |
+| `backend: prisma migrate diff --exit-code` | **PASS(0) — 수정 전에는 2** |
+| `backend: repair 5종 + audit-general dry-run` | PASS — findings 0, exit 0, 쓰기 없음 |
+| `backend: lint:accounts:check` | PASS — 0 errors |
+| `backend: lint:candles:check` / `format:candles:check` | PASS — **수정 전에는 17 errors로 실패(기준 커밋에서도 동일)** |
+| `backend: eslint 전체` | 기존 부채 잔존(이번 작업 증가분 0, 감소분 17) |
+| `frontend: tsc --noEmit` | PASS |
+| `frontend: npm test` | PASS — 429 (기준 414) |
+| `frontend: npm run export:web` | PASS — 1.5MB 번들 |
+
+**주의: dry-run은 빈 DB 위에서 실행했다.** "0 findings"는 도구가 깨끗한 DB를
+깨끗하다고 말한다는 것만 증명한다. 손상이 있을 때 말하는지는 손상 주입 통합
+suite(작업 10에서 6개 도구 전부 확보)가 증명하며, 그 쪽이 신뢰의 근거다.
+
+**실행하지 않은 것**
+
+- hosted CI: push 자격증명이 없어 GitHub Actions는 한 번도 돌지 않았다. 새 job
+  2개는 YAML 파싱과 **동일 명령의 로컬 실행**으로만 검증했다.
+- 실제 렌더링 기반 텍스트 잘림 검수(좁은 폭 / font scale 1.3+).
+- 광고 provider 연동, 일반계정 매매·환전 backend — 게이트 그대로 유지.
+
+---
+
 ### 작업 단위: 프런트엔드 계정 scope 완성 + 릴리스 하드닝 (2026-08-04, 작업 9 보완 + 작업 10, WORK-ID FRONTEND-ACCOUNT-SCOPE-COMPLETION-AND-RELEASE-HARDENING-V1)
 
 **기준 커밋** `0a837c8c291ec22b290e82a711c4444b25b23259`
@@ -2020,6 +2195,31 @@ cd frontend && npm run typecheck && npm test
 ---
 
 ## 2. 최신 작업 시간순 기록
+
+### 2026-08-05 — 가상 트레이딩 계정 UX 완성 + 릴리스 하드닝 (작업 9 잔여 + 작업 10 보완)
+
+- **앱 진입이 더 이상 시즌을 묻지 않는다.** 소유 계정 목록으로 라우팅한다. 일반
+  계정만 가진 사용자가 시즌이 없다는 이유로 시즌 화면에 갇히던 경로가 사라졌다.
+  목록 조회 실패는 "계정 없음"이 아니다 — 그렇게 취급하면 사용자가 계정을 하나
+  더 만든다.
+- **계정이 없는 사용자에게 출구가 생겼다.** `POST /trading-accounts/general`을
+  누르는 화면. 명시적 press에서만 호출한다 — 개설은 자본을 지급하고 원장을 쓴다.
+- **시즌 홈이 선택 계정을 읽는다.** legacy `/home`(현재 시즌 participant를
+  서버가 스스로 찾는다)을 걷어내고, 계정 scope 조회 + `seasonId`를 명시한 랭킹
+  으로 다시 만들었다. 정산된 시즌 계정을 골라도 이번 시즌 숫자가 그 이름 아래
+  찍히지 않는다.
+- **계정 목록 캐시를 사용자별로 분리했다.** 로그인 직후 가장 먼저 읽는 항목이라
+  clear 타이밍에 의존하는 격리는 충분하지 않았다.
+- **legacy 호출 회귀 가드를 넣었고, 위반을 주입해 실패하는 것을 확인했다.**
+- **migration drift가 실제로 있었다.** `migrate diff --exit-code`가 2였고, 그
+  명령을 쓰는 기존 CI job은 오늘 main에서 실패 상태였다(hosted CI가 한 번도
+  돌지 않아 드러나지 않았다). index 이름 3개를 `map:`으로 고정해 0으로 만들었다.
+  migration은 추가하지 않았다 — DB가 아니라 schema 선언이 틀렸다.
+- **CI에 core account DB integration과 canonical e2e job을 추가했다.** 계정 계층
+  lint 게이트와 frontend web export도 추가. canonical 환경과 명령은
+  `backend/docs/release-verification.md`에 하나로 고정했다.
+- 여전히 push 자격증명이 없다. origin/main은 `0a837c8c` 그대로이고 로컬이 2 커밋
+  앞서 있다.
 
 ### 2026-08-04 — 프런트엔드 계정 scope 완성 + 릴리스 하드닝 (작업 9 보완 + 작업 10)
 

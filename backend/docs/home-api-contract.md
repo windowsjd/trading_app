@@ -9,6 +9,24 @@
 - Provider ingestion, cron scheduler, automatic snapshot/ranking generation, settlement write-policy extensions beyond final tier assignment, and actual reward/payment/badge/trophy fulfillment remain STOP.
 - Do not add fake data, temporary runtime contracts, Prisma schema changes, migrations, or seed changes from this draft.
 
+## Client status (작업 11): no longer used by the app
+
+`GET /api/v1/home` is **unchanged and still served**, but the mobile app no
+longer calls it.
+
+It answers "how is this user doing in the CURRENT season", resolving the
+participant from whichever season is running. Home, however, is about the
+account the switcher names, and the two agree only while the selected account
+happens to be the current season's. Since the app can select a settled season's
+account — by the fallback policy or by the user picking it — the screen was able
+to show one season's name over another season's money.
+
+The season Home is now built from account-scoped reads
+(`/trading-accounts/:id/portfolio`, `/portfolio/equity`, `/wallets`,
+`/positions`) plus `/ranking?seasonId=<the account's season>`. This endpoint is
+kept for compatibility; any future client use must supply the account or season
+it means rather than relying on the implicit current one.
+
 ## Source Rules
 
 - Amount values are strings.

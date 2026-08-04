@@ -1,5 +1,7 @@
 jest.mock('../../src/generated/prisma/client', () => {
-  const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
+  const { Decimal } = jest.requireActual<
+    typeof import('@prisma/client/runtime/client')
+  >('@prisma/client/runtime/client');
 
   return {
     ParticipantStatus: {
@@ -100,6 +102,10 @@ describe('repairMissingTradingAccountLinks', () => {
     );
     expect(prisma.seasonParticipant.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
+        // `expect.objectContaining` is typed as `any` by jest; nesting two of
+        // them is what makes this assertion about the QUERY SHAPE rather than
+        // an exact object.
+        /* eslint-disable @typescript-eslint/no-unsafe-assignment */
         where: expect.objectContaining({
           participantStatus: 'excluded',
           tradingAccount: expect.objectContaining({
@@ -107,6 +113,7 @@ describe('repairMissingTradingAccountLinks', () => {
             status: 'active',
           }),
         }),
+        /* eslint-enable @typescript-eslint/no-unsafe-assignment */
       }),
     );
     expect(summary).toEqual({

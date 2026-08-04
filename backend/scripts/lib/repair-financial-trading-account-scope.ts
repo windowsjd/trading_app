@@ -294,24 +294,24 @@ async function countParticipantMismatch(
   model: FinancialScopeModel,
 ): Promise<number> {
   const table = MODEL_TABLES[model];
-  const rows = (await prisma.$queryRawUnsafe(
+  const rows = await prisma.$queryRawUnsafe<Array<{ n: number }>>(
     `SELECT count(*)::int AS n FROM "${table}" t
      JOIN "season_participants" sp ON sp."id" = t."season_participant_id"
      WHERE t."trading_account_id" IS NOT NULL
        AND sp."trading_account_id" IS DISTINCT FROM t."trading_account_id"`,
-  )) as Array<{ n: number }>;
+  );
   return rows[0]?.n ?? 0;
 }
 
 async function countWalletTransactionWalletMismatch(
   prisma: RepairPrismaClient,
 ): Promise<number> {
-  const rows = (await prisma.$queryRawUnsafe(
+  const rows = await prisma.$queryRawUnsafe<Array<{ n: number }>>(
     `SELECT count(*)::int AS n FROM "wallet_transactions" t
      JOIN "cash_wallets" w ON w."id" = t."wallet_id"
      WHERE t."trading_account_id" IS NOT NULL
        AND w."trading_account_id" IS NOT NULL
        AND t."trading_account_id" <> w."trading_account_id"`,
-  )) as Array<{ n: number }>;
+  );
   return rows[0]?.n ?? 0;
 }

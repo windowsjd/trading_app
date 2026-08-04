@@ -8,8 +8,6 @@ import type {
   SeasonJoinViewState,
 } from '@/models/enums/viewState';
 
-export type SeasonEntryRoute = 'home' | 'season_join';
-
 export function getEffectiveSeasonMode(
   season: CurrentSeasonDto | null | undefined,
   now = new Date(),
@@ -58,22 +56,6 @@ export function toSeasonDomainState(
   return season.joined ? 'season_settled_joined' : 'season_settled_not_joined';
 }
 
-export function toSeasonEntryRoute(
-  season: CurrentSeasonDto | null | undefined,
-  now = new Date(),
-): SeasonEntryRoute {
-  const seasonState = toSeasonDomainState(season, now);
-
-  if (
-    seasonState === 'season_upcoming' ||
-    seasonState === 'season_active_not_joined' ||
-    seasonState === 'season_not_configured'
-  ) {
-    return 'season_join';
-  }
-
-  return 'home';
-}
 
 export function toSeasonJoinViewState(
   season: CurrentSeasonDto | null | undefined,

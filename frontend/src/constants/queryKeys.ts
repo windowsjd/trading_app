@@ -13,10 +13,6 @@ export const QUERY_KEYS = {
       ] as const,
   },
 
-  home: {
-    dashboard: ['home', 'dashboard'] as const,
-  },
-
   wallet: {
     all: ['wallet'] as const,
     balances: ['wallet', 'balances'] as const,
@@ -145,8 +141,18 @@ export const QUERY_KEYS = {
 
   ranking: {
     all: ['ranking'] as const,
+    /**
+     * The leaderboard of ONE season. `seasonId` sits first because a screen that
+     * names its season (Home, for the selected account) and a screen that means
+     * "whatever season is current" (the public ranking tab) are asking different
+     * questions, and two seasons sharing one cache entry would let the first
+     * screen paint the other season's rank next to this season's name.
+     * `null` is the current-season request and is a distinct entry, not a
+     * wildcard.
+     */
     list: (params: {
       scope: string;
+      seasonId?: string | null;
       rankType?: string;
       rankingDate?: string | null;
       capturedAt?: string | null;
@@ -156,6 +162,7 @@ export const QUERY_KEYS = {
       [
         'ranking',
         'list',
+        params.seasonId ?? null,
         params.scope,
         params.rankType ?? 'auto',
         params.rankingDate ?? null,
@@ -252,8 +259,26 @@ export const QUERY_KEYS = {
   tradingAccount: {
     /** Everything account-scoped; the logout-time clear target. */
     all: ['tradingAccount'] as const,
-    /** The owned-account list is per USER, not per account. */
-    list: ['tradingAccount', 'list'] as const,
+
+    /**
+     * The owned-account list is per USER, not per account — and the userId is
+     * IN the key (작업 11 §3.1).
+     *
+     * A single `['tradingAccount','list']` entry is shared state between two
+     * people on one device. Logout clears the cache, but the list is also the
+     * first thing the app reads after a login, and any path that seeds or
+     * refetches it before the previous entry is gone hands user B the accounts
+     * of user A — which then selects an account B does not own and issues
+     * account-scoped reads against it. Keying by user makes that impossible
+     * rather than merely unlikely: B's key has never been written.
+     */
+    list: (userId: string) => ['tradingAccount', 'list', userId] as const,
+    /**
+     * Prefix for "the account list, whoever it belongs to". For invalidation
+     * only — from a callsite that has no userId to hand (joining a season, for
+     * instance). It must never be used as a queryKey.
+     */
+    listAll: ['tradingAccount', 'list'] as const,
     detail: (accountId: string) =>
       ['tradingAccount', 'detail', accountId] as const,
 

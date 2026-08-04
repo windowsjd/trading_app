@@ -328,37 +328,37 @@ async function countParticipantMismatch(
   model: TradingScopeModel,
 ): Promise<number> {
   const table = MODEL_TABLES[model];
-  const rows = (await prisma.$queryRawUnsafe(
+  const rows = await prisma.$queryRawUnsafe<Array<{ n: number }>>(
     `SELECT count(*)::int AS n FROM "${table}" t
      JOIN "season_participants" sp ON sp."id" = t."season_participant_id"
      WHERE t."trading_account_id" IS NOT NULL
        AND sp."trading_account_id" IS DISTINCT FROM t."trading_account_id"`,
-  )) as Array<{ n: number }>;
+  );
   return rows[0]?.n ?? 0;
 }
 
 async function countOrderQuoteAccountMismatch(
   prisma: RepairPrismaClient,
 ): Promise<number> {
-  const rows = (await prisma.$queryRawUnsafe(
+  const rows = await prisma.$queryRawUnsafe<Array<{ n: number }>>(
     `SELECT count(*)::int AS n FROM "orders" o
      JOIN "quotes" q ON q."id" = o."quote_id"
      WHERE o."trading_account_id" IS NOT NULL
        AND q."trading_account_id" IS NOT NULL
        AND o."trading_account_id" <> q."trading_account_id"`,
-  )) as Array<{ n: number }>;
+  );
   return rows[0]?.n ?? 0;
 }
 
 async function countOrderQuoteParticipantMismatch(
   prisma: RepairPrismaClient,
 ): Promise<number> {
-  const rows = (await prisma.$queryRawUnsafe(
+  const rows = await prisma.$queryRawUnsafe<Array<{ n: number }>>(
     `SELECT count(*)::int AS n FROM "orders" o
      JOIN "quotes" q ON q."id" = o."quote_id"
      WHERE q."season_participant_id" IS NOT NULL
        AND o."season_participant_id" <> q."season_participant_id"`,
-  )) as Array<{ n: number }>;
+  );
   return rows[0]?.n ?? 0;
 }
 

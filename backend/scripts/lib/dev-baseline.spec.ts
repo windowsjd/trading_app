@@ -1,5 +1,7 @@
 jest.mock('../../src/generated/prisma/client', () => {
-  const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
+  const { Decimal } = jest.requireActual<
+    typeof import('@prisma/client/runtime/client')
+  >('@prisma/client/runtime/client');
 
   return {
     CurrencyCode: {
@@ -180,6 +182,9 @@ describe('ensureDevBaselineParticipant trading-account link repair', () => {
       true,
     );
     expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+    // The jest mock's `.mock` surface is untyped by construction; asserting on
+    // the recorded arguments is the point of this test.
+    /* eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
     expect(prisma.$executeRaw.mock.calls[0].slice(1)).toEqual([
       deterministicId,
       DEV_USER_ID,

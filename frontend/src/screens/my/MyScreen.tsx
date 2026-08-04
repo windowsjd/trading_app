@@ -14,8 +14,7 @@ import { TEST_IDS } from '../../constants/testIds';
 
 import { getMe } from '../../features/me/api';
 import { useLogout } from '../../features/auth/useLogout';
-import { getHomeDashboard } from '../../features/home/api';
-import { getHomeRankingDisplay } from '../../features/home/mapper';
+import { getRankings, getRankingTier } from '../../features/ranking/api';
 import { getMySeasonRecords } from '../../features/record/api';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 
@@ -33,16 +32,39 @@ export default function MyScreen({ navigation }: Props) {
    * "you are unranked" rather than "this does not apply".
    */
   const { selectedAccount, isLoading: accountsLoading } = useTradingAccount();
-  const showsSeasonUi = selectedAccount?.mode === 'season';
+  const seasonId = selectedAccount?.season?.seasonId ?? null;
+  const showsSeasonUi = selectedAccount?.mode === 'season' && !!seasonId;
+  const rankType =
+    selectedAccount?.season?.seasonStatus === 'settled' ? 'final' : 'daily';
 
   const meQuery = useQuery({
     queryKey: QUERY_KEYS.me,
     queryFn: getMe,
   });
 
-  const homeQuery = useQuery({
-    queryKey: QUERY_KEYS.home.dashboard,
-    queryFn: getHomeDashboard,
+  /**
+   * The rank shown here belongs to the SELECTED account's season, named
+   * explicitly (작업 11 §10.1). The season dashboard would have answered for
+   * whichever season is current, which is a different season as soon as the
+   * user selects a past one — and a rank under the wrong season is worse than
+   * no rank.
+   */
+  const rankingQuery = useQuery({
+    queryKey: QUERY_KEYS.ranking.list({
+      scope: 'near_me',
+      seasonId,
+      rankType,
+      limit: 1,
+      offset: 0,
+    }),
+    queryFn: () =>
+      getRankings({
+        scope: 'near_me',
+        seasonId,
+        rankType,
+        limit: 1,
+        offset: 0,
+      }),
     enabled: !accountsLoading && showsSeasonUi,
   });
 
@@ -55,7 +77,7 @@ export default function MyScreen({ navigation }: Props) {
     if (
       accountsLoading ||
       meQuery.isLoading ||
-      (showsSeasonUi && homeQuery.isLoading) ||
+      (showsSeasonUi && rankingQuery.isLoading) ||
       recordsQuery.isLoading
     ) {
       return 'my_loading';
@@ -68,7 +90,7 @@ export default function MyScreen({ navigation }: Props) {
     accountsLoading,
     showsSeasonUi,
     meQuery.isLoading,
-    homeQuery.isLoading,
+    rankingQuery.isLoading,
     recordsQuery.isLoading,
     meQuery.data,
     recordsQuery.data,
@@ -90,7 +112,7 @@ export default function MyScreen({ navigation }: Props) {
         message="잠시 후 다시 시도해주세요."
         onRetry={() => {
           meQuery.refetch();
-          if (showsSeasonUi) homeQuery.refetch();
+          if (showsSeasonUi) rankingQuery.refetch();
           recordsQuery.refetch();
         }}
       />
@@ -98,8 +120,15 @@ export default function MyScreen({ navigation }: Props) {
   }
 
   const me = meQuery.data;
+  const myRanking = rankingQuery.data?.myRanking ?? null;
   const ranking = showsSeasonUi
-    ? getHomeRankingDisplay(homeQuery.data?.ranking)
+    ? {
+        rank:
+          myRanking?.rank === undefined || myRanking?.rank === null
+            ? '-'
+            : String(myRanking.rank),
+        tier: getRankingTier(myRanking, rankType),
+      }
     : null;
   const seasonCount = recordsQuery.data.items.length;
 

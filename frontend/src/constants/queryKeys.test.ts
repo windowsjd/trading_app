@@ -115,13 +115,43 @@ describe('invalidation prefixes cannot cross accounts', () => {
     }
   });
 
+  it('separates the owned-account LIST across two users', () => {
+    // 작업 11 §3.1. Before this, both users read one shared entry, so the first
+    // frame after a switch could offer — and then select — an account the new
+    // user does not own.
+    assert.notDeepEqual(
+      QUERY_KEYS.tradingAccount.list('user-a'),
+      QUERY_KEYS.tradingAccount.list('user-b'),
+    );
+    assert.ok(
+      startsWith(
+        QUERY_KEYS.tradingAccount.list('user-a'),
+        QUERY_KEYS.tradingAccount.listAll,
+      ),
+      'listAll must remain a usable invalidation prefix for any user',
+    );
+  });
+
+  it('separates the SAME leaderboard request across two seasons', () => {
+    // 작업 11 §10.1: Home names the selected account's season explicitly, the
+    // public tab means "current". They must not share one entry.
+    assert.notDeepEqual(
+      QUERY_KEYS.ranking.list({ scope: 'near_me', seasonId: 'season-1' }),
+      QUERY_KEYS.ranking.list({ scope: 'near_me', seasonId: 'season-2' }),
+    );
+    assert.notDeepEqual(
+      QUERY_KEYS.ranking.list({ scope: 'near_me', seasonId: 'season-1' }),
+      QUERY_KEYS.ranking.list({ scope: 'near_me' }),
+    );
+  });
+
   it('the account-wide prefix still clears everything at logout', () => {
     const all = QUERY_KEYS.tradingAccount.all;
 
     for (const entry of [
       QUERY_KEYS.tradingAccount.portfolio(A),
       QUERY_KEYS.tradingAccount.wallets(B),
-      QUERY_KEYS.tradingAccount.list,
+      QUERY_KEYS.tradingAccount.list('user-1'),
     ]) {
       assert.ok(startsWith(entry, all));
     }

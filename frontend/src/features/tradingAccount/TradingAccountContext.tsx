@@ -92,7 +92,9 @@ export function TradingAccountProvider({ children }: PropsWithChildren) {
   const userId = meQuery.data?.id ?? null;
 
   const accountsQuery = useQuery({
-    queryKey: QUERY_KEYS.tradingAccount.list,
+    // Keyed by user (작업 11 §3.1): two users on one device never read one
+    // another's owned-account list, independently of clear-on-logout timing.
+    queryKey: QUERY_KEYS.tradingAccount.list(userId ?? 'anonymous'),
     queryFn: getTradingAccounts,
     enabled: !!userId,
     staleTime: 30_000,

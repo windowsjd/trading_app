@@ -195,6 +195,32 @@ export async function getTradingAccounts() {
   return response.data.data;
 }
 
+export interface OpenGeneralAccountDto {
+  /** true only for the call that actually opened it; a replay answers false. */
+  created: boolean;
+  account: TradingAccountDto;
+  wallets: WalletBalanceDto[];
+}
+
+/**
+ * Opens the user's general account — the ONE place the app creates one
+ * (작업 11 §3.3).
+ *
+ * A POST, always, and only from an explicit user action. Opening an account
+ * grants starting capital and writes wallets and a ledger row; a screen that
+ * did this on mount would hand out capital to anyone who scrolled past it, and
+ * a GET that creates money is indistinguishable from a bug the first time it is
+ * retried. The server is idempotent (one general account per user, `created`
+ * tells the first open from a replay), so a double tap costs nothing.
+ */
+export async function openGeneralAccount() {
+  const response = await apiClient.post<
+    ApiSuccessResponse<OpenGeneralAccountDto>
+  >('/trading-accounts/general');
+
+  return response.data.data;
+}
+
 export async function getTradingAccount(accountId: string) {
   const response = await apiClient.get<ApiSuccessResponse<TradingAccountDto>>(
     accountPath(accountId),

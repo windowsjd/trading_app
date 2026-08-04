@@ -179,7 +179,6 @@ describe('account-scoped invalidation targets ONE account', () => {
 
     assert.ok(!matchesAny(keys, QUERY_KEYS.ranking.all));
     assert.ok(!matchesAny(keys, QUERY_KEYS.record.all));
-    assert.ok(!matchesAny(keys, QUERY_KEYS.home.dashboard));
   });
 
   it('refreshes season-only views for a season account', async () => {

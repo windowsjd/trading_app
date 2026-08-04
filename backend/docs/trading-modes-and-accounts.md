@@ -1915,3 +1915,27 @@ Each asserts the same shape: damage is detected, a dry-run writes nothing,
 REPORTED rather than guessed at, a non-null mismatch is never auto-overwritten,
 re-running is idempotent, remaining damage exits non-zero, and `audit-general`
 never writes.
+
+## Client entry and general-account creation (작업 11)
+
+`POST /api/v1/trading-accounts/general` is now reachable from the app. It was
+implemented in 작업 6 and had no UI, so a user who owned nothing had no way to
+start: every financial screen was empty and every route led back to the season
+screen.
+
+The contract is unchanged and the invariants it protects are the reason the UI
+is shaped the way it is:
+
+- **Creation is a POST behind an explicit press.** Opening the account grants
+  starting capital and writes wallets and a ledger row. No GET, no screen mount,
+  and no navigation may cause it — a read that creates money is indistinguishable
+  from a bug the first time it is retried.
+- **Idempotent.** `data.created` distinguishes the first open from a replay, and
+  the status is pinned to 200 either way, so a double press yields one account.
+- **The app never creates one implicitly.** Selecting an account issues reads
+  only; a user with no accounts gets an explicit empty state offering the two
+  real entrances (open a general account, or join a season when one is open).
+
+App entry no longer depends on the current season at all: the client routes on
+the owned-account list (`GET /api/v1/trading-accounts`). A user holding only a
+general account, with every season settled, enters the app normally.

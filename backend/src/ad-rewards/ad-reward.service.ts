@@ -1065,6 +1065,9 @@ export class AdRewardService {
       );
     }
     // Control characters would make the key unloggable and unsafe to echo.
+    // Matching control characters IS the check here; the rule exists to catch
+    // them being typed into a pattern by accident.
+    // eslint-disable-next-line no-control-regex
     if (/[\u0000-\u001f\u007f]/u.test(idempotencyKey)) {
       throwAdRewardError(
         adRewardErrorCodes.AD_REWARD_INVALID_REQUEST,

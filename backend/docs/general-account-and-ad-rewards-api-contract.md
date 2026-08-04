@@ -914,3 +914,14 @@ produces a snapshot mixing a post-payout wallet with a pre-payout funding total.
 An account closed after the run listed it gets no snapshot at all and is counted
 in `excludedClosed` / `skippedClosedDuringRun`.
 
+
+## Client status (작업 11)
+
+- `POST /api/v1/trading-accounts/general` now has a UI (`AccountSetupPanel`),
+  reached when a user owns no trading account. Creation stays an explicit press;
+  no GET, mount, or navigation creates an account, a wallet, or a grant.
+- Ad reward **eligibility/claim screens still do not exist**. The client
+  wrappers (`getAdRewardEligibility`, `getAdRewardClaims`, `claimAdReward`) and
+  their cache invalidation are in place; no screen calls them.
+- No real ad provider is registered, and reward fulfilment remains disabled.
+  This is unchanged by 작업 11 and is deliberate.

@@ -144,6 +144,34 @@ describe('the styles long text depends on are present', () => {
     assert.ok(!/numberOfLines=\{/.test(source));
   });
 
+  it('SeasonAccountHome: season name, amounts and the rank pair all wrap', () => {
+    const source = read('screens/home/SeasonAccountHome.tsx');
+
+    // A user-supplied season name is unbounded; it wraps rather than truncating.
+    assert.match(source, /seasonName:\s*\{[^}]*lineHeight/s);
+    assert.match(source, /big:\s*\{[^}]*flexShrink:\s*1/s);
+    assert.match(source, /big:\s*\{[^}]*lineHeight/s);
+    // Rank and tier sit in a two-up row: each half must be allowed to wrap
+    // inside itself instead of pushing the other card off screen.
+    assert.match(source, /flex:\s*\{[^}]*minWidth:\s*0/s);
+    assert.match(source, /positionName:\s*\{[^}]*minWidth:\s*0/s);
+    assert.match(source, /positionValue:\s*\{[^}]*flexShrink:\s*0/s);
+    assert.ok(!/numberOfLines=\{/.test(source));
+  });
+
+  it('AccountSetupPanel: the only screen a user with nothing sees, scrolls', () => {
+    const source = read('components/tradingAccount/AccountSetupPanel.tsx');
+
+    // Centred while it fits, scrolling when it does not — the copy here is long
+    // and at large font scales `flex: 1` + centring would clip it.
+    assert.match(source, /ScrollView/);
+    assert.match(source, /content:\s*\{[^}]*flexGrow:\s*1/s);
+    assert.match(source, /title:\s*\{[^}]*lineHeight/s);
+    assert.match(source, /message:\s*\{[^}]*lineHeight/s);
+    assert.match(source, /error:\s*\{[^}]*lineHeight/s);
+    assert.ok(!/numberOfLines=\{/.test(source));
+  });
+
   it('error and blocked screens scroll instead of clipping a long message', () => {
     for (const path of [
       'components/states/ErrorState.tsx',

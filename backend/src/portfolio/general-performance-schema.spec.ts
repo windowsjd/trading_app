@@ -185,13 +185,36 @@ describe('General performance schema contract', () => {
     it('adds the account read indexes', () => {
       expect(block()).toContain('@@index([tradingAccountId, capturedAt])');
       expect(block()).toContain(
-        '@@index([tradingAccountId, snapshotReason, capturedAt])',
+        '@@index([tradingAccountId, snapshotReason, capturedAt]',
       );
       expect(block()).toContain(
-        '@@index([externalFundingReferenceType, externalFundingReferenceId])',
+        '@@index([externalFundingReferenceType, externalFundingReferenceId]',
       );
       // The legacy season index is untouched.
       expect(block()).toContain('@@index([seasonParticipantId, capturedAt])');
+    });
+
+    /**
+     * The three indexes the migration named EXPLICITLY must be pinned with
+     * `map:` in the schema (작업 11 §24).
+     *
+     * Without the pin, Prisma computes its own truncated default name, and
+     * `prisma migrate diff --exit-code` — the drift gate in CI — reports a
+     * rename against a database that is in fact correct. The gate then fails on
+     * every green build, which is how a drift check stops being read. The names
+     * asserted here are the ones PostgreSQL actually holds (the third is the
+     * 63-byte truncation of the name in the migration SQL).
+     */
+    it('pins the explicitly named indexes so migrate diff reports no drift', () => {
+      expect(block()).toContain(
+        'map: "equity_snapshots_external_funding_boundary_key"',
+      );
+      expect(block()).toContain(
+        'map: "equity_snapshots_trading_account_id_snapshot_reason_captured_at"',
+      );
+      expect(block()).toContain(
+        'map: "equity_snapshots_external_funding_reference_idx"',
+      );
     });
   });
 

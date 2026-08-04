@@ -6,29 +6,40 @@ import {
   StyleSheet,
   SafeAreaView,
 } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
 
 import type { SplashScreenProps } from '../../app/navigation/types';
-import {
-  resetToLogin,
-  resetToSeasonEntry,
-  resetToSeasonJoin,
-} from '../../app/navigation/seasonRouting';
+import { resetToLogin } from '../../app/navigation/seasonRouting';
 import { getAccessToken, clearTokens } from '../../services/storage/tokenStorage';
-import { getCurrentSeason } from '../../features/season/api';
+import { QUERY_KEYS } from '../../constants/queryKeys';
+import { getMe } from '../../features/me/api';
+import { useEnterApp } from '../../features/auth/useEnterApp';
 import ErrorState from '../../components/states/ErrorState';
 import {
   getApiErrorCode,
   getErrorMessageFromCode,
   isAuthUserInactiveError,
 } from '../../services/api/errorMapper';
-import { ERROR_CODE } from '../../models/enums/errorCode';
 
 export default function SplashScreen({ navigation }: SplashScreenProps) {
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const enterApp = useEnterApp();
 
   useEffect(() => {
     let mounted = true;
 
+    /**
+     * Session restore (작업 11 §3): token → identity → owned accounts → app.
+     *
+     * The current season is NOT consulted. A returning user with a general
+     * account is a user who can trade nothing but can read everything about
+     * their own account, and gating their re-entry on a season that may not
+     * exist put them on a join screen they had no business seeing.
+     *
+     * `me` is seeded into the cache from this call so the account provider does
+     * not repeat it one render later.
+     */
     async function bootstrap() {
       try {
         const accessToken = await getAccessToken();
@@ -40,11 +51,12 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
           return;
         }
 
-        const season = await getCurrentSeason();
+        const me = await getMe();
 
         if (!mounted) return;
 
-        resetToSeasonEntry(navigation, season);
+        queryClient.setQueryData(QUERY_KEYS.me, me);
+        await enterApp(me.id);
       } catch (error) {
         if (!mounted) return;
 
@@ -53,11 +65,6 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
         if (isAuthUserInactiveError(code)) {
           await clearTokens();
           setBootstrapError(getErrorMessageFromCode(code));
-          return;
-        }
-
-        if (code === ERROR_CODE.SEASON_NOT_FOUND) {
-          resetToSeasonJoin(navigation);
           return;
         }
 
@@ -70,7 +77,7 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
     return () => {
       mounted = false;
     };
-  }, [navigation]);
+  }, [enterApp, navigation, queryClient]);
 
   if (bootstrapError) {
     return (

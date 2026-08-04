@@ -63,6 +63,9 @@ export async function seedSessionCache(
   queryClient.clear();
   queryClient.setQueryData(QUERY_KEYS.me, user);
   await queryClient.invalidateQueries({
-    queryKey: QUERY_KEYS.tradingAccount.list,
+    // The incoming user's OWN list key. `listAll` would also match, but naming
+    // the user here is what makes "the list I am about to read is this user's"
+    // true by construction (작업 11 §3.1).
+    queryKey: QUERY_KEYS.tradingAccount.list(user.id),
   });
 }

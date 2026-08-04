@@ -1,9 +1,11 @@
-# Frontend TradingAccount Switching (작업 9 + 작업 10)
+# Frontend TradingAccount Switching (작업 9 + 작업 10 + 작업 11)
 
 Reference for the account-selection layer added by WORK-ID
-`SEASON-RANKING-HARDENING-AND-FRONTEND-ACCOUNT-SWITCH-V1` and completed across
+`SEASON-RANKING-HARDENING-AND-FRONTEND-ACCOUNT-SWITCH-V1`, completed across
 every current financial screen and mutation by
-`FRONTEND-ACCOUNT-SCOPE-COMPLETION-AND-RELEASE-HARDENING-V1` (작업 10).
+`FRONTEND-ACCOUNT-SCOPE-COMPLETION-AND-RELEASE-HARDENING-V1` (작업 10), and
+extended to app ENTRY, per-user cache separation and the season Home itself by
+`VIRTUAL-TRADING-ACCOUNT-UX-AND-RELEASE-HARDENING-V1` (작업 11).
 
 Backend contracts this depends on:
 `backend/docs/trading-accounts-api-contract.md`,
@@ -37,6 +39,10 @@ plus one AsyncStorage entry.
 | `services/api/sessionExpiry.ts` | the one seam from a dead refresh token to teardown (작업 10) |
 | `features/record/accountOrders.ts` | account-scoped order row → record row shape (작업 10) |
 | `screens/home/GeneralAccountHome.tsx` | Home for a general account (작업 10) |
+| `screens/home/SeasonAccountHome.tsx` | Home for a season account, account-scoped (작업 11) |
+| `features/auth/entry.ts` / `useEnterApp.ts` | app entry decided by owned accounts (작업 11) |
+| `components/tradingAccount/AccountSetupPanel.tsx` | the no-account landing; opens a general account (작업 11) |
+| `features/tradingAccount/legacyFinancialCalls.test.ts` | the guard that keeps legacy implicit-account calls out (작업 11) |
 | `components/tradingAccount/AccountSwitcher.tsx` | switcher UI |
 | `constants/queryKeys.ts` → `QUERY_KEYS.tradingAccount.*` | account-scoped cache keys |
 
@@ -44,8 +50,10 @@ plus one AsyncStorage entry.
 
 | Screen | accountId source | Endpoints |
 | --- | --- | --- |
-| Home (season) | selected | legacy `/home` — season participation, unchanged |
+| Home (season) | selected | `/trading-accounts/:id/portfolio`, `/portfolio/equity`, `/wallets`, `/positions`, and `/ranking?seasonId=<the account's season>` (작업 11) |
 | Home (general) | selected | `/trading-accounts/:id/portfolio`, `/wallets`, `/positions` |
+| Home (no account) | — | nothing is read; `POST /trading-accounts/general` on an explicit press (작업 11) |
+| My (rank/tier) | selected | `/ranking?seasonId=<the account's season>` (작업 11) |
 | Portfolio | selected | `/portfolio`, `/portfolio/equity`, `/positions` |
 | AssetDetail | selected (positions only) | `/positions`; price/candles stay public |
 | Order | **route param**, fixed at entry | `/orders/quote`, `/orders`, `/positions`, `/wallets` |
@@ -83,9 +91,50 @@ from while the account they could actually use sat one tap away. Those accounts
 are still reachable through rule 4 — readable history, just not the landing
 place.
 
+## App entry (작업 11)
+
+Entry is decided by the accounts the user OWNS, never by `getCurrentSeason()`.
+
+Splash, login and signup each used to ask for the current season and route on
+the answer, which conflates two unrelated questions: *is there a season to
+join* (a property of the server) and *does this user have an account to use* (a
+property of the user). A user holding a general account, with every season
+settled, was sent to the season screen — a page about something they are not
+doing — while the app they could use sat behind it.
+
+The order after authentication is now:
+
+1. save tokens;
+2. seed `me` (from the login response, or from `GET /me` on session restore);
+3. read `tradingAccount.list(<userId>)` — the same cache entry the provider
+   mounts on, so entry and the provider make ONE request between them;
+4. `accounts.length > 0` → MainTabs; otherwise → the account setup screen;
+5. the provider restores the stored selection and applies the fallback policy.
+
+A failure to read the list is NOT treated as "no accounts": the user stays put
+with the real error. Reporting a network blip as an empty account list invites a
+second account.
+
+`getCurrentSeason()` keeps its real jobs — may I join, what is the public
+season, which season does the leaderboard default to — and
+`features/tradingAccount/legacyFinancialCalls.test.ts` fails the build if it
+reappears anywhere else.
+
+## No accounts at all (작업 11)
+
+`AccountSetupPanel` is the landing for a user who owns nothing. It offers the
+two real entrances: open a general account, or join a season when one is open.
+The general account is created by `POST /trading-accounts/general` **on an
+explicit press only** — opening an account grants starting capital and writes
+wallets and a ledger row, so no GET, no screen mount, and no navigation may
+cause it. The server is idempotent (`data.created` distinguishes the first open
+from a replay), so a double press yields one account.
+
 ## Per-user persistence and logout
 
-The storage key is `selectedTradingAccountId:<userId>`. With a single global key,
+The storage key is `selectedTradingAccountId:<userId>`, and since 작업 11 the
+account LIST cache key is `['tradingAccount','list',<userId>]` as well. With a
+single global key,
 user A logs out, user B logs in, and B's first financial screen requests A's
 accountId — the server correctly answers 404, but B sees an error on their own
 portfolio.
@@ -116,7 +165,7 @@ every mounted screen rendering a full portfolio for a session the server had
 already stopped honouring.
 
 On login/signup `beginSession()` runs in this order: clear → seed `me` from the
-login response → invalidate the account list. The middle step is what makes the
+login response → invalidate that user's account list key. The middle step is what makes the
 switcher appear without an app restart: the provider gates its account query on
 `enabled: !!userId`, so without it the provider sat on its pre-login 401.
 
@@ -130,7 +179,8 @@ an identity: a user can hold several season accounts across seasons, and two of
 them keyed only by `'season'` would share one cache entry.
 
 ```
-tradingAccount.list                                  // per user
+tradingAccount.list(userId)                          // per USER (작업 11)
+tradingAccount.listAll                               // invalidation prefix only
 tradingAccount.detail(accountId)
 tradingAccount.portfolio(accountId)
 tradingAccount.portfolioEquity(accountId, range)
@@ -153,6 +203,18 @@ leaves B's perfectly good cache alone.
 `normalizeFilterKey()` collapses `undefined`, `null`, `''`, and omission to one
 token and sorts keys, so two calls that mean the same query never produce two
 cache entries.
+
+The owned-account LIST carries the userId for the same reason (작업 11). Logout
+clears the cache, but the list is also the first thing read after a login, and
+any path that seeds or refetches it before the previous entry is gone would hand
+user B the accounts of user A — which then selects an account B does not own and
+issues account-scoped reads against it. Keyed by user, B's entry has never been
+written.
+
+The season leaderboard key carries its `seasonId` (작업 11): Home names the
+selected account's season explicitly, while the public ranking tab means
+"whatever is current". Sharing one entry would print this season's rank beside
+last season's name.
 
 ### Switching
 
@@ -290,7 +352,8 @@ variable-length Korean text, and a season name is user-supplied content:
 
 ## Tests
 
-`node --test` (no Jest in this project). 414 tests as of 작업 10 (was 338).
+`node --test` (no Jest in this project). 427 tests as of 작업 11 (414 after
+작업 10, 338 before).
 
 Coverage: selection policy and fallbacks including the ended/settled/upcoming
 season cases; per-user storage isolation; cache separation and cross-account
@@ -301,6 +364,13 @@ with long Korean season names; error classification; response-scope mismatch
 clear-before-seed ordering, and that the previous user's portfolio is
 unreadable afterwards); order-flow account binding; the record-order row
 adapter; and layout invariants.
+
+`legacyFinancialCalls.test.ts` (작업 11) is the standing guard: no legacy
+implicit-account financial function may be defined or imported anywhere, the
+listed financial screens must read the account-scoped surface, and
+`getCurrentSeason` may appear only in the four season-specific files. It was
+verified to FAIL when a legacy import is reintroduced — a guard that cannot fail
+proves nothing.
 
 Layout has no renderer here, so `accountLayout.test.ts` asserts the two things
 that can be checked without one, and that are the two that broke in practice:

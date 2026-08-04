@@ -66,7 +66,7 @@ export function invalidateAfterOrderCreate(
     // Season history/record lists are keyed by seasonId, not accountId; a new
     // order must appear there too.
     ...(options.seasonUi
-      ? [QUERY_KEYS.record.all, QUERY_KEYS.ranking.all, QUERY_KEYS.home.dashboard]
+      ? [QUERY_KEYS.record.all, QUERY_KEYS.ranking.all]
       : []),
   ];
 
@@ -86,7 +86,7 @@ export function invalidateAfterOrderCancel(
     QUERY_KEYS.tradingAccount.ordersAll(accountId),
     ...walletKeys(accountId),
     ...portfolioKeys(accountId),
-    ...(options.seasonUi ? [QUERY_KEYS.record.all, QUERY_KEYS.home.dashboard] : []),
+    ...(options.seasonUi ? [QUERY_KEYS.record.all] : []),
   ];
 
   return invalidateAll(client, keys);
@@ -105,7 +105,10 @@ export function invalidateAfterFx(
   const keys: QueryKey[] = [
     ...walletKeys(accountId),
     ...portfolioKeys(accountId),
-    ...(options.seasonUi ? [QUERY_KEYS.home.dashboard, QUERY_KEYS.ranking.all] : []),
+    // Nothing season-wide to refresh: an exchange moves cash between two of
+    // this account's wallets. The account's own portfolio is invalidated
+    // above, and a stored ranking snapshot is not changed by an exchange.
+
   ];
 
   return invalidateAll(client, keys);

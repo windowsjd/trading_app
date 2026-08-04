@@ -80,6 +80,14 @@ export interface UserSeasonSummaryDto {
 
 export interface GetRankingsParams {
   scope: RankingScope;
+  /**
+   * The season the leaderboard is about. Omitted means "whatever season is
+   * current", which is the public ranking tab's question. A screen that is
+   * about a SELECTED ACCOUNT must name the account's own season instead
+   * (작업 11 §10.1) — otherwise a user looking at last season's account is
+   * shown this season's rank beside last season's name.
+   */
+  seasonId?: string | null;
   rankType?: RankingRankType;
   limit?: number;
   offset?: number;
@@ -118,6 +126,7 @@ export async function getRankings(params: GetRankingsParams) {
   const searchParams = new URLSearchParams();
 
   searchParams.set('scope', params.scope);
+  if (params.seasonId) searchParams.set('seasonId', params.seasonId);
   searchParams.set('limit', String(limit));
   searchParams.set('offset', String(offset));
   if (params.rankType) searchParams.set('rankType', params.rankType);

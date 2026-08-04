@@ -1230,11 +1230,11 @@ model EquitySnapshot {
   // Prisma CAN express this one as a plain composite unique because all four
   // columns are nullable and PostgreSQL treats NULLs as distinct, so ordinary
   // season/ordinary rows are unaffected.
-  @@unique([tradingAccountId, externalFundingReferenceType, externalFundingReferenceId, snapshotReason], name: "equity_snapshot_external_funding_boundary")
+  @@unique([tradingAccountId, externalFundingReferenceType, externalFundingReferenceId, snapshotReason], name: "equity_snapshot_external_funding_boundary", map: "equity_snapshots_external_funding_boundary_key")
   @@index([seasonParticipantId, capturedAt])
   @@index([tradingAccountId, capturedAt])
-  @@index([tradingAccountId, snapshotReason, capturedAt])
-  @@index([externalFundingReferenceType, externalFundingReferenceId])
+  @@index([tradingAccountId, snapshotReason, capturedAt], map: "equity_snapshots_trading_account_id_snapshot_reason_captured_at")
+  @@index([externalFundingReferenceType, externalFundingReferenceId], map: "equity_snapshots_external_funding_reference_idx")
   @@index([snapshotReason, capturedAt])
   @@map("equity_snapshots")
 }

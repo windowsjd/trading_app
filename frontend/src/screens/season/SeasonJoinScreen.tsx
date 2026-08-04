@@ -26,6 +26,7 @@ import { ERROR_CODE } from '../../models/enums/errorCode';
 import type { SeasonJoinViewState } from '../../models/enums/viewState';
 import { formatKrw } from '../../utils/format';
 
+import AccountSetupPanel from '../../components/tradingAccount/AccountSetupPanel';
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import BlockedState from '../../components/states/BlockedState';
@@ -50,6 +51,7 @@ function getJoinErrorViewState(
 export default function SeasonJoinScreen({ navigation }: Props) {
   const queryClient = useQueryClient();
   const [joinErrorCode, setJoinErrorCode] = useState<string | null>(null);
+  const [showGeneralSetup, setShowGeneralSetup] = useState(false);
 
   const resetToHome = () => {
     navigation.reset({
@@ -93,9 +95,8 @@ export default function SeasonJoinScreen({ navigation }: Props) {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.season.current }),
         queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.tradingAccount.list,
+          queryKey: QUERY_KEYS.tradingAccount.listAll,
         }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.home.dashboard }),
       ]);
 
       resetToHome();
@@ -119,9 +120,8 @@ export default function SeasonJoinScreen({ navigation }: Props) {
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: QUERY_KEYS.season.current }),
           queryClient.invalidateQueries({
-            queryKey: QUERY_KEYS.tradingAccount.list,
+            queryKey: QUERY_KEYS.tradingAccount.listAll,
           }),
-          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.home.dashboard }),
         ]);
         await seasonQuery.refetch();
       }
@@ -157,10 +157,24 @@ export default function SeasonJoinScreen({ navigation }: Props) {
     joinErrorCode,
   ]);
 
+  if (showGeneralSetup) {
+    return (
+      <AccountSetupPanel
+        message="일반 투자 계정은 시즌과 무관하게 유지됩니다. 계정을 연 뒤에도 시즌이 열리면 별도로 참가할 수 있습니다."
+        onOpened={resetToHome}
+      />
+    );
+  }
+
   if (viewState === 'season_info_loading') {
     return <FullPageLoading message="현재 시즌 정보를 불러오는 중입니다." />;
   }
 
+  /**
+   * No season to join is not an error for a user who owns nothing — it just
+   * means the other entrance is the only one open (작업 11 §3.3). Users who
+   * already own an account keep the route home.
+   */
   if (viewState === 'season_not_configured_view') {
     return hasUsableAccount ? (
       <BlockedState
@@ -170,10 +184,9 @@ export default function SeasonJoinScreen({ navigation }: Props) {
         onAction={resetToHome}
       />
     ) : (
-      <ErrorState
-        title="현재 시즌이 설정되지 않았습니다."
-        message="시즌이 열리면 참가할 수 있습니다."
-        onRetry={() => seasonQuery.refetch()}
+      <AccountSetupPanel
+        message="현재 참가할 수 있는 시즌이 없습니다. 일반 투자 계정을 열면 시즌과 무관하게 잔고와 수익률을 확인할 수 있고, 시즌이 열리면 그때 참가할 수 있습니다."
+        onOpened={resetToHome}
       />
     );
   }
@@ -230,7 +243,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
   }
 
   if (viewState === 'season_join_closed') {
-    return (
+    return hasUsableAccount ? (
       <BlockedState
         title={season.name}
         message="현재 시즌 참가가 마감되었거나 활성 상태가 아닙니다."
@@ -239,6 +252,12 @@ export default function SeasonJoinScreen({ navigation }: Props) {
           setJoinErrorCode(null);
           seasonQuery.refetch();
         }}
+      />
+    ) : (
+      <AccountSetupPanel
+        title={season.name}
+        message="이번 시즌은 참가가 마감되었습니다. 일반 투자 계정을 열면 다음 시즌을 기다리는 동안에도 계정을 사용할 수 있습니다."
+        onOpened={resetToHome}
       />
     );
   }
@@ -317,6 +336,19 @@ export default function SeasonJoinScreen({ navigation }: Props) {
         >
           <Text style={styles.secondaryButtonText}>지금은 둘러보기</Text>
         </Pressable>
+
+        {/* A user who owns nothing needs the other entrance visible here too:
+            joining is not the only way to have an account (작업 11 §3.3). */}
+        {!hasUsableAccount ? (
+          <Pressable
+            style={styles.secondaryButton}
+            onPress={() => setShowGeneralSetup(true)}
+          >
+            <Text style={styles.secondaryButtonText}>
+              일반 투자 계정으로 시작하기
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
     </SafeAreaView>
   );

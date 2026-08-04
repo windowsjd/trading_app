@@ -1,6 +1,13 @@
-import { apiClient } from '../../services/api/client';
+/**
+ * Position DTO shapes only (작업 11 §12).
+ *
+ * The legacy `/positions` reads that used to live here are GONE. They resolved
+ * the account implicitly from the current season's participant, so on a screen
+ * showing a selected account they answered about a different one. Every caller
+ * now uses `getTradingAccountPositions(accountId, …)`. The types stay because
+ * the account-scoped payload has the same row shape.
+ */
 import type {
-  ApiSuccessResponse,
   IsoDateTimeString,
   MoneyString,
   OffsetPagination,
@@ -42,69 +49,3 @@ export interface PositionsResponseDto {
   positions: PositionItemDto[];
 }
 
-export interface GetPositionsParams {
-  assetType?: AssetType;
-  assetId?: string;
-  limit?: number;
-  offset?: number;
-}
-
-function buildFallbackPagination(
-  limit: number,
-  offset: number,
-  returned: number,
-): OffsetPagination {
-  return {
-    limit,
-    offset,
-    total: offset + returned,
-    returned,
-    nextOffset: returned >= limit ? offset + returned : null,
-  };
-}
-
-export async function getPositions(params: GetPositionsParams = {}) {
-  const limit = params.limit ?? 20;
-  const offset = params.offset ?? 0;
-  const searchParams = new URLSearchParams();
-
-  if (params.assetType) searchParams.set('assetType', params.assetType);
-  if (params.assetId) searchParams.set('assetId', params.assetId);
-  searchParams.set('limit', String(limit));
-  searchParams.set('offset', String(offset));
-
-  const response = await apiClient.get<
-    ApiSuccessResponse<
-      PositionsResponseDto & {
-        items?: PositionItemDto[];
-      }
-    >
-  >(`/positions?${searchParams.toString()}`);
-
-  const data = response.data.data;
-  const positions = data.positions ?? data.items ?? [];
-
-  return {
-    ...data,
-    positions,
-    pagination:
-      data.pagination ?? buildFallbackPagination(limit, offset, positions.length),
-  };
-}
-
-export function getPositionForAsset(
-  positionsResponse: PositionsResponseDto | null | undefined,
-  assetId: string,
-) {
-  return (
-    positionsResponse?.positions.find((position) => position.assetId === assetId) ??
-    null
-  );
-}
-
-export function getPositionQuantity(
-  positionsResponse: PositionsResponseDto | null | undefined,
-  assetId: string,
-) {
-  return getPositionForAsset(positionsResponse, assetId)?.quantity ?? '0';
-}

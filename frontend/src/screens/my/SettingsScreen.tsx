@@ -44,7 +44,6 @@ export default function SettingsScreen({ navigation }: Props) {
     mutationFn: updateMe,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.me });
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.home.dashboard });
       Alert.alert('저장 완료', '닉네임이 변경되었습니다.');
     },
     onError: () => {

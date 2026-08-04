@@ -10,14 +10,9 @@ import {
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import type { SignupScreenProps } from '../../app/navigation/types';
-import { useRootNavigation } from '../../app/navigation/navigationHooks';
-import {
-  resetToSeasonEntry,
-  resetToSeasonJoin,
-} from '../../app/navigation/seasonRouting';
 import { signup } from '../../features/auth/api';
 import { beginSession } from '../../features/auth/session';
-import { getCurrentSeason } from '../../features/season/api';
+import { useEnterApp } from '../../features/auth/useEnterApp';
 import { clearTokens, saveTokens } from '../../services/storage/tokenStorage';
 import {
   getApiErrorCode,
@@ -51,7 +46,7 @@ function getBlockedAuthMessage(state: AuthViewState | null) {
 }
 
 export default function SignupScreen({ navigation }: SignupScreenProps) {
-  const rootNavigation = useRootNavigation();
+  const enterApp = useEnterApp();
 
   const [email, setEmail] = useState('');
   const [nickname, setNickname] = useState('');
@@ -89,8 +84,10 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
       await beginSession(queryClient, result.user);
 
       try {
-        const season = await getCurrentSeason();
-        resetToSeasonEntry(rootNavigation, season);
+        // Entry is decided by the accounts this user OWNS, not by whether a
+        // season is running (작업 11 §3). A user with a general account and no
+        // open season belongs in the app, not on the season screen.
+        await enterApp(result.user.id);
       } catch (error) {
         const code = getApiErrorCode(error);
 
@@ -100,11 +97,9 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           return;
         }
 
-        if (code === ERROR_CODE.SEASON_NOT_FOUND) {
-          resetToSeasonJoin(rootNavigation);
-          return;
-        }
-
+        // The account list could not be read. That is not "you have no
+        // accounts", so the user is not sent to the setup screen: they stay
+        // here with the real error and can retry.
         setSubmitError(getApiErrorDisplayMessage(error));
       }
     },

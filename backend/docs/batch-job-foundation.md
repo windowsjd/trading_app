@@ -403,3 +403,16 @@ contract test pins `SCHEDULER_*` / `ENABLE_*` for the duration of its assertion
 (작업 10) — before that it failed on any developer machine whose `.env.local`
 enabled the candle sync, which is a normal local setup and not a readiness
 fault.
+
+## CI coverage (작업 11)
+
+The account/general/ranking/settlement integration suites — including the daily
+snapshot job's atomicity and its serialisation against ad payouts — now run in
+CI as the **Core account PostgreSQL integration** job (PostgreSQL 16 + Redis 7,
+`--runInBand`, migrations deployed and drift-checked first). They were
+previously opt-in locally and could regress unobserved. The same job runs all
+five repair tools and `audit-general` in dry-run, so a change that makes an
+operational tool crash, write during a dry-run, or report findings against a
+clean database fails the build.
+
+Canonical commands and the environment they assume: `backend/docs/release-verification.md`.

@@ -3,7 +3,6 @@ import {
   CurrencyCode,
   Prisma,
   TradingAccountMode,
-  WalletTransactionDirection,
   WalletTransactionReferenceType,
   WalletTransactionType,
 } from '../generated/prisma/client';

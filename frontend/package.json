@@ -28,6 +28,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "node --test 'src/**/*.test.ts'",
-    "check": "npm run typecheck && npm run test"
+    "check": "npm run typecheck && npm run test",
+    "export:web": "expo export --platform web --output-dir dist"
   }
 }
