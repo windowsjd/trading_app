@@ -376,6 +376,10 @@ describe('AppController (e2e)', () => {
    */
   let accessTokenSecret: string;
   let prisma: PrismaMock;
+  // The readiness contract distinguishes "Redis is not configured" from
+  // "Redis is configured but unreachable"; the second case needs a ping that
+  // rejects, so the mock is reachable from the tests rather than inlined.
+  let redisPing: jest.Mock;
 
   const originalJwtAccessSecret = process.env.JWT_ACCESS_SECRET;
   const originalJwtAccessTtl = process.env.JWT_ACCESS_TTL;
@@ -655,7 +659,7 @@ describe('AppController (e2e)', () => {
       .useValue(prisma)
       .overrideProvider(RedisService)
       .useValue({
-        ping: jest.fn().mockResolvedValue('PONG'),
+        ping: (redisPing = jest.fn().mockResolvedValue('PONG')),
         onModuleDestroy: jest.fn().mockResolvedValue(undefined),
       })
       .compile();
@@ -979,83 +983,222 @@ describe('AppController (e2e)', () => {
       });
   });
 
-  it('/readiness (GET) reports database and scheduler readiness without secrets', async () => {
-    prisma.$queryRaw.mockResolvedValueOnce([{ result: 1 }]);
-    // Pin the calendar requirement to the audited year so this contract test
-    // stays deterministic: the default range (current..next year) includes
-    // the provisional KRX 2027 dataset, which correctly degrades readiness
-    // with MARKET_CALENDAR_PROVISIONAL.
-    const priorFrom = process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR;
-    const priorThrough = process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR;
-    process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR = '2026';
-    process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR = '2026';
-    // The scheduler flags are pinned for the same reason as the calendar
-    // range: this asserts the readiness CONTRACT, not one machine's config.
-    // `getOpsSchedulerConfig()` reads process.env per request, and any single
-    // enabled job flips `scheduler.enabled` to true — so a developer whose
-    // .env.local runs the candle sync (a normal local setup) saw this test
-    // fail for a reason that has nothing to do with readiness.
-    const priorScheduler = { ...process.env };
+  /**
+   * Pins every environment input the readiness contract reads, runs `body`,
+   * and restores the previous environment in `finally` — including keys the
+   * test itself never named.
+   *
+   * The canonical e2e command deliberately takes NO environment variables, but
+   * `ConfigModule.forRoot({ envFilePath: [...] })` copies whatever `.env` file
+   * a developer happens to have into `process.env` at module compile time, and
+   * readiness re-reads `process.env` per request. Without this pin the same
+   * assertion passes on a laptop with a `.env` and fails on CI without one —
+   * which is exactly how `redis: 'ok'` (a local `REDIS_URL`) came to be
+   * asserted as the contract.
+   *
+   * Pinned by default:
+   * - the calendar range, to the audited year: the default range
+   *   (current..next year) includes the provisional KRX 2027 dataset, which
+   *   correctly degrades readiness with MARKET_CALENDAR_PROVISIONAL;
+   * - every `SCHEDULER_` / `ENABLE_` flag, cleared: any single enabled job flips
+   *   `scheduler.enabled` to true, so a developer running the candle sync
+   *   locally saw failures unrelated to readiness;
+   * - REDIS_URL, unset: Redis is an OPTIONAL dependency, and the canonical
+   *   e2e job runs without a Redis service.
+   */
+  const withPinnedReadinessEnv = async <T>(
+    overrides: Record<string, string | undefined>,
+    body: () => Promise<T>,
+  ): Promise<T> => {
+    const prior = { ...process.env };
+    const pinned: Record<string, string | undefined> = {
+      MARKET_CALENDAR_REQUIRED_FROM_YEAR: '2026',
+      MARKET_CALENDAR_REQUIRED_THROUGH_YEAR: '2026',
+      SCHEDULER_ENABLED: 'false',
+      REDIS_URL: undefined,
+      ...overrides,
+    };
+    const isSchedulerKey = (key: string) =>
+      key.startsWith('SCHEDULER_') || key.startsWith('ENABLE_');
+    const touched = new Set(Object.keys(pinned));
     for (const key of Object.keys(process.env)) {
-      if (key.startsWith('SCHEDULER_') || key.startsWith('ENABLE_')) {
+      if (isSchedulerKey(key)) {
+        touched.add(key);
         delete process.env[key];
       }
     }
-    process.env.SCHEDULER_ENABLED = 'false';
+    for (const [key, value] of Object.entries(pinned)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+
     try {
+      return await body();
+    } finally {
+      for (const key of Object.keys(process.env)) {
+        if (isSchedulerKey(key)) touched.add(key);
+      }
+      for (const key of touched) {
+        const value = prior[key];
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+    }
+  };
+
+  /**
+   * The readiness fields this release actually contracts on. Asserted with
+   * `objectContaining` at BOTH levels on purpose: adding a diagnostic field to
+   * the payload is an additive change and must not fail the contract test.
+   */
+  const expectReadinessContract = (
+    body: unknown,
+    expected: {
+      redis: 'ok' | 'disabled' | 'unavailable';
+      status: 'ready' | 'degraded' | 'unavailable';
+    },
+  ) => {
+    expect(body).toEqual(
+      expect.objectContaining({
+        success: true,
+        data: expect.objectContaining({
+          app: 'ok',
+          database: 'ok',
+          redis: expected.redis,
+          status: expected.status,
+          scheduler: {
+            enabled: false,
+            timezone: 'Asia/Seoul',
+            jobs: expect.objectContaining({
+              daily_portfolio_snapshot: false,
+              provider_fx_ingest: false,
+            }),
+          },
+          liveCandle: expect.objectContaining({ enabled: false }),
+          reconciliation: expect.any(Array),
+          currentTime: expect.any(String),
+        }),
+      }),
+    );
+    // Readiness is a public, unauthenticated endpoint: it reports STATES, never
+    // the configuration behind them.
+    expect(JSON.stringify(body)).not.toMatch(
+      /DATABASE_URL|REDIS_URL|KIS_APP_SECRET|approval_key|access_token|secret/i,
+    );
+  };
+
+  it('/readiness (GET) reports database and scheduler readiness without secrets', async () => {
+    prisma.$queryRaw.mockResolvedValueOnce([{ result: 1 }]);
+
+    await withPinnedReadinessEnv({}, async () => {
       await request(app.getHttpServer())
         .get('/readiness')
         .expect(200)
         .expect((response) => {
-          expect(response.body).toEqual({
-            success: true,
-            data: expect.objectContaining({
-              app: 'ok',
-              database: 'ok',
+          // No REDIS_URL: Redis is an optional dependency, so it reports
+          // `disabled` and readiness stays `ready` — this is the contract the
+          // canonical e2e job (which has no Redis service) runs under.
+          expectReadinessContract(response.body, {
+            redis: 'disabled',
+            status: 'ready',
+          });
+          expect(response.body.data.reasons).toEqual([]);
+        });
+    });
+  });
+
+  it('/readiness (GET) treats an explicitly blank REDIS_URL as disabled, not as a failure', async () => {
+    prisma.$queryRaw.mockResolvedValueOnce([{ result: 1 }]);
+
+    await withPinnedReadinessEnv({ REDIS_URL: '   ' }, async () => {
+      await request(app.getHttpServer())
+        .get('/readiness')
+        .expect(200)
+        .expect((response) => {
+          expectReadinessContract(response.body, {
+            redis: 'disabled',
+            status: 'ready',
+          });
+          expect(response.body.data.reasons).toEqual([]);
+        });
+    });
+  });
+
+  it('/readiness (GET) reports a configured and reachable Redis as ok', async () => {
+    prisma.$queryRaw.mockResolvedValueOnce([{ result: 1 }]);
+
+    await withPinnedReadinessEnv(
+      { REDIS_URL: 'redis://localhost:6379' },
+      async () => {
+        await request(app.getHttpServer())
+          .get('/readiness')
+          .expect(200)
+          .expect((response) => {
+            expectReadinessContract(response.body, {
               redis: 'ok',
               status: 'ready',
-              scheduler: {
-                enabled: false,
-                timezone: 'Asia/Seoul',
-                jobs: expect.objectContaining({
-                  daily_portfolio_snapshot: false,
-                  provider_fx_ingest: false,
-                }),
-              },
-              liveCandle: expect.objectContaining({ enabled: false }),
-              reconciliation: expect.any(Array),
-              currentTime: expect.any(String),
-            }),
+            });
           });
-          expect(JSON.stringify(response.body)).not.toMatch(
-            /DATABASE_URL|KIS_APP_SECRET|approval_key|access_token/i,
-          );
+      },
+    );
+  });
+
+  it('/readiness (GET) does not report ready when a CONFIGURED Redis is unreachable', async () => {
+    prisma.$queryRaw.mockResolvedValueOnce([{ result: 1 }]);
+    redisPing.mockRejectedValueOnce(new Error('ECONNREFUSED'));
+
+    await withPinnedReadinessEnv(
+      { REDIS_URL: 'redis://localhost:6379' },
+      async () => {
+        await request(app.getHttpServer())
+          .get('/readiness')
+          .expect(200)
+          .expect((response) => {
+            // Configured-but-broken is NOT the same state as not-configured:
+            // it degrades readiness, where `disabled` does not.
+            expectReadinessContract(response.body, {
+              redis: 'unavailable',
+              status: 'degraded',
+            });
+            expect(response.body.data.status).not.toBe('ready');
+          });
+      },
+    );
+  });
+
+  it('/readiness (GET) contract holds even though the payload carries extra diagnostic fields', async () => {
+    prisma.$queryRaw.mockResolvedValueOnce([{ result: 1 }]);
+
+    await withPinnedReadinessEnv({}, async () => {
+      await request(app.getHttpServer())
+        .get('/readiness')
+        .expect(200)
+        .expect((response) => {
+          const diagnosticOnlyFields = [
+            'marketCalendar',
+            'marketSessionOverride',
+            'kisWebSocketStreaming',
+            'binanceWebSocketStreaming',
+            'assetTicker',
+          ];
+          // Proves the assertion above is tolerant rather than vacuously
+          // exhaustive: these fields exist, are not part of the contract, and
+          // do not fail it.
+          for (const field of diagnosticOnlyFields) {
+            expect(Object.keys(response.body.data)).toContain(field);
+          }
+          expectReadinessContract(response.body, {
+            redis: 'disabled',
+            status: 'ready',
+          });
         });
-    } finally {
-      for (const key of Object.keys(process.env)) {
-        if (key.startsWith('SCHEDULER_') || key.startsWith('ENABLE_')) {
-          delete process.env[key];
-        }
-      }
-      for (const [key, value] of Object.entries(priorScheduler)) {
-        if (
-          (key.startsWith('SCHEDULER_') || key.startsWith('ENABLE_')) &&
-          value !== undefined
-        ) {
-          process.env[key] = value;
-        }
-      }
-      if (priorFrom === undefined) {
-        delete process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR;
-      } else {
-        process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR = priorFrom;
-      }
-      if (priorThrough === undefined) {
-        delete process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR;
-      } else {
-        process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR = priorThrough;
-      }
-    }
+    });
   });
 
   it('/api/v1/auth/signup (POST) creates a user and returns access and refresh tokens', () => {

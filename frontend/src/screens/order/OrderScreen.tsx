@@ -220,11 +220,17 @@ export default function OrderScreen({ route, navigation }: Props) {
   const successData = successState.data;
   const successQuoteData = successState.quote;
   const [quoteNow, setQuoteNow] = useState(() => Date.now());
-  const latestQuoteInputRef = useRef({
+  const latestQuoteInputRef = useRef<{
+    assetId: string;
+    side: typeof side;
+    quantity: string;
+    orderType: 'market' | 'limit';
+    limitPrice: string;
+  }>({
     assetId,
     side,
     quantity: '',
-    orderType: 'market' as 'market' | 'limit',
+    orderType: 'market',
     limitPrice: '',
   });
 
@@ -436,19 +442,29 @@ export default function OrderScreen({ route, navigation }: Props) {
     [quoteData, quoteNow],
   );
 
-  const quoteDisplay = useMemo(
-    () =>
-      quoteData
-        ? getOrderQuoteDisplay(quoteData, asset?.displayPriceDecimals)
-        : null,
-    [quoteData],
-  );
-
   const asset = assetQuery.data?.asset;
   const price = asset?.price;
   const positionQuantity = getAccountPositionQuantity(
     positionQuery.data,
     assetId,
+  );
+
+  /**
+   * Declared AFTER `asset` on purpose (작업 12 §6).
+   *
+   * This memo reads `asset?.displayPriceDecimals`, and its factory runs during
+   * render — so while `const asset` sat below it, the first render in which
+   * `quoteData` became non-null entered the factory with `asset` still in its
+   * temporal dead zone and threw `ReferenceError: Cannot access 'asset' before
+   * initialization`, taking the order screen down the moment a quote succeeded.
+   * The missing dependency (which the new lint gate reported) was the symptom.
+   */
+  const quoteDisplay = useMemo(
+    () =>
+      quoteData
+        ? getOrderQuoteDisplay(quoteData, asset?.displayPriceDecimals)
+        : null,
+    [quoteData, asset?.displayPriceDecimals],
   );
 
   /**
@@ -732,7 +748,7 @@ export default function OrderScreen({ route, navigation }: Props) {
       <ErrorState
         title="주문에 필요한 자산 정보를 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
-        onRetry={() => assetQuery.refetch()}
+        onRetry={() => void assetQuery.refetch()}
       />
     );
   }

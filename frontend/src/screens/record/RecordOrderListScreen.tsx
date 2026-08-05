@@ -34,7 +34,18 @@ import {
 } from '../../features/tradingAccount/api';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import { getAccountDisplay } from '../../features/tradingAccount/accountDisplay';
-import { getIntegrityErrorMessage } from '../../features/tradingAccount/integrityErrors';
+import {
+  ACCOUNT_INTEGRITY_TITLE,
+  findAccountIntegrityFailure,
+} from '../../features/tradingAccount/accountIntegrityGate';
+import {
+  ACCOUNT_LIST_ERROR_MESSAGE,
+  ACCOUNT_LIST_ERROR_TITLE,
+  ACCOUNT_MISSING_MESSAGE,
+  ACCOUNT_MISSING_TITLE,
+  canQuerySeasonOrders,
+  resolveSeasonAccount,
+} from '../../features/record/seasonAccountLookup';
 import {
   invalidateAfterOrderCancel,
   invalidateAfterOrderCreate,
@@ -55,7 +66,12 @@ export default function RecordOrderListScreen({ route }: Props) {
   const { seasonId } = route.params;
   const [filter, setFilter] = useState<Filter>('all');
   const queryClient = useQueryClient();
-  const { accounts, isLoading: accountsLoading } = useTradingAccount();
+  const {
+    accounts,
+    isLoading: accountsLoading,
+    isError: accountsError,
+    refetchAccounts,
+  } = useTradingAccount();
 
   /**
    * The account is derived from the SEASON this screen is about — not from the
@@ -69,14 +85,20 @@ export default function RecordOrderListScreen({ route }: Props) {
    * Reads are status-blind by contract, so an ended or settled season's closed
    * account still shows its full history here — read-only, with cancel
    * naturally unavailable because nothing is open.
+   *
+   * `resolveSeasonAccount` separates "the account LIST failed" from "the list
+   * is fine and this season has no account of yours" (작업 12 §5) — two states
+   * that were one, with a retry button wired to a query that was disabled.
    */
-  const seasonAccount =
-    accounts.find(
-      (account) =>
-        account.mode === 'season' && account.season?.seasonId === seasonId,
-    ) ?? null;
+  const accountLookup = resolveSeasonAccount({
+    seasonId,
+    accounts,
+    isLoading: accountsLoading,
+    isError: accountsError,
+  });
+  const seasonAccount = accountLookup.account;
   const accountId = seasonAccount?.id ?? '';
-  const hasAccount = !!seasonAccount;
+  const hasAccount = canQuerySeasonOrders(accountLookup);
   const accountDisplay = seasonAccount ? getAccountDisplay(seasonAccount) : null;
   const isFocused = useIsFocused();
   const [appState, setAppState] = useState<AppStateStatus>(
@@ -188,7 +210,7 @@ export default function RecordOrderListScreen({ route }: Props) {
       const orderId = item.orderId ?? item.id;
       return (
         Boolean(orderId) &&
-        previousOpenLimitIds.current.has(orderId as string) &&
+        previousOpenLimitIds.current.has(orderId) &&
         !isOpenLimitBuyOrder(item)
       );
     });
@@ -221,36 +243,65 @@ export default function RecordOrderListScreen({ route }: Props) {
     items.length,
   ]);
 
-  if (accountsLoading || (hasAccount && viewState === 'record_orders_loading')) {
+  if (
+    accountLookup.state === 'loading' ||
+    (hasAccount && viewState === 'record_orders_loading')
+  ) {
     return <FullPageLoading message="거래 내역을 불러오는 중입니다." />;
   }
 
-  // No owned account for this season. Not an empty list — an empty list would
-  // claim the user made no trades that season, which this does not know.
-  if (!hasAccount) {
+  // The account LIST failed. Retrying the orders query would do nothing — it is
+  // disabled without an account — so the retry is the account list itself.
+  if (accountLookup.state === 'account_list_error') {
     return (
       <ErrorState
-        title="이 시즌의 계정을 찾을 수 없습니다."
-        message="계정 정보를 다시 불러온 뒤 시도해주세요. 계속되면 고객센터에 문의해주세요."
-        onRetry={() => ordersQuery.refetch()}
+        title={ACCOUNT_LIST_ERROR_TITLE}
+        message={ACCOUNT_LIST_ERROR_MESSAGE}
+        onRetry={() => void refetchAccounts()}
       />
     );
   }
 
-  const integrityMessage = ordersQuery.isError
-    ? getIntegrityErrorMessage(ordersQuery.error)
-    : null;
+  // The list loaded and contains no account for this season. Not an empty order
+  // list — that would claim the user made no trades, which this does not know —
+  // and not a foreign-account probe either: the client never tries to tell
+  // "someone else's" from "does not exist".
+  if (accountLookup.state === 'account_missing') {
+    return (
+      <ErrorState
+        title={ACCOUNT_MISSING_TITLE}
+        message={ACCOUNT_MISSING_MESSAGE}
+        onRetry={() => void refetchAccounts()}
+      />
+    );
+  }
+
+  // Damage in the order history is not a transient fetch failure (작업 12 §3).
+  const integrityFailure = findAccountIntegrityFailure([
+    {
+      section: '거래 내역',
+      isError: ordersQuery.isError,
+      error: ordersQuery.error,
+      retry: () => void ordersQuery.refetch(),
+    },
+  ]);
+
+  if (integrityFailure) {
+    return (
+      <ErrorState
+        title={ACCOUNT_INTEGRITY_TITLE}
+        message={integrityFailure.message}
+        onRetry={integrityFailure.retry}
+      />
+    );
+  }
 
   if (viewState === 'record_orders_error') {
     return (
       <ErrorState
-        title={
-          integrityMessage
-            ? '거래 내역을 안전하게 표시할 수 없습니다.'
-            : '거래 내역을 불러오지 못했습니다.'
-        }
-        message={integrityMessage ?? '잠시 후 다시 시도해주세요.'}
-        onRetry={() => ordersQuery.refetch()}
+        title="거래 내역을 불러오지 못했습니다."
+        message="잠시 후 다시 시도해주세요."
+        onRetry={() => void ordersQuery.refetch()}
       />
     );
   }
@@ -264,7 +315,7 @@ export default function RecordOrderListScreen({ route }: Props) {
         contentContainerStyle={styles.content}
         onEndReached={() => {
           if (ordersQuery.hasNextPage && !ordersQuery.isFetchingNextPage) {
-            ordersQuery.fetchNextPage();
+            void ordersQuery.fetchNextPage();
           }
         }}
         onEndReachedThreshold={0.4}
@@ -316,7 +367,7 @@ export default function RecordOrderListScreen({ route }: Props) {
               style={styles.rowCard}
             >
               <View style={styles.rowBody}>
-                <View>
+                <View style={styles.rowNameColumn}>
                   <Text style={styles.itemTitle}>{display.name}</Text>
                   <Text style={styles.helper}>{display.symbol}</Text>
                   <Text style={styles.helper}>
@@ -383,9 +434,7 @@ export default function RecordOrderListScreen({ route }: Props) {
                     isCanceling && styles.cancelButtonDisabled,
                   ]}
                   disabled={isCanceling}
-                  onPress={() =>
-                    confirmCancel(display.orderId as string, display.name)
-                  }
+                  onPress={() => confirmCancel(display.orderId, display.name)}
                 >
                   <Text style={styles.cancelButtonText}>
                     {isCanceling ? '취소 중...' : '주문 취소'}
@@ -464,8 +513,13 @@ const styles = StyleSheet.create({
   },
   rowBody: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+    gap: 12,
   },
+  // A long Korean asset name wraps inside its own column instead of pushing the
+  // amount column off the screen (작업 12 §7).
+  rowNameColumn: { flex: 1, minWidth: 0 },
   cancelButton: {
     borderWidth: 1,
     borderColor: '#c62828',
@@ -480,9 +534,12 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: '#c62828',
     fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 21,
   },
-  itemTitle: { fontSize: 15, fontWeight: '700' },
-  helper: { fontSize: 14, color: '#444' },
-  alignEnd: { alignItems: 'flex-end' },
+  itemTitle: { fontSize: 15, fontWeight: '700', lineHeight: 21 },
+  helper: { fontSize: 14, color: '#444', lineHeight: 20 },
+  // The amount column keeps its own track: it is the figure the row is about.
+  alignEnd: { alignItems: 'flex-end', flexShrink: 0 },
   footerLoader: { paddingVertical: 16 },
 });

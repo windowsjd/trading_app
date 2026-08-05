@@ -16,7 +16,10 @@ import {
   getAccountDisplay,
   getReturnRateMethodLabel,
 } from '../../features/tradingAccount/accountDisplay';
-import { getIntegrityErrorMessage } from '../../features/tradingAccount/integrityErrors';
+import {
+  ACCOUNT_INTEGRITY_TITLE,
+  findAccountIntegrityFailure,
+} from '../../features/tradingAccount/accountIntegrityGate';
 import { CAPABILITY_BLOCK_MESSAGE } from '../../features/tradingAccount/capabilities';
 import type { TradingAccountCapabilities } from '../../features/tradingAccount/capabilities';
 import { getRankings, getRankingTier } from '../../features/ranking/api';
@@ -164,17 +167,56 @@ export default function SeasonAccountHome({
     enabled: !!season?.seasonId,
   });
 
-  const integrityMessage = portfolioQuery.isError
-    ? getIntegrityErrorMessage(portfolioQuery.error)
-    : null;
+  /**
+   * EVERY account-scoped query on this screen (작업 12 §3).
+   *
+   * The ranking one matters most here. `myRanking` missing renders as rank "-"
+   * and tier "-", which a user reads as "I am unranked" — so a
+   * SEASON_RANKING_SCOPE_MISMATCH, which means the leaderboard row was found
+   * attached to the wrong account, would have been shown as an ordinary
+   * non-participation. Equity and positions have the same problem in chart and
+   * list form: an empty chart and "보유 종목이 없습니다" are both claims.
+   */
+  const integrityFailure = findAccountIntegrityFailure([
+    {
+      section: '총 자산',
+      isError: portfolioQuery.isError,
+      error: portfolioQuery.error,
+      retry: () => void portfolioQuery.refetch(),
+    },
+    {
+      section: '지갑',
+      isError: walletsQuery.isError,
+      error: walletsQuery.error,
+      retry: () => void walletsQuery.refetch(),
+    },
+    {
+      section: '보유 종목',
+      isError: positionsQuery.isError,
+      error: positionsQuery.error,
+      retry: () => void positionsQuery.refetch(),
+    },
+    {
+      section: '자산 추이',
+      isError: equityQuery.isError,
+      error: equityQuery.error,
+      retry: () => void equityQuery.refetch(),
+    },
+    {
+      section: '순위',
+      isError: rankingQuery.isError,
+      error: rankingQuery.error,
+      retry: () => void rankingQuery.refetch(),
+    },
+  ]);
 
-  if (integrityMessage) {
+  if (integrityFailure) {
     return (
       <View testID={TEST_IDS.tradingAccount.integrityError}>
         <ErrorState
-          title="계정 데이터를 안전하게 표시할 수 없습니다."
-          message={integrityMessage}
-          onRetry={() => portfolioQuery.refetch()}
+          title={ACCOUNT_INTEGRITY_TITLE}
+          message={integrityFailure.message}
+          onRetry={integrityFailure.retry}
         />
       </View>
     );
@@ -189,7 +231,7 @@ export default function SeasonAccountHome({
       <ErrorState
         title="계정 정보를 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
-        onRetry={() => portfolioQuery.refetch()}
+        onRetry={() => void portfolioQuery.refetch()}
       />
     );
   }

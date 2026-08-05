@@ -47,8 +47,13 @@ export async function endSession(
   queryClient: SessionQueryClient,
   userId?: string | null,
 ) {
-  await clearTokens();
+  // The cache goes FIRST, synchronously, before any await (작업 12 §4). It used
+  // to wait behind the AsyncStorage round-trip, which left a window in which
+  // the tokens were gone but the previous session's balances were still
+  // readable — and a screen rendering during that window paints them.
   clearSessionCache(queryClient);
+
+  await clearTokens();
 
   if (userId) {
     await clearSelectedAccountId(userId);

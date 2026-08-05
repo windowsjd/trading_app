@@ -27,10 +27,11 @@ import {
   type TradingAccountPortfolioSummaryDto,
 } from '../../features/tradingAccount/api';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
+import { classifyAccountError } from '../../features/tradingAccount/integrityErrors';
 import {
-  classifyAccountError,
-  getIntegrityErrorMessage,
-} from '../../features/tradingAccount/integrityErrors';
+  ACCOUNT_INTEGRITY_TITLE,
+  findAccountIntegrityFailure,
+} from '../../features/tradingAccount/accountIntegrityGate';
 import {
   getReturnRateMethodLabel,
 } from '../../features/tradingAccount/accountDisplay';
@@ -270,22 +271,39 @@ export default function PortfolioScreen({ navigation }: Props) {
 
   // Structural integrity faults get their OWN state. Showing them as an empty
   // portfolio would hide server-detected data damage behind a calm screen
-  // (작업 9 §B-9).
-  const integrityMessage = overviewQuery.isError
-    ? getIntegrityErrorMessage(overviewQuery.error)
-    : null;
+  // (작업 9 §B-9). Since 작업 12 §3 this covers the positions and equity queries
+  // too: `portfolio_partial_unavailable` is the right answer for a price gap,
+  // and the wrong one for a scope mismatch.
+  const integrityFailure = findAccountIntegrityFailure([
+    {
+      section: '포트폴리오',
+      isError: overviewQuery.isError,
+      error: overviewQuery.error,
+      retry: () => void overviewQuery.refetch(),
+    },
+    {
+      section: '보유 종목',
+      isError: positionsQuery.isError,
+      error: positionsQuery.error,
+      retry: () => void positionsQuery.refetch(),
+    },
+    {
+      section: '자산 추이',
+      isError: equityQuery.isError,
+      error: equityQuery.error,
+      retry: () => void equityQuery.refetch(),
+    },
+  ]);
 
-  if (integrityMessage) {
+  if (integrityFailure) {
     return (
       <SafeAreaView style={styles.container} testID={TEST_IDS.tradingAccount.integrityError}>
         <View style={styles.content}>
           <AccountSwitcher />
           <ErrorState
-            title="계정 데이터를 안전하게 표시할 수 없습니다."
-            message={integrityMessage}
-            onRetry={() => {
-              overviewQuery.refetch();
-            }}
+            title={ACCOUNT_INTEGRITY_TITLE}
+            message={integrityFailure.message}
+            onRetry={integrityFailure.retry}
           />
         </View>
       </SafeAreaView>
@@ -300,9 +318,7 @@ export default function PortfolioScreen({ navigation }: Props) {
           <ErrorState
             title="포트폴리오를 불러오지 못했습니다."
             message="잠시 후 다시 시도해주세요."
-            onRetry={() => {
-              overviewQuery.refetch();
-            }}
+            onRetry={() => void overviewQuery.refetch()}
           />
         </View>
       </SafeAreaView>
@@ -338,7 +354,7 @@ export default function PortfolioScreen({ navigation }: Props) {
         contentContainerStyle={styles.content}
         onEndReached={() => {
           if (positionsQuery.hasNextPage && !positionsQuery.isFetchingNextPage) {
-            positionsQuery.fetchNextPage();
+            void positionsQuery.fetchNextPage();
           }
         }}
         onEndReachedThreshold={0.4}
@@ -419,7 +435,7 @@ export default function PortfolioScreen({ navigation }: Props) {
                   />
                   <CTAButton
                     label="자산 추이 다시 불러오기"
-                    onPress={() => equityQuery.refetch()}
+                    onPress={() => void equityQuery.refetch()}
                   />
                 </View>
               ) : equity.length ? (
@@ -470,7 +486,7 @@ export default function PortfolioScreen({ navigation }: Props) {
               />
               <CTAButton
                 label="포지션 다시 불러오기"
-                onPress={() => positionsQuery.refetch()}
+                onPress={() => void positionsQuery.refetch()}
               />
             </View>
           ) : viewState === 'portfolio_no_positions' ? (

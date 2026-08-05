@@ -23,7 +23,7 @@ import ErrorState from '../../components/states/ErrorState';
 
 type Props = NativeStackScreenProps<MyStackParamList, 'Settings'>;
 
-export default function SettingsScreen({ navigation }: Props) {
+export default function SettingsScreen({ navigation: _navigation }: Props) {
   const queryClient = useQueryClient();
 
   const meQuery = useQuery({
@@ -76,7 +76,7 @@ export default function SettingsScreen({ navigation }: Props) {
       <ErrorState
         title="설정 정보를 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
-        onRetry={() => meQuery.refetch()}
+        onRetry={() => void meQuery.refetch()}
       />
     );
   }
@@ -132,7 +132,7 @@ export default function SettingsScreen({ navigation }: Props) {
         <Pressable
           testID={TEST_IDS.settings.logout}
           style={styles.logoutButton}
-          onPress={onLogout}
+          onPress={() => void onLogout()}
         >
           <Text style={styles.logoutText}>로그아웃</Text>
         </Pressable>

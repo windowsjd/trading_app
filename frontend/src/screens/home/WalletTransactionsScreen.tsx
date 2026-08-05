@@ -21,7 +21,10 @@ import {
 import { getTradingAccountWalletTransactions } from '../../features/tradingAccount/api';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import { getAccountDisplay } from '../../features/tradingAccount/accountDisplay';
-import { getIntegrityErrorMessage } from '../../features/tradingAccount/integrityErrors';
+import {
+  ACCOUNT_INTEGRITY_TITLE,
+  findAccountIntegrityFailure,
+} from '../../features/tradingAccount/accountIntegrityGate';
 import AccountSwitcher from '../../components/tradingAccount/AccountSwitcher';
 import { formatMoney } from '../../utils/format';
 
@@ -32,7 +35,9 @@ import EmptyState from '../../components/states/EmptyState';
 type Props = WalletTransactionsScreenProps;
 type CurrencyFilter = 'all' | WalletCurrency;
 type DirectionFilter = 'all' | WalletTransactionDirection;
-type TxTypeFilter = 'all' | string;
+// 'all' plus whatever transaction types the ledger actually returns, which
+// the server owns — so this is a plain string rather than a closed union.
+type TxTypeFilter = string;
 
 const PAGE_SIZE = 20;
 
@@ -182,20 +187,33 @@ export default function WalletTransactionsScreen({ route }: Props) {
     );
   }
 
-  const integrityMessage = transactionsQuery.isError
-    ? getIntegrityErrorMessage(transactionsQuery.error)
-    : null;
+  // Ledger damage is not an unreachable ledger (작업 12 §3): an empty or partial
+  // transaction list would understate what actually moved through this wallet.
+  const integrityFailure = findAccountIntegrityFailure([
+    {
+      section: '지갑 원장',
+      isError: transactionsQuery.isError,
+      error: transactionsQuery.error,
+      retry: () => void transactionsQuery.refetch(),
+    },
+  ]);
+
+  if (integrityFailure) {
+    return (
+      <ErrorState
+        title={ACCOUNT_INTEGRITY_TITLE}
+        message={integrityFailure.message}
+        onRetry={integrityFailure.retry}
+      />
+    );
+  }
 
   if (transactionsQuery.isError) {
     return (
       <ErrorState
-        title={
-          integrityMessage
-            ? '원장을 안전하게 표시할 수 없습니다.'
-            : '지갑 원장을 불러오지 못했습니다.'
-        }
-        message={integrityMessage ?? '잠시 후 다시 시도해주세요.'}
-        onRetry={() => transactionsQuery.refetch()}
+        title="지갑 원장을 불러오지 못했습니다."
+        message="잠시 후 다시 시도해주세요."
+        onRetry={() => void transactionsQuery.refetch()}
       />
     );
   }
@@ -211,13 +229,13 @@ export default function WalletTransactionsScreen({ route }: Props) {
           transactionsQuery.isRefetching &&
           !transactionsQuery.isFetchingNextPage
         }
-        onRefresh={() => transactionsQuery.refetch()}
+        onRefresh={() => void transactionsQuery.refetch()}
         onEndReached={() => {
           if (
             transactionsQuery.hasNextPage &&
             !transactionsQuery.isFetchingNextPage
           ) {
-            transactionsQuery.fetchNextPage();
+            void transactionsQuery.fetchNextPage();
           }
         }}
         onEndReachedThreshold={0.4}

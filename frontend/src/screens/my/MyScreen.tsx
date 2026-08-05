@@ -17,6 +17,10 @@ import { useLogout } from '../../features/auth/useLogout';
 import { getRankings, getRankingTier } from '../../features/ranking/api';
 import { getMySeasonRecords } from '../../features/record/api';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
+import {
+  ACCOUNT_INTEGRITY_TITLE,
+  findAccountIntegrityFailure,
+} from '../../features/tradingAccount/accountIntegrityGate';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -105,15 +109,53 @@ export default function MyScreen({ navigation }: Props) {
     return <FullPageLoading message="내 정보를 불러오는 중입니다." />;
   }
 
+  /**
+   * A structural fault behind the rank must not become "-" (작업 12 §3).
+   *
+   * Rank and tier render as "-" whenever `myRanking` is absent, and that is
+   * correct for a user who has not been ranked yet. It is badly wrong for
+   * SEASON_RANKING_SCOPE_MISMATCH, which means the ranking row the server found
+   * belongs to a different account than the one it was asked about.
+   */
+  const integrityFailure = findAccountIntegrityFailure([
+    {
+      section: '순위',
+      isError: rankingQuery.isError,
+      error: rankingQuery.error,
+      retry: () => void rankingQuery.refetch(),
+    },
+    {
+      section: '시즌 기록',
+      isError: recordsQuery.isError,
+      error: recordsQuery.error,
+      retry: () => void recordsQuery.refetch(),
+    },
+  ]);
+
+  if (integrityFailure) {
+    return (
+      <View
+        style={styles.container}
+        testID={TEST_IDS.tradingAccount.integrityError}
+      >
+        <ErrorState
+          title={ACCOUNT_INTEGRITY_TITLE}
+          message={integrityFailure.message}
+          onRetry={integrityFailure.retry}
+        />
+      </View>
+    );
+  }
+
   if (viewState === 'my_error' || !meQuery.data || !recordsQuery.data) {
     return (
       <ErrorState
         title="내 정보를 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
         onRetry={() => {
-          meQuery.refetch();
-          if (showsSeasonUi) rankingQuery.refetch();
-          recordsQuery.refetch();
+          void meQuery.refetch();
+          if (showsSeasonUi) void rankingQuery.refetch();
+          void recordsQuery.refetch();
         }}
       />
     );
@@ -173,7 +215,7 @@ export default function MyScreen({ navigation }: Props) {
           <Pressable
             testID={TEST_IDS.my.logoutMenu}
             style={styles.menuRow}
-            onPress={onLogout}
+            onPress={() => void onLogout()}
           >
             <Text style={styles.logoutText}>로그아웃</Text>
           </Pressable>
@@ -194,8 +236,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#fafafa',
     gap: 10,
   },
-  title: { fontSize: 22, fontWeight: '700' },
-  helper: { fontSize: 14, color: '#444' },
+  // A long nickname or email wraps rather than running off the card.
+  title: { fontSize: 22, fontWeight: '700', lineHeight: 30 },
+  helper: { fontSize: 14, color: '#444', lineHeight: 21 },
   menuRow: {
     paddingVertical: 14,
     borderBottomWidth: 1,

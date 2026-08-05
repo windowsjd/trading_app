@@ -42,6 +42,14 @@ export const TRADING_ACCOUNT_INTEGRITY_CODES = [
   'SEASON_RANKING_SCOPE_MISMATCH',
   'SEASON_RANKING_SOURCE_SCOPE_REPAIR_REQUIRED',
   'SEASON_RANKING_SOURCE_SCOPE_MISMATCH',
+  // Snapshot-scope damage found during settlement. Today these are raised by
+  // the settlement job rather than by a request handler, so a screen is
+  // unlikely to see one — but they carry exactly the meaning this set is for,
+  // and listing them means the day one does surface through an endpoint it
+  // fails closed instead of arriving as an unrecognised 500 (작업 12 §3).
+  'SETTLEMENT_ACCOUNT_LINK_INTEGRITY',
+  'SETTLEMENT_SNAPSHOT_SCOPE_MISMATCH',
+  'SETTLEMENT_SNAPSHOT_SCOPE_REPAIR_REQUIRED',
   'FINAL_RESULTS_INTEGRITY',
   // Settlement wrote a tier that disagrees with the final ranking: the two
   // published numbers contradict each other, which is damage, not absence.

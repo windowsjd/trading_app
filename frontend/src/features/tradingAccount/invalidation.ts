@@ -26,7 +26,7 @@ import { QUERY_KEYS } from '../../constants/queryKeys.ts';
 export type InvalidatorClient = {
   invalidateQueries: (filters: {
     queryKey: readonly unknown[];
-  }) => Promise<unknown> | unknown;
+  }) => unknown;
 };
 
 type QueryKey = readonly unknown[];
@@ -100,7 +100,10 @@ export function invalidateAfterOrderCancel(
 export function invalidateAfterFx(
   client: InvalidatorClient,
   accountId: string,
-  options: { seasonUi?: boolean } = {},
+  // Accepted and ignored on purpose: every sibling invalidator takes the same
+  // options object, and an exchange happens to have nothing season-wide to
+  // refresh. Keeping the parameter means the call sites stay uniform.
+  _options: { seasonUi?: boolean } = {},
 ) {
   const keys: QueryKey[] = [
     ...walletKeys(accountId),

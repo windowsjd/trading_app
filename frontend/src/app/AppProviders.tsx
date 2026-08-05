@@ -7,6 +7,7 @@ import {
 
 import { TradingAccountProvider } from '../features/tradingAccount/TradingAccountContext';
 import { endSession } from '../features/auth/session';
+import { runSessionExpiryTeardown } from '../features/auth/sessionTeardown';
 import { setSessionExpiredHandler } from '../services/api/sessionExpiry';
 import { resetToLoginFromRef } from './navigation/navigationRef';
 
@@ -23,14 +24,31 @@ import { resetToLoginFromRef } from './navigation/navigationRef';
  * about to be cleared anyway, and the per-user stored SELECTION is a harmless
  * pointer that should survive so the same user returns to the same account
  * after logging back in. An explicit logout does clear it.
+ *
+ * The three teardown steps are ORDERED rather than fired together (작업 12 §4):
+ * cache, then credentials, then navigation. `runSessionExpiryTeardown` owns
+ * that order and the reasoning behind it. Registering the handler also delivers
+ * any expiry that already happened before this effect ran — a refresh token
+ * that died overnight fails during cold start, which is before the React tree
+ * exists.
  */
 function SessionExpiryBridge({ children }: PropsWithChildren) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
     setSessionExpiredHandler(() => {
-      void endSession(queryClient);
-      resetToLoginFromRef();
+      void runSessionExpiryTeardown({
+        // `endSession` clears the cache too, synchronously, before its first
+        // await. Naming it here makes the ordering a property of the teardown
+        // rather than of endSession's internals; `clear()` is idempotent.
+        clearCache: () => queryClient.clear(),
+        clearCredentials: () => endSession(queryClient),
+        resetToLogin: resetToLoginFromRef,
+        // A rejected storage write has already been survived: the cache is
+        // cleared and the login reset runs in the teardown's `finally`. There
+        // is nothing left to recover, and an unhandled rejection here would be
+        // noise on a screen the user has already left.
+      }).catch(() => undefined);
     });
 
     return () => setSessionExpiredHandler(null);

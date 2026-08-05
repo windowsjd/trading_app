@@ -11,7 +11,10 @@ import {
   type TradingAccountDto,
 } from '../../features/tradingAccount/api';
 import { getReturnRateMethodLabel } from '../../features/tradingAccount/accountDisplay';
-import { getIntegrityErrorMessage } from '../../features/tradingAccount/integrityErrors';
+import {
+  ACCOUNT_INTEGRITY_TITLE,
+  findAccountIntegrityFailure,
+} from '../../features/tradingAccount/accountIntegrityGate';
 import { CAPABILITY_BLOCK_MESSAGE } from '../../features/tradingAccount/capabilities';
 import type { TradingAccountCapabilities } from '../../features/tradingAccount/capabilities';
 import { getWalletBalanceAmount } from '../../features/wallet/mapper';
@@ -86,17 +89,44 @@ export default function GeneralAccountHome({
     enabled: available,
   });
 
-  const integrityMessage = portfolioQuery.isError
-    ? getIntegrityErrorMessage(portfolioQuery.error)
-    : null;
+  /**
+   * EVERY account-scoped query on this screen, not just the overview
+   * (작업 12 §3).
+   *
+   * A scope mismatch on the wallet or positions query used to fall through to
+   * "지갑 요약을 불러오지 못했습니다" / "보유 종목이 없습니다" — a grey box beside a
+   * confident 총 자산 figure. The server refusing to vouch for part of an
+   * account is not a partial outage of that part; it is a reason to stop
+   * presenting the account as readable at all.
+   */
+  const integrityFailure = findAccountIntegrityFailure([
+    {
+      section: '총 자산',
+      isError: portfolioQuery.isError,
+      error: portfolioQuery.error,
+      retry: () => void portfolioQuery.refetch(),
+    },
+    {
+      section: '지갑',
+      isError: walletsQuery.isError,
+      error: walletsQuery.error,
+      retry: () => void walletsQuery.refetch(),
+    },
+    {
+      section: '보유 종목',
+      isError: positionsQuery.isError,
+      error: positionsQuery.error,
+      retry: () => void positionsQuery.refetch(),
+    },
+  ]);
 
-  if (integrityMessage) {
+  if (integrityFailure) {
     return (
       <View testID={TEST_IDS.tradingAccount.integrityError}>
         <ErrorState
-          title="계정 데이터를 안전하게 표시할 수 없습니다."
-          message={integrityMessage}
-          onRetry={() => portfolioQuery.refetch()}
+          title={ACCOUNT_INTEGRITY_TITLE}
+          message={integrityFailure.message}
+          onRetry={integrityFailure.retry}
         />
       </View>
     );
@@ -111,7 +141,7 @@ export default function GeneralAccountHome({
       <ErrorState
         title="계정 정보를 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
-        onRetry={() => portfolioQuery.refetch()}
+        onRetry={() => void portfolioQuery.refetch()}
       />
     );
   }

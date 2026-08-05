@@ -72,7 +72,7 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
       }
     }
 
-    bootstrap();
+    void bootstrap();
 
     return () => {
       mounted = false;

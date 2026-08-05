@@ -27,8 +27,17 @@ import {
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import { CAPABILITY_BLOCK_MESSAGE } from '../../features/tradingAccount/capabilities';
 import { getAccountDisplay } from '../../features/tradingAccount/accountDisplay';
-import { getIntegrityErrorMessage } from '../../features/tradingAccount/integrityErrors';
+import {
+  ACCOUNT_INTEGRITY_TITLE,
+  findAccountIntegrityFailure,
+} from '../../features/tradingAccount/accountIntegrityGate';
 import { invalidateAfterFx } from '../../features/tradingAccount/invalidation';
+import {
+  isFxQuoteResponseCurrent,
+  isFxResponseInScope,
+  type FxQuoteRequestScope,
+  type FxRequestScope,
+} from '../../features/wallet/fxAccountScope';
 import AccountSwitcher from '../../components/tradingAccount/AccountSwitcher';
 import {
   calculateUsdBalanceKrw,
@@ -119,6 +128,36 @@ export default function WalletFxScreen({ navigation }: Props) {
     ? getAccountDisplay(selectedAccount)
     : null;
 
+  /**
+   * The scope every FX request is stamped with (작업 12 §2).
+   *
+   * Adjusted during render rather than in an effect so it is ALREADY correct
+   * for the account being rendered — a mutation callback that fires between a
+   * render and its effects must not read the previous account's scope. The
+   * guard makes the write idempotent, so a double-invoked render is harmless.
+   *
+   * The epoch is what distinguishes A→B→A from "never left A": the ids match
+   * again, but the screen was wiped in between and the in-flight request
+   * describes a quote the user can no longer see.
+   */
+  const scopeRef = useRef<{ accountId: string; epoch: number }>({
+    accountId,
+    epoch: 0,
+  });
+  if (scopeRef.current.accountId !== accountId) {
+    scopeRef.current = { accountId, epoch: scopeRef.current.epoch + 1 };
+  }
+  const currentScope: FxRequestScope = {
+    accountId: scopeRef.current.accountId,
+    scopeEpoch: scopeRef.current.epoch,
+  };
+  // Read through the ref (never through a render closure) so a late callback
+  // compares against the scope the screen is in NOW.
+  const readScope = (): FxRequestScope => ({
+    accountId: scopeRef.current.accountId,
+    scopeEpoch: scopeRef.current.epoch,
+  });
+
   const [fromCurrency, setFromCurrency] = useState<Currency>('KRW');
   const [amount, setAmount] = useState('');
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -132,9 +171,13 @@ export default function WalletFxScreen({ navigation }: Props) {
   );
   const [successData, setSuccessData] = useState<FxExecuteDto | null>(null);
   const [quoteNow, setQuoteNow] = useState(() => Date.now());
-  const latestQuoteInputRef = useRef({
-    fromCurrency: 'KRW' as Currency,
-    toCurrency: 'USD' as Currency,
+  const latestQuoteInputRef = useRef<{
+    fromCurrency: Currency;
+    toCurrency: Currency;
+    sourceAmount: string;
+  }>({
+    fromCurrency: 'KRW',
+    toCurrency: 'USD',
     sourceAmount: '',
   });
 
@@ -154,17 +197,27 @@ export default function WalletFxScreen({ navigation }: Props) {
       ),
   });
 
+  /** The quote inputs the screen is currently asking about. */
+  const readQuoteScope = (): FxQuoteRequestScope => ({
+    ...readScope(),
+    ...latestQuoteInputRef.current,
+  });
+
   const quoteMutation = useMutation({
-    mutationFn: (payload: Parameters<typeof quoteTradingAccountFx>[1]) =>
-      quoteTradingAccountFx(accountId, payload),
+    // The account is a REQUEST variable, not a closure read. `mutationFn` runs
+    // at mutate() time so a closure would still have been right here — but the
+    // callbacks below run at RESPONSE time, and there the closure is whatever
+    // account the screen has drifted to. Carrying it in the variables means
+    // both halves are talking about the same account by construction.
+    mutationFn: (variables: {
+      scope: FxQuoteRequestScope;
+      payload: Parameters<typeof quoteTradingAccountFx>[1];
+    }) => quoteTradingAccountFx(variables.scope.accountId, variables.payload),
     retry: false,
     onSuccess: (result, variables) => {
-      const latestInput = latestQuoteInputRef.current;
-      if (
-        variables.fromCurrency !== latestInput.fromCurrency ||
-        variables.toCurrency !== latestInput.toCurrency ||
-        variables.sourceAmount !== latestInput.sourceAmount
-      ) {
+      // Wrong account, or right account after a switch away and back: this
+      // quote describes something the user is no longer looking at.
+      if (!isFxQuoteResponseCurrent(variables.scope, readQuoteScope())) {
         return;
       }
 
@@ -176,12 +229,7 @@ export default function WalletFxScreen({ navigation }: Props) {
       setSuccessData(null);
     },
     onError: (error, variables) => {
-      const latestInput = latestQuoteInputRef.current;
-      if (
-        variables.fromCurrency !== latestInput.fromCurrency ||
-        variables.toCurrency !== latestInput.toCurrency ||
-        variables.sourceAmount !== latestInput.sourceAmount
-      ) {
+      if (!isFxQuoteResponseCurrent(variables.scope, readQuoteScope())) {
         return;
       }
 
@@ -199,30 +247,51 @@ export default function WalletFxScreen({ navigation }: Props) {
   });
 
   const executeMutation = useMutation({
-    mutationFn: (payload: Parameters<typeof executeTradingAccountFx>[1]) =>
-      executeTradingAccountFx(accountId, payload),
+    mutationFn: (variables: {
+      scope: FxRequestScope;
+      seasonUi: boolean;
+      payload: Parameters<typeof executeTradingAccountFx>[1];
+    }) => executeTradingAccountFx(variables.scope.accountId, variables.payload),
     retry: false,
-    onSuccess: async (result) => {
-      setSuccessData(result);
-      setQuoteData(null);
-      setExecuteIdempotencyKey(null);
-      setFxDomainState(null);
-      setFieldError(null);
-      setDomainError(null);
+    onSuccess: async (result, variables) => {
+      const inScope = isFxResponseInScope(variables.scope, readScope());
 
-      // This account's wallets, ledger and valuation only — another account's
-      // cash cannot have moved (작업 10 §A-11). The public FX rate is refreshed
-      // because the executed rate is new market information.
+      // SCREEN state only when the answer belongs to this screen. A success
+      // sheet for account A over account B's screen would invite the user to
+      // act on a movement in money they are not looking at.
+      if (inScope) {
+        setSuccessData(result);
+        setQuoteData(null);
+        setExecuteIdempotencyKey(null);
+        setFxDomainState(null);
+        setFieldError(null);
+        setDomainError(null);
+      }
+
+      // CACHE regardless of scope, and keyed by the account that actually
+      // moved (작업 12 §2). The server executed this exchange; A's wallets are
+      // stale whether or not the user is still on A's screen. Using the current
+      // selection here would have invalidated the WRONG account — refetching B
+      // for nothing while leaving A's stale balances cached for the moment the
+      // user switches back.
+      //
+      // `seasonUi` is likewise the acting account's, captured at issue time:
+      // the current selection's capabilities describe a different account.
       await Promise.all([
-        invalidateAfterFx(queryClient, accountId, {
-          seasonUi: capabilities?.isSeason ?? false,
+        invalidateAfterFx(queryClient, variables.scope.accountId, {
+          seasonUi: variables.seasonUi,
         }),
+        // The executed rate is new public market information, not account data.
         queryClient.invalidateQueries({
           queryKey: QUERY_KEYS.wallet.fxRate(FX_RATE_PARAMS),
         }),
       ]);
     },
-    onError: (error) => {
+    onError: (error, variables) => {
+      if (!isFxResponseInScope(variables.scope, readScope())) {
+        return;
+      }
+
       const code = getApiErrorCode(error);
 
       if (isFxRequoteRequiredCode(code)) {
@@ -316,9 +385,6 @@ export default function WalletFxScreen({ navigation }: Props) {
     setExecuteIdempotencyKey(null);
     setFxDomainState(null);
     setSuccessData(null);
-    // Mutation objects are new every render; depending on them would re-run
-    // this constantly instead of only on an account change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId]);
 
   const quoteExpired = useMemo(
@@ -337,10 +403,28 @@ export default function WalletFxScreen({ navigation }: Props) {
     [quoteData],
   );
 
+  /**
+   * A request still in flight for the PREVIOUS account must not put this
+   * account's screen into a loading state — the "환전 실행 중" spinner belongs to
+   * the account that pressed the button. The mutation is deliberately not
+   * `reset()` here: it is still going to succeed or fail on the server, and its
+   * callback still has to invalidate the acting account's cache.
+   */
+  const quoteVariables = quoteMutation.variables;
+  const quotePendingInScope =
+    quoteMutation.isPending &&
+    !!quoteVariables &&
+    isFxResponseInScope(quoteVariables.scope, currentScope);
+  const executeVariables = executeMutation.variables;
+  const executePendingInScope =
+    executeMutation.isPending &&
+    !!executeVariables &&
+    isFxResponseInScope(executeVariables.scope, currentScope);
+
   const viewState = useMemo<WalletFxViewState>(() => {
     if (walletLookupState !== 'wallet_ready') return walletLookupState;
-    if (executeMutation.isPending) return 'fx_execute_submitting';
-    if (quoteMutation.isPending) return 'fx_quote_loading';
+    if (executePendingInScope) return 'fx_execute_submitting';
+    if (quotePendingInScope) return 'fx_quote_loading';
     if (successData) return 'fx_execute_success';
     if (
       fxDomainState === 'fx_execute_requote_required' ||
@@ -358,8 +442,8 @@ export default function WalletFxScreen({ navigation }: Props) {
     return 'fx_input_idle';
   }, [
     walletLookupState,
-    executeMutation.isPending,
-    quoteMutation.isPending,
+    executePendingInScope,
+    quotePendingInScope,
     successData,
     fxDomainState,
     quoteData,
@@ -394,8 +478,8 @@ export default function WalletFxScreen({ navigation }: Props) {
   };
 
   const retryWalletLookup = () => {
-    walletsQuery.refetch();
-    rateQuery.refetch();
+    void walletsQuery.refetch();
+    void rateQuery.refetch();
   };
 
   const requestQuote = () => {
@@ -412,10 +496,14 @@ export default function WalletFxScreen({ navigation }: Props) {
     setSuccessData(null);
     executeMutation.reset();
 
-    quoteMutation.mutate({
+    const payload = {
       fromCurrency,
       toCurrency,
       sourceAmount: amount.trim(),
+    };
+    quoteMutation.mutate({
+      scope: { ...readScope(), ...payload },
+      payload,
     });
   };
 
@@ -446,11 +534,17 @@ export default function WalletFxScreen({ navigation }: Props) {
     setFxDomainState(null);
 
     executeMutation.mutate({
-      quoteId: quoteData.quoteId,
-      fromCurrency: quoteData.fromCurrency,
-      toCurrency: quoteData.toCurrency,
-      sourceAmount: quoteData.sourceAmount,
-      idempotencyKey: executeIdempotencyKey,
+      scope: readScope(),
+      // The ACTING account's UI mode, captured now: by the time the response
+      // lands, `capabilities` may describe a different account entirely.
+      seasonUi: capabilities?.isSeason ?? false,
+      payload: {
+        quoteId: quoteData.quoteId,
+        fromCurrency: quoteData.fromCurrency,
+        toCurrency: quoteData.toCurrency,
+        sourceAmount: quoteData.sourceAmount,
+        idempotencyKey: executeIdempotencyKey,
+      },
     });
   };
 
@@ -507,20 +601,27 @@ export default function WalletFxScreen({ navigation }: Props) {
     );
   }
 
-  // Server-detected damage never renders as an empty or zero wallet.
-  const walletIntegrityMessage = walletsQuery.isError
-    ? getIntegrityErrorMessage(walletsQuery.error)
-    : null;
+  // Server-detected damage never renders as an empty or zero wallet — and an
+  // account whose wallet the server will not vouch for must not offer 환전
+  // either, so this returns before the exchange form (작업 12 §3).
+  const integrityFailure = findAccountIntegrityFailure([
+    {
+      section: '지갑',
+      isError: walletsQuery.isError,
+      error: walletsQuery.error,
+      retry: () => void walletsQuery.refetch(),
+    },
+  ]);
 
-  if (walletIntegrityMessage) {
+  if (integrityFailure) {
     return (
       <SafeAreaView style={styles.container} testID={TEST_IDS.tradingAccount.integrityError}>
         <View style={styles.content}>
           <AccountSwitcher />
           <ErrorState
-            title="지갑 데이터를 안전하게 표시할 수 없습니다."
-            message={walletIntegrityMessage}
-            onRetry={retryWalletLookup}
+            title={ACCOUNT_INTEGRITY_TITLE}
+            message={integrityFailure.message}
+            onRetry={integrityFailure.retry}
           />
         </View>
       </SafeAreaView>

@@ -87,6 +87,13 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install dependencies (frozen lockfile)
         run: npm ci
+      # The account/auth/order/FX/home product files are the gated frontend
+      # scope (작업 12 §6) — the same "product files only, known-clean area"
+      # rule the backend's candle and trading-account gates follow. Warnings
+      # fail (--max-warnings=0) and nothing is auto-fixed (--no-fix): a gate
+      # that repairs the tree cannot tell you the tree was broken.
+      - name: Account/auth layer lint (check only, no fix)
+        run: npm run lint:accounts:check
       - name: Typecheck
         run: npm run typecheck
       - name: Tests (node --test, Node 24 type stripping)

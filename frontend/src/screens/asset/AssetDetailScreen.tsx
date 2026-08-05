@@ -142,9 +142,12 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
     enabled: !!assetTickerWsUrl,
   });
 
+  // `refetch` is identity-stable in react-query, so naming it as a dependency
+  // states the real dependency without re-running on every render.
+  const refetchCandles = candlesQuery.refetch;
   useEffect(() => {
-    if (candleResyncVersion > 0) void candlesQuery.refetch();
-  }, [candleResyncVersion]);
+    if (candleResyncVersion > 0) void refetchCandles();
+  }, [candleResyncVersion, refetchCandles]);
 
   if (detailQuery.isLoading) {
     return <FullPageLoading message="종목 정보를 불러오는 중입니다." />;
@@ -155,7 +158,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
       <ErrorState
         title="종목 정보를 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
-        onRetry={() => detailQuery.refetch()}
+        onRetry={() => void detailQuery.refetch()}
       />
     );
   }
@@ -348,15 +351,11 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
           <Text style={styles.helper}>실시간 연결 {connectionState}</Text>
           <Text style={styles.helper}>
             가격 소스{" "}
-            {formatSourceMetadata(
-              displayPriceSource as Parameters<typeof formatSourceMetadata>[0],
-            )}
+            {formatSourceMetadata(displayPriceSource)}
           </Text>
           <Text style={styles.helper}>
             환율 소스{" "}
-            {formatSourceMetadata(
-              displayFxRateSource as Parameters<typeof formatSourceMetadata>[0],
-            )}
+            {formatSourceMetadata(displayFxRateSource)}
           </Text>
 
           {tradingNote ? (
@@ -425,7 +424,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
               />
               <Pressable
                 style={styles.retryButton}
-                onPress={() => positionQuery.refetch()}
+                onPress={() => void positionQuery.refetch()}
               >
                 <Text style={styles.retryText}>포지션 다시 시도</Text>
               </Pressable>
@@ -438,7 +437,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
               />
               <Pressable
                 style={styles.retryButton}
-                onPress={() => positionQuery.refetch()}
+                onPress={() => void positionQuery.refetch()}
               >
                 <Text style={styles.retryText}>포지션 다시 시도</Text>
               </Pressable>
@@ -507,7 +506,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
               <Pressable
                 testID={TEST_IDS.assetDetail.chartRetry}
                 style={styles.retryButton}
-                onPress={() => candlesQuery.refetch()}
+                onPress={() => void candlesQuery.refetch()}
               >
                 <Text style={styles.retryText}>차트 다시 시도</Text>
               </Pressable>

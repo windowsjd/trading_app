@@ -25,6 +25,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     gap: 6,
   },
-  title: { fontSize: 15, fontWeight: '700' },
-  message: { fontSize: 14, color: '#444' },
+  // Section notices carry full sentences; they wrap rather than clip.
+  title: { fontSize: 15, fontWeight: '700', lineHeight: 21 },
+  message: { fontSize: 14, color: '#444', lineHeight: 20 },
 });

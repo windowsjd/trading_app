@@ -5,6 +5,16 @@ import { describe, it } from 'node:test';
 
 import { getAccountDisplay } from '../../features/tradingAccount/accountDisplay.ts';
 import { CAPABILITY_BLOCK_MESSAGE } from '../../features/tradingAccount/capabilities.ts';
+import {
+  ACCOUNT_INTEGRITY_TITLE,
+  getAccountIntegrityMessage,
+} from '../../features/tradingAccount/accountIntegrityGate.ts';
+import {
+  ACCOUNT_LIST_ERROR_MESSAGE,
+  ACCOUNT_LIST_ERROR_TITLE,
+  ACCOUNT_MISSING_MESSAGE,
+  ACCOUNT_MISSING_TITLE,
+} from '../../features/record/seasonAccountLookup.ts';
 
 /**
  * Layout invariants for the account-scoped screens (작업 10 §B-8).
@@ -201,5 +211,125 @@ describe('the styles long text depends on are present', () => {
 
     assert.match(source, /blockedMessage:\s*\{[^}]*lineHeight/s);
     assert.ok(!/numberOfLines=\{/.test(source));
+  });
+
+  it('RecordOrderList: a long asset name wraps beside its amount, not through it', () => {
+    const source = read('screens/record/RecordOrderListScreen.tsx');
+
+    // The name column may wrap and give way; the amount column never shrinks.
+    assert.match(source, /rowNameColumn:\s*\{[^}]*flex:\s*1/s);
+    assert.match(source, /rowNameColumn:\s*\{[^}]*minWidth:\s*0/s);
+    assert.match(source, /alignEnd:\s*\{[^}]*flexShrink:\s*0/s);
+    // The season name doubles as this screen's heading.
+    assert.match(source, /accountHeader:\s*\{[^}]*lineHeight/s);
+    // 취소 중... and 주문 취소 are different lengths; the button wraps either.
+    assert.match(source, /cancelButtonText:\s*\{[^}]*lineHeight/s);
+    assert.ok(!/numberOfLines=\{/.test(source));
+  });
+
+  it('MyScreen: a long nickname or email wraps', () => {
+    const source = read('screens/my/MyScreen.tsx');
+
+    assert.match(source, /title:\s*\{[^}]*lineHeight/s);
+    assert.match(source, /helper:\s*\{[^}]*lineHeight/s);
+    assert.ok(!/numberOfLines=\{/.test(source));
+  });
+
+  it('inline section notices wrap their full sentence', () => {
+    const source = read('components/states/InlineEmptyState.tsx');
+
+    assert.match(source, /message:\s*\{[^}]*lineHeight/s);
+    assert.ok(!/numberOfLines=\{/.test(source));
+  });
+});
+
+/**
+ * The fail-closed copy added in 작업 12 (§3 · §5). These messages are the ONLY
+ * thing standing between a user and a screen that quietly reports damaged money
+ * as zero, so they are long by necessity — and every one of them renders inside
+ * `ErrorState`, which scrolls and never truncates (asserted above).
+ */
+describe('fail-closed copy is complete, plain, and never claims absence', () => {
+  it('the integrity message names the failed sections and denies "0"', () => {
+    const message = getAccountIntegrityMessage(['지갑', '보유 종목']);
+
+    assert.ok(message.includes('지갑'));
+    assert.ok(message.includes('보유 종목'));
+    // The whole point: this is not an empty account.
+    assert.match(message, /0이라는 뜻이 아닙니다/);
+    assert.match(message, /고객센터/);
+    assert.ok(!message.includes('…') && !message.includes('...'));
+  });
+
+  it('the integrity message never reads as an empty state or a 준비 중 notice', () => {
+    for (const sections of [['순위'], ['지갑'], ['자산 추이'], []]) {
+      const message = getAccountIntegrityMessage(sections);
+
+      assert.ok(!/데이터가 없습니다/.test(message), message);
+      assert.ok(!/준비 중/.test(message), message);
+      assert.ok(message.endsWith('.'), message);
+    }
+  });
+
+  it('the fail-closed title says the data cannot be shown, not that it is empty', () => {
+    assert.match(ACCOUNT_INTEGRITY_TITLE, /안전하게 표시할 수 없습니다/);
+    // "데이터가 없습니다" and "준비 중" are the two readings this must not have.
+    assert.ok(!/데이터가 없습니다|준비 중/.test(ACCOUNT_INTEGRITY_TITLE));
+  });
+
+  it('account-list failure and a missing season account read differently', () => {
+    assert.notEqual(ACCOUNT_LIST_ERROR_TITLE, ACCOUNT_MISSING_TITLE);
+    assert.notEqual(ACCOUNT_LIST_ERROR_MESSAGE, ACCOUNT_MISSING_MESSAGE);
+
+    // The missing-account copy must not be mistaken for "you made no trades".
+    assert.match(ACCOUNT_MISSING_MESSAGE, /거래 내역이 없다는 뜻이 아니라/);
+    assert.match(ACCOUNT_MISSING_MESSAGE, /계정 연결/);
+    // The list-failure copy points at the thing that actually failed.
+    assert.match(ACCOUNT_LIST_ERROR_MESSAGE, /계정 목록/);
+
+    for (const message of [ACCOUNT_LIST_ERROR_MESSAGE, ACCOUNT_MISSING_MESSAGE]) {
+      assert.ok(message.endsWith('.'), message);
+      assert.ok(!message.includes('…') && !message.includes('...'), message);
+    }
+  });
+
+  it('every fail-closed string is a full sentence a user can report', () => {
+    const strings = [
+      ACCOUNT_INTEGRITY_TITLE,
+      ACCOUNT_LIST_ERROR_TITLE,
+      ACCOUNT_LIST_ERROR_MESSAGE,
+      ACCOUNT_MISSING_TITLE,
+      ACCOUNT_MISSING_MESSAGE,
+      getAccountIntegrityMessage(['지갑']),
+    ];
+
+    for (const value of strings) {
+      assert.ok(value.length >= 10, value);
+      assert.ok(value.endsWith('.'), value);
+      // No placeholder or debug residue reaching a user.
+      assert.ok(!/undefined|null|\{\{/.test(value), value);
+    }
+  });
+});
+
+describe('an account switch cannot leave the previous account on screen', () => {
+  it('WalletFxScreen gates every FX callback on the request scope', () => {
+    const source = read('screens/wallet/WalletFxScreen.tsx');
+
+    // Success/error handlers compare the RESPONSE's scope, not a render
+    // closure, before touching quote/success/error state.
+    assert.match(source, /isFxQuoteResponseCurrent\(variables\.scope/);
+    assert.match(source, /isFxResponseInScope\(variables\.scope/);
+    // Cache invalidation is keyed by the account that actually moved.
+    assert.match(
+      source,
+      /invalidateAfterFx\(\s*queryClient,\s*variables\.scope\.accountId/s,
+    );
+    assert.ok(
+      !/invalidateAfterFx\(queryClient, accountId/.test(source),
+      'invalidating the CURRENT selection would refresh the wrong account',
+    );
+    // The success sheet is bound to successData, which the scope gate owns.
+    assert.match(source, /visible=\{!!successData\}/);
   });
 });

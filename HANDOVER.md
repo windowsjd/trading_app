@@ -12,6 +12,259 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 릴리스 E2E 복구 + 계정 전환 stale 응답·무결성 fail-closed 보완 (2026-08-05, 작업 11 보완, WORK-ID VIRTUAL-TRADING-ACCOUNT-UX-RELEASE-HARDENING-FIX-V1)
+
+**기준 커밋** `e8063c0e7a5148718544935dff639d47682a2f9f` (= 지시받은 기준이자
+`git fetch` 시점의 `origin/main`. 로컬 HEAD와 완전히 일치했고 working tree는
+clean이었다 — 직전 작업과 달리 미푸시 커밋은 없었다).
+
+**시작 시점 hosted CI 상태 (run 30928336606, `e8063c0e`)**
+
+| Job | 결과 |
+| --- | --- |
+| Backend quality | 성공 |
+| Frontend quality | 성공 |
+| Core account PostgreSQL integration | 성공 |
+| Limit order PostgreSQL integration | 성공 |
+| Candle fixture integration | 성공 |
+| **Release-critical E2E** | **실패** — `Canonical e2e (no environment variables)` step |
+
+---
+
+#### 1. Release-critical E2E 실패 — 테스트가 한 사람의 `.env`를 계약으로 굳혔다
+
+**원인.** `AppModule`의 `ConfigModule.forRoot({ envFilePath: ['.env.local',
+'.env.development', '.env'] })`는 모듈 compile 시점에 `.env`의 내용을
+`process.env`로 복사한다. readiness는 요청마다 `readRedisConfig()`로
+`process.env`를 다시 읽는다. 그래서 `.env`에 `REDIS_URL`이 있는 개발자 기계에서는
+mock RedisService가 `PONG`을 돌려주어 `redis: 'ok'`가 나오고, `.env`도 Redis
+service도 없는 CI에서는 `redis: 'disabled'`가 나온다. 테스트는 `'ok'`를
+하드코딩하고 있었다.
+
+`test:e2e`가 "환경변수를 받지 않는다"는 것은 **suite가 자기가 읽는 값을 고정할
+때만** 참이다. scheduler와 calendar는 이미 고정하고 있었고 `REDIS_URL`만
+빠져 있었다.
+
+**고친 방향 — 제품 계약이 아니라 테스트를 옮겼다.** `AppService.getReadiness()`는
+이미 옳았다: 설정 없음/공백 → `disabled`(degrade 아님), 설정 있음 + ping 실패 →
+`unavailable`(→ `degraded`, 절대 `ready` 아님). **backend 제품 코드는 0줄
+바꾸지 않았다.** canonical E2E job에 Redis service를 추가하지도 않았다 — 그러면
+릴리스가 요구하지 않는 구성을 job이 주장하게 된다.
+
+- `withPinnedReadinessEnv()`가 readiness가 읽는 환경값을 전부 고정하고
+  `finally`에서 — 테스트가 이름 붙이지 않은 키까지 포함해 — 원상복구한다.
+  기본 pin: calendar 연도(2026 감사분), 모든 `SCHEDULER_`/`ENABLE_` 플래그 제거,
+  `REDIS_URL` 제거.
+- `expectReadinessContract()`가 **양쪽 레벨 모두 `objectContaining`**으로
+  검증한다. 진단 필드가 늘어나는 것은 additive 변경이고 계약 테스트를 깨서는
+  안 된다. 비밀 노출 검사(`DATABASE_URL|REDIS_URL|KIS_APP_SECRET|approval_key|
+  access_token|secret`)는 유지·확장했다.
+- readiness 테스트 1개 → 5개: 설정 없음 → `disabled`+`ready`+`reasons: []`,
+  공백 `REDIS_URL`(명시적 비활성화) → `disabled`, 설정+정상 → `ok`, 설정+연결
+  실패 → `unavailable`이며 `ready`가 **아님**, 그리고 진단 필드가 존재해도
+  계약이 통과함을 (그 필드들의 존재를 실제로 단언해서) 증명.
+
+**결과: 122 → 126 tests, `.env` 있는 로컬과 `.env`를 전부 치운 CI 모사 환경에서
+동일하게 126/126.**
+
+---
+
+#### 2. WalletFx — 계정 A의 응답이 계정 B 화면에 반영될 수 있었다
+
+react-query mutation의 `onSuccess`/`onError`는 **응답 시점의 최신 render
+options**로 호출된다. `mutationFn`은 mutate() 시점에 실행되므로 계정 A로 요청이
+나가지만, 콜백은 그 사이 사용자가 옮겨간 계정 B를 closure로 읽는다. 그래서 A의
+quote가 B 화면에 그려지고, A의 오류가 B 제목 아래 뜨고, A의 성공 모달이 B 위에
+올라오고, **A가 움직인 돈을 두고 B의 캐시가 무효화**됐다.
+
+- 계정을 closure가 아니라 **mutation variables**로 옮겼다:
+  `{ scope, payload }`, `{ scope, seasonUi, payload }`.
+- `features/wallet/fxAccountScope.ts` (순수·테스트 가능): `scope`는
+  `{ accountId, scopeEpoch }`. epoch는 **A→B→A를 "A를 떠난 적 없음"과 구별**한다
+  — id는 다시 같아지지만 그 사이 화면은 초기화됐고 in-flight 요청은 사용자가 더
+  이상 볼 수 없는 quote를 설명한다. epoch는 render 중 ref로 조정한다(가드로
+  idempotent). effect에 두면 render와 effect 사이에 도착한 콜백이 이전 계정의
+  scope를 읽는다.
+- quote는 scope + 입력값 일치까지(기존 latest-wins 규칙 유지), execute는 scope만.
+- **캐시 무효화는 게이트하지 않는다.** A의 execute가 서버에서 성공했다면 A의 돈은
+  실제로 움직였고 사용자가 보고 있든 아니든 A의 캐시는 stale이다. 다만
+  `variables.scope.accountId`로 — 현재 선택이 아니라 — 무효화한다. `seasonUi`도
+  발행 시점의 **행위 계정**의 값을 담아 보낸다.
+- pending도 scope로 판정한다(`quoteMutation.variables.scope`). A의 "환전 실행 중"
+  스피너가 B 화면에 뜨지 않는다. **mutation을 `reset()`하지는 않는다** — 서버에서
+  아직 진행 중이고, 그 콜백이 A의 캐시를 무효화해야 한다.
+
+---
+
+#### 3. 하위 금융 query의 구조적 무결성 오류가 일반 부분 실패로 숨겨졌다
+
+`getIntegrityErrorMessage()`는 각 화면의 **1차 query(portfolio overview)에만**
+적용돼 있었다. 나머지 계정 scope query는 전부 일반 부분 실패로 떨어졌다:
+
+    walletsQuery.isError   → "지갑 요약을 불러오지 못했습니다."
+    positionsQuery.isError → "보유 종목이 없습니다."
+    rankingQuery.isError   → 순위 "-" · 등급 "-"
+
+이건 일시적 장애로 읽힌다. 그러나 지갑 query의 `TRADING_ACCOUNT_SCOPE_MISMATCH`는
+"지갑에 잠깐 닿지 않는다"가 아니라 **서버가 저장된 지갑이 엉뚱한 계정에 붙어
+있는 것을 발견하고 답하기를 거부했다**는 뜻이다. 그걸 자신만만한 총 자산 옆의
+회색 박스로 그리면, 서버가 보증하지 못하겠다고 한 화면을 멀쩡하다고 말하는 것이다.
+
+- `features/tradingAccount/accountIntegrityGate.ts` — 화면이 이미 들고 있는 query
+  상태에 대한 순수 함수. 새 오류 프레임워크도, 전역 상태도, error boundary도
+  만들지 않았다. 구조적 오류가 **하나라도** 있으면 화면 전체가 fail-closed되고,
+  일시적 오류는 기존 section 알림을 그대로 유지한다. 판정은 이미 단일 소스인
+  `classifyAccountError`가 한다.
+- 재시도는 **실제로 실패한 query만** 다시 조회한다.
+- 적용: `GeneralAccountHome`(총 자산·지갑·보유 종목), `SeasonAccountHome`(+자산
+  추이·순위), `PortfolioScreen`(+보유 종목·자산 추이), `MyScreen`(순위·시즌 기록),
+  `WalletFxScreen`(지갑 — 서버가 보증 못 하는 지갑으로 환전 폼을 띄우지 않도록
+  폼보다 먼저 return), `WalletTransactionsScreen`(원장),
+  `RecordOrderListScreen`(거래 내역).
+- 문구는 "0이라는 뜻이 아닙니다"를 명시하고 실패한 section 이름을 담는다.
+- `integrityErrors.ts`에 backend 실제 코드 3개를 추가했다:
+  `SETTLEMENT_ACCOUNT_LINK_INTEGRITY`, `SETTLEMENT_SNAPSHOT_SCOPE_MISMATCH`,
+  `SETTLEMENT_SNAPSHOT_SCOPE_REPAIR_REQUIRED`. 오늘은 정산 job만 던지므로 화면이
+  볼 일은 거의 없지만, 이 집합의 의미와 정확히 같다. backend 전수 조사 결과
+  HTTP로 도달 가능한 나머지 구조적 코드는 이미 전부 들어 있었다
+  (`INVALID_RANKING_SCOPE`는 400 요청 검증이라 손상이 아니다 — 넣지 않았다).
+
+---
+
+#### 4. 세션 만료 — 알림이 유실되고, cache가 navigation 뒤에 정리됐다
+
+**A. 유실.** `notifySessionExpired()`가 handler 등록 **전에** 불리면
+`notified = true`만 세워지고 알림은 사라졌다. axios 싱글턴은 React 트리보다 먼저
+존재하고 handler는 effect에서 등록되므로, **밤새 만료된 refresh 토큰으로 cold
+start 하는 경우** — 이 일이 일어날 가능성이 가장 높은 바로 그 순간 — teardown이
+아예 실행되지 않았다. 사용자는 모든 요청이 401인 정상처럼 보이는 앱에, 이전
+세션의 캐시를 화면에 둔 채 남겨졌다.
+
+  → `pending`을 보존하고 다음에 등록되는 handler에게 **정확히 한 번** 전달한다.
+  단일 handler 구조 그대로 — emitter도 bus도 subscriber 목록도 없다.
+  `resetSessionExpiryNotice()`는 `notified`와 `pending`을 **둘 다** 지운다.
+  죽은 세션의 만료가 방금 성공한 로그인을 무너뜨리면 안 된다.
+
+**B. 순서.** bridge가 `void endSession(...)`과 `resetToLoginFromRef()`를 나란히
+호출했고, `endSession`은 AsyncStorage를 await한 **뒤에야** 캐시를 지웠다. 그
+사이 토큰은 없는데 이전 세션의 잔액은 캐시에서 읽히는 창이 있었다.
+
+  → `features/auth/sessionTeardown.ts`가 순서를 소유한다: **캐시(첫 await 이전에
+  동기적으로) → 토큰·storage → navigation reset(마지막, `finally`에서)**.
+  storage 쓰기가 실패해도 사용자는 로그인 화면에 도달한다 — 공용 기기에서
+  인증할 수 없는 앱 안에 갇히면 안 된다. `endSession`도 캐시를 먼저 지우도록
+  뒤집었다. 명시적 logout(`useLogout`)의 동작과 저장된 계정 선택 유지 정책은
+  그대로다.
+
+---
+
+#### 5. RecordOrderList — 비활성 query를 재시도하는 버튼
+
+seasonId에 대응하는 소유 계정을 못 찾으면 "이 시즌의 계정을 찾을 수 없습니다"를
+띄우고 재시도를 `ordersQuery.refetch()`에 걸었다. 그 query는
+`enabled: hasAccount`라 그 상태에서는 **비활성이고 refetch는 아무 일도 하지
+않는다.** 버튼이 장식이었다. 게다가 "계정 목록 조회 실패"와 "목록은 멀쩡한데 이
+시즌 계정이 없음"이 한 상태로 뭉쳐 있었다.
+
+`features/record/seasonAccountLookup.ts`가 네 상태로 나눈다: `loading` ·
+`account_list_error`(재시도 = `refetchAccounts()`) · `account_missing`(빈 주문
+목록으로 표현하지 않는다 — 그건 그 시즌에 거래가 없었다는 주장이고, 화면은 그걸
+알지 못한다. 계정 연결 문제 가능성을 설명한다) · `ready`. 캐시된 목록이 있으면
+background refetch 실패보다 목록을 우선한다. 빈 `accountId`로는 절대 요청하지
+않는다. foreign account와 missing account를 클라이언트가 구별하려 들지 않는
+기존 정책은 그대로다.
+
+---
+
+#### 6. frontend lint gate (범위 한정)
+
+frontend에는 lint가 전혀 없었다. `typecheck`·`test`·`export:web` 중 무엇도
+의존성이 빠진 effect, 떠 있는 promise, 조건부 hook을 볼 수 없다 — 이번 릴리스가
+손으로 잡아 온 결함이 정확히 그 부류다.
+
+- `frontend/eslint.config.mjs` 신규 + devDependency 5개(eslint, @eslint/js,
+  typescript-eslint, globals, eslint-plugin-react-hooks). `npm ci` 구조는 유지.
+- `npm run lint:accounts:check` — `--no-fix --max-warnings=0`, `*.test.ts` 제외
+  (node:test의 `describe()`/`it()`은 설계상 floating promise다).
+  범위: `features/auth`·`features/tradingAccount`·`features/record`·
+  `features/wallet`·`app/AppProviders.tsx`·`services/api/sessionExpiry.ts`·
+  `screens/auth`·`screens/home`·`screens/my`·`WalletFxScreen`·`OrderScreen`·
+  `AssetDetailScreen`·`RecordOrderListScreen`·`components/tradingAccount`·
+  `CTAButton`. 전체 저장소 부채는 건드리지 않았다.
+- 규칙은 전부 "실제 동작을 깨뜨릴 수 있는 것"만. Prettier plugin·import 정렬·
+  네이밍 규약 없음. 초기 33건을 **`--fix` 없이 손으로** 고쳤다.
+- **게이트가 실제로 닫히는지 확인했다**: 위반 주입 시 exit 1(2 errors), 복구 후
+  exit 0.
+- **`exhaustive-deps`가 살아 있는 버그를 잡았다.** `OrderScreen`의 `quoteDisplay`
+  useMemo가 자기 아래에 선언된 `const asset`을 읽고 있었다. factory는 render 중
+  실행되므로 `quoteData`가 처음 non-null이 되는 render에서 TDZ에 걸려
+  `ReferenceError: Cannot access 'asset' before initialization` — **견적이 성공한
+  바로 그 순간 주문 화면이 죽는다.** 선언을 memo 위로 올리고 dep을 채웠다.
+- CI `Frontend quality` job 순서: install → **lint** → typecheck → test →
+  web export.
+
+---
+
+#### 7. 텍스트 잘림
+
+이번에 손댄 상태 화면 전부를 훑었다. 새 fail-closed 문구는 전부 `ErrorState`
+안에서 렌더된다 — ScrollView + `flexGrow: 1` + `lineHeight`, `numberOfLines`
+없음(기존 규약, 테스트로 고정돼 있다).
+
+실제로 고친 것: `RecordOrderListScreen`의 행이 이름 column에 `flex: 1,
+minWidth: 0`이 없어 **긴 한국어 종목명이 금액 column을 화면 밖으로 밀어낼 수
+있었다.** 이름 column과 금액 column(`flexShrink: 0`)을 분리하고 gap을 넣었다.
+`MyScreen`·`InlineEmptyState`·취소 버튼 라벨에 `lineHeight`를 채웠다.
+
+`accountLayout.test.ts`에 규약 10건을 추가했다: 긴 종목명 wrap, 긴 닉네임/이메일
+wrap, fail-closed 문구가 완결된 문장이고 "데이터가 없습니다"/"준비 중"으로 읽히지
+않으며 "0이라는 뜻이 아닙니다"를 담을 것, account-list 실패와 season account 부재
+문구가 서로 다를 것, 그리고 WalletFx가 캐시 무효화를 현재 선택이 아니라
+`variables.scope.accountId`로 한다는 회귀 가드. **렌더러가 없는 프로젝트이므로
+실제 폭·font scale 실측은 여전히 수동 검수 항목이고, 이번에도 하지 않았다.**
+
+---
+
+**변경 파일**
+
+frontend 신규 5(+테스트 4): `features/wallet/fxAccountScope.ts`,
+`features/tradingAccount/accountIntegrityGate.ts`,
+`features/record/seasonAccountLookup.ts`, `features/auth/sessionTeardown.ts`,
+`eslint.config.mjs`. frontend 수정 22 + `package.json`/`package-lock.json`.
+backend 수정 1: `test/app.e2e-spec.ts` **(제품 코드 0줄)**. docs 2, CI 1.
+**backend `src/` 0파일, `prisma/` 0파일, migration 0건.**
+
+**검증 결과 (이 환경에서 실제 실행)**
+
+| 명령 | 결과 |
+| --- | --- |
+| `backend: pnpm run lint:accounts:check` | PASS |
+| `backend: pnpm run lint:candles:check` / `format:candles:check` | PASS |
+| `backend: pnpm run typecheck` / `pnpm run build` | PASS |
+| `backend: pnpm exec jest --runInBand` (unit) | PASS — 2551 pass / 37 skip |
+| `backend: pnpm run test:e2e` (`.env` 있는 로컬) | PASS — **126/126** (기준 122) |
+| `backend: pnpm run test:e2e` (`.env` 3개를 치우고 `env -i`, CI 모사) | PASS — **126/126** |
+| `frontend: npm run lint:accounts:check` | PASS — 0 errors (위반 주입 시 exit 1 확인) |
+| `frontend: npm run typecheck` | PASS |
+| `frontend: npm test` | PASS — **476** (기준 467) |
+| `frontend: npm run export:web` | PASS — 1.5MB 번들 |
+
+> `pnpm test -- --runInBand`는 pnpm이 `--`를 그대로 전달해 jest가 `--runInBand`를
+> **테스트 경로 패턴**으로 해석하고 "No tests found"로 exit 1이 된다. 실제 명령은
+> `pnpm exec jest --runInBand`(또는 CI가 쓰는 `pnpm test`)다.
+
+**이 환경에서 실행하지 못한 것**
+
+- **DB 통합 suite(core account / limit order), `migrate deploy`·`status`·
+  `diff --exit-code`, repair·audit dry-run.** 이 세션에는 PostgreSQL도 Redis도
+  설치돼 있지 않다(`pg_isready`·`redis-cli` 없음, 실행 중인 프로세스 없음).
+  다만 이번 작업은 `backend/src`와 `backend/prisma`를 **한 글자도** 바꾸지
+  않았으므로 schema drift는 구조적으로 발생할 수 없고, 해당 job들은 기준
+  커밋에서 이미 green이었다. hosted CI가 확인한다.
+- 실제 렌더링 기반 텍스트 잘림 실측(좁은 폭 / font scale 1.3+).
+
+---
+
 ### 작업 단위: 가상 트레이딩 계정 UX 완성 + 릴리스 하드닝 (2026-08-05, 작업 9 잔여 + 작업 10 보완, WORK-ID VIRTUAL-TRADING-ACCOUNT-UX-AND-RELEASE-HARDENING-V1)
 
 **기준 커밋** `0a837c8c291ec22b290e82a711c4444b25b23259` (= 지시받은 기준이자
@@ -2195,6 +2448,44 @@ cd frontend && npm run typecheck && npm test
 ---
 
 ## 2. 최신 작업 시간순 기록
+
+### 2026-08-05 (2차) — 릴리스 E2E 복구 + 계정 전환 stale 응답·무결성 fail-closed 보완 (작업 11 보완)
+
+- **Release-critical E2E가 실패하던 이유는 제품이 아니라 테스트였다.**
+  `ConfigModule`이 `.env`를 `process.env`로 복사하고 readiness가 요청마다 그걸
+  다시 읽는다 — 그래서 로컬에서는 `redis: 'ok'`, `.env`도 Redis도 없는 CI에서는
+  `disabled`. 테스트가 한 사람의 `.env`를 계약으로 굳히고 있었다. suite가 읽는
+  환경값을 전부 고정하고 `finally`에서 복구하게 고쳤고, **backend 제품 코드는
+  0줄 바꾸지 않았다.** canonical job에 Redis service도 추가하지 않았다 —
+  Redis는 선택적 의존성이고, 설정 없음(`disabled`, `ready` 가능)과 설정했는데
+  연결 실패(`unavailable`, 절대 `ready` 아님)는 다른 상태다. 122 → **126/126**.
+- **계정 A의 FX 응답이 계정 B 화면에 반영될 수 있었다.** mutation 콜백은 응답
+  시점의 최신 render를 읽으므로, 전환 후 도착한 A의 quote·오류·성공 모달이 B에
+  그려지고 **B의 캐시가 무효화**됐다. 계정을 mutation variables로 옮기고
+  `{accountId, scopeEpoch}` scope로 게이트했다. epoch가 A→B→A를 구별한다.
+  캐시 무효화만은 게이트하지 않되 **행위 계정** 기준으로 한다 — A의 돈은 실제로
+  움직였다.
+- **하위 금융 query의 구조적 오류가 일반 부분 실패로 숨겨졌다.** 지갑 query의
+  scope mismatch는 "잠깐 안 됨"이 아니라 "서버가 답하기를 거부했다"인데, 자신만만한
+  총 자산 옆 회색 박스로 그려졌다. 순수 helper 하나로 화면 전체를 fail-closed
+  시킨다(일시적 오류는 기존 section 알림 유지, 재시도는 실패한 query만).
+  순위가 "-", 보유가 "없음", 잔액이 0으로 대체되지 않는다.
+- **밤새 만료된 토큰으로 cold start 하면 세션 teardown이 아예 실행되지 않았다.**
+  handler 등록 전 알림이 유실됐다. pending을 보존해 정확히 한 번 전달한다.
+  teardown 순서도 고정했다: **캐시(첫 await 이전) → 토큰·storage → navigation
+  (마지막, `finally`)**.
+- **RecordOrderList의 재시도 버튼이 비활성 query를 재시도했다** — 장식이었다.
+  계정 목록 조회 실패와 season account 부재를 나누고, 전자는 `refetchAccounts()`,
+  후자는 빈 주문 목록으로 표현하지 않는다.
+- **frontend에 범위 한정 lint gate를 넣었고, 그게 즉시 살아 있는 버그를 잡았다.**
+  `OrderScreen`의 useMemo가 자기 아래에 선언된 `const asset`을 읽고 있었다 —
+  견적이 성공하는 순간 TDZ `ReferenceError`로 주문 화면이 죽는다. 위반을 주입해
+  게이트가 exit 1로 닫히는 것도 확인했다.
+- **긴 한국어 종목명이 금액 column을 화면 밖으로 밀어낼 수 있었다**
+  (RecordOrderList 행). 이름/금액 column을 분리했다.
+- 이 환경에는 PostgreSQL·Redis가 없어 DB 통합 suite는 돌리지 못했다. 다만
+  `backend/src`·`backend/prisma`를 한 글자도 바꾸지 않았으므로 drift는 구조적으로
+  불가능하다.
 
 ### 2026-08-05 — 가상 트레이딩 계정 UX 완성 + 릴리스 하드닝 (작업 9 잔여 + 작업 10 보완)
 

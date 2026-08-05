@@ -35,7 +35,7 @@ export type SessionQueryClient = {
   setQueryData: (queryKey: readonly unknown[], data: unknown) => unknown;
   invalidateQueries: (filters: {
     queryKey: readonly unknown[];
-  }) => Promise<unknown> | unknown;
+  }) => unknown;
 };
 
 /** Everything this device remembers about the outgoing session. */

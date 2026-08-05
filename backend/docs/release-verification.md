@@ -91,24 +91,62 @@ cd backend && pnpm run test:e2e
 
 **It takes no environment variables.** That is a property of the suite, not an
 omission: it signs its tokens with the secret the application itself resolves
-and pins the scheduler and calendar inputs it depends on. If this command ever
-needs a variable again, the suite has gone back to depending on whose machine it
-ran on — fix the suite, do not document the variable.
+and pins the scheduler, calendar AND Redis inputs it depends on. If this command
+ever needs a variable again, the suite has gone back to depending on whose
+machine it ran on — fix the suite, do not document the variable.
+
+`ConfigModule.forRoot({ envFilePath: [...] })` copies whatever `.env` file a
+developer happens to have into `process.env` at module compile time, and
+readiness re-reads `process.env` per request — so "takes no environment
+variables" only holds if the suite pins the ones it reads. It did not pin
+`REDIS_URL`, which is how `redis: 'ok'` (a laptop's local Redis) came to be
+asserted as the contract while CI, which has no `.env` and no Redis service,
+correctly reported `redis: 'disabled'` and failed (작업 12 §1).
+
+**Redis is an OPTIONAL dependency, and the readiness contract says so:**
+
+| Configuration | `redis` | `status` |
+| --- | --- | --- |
+| No `REDIS_URL` | `disabled` | may be `ready` |
+| `REDIS_URL` blank/whitespace (explicitly disabled) | `disabled` | may be `ready` |
+| `REDIS_URL` set, ping succeeds | `ok` | may be `ready` |
+| `REDIS_URL` set, ping fails or the client is absent | `unavailable` | **never `ready`** — `degraded` |
+
+Not-configured and configured-but-broken are different states on purpose. The
+canonical E2E job therefore runs **without a Redis service**, and no Redis
+service should be added to it: doing so would make the job assert a
+configuration the release does not require. Readiness is also asserted with
+`objectContaining` at both levels, so adding a diagnostic field to the payload
+is an additive change that cannot fail the contract test.
 
 ### Frontend
 
 ```bash
 cd frontend
 npm ci
+npm run lint:accounts:check  # scoped ESLint; warnings fail, nothing is fixed
 npm run typecheck
-npm test            # node --test
-npm run export:web  # production bundle; proves every module resolves
+npm test                     # node --test
+npm run export:web           # production bundle; proves every module resolves
 ```
 
-There is no ESLint in the frontend app and none was added for this work — a new
-lint toolchain is infrastructure, and the two gates that catch what mattered
-here (`tsc --noEmit`, and the source-scanning
-`legacyFinancialCalls.test.ts`) already run on every commit.
+**The frontend lint gate is scoped, not repository-wide (작업 12 §6).** It
+covers the account, auth, order, FX, record and home PRODUCT files — the area
+this release keeps changing — and excludes `*.test.ts`, whose `describe()` /
+`it()` calls are floating promises by node:test's design rather than by defect.
+The rest of the repository has pre-existing debt and is deliberately not gated
+yet, the same rule the backend's candle and trading-account gates follow.
+
+Config lives in `frontend/eslint.config.mjs`; the SCOPE lives in the npm script,
+so widening it later needs no config surgery. Every enabled rule can fail a real
+behaviour — type-aware correctness plus `react-hooks/rules-of-hooks` and
+`react-hooks/exhaustive-deps`. No Prettier plugin, no style pack: a gate that
+also reformats is a gate people learn to run with `--fix`.
+
+It earns its place immediately — `exhaustive-deps` surfaced a live
+`ReferenceError` in `OrderScreen`, where a `useMemo` factory read `asset` from
+above its own `const` declaration and crashed the order screen the moment a
+quote succeeded.
 
 ### Operational tools (dry-run — must not write)
 
@@ -134,7 +172,7 @@ integration suites (`snapshot-scope-audit`, `trading-account-*-scope`,
 | Job | Gate |
 | --- | --- |
 | Backend quality | install, generate, candle lint/format, **trading-account lint**, typecheck, build, unit |
-| Frontend quality | `npm ci`, typecheck, tests, **web export** |
+| Frontend quality | `npm ci`, **account/auth lint**, typecheck, tests, **web export** |
 | Limit order PostgreSQL integration | migrations + drift + money-layer order/FX suites |
 | **Core account PostgreSQL integration** | migrations + drift + account/general/ranking/settlement suites + repair·audit dry-runs |
 | **Release-critical E2E** | `pnpm test:e2e`, no environment variables |
@@ -147,7 +185,7 @@ integration suites (`snapshot-scope-audit`, `trading-account-*-scope`,
 3. Repair ×5 + `audit-general` dry-run — findings 0. If any are non-zero, stop:
    apply is a decision, not a step.
 4. Backend gates green; core account integration green; canonical e2e green.
-5. Frontend typecheck + tests + web export green.
+5. Frontend lint (scoped) + typecheck + tests + web export green.
 6. Deploy backend, then frontend.
 7. Smoke, in this order: login → account list loads → fallback selection →
    season/general switch → order + cancel reflected in wallet and positions →

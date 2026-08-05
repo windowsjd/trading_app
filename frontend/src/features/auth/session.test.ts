@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import { QUERY_KEYS } from '../../constants/queryKeys.ts';
 import { clearSessionCache, seedSessionCache } from './sessionCache.ts';
+import { runSessionExpiryTeardown } from './sessionTeardown.ts';
 
 /**
  * These cover the CACHE half of the session boundary — the half that decides
@@ -166,5 +167,68 @@ describe('session boundary', () => {
       );
     });
 
+  });
+
+  describe('runSessionExpiryTeardown (expiry ordering)', () => {
+    it('clears the query cache BEFORE resetting navigation', async () => {
+      const order: string[] = [];
+
+      await runSessionExpiryTeardown({
+        clearCache: () => order.push('clearCache'),
+        clearCredentials: async () => {
+          order.push('clearCredentials');
+          await Promise.resolve();
+        },
+        resetToLogin: () => order.push('resetToLogin'),
+      });
+
+      assert.deepEqual(order, [
+        'clearCache',
+        'clearCredentials',
+        'resetToLogin',
+      ]);
+    });
+
+    it('clears the cache synchronously, before the first await can yield', async () => {
+      // The window this closes: navigation resets while an async storage
+      // round-trip is still pending and the previous session's balances are
+      // still readable from the cache.
+      const order: string[] = [];
+      let cacheClearedBeforeYield = false;
+
+      const teardown = runSessionExpiryTeardown({
+        clearCache: () => {
+          order.push('clearCache');
+          cacheClearedBeforeYield = true;
+        },
+        clearCredentials: () => new Promise((resolve) => setTimeout(resolve, 0)),
+        resetToLogin: () => order.push('resetToLogin'),
+      });
+
+      // Nothing has been awaited yet on this line, so anything the teardown did
+      // synchronously has already happened.
+      assert.equal(cacheClearedBeforeYield, true);
+      assert.deepEqual(order, ['clearCache']);
+
+      await teardown;
+      assert.deepEqual(order, ['clearCache', 'resetToLogin']);
+    });
+
+    it('still reaches the login screen when storage teardown fails', async () => {
+      // A user on a shared device must not be left inside an app that can no
+      // longer authenticate because one AsyncStorage write rejected.
+      const order: string[] = [];
+
+      await assert.rejects(
+        runSessionExpiryTeardown({
+          clearCache: () => order.push('clearCache'),
+          clearCredentials: () => Promise.reject(new Error('storage failed')),
+          resetToLogin: () => order.push('resetToLogin'),
+        }),
+        /storage failed/,
+      );
+
+      assert.deepEqual(order, ['clearCache', 'resetToLogin']);
+    });
   });
 });

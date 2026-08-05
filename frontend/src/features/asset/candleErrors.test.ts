@@ -114,7 +114,9 @@ describe('asset detail screen wiring', () => {
       'retry stays available in the baseline state',
     );
     assert.ok(
-      screenSource.includes('onPress={() => candlesQuery.refetch()}'),
+      // `void` is how the lint gate requires a fire-and-forget refetch to be
+      // written; what matters here is that the button refetches the CANDLES.
+      /onPress=\{\(\) => (void )?candlesQuery\.refetch\(\)\}/.test(screenSource),
       'retry refetches the candles query',
     );
   });

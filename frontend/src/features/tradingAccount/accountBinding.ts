@@ -78,8 +78,8 @@ export function resolveAccountBinding(params: {
   return {
     state: 'bound',
     account,
-    // Non-null for a real account; the cast documents that.
-    capabilities: getTradingAccountCapabilities(account)!,
+    // Non-null for a real account, and the signature already says so.
+    capabilities: getTradingAccountCapabilities(account),
   };
 }
 
