@@ -84,10 +84,11 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
       await beginSession(queryClient, result.user);
 
       try {
-        // Entry is decided by the accounts this user OWNS, not by whether a
-        // season is running (작업 11 §3). A user with a general account and no
-        // open season belongs in the app, not on the season screen.
-        await enterApp(result.user.id);
+        // A NEW login always lands on mode selection (작업 13 §2): which
+        // account this session is about — 일반 투자 or 시즌 투자 — is the
+        // user's choice, not an inference from what they happen to own or
+        // from a stored selection.
+        await enterApp(result.user.id, 'new_login');
       } catch (error) {
         const code = getApiErrorCode(error);
 

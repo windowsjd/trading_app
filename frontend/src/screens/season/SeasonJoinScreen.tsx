@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { SeasonJoinScreenProps } from '../../app/navigation/types';
 import { getCurrentSeason, joinSeason } from '../../features/season/api';
+import { findAccountForSeason } from '../../features/tradingAccount/accountSelection';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import {
   toSeasonJoinViewState,
@@ -76,8 +77,29 @@ export default function SeasonJoinScreen({ navigation }: Props) {
    * account and the season screen has nothing to offer them. If they own ANY
    * account, the screen offers a way home instead of only a retry button.
    */
-  const { accounts } = useTradingAccount();
+  const { accounts, refetchAccounts, selectAccount } = useTradingAccount();
   const hasUsableAccount = accounts.length > 0;
+
+  /**
+   * After a join is CONFIRMED to hold (fresh success or "already joined"),
+   * Home must open on THAT season's account (작업 13 §8) — not on whatever the
+   * stored selection pointed at, which for a user who was in 일반 투자 a
+   * moment ago would silently show the general account under a "참가 완료"
+   * impression. The owned list is refetched first so the selection lands on an
+   * account the provider can already see; the account is found by the joined
+   * seasonId, never by a fabricated id.
+   */
+  const selectJoinedSeasonAccount = async (seasonId: string) => {
+    const refreshed = await refetchAccounts();
+    const joinedAccount = findAccountForSeason(
+      refreshed.data?.accounts ?? [],
+      seasonId,
+    );
+
+    if (joinedAccount) {
+      selectAccount(joinedAccount.id);
+    }
+  };
 
   const seasonQuery = useQuery({
     queryKey: QUERY_KEYS.season.current,
@@ -86,22 +108,21 @@ export default function SeasonJoinScreen({ navigation }: Props) {
 
   const joinMutation = useMutation({
     mutationFn: (seasonId: string) => joinSeason(seasonId),
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       setJoinErrorCode(null);
       // Joining a season CREATES a new season TradingAccount (작업 10 §A-12).
       // The owned-account list must be refetched or the switcher will not show
-      // the account the user just opened, and the selection policy cannot land
-      // on it.
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.season.current }),
-        queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.tradingAccount.listAll,
-        }),
-      ]);
+      // the account the user just opened — and the NEW account is then
+      // selected explicitly, so join lands on the joined season's Home in one
+      // step (작업 13 §8) instead of bouncing through another selection.
+      await queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.season.current,
+      });
+      await selectJoinedSeasonAccount(result.seasonId);
 
       resetToHome();
     },
-    onError: async (error: unknown) => {
+    onError: async (error: unknown, seasonId) => {
       const code = getApiErrorCode(error);
       setJoinErrorCode(code ?? 'UNKNOWN');
 
@@ -116,13 +137,18 @@ export default function SeasonJoinScreen({ navigation }: Props) {
         code === ERROR_CODE.SEASON_NOT_FOUND
       ) {
         // SEASON_ALREADY_JOINED means the account exists already; the list is
-        // refetched for the same reason as on success.
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.season.current }),
-          queryClient.invalidateQueries({
-            queryKey: QUERY_KEYS.tradingAccount.listAll,
-          }),
-        ]);
+        // refetched — and that account selected — for the same reason as on
+        // success.
+        await queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.season.current,
+        });
+
+        if (code === ERROR_CODE.SEASON_ALREADY_JOINED) {
+          await selectJoinedSeasonAccount(seasonId);
+        } else {
+          await refetchAccounts();
+        }
+
         await seasonQuery.refetch();
       }
 

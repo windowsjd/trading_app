@@ -7,6 +7,7 @@ import { rootNavigationRef } from './navigationRef';
 import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
 import SplashScreen from '../../screens/auth/SplashScreen';
+import ModeSelectionScreen from '../../screens/entry/ModeSelectionScreen';
 import SeasonJoinScreen from '../../screens/season/SeasonJoinScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -21,6 +22,7 @@ export default function RootNavigator() {
       >
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="AuthStack" component={AuthStack} />
+        <Stack.Screen name="ModeSelection" component={ModeSelectionScreen} />
         <Stack.Screen name="MainTabs" component={MainTabs} />
         <Stack.Screen name="SeasonJoin" component={SeasonJoinScreen} />
       </Stack.Navigator>

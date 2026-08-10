@@ -1,11 +1,13 @@
-# Frontend TradingAccount Switching (작업 9 + 작업 10 + 작업 11)
+# Frontend TradingAccount Switching (작업 9 + 작업 10 + 작업 11 + 작업 13)
 
 Reference for the account-selection layer added by WORK-ID
 `SEASON-RANKING-HARDENING-AND-FRONTEND-ACCOUNT-SWITCH-V1`, completed across
 every current financial screen and mutation by
-`FRONTEND-ACCOUNT-SCOPE-COMPLETION-AND-RELEASE-HARDENING-V1` (작업 10), and
+`FRONTEND-ACCOUNT-SCOPE-COMPLETION-AND-RELEASE-HARDENING-V1` (작업 10),
 extended to app ENTRY, per-user cache separation and the season Home itself by
-`VIRTUAL-TRADING-ACCOUNT-UX-AND-RELEASE-HARDENING-V1` (작업 11).
+`VIRTUAL-TRADING-ACCOUNT-UX-AND-RELEASE-HARDENING-V1` (작업 11), and given an
+explicit investment-mode choice at login by
+`TRADING-MODE-ENTRY-AND-GENERAL-ACCOUNT-ACCESS-V1` (작업 13).
 
 Backend contracts this depends on:
 `backend/docs/trading-accounts-api-contract.md`,
@@ -43,7 +45,11 @@ plus one AsyncStorage entry.
 | `features/auth/entry.ts` / `useEnterApp.ts` | app entry decided by owned accounts (작업 11) |
 | `components/tradingAccount/AccountSetupPanel.tsx` | the no-account landing; opens a general account (작업 11) |
 | `features/tradingAccount/legacyFinancialCalls.test.ts` | the guard that keeps legacy implicit-account calls out (작업 11) |
-| `components/tradingAccount/AccountSwitcher.tsx` | switcher UI |
+| `components/tradingAccount/AccountSwitcher.tsx` | switcher UI + first-time 일반 투자 start (작업 13) |
+| `screens/entry/ModeSelectionScreen.tsx` | the 일반/시즌 choice every fresh login answers (작업 13) |
+| `features/tradingAccount/modeSelection.ts` | pure view-model of what mode selection may offer (작업 13) |
+| `features/tradingAccount/useOpenGeneralAccount.ts` / `generalAccountOpen.ts` | the ONE general-open flow all three entry points share (작업 13) |
+| `features/auth/entry.ts` / `useEnterApp.ts` | intent-aware entry routing: new login vs session restore (작업 13) |
 | `constants/queryKeys.ts` → `QUERY_KEYS.tradingAccount.*` | account-scoped cache keys |
 
 ## Which screen uses which account (작업 10)
@@ -91,44 +97,89 @@ from while the account they could actually use sat one tap away. Those accounts
 are still reachable through rule 4 — readable history, just not the landing
 place.
 
-## App entry (작업 11)
+## App entry (작업 11 · rewritten by 작업 13)
 
-Entry is decided by the accounts the user OWNS, never by `getCurrentSeason()`.
+Entry routes on the caller's INTENT plus the stored selection — never on
+`getCurrentSeason()`, and (since 작업 13) never on "owns anything → home".
 
-Splash, login and signup each used to ask for the current season and route on
-the answer, which conflates two unrelated questions: *is there a season to
-join* (a property of the server) and *does this user have an account to use* (a
-property of the user). A user holding a general account, with every season
-settled, was sent to the season screen — a page about something they are not
-doing — while the app they could use sat behind it.
+작업 11 removed the season from the decision: *is there a season to join* is a
+property of the server, *does this user have an account* a property of the
+user. 작업 13 removes the remaining guess. "Owns an account → straight to
+Home" silently answered a question that belongs to the user: WHICH account is
+this session about? Because the fallback policy prefers the active season, a
+user holding only a season account was always dropped into season Home, and a
+season participant who wanted 일반 투자 had no doorway to it at all.
 
-The order after authentication is now:
+`resolveAuthedEntryRoute(intent, accounts, storedAccountId)` in
+`features/auth/entry.ts`:
+
+| Intent | Stored selection | Route |
+| --- | --- | --- |
+| `new_login` (login, signup) | ignored — not even read | `ModeSelection`, always |
+| `session_restore` (splash) | still in the owned list | `MainTabs` on that account |
+| `session_restore` | missing / no longer owned | `ModeSelection` |
+
+The order after authentication is:
 
 1. save tokens;
 2. seed `me` (from the login response, or from `GET /me` on session restore);
 3. read `tradingAccount.list(<userId>)` — the same cache entry the provider
    mounts on, so entry and the provider make ONE request between them;
-4. `accounts.length > 0` → MainTabs; otherwise → the account setup screen;
-5. the provider restores the stored selection and applies the fallback policy.
+4. route by the table above;
+5. the provider restores the stored selection and applies the fallback policy
+   (mode selection writes an explicit selection before navigating home).
 
-A failure to read the list is NOT treated as "no accounts": the user stays put
-with the real error. Reporting a network blip as an empty account list invites a
-second account.
+A failure to read the list is NOT treated as "no accounts": login/signup stay
+put with the real error, and splash shows an explicit retry instead of
+guessing between "logged out" and "owns nothing".
 
 `getCurrentSeason()` keeps its real jobs — may I join, what is the public
 season, which season does the leaderboard default to — and
 `features/tradingAccount/legacyFinancialCalls.test.ts` fails the build if it
-reappears anywhere else.
+reappears anywhere else. Mode selection is on that allowlist for exactly the
+"may I join" question; the entry ROUTE still never consults it.
 
-## No accounts at all (작업 11)
+## Mode selection (작업 13)
 
-`AccountSetupPanel` is the landing for a user who owns nothing. It offers the
-two real entrances: open a general account, or join a season when one is open.
-The general account is created by `POST /trading-accounts/general` **on an
-explicit press only** — opening an account grants starting capital and writes
-wallets and a ledger row, so no GET, no screen mount, and no navigation may
-cause it. The server is idempotent (`data.created` distinguishes the first open
-from a replay), so a double press yields one account.
+`screens/entry/ModeSelectionScreen.tsx` asks: **"이번 세션에서 어떤 투자
+계정으로 시작할 것인가?"** Its options come from the pure view-model
+`buildModeSelectionModel(accounts, currentSeason)`:
+
+- **일반 투자 — always offered.** With a general account (any status): use it.
+  Without one: "일반 투자 계정 시작하기", which fires the explicit
+  `POST /trading-accounts/general`. The card states the standing policy: 초기
+  자금 10,000,000원, 시간가중 수익률, and that 매매/환전 are 준비 중.
+- **시즌 투자.** Season accounts the user is competing in ("시즌 투자
+  계속하기"), or — when the current season is effectively active, the server
+  says not joined, AND the owned list has no account for it — "시즌 참가하기"
+  into `SeasonJoin` (pushed, so back returns here). Otherwise the screen says
+  outright that no season is joinable, with 일반 투자 still available.
+- **지난 시즌 계정.** Finished/settled/excluded season accounts are reachable
+  as history ("기록 보기") but are never a default and never look like a live
+  start.
+
+A season-lookup failure disables only the season column (with its own retry);
+a general-open failure shows its message and leaves every season option
+usable. Nothing is created on mount, by GET, or by navigation.
+
+## Opening the general account (작업 11 · unified by 작업 13)
+
+Three surfaces offer "일반 투자 시작하기" — mode selection, the account
+switcher sheet (when no general account exists), and `AccountSetupPanel` (the
+in-app no-account landing). All three run the ONE flow in
+`useOpenGeneralAccount` / `completeGeneralAccountOpen`:
+
+1. `POST /trading-accounts/general` — on an explicit press only; `start()` is
+   a no-op while a request is in flight, and the button is disabled/loading;
+2. await the owned-list refetch, so the provider can already see the account;
+3. select the id THE SERVER RETURNED (`data.created` distinguishes the first
+   open from a replay — a double tap or retry lands on the same account);
+4. only then run the caller's `onOpened` (navigate home / close the sheet).
+
+The switcher's row is an ACTION, not an account: no synthetic id, no fake
+account row, and no financial read happens before the server has answered.
+On failure the sheet stays open with the full message and the season accounts
+remain selectable.
 
 ## Per-user persistence and logout
 
@@ -352,8 +403,8 @@ variable-length Korean text, and a season name is user-supplied content:
 
 ## Tests
 
-`node --test` (no Jest in this project). 427 tests as of 작업 11 (414 after
-작업 10, 338 before).
+`node --test` (no Jest in this project). 510 tests as of 작업 13 (427 after
+작업 11, 414 after 작업 10, 338 before).
 
 Coverage: selection policy and fallbacks including the ended/settled/upcoming
 season cases; per-user storage isolation; cache separation and cross-account
@@ -365,12 +416,24 @@ clear-before-seed ordering, and that the previous user's portfolio is
 unreadable afterwards); order-flow account binding; the record-order row
 adapter; and layout invariants.
 
+작업 13 adds: intent-aware entry routing (`entry.test.ts` — every account
+shape on a new login routes to mode selection, the stored id is not even read;
+restore keeps only a still-owned selection); the mode-selection model
+(`modeSelection.test.ts` — the §13 user shapes: season-only, general-only,
+both, nothing, past-only, excluded, stale season answer); the general-open
+ordering (`generalAccountOpen.test.ts` — refetch before select, replay lands
+on the same account, no selection on failure); and the composed release
+scenarios (`entryScenarios.test.ts` — 시나리오 A/B/C run through the real
+functions end to end, the closest executable form of the E2E flows in a
+renderer-less project).
+
 `legacyFinancialCalls.test.ts` (작업 11) is the standing guard: no legacy
 implicit-account financial function may be defined or imported anywhere, the
 listed financial screens must read the account-scoped surface, and
-`getCurrentSeason` may appear only in the four season-specific files. It was
-verified to FAIL when a legacy import is reintroduced — a guard that cannot fail
-proves nothing.
+`getCurrentSeason` may appear only in the season-specific files (작업 13 adds
+`ModeSelectionScreen` for the "may I join" question). It was verified to FAIL
+when a legacy import is reintroduced — a guard that cannot fail proves
+nothing.
 
 Layout has no renderer here, so `accountLayout.test.ts` asserts the two things
 that can be checked without one, and that are the two that broke in practice:

@@ -11,7 +11,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { getMe } from '../me/api';
-import { getTradingAccounts, type TradingAccountDto } from './api';
+import {
+  getTradingAccounts,
+  type TradingAccountDto,
+  type TradingAccountsDto,
+} from './api';
 import {
   selectTradingAccountId,
   sortAccountsForDisplay,
@@ -62,7 +66,13 @@ export type TradingAccountContextValue = {
   error: unknown;
   isEmpty: boolean;
   selectAccount: (accountId: string) => void;
-  refetchAccounts: () => Promise<unknown>;
+  /**
+   * Refetches the owned-account list and RESOLVES WITH IT, so a flow that just
+   * created an account (season join, general open) can find the new account in
+   * the same list the provider now renders from — no second read, no window in
+   * which the two disagree.
+   */
+  refetchAccounts: () => Promise<{ data?: TradingAccountsDto }>;
   /**
    * Called when a request for the selected account came back "not mine":
    * refetch the owned list and let the selection policy land somewhere valid.
@@ -103,7 +113,7 @@ export function TradingAccountProvider({ children }: PropsWithChildren) {
   const accounts = useMemo(
     () => sortAccountsForDisplay(accountsQuery.data?.accounts ?? []),
     [accountsQuery.data],
-  ) as TradingAccountDto[];
+  );
 
   // The persisted choice is loaded once per user. When the user changes, the
   // in-memory selection is dropped FIRST so no render can hand the new user the

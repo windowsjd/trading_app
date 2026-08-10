@@ -12,6 +12,98 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 투자 모드 선택 진입 + 일반계정 접근 완성 (2026-08-10, 작업 13, WORK-ID TRADING-MODE-ENTRY-AND-GENERAL-ACCOUNT-ACCESS-V1)
+
+**기준 커밋** `bce0c52c747813a6d86366f27b6d3f523da4ed67` (= 지시받은 기준 =
+`git fetch` 시점의 `origin/main` = 로컬 HEAD, working tree clean). 시작 시점
+hosted CI (run 30987601401, `bce0c52c`): 6개 job 전부 성공.
+
+**backend는 0줄 변경.** migration 없음, schema 없음, API 계약 변경 없음.
+frontend 전용 작업이다.
+
+#### 문제의 실제 원인
+
+로그인 후 라우팅이 "계정 1개 이상 → 즉시 Home"이었고(`entry.ts`), Home에
+도착하면 선택 정책이 `stored → active season → active general → most recent`
+순서로 **대신 골라줬다**. 그래서:
+
+1. 시즌계정만 가진 사용자는 로그인 즉시 시즌 Home — 일반 투자를 고를 기회 자체가
+   없다.
+2. general account가 없는 시즌 참가자는 일반계정을 만들 UI 경로가 없다
+   (`AccountSetupPanel`은 계정 0개 상태에서만 나타나고, `AccountSwitcher`는
+   이미 소유한 계정만 나열한다). backend의 idempotent
+   `POST /trading-accounts/general`은 이미 있었다 — 연결된 화면이 없었을 뿐.
+
+#### 무엇을 만들었나
+
+- **진입 라우팅을 intent 기반으로 재설계** (`features/auth/entry.ts`).
+  `resolveAuthedEntryRoute(intent, accounts, storedAccountId)`:
+  `new_login`(로그인·가입) → 무조건 `mode_selection` (저장 선택은 **읽지도
+  않는다**); `session_restore`(스플래시) → 저장 계정이 여전히 소유 목록에 있을
+  때만 `home`, 아니면 `mode_selection`. "active season 자동 진입"은 어떤
+  경로에도 없다. `account_setup` route는 제거 — 계정 0개 상태도 ModeSelection이
+  같은 질문의 한 형태로 처리한다.
+- **`ModeSelectionScreen`** (root route `ModeSelection`,
+  `screens/entry/`). 순수 view-model `buildModeSelectionModel`이 §13 사용자
+  유형별 제공 옵션을 결정: 일반 투자(기존 계정 사용 or 명시적 시작), 시즌
+  계속하기(참가 중 + season active), 시즌 참가하기(effective active + 서버
+  미참가 + **소유 목록에 그 시즌 계정 없음** — 목록이 더 신선할 때 stale join
+  CTA 방지), 지난 시즌 계정(기록 보기 — 기본값이 되지 않는다). 시즌 조회 실패는
+  시즌 column만 막고(자체 재시도), 일반 투자는 계속 가능. mount/GET로 생성되는
+  것은 없다.
+- **일반계정 생성 플로우 단일화**
+  (`useOpenGeneralAccount` + `completeGeneralAccountOpen`). ModeSelection·
+  AccountSwitcher·AccountSetupPanel 세 곳이 같은 훅을 쓴다: press에서만 POST →
+  목록 refetch를 **await** → 서버가 돌려준 id 선택 → 그 다음에야 caller의
+  onOpened(네비게이션/시트 닫기). refetch 전에 선택하면 provider가 못 보는 id라
+  fallback이 다른 계정(= 시즌)에 착지한다 — 순서가 곧 정확성이다. `start()`는
+  in-flight 중 no-op, react-query v5가 onSuccess를 await하므로 `isPending`이
+  생성~선택 전 구간까지 버튼을 잠근다. 서버 idempotent(`created` 필드) 위에
+  이중 방어.
+- **AccountSwitcher에 "일반 투자 시작하기"** — general 미보유일 때만, 계정
+  row가 아닌 **action row**(dashed, 상태 badge·선택됨 없음, synthetic id 없음).
+  실패 시 시트 유지 + 전체 오류 문구 + 기존 시즌 row 계속 선택 가능.
+- **SeasonJoin 성공 시 새 시즌 계정을 명시적으로 선택.** 종전에는 목록
+  invalidate 후 `resetToHome`이라, stored 선택(예: general)이 이겨서 "참가
+  완료" 직후 일반 Home이 그려질 수 있었다. 이제 refetch 결과에서
+  `findAccountForSeason(list, joinedSeasonId)`로 찾아 선택한다.
+  `SEASON_ALREADY_JOINED`도 동일 (계정이 이미 있다는 뜻이므로).
+  ModeSelection→SeasonJoin은 push라 뒤로가기가 ModeSelection으로 돌아온다.
+- **Splash 오류 정책** (§5 D): 계정 목록/identity 조회 실패를 로그인 화면으로
+  던지지 않고 명시적 재시도 화면으로. 죽은 refresh token은 기존 session-expiry
+  teardown이 알아서 로그인으로 보낸다. inactive 분기는 종전 유지.
+
+#### 검증
+
+- frontend: `lint:accounts:check`(scope에 `src/screens/entry` 추가) ·
+  `typecheck` · `npm test` **510/510** · `export:web` 모두 통과.
+- 새 테스트: `entry.test.ts`(intent별 라우팅, 저장 선택 미독), `modeSelection.test.ts`
+  (§13 유형: season-only/general-only/both/none/past-only/excluded/stale-join),
+  `generalAccountOpen.test.ts`(refetch→select 순서, replay, 실패 시 무선택),
+  `entryScenarios.test.ts`(시나리오 A/B/C를 실제 함수 합성으로 — renderer가 없는
+  프로젝트에서 E2E에 가장 가까운 실행 형태), `accountLayout.test.ts`에
+  ModeSelection·switcher CTA 레이아웃 불변식 추가.
+- `legacyFinancialCalls` 가드의 `getCurrentSeason` allowlist에
+  `ModeSelectionScreen` 추가 — 가드가 명시적으로 허용하는 "may I join" 질문이고,
+  진입 route 결정은 여전히 시즌을 참조하지 않는다.
+- backend (무변경 확인 겸): `lint:accounts:check` · `lint:candles:check` ·
+  `typecheck` · `build` · `pnpm test` 2551 passed (33 suite는 env-gated skip) ·
+  `test:e2e` **126/126** (로컬 `.env.local`의 WebSocket streaming 플래그 2개만
+  CI와 동일하게 끄고 실행 — 알려진 env-driven readiness 차이, HANDOVER 2026-08-05
+  기록 참조).
+
+#### 주의사항
+
+- `refetchAccounts()`가 이제 refetch 결과(`{ data? }`)를 돌려준다 — join/생성
+  플로우가 "지금 provider가 그리는 목록"에서 새 계정을 찾기 위함이다.
+- 세션 복구의 Home 직행은 **저장 선택이 유효할 때만**이다. 저장이 없거나 무효면
+  ModeSelection이며, 그 화면에서 provider의 fallback 선택값은 화면 표시에
+  사용되지 않는다(금융 화면이 mount되지 않으므로 금융 query도 없다).
+- 일반계정 생성 후 다른 계정 캐시는 건드리지 않는다: invalidate 대상은
+  `tradingAccount.list` prefix뿐이다.
+
+---
+
 ### 작업 단위: 릴리스 E2E 복구 + 계정 전환 stale 응답·무결성 fail-closed 보완 (2026-08-05, 작업 11 보완, WORK-ID VIRTUAL-TRADING-ACCOUNT-UX-RELEASE-HARDENING-FIX-V1)
 
 **기준 커밋** `e8063c0e7a5148718544935dff639d47682a2f9f` (= 지시받은 기준이자
@@ -2448,6 +2540,31 @@ cd frontend && npm run typecheck && npm test
 ---
 
 ## 2. 최신 작업 시간순 기록
+
+### 2026-08-10 — 투자 모드 선택 진입 + 일반계정 접근 완성 (작업 13)
+
+- **새 로그인이 더 이상 계정을 대신 골라주지 않는다.** "계정 있음 → 즉시 Home"
+  + "fallback이 active season 우선"의 합성으로, 시즌계정만 가진 사용자는 항상
+  시즌 Home에 떨어졌고 일반 투자로 가는 문이 없었다. 이제 새 로그인은 무조건
+  `ModeSelection`(일반 투자 / 시즌 투자 선택 화면)에 착지하고, 저장된 선택은
+  읽지도 않는다. 세션 복구만 — 저장 계정이 여전히 소유 목록에 있을 때 — Home
+  직행이 가능하다.
+- **general account가 없어도 일반 투자가 항상 선택지다.** ModeSelection·
+  AccountSwitcher 시트("일반 투자 시작하기" action row)·AccountSetupPanel 세
+  곳이 하나의 훅(`useOpenGeneralAccount`)으로 기존 idempotent
+  `POST /trading-accounts/general`을 쓴다: press에서만 POST → 목록 refetch
+  await → **서버가 돌려준 id** 선택 → 그 다음 네비게이션. 신규 endpoint 없음,
+  GET side effect 없음, mount 생성 없음.
+- **SeasonJoin 성공이 새 시즌 계정을 선택한다.** 종전에는 stored 선택이 이겨서
+  참가 직후 일반 Home이 그려질 수 있었다. `SEASON_ALREADY_JOINED`도 동일하게
+  그 시즌 계정을 선택하고 Home으로 간다.
+- **Splash의 목록 조회 실패가 재시도 화면이 됐다** — 로그인으로 내쫓지도,
+  "계정 없음"으로 오판하지도 않는다.
+- frontend 전용 (backend 0줄, migration 없음). frontend
+  lint(+`src/screens/entry` scope)/typecheck/**510** tests/export:web 통과;
+  backend 게이트·2551 unit·e2e 126/126 재확인. 기준 `bce0c52c`의 hosted CI는
+  6 job 전부 성공 상태였고, push 자격증명이 이 환경에 없으면 새 커밋의 hosted
+  CI는 push 이후 확인해야 한다.
 
 ### 2026-08-05 (2차) — 릴리스 E2E 복구 + 계정 전환 stale 응답·무결성 fail-closed 보완 (작업 11 보완)
 

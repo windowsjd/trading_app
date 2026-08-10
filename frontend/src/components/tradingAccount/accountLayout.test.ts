@@ -124,6 +124,45 @@ describe('the styles long text depends on are present', () => {
     );
   });
 
+  it('AccountSwitcher: the start-general row wraps its copy and its error whole', () => {
+    const source = read('components/tradingAccount/AccountSwitcher.tsx');
+
+    // The action row reuses the wrapping text column; the trailing action
+    // (spinner or "시작") sits on the non-shrinking badge track.
+    assert.match(source, /startRow:\s*\{[^}]*flexDirection:\s*'row'/s);
+    assert.match(source, /startError:\s*\{[^}]*lineHeight/s);
+    // An offer, not an account: no synthetic id and no fake account row.
+    assert.match(source, /switcherStartGeneral/);
+    assert.ok(
+      !/switcherOption\(\s*['"`]/.test(source),
+      'the start CTA must not borrow a hard-coded account-row testID',
+    );
+  });
+
+  it('ModeSelectionScreen: every option wraps; the page scrolls', () => {
+    const source = read('screens/entry/ModeSelectionScreen.tsx');
+
+    // Centred while it fits, scrolling when it does not — same discipline as
+    // the setup panel: this is the first screen after login and its copy is
+    // long Korean sentences plus a user-supplied season name.
+    assert.match(source, /ScrollView/);
+    assert.match(source, /content:\s*\{[^}]*flexGrow:\s*1/s);
+    // The general card's title shares a row with the status badge: the title
+    // wraps, the badge never shrinks away.
+    assert.match(source, /cardHeaderTitle:\s*\{[^}]*flexShrink:\s*1/s);
+    assert.match(source, /badge:\s*\{[^}]*flexShrink:\s*0/s);
+    // Past-season rows: name wraps beside a non-shrinking action label.
+    assert.match(source, /pastRowText:\s*\{[^}]*minWidth:\s*0/s);
+    assert.match(source, /pastRowAction:\s*\{[^}]*flexShrink:\s*0/s);
+    // Errors and body copy carry lineHeight and are never clipped to a line.
+    assert.match(source, /errorText:\s*\{[^}]*lineHeight/s);
+    assert.match(source, /cardBody:\s*\{[^}]*lineHeight/s);
+    assert.ok(
+      !/numberOfLines=\{/.test(source),
+      'mode selection may not cut a season name or an error message',
+    );
+  });
+
   it('OrderScreen: the bound-account header wraps and keeps its badge', () => {
     const source = read('screens/order/OrderScreen.tsx');
 

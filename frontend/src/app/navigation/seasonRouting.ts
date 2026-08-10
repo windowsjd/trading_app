@@ -27,21 +27,19 @@ export function resetToHome(navigation: RootNavigationProp) {
   });
 }
 
-export function resetToSeasonJoin(navigation: RootNavigationProp) {
+/**
+ * Where EVERY fresh authentication lands (작업 13 §2): the screen that asks
+ * which investment mode this session is about — 일반 투자 or 시즌 투자.
+ *
+ * A reset, not a push: mode selection replaces the auth flow rather than
+ * stacking on it, so back does not return the user to a login form they have
+ * already passed. It also serves the "owns nothing yet" state — the screen
+ * offers opening a general account and joining a season — so there is no
+ * separate account-setup entry route any more.
+ */
+export function resetToModeSelection(navigation: RootNavigationProp) {
   navigation.reset({
     index: 0,
-    routes: [{ name: 'SeasonJoin' }],
+    routes: [{ name: 'ModeSelection' }],
   });
-}
-
-/**
- * Where a user with NO trading account lands (작업 11 §3.3).
- *
- * The same screen as season join, under the name that says what it is for. It
- * offers both ways to start — open a general account, or join a season if one
- * is open — and it is reached because the user owns nothing, never because the
- * server happens to have no active season.
- */
-export function resetToAccountSetup(navigation: RootNavigationProp) {
-  resetToSeasonJoin(navigation);
 }

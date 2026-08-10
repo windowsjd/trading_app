@@ -89,7 +89,7 @@ function isActive(account: SelectableAccount) {
  * "Most recently opened" (rule 4) still reaches those accounts — they are
  * readable history, just not the natural landing place.
  */
-function isParticipatingSeasonAccount(account: SelectableAccount) {
+export function isParticipatingSeasonAccount(account: SelectableAccount) {
   return (
     account.mode === 'season' &&
     isActive(account) &&
@@ -128,10 +128,37 @@ export function selectTradingAccountId(
   return { accountId: sorted[0].id, reason: 'most_recent' };
 }
 
-/** The order accounts are OFFERED in, which is not the selection order. */
-export function sortAccountsForDisplay(
+/**
+ * Whether this user has a general account AT ALL — any status. The server
+ * keeps one general account per user for life, so "none in the list" is the
+ * one and only state in which offering "일반 투자 시작하기" is honest; a
+ * closed or suspended general account is still THE general account and must be
+ * offered as itself, not as something to create again.
+ */
+export function hasGeneralAccount(
   accounts: readonly SelectableAccount[],
-): SelectableAccount[] {
+): boolean {
+  return accounts.some((account) => account.mode === 'general');
+}
+
+/**
+ * The owned account that belongs to ONE season — how a join flow finds the
+ * account it just created without a fabricated id: the list is refetched and
+ * the season named by the join answer is looked up in it.
+ */
+export function findAccountForSeason<A extends SelectableAccount>(
+  accounts: readonly A[],
+  seasonId: string,
+): A | null {
+  return (
+    accounts.find((account) => account.season?.seasonId === seasonId) ?? null
+  );
+}
+
+/** The order accounts are OFFERED in, which is not the selection order. */
+export function sortAccountsForDisplay<A extends SelectableAccount>(
+  accounts: readonly A[],
+): A[] {
   const rank = (account: SelectableAccount) => {
     if (isParticipatingSeasonAccount(account)) return 0;
     if (account.mode === 'general' && isActive(account)) return 1;

@@ -21,8 +21,15 @@ import {
   isAuthUserInactiveError,
 } from '../../services/api/errorMapper';
 
+type BootstrapError =
+  | { kind: 'inactive'; message: string }
+  | { kind: 'retryable' };
+
 export default function SplashScreen({ navigation }: SplashScreenProps) {
-  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const [bootstrapError, setBootstrapError] = useState<BootstrapError | null>(
+    null,
+  );
+  const [attempt, setAttempt] = useState(0);
   const queryClient = useQueryClient();
   const enterApp = useEnterApp();
 
@@ -30,15 +37,22 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
     let mounted = true;
 
     /**
-     * Session restore (작업 11 §3): token → identity → owned accounts → app.
+     * Session restore (작업 11 §3 · 작업 13 §2·§5): token → identity → owned
+     * accounts → app.
      *
-     * The current season is NOT consulted. A returning user with a general
-     * account is a user who can trade nothing but can read everything about
-     * their own account, and gating their re-entry on a season that may not
-     * exist put them on a join screen they had no business seeing.
+     * This is the ONE entry that may skip the mode-selection question: the
+     * user already answered it, and the stored per-user selection is that
+     * answer. `enterApp` with 'session_restore' keeps the stored account only
+     * while it is still owned; a missing or no-longer-owned selection lands on
+     * mode selection — never silently on the active season.
      *
-     * `me` is seeded into the cache from this call so the account provider does
-     * not repeat it one render later.
+     * A failure to read identity or accounts is NOT a routing signal: "we
+     * could not read" must not become "you own nothing" (or "you are logged
+     * out" while the tokens may be fine). Those failures stay here as an
+     * explicit retry. Only a missing token routes to login, and only an
+     * inactive account shows the terminal notice. A genuinely dead refresh
+     * token is handled by the session-expiry teardown, which resets to login
+     * on its own.
      */
     async function bootstrap() {
       try {
@@ -56,7 +70,7 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
         if (!mounted) return;
 
         queryClient.setQueryData(QUERY_KEYS.me, me);
-        await enterApp(me.id);
+        await enterApp(me.id, 'session_restore');
       } catch (error) {
         if (!mounted) return;
 
@@ -64,11 +78,14 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
 
         if (isAuthUserInactiveError(code)) {
           await clearTokens();
-          setBootstrapError(getErrorMessageFromCode(code));
+          setBootstrapError({
+            kind: 'inactive',
+            message: getErrorMessageFromCode(code),
+          });
           return;
         }
 
-        resetToLogin(navigation);
+        setBootstrapError({ kind: 'retryable' });
       }
     }
 
@@ -77,13 +94,26 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
     return () => {
       mounted = false;
     };
-  }, [enterApp, navigation, queryClient]);
+  }, [attempt, enterApp, navigation, queryClient]);
 
-  if (bootstrapError) {
+  if (bootstrapError?.kind === 'inactive') {
     return (
       <ErrorState
         title="계정을 사용할 수 없습니다."
-        message={bootstrapError}
+        message={bootstrapError.message}
+      />
+    );
+  }
+
+  if (bootstrapError?.kind === 'retryable') {
+    return (
+      <ErrorState
+        title="앱을 시작하지 못했습니다."
+        message="계정 정보를 불러오지 못했습니다. 네트워크 상태를 확인한 뒤 다시 시도해주세요."
+        onRetry={() => {
+          setBootstrapError(null);
+          setAttempt((current) => current + 1);
+        }}
       />
     );
   }

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  findAccountForSeason,
   selectTradingAccountId,
   sortAccountsForDisplay,
   type SelectableAccount,
@@ -257,6 +258,22 @@ describe('selection never prefers a season that is no longer running (작업 10 
       accountId: 's-live',
       reason: 'active_season',
     });
+  });
+});
+
+describe('findAccountForSeason — how a join flow finds the account it created', () => {
+  it('finds the owned account linked to the joined season', () => {
+    const s1 = seasonAccount('s1');
+    const accounts = [generalAccount('g1'), s1];
+
+    assert.equal(findAccountForSeason(accounts, 'season-of-s1'), s1);
+  });
+
+  it('answers null — never a fabricated id — when the list has no account for that season', () => {
+    assert.equal(
+      findAccountForSeason([generalAccount('g1')], 'season-of-s1'),
+      null,
+    );
   });
 });
 

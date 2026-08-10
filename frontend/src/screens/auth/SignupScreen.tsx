@@ -84,10 +84,10 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
       await beginSession(queryClient, result.user);
 
       try {
-        // Entry is decided by the accounts this user OWNS, not by whether a
-        // season is running (작업 11 §3). A user with a general account and no
-        // open season belongs in the app, not on the season screen.
-        await enterApp(result.user.id);
+        // A brand-new signup is a new login (작업 13 §2): the user chooses
+        // 일반 투자 or 시즌 투자 on the mode-selection screen — which also
+        // handles their "no accounts yet" state.
+        await enterApp(result.user.id, 'new_login');
       } catch (error) {
         const code = getApiErrorCode(error);
 

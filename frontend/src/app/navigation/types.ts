@@ -69,6 +69,12 @@ export type MainTabParamList = {
 export type RootStackParamList = {
   Splash: undefined;
   AuthStack: NavigatorScreenParams<AuthStackParamList> | undefined;
+  /**
+   * Every fresh authentication lands here to choose 일반 투자 vs 시즌 투자
+   * (작업 13 §2). Also serves the "owns no account yet" state, so there is no
+   * separate account-setup route.
+   */
+  ModeSelection: undefined;
   MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
   SeasonJoin: undefined;
 };
@@ -100,6 +106,8 @@ export type SignupScreenProps = NativeStackScreenProps<
 >;
 
 export type SeasonJoinScreenProps = RootScreenProps<'SeasonJoin'>;
+
+export type ModeSelectionScreenProps = RootScreenProps<'ModeSelection'>;
 
 export type HomeScreenProps = CompositeScreenProps<
   StackScreenProps<HomeStackParamList, 'Home'>,

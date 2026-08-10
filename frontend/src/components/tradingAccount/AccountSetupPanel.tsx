@@ -1,13 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import CTAButton from '../common/CTAButton';
-import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
-import { openGeneralAccount } from '../../features/tradingAccount/api';
-import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
-import { getApiErrorDisplayMessage } from '../../services/api/errorMapper';
+import { useOpenGeneralAccount } from '../../features/tradingAccount/useOpenGeneralAccount';
 
 /**
  * What a user with NO trading account sees (작업 11 §3.3).
@@ -48,27 +44,9 @@ export default function AccountSetupPanel({
   onOpened,
   seasonAction,
 }: Props) {
-  const queryClient = useQueryClient();
-  const { selectAccount } = useTradingAccount();
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const openMutation = useMutation({
-    mutationFn: openGeneralAccount,
-    onSuccess: async (result) => {
-      setErrorMessage(null);
-      // The list is the source of truth for what this user owns; refetch it
-      // before selecting so the selection lands on an account the provider can
-      // actually see.
-      await queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.tradingAccount.listAll,
-      });
-      selectAccount(result.account.id);
-      onOpened();
-    },
-    onError: (error: unknown) => {
-      setErrorMessage(getApiErrorDisplayMessage(error));
-    },
-  });
+  // The one shared open flow (작업 13 §7): POST on press only, refetch the
+  // list, select the returned account, then hand back to the caller.
+  const openGeneral = useOpenGeneralAccount({ onOpened });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -83,15 +61,12 @@ export default function AccountSetupPanel({
 
         <CTAButton
           label={
-            openMutation.isPending
+            openGeneral.isPending
               ? '계정을 여는 중입니다...'
               : '일반 투자 계정 시작하기'
           }
-          state={openMutation.isPending ? 'loading' : 'enabled'}
-          onPress={() => {
-            setErrorMessage(null);
-            openMutation.mutate();
-          }}
+          state={openGeneral.isPending ? 'loading' : 'enabled'}
+          onPress={openGeneral.start}
         />
         <Text style={styles.helper}>
           일반 투자 계정은 시즌과 무관하게 유지되며, 시간가중 수익률로 성과를
@@ -111,8 +86,8 @@ export default function AccountSetupPanel({
           </>
         ) : null}
 
-        {errorMessage ? (
-          <Text style={styles.error}>{errorMessage}</Text>
+        {openGeneral.errorMessage ? (
+          <Text style={styles.error}>{openGeneral.errorMessage}</Text>
         ) : null}
       </ScrollView>
     </SafeAreaView>

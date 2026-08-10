@@ -31,7 +31,7 @@
   "name": "LeagueOfTrading",
   "version": "1.0.0",
   "scripts": {
-    "lint:accounts:check": "eslint --no-fix --max-warnings=0 --no-warn-ignored --ignore-pattern \"**/*.test.ts\" src/features/auth src/features/tradingAccount src/features/record src/features/wallet src/app/AppProviders.tsx src/services/api/sessionExpiry.ts src/screens/auth src/screens/home src/screens/my src/screens/wallet/WalletFxScreen.tsx src/screens/order/OrderScreen.tsx src/screens/asset/AssetDetailScreen.tsx src/screens/record/RecordOrderListScreen.tsx src/components/tradingAccount src/components/common/CTAButton.tsx",
+    "lint:accounts:check": "eslint --no-fix --max-warnings=0 --no-warn-ignored --ignore-pattern \"**/*.test.ts\" src/features/auth src/features/tradingAccount src/features/record src/features/wallet src/app/AppProviders.tsx src/services/api/sessionExpiry.ts src/screens/auth src/screens/entry src/screens/home src/screens/my src/screens/wallet/WalletFxScreen.tsx src/screens/order/OrderScreen.tsx src/screens/asset/AssetDetailScreen.tsx src/screens/record/RecordOrderListScreen.tsx src/components/tradingAccount src/components/common/CTAButton.tsx",
     "typecheck": "tsc --noEmit",
     "test": "node --test 'src/**/*.test.ts'",
     "check": "npm run lint:accounts:check && npm run typecheck && npm run test",

@@ -18,6 +18,20 @@ export const TEST_IDS = {
     joinSubmit: 'season-join-submit',
   },
 
+  modeSelection: {
+    screen: 'mode-selection-screen',
+    generalUse: 'mode-selection-general-use',
+    generalStart: 'mode-selection-general-start',
+    generalError: 'mode-selection-general-error',
+    seasonContinue: (accountId: string) =>
+      `mode-selection-season-continue-${accountId}`,
+    seasonJoin: 'mode-selection-season-join',
+    seasonNone: 'mode-selection-season-none',
+    seasonError: 'mode-selection-season-error',
+    pastSeason: (accountId: string) =>
+      `mode-selection-past-season-${accountId}`,
+  },
+
   home: {
     screen: 'home-screen',
     summaryCard: 'home-summary-card',
@@ -153,6 +167,8 @@ export const TEST_IDS = {
     switcherEmpty: 'trading-account-switcher-empty',
     switcherOption: (accountId: string) =>
       `trading-account-switcher-option-${accountId}`,
+    switcherStartGeneral: 'trading-account-switcher-start-general',
+    switcherStartGeneralError: 'trading-account-switcher-start-general-error',
     integrityError: 'trading-account-integrity-error',
     capabilityNotice: 'trading-account-capability-notice',
     generalSummary: 'trading-account-general-summary',

@@ -11,6 +11,8 @@ import {
 import BottomSheetBackdrop from '../common/BottomSheetBackdrop';
 import { TEST_IDS } from '../../constants/testIds';
 import { getAccountDisplay } from '../../features/tradingAccount/accountDisplay';
+import { hasGeneralAccount } from '../../features/tradingAccount/modeSelection';
+import { useOpenGeneralAccount } from '../../features/tradingAccount/useOpenGeneralAccount';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import type { TradingAccountDto } from '../../features/tradingAccount/api';
 
@@ -53,6 +55,15 @@ export default function AccountSwitcher({ compact = false }: Props) {
     refetchAccounts,
   } = useTradingAccount();
   const [open, setOpen] = useState(false);
+
+  // First doorway to 일반 투자 for a user who only ever joined seasons
+  // (작업 13 §7): the sheet offers STARTING the general account when none
+  // exists. The row is an action, not an account — no synthetic id, no row
+  // pretending to be a selectable account, and nothing financial is read
+  // until the server has actually answered with the created account.
+  const startGeneral = useOpenGeneralAccount({
+    onOpened: () => setOpen(false),
+  });
 
   if (isLoading) {
     return (
@@ -153,6 +164,48 @@ export default function AccountSwitcher({ compact = false }: Props) {
                 }}
               />
             ))}
+
+            {!hasGeneralAccount(accounts) ? (
+              <View style={styles.startBox}>
+                <Pressable
+                  style={styles.startRow}
+                  onPress={startGeneral.start}
+                  disabled={startGeneral.isPending}
+                  accessibilityRole="button"
+                  accessibilityState={{ busy: startGeneral.isPending }}
+                  testID={TEST_IDS.tradingAccount.switcherStartGeneral}
+                >
+                  <View style={styles.rowTextColumn}>
+                    <Text style={styles.rowTitle}>일반 투자 시작하기</Text>
+                    <Text style={styles.rowSubtitle}>
+                      시즌과 무관하게 유지되는 일반 투자 계정을 새로 만듭니다.
+                      초기 자금 10,000,000원, 시간가중 수익률로 성과를
+                      측정합니다.
+                    </Text>
+                    <Text style={styles.rowMeaning}>
+                      매매와 환전 기능은 아직 준비 중입니다.
+                    </Text>
+                  </View>
+                  <View style={styles.rowBadgeColumn}>
+                    {startGeneral.isPending ? (
+                      <ActivityIndicator size="small" color="#1565c0" />
+                    ) : (
+                      <Text style={styles.startAction}>시작</Text>
+                    )}
+                  </View>
+                </Pressable>
+                {startGeneral.errorMessage ? (
+                  <Text
+                    style={styles.startError}
+                    testID={
+                      TEST_IDS.tradingAccount.switcherStartGeneralError
+                    }
+                  >
+                    {startGeneral.errorMessage}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
           </ScrollView>
         </View>
       </BottomSheetBackdrop>
@@ -285,4 +338,23 @@ const styles = StyleSheet.create({
 
   badge: { paddingVertical: 3, paddingHorizontal: 8, borderRadius: 999 },
   badgeText: { fontSize: 11, fontWeight: '700' },
+
+  // The start-general action: visually an offer, not an owned account —
+  // dashed border, no status badge, no "선택됨" state it could ever be in.
+  startBox: { marginBottom: 8 },
+  startRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#90caf9',
+    backgroundColor: '#f5faff',
+  },
+  startAction: { fontSize: 12, color: '#1565c0', fontWeight: '700' },
+  // Full message, wrapping: a Korean error must never be clipped to fit a row.
+  startError: { marginTop: 6, fontSize: 13, color: '#c62828', lineHeight: 20 },
 });

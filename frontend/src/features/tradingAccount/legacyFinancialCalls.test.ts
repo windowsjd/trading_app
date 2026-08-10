@@ -91,6 +91,11 @@ const CURRENT_SEASON_ALLOWLIST = new Set([
   'screens/season/SeasonJoinScreen.tsx',
   'screens/ranking/RankingScreen.tsx',
   'screens/record/RecordSeasonListScreen.tsx',
+  // Mode selection asks the ALLOWED question — "may this user join the current
+  // season?" — to decide whether to offer 시즌 참가하기. The entry ROUTE
+  // (home vs mode_selection, in features/auth/entry.ts) still never consults
+  // the season, and neither does any per-account capability.
+  'screens/entry/ModeSelectionScreen.tsx',
 ]);
 
 describe('current financial screens never call a legacy implicit-account API', () => {
