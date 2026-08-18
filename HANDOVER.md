@@ -12,11 +12,94 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 일반계정 매매 릴리스 하드닝 (2026-08-18, WORK-ID GENERAL-TRADING-RELEASE-HARDENING-V1)
+
+**시작 커밋** `1039eb6218971c545ebbc6821715eea70c5dc2fa`
+(parent `3be4b1e68b80bd3ff178bdec567dec012bc00213`; 작업 시작 시 `git fetch`
+완료, 로컬 HEAD = `origin/main`, working tree clean). 이 기록의 변경은 해당 커밋
+위 working tree에 있으며 최종 commit SHA는 커밋 후 `git log -1`로 확인한다.
+
+#### 목표와 변경 영역
+
+새 주문 기능이나 general 전용 엔진을 만들지 않고 직전 general market/limit 구현의
+릴리스 검증·운영 탐지·fee 결정론만 보강했다.
+
+- `.github/workflows/ci.yml`의 기존 `core-account-db-integration` job을 재사용했다.
+  job-level `GENERAL_TRADING_DB_INTEGRATION=1`과
+  `general-account-trading.integration.spec.ts`를 추가해 opt-in test가 skip되지 않게
+  했고, 새 read-only audit 손상 주입 spec도 같은 serial PostgreSQL 명령에 넣었다.
+  별도 job은 만들지 않았다. 두 suite 모두 기존 `test:db:prepare`가 migration deploy만
+  수행하고 고유 fixture를 정리하므로 fresh DB에서 다른 core-account suite와 함께
+  실행 가능하다.
+- `audit-general`의 기존 summary/finding 구조와 SELECT-only 구현을 확장했다. general
+  Order/Position/Quote의 participant pollution, durable quote 누락·order/quote account
+  mismatch, Position 예약 범위와 account+asset 중복, full-fill-only limit-sell 주문의
+  예약 증거, account+asset별 live sell 예약합과 `Position.reservedQuantity` 불일치를
+  보고한다. INSERT/UPDATE/DELETE, 자동 repair, 예약 재계산 writer는 추가하지 않았다.
+- general MARKET quote가 quote 당시 `GENERAL_TRADE_FEE_RATE`를 기존
+  `Quote.quotedFeeRate`에 기록하고 create/execute가 그 값을 사용한다. 가격은 기존
+  fresh provider execute-time repricing을 유지한다. rolling deploy 중 구버전이 만든
+  null-fee general market quote는 현재 env를 조용히 적용하지 않고 409
+  `QUOTE_MISMATCH`로 재견적한다. limit fee pinning과 season MARKET의
+  `Season.tradeFeeRate` 경로는 바꾸지 않았다. 기본값 `0.001000`도 그대로다.
+- Prisma migration/컬럼은 추가하지 않았다. schema의 `quotedFeeRate` 설명만 실제
+  market-general 사용과 맞췄고 Prisma client를 재생성했다. 정책/API/운영 문서와
+  backend 현재 상태 설명을 구현에 맞게 갱신했다.
+
+#### PostgreSQL 손상 주입과 회귀 검증
+
+`general-trading-audit.integration.spec.ts`는 두 정상 general account와 정상 submitted
+limit-sell 예약을 만든 뒤, production audit과 분리된 test fixture writer로 다음을
+하나씩 주입하고 원복한다: Order participant, Position participant, Quote participant,
+Order account를 다른 general account로 이동, Quote account를 다른 general account로
+이동, sell `reservedAmount` pollution, Position 예약수량 불일치. 각 손상은 대응 finding
+code와 findings > 0 / exit code 1을 만들었고, audit가 row를 수정하지 않음을 확인했다.
+전부 복원한 마지막 실행은 findings = 0 / exit code 0이다. 실제 개발 DB의
+`pnpm trading-accounts:audit-general`도 새 count 전체 0과 `No findings`를 출력했다.
+
+수정된 CI 두 suite 명령은 2 suites/2 tests 전부 실행·통과했다. 기존 데이터가 있는
+개발 DB에서 전체 core-account 명령을 재현하면 기존 migration-backfill suite의
+“general account 0개” precondition 때문에 13/14만 통과했으므로 이를 신규 회귀로
+오인하지 않았다. 별도 임시 fresh PostgreSQL database에 51 migrations를 적용해
+GitHub job과 동일한 환경/14-spec serial 명령을 다시 실행했고 14 suites/14 tests가
+모두 통과했다. 임시 database는 결과 확인 뒤 삭제했다. account scope/replay 2/2,
+matcher 1/1, reservation 1/1도 별도로 통과했다.
+
+최종 전체 검증은 Prisma format/validate/generate, migrate status(51개 up to date),
+migrate diff(no drift), account lint와 변경 production 주문/audit ESLint, typecheck,
+build가 모두 통과했다. backend unit은 183 suites/2,568 tests 통과, env-gated 35
+suites/39 tests skip이고 E2E는 126/126 통과했다. frontend는 코드를 변경하지 않았지만
+`npm run check`(lint/typecheck/38 tests)와 `npm run export:web`을 통과했다.
+
+#### 최종 자체 검토와 불변 범위
+
+- quote → create → execute를 다시 추적해 general fee source는 durable quote 하나,
+  execution price source는 fresh provider임을 확인했다. fee env를 0.001에서 0.002로
+  바꾼 뒤 실행해 order/응답/ledger가 quote 당시 0.001을 사용하고, null legacy quote는
+  재견적되는 PostgreSQL assertion을 추가했다.
+- CI 재현 중 KRX 장외 시간에는 `tsx -e` runner의 module 격리로 test-only calendar
+  override가 TWR valuation module까지 공유되지 않는 fixture 결함을 발견했다. 주문
+  quote/execute가 provider snapshot ID를 사용함을 명시 검증하고, 동일 가격의 test-only
+  admin fallback을 valuation에만 제공해 장외 실행을 결정론적으로 만들었다. 제품 가격
+  정책이나 season market gate는 변경하지 않았다.
+- limit buy cash / limit sell quantity 예약, cancel·matcher race, inactive general skip,
+  market sell available quantity, account/quote/order/position scope, TWR ordinary snapshot,
+  season matcher/ranking/settlement 입력 경로를 재검토했다. 주문·matcher·reservation
+  production 코어는 fee pinning 외에 재설계하지 않았고 general row는 season ranking과
+  settlement에 참여하지 않는다.
+- 의도적 제외: general FX와 KRW→USD 자동환전, 광고 provider 실제 연동, general
+  ranking/reward, 실제 거래소 주문, partial fill/order book/별도 matcher, 계정 간 이동.
+
+---
+
 ### 작업 단위: 일반계정 시장가·지정가 거래 공통 코어 활성화 (2026-08-18, WORK-ID GENERAL-ACCOUNT-TRADING-CORE-V1)
 
 **기준 커밋** `3be4b1e68b80bd3ff178bdec567dec012bc00213`
 (작업 시작 시 `origin/main` = 로컬 HEAD, `git fetch` 완료, working tree clean).
-이번 변경은 아직 커밋하지 않은 working tree 변경이다.
+이 작업은 수행 당시 working tree 변경이었고, 이후 commit
+`1039eb6218971c545ebbc6821715eea70c5dc2fa`로 main에 반영되었다(parent
+`3be4b1e68b80bd3ff178bdec567dec012bc00213`). 현재 uncommitted 작업이라는 뜻이
+아니다.
 
 #### 목표와 설계
 
@@ -2670,6 +2753,40 @@ cd frontend && npm run typecheck && npm test
 ---
 
 ## 2. 최신 작업 시간순 기록
+
+### 2026-08-18 — 일반계정 매매 릴리스 하드닝 (GENERAL-TRADING-RELEASE-HARDENING-V1)
+
+- 시작 SHA `1039eb6218971c545ebbc6821715eea70c5dc2fa`(parent `3be4b1e...`,
+  fetch 후 HEAD = origin/main, clean). 직전 general 거래 구현을 재설계하지 않고 CI,
+  read-only 운영 audit, market fee 결정론, 문서 정합성만 보완했다.
+- 기존 `core-account-db-integration` job에
+  `GENERAL_TRADING_DB_INTEGRATION=1`, general trading lifecycle spec, general trading
+  audit corruption spec을 추가했다. job-level env + 명시적 spec 경로이므로 둘 다 실제
+  실행되며, serial/fresh PostgreSQL 구조와 기존 migration drift gate를 재사용한다.
+  별도 CI job은 없다.
+- `audit-general`이 general Order/Position/Quote participant/account scope, durable
+  quote, Position reservation bounds/duplicate account+asset, submitted/terminal
+  full-fill-only sell reservation evidence, Position 예약합을 finding code와 row detail로
+  보고한다. test가 participant pollution 3종, order/quote account mismatch, sell
+  reservation pollution/mismatch를 직접 주입해 exit 1을 확인하고, 원복 후 findings 0 /
+  exit 0을 확인했다. production audit은 계속 SELECT-only이며 repair 기능이 없다.
+- general MARKET durable quote는 기본/설정 fee(`GENERAL_TRADE_FEE_RATE`, 기본
+  `0.001000`)를 `quotedFeeRate`에 pin한다. quote 뒤 env를 0.002로 바꿔도 실제
+  order/ledger/응답은 0.001을 쓰며 provider price는 execute-time reprice한다. 구버전
+  null-fee quote는 409 `QUOTE_MISMATCH` 재견적이다. season MARKET은 계속
+  `Season.tradeFeeRate`, limit은 기존 pinned reservation fee를 사용한다.
+- 수정 CI 두 spec은 2/2 통과했고, fresh 임시 PostgreSQL에 51 migrations 적용 후
+  전체 core-account CI 명령 14 suites/14 tests 통과했다(기존 데이터가 있는 개발 DB의
+  최초 13/14 결과는 migration-backfill suite의 global general-count precondition 때문).
+  account scope/replay 2/2, matcher 1/1, reservation 1/1, backend unit 2568 pass/39
+  skip, E2E 126/126도 확인했다. Prisma/account lint/production ESLint/typecheck/build와
+  migration status/drift도 통과했고, frontend check 38/38 및 export:web도 통과했다.
+  실제 audit CLI는 새 count 전체 0과 `No findings`였다.
+- 최종 review에서 장외 KRX 통합 fixture가 `tsx -e` module 격리 때문에 TWR 쪽
+  test-only override를 보지 못하는 문제를 발견했다. order의 provider snapshot 사용을
+  assertion으로 고정하고 valuation에 동일 가격 test fallback만 추가해 결정론화했다.
+  제품 market/season 정책은 바꾸지 않았다. general FX/자동환전, 광고 provider,
+  general ranking/reward, 실제 주문, partial fill/order book은 계속 제외한다.
 
 ### 2026-08-18 — 일반계정 시장가·지정가 거래 공통 코어 활성화
 

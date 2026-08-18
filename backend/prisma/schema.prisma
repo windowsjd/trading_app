@@ -1104,10 +1104,11 @@ model Quote {
   currencyCode         CurrencyCode? @map("currency_code")
   quotedPrice          Decimal?      @map("quoted_price") @db.Decimal(24, 8)
   quotedRate           Decimal?      @map("quoted_rate") @db.Decimal(18, 8)
-  // Limit-order fee basis pinned AT QUOTE TIME (null on market/FX quotes).
-  // Buy create reserves quotedReservedAmount; sell create reserves quantity
-  // and uses quotedNetAmount as estimated proceeds. A fee policy change
-  // between quote and create cannot move the quoted result.
+  // Fee basis pinned AT QUOTE TIME for limit orders and general market orders
+  // (season market / FX quotes remain null). Limit-buy create reserves
+  // quotedReservedAmount; limit-sell create reserves quantity and uses
+  // quotedNetAmount. General market price still reprices at execute, while the
+  // fee rate stays fixed across rolling deploy/config changes.
   quotedFeeRate        Decimal?      @map("quoted_fee_rate") @db.Decimal(10, 6)
   quotedGrossAmount    Decimal?      @map("quoted_gross_amount") @db.Decimal(24, 8)
   quotedFeeAmount      Decimal?      @map("quoted_fee_amount") @db.Decimal(24, 8)

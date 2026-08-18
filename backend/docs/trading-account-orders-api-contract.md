@@ -49,7 +49,11 @@ See `frontend/docs/trading-account-switching.md`.
 - The common calculation core receives `feeRate` from the validated context:
   season uses `Season.tradeFeeRate`; general uses the independent
   `GENERAL_TRADE_FEE_RATE` config (default `0.001000`). General never reads the
-  current season to obtain a fee.
+  current season to obtain a fee. A general MARKET durable quote stores that
+  resolved rate in `Quote.quotedFeeRate`; create and immediate execution reuse
+  the stored rate even if another instance now has a different config. Provider
+  price still follows execute-time repricing. A legacy general market quote
+  with null `quotedFeeRate` fails 409 `QUOTE_MISMATCH` and must be requoted.
 - Season-account read integrity: if the linked participant still owns
   orders (order routes) or positions (position routes) whose
   `tradingAccountId` is NULL or points at a different account, the read
@@ -200,8 +204,9 @@ Quote rows persist the verified `tradingAccountId`. General quotes always have
 `seasonParticipantId=null`; season quotes retain their participant. Create and
 execute reject a different account (409 `QUOTE_MISMATCH`). NULL-account legacy
 quotes remain consumable only on the season path and stay participant/hash
-pinned. General request hashes include `tradingAccountId`; legacy season hash
-material is unchanged.
+pinned. General MARKET quotes additionally pin `quotedFeeRate`; only price is
+re-resolved at execution. General request hashes include `tradingAccountId`;
+legacy season hash material is unchanged.
 
 ## Positions
 

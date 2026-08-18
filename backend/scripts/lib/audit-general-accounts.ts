@@ -32,6 +32,9 @@ import type { PrismaClient } from '../../src/generated/prisma/client';
  *    after-total) reported on its own, general daily rows polluted with a
  *    participant or missing performance columns, and daily rows written to a
  *    closed general account
+ *  - general Order/Position/Quote participant and account-scope pollution,
+ *    missing durable quotes, invalid sell-side reservation evidence, invalid
+ *    Position reservation bounds, and account+asset reservation mismatches
  */
 
 export const GENERAL_ACCOUNT_INITIAL_CAPITAL_KRW = '10000000.00000000';
@@ -58,6 +61,16 @@ export type GeneralAccountAuditSummary = {
   claimLedgerAmountMismatches: number;
   adRewardLedgerRowsWithoutClaim: number;
   duplicateProviderEventGroups: number;
+  // ---- general trading checks ----
+  generalOrdersWithSeasonParticipant: number;
+  generalOrdersWithoutDurableQuote: number;
+  generalOrderQuoteAccountMismatches: number;
+  generalPositionsWithSeasonParticipant: number;
+  generalPositionsWithInvalidReservation: number;
+  duplicateGeneralPositionAccountAssetGroups: number;
+  generalQuotesWithSeasonParticipant: number;
+  invalidGeneralSellReservations: number;
+  generalPositionReservationMismatches: number;
   // ---- 작업 7 performance checks ----
   accountsWithoutPerformanceOrigin: number;
   accountsWithDuplicatePerformanceOrigin: number;
@@ -325,6 +338,8 @@ export async function auditGeneralAccounts(
     );
   }
 
+  const trading = await auditGeneralTrading(prisma, add);
+
   // ------------------------------------------------------------ 작업 7
   const performance = await auditGeneralPerformance(prisma, add);
 
@@ -344,8 +359,233 @@ export async function auditGeneralAccounts(
     claimLedgerAmountMismatches,
     adRewardLedgerRowsWithoutClaim,
     duplicateProviderEventGroups,
+    ...trading,
     ...performance,
     findings,
+  };
+}
+
+type TradingAuditRow = {
+  id: string;
+  tradingAccountId: string | null;
+  detail: string;
+};
+
+/**
+ * General trading audit. Every query is SELECT-only and mirrors invariants
+ * enforced by assertGeneralAccountTradingRowsIntegrity plus the current
+ * full-fill-only limit-sell reservation lifecycle.
+ */
+async function auditGeneralTrading(
+  prisma: PrismaClient,
+  add: (code: string, tradingAccountId: string | null, detail: string) => void,
+) {
+  const reportRows = (rows: TradingAuditRow[], code: string): number => {
+    for (const row of rows) {
+      add(code, row.tradingAccountId, `${row.id}: ${row.detail}`);
+    }
+    return rows.length;
+  };
+
+  const generalOrdersWithSeasonParticipant = reportRows(
+    await prisma.$queryRaw<TradingAuditRow[]>`
+      SELECT
+        o."id",
+        coalesce(o."trading_account_id", q."trading_account_id") AS "tradingAccountId",
+        'seasonParticipantId=' || o."season_participant_id" AS "detail"
+      FROM "orders" o
+      LEFT JOIN "quotes" q ON q."id" = o."quote_id"
+      LEFT JOIN "trading_accounts" oa ON oa."id" = o."trading_account_id"
+      LEFT JOIN "trading_accounts" qa ON qa."id" = q."trading_account_id"
+      WHERE o."season_participant_id" IS NOT NULL
+        AND (oa."mode" = 'general' OR qa."mode" = 'general')
+      ORDER BY o."id"
+    `,
+    'GENERAL_ORDER_HAS_SEASON_PARTICIPANT',
+  );
+
+  const generalOrdersWithoutDurableQuote = reportRows(
+    await prisma.$queryRaw<TradingAuditRow[]>`
+      SELECT
+        o."id",
+        o."trading_account_id" AS "tradingAccountId",
+        'durable quote is missing' AS "detail"
+      FROM "orders" o
+      JOIN "trading_accounts" a ON a."id" = o."trading_account_id"
+      LEFT JOIN "quotes" q ON q."id" = o."quote_id"
+      WHERE a."mode" = 'general'
+        AND (o."quote_id" IS NULL OR q."id" IS NULL)
+      ORDER BY o."id"
+    `,
+    'GENERAL_ORDER_DURABLE_QUOTE_MISSING',
+  );
+
+  const generalOrderQuoteAccountMismatches = reportRows(
+    await prisma.$queryRaw<TradingAuditRow[]>`
+      SELECT
+        o."id",
+        coalesce(o."trading_account_id", q."trading_account_id") AS "tradingAccountId",
+        'orderAccount=' || coalesce(o."trading_account_id", 'null')
+          || ', quote=' || coalesce(q."id", 'null')
+          || ', quoteAccount=' || coalesce(q."trading_account_id", 'null') AS "detail"
+      FROM "orders" o
+      JOIN "quotes" q ON q."id" = o."quote_id"
+      LEFT JOIN "trading_accounts" oa ON oa."id" = o."trading_account_id"
+      LEFT JOIN "trading_accounts" qa ON qa."id" = q."trading_account_id"
+      WHERE (oa."mode" = 'general' OR qa."mode" = 'general')
+        AND q."trading_account_id" IS DISTINCT FROM o."trading_account_id"
+      ORDER BY o."id"
+    `,
+    'GENERAL_ORDER_QUOTE_ACCOUNT_MISMATCH',
+  );
+
+  const generalPositionsWithSeasonParticipant = reportRows(
+    await prisma.$queryRaw<TradingAuditRow[]>`
+      SELECT
+        p."id",
+        p."trading_account_id" AS "tradingAccountId",
+        'seasonParticipantId=' || p."season_participant_id" AS "detail"
+      FROM "positions" p
+      JOIN "trading_accounts" a ON a."id" = p."trading_account_id"
+      WHERE a."mode" = 'general'
+        AND p."season_participant_id" IS NOT NULL
+      ORDER BY p."id"
+    `,
+    'GENERAL_POSITION_HAS_SEASON_PARTICIPANT',
+  );
+
+  const generalPositionsWithInvalidReservation = reportRows(
+    await prisma.$queryRaw<TradingAuditRow[]>`
+      SELECT
+        p."id",
+        p."trading_account_id" AS "tradingAccountId",
+        'quantity=' || p."quantity"::text
+          || ', reservedQuantity=' || p."reserved_quantity"::text AS "detail"
+      FROM "positions" p
+      JOIN "trading_accounts" a ON a."id" = p."trading_account_id"
+      WHERE a."mode" = 'general'
+        AND (p."reserved_quantity" < 0 OR p."reserved_quantity" > p."quantity")
+      ORDER BY p."id"
+    `,
+    'GENERAL_POSITION_RESERVATION_INVALID',
+  );
+
+  const duplicateGeneralPositionAccountAssetGroups = reportRows(
+    await prisma.$queryRaw<TradingAuditRow[]>`
+      SELECT
+        min(p."id") AS "id",
+        p."trading_account_id" AS "tradingAccountId",
+        'assetId=' || p."asset_id" || ', rows=' || count(*)::text AS "detail"
+      FROM "positions" p
+      JOIN "trading_accounts" a ON a."id" = p."trading_account_id"
+      WHERE a."mode" = 'general'
+      GROUP BY p."trading_account_id", p."asset_id"
+      HAVING count(*) > 1
+      ORDER BY p."trading_account_id", p."asset_id"
+    `,
+    'GENERAL_POSITION_ACCOUNT_ASSET_DUPLICATE',
+  );
+
+  const generalQuotesWithSeasonParticipant = reportRows(
+    await prisma.$queryRaw<TradingAuditRow[]>`
+      SELECT
+        q."id",
+        coalesce(q."trading_account_id", o."trading_account_id") AS "tradingAccountId",
+        'seasonParticipantId=' || q."season_participant_id" AS "detail"
+      FROM "quotes" q
+      LEFT JOIN "orders" o ON o."quote_id" = q."id"
+      LEFT JOIN "trading_accounts" qa ON qa."id" = q."trading_account_id"
+      LEFT JOIN "trading_accounts" oa ON oa."id" = o."trading_account_id"
+      WHERE q."season_participant_id" IS NOT NULL
+        AND (qa."mode" = 'general' OR oa."mode" = 'general')
+      ORDER BY q."id"
+    `,
+    'GENERAL_QUOTE_HAS_SEASON_PARTICIPANT',
+  );
+
+  const invalidGeneralSellReservations = reportRows(
+    await prisma.$queryRaw<TradingAuditRow[]>`
+      SELECT
+        o."id",
+        o."trading_account_id" AS "tradingAccountId",
+        'status=' || o."status"::text
+          || ', quantity=' || o."quantity"::text
+          || ', reservedQuantity=' || coalesce(o."reserved_quantity"::text, 'null')
+          || ', reservedAmount=' || coalesce(o."reserved_amount"::text, 'null')
+          || ', releasedAt=' || coalesce(o."reservation_released_at"::text, 'null') AS "detail"
+      FROM "orders" o
+      JOIN "trading_accounts" a ON a."id" = o."trading_account_id"
+      WHERE a."mode" = 'general'
+        AND o."order_type" = 'limit'
+        AND o."side" = 'sell'
+        AND (
+          (
+            o."status" = 'submitted'
+            AND (
+              o."reserved_quantity" IS NULL
+              OR o."reserved_quantity" <= 0
+              OR o."reserved_quantity" IS DISTINCT FROM o."quantity"
+              OR o."reserved_amount" IS NOT NULL
+              OR o."reservation_released_at" IS NOT NULL
+            )
+          )
+          OR (
+            o."status" IN ('executed', 'canceled')
+            AND o."reservation_released_at" IS NULL
+          )
+        )
+      ORDER BY o."id"
+    `,
+    'GENERAL_LIMIT_SELL_RESERVATION_INVALID',
+  );
+
+  const generalPositionReservationMismatches = reportRows(
+    await prisma.$queryRaw<TradingAuditRow[]>`
+      WITH live_sell AS (
+        SELECT
+          o."trading_account_id" AS account_id,
+          o."asset_id" AS asset_id,
+          coalesce(sum(o."reserved_quantity"), 0) AS reserved_quantity
+        FROM "orders" o
+        JOIN "trading_accounts" a ON a."id" = o."trading_account_id"
+        WHERE a."mode" = 'general'
+          AND o."order_type" = 'limit'
+          AND o."side" = 'sell'
+          AND o."status" = 'submitted'
+        GROUP BY o."trading_account_id", o."asset_id"
+      ),
+      general_position AS (
+        SELECT p."id", p."trading_account_id", p."asset_id", p."reserved_quantity"
+        FROM "positions" p
+        JOIN "trading_accounts" a ON a."id" = p."trading_account_id"
+        WHERE a."mode" = 'general'
+      )
+      SELECT
+        coalesce(p."id", 'missing-position:' || l.account_id || ':' || l.asset_id) AS "id",
+        coalesce(p."trading_account_id", l.account_id) AS "tradingAccountId",
+        'assetId=' || coalesce(p."asset_id", l.asset_id)
+          || ', positionReserved=' || coalesce(p."reserved_quantity", 0)::text
+          || ', liveSellReserved=' || coalesce(l.reserved_quantity, 0)::text AS "detail"
+      FROM general_position p
+      FULL OUTER JOIN live_sell l
+        ON l.account_id = p."trading_account_id" AND l.asset_id = p."asset_id"
+      WHERE coalesce(p."reserved_quantity", 0)
+        IS DISTINCT FROM coalesce(l.reserved_quantity, 0)
+      ORDER BY "tradingAccountId", "id"
+    `,
+    'GENERAL_POSITION_RESERVATION_MISMATCH',
+  );
+
+  return {
+    generalOrdersWithSeasonParticipant,
+    generalOrdersWithoutDurableQuote,
+    generalOrderQuoteAccountMismatches,
+    generalPositionsWithSeasonParticipant,
+    generalPositionsWithInvalidReservation,
+    duplicateGeneralPositionAccountAssetGroups,
+    generalQuotesWithSeasonParticipant,
+    invalidGeneralSellReservations,
+    generalPositionReservationMismatches,
   };
 }
 

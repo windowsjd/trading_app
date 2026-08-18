@@ -177,6 +177,8 @@ OpsJobLockService + ops_job_locks다(Redis lock 아님). 실제 거래소 주문
   근거: 기존 시즌 관계를 보존하면서 일반계정 데이터를 participant 없이 완전히 분리해야 한다.
 - 주문 코어는 검증된 `TradingContext`의 `feeRate`를 사용한다. 시즌은 `Season.tradeFeeRate`, 일반은 한 곳의 `GENERAL_TRADE_FEE_RATE`(미설정 기본 `0.001000`)를 사용하며 현재 시즌에서 일반 수수료를 가져오지 않는다.
   근거: 일반계정은 시즌 존재/상태와 독립적으로 거래해야 하고, 수수료 숫자가 주문 경로에 분산되면 quote/create/fill 사이에 불일치가 생긴다. 저장소에 별도 general canonical 값은 없었으므로, 기존 season/dev fixture가 일관되게 쓰는 가상거래 0.1%를 독립 기본값으로 채택했고 운영 override도 이 한 config만 사용한다.
+- general 시장가 durable quote는 quote 시점의 `GENERAL_TRADE_FEE_RATE`를 기존 `Quote.quotedFeeRate`에 고정하고 create/execute가 그 값을 사용한다. provider 가격은 기존처럼 execute-time repricing한다. 구버전의 null fee general market quote는 현재 config를 조용히 적용하지 않고 409 `QUOTE_MISMATCH`로 재견적한다. 시즌 시장가는 계속 `Season.tradeFeeRate`를 사용한다.
+  근거: rolling deployment/config 변경 사이에도 사용자에게 제시한 fee와 실제 주문·원장 fee가 같아야 하지만, fresh provider price와 max-change 보호는 유지해야 한다.
 - 사용자당 general 계정은 최대 1개이며 DB partial unique index(`trading_accounts_general_owner_unique`, `WHERE mode='general'`)로 강제한다. `@@unique([userId, mode])`는 사용하지 않는다.
   근거: 시즌 계정은 시즌마다 여러 개가 정상이므로 composite unique로는 표현할 수 없다.
 - 일반모드 최초 가상자금은 계정 최초 생성 시 10,000,000 KRW 1회 지급뿐이다. 월별/가입일 기준/스케줄러 정기 지급과 grantAnchorDay·nextGrantAt류 필드는 폐기·금지한다. 소진 시 자동 재지급·계정 초기화도 없다.
@@ -280,7 +282,7 @@ OpsJobLockService + ops_job_locks다(Redis lock 아님). 실제 거래소 주문
   근거: "나중에 한도가 풀리면 지급"은 이벤트 저장 후 재사용 공격을 허용하고, 거절 기록이 rollback 되면 같은 이벤트가 다음 날 다시 지급된다.
 - 누적 광고 보상금은 granted claim 또는 `ad_reward` 원장의 집계로 계산한다. `cumulativeAdReward`·`cumulativeExternalFunding`·`totalDeposits`·`currentProfit`·`currentReturnRate`·`twr` 컬럼은 만들지 않는다.
   근거: 캐시된 금융 집계는 원장과 어긋나는 순간 어느 쪽이 진실인지 판정할 수 없다.
-- 일반계정 운영 점검 `pnpm trading-accounts:audit-general`은 read-only 전용이며 `--apply` 복구를 만들지 않는다.
+- 일반계정 운영 점검 `pnpm trading-accounts:audit-general`은 read-only 전용이며 `--apply` 복구를 만들지 않는다. foundation/wallet/ledger/TWR뿐 아니라 general Order/Position/Quote scope와 full-fill-only limit-sell 예약 증거, Position 예약합계도 탐지·보고만 한다.
   근거: 손상된 계정을 자동으로 다시 충전하는 스크립트는 실수 한 번으로 전 사용자에게 자금을 재지급한다.
 
 

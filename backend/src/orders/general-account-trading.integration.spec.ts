@@ -24,9 +24,11 @@ describe('General account trading DB integration', () => {
       );
       if (prepare.status !== 0) {
         throw new Error(
-          ['General trading DB prepare failed.', prepare.stdout, prepare.stderr].join(
-            '\n',
-          ),
+          [
+            'General trading DB prepare failed.',
+            prepare.stdout,
+            prepare.stderr,
+          ].join('\n'),
         );
       }
 
@@ -256,6 +258,7 @@ async function price(
   currencyCode = CurrencyCode.USD,
   sourceName = 'binance_public_rest_24hr_ticker',
 ) {
+  const observedAt = new Date(Date.now() - 1_000);
   return prisma.assetPriceSnapshot.create({
     data: {
       assetId,
@@ -263,14 +266,15 @@ async function price(
       currencyCode,
       sourceType: AssetPriceSourceType.provider_api,
       sourceName,
-      effectiveAt: new Date(),
-      capturedAt: new Date(),
+      effectiveAt: observedAt,
+      capturedAt: observedAt,
     },
     select: { id: true },
   });
 }
 
 async function freshUsdKrwRate() {
+  const observedAt = new Date(Date.now() - 1_000);
   const row = await prisma.fxRateSnapshot.create({
     data: {
       baseCurrency: CurrencyCode.USD,
@@ -278,8 +282,8 @@ async function freshUsdKrwRate() {
       rate: '1400.00000000',
       sourceType: AssetPriceSourceType.provider_api,
       sourceName: 'exchange_rate_api',
-      effectiveAt: new Date(),
-      capturedAt: new Date(),
+      effectiveAt: observedAt,
+      capturedAt: observedAt,
     },
     select: { id: true },
   });
@@ -443,21 +447,77 @@ async function main() {
   // Explicit required scenario: a general account buys a domestic stock from
   // its existing KRW wallet and writes account-only order/ledger/position/TWR.
   const domesticAssetId = await createDomesticAsset();
-  await price(
+  const domesticProviderSnapshot = await price(
     domesticAssetId,
     '70000.00000000',
     CurrencyCode.KRW,
     'kis_krx_realtime_trade',
   );
-  const domesticBuy = await market(
+  // The runner is compiled from an eval module, so its test-only in-memory
+  // market-session override is not shared with every tsx dependency module.
+  // Keep valuation deterministic outside real KRX hours with the same-price
+  // admin fallback; order quote/execute still prove provider_api selection.
+  const domesticFallbackAt = new Date(Date.now() - 1_000);
+  await prisma.assetPriceSnapshot.create({
+    data: {
+      assetId: domesticAssetId,
+      price: '70000.00000000',
+      currencyCode: CurrencyCode.KRW,
+      sourceType: AssetPriceSourceType.admin_manual,
+      sourceName: 'general-trading-integration-fallback',
+      effectiveAt: domesticFallbackAt,
+      capturedAt: domesticFallbackAt,
+    },
+  });
+  const domesticRequest = {
+    assetId: domesticAssetId,
+    side: 'buy',
+    orderType: 'market',
+    quantity: '10.000000',
+  };
+  const domesticQuote = await orders.quoteOrderForTradingAccount(
     userId,
     accountId,
-    domesticAssetId,
-    'buy',
-    '10.000000',
-    'domestic-buy-' + randomUUID(),
+    domesticRequest,
   );
+  assert.equal(domesticQuote.data.feeRate, '0.001000');
+  const storedDomesticQuote = await prisma.quote.findUniqueOrThrow({
+    where: { id: domesticQuote.data.quoteId },
+  });
+  assert.equal(
+    storedDomesticQuote.assetPriceSnapshotId,
+    domesticProviderSnapshot.id,
+  );
+  assert.equal(storedDomesticQuote.quotedFeeRate?.toFixed(6), '0.001000');
+
+  // A rolling deployment/config change after quote must not change the fill:
+  // fee is pinned, while provider price keeps its execute-time repricing.
+  process.env.GENERAL_TRADE_FEE_RATE = '0.002000';
+  const domesticIdempotencyKey = 'domestic-fee-pinned-' + randomUUID();
+  let domesticBuy;
+  try {
+    domesticBuy = {
+      body: {
+        ...domesticRequest,
+        quoteId: domesticQuote.data.quoteId,
+        idempotencyKey: domesticIdempotencyKey,
+      },
+      response: await orders.createOrderForTradingAccount(
+        userId,
+        accountId,
+        {
+          ...domesticRequest,
+          quoteId: domesticQuote.data.quoteId,
+          idempotencyKey: domesticIdempotencyKey,
+        },
+      ),
+    };
+  } finally {
+    process.env.GENERAL_TRADE_FEE_RATE = '0.001000';
+  }
   const domesticOrderId = domesticBuy.response.data.order.orderId;
+  assert.equal(domesticBuy.response.data.order.feeAmount, '700.00000000');
+  assert.equal(domesticBuy.response.data.order.netAmount, '700700.00000000');
   const domesticOrder = await prisma.order.findUniqueOrThrow({
     where: { id: domesticOrderId },
   });
@@ -488,6 +548,28 @@ async function main() {
     where: { tradingAccountId: accountId, referenceId: domesticOrderId },
   });
   assert.equal(domesticLedger.seasonParticipantId, null);
+  assert.equal(text(domesticLedger.amount), '700700.00000000');
+
+  // A quote minted by the previous version has no general market fee pin.
+  // The new server must require a requote instead of silently reading env.
+  const legacyMarketQuote = await orders.quoteOrderForTradingAccount(
+    userId,
+    accountId,
+    { ...domesticRequest, quantity: '1.000000' },
+  );
+  await prisma.quote.update({
+    where: { id: legacyMarketQuote.data.quoteId },
+    data: { quotedFeeRate: null },
+  });
+  await expectCode(
+    orders.createOrderForTradingAccount(userId, accountId, {
+      ...domesticRequest,
+      quantity: '1.000000',
+      quoteId: legacyMarketQuote.data.quoteId,
+      idempotencyKey: 'legacy-null-fee-' + randomUUID(),
+    }),
+    'QUOTE_MISMATCH',
+  );
   resetMarketSessionOverrideStoreForTest();
 
   const closedMarket = naturallyClosedMarket;

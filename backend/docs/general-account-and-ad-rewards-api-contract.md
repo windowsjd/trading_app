@@ -452,7 +452,11 @@ account counts, attached participants, missing/duplicate wallets, general
 wallets or ledger rows carrying a participant link, missing/duplicate/
 wrong-amount initial grants, wrong `initialCapitalKrw`, granted claims with no
 ledger row, claim↔ledger mismatches, `ad_reward` rows with no claim, and
-duplicate provider events. Exit code 1 when anything is found.
+duplicate provider events. It also reports general Order/Position/Quote
+participant pollution, missing/mismatched durable quote scope, invalid
+limit-sell reservation evidence, invalid Position reservation bounds, duplicate
+account+asset positions, and Position reservation totals that disagree with
+live submitted limit-sell orders. Exit code 1 when anything is found.
 
 There is deliberately **no `--apply`**: automatic financial correction of
 damaged data is more dangerous than the damage. Damaged general accounts are
@@ -484,8 +488,11 @@ The legacy `GET /api/v1/portfolio` and `GET /api/v1/portfolio/equity` are
 UNCHANGED (current-season selection, response shape, range meaning), and no
 season calculation, ranking, or settlement behavior was altered.
 
-NOT implemented (still): general-mode orders / FX / positions, the general
-DAILY snapshot job, SeasonRanking's account transition, and any frontend.
+The later shared TradingAccount order work implements general market/limit
+orders and account-scoped positions; the general daily snapshot job,
+SeasonRanking account transition, and account-aware frontend are also now
+implemented. Still not implemented here: general FX, general ranking/rewards,
+or a real ad-provider adapter.
 
 ## Ad reward command idempotency (작업 6 보완 1)
 

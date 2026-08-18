@@ -416,6 +416,7 @@ type OrderExecutionRecord = {
     limitPrice: Prisma.Decimal | null;
     currencyCode: CurrencyCode | null;
     quotedPrice: Prisma.Decimal | null;
+    quotedFeeRate: Prisma.Decimal | null;
     quotedRate: Prisma.Decimal | null;
     maxChangeBps: Prisma.Decimal;
     expiresAt: Date;
@@ -535,6 +536,7 @@ const ORDER_EXECUTION_SELECT = {
       limitPrice: true,
       currencyCode: true,
       quotedPrice: true,
+      quotedFeeRate: true,
       quotedRate: true,
       maxChangeBps: true,
       expiresAt: true,
@@ -1306,13 +1308,18 @@ export class OrdersService {
         });
         this.assertOrderAssetTradable(quote.asset, effectiveSubmittedAt);
 
+        const tradeFeeRate = this.resolveMarketOrderFeeRate({
+          mode: input.context.mode,
+          quotedFeeRate: quote.quotedFeeRate,
+          currentFeeRate: input.context.feeRate,
+        });
         const price = roundDecimalHalfUp(quote.quotedPrice, monetaryScale);
         const grossAmount = roundDecimalHalfUp(
           request.quantity.mul(price),
           monetaryScale,
         );
         const feeAmount = roundDecimalHalfUp(
-          grossAmount.mul(input.context.feeRate),
+          grossAmount.mul(tradeFeeRate),
           monetaryScale,
         );
         const netAmount =
@@ -2478,16 +2485,18 @@ export class OrdersService {
       quote,
       executedAt,
     );
-    const tradeFeeRate = roundDecimalHalfUp(
-      order.tradingAccount?.mode === TradingAccountMode.general
-        ? readGeneralTradeFeeRate()
-        : (order.seasonParticipant?.season.tradeFeeRate ??
-            this.throwTradingScopeIntegrityError(
+    const tradeFeeRate = this.resolveMarketOrderFeeRate({
+      mode: order.tradingAccount?.mode,
+      quotedFeeRate: quote.quotedFeeRate,
+      currentFeeRate:
+        order.seasonParticipant?.season.tradeFeeRate ??
+        (order.tradingAccount?.mode === TradingAccountMode.general
+          ? null
+          : this.throwTradingScopeIntegrityError(
               'TRADING_ACCOUNT_SCOPE_MISMATCH',
               'Season order has no fee source.',
             )),
-      feeRateScale,
-    );
+    });
     const grossAmount = roundDecimalHalfUp(
       order.quantity.mul(priceContext.price),
       monetaryScale,
@@ -2534,6 +2543,43 @@ export class OrdersService {
       rateChangeBps: fxSnapshot?.rateChangeBps ?? null,
       fxRateSource: fxSnapshot?.fxRateSource ?? null,
     };
+  }
+
+  /**
+   * General market fees are part of the durable quote contract: a rolling
+   * deploy or config change may alter the instance-local default after quote,
+   * but it must never alter the customer's fill. Legacy general market quotes
+   * with no pinned rate are rejected through the existing requote-capable
+   * QUOTE_MISMATCH contract. Season market orders deliberately retain their
+   * historical Season.tradeFeeRate source.
+   */
+  private resolveMarketOrderFeeRate(input: {
+    mode: TradingAccountMode | undefined;
+    quotedFeeRate: Prisma.Decimal | null;
+    currentFeeRate: Prisma.Decimal | null;
+  }): Prisma.Decimal {
+    if (input.mode === TradingAccountMode.general) {
+      if (
+        !input.quotedFeeRate ||
+        input.quotedFeeRate.lt(0) ||
+        input.quotedFeeRate.gt(1)
+      ) {
+        this.throwApiError(
+          HttpStatus.CONFLICT,
+          'QUOTE_MISMATCH',
+          'General market quote has no valid pinned fee rate; requote is required.',
+        );
+      }
+      return roundDecimalHalfUp(input.quotedFeeRate, feeRateScale);
+    }
+
+    if (!input.currentFeeRate) {
+      return this.throwTradingScopeIntegrityError(
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+        'Season order has no fee source.',
+      );
+    }
+    return roundDecimalHalfUp(input.currentFeeRate, feeRateScale);
   }
 
   private async assertActiveOrderQuoteForExecution(
@@ -4464,8 +4510,10 @@ export class OrdersService {
         currencyCode: this.getAssetSettlementCurrency(quote.asset),
         quotedPrice: this.formatDecimal(quote.price, monetaryScale),
         quotedRate: quote.fxRate ? this.formatDecimal(quote.fxRate, 8) : null,
-        // Limit quotes only: the reservation basis create must reuse verbatim.
-        // Market quotes leave all four null and keep repricing at execute.
+        // Limit quotes pin their reservation/fill fee basis. General market
+        // quotes also pin ONLY the fee rate: provider price still reprices at
+        // execute. Season market quotes retain their historical null here and
+        // continue to use Season.tradeFeeRate.
         quotedFeeRate: quote.limitReservationBasis
           ? formatDecimalScale(
               quote.limitReservationBasis.quotedFeeRate,
@@ -4476,7 +4524,10 @@ export class OrdersService {
                 quote.limitSellBasis.quotedFeeRate,
                 feeRateScale,
               )
-            : null,
+            : quote.context.mode === TradingAccountMode.general &&
+                quote.request.orderType === OrderType.market
+              ? formatDecimalScale(quote.context.feeRate, feeRateScale)
+              : null,
         quotedGrossAmount: quote.limitReservationBasis
           ? this.formatDecimal(
               quote.limitReservationBasis.quotedGrossAmount,

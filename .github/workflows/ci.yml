@@ -235,6 +235,10 @@ jobs:
       # Ownership, participant↔account linkage, financial scope, trading scope,
       # general-account creation and initial grant, snapshot/ranking scope.
       TRADING_ACCOUNT_DB_INTEGRATION: "1"
+      # Complete general trading lifecycle: KRW market buy, market sell,
+      # limit buy/sell reservations, cancel/release, matcher fill/skip, TWR,
+      # account isolation, and injected trading-scope corruption.
+      GENERAL_TRADING_DB_INTEGRATION: "1"
       SEASON_JOIN_DB_INTEGRATION: "1"
       # Feature flags the account-scoped suites assert THROUGH; they gate
       # product behaviour, not the tests.
@@ -282,9 +286,11 @@ jobs:
           src/seasons/trading-account-financial-scope.integration.spec.ts
           src/seasons/trading-account-trading-scope.integration.spec.ts
           src/trading-accounts/general-account.integration.spec.ts
+          src/orders/general-account-trading.integration.spec.ts
           src/orders/order-replay-and-cancel-scope.integration.spec.ts
           src/portfolio/general-performance-hardening.integration.spec.ts
           src/portfolio/snapshot-scope-audit.integration.spec.ts
+          src/trading-accounts/general-trading-audit.integration.spec.ts
           src/ranking/season-ranking-scope.integration.spec.ts
           src/seasons/seasons.join.integration.spec.ts
           src/auth/auth.integration.spec.ts

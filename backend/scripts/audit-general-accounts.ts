@@ -62,6 +62,35 @@ async function main() {
       `general ledger rows with a season participant: ${summary.ledgerRowsWithSeasonParticipant}`,
     );
 
+    console.log('\ngeneral trading:');
+    console.log(
+      `  orders with a season participant: ${summary.generalOrdersWithSeasonParticipant}`,
+    );
+    console.log(
+      `  orders without a durable quote: ${summary.generalOrdersWithoutDurableQuote}`,
+    );
+    console.log(
+      `  order/quote account mismatches: ${summary.generalOrderQuoteAccountMismatches}`,
+    );
+    console.log(
+      `  positions with a season participant: ${summary.generalPositionsWithSeasonParticipant}`,
+    );
+    console.log(
+      `  positions with invalid reservation bounds: ${summary.generalPositionsWithInvalidReservation}`,
+    );
+    console.log(
+      `  duplicate (account, asset) position groups: ${summary.duplicateGeneralPositionAccountAssetGroups}`,
+    );
+    console.log(
+      `  quotes with a season participant: ${summary.generalQuotesWithSeasonParticipant}`,
+    );
+    console.log(
+      `  invalid limit-sell reservations: ${summary.invalidGeneralSellReservations}`,
+    );
+    console.log(
+      `  position/live-sell reservation mismatches: ${summary.generalPositionReservationMismatches}`,
+    );
+
     console.log('\nad rewards:');
     console.log(
       `  granted claims without a wallet transaction: ${summary.grantedClaimsWithoutWalletTransaction}`,
