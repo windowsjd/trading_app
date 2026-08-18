@@ -1,10 +1,5 @@
 import { createHash } from 'node:crypto';
-import {
-  CurrencyCode,
-  OrderSide,
-  OrderType,
-  Prisma,
-} from '../generated/prisma/client';
+import { Prisma } from '../generated/prisma/client';
 import { formatMoneyScale8 } from '../fx/fx-decimal-policy';
 import { DEFAULT_QUOTE_TTL_SECONDS } from './realtime-execution-policy';
 
@@ -16,20 +11,22 @@ type DecimalInput = string | Prisma.Decimal;
 export type FxQuoteRequestHashInput = {
   userId: string;
   seasonParticipantId: string;
-  fromCurrency: CurrencyCode | string;
-  toCurrency: CurrencyCode | string;
+  fromCurrency: string;
+  toCurrency: string;
   sourceAmount: DecimalInput;
 };
 
 export type OrderQuoteRequestHashInput = {
   userId: string;
-  seasonParticipantId: string;
+  seasonParticipantId: string | null;
+  /** Required for participant-less general-account quotes. */
+  tradingAccountId?: string | null;
   assetId: string;
-  side: OrderSide | string;
-  orderType: OrderType | string;
+  side: string;
+  orderType: string;
   quantity: DecimalInput;
   limitPrice: DecimalInput | null;
-  currencyCode: CurrencyCode | string;
+  currencyCode: string;
 };
 
 export function buildQuoteExpiresAt(
@@ -61,10 +58,20 @@ export function computeOrderQuoteRequestHash(
   return sha256Json({
     apiVersion: ORDER_QUOTE_REQUEST_HASH_API_VERSION,
     userId: normalizeRequiredString(input.userId, 'userId'),
-    seasonParticipantId: normalizeRequiredString(
-      input.seasonParticipantId,
-      'seasonParticipantId',
-    ),
+    seasonParticipantId: input.seasonParticipantId
+      ? normalizeRequiredString(
+          input.seasonParticipantId,
+          'seasonParticipantId',
+        )
+      : null,
+    ...(input.seasonParticipantId === null
+      ? {
+          tradingAccountId: normalizeRequiredString(
+            input.tradingAccountId,
+            'tradingAccountId',
+          ),
+        }
+      : {}),
     assetId: normalizeRequiredString(input.assetId, 'assetId'),
     side: normalizeRequiredString(input.side, 'side'),
     orderType: normalizeRequiredString(input.orderType, 'orderType'),

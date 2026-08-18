@@ -7,7 +7,9 @@ every current financial screen and mutation by
 extended to app ENTRY, per-user cache separation and the season Home itself by
 `VIRTUAL-TRADING-ACCOUNT-UX-AND-RELEASE-HARDENING-V1` (작업 11), and given an
 explicit investment-mode choice at login by
-`TRADING-MODE-ENTRY-AND-GENERAL-ACCOUNT-ACCESS-V1` (작업 13).
+`TRADING-MODE-ENTRY-AND-GENERAL-ACCOUNT-ACCESS-V1` (작업 13). General-account
+market/limit trading was enabled on 2026-08-18 without changing this accountId
+binding or cache-isolation design; general FX remains unavailable.
 
 Backend contracts this depends on:
 `backend/docs/trading-accounts-api-contract.md`,
@@ -65,7 +67,7 @@ plus one AsyncStorage entry.
 | Order | **route param**, fixed at entry | `/orders/quote`, `/orders`, `/positions`, `/wallets` |
 | Wallet FX | selected | `/wallets`, `/fx/quote`, `/fx/execute`; public `/fx/rates/current` |
 | Wallet ledger | selected | `/wallet-transactions` |
-| Order list + cancel | the account **of that record's season** | `/orders`, `/orders/:orderId/cancel` |
+| Order list + cancel | season record's account or General Home's pinned accountId | `/orders`, `/orders/:orderId/cancel` |
 
 Market data (asset detail, price, candles, market list) keeps account-free cache
 keys: those rows are identical for every account and every user, and an order
@@ -148,7 +150,7 @@ reappears anywhere else. Mode selection is on that allowlist for exactly the
 - **일반 투자 — always offered.** With a general account (any status): use it.
   Without one: "일반 투자 계정 시작하기", which fires the explicit
   `POST /trading-accounts/general`. The card states the standing policy: 초기
-  자금 10,000,000원, 시간가중 수익률, and that 매매/환전 are 준비 중.
+  자금 10,000,000원, 시간가중 수익률, 매매 가능, 환전은 준비 중.
 - **시즌 투자.** Season accounts the user is competing in ("시즌 투자
   계속하기"), or — when the current season is effectively active, the server
   says not joined, AND the owned list has no account for it — "시즌 참가하기"
@@ -361,14 +363,23 @@ never change.
 | | active | suspended | closed |
 | --- | --- | --- | --- |
 | reads | ✓ | ✓ | ✓ |
-| new order / quote / FX | season only | ✗ | ✗ |
+| new order / quote | season + general | ✗ | ✗ |
+| FX | season only | ✗ | ✗ |
 | cancel order | ✓ | ✓ | ✓ |
 | ad-reward claim | general only | ✗ | ✗ |
 
-General trading and FX are blocked as `general_trading_not_implemented` /
-`general_fx_not_implemented` and presented as 준비 중. Nothing here can enable
-anything — the server is still authoritative. What it prevents is a live-looking
-button whose only possible outcome is a 409.
+Active general accounts can quote/create market and limit buy/sell orders through
+the same account-scoped endpoints as season accounts. Suspended/closed accounts
+remain readable and may cancel submitted limit orders, but cannot create new
+quotes/orders. General FX stays blocked as `general_fx_not_implemented` and is
+presented separately as 준비 중. The server remains authoritative for every
+capability.
+
+General Home exposes `주문 내역 보기`, carrying its accountId into the existing
+Record order-list route. That route resolves the id against the owned-account
+list and keeps it fixed for polling and cancel; a later global account switch
+cannot retarget the request. Season record entry points keep their seasonId
+lookup and use the same account-scoped list/cancel implementation.
 
 ## Errors
 
@@ -403,8 +414,10 @@ variable-length Korean text, and a season name is user-supplied content:
 
 ## Tests
 
-`node --test` (no Jest in this project). 510 tests as of 작업 13 (427 after
-작업 11, 414 after 작업 10, 338 before).
+`node --test` (no Jest in this project). The general-trading additions cover
+active/inactive capability derivation, sell-side limit presentation, account-
+scoped quote/create/cancel paths, and the existing account-switch/stale-response
+guards in addition to the 작업 13 suite.
 
 Coverage: selection policy and fallbacks including the ended/settled/upcoming
 season cases; per-user storage isolation; cache separation and cross-account

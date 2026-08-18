@@ -111,6 +111,9 @@ import { LimitOrderExecutionService } from './src/orders/limit-order-execution.s
 import { PositionsService } from './src/positions/positions.service';
 import { WalletsService } from './src/wallets/wallets.service';
 import { TradingAccountAccessService } from './src/trading-accounts/trading-account-access.service';
+import { PortfolioValuationService } from './src/portfolio/portfolio-valuation.service';
+import { GeneralExternalFundingService } from './src/portfolio/general-external-funding.service';
+import { GeneralAccountPerformanceService } from './src/portfolio/general-account-performance.service';
 import {
   repairTradingScope,
   resolveTradingScopeExitCode,
@@ -123,6 +126,13 @@ const ZERO = '0.00000000';
 const CAPITAL = '10000000.00000000';
 const prisma = new PrismaService();
 const accessService = new TradingAccountAccessService(prisma);
+const valuationService = new PortfolioValuationService(prisma);
+const externalFundingService = new GeneralExternalFundingService(prisma);
+const generalPerformanceService = new GeneralAccountPerformanceService(
+  prisma,
+  valuationService,
+  externalFundingService,
+);
 const reservationService = new OrderReservationService();
 const limitCreateService = new LimitOrderCreateService(prisma, reservationService);
 const limitCancelService = new LimitOrderCancelService(prisma, reservationService);
@@ -132,12 +142,14 @@ const ordersService = new OrdersService(
   limitCreateService,
   limitCancelService,
   accessService,
+  generalPerformanceService,
 );
 const candleEvidenceService = new LimitOrderCandleEvidenceService(prisma);
 const executionService = new LimitOrderExecutionService(
   prisma,
   candleEvidenceService,
   ordersService,
+  generalPerformanceService,
 );
 const positionsService = new PositionsService(prisma, accessService);
 const walletsService = new WalletsService(prisma, accessService);
@@ -1151,7 +1163,8 @@ async function testLimitLifecycleAndFill() {
     blockCreate.data.order.orderId,
   );
 
-  // General account: no trading, empty reads, nothing auto-created.
+  // A raw general account without wallets/grant/origin is corrupt. Trading is
+  // implemented, but must fail closed and must not auto-create its foundation.
   const generalAccount = await prisma.tradingAccount.create({
     data: {
       userId: user.id,
@@ -1163,9 +1176,9 @@ async function testLimitLifecycleAndFill() {
   });
   await expectHttpError(
     ordersService.quoteOrderForTradingAccount(user.id, generalAccount.id, quoteBody),
-    409,
-    'GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED',
-    'general account quote',
+    500,
+    'GENERAL_ACCOUNT_INTEGRITY',
+    'incomplete general account quote',
   );
   await expectHttpError(
     ordersService.createOrderForTradingAccount(user.id, generalAccount.id, {
@@ -1173,9 +1186,9 @@ async function testLimitLifecycleAndFill() {
       quoteId: 'irrelevant',
       idempotencyKey: 'general-key',
     }),
-    409,
-    'GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED',
-    'general account create',
+    500,
+    'GENERAL_ACCOUNT_INTEGRITY',
+    'incomplete general account create',
   );
   // 작업 6 보완 2: this general account was created RAW (no wallets, no
   // initial grant), i.e. exactly the structurally incomplete shape the
@@ -1197,14 +1210,11 @@ async function testLimitLifecycleAndFill() {
     'GENERAL_ACCOUNT_INTEGRITY',
     'incomplete general account ledger read',
   );
-  const generalPositions = await positionsService.getPositionsForTradingAccount(
-    user.id,
-    generalAccount.id,
-  );
-  assert.equal(
-    generalPositions.data.positions.length,
-    0,
-    'general positions empty',
+  await expectHttpError(
+    positionsService.getPositionsForTradingAccount(user.id, generalAccount.id),
+    500,
+    'GENERAL_ACCOUNT_INTEGRITY',
+    'incomplete general account position read',
   );
   const generalWalletCount = await prisma.cashWallet.count({
     where: { tradingAccountId: generalAccount.id },

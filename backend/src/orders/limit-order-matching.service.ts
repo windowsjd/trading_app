@@ -1,6 +1,7 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import {
   AssetPriceSourceType,
+  OrderSide,
   Prisma,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -39,7 +40,7 @@ export type LimitMatchingSummary = {
 };
 
 /**
- * One matching cycle: for each asset with fillable submitted limit buys,
+ * One matching cycle: for each asset with fillable submitted limit orders,
  * evaluate path A (fresh provider snapshot) then path B (closed 5m candle
  * touch), and fill the qualifying orders — each in its own transaction, oldest
  * first. Single-instance execution is the scheduler's OpsJobLock, not this
@@ -66,7 +67,7 @@ export class LimitOrderMatchingService {
   /**
    * Cheap "is there anything to do" probe used by the scheduler to avoid
    * dispatching (and auditing) an idle cycle. True when at least one fillable
-   * submitted limit buy exists.
+   * submitted limit order exists.
    */
   async hasFillableWork(now: Date): Promise<boolean> {
     const assetIds = await this.candidates.findAssetIdsWithFillableLimitBuys(
@@ -97,7 +98,10 @@ export class LimitOrderMatchingService {
     };
 
     // Deduped set of participants whose rankings need a refresh after commit.
-    const rankingTargets = new Map<string, { seasonId: string; participantId: string }>();
+    const rankingTargets = new Map<
+      string,
+      { seasonId: string; participantId: string }
+    >();
 
     let budget = batchSize;
     const assetIds = await this.candidates.findAssetIdsWithFillableLimitBuys(
@@ -143,7 +147,7 @@ export class LimitOrderMatchingService {
         summary.ordersConsidered += 1;
         budget -= 1;
         try {
-          const outcome = await this.execution.fillLimitBuyOrder({
+          const outcome = await this.execution.fillLimitOrder({
             orderId: candidate.id,
             now,
             plan,
@@ -151,13 +155,15 @@ export class LimitOrderMatchingService {
           if (outcome.state === 'filled') {
             if (outcome.path === 'snapshot') summary.filledPathA += 1;
             else summary.filledPathB += 1;
-            rankingTargets.set(
-              `${outcome.seasonId}:${outcome.seasonParticipantId}`,
-              {
-                seasonId: outcome.seasonId,
-                participantId: outcome.seasonParticipantId,
-              },
-            );
+            if (outcome.seasonId && outcome.seasonParticipantId) {
+              rankingTargets.set(
+                `${outcome.seasonId}:${outcome.seasonParticipantId}`,
+                {
+                  seasonId: outcome.seasonId,
+                  participantId: outcome.seasonParticipantId,
+                },
+              );
+            }
           } else {
             summary.skipped += 1;
           }
@@ -190,7 +196,8 @@ export class LimitOrderMatchingService {
   /**
    * Path A takes priority: if a fresh provider snapshot reaches the limit, fill
    * at the snapshot price. Otherwise path B: the earliest eligible closed 5m
-   * candle whose low reached the limit, filled at the ORDER's limitPrice.
+   * candle whose buy-low/sell-high reached the limit, filled at the ORDER's
+   * limitPrice.
    */
   private buildFillPlan(
     candidate: LimitMatchCandidate,
@@ -201,7 +208,14 @@ export class LimitOrderMatchingService {
       >
     >,
   ): LimitFillPlan | null {
-    if (pathASnapshot && pathASnapshot.price.lte(candidate.limitPrice)) {
+    const side = candidate.side ?? OrderSide.buy;
+    if (
+      pathASnapshot &&
+      ((side === OrderSide.buy &&
+        pathASnapshot.price.lte(candidate.limitPrice)) ||
+        (side === OrderSide.sell &&
+          pathASnapshot.price.gte(candidate.limitPrice)))
+    ) {
       return {
         path: 'snapshot',
         executedPrice: pathASnapshot.price,
@@ -214,6 +228,7 @@ export class LimitOrderMatchingService {
       {
         submittedAt: candidate.submittedAt,
         limitPrice: candidate.limitPrice,
+        side,
         seasonEndAt: candidate.seasonEndAt,
       },
     );
@@ -291,7 +306,10 @@ export class LimitOrderMatchingService {
   ): void {
     if (!this.rankingRefresh) return;
     void this.rankingRefresh
-      .refreshCurrentRankingAfterParticipantChange(seasonId, seasonParticipantId)
+      .refreshCurrentRankingAfterParticipantChange(
+        seasonId,
+        seasonParticipantId,
+      )
       .catch((error) => {
         this.logger.error(
           JSON.stringify({

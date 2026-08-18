@@ -150,10 +150,9 @@ describe('TradingAccount schema contract', () => {
     // Financial + trading tables carry BOTH identifiers during the
     // transition. CashWallet/WalletTransaction became OPTIONAL on the
     // participant in 작업 6 (general-mode rows have no participant at all);
-    // ExchangeTransaction / FxExecuteRequest / Order / Position keep the
-    // participant REQUIRED because general-mode trading and FX are still
-    // disabled. The account scope stays a NULLABLE addition everywhere
-    // (NOT NULL tightening is a later work unit).
+    // Order/Position are optional for participant-less general trading;
+    // ExchangeTransaction/FxExecuteRequest remain required because general FX
+    // is still disabled. Account scope stays nullable during the transition.
     for (const model of ['CashWallet', 'WalletTransaction']) {
       const block = modelBlock(model);
       expect(block).toMatch(/seasonParticipantId\s+String\?/);
@@ -166,14 +165,18 @@ describe('TradingAccount schema contract', () => {
       );
     }
 
-    for (const model of [
-      'ExchangeTransaction',
-      'FxExecuteRequest',
-      'Order',
-      'Position',
-    ]) {
+    for (const model of ['ExchangeTransaction', 'FxExecuteRequest']) {
       const block = modelBlock(model);
       expect(block).toMatch(/seasonParticipantId\s+String\s/);
+      expect(block).toMatch(/tradingAccountId\s+String\?/);
+      expect(block).toMatch(
+        /tradingAccount\s+TradingAccount\?\s+@relation\([^)]*onDelete: Restrict/,
+      );
+    }
+
+    for (const model of ['Order', 'Position']) {
+      const block = modelBlock(model);
+      expect(block).toMatch(/seasonParticipantId\s+String\?/);
       expect(block).toMatch(/tradingAccountId\s+String\?/);
       expect(block).toMatch(
         /tradingAccount\s+TradingAccount\?\s+@relation\([^)]*onDelete: Restrict/,

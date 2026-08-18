@@ -8,27 +8,32 @@ import {
   ParticipantStatus,
   Prisma,
   SeasonStatus,
+  TradingAccountMode,
+  TradingAccountStatus,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
- * A submitted limit-buy order that is currently fillable: its season is active
- * and unexpired, its participant is active, and its asset is active. Every one
- * of these is re-verified against locked rows inside the execution transaction;
- * the query filters are a work-reduction pre-check, never the authority.
+ * A submitted limit order that is currently fillable. Season rows require an
+ * active/unexpired season and participant; general rows require an active
+ * participant-less account. The execution transaction re-verifies every fact,
+ * so these filters are work-reduction only, never authority.
  */
 export type LimitMatchCandidate = {
   id: string;
-  seasonParticipantId: string;
+  side?: OrderSide;
+  seasonParticipantId: string | null;
+  tradingAccountId: string;
   assetId: string;
   quantity: Prisma.Decimal;
   limitPrice: Prisma.Decimal;
   currencyCode: CurrencyCode;
-  reservedAmount: Prisma.Decimal;
+  reservedAmount: Prisma.Decimal | null;
+  reservedQuantity?: Prisma.Decimal | null;
   reservationFeeRate: Prisma.Decimal;
   submittedAt: Date;
-  seasonId: string;
-  seasonEndAt: Date;
+  seasonId: string | null;
+  seasonEndAt: Date | null;
   asset: {
     id: string;
     assetType: AssetType;
@@ -43,12 +48,15 @@ export type LimitMatchCandidate = {
 
 const CANDIDATE_SELECT = {
   id: true,
+  side: true,
   seasonParticipantId: true,
+  tradingAccountId: true,
   assetId: true,
   quantity: true,
   limitPrice: true,
   currencyCode: true,
   reservedAmount: true,
+  reservedQuantity: true,
   reservationFeeRate: true,
   submittedAt: true,
   seasonParticipant: {
@@ -79,32 +87,54 @@ export class LimitOrderCandidateRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * The where-clause shared by both queries: a submitted limit BUY whose
-   * season is active and currently within [startAt, endAt), whose participant
-   * is active, whose asset is active, and that carries a usable reservation.
+   * Shared candidate clause for submitted buy/sell reservations in either a
+   * tradable season account or an active participant-less general account.
    */
   private fillableWhere(now: Date): Prisma.OrderWhereInput {
     return {
       status: OrderStatus.submitted,
       orderType: OrderType.limit,
-      side: OrderSide.buy,
-      reservedAmount: { not: null },
       reservationFeeRate: { not: null },
       asset: { isActive: true },
-      seasonParticipant: {
-        participantStatus: ParticipantStatus.active,
-        season: {
-          status: SeasonStatus.active,
-          startAt: { lte: now },
-          endAt: { gt: now },
+      AND: [
+        {
+          OR: [
+            { side: OrderSide.buy, reservedAmount: { not: null } },
+            { side: OrderSide.sell, reservedQuantity: { not: null } },
+          ],
         },
-      },
+        {
+          OR: [
+            {
+              seasonParticipant: {
+                participantStatus: ParticipantStatus.active,
+                season: {
+                  status: SeasonStatus.active,
+                  startAt: { lte: now },
+                  endAt: { gt: now },
+                },
+              },
+              tradingAccount: {
+                mode: TradingAccountMode.season,
+                status: TradingAccountStatus.active,
+              },
+            },
+            {
+              seasonParticipantId: null,
+              tradingAccount: {
+                mode: TradingAccountMode.general,
+                status: TradingAccountStatus.active,
+              },
+            },
+          ],
+        },
+      ],
     };
   }
 
   /**
    * Distinct asset ids that currently have at least one fillable submitted
-   * limit buy. Bounded so one cycle never scans an unbounded asset universe.
+   * limit order. Bounded so one cycle never scans an unbounded asset universe.
    */
   async findAssetIdsWithFillableLimitBuys(
     now: Date,
@@ -121,7 +151,7 @@ export class LimitOrderCandidateRepository {
   }
 
   /**
-   * Fillable submitted limit buys for one asset, oldest first (FIFO by
+   * Fillable submitted limit orders for one asset, oldest first (FIFO by
    * submittedAt then id). Bounded to `limit`.
    */
   async findFillableLimitBuysForAsset(
@@ -137,25 +167,34 @@ export class LimitOrderCandidateRepository {
     });
 
     return rows.flatMap((row) => {
-      // reservedAmount/reservationFeeRate are non-null by the where clause, but
-      // narrow explicitly so a corrupt row is skipped rather than crashed on.
-      if (row.reservedAmount === null || row.reservationFeeRate === null) {
+      // Reservation fields are non-null by the where clause; narrow explicitly
+      // for Prisma's nullable field types. Locked execution remains the final
+      // integrity authority.
+      if (
+        row.reservationFeeRate === null ||
+        (row.side === OrderSide.buy && row.reservedAmount === null) ||
+        (row.side === OrderSide.sell && row.reservedQuantity === null)
+      ) {
         return [];
       }
-      const season = row.seasonParticipant.season;
+      if (!row.tradingAccountId) return [];
+      const season = row.seasonParticipant?.season ?? null;
       return [
         {
           id: row.id,
+          side: row.side,
           seasonParticipantId: row.seasonParticipantId,
+          tradingAccountId: row.tradingAccountId,
           assetId: row.assetId,
           quantity: row.quantity,
           limitPrice: row.limitPrice as Prisma.Decimal,
           currencyCode: row.currencyCode,
           reservedAmount: row.reservedAmount,
+          reservedQuantity: row.reservedQuantity,
           reservationFeeRate: row.reservationFeeRate,
           submittedAt: row.submittedAt,
-          seasonId: season.id,
-          seasonEndAt: season.endAt,
+          seasonId: season?.id ?? null,
+          seasonEndAt: season?.endAt ?? null,
           asset: row.asset,
         },
       ];

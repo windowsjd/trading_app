@@ -250,7 +250,7 @@ test('hasNoExecutionResult covers submitted AND canceled limit rows', () => {
   );
 });
 
-test('open limit buy detection requires limit + buy + submitted', () => {
+test('open limit detection covers submitted buys and sells only', () => {
   assert.equal(
     isOpenLimitBuyOrder({
       orderType: 'limit',
@@ -273,7 +273,7 @@ test('open limit buy detection requires limit + buy + submitted', () => {
       side: 'sell',
       status: 'submitted',
     }),
-    false,
+    true,
   );
   assert.equal(
     isOpenLimitBuyOrder({
@@ -357,6 +357,54 @@ test('success copy follows the server execution policy without promising exchang
   });
   assert.match(disabled, /미체결 상태로 등록/);
   assert.doesNotMatch(disabled, /자동 체결/);
+
+  const sellEnabled = getLimitOrderSuccessMessage(
+    {
+      autoExecutionEnabled: true,
+      mode: 'scheduler_snapshot_candle',
+      triggerType: 'provider_snapshot_or_closed_candle',
+      fullFillOnly: true,
+    },
+    'sell',
+  );
+  assert.match(sellEnabled, /지정가 이상/);
+});
+
+test('submitted limit sell displays reserved quantity and expected proceeds', () => {
+  const sellResult: CreateOrderDto = {
+    order: {
+      orderId: 'sell-order-1',
+      side: 'sell',
+      orderType: 'limit',
+      status: 'submitted',
+      quantity: '2.000000',
+      limitPrice: '60000.00000000',
+      currencyCode: 'KRW',
+      reservedAmount: null,
+      reservedQuantity: '2.000000',
+    },
+    execution: {
+      state: 'submitted',
+      side: 'sell',
+      reservedAmount: null,
+      reservedQuantity: '2.000000',
+    },
+  };
+  const display = getOrderSuccessDisplay(sellResult);
+  assert.equal(display.side, 'sell');
+  assert.equal(display.reservedAmount, '-');
+  assert.equal(display.reservedQuantity, '2.000000');
+
+  const estimate = getLimitQuoteEstimateDisplay({
+    quotedGrossAmount: '120000.00000000',
+    quotedFeeAmount: '120.00000000',
+    quotedNetAmount: '119880.00000000',
+    reservedQuantity: '2.000000',
+    currencyCode: 'KRW',
+  });
+  assert.ok(estimate);
+  assert.equal(estimate.expectedNetAmount, '119,880');
+  assert.equal(estimate.reservedQuantity, '2.000000');
 });
 
 test('submitted-limit polling requires foreground, focus, and an open order', () => {

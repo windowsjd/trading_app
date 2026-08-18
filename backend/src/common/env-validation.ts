@@ -1,6 +1,7 @@
 import { readAdRewardConfig } from '../ad-rewards/ad-reward.config';
 import { parseLimitOrderEnabled } from '../orders/limit-order.config';
 import { readLimitOrderMatchingConfig } from '../orders/limit-order-matching.config';
+import { readGeneralTradeFeeRate } from '../orders/general-trading.config';
 import { readLiveCandleConfig } from '../assets/live-candle.config';
 
 /**
@@ -38,6 +39,7 @@ export function validateEnv(
   const matching = collect(errors, () => readLimitOrderMatchingConfig(env));
 
   collect(errors, () => readLiveCandleConfig(env));
+  collect(errors, () => readGeneralTradeFeeRate(env));
 
   // AD_REWARD_*: absent → disabled, which is a complete valid state. With
   // AD_REWARD_ENABLED=true every operational value (provider, amount, daily

@@ -6,6 +6,7 @@ import {
   OrderType,
   Prisma,
   SeasonStatus,
+  TradingAccountMode,
 } from '../generated/prisma/client';
 import { formatDecimalScale, monetaryScale } from '../fx/fx-decimal-policy';
 import { PrismaService } from '../prisma/prisma.service';
@@ -20,6 +21,7 @@ import {
   type LimitOrderCancelReason,
 } from './limit-order-policy';
 import { OrderReservationService } from './order-reservation.service';
+import { releaseReservedPositionQuantity } from './position-reservation-atomic';
 import {
   formatOrderResponse,
   type OrderResponsePayload,
@@ -31,10 +33,20 @@ const CANCEL_ORDER_SELECT = {
   tradingAccountId: true,
   seasonParticipant: {
     select: {
+      id: true,
       tradingAccountId: true,
     },
   },
+  tradingAccount: {
+    select: {
+      id: true,
+      userId: true,
+      mode: true,
+      seasonParticipant: { select: { id: true } },
+    },
+  },
   quoteId: true,
+  assetId: true,
   side: true,
   orderType: true,
   status: true,
@@ -48,6 +60,7 @@ const CANCEL_ORDER_SELECT = {
   assetPriceSnapshotId: true,
   fxRateSnapshotId: true,
   reservedAmount: true,
+  reservedQuantity: true,
   reservationReleasedAt: true,
   cancelReason: true,
   submittedAt: true,
@@ -79,6 +92,7 @@ export type CancelLimitOrderResponse = {
       /** True when this call found the order already canceled. */
       alreadyCanceled: boolean;
       reservedAmountReleased: string | null;
+      reservedQuantityReleased: string | null;
     };
   };
 };
@@ -91,13 +105,14 @@ export type LimitReservationCleanupResult = {
 type CancelTransactionClient = Prisma.TransactionClient;
 
 /**
- * Cancel + lifecycle-release paths for submitted limit-buy reservations.
- * Lock order is always Order row (FOR UPDATE) → CashWallet row (the guarded
- * UPDATE), and a release happens at most once per order because the order
- * leaves `submitted` in the same transaction that releases its reservation.
+ * Cancel + lifecycle-release paths for submitted limit-order reservations.
+ * Lock order is always Order row (FOR UPDATE) → reservation owner
+ * (CashWallet for buy, Position for sell), and a release happens at most once
+ * per order because the order leaves `submitted` in the same transaction that
+ * releases its reservation.
  *
- * Deliberately NOT gated by LIMIT_ORDER_ENABLED: already-reserved cash must
- * always be releasable even when the feature flag is turned back off.
+ * Deliberately NOT gated by LIMIT_ORDER_ENABLED: already-reserved cash or
+ * quantity must always be releasable even when the feature flag is turned off.
  */
 @Injectable()
 export class LimitOrderCancelService {
@@ -109,7 +124,7 @@ export class LimitOrderCancelService {
   ) {}
 
   /**
-   * User-facing cancel of an owned submitted limit-buy order. Idempotent:
+   * User-facing cancel of an owned submitted limit order. Idempotent:
    * canceling an already-canceled order returns the current state without a
    * second release. Market orders keep the historical
    * ORDER_CANCEL_NOT_SUPPORTED (410) meaning.
@@ -136,9 +151,10 @@ export class LimitOrderCancelService {
       const lockedRows = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT o."id"
         FROM "orders" o
-        JOIN "season_participants" sp ON sp."id" = o."season_participant_id"
+        LEFT JOIN "trading_accounts" ta ON ta."id" = o."trading_account_id"
+        LEFT JOIN "season_participants" sp ON sp."id" = o."season_participant_id"
         WHERE o."id" = ${input.orderId}
-          AND sp."user_id" = ${input.userId}
+          AND (sp."user_id" = ${input.userId} OR ta."user_id" = ${input.userId})
         FOR UPDATE OF o
       `;
 
@@ -193,19 +209,13 @@ export class LimitOrderCancelService {
         );
       }
 
-      if (order.side !== OrderSide.buy) {
-        this.throwLimitOrderError(
-          limitOrderErrorCodes.ORDER_NOT_CANCELABLE,
-          'Only limit buy orders can be canceled.',
-        );
-      }
-
       if (order.status === OrderStatus.canceled) {
         // Idempotent replay: the reservation was already released exactly
         // once when the order left `submitted`.
         return this.buildCancelResponse(order, {
           alreadyCanceled: true,
           reservedAmountReleased: null,
+          reservedQuantityReleased: null,
         });
       }
 
@@ -216,12 +226,15 @@ export class LimitOrderCancelService {
         );
       }
 
-      const releasedAmount = await this.releaseAndCancelLockedOrder(tx, {
+      const released = await this.releaseAndCancelLockedOrder(tx, {
         orderId: order.id,
+        side: order.side,
+        assetId: order.assetId,
         seasonParticipantId: order.seasonParticipantId,
         tradingAccountId: this.requireOrderTradingScopeForRelease(order),
         currencyCode: order.currencyCode,
         reservedAmount: order.reservedAmount,
+        reservedQuantity: order.reservedQuantity,
         cancelReason: LIMIT_ORDER_CANCEL_REASONS.userCanceled,
         canceledAt: input.canceledAt,
       });
@@ -240,13 +253,14 @@ export class LimitOrderCancelService {
 
       return this.buildCancelResponse(canceledOrder, {
         alreadyCanceled: false,
-        reservedAmountReleased: releasedAmount,
+        reservedAmountReleased: released.reservedAmount,
+        reservedQuantityReleased: released.reservedQuantity,
       });
     });
   }
 
   /**
-   * Cancels every submitted limit-buy order of one participant inside the
+   * Cancels every submitted limit order of one participant inside the
    * caller's transaction (participant exclusion path). Orders are locked
    * in a stable id order before wallets are touched.
    */
@@ -264,7 +278,6 @@ export class LimitOrderCancelService {
       WHERE "season_participant_id" = ${input.seasonParticipantId}
         AND "status" = 'submitted'
         AND "order_type" = 'limit'
-        AND "side" = 'buy'
       ORDER BY "id"
       FOR UPDATE
     `;
@@ -275,14 +288,23 @@ export class LimitOrderCancelService {
         where: { id: row.id },
         select: {
           id: true,
+          assetId: true,
           seasonParticipantId: true,
           tradingAccountId: true,
           seasonParticipant: { select: { tradingAccountId: true } },
+          tradingAccount: {
+            select: {
+              id: true,
+              mode: true,
+              seasonParticipant: { select: { id: true } },
+            },
+          },
           currencyCode: true,
           status: true,
           orderType: true,
           side: true,
           reservedAmount: true,
+          reservedQuantity: true,
         },
       });
 
@@ -290,17 +312,20 @@ export class LimitOrderCancelService {
         !order ||
         order.status !== OrderStatus.submitted ||
         order.orderType !== OrderType.limit ||
-        order.side !== OrderSide.buy
+        (order.side !== OrderSide.buy && order.side !== OrderSide.sell)
       ) {
         continue;
       }
 
       await this.releaseAndCancelLockedOrder(tx, {
         orderId: order.id,
+        side: order.side,
+        assetId: order.assetId,
         seasonParticipantId: order.seasonParticipantId,
         tradingAccountId: this.requireOrderTradingScopeForRelease(order),
         currencyCode: order.currencyCode,
         reservedAmount: order.reservedAmount,
+        reservedQuantity: order.reservedQuantity,
         cancelReason: input.reason,
         canceledAt: input.canceledAt,
       });
@@ -314,7 +339,7 @@ export class LimitOrderCancelService {
   }
 
   /**
-   * Season-end safety net: cancels submitted limit buys belonging to ended
+   * Season-end safety net: cancels submitted limit orders belonging to ended
    * (or settled) seasons and releases their reservations, in bounded
    * batches. Idempotent and re-runnable — it re-selects open orders every
    * pass, so a crash mid-way is healed by the next run.
@@ -331,7 +356,6 @@ export class LimitOrderCancelService {
         where: {
           status: OrderStatus.submitted,
           orderType: OrderType.limit,
-          side: OrderSide.buy,
           seasonParticipant: {
             season: {
               status: { in: [SeasonStatus.ended, SeasonStatus.settled] },
@@ -357,7 +381,6 @@ export class LimitOrderCancelService {
           WHERE "id" = ANY(${batchIds})
             AND "status" = 'submitted'
             AND "order_type" = 'limit'
-            AND "side" = 'buy'
           ORDER BY "id"
           FOR UPDATE
         `;
@@ -368,21 +391,34 @@ export class LimitOrderCancelService {
             where: { id: row.id },
             select: {
               id: true,
+              assetId: true,
+              side: true,
               seasonParticipantId: true,
               tradingAccountId: true,
               seasonParticipant: { select: { tradingAccountId: true } },
+              tradingAccount: {
+                select: {
+                  id: true,
+                  mode: true,
+                  seasonParticipant: { select: { id: true } },
+                },
+              },
               currencyCode: true,
               reservedAmount: true,
+              reservedQuantity: true,
             },
           });
           if (!order) continue;
 
           await this.releaseAndCancelLockedOrder(tx, {
             orderId: order.id,
+            side: order.side,
+            assetId: order.assetId,
             seasonParticipantId: order.seasonParticipantId,
             tradingAccountId: this.requireOrderTradingScopeForRelease(order),
             currencyCode: order.currencyCode,
             reservedAmount: order.reservedAmount,
+            reservedQuantity: order.reservedQuantity,
             cancelReason: LIMIT_ORDER_CANCEL_REASONS.seasonEnded,
             canceledAt: input.now,
           });
@@ -443,73 +479,154 @@ export class LimitOrderCancelService {
 
   /**
    * Shared release+cancel step. Caller must hold the order row lock and
-   * have verified status === submitted. Wallet reservation is released via
-   * the atomic guard (CashWallet lock acquired here, after the order lock),
-   * then the order is flipped out of `submitted` with a guarded updateMany —
-   * so release and cancel are inseparable within the transaction.
+   * have verified status === submitted. Its cash/quantity reservation is
+   * released via the corresponding atomic guard, then the order is flipped
+   * out of `submitted` with a guarded updateMany — so release and cancel are
+   * inseparable within the transaction.
    */
   private async releaseAndCancelLockedOrder(
     tx: CancelTransactionClient,
     input: {
       orderId: string;
-      seasonParticipantId: string;
+      side: OrderSide;
+      assetId: string;
+      seasonParticipantId: string | null;
       /** VERIFIED account scope (order scope, checked against the
        * participant link by requireOrderTradingScopeForRelease). */
       tradingAccountId: string;
       currencyCode: CurrencyCode;
       reservedAmount: Prisma.Decimal | null;
+      reservedQuantity: Prisma.Decimal | null;
       cancelReason: LimitOrderCancelReason;
       canceledAt: Date;
     },
-  ): Promise<string> {
-    if (!input.reservedAmount || input.reservedAmount.lte(0)) {
+  ): Promise<{
+    reservedAmount: string | null;
+    reservedQuantity: string | null;
+  }> {
+    if (
+      input.side === OrderSide.buy &&
+      (!input.reservedAmount || input.reservedAmount.lte(0))
+    ) {
       this.throwLimitOrderError(
         limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
         'Submitted limit order has no recorded reservation.',
       );
     }
-
-    const wallet = await tx.cashWallet.findUnique({
-      where: {
-        seasonParticipantId_currencyCode: {
-          seasonParticipantId: input.seasonParticipantId,
-          currencyCode: input.currencyCode,
-        },
-      },
-      select: { id: true, seasonParticipantId: true, tradingAccountId: true },
-    });
-
-    if (!wallet) {
+    if (
+      input.side === OrderSide.sell &&
+      (!input.reservedQuantity || input.reservedQuantity.lte(0))
+    ) {
       this.throwLimitOrderError(
         limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
-        'Cash wallet for the order reservation was not found.',
+        'Submitted limit sell has no recorded quantity reservation.',
       );
     }
 
-    // Wallet scope must match the ORDER's verified account exactly before
-    // any reservation is decreased: a null-scope wallet is repair-required,
-    // a foreign wallet is never touched (both structured 500s).
-    assertCashWalletTradingAccountScope(wallet, {
-      seasonParticipantId: input.seasonParticipantId,
-      tradingAccountId: input.tradingAccountId,
-    });
+    let releasedAmountText: string | null = null;
+    let releasedQuantityText: string | null = null;
+    if (input.side === OrderSide.buy) {
+      const wallet = await tx.cashWallet.findUnique({
+        where:
+          input.seasonParticipantId === null
+            ? {
+                tradingAccountId_currencyCode: {
+                  tradingAccountId: input.tradingAccountId,
+                  currencyCode: input.currencyCode,
+                },
+              }
+            : {
+                seasonParticipantId_currencyCode: {
+                  seasonParticipantId: input.seasonParticipantId,
+                  currencyCode: input.currencyCode,
+                },
+              },
+        select: { id: true, seasonParticipantId: true, tradingAccountId: true },
+      });
 
-    const releasedAmountText = formatDecimalScale(
-      input.reservedAmount,
-      monetaryScale,
-    );
+      if (!wallet) {
+        this.throwLimitOrderError(
+          limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
+          'Cash wallet for the order reservation was not found.',
+        );
+      }
 
-    await this.reservation.releaseLimitBuyReservation(tx, {
-      walletId: wallet.id,
-      seasonParticipantId: input.seasonParticipantId,
-      tradingAccountId: input.tradingAccountId,
-      currencyCode: input.currencyCode,
-      amount: releasedAmountText,
-    });
+      // Wallet scope must match the ORDER's verified account exactly before
+      // any reservation is decreased: a null-scope wallet is repair-required,
+      // a foreign wallet is never touched (both structured 500s).
+      assertCashWalletTradingAccountScope(wallet, {
+        seasonParticipantId: input.seasonParticipantId,
+        tradingAccountId: input.tradingAccountId,
+      });
+
+      releasedAmountText = formatDecimalScale(
+        input.reservedAmount as Prisma.Decimal,
+        monetaryScale,
+      );
+
+      await this.reservation.releaseLimitBuyReservation(tx, {
+        walletId: wallet.id,
+        seasonParticipantId: input.seasonParticipantId,
+        tradingAccountId: input.tradingAccountId,
+        currencyCode: input.currencyCode,
+        amount: releasedAmountText,
+      });
+    } else {
+      const position = await tx.position.findUnique({
+        where:
+          input.seasonParticipantId === null
+            ? {
+                tradingAccountId_assetId: {
+                  tradingAccountId: input.tradingAccountId,
+                  assetId: input.assetId,
+                },
+              }
+            : {
+                seasonParticipantId_assetId: {
+                  seasonParticipantId: input.seasonParticipantId,
+                  assetId: input.assetId,
+                },
+              },
+        select: {
+          id: true,
+          seasonParticipantId: true,
+          tradingAccountId: true,
+        },
+      });
+      if (
+        !position ||
+        position.seasonParticipantId !== input.seasonParticipantId ||
+        position.tradingAccountId !== input.tradingAccountId
+      ) {
+        this.throwLimitOrderError(
+          limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
+          'Position for the order reservation was not found or mis-scoped.',
+        );
+      }
+      releasedQuantityText = formatDecimalScale(
+        input.reservedQuantity as Prisma.Decimal,
+        monetaryScale,
+      );
+      const released = await releaseReservedPositionQuantity(tx, {
+        positionId: position.id,
+        seasonParticipantId: input.seasonParticipantId,
+        tradingAccountId: input.tradingAccountId,
+        assetId: input.assetId,
+        quantity: releasedQuantityText,
+      });
+      if (released !== 1) {
+        this.throwLimitOrderError(
+          limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
+          'Position reservation does not cover the order quantity.',
+        );
+      }
+    }
 
     const flipped = await tx.order.updateMany({
       where: {
         id: input.orderId,
+        seasonParticipantId: input.seasonParticipantId,
+        tradingAccountId: input.tradingAccountId,
         status: OrderStatus.submitted,
       },
       data: {
@@ -527,7 +644,10 @@ export class LimitOrderCancelService {
       );
     }
 
-    return releasedAmountText;
+    return {
+      reservedAmount: releasedAmountText,
+      reservedQuantity: releasedQuantityText,
+    };
   }
 
   /**
@@ -559,12 +679,43 @@ export class LimitOrderCancelService {
   private assertRequestedAccountScope(
     order: {
       tradingAccountId: string | null;
-      seasonParticipant: { tradingAccountId: string | null };
+      seasonParticipantId?: string | null;
+      seasonParticipant: {
+        id?: string;
+        tradingAccountId: string | null;
+      } | null;
+      tradingAccount: {
+        id: string;
+        mode: TradingAccountMode;
+        seasonParticipant: { id: string } | null;
+      } | null;
     },
     requestedTradingAccountId: string,
   ): void {
-    const participantAccountId = order.seasonParticipant.tradingAccountId;
+    const participantAccountId = order.seasonParticipant?.tradingAccountId;
     const orderAccountId = order.tradingAccountId;
+
+    if (orderAccountId === requestedTradingAccountId) {
+      if (!order.tradingAccount || order.tradingAccount.id !== orderAccountId) {
+        this.throwScopeIntegrity(
+          'TRADING_ACCOUNT_SCOPE_MISMATCH',
+          'Order trading-account relation is inconsistent.',
+        );
+      }
+      if (order.tradingAccount.mode === TradingAccountMode.general) {
+        if (
+          order.seasonParticipantId !== null ||
+          order.seasonParticipant !== null ||
+          order.tradingAccount.seasonParticipant !== null
+        ) {
+          this.throwScopeIntegrity(
+            'TRADING_ACCOUNT_SCOPE_MISMATCH',
+            'General order carries a season participant link.',
+          );
+        }
+        return;
+      }
+    }
 
     if (participantAccountId === requestedTradingAccountId) {
       if (orderAccountId === null) {
@@ -622,7 +773,16 @@ export class LimitOrderCancelService {
    */
   private requireOrderTradingScopeForRelease(order: {
     tradingAccountId: string | null;
-    seasonParticipant: { tradingAccountId: string | null };
+    seasonParticipantId?: string | null;
+    seasonParticipant: {
+      id?: string;
+      tradingAccountId: string | null;
+    } | null;
+    tradingAccount: {
+      id: string;
+      mode: TradingAccountMode;
+      seasonParticipant: { id: string } | null;
+    } | null;
   }): string {
     if (!order.tradingAccountId) {
       this.throwScopeIntegrity(
@@ -631,7 +791,37 @@ export class LimitOrderCancelService {
       );
     }
 
-    if (order.tradingAccountId !== order.seasonParticipant.tradingAccountId) {
+    if (
+      !order.tradingAccount ||
+      order.tradingAccount.id !== order.tradingAccountId
+    ) {
+      this.throwScopeIntegrity(
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+        'Order trading-account relation is inconsistent.',
+      );
+    }
+
+    if (order.tradingAccount.mode === TradingAccountMode.general) {
+      if (
+        order.seasonParticipantId !== null ||
+        order.seasonParticipant !== null ||
+        order.tradingAccount.seasonParticipant !== null
+      ) {
+        this.throwScopeIntegrity(
+          'TRADING_ACCOUNT_SCOPE_MISMATCH',
+          'General order carries a season participant link.',
+        );
+      }
+      return order.tradingAccountId;
+    }
+
+    if (
+      order.seasonParticipantId === null ||
+      !order.seasonParticipant ||
+      order.tradingAccount.seasonParticipant?.id !==
+        order.seasonParticipantId ||
+      order.tradingAccountId !== order.seasonParticipant.tradingAccountId
+    ) {
       this.throwScopeIntegrity(
         'TRADING_ACCOUNT_SCOPE_MISMATCH',
         'Order is scoped to a different trading account than its participant.',
@@ -646,6 +836,7 @@ export class LimitOrderCancelService {
     execution: {
       alreadyCanceled: boolean;
       reservedAmountReleased: string | null;
+      reservedQuantityReleased: string | null;
     },
   ): CancelLimitOrderResponse {
     return {
@@ -657,9 +848,10 @@ export class LimitOrderCancelService {
           reason: 'ORDER_CANCELED_BEFORE_EXECUTION',
           message: execution.alreadyCanceled
             ? 'Order was already canceled; the reservation was released when it was first canceled.'
-            : 'Limit order was canceled and its cash reservation was released.',
+            : 'Limit order was canceled and its reservation was released.',
           alreadyCanceled: execution.alreadyCanceled,
           reservedAmountReleased: execution.reservedAmountReleased,
+          reservedQuantityReleased: execution.reservedQuantityReleased,
         },
       },
     };

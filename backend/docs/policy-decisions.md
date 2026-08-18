@@ -100,16 +100,17 @@
 - 자산 DB 시딩: `pnpm tsx scripts/seed-kis-fixed-asset-universe.ts [--dry-run]`로 40개 자산을 upsert한다.
 - 근거: 이 리스트는 프로젝트 결정으로 고정된 고유동성 후보군이며(공식 YTD 순위 검증을 주장하지 않음), 매 환경마다 운영자가 수동 입력하지 않도록 코드에 기본값으로 고정한다.
 
-## Limit Buy (Cash Reservation + Scheduler Auto-Execution)
+## Limit Orders (Reservation + Scheduler Auto-Execution)
 
-지정가 매수는 등록(quote/create)·예약·취소·시즌 정리 + 스케줄러 기반 자동 체결
+지정가 매수·매도는 등록(quote/create)·예약·취소·시즌 정리 + 스케줄러 기반 자동 체결
 (경로 A/B)까지 구현되어 있다. 등록은 PostgreSQL만으로 완결되고, 자동 체결은
 별도 플래그 `SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED`로 켜지는 OpsJobLock 기반
-스케줄러 job이 수행한다. 자동 체결은 아래 "Limit Buy Scheduler Matching" 참조.
+스케줄러 job이 수행한다. 자동 체결은 아래 "Limit Order Scheduler Matching" 참조.
 
-- 지원: 지정가 매수 등록/취소만. 전량 주문, GTC 성격(주문 자체 만료 없음). 지정가 매도·부분 체결·IOC/FOK/DAY·Stop·실거래소 주문은 미지원.
-- 등록은 항상 `status=submitted`로 commit되며 reservation-only다. Create 자체는 Provider 현재가를 읽거나 즉시 체결하지 않는다. 등록은 PostgreSQL만으로 완결된다 — 검증 대상은 시즌·참가자·자산·시장세션·Quote·지갑뿐이고, Redis나 Provider WebSocket 상태는 등록을 가로막지 않는다(Redis 미기동 통합 테스트로 보증).
+- 지원: 지정가 매수·매도 등록/취소/전량 체결, GTC 성격(주문 자체 만료 없음). 부분 체결·IOC/FOK/DAY·Stop·실거래소 주문은 미지원.
+- 등록은 항상 `status=submitted`로 commit되며 reservation-only다. Create 자체는 Provider 현재가를 읽거나 즉시 체결하지 않는다. 등록은 PostgreSQL만으로 완결된다 — 검증 대상은 mode별 계정 integrity·자산·시장세션·Quote·지갑/포지션뿐이고, Redis나 Provider WebSocket 상태는 등록을 가로막지 않는다(Redis 미기동 통합 테스트로 보증).
 - 현금 의미: `balanceAmount`=총 보유 현금(총자산 평가 입력, 예약으로 감소하지 않음), `reservedAmount`=submitted 지정가 매수 예약금, `availableAmount`=balance-reserved(파생값, DB 미저장). 홈/포트폴리오/랭킹/equity·daily snapshot/정산/거래기록 평가에서 reservedAmount를 차감하지 않는다.
+- 보유수량 의미: `Position.quantity`=총 보유수량, `reservedQuantity`=submitted 지정가 매도 예약수량, 매도 가능수량=`quantity-reservedQuantity`. 예약은 총자산 평가수량을 줄이지 않으며 취소 시 전량 반환, 체결 시 예약수량과 총수량을 함께 줄인다.
 - 예약금: `gross=round8(limitPrice×qty)`, `fee=round8(gross×feeRate)`, `reserved=round8(gross+fee)` — 시장가 매수 netAmount와 동일한 반올림 체인. 등록 시점 feeRate는 `orders.reservation_fee_rate`에 영구 저장된다(미래의 체결 구현이 동일 rate를 사용하기 위한 보존).
 - 수수료율 고정(Quote 시점): 예약 계산 근거를 durable Quote에 저장한다(`quotes.quoted_fee_rate/quoted_gross_amount/quoted_fee_amount/quoted_reserved_amount`, 시장가·FX Quote는 모두 null). Create는 이 저장값을 그대로 예약하고 현재 `Season.tradeFeeRate`를 다시 읽지 않는다. Quote 이후 운영자가 시즌 수수료율을 바꿔도 Quote 응답 예약금 = 실제 wallet reservedAmount 증가액 = `Order.reservedAmount`가 모두 동일하며, `Order.reservationFeeRate`도 Quote 시점 rate다. Create는 저장값을 재검증한다(전부 non-null, 음수 아님, rate가 [0,1], gross/fee/reserved가 Quote의 limitPrice×quantity에서 canonical 반올림 체인으로 재도출 가능). 실패 시 `QUOTE_RESERVATION_BASIS_INVALID`(409)로 거절하며 현재 시즌 수수료율로 대체 계산하는 fallback은 두지 않는다 — 조용한 재가격 산정이야말로 이 고정이 막으려는 실패다.
 - 미체결 주문 금액 필드 의미: `grossAmount`/`feeAmount`/`netAmount`/`executedPrice`/`executedAt`는 **실제 체결 결과**만 의미한다. 자동 체결이 없는 1차 단계에서 `submitted`·`canceled` 지정가 주문은 이 다섯 필드가 모두 null이다. 미체결 주문의 금액은 `reservedAmount`(체결금액이 아니라 미체결 예약금)와 `reservationFeeRate`, 그리고 등록 전 단계에서는 Quote의 `quoted*` 예상값으로 제공한다. 시장가 executed 주문의 세 금액 의미는 그대로 유지한다. 근거: 예약 추정치를 체결 결과 컬럼에 쓰면 미체결 주문이 체결된 것처럼 읽히고, 미래의 체결 구현이 진짜 체결값을 쓸 자리가 사라진다.
@@ -119,13 +120,13 @@
   - participant를 season보다 먼저 잠그는 이유: settlement가 `SeasonParticipant` 갱신 후 마지막에 `Season`을 갱신하므로, season을 먼저 잠그면 순서가 역전돼 deadlock이 가능하다. 시즌 종료 transaction은 `Season`만 건드리고, 취소·cleanup 경로는 `Order → CashWallet`만 잠그므로 이 순서와 순환이 없다.
   - 부수 효과: 시즌이 ended가 된 뒤에는 신규 예약이 생길 수 없으므로, settlement의 open-reservation 사전점검(트랜잭션 밖 2개 count)이 사이에 끼어든 Create 때문에 뚫리는 창도 함께 닫힌다.
 - 원자성: 모든 일반 현금 차감(시장가 매수, FX source debit)과 예약 생성은 단일 SQL UPDATE 안에서 `balance_amount - reserved_amount >= :amount` 가드로 판정한다(read-then-write 금지, parameterized raw SQL: `src/wallets/cash-wallet-atomic.ts`). DB CHECK(`reserved>=0`, `balance>=reserved`)가 최후 방어선.
-- 취소: Order row lock(FOR UPDATE) → CashWallet 순서. 예약 해제와 `submitted→canceled` 전이가 한 transaction이라 해제는 주문당 정확히 1회. 중복 취소는 멱등 replay. 취소는 `LIMIT_ORDER_ENABLED`와 무관하게 항상 가능.
-- 정산 전제조건: 해당 시즌에 submitted 지정가 매수 또는 reservedAmount>0 지갑이 남아 있으면 `OPEN_LIMIT_ORDER_RESERVATIONS`로 settlement를 차단한다. 시즌 lifecycle job이 tick마다 ended/settled 시즌의 잔여 예약을 자가치유 정리하므로 차단은 일시적이다.
+- 취소: Order row lock(FOR UPDATE) → 매수는 CashWallet, 매도는 Position 순서. 예약 해제와 `submitted→canceled` 전이가 한 transaction이라 해제는 주문당 정확히 1회. 중복 취소는 멱등 replay. 취소는 `LIMIT_ORDER_ENABLED`와 계정 status에 무관하게 소유자에게 항상 가능하다.
+- 정산 전제조건: 해당 시즌에 submitted 지정가 주문, reservedAmount>0 지갑 또는 reservedQuantity>0 포지션이 남아 있으면 `OPEN_LIMIT_ORDER_RESERVATIONS`로 settlement를 차단한다. 시즌 lifecycle job이 tick마다 ended/settled 시즌의 잔여 예약을 자가치유 정리하므로 차단은 일시적이다.
 - 기능 플래그: `LIMIT_ORDER_ENABLED`(기본 false)는 신규 Quote/Create만 연다. 자동 체결은 별도 `SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED`(기본 false)로 켠다. 둘 다 strict boolean parser. matching만 켜고 registration을 끄면 신규 등록은 막히되 기존 submitted 주문은 계속 체결되는 "drain" 상태이며, startup에서 WARNING을 남긴다.
 - 프런트엔드 공개 플래그: `EXPO_PUBLIC_LIMIT_ORDER_ENABLED`는 반드시 정적 dot notation(`process.env.EXPO_PUBLIC_LIMIT_ORDER_ENABLED`)으로 읽는다. `babel-preset-expo`의 inline-env-vars 패스는 property가 `EXPO_PUBLIC_` 리터럴인 member expression만 치환하므로, `process.env[key]` 같은 동적 접근은 번들에 값이 아예 들어가지 않아 플래그가 항상 꺼진 것처럼 동작한다. 클라이언트는 부팅 실패시킬 지점이 없으므로 백엔드와 달리 미인식 값도 fail-closed(false)로 두고, 엄격 검증은 실제 인가 주체인 서버가 담당한다.
 - 근거: 예약 없는 지정가 등록은 체결 시점 잔액 부족을 만들고, 예약을 balanceAmount 차감으로 구현하면 총자산이 왜곡된다. 예약을 별도 fence 컬럼으로 두면 두 문제를 모두 피하면서 기존 시장가/FX/평가 경로의 의미를 보존한다.
 
-## Limit Buy Scheduler Matching (경로 A/B, OpsJobLock, 주문별 tx)
+## Limit Order Scheduler Matching (경로 A/B, OpsJobLock, 주문별 tx)
 
 이벤트 기반 매칭 계층(Redis Stream matcher, 활성화 토큰, shared readiness)은
 제거되었고, 자동 체결은 **스케줄러 폴링**으로 재구현했다. Redis Stream/consumer
@@ -139,19 +140,22 @@ OpsJobLockService + ops_job_locks다(Redis lock 아님). 실제 거래소 주문
 - interval ≤ execute freshness(10s)/2: matcher가 수용한 snapshot이 체결 commit 전에
   stale해지지 않도록 config parser가 강제(startup 실패).
 - 경로 A(fresh snapshot): 자산의 최신 유효 `provider_api` AssetPriceSnapshot이
-  limitPrice 이하이면 **snapshot 가격**으로 체결(가격 개선 허용). 기존 시장가 execute의
+  매수는 limitPrice 이하, 매도는 limitPrice 이상이면 **snapshot 가격**으로 체결(가격 개선 허용). 기존 시장가 execute의
   source eligibility·freshness·시장세션 판정을 그대로 재사용(admin_manual/official_batch
   거절, 주식은 개장 세션 필요, crypto 24h).
-- 경로 B(closed 5분봉 터치): 경로 A 미체결분에 대해, 마감된 5분봉 low가 limitPrice
-  이하이면 **order.limitPrice**로 체결(candle.low는 터치 evidence일 뿐). 주문 제출 시각을
+- 경로 B(closed 5분봉 터치): 경로 A 미체결분에 대해, 마감된 5분봉의 매수 low가
+  limitPrice 이하 또는 매도 high가 limitPrice 이상이면 **order.limitPrice**로 체결
+  (candle low/high는 터치 evidence일 뿐). 주문 제출 시각을
   다음 5분 경계로 올린 `firstEligibleCandleOpen` 이후 캔들만, `LIMIT_ORDER_CANDLE_LOOKBACK_MS`
-  (기본 15분) 이내, closeTime ≤ season.endAt인 캔들만 사용. 주문 제출 중이던 첫 부분 캔들은
+  (기본 15분) 이내, 시즌 주문은 closeTime ≤ season.endAt인 캔들만 사용한다. 일반 주문은
+  season 종료 horizon을 두지 않는다. 주문 제출 중이던 첫 부분 캔들은
   절대 사용하지 않는다. 주식은 캔들 window가 유효 세션 안에 있어야 함(휴장/미커버리지 제외).
-- 체결 tx(주문별 독립): Order(FOR UPDATE) → CashWallet(guarded settle) → Position →
-  WalletTransaction 순서(취소·cleanup과 동일). status=submitted·시즌 active·now<endAt·
-  참가자 active·자산 active·execPrice≤limitPrice 재검증. actualNet=round(execPrice*qty*(1+
-  reservationFeeRate)) ≤ reservedAmount 강제. `settleLimitBuyReservedCash`로 balance -= net,
-  reserved -= 주문예약금 전체를 한 문장에 처리(가격 개선 차액은 availableAmount로 복귀).
+- 체결 tx(주문별 독립): Order(FOR UPDATE) → CashWallet/Position 예약 settle → Position →
+  WalletTransaction 순서(취소·cleanup과 동일). status=submitted·mode별 account gate·
+  자산 active·매수 execPrice≤limitPrice/매도 execPrice≥limitPrice를 재검증한다. 매수는
+  `actualNet=round(execPrice*qty*(1+reservationFeeRate)) ≤ reservedAmount`를 강제하고
+  예약금 전체를 해제하면서 실제 net만 balance에서 차감한다. 매도는 reservedQuantity를
+  전량 settle하고 수수료 차감 net을 wallet에 입금한다.
   USD 자산은 fill 시점 fresh USD/KRW snapshot을 fxRateSnapshotId evidence로 부착하며, 없으면
   해당 주문은 이번 cycle 체결을 미룬다(user requote 없는 자동 체결이라 stale FX로 진행 불가).
 - 취소·체결 경합: 둘 다 Order row lock + status=submitted 조건 → 정확히 한쪽 승리. 체결
@@ -169,15 +173,17 @@ OpsJobLockService + ops_job_locks다(Redis lock 아님). 실제 거래소 주문
 
 - 시즌모드와 일반모드는 하나의 사용자 계정을 공유하되 거래계정·지갑·주문·포지션·손익·스냅샷을 완전히 분리하고, 계정 간 자금·자산 이전은 지원하지 않는다.
   근거: 대회형 시즌 성과와 무기한 개인 투자 기록이 섞이면 랭킹·수익률 양쪽의 의미가 깨진다.
-- 공통 계정 계층은 `trading_accounts`(mode=season|general)이며, 이번 단계에서는 식별 계층만 도입하고 지갑·주문·포지션은 여전히 seasonParticipantId를 참조한다(transitional; 후속 작업에서 accountId 전환).
-  근거: 기존 시즌 기능을 깨지 않는 additive 전환 경로가 필요하다.
+- 공통 계정 계층은 `trading_accounts`(mode=season|general)이며 주문·포지션의 실질 격리 키는 `tradingAccountId`다. 시즌 행은 legacy participant를 함께 기록하고 일반 행은 participant가 null이다.
+  근거: 기존 시즌 관계를 보존하면서 일반계정 데이터를 participant 없이 완전히 분리해야 한다.
+- 주문 코어는 검증된 `TradingContext`의 `feeRate`를 사용한다. 시즌은 `Season.tradeFeeRate`, 일반은 한 곳의 `GENERAL_TRADE_FEE_RATE`(미설정 기본 `0.001000`)를 사용하며 현재 시즌에서 일반 수수료를 가져오지 않는다.
+  근거: 일반계정은 시즌 존재/상태와 독립적으로 거래해야 하고, 수수료 숫자가 주문 경로에 분산되면 quote/create/fill 사이에 불일치가 생긴다. 저장소에 별도 general canonical 값은 없었으므로, 기존 season/dev fixture가 일관되게 쓰는 가상거래 0.1%를 독립 기본값으로 채택했고 운영 override도 이 한 config만 사용한다.
 - 사용자당 general 계정은 최대 1개이며 DB partial unique index(`trading_accounts_general_owner_unique`, `WHERE mode='general'`)로 강제한다. `@@unique([userId, mode])`는 사용하지 않는다.
   근거: 시즌 계정은 시즌마다 여러 개가 정상이므로 composite unique로는 표현할 수 없다.
 - 일반모드 최초 가상자금은 계정 최초 생성 시 10,000,000 KRW 1회 지급뿐이다. 월별/가입일 기준/스케줄러 정기 지급과 grantAnchorDay·nextGrantAt류 필드는 폐기·금지한다. 소진 시 자동 재지급·계정 초기화도 없다.
   근거: 반복 무상 지급은 수익률 비교 의미를 없애고, 지급일 스케줄링 상태는 유지비만 만든다.
 - 일반모드 추가 가상자금은 보상형 광고 완료 보상으로만 획득한다(광고 보상은 general 계정 한정, 서버 검증·이벤트 고유 ID·중복 지급 차단·지급+원장 단일 트랜잭션 필수). 1회 지급액·일일 한도·제공자는 운영 설정값으로 미정.
   근거: 클라이언트 신고만으로 잔액이 늘 수 있으면 가상자금이라도 원장 무결성이 무너진다.
-- 광고 보상금은 투자수익이 아니라 외부 가상자금 유입이다. 누적 투자손익 = 현재 총자산 − 누적 외부 가상자금(최초 지급 + 광고 보상 + 운영자 외부 조정)으로 계산하고, 대표 수익률은 단순 (총자산−외부자금)/외부자금 대신 외부자금 유입 시점을 구간 경계로 하는 시간가중수익률(향후 구현)을 쓴다. `TradingAccount.initialCapitalKrw`와 누적 보상 컬럼에 가산하지 않고 원장 집계로만 계산한다.
+- 광고 보상금은 투자수익이 아니라 외부 가상자금 유입이다. 누적 투자손익 = 현재 총자산 − 누적 외부 가상자금(최초 지급 + 광고 보상 + 운영자 외부 조정)으로 계산하고, 대표 수익률은 단순 (총자산−외부자금)/외부자금 대신 외부자금 유입 시점을 구간 경계로 하는 시간가중수익률을 사용한다. 주문 체결은 ordinary advance이고 외부자금 before/after boundary를 만들지 않는다. `TradingAccount.initialCapitalKrw`와 누적 보상 컬럼에 가산하지 않고 원장 집계로만 계산한다.
   근거: 보상 유입 자체로 수익률이 변하면 실제 투자 성과 지표가 왜곡된다.
 - 시즌 거래 가능 판정은 기존 Season.status·기간·ParticipantStatus 검증을 유지하고 TradingAccount.status(active/suspended/closed)는 공통 계정 상태로만 쓴다. backfill 매핑: registered/active→active, excluded→suspended, finished/rewarded→closed, closedAt은 확실한 종료 시각이 없으면 NULL.
   근거: 검증 체계를 한 번에 갈아끼우면 시즌 회귀 위험이 크고, 종료 시각 날조는 금융 기록 원칙에 반한다.
@@ -217,13 +223,13 @@ OpsJobLockService + ops_job_locks다(Redis lock 아님). 실제 거래소 주문
   근거: 환전 규칙이 두 벌 존재하는 순간부터 두 경로의 결과가 갈라진다.
 
 
-## Trading TradingAccount Scope (Order/Position/Quote 전환, 작업 5)
+## Trading TradingAccount Scope (Order/Position/Quote 전환)
 
-- Order·Position·Quote는 전환 기간 동안 seasonParticipantId를 유지한 채 nullable tradingAccountId를 dual-write한다. Order는 `(tradingAccountId, idempotencyKey)` unique(+submittedAt/status 인덱스), Position은 `(tradingAccountId, assetId)` unique를 추가하고 기존 참가자 unique를 유지한다. Quote에는 신규 unique를 두지 않는다(status/consume가 단일 사용을 보장).
+- Order·Position은 전환 기간 동안 nullable `seasonParticipantId`를 유지하고 `tradingAccountId`를 dual-write한다. 시즌 행은 두 scope를 모두 기록하며 일반 행은 participant가 null이다. Order는 `(tradingAccountId, idempotencyKey)` unique(+submittedAt/status 인덱스), Position은 `(tradingAccountId, assetId)` unique를 사용하고 기존 참가자 unique를 유지한다. Quote에는 신규 unique를 두지 않는다(status/consume가 단일 사용을 보장).
   근거: 계정이 거래 데이터의 자산 격리 기준이 되려면 멱등성·집계 unique도 계정 축으로 존재해야 하고, 참가자 축 제거는 별도 작업이다.
 - 지갑을 변경하거나 지갑 잔액을 근거로 quote를 만드는 모든 경로는 wallet의 participant+account scope를 선검증하고, 원자적 잔액 UPDATE의 WHERE에도 `trading_account_id`를 포함한다. null scope는 500 `FINANCIAL_SCOPE_REPAIR_REQUIRED`(거래 중 자동 backfill 금지), 불일치는 500 `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`(덮어쓰기 금지)로 fail-closed 한다. 400류로 다루지 않는다.
   근거: 이는 클라이언트 입력 문제가 아니라 서버 정합성 손상이며, 어떤 계정의 지갑인지 거래가 결정하게 두면 손상이 확산된다.
-- account-scoped 조회(금융 4모델·주문·포지션)는 시즌 참가자의 null/불일치 scope 행이 존재하면 빈·부분 결과 대신 repair-required/mismatch 500으로 실패한다. general 계정은 참가자가 없으므로 정상 빈 결과다.
+- account-scoped 조회(금융 4모델·주문·포지션)는 시즌 참가자의 null/불일치 scope 또는 일반 행의 participant 오염이 존재하면 빈·부분 결과 대신 구조화 500으로 실패한다. 정상 general 행은 participant 없이 account scope만 가진다.
   근거: 복구 미완료 상태를 "정상적으로 빈 계정"으로 보여 주는 것이 가장 위험한 침묵 실패다.
 - Quote는 자산을 직접 바꾸지 않지만 실행 권한을 제공하므로 계정 격리 대상이다: 신규 quote는 검증된 accountId를 기록하고, 실행 시 non-null quote 계정이 다르면 `QUOTE_MISMATCH`, 소비는 `id+status+participant+(계정 일치 OR null)` 조건의 updateMany로만 한다. requestHash 계산식은 교체하지 않는다.
   근거: 저장된 scope 검증만으로 계정 격리가 완성되며, hash 전면 교체는 미소비 legacy quote와 replay 계약을 깨뜨린다.
@@ -239,7 +245,7 @@ OpsJobLockService + ops_job_locks다(Redis lock 아님). 실제 거래소 주문
 
 - account-scoped 주문 취소의 잠금 SQL에는 `trading_account_id` 조건을 넣지 않는다. 주문은 orderId + 사용자 소유권으로만 잠그고, 계정 소속은 조회된 행으로 분류한다: 참가자 링크가 요청 계정이면 order scope null → 500 `TRADING_SCOPE_REPAIR_REQUIRED`, 불일치 → 500 `TRADING_ACCOUNT_SCOPE_MISMATCH`; 참가자 링크가 다른 계정이라도 order scope가 요청 계정을 가리키면 500 mismatch; 둘 다 다르면 404 `ORDER_NOT_FOUND`. 분류는 시장가 410 판정보다 먼저 수행하고 어떤 오류 경로에서도 주문 상태·예약금을 바꾸지 않는다.
   근거: 타인의 주문(숨겨야 함)과 자기 주문의 scope 손상(드러내야 함)은 정반대 성격인데, 잠금 조건에 계정을 넣으면 둘이 같은 404로 붕괴하고 사용자는 자기 주문이 사라진 이유를 알 수 없다.
-- 이미 커밋된 주문 생성의 재시도는 현재 상태 gate보다 먼저 저장된 최초 응답을 재생한다. 시장가·지정가 모두 적용되며, 신규 주문 gate(general 차단, account active, 시즌 status·기간, participant status, 시장 개장, quote, wallet scope, 잔액, 가격 freshness)는 기존 주문이 하나도 없을 때만 실행한다. 계정 소유권 확인만은 replay보다 먼저 수행한다.
+- 이미 커밋된 주문 생성의 재시도는 현재 상태 gate보다 먼저 저장된 최초 응답을 재생한다. 시장가·지정가 모두 적용되며, 신규 주문 gate(account active, mode별 integrity, 시즌 status·기간·participant status, 시장 개장, quote, wallet/position scope, 잔액/수량, 가격 freshness)는 기존 주문이 하나도 없을 때만 실행한다. 계정 소유권 확인만은 replay보다 먼저 수행한다.
   근거: 이미 돈이 움직인 요청에 상태 오류를 돌려주는 것은 사실과 다르고, 재시도 폭주는 바로 그 gate가 실패하기 시작할 때 일어난다. 소유권을 먼저 보지 않으면 남의 accountId로 주문 정보를 열람할 수 있다.
 - 시장가 주문의 `responsePayloadJson`은 생성·체결 트랜잭션 안에서 저장한다. 저장 실패 시 주문·체결·지갑·원장·포지션이 함께 rollback 된다. 재시도는 현재 데이터로 응답을 재구성하지 않고 저장된 payload를 반환한다(payload 없는 legacy 행만 기존 fallback 유지).
   근거: 응답 없이 커밋된 주문은 어떤 재시도로도 정확히 재현할 수 없다.
@@ -345,4 +351,3 @@ OpsJobLockService + ops_job_locks다(Redis lock 아님). 실제 거래소 주문
 - `repair-ranking-scope`는 기본 dry-run이며 `ranking.tradingAccountId`만 채운다. non-null mismatch·participant link null·general account·user/season 불일치는 보고만 하고 절대 고치지 않는다. 함께 출력되는 audit는 read-only이며 rank 재계산이나 재번호 매기기를 하지 않는다.
   근거: 추측으로 채운 scope는 잘못된 계정에 성적을 귀속시킨다. rank gap이나 tier 불일치는 스크립트가 아니라 해당 job 재실행으로 고쳐야 한다.
 - 랭킹 계산 정책·순위 방식(sequential 1,2,3,4)·티어 비율·시즌 초기자본 기준 수익률은 이번 작업에서 변경하지 않는다. reward 지급 gate는 계속 닫혀 있고, 실제 광고 provider는 계속 미연동이다.
-

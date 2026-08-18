@@ -87,6 +87,19 @@ describe('account-scoped order rows adapt to the record row shape', () => {
     assert.equal(item.netAmount, '711420.00');
   });
 
+  it('keeps a submitted limit-sell reservation open for polling and cancel', () => {
+    const item = toRecordOrderItem(
+      accountOrderRow({
+        side: 'sell',
+        reservedAmount: null,
+        reservedQuantity: '2.000000',
+      }),
+    );
+
+    assert.equal(isOpenLimitBuyOrder(item), true);
+    assert.equal(item.reservedQuantity, '2.000000');
+  });
+
   it('falls back to flat fields when the asset is absent', () => {
     const item = toRecordOrderItem({
       id: 'order-2',

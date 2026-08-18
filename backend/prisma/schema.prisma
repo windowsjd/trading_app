@@ -773,7 +773,9 @@ model MarketSessionOverride {
 
 model Position {
   id                  String       @id @default(uuid())
-  seasonParticipantId String       @map("season_participant_id")
+  // NULL for general-mode positions. Season positions keep their participant
+  // link and every writer also records tradingAccountId.
+  seasonParticipantId String?      @map("season_participant_id")
   // Transitional dual identity (see CashWallet): nullable trading-account
   // scope next to the legacy seasonParticipantId. Backfilled from the
   // participant link by add_trading_scope_and_fx_legacy_partial_unique;
@@ -781,6 +783,9 @@ model Position {
   tradingAccountId    String?      @map("trading_account_id")
   assetId             String       @map("asset_id")
   quantity            Decimal      @db.Decimal(24, 8)
+  // Quantity locked by submitted limit-sell orders. It remains part of the
+  // owned position/equity until fill, but is unavailable to another sell.
+  reservedQuantity    Decimal      @default(0) @map("reserved_quantity") @db.Decimal(24, 8)
   averageCost         Decimal      @map("average_cost") @db.Decimal(24, 8)
   currencyCode        CurrencyCode @map("currency_code")
   realizedPnl         Decimal      @default(0) @map("realized_pnl") @db.Decimal(24, 8)
@@ -794,9 +799,9 @@ model Position {
   createdAt           DateTime     @default(now()) @map("created_at")
   updatedAt           DateTime     @updatedAt @map("updated_at")
 
-  seasonParticipant SeasonParticipant @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
-  tradingAccount    TradingAccount?   @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
-  asset             Asset             @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  seasonParticipant SeasonParticipant? @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  tradingAccount    TradingAccount?    @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  asset             Asset              @relation(fields: [assetId], references: [id], onDelete: Restrict)
 
   @@unique([seasonParticipantId, assetId])
   // One aggregate position per asset per trading account. NULL legacy rows
@@ -810,7 +815,8 @@ model Position {
 
 model Order {
   id                         String       @id @default(uuid())
-  seasonParticipantId        String       @map("season_participant_id")
+  // NULL for general-mode orders. Season orders keep their existing link.
+  seasonParticipantId        String?      @map("season_participant_id")
   // Transitional dual identity (see CashWallet). The trading account is the
   // asset-isolation boundary for order data; the participant link stays for
   // season state/ranking/settlement until the removal work unit.
@@ -832,15 +838,17 @@ model Order {
   idempotencyKey             String?      @map("idempotency_key")
   requestHash                String?      @map("request_hash")
   responsePayloadJson        Json?        @map("response_payload_json")
-  // Limit-buy reservation bookkeeping (null for market orders): the cash
-  // amount locked at submit time, the fee rate captured for the future
-  // execution phase, and when the reservation was released (cancel/cleanup).
+  // Limit-order reservation bookkeeping: buys use reservedAmount, sells use
+  // reservedQuantity; both pin reservationFeeRate for future execution and
+  // record reservationReleasedAt on fill/cancel/cleanup.
   reservedAmount             Decimal?     @map("reserved_amount") @db.Decimal(24, 8)
+  // Limit-sell reservation bookkeeping. Cash reservations use
+  // reservedAmount; quantity reservations use this field.
+  reservedQuantity           Decimal?     @map("reserved_quantity") @db.Decimal(24, 8)
   reservationFeeRate         Decimal?     @map("reservation_fee_rate") @db.Decimal(10, 6)
   reservationReleasedAt      DateTime?    @map("reservation_released_at")
   cancelReason               String?      @map("cancel_reason")
-  // Closed-candle evidence link (spec §7 model, preserved at the schema level
-  // for the future scheduler-based matching). No code writes it today.
+  // Closed-candle evidence link written by scheduler path-B matching.
   limitOrderCandleEvidenceId String?      @map("limit_order_candle_evidence_id")
   submittedAt                DateTime     @map("submitted_at")
   executedAt                 DateTime?    @map("executed_at")
@@ -850,7 +858,7 @@ model Order {
   createdAt                  DateTime     @default(now()) @map("created_at")
   updatedAt                  DateTime     @updatedAt @map("updated_at")
 
-  seasonParticipant  SeasonParticipant         @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  seasonParticipant  SeasonParticipant?        @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
   tradingAccount     TradingAccount?           @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   asset              Asset                     @relation(fields: [assetId], references: [id], onDelete: Restrict)
   quote              Quote?                    @relation(fields: [quoteId], references: [id], onDelete: Restrict)
@@ -1096,13 +1104,16 @@ model Quote {
   currencyCode         CurrencyCode? @map("currency_code")
   quotedPrice          Decimal?      @map("quoted_price") @db.Decimal(24, 8)
   quotedRate           Decimal?      @map("quoted_rate") @db.Decimal(18, 8)
-  // Limit-buy reservation basis pinned AT QUOTE TIME (null on market/FX
-  // quotes). Create reserves exactly these amounts, so a Season.tradeFeeRate
-  // change between quote and create can never move the user's reservation.
+  // Limit-order fee basis pinned AT QUOTE TIME (null on market/FX quotes).
+  // Buy create reserves quotedReservedAmount; sell create reserves quantity
+  // and uses quotedNetAmount as estimated proceeds. A fee policy change
+  // between quote and create cannot move the quoted result.
   quotedFeeRate        Decimal?      @map("quoted_fee_rate") @db.Decimal(10, 6)
   quotedGrossAmount    Decimal?      @map("quoted_gross_amount") @db.Decimal(24, 8)
   quotedFeeAmount      Decimal?      @map("quoted_fee_amount") @db.Decimal(24, 8)
   quotedReservedAmount Decimal?      @map("quoted_reserved_amount") @db.Decimal(24, 8)
+  // Limit-sell estimated proceeds (gross - fee), pinned at quote time.
+  quotedNetAmount      Decimal?      @map("quoted_net_amount") @db.Decimal(24, 8)
   assetPriceSnapshotId String?       @map("asset_price_snapshot_id")
   fxRateSnapshotId     String?       @map("fx_rate_snapshot_id")
   assetPriceSourceJson Json?         @map("asset_price_source_json")
@@ -1399,6 +1410,7 @@ model LimitOrderCandleEvidence {
   openTime             DateTime @map("open_time") @db.Timestamptz(3)
   closeTime            DateTime @map("close_time") @db.Timestamptz(3)
   triggerLowPrice      Decimal  @map("trigger_low_price") @db.Decimal(24, 8)
+  triggerHighPrice     Decimal? @map("trigger_high_price") @db.Decimal(24, 8)
   // Always 'limit_price': a 5m low proves the limit was touched, never the
   // price a fill could actually have been obtained at.
   executionPricePolicy String   @map("execution_price_policy")

@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import {
   assertGeneralAccountFinancialIntegrity,
+  assertGeneralAccountTradingRowsIntegrity,
   throwGeneralAccountIntegrity,
   type GeneralAccountIntegrityTarget,
   type VerifiedGeneralAccountWallets,
@@ -400,6 +401,34 @@ export class GeneralAccountPerformanceService {
   }
 
   /**
+   * Persists an ordinary, performance-bearing event inside the caller's
+   * financial transaction. A trade is not external funding: it advances TWR
+   * from the verified prior state and keeps cumulative funding unchanged.
+   */
+  async createOrdinarySnapshotInTransaction(input: {
+    account: GeneralAccountIntegrityTarget;
+    reason: SnapshotReason;
+    capturedAt: Date;
+    client: Prisma.TransactionClient;
+  }): Promise<string> {
+    const { values } = await this.buildOrdinarySnapshotValues({
+      account: input.account,
+      valuationAt: input.capturedAt,
+      client: input.client,
+    });
+    const snapshot = await input.client.equitySnapshot.create({
+      data: {
+        seasonParticipantId: null,
+        ...values,
+        snapshotReason: input.reason,
+        capturedAt: input.capturedAt,
+      },
+      select: { id: true },
+    });
+    return snapshot.id;
+  }
+
+  /**
    * The before/after pair bracketing an external virtual-funding inflow.
    *
    * BEFORE captures every bit of market performance up to the instant of the
@@ -518,13 +547,7 @@ export class GeneralAccountPerformanceService {
 
   // ------------------------------------------------------------ helpers
 
-  /**
-   * Full general-account financial structure + the trading-disabled
-   * invariant. General trading is not activated in this release, so any
-   * Order/Position/Exchange/FxExecuteRequest on a general account means data
-   * arrived through a path that is not supposed to exist — valuing it as if
-   * it were normal would produce a confidently wrong number.
-   */
+  /** Full general-account financial structure and account-scope integrity. */
   async assertGeneralAccountReady(
     account: GeneralAccountIntegrityTarget,
     client: PerformanceClient = this.prisma,
@@ -538,9 +561,9 @@ export class GeneralAccountPerformanceService {
       account,
     );
 
-    const [orders, positions, exchanges, fxRequests] = await Promise.all([
-      client.order.count({ where: { tradingAccountId: account.id } }),
-      client.position.count({ where: { tradingAccountId: account.id } }),
+    await assertGeneralAccountTradingRowsIntegrity(client, account.id);
+
+    const [exchanges, fxRequests] = await Promise.all([
       client.exchangeTransaction.count({
         where: { tradingAccountId: account.id },
       }),
@@ -549,10 +572,12 @@ export class GeneralAccountPerformanceService {
       }),
     ]);
 
-    if (orders > 0 || positions > 0 || exchanges > 0 || fxRequests > 0) {
+    // General FX remains a separate, disabled domain. Its rows are still
+    // structural corruption for a general account in this release.
+    if (exchanges > 0 || fxRequests > 0) {
       throwGeneralAccountIntegrity(
         account.id,
-        `general trading is not enabled in this release but the account has orders=${orders}, positions=${positions}, exchanges=${exchanges}, fxRequests=${fxRequests}`,
+        `general FX is not enabled but the account has exchanges=${exchanges}, fxRequests=${fxRequests}`,
       );
     }
 

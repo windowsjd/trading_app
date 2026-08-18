@@ -217,7 +217,12 @@ export async function runAdminGenerateSeasonRanking(argv: string[]) {
           snapshot.seasonParticipantId,
         ),
       })),
-      executedOrders,
+      executedOrders: executedOrders.map((order) => ({
+        ...order,
+        seasonParticipantId: requireSeasonSnapshotParticipantId(
+          order.seasonParticipantId,
+        ),
+      })),
     });
     const writeResult = await writeSeasonRankings(prisma, {
       seasonId,

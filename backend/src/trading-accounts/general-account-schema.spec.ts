@@ -8,7 +8,7 @@ import { join } from 'node:path';
  * if someone re-tightens the nullable participant links, drops a partial
  * unique index Prisma cannot express, adds a monthly-grant field or
  * scheduler, caches a cumulative ad-reward value on TradingAccount, makes the
- * migration create a general account, or prematurely relaxes Order/Position.
+ * migration create a general account, or rewrites existing season trades.
  *
  * DB-level behavior (index enforcement, transaction atomicity, races) is
  * covered by the opt-in PostgreSQL specs — text assertions never replace them.
@@ -32,6 +32,16 @@ const foundationMigration = readFileSync(
     'prisma',
     'migrations',
     '20260803181000_add_general_account_and_ad_reward_foundation',
+    'migration.sql',
+  ),
+  'utf8',
+);
+const generalTradingMigration = readFileSync(
+  join(
+    root,
+    'prisma',
+    'migrations',
+    '20260818120000_enable_general_account_trading',
     'migration.sql',
   ),
   'utf8',
@@ -75,12 +85,28 @@ describe('General account + ad reward schema contract', () => {
       );
     });
 
-    it('keeps Order and Position participant links REQUIRED in this work unit', () => {
-      // General-mode trading is still disabled, so these must not be relaxed
-      // "while we are in here". That is a separate work unit.
+    it('makes Order and Position participant links nullable for general trading', () => {
       for (const model of ['Order', 'Position']) {
-        expect(modelBlock(model)).toMatch(/seasonParticipantId\s+String\s/);
+        expect(modelBlock(model)).toMatch(/seasonParticipantId\s+String\?/);
       }
+    });
+
+    it('uses an additive DDL-only general-trading migration', () => {
+      expect(generalTradingMigration).toContain(
+        'ALTER COLUMN "season_participant_id" DROP NOT NULL',
+      );
+      expect(generalTradingMigration).toContain(
+        'ADD COLUMN "reserved_quantity" DECIMAL(24, 8)',
+      );
+      expect(generalTradingMigration).toContain(
+        'positions_reserved_quantity_within_quantity_check',
+      );
+      expect(generalTradingMigration).not.toMatch(
+        /\b(?:UPDATE|DELETE\s+FROM|TRUNCATE)\b/i,
+      );
+      expect(generalTradingMigration).not.toMatch(/DROP\s+COLUMN/i);
+      expect(generalTradingMigration).not.toContain('exchange_transactions');
+      expect(generalTradingMigration).not.toContain('fx_execute_requests');
     });
 
     it('keeps ExchangeTransaction and FxExecuteRequest participant links REQUIRED', () => {

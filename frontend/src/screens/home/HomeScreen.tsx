@@ -95,6 +95,15 @@ export default function HomeScreen({ navigation }: Props) {
           account={selectedAccount}
           capabilities={capabilities}
           onOpenLedger={() => navigation.navigate('WalletTransactions')}
+          onOpenOrders={() =>
+            rootNavigation.navigate('MainTabs', {
+              screen: 'RecordTab',
+              params: {
+                screen: 'RecordOrderList',
+                params: { accountId: selectedAccount.id },
+              },
+            })
+          }
         />
       ) : (
         <SeasonAccountHome

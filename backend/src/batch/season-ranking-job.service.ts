@@ -473,7 +473,12 @@ export class SeasonRankingJobService {
 
     assertRankingSourceOrderScopes({ rows, participantScopes });
 
-    return rows;
+    return rows.map((row) => ({
+      ...row,
+      seasonParticipantId: requireSeasonSnapshotParticipantId(
+        row.seasonParticipantId,
+      ),
+    }));
   }
 
   private formatCalculatedRankingRow(

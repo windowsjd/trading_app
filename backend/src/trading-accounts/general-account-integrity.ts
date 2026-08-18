@@ -39,6 +39,11 @@ type GeneralIntegrityClient = Pick<
   'cashWallet' | 'walletTransaction'
 >;
 
+type GeneralTradingRowsClient = Pick<
+  Prisma.TransactionClient,
+  'order' | 'position' | 'quote'
+>;
+
 export type GeneralAccountIntegrityTarget = {
   id: string;
   mode: TradingAccountMode;
@@ -302,4 +307,67 @@ export async function assertGeneralAccountFinancialIntegrity(
   );
   await assertGeneralAccountFinancialRowsIntegrity(prisma, account.id);
   return wallets;
+}
+
+/** General trading rows are account-only and must never carry a participant. */
+export async function assertGeneralAccountTradingRowsIntegrity(
+  prisma: GeneralTradingRowsClient,
+  accountId: string,
+): Promise<void> {
+  const [order, position, quote] = await Promise.all([
+    prisma.order.findFirst({
+      where: {
+        tradingAccountId: accountId,
+        OR: [
+          { seasonParticipantId: { not: null } },
+          // Every general order is durable-quote backed. Missing or foreign
+          // quote scope is corruption, not a row that may be shown normally.
+          { quoteId: null },
+          { quote: { is: { tradingAccountId: null } } },
+          {
+            quote: {
+              is: { tradingAccountId: { not: accountId } },
+            },
+          },
+          { quote: { is: { seasonParticipantId: { not: null } } } },
+        ],
+      },
+      select: { id: true },
+    }),
+    prisma.position.findFirst({
+      where: {
+        tradingAccountId: accountId,
+        seasonParticipantId: { not: null },
+      },
+      select: { id: true },
+    }),
+    prisma.quote.findFirst({
+      where: {
+        tradingAccountId: accountId,
+        OR: [
+          { seasonParticipantId: { not: null } },
+          // Also look from the quote side so moving an Order's accountId does
+          // not make the damaged row silently disappear from its origin.
+          {
+            orders: {
+              some: {
+                OR: [
+                  { tradingAccountId: null },
+                  { tradingAccountId: { not: accountId } },
+                  { seasonParticipantId: { not: null } },
+                ],
+              },
+            },
+          },
+        ],
+      },
+      select: { id: true },
+    }),
+  ]);
+  if (order || position || quote) {
+    throwGeneralAccountIntegrity(
+      accountId,
+      'a general order, position, or quote has participant pollution or mismatched durable-quote scope',
+    );
+  }
 }

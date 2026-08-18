@@ -24,9 +24,11 @@ import {
 import {
   calculateAvailableAmount,
   calculateLimitBuyReservation,
+  calculateLimitSellQuote,
   validateQuotedLimitReservationBasis,
   type QuotedLimitReservationBasis,
 } from './limit-order-policy';
+import { reserveAvailablePositionQuantity } from './position-reservation-atomic';
 import { OrderReservationService } from './order-reservation.service';
 import {
   formatOrderResponse,
@@ -50,6 +52,7 @@ const LIMIT_ORDER_PAYLOAD_SELECT = {
   assetPriceSnapshotId: true,
   fxRateSnapshotId: true,
   reservedAmount: true,
+  reservedQuantity: true,
   reservationReleasedAt: true,
   cancelReason: true,
   submittedAt: true,
@@ -99,6 +102,7 @@ export type LimitOrderCreateResponse = {
       submittedAt: string;
       quoteId: string | null;
       reservedAmount: string | null;
+      reservedQuantity: string | null;
       reservationFeeRate: string | null;
       duplicate: boolean;
     };
@@ -119,6 +123,20 @@ export type LimitOrderExecutionPolicy = {
   fullFillOnly: true;
   candleInterval: '5m' | null;
   candleExecutionPricePolicy: 'limit_price' | null;
+};
+
+export type LimitSellQuotePreview = {
+  quotedFeeRate: Prisma.Decimal;
+  grossAmount: Prisma.Decimal;
+  feeAmount: Prisma.Decimal;
+  netAmount: Prisma.Decimal;
+  walletBalanceBefore: Prisma.Decimal;
+  positionQuantityBefore: Prisma.Decimal;
+  positionReservedBefore: Prisma.Decimal;
+  positionAvailableBefore: Prisma.Decimal;
+  estimatedPositionReservedAfter: Prisma.Decimal;
+  estimatedPositionAvailableAfter: Prisma.Decimal;
+  estimatedPositionQuantityAfter: Prisma.Decimal;
 };
 
 export function buildLimitOrderExecutionPolicy(input: {
@@ -142,11 +160,11 @@ export function buildLimitOrderExecutionPolicy(input: {
 type LimitCreateTransactionClient = Prisma.TransactionClient;
 
 /**
- * Limit-buy quote preview and submitted-order creation with cash reservation.
+ * Limit-order quote preview and submitted-order creation with reservation.
  * No provider price is read anywhere in this service and no
- * WalletTransaction/Position is written during Create. Registration completes
- * against PostgreSQL alone; automatic matching is not implemented, so a
- * submitted order changes state only through user cancel or cleanup.
+ * WalletTransaction is written during Create. Buy orders reserve wallet cash;
+ * sell orders reserve position quantity. Registration completes against
+ * PostgreSQL alone and the shared scheduler matcher performs later fills.
  */
 @Injectable()
 export class LimitOrderCreateService {
@@ -156,12 +174,12 @@ export class LimitOrderCreateService {
   ) {}
 
   /**
-   * Read-only wallet/position preview for a limit-buy quote. Rejects with
-   * INSUFFICIENT_AVAILABLE_BALANCE when balance - reserved cannot cover the
-   * would-be reservation. Never mutates anything.
+   * Read-only wallet/position preview for a limit-order quote. Buy rejects
+   * when available wallet cash cannot cover the reservation; sell rejects
+   * when available position quantity cannot cover it. Never mutates anything.
    */
   async buildLimitBuyQuotePreview(input: {
-    participantId: string;
+    participantId: string | null;
     /** VERIFIED trading account id (participant link / owned account). */
     tradingAccountId: string;
     assetId: string;
@@ -178,12 +196,20 @@ export class LimitOrderCreateService {
 
     const [wallet, position] = await Promise.all([
       this.prisma.cashWallet.findUnique({
-        where: {
-          seasonParticipantId_currencyCode: {
-            seasonParticipantId: input.participantId,
-            currencyCode: input.currencyCode,
-          },
-        },
+        where:
+          input.participantId === null
+            ? {
+                tradingAccountId_currencyCode: {
+                  tradingAccountId: input.tradingAccountId,
+                  currencyCode: input.currencyCode,
+                },
+              }
+            : {
+                seasonParticipantId_currencyCode: {
+                  seasonParticipantId: input.participantId,
+                  currencyCode: input.currencyCode,
+                },
+              },
         select: {
           id: true,
           seasonParticipantId: true,
@@ -193,13 +219,24 @@ export class LimitOrderCreateService {
         },
       }),
       this.prisma.position.findUnique({
-        where: {
-          seasonParticipantId_assetId: {
-            seasonParticipantId: input.participantId,
-            assetId: input.assetId,
-          },
-        },
+        where:
+          input.participantId === null
+            ? {
+                tradingAccountId_assetId: {
+                  tradingAccountId: input.tradingAccountId,
+                  assetId: input.assetId,
+                },
+              }
+            : {
+                seasonParticipantId_assetId: {
+                  seasonParticipantId: input.participantId,
+                  assetId: input.assetId,
+                },
+              },
         select: {
+          id: true,
+          seasonParticipantId: true,
+          tradingAccountId: true,
           quantity: true,
         },
       }),
@@ -230,6 +267,17 @@ export class LimitOrderCreateService {
     }
 
     const positionQuantityBefore = position?.quantity ?? new Prisma.Decimal(0);
+    if (
+      position &&
+      (position.seasonParticipantId !== input.participantId ||
+        position.tradingAccountId !== input.tradingAccountId)
+    ) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+        'Position scope does not match the limit-order trading account.',
+      );
+    }
 
     return {
       ...amounts,
@@ -245,6 +293,108 @@ export class LimitOrderCreateService {
       estimatedPositionQuantityAfter: positionQuantityBefore.add(
         input.quantity,
       ),
+    };
+  }
+
+  async buildLimitSellQuotePreview(input: {
+    participantId: string | null;
+    tradingAccountId: string;
+    assetId: string;
+    currencyCode: CurrencyCode;
+    limitPrice: Prisma.Decimal;
+    quantity: Prisma.Decimal;
+    tradeFeeRate: Prisma.Decimal;
+  }): Promise<LimitSellQuotePreview> {
+    const amounts = calculateLimitSellQuote({
+      limitPrice: input.limitPrice,
+      quantity: input.quantity,
+      tradeFeeRate: input.tradeFeeRate,
+    });
+    const [wallet, position] = await Promise.all([
+      this.prisma.cashWallet.findUnique({
+        where:
+          input.participantId === null
+            ? {
+                tradingAccountId_currencyCode: {
+                  tradingAccountId: input.tradingAccountId,
+                  currencyCode: input.currencyCode,
+                },
+              }
+            : {
+                seasonParticipantId_currencyCode: {
+                  seasonParticipantId: input.participantId,
+                  currencyCode: input.currencyCode,
+                },
+              },
+        select: {
+          id: true,
+          seasonParticipantId: true,
+          tradingAccountId: true,
+          balanceAmount: true,
+        },
+      }),
+      this.prisma.position.findUnique({
+        where:
+          input.participantId === null
+            ? {
+                tradingAccountId_assetId: {
+                  tradingAccountId: input.tradingAccountId,
+                  assetId: input.assetId,
+                },
+              }
+            : {
+                seasonParticipantId_assetId: {
+                  seasonParticipantId: input.participantId,
+                  assetId: input.assetId,
+                },
+              },
+        select: {
+          seasonParticipantId: true,
+          tradingAccountId: true,
+          quantity: true,
+          reservedQuantity: true,
+        },
+      }),
+    ]);
+    if (wallet) {
+      assertCashWalletTradingAccountScope(wallet, {
+        seasonParticipantId: input.participantId,
+        tradingAccountId: input.tradingAccountId,
+      });
+    }
+    if (
+      position &&
+      (position.seasonParticipantId !== input.participantId ||
+        position.tradingAccountId !== input.tradingAccountId)
+    ) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+        'Position scope does not match the limit-order trading account.',
+      );
+    }
+    const reservedQuantity =
+      position?.reservedQuantity ?? new Prisma.Decimal(0);
+    const available = position
+      ? position.quantity.sub(reservedQuantity)
+      : new Prisma.Decimal(0);
+    if (!position || available.lt(input.quantity)) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'INSUFFICIENT_QUANTITY',
+        'Available position quantity is insufficient.',
+      );
+    }
+    return {
+      ...amounts,
+      quotedFeeRate: input.tradeFeeRate,
+      walletBalanceBefore: wallet?.balanceAmount ?? new Prisma.Decimal(0),
+      positionQuantityBefore: position.quantity,
+      positionReservedBefore: reservedQuantity,
+      positionAvailableBefore: available,
+      estimatedPositionReservedAfter: reservedQuantity.add(input.quantity),
+      estimatedPositionAvailableAfter: available.sub(input.quantity),
+      estimatedPositionQuantityAfter: position.quantity.sub(input.quantity),
     };
   }
 
@@ -423,8 +573,8 @@ export class LimitOrderCreateService {
   }
 
   /**
-   * Creates the submitted limit-buy order inside the caller's transaction.
-   * One atomic unit: cash reservation, order row, quote consumption, and
+   * Creates the submitted limit order inside the caller's transaction. One
+   * atomic unit: cash/quantity reservation, order row, quote consumption, and
    * the idempotent response payload all commit or roll back together.
    *
    * The reservation is taken from the basis pinned on the durable quote —
@@ -448,7 +598,7 @@ export class LimitOrderCreateService {
         };
       };
       participant: {
-        id: string;
+        id: string | null;
         /** VERIFIED trading account id (participant link, re-checked against
          * the locked row by the caller). */
         tradingAccountId: string;
@@ -488,8 +638,7 @@ export class LimitOrderCreateService {
 
     // 2) Submitted order row. grossAmount/feeAmount/netAmount/executedPrice/
     // executedAt mean ACTUAL EXECUTION RESULT and stay null until a fill
-    // exists — and with no automatic matching implemented, a submitted limit
-    // order has no fill path at all. The unfilled order's monetary story lives
+    // exists. The unfilled order's monetary story lives
     // in reservedAmount + reservationFeeRate (and, for the pre-submit preview,
     // the quote's pinned quoted* amounts).
     const created = await tx.order.create({
@@ -533,10 +682,14 @@ export class LimitOrderCreateService {
         id: input.quote.id,
         status: QuoteStatus.active,
         seasonParticipantId: input.participant.id,
-        OR: [
-          { tradingAccountId: input.participant.tradingAccountId },
-          { tradingAccountId: null },
-        ],
+        ...(input.participant.id === null
+          ? { tradingAccountId: input.participant.tradingAccountId }
+          : {
+              OR: [
+                { tradingAccountId: input.participant.tradingAccountId },
+                { tradingAccountId: null },
+              ],
+            }),
       },
       data: {
         status: QuoteStatus.consumed,
@@ -578,6 +731,7 @@ export class LimitOrderCreateService {
           submittedAt: input.submittedAt.toISOString(),
           quoteId: input.quote.id,
           reservedAmount: reservedAmountText,
+          reservedQuantity: null,
           reservationFeeRate: reservationFeeRateText,
           duplicate: false,
         },
@@ -596,6 +750,211 @@ export class LimitOrderCreateService {
       select: { id: true },
     });
 
+    return response;
+  }
+
+  /** Submitted limit sell: reserve position quantity, consume quote, persist replay. */
+  async createSubmittedLimitSellInTransaction(
+    tx: LimitCreateTransactionClient,
+    input: {
+      quote: {
+        id: string;
+        limitPrice: Prisma.Decimal;
+        quotedFeeRate: Prisma.Decimal | null;
+        quotedGrossAmount: Prisma.Decimal | null;
+        quotedFeeAmount: Prisma.Decimal | null;
+        quotedNetAmount: Prisma.Decimal | null;
+        asset: {
+          id: string;
+          settlementCurrency: CurrencyCode | null;
+          currencyCode: CurrencyCode;
+        };
+      };
+      participant: { id: string | null; tradingAccountId: string };
+      quantity: Prisma.Decimal;
+      idempotency: { idempotencyKey: string; requestHash: string };
+      submittedAt: Date;
+      autoExecutionEnabled?: boolean;
+    },
+  ): Promise<LimitOrderCreateResponse> {
+    const currencyCode =
+      input.quote.asset.settlementCurrency ?? input.quote.asset.currencyCode;
+    if (
+      !input.quote.quotedFeeRate ||
+      !input.quote.quotedGrossAmount ||
+      !input.quote.quotedFeeAmount ||
+      !input.quote.quotedNetAmount
+    ) {
+      this.throwLimitOrderError(
+        limitOrderErrorCodes.QUOTE_RESERVATION_BASIS_INVALID,
+        'Limit sell quote is missing its pinned fee basis.',
+      );
+    }
+    const recomputed = calculateLimitSellQuote({
+      limitPrice: input.quote.limitPrice,
+      quantity: input.quantity,
+      tradeFeeRate: input.quote.quotedFeeRate,
+    });
+    if (
+      input.quote.quotedFeeRate.lt(0) ||
+      input.quote.quotedFeeRate.gt(1) ||
+      !recomputed.grossAmount.eq(input.quote.quotedGrossAmount) ||
+      !recomputed.feeAmount.eq(input.quote.quotedFeeAmount) ||
+      !recomputed.netAmount.eq(input.quote.quotedNetAmount)
+    ) {
+      this.throwLimitOrderError(
+        limitOrderErrorCodes.QUOTE_RESERVATION_BASIS_INVALID,
+        'Limit sell quote fee basis is inconsistent.',
+      );
+    }
+
+    const position = await tx.position.findUnique({
+      where:
+        input.participant.id === null
+          ? {
+              tradingAccountId_assetId: {
+                tradingAccountId: input.participant.tradingAccountId,
+                assetId: input.quote.asset.id,
+              },
+            }
+          : {
+              seasonParticipantId_assetId: {
+                seasonParticipantId: input.participant.id,
+                assetId: input.quote.asset.id,
+              },
+            },
+      select: {
+        id: true,
+        seasonParticipantId: true,
+        tradingAccountId: true,
+        currencyCode: true,
+      },
+    });
+    if (!position || position.currencyCode !== currencyCode) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'INSUFFICIENT_QUANTITY',
+        'Position for the limit sell was not found.',
+      );
+    }
+    if (
+      position.seasonParticipantId !== input.participant.id ||
+      position.tradingAccountId !== input.participant.tradingAccountId
+    ) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+        'Position scope does not match the limit sell account.',
+      );
+    }
+    const quantityText = formatDecimalScale(input.quantity, orderQuantityScale);
+    const reserved = await reserveAvailablePositionQuantity(tx, {
+      positionId: position.id,
+      seasonParticipantId: input.participant.id,
+      tradingAccountId: input.participant.tradingAccountId,
+      assetId: input.quote.asset.id,
+      quantity: quantityText,
+    });
+    if (reserved !== 1) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'INSUFFICIENT_QUANTITY',
+        'Available position quantity is insufficient.',
+      );
+    }
+
+    const feeRateText = formatDecimalScale(
+      input.quote.quotedFeeRate,
+      feeRateScale,
+    );
+    const created = await tx.order.create({
+      data: {
+        seasonParticipantId: input.participant.id,
+        tradingAccountId: input.participant.tradingAccountId,
+        assetId: input.quote.asset.id,
+        quoteId: input.quote.id,
+        side: OrderSide.sell,
+        orderType: OrderType.limit,
+        status: OrderStatus.submitted,
+        quantity: quantityText,
+        limitPrice: formatDecimalScale(input.quote.limitPrice, monetaryScale),
+        executedPrice: null,
+        currencyCode,
+        grossAmount: null,
+        feeAmount: null,
+        netAmount: null,
+        reservedAmount: null,
+        reservedQuantity: quantityText,
+        reservationFeeRate: feeRateText,
+        reservationReleasedAt: null,
+        cancelReason: null,
+        idempotencyKey: input.idempotency.idempotencyKey,
+        requestHash: input.idempotency.requestHash,
+        submittedAt: input.submittedAt,
+        executedAt: null,
+        createdAt: input.submittedAt,
+        updatedAt: input.submittedAt,
+      },
+      select: { id: true },
+    });
+    const consumed = await tx.quote.updateMany({
+      where: {
+        id: input.quote.id,
+        status: QuoteStatus.active,
+        seasonParticipantId: input.participant.id,
+        ...(input.participant.id === null
+          ? { tradingAccountId: input.participant.tradingAccountId }
+          : {
+              OR: [
+                { tradingAccountId: input.participant.tradingAccountId },
+                { tradingAccountId: null },
+              ],
+            }),
+      },
+      data: { status: QuoteStatus.consumed, consumedAt: input.submittedAt },
+    });
+    if (consumed.count !== 1) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'QUOTE_NOT_ACTIVE',
+        'Quote is not active.',
+      );
+    }
+    const order = await tx.order.findUnique({
+      where: { id: created.id },
+      select: LIMIT_ORDER_PAYLOAD_SELECT,
+    });
+    if (!order) {
+      this.throwLimitOrderError(
+        limitOrderErrorCodes.ORDER_RESERVATION_CONFLICT,
+        'Created limit sell could not be read back.',
+      );
+    }
+    const response: LimitOrderCreateResponse = {
+      success: true,
+      data: {
+        order: formatOrderResponse(order),
+        execution: {
+          state: 'submitted',
+          submittedAt: input.submittedAt.toISOString(),
+          quoteId: input.quote.id,
+          reservedAmount: null,
+          reservedQuantity: quantityText,
+          reservationFeeRate: feeRateText,
+          duplicate: false,
+        },
+        executionPolicy: buildLimitOrderExecutionPolicy({
+          autoExecutionEnabled: input.autoExecutionEnabled === true,
+        }),
+      },
+    };
+    await tx.order.update({
+      where: { id: created.id },
+      data: {
+        responsePayloadJson: response as unknown as Prisma.InputJsonValue,
+      },
+      select: { id: true },
+    });
     return response;
   }
 

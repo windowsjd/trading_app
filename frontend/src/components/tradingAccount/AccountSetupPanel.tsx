@@ -70,7 +70,7 @@ export default function AccountSetupPanel({
         />
         <Text style={styles.helper}>
           일반 투자 계정은 시즌과 무관하게 유지되며, 시간가중 수익률로 성과를
-          확인할 수 있습니다. 매매와 환전 기능은 아직 준비 중입니다.
+          확인할 수 있습니다. 매매는 가능하며 환전 기능은 준비 중입니다.
         </Text>
 
         {seasonAction ? (

@@ -14,7 +14,7 @@ export type OrderTypeDto = 'market' | 'limit';
 
 /**
  * Server-authoritative execution policy. When automatic matching is enabled,
- * the backend scheduler fills submitted limit buys (path A at a fresh provider
+ * the backend scheduler fills submitted limit orders (path A at a fresh provider
  * snapshot price, path B at the order's limit price off a closed 5m candle
  * touch). When off, `reservation_only`: nothing fills automatically. The client
  * follows this rather than a client-side flag, and never promises live-exchange
@@ -78,7 +78,7 @@ export interface OrderQuoteDto {
   expiresAt: IsoDateTimeString;
   maxChangeBps: BpsString | number;
   quoteAt: IsoDateTimeString;
-  // Limit-buy additive fields (present only on limit quotes). All amounts
+  // Limit-order additive fields (present only on limit quotes). All amounts
   // are server-final decimal strings — the client never re-derives them.
   limitPrice?: MoneyString;
   /**
@@ -93,7 +93,13 @@ export interface OrderQuoteDto {
   quotedGrossAmount?: MoneyString;
   quotedFeeAmount?: MoneyString;
   quotedReservedAmount?: MoneyString;
+  quotedNetAmount?: MoneyString;
   reservedAmount?: MoneyString;
+  reservedQuantity?: QuantityString;
+  positionReservedBefore?: QuantityString;
+  positionAvailableBefore?: QuantityString;
+  estimatedPositionReservedAfter?: QuantityString;
+  estimatedPositionAvailableAfter?: QuantityString;
   walletReservedBefore?: MoneyString;
   walletAvailableBefore?: MoneyString;
   estimatedReservedAfter?: MoneyString;
@@ -129,7 +135,7 @@ export interface CreatedOrderDto {
   /**
    * ACTUAL execution result. Null until the order really fills — a submitted
    * or canceled limit order always has these null, and with no automatic
-   * matching implemented they stay null for every limit order today. Never
+   * matching fills it. Never
    * render these as an unfilled order's amounts.
    */
   grossAmount?: MoneyString | null;
@@ -139,6 +145,8 @@ export interface CreatedOrderDto {
   executedAt?: IsoDateTimeString | null;
   /** Unfilled limit buy: cash locked by the reservation, not a fill amount. */
   reservedAmount?: MoneyString | null;
+  /** Unfilled limit sell: position quantity locked by the reservation. */
+  reservedQuantity?: QuantityString | null;
   reservationReleasedAt?: IsoDateTimeString | null;
   cancelReason?: string | null;
   submittedAt?: IsoDateTimeString;
@@ -148,8 +156,7 @@ export interface CreatedOrderDto {
 export type OrderExecutionState =
   | 'executed'
   | 'already_executed'
-  // A limit buy is registered unfilled; Create returns submitted and nothing
-  // fills it automatically today.
+  // A limit order is registered unfilled; the scheduler may fill it later.
   | 'submitted'
   | (string & {});
 
@@ -183,8 +190,9 @@ export interface OrderExecutionDto {
   equitySnapshotId?: string | null;
   duplicate?: boolean;
   walletBalanceAfter?: MoneyString | null;
-  // Limit-buy additive fields (state='submitted' responses).
+  // Limit-order additive fields (state='submitted' responses).
   reservedAmount?: MoneyString | null;
+  reservedQuantity?: QuantityString | null;
   reservationFeeRate?: RateString | null;
 }
 
@@ -204,6 +212,6 @@ export interface CancelOrderDto {
     message?: string;
     alreadyCanceled?: boolean;
     reservedAmountReleased?: MoneyString | null;
+    reservedQuantityReleased?: QuantityString | null;
   };
 }
-

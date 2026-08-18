@@ -2,13 +2,11 @@ import { Prisma } from '../generated/prisma/client';
 import { monetaryScale, roundDecimalHalfUp } from '../fx/fx-decimal-policy';
 
 /**
- * Pure fill arithmetic for a limit-buy execution. The rounding chain is
- * identical to the market-buy money path (gross → fee → gross + fee, each
- * ROUND_HALF_UP at the monetary scale), so a limit fill and a market fill at
- * the same price produce the same amounts. The only difference from market is
- * the inputs: the fee rate is the order's PINNED reservationFeeRate (never the
- * live season rate), and the price is the path's execution price (path A: the
- * fresh snapshot price; path B: the order's limitPrice).
+ * Pure fill arithmetic for limit execution. Buy follows the market-buy chain
+ * (gross → fee → gross + fee), while sell follows the market-sell chain
+ * (gross → fee → gross - fee), each ROUND_HALF_UP at the monetary scale. The
+ * fee rate is the order's pinned reservationFeeRate (never a live season
+ * lookup), and price is the selected matcher path's execution price.
  */
 export type LimitFillAmounts = {
   grossAmount: Prisma.Decimal;
@@ -32,6 +30,27 @@ export function calculateLimitFillAmounts(input: {
   );
   const netAmount = roundDecimalHalfUp(
     grossAmount.add(feeAmount),
+    monetaryScale,
+  );
+  return { grossAmount, feeAmount, netAmount };
+}
+
+/** Sell-side counterpart: cash credited is gross minus the pinned fee. */
+export function calculateLimitSellFillAmounts(input: {
+  executedPrice: Prisma.Decimal;
+  quantity: Prisma.Decimal;
+  reservationFeeRate: Prisma.Decimal;
+}): LimitFillAmounts {
+  const grossAmount = roundDecimalHalfUp(
+    input.quantity.mul(input.executedPrice),
+    monetaryScale,
+  );
+  const feeAmount = roundDecimalHalfUp(
+    grossAmount.mul(input.reservationFeeRate),
+    monetaryScale,
+  );
+  const netAmount = roundDecimalHalfUp(
+    grossAmount.sub(feeAmount),
     monetaryScale,
   );
   return { grossAmount, feeAmount, netAmount };

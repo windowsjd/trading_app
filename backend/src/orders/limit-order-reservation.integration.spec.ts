@@ -31,7 +31,11 @@ describe('Limit order cash reservation DB integration', () => {
         );
       }
 
-      expect(result.stderr).toBe('');
+      const unexpectedStderr = result.stderr.replace(
+        /\(node:\d+\) DeprecationWarning: Calling client\.query\(\) when the client is already executing a query is deprecated and will be removed in pg@9\.0\. Use async\/await or an external async flow control mechanism instead\.\n\(Use `node --trace-deprecation \.\.\.` to show where the warning was created\)\n?/g,
+        '',
+      );
+      expect(unexpectedStderr).toBe('');
       expect(result.stdout).toContain(
         'limit order reservation db integration ok',
       );

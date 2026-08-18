@@ -308,55 +308,60 @@ Same body as `POST /api/v1/orders/quote`.
 }
 ```
 
-## Limit Buy Orders (Phase 1 Foundation: Reservation Only)
+## Limit Orders (Full-quantity, GTC-style)
 
-This is the FIRST phase of limit orders. Scope is deliberately narrow:
+The existing reservation/matcher lifecycle supports both sides without partial
+fills or an exchange order book:
 
-- Limit BUY only (`LIMIT_BUY_ONLY` for limit sells); full-quantity, GTC-style.
+- Limit BUY and SELL; full-quantity, GTC-style.
 - KRX / US stocks (registration only while the market is open, calendar
   fail-closed) and Binance USD-equivalent crypto (24h).
-- Creating a limit buy RESERVES cash (`reservedAmount = grossAmount +
-feeAmount`, computed from `limitPrice × quantity` with the exact
-  market-buy rounding chain) and stores the order as `status=submitted`.
+- Creating a limit buy reserves cash (`reservedAmount = grossAmount +
+  feeAmount`); creating a limit sell reserves existing position quantity
+  (`reservedQuantity = quantity`). Both store `status=submitted`.
 - The reservation basis is PINNED AT QUOTE TIME on the durable quote
   (`quotedFeeRate`, `quotedGrossAmount`, `quotedFeeAmount`,
   `quotedReservedAmount`). Create reserves exactly those stored values and
-  never re-reads `Season.tradeFeeRate`, so an operator changing the season
-  fee rate between quote and create cannot move the user's reservation.
+  never re-reads a live fee source, so a fee policy change between quote and
+  create cannot move the user's reservation or quoted proceeds.
 - `grossAmount` / `feeAmount` / `netAmount` / `executedPrice` /
   `executedAt` mean ACTUAL EXECUTION RESULT. A `submitted` or `canceled`
-  limit order has all of them **null** — and with no automatic execution
-  implemented, they stay null for every limit order today. An unfilled order's money is `reservedAmount` +
-  `reservationFeeRate` (and, before submitting, the quote's `quoted*`
-  estimates). Market orders keep their existing executed-amount meaning
-  unchanged.
+  limit order has all of them **null** until the matcher fills it. An unfilled
+  buy carries `reservedAmount`; an unfilled sell carries `reservedQuantity`;
+  both pin `reservationFeeRate`. Market orders keep their existing
+  executed-amount meaning unchanged.
 - Create never executes immediately or reads a provider price — a submitted
   order is filled LATER by the scheduler matcher (when
   `SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED=true`), or changes state through user
   cancel / season / exclusion cleanup. Path A fills at a fresh provider snapshot
   price when it reaches the limit; path B fills at the ORDER's limit price off a
-  closed 5m candle low touch (never the candle low; never the partial submit
+  closed 5m candle touch (buy low / sell high; never the candle extreme as the
+  fill price; never the partial submit
   candle; never a candle older than the lookback or closing after season endAt).
   The matcher is scheduler-polling based (PostgreSQL OpsJobLock, no Redis Stream)
   and never places a real exchange order.
 - Registration completes against PostgreSQL alone. The validation surface is
-  season, participant, asset, market session, quote, and wallet; Redis or
-  provider WebSocket state never gates a limit quote/create, and the matcher is
-  independent (the money commits in PostgreSQL fill transactions).
+  verified TradingContext, asset, market session, quote, and wallet/position;
+  Redis or provider WebSocket state never gates a limit quote/create, and the
+  matcher is independent (the money commits in PostgreSQL fill transactions).
 - Wallet meaning: `balanceAmount` (total owned cash, valuation input; never
   reduced by a reservation), `reservedAmount` (locked by submitted limit
   buys), `availableAmount = balance - reserved` (derived server-side, never
   stored). Every ordinary cash debit (market buy, FX source debit) is
   atomically guarded by `balance - reserved >= amount` in one SQL UPDATE.
-- No WalletTransaction and no Position row is written at registration or
-  cancel; only the wallet `reservedAmount` fence and the order row change.
+- Position meaning for sells: `quantity` remains total owned quantity and
+  valuation input; `reservedQuantity` is unavailable to another market/limit
+  sell. Registration/cancel changes only that fence, not owned quantity.
+- No WalletTransaction is written at registration or cancel. A buy changes the
+  wallet reservation; a sell changes the position reservation; fill writes the
+  normal order ledger and position/wallet effects.
 - Total-asset valuation (home/portfolio/ranking/equity snapshot/settlement/
   records) keeps using the full `balanceAmount`; reservations never reduce
   총자산.
 - Feature flag `LIMIT_ORDER_ENABLED` (default **false**): when off, limit
   QUOTE/CREATE are rejected with `LIMIT_ORDER_DISABLED`, but cancel,
-  season-end cleanup, and exclusion cleanup keep working so reserved cash
-  can always be released. Accepted values are exactly `true` / `false` /
+  season-end cleanup, and exclusion cleanup keep working so reserved cash or
+  quantity can always be released. Accepted values are exactly `true` / `false` /
   `1` / `0` (trimmed, case-insensitive, so `TRUE` and `False` are fine);
   omitting the variable means false. Any other value — `yes`, `enabled`,
   `tru`, or an explicitly empty string — **fails startup** instead of being
@@ -374,16 +379,16 @@ feeAmount`, computed from `limitPrice × quantity` with the exact
   order; the created `submitted` order itself has no expiry (GTC) and is
   unaffected by the quote expiring afterwards.
 - Lifecycle: season end (`season_lifecycle_transition` job) cancels
-  submitted limit buys of ended seasons with `cancelReason=season_ended`
+  submitted limit orders of ended seasons with `cancelReason=season_ended`
   and releases their reservations (bounded batches, idempotent,
   self-healing); participant exclusion does the same in the exclusion
   transaction with `cancelReason=participant_excluded`. Settlement is
   blocked with `OPEN_LIMIT_ORDER_RESERVATIONS` while any submitted limit
-  buy or non-zero wallet reservation remains for the season.
+  order, non-zero wallet reservation, or non-zero position reservation remains.
 
 ### Limit Quote (`POST /api/v1/orders/quote` with `orderType: "limit"`)
 
-Request: `assetId`, `side: "buy"`, `orderType: "limit"`, `quantity`,
+Request: `assetId`, `side: "buy" | "sell"`, `orderType: "limit"`, `quantity`,
 `limitPrice` (positive decimal string, scale ≤ 8), optional `currencyCode`
 matching the asset settlement currency. `orderType` omitted keeps the
 historical market default; a market request carrying `limitPrice` keeps the
@@ -410,10 +415,11 @@ Field meanings:
 | Field                     | Meaning                                                                                         |
 | ------------------------- | ----------------------------------------------------------------------------------------------- |
 | `limitPrice`              | The price the user set. `quotedPrice` equals it.                                                |
-| `quotedFeeRate`           | Season fee rate captured AT QUOTE TIME. Create uses this rate, not the live one.                |
+| `quotedFeeRate`           | TradingContext fee rate captured AT QUOTE TIME. Create uses this rate, not a live lookup.       |
 | `quotedGrossAmount`       | `round8(limitPrice × quantity)` at quote time. An ESTIMATE for an unfilled order, never a fill. |
 | `quotedFeeAmount`         | `round8(quotedGrossAmount × quotedFeeRate)`. Also an estimate.                                  |
-| `quotedReservedAmount`    | `round8(quotedGrossAmount + quotedFeeAmount)` — the cash create will actually lock.             |
+| `quotedReservedAmount`    | Buy only: `round8(gross + fee)` — the cash create will actually lock.                          |
+| `quotedNetAmount`         | Sell only: `round8(gross - fee)` — estimated proceeds if later filled at the limit.            |
 | `reservedAmount`          | Pre-existing alias of `quotedReservedAmount`, kept for current clients.                         |
 | `walletBalanceBefore`     | Total owned cash before the reservation.                                                        |
 | `walletReservedBefore`    | Cash already locked by other submitted limit buys.                                              |
@@ -421,19 +427,18 @@ Field meanings:
 | `estimatedReservedAfter`  | `walletReservedBefore + quotedReservedAmount`.                                                  |
 | `estimatedAvailableAfter` | `walletAvailableBefore - quotedReservedAmount`.                                                 |
 
-The generic `grossAmount` / `feeRate` / `feeAmount` / `netAmount` fields
-stay present and carry the same numbers (`netAmount` equals the reservation
-for a limit buy) so existing clients keep working; the `quoted*` names exist
-to state without ambiguity which values are pinned and binding.
+The generic `grossAmount` / `feeRate` / `feeAmount` / `netAmount` fields stay
+present with side-aware estimates so existing clients keep working; the
+`quoted*` names state which values are pinned and binding.
 
 ### Limit Create (`POST /api/v1/orders` with `orderType: "limit"`)
 
 Same durable-quote validation as market orders (TTL 15s, `QUOTE_MISMATCH`
 covers assetId/side/orderType/quantity/limitPrice/currency/hash). In ONE
-transaction: atomic cash reservation (`balance - reserved >= reservation`
-guarded in the UPDATE itself — two concurrent creates can never double-book
-the same available cash), `submitted` order row (stores `reservedAmount`
-and the quote-time `reservationFeeRate` for the future execution phase),
+transaction: atomic cash or position reservation (two concurrent creates can
+never double-book the same available balance/quantity), `submitted` order row
+(stores side-appropriate `reservedAmount`/`reservedQuantity` and the quote-time
+`reservationFeeRate` for the future execution phase),
 quote consumption, and the idempotent response payload. Any failure rolls
 the reservation back. Idempotency: same quote + same key + same payload
 replays the stored response; same quote + same key + different
@@ -490,7 +495,7 @@ Response: the standard order payload (with additive `reservedAmount`,
 `triggerEventId`, `triggerEventAt`, `candleEvidence` fields) plus
 `execution: { state: "submitted", submittedAt, quoteId, reservedAmount,
 reservationFeeRate, duplicate }` plus additive `executionPolicy`. On the order payload
-`status=submitted`, `orderType=limit`, `side=buy`, `limitPrice` and
+`status=submitted`, `orderType=limit`, `side`, `limitPrice` and
 `quantity` are set, `reservationReleasedAt` is null, and `grossAmount`,
 `feeAmount`, `netAmount`, `executedPrice`, `executedAt` are all **null** —
 nothing was executed. No provider price fields, no walletTransactionId, no
@@ -498,8 +503,8 @@ positionId.
 
 ## POST /api/v1/orders/:orderId/cancel
 
-Cancels the caller's own SUBMITTED limit buy order and releases its cash
-reservation. Now publicly routed. NOT gated by `LIMIT_ORDER_ENABLED`.
+Cancels the caller's own SUBMITTED limit order and releases its cash or
+position-quantity reservation. NOT gated by `LIMIT_ORDER_ENABLED`.
 
 ### Request
 
@@ -508,7 +513,7 @@ reservation. Now publicly routed. NOT gated by `LIMIT_ORDER_ENABLED`.
 ### Behavior
 
 - Lock order: Order row (`SELECT ... FOR UPDATE`, ownership enforced in the
-  locking query) → CashWallet row (the guarded release UPDATE). Release and
+  locking query) → CashWallet (buy) or Position (sell) guarded release. Release and
   the `submitted → canceled` flip commit in one transaction, so the
   reservation is released exactly once even under concurrent cancels.
 - Market orders keep the historical `ORDER_CANCEL_NOT_SUPPORTED` (410).
@@ -516,8 +521,8 @@ reservation. Now publicly routed. NOT gated by `LIMIT_ORDER_ENABLED`.
 - Already `canceled` → idempotent success replay
   (`execution.alreadyCanceled: true`, no second release).
 - Sets `canceledAt`, `cancelReason: "user_canceled"`,
-  `reservationReleasedAt`. `balanceAmount` unchanged; no WalletTransaction;
-  no Position change.
+  `reservationReleasedAt`. Owned cash/quantity is unchanged; only the
+  reservation fence is released; no WalletTransaction.
 - Cancel works regardless of season status so stale reservations can
   always be freed by the user.
 
@@ -525,7 +530,7 @@ reservation. Now publicly routed. NOT gated by `LIMIT_ORDER_ENABLED`.
 
 `data.order` is the standard order payload; `data.execution` is
 `{ state: "not_executed", reason: "ORDER_CANCELED_BEFORE_EXECUTION",
-message, alreadyCanceled, reservedAmountReleased }`.
+message, alreadyCanceled, reservedAmountReleased, reservedQuantityReleased }`.
 
 `cancelReason` canonical values: `user_canceled`, `season_ended`,
 `participant_excluded` (safe for direct display; no internal detail).
@@ -679,7 +684,8 @@ at all today; automatic matching is planned as separate work.
 - `LIMIT_ORDER_DISABLED` (limit quote/create while the feature flag is off)
 - `LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED` (internal execute path refuses
   limit orders; there is no limit-execution path)
-- `LIMIT_BUY_ONLY` (limit sell is not supported)
+- `LIMIT_BUY_ONLY` is retained as a legacy client/error enum but the current
+  writer no longer emits it; limit sell is supported.
 - `INVALID_LIMIT_PRICE`
 - `INSUFFICIENT_AVAILABLE_BALANCE` (balance - reserved cannot cover the reservation)
 - `ORDER_RESERVATION_CONFLICT`
@@ -722,23 +728,20 @@ at all today; automatic matching is planned as separate work.
 - `INVALID_LIMIT`
 - `INVALID_OFFSET`
 
-## Not Implemented
+## Intentionally Not Implemented Here
 
-- Partial fills.
-- Matching engine.
-- Execute-specific exact response replay.
-- Scheduler/batch.
-- Settlement.
-- Equity snapshot creation from order execution.
-- Daily portfolio snapshot automatic generation.
-- Ranking automatic generation.
+- Partial fills, an exchange-style order book, or a new matching engine.
+- Real exchange/provider authenticated order placement.
+- A public manual execute endpoint for limit orders.
+- Execute-specific replay separate from the order's stored create response.
 
 ## Limit fill result fields
 
 A scheduler-filled limit order carries the same actual-result fields as a
 market fill: `executedPrice` (path A: snapshot price / path B: the limit
-price), `grossAmount`, `feeAmount`, `netAmount` (`gross + fee` at the pinned
-`reservationFeeRate`), `executedAt`, `reservationReleasedAt`, and exactly one
+price), `grossAmount`, `feeAmount`, `netAmount` (buy `gross + fee`, sell
+`gross - fee`, at the pinned `reservationFeeRate`), `executedAt`,
+`reservationReleasedAt`, and exactly one
 evidence link — path A `assetPriceSnapshotId`, path B `limitOrderCandleEvidenceId`
 (the other is null). These are null while `submitted` or `canceled`. The
 event-era provenance fields (`matchingSource`, `triggerEventId`, …) do not
@@ -747,7 +750,7 @@ it cannot affect current price / valuation / ranking.
 
 ## Limit-create replay ordering and operational errors
 
-For a limit BUY, `POST /api/v1/orders` runs in exactly this order:
+For either limit side, `POST /api/v1/orders` runs in exactly this order:
 
 1. authenticate the caller;
 2. parse the body and compute the canonical request hash (`quoteId`,

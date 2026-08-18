@@ -34,6 +34,7 @@ export type OrderAvgAggregateOutputType = {
   feeAmount: runtime.Decimal | null
   netAmount: runtime.Decimal | null
   reservedAmount: runtime.Decimal | null
+  reservedQuantity: runtime.Decimal | null
   reservationFeeRate: runtime.Decimal | null
 }
 
@@ -45,6 +46,7 @@ export type OrderSumAggregateOutputType = {
   feeAmount: runtime.Decimal | null
   netAmount: runtime.Decimal | null
   reservedAmount: runtime.Decimal | null
+  reservedQuantity: runtime.Decimal | null
   reservationFeeRate: runtime.Decimal | null
 }
 
@@ -69,6 +71,7 @@ export type OrderMinAggregateOutputType = {
   idempotencyKey: string | null
   requestHash: string | null
   reservedAmount: runtime.Decimal | null
+  reservedQuantity: runtime.Decimal | null
   reservationFeeRate: runtime.Decimal | null
   reservationReleasedAt: Date | null
   cancelReason: string | null
@@ -103,6 +106,7 @@ export type OrderMaxAggregateOutputType = {
   idempotencyKey: string | null
   requestHash: string | null
   reservedAmount: runtime.Decimal | null
+  reservedQuantity: runtime.Decimal | null
   reservationFeeRate: runtime.Decimal | null
   reservationReleasedAt: Date | null
   cancelReason: string | null
@@ -138,6 +142,7 @@ export type OrderCountAggregateOutputType = {
   requestHash: number
   responsePayloadJson: number
   reservedAmount: number
+  reservedQuantity: number
   reservationFeeRate: number
   reservationReleasedAt: number
   cancelReason: number
@@ -161,6 +166,7 @@ export type OrderAvgAggregateInputType = {
   feeAmount?: true
   netAmount?: true
   reservedAmount?: true
+  reservedQuantity?: true
   reservationFeeRate?: true
 }
 
@@ -172,6 +178,7 @@ export type OrderSumAggregateInputType = {
   feeAmount?: true
   netAmount?: true
   reservedAmount?: true
+  reservedQuantity?: true
   reservationFeeRate?: true
 }
 
@@ -196,6 +203,7 @@ export type OrderMinAggregateInputType = {
   idempotencyKey?: true
   requestHash?: true
   reservedAmount?: true
+  reservedQuantity?: true
   reservationFeeRate?: true
   reservationReleasedAt?: true
   cancelReason?: true
@@ -230,6 +238,7 @@ export type OrderMaxAggregateInputType = {
   idempotencyKey?: true
   requestHash?: true
   reservedAmount?: true
+  reservedQuantity?: true
   reservationFeeRate?: true
   reservationReleasedAt?: true
   cancelReason?: true
@@ -265,6 +274,7 @@ export type OrderCountAggregateInputType = {
   requestHash?: true
   responsePayloadJson?: true
   reservedAmount?: true
+  reservedQuantity?: true
   reservationFeeRate?: true
   reservationReleasedAt?: true
   cancelReason?: true
@@ -367,7 +377,7 @@ export type OrderGroupByArgs<ExtArgs extends runtime.Types.Extensions.InternalAr
 
 export type OrderGroupByOutputType = {
   id: string
-  seasonParticipantId: string
+  seasonParticipantId: string | null
   tradingAccountId: string | null
   assetId: string
   quoteId: string | null
@@ -387,6 +397,7 @@ export type OrderGroupByOutputType = {
   requestHash: string | null
   responsePayloadJson: runtime.JsonValue | null
   reservedAmount: runtime.Decimal | null
+  reservedQuantity: runtime.Decimal | null
   reservationFeeRate: runtime.Decimal | null
   reservationReleasedAt: Date | null
   cancelReason: string | null
@@ -425,7 +436,7 @@ export type OrderWhereInput = {
   OR?: Prisma.OrderWhereInput[]
   NOT?: Prisma.OrderWhereInput | Prisma.OrderWhereInput[]
   id?: Prisma.StringFilter<"Order"> | string
-  seasonParticipantId?: Prisma.StringFilter<"Order"> | string
+  seasonParticipantId?: Prisma.StringNullableFilter<"Order"> | string | null
   tradingAccountId?: Prisma.StringNullableFilter<"Order"> | string | null
   assetId?: Prisma.StringFilter<"Order"> | string
   quoteId?: Prisma.StringNullableFilter<"Order"> | string | null
@@ -445,6 +456,7 @@ export type OrderWhereInput = {
   requestHash?: Prisma.StringNullableFilter<"Order"> | string | null
   responsePayloadJson?: Prisma.JsonNullableFilter<"Order">
   reservedAmount?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   cancelReason?: Prisma.StringNullableFilter<"Order"> | string | null
@@ -456,7 +468,7 @@ export type OrderWhereInput = {
   rejectReason?: Prisma.StringNullableFilter<"Order"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
-  seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantScalarRelationFilter, Prisma.SeasonParticipantWhereInput>
+  seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantNullableScalarRelationFilter, Prisma.SeasonParticipantWhereInput> | null
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountNullableScalarRelationFilter, Prisma.TradingAccountWhereInput> | null
   asset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
   quote?: Prisma.XOR<Prisma.QuoteNullableScalarRelationFilter, Prisma.QuoteWhereInput> | null
@@ -467,7 +479,7 @@ export type OrderWhereInput = {
 
 export type OrderOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  seasonParticipantId?: Prisma.SortOrder
+  seasonParticipantId?: Prisma.SortOrderInput | Prisma.SortOrder
   tradingAccountId?: Prisma.SortOrderInput | Prisma.SortOrder
   assetId?: Prisma.SortOrder
   quoteId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -487,6 +499,7 @@ export type OrderOrderByWithRelationInput = {
   requestHash?: Prisma.SortOrderInput | Prisma.SortOrder
   responsePayloadJson?: Prisma.SortOrderInput | Prisma.SortOrder
   reservedAmount?: Prisma.SortOrderInput | Prisma.SortOrder
+  reservedQuantity?: Prisma.SortOrderInput | Prisma.SortOrder
   reservationFeeRate?: Prisma.SortOrderInput | Prisma.SortOrder
   reservationReleasedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   cancelReason?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -515,7 +528,7 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.OrderWhereInput | Prisma.OrderWhereInput[]
   OR?: Prisma.OrderWhereInput[]
   NOT?: Prisma.OrderWhereInput | Prisma.OrderWhereInput[]
-  seasonParticipantId?: Prisma.StringFilter<"Order"> | string
+  seasonParticipantId?: Prisma.StringNullableFilter<"Order"> | string | null
   tradingAccountId?: Prisma.StringNullableFilter<"Order"> | string | null
   assetId?: Prisma.StringFilter<"Order"> | string
   side?: Prisma.EnumOrderSideFilter<"Order"> | $Enums.OrderSide
@@ -534,6 +547,7 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   requestHash?: Prisma.StringNullableFilter<"Order"> | string | null
   responsePayloadJson?: Prisma.JsonNullableFilter<"Order">
   reservedAmount?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   cancelReason?: Prisma.StringNullableFilter<"Order"> | string | null
@@ -545,7 +559,7 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   rejectReason?: Prisma.StringNullableFilter<"Order"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
-  seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantScalarRelationFilter, Prisma.SeasonParticipantWhereInput>
+  seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantNullableScalarRelationFilter, Prisma.SeasonParticipantWhereInput> | null
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountNullableScalarRelationFilter, Prisma.TradingAccountWhereInput> | null
   asset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
   quote?: Prisma.XOR<Prisma.QuoteNullableScalarRelationFilter, Prisma.QuoteWhereInput> | null
@@ -556,7 +570,7 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
 
 export type OrderOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  seasonParticipantId?: Prisma.SortOrder
+  seasonParticipantId?: Prisma.SortOrderInput | Prisma.SortOrder
   tradingAccountId?: Prisma.SortOrderInput | Prisma.SortOrder
   assetId?: Prisma.SortOrder
   quoteId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -576,6 +590,7 @@ export type OrderOrderByWithAggregationInput = {
   requestHash?: Prisma.SortOrderInput | Prisma.SortOrder
   responsePayloadJson?: Prisma.SortOrderInput | Prisma.SortOrder
   reservedAmount?: Prisma.SortOrderInput | Prisma.SortOrder
+  reservedQuantity?: Prisma.SortOrderInput | Prisma.SortOrder
   reservationFeeRate?: Prisma.SortOrderInput | Prisma.SortOrder
   reservationReleasedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   cancelReason?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -599,7 +614,7 @@ export type OrderScalarWhereWithAggregatesInput = {
   OR?: Prisma.OrderScalarWhereWithAggregatesInput[]
   NOT?: Prisma.OrderScalarWhereWithAggregatesInput | Prisma.OrderScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"Order"> | string
-  seasonParticipantId?: Prisma.StringWithAggregatesFilter<"Order"> | string
+  seasonParticipantId?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
   tradingAccountId?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
   assetId?: Prisma.StringWithAggregatesFilter<"Order"> | string
   quoteId?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
@@ -619,6 +634,7 @@ export type OrderScalarWhereWithAggregatesInput = {
   requestHash?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
   responsePayloadJson?: Prisma.JsonNullableWithAggregatesFilter<"Order">
   reservedAmount?: Prisma.DecimalNullableWithAggregatesFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.DecimalNullableWithAggregatesFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.DecimalNullableWithAggregatesFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
   cancelReason?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
@@ -648,6 +664,7 @@ export type OrderCreateInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -658,7 +675,7 @@ export type OrderCreateInput = {
   rejectReason?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  seasonParticipant: Prisma.SeasonParticipantCreateNestedOneWithoutOrdersInput
+  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutOrdersInput
   tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
@@ -669,7 +686,7 @@ export type OrderCreateInput = {
 
 export type OrderUncheckedCreateInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
   tradingAccountId?: string | null
   assetId: string
   quoteId?: string | null
@@ -689,6 +706,7 @@ export type OrderUncheckedCreateInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -718,6 +736,7 @@ export type OrderUpdateInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -728,7 +747,7 @@ export type OrderUpdateInput = {
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  seasonParticipant?: Prisma.SeasonParticipantUpdateOneRequiredWithoutOrdersNestedInput
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutOrdersNestedInput
   tradingAccount?: Prisma.TradingAccountUpdateOneWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
@@ -739,7 +758,7 @@ export type OrderUpdateInput = {
 
 export type OrderUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -759,6 +778,7 @@ export type OrderUncheckedUpdateInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -774,7 +794,7 @@ export type OrderUncheckedUpdateInput = {
 
 export type OrderCreateManyInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
   tradingAccountId?: string | null
   assetId: string
   quoteId?: string | null
@@ -794,6 +814,7 @@ export type OrderCreateManyInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -823,6 +844,7 @@ export type OrderUpdateManyMutationInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -837,7 +859,7 @@ export type OrderUpdateManyMutationInput = {
 
 export type OrderUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -857,6 +879,7 @@ export type OrderUncheckedUpdateManyInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -912,6 +935,7 @@ export type OrderCountOrderByAggregateInput = {
   requestHash?: Prisma.SortOrder
   responsePayloadJson?: Prisma.SortOrder
   reservedAmount?: Prisma.SortOrder
+  reservedQuantity?: Prisma.SortOrder
   reservationFeeRate?: Prisma.SortOrder
   reservationReleasedAt?: Prisma.SortOrder
   cancelReason?: Prisma.SortOrder
@@ -933,6 +957,7 @@ export type OrderAvgOrderByAggregateInput = {
   feeAmount?: Prisma.SortOrder
   netAmount?: Prisma.SortOrder
   reservedAmount?: Prisma.SortOrder
+  reservedQuantity?: Prisma.SortOrder
   reservationFeeRate?: Prisma.SortOrder
 }
 
@@ -957,6 +982,7 @@ export type OrderMaxOrderByAggregateInput = {
   idempotencyKey?: Prisma.SortOrder
   requestHash?: Prisma.SortOrder
   reservedAmount?: Prisma.SortOrder
+  reservedQuantity?: Prisma.SortOrder
   reservationFeeRate?: Prisma.SortOrder
   reservationReleasedAt?: Prisma.SortOrder
   cancelReason?: Prisma.SortOrder
@@ -991,6 +1017,7 @@ export type OrderMinOrderByAggregateInput = {
   idempotencyKey?: Prisma.SortOrder
   requestHash?: Prisma.SortOrder
   reservedAmount?: Prisma.SortOrder
+  reservedQuantity?: Prisma.SortOrder
   reservationFeeRate?: Prisma.SortOrder
   reservationReleasedAt?: Prisma.SortOrder
   cancelReason?: Prisma.SortOrder
@@ -1012,6 +1039,7 @@ export type OrderSumOrderByAggregateInput = {
   feeAmount?: Prisma.SortOrder
   netAmount?: Prisma.SortOrder
   reservedAmount?: Prisma.SortOrder
+  reservedQuantity?: Prisma.SortOrder
   reservationFeeRate?: Prisma.SortOrder
 }
 
@@ -1337,6 +1365,7 @@ export type OrderCreateWithoutTradingAccountInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -1347,7 +1376,7 @@ export type OrderCreateWithoutTradingAccountInput = {
   rejectReason?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  seasonParticipant: Prisma.SeasonParticipantCreateNestedOneWithoutOrdersInput
+  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
@@ -1357,7 +1386,7 @@ export type OrderCreateWithoutTradingAccountInput = {
 
 export type OrderUncheckedCreateWithoutTradingAccountInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
   assetId: string
   quoteId?: string | null
   side: $Enums.OrderSide
@@ -1376,6 +1405,7 @@ export type OrderUncheckedCreateWithoutTradingAccountInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -1420,7 +1450,7 @@ export type OrderScalarWhereInput = {
   OR?: Prisma.OrderScalarWhereInput[]
   NOT?: Prisma.OrderScalarWhereInput | Prisma.OrderScalarWhereInput[]
   id?: Prisma.StringFilter<"Order"> | string
-  seasonParticipantId?: Prisma.StringFilter<"Order"> | string
+  seasonParticipantId?: Prisma.StringNullableFilter<"Order"> | string | null
   tradingAccountId?: Prisma.StringNullableFilter<"Order"> | string | null
   assetId?: Prisma.StringFilter<"Order"> | string
   quoteId?: Prisma.StringNullableFilter<"Order"> | string | null
@@ -1440,6 +1470,7 @@ export type OrderScalarWhereInput = {
   requestHash?: Prisma.StringNullableFilter<"Order"> | string | null
   responsePayloadJson?: Prisma.JsonNullableFilter<"Order">
   reservedAmount?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   cancelReason?: Prisma.StringNullableFilter<"Order"> | string | null
@@ -1469,6 +1500,7 @@ export type OrderCreateWithoutSeasonParticipantInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -1508,6 +1540,7 @@ export type OrderUncheckedCreateWithoutSeasonParticipantInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -1563,6 +1596,7 @@ export type OrderCreateWithoutAssetInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -1573,7 +1607,7 @@ export type OrderCreateWithoutAssetInput = {
   rejectReason?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  seasonParticipant: Prisma.SeasonParticipantCreateNestedOneWithoutOrdersInput
+  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutOrdersInput
   tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
@@ -1583,7 +1617,7 @@ export type OrderCreateWithoutAssetInput = {
 
 export type OrderUncheckedCreateWithoutAssetInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
   tradingAccountId?: string | null
   quoteId?: string | null
   side: $Enums.OrderSide
@@ -1602,6 +1636,7 @@ export type OrderUncheckedCreateWithoutAssetInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -1657,6 +1692,7 @@ export type OrderCreateWithoutAssetPriceSnapshotInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -1667,7 +1703,7 @@ export type OrderCreateWithoutAssetPriceSnapshotInput = {
   rejectReason?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  seasonParticipant: Prisma.SeasonParticipantCreateNestedOneWithoutOrdersInput
+  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutOrdersInput
   tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
@@ -1677,7 +1713,7 @@ export type OrderCreateWithoutAssetPriceSnapshotInput = {
 
 export type OrderUncheckedCreateWithoutAssetPriceSnapshotInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
   tradingAccountId?: string | null
   assetId: string
   quoteId?: string | null
@@ -1696,6 +1732,7 @@ export type OrderUncheckedCreateWithoutAssetPriceSnapshotInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -1751,6 +1788,7 @@ export type OrderCreateWithoutFxRateSnapshotInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -1761,7 +1799,7 @@ export type OrderCreateWithoutFxRateSnapshotInput = {
   rejectReason?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  seasonParticipant: Prisma.SeasonParticipantCreateNestedOneWithoutOrdersInput
+  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutOrdersInput
   tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
@@ -1771,7 +1809,7 @@ export type OrderCreateWithoutFxRateSnapshotInput = {
 
 export type OrderUncheckedCreateWithoutFxRateSnapshotInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
   tradingAccountId?: string | null
   assetId: string
   quoteId?: string | null
@@ -1790,6 +1828,7 @@ export type OrderUncheckedCreateWithoutFxRateSnapshotInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -1845,6 +1884,7 @@ export type OrderCreateWithoutQuoteInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -1855,7 +1895,7 @@ export type OrderCreateWithoutQuoteInput = {
   rejectReason?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  seasonParticipant: Prisma.SeasonParticipantCreateNestedOneWithoutOrdersInput
+  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutOrdersInput
   tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
@@ -1865,7 +1905,7 @@ export type OrderCreateWithoutQuoteInput = {
 
 export type OrderUncheckedCreateWithoutQuoteInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
   tradingAccountId?: string | null
   assetId: string
   side: $Enums.OrderSide
@@ -1884,6 +1924,7 @@ export type OrderUncheckedCreateWithoutQuoteInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -1939,6 +1980,7 @@ export type OrderCreateWithoutCandleEvidenceInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -1949,7 +1991,7 @@ export type OrderCreateWithoutCandleEvidenceInput = {
   rejectReason?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  seasonParticipant: Prisma.SeasonParticipantCreateNestedOneWithoutOrdersInput
+  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutOrdersInput
   tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
@@ -1959,7 +2001,7 @@ export type OrderCreateWithoutCandleEvidenceInput = {
 
 export type OrderUncheckedCreateWithoutCandleEvidenceInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
   tradingAccountId?: string | null
   assetId: string
   quoteId?: string | null
@@ -1979,6 +2021,7 @@ export type OrderUncheckedCreateWithoutCandleEvidenceInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -2019,7 +2062,7 @@ export type OrderUpdateManyWithWhereWithoutCandleEvidenceInput = {
 
 export type OrderCreateManyTradingAccountInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
   assetId: string
   quoteId?: string | null
   side: $Enums.OrderSide
@@ -2038,6 +2081,7 @@ export type OrderCreateManyTradingAccountInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -2067,6 +2111,7 @@ export type OrderUpdateWithoutTradingAccountInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2077,7 +2122,7 @@ export type OrderUpdateWithoutTradingAccountInput = {
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  seasonParticipant?: Prisma.SeasonParticipantUpdateOneRequiredWithoutOrdersNestedInput
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
@@ -2087,7 +2132,7 @@ export type OrderUpdateWithoutTradingAccountInput = {
 
 export type OrderUncheckedUpdateWithoutTradingAccountInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
@@ -2106,6 +2151,7 @@ export type OrderUncheckedUpdateWithoutTradingAccountInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2121,7 +2167,7 @@ export type OrderUncheckedUpdateWithoutTradingAccountInput = {
 
 export type OrderUncheckedUpdateManyWithoutTradingAccountInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
@@ -2140,6 +2186,7 @@ export type OrderUncheckedUpdateManyWithoutTradingAccountInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2174,6 +2221,7 @@ export type OrderCreateManySeasonParticipantInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -2203,6 +2251,7 @@ export type OrderUpdateWithoutSeasonParticipantInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2242,6 +2291,7 @@ export type OrderUncheckedUpdateWithoutSeasonParticipantInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2276,6 +2326,7 @@ export type OrderUncheckedUpdateManyWithoutSeasonParticipantInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2291,7 +2342,7 @@ export type OrderUncheckedUpdateManyWithoutSeasonParticipantInput = {
 
 export type OrderCreateManyAssetInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
   tradingAccountId?: string | null
   quoteId?: string | null
   side: $Enums.OrderSide
@@ -2310,6 +2361,7 @@ export type OrderCreateManyAssetInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -2339,6 +2391,7 @@ export type OrderUpdateWithoutAssetInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2349,7 +2402,7 @@ export type OrderUpdateWithoutAssetInput = {
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  seasonParticipant?: Prisma.SeasonParticipantUpdateOneRequiredWithoutOrdersNestedInput
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutOrdersNestedInput
   tradingAccount?: Prisma.TradingAccountUpdateOneWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
@@ -2359,7 +2412,7 @@ export type OrderUpdateWithoutAssetInput = {
 
 export type OrderUncheckedUpdateWithoutAssetInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
@@ -2378,6 +2431,7 @@ export type OrderUncheckedUpdateWithoutAssetInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2393,7 +2447,7 @@ export type OrderUncheckedUpdateWithoutAssetInput = {
 
 export type OrderUncheckedUpdateManyWithoutAssetInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
@@ -2412,6 +2466,7 @@ export type OrderUncheckedUpdateManyWithoutAssetInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2427,7 +2482,7 @@ export type OrderUncheckedUpdateManyWithoutAssetInput = {
 
 export type OrderCreateManyAssetPriceSnapshotInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
   tradingAccountId?: string | null
   assetId: string
   quoteId?: string | null
@@ -2446,6 +2501,7 @@ export type OrderCreateManyAssetPriceSnapshotInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -2475,6 +2531,7 @@ export type OrderUpdateWithoutAssetPriceSnapshotInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2485,7 +2542,7 @@ export type OrderUpdateWithoutAssetPriceSnapshotInput = {
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  seasonParticipant?: Prisma.SeasonParticipantUpdateOneRequiredWithoutOrdersNestedInput
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutOrdersNestedInput
   tradingAccount?: Prisma.TradingAccountUpdateOneWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
@@ -2495,7 +2552,7 @@ export type OrderUpdateWithoutAssetPriceSnapshotInput = {
 
 export type OrderUncheckedUpdateWithoutAssetPriceSnapshotInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2514,6 +2571,7 @@ export type OrderUncheckedUpdateWithoutAssetPriceSnapshotInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2529,7 +2587,7 @@ export type OrderUncheckedUpdateWithoutAssetPriceSnapshotInput = {
 
 export type OrderUncheckedUpdateManyWithoutAssetPriceSnapshotInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2548,6 +2606,7 @@ export type OrderUncheckedUpdateManyWithoutAssetPriceSnapshotInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2563,7 +2622,7 @@ export type OrderUncheckedUpdateManyWithoutAssetPriceSnapshotInput = {
 
 export type OrderCreateManyFxRateSnapshotInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
   tradingAccountId?: string | null
   assetId: string
   quoteId?: string | null
@@ -2582,6 +2641,7 @@ export type OrderCreateManyFxRateSnapshotInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -2611,6 +2671,7 @@ export type OrderUpdateWithoutFxRateSnapshotInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2621,7 +2682,7 @@ export type OrderUpdateWithoutFxRateSnapshotInput = {
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  seasonParticipant?: Prisma.SeasonParticipantUpdateOneRequiredWithoutOrdersNestedInput
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutOrdersNestedInput
   tradingAccount?: Prisma.TradingAccountUpdateOneWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
@@ -2631,7 +2692,7 @@ export type OrderUpdateWithoutFxRateSnapshotInput = {
 
 export type OrderUncheckedUpdateWithoutFxRateSnapshotInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2650,6 +2711,7 @@ export type OrderUncheckedUpdateWithoutFxRateSnapshotInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2665,7 +2727,7 @@ export type OrderUncheckedUpdateWithoutFxRateSnapshotInput = {
 
 export type OrderUncheckedUpdateManyWithoutFxRateSnapshotInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2684,6 +2746,7 @@ export type OrderUncheckedUpdateManyWithoutFxRateSnapshotInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2699,7 +2762,7 @@ export type OrderUncheckedUpdateManyWithoutFxRateSnapshotInput = {
 
 export type OrderCreateManyQuoteInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
   tradingAccountId?: string | null
   assetId: string
   side: $Enums.OrderSide
@@ -2718,6 +2781,7 @@ export type OrderCreateManyQuoteInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -2747,6 +2811,7 @@ export type OrderUpdateWithoutQuoteInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2757,7 +2822,7 @@ export type OrderUpdateWithoutQuoteInput = {
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  seasonParticipant?: Prisma.SeasonParticipantUpdateOneRequiredWithoutOrdersNestedInput
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutOrdersNestedInput
   tradingAccount?: Prisma.TradingAccountUpdateOneWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
@@ -2767,7 +2832,7 @@ export type OrderUpdateWithoutQuoteInput = {
 
 export type OrderUncheckedUpdateWithoutQuoteInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
@@ -2786,6 +2851,7 @@ export type OrderUncheckedUpdateWithoutQuoteInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2801,7 +2867,7 @@ export type OrderUncheckedUpdateWithoutQuoteInput = {
 
 export type OrderUncheckedUpdateManyWithoutQuoteInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
@@ -2820,6 +2886,7 @@ export type OrderUncheckedUpdateManyWithoutQuoteInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2835,7 +2902,7 @@ export type OrderUncheckedUpdateManyWithoutQuoteInput = {
 
 export type OrderCreateManyCandleEvidenceInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
   tradingAccountId?: string | null
   assetId: string
   quoteId?: string | null
@@ -2855,6 +2922,7 @@ export type OrderCreateManyCandleEvidenceInput = {
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Date | string | null
   cancelReason?: string | null
@@ -2883,6 +2951,7 @@ export type OrderUpdateWithoutCandleEvidenceInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2893,7 +2962,7 @@ export type OrderUpdateWithoutCandleEvidenceInput = {
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  seasonParticipant?: Prisma.SeasonParticipantUpdateOneRequiredWithoutOrdersNestedInput
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutOrdersNestedInput
   tradingAccount?: Prisma.TradingAccountUpdateOneWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
@@ -2903,7 +2972,7 @@ export type OrderUpdateWithoutCandleEvidenceInput = {
 
 export type OrderUncheckedUpdateWithoutCandleEvidenceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2923,6 +2992,7 @@ export type OrderUncheckedUpdateWithoutCandleEvidenceInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2937,7 +3007,7 @@ export type OrderUncheckedUpdateWithoutCandleEvidenceInput = {
 
 export type OrderUncheckedUpdateManyWithoutCandleEvidenceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2957,6 +3027,7 @@ export type OrderUncheckedUpdateManyWithoutCandleEvidenceInput = {
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2993,6 +3064,7 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   requestHash?: boolean
   responsePayloadJson?: boolean
   reservedAmount?: boolean
+  reservedQuantity?: boolean
   reservationFeeRate?: boolean
   reservationReleasedAt?: boolean
   cancelReason?: boolean
@@ -3004,7 +3076,7 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   rejectReason?: boolean
   createdAt?: boolean
   updatedAt?: boolean
-  seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
+  seasonParticipant?: boolean | Prisma.Order$seasonParticipantArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.Order$tradingAccountArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   quote?: boolean | Prisma.Order$quoteArgs<ExtArgs>
@@ -3035,6 +3107,7 @@ export type OrderSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   requestHash?: boolean
   responsePayloadJson?: boolean
   reservedAmount?: boolean
+  reservedQuantity?: boolean
   reservationFeeRate?: boolean
   reservationReleasedAt?: boolean
   cancelReason?: boolean
@@ -3046,7 +3119,7 @@ export type OrderSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   rejectReason?: boolean
   createdAt?: boolean
   updatedAt?: boolean
-  seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
+  seasonParticipant?: boolean | Prisma.Order$seasonParticipantArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.Order$tradingAccountArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   quote?: boolean | Prisma.Order$quoteArgs<ExtArgs>
@@ -3077,6 +3150,7 @@ export type OrderSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   requestHash?: boolean
   responsePayloadJson?: boolean
   reservedAmount?: boolean
+  reservedQuantity?: boolean
   reservationFeeRate?: boolean
   reservationReleasedAt?: boolean
   cancelReason?: boolean
@@ -3088,7 +3162,7 @@ export type OrderSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   rejectReason?: boolean
   createdAt?: boolean
   updatedAt?: boolean
-  seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
+  seasonParticipant?: boolean | Prisma.Order$seasonParticipantArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.Order$tradingAccountArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   quote?: boolean | Prisma.Order$quoteArgs<ExtArgs>
@@ -3119,6 +3193,7 @@ export type OrderSelectScalar = {
   requestHash?: boolean
   responsePayloadJson?: boolean
   reservedAmount?: boolean
+  reservedQuantity?: boolean
   reservationFeeRate?: boolean
   reservationReleasedAt?: boolean
   cancelReason?: boolean
@@ -3132,9 +3207,9 @@ export type OrderSelectScalar = {
   updatedAt?: boolean
 }
 
-export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "seasonParticipantId" | "tradingAccountId" | "assetId" | "quoteId" | "side" | "orderType" | "status" | "quantity" | "limitPrice" | "executedPrice" | "currencyCode" | "grossAmount" | "feeAmount" | "netAmount" | "assetPriceSnapshotId" | "fxRateSnapshotId" | "idempotencyKey" | "requestHash" | "responsePayloadJson" | "reservedAmount" | "reservationFeeRate" | "reservationReleasedAt" | "cancelReason" | "limitOrderCandleEvidenceId" | "submittedAt" | "executedAt" | "canceledAt" | "rejectedAt" | "rejectReason" | "createdAt" | "updatedAt", ExtArgs["result"]["order"]>
+export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "seasonParticipantId" | "tradingAccountId" | "assetId" | "quoteId" | "side" | "orderType" | "status" | "quantity" | "limitPrice" | "executedPrice" | "currencyCode" | "grossAmount" | "feeAmount" | "netAmount" | "assetPriceSnapshotId" | "fxRateSnapshotId" | "idempotencyKey" | "requestHash" | "responsePayloadJson" | "reservedAmount" | "reservedQuantity" | "reservationFeeRate" | "reservationReleasedAt" | "cancelReason" | "limitOrderCandleEvidenceId" | "submittedAt" | "executedAt" | "canceledAt" | "rejectedAt" | "rejectReason" | "createdAt" | "updatedAt", ExtArgs["result"]["order"]>
 export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
+  seasonParticipant?: boolean | Prisma.Order$seasonParticipantArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.Order$tradingAccountArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   quote?: boolean | Prisma.Order$quoteArgs<ExtArgs>
@@ -3143,7 +3218,7 @@ export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   candleEvidence?: boolean | Prisma.Order$candleEvidenceArgs<ExtArgs>
 }
 export type OrderIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
+  seasonParticipant?: boolean | Prisma.Order$seasonParticipantArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.Order$tradingAccountArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   quote?: boolean | Prisma.Order$quoteArgs<ExtArgs>
@@ -3152,7 +3227,7 @@ export type OrderIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extens
   candleEvidence?: boolean | Prisma.Order$candleEvidenceArgs<ExtArgs>
 }
 export type OrderIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
+  seasonParticipant?: boolean | Prisma.Order$seasonParticipantArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.Order$tradingAccountArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   quote?: boolean | Prisma.Order$quoteArgs<ExtArgs>
@@ -3164,7 +3239,7 @@ export type OrderIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extens
 export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "Order"
   objects: {
-    seasonParticipant: Prisma.$SeasonParticipantPayload<ExtArgs>
+    seasonParticipant: Prisma.$SeasonParticipantPayload<ExtArgs> | null
     tradingAccount: Prisma.$TradingAccountPayload<ExtArgs> | null
     asset: Prisma.$AssetPayload<ExtArgs>
     quote: Prisma.$QuotePayload<ExtArgs> | null
@@ -3174,7 +3249,7 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    seasonParticipantId: string
+    seasonParticipantId: string | null
     tradingAccountId: string | null
     assetId: string
     quoteId: string | null
@@ -3194,6 +3269,7 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     requestHash: string | null
     responsePayloadJson: runtime.JsonValue | null
     reservedAmount: runtime.Decimal | null
+    reservedQuantity: runtime.Decimal | null
     reservationFeeRate: runtime.Decimal | null
     reservationReleasedAt: Date | null
     cancelReason: string | null
@@ -3599,7 +3675,7 @@ readonly fields: OrderFieldRefs;
  */
 export interface Prisma__OrderClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
-  seasonParticipant<T extends Prisma.SeasonParticipantDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.SeasonParticipantDefaultArgs<ExtArgs>>): Prisma.Prisma__SeasonParticipantClient<runtime.Types.Result.GetResult<Prisma.$SeasonParticipantPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  seasonParticipant<T extends Prisma.Order$seasonParticipantArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$seasonParticipantArgs<ExtArgs>>): Prisma.Prisma__SeasonParticipantClient<runtime.Types.Result.GetResult<Prisma.$SeasonParticipantPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   tradingAccount<T extends Prisma.Order$tradingAccountArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$tradingAccountArgs<ExtArgs>>): Prisma.Prisma__TradingAccountClient<runtime.Types.Result.GetResult<Prisma.$TradingAccountPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   asset<T extends Prisma.AssetDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AssetDefaultArgs<ExtArgs>>): Prisma.Prisma__AssetClient<runtime.Types.Result.GetResult<Prisma.$AssetPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   quote<T extends Prisma.Order$quoteArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$quoteArgs<ExtArgs>>): Prisma.Prisma__QuoteClient<runtime.Types.Result.GetResult<Prisma.$QuotePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
@@ -3656,6 +3732,7 @@ export interface OrderFieldRefs {
   readonly requestHash: Prisma.FieldRef<"Order", 'String'>
   readonly responsePayloadJson: Prisma.FieldRef<"Order", 'Json'>
   readonly reservedAmount: Prisma.FieldRef<"Order", 'Decimal'>
+  readonly reservedQuantity: Prisma.FieldRef<"Order", 'Decimal'>
   readonly reservationFeeRate: Prisma.FieldRef<"Order", 'Decimal'>
   readonly reservationReleasedAt: Prisma.FieldRef<"Order", 'DateTime'>
   readonly cancelReason: Prisma.FieldRef<"Order", 'String'>
@@ -4065,6 +4142,25 @@ export type OrderDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Interna
    * Limit how many Orders to delete.
    */
   limit?: number
+}
+
+/**
+ * Order.seasonParticipant
+ */
+export type Order$seasonParticipantArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the SeasonParticipant
+   */
+  select?: Prisma.SeasonParticipantSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the SeasonParticipant
+   */
+  omit?: Prisma.SeasonParticipantOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.SeasonParticipantInclude<ExtArgs> | null
+  where?: Prisma.SeasonParticipantWhereInput
 }
 
 /**

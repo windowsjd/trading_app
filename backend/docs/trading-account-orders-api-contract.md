@@ -2,7 +2,8 @@
 
 ## Status
 
-Implemented (작업 5, 2026-08-03). These endpoints are the account-addressed
+Implemented for season and general accounts (작업 5, general trading expansion
+2026-08-18). These endpoints are the account-addressed
 counterparts of the legacy `/api/v1/orders` and `/api/v1/positions` surfaces,
 which stay unchanged and share the SAME service cores (fees, quote
 consumption, wallet/ledger/position writes, idempotency, transaction
@@ -38,21 +39,26 @@ See `frontend/docs/trading-account-switching.md`.
   account-existence oracle). The server stores no "current account" state.
 - Reads are status-blind: an owner can read orders/positions of active,
   suspended, and closed accounts alike.
-- Mutations additionally require `mode=season` (general accounts: 409
-  `GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED` — no general wallets, funding,
-  or orders exist yet, and a request never fabricates them) and
-  `TradingAccount.status=active` (otherwise 409 `TRADING_ACCOUNT_NOT_ACTIVE`),
-  ON TOP of every existing season gate (season window/status, participant
-  active/not excluded, market hours, price-source freshness, wallet scope,
-  balances). Account status alone never authorizes trading.
+- New quotes/orders require `TradingAccount.status=active` (otherwise 409
+  `TRADING_ACCOUNT_NOT_ACTIVE`). Season accounts additionally retain every
+  existing season/participant gate. General accounts require their complete
+  KRW/USD wallet, initial-grant ledger, and TWR origin integrity, but never
+  query or require a current season or SeasonParticipant. Both modes share
+  market-hours, provider freshness, quote, fee-calculation, wallet, position,
+  idempotency, and transaction cores.
+- The common calculation core receives `feeRate` from the validated context:
+  season uses `Season.tradeFeeRate`; general uses the independent
+  `GENERAL_TRADE_FEE_RATE` config (default `0.001000`). General never reads the
+  current season to obtain a fee.
 - Season-account read integrity: if the linked participant still owns
   orders (order routes) or positions (position routes) whose
   `tradingAccountId` is NULL or points at a different account, the read
   fails closed with 500 `FINANCIAL_SCOPE_REPAIR_REQUIRED` /
   `TRADING_ACCOUNT_SCOPE_MISMATCH` instead of silently returning a
   partial/empty result. Run `pnpm trading-accounts:repair-trading-scope`.
-  General accounts have no participant, so an empty list is a normal empty
-  account.
+  General reads validate the account foundation and reject participant-polluted
+  Order/Position/Quote rows with 500 `GENERAL_ACCOUNT_INTEGRITY`; a genuinely
+  empty general account remains a normal 200 empty list.
 
 ## Orders
 
@@ -106,16 +112,23 @@ classified afterwards against the loaded row (`req` = requested account,
 | unknown id / another user | 404 `ORDER_NOT_FOUND` (unchanged) |
 
 Classification runs BEFORE any cancel work — including before the market-order
-410 — so no error path can change order status or `reservedAmount`; the whole
-transaction rolls back.
+410 — so no error path can change order status, cash reservation, or quantity
+reservation; the whole transaction rolls back.
 
-Wallet checks are unchanged and still required before a release:
+For general orders there is no `part` identity to infer from. Ownership and
+membership are resolved directly through
+`order.tradingAccountId → TradingAccount.userId`; the row must point to a
+general account and must have `seasonParticipantId=null`. Suspended/closed does
+not block this release-only operation.
+
+BUY wallet checks are unchanged and still required before a release:
 `wallet.seasonParticipantId = order.seasonParticipantId`,
 `wallet.tradingAccountId = order.tradingAccountId`,
 `wallet.currencyCode = order.currencyCode`. A null wallet scope is 500
 `FINANCIAL_SCOPE_REPAIR_REQUIRED`, a mismatch is 500
 `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`, and either rolls the whole
-transaction back.
+transaction back. SELL cancel applies the equivalent account+asset scope guard
+to `Position.reservedQuantity` and releases it atomically with the order state.
 
 **Legacy cancel** keeps its route and response contract: another user's order
 is still a plain 404. It also still fails closed with a structured 500 —
@@ -144,9 +157,10 @@ Account-scoped market create order of work:
 7. if found: same requestHash → return the stored `responsePayloadJson`;
    different requestHash → 409 `ORDER_IDEMPOTENCY_CONFLICT`. Account status,
    season status, participant status, and market state are NOT re-checked.
-8. ONLY when no order exists: general-mode block, account active, season
-   status/window, participant status, market open, quote, wallet scope,
-   balance, price freshness, then the create transaction.
+8. ONLY when no order exists: account active and mode-specific gates (season
+   status/window/participant, or general foundation integrity), followed by
+   market open, quote, wallet scope, balance, price freshness, and the create
+   transaction.
 
 So a committed market order still replays after the account was suspended or
 closed, the season ended, the participant was excluded, or the asset stopped
@@ -182,13 +196,12 @@ user may reuse one key on DIFFERENT accounts.
 
 ### Quote account binding
 
-Quote rows persist the verified `tradingAccountId`. Order create/execute
-refuses a quote whose non-null account differs from the request's account
-(409 `QUOTE_MISMATCH`); only NULL legacy quotes pass, and those are still
-pinned to the same participant + requestHash. Quote consumption is an
-account-conditioned `updateMany` (`id + status=active + seasonParticipantId
-+ (account match OR null)`), so another account's quote can never be
-consumed or state-flipped. The requestHash formula itself is unchanged.
+Quote rows persist the verified `tradingAccountId`. General quotes always have
+`seasonParticipantId=null`; season quotes retain their participant. Create and
+execute reject a different account (409 `QUOTE_MISMATCH`). NULL-account legacy
+quotes remain consumable only on the season path and stay participant/hash
+pinned. General request hashes include `tradingAccountId`; legacy season hash
+material is unchanged.
 
 ## Positions
 
@@ -204,20 +217,31 @@ consumed or state-flipped. The requestHash formula itself is unchanged.
 
 ## Limit-order auto-fill gating (scheduler)
 
-Fills re-verify, inside the fill transaction against locked rows: the
-order's own `tradingAccountId` exists and equals the participant link, the
-account is `mode=season`, a linked quote's scope matches, and the
-wallet/position carry the same verified account. A suspended/closed account
-SKIPS the fill (`account_not_active`; the submitted order and its
-reservation stay — existing policy, no auto-cancel). Scope corruption
-(null/mismatch) throws a structured 500 and rolls the fill back; the
-noisy per-cycle retry is the operator signal to run the repair scripts.
+Fills re-verify, inside the fill transaction against locked rows: the order's
+own account exists, is active, its quote and wallet/position have the same
+scope, and the reservation still exists. Season fills additionally require the
+participant/account link plus unchanged season gates. General fills require
+`seasonParticipantId=null` and never read a season. A suspended/closed account
+SKIPS the fill (`account_not_active`); owner cancel remains available so the
+reservation is not stranded. Scope corruption throws a structured 500 and
+rolls the fill back.
+
+Both BUY and SELL limit orders use the same scheduler. BUY reserves cash in
+`CashWallet.reservedAmount`; SELL reserves owned quantity in
+`Position.reservedQuantity`. Cancel releases the corresponding fence, and fill
+settles it atomically before writing the ledger, position, and
+`SnapshotReason.order_executed` snapshot.
+
+General market execution and limit fill take an exclusive per-account row
+fence before financial writes. This serializes KRW/USD trades with each other
+and with ad-reward external-funding boundaries; the post-lock database wall
+clock becomes the execution/ledger/TWR snapshot time. Season lock order and
+ranking refresh behavior remain unchanged.
 
 ## Error codes (new in this surface)
 
 | Code | Status | Meaning |
 | --- | --- | --- |
-| `GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED` | 409 | general-mode trading not implemented |
 | `TRADING_ACCOUNT_NOT_ACTIVE` | 409 | account suspended/closed blocks new quotes/orders |
 | `TRADING_SCOPE_REPAIR_REQUIRED` | 500 | order/position row lacks account scope — run trading-accounts:repair-trading-scope |
 | `TRADING_ACCOUNT_SCOPE_MISMATCH` | 500 | order/position/quote scope disagrees with the participant link — investigate, never overwritten |

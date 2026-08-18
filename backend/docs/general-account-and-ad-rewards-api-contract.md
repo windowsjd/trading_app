@@ -23,14 +23,14 @@ portfolio valuation, time-weighted return, investment PnL display, and the
 general-account daily snapshot job ARE implemented now; the list below is the
 current one.
 
+General-mode market/limit orders and positions are now implemented through the
+existing account-scoped order API; see
+`docs/trading-account-orders-api-contract.md`.
+
 NOT implemented (deliberately still blocked):
 
-- general-mode orders (`GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED`) and FX
-  (`GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`),
-- general-mode positions and any general-mode trading activation,
-- SeasonRanking's TradingAccount transition,
-- a real ad-network adapter, an ad SDK, an ad-watching screen, the
-  post-login mode-selection screen, and any frontend change.
+- general-mode FX (`GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`),
+- a real ad-network adapter, an ad SDK, and an ad-watching screen.
 
 **No real ad provider has been chosen.** No provider protocol, SDK, callback
 shape, or signature scheme is implemented or assumed anywhere. Ad rewards are

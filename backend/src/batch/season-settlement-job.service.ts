@@ -1,6 +1,5 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import {
-  OrderSide,
   OrderStatus,
   OrderType,
   ParticipantStatus,
@@ -504,49 +503,60 @@ export class SeasonSettlementJobService {
   }
 
   /**
-   * Settlement precondition: no submitted limit-buy order and no wallet
-   * with a non-zero reservation may remain for the season. Open
-   * reservations mean cash is still fenced off and final valuations would
+   * Settlement precondition: no submitted limit order, reserved wallet cash,
+   * or reserved position quantity may remain for the season. Open
+   * reservations mean assets are still fenced off and final valuations would
    * be settled against an unfinished order book — the season-lifecycle
-   * cleanup (which cancels open limit buys of ended seasons on every tick)
+   * cleanup (which cancels open limit orders of ended seasons on every tick)
    * must run first. Fails closed with a structured operational log.
    */
   private async assertNoOpenLimitReservations(
     seasonId: string,
     client: PrismaService | Prisma.TransactionClient = this.prisma,
   ) {
-    const [openLimitBuyOrderCount, reservedWalletCount] = await Promise.all([
-      client.order.count({
-        where: {
-          status: OrderStatus.submitted,
-          orderType: OrderType.limit,
-          side: OrderSide.buy,
-          seasonParticipant: { seasonId },
-        },
-      }),
-      client.cashWallet.count({
-        where: {
-          seasonParticipant: { seasonId },
-          reservedAmount: { gt: 0 },
-        },
-      }),
-    ]);
+    const [openLimitOrderCount, reservedWalletCount, reservedPositionCount] =
+      await Promise.all([
+        client.order.count({
+          where: {
+            status: OrderStatus.submitted,
+            orderType: OrderType.limit,
+            seasonParticipant: { seasonId },
+          },
+        }),
+        client.cashWallet.count({
+          where: {
+            seasonParticipant: { seasonId },
+            reservedAmount: { gt: 0 },
+          },
+        }),
+        client.position.count({
+          where: {
+            seasonParticipant: { seasonId },
+            reservedQuantity: { gt: 0 },
+          },
+        }),
+      ]);
 
-    if (openLimitBuyOrderCount > 0 || reservedWalletCount > 0) {
+    if (
+      openLimitOrderCount > 0 ||
+      reservedWalletCount > 0 ||
+      reservedPositionCount > 0
+    ) {
       this.logger.error(
         JSON.stringify({
           event: 'season_settlement_blocked_open_limit_reservations',
           seasonId,
-          openLimitBuyOrderCount,
+          openLimitOrderCount,
           reservedWalletCount,
+          reservedPositionCount,
           recovery:
-            'run season lifecycle transition cleanup to cancel open limit buys and release reservations, then retry settlement',
+            'run season lifecycle transition cleanup to cancel open limit orders and release reservations, then retry settlement',
         }),
       );
       this.throwJobError(
         HttpStatus.CONFLICT,
         'OPEN_LIMIT_ORDER_RESERVATIONS',
-        'Season settlement is blocked while submitted limit-buy orders or cash reservations remain.',
+        'Season settlement is blocked while submitted limit orders or reservations remain.',
       );
     }
   }

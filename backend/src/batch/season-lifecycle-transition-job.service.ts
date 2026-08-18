@@ -137,7 +137,7 @@ export class SeasonLifecycleTransitionJobService {
     });
 
     // Post-transition safety net (bounded batches, idempotent): cancel
-    // submitted limit-buy orders of ended/settled seasons and release their
+    // submitted limit orders of ended/settled seasons and release their
     // reservations. Runs every tick — not only when a transition happened —
     // so leftovers from an earlier crashed run are healed automatically.
     if (this.limitOrderCancelService) {

@@ -19,7 +19,7 @@ interface OrderSuccessBottomSheetProps {
   payload: CreateOrderDto | null;
   /**
    * The quote this order was created from. Supplies the quote-time ESTIMATES
-   * for an unfilled limit buy — the order itself has no gross/fee/net until the
+   * for an unfilled limit order — the order itself has no gross/fee/net until the
    * scheduler matcher fills it (when auto-execution is enabled).
    */
   quote?: OrderQuoteDto | null;
@@ -44,6 +44,7 @@ export default function OrderSuccessBottomSheet({
   const limitEstimate = isSubmittedLimit
     ? getLimitQuoteEstimateDisplay(quote)
     : null;
+  const submittedSide = display?.side === 'sell' ? 'sell' : 'buy';
 
   return (
     <BottomSheetBackdrop visible={visible} onClose={onClose}>
@@ -53,12 +54,15 @@ export default function OrderSuccessBottomSheet({
 
       <Text style={styles.title}>
         {isSubmittedLimit
-          ? '지정가 매수 주문이 등록되었습니다.'
+          ? `지정가 ${submittedSide === 'buy' ? '매수' : '매도'} 주문이 등록되었습니다.`
           : '주문이 완료되었습니다'}
       </Text>
       {isSubmittedLimit ? (
         <Text style={styles.subtitle}>
-          {getLimitOrderSuccessMessage(payload?.executionPolicy)}
+          {getLimitOrderSuccessMessage(
+            payload?.executionPolicy,
+            submittedSide,
+          )}
         </Text>
       ) : null}
 
@@ -67,7 +71,10 @@ export default function OrderSuccessBottomSheet({
           <Row label="주문 ID" value={display.orderId} />
           <Row label="견적 ID" value={display.quoteId} />
           <Row label="종목" value={display.assetLabel} />
-          <Row label="주문 유형" value="지정가 매수" />
+          <Row
+            label="주문 유형"
+            value={`지정가 ${submittedSide === 'buy' ? '매수' : '매도'}`}
+          />
           <Row label="상태" value="미체결" />
           <Row label="지정가" value={display.limitPrice} />
           <Row label="수량" value={display.quantity} />
@@ -85,9 +92,26 @@ export default function OrderSuccessBottomSheet({
                 label="예상 수수료 (견적 기준)"
                 value={limitEstimate.estimatedFeeAmount}
               />
+              {submittedSide === 'sell' ? (
+                <Row
+                  label="예상 순수령액 (견적 기준)"
+                  value={limitEstimate.expectedNetAmount}
+                />
+              ) : null}
             </>
           ) : null}
-          <Row label="예약금 (미체결 예약)" value={display.reservedAmount} />
+          <Row
+            label={
+              submittedSide === 'buy'
+                ? '예약금 (미체결 예약)'
+                : '예약 수량 (미체결 예약)'
+            }
+            value={
+              submittedSide === 'buy'
+                ? display.reservedAmount
+                : display.reservedQuantity
+            }
+          />
           <Row label="제출 시각" value={display.submittedAt} />
         </View>
       ) : display ? (

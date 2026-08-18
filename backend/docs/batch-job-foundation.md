@@ -295,7 +295,7 @@ COMMIT/ROLLBACK and works across instances, which the existing in-memory
   exists", so a damaged set is never presented as a healthy result.
 - `RankingRefreshService` skips (does not write) when the locked season is no
   longer `active` inside its ranking window. A settled season keeps its rows.
-- `season-settlement` re-checks open limit-buy orders and reserved wallets
+- `season-settlement` re-checks open limit orders, reserved wallets, and reserved positions
   INSIDE the write transaction, not only before it, then writes the settlement
   EquitySnapshot, the final SeasonRanking (with `tradingAccountId`), the
   participant final results, the participant status transitions, the closure of

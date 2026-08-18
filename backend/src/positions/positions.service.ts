@@ -12,11 +12,16 @@ import {
   ParticipantStatus,
   Prisma,
   SeasonStatus,
+  TradingAccountMode,
 } from '../generated/prisma/client';
 import { isFxSnapshotStaleForPortfolioValuation } from '../portfolio/portfolio-valuation.policy';
 import { PrismaService } from '../prisma/prisma.service';
 import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
 import { assertSeasonAccountPositionScopeIntegrity } from '../trading-accounts/trading-account-financial-integrity';
+import {
+  assertGeneralAccountFinancialIntegrity,
+  assertGeneralAccountTradingRowsIntegrity,
+} from '../trading-accounts/general-account-integrity';
 import {
   buildAdminManualFallbackDecision,
   isPositiveDecimal,
@@ -296,10 +301,15 @@ export class PositionsService {
           : tradingAccountId,
       );
 
-    await assertSeasonAccountPositionScopeIntegrity(this.prisma, {
-      tradingAccountId: account.id,
-      seasonParticipantId: account.seasonParticipant?.id ?? null,
-    });
+    if (account.mode === TradingAccountMode.general) {
+      await assertGeneralAccountFinancialIntegrity(this.prisma, account);
+      await assertGeneralAccountTradingRowsIntegrity(this.prisma, account.id);
+    } else {
+      await assertSeasonAccountPositionScopeIntegrity(this.prisma, {
+        tradingAccountId: account.id,
+        seasonParticipantId: account.seasonParticipant?.id ?? null,
+      });
+    }
 
     const valuationAt = new Date();
     const positions = await this.findPositionsByScope(

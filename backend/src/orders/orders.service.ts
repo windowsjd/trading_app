@@ -34,6 +34,7 @@ import {
 } from '../fx/fx-decimal-policy';
 import { isFxSnapshotStale } from '../fx/fx-execute-snapshot-policy';
 import { isFxSnapshotStaleForPortfolioValuation } from '../portfolio/portfolio-valuation.policy';
+import { GeneralAccountPerformanceService } from '../portfolio/general-account-performance.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   buildAdminManualFallbackDecision,
@@ -64,11 +65,15 @@ import {
   calculateMaxDrawdown,
   RankingRefreshService,
 } from '../ranking/ranking-refresh.service';
-import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
+import {
+  TradingAccountAccessService,
+  type OwnedTradingAccount,
+} from '../trading-accounts/trading-account-access.service';
 import { assertSeasonAccountOrderScopeIntegrity } from '../trading-accounts/trading-account-financial-integrity';
 import { debitAvailableCash } from '../wallets/cash-wallet-atomic';
 import { diagnoseCashWalletMutationFailure } from '../wallets/cash-wallet-failure-diagnosis';
 import { assertCashWalletTradingAccountScope } from '../wallets/cash-wallet-scope';
+import { readGeneralTradeFeeRate } from './general-trading.config';
 import { assertAssetTradable, MarketHoursError } from './market-hours.policy';
 import { isLimitOrderEnabled } from './limit-order.config';
 import { readLimitOrderMatchingConfig } from './limit-order-matching.config';
@@ -127,16 +132,15 @@ type OrdersParticipant = {
 };
 
 /**
- * Season trading context every order mutation runs in. Both producers —
- * the legacy current-season resolution and the accountId-path resolution —
- * end here, so the quote/create/execute core is ONE implementation.
- * tradingAccountId is always the VERIFIED account (participant link or the
- * owned account named in the path; the 1:1 FK makes them identical).
+ * Validated account trading context. The calculation/execution core consumes
+ * this and never infers a mode from whichever related row happens to exist.
  */
-type SeasonTradingContext = {
-  season: ActiveOrderSeason;
-  participant: OrdersParticipant;
+type TradingContext = {
+  mode: TradingAccountMode;
+  season: ActiveOrderSeason | null;
+  participant: OrdersParticipant | null;
   tradingAccountId: string;
+  feeRate: Prisma.Decimal;
 };
 
 type ActiveOrderSeason = OrdersSeason & {
@@ -215,8 +219,7 @@ type OrderDetailResponse = {
 };
 
 type OrderQuoteCalculation = {
-  season: ActiveOrderSeason;
-  participant: OrdersParticipant;
+  context: TradingContext;
   asset: OrderAsset;
   request: ParsedOrderRequest;
   price: Prisma.Decimal;
@@ -226,11 +229,14 @@ type OrderQuoteCalculation = {
   krwGrossAmount: Prisma.Decimal;
   krwFeeAmount: Prisma.Decimal;
   krwNetAmount: Prisma.Decimal;
-  /**
-   * Limit-buy only: the reservation basis pinned at quote time and persisted
-   * on the durable quote. Absent on market quotes, which reprice at execute.
-   */
+  /** Buy-side cash reservation basis pinned on the durable limit quote. */
   limitReservationBasis?: QuotedLimitReservationBasis;
+  limitSellBasis?: {
+    quotedFeeRate: Prisma.Decimal;
+    quotedGrossAmount: Prisma.Decimal;
+    quotedFeeAmount: Prisma.Decimal;
+    quotedNetAmount: Prisma.Decimal;
+  };
   assetPriceSnapshotId: string | null;
   fxRateSnapshotId: string | null;
   fxRate: Prisma.Decimal | null;
@@ -264,6 +270,7 @@ type DurableOrderQuoteForCreate = {
   quotedGrossAmount: Prisma.Decimal | null;
   quotedFeeAmount: Prisma.Decimal | null;
   quotedReservedAmount: Prisma.Decimal | null;
+  quotedNetAmount: Prisma.Decimal | null;
   assetPriceSnapshotId: string | null;
   fxRateSnapshotId: string | null;
   expiresAt: Date;
@@ -286,7 +293,13 @@ type OrderQuoteResponse = {
     quotedGrossAmount?: string;
     quotedFeeAmount?: string;
     quotedReservedAmount?: string;
+    quotedNetAmount?: string;
     reservedAmount?: string;
+    reservedQuantity?: string;
+    positionReservedBefore?: string;
+    positionAvailableBefore?: string;
+    estimatedPositionReservedAfter?: string;
+    estimatedPositionAvailableAfter?: string;
     walletReservedBefore?: string;
     walletAvailableBefore?: string;
     estimatedReservedAfter?: string;
@@ -357,7 +370,7 @@ type ExecuteOrderResponse = {
 
 type OrderExecutionRecord = {
   id: string;
-  seasonParticipantId: string;
+  seasonParticipantId: string | null;
   tradingAccountId: string | null;
   assetId: string;
   quoteId: string | null;
@@ -414,7 +427,15 @@ type OrderExecutionRecord = {
     joinedAt: Date;
     tradingAccountId: string | null;
     season: ActiveOrderSeason;
-  };
+  } | null;
+  tradingAccount: {
+    id: string;
+    userId: string;
+    mode: TradingAccountMode;
+    status: TradingAccountStatus;
+    initialCapitalKrw: Prisma.Decimal;
+    seasonParticipant: { id: string } | null;
+  } | null;
 };
 
 type OrderExecutionPlan = {
@@ -435,8 +456,8 @@ type OrderExecutionPlan = {
 };
 
 type OrderExecutionTransactionResult = {
-  seasonId: string;
-  seasonParticipantId: string;
+  seasonId: string | null;
+  seasonParticipantId: string | null;
   order: NonNullable<OrdersResponse['data']['orders']>[number];
   walletTransactionId: string;
   walletBalanceAfter: string;
@@ -478,6 +499,7 @@ const ORDER_EXECUTION_SELECT = {
   assetPriceSnapshotId: true,
   fxRateSnapshotId: true,
   reservedAmount: true,
+  reservedQuantity: true,
   reservationReleasedAt: true,
   cancelReason: true,
   submittedAt: true,
@@ -537,6 +559,16 @@ const ORDER_EXECUTION_SELECT = {
       },
     },
   },
+  tradingAccount: {
+    select: {
+      id: true,
+      userId: true,
+      mode: true,
+      status: true,
+      initialCapitalKrw: true,
+      seasonParticipant: { select: { id: true } },
+    },
+  },
 } as const;
 
 /**
@@ -564,6 +596,7 @@ const IDEMPOTENT_CREATE_ORDER_SELECT = {
   assetPriceSnapshotId: true,
   fxRateSnapshotId: true,
   reservedAmount: true,
+  reservedQuantity: true,
   reservationReleasedAt: true,
   cancelReason: true,
   submittedAt: true,
@@ -593,6 +626,8 @@ export class OrdersService {
     private readonly limitOrderCancelService?: LimitOrderCancelService,
     @Optional()
     private readonly tradingAccountAccessService?: TradingAccountAccessService,
+    @Optional()
+    private readonly generalPerformanceService?: GeneralAccountPerformanceService,
   ) {}
 
   private requireTradingAccountAccessService(): TradingAccountAccessService {
@@ -604,6 +639,17 @@ export class OrdersService {
       );
     }
     return this.tradingAccountAccessService;
+  }
+
+  private requireGeneralPerformanceService(): GeneralAccountPerformanceService {
+    if (!this.generalPerformanceService) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'INTERNAL_ERROR',
+        'General account performance service unavailable',
+      );
+    }
+    return this.generalPerformanceService;
   }
 
   private assertLimitOrderFeatureEnabled(): void {
@@ -691,7 +737,7 @@ export class OrdersService {
 
     const quoteAt = new Date();
     const request = this.parseOrderRequest(body);
-    const context = await this.resolveAccountSeasonTradingContext(
+    const context = await this.resolveAccountTradingContext(
       userId,
       tradingAccountId,
       quoteAt,
@@ -722,7 +768,7 @@ export class OrdersService {
   }
 
   /**
-   * Limit-buy quote: reservation preview from limitPrice × quantity only.
+   * Limit quote: reservation/proceeds preview from limitPrice × quantity only.
    * No provider asset price is resolved; the USD/KRW snapshot (USD assets)
    * feeds the KRW display conversion exactly like market quotes. Read-only:
    * the wallet is never mutated at quote time.
@@ -751,9 +797,11 @@ export class OrdersService {
       this.requireParticipantTradingAccountId(participant);
 
     return this.quoteLimitBuyOrderForContext(userId, request, quoteAt, {
+      mode: TradingAccountMode.season,
       season,
       participant,
       tradingAccountId,
+      feeRate: season.tradeFeeRate,
     });
   }
 
@@ -761,9 +809,17 @@ export class OrdersService {
     userId: string,
     request: ParsedOrderRequest,
     quoteAt: Date,
-    context: SeasonTradingContext,
+    context: TradingContext,
   ): Promise<OrderQuoteResponse> {
-    const { season, participant, tradingAccountId } = context;
+    if (request.side === OrderSide.sell) {
+      return this.quoteLimitSellOrderForContext(
+        userId,
+        request,
+        quoteAt,
+        context,
+      );
+    }
+    const { participant, tradingAccountId } = context;
     const limitOrderCreate = this.requireLimitOrderCreateService();
     if (!request.limitPrice) {
       this.throwApiError(
@@ -800,13 +856,13 @@ export class OrdersService {
 
     const settlementCurrency = this.getAssetSettlementCurrency(asset);
     const preview = await limitOrderCreate.buildLimitBuyQuotePreview({
-      participantId: participant.id,
+      participantId: participant?.id ?? null,
       tradingAccountId,
       assetId: asset.id,
       currencyCode: settlementCurrency,
       limitPrice: request.limitPrice,
       quantity: request.quantity,
-      tradeFeeRate: season.tradeFeeRate,
+      tradeFeeRate: context.feeRate,
     });
 
     const fxSnapshot =
@@ -824,8 +880,7 @@ export class OrdersService {
     );
 
     const calculation: OrderQuoteCalculation = {
-      season,
-      participant,
+      context,
       asset,
       request,
       price: request.limitPrice,
@@ -924,6 +979,141 @@ export class OrdersService {
     };
   }
 
+  private async quoteLimitSellOrderForContext(
+    userId: string,
+    request: ParsedOrderRequest,
+    quoteAt: Date,
+    context: TradingContext,
+  ): Promise<OrderQuoteResponse> {
+    if (!request.limitPrice) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        limitOrderErrorCodes.INVALID_LIMIT_PRICE,
+        'limitPrice is required for limit orders.',
+      );
+    }
+    const asset = await this.findUsableAsset(request.assetId);
+    const settlementCurrency = this.getAssetSettlementCurrency(asset);
+    if (request.currencyCode && request.currencyCode !== settlementCurrency) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'ASSET_CURRENCY_MISMATCH',
+        'currencyCode must match asset settlementCurrency.',
+      );
+    }
+    if (this.getAssetPriceCurrency(asset) !== settlementCurrency) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'ORDER_PRICE_SETTLEMENT_CURRENCY_NOT_SUPPORTED',
+        'Separate price and settlement currencies are not supported for order execution yet.',
+      );
+    }
+    this.assertOrderAssetTradable(asset, quoteAt);
+    const preview =
+      await this.requireLimitOrderCreateService().buildLimitSellQuotePreview({
+        participantId: context.participant?.id ?? null,
+        tradingAccountId: context.tradingAccountId,
+        assetId: asset.id,
+        currencyCode: settlementCurrency,
+        limitPrice: request.limitPrice,
+        quantity: request.quantity,
+        tradeFeeRate: context.feeRate,
+      });
+    const fxSnapshot =
+      settlementCurrency === CurrencyCode.USD
+        ? await this.findFreshUsdKrwSnapshot(quoteAt, 'orders_quote')
+        : null;
+    const krwAmounts = this.calculateKrwAmounts(
+      preview,
+      settlementCurrency,
+      fxSnapshot?.rate ?? null,
+    );
+    const calculation: OrderQuoteCalculation = {
+      context,
+      asset,
+      request,
+      price: request.limitPrice,
+      grossAmount: preview.grossAmount,
+      feeAmount: preview.feeAmount,
+      netAmount: preview.netAmount,
+      limitSellBasis: {
+        quotedFeeRate: preview.quotedFeeRate,
+        quotedGrossAmount: preview.grossAmount,
+        quotedFeeAmount: preview.feeAmount,
+        quotedNetAmount: preview.netAmount,
+      },
+      krwGrossAmount: krwAmounts.krwGrossAmount,
+      krwFeeAmount: krwAmounts.krwFeeAmount,
+      krwNetAmount: krwAmounts.krwNetAmount,
+      assetPriceSnapshotId: null,
+      fxRateSnapshotId: fxSnapshot?.id ?? null,
+      fxRate: fxSnapshot?.rate ?? null,
+      assetPriceSource: null,
+      fxRateSource: fxSnapshot?.fxRateSource ?? null,
+      walletBalanceBefore: preview.walletBalanceBefore,
+      estimatedWalletBalanceAfter: preview.walletBalanceBefore.add(
+        preview.netAmount,
+      ),
+      positionQuantityBefore: preview.positionQuantityBefore,
+      estimatedPositionQuantityAfter: preview.estimatedPositionQuantityAfter,
+      quoteAt,
+      quoteId: null,
+      expiresAt: null,
+      maxChangeBps: null,
+      requestHash: null,
+    };
+    const durableQuote = await this.createDurableOrderQuote(
+      userId,
+      calculation,
+    );
+    const basis = durableQuote.limitSellBasis;
+    if (!basis) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        limitOrderErrorCodes.QUOTE_RESERVATION_BASIS_INVALID,
+        'Limit sell quote was stored without its fee basis.',
+      );
+    }
+    return {
+      success: true,
+      data: {
+        ...this.formatOrderQuoteData(durableQuote),
+        limitPrice: this.formatDecimal(request.limitPrice, monetaryScale),
+        quotedFeeRate: formatDecimalScale(basis.quotedFeeRate, feeRateScale),
+        quotedGrossAmount: this.formatDecimal(
+          basis.quotedGrossAmount,
+          monetaryScale,
+        ),
+        quotedFeeAmount: this.formatDecimal(
+          basis.quotedFeeAmount,
+          monetaryScale,
+        ),
+        quotedNetAmount: this.formatDecimal(
+          basis.quotedNetAmount,
+          monetaryScale,
+        ),
+        reservedQuantity: this.formatDecimal(request.quantity, quantityScale),
+        positionReservedBefore: this.formatDecimal(
+          preview.positionReservedBefore,
+          quantityScale,
+        ),
+        positionAvailableBefore: this.formatDecimal(
+          preview.positionAvailableBefore,
+          quantityScale,
+        ),
+        estimatedPositionReservedAfter: this.formatDecimal(
+          preview.estimatedPositionReservedAfter,
+          quantityScale,
+        ),
+        estimatedPositionAvailableAfter: this.formatDecimal(
+          preview.estimatedPositionAvailableAfter,
+          quantityScale,
+        ),
+        executionPolicy: this.limitOrderExecutionPolicy(),
+      },
+    };
+  }
+
   async createOrder(
     userId: string | undefined,
     body: OrderRequestBody = {},
@@ -988,7 +1178,13 @@ export class OrdersService {
       quoteId,
       idempotency,
       submittedAt,
-      context: { season, participant, tradingAccountId },
+      context: {
+        mode: TradingAccountMode.season,
+        season,
+        participant,
+        tradingAccountId,
+        feeRate: season.tradeFeeRate,
+      },
     });
   }
 
@@ -1041,7 +1237,7 @@ export class OrdersService {
     // COMMITTED REPLAY FIRST (작업 5 보완 2). The lookup replays exactly what
     // the DB uniquely enforces — (tradingAccountId, idempotencyKey), plus the
     // legacy null-scope row pinned to this participant AND user — and runs
-    // BEFORE the general-mode block, account status, season status/window,
+    // BEFORE account status, mode-specific integrity, season status/window,
     // participant status, market hours, quote, wallet scope, balance, and
     // price freshness. Those gates decide whether a NEW order may be created;
     // they must not withhold a response the system already committed to.
@@ -1057,7 +1253,7 @@ export class OrdersService {
       return this.replayIdempotentCreateOrder(existingOrder, idempotency);
     }
 
-    const context = await this.resolveAccountSeasonTradingContextForAccount(
+    const context = await this.resolveAccountTradingContextForAccount(
       account,
       submittedAt,
     );
@@ -1078,13 +1274,13 @@ export class OrdersService {
     quoteId: string;
     idempotency: OrderCreateIdempotency;
     submittedAt: Date;
-    context: SeasonTradingContext;
+    context: TradingContext;
   }): Promise<CreateOrderResponse | LimitOrderCreateResponse> {
     const { userId, request, quoteId, idempotency, submittedAt } = input;
     const { season, participant, tradingAccountId } = input.context;
     const existingOrder = await this.findIdempotentCreateOrder({
       tradingAccountId,
-      seasonParticipantId: participant.id,
+      seasonParticipantId: participant?.id ?? null,
       userId,
       idempotencyKey: idempotency.idempotencyKey,
     });
@@ -1095,15 +1291,20 @@ export class OrdersService {
 
     try {
       const response = await this.prisma.$transaction(async (tx) => {
+        await this.lockGeneralTradingAccountInTransaction(tx, input.context);
+        const effectiveSubmittedAt =
+          input.context.mode === TradingAccountMode.general
+            ? await this.readTransactionWallClock(tx)
+            : submittedAt;
         const quote = await this.findActiveOrderQuoteForCreateOrThrow(tx, {
           quoteId,
           userId,
-          seasonParticipantId: participant.id,
+          seasonParticipantId: participant?.id ?? null,
           tradingAccountId,
           request,
-          now: submittedAt,
+          now: effectiveSubmittedAt,
         });
-        this.assertOrderAssetTradable(quote.asset, submittedAt);
+        this.assertOrderAssetTradable(quote.asset, effectiveSubmittedAt);
 
         const price = roundDecimalHalfUp(quote.quotedPrice, monetaryScale);
         const grossAmount = roundDecimalHalfUp(
@@ -1111,7 +1312,7 @@ export class OrdersService {
           monetaryScale,
         );
         const feeAmount = roundDecimalHalfUp(
-          grossAmount.mul(season.tradeFeeRate),
+          grossAmount.mul(input.context.feeRate),
           monetaryScale,
         );
         const netAmount =
@@ -1123,7 +1324,7 @@ export class OrdersService {
         await tx.order.create({
           data: {
             id: orderId,
-            seasonParticipantId: participant.id,
+            seasonParticipantId: participant?.id ?? null,
             tradingAccountId,
             assetId: quote.asset.id,
             quoteId: quote.id,
@@ -1141,13 +1342,13 @@ export class OrdersService {
             fxRateSnapshotId: quote.fxRateSnapshotId,
             idempotencyKey: idempotency.idempotencyKey,
             requestHash: idempotency.requestHash,
-            submittedAt,
+            submittedAt: effectiveSubmittedAt,
             executedAt: null,
             canceledAt: null,
             rejectedAt: null,
             rejectReason: null,
-            createdAt: submittedAt,
-            updatedAt: submittedAt,
+            createdAt: effectiveSubmittedAt,
+            updatedAt: effectiveSubmittedAt,
           },
           select: {
             id: true,
@@ -1170,11 +1371,14 @@ export class OrdersService {
         }
 
         const executionOrder = order as OrderExecutionRecord;
-        this.assertExecutableSeasonAndAsset(executionOrder, submittedAt);
+        this.assertExecutableSeasonAndAsset(
+          executionOrder,
+          effectiveSubmittedAt,
+        );
         const plan = await this.buildOrderExecutionPlan(
           tx,
           executionOrder,
-          submittedAt,
+          effectiveSubmittedAt,
         );
         const result =
           executionOrder.side === OrderSide.buy
@@ -1208,7 +1412,9 @@ export class OrdersService {
         return responsePayloadJson;
       });
 
-      this.refreshRankingAfterParticipantChange(season.id, participant.id);
+      if (season && participant) {
+        this.refreshRankingAfterParticipantChange(season.id, participant.id);
+      }
 
       return response;
     } catch (error) {
@@ -1218,7 +1424,7 @@ export class OrdersService {
 
       const racedOrder = await this.findIdempotentCreateOrder({
         tradingAccountId,
-        seasonParticipantId: participant.id,
+        seasonParticipantId: participant?.id ?? null,
         userId,
         idempotencyKey: idempotency.idempotencyKey,
       });
@@ -1236,10 +1442,9 @@ export class OrdersService {
   }
 
   /**
-   * Creates a SUBMITTED limit-buy order with an atomic cash reservation.
-   * This request never executes or reads a provider price and never touches
-   * balanceAmount / WalletTransaction / Position. Only a later path A stream
-   * event can fill the committed submitted order.
+   * Legacy-endpoint entry into the shared SUBMITTED limit-order core. Create
+   * reserves buy cash or sell quantity but never executes or reads a provider
+   * price; the common scheduler matcher performs later fills.
    */
   private async createLimitBuyOrder(
     userId: string,
@@ -1298,7 +1503,13 @@ export class OrdersService {
       request,
       quoteId,
       idempotency,
-      context: { season, participant, tradingAccountId },
+      context: {
+        mode: TradingAccountMode.season,
+        season,
+        participant,
+        tradingAccountId,
+        feeRate: season.tradeFeeRate,
+      },
     });
   }
 
@@ -1346,7 +1557,7 @@ export class OrdersService {
 
     this.assertLimitOrderFeatureEnabled();
     const submittedAt = new Date();
-    const context = await this.resolveAccountSeasonTradingContextForAccount(
+    const context = await this.resolveAccountTradingContextForAccount(
       account,
       submittedAt,
     );
@@ -1365,7 +1576,7 @@ export class OrdersService {
     request: ParsedOrderRequest;
     quoteId: string;
     idempotency: OrderCreateIdempotency;
-    context: SeasonTradingContext;
+    context: TradingContext;
   }): Promise<CreateOrderResponse | LimitOrderCreateResponse> {
     const { userId, request, quoteId, idempotency } = input;
     const { participant, tradingAccountId } = input.context;
@@ -1385,22 +1596,24 @@ export class OrdersService {
         // fails) or waits behind these locks (and its cleanup then cancels the
         // order this transaction is about to commit). No third outcome exists,
         // so no reservation can outlive an exclusion or a season end.
-        const lockedContext =
-          await limitOrderCreate.lockTradableContextInTransaction(tx, {
-            userId,
-            seasonParticipantId: participant.id,
-          });
-
-        // Trading-account link re-verified against the LOCKED participant
-        // row: a null or different link at commit time fails the create
-        // instead of writing an unscoped/mis-scoped order.
-        if (lockedContext.tradingAccountId !== tradingAccountId) {
-          this.throwTradingScopeIntegrityError(
-            lockedContext.tradingAccountId === null
-              ? 'TRADING_ACCOUNT_LINK_INTEGRITY'
-              : 'TRADING_ACCOUNT_SCOPE_MISMATCH',
-            'Participant trading-account link changed while creating the order.',
-          );
+        const lockedContext = participant
+          ? await limitOrderCreate.lockTradableContextInTransaction(tx, {
+              userId,
+              seasonParticipantId: participant.id,
+            })
+          : null;
+        if (participant) {
+          // Trading-account link re-verified against the LOCKED participant.
+          if (lockedContext?.tradingAccountId !== tradingAccountId) {
+            this.throwTradingScopeIntegrityError(
+              lockedContext?.tradingAccountId === null
+                ? 'TRADING_ACCOUNT_LINK_INTEGRITY'
+                : 'TRADING_ACCOUNT_SCOPE_MISMATCH',
+              'Participant trading-account link changed while creating the order.',
+            );
+          }
+        } else {
+          await this.lockGeneralTradingAccountInTransaction(tx, input.context);
         }
 
         // PostgreSQL CURRENT_TIMESTAMP/now() are fixed at transaction start.
@@ -1418,15 +1631,17 @@ export class OrdersService {
             'Database transaction clock is unavailable.',
           );
         }
-        limitOrderCreate.assertLockedTradableContext(
-          lockedContext,
-          transactionNow,
-        );
+        if (lockedContext) {
+          limitOrderCreate.assertLockedTradableContext(
+            lockedContext,
+            transactionNow,
+          );
+        }
 
         const quote = await this.findActiveOrderQuoteForCreateOrThrow(tx, {
           quoteId,
           userId,
-          seasonParticipantId: participant.id,
+          seasonParticipantId: participant?.id ?? null,
           tradingAccountId,
           request,
           now: transactionNow,
@@ -1441,7 +1656,7 @@ export class OrdersService {
           );
         }
 
-        return limitOrderCreate.createSubmittedLimitBuyInTransaction(tx, {
+        const createInput = {
           quote: {
             id: quote.id,
             limitPrice: quote.limitPrice,
@@ -1455,13 +1670,26 @@ export class OrdersService {
               currencyCode: quote.asset.currencyCode,
             },
           },
-          participant: { id: participant.id, tradingAccountId },
+          participant: { id: participant?.id ?? null, tradingAccountId },
           quantity: request.quantity,
           idempotency,
           submittedAt: transactionNow,
           autoExecutionEnabled:
             this.limitOrderExecutionPolicy().autoExecutionEnabled,
-        });
+        };
+        if (request.side === OrderSide.sell) {
+          return limitOrderCreate.createSubmittedLimitSellInTransaction(tx, {
+            ...createInput,
+            quote: {
+              ...createInput.quote,
+              quotedNetAmount: quote.quotedNetAmount,
+            },
+          });
+        }
+        return limitOrderCreate.createSubmittedLimitBuyInTransaction(
+          tx,
+          createInput,
+        );
       });
     } catch (error) {
       if (!this.isUniqueConstraintError(error)) {
@@ -1485,7 +1713,7 @@ export class OrdersService {
         })) ??
         (await this.findIdempotentCreateOrder({
           tradingAccountId,
-          seasonParticipantId: participant.id,
+          seasonParticipantId: participant?.id ?? null,
           userId,
           idempotencyKey: idempotency.idempotencyKey,
         }));
@@ -1515,7 +1743,7 @@ export class OrdersService {
     }
 
     const parsedOrderId = this.parseOrderId(orderId);
-    // Limit buy orders are cancelable; market orders keep the historical
+    // Limit orders are cancelable; market orders keep the historical
     // ORDER_CANCEL_NOT_SUPPORTED (410) inside the cancel service. Cancel is
     // intentionally NOT gated by LIMIT_ORDER_ENABLED so existing
     // reservations can always be released.
@@ -1627,10 +1855,12 @@ export class OrdersService {
       }
 
       const executionResult = result as OrderExecutionTransactionResult;
-      this.refreshRankingAfterParticipantChange(
-        executionResult.seasonId,
-        executionResult.seasonParticipantId,
-      );
+      if (executionResult.seasonId && executionResult.seasonParticipantId) {
+        this.refreshRankingAfterParticipantChange(
+          executionResult.seasonId,
+          executionResult.seasonParticipantId,
+        );
+      }
 
       return this.buildExecutedOrderResponse(executionResult);
     } catch (error) {
@@ -1723,6 +1953,7 @@ export class OrdersService {
           assetPriceSnapshotId: true,
           fxRateSnapshotId: true,
           reservedAmount: true,
+          reservedQuantity: true,
           reservationReleasedAt: true,
           cancelReason: true,
           submittedAt: true,
@@ -1845,10 +2076,16 @@ export class OrdersService {
         tradingAccountId.trim(),
       );
 
-    await assertSeasonAccountOrderScopeIntegrity(this.prisma, {
-      tradingAccountId: account.id,
-      seasonParticipantId: account.seasonParticipant?.id ?? null,
-    });
+    if (account.mode === TradingAccountMode.general) {
+      await this.requireGeneralPerformanceService().assertGeneralAccountReady(
+        account,
+      );
+    } else {
+      await assertSeasonAccountOrderScopeIntegrity(this.prisma, {
+        tradingAccountId: account.id,
+        seasonParticipantId: account.seasonParticipant?.id ?? null,
+      });
+    }
 
     const where = {
       tradingAccountId: account.id,
@@ -1879,6 +2116,7 @@ export class OrdersService {
           assetPriceSnapshotId: true,
           fxRateSnapshotId: true,
           reservedAmount: true,
+          reservedQuantity: true,
           reservationReleasedAt: true,
           cancelReason: true,
           submittedAt: true,
@@ -1937,10 +2175,16 @@ export class OrdersService {
         tradingAccountId.trim(),
       );
 
-    await assertSeasonAccountOrderScopeIntegrity(this.prisma, {
-      tradingAccountId: account.id,
-      seasonParticipantId: account.seasonParticipant?.id ?? null,
-    });
+    if (account.mode === TradingAccountMode.general) {
+      await this.requireGeneralPerformanceService().assertGeneralAccountReady(
+        account,
+      );
+    } else {
+      await assertSeasonAccountOrderScopeIntegrity(this.prisma, {
+        tradingAccountId: account.id,
+        seasonParticipantId: account.seasonParticipant?.id ?? null,
+      });
+    }
 
     const order = await this.prisma.order.findFirst({
       where: {
@@ -1988,58 +2232,53 @@ export class OrdersService {
   }
 
   /**
-   * Resolve an owned account into a mutation-grade season trading context.
-   * Gate order: ownership (404) → mode (general trading unimplemented,
-   * 409) → account status (409) → season/participant tradability (the same
-   * asserts the legacy path uses). TradingAccount.status alone NEVER
-   * authorizes trading — season window and participant status still gate.
+   * Resolve an owned account into a mutation-grade trading context. General
+   * accounts require their complete financial/performance foundation and no
+   * season. Season accounts retain every existing season/participant gate.
    */
-  private async resolveAccountSeasonTradingContext(
+  private async resolveAccountTradingContext(
     userId: string,
     tradingAccountId: string,
     now: Date,
-  ): Promise<SeasonTradingContext> {
+  ): Promise<TradingContext> {
     const account =
       await this.requireTradingAccountAccessService().getOwnedAccountOrThrow(
         userId,
         tradingAccountId.trim(),
       );
 
-    return this.resolveAccountSeasonTradingContextForAccount(account, now);
+    return this.resolveAccountTradingContextForAccount(account, now);
   }
 
-  private async resolveAccountSeasonTradingContextForAccount(
-    account: {
-      id: string;
-      mode: TradingAccountMode;
-      status: TradingAccountStatus;
-      seasonParticipant: {
-        id: string;
-        participantStatus: ParticipantStatus;
-        joinedAt: Date;
-        season: { id: string };
-      } | null;
-    },
+  private async resolveAccountTradingContextForAccount(
+    account: OwnedTradingAccount,
     now: Date,
-  ): Promise<SeasonTradingContext> {
-    // General-mode trading is not implemented: no wallets or funding exist
-    // for general accounts, and a GET/POST must never fabricate them.
-    if (
-      account.mode !== TradingAccountMode.season ||
-      !account.seasonParticipant
-    ) {
-      this.throwApiError(
-        HttpStatus.CONFLICT,
-        'GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED',
-        'Trading is not available for general accounts yet.',
-      );
-    }
-
+  ): Promise<TradingContext> {
     if (account.status !== TradingAccountStatus.active) {
       this.throwApiError(
         HttpStatus.CONFLICT,
         'TRADING_ACCOUNT_NOT_ACTIVE',
         'Trading account is not active',
+      );
+    }
+
+    if (account.mode === TradingAccountMode.general) {
+      await this.requireGeneralPerformanceService().assertGeneralAccountReady(
+        account,
+      );
+      return {
+        mode: TradingAccountMode.general,
+        season: null,
+        participant: null,
+        tradingAccountId: account.id,
+        feeRate: readGeneralTradeFeeRate(),
+      };
+    }
+
+    if (!account.seasonParticipant) {
+      this.throwTradingScopeIntegrityError(
+        'TRADING_ACCOUNT_LINK_INTEGRITY',
+        'Season trading account has no participant link.',
       );
     }
 
@@ -2067,6 +2306,7 @@ export class OrdersService {
     this.assertParticipantTradable(account.seasonParticipant.participantStatus);
 
     return {
+      mode: TradingAccountMode.season,
       season,
       participant: {
         id: account.seasonParticipant.id,
@@ -2075,7 +2315,84 @@ export class OrdersService {
         tradingAccountId: account.id,
       },
       tradingAccountId: account.id,
+      feeRate: season.tradeFeeRate,
     };
+  }
+
+  /**
+   * Serializes every general-account financial mutation, across both wallet
+   * currencies, with external-funding boundaries and account status changes.
+   * This exclusive per-account fence keeps ordinary TWR snapshots in commit
+   * order even when concurrent trades touch different wallets. The row is
+   * never created or repaired here.
+   */
+  private async lockGeneralTradingAccountInTransaction(
+    tx: Prisma.TransactionClient,
+    context: TradingContext,
+  ): Promise<void> {
+    if (context.mode !== TradingAccountMode.general) return;
+
+    const rows = await tx.$queryRaw<
+      Array<{
+        id: string;
+        mode: TradingAccountMode;
+        status: TradingAccountStatus;
+      }>
+    >`
+      SELECT "id", "mode", "status"
+      FROM "trading_accounts"
+      WHERE "id" = ${context.tradingAccountId}
+      FOR UPDATE
+    `;
+    const locked = rows[0];
+    if (
+      !locked ||
+      locked.mode !== TradingAccountMode.general ||
+      locked.status !== TradingAccountStatus.active
+    ) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'TRADING_ACCOUNT_NOT_ACTIVE',
+        'Trading account is not active',
+      );
+    }
+
+    const account = await tx.tradingAccount.findUnique({
+      where: { id: context.tradingAccountId },
+      select: {
+        id: true,
+        mode: true,
+        initialCapitalKrw: true,
+        seasonParticipant: { select: { id: true } },
+      },
+    });
+    if (!account) {
+      this.throwTradingScopeIntegrityError(
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+        'General trading account disappeared while creating an order.',
+      );
+    }
+    await this.requireGeneralPerformanceService().assertGeneralAccountReady(
+      account,
+      tx,
+    );
+  }
+
+  private async readTransactionWallClock(
+    tx: Prisma.TransactionClient,
+  ): Promise<Date> {
+    const rows = await tx.$queryRaw<Array<{ now: Date }>>`
+      SELECT clock_timestamp() AS "now"
+    `;
+    const now = rows[0]?.now;
+    if (!now) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'ORDER_EXECUTION_TRANSACTION_FAILED',
+        'Database transaction clock is unavailable.',
+      );
+    }
+    return now;
   }
 
   private async findOwnedOrderForExecution(
@@ -2100,8 +2417,24 @@ export class OrdersService {
     order: OrderExecutionRecord,
     executedAt: Date,
   ) {
-    this.assertSeasonTradable(order.seasonParticipant.season, executedAt);
-    this.assertParticipantTradable(order.seasonParticipant.participantStatus);
+    this.requireOrderTradingScope(order);
+    if (order.tradingAccount?.status !== TradingAccountStatus.active) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'TRADING_ACCOUNT_NOT_ACTIVE',
+        'Trading account is not active',
+      );
+    }
+    if (order.tradingAccount?.mode === TradingAccountMode.season) {
+      if (!order.seasonParticipant) {
+        this.throwTradingScopeIntegrityError(
+          'TRADING_ACCOUNT_SCOPE_MISMATCH',
+          'Season order has no season participant.',
+        );
+      }
+      this.assertSeasonTradable(order.seasonParticipant.season, executedAt);
+      this.assertParticipantTradable(order.seasonParticipant.participantStatus);
+    }
     this.assertOrderAssetTradable(order.asset, executedAt);
 
     if (order.orderType !== OrderType.market) {
@@ -2146,7 +2479,13 @@ export class OrdersService {
       executedAt,
     );
     const tradeFeeRate = roundDecimalHalfUp(
-      order.seasonParticipant.season.tradeFeeRate,
+      order.tradingAccount?.mode === TradingAccountMode.general
+        ? readGeneralTradeFeeRate()
+        : (order.seasonParticipant?.season.tradeFeeRate ??
+            this.throwTradingScopeIntegrityError(
+              'TRADING_ACCOUNT_SCOPE_MISMATCH',
+              'Season order has no fee source.',
+            )),
       feeRateScale,
     );
     const grossAmount = roundDecimalHalfUp(
@@ -2243,6 +2582,7 @@ export class OrdersService {
     const expectedHash = computeOrderQuoteRequestHash({
       userId: quote.userId,
       seasonParticipantId: order.seasonParticipantId,
+      tradingAccountId: this.requireOrderTradingScope(order),
       assetId: order.assetId,
       side: order.side,
       orderType: order.orderType,
@@ -2255,8 +2595,8 @@ export class OrdersService {
     // never executable, even for the same user. NULL legacy quotes pass and
     // stay pinned to the participant + request hash below.
     if (
-      quote.tradingAccountId !== null &&
-      quote.tradingAccountId !== this.requireOrderTradingScope(order)
+      quote.tradingAccountId !== this.requireOrderTradingScope(order) &&
+      !(order.seasonParticipantId !== null && quote.tradingAccountId === null)
     ) {
       this.throwApiError(
         HttpStatus.CONFLICT,
@@ -2573,7 +2913,7 @@ export class OrdersService {
     );
 
     return {
-      seasonId: order.seasonParticipant.season.id,
+      seasonId: order.seasonParticipant?.season.id ?? null,
       seasonParticipantId: order.seasonParticipantId,
       order: this.formatOrder(finalizedOrder),
       walletTransactionId: walletTransaction.id,
@@ -2595,17 +2935,26 @@ export class OrdersService {
     const tradingAccountId = this.requireOrderTradingScope(order);
     await this.consumeOrderQuoteInTransaction(tx, order, plan.executedAt);
     const position = await tx.position.findUnique({
-      where: {
-        seasonParticipantId_assetId: {
-          seasonParticipantId: order.seasonParticipantId,
-          assetId: order.assetId,
-        },
-      },
+      where:
+        order.seasonParticipantId === null
+          ? {
+              tradingAccountId_assetId: {
+                tradingAccountId,
+                assetId: order.assetId,
+              },
+            }
+          : {
+              seasonParticipantId_assetId: {
+                seasonParticipantId: order.seasonParticipantId,
+                assetId: order.assetId,
+              },
+            },
       select: {
         id: true,
         seasonParticipantId: true,
         tradingAccountId: true,
         quantity: true,
+        reservedQuantity: true,
         averageCost: true,
         currencyCode: true,
       },
@@ -2653,8 +3002,12 @@ export class OrdersService {
         seasonParticipantId: order.seasonParticipantId,
         tradingAccountId,
         assetId: order.assetId,
-        quantity: {
-          gte: this.formatDecimal(order.quantity, monetaryScale),
+        quantity: { gte: this.formatDecimal(order.quantity, monetaryScale) },
+        reservedQuantity: {
+          lte: this.formatDecimal(
+            position.quantity.sub(order.quantity),
+            monetaryScale,
+          ),
         },
       },
       data: {
@@ -2740,7 +3093,7 @@ export class OrdersService {
     );
 
     return {
-      seasonId: order.seasonParticipant.season.id,
+      seasonId: order.seasonParticipant?.season.id ?? null,
       seasonParticipantId: order.seasonParticipantId,
       order: this.formatOrder(finalizedOrder),
       walletTransactionId: walletTransaction.id,
@@ -2776,10 +3129,14 @@ export class OrdersService {
         id: order.quoteId,
         status: QuoteStatus.active,
         seasonParticipantId: order.seasonParticipantId,
-        OR: [
-          { tradingAccountId: this.requireOrderTradingScope(order) },
-          { tradingAccountId: null },
-        ],
+        ...(order.seasonParticipantId === null
+          ? { tradingAccountId: this.requireOrderTradingScope(order) }
+          : {
+              OR: [
+                { tradingAccountId: this.requireOrderTradingScope(order) },
+                { tradingAccountId: null },
+              ],
+            }),
       },
       data: {
         status: QuoteStatus.consumed,
@@ -2798,17 +3155,25 @@ export class OrdersService {
 
   private async findCashWalletForExecution(
     tx: OrderExecuteTransactionClient,
-    seasonParticipantId: string,
+    seasonParticipantId: string | null,
     currencyCode: CurrencyCode,
     tradingAccountId: string,
   ) {
     const wallet = await tx.cashWallet.findUnique({
-      where: {
-        seasonParticipantId_currencyCode: {
-          seasonParticipantId,
-          currencyCode,
-        },
-      },
+      where:
+        seasonParticipantId === null
+          ? {
+              tradingAccountId_currencyCode: {
+                tradingAccountId,
+                currencyCode,
+              },
+            }
+          : {
+              seasonParticipantId_currencyCode: {
+                seasonParticipantId,
+                currencyCode,
+              },
+            },
       select: {
         id: true,
         seasonParticipantId: true,
@@ -2838,7 +3203,7 @@ export class OrdersService {
     tx: OrderExecuteTransactionClient,
     input: {
       walletId: string;
-      seasonParticipantId: string;
+      seasonParticipantId: string | null;
       currencyCode: CurrencyCode;
     },
   ) {
@@ -2876,7 +3241,7 @@ export class OrdersService {
     tx: OrderExecuteTransactionClient,
     input: {
       walletId: string;
-      seasonParticipantId: string;
+      seasonParticipantId: string | null;
       tradingAccountId: string;
       currencyCode: CurrencyCode;
       amount: Prisma.Decimal;
@@ -2920,7 +3285,7 @@ export class OrdersService {
     tx: OrderExecuteTransactionClient,
     input: {
       walletId: string;
-      seasonParticipantId: string;
+      seasonParticipantId: string | null;
       tradingAccountId: string;
       currencyCode: CurrencyCode;
     },
@@ -2957,12 +3322,20 @@ export class OrdersService {
     tradingAccountId: string,
   ): Promise<string> {
     const position = await tx.position.findUnique({
-      where: {
-        seasonParticipantId_assetId: {
-          seasonParticipantId: order.seasonParticipantId,
-          assetId: order.assetId,
-        },
-      },
+      where:
+        order.seasonParticipantId === null
+          ? {
+              tradingAccountId_assetId: {
+                tradingAccountId,
+                assetId: order.assetId,
+              },
+            }
+          : {
+              seasonParticipantId_assetId: {
+                seasonParticipantId: order.seasonParticipantId,
+                assetId: order.assetId,
+              },
+            },
       select: {
         id: true,
         seasonParticipantId: true,
@@ -2984,6 +3357,7 @@ export class OrdersService {
           tradingAccountId,
           assetId: order.assetId,
           quantity: this.formatDecimal(order.quantity, monetaryScale),
+          reservedQuantity: ZERO_MONEY,
           averageCost: this.formatDecimal(averageCost, monetaryScale),
           currencyCode: order.currencyCode,
           realizedPnl: ZERO_MONEY,
@@ -3049,11 +3423,37 @@ export class OrdersService {
 
   private async recordOrderExecutedPortfolioSnapshot(
     tx: OrderExecuteTransactionClient,
-    seasonParticipantId: string,
+    seasonParticipantId: string | null,
     capturedAt: Date,
     /** The order's ALREADY-VERIFIED account scope (작업 7 dual-write). */
     tradingAccountId: string,
   ): Promise<string | null> {
+    if (seasonParticipantId === null) {
+      const account = await tx.tradingAccount.findUnique({
+        where: { id: tradingAccountId },
+        select: {
+          id: true,
+          mode: true,
+          initialCapitalKrw: true,
+          seasonParticipant: { select: { id: true } },
+        },
+      });
+      if (!account || account.mode !== TradingAccountMode.general) {
+        this.throwTradingScopeIntegrityError(
+          'TRADING_ACCOUNT_SCOPE_MISMATCH',
+          'General order snapshot account is missing or has the wrong mode.',
+        );
+      }
+      return this.requireGeneralPerformanceService().createOrdinarySnapshotInTransaction(
+        {
+          account,
+          reason: SnapshotReason.order_executed,
+          capturedAt,
+          client: tx,
+        },
+      );
+    }
+
     let valuation: Awaited<
       ReturnType<OrdersService['calculateParticipantValuationInTransaction']>
     >;
@@ -3667,7 +4067,7 @@ export class OrdersService {
     tx: OrderExecuteTransactionClient,
     input: {
       positionId: string;
-      seasonParticipantId: string;
+      seasonParticipantId: string | null;
       assetId: string;
       quantity: Prisma.Decimal;
     },
@@ -3715,6 +4115,7 @@ export class OrdersService {
       where: {
         id: order.id,
         seasonParticipantId: order.seasonParticipantId,
+        tradingAccountId: this.requireOrderTradingScope(order),
         status: OrderStatus.submitted,
       },
       data: {
@@ -3876,31 +4277,26 @@ export class OrdersService {
       this.requireParticipantTradingAccountId(participant);
 
     return this.buildOrderQuoteForContext({
+      mode: TradingAccountMode.season,
       season,
       participant,
       tradingAccountId,
+      feeRate: season.tradeFeeRate,
       request,
       quoteAt,
       sourceWorkflow,
     });
   }
 
-  private async buildOrderQuoteForContext(input: {
-    season: ActiveOrderSeason;
-    participant: OrdersParticipant;
-    tradingAccountId: string;
-    request: ParsedOrderRequest;
-    quoteAt: Date;
-    sourceWorkflow: OrderQuoteSourceWorkflow;
-  }): Promise<OrderQuoteCalculation> {
-    const {
-      season,
-      participant,
-      tradingAccountId,
-      request,
-      quoteAt,
-      sourceWorkflow,
-    } = input;
+  private async buildOrderQuoteForContext(
+    input: TradingContext & {
+      request: ParsedOrderRequest;
+      quoteAt: Date;
+      sourceWorkflow: OrderQuoteSourceWorkflow;
+    },
+  ): Promise<OrderQuoteCalculation> {
+    const { participant, tradingAccountId, request, quoteAt, sourceWorkflow } =
+      input;
     const asset = await this.findUsableAsset(request.assetId);
     if (
       request.currencyCode &&
@@ -3935,7 +4331,7 @@ export class OrdersService {
       monetaryScale,
     );
     const feeAmount = roundDecimalHalfUp(
-      grossAmount.mul(season.tradeFeeRate),
+      grossAmount.mul(input.feeRate),
       monetaryScale,
     );
     const netAmount =
@@ -3966,7 +4362,7 @@ export class OrdersService {
     );
 
     const previewBalances = await this.assertOrderResourcesAvailable({
-      participantId: participant.id,
+      participantId: participant?.id ?? null,
       tradingAccountId,
       assetId: asset.id,
       side: request.side,
@@ -3984,8 +4380,13 @@ export class OrdersService {
         : previewBalances.positionQuantityBefore.sub(request.quantity);
 
     return {
-      season,
-      participant,
+      context: {
+        mode: input.mode,
+        season: input.season,
+        participant,
+        tradingAccountId,
+        feeRate: input.feeRate,
+      },
       asset,
       request,
       price: priceContext.price,
@@ -4034,7 +4435,8 @@ export class OrdersService {
     );
     const requestHash = computeOrderQuoteRequestHash({
       userId,
-      seasonParticipantId: quote.participant.id,
+      seasonParticipantId: quote.context.participant?.id ?? null,
+      tradingAccountId: quote.context.tradingAccountId,
       assetId: quote.asset.id,
       side: quote.request.side,
       orderType: quote.request.orderType,
@@ -4045,13 +4447,11 @@ export class OrdersService {
     const durableQuote = await this.prisma.quote.create({
       data: {
         userId,
-        seasonParticipantId: quote.participant.id,
+        seasonParticipantId: quote.context.participant?.id ?? null,
         // Dual-write: quote rows always carry the verified account. Every
         // producer of OrderQuoteCalculation resolves the link fail-closed
         // (requireParticipantTradingAccountId) before reaching here.
-        tradingAccountId: this.requireParticipantTradingAccountId(
-          quote.participant,
-        ),
+        tradingAccountId: quote.context.tradingAccountId,
         quoteType: QuoteType.order,
         status: QuoteStatus.active,
         assetId: quote.asset.id,
@@ -4071,22 +4471,43 @@ export class OrdersService {
               quote.limitReservationBasis.quotedFeeRate,
               feeRateScale,
             )
-          : null,
+          : quote.limitSellBasis
+            ? formatDecimalScale(
+                quote.limitSellBasis.quotedFeeRate,
+                feeRateScale,
+              )
+            : null,
         quotedGrossAmount: quote.limitReservationBasis
           ? this.formatDecimal(
               quote.limitReservationBasis.quotedGrossAmount,
               monetaryScale,
             )
-          : null,
+          : quote.limitSellBasis
+            ? this.formatDecimal(
+                quote.limitSellBasis.quotedGrossAmount,
+                monetaryScale,
+              )
+            : null,
         quotedFeeAmount: quote.limitReservationBasis
           ? this.formatDecimal(
               quote.limitReservationBasis.quotedFeeAmount,
               monetaryScale,
             )
-          : null,
+          : quote.limitSellBasis
+            ? this.formatDecimal(
+                quote.limitSellBasis.quotedFeeAmount,
+                monetaryScale,
+              )
+            : null,
         quotedReservedAmount: quote.limitReservationBasis
           ? this.formatDecimal(
               quote.limitReservationBasis.quotedReservedAmount,
+              monetaryScale,
+            )
+          : null,
+        quotedNetAmount: quote.limitSellBasis
+          ? this.formatDecimal(
+              quote.limitSellBasis.quotedNetAmount,
               monetaryScale,
             )
           : null,
@@ -4106,6 +4527,7 @@ export class OrdersService {
         quotedGrossAmount: true,
         quotedFeeAmount: true,
         quotedReservedAmount: true,
+        quotedNetAmount: true,
       },
     });
 
@@ -4124,10 +4546,23 @@ export class OrdersService {
             quotedReservedAmount: durableQuote.quotedReservedAmount,
           }
         : undefined;
+    const persistedSellBasis =
+      durableQuote.quotedFeeRate &&
+      durableQuote.quotedGrossAmount &&
+      durableQuote.quotedFeeAmount &&
+      durableQuote.quotedNetAmount
+        ? {
+            quotedFeeRate: durableQuote.quotedFeeRate,
+            quotedGrossAmount: durableQuote.quotedGrossAmount,
+            quotedFeeAmount: durableQuote.quotedFeeAmount,
+            quotedNetAmount: durableQuote.quotedNetAmount,
+          }
+        : undefined;
 
     return {
       ...quote,
       ...(persistedBasis ? { limitReservationBasis: persistedBasis } : {}),
+      ...(persistedSellBasis ? { limitSellBasis: persistedSellBasis } : {}),
       quoteId: durableQuote.id,
       expiresAt,
       maxChangeBps,
@@ -4140,7 +4575,7 @@ export class OrdersService {
     input: {
       quoteId: string;
       userId: string;
-      seasonParticipantId: string;
+      seasonParticipantId: string | null;
       tradingAccountId: string;
       request: ParsedOrderRequest;
       now: Date;
@@ -4168,6 +4603,7 @@ export class OrdersService {
         quotedGrossAmount: true,
         quotedFeeAmount: true,
         quotedReservedAmount: true,
+        quotedNetAmount: true,
         assetPriceSnapshotId: true,
         fxRateSnapshotId: true,
         expiresAt: true,
@@ -4200,8 +4636,8 @@ export class OrdersService {
     // cannot back an order create on this account. NULL legacy quotes pass
     // and stay pinned to the participant + request hash below.
     if (
-      quote.tradingAccountId !== null &&
-      quote.tradingAccountId !== input.tradingAccountId
+      quote.tradingAccountId !== input.tradingAccountId &&
+      !(input.seasonParticipantId !== null && quote.tradingAccountId === null)
     ) {
       this.throwApiError(
         HttpStatus.CONFLICT,
@@ -4246,6 +4682,7 @@ export class OrdersService {
     const expectedRequestHash = computeOrderQuoteRequestHash({
       userId: input.userId,
       seasonParticipantId: input.seasonParticipantId,
+      tradingAccountId: input.tradingAccountId,
       assetId: input.request.assetId,
       side: input.request.side,
       orderType: input.request.orderType,
@@ -4388,15 +4825,6 @@ export class OrdersService {
       };
     }
 
-    // Limit orders: phase 1 supports full-quantity BUY only.
-    if (side !== OrderSide.buy) {
-      this.throwApiError(
-        HttpStatus.BAD_REQUEST,
-        limitOrderErrorCodes.LIMIT_BUY_ONLY,
-        'Limit orders support buy side only.',
-      );
-    }
-
     if (!this.hasProvidedValue(body.limitPrice)) {
       this.throwApiError(
         HttpStatus.BAD_REQUEST,
@@ -4506,7 +4934,10 @@ export class OrdersService {
     const order = await this.prisma.order.findFirst({
       where: {
         quoteId: input.quoteId,
-        seasonParticipant: { userId: input.userId },
+        OR: [
+          { seasonParticipant: { userId: input.userId } },
+          { tradingAccount: { userId: input.userId } },
+        ],
       },
       select: {
         ...IDEMPOTENT_CREATE_ORDER_SELECT,
@@ -4595,7 +5026,7 @@ export class OrdersService {
         | LimitOrderCreateResponse;
     }
 
-    // Limit-buy creates always persist their payload in the same
+    // Limit-order creates always persist their payload in the same
     // transaction; reaching here without one means the row predates that
     // guarantee — rebuild a faithful submitted-state payload instead of the
     // market executed-shape below.
@@ -4611,6 +5042,10 @@ export class OrdersService {
             reservedAmount: this.formatNullableDecimal(
               order.reservedAmount,
               monetaryScale,
+            ),
+            reservedQuantity: this.formatNullableDecimal(
+              order.reservedQuantity,
+              quantityScale,
             ),
             reservationFeeRate: null,
             duplicate: true,
@@ -5114,7 +5549,7 @@ export class OrdersService {
   }
 
   private async assertOrderResourcesAvailable(input: {
-    participantId: string;
+    participantId: string | null;
     tradingAccountId: string;
     assetId: string;
     side: OrderSide;
@@ -5127,12 +5562,20 @@ export class OrdersService {
   }> {
     if (input.side === OrderSide.buy) {
       const wallet = await this.prisma.cashWallet.findUnique({
-        where: {
-          seasonParticipantId_currencyCode: {
-            seasonParticipantId: input.participantId,
-            currencyCode: input.currencyCode,
-          },
-        },
+        where:
+          input.participantId === null
+            ? {
+                tradingAccountId_currencyCode: {
+                  tradingAccountId: input.tradingAccountId,
+                  currencyCode: input.currencyCode,
+                },
+              }
+            : {
+                seasonParticipantId_currencyCode: {
+                  seasonParticipantId: input.participantId,
+                  currencyCode: input.currencyCode,
+                },
+              },
         select: {
           id: true,
           seasonParticipantId: true,
@@ -5169,16 +5612,33 @@ export class OrdersService {
       }
 
       const position = await this.prisma.position.findUnique({
-        where: {
-          seasonParticipantId_assetId: {
-            seasonParticipantId: input.participantId,
-            assetId: input.assetId,
-          },
-        },
+        where:
+          input.participantId === null
+            ? {
+                tradingAccountId_assetId: {
+                  tradingAccountId: input.tradingAccountId,
+                  assetId: input.assetId,
+                },
+              }
+            : {
+                seasonParticipantId_assetId: {
+                  seasonParticipantId: input.participantId,
+                  assetId: input.assetId,
+                },
+              },
         select: {
+          seasonParticipantId: true,
+          tradingAccountId: true,
           quantity: true,
         },
       });
+
+      if (position) {
+        this.assertPositionTradingScope(position, {
+          seasonParticipantId: input.participantId,
+          tradingAccountId: input.tradingAccountId,
+        });
+      }
 
       return {
         walletBalanceBefore: wallet.balanceAmount,
@@ -5187,18 +5647,41 @@ export class OrdersService {
     }
 
     const position = await this.prisma.position.findUnique({
-      where: {
-        seasonParticipantId_assetId: {
-          seasonParticipantId: input.participantId,
-          assetId: input.assetId,
-        },
-      },
+      where:
+        input.participantId === null
+          ? {
+              tradingAccountId_assetId: {
+                tradingAccountId: input.tradingAccountId,
+                assetId: input.assetId,
+              },
+            }
+          : {
+              seasonParticipantId_assetId: {
+                seasonParticipantId: input.participantId,
+                assetId: input.assetId,
+              },
+            },
       select: {
+        seasonParticipantId: true,
+        tradingAccountId: true,
         quantity: true,
+        reservedQuantity: true,
       },
     });
 
-    if (!position || position.quantity.lt(input.quantity)) {
+    if (position) {
+      this.assertPositionTradingScope(position, {
+        seasonParticipantId: input.participantId,
+        tradingAccountId: input.tradingAccountId,
+      });
+    }
+
+    if (
+      !position ||
+      position.quantity
+        .sub(position.reservedQuantity ?? new Prisma.Decimal(0))
+        .lt(input.quantity)
+    ) {
       this.throwApiError(
         HttpStatus.CONFLICT,
         'INSUFFICIENT_QUANTITY',
@@ -5207,12 +5690,20 @@ export class OrdersService {
     }
 
     const wallet = await this.prisma.cashWallet.findUnique({
-      where: {
-        seasonParticipantId_currencyCode: {
-          seasonParticipantId: input.participantId,
-          currencyCode: input.currencyCode,
-        },
-      },
+      where:
+        input.participantId === null
+          ? {
+              tradingAccountId_currencyCode: {
+                tradingAccountId: input.tradingAccountId,
+                currencyCode: input.currencyCode,
+              },
+            }
+          : {
+              seasonParticipantId_currencyCode: {
+                seasonParticipantId: input.participantId,
+                currencyCode: input.currencyCode,
+              },
+            },
       select: {
         id: true,
         seasonParticipantId: true,
@@ -5444,8 +5935,12 @@ export class OrdersService {
   private formatOrderQuoteData(quote: OrderQuoteCalculation) {
     return {
       state: 'available' as const,
-      season: this.formatSeason(quote.season),
-      participant: this.formatParticipant(quote.participant),
+      season: quote.context.season
+        ? this.formatSeason(quote.context.season)
+        : null,
+      participant: quote.context.participant
+        ? this.formatParticipant(quote.context.participant)
+        : null,
       asset: {
         id: quote.asset.id,
         symbol: quote.asset.symbol,
@@ -5461,7 +5956,7 @@ export class OrdersService {
       price: this.formatDecimal(quote.price, monetaryScale),
       currencyCode: this.getAssetSettlementCurrency(quote.asset),
       grossAmount: this.formatDecimal(quote.grossAmount, monetaryScale),
-      feeRate: formatDecimalScale(quote.season.tradeFeeRate, feeRateScale),
+      feeRate: formatDecimalScale(quote.context.feeRate, feeRateScale),
       feeAmount: this.formatDecimal(quote.feeAmount, monetaryScale),
       netAmount: this.formatDecimal(quote.netAmount, monetaryScale),
       krwGrossAmount: this.formatDecimal(quote.krwGrossAmount, monetaryScale),
@@ -5659,17 +6154,14 @@ export class OrdersService {
    */
   private requireOrderTradingScope(order: {
     tradingAccountId: string | null;
-    seasonParticipant: { tradingAccountId: string | null };
+    seasonParticipantId?: string | null;
+    seasonParticipant: { id?: string; tradingAccountId: string | null } | null;
+    tradingAccount: {
+      id: string;
+      mode: TradingAccountMode;
+      seasonParticipant: { id: string } | null;
+    } | null;
   }): string {
-    const participantAccountId = order.seasonParticipant.tradingAccountId;
-    if (!participantAccountId) {
-      this.throwApiError(
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        'TRADING_ACCOUNT_LINK_INTEGRITY',
-        'Participant has no trading account link; run trading-accounts:repair-links.',
-      );
-    }
-
     if (!order.tradingAccountId) {
       this.throwTradingScopeIntegrityError(
         'TRADING_SCOPE_REPAIR_REQUIRED',
@@ -5677,10 +6169,49 @@ export class OrdersService {
       );
     }
 
-    if (order.tradingAccountId !== participantAccountId) {
+    if (
+      !order.tradingAccount ||
+      order.tradingAccount.id !== order.tradingAccountId
+    ) {
       this.throwTradingScopeIntegrityError(
         'TRADING_ACCOUNT_SCOPE_MISMATCH',
-        'Order is scoped to a different trading account than its participant.',
+        'Order trading-account relation does not match its account scope.',
+      );
+    }
+
+    if (order.tradingAccount.mode === TradingAccountMode.general) {
+      if (
+        order.seasonParticipantId !== null ||
+        order.seasonParticipant !== null ||
+        order.tradingAccount.seasonParticipant !== null
+      ) {
+        this.throwTradingScopeIntegrityError(
+          'TRADING_ACCOUNT_SCOPE_MISMATCH',
+          'General order carries a season participant link.',
+        );
+      }
+      return order.tradingAccountId;
+    }
+
+    const participantAccountId = order.seasonParticipant?.tradingAccountId;
+    if (!participantAccountId) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'TRADING_ACCOUNT_LINK_INTEGRITY',
+        'Season order has no valid participant account link; run trading-accounts:repair-links.',
+      );
+    }
+
+    if (
+      order.seasonParticipantId === null ||
+      order.seasonParticipant?.id !== order.seasonParticipantId ||
+      order.tradingAccount.seasonParticipant?.id !==
+        order.seasonParticipantId ||
+      order.tradingAccountId !== participantAccountId
+    ) {
+      this.throwTradingScopeIntegrityError(
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+        'Season order participant and trading-account scope do not agree.',
       );
     }
 
@@ -5694,10 +6225,13 @@ export class OrdersService {
    */
   private assertPositionTradingScope(
     position: {
-      seasonParticipantId: string;
+      seasonParticipantId: string | null;
       tradingAccountId: string | null;
     },
-    expected: { seasonParticipantId: string; tradingAccountId: string },
+    expected: {
+      seasonParticipantId: string | null;
+      tradingAccountId: string;
+    },
   ): void {
     if (position.seasonParticipantId !== expected.seasonParticipantId) {
       this.throwTradingScopeIntegrityError(
@@ -5777,13 +6311,13 @@ export class OrdersService {
    */
   async recordOrderExecutedPortfolioSnapshotInTransaction(
     tx: Prisma.TransactionClient,
-    seasonParticipantId: string,
+    seasonParticipantId: string | null,
     capturedAt: Date,
     /** The fill's verified account scope (작업 7 dual-write). */
     tradingAccountId: string,
   ): Promise<string | null> {
     return this.recordOrderExecutedPortfolioSnapshot(
-      tx as OrderExecuteTransactionClient,
+      tx,
       seasonParticipantId,
       capturedAt,
       tradingAccountId,

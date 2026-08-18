@@ -1,4 +1,9 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Optional,
+} from '@nestjs/common';
 import {
   CurrencyCode,
   FxRateSourceType,
@@ -15,7 +20,12 @@ import {
   WalletTransactionType,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { formatDecimalScale, monetaryScale } from '../fx/fx-decimal-policy';
+import { GeneralAccountPerformanceService } from '../portfolio/general-account-performance.service';
+import {
+  formatDecimalScale,
+  monetaryScale,
+  roundDecimalHalfUp,
+} from '../fx/fx-decimal-policy';
 import { settleLimitBuyReservedCash } from '../wallets/cash-wallet-atomic';
 import { diagnoseCashWalletMutationFailure } from '../wallets/cash-wallet-failure-diagnosis';
 import { assertCashWalletTradingAccountScope } from '../wallets/cash-wallet-scope';
@@ -31,8 +41,10 @@ import {
 import {
   calculateBuyPositionAverageCost,
   calculateLimitFillAmounts,
+  calculateLimitSellFillAmounts,
   isFillWithinReservation,
 } from './limit-order-execution-policy';
+import { settleReservedPositionQuantity } from './position-reservation-atomic';
 import {
   LimitOrderCandleEvidenceService,
   type EligibleClosedCandle,
@@ -63,8 +75,8 @@ export type LimitFillOutcome =
   | {
       state: 'filled';
       orderId: string;
-      seasonId: string;
-      seasonParticipantId: string;
+      seasonId: string | null;
+      seasonParticipantId: string | null;
       path: 'snapshot' | 'candle';
       executedPrice: string;
       netAmount: string;
@@ -92,6 +104,7 @@ const EXEC_ORDER_SELECT = {
   limitPrice: true,
   currencyCode: true,
   reservedAmount: true,
+  reservedQuantity: true,
   reservationFeeRate: true,
   asset: { select: { id: true, isActive: true } },
   quote: {
@@ -103,6 +116,7 @@ const EXEC_ORDER_SELECT = {
   },
   seasonParticipant: {
     select: {
+      id: true,
       participantStatus: true,
       tradingAccountId: true,
       tradingAccount: {
@@ -113,15 +127,24 @@ const EXEC_ORDER_SELECT = {
       },
     },
   },
+  tradingAccount: {
+    select: {
+      id: true,
+      mode: true,
+      status: true,
+      initialCapitalKrw: true,
+      seasonParticipant: { select: { id: true } },
+    },
+  },
 } as const;
 
 /**
- * Executes ONE limit-buy fill in its own transaction. Lock order is always
- * Order (FOR UPDATE) → CashWallet (guarded settle) → Position → WalletTransaction
- * — identical to the user-cancel / cleanup paths, so a fill and a cancel that
- * race the same order serialize on the order row and exactly one wins. Every
- * authorization fact is re-verified against the LOCKED rows; the matcher's
- * pre-checks are only there to avoid opening a transaction that would no-op.
+ * Executes ONE limit-order fill in its own transaction. Season fills lock the
+ * Order first. General fills take the account's exclusive performance fence,
+ * then Order → CashWallet/Position → WalletTransaction. Cancel does not take
+ * the account fence and still races on the Order row, so exactly one wins.
+ * Every authorization fact is re-verified against locked rows; matcher
+ * pre-checks only avoid transactions that would no-op.
  */
 @Injectable()
 export class LimitOrderExecutionService {
@@ -129,15 +152,34 @@ export class LimitOrderExecutionService {
     private readonly prisma: PrismaService,
     private readonly candleEvidence: LimitOrderCandleEvidenceService,
     private readonly ordersService: OrdersService,
+    @Optional()
+    private readonly generalPerformance?: GeneralAccountPerformanceService,
   ) {}
 
-  async fillLimitBuyOrder(input: {
+  async fillLimitOrder(input: {
     orderId: string;
     now: Date;
     plan: LimitFillPlan;
   }): Promise<LimitFillOutcome> {
     const { orderId, now, plan } = input;
     return this.prisma.$transaction(async (tx) => {
+      const prelock = await tx.order.findUnique({
+        where: { id: orderId },
+        select: {
+          tradingAccountId: true,
+          tradingAccount: { select: { mode: true } },
+        },
+      });
+      if (
+        prelock?.tradingAccountId &&
+        prelock.tradingAccount?.mode === TradingAccountMode.general
+      ) {
+        await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT "id" FROM "trading_accounts"
+          WHERE "id" = ${prelock.tradingAccountId}
+          FOR UPDATE
+        `;
+      }
       // 1) Lock the order row first (Order → CashWallet → Position order).
       const locked = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT "id" FROM "orders" WHERE "id" = ${orderId} FOR UPDATE
@@ -158,17 +200,18 @@ export class LimitOrderExecutionService {
       // cancel/cleanup that already flipped it out of `submitted` lands here.
       if (
         order.status !== OrderStatus.submitted ||
-        order.side !== OrderSide.buy ||
-        order.orderType !== OrderType.limit
+        order.orderType !== OrderType.limit ||
+        (order.side !== OrderSide.buy && order.side !== OrderSide.sell)
       ) {
-        return { state: 'skipped', orderId, reason: 'not_submitted_limit_buy' };
+        return { state: 'skipped', orderId, reason: 'not_submitted_limit' };
       }
       if (
         !order.limitPrice ||
-        !order.reservedAmount ||
-        !order.reservationFeeRate
+        !order.reservationFeeRate ||
+        (order.side === OrderSide.buy && !order.reservedAmount) ||
+        (order.side === OrderSide.sell && !order.reservedQuantity)
       ) {
-        // A submitted limit buy must carry its reservation basis; a missing one
+        // A submitted limit order must carry its reservation basis; a missing one
         // is an invariant breach, never a silent fill.
         this.throwLimitOrderError(
           limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
@@ -177,18 +220,46 @@ export class LimitOrderExecutionService {
       }
 
       // 3) Re-validate season / participant / asset (§17: no fill at/after endAt).
-      const season = order.seasonParticipant.season;
-      if (
-        season.status !== SeasonStatus.active ||
-        now < season.startAt ||
-        now >= season.endAt
-      ) {
-        return { state: 'skipped', orderId, reason: 'season_not_active' };
+      const account = order.tradingAccount;
+      if (!order.tradingAccountId || !account) {
+        this.throwTradingScopeError(
+          'TRADING_SCOPE_REPAIR_REQUIRED',
+          'Order has no valid trading account scope.',
+        );
       }
-      if (
-        order.seasonParticipant.participantStatus !== ParticipantStatus.active
+      const season = order.seasonParticipant?.season ?? null;
+      if (account.mode === TradingAccountMode.season) {
+        if (!order.seasonParticipant || !season) {
+          this.throwTradingScopeError(
+            'TRADING_ACCOUNT_SCOPE_MISMATCH',
+            'Season order has no season participant.',
+          );
+        }
+        if (
+          season.status !== SeasonStatus.active ||
+          now < season.startAt ||
+          now >= season.endAt
+        ) {
+          return { state: 'skipped', orderId, reason: 'season_not_active' };
+        }
+        if (
+          order.seasonParticipant.participantStatus !== ParticipantStatus.active
+        ) {
+          return {
+            state: 'skipped',
+            orderId,
+            reason: 'participant_not_active',
+          };
+        }
+      } else if (
+        order.seasonParticipantId !== null ||
+        order.seasonParticipant !== null ||
+        account.seasonParticipant !== null
       ) {
-        return { state: 'skipped', orderId, reason: 'participant_not_active' };
+        this.throwTradingScopeError(
+          'TRADING_ACCOUNT_SCOPE_MISMATCH',
+          'General order carries a season participant link.',
+        );
       }
       if (!order.asset.isActive) {
         return { state: 'skipped', orderId, reason: 'asset_inactive' };
@@ -199,38 +270,48 @@ export class LimitOrderExecutionService {
       // structured errors — repair scripts must run, and the noisy retry is
       // the operator signal. A suspended/closed account is a normal skip:
       // automatic fills stop, the submitted order and its reservation stay.
-      const participantAccountId = order.seasonParticipant.tradingAccountId;
-      const account = order.seasonParticipant.tradingAccount;
-      if (!participantAccountId || !account) {
-        this.throwLimitOrderError(
-          limitOrderErrorCodes.TRADING_ACCOUNT_LINK_INTEGRITY,
-          'Participant has no trading account link; run trading-accounts:repair-links.',
-        );
-      }
-      if (!order.tradingAccountId) {
-        this.throwTradingScopeError(
-          'TRADING_SCOPE_REPAIR_REQUIRED',
-          'Order has no trading account scope; run trading-accounts:repair-trading-scope.',
-        );
-      }
-      if (
-        order.tradingAccountId !== participantAccountId ||
-        account.mode !== TradingAccountMode.season
-      ) {
-        this.throwTradingScopeError(
-          'TRADING_ACCOUNT_SCOPE_MISMATCH',
-          'Order is scoped to a different trading account than its participant.',
-        );
+      if (account.mode === TradingAccountMode.season) {
+        const participantAccountId = order.seasonParticipant?.tradingAccountId;
+        if (!participantAccountId) {
+          this.throwLimitOrderError(
+            limitOrderErrorCodes.TRADING_ACCOUNT_LINK_INTEGRITY,
+            'Participant has no trading account link; run trading-accounts:repair-links.',
+          );
+        }
+        if (
+          order.tradingAccountId !== participantAccountId ||
+          order.seasonParticipant?.tradingAccount?.id !== account.id ||
+          order.seasonParticipant?.id !== order.seasonParticipantId ||
+          account.seasonParticipant?.id !== order.seasonParticipantId
+        ) {
+          this.throwTradingScopeError(
+            'TRADING_ACCOUNT_SCOPE_MISMATCH',
+            'Order is scoped to a different trading account than its participant.',
+          );
+        }
       }
       if (account.status !== TradingAccountStatus.active) {
         return { state: 'skipped', orderId, reason: 'account_not_active' };
       }
+      if (account.mode === TradingAccountMode.general) {
+        if (!this.generalPerformance) {
+          this.throwTradingScopeError(
+            'INTERNAL_ERROR',
+            'General account performance service is unavailable.',
+          );
+        }
+        await this.generalPerformance.assertGeneralAccountReady(account, tx);
+      }
+      const effectiveNow =
+        account.mode === TradingAccountMode.general
+          ? await this.readTransactionWallClock(tx)
+          : now;
       if (
         order.quote &&
-        ((order.quote.tradingAccountId !== null &&
+        (((account.mode === TradingAccountMode.general ||
+          order.quote.tradingAccountId !== null) &&
           order.quote.tradingAccountId !== order.tradingAccountId) ||
-          (order.quote.seasonParticipantId !== null &&
-            order.quote.seasonParticipantId !== order.seasonParticipantId))
+          order.quote.seasonParticipantId !== order.seasonParticipantId)
       ) {
         this.throwTradingScopeError(
           'TRADING_ACCOUNT_SCOPE_MISMATCH',
@@ -240,18 +321,36 @@ export class LimitOrderExecutionService {
       const tradingAccountId = order.tradingAccountId;
 
       // 4) Re-verify the price basis reaches the limit (§19 step 12).
-      if (plan.executedPrice.gt(order.limitPrice)) {
-        return { state: 'skipped', orderId, reason: 'price_above_limit' };
+      if (
+        (order.side === OrderSide.buy &&
+          plan.executedPrice.gt(order.limitPrice)) ||
+        (order.side === OrderSide.sell &&
+          plan.executedPrice.lt(order.limitPrice))
+      ) {
+        return { state: 'skipped', orderId, reason: 'price_outside_limit' };
       }
 
       // 5) Actual amounts from the ACTUAL execution price and the PINNED fee
       // rate (never the live season rate).
-      const amounts = calculateLimitFillAmounts({
-        executedPrice: plan.executedPrice,
-        quantity: order.quantity,
-        reservationFeeRate: order.reservationFeeRate,
-      });
-      if (!isFillWithinReservation(amounts.netAmount, order.reservedAmount)) {
+      const amounts =
+        order.side === OrderSide.buy
+          ? calculateLimitFillAmounts({
+              executedPrice: plan.executedPrice,
+              quantity: order.quantity,
+              reservationFeeRate: order.reservationFeeRate,
+            })
+          : calculateLimitSellFillAmounts({
+              executedPrice: plan.executedPrice,
+              quantity: order.quantity,
+              reservationFeeRate: order.reservationFeeRate,
+            });
+      if (
+        order.side === OrderSide.buy &&
+        !isFillWithinReservation(
+          amounts.netAmount,
+          order.reservedAmount as Prisma.Decimal,
+        )
+      ) {
         // Cannot happen while price <= limit and the fee rate is the pinned
         // one — but if it ever does, refuse rather than silently overspend.
         this.throwLimitOrderError(
@@ -265,37 +364,47 @@ export class LimitOrderExecutionService {
       // automatic fill has no user to requote, so it cannot proceed on stale
       // FX). KRW-settled assets need no FX.
       let fxRateSnapshotId: string | null = null;
+      let fxRate: Prisma.Decimal | null = null;
       if (order.currencyCode === CurrencyCode.USD) {
-        fxRateSnapshotId = await this.resolveFxEvidenceSnapshotId(tx, now);
-        if (!fxRateSnapshotId) {
+        const evidence = await this.resolveFxEvidenceSnapshot(tx, effectiveNow);
+        if (!evidence) {
           return {
             state: 'skipped',
             orderId,
             reason: 'fx_evidence_unavailable',
           };
         }
+        fxRateSnapshotId = evidence.id;
+        fxRate = evidence.rate;
       }
 
       const netAmountText = formatDecimalScale(
         amounts.netAmount,
         monetaryScale,
       );
-      const reservedAmountText = formatDecimalScale(
-        order.reservedAmount,
-        monetaryScale,
-      );
+      const reservedAmountText = order.reservedAmount
+        ? formatDecimalScale(order.reservedAmount, monetaryScale)
+        : null;
 
       // 7) Settle wallet: debit the actual net, release the whole reservation,
       // in one guarded statement (balance still covers all other reservations).
       // The wallet must carry the ORDER's verified account scope — null or
       // foreign scope rolls the whole fill back before any money moves.
       const wallet = await tx.cashWallet.findUnique({
-        where: {
-          seasonParticipantId_currencyCode: {
-            seasonParticipantId: order.seasonParticipantId,
-            currencyCode: order.currencyCode,
-          },
-        },
+        where:
+          order.seasonParticipantId === null
+            ? {
+                tradingAccountId_currencyCode: {
+                  tradingAccountId,
+                  currencyCode: order.currencyCode,
+                },
+              }
+            : {
+                seasonParticipantId_currencyCode: {
+                  seasonParticipantId: order.seasonParticipantId,
+                  currencyCode: order.currencyCode,
+                },
+              },
         select: { id: true, seasonParticipantId: true, tradingAccountId: true },
       });
       if (!wallet) {
@@ -308,41 +417,43 @@ export class LimitOrderExecutionService {
         seasonParticipantId: order.seasonParticipantId,
         tradingAccountId,
       });
-      const settled = await settleLimitBuyReservedCash(tx, {
-        walletId: wallet.id,
-        seasonParticipantId: order.seasonParticipantId,
-        tradingAccountId,
-        currencyCode: order.currencyCode,
-        actualDebit: netAmountText,
-        orderReservation: reservedAmountText,
-      });
-      if (settled !== 1) {
-        // 작업 5 보완 3: classify before reporting. Scope corruption throws
-        // its own structured 500 (repair-required / mismatch) from the shared
-        // diagnosis; only genuinely concurrent updates or an actually
-        // uncovered reservation reach the limit-order error codes below. The
-        // whole fill rolls back either way.
-        const reason = await diagnoseCashWalletMutationFailure(tx, {
+      if (order.side === OrderSide.buy) {
+        const settled = await settleLimitBuyReservedCash(tx, {
           walletId: wallet.id,
-          expected: {
-            seasonParticipantId: order.seasonParticipantId,
-            tradingAccountId,
-            currencyCode: order.currencyCode,
-          },
-          requires: {
-            reserved: reservedAmountText,
-            balance: netAmountText,
-          },
+          seasonParticipantId: order.seasonParticipantId,
+          tradingAccountId,
+          currencyCode: order.currencyCode,
+          actualDebit: netAmountText,
+          orderReservation: reservedAmountText as string,
         });
+        if (settled !== 1) {
+          // 작업 5 보완 3: classify before reporting. Scope corruption throws
+          // its own structured 500 (repair-required / mismatch) from the shared
+          // diagnosis; only genuinely concurrent updates or an actually
+          // uncovered reservation reach the limit-order error codes below. The
+          // whole fill rolls back either way.
+          const reason = await diagnoseCashWalletMutationFailure(tx, {
+            walletId: wallet.id,
+            expected: {
+              seasonParticipantId: order.seasonParticipantId,
+              tradingAccountId,
+              currencyCode: order.currencyCode,
+            },
+            requires: {
+              reserved: reservedAmountText as string,
+              balance: netAmountText,
+            },
+          });
 
-        this.throwLimitOrderError(
-          reason === 'conflict'
-            ? limitOrderErrorCodes.ORDER_RESERVATION_CONFLICT
-            : limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
-          reason === 'conflict'
-            ? 'Wallet settlement failed due to a concurrent wallet update.'
-            : 'Wallet settlement guard failed for the limit fill.',
-        );
+          this.throwLimitOrderError(
+            reason === 'conflict'
+              ? limitOrderErrorCodes.ORDER_RESERVATION_CONFLICT
+              : limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
+            reason === 'conflict'
+              ? 'Wallet settlement failed due to a concurrent wallet update.'
+              : 'Wallet settlement guard failed for the limit fill.',
+          );
+        }
       }
 
       // 8) Evidence link. Path A → snapshot; path B → shared candle evidence.
@@ -361,14 +472,41 @@ export class LimitOrderExecutionService {
 
       // 9) Position (same average-cost policy as market buy), scoped to the
       // order's verified account.
-      await this.upsertBuyPosition(tx, {
-        seasonParticipantId: order.seasonParticipantId,
-        tradingAccountId,
-        assetId: order.assetId,
-        currencyCode: order.currencyCode,
-        quantity: order.quantity,
-        netAmount: amounts.netAmount,
-      });
+      if (order.side === OrderSide.buy) {
+        await this.upsertBuyPosition(tx, {
+          seasonParticipantId: order.seasonParticipantId,
+          tradingAccountId,
+          assetId: order.assetId,
+          currencyCode: order.currencyCode,
+          quantity: order.quantity,
+          netAmount: amounts.netAmount,
+        });
+      } else {
+        await this.settleSellPosition(tx, {
+          seasonParticipantId: order.seasonParticipantId,
+          tradingAccountId,
+          assetId: order.assetId,
+          currencyCode: order.currencyCode,
+          quantity: order.quantity,
+          netAmount: amounts.netAmount,
+          fxRate,
+        });
+        const credited = await tx.cashWallet.updateMany({
+          where: {
+            id: wallet.id,
+            seasonParticipantId: order.seasonParticipantId,
+            tradingAccountId,
+            currencyCode: order.currencyCode,
+          },
+          data: { balanceAmount: { increment: netAmountText } },
+        });
+        if (credited.count !== 1) {
+          this.throwLimitOrderError(
+            limitOrderErrorCodes.ORDER_RESERVATION_CONFLICT,
+            'Wallet changed while crediting the limit sell.',
+          );
+        }
+      }
 
       // 10) Ledger row + order finalization.
       const walletAfter = await tx.cashWallet.findUniqueOrThrow({
@@ -382,8 +520,14 @@ export class LimitOrderExecutionService {
           tradingAccountId,
           walletId: wallet.id,
           currencyCode: order.currencyCode,
-          direction: WalletTransactionDirection.debit,
-          txType: WalletTransactionType.order_buy,
+          direction:
+            order.side === OrderSide.buy
+              ? WalletTransactionDirection.debit
+              : WalletTransactionDirection.credit,
+          txType:
+            order.side === OrderSide.buy
+              ? WalletTransactionType.order_buy
+              : WalletTransactionType.order_sell,
           referenceType: WalletTransactionReferenceType.order,
           referenceId: order.id,
           amount: netAmountText,
@@ -391,7 +535,7 @@ export class LimitOrderExecutionService {
             walletAfter.balanceAmount,
             monetaryScale,
           ),
-          occurredAt: now,
+          occurredAt: effectiveNow,
         },
         select: { id: true },
       });
@@ -401,7 +545,12 @@ export class LimitOrderExecutionService {
         monetaryScale,
       );
       const flipped = await tx.order.updateMany({
-        where: { id: order.id, status: OrderStatus.submitted },
+        where: {
+          id: order.id,
+          seasonParticipantId: order.seasonParticipantId,
+          tradingAccountId,
+          status: OrderStatus.submitted,
+        },
         data: {
           status: OrderStatus.executed,
           executedPrice: executedPriceText,
@@ -411,8 +560,8 @@ export class LimitOrderExecutionService {
           assetPriceSnapshotId,
           fxRateSnapshotId,
           limitOrderCandleEvidenceId,
-          executedAt: now,
-          reservationReleasedAt: now,
+          executedAt: effectiveNow,
+          reservationReleasedAt: effectiveNow,
         },
       });
       if (flipped.count !== 1) {
@@ -427,7 +576,7 @@ export class LimitOrderExecutionService {
       await this.ordersService.recordOrderExecutedPortfolioSnapshotInTransaction(
         tx,
         order.seasonParticipantId,
-        now,
+        effectiveNow,
         // The fill's verified account scope (작업 7 dual-write).
         tradingAccountId,
       );
@@ -435,7 +584,7 @@ export class LimitOrderExecutionService {
       return {
         state: 'filled',
         orderId: order.id,
-        seasonId: season.id,
+        seasonId: season?.id ?? null,
         seasonParticipantId: order.seasonParticipantId,
         path: plan.path,
         executedPrice: executedPriceText,
@@ -444,10 +593,113 @@ export class LimitOrderExecutionService {
     });
   }
 
+  /** Backward-compatible name retained for existing callers/tests. */
+  async fillLimitBuyOrder(input: {
+    orderId: string;
+    now: Date;
+    plan: LimitFillPlan;
+  }): Promise<LimitFillOutcome> {
+    return this.fillLimitOrder(input);
+  }
+
+  private async readTransactionWallClock(tx: ExecTx): Promise<Date> {
+    const rows = await tx.$queryRaw<Array<{ now: Date }>>`
+      SELECT clock_timestamp() AS "now"
+    `;
+    const now = rows[0]?.now;
+    if (!now) {
+      this.throwTradingScopeError(
+        'ORDER_EXECUTION_TRANSACTION_FAILED',
+        'Database transaction clock is unavailable.',
+      );
+    }
+    return now;
+  }
+
+  private async settleSellPosition(
+    tx: ExecTx,
+    input: {
+      seasonParticipantId: string | null;
+      tradingAccountId: string;
+      assetId: string;
+      currencyCode: CurrencyCode;
+      quantity: Prisma.Decimal;
+      netAmount: Prisma.Decimal;
+      fxRate: Prisma.Decimal | null;
+    },
+  ): Promise<void> {
+    const position = await tx.position.findUnique({
+      where:
+        input.seasonParticipantId === null
+          ? {
+              tradingAccountId_assetId: {
+                tradingAccountId: input.tradingAccountId,
+                assetId: input.assetId,
+              },
+            }
+          : {
+              seasonParticipantId_assetId: {
+                seasonParticipantId: input.seasonParticipantId,
+                assetId: input.assetId,
+              },
+            },
+      select: {
+        id: true,
+        seasonParticipantId: true,
+        tradingAccountId: true,
+        currencyCode: true,
+        averageCost: true,
+      },
+    });
+    if (
+      !position ||
+      position.seasonParticipantId !== input.seasonParticipantId ||
+      position.tradingAccountId !== input.tradingAccountId ||
+      position.currencyCode !== input.currencyCode
+    ) {
+      this.throwTradingScopeError(
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+        'Limit-sell position is missing or mis-scoped.',
+      );
+    }
+    const realized = roundDecimalHalfUp(
+      input.netAmount.sub(position.averageCost.mul(input.quantity)),
+      monetaryScale,
+    );
+    const realizedKrw =
+      input.currencyCode === CurrencyCode.KRW
+        ? realized
+        : roundDecimalHalfUp(
+            realized.mul(
+              input.fxRate ??
+                this.throwTradingScopeError(
+                  'FX_RATE_UNAVAILABLE',
+                  'USD limit-sell fill has no FX evidence.',
+                ),
+            ),
+            monetaryScale,
+          );
+    const settled = await settleReservedPositionQuantity(tx, {
+      positionId: position.id,
+      seasonParticipantId: input.seasonParticipantId,
+      tradingAccountId: input.tradingAccountId,
+      assetId: input.assetId,
+      quantity: formatDecimalScale(input.quantity, monetaryScale),
+      realizedPnlDelta: formatDecimalScale(realized, monetaryScale),
+      realizedPnlKrwDelta: formatDecimalScale(realizedKrw, monetaryScale),
+    });
+    if (settled !== 1) {
+      this.throwLimitOrderError(
+        limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
+        'Position reservation does not cover the limit-sell fill.',
+      );
+    }
+  }
+
   private async upsertBuyPosition(
     tx: ExecTx,
     input: {
-      seasonParticipantId: string;
+      seasonParticipantId: string | null;
       /** VERIFIED account scope of the order being filled. */
       tradingAccountId: string;
       assetId: string;
@@ -457,14 +709,23 @@ export class LimitOrderExecutionService {
     },
   ): Promise<string> {
     const existing = await tx.position.findUnique({
-      where: {
-        seasonParticipantId_assetId: {
-          seasonParticipantId: input.seasonParticipantId,
-          assetId: input.assetId,
-        },
-      },
+      where:
+        input.seasonParticipantId === null
+          ? {
+              tradingAccountId_assetId: {
+                tradingAccountId: input.tradingAccountId,
+                assetId: input.assetId,
+              },
+            }
+          : {
+              seasonParticipantId_assetId: {
+                seasonParticipantId: input.seasonParticipantId,
+                assetId: input.assetId,
+              },
+            },
       select: {
         id: true,
+        seasonParticipantId: true,
         tradingAccountId: true,
         quantity: true,
         averageCost: true,
@@ -479,7 +740,11 @@ export class LimitOrderExecutionService {
         'Position has no trading account scope; run trading-accounts:repair-trading-scope.',
       );
     }
-    if (existing && existing.tradingAccountId !== input.tradingAccountId) {
+    if (
+      existing &&
+      (existing.tradingAccountId !== input.tradingAccountId ||
+        existing.seasonParticipantId !== input.seasonParticipantId)
+    ) {
       this.throwTradingScopeError(
         'TRADING_ACCOUNT_SCOPE_MISMATCH',
         'Position belongs to a different trading account.',
@@ -499,6 +764,7 @@ export class LimitOrderExecutionService {
           tradingAccountId: input.tradingAccountId,
           assetId: input.assetId,
           quantity: formatDecimalScale(newQuantity, monetaryScale),
+          reservedQuantity: ZERO_MONEY,
           averageCost: formatDecimalScale(newAverageCost, monetaryScale),
           currencyCode: input.currencyCode,
           realizedPnl: ZERO_MONEY,
@@ -514,6 +780,7 @@ export class LimitOrderExecutionService {
     const updated = await tx.position.updateMany({
       where: {
         id: existing.id,
+        seasonParticipantId: input.seasonParticipantId,
         tradingAccountId: input.tradingAccountId,
         quantity: existing.quantity,
         averageCost: existing.averageCost,
@@ -538,10 +805,10 @@ export class LimitOrderExecutionService {
    * against. Uses the same provider eligibility + freshness the order execute
    * path uses.
    */
-  private async resolveFxEvidenceSnapshotId(
+  private async resolveFxEvidenceSnapshot(
     tx: ExecTx,
     now: Date,
-  ): Promise<string | null> {
+  ): Promise<{ id: string; rate: Prisma.Decimal } | null> {
     const eligibility = resolveFxProviderEligibility({
       workflow: 'orders_execute',
       baseCurrency: CurrencyCode.USD,
@@ -578,7 +845,9 @@ export class LimitOrderExecutionService {
       freshnessThresholdSeconds: eligibility.freshnessThresholdSeconds,
       isPositiveValue: (candidate) => candidate.rate.gt(0),
     });
-    return selection.state === 'selected' ? selection.snapshot.id : null;
+    return selection.state === 'selected'
+      ? { id: selection.snapshot.id, rate: selection.snapshot.rate }
+      : null;
   }
 
   private throwLimitOrderError(

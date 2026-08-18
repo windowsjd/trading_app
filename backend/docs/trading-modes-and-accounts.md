@@ -107,21 +107,23 @@
     오염·closed 계정 daily 행 검사 추가(여전히 read-only, `--apply` 없음)
   (계약: `docs/general-account-and-ad-rewards-api-contract.md`,
    `docs/batch-job-foundation.md`)
+- **일반계정 거래 활성화 (2026-08-18):** 기존 account-scoped 주문 API와
+  시즌 주문 코어를 `TradingContext`로 일반화했다. 일반계정은 별도 엔진이나
+  endpoint 없이 시장가·지정가 매수/매도, durable quote, 예약·취소, 공용
+  matcher, 지갑·원장·포지션 반영, 계정 단위 멱등성을 사용한다. `Order`와
+  `Position`의 `seasonParticipantId`만 optional로 전환했으며 일반 행은
+  `tradingAccountId != null` + `seasonParticipantId = null`이다. 체결 후 일반
+  성과는 `order_executed` ordinary TWR snapshot으로 전진하고 시즌 ranking은
+  변경하지 않는다. 상세 계약은
+  `docs/trading-account-orders-api-contract.md`를 따른다.
 
 **아직 구현되지 않음 (문서만 보고 사용 가능하다고 오해하지 말 것):**
 
-- 일반계정의 실제 주식·암호화폐 주문(409
-  `GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED` 유지)과 실제 환전(409
-  `GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED` 유지), 일반계정 Position 생성
-- 로그인 후 모드 선택 화면, 앱 내 모드 전환, 프런트엔드 연결 일체
-- SeasonRanking의 TradingAccount 전환 (EquitySnapshot과
-  DailyPortfolioSnapshot은 작업 7에서 전환 완료)
+- 일반계정 실제 환전(409 `GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED` 유지)
 - 광고 SDK, 광고 시청 UI, **실제 광고 네트워크의 provider 전용 서버 검증
   어댑터** (인터페이스와 registry만 존재하며 운영 registry는 비어 있음),
   광고 1회당 지급액·일일 한도·대기시간의 확정값
-- Order·Position·ExchangeTransaction·FxExecuteRequest의
-  `seasonParticipantId` optional 전환 (작업 6에서는 CashWallet·
-  WalletTransaction만 nullable로 전환)
+- ExchangeTransaction·FxExecuteRequest의 `seasonParticipantId` optional 전환
 - `tradingAccountId` NOT NULL 강화 (참가자: §3.5.5, 금융 4모델: §3.6.5)
 - 시즌 finished/rewarded/settled 전환 시 account `closed` 일괄 동기화,
   suspended 계정 재활성화, 운영자 일반계정 정지 API (§4.4의 잔여 범위)
@@ -134,14 +136,15 @@
 로그인한 사용자에게 장기적으로 두 투자 모드를 제공한다.
 
 - **시즌모드** — 기간제 대회형 가상투자 (현재 구현되어 있는 기능)
-- **일반모드** — 시즌 없는 무기한 가상투자 (향후 구현)
+- **일반모드** — 시즌 없는 무기한 가상투자 (계정·TWR·시장가/지정가 거래 구현,
+  FX는 별도 미구현)
 
 두 모드는 하나의 사용자 계정을 공유하지만 **거래계정과 가상자산은 완전히 분리**한다. KRW/USD 지갑, 주문, 미체결 주문, 포지션, 평균단가, 실현/미실현손익, 환전 기록, 지갑 원장, 포트폴리오 스냅샷, 투자손익, 수익률은 모드 간에 공유하지 않는다. 예: 일반모드 KRW 800만 원과 시즌모드 KRW 950만 원은 서로 영향을 주지 않고, 일반모드에서 매수한 종목은 시즌모드 포지션에 나타나지 않는다. 거래계정 간 가상자금·자산 이전은 지원하지 않는다.
 
 ### 1.2 게임 흐름 (목표 구조)
 
 1. 회원가입과 로그인
-2. 시즌모드 또는 일반모드 선택 *(모드 선택 화면은 미구현)*
+2. 시즌모드 또는 일반모드 선택 *(모드 선택 화면 구현)*
 3. 선택한 모드의 독립 거래계정으로 진입
 4. 해당 거래계정의 지갑·포지션·주문 사용
 5. 시즌모드는 시즌 종료·랭킹·보상 적용
@@ -650,19 +653,22 @@ repair-links(참가자↔계정 link·excluded-active) → repair-financial-scop
 - `GET/POST /api/v1/trading-accounts/:accountId/orders[...]`,
   `GET /api/v1/trading-accounts/:accountId/positions`. 조회는
   active/suspended/closed 모두 허용(소유자), 미존재·타인 계정은 동일 404,
-  다른 계정 orderId도 동일 404. 신규 quote/주문은 계정 소유권 + mode=season
-  (general은 409 `GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED`) +
+  다른 계정 orderId도 동일 404. 신규 quote/주문은 계정 소유권 +
   TradingAccount.status=active(아니면 409 `TRADING_ACCOUNT_NOT_ACTIVE`) +
-  기존 시즌/참가자/시장/가격/지갑/잔액 정책 전부를 요구한다(계정 status만으로
-  거래 허용 금지). account-scoped execute endpoint는 만들지 않았다(legacy에도
-  없음 — 시장가는 create 내부 실행, 지정가는 스케줄러 체결).
+  공통 시장/가격/지갑/잔액 정책을 요구한다. season은 기존 시즌·참가자 조건을
+  추가로 모두 요구하고, general은 season/participant를 조회하거나 요구하지
+  않으며 일반 금융 foundation을 검증한다. account-scoped execute endpoint는
+  만들지 않았다(legacy에도 없음 — 시장가는 create 내부 실행, 지정가는 공용
+  스케줄러 체결).
 - 취소는 보호 동작이므로 legacy와 동일하게 계정/참가자 status로 gate하지
   않는다(소유자는 suspended/closed 계정의 submitted 지정가도 취소 가능).
   단 order/wallet scope가 null·불일치면 자동 추정 없이 repair-required로
   중단하고 주문 상태·예약금 변경이 함께 rollback 된다.
 - 지정가 자동 체결(스케줄러)은 체결 트랜잭션 안에서 locked row 기준으로
-  `order.tradingAccountId` 존재·참가자 링크 일치·account.mode=season·연결
-  quote scope 일치·wallet/position scope 일치를 재검증한다. 계정이
+  `order.tradingAccountId` 존재·mode별 participant 규칙·연결 quote scope·
+  wallet/position scope 일치를 재검증한다. season은 기존 season/participant
+  거래 가능 조건을 유지하고 general은 active 계정과 일반 금융 foundation만
+  요구한다. 계정이
   suspended/closed면 **체결하지 않고 skip**(`account_not_active`; 주문은
   submitted 유지, 기존 정책대로 자동 취소하지 않음). scope 손상은 구조화된
   500으로 fail-closed(다음 사이클 재시도가 운영 신호).
@@ -783,8 +789,8 @@ legacy `/api/v1/wallets`·`/api/v1/fx/*`는 계약 그대로 유지되고 두 �
 **account-scoped 주문·포지션 API (작업 5에서 추가):** 소유 계정 하위의
 `GET .../orders`·`GET .../orders/:orderId`(조회, active/suspended/closed 모두
 허용, 다른 계정 orderId는 동일 404), `POST .../orders/quote`·
-`POST .../orders`(시즌계정 + account active + 기존 시즌/참가자/시장/가격/지갑
-정책 전부; general은 409 `GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED`),
+`POST .../orders`(active season/general 계정 + 공통 시장/가격/지갑 정책;
+season은 기존 시즌/참가자 gate, general은 일반 금융 foundation gate),
 `POST .../orders/:orderId/cancel`(보호 동작 — 계정 status로 gate하지 않음),
 `GET .../positions`(조회). account-scoped execute endpoint는 legacy에도
 없으므로 만들지 않았다. legacy `/api/v1/orders`·`/api/v1/positions`는 계약
@@ -1175,7 +1181,7 @@ eligibility:
 11. enable 전 reward amount·일일 횟수·일일 금액·cooldown·timezone 검토
 12. enable 후에는 테스트용 이벤트가 아니라 provider sandbox 이벤트로 검증
 13. `pnpm trading-accounts:audit-general` 실행 (findings 0 기대)
-14. 일반계정 주문·FX가 계속 차단되는지 확인
+14. 일반계정 시장가·지정가 주문 lifecycle smoke + 일반 FX 차단 유지 확인
 
 **migration만 적용한 상태에서 기존 사용자에게 general account를 자동 생성하지
 않는다.** general 계정은 사용자가 명시적으로 POST를 호출할 때만 생긴다.
@@ -1622,7 +1628,7 @@ findings(rank gap, tier 불일치)는 이 스크립트의 소관이 아니라 �
 
 repair가 끝나기 전에 NOT NULL을 적용하지 않는다.
 
-### 8-A.17 이번 작업에서 하지 않은 것
+### 8-A.17 당시 작업에서 하지 않은 것
 
 일반계정 실제 주문·환전·Position 활성화, 일반모드 랭킹, 시즌+일반 통합 랭킹,
 프런트엔드 변경(모드 선택·랭킹 화면·일반계정 portfolio 연결), 광고 SDK·실제
@@ -1635,8 +1641,8 @@ Order·Position·ExchangeTransaction·FxExecuteRequest의 participant FK 제거,
 별도 랭킹 이벤트 로그 테이블, 랭킹 결과 무제한 버전 보관, Redis 분산락,
 메시지 브로커, 범용 작업 큐.
 
-기존 차단 유지: `GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED`,
-`GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`.
+당시에는 일반 주문과 FX 차단을 모두 유지했다. 일반 주문 차단은 2026-08-18
+일반계정 거래 활성화 작업에서 제거됐고, FX 차단만 현재도 유지된다.
 
 ## 8-B. 작업 8 보완 · 작업 9 — 랭킹/정산 무결성 잔여 결함 + 프런트엔드 계정 전환
 
@@ -1849,17 +1855,17 @@ repair-ranking-scope 정책과 "구버전 writer 종료 후 repair 실행" 배�
 (§8-A.16)를 그대로 유지한다. routine API/job은 repair 스크립트 역할을 대신하지
 않는다 — 8-B.3이 그 경계를 코드로 강제한다.
 
-### 8-B.10 이번 작업에서 하지 않은 것
+### 8-B.10 당시 작업에서 하지 않은 것
 
 `SeasonRanking.tradingAccountId` NOT NULL 강화, transitional nullable scope 제거,
 Redis 분산락·메시지 큐·이벤트 소싱·전 계정 global lock·별도 ranking
 microservice, 일반계정용 가짜 SeasonParticipant, 시즌/일반 wallet·position 통합,
-실제 광고 provider 연동, 실제 reward 지급, 일반계정 거래·환전 backend 활성화,
+실제 광고 provider 연동, 실제 reward 지급, 당시 일반계정 거래·환전 backend 활성화,
 작업 10 hardening 선행 구현, 기존 API 주소 변경, 랭킹 계산·tier 비율 변경,
 프런트엔드 디자인 전면 개편.
 
-기존 차단 유지: `GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED`,
-`GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`.
+당시에는 일반 주문과 FX 차단을 모두 유지했다. 일반 주문 차단은 2026-08-18에
+해제됐고, `GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`만 현재도 유지된다.
 
 ## 9. 후속 작업 권장 순서
 
@@ -1867,8 +1873,8 @@ microservice, 일반계정용 가짜 SeasonParticipant, 시즌/일반 wallet·po
 2. ~~스냅샷 3모델(EquitySnapshot·DailyPortfolioSnapshot·SeasonRanking)의 accountId 전환~~
    — EquitySnapshot·DailyPortfolioSnapshot은 작업 7, SeasonRanking은 작업 8에서
    완료. 남은 것은 repair 수렴 이후의 `tradingAccountId` NOT NULL 강화
-3. 일반모드 거래 활성화: Order·Position·ExchangeTransaction·FxExecuteRequest의
-   `seasonParticipantId` optional 전환 + 일반모드 주문·환전 정책 + 일반 Position
+3. ~~일반모드 주문·Position 활성화~~ — 2026-08-18 완료. 남은 것은
+   ExchangeTransaction·FxExecuteRequest participant optional 전환과 일반 FX 정책
 4. 시즌 lifecycle 격리: finished/rewarded/settled 전환 시 account closed 동기화, suspended 재활성화, 운영자 일반계정 정지
 5. 광고 제공자 선정 → `AdRewardVerifier` 구현체를 `AdRewardsModule`에 등록(additive) + 운영 설정값 확정 + sandbox 검증
 6. 시간가중수익률 계산 + 외부자금 유입 경계 스냅샷 (`initial_grant`/`ad_reward` 원장을 외부 유입으로 분리)
@@ -1890,8 +1896,8 @@ screen and mutation**. The rules that matter to this document:
 - Account fallback requires the SEASON to be active, not merely the account.
   An `ended` (settlement pending) or failed-to-close `settled` season account
   no longer outranks a live general account.
-- General-mode trading and FX are presented as 준비 중 and the request is not
-  sent. This mirrors the server gate; it never relaxes it.
+- Active general accounts use the same account-scoped market/limit order flow
+  as season accounts. General FX alone remains 준비 중 and is not sent.
 
 Full detail: `frontend/docs/trading-account-switching.md`.
 

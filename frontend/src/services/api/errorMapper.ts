@@ -322,8 +322,6 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.TRADING_ACCOUNT_NOT_ACTIVE:
       return '현재 계정 상태에서는 이 작업을 할 수 없습니다.';
     // 준비 중인 기능: 데이터 손상이 아니므로 문의를 안내하지 않는다.
-    case ERROR_CODE.GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED:
-      return '일반 투자 계정의 매매 기능은 아직 준비 중입니다.';
     case ERROR_CODE.GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED:
       return '일반 투자 계정의 환전 기능은 아직 준비 중입니다.';
     // 구조적 무결성 오류: 빈 데이터로 위장하지 않고 재시도/문의를 안내한다.

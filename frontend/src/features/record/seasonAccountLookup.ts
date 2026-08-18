@@ -48,6 +48,10 @@ export type SeasonAccountLookupInput = {
   isError: boolean;
 };
 
+export type RecordOrderAccountScope =
+  | { seasonId: string; accountId?: never }
+  | { accountId: string; seasonId?: never };
+
 export const ACCOUNT_LIST_ERROR_TITLE = '계정 정보를 불러오지 못했습니다.';
 export const ACCOUNT_LIST_ERROR_MESSAGE =
   '계정 목록을 불러오지 못해 어떤 계정의 거래 내역인지 확인할 수 없습니다. 네트워크 상태를 확인한 뒤 다시 시도해주세요.';
@@ -89,6 +93,42 @@ export function resolveSeasonAccount({
 }
 
 /**
+ * Resolves the immutable subject carried by the order-history route.
+ *
+ * Historical season entry points name a season and retain the strict
+ * participant/account-link lookup above. General Home has no season to name,
+ * so it carries the already-owned general account id directly. In both cases
+ * the id must still be present in the authenticated account list; this helper
+ * never probes an arbitrary id and never falls back to the currently selected
+ * account after the route has been opened.
+ */
+export function resolveRecordOrderAccount(input: {
+  scope: RecordOrderAccountScope;
+  accounts: readonly TradingAccountDto[];
+  isLoading: boolean;
+  isError: boolean;
+}): SeasonAccountLookup {
+  if ('seasonId' in input.scope && input.scope.seasonId) {
+    return resolveSeasonAccount({
+      seasonId: input.scope.seasonId,
+      accounts: input.accounts,
+      isLoading: input.isLoading,
+      isError: input.isError,
+    });
+  }
+
+  if (input.isLoading) return { state: 'loading', account: null };
+
+  const account = input.accounts.find(
+    (candidate) =>
+      candidate.id === input.scope.accountId && candidate.mode === 'general',
+  );
+  if (account) return { state: 'ready', account };
+  if (input.isError) return { state: 'account_list_error', account: null };
+  return { state: 'account_missing', account: null };
+}
+
+/**
  * The orders query may only run for a real account id. An empty id would send
  * `/trading-accounts//orders` — a request that can only 404, and that would
  * make an infrastructure error look like a missing season.
@@ -96,3 +136,5 @@ export function resolveSeasonAccount({
 export function canQuerySeasonOrders(lookup: SeasonAccountLookup): boolean {
   return lookup.state === 'ready' && !!lookup.account.id;
 }
+
+export const canQueryRecordOrders = canQuerySeasonOrders;

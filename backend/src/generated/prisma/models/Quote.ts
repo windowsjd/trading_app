@@ -37,6 +37,7 @@ export type QuoteAvgAggregateOutputType = {
   quotedGrossAmount: runtime.Decimal | null
   quotedFeeAmount: runtime.Decimal | null
   quotedReservedAmount: runtime.Decimal | null
+  quotedNetAmount: runtime.Decimal | null
   maxChangeBps: runtime.Decimal | null
 }
 
@@ -51,6 +52,7 @@ export type QuoteSumAggregateOutputType = {
   quotedGrossAmount: runtime.Decimal | null
   quotedFeeAmount: runtime.Decimal | null
   quotedReservedAmount: runtime.Decimal | null
+  quotedNetAmount: runtime.Decimal | null
   maxChangeBps: runtime.Decimal | null
 }
 
@@ -77,6 +79,7 @@ export type QuoteMinAggregateOutputType = {
   quotedGrossAmount: runtime.Decimal | null
   quotedFeeAmount: runtime.Decimal | null
   quotedReservedAmount: runtime.Decimal | null
+  quotedNetAmount: runtime.Decimal | null
   assetPriceSnapshotId: string | null
   fxRateSnapshotId: string | null
   maxChangeBps: runtime.Decimal | null
@@ -110,6 +113,7 @@ export type QuoteMaxAggregateOutputType = {
   quotedGrossAmount: runtime.Decimal | null
   quotedFeeAmount: runtime.Decimal | null
   quotedReservedAmount: runtime.Decimal | null
+  quotedNetAmount: runtime.Decimal | null
   assetPriceSnapshotId: string | null
   fxRateSnapshotId: string | null
   maxChangeBps: runtime.Decimal | null
@@ -143,6 +147,7 @@ export type QuoteCountAggregateOutputType = {
   quotedGrossAmount: number
   quotedFeeAmount: number
   quotedReservedAmount: number
+  quotedNetAmount: number
   assetPriceSnapshotId: number
   fxRateSnapshotId: number
   assetPriceSourceJson: number
@@ -168,6 +173,7 @@ export type QuoteAvgAggregateInputType = {
   quotedGrossAmount?: true
   quotedFeeAmount?: true
   quotedReservedAmount?: true
+  quotedNetAmount?: true
   maxChangeBps?: true
 }
 
@@ -182,6 +188,7 @@ export type QuoteSumAggregateInputType = {
   quotedGrossAmount?: true
   quotedFeeAmount?: true
   quotedReservedAmount?: true
+  quotedNetAmount?: true
   maxChangeBps?: true
 }
 
@@ -208,6 +215,7 @@ export type QuoteMinAggregateInputType = {
   quotedGrossAmount?: true
   quotedFeeAmount?: true
   quotedReservedAmount?: true
+  quotedNetAmount?: true
   assetPriceSnapshotId?: true
   fxRateSnapshotId?: true
   maxChangeBps?: true
@@ -241,6 +249,7 @@ export type QuoteMaxAggregateInputType = {
   quotedGrossAmount?: true
   quotedFeeAmount?: true
   quotedReservedAmount?: true
+  quotedNetAmount?: true
   assetPriceSnapshotId?: true
   fxRateSnapshotId?: true
   maxChangeBps?: true
@@ -274,6 +283,7 @@ export type QuoteCountAggregateInputType = {
   quotedGrossAmount?: true
   quotedFeeAmount?: true
   quotedReservedAmount?: true
+  quotedNetAmount?: true
   assetPriceSnapshotId?: true
   fxRateSnapshotId?: true
   assetPriceSourceJson?: true
@@ -396,6 +406,7 @@ export type QuoteGroupByOutputType = {
   quotedGrossAmount: runtime.Decimal | null
   quotedFeeAmount: runtime.Decimal | null
   quotedReservedAmount: runtime.Decimal | null
+  quotedNetAmount: runtime.Decimal | null
   assetPriceSnapshotId: string | null
   fxRateSnapshotId: string | null
   assetPriceSourceJson: runtime.JsonValue | null
@@ -454,6 +465,7 @@ export type QuoteWhereInput = {
   quotedGrossAmount?: Prisma.DecimalNullableFilter<"Quote"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.DecimalNullableFilter<"Quote"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.DecimalNullableFilter<"Quote"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.DecimalNullableFilter<"Quote"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: Prisma.StringNullableFilter<"Quote"> | string | null
   fxRateSnapshotId?: Prisma.StringNullableFilter<"Quote"> | string | null
   assetPriceSourceJson?: Prisma.JsonNullableFilter<"Quote">
@@ -496,6 +508,7 @@ export type QuoteOrderByWithRelationInput = {
   quotedGrossAmount?: Prisma.SortOrderInput | Prisma.SortOrder
   quotedFeeAmount?: Prisma.SortOrderInput | Prisma.SortOrder
   quotedReservedAmount?: Prisma.SortOrderInput | Prisma.SortOrder
+  quotedNetAmount?: Prisma.SortOrderInput | Prisma.SortOrder
   assetPriceSnapshotId?: Prisma.SortOrderInput | Prisma.SortOrder
   fxRateSnapshotId?: Prisma.SortOrderInput | Prisma.SortOrder
   assetPriceSourceJson?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -541,6 +554,7 @@ export type QuoteWhereUniqueInput = Prisma.AtLeast<{
   quotedGrossAmount?: Prisma.DecimalNullableFilter<"Quote"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.DecimalNullableFilter<"Quote"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.DecimalNullableFilter<"Quote"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.DecimalNullableFilter<"Quote"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: Prisma.StringNullableFilter<"Quote"> | string | null
   fxRateSnapshotId?: Prisma.StringNullableFilter<"Quote"> | string | null
   assetPriceSourceJson?: Prisma.JsonNullableFilter<"Quote">
@@ -583,6 +597,7 @@ export type QuoteOrderByWithAggregationInput = {
   quotedGrossAmount?: Prisma.SortOrderInput | Prisma.SortOrder
   quotedFeeAmount?: Prisma.SortOrderInput | Prisma.SortOrder
   quotedReservedAmount?: Prisma.SortOrderInput | Prisma.SortOrder
+  quotedNetAmount?: Prisma.SortOrderInput | Prisma.SortOrder
   assetPriceSnapshotId?: Prisma.SortOrderInput | Prisma.SortOrder
   fxRateSnapshotId?: Prisma.SortOrderInput | Prisma.SortOrder
   assetPriceSourceJson?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -626,6 +641,7 @@ export type QuoteScalarWhereWithAggregatesInput = {
   quotedGrossAmount?: Prisma.DecimalNullableWithAggregatesFilter<"Quote"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.DecimalNullableWithAggregatesFilter<"Quote"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.DecimalNullableWithAggregatesFilter<"Quote"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.DecimalNullableWithAggregatesFilter<"Quote"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: Prisma.StringNullableWithAggregatesFilter<"Quote"> | string | null
   fxRateSnapshotId?: Prisma.StringNullableWithAggregatesFilter<"Quote"> | string | null
   assetPriceSourceJson?: Prisma.JsonNullableWithAggregatesFilter<"Quote">
@@ -657,6 +673,7 @@ export type QuoteCreateInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   maxChangeBps: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -697,6 +714,7 @@ export type QuoteUncheckedCreateInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: string | null
   fxRateSnapshotId?: string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -729,6 +747,7 @@ export type QuoteUpdateInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   maxChangeBps?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -769,6 +788,7 @@ export type QuoteUncheckedUpdateInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -805,6 +825,7 @@ export type QuoteCreateManyInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: string | null
   fxRateSnapshotId?: string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -836,6 +857,7 @@ export type QuoteUpdateManyMutationInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   maxChangeBps?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -869,6 +891,7 @@ export type QuoteUncheckedUpdateManyInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -919,6 +942,7 @@ export type QuoteCountOrderByAggregateInput = {
   quotedGrossAmount?: Prisma.SortOrder
   quotedFeeAmount?: Prisma.SortOrder
   quotedReservedAmount?: Prisma.SortOrder
+  quotedNetAmount?: Prisma.SortOrder
   assetPriceSnapshotId?: Prisma.SortOrder
   fxRateSnapshotId?: Prisma.SortOrder
   assetPriceSourceJson?: Prisma.SortOrder
@@ -942,6 +966,7 @@ export type QuoteAvgOrderByAggregateInput = {
   quotedGrossAmount?: Prisma.SortOrder
   quotedFeeAmount?: Prisma.SortOrder
   quotedReservedAmount?: Prisma.SortOrder
+  quotedNetAmount?: Prisma.SortOrder
   maxChangeBps?: Prisma.SortOrder
 }
 
@@ -968,6 +993,7 @@ export type QuoteMaxOrderByAggregateInput = {
   quotedGrossAmount?: Prisma.SortOrder
   quotedFeeAmount?: Prisma.SortOrder
   quotedReservedAmount?: Prisma.SortOrder
+  quotedNetAmount?: Prisma.SortOrder
   assetPriceSnapshotId?: Prisma.SortOrder
   fxRateSnapshotId?: Prisma.SortOrder
   maxChangeBps?: Prisma.SortOrder
@@ -1001,6 +1027,7 @@ export type QuoteMinOrderByAggregateInput = {
   quotedGrossAmount?: Prisma.SortOrder
   quotedFeeAmount?: Prisma.SortOrder
   quotedReservedAmount?: Prisma.SortOrder
+  quotedNetAmount?: Prisma.SortOrder
   assetPriceSnapshotId?: Prisma.SortOrder
   fxRateSnapshotId?: Prisma.SortOrder
   maxChangeBps?: Prisma.SortOrder
@@ -1022,6 +1049,7 @@ export type QuoteSumOrderByAggregateInput = {
   quotedGrossAmount?: Prisma.SortOrder
   quotedFeeAmount?: Prisma.SortOrder
   quotedReservedAmount?: Prisma.SortOrder
+  quotedNetAmount?: Prisma.SortOrder
   maxChangeBps?: Prisma.SortOrder
 }
 
@@ -1332,6 +1360,7 @@ export type QuoteCreateWithoutUserInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   maxChangeBps: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -1370,6 +1399,7 @@ export type QuoteUncheckedCreateWithoutUserInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: string | null
   fxRateSnapshotId?: string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1435,6 +1465,7 @@ export type QuoteScalarWhereInput = {
   quotedGrossAmount?: Prisma.DecimalNullableFilter<"Quote"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.DecimalNullableFilter<"Quote"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.DecimalNullableFilter<"Quote"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.DecimalNullableFilter<"Quote"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: Prisma.StringNullableFilter<"Quote"> | string | null
   fxRateSnapshotId?: Prisma.StringNullableFilter<"Quote"> | string | null
   assetPriceSourceJson?: Prisma.JsonNullableFilter<"Quote">
@@ -1466,6 +1497,7 @@ export type QuoteCreateWithoutTradingAccountInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   maxChangeBps: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -1504,6 +1536,7 @@ export type QuoteUncheckedCreateWithoutTradingAccountInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: string | null
   fxRateSnapshotId?: string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1562,6 +1595,7 @@ export type QuoteCreateWithoutSeasonParticipantInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   maxChangeBps: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -1600,6 +1634,7 @@ export type QuoteUncheckedCreateWithoutSeasonParticipantInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: string | null
   fxRateSnapshotId?: string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1658,6 +1693,7 @@ export type QuoteCreateWithoutAssetInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   maxChangeBps: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -1696,6 +1732,7 @@ export type QuoteUncheckedCreateWithoutAssetInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: string | null
   fxRateSnapshotId?: string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1754,6 +1791,7 @@ export type QuoteCreateWithoutAssetPriceSnapshotInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   maxChangeBps: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -1793,6 +1831,7 @@ export type QuoteUncheckedCreateWithoutAssetPriceSnapshotInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   fxRateSnapshotId?: string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1850,6 +1889,7 @@ export type QuoteCreateWithoutOrdersInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   maxChangeBps: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -1889,6 +1929,7 @@ export type QuoteUncheckedCreateWithoutOrdersInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: string | null
   fxRateSnapshotId?: string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1936,6 +1977,7 @@ export type QuoteUpdateWithoutOrdersInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   maxChangeBps?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -1975,6 +2017,7 @@ export type QuoteUncheckedUpdateWithoutOrdersInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2006,6 +2049,7 @@ export type QuoteCreateWithoutFxRateSnapshotInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   maxChangeBps: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -2045,6 +2089,7 @@ export type QuoteUncheckedCreateWithoutFxRateSnapshotInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2105,6 +2150,7 @@ export type QuoteCreateManyUserInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: string | null
   fxRateSnapshotId?: string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2136,6 +2182,7 @@ export type QuoteUpdateWithoutUserInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   maxChangeBps?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -2174,6 +2221,7 @@ export type QuoteUncheckedUpdateWithoutUserInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2209,6 +2257,7 @@ export type QuoteUncheckedUpdateManyWithoutUserInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2243,6 +2292,7 @@ export type QuoteCreateManyTradingAccountInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: string | null
   fxRateSnapshotId?: string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2274,6 +2324,7 @@ export type QuoteUpdateWithoutTradingAccountInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   maxChangeBps?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -2312,6 +2363,7 @@ export type QuoteUncheckedUpdateWithoutTradingAccountInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2347,6 +2399,7 @@ export type QuoteUncheckedUpdateManyWithoutTradingAccountInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2381,6 +2434,7 @@ export type QuoteCreateManySeasonParticipantInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: string | null
   fxRateSnapshotId?: string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2412,6 +2466,7 @@ export type QuoteUpdateWithoutSeasonParticipantInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   maxChangeBps?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -2450,6 +2505,7 @@ export type QuoteUncheckedUpdateWithoutSeasonParticipantInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2485,6 +2541,7 @@ export type QuoteUncheckedUpdateManyWithoutSeasonParticipantInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2519,6 +2576,7 @@ export type QuoteCreateManyAssetInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: string | null
   fxRateSnapshotId?: string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2550,6 +2608,7 @@ export type QuoteUpdateWithoutAssetInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   maxChangeBps?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -2588,6 +2647,7 @@ export type QuoteUncheckedUpdateWithoutAssetInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2623,6 +2683,7 @@ export type QuoteUncheckedUpdateManyWithoutAssetInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2658,6 +2719,7 @@ export type QuoteCreateManyAssetPriceSnapshotInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   fxRateSnapshotId?: string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2688,6 +2750,7 @@ export type QuoteUpdateWithoutAssetPriceSnapshotInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   maxChangeBps?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -2727,6 +2790,7 @@ export type QuoteUncheckedUpdateWithoutAssetPriceSnapshotInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2762,6 +2826,7 @@ export type QuoteUncheckedUpdateManyWithoutAssetPriceSnapshotInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2796,6 +2861,7 @@ export type QuoteCreateManyFxRateSnapshotInput = {
   quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2826,6 +2892,7 @@ export type QuoteUpdateWithoutFxRateSnapshotInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   maxChangeBps?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -2865,6 +2932,7 @@ export type QuoteUncheckedUpdateWithoutFxRateSnapshotInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2900,6 +2968,7 @@ export type QuoteUncheckedUpdateManyWithoutFxRateSnapshotInput = {
   quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2965,6 +3034,7 @@ export type QuoteSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   quotedGrossAmount?: boolean
   quotedFeeAmount?: boolean
   quotedReservedAmount?: boolean
+  quotedNetAmount?: boolean
   assetPriceSnapshotId?: boolean
   fxRateSnapshotId?: boolean
   assetPriceSourceJson?: boolean
@@ -3008,6 +3078,7 @@ export type QuoteSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   quotedGrossAmount?: boolean
   quotedFeeAmount?: boolean
   quotedReservedAmount?: boolean
+  quotedNetAmount?: boolean
   assetPriceSnapshotId?: boolean
   fxRateSnapshotId?: boolean
   assetPriceSourceJson?: boolean
@@ -3049,6 +3120,7 @@ export type QuoteSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   quotedGrossAmount?: boolean
   quotedFeeAmount?: boolean
   quotedReservedAmount?: boolean
+  quotedNetAmount?: boolean
   assetPriceSnapshotId?: boolean
   fxRateSnapshotId?: boolean
   assetPriceSourceJson?: boolean
@@ -3090,6 +3162,7 @@ export type QuoteSelectScalar = {
   quotedGrossAmount?: boolean
   quotedFeeAmount?: boolean
   quotedReservedAmount?: boolean
+  quotedNetAmount?: boolean
   assetPriceSnapshotId?: boolean
   fxRateSnapshotId?: boolean
   assetPriceSourceJson?: boolean
@@ -3102,7 +3175,7 @@ export type QuoteSelectScalar = {
   updatedAt?: boolean
 }
 
-export type QuoteOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "seasonParticipantId" | "tradingAccountId" | "quoteType" | "status" | "assetId" | "side" | "orderType" | "quantity" | "limitPrice" | "fromCurrency" | "toCurrency" | "sourceAmount" | "targetAmount" | "currencyCode" | "quotedPrice" | "quotedRate" | "quotedFeeRate" | "quotedGrossAmount" | "quotedFeeAmount" | "quotedReservedAmount" | "assetPriceSnapshotId" | "fxRateSnapshotId" | "assetPriceSourceJson" | "fxRateSourceJson" | "maxChangeBps" | "expiresAt" | "requestHash" | "consumedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["quote"]>
+export type QuoteOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "seasonParticipantId" | "tradingAccountId" | "quoteType" | "status" | "assetId" | "side" | "orderType" | "quantity" | "limitPrice" | "fromCurrency" | "toCurrency" | "sourceAmount" | "targetAmount" | "currencyCode" | "quotedPrice" | "quotedRate" | "quotedFeeRate" | "quotedGrossAmount" | "quotedFeeAmount" | "quotedReservedAmount" | "quotedNetAmount" | "assetPriceSnapshotId" | "fxRateSnapshotId" | "assetPriceSourceJson" | "fxRateSourceJson" | "maxChangeBps" | "expiresAt" | "requestHash" | "consumedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["quote"]>
 export type QuoteInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   seasonParticipant?: boolean | Prisma.Quote$seasonParticipantArgs<ExtArgs>
@@ -3164,6 +3237,7 @@ export type $QuotePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     quotedGrossAmount: runtime.Decimal | null
     quotedFeeAmount: runtime.Decimal | null
     quotedReservedAmount: runtime.Decimal | null
+    quotedNetAmount: runtime.Decimal | null
     assetPriceSnapshotId: string | null
     fxRateSnapshotId: string | null
     assetPriceSourceJson: runtime.JsonValue | null
@@ -3626,6 +3700,7 @@ export interface QuoteFieldRefs {
   readonly quotedGrossAmount: Prisma.FieldRef<"Quote", 'Decimal'>
   readonly quotedFeeAmount: Prisma.FieldRef<"Quote", 'Decimal'>
   readonly quotedReservedAmount: Prisma.FieldRef<"Quote", 'Decimal'>
+  readonly quotedNetAmount: Prisma.FieldRef<"Quote", 'Decimal'>
   readonly assetPriceSnapshotId: Prisma.FieldRef<"Quote", 'String'>
   readonly fxRateSnapshotId: Prisma.FieldRef<"Quote", 'String'>
   readonly assetPriceSourceJson: Prisma.FieldRef<"Quote", 'Json'>

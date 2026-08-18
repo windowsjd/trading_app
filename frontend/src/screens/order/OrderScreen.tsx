@@ -198,9 +198,7 @@ export default function OrderScreen({ route, navigation }: Props) {
   const accountChangedAway = shouldResetBoundFlow(binding);
 
   const [quantity, setQuantity] = useState('');
-  // Limit orders are buy-only in phase 1; the toggle is hidden entirely
-  // unless the feature flag is on AND this is a buy screen.
-  const showLimitToggle = LIMIT_ORDER_ENABLED && side === 'buy';
+  const showLimitToggle = LIMIT_ORDER_ENABLED;
   const [orderTypeState, setOrderTypeState] = useState<'market' | 'limit'>(
     'market',
   );
@@ -468,9 +466,9 @@ export default function OrderScreen({ route, navigation }: Props) {
   );
 
   /**
-   * Every gate below is about the ROUTE account. A general account is 준비 중
-   * (and the request is never sent, so the user does not collect a 409 per
-   * press); suspended/closed accounts cannot open new orders; a season account
+   * Every gate below is about the ROUTE account. General and season accounts
+   * share this flow; suspended/closed accounts cannot open new orders; season
+   * accounts
    * needs its own season to be active — not merely for some season somewhere to
    * be running.
    */
@@ -919,8 +917,9 @@ export default function OrderScreen({ route, navigation }: Props) {
                   placeholder="지정가 가격 입력"
                 />
                 <Text style={styles.helper}>
-                  지정가 매수 주문은 제출 시 미체결 상태로 등록되며, 주문 금액과
-                  수수료만큼 현금이 예약됩니다.
+                  {side === 'buy'
+                    ? '지정가 매수는 미체결 상태로 등록되며 주문 금액과 수수료만큼 현금이 예약됩니다.'
+                    : '지정가 매도는 미체결 상태로 등록되며 주문 수량이 예약됩니다.'}
                 </Text>
               </>
             ) : null}
@@ -1036,37 +1035,65 @@ export default function OrderScreen({ route, navigation }: Props) {
                       quoteData.currencyCode,
                     )}
                   </Text>
+                  {side === 'buy' ? (
+                    <>
+                      <Text style={styles.helper}>
+                        예약 예정 금액{' '}
+                        {formatCurrency(
+                          quoteData.quotedReservedAmount ??
+                            quoteData.reservedAmount,
+                          quoteData.currencyCode,
+                        )}
+                      </Text>
+                      <Text style={styles.helper}>
+                        기존 예약금{' '}
+                        {formatCurrency(
+                          quoteData.walletReservedBefore,
+                          quoteData.currencyCode,
+                        )}
+                      </Text>
+                      <Text style={styles.helper}>
+                        사용 가능 현금{' '}
+                        {formatCurrency(
+                          quoteData.walletAvailableBefore,
+                          quoteData.currencyCode,
+                        )}
+                      </Text>
+                      <Text style={styles.helper}>
+                        주문 후 예상 사용 가능 현금{' '}
+                        {formatCurrency(
+                          quoteData.estimatedAvailableAfter,
+                          quoteData.currencyCode,
+                        )}
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.helper}>
+                        예상 순수령액{' '}
+                        {formatCurrency(
+                          quoteData.quotedNetAmount ?? quoteData.netAmount,
+                          quoteData.currencyCode,
+                        )}
+                      </Text>
+                      <Text style={styles.helper}>
+                        예약 예정 수량 {quoteData.reservedQuantity ?? '-'}
+                      </Text>
+                      <Text style={styles.helper}>
+                        주문 전 사용 가능 수량{' '}
+                        {quoteData.positionAvailableBefore ?? '-'}
+                      </Text>
+                      <Text style={styles.helper}>
+                        주문 후 사용 가능 수량{' '}
+                        {quoteData.estimatedPositionAvailableAfter ?? '-'}
+                      </Text>
+                    </>
+                  )}
                   <Text style={styles.helper}>
-                    예약 예정 금액{' '}
-                    {formatCurrency(
-                      quoteData.quotedReservedAmount ??
-                        quoteData.reservedAmount,
-                      quoteData.currencyCode,
+                    {getLimitOrderSuccessMessage(
+                      quoteData.executionPolicy,
+                      side,
                     )}
-                  </Text>
-                  <Text style={styles.helper}>
-                    기존 예약금{' '}
-                    {formatCurrency(
-                      quoteData.walletReservedBefore,
-                      quoteData.currencyCode,
-                    )}
-                  </Text>
-                  <Text style={styles.helper}>
-                    사용 가능 현금{' '}
-                    {formatCurrency(
-                      quoteData.walletAvailableBefore,
-                      quoteData.currencyCode,
-                    )}
-                  </Text>
-                  <Text style={styles.helper}>
-                    주문 후 예상 사용 가능 현금{' '}
-                    {formatCurrency(
-                      quoteData.estimatedAvailableAfter,
-                      quoteData.currencyCode,
-                    )}
-                  </Text>
-                  <Text style={styles.helper}>
-                    {getLimitOrderSuccessMessage(quoteData.executionPolicy)}
                   </Text>
                 </>
               ) : (

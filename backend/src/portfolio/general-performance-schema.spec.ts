@@ -261,13 +261,11 @@ describe('General performance schema contract', () => {
       expect(foundationSql).not.toContain('season_rankings');
     });
 
-    it('keeps Order / Position / Exchange / FxExecuteRequest participant links REQUIRED', () => {
-      for (const model of [
-        'Order',
-        'Position',
-        'ExchangeTransaction',
-        'FxExecuteRequest',
-      ]) {
+    it('allows general Order/Position while FX participant links remain required', () => {
+      for (const model of ['Order', 'Position']) {
+        expect(modelBlock(model)).toMatch(/seasonParticipantId\s+String\?/);
+      }
+      for (const model of ['ExchangeTransaction', 'FxExecuteRequest']) {
         expect(modelBlock(model)).toMatch(/seasonParticipantId\s+String\s/);
       }
     });

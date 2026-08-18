@@ -1142,6 +1142,7 @@ function createPrismaMock() {
     },
     order: { count: jest.fn().mockResolvedValue(0) },
     cashWallet: { count: jest.fn().mockResolvedValue(0) },
+    position: { count: jest.fn().mockResolvedValue(0) },
     // Settlement closes EVERY season account, so it re-reads all participants
     // with their account link under the lock (작업 8 §14.2).
     tradingAccount: {
@@ -1273,6 +1274,8 @@ function createPrismaMock() {
       update: jest.fn(),
     },
     position: {
+      // Settlement precondition: no position may still hold a sell reservation.
+      count: jest.fn().mockResolvedValue(0),
       create: jest.fn(),
       update: jest.fn(),
     },

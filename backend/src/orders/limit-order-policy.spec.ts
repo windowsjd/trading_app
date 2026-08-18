@@ -14,6 +14,7 @@ import { Prisma } from '../generated/prisma/client';
 import {
   calculateAvailableAmount,
   calculateLimitBuyReservation,
+  calculateLimitSellQuote,
   LIMIT_ORDER_CANCEL_REASONS,
   validateQuotedLimitReservationBasis,
 } from './limit-order-policy';
@@ -34,6 +35,18 @@ describe('limit order policy', () => {
     expect(result.grossAmount.toFixed(8)).toBe('150000.00000000');
     expect(result.feeAmount.toFixed(8)).toBe('150.00000000');
     expect(result.reservedAmount.toFixed(8)).toBe('150150.00000000');
+  });
+
+  it('computes limit-sell estimated proceeds as gross minus fee', () => {
+    const result = calculateLimitSellQuote({
+      limitPrice: new Prisma.Decimal('50000.00000000'),
+      quantity: new Prisma.Decimal('3.000000'),
+      tradeFeeRate: new Prisma.Decimal('0.001000'),
+    });
+
+    expect(result.grossAmount.toFixed(8)).toBe('150000.00000000');
+    expect(result.feeAmount.toFixed(8)).toBe('150.00000000');
+    expect(result.netAmount.toFixed(8)).toBe('149850.00000000');
   });
 
   it('rounds half-up at scale 8 in each step, matching market buy netAmount', () => {

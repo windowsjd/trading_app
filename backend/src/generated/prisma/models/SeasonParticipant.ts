@@ -1133,10 +1133,12 @@ export type SeasonParticipantCreateNestedOneWithoutPositionsInput = {
   connect?: Prisma.SeasonParticipantWhereUniqueInput
 }
 
-export type SeasonParticipantUpdateOneRequiredWithoutPositionsNestedInput = {
+export type SeasonParticipantUpdateOneWithoutPositionsNestedInput = {
   create?: Prisma.XOR<Prisma.SeasonParticipantCreateWithoutPositionsInput, Prisma.SeasonParticipantUncheckedCreateWithoutPositionsInput>
   connectOrCreate?: Prisma.SeasonParticipantCreateOrConnectWithoutPositionsInput
   upsert?: Prisma.SeasonParticipantUpsertWithoutPositionsInput
+  disconnect?: Prisma.SeasonParticipantWhereInput | boolean
+  delete?: Prisma.SeasonParticipantWhereInput | boolean
   connect?: Prisma.SeasonParticipantWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.SeasonParticipantUpdateToOneWithWhereWithoutPositionsInput, Prisma.SeasonParticipantUpdateWithoutPositionsInput>, Prisma.SeasonParticipantUncheckedUpdateWithoutPositionsInput>
 }
@@ -1147,10 +1149,12 @@ export type SeasonParticipantCreateNestedOneWithoutOrdersInput = {
   connect?: Prisma.SeasonParticipantWhereUniqueInput
 }
 
-export type SeasonParticipantUpdateOneRequiredWithoutOrdersNestedInput = {
+export type SeasonParticipantUpdateOneWithoutOrdersNestedInput = {
   create?: Prisma.XOR<Prisma.SeasonParticipantCreateWithoutOrdersInput, Prisma.SeasonParticipantUncheckedCreateWithoutOrdersInput>
   connectOrCreate?: Prisma.SeasonParticipantCreateOrConnectWithoutOrdersInput
   upsert?: Prisma.SeasonParticipantUpsertWithoutOrdersInput
+  disconnect?: Prisma.SeasonParticipantWhereInput | boolean
+  delete?: Prisma.SeasonParticipantWhereInput | boolean
   connect?: Prisma.SeasonParticipantWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.SeasonParticipantUpdateToOneWithWhereWithoutOrdersInput, Prisma.SeasonParticipantUpdateWithoutOrdersInput>, Prisma.SeasonParticipantUncheckedUpdateWithoutOrdersInput>
 }

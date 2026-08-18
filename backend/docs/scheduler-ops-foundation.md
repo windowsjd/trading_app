@@ -301,10 +301,10 @@ Ops job `limit_order_matching`, added additively to `OpsJobName`. Default
 - Single-instance execution is the existing `OpsJobLockService` +
   `ops_job_locks` (lock key `limit_order_matching:current`), NEVER a Redis lock.
 - The dedicated tick pre-gates on `hasFillableWork(now)` (does any fillable
-  submitted limit buy exist) BEFORE acquiring the lock, so an idle system
+  submitted limit order exist) BEFORE acquiring the lock, so an idle system
   produces no `ops_job_runs` rows; a row is written only when there is real
   matching work.
-- One cycle: for each asset with fillable submitted limit buys, evaluate path A
+- One cycle: for each asset with fillable submitted limit orders, evaluate path A
   (fresh provider snapshot) then path B (closed 5m candle touch), and fill
   qualifying orders each in its OWN transaction, oldest first. Bounded by
   `LIMIT_ORDER_MATCH_BATCH_SIZE` fills per cycle; the rest roll over. One order's
@@ -317,4 +317,4 @@ Ops job `limit_order_matching`, added additively to `OpsJobName`. Default
 
 Full matching semantics (fill price, first-eligible candle, lookback, season
 endAt, lock order, evidence isolation) are in `docs/policy-decisions.md`
-(“Limit Buy Scheduler Matching”) and `docs/orders-api-contract.md`.
+(“Limit Order Scheduler Matching”) and `docs/orders-api-contract.md`.

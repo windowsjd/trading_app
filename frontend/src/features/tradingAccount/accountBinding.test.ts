@@ -5,7 +5,6 @@ import {
   resolveAccountBinding,
   shouldResetBoundFlow,
 } from './accountBinding.ts';
-import { CAPABILITY_BLOCK_MESSAGE } from './capabilities.ts';
 import { QUERY_KEYS } from '../../constants/queryKeys.ts';
 import type { TradingAccountDto } from './api.ts';
 
@@ -155,7 +154,7 @@ describe('order/FX flow account binding', () => {
 });
 
 describe('bound-account capabilities gate the mutation, not just the button', () => {
-  it('a general account cannot start an order — 준비 중, and no request', () => {
+  it('an active general account can quote and create an order', () => {
     const binding = resolveAccountBinding({
       boundAccountId: GENERAL.id,
       accounts: ACCOUNTS,
@@ -166,16 +165,10 @@ describe('bound-account capabilities gate the mutation, not just the button', ()
     assert.equal(binding.state, 'bound');
     if (binding.state !== 'bound') return;
 
-    assert.equal(binding.capabilities.canTrade, false);
-    assert.equal(binding.capabilities.canQuote, false);
-    assert.equal(
-      binding.capabilities.tradeBlockReason,
-      'general_trading_not_implemented',
-    );
-    assert.match(
-      CAPABILITY_BLOCK_MESSAGE[binding.capabilities.tradeBlockReason!],
-      /준비 중/,
-    );
+    assert.equal(binding.capabilities.canTrade, true);
+    assert.equal(binding.capabilities.canQuote, true);
+    assert.equal(binding.capabilities.canCancelOrder, true);
+    assert.equal(binding.capabilities.tradeBlockReason, null);
   });
 
   it('a general account cannot exchange either', () => {

@@ -10,22 +10,31 @@ jest.mock('../generated/prisma/client', () => {
       us_stock: 'us_stock',
       crypto: 'crypto',
     },
+    OrderSide: {
+      buy: 'buy',
+      sell: 'sell',
+    },
   };
 });
 
-import { Prisma } from '../generated/prisma/client';
+import { OrderSide, Prisma } from '../generated/prisma/client';
 import { LimitOrderCandleEvidenceService } from './limit-order-candle-evidence.service';
 import type { EligibleClosedCandle } from './limit-order-candle-evidence.service';
 
 const d = (value: string | number) => new Prisma.Decimal(value);
 
-function candle(openIso: string, low: string): EligibleClosedCandle {
+function candle(
+  openIso: string,
+  low: string,
+  high = low,
+): EligibleClosedCandle {
   const open = new Date(openIso);
   return {
     marketCandleId: `candle-${openIso}`,
     openTime: open,
     closeTime: new Date(open.getTime() + 300_000),
     low: d(low),
+    high: d(high),
     sourceProvider: 'binance',
     sourceUpdatedAt: open,
     finalizedAt: open,
@@ -95,6 +104,34 @@ describe('LimitOrderCandleEvidenceService.selectTriggerCandleForOrder', () => {
       limitPrice: d('100'),
       seasonEndAt,
     });
+    expect(match?.openTime.toISOString()).toBe('2026-07-22T12:05:00.000Z');
+  });
+
+  it('uses candle high for a limit sell and picks the earliest reached window', () => {
+    const candles = [
+      candle('2026-07-22T12:05:00.000Z', '80', '99'),
+      candle('2026-07-22T12:10:00.000Z', '85', '101'),
+      candle('2026-07-22T12:15:00.000Z', '90', '110'),
+    ];
+    const match = service.selectTriggerCandleForOrder(candles, {
+      submittedAt: new Date('2026-07-22T12:00:00.000Z'),
+      limitPrice: d('100'),
+      side: OrderSide.sell,
+      seasonEndAt,
+    });
+    expect(match?.openTime.toISOString()).toBe('2026-07-22T12:10:00.000Z');
+  });
+
+  it('allows a participant-less general order without a season end horizon', () => {
+    const match = service.selectTriggerCandleForOrder(
+      [candle('2026-07-22T12:05:00.000Z', '80', '100')],
+      {
+        submittedAt: new Date('2026-07-22T12:00:00.000Z'),
+        limitPrice: d('100'),
+        side: OrderSide.sell,
+        seasonEndAt: null,
+      },
+    );
     expect(match?.openTime.toISOString()).toBe('2026-07-22T12:05:00.000Z');
   });
 });

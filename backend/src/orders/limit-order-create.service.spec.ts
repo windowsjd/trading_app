@@ -66,6 +66,15 @@ jest.mock('../generated/prisma/client', () => {
       ended: 'ended',
       settled: 'settled',
     },
+    TradingAccountMode: {
+      general: 'general',
+      season: 'season',
+    },
+    TradingAccountStatus: {
+      active: 'active',
+      suspended: 'suspended',
+      closed: 'closed',
+    },
     SnapshotReason: {
       season_join: 'season_join',
       exchange_executed: 'exchange_executed',
@@ -313,7 +322,11 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
     });
     prisma.position.findUnique.mockResolvedValueOnce(
       input.positionQuantity
-        ? { quantity: new Prisma.Decimal(input.positionQuantity) }
+        ? {
+            seasonParticipantId: 'sp-1',
+            tradingAccountId: 'trading-account-1',
+            quantity: new Prisma.Decimal(input.positionQuantity),
+          }
         : null,
     );
   };
@@ -438,7 +451,6 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
     });
 
     it.each([
-      [{ side: 'sell' }, 'LIMIT_BUY_ONLY'],
       [{ limitPrice: undefined }, 'INVALID_LIMIT_PRICE'],
       [{ limitPrice: '0' }, 'INVALID_LIMIT_PRICE'],
       [{ limitPrice: '-1' }, 'INVALID_LIMIT_PRICE'],
@@ -1118,7 +1130,10 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             quoteId: 'quote-limit-1',
-            seasonParticipant: { userId: 'user-1' },
+            OR: [
+              { seasonParticipant: { userId: 'user-1' } },
+              { tradingAccount: { userId: 'user-1' } },
+            ],
           }) as never,
         }),
       );
@@ -1341,7 +1356,10 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             quoteId: 'quote-limit-1',
-            seasonParticipant: { userId: 'user-1' },
+            OR: [
+              { seasonParticipant: { userId: 'user-1' } },
+              { tradingAccount: { userId: 'user-1' } },
+            ],
           }) as never,
         }),
       );

@@ -12,6 +12,133 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 일반계정 시장가·지정가 거래 공통 코어 활성화 (2026-08-18, WORK-ID GENERAL-ACCOUNT-TRADING-CORE-V1)
+
+**기준 커밋** `3be4b1e68b80bd3ff178bdec567dec012bc00213`
+(작업 시작 시 `origin/main` = 로컬 HEAD, `git fetch` 완료, working tree clean).
+이번 변경은 아직 커밋하지 않은 working tree 변경이다.
+
+#### 목표와 설계
+
+일반계정 전용 주문 서비스·API·matcher를 만들지 않았다. 기존
+`/api/v1/trading-accounts/:accountId/orders*`와 시즌 주문 계산·견적·체결 코어를
+`TradingContext`로 일반화했다. context가 `mode`, `tradingAccountId`, 계정 상태,
+nullable participant/season, `feeRate`를 확정한 뒤 공통 코어에 전달한다.
+
+- season context는 기존 `SeasonParticipant`, effective season active/기간,
+  participant 거래 상태·excluded 여부, `Season.tradeFeeRate`를 계속 요구한다.
+- general context는 소유한 active general account와 KRW/USD wallet·최초 지급 ledger·
+  performance origin 무결성만 요구하며 season/participant/ranking을 조회하거나
+  요구하지 않는다.
+- general 수수료는 현재 시즌과 독립된 단일 config
+  `GENERAL_TRADE_FEE_RATE`(기본 `0.001000`, 0 이상 1 이하, 소수 6자리 이하)에서
+  결정한다. 별도 canonical general 값이 없어서 저장소의 season/dev fixture가
+  일관되게 사용하는 가상거래 0.1%를 독립 기본값으로 채택했고, 선택 근거와 운영
+  override 지점을 policy 문서에 기록했다. season 수수료 source는 바꾸지 않았다.
+- general FX는 의도적으로 열지 않았다. USD 자동환전도 추가하지 않았다.
+
+#### DB와 account scope
+
+- migration `20260818120000_enable_general_account_trading`은 기존 season row를
+  UPDATE하지 않는 DDL-only 전환이다. `Order.seasonParticipantId`와
+  `Position.seasonParticipantId`를 nullable로 바꾸고, sell-side 지정가 예약을 위한
+  `Order.reservedQuantity`/`Position.reservedQuantity`, sell quote net 금액,
+  candle high evidence를 additive하게 추가했다.
+- season Order/Position/Quote는 participant와 `tradingAccountId`가 일치해야 하고,
+  general row는 `tradingAccountId`가 필수이며 participant가 반드시 null이어야 한다.
+  새 writer와 read path 모두 이 규칙을 검사하고 pollution/mismatch는
+  `GENERAL_ACCOUNT_INTEGRITY` 등 구조적 오류로 fail-closed한다.
+- Position lookup/update의 실제 격리 기준은 `tradingAccountId + assetId`다. 동일
+  사용자의 general/season A/season B 보유분과 멱등성 key가 서로 섞이지 않는다.
+
+#### 주문·지정가 lifecycle
+
+- durable quote, TTL/ownership/account binding/request hash, committed replay first,
+  execute-time repricing/max change, market calendar, provider freshness, settlement
+  currency, wallet debit/credit, fee ledger, rollback, stored response replay를 season과
+  general이 같은 경로로 사용한다.
+- 시장가 buy/sell과 지정가 buy/sell을 모두 general에서 지원한다. limit buy는 cash,
+  limit sell은 position quantity를 원자적으로 예약한다. cancel은 active/suspended/
+  closed 소유자에게 허용하며 cash/quantity를 order side에 맞춰 반환한다.
+- 기존 matcher 하나가 season/general candidate를 처리한다. buy는 가격이 limit 이하,
+  sell은 limit 이상일 때만 fill하며 candle trigger는 buy low/sell high를 사용한다.
+  fill transaction에서 account/quote/wallet/position scope와 account 상태를 다시
+  검증한다. inactive general은 신규 fill을 skip하지만 cancel/release는 가능하다.
+- general order ownership은 participant가 아니라
+  `Order.tradingAccountId -> TradingAccount.userId`로 판정한다. legacy season API와
+  account-scoped response shape는 유지했다.
+
+#### 일반 성과/TWR와 동시성
+
+- general 체결은 `SnapshotReason.order_executed`, null participant, 완전한 general
+  performance 필드로 ordinary TWR advance를 기록한다. buy/sell/fee는 외부자금
+  boundary가 아니며 cumulative funding을 늘리지 않는다.
+- general 체결은 `SeasonParticipant.totalAssetKrw/currentRank/totalFillCount`, ranking,
+  settlement input을 갱신하지 않는다. season fill의 기존 snapshot/ranking 경로는
+  mode guard 안에서 그대로 유지한다.
+- market/limit fill은 general TradingAccount row를 `FOR UPDATE`로 잠그고, lock을
+  얻은 뒤 DB `clock_timestamp()`를 snapshot 시간으로 사용한다. 서로 다른 통화의
+  동시 주문과 광고 보상 같은 external funding이 TWR snapshot 순서를 역전시키지
+  않도록 한 account 단위 fence다. 기존 wallet/position/order 원자 갱신과
+  committed replay 우선순위는 유지했다.
+
+#### Frontend
+
+- active general은 `canTrade=true`, `canQuote=true`, `canCancelOrder=true`,
+  `canExchange=false`; suspended/closed는 read와 기존 limit cancel만 가능하다.
+- 기존 `OrderScreen`과 account-scoped quote/create/cancel API를 general도 그대로
+  사용한다. 시장가/지정가 buy/sell, sell 예약수량·예상 순수령액, 주문 목록 row의
+  체결·예약 상세, position 표시를 연결했다. General Home의 `주문 내역 보기`는
+  accountId를 기존 Record 목록 route에 고정하며 backend 상세 route도 같은 scope로
+  유지한다. general 전용 주문 화면이나 query/state framework는 없다.
+- 기존 `{accountId, scopeEpoch}` gate, 진입 account 고정, stale response 차단,
+  행위 account만 invalidate하는 cache isolation은 유지했다.
+- 일반 투자 문구는 매매 가능/환전 준비 중을 구분한다. ranking/tier/season reward는
+  general에 노출하지 않는다.
+
+#### 검증
+
+- backend 정적 게이트: Prisma format/validate/generate, migration status(51개,
+  up to date), account lint와 변경 주문 코어 명시 ESLint, typecheck, build 모두 통과.
+- backend unit: `pnpm test --runInBand` — 183 suites/2568 tests 통과,
+  env-gated 34 suites/38 tests skip. E2E `126/126` 통과.
+- PostgreSQL: general trading `1/1`, account scope+replay `2/2`, matcher `1/1`,
+  execute+limit replay `2/2`, reservation 재실행 `1/1` 통과. general suite가 market
+  buy/sell(일반계정 KRW wallet + KRX 국내주식 시장가 buy 포함),
+  idempotency/account·user isolation, limit buy/sell reserve/cancel/matcher
+  fill/inactive skip, 상태 gate, market/stale/quote/reprice 오류, wallet/position/ledger,
+  TWR snapshot 및 season ranking 무변경을 확인한다. wrong account, general row의
+  participant pollution, quote/order scope mismatch, wallet scope mismatch도 주입해
+  부분 성공 없이 `GENERAL_ACCOUNT_INTEGRITY`로 fail-closed됨을 검증했다.
+- frontend: `npm run check`(lint+typecheck+38/38 test files)와
+  `npm run export:web` 통과.
+- `git diff --check` 및 최종 전체 검색/리뷰를 수행했다.
+
+로컬 개발 DB 최초 적용 전 fingerprint는 캡처하지 못했으므로 그 DB 자체의 전/후
+비교라고 주장하지 않는다. 대신 완전히 격리된 임시 PostgreSQL database에 직전 50개
+migration만 적용하고 대표 season Order/Position을 넣은 뒤 새 migration을 실제
+적용했다. ID, participant/account ID, asset, 수량, 가격·gross/fee/net, 상태,
+timestamp를 포함한 fingerprint와 count가 전/후 완전히 같았다(`orders=1`,
+`positions=1`). 검증용 database/schema와 `/tmp` 파일은 결과 확인 뒤 삭제했다.
+DDL-only/no UPDATE·DELETE·TRUNCATE·DROP COLUMN schema contract와 기존 season
+account-scope/matcher/E2E 회귀도 함께 통과했다.
+
+#### 최종 자체 검토에서 보완한 점과 남은 범위
+
+- 처음의 general account `FOR SHARE`가 서로 다른 wallet 통화의 동시 TWR writer를
+  직렬화하지 못함을 발견해 `FOR UPDATE`로 강화했고, lock 대기 전에 만든 앱 시간을
+  쓰지 않도록 post-lock DB 시간을 사용했다.
+- matcher의 최종 Order/Position writer에도 account/participant 조건을 넣고,
+  sell high evidence와 관련 legacy 명칭/주석을 재검토했다.
+- 최종 read/UI 추적에서 Record 주문 route가 seasonId만 받아 general 주문 목록으로
+  진입할 수 없음을 발견했다. 기존 route를 `seasonId | accountId` subject로
+  일반화하고 General Home에서 고정 accountId로 연결했으며, 다른 계정으로 전환해도
+  polling/cancel 대상이 바뀌지 않는 resolver test를 추가했다.
+- 의도적 제외: general FX, 광고 provider 실제 연동, general ranking/reward,
+  실제 거래소 주문, partial fill/order book/새 matching engine, 계정 간 자금 이동.
+
+---
+
 ### 작업 단위: 투자 모드 선택 진입 + 일반계정 접근 완성 (2026-08-10, 작업 13, WORK-ID TRADING-MODE-ENTRY-AND-GENERAL-ACCOUNT-ACCESS-V1)
 
 **기준 커밋** `bce0c52c747813a6d86366f27b6d3f523da4ed67` (= 지시받은 기준 =
@@ -750,13 +877,14 @@ migration이 없고 backend 제품 코드가 그대로이므로 **frontend만 �
 그래도 순서는 지킨다: (1) `prisma migrate status` — 미적용 0 확인,
 (2) repair 5종 + `audit-general` dry-run → findings 0 확인(0이면 apply 하지 않는다),
 (3) backend 재배포는 선택(변경 없음), (4) frontend 배포,
-(5) 스모크: 로그인 → 계정 자동 선택 → season/general 전환 → 주문·취소·지갑 반영
-→ 일반계정 거래·환전 차단 → 로그아웃 후 다른 사용자 캐시 격리.
+(5) 당시 스모크: 로그인 → 계정 자동 선택 → season/general 전환 → 주문·취소·지갑 반영
+→ 일반계정 거래·환전 차단 → 로그아웃 후 다른 사용자 캐시 격리. 현재는 2026-08-18
+작업으로 일반계정 주문이 활성화됐고 환전만 차단된다.
 
 **남은 제한사항**
 
-- 일반계정 주문·환전은 여전히 backend 미구현이며, 프런트 차단은 UX용일 뿐
-  서버 게이트가 그대로 권위를 갖는다.
+- 당시 일반계정 주문·환전은 backend 미구현이었다. 2026-08-18에 주문은
+  공통 코어로 활성화됐고, 환전만 계속 차단된다.
 - 광고 provider 어댑터 없음(기본 비활성). eligibility/claim 화면은 아직 없고,
   claim wrapper와 무효화 경로만 준비되어 있다.
 - 주문 **상세** 전용 화면은 여전히 없다(백엔드 route는 있다). 목록이 상세 정보를
@@ -867,7 +995,8 @@ React Navigation, `@tanstack/react-query`, axios, AsyncStorage). **신규 전역
 - **capability.** mode·status 두 사실에서 파생된 작은 레코드. status를 mode보다
   **먼저** 본다 — 종료된 general 계정은 "준비 중"이 아니라 "종료"다. 서버 게이트를
   완화하는 경로는 없다. 취소는 예약 해제이므로 suspended/closed에서도 허용(백엔드
-  계약과 동일). 일반계정 매매·환전은 준비 중으로 표시하고 요청 자체를 보내지 않는다.
+  계약과 동일). 당시 일반계정 매매·환전은 준비 중으로 표시했다. 2026-08-18부터
+  active general 매매는 허용하고 환전만 준비 중으로 남긴다.
 - **오류.** 구조적 무결성 코드 16종은 빈 데이터가 아니라 전용 오류 상태로 간다.
   `GENERAL_ACCOUNT_*_NOT_IMPLEMENTED`는 무결성 집합에 넣지 않는다(준비 중 안내이지
   손상이 아니다). 선택 계정 404는 존재를 노출하지 않고 목록 재조회 + fallback.
@@ -962,8 +1091,9 @@ selectionStorage,integrityErrors,TradingAccountContext}.ts(x)`,
 - 프런트엔드는 `PortfolioScreen`을 account-scoped로 전환했다. 지갑·주문 목록·
   주문 상세·포지션 화면은 query-key factory와 account-scoped API 계층이 준비되어
   있으나 화면 전환은 아직 하지 않았다(기존 시즌 동작 그대로 유지, 회귀 없음).
-- 일반계정 거래·환전은 backend에서 여전히 미구현이고 프런트는 준비 중으로만
-  표시한다. 광고 provider 연동과 실제 reward 지급도 그대로 닫혀 있다.
+- 당시 일반계정 거래·환전은 backend에서 미구현이었고 프런트는 준비 중으로만
+  표시했다. 2026-08-18부터 주문은 공통 코어로 활성화됐으며 FX와 광고 provider
+  연동·실제 reward 지급은 계속 닫혀 있다.
 - e2e 실행 환경(`.env.local` 플래그)이 정리되지 않아 e2e는 여전히 기준선 실패를
   안고 있다.
 
@@ -1079,8 +1209,8 @@ reward-grant gate 개방, 경쟁 순위(1,2,2,4), 랭킹 계산 규칙·티어 �
 시즌 수익률의 TWR 전환, SeasonParticipant 캐시 컬럼/모델 제거,
 `SeasonRanking.seasonParticipantId` nullable 전환, `tradingAccountId` NOT NULL
 강화, participant FK 제거, 랭킹 이벤트 로그 테이블, Redis 분산락, 메시지
-브로커, 작업 큐. `GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED`·
-`GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED` 차단 유지.
+브로커, 작업 큐. 당시 일반 주문·FX 차단 유지(일반 주문 차단은 2026-08-18 해제,
+`GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`만 현재 유지).
 
 **검증**
 
@@ -1439,7 +1569,7 @@ null/불일치 상태에서도 거래 허용, ② account-scoped 금융 조회�
 - account-scoped API: `/api/v1/trading-accounts/:accountId/orders`(목록/상세/
   quote/생성/취소 — execute는 legacy에도 없어 미노출)·`/positions`(목록).
   조회는 status 무관 소유자 허용, 타인/미존재 계정·타 계정 orderId 동일 404,
-  general 신규 주문 409 `GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED`, suspended/
+  당시 general 신규 주문은 미구현 409, suspended/
   closed 신규 quote/주문 409 `TRADING_ACCOUNT_NOT_ACTIVE`. 취소는 보호
   동작이라 status gate 없음(scope 손상 시 repair-required 중단 + rollback).
   legacy 주문/포지션 API 계약 불변, 같은 서비스 코어 공유(수수료·체결가·지갑/
@@ -2541,6 +2671,47 @@ cd frontend && npm run typecheck && npm test
 
 ## 2. 최신 작업 시간순 기록
 
+### 2026-08-18 — 일반계정 시장가·지정가 거래 공통 코어 활성화
+
+- 기준 `3be4b1e68b80bd3ff178bdec567dec012bc00213`(fetch한 `origin/main`, 시작
+  working tree clean). 별도 general 주문 API/서비스/matcher 없이 기존 account-scoped
+  `/api/v1` 주문 코어를 nullable season/participant와 확정 fee를 가진
+  `TradingContext`로 일반화했다. season gate와 `Season.tradeFeeRate`는 유지하고,
+  general은 season과 독립된 active account/foundation/wallet integrity 및 단일
+  `GENERAL_TRADE_FEE_RATE`(기본 0.001000)를 사용한다.
+- DDL-only migration으로 Order/Position participant를 nullable화하고 sell-side
+  cash가 아닌 quantity reservation, quote net amount, candle high evidence를
+  additive하게 추가했다. season row는 participant/account 일치, general row는
+  account 필수/participant null을 모든 writer와 reader에서 fail-closed 검증한다.
+- 시장가 buy/sell, 지정가 buy/sell quote/create, cash·position reservation,
+  matcher fill, active/suspended/closed cancel/release, account-scoped list/detail/
+  positions, durable quote·execute repricing·market/provider policy·idempotent replay를
+  동일 코어로 제공한다. general matcher는 season/participant를 요구하지 않고
+  inactive account fill을 skip한다.
+- general fill은 account `FOR UPDATE` + post-lock DB clock으로 snapshot ordering을
+  직렬화하고, null participant의 `order_executed` ordinary TWR snapshot을 남긴다.
+  거래·수수료는 external funding이 아니며 ranking/participant/settlement를 전혀
+  갱신하지 않는다. season의 기존 snapshot/ranking 동작은 mode guard 안에 유지했다.
+- frontend active general capability를 trade/quote/cancel 가능, exchange 불가로
+  열었다. 기존 OrderScreen/accountId endpoint와 scopeEpoch stale-response 방어를
+  재사용하고 limit sell/예약·주문기록 UI 및 “매매 가능, 환전 준비 중” 문구를
+  반영했다. 최종 read-path review에서 seasonId 전용이던 Record 주문 route를
+  발견해 General Home의 고정 accountId 진입도 처리하도록 일반화했다.
+- Prisma format/validate/generate/status(51 migrations up to date), backend lint/
+  typecheck/build, unit 2568 passed, E2E 126/126, general/account-scope/replay/matcher/
+  reservation PostgreSQL suites, frontend check 38/38 test files, export:web,
+  diff check가 통과했다. general PostgreSQL suite에는 KRW wallet + KRX 국내주식
+  시장가 buy와 participant/account/quote/wallet 오염 fail-closed 주입도 포함했다.
+  로컬 개발 DB의 최초 적용 전 fingerprint는 캡처하지 못했지만, 별도 임시
+  PostgreSQL database를 직전 50 migrations 상태로 만들고 대표 season
+  Order/Position을 seed한 뒤 새 migration을 실제 적용해 count/ID/participant·account/
+  수량/금액/상태/timestamp fingerprint 불변을 확인했다. migration no-DML contract와
+  기존 season PostgreSQL/E2E 회귀도 함께 통과했다.
+- 최종 review에서 general account lock을 `FOR SHARE`에서 `FOR UPDATE`로 강화하고
+  post-lock DB timestamp, 최종 writer account 조건을 보완했다. general FX/자동환전,
+  실제 광고 provider, general ranking/reward, 실제 거래소 주문, partial fill/order
+  book은 계속 범위 밖이다.
+
 ### 2026-08-10 — 투자 모드 선택 진입 + 일반계정 접근 완성 (작업 13)
 
 - **새 로그인이 더 이상 계정을 대신 골라주지 않는다.** "계정 있음 → 즉시 Home"
@@ -2902,8 +3073,9 @@ cd frontend && npm run typecheck && npm test
   미지급. 시즌계정 지급 차단, USD 미지급, initialCapitalKrw 불변.
   **실제 광고 provider 미확정 — 운영 registry 비어 있어 503
   `AD_REWARD_PROVIDER_UNAVAILABLE`, fake verifier는 테스트 전용.**
-- 일반모드 주문·환전은 계속 차단(`GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED`/
-  `GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`), TWR·투자손익·프런트엔드 미구현.
+- 당시 일반모드 주문·환전은 모두 차단됐고 TWR·투자손익·프런트엔드도 미구현이었다.
+  2026-08-18 현재 주문·TWR·프런트엔드는 구현됐으며
+  `GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`만 유지한다.
   read-only 운영 점검 `pnpm trading-accounts:audit-general` 추가.
 - 검증: unit 2,315 pass, opt-in DB 통합 16종 직렬 PASS(신규 general-account·
   order-replay-and-cancel-scope 포함), e2e 119/122(실패 3건은 기준 커밋
@@ -2932,7 +3104,8 @@ cd frontend && npm run typecheck && npm test
   재검증 + suspended/closed 계정 skip.
 - account-scoped 주문·포지션 API 추가(`…/:accountId/orders` 목록/상세/quote/
   생성/취소, `…/positions` 목록; 타인·미존재·타 계정 orderId 동일 404,
-  general 409, suspended/closed 신규 주문 409·조회 허용·취소 허용). legacy
+  당시 general 미구현 409, suspended/closed 신규 주문 409·조회 허용·취소 허용).
+  일반 주문 차단은 2026-08-18 공통 코어 활성화로 대체됐다. legacy
   주문·포지션 API 계약 불변, 같은 서비스 코어 공유. 운영 스크립트
   `trading-accounts:repair-trading-scope`(기본 dry-run, mismatch 보고만,
   apply 후 잔여 시 exit 1) 추가. 계약 문서

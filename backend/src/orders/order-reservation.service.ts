@@ -35,7 +35,7 @@ export class OrderReservationService {
   async reserveForLimitBuy(
     tx: ReservationTransactionClient,
     input: {
-      seasonParticipantId: string;
+      seasonParticipantId: string | null;
       /** VERIFIED trading account id (participant link). */
       tradingAccountId: string;
       currencyCode: CurrencyCode;
@@ -44,12 +44,20 @@ export class OrderReservationService {
     },
   ): Promise<{ walletId: string }> {
     const wallet = await tx.cashWallet.findUnique({
-      where: {
-        seasonParticipantId_currencyCode: {
-          seasonParticipantId: input.seasonParticipantId,
-          currencyCode: input.currencyCode,
-        },
-      },
+      where:
+        input.seasonParticipantId === null
+          ? {
+              tradingAccountId_currencyCode: {
+                tradingAccountId: input.tradingAccountId,
+                currencyCode: input.currencyCode,
+              },
+            }
+          : {
+              seasonParticipantId_currencyCode: {
+                seasonParticipantId: input.seasonParticipantId,
+                currencyCode: input.currencyCode,
+              },
+            },
       select: { id: true, seasonParticipantId: true, tradingAccountId: true },
     });
 
@@ -101,7 +109,7 @@ export class OrderReservationService {
     tx: ReservationTransactionClient,
     input: {
       walletId: string;
-      seasonParticipantId: string;
+      seasonParticipantId: string | null;
       /** VERIFIED trading account id (order/wallet verified scope). */
       tradingAccountId: string;
       currencyCode: CurrencyCode;
@@ -140,7 +148,7 @@ export class OrderReservationService {
     tx: ReservationTransactionClient,
     input: {
       walletId: string;
-      seasonParticipantId: string;
+      seasonParticipantId: string | null;
       tradingAccountId: string;
       currencyCode: CurrencyCode;
       amount: string;

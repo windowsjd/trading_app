@@ -48,7 +48,9 @@ export type RecordStackParamList = {
   RecordSeasonList: undefined;
   RecordSeasonDetail: { seasonId: string };
   RecordProfitAnalysis: { seasonId: string };
-  RecordOrderList: { seasonId: string };
+  RecordOrderList:
+    | { seasonId: string; accountId?: never }
+    | { accountId: string; seasonId?: never };
   RecordExchangeList: { seasonId: string };
 };
 

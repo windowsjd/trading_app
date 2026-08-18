@@ -922,7 +922,7 @@ pipeline only as a consumer:
   simply not a trigger until it lands.
 - Crypto and KIS domestic produce closed 5m candles reliably; KIS US only when
   delayed US candles are enabled, so US path B is effective only then —
-  otherwise US limit buys fill via path A (fresh snapshot) alone.
+  otherwise US limit orders fill via path A (fresh snapshot) alone.
 - Path B validates each candle's window against the market session
   (`resolveRegularSessionForEvent`) and the calendar, fail-closed on gaps, so a
   holiday / uncovered candle never triggers a fill.

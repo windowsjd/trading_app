@@ -1,12 +1,12 @@
 /**
- * Feature flag for the limit-buy order foundation (phase 1: reservation
- * only, no automatic matching). Default OFF — production should keep it off
- * unless operators intentionally expose limit-buy registration.
+ * Feature flag for limit-order registration and matching. Default OFF —
+ * production should keep it off unless operators intentionally expose limit
+ * buy/sell registration.
  *
  * Scope when disabled: new limit QUOTE/CREATE requests are rejected with
  * LIMIT_ORDER_DISABLED. Cancel and season-end / participant-exclusion
- * cleanup stay available regardless of the flag so already-reserved cash
- * can always be released.
+ * cleanup stay available regardless of the flag so already-reserved cash or
+ * position quantity can always be released.
  */
 
 /** The only accepted spellings, compared after trim + lowercase. */

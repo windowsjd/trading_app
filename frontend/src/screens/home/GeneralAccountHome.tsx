@@ -47,6 +47,7 @@ type Props = {
   account: TradingAccountDto;
   capabilities: TradingAccountCapabilities | null;
   onOpenLedger: () => void;
+  onOpenOrders: () => void;
 };
 
 const POSITIONS_PREVIEW_LIMIT = 5;
@@ -61,6 +62,7 @@ export default function GeneralAccountHome({
   account,
   capabilities,
   onOpenLedger,
+  onOpenOrders,
 }: Props) {
   const accountId = account.id;
 
@@ -149,9 +151,11 @@ export default function GeneralAccountHome({
   const portfolio = portfolioQuery.data;
   const summary = portfolio.summary;
   const positions = positionsQuery.data?.positions ?? [];
-  const tradeNotice =
-    capabilities && !capabilities.canTrade && capabilities.tradeBlockReason
-      ? CAPABILITY_BLOCK_MESSAGE[capabilities.tradeBlockReason]
+  const capabilityNotice =
+    capabilities &&
+    !capabilities.canExchange &&
+    capabilities.exchangeBlockReason
+      ? CAPABILITY_BLOCK_MESSAGE[capabilities.exchangeBlockReason]
       : null;
 
   return (
@@ -244,6 +248,9 @@ export default function GeneralAccountHome({
             <Pressable style={styles.retryButton} onPress={onOpenLedger}>
               <Text style={styles.retryText}>원장 보기</Text>
             </Pressable>
+            <Pressable style={styles.retryButton} onPress={onOpenOrders}>
+              <Text style={styles.retryText}>주문 내역 보기</Text>
+            </Pressable>
           </>
         )}
       </View>
@@ -277,13 +284,13 @@ export default function GeneralAccountHome({
         )}
       </View>
 
-      {tradeNotice ? (
+      {capabilityNotice ? (
         <View
           testID={TEST_IDS.tradingAccount.capabilityNotice}
           style={styles.noticeBox}
         >
-          <Text style={styles.warningTitle}>준비 중인 기능</Text>
-          <Text style={styles.warningText}>{tradeNotice}</Text>
+          <Text style={styles.warningTitle}>환전 안내</Text>
+          <Text style={styles.warningText}>{capabilityNotice}</Text>
         </View>
       ) : null}
     </ScrollView>

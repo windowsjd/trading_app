@@ -121,15 +121,18 @@ export function isSubmittedLimitOrder(
  */
 export function getLimitOrderSuccessMessage(
   policy?: LimitOrderExecutionPolicyDto | null,
+  side: 'buy' | 'sell' = 'buy',
 ) {
+  const reservation = side === 'buy' ? '금액' : '수량';
+  const trigger = side === 'buy' ? '이하' : '이상';
   if (!policy?.autoExecutionEnabled) {
-    return '현재 단계에서는 주문이 미체결 상태로 등록됩니다. 예약된 금액은 주문을 취소하면 다시 사용할 수 있습니다.';
+    return `주문이 미체결 상태로 등록됩니다. 예약된 ${reservation}은 주문을 취소하면 다시 사용할 수 있습니다.`;
   }
-  return '유효한 체결가격이 지정가 이하가 되면 전량 자동 체결됩니다. 체결까지 수 분 지연될 수 있으며, 주문장 유동성과 거래량은 반영하지 않습니다.';
+  return `유효한 체결가격이 지정가 ${trigger}가 되면 전량 자동 체결됩니다. 체결까지 수 분 지연될 수 있으며, 주문장 유동성과 거래량은 반영하지 않습니다.`;
 }
 
 /**
- * Quote-time estimates for an unfilled limit buy. These are the ONLY figures
+ * Quote-time estimates for an unfilled limit order. These are the ONLY figures
  * that may be presented as a submitted order's expected cost, and every label
  * rendering them must say 예상/예약 — nothing here is an execution result.
  * Returns null for a market quote, which has no pinned reservation basis.
@@ -141,14 +144,22 @@ export function getLimitQuoteEstimateDisplay(
     | 'quotedFeeAmount'
     | 'quotedFeeRate'
     | 'quotedReservedAmount'
+    | 'quotedNetAmount'
     | 'reservedAmount'
+    | 'reservedQuantity'
     | 'currencyCode'
   > | null,
 ) {
   if (!quote) return null;
 
   const reserved = quote.quotedReservedAmount ?? quote.reservedAmount;
-  if (!quote.quotedGrossAmount && !quote.quotedFeeAmount && !reserved) {
+  if (
+    !quote.quotedGrossAmount &&
+    !quote.quotedFeeAmount &&
+    !quote.quotedNetAmount &&
+    !reserved &&
+    !quote.reservedQuantity
+  ) {
     return null;
   }
 
@@ -163,6 +174,11 @@ export function getLimitQuoteEstimateDisplay(
     ),
     quotedFeeRate: displayValue(quote.quotedFeeRate),
     reservedAmount: formatCurrency(reserved, quote.currencyCode),
+    expectedNetAmount: formatCurrency(
+      quote.quotedNetAmount,
+      quote.currencyCode,
+    ),
+    reservedQuantity: displayValue(quote.reservedQuantity),
   };
 }
 
@@ -244,6 +260,9 @@ export function getOrderSuccessDisplay(
     reservedAmount: formatCurrency(
       execution.reservedAmount ?? order.reservedAmount,
       currencyCode,
+    ),
+    reservedQuantity: displayValue(
+      execution.reservedQuantity ?? order.reservedQuantity,
     ),
     reservationFeeRate: displayValue(execution.reservationFeeRate),
     isAlreadyExecuted: execution.state === 'already_executed',

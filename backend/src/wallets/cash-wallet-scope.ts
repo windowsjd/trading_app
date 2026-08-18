@@ -52,7 +52,8 @@ export type CashWalletScopeCandidate = {
 };
 
 export type ExpectedCashWalletScope = {
-  seasonParticipantId: string;
+  /** Null for a general account, which must never carry participant scope. */
+  seasonParticipantId: string | null;
   /** The VERIFIED trading account (participant link / owned account id). */
   tradingAccountId: string;
 };
@@ -71,7 +72,7 @@ export function assertCashWalletTradingAccountScope<
   if (wallet.seasonParticipantId !== expected.seasonParticipantId) {
     throwScopeError(
       cashWalletScopeErrorCodes.FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH,
-      'Cash wallet belongs to a different season participant.',
+      'Cash wallet participant scope does not match the trading context.',
     );
   }
 

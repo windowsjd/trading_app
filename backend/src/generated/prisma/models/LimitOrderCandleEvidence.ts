@@ -28,11 +28,13 @@ export type AggregateLimitOrderCandleEvidence = {
 
 export type LimitOrderCandleEvidenceAvgAggregateOutputType = {
   triggerLowPrice: runtime.Decimal | null
+  triggerHighPrice: runtime.Decimal | null
   policyVersion: number | null
 }
 
 export type LimitOrderCandleEvidenceSumAggregateOutputType = {
   triggerLowPrice: runtime.Decimal | null
+  triggerHighPrice: runtime.Decimal | null
   policyVersion: number | null
 }
 
@@ -44,6 +46,7 @@ export type LimitOrderCandleEvidenceMinAggregateOutputType = {
   openTime: Date | null
   closeTime: Date | null
   triggerLowPrice: runtime.Decimal | null
+  triggerHighPrice: runtime.Decimal | null
   executionPricePolicy: string | null
   provider: string | null
   sourceName: string | null
@@ -61,6 +64,7 @@ export type LimitOrderCandleEvidenceMaxAggregateOutputType = {
   openTime: Date | null
   closeTime: Date | null
   triggerLowPrice: runtime.Decimal | null
+  triggerHighPrice: runtime.Decimal | null
   executionPricePolicy: string | null
   provider: string | null
   sourceName: string | null
@@ -78,6 +82,7 @@ export type LimitOrderCandleEvidenceCountAggregateOutputType = {
   openTime: number
   closeTime: number
   triggerLowPrice: number
+  triggerHighPrice: number
   executionPricePolicy: number
   provider: number
   sourceName: number
@@ -91,11 +96,13 @@ export type LimitOrderCandleEvidenceCountAggregateOutputType = {
 
 export type LimitOrderCandleEvidenceAvgAggregateInputType = {
   triggerLowPrice?: true
+  triggerHighPrice?: true
   policyVersion?: true
 }
 
 export type LimitOrderCandleEvidenceSumAggregateInputType = {
   triggerLowPrice?: true
+  triggerHighPrice?: true
   policyVersion?: true
 }
 
@@ -107,6 +114,7 @@ export type LimitOrderCandleEvidenceMinAggregateInputType = {
   openTime?: true
   closeTime?: true
   triggerLowPrice?: true
+  triggerHighPrice?: true
   executionPricePolicy?: true
   provider?: true
   sourceName?: true
@@ -124,6 +132,7 @@ export type LimitOrderCandleEvidenceMaxAggregateInputType = {
   openTime?: true
   closeTime?: true
   triggerLowPrice?: true
+  triggerHighPrice?: true
   executionPricePolicy?: true
   provider?: true
   sourceName?: true
@@ -141,6 +150,7 @@ export type LimitOrderCandleEvidenceCountAggregateInputType = {
   openTime?: true
   closeTime?: true
   triggerLowPrice?: true
+  triggerHighPrice?: true
   executionPricePolicy?: true
   provider?: true
   sourceName?: true
@@ -245,6 +255,7 @@ export type LimitOrderCandleEvidenceGroupByOutputType = {
   openTime: Date
   closeTime: Date
   triggerLowPrice: runtime.Decimal
+  triggerHighPrice: runtime.Decimal | null
   executionPricePolicy: string
   provider: string
   sourceName: string
@@ -285,6 +296,7 @@ export type LimitOrderCandleEvidenceWhereInput = {
   openTime?: Prisma.DateTimeFilter<"LimitOrderCandleEvidence"> | Date | string
   closeTime?: Prisma.DateTimeFilter<"LimitOrderCandleEvidence"> | Date | string
   triggerLowPrice?: Prisma.DecimalFilter<"LimitOrderCandleEvidence"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerHighPrice?: Prisma.DecimalNullableFilter<"LimitOrderCandleEvidence"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executionPricePolicy?: Prisma.StringFilter<"LimitOrderCandleEvidence"> | string
   provider?: Prisma.StringFilter<"LimitOrderCandleEvidence"> | string
   sourceName?: Prisma.StringFilter<"LimitOrderCandleEvidence"> | string
@@ -304,6 +316,7 @@ export type LimitOrderCandleEvidenceOrderByWithRelationInput = {
   openTime?: Prisma.SortOrder
   closeTime?: Prisma.SortOrder
   triggerLowPrice?: Prisma.SortOrder
+  triggerHighPrice?: Prisma.SortOrderInput | Prisma.SortOrder
   executionPricePolicy?: Prisma.SortOrder
   provider?: Prisma.SortOrder
   sourceName?: Prisma.SortOrder
@@ -327,6 +340,7 @@ export type LimitOrderCandleEvidenceWhereUniqueInput = Prisma.AtLeast<{
   openTime?: Prisma.DateTimeFilter<"LimitOrderCandleEvidence"> | Date | string
   closeTime?: Prisma.DateTimeFilter<"LimitOrderCandleEvidence"> | Date | string
   triggerLowPrice?: Prisma.DecimalFilter<"LimitOrderCandleEvidence"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerHighPrice?: Prisma.DecimalNullableFilter<"LimitOrderCandleEvidence"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executionPricePolicy?: Prisma.StringFilter<"LimitOrderCandleEvidence"> | string
   provider?: Prisma.StringFilter<"LimitOrderCandleEvidence"> | string
   sourceName?: Prisma.StringFilter<"LimitOrderCandleEvidence"> | string
@@ -346,6 +360,7 @@ export type LimitOrderCandleEvidenceOrderByWithAggregationInput = {
   openTime?: Prisma.SortOrder
   closeTime?: Prisma.SortOrder
   triggerLowPrice?: Prisma.SortOrder
+  triggerHighPrice?: Prisma.SortOrderInput | Prisma.SortOrder
   executionPricePolicy?: Prisma.SortOrder
   provider?: Prisma.SortOrder
   sourceName?: Prisma.SortOrder
@@ -371,6 +386,7 @@ export type LimitOrderCandleEvidenceScalarWhereWithAggregatesInput = {
   openTime?: Prisma.DateTimeWithAggregatesFilter<"LimitOrderCandleEvidence"> | Date | string
   closeTime?: Prisma.DateTimeWithAggregatesFilter<"LimitOrderCandleEvidence"> | Date | string
   triggerLowPrice?: Prisma.DecimalWithAggregatesFilter<"LimitOrderCandleEvidence"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerHighPrice?: Prisma.DecimalNullableWithAggregatesFilter<"LimitOrderCandleEvidence"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executionPricePolicy?: Prisma.StringWithAggregatesFilter<"LimitOrderCandleEvidence"> | string
   provider?: Prisma.StringWithAggregatesFilter<"LimitOrderCandleEvidence"> | string
   sourceName?: Prisma.StringWithAggregatesFilter<"LimitOrderCandleEvidence"> | string
@@ -387,6 +403,7 @@ export type LimitOrderCandleEvidenceCreateInput = {
   openTime: Date | string
   closeTime: Date | string
   triggerLowPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerHighPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executionPricePolicy: string
   provider: string
   sourceName: string
@@ -406,6 +423,7 @@ export type LimitOrderCandleEvidenceUncheckedCreateInput = {
   openTime: Date | string
   closeTime: Date | string
   triggerLowPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerHighPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executionPricePolicy: string
   provider: string
   sourceName: string
@@ -423,6 +441,7 @@ export type LimitOrderCandleEvidenceUpdateInput = {
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   closeTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   triggerLowPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerHighPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executionPricePolicy?: Prisma.StringFieldUpdateOperationsInput | string
   provider?: Prisma.StringFieldUpdateOperationsInput | string
   sourceName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -442,6 +461,7 @@ export type LimitOrderCandleEvidenceUncheckedUpdateInput = {
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   closeTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   triggerLowPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerHighPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executionPricePolicy?: Prisma.StringFieldUpdateOperationsInput | string
   provider?: Prisma.StringFieldUpdateOperationsInput | string
   sourceName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -460,6 +480,7 @@ export type LimitOrderCandleEvidenceCreateManyInput = {
   openTime: Date | string
   closeTime: Date | string
   triggerLowPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerHighPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executionPricePolicy: string
   provider: string
   sourceName: string
@@ -476,6 +497,7 @@ export type LimitOrderCandleEvidenceUpdateManyMutationInput = {
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   closeTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   triggerLowPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerHighPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executionPricePolicy?: Prisma.StringFieldUpdateOperationsInput | string
   provider?: Prisma.StringFieldUpdateOperationsInput | string
   sourceName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -493,6 +515,7 @@ export type LimitOrderCandleEvidenceUncheckedUpdateManyInput = {
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   closeTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   triggerLowPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerHighPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executionPricePolicy?: Prisma.StringFieldUpdateOperationsInput | string
   provider?: Prisma.StringFieldUpdateOperationsInput | string
   sourceName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -532,6 +555,7 @@ export type LimitOrderCandleEvidenceCountOrderByAggregateInput = {
   openTime?: Prisma.SortOrder
   closeTime?: Prisma.SortOrder
   triggerLowPrice?: Prisma.SortOrder
+  triggerHighPrice?: Prisma.SortOrder
   executionPricePolicy?: Prisma.SortOrder
   provider?: Prisma.SortOrder
   sourceName?: Prisma.SortOrder
@@ -543,6 +567,7 @@ export type LimitOrderCandleEvidenceCountOrderByAggregateInput = {
 
 export type LimitOrderCandleEvidenceAvgOrderByAggregateInput = {
   triggerLowPrice?: Prisma.SortOrder
+  triggerHighPrice?: Prisma.SortOrder
   policyVersion?: Prisma.SortOrder
 }
 
@@ -554,6 +579,7 @@ export type LimitOrderCandleEvidenceMaxOrderByAggregateInput = {
   openTime?: Prisma.SortOrder
   closeTime?: Prisma.SortOrder
   triggerLowPrice?: Prisma.SortOrder
+  triggerHighPrice?: Prisma.SortOrder
   executionPricePolicy?: Prisma.SortOrder
   provider?: Prisma.SortOrder
   sourceName?: Prisma.SortOrder
@@ -571,6 +597,7 @@ export type LimitOrderCandleEvidenceMinOrderByAggregateInput = {
   openTime?: Prisma.SortOrder
   closeTime?: Prisma.SortOrder
   triggerLowPrice?: Prisma.SortOrder
+  triggerHighPrice?: Prisma.SortOrder
   executionPricePolicy?: Prisma.SortOrder
   provider?: Prisma.SortOrder
   sourceName?: Prisma.SortOrder
@@ -582,6 +609,7 @@ export type LimitOrderCandleEvidenceMinOrderByAggregateInput = {
 
 export type LimitOrderCandleEvidenceSumOrderByAggregateInput = {
   triggerLowPrice?: Prisma.SortOrder
+  triggerHighPrice?: Prisma.SortOrder
   policyVersion?: Prisma.SortOrder
 }
 
@@ -650,6 +678,7 @@ export type LimitOrderCandleEvidenceCreateWithoutAssetInput = {
   openTime: Date | string
   closeTime: Date | string
   triggerLowPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerHighPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executionPricePolicy: string
   provider: string
   sourceName: string
@@ -667,6 +696,7 @@ export type LimitOrderCandleEvidenceUncheckedCreateWithoutAssetInput = {
   openTime: Date | string
   closeTime: Date | string
   triggerLowPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerHighPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executionPricePolicy: string
   provider: string
   sourceName: string
@@ -714,6 +744,7 @@ export type LimitOrderCandleEvidenceScalarWhereInput = {
   openTime?: Prisma.DateTimeFilter<"LimitOrderCandleEvidence"> | Date | string
   closeTime?: Prisma.DateTimeFilter<"LimitOrderCandleEvidence"> | Date | string
   triggerLowPrice?: Prisma.DecimalFilter<"LimitOrderCandleEvidence"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerHighPrice?: Prisma.DecimalNullableFilter<"LimitOrderCandleEvidence"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executionPricePolicy?: Prisma.StringFilter<"LimitOrderCandleEvidence"> | string
   provider?: Prisma.StringFilter<"LimitOrderCandleEvidence"> | string
   sourceName?: Prisma.StringFilter<"LimitOrderCandleEvidence"> | string
@@ -730,6 +761,7 @@ export type LimitOrderCandleEvidenceCreateWithoutOrdersInput = {
   openTime: Date | string
   closeTime: Date | string
   triggerLowPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerHighPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executionPricePolicy: string
   provider: string
   sourceName: string
@@ -748,6 +780,7 @@ export type LimitOrderCandleEvidenceUncheckedCreateWithoutOrdersInput = {
   openTime: Date | string
   closeTime: Date | string
   triggerLowPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerHighPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executionPricePolicy: string
   provider: string
   sourceName: string
@@ -780,6 +813,7 @@ export type LimitOrderCandleEvidenceUpdateWithoutOrdersInput = {
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   closeTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   triggerLowPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerHighPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executionPricePolicy?: Prisma.StringFieldUpdateOperationsInput | string
   provider?: Prisma.StringFieldUpdateOperationsInput | string
   sourceName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -798,6 +832,7 @@ export type LimitOrderCandleEvidenceUncheckedUpdateWithoutOrdersInput = {
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   closeTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   triggerLowPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerHighPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executionPricePolicy?: Prisma.StringFieldUpdateOperationsInput | string
   provider?: Prisma.StringFieldUpdateOperationsInput | string
   sourceName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -814,6 +849,7 @@ export type LimitOrderCandleEvidenceCreateManyAssetInput = {
   openTime: Date | string
   closeTime: Date | string
   triggerLowPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerHighPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executionPricePolicy: string
   provider: string
   sourceName: string
@@ -830,6 +866,7 @@ export type LimitOrderCandleEvidenceUpdateWithoutAssetInput = {
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   closeTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   triggerLowPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerHighPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executionPricePolicy?: Prisma.StringFieldUpdateOperationsInput | string
   provider?: Prisma.StringFieldUpdateOperationsInput | string
   sourceName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -847,6 +884,7 @@ export type LimitOrderCandleEvidenceUncheckedUpdateWithoutAssetInput = {
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   closeTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   triggerLowPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerHighPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executionPricePolicy?: Prisma.StringFieldUpdateOperationsInput | string
   provider?: Prisma.StringFieldUpdateOperationsInput | string
   sourceName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -864,6 +902,7 @@ export type LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetInput = {
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   closeTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   triggerLowPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerHighPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executionPricePolicy?: Prisma.StringFieldUpdateOperationsInput | string
   provider?: Prisma.StringFieldUpdateOperationsInput | string
   sourceName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -912,6 +951,7 @@ export type LimitOrderCandleEvidenceSelect<ExtArgs extends runtime.Types.Extensi
   openTime?: boolean
   closeTime?: boolean
   triggerLowPrice?: boolean
+  triggerHighPrice?: boolean
   executionPricePolicy?: boolean
   provider?: boolean
   sourceName?: boolean
@@ -932,6 +972,7 @@ export type LimitOrderCandleEvidenceSelectCreateManyAndReturn<ExtArgs extends ru
   openTime?: boolean
   closeTime?: boolean
   triggerLowPrice?: boolean
+  triggerHighPrice?: boolean
   executionPricePolicy?: boolean
   provider?: boolean
   sourceName?: boolean
@@ -950,6 +991,7 @@ export type LimitOrderCandleEvidenceSelectUpdateManyAndReturn<ExtArgs extends ru
   openTime?: boolean
   closeTime?: boolean
   triggerLowPrice?: boolean
+  triggerHighPrice?: boolean
   executionPricePolicy?: boolean
   provider?: boolean
   sourceName?: boolean
@@ -968,6 +1010,7 @@ export type LimitOrderCandleEvidenceSelectScalar = {
   openTime?: boolean
   closeTime?: boolean
   triggerLowPrice?: boolean
+  triggerHighPrice?: boolean
   executionPricePolicy?: boolean
   provider?: boolean
   sourceName?: boolean
@@ -977,7 +1020,7 @@ export type LimitOrderCandleEvidenceSelectScalar = {
   createdAt?: boolean
 }
 
-export type LimitOrderCandleEvidenceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "marketCandleId" | "assetId" | "interval" | "openTime" | "closeTime" | "triggerLowPrice" | "executionPricePolicy" | "provider" | "sourceName" | "sourceUpdatedAt" | "finalizedAt" | "policyVersion" | "createdAt", ExtArgs["result"]["limitOrderCandleEvidence"]>
+export type LimitOrderCandleEvidenceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "marketCandleId" | "assetId" | "interval" | "openTime" | "closeTime" | "triggerLowPrice" | "triggerHighPrice" | "executionPricePolicy" | "provider" | "sourceName" | "sourceUpdatedAt" | "finalizedAt" | "policyVersion" | "createdAt", ExtArgs["result"]["limitOrderCandleEvidence"]>
 export type LimitOrderCandleEvidenceInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   orders?: boolean | Prisma.LimitOrderCandleEvidence$ordersArgs<ExtArgs>
@@ -1004,6 +1047,7 @@ export type $LimitOrderCandleEvidencePayload<ExtArgs extends runtime.Types.Exten
     openTime: Date
     closeTime: Date
     triggerLowPrice: runtime.Decimal
+    triggerHighPrice: runtime.Decimal | null
     executionPricePolicy: string
     provider: string
     sourceName: string
@@ -1443,6 +1487,7 @@ export interface LimitOrderCandleEvidenceFieldRefs {
   readonly openTime: Prisma.FieldRef<"LimitOrderCandleEvidence", 'DateTime'>
   readonly closeTime: Prisma.FieldRef<"LimitOrderCandleEvidence", 'DateTime'>
   readonly triggerLowPrice: Prisma.FieldRef<"LimitOrderCandleEvidence", 'Decimal'>
+  readonly triggerHighPrice: Prisma.FieldRef<"LimitOrderCandleEvidence", 'Decimal'>
   readonly executionPricePolicy: Prisma.FieldRef<"LimitOrderCandleEvidence", 'String'>
   readonly provider: Prisma.FieldRef<"LimitOrderCandleEvidence", 'String'>
   readonly sourceName: Prisma.FieldRef<"LimitOrderCandleEvidence", 'String'>

@@ -31,6 +31,7 @@ export type OrderResponseRecord = {
   assetPriceSnapshotId: string | null;
   fxRateSnapshotId: string | null;
   reservedAmount?: Prisma.Decimal | null;
+  reservedQuantity?: Prisma.Decimal | null;
   reservationReleasedAt?: Date | null;
   cancelReason?: string | null;
   submittedAt: Date;
@@ -69,6 +70,7 @@ export function formatOrderResponse(order: OrderResponseRecord) {
     assetPriceSnapshotId: order.assetPriceSnapshotId,
     fxRateSnapshotId: order.fxRateSnapshotId,
     reservedAmount: formatNullableDecimal(order.reservedAmount ?? null),
+    reservedQuantity: formatNullableDecimal(order.reservedQuantity ?? null),
     reservationReleasedAt: formatNullableDate(
       order.reservationReleasedAt ?? null,
     ),

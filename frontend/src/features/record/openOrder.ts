@@ -14,14 +14,13 @@ export type OrderStatusFields = {
   status?: string | null;
 };
 
-/** True for an unfilled limit-buy order the user can still cancel. */
-export function isOpenLimitBuyOrder(item: OrderStatusFields): boolean {
-  return (
-    item.orderType === 'limit' &&
-    item.side === 'buy' &&
-    item.status === 'submitted'
-  );
+/** True for an unfilled limit order the user can still cancel. */
+export function isOpenLimitOrder(item: OrderStatusFields): boolean {
+  return item.orderType === 'limit' && item.status === 'submitted';
 }
+
+/** Backward-compatible export for existing callers; now covers both sides. */
+export const isOpenLimitBuyOrder = isOpenLimitOrder;
 
 export function shouldPollSubmittedLimitOrders(input: {
   isFocused: boolean;
@@ -31,7 +30,7 @@ export function shouldPollSubmittedLimitOrders(input: {
   return (
     input.isFocused &&
     input.appState === 'active' &&
-    input.items.some(isOpenLimitBuyOrder)
+    input.items.some(isOpenLimitOrder)
   );
 }
 

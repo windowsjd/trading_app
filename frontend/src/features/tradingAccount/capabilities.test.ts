@@ -49,19 +49,16 @@ describe('mode capabilities', () => {
     assert.equal(caps.returnRateMethod, 'initial_capital');
   });
 
-  it('blocks general trading and FX as an expected limit, not a failure', () => {
+  it('allows active general trading while keeping FX unavailable', () => {
     const caps = getTradingAccountCapabilities(generalAccount())!;
 
-    assert.equal(caps.canTrade, false);
-    assert.equal(caps.canQuote, false);
+    assert.equal(caps.canTrade, true);
+    assert.equal(caps.canQuote, true);
+    assert.equal(caps.canCancelOrder, true);
     assert.equal(caps.canExchange, false);
-    assert.equal(caps.tradeBlockReason, 'general_trading_not_implemented');
+    assert.equal(caps.tradeBlockReason, null);
     assert.equal(caps.exchangeBlockReason, 'general_fx_not_implemented');
     // The copy says "준비 중", never "오류" — the two are different situations.
-    assert.match(
-      CAPABILITY_BLOCK_MESSAGE.general_trading_not_implemented,
-      /준비 중/,
-    );
     assert.match(CAPABILITY_BLOCK_MESSAGE.general_fx_not_implemented, /준비 중/);
   });
 

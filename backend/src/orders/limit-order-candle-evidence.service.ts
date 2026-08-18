@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AssetType, Prisma } from '../generated/prisma/client';
+import { AssetType, OrderSide, Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   resolveRegularSessionForEvent,
@@ -26,6 +26,7 @@ export type EligibleClosedCandle = {
   openTime: Date;
   closeTime: Date;
   low: Prisma.Decimal;
+  high?: Prisma.Decimal;
   sourceProvider: string;
   sourceUpdatedAt: Date;
   finalizedAt: Date;
@@ -34,8 +35,9 @@ export type EligibleClosedCandle = {
 export type CandleTriggerOrder = {
   submittedAt: Date;
   limitPrice: Prisma.Decimal;
+  side?: OrderSide;
   /** Season.endAt of the order's season — no candle may close after it (§17). */
-  seasonEndAt: Date;
+  seasonEndAt: Date | null;
 };
 
 /**
@@ -74,6 +76,7 @@ export class LimitOrderCandleEvidenceService {
         openTime: true,
         closeTime: true,
         low: true,
+        high: true,
         sourceProvider: true,
         sourceUpdatedAt: true,
         updatedAt: true,
@@ -102,6 +105,7 @@ export class LimitOrderCandleEvidenceService {
         openTime: row.openTime,
         closeTime: row.closeTime,
         low: row.low,
+        high: row.high,
         sourceProvider: row.sourceProvider,
         sourceUpdatedAt: row.sourceUpdatedAt,
         finalizedAt: row.updatedAt,
@@ -128,8 +132,20 @@ export class LimitOrderCandleEvidenceService {
     for (const candle of candles) {
       if (candle.openTime.getTime() < firstEligibleOpenMs) continue;
       // §17: no candle that closes after the season end may fill.
-      if (candle.closeTime.getTime() > order.seasonEndAt.getTime()) continue;
-      if (candle.low.lte(order.limitPrice)) return candle;
+      if (
+        order.seasonEndAt &&
+        candle.closeTime.getTime() > order.seasonEndAt.getTime()
+      ) {
+        continue;
+      }
+      if (
+        ((order.side ?? OrderSide.buy) === OrderSide.buy &&
+          candle.low.lte(order.limitPrice)) ||
+        (order.side === OrderSide.sell &&
+          candle.high?.gte(order.limitPrice) === true)
+      ) {
+        return candle;
+      }
     }
     return null;
   }
@@ -164,6 +180,7 @@ export class LimitOrderCandleEvidenceService {
         openTime: candle.openTime,
         closeTime: candle.closeTime,
         triggerLowPrice: candle.low,
+        triggerHighPrice: candle.high ?? null,
         executionPricePolicy: EXECUTION_PRICE_POLICY,
         provider: candle.sourceProvider,
         sourceName: candle.sourceProvider,
@@ -171,7 +188,7 @@ export class LimitOrderCandleEvidenceService {
         finalizedAt: candle.finalizedAt,
         policyVersion: EVIDENCE_POLICY_VERSION,
       },
-      update: {},
+      update: { triggerHighPrice: candle.high ?? undefined },
       select: { id: true },
     });
     return evidence.id;

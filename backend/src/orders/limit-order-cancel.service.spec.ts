@@ -30,6 +30,15 @@ jest.mock('../generated/prisma/client', () => {
       ended: 'ended',
       settled: 'settled',
     },
+    TradingAccountMode: {
+      general: 'general',
+      season: 'season',
+    },
+    TradingAccountStatus: {
+      active: 'active',
+      suspended: 'suspended',
+      closed: 'closed',
+    },
   };
 });
 
@@ -57,7 +66,17 @@ describe('LimitOrderCancelService', () => {
     id: 'order-1',
     seasonParticipantId: 'sp-1',
     tradingAccountId: 'trading-account-1',
-    seasonParticipant: { tradingAccountId: 'trading-account-1' },
+    seasonParticipant: {
+      id: 'sp-1',
+      tradingAccountId: 'trading-account-1',
+    },
+    tradingAccount: {
+      id: 'trading-account-1',
+      userId: 'user-1',
+      mode: 'season',
+      status: 'active',
+      seasonParticipant: { id: 'sp-1' },
+    },
     quoteId: 'quote-1',
     side: 'buy',
     orderType: OrderType.limit,
@@ -72,6 +91,7 @@ describe('LimitOrderCancelService', () => {
     assetPriceSnapshotId: null,
     fxRateSnapshotId: null,
     reservedAmount: new Prisma.Decimal('150150.00000000'),
+    reservedQuantity: null,
     reservationReleasedAt: null,
     cancelReason: null,
     submittedAt,
@@ -190,7 +210,12 @@ describe('LimitOrderCancelService', () => {
       // The order leaves `submitted` with a guarded updateMany in the same
       // transaction; cancel bookkeeping is written together.
       expect(prisma.order.updateMany).toHaveBeenCalledWith({
-        where: { id: 'order-1', status: OrderStatus.submitted },
+        where: {
+          id: 'order-1',
+          seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
+          status: OrderStatus.submitted,
+        },
         data: {
           status: OrderStatus.canceled,
           canceledAt,
@@ -442,25 +467,45 @@ describe('LimitOrderCancelService', () => {
       prisma.order.findUnique
         .mockResolvedValueOnce({
           id: 'order-1',
+          assetId: 'asset-1',
           seasonParticipantId: 'sp-1',
           tradingAccountId: 'trading-account-1',
-          seasonParticipant: { tradingAccountId: 'trading-account-1' },
+          seasonParticipant: {
+            id: 'sp-1',
+            tradingAccountId: 'trading-account-1',
+          },
+          tradingAccount: {
+            id: 'trading-account-1',
+            mode: 'season',
+            seasonParticipant: { id: 'sp-1' },
+          },
           currencyCode: CurrencyCode.KRW,
           status: OrderStatus.submitted,
           orderType: OrderType.limit,
           side: 'buy',
           reservedAmount: new Prisma.Decimal('100.00000000'),
+          reservedQuantity: null,
         })
         .mockResolvedValueOnce({
           id: 'order-2',
+          assetId: 'asset-1',
           seasonParticipantId: 'sp-1',
           tradingAccountId: 'trading-account-1',
-          seasonParticipant: { tradingAccountId: 'trading-account-1' },
+          seasonParticipant: {
+            id: 'sp-1',
+            tradingAccountId: 'trading-account-1',
+          },
+          tradingAccount: {
+            id: 'trading-account-1',
+            mode: 'season',
+            seasonParticipant: { id: 'sp-1' },
+          },
           currencyCode: CurrencyCode.USD,
           status: OrderStatus.submitted,
           orderType: OrderType.limit,
           side: 'buy',
           reservedAmount: new Prisma.Decimal('50.00000000'),
+          reservedQuantity: null,
         });
       prisma.cashWallet.findUnique
         .mockResolvedValueOnce({
@@ -492,7 +537,12 @@ describe('LimitOrderCancelService', () => {
       });
       expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
       expect(prisma.order.updateMany).toHaveBeenNthCalledWith(1, {
-        where: { id: 'order-1', status: OrderStatus.submitted },
+        where: {
+          id: 'order-1',
+          seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
+          status: OrderStatus.submitted,
+        },
         data: expect.objectContaining({
           cancelReason: 'participant_excluded',
         }) as never,
@@ -536,19 +586,41 @@ describe('LimitOrderCancelService', () => {
       prisma.order.findUnique
         .mockResolvedValueOnce({
           id: 'order-1',
+          assetId: 'asset-1',
           seasonParticipantId: 'sp-1',
           tradingAccountId: 'trading-account-1',
-          seasonParticipant: { tradingAccountId: 'trading-account-1' },
+          seasonParticipant: {
+            id: 'sp-1',
+            tradingAccountId: 'trading-account-1',
+          },
+          tradingAccount: {
+            id: 'trading-account-1',
+            mode: 'season',
+            seasonParticipant: { id: 'sp-1' },
+          },
           currencyCode: CurrencyCode.KRW,
           reservedAmount: new Prisma.Decimal('100.00000000'),
+          reservedQuantity: null,
+          side: 'buy',
         })
         .mockResolvedValueOnce({
           id: 'order-2',
+          assetId: 'asset-1',
           seasonParticipantId: 'sp-2',
           tradingAccountId: 'trading-account-2',
-          seasonParticipant: { tradingAccountId: 'trading-account-2' },
+          seasonParticipant: {
+            id: 'sp-2',
+            tradingAccountId: 'trading-account-2',
+          },
+          tradingAccount: {
+            id: 'trading-account-2',
+            mode: 'season',
+            seasonParticipant: { id: 'sp-2' },
+          },
           currencyCode: CurrencyCode.KRW,
           reservedAmount: new Prisma.Decimal('40.00000000'),
+          reservedQuantity: null,
+          side: 'buy',
         });
       prisma.cashWallet.findUnique
         .mockResolvedValueOnce({
@@ -578,7 +650,6 @@ describe('LimitOrderCancelService', () => {
           where: expect.objectContaining({
             status: OrderStatus.submitted,
             orderType: OrderType.limit,
-            side: 'buy',
             seasonParticipant: {
               season: {
                 status: { in: [SeasonStatus.ended, SeasonStatus.settled] },
@@ -711,7 +782,7 @@ describe('LimitOrderCancelService', () => {
       await scopedCancel(service);
 
       const lockValues = (prisma.$queryRaw.mock.calls[0] as unknown[]).slice(1);
-      expect(lockValues).toEqual(['order-1', 'user-1']);
+      expect(lockValues).toEqual(['order-1', 'user-1', 'user-1']);
       expect(lockValues).not.toContain('trading-account-1');
     });
 

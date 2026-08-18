@@ -43,8 +43,8 @@ import {
   ACCOUNT_LIST_ERROR_TITLE,
   ACCOUNT_MISSING_MESSAGE,
   ACCOUNT_MISSING_TITLE,
-  canQuerySeasonOrders,
-  resolveSeasonAccount,
+  canQueryRecordOrders,
+  resolveRecordOrderAccount,
 } from '../../features/record/seasonAccountLookup';
 import {
   invalidateAfterOrderCancel,
@@ -63,7 +63,8 @@ type Props = NativeStackScreenProps<RecordStackParamList, 'RecordOrderList'>;
 type Filter = 'all' | 'buy' | 'sell';
 
 export default function RecordOrderListScreen({ route }: Props) {
-  const { seasonId } = route.params;
+  const recordScope = route.params;
+  const isGeneralScope = 'accountId' in recordScope;
   const [filter, setFilter] = useState<Filter>('all');
   const queryClient = useQueryClient();
   const {
@@ -74,32 +75,29 @@ export default function RecordOrderListScreen({ route }: Props) {
   } = useTradingAccount();
 
   /**
-   * The account is derived from the SEASON this screen is about — not from the
-   * globally selected account (작업 10 §A-5).
-   *
-   * The screen is reached from one season's record, so the orders it shows
-   * belong to that season's account. Using the current selection instead would
-   * list a general account's orders (or another season's) under this season's
-   * heading, and would aim the cancel button at the wrong account.
+   * The account is derived from the immutable route subject — a season for a
+   * historical season record, or an explicit accountId from General Home —
+   * never from whatever account happens to be selected now (작업 10 §A-5).
    *
    * Reads are status-blind by contract, so an ended or settled season's closed
    * account still shows its full history here — read-only, with cancel
    * naturally unavailable because nothing is open.
    *
-   * `resolveSeasonAccount` separates "the account LIST failed" from "the list
-   * is fine and this season has no account of yours" (작업 12 §5) — two states
-   * that were one, with a retry button wired to a query that was disabled.
+   * `resolveRecordOrderAccount` separates "the account LIST failed" from "the
+   * pinned subject is no longer owned" (작업 12 §5) — two states that were one,
+   * with a retry button wired to a query that was disabled.
    */
-  const accountLookup = resolveSeasonAccount({
-    seasonId,
+  const accountLookup = resolveRecordOrderAccount({
+    scope: recordScope,
     accounts,
     isLoading: accountsLoading,
     isError: accountsError,
   });
-  const seasonAccount = accountLookup.account;
-  const accountId = seasonAccount?.id ?? '';
-  const hasAccount = canQuerySeasonOrders(accountLookup);
-  const accountDisplay = seasonAccount ? getAccountDisplay(seasonAccount) : null;
+  const recordAccount = accountLookup.account;
+  const accountId = recordAccount?.id ?? '';
+  const hasAccount = canQueryRecordOrders(accountLookup);
+  const accountDisplay = recordAccount ? getAccountDisplay(recordAccount) : null;
+  const seasonUi = recordAccount?.mode === 'season';
   const isFocused = useIsFocused();
   const [appState, setAppState] = useState<AppStateStatus>(
     AppState.currentState,
@@ -127,7 +125,7 @@ export default function RecordOrderListScreen({ route }: Props) {
       // and dashboard views that are keyed by season rather than by account
       // (작업 10 §A-11). Positions are untouched: a cancel never fills.
       await invalidateAfterOrderCancel(queryClient, accountId, {
-        seasonUi: true,
+        seasonUi,
       });
     },
     onError: (error) => {
@@ -140,7 +138,7 @@ export default function RecordOrderListScreen({ route }: Props) {
   const confirmCancel = (orderId: string, label: string) => {
     Alert.alert(
       '지정가 주문 취소',
-      `${label} 주문을 취소할까요? 예약된 금액은 다시 사용할 수 있게 됩니다.`,
+      `${label} 주문을 취소할까요? 예약된 금액 또는 수량은 다시 사용할 수 있게 됩니다.`,
       [
         { text: '유지', style: 'cancel' },
         {
@@ -219,7 +217,7 @@ export default function RecordOrderListScreen({ route }: Props) {
       // filled (position + cash changed) or was released. Same account-scoped
       // refresh as a create, so no other account's cache is disturbed.
       void invalidateAfterOrderCreate(queryClient, accountId, {
-        seasonUi: true,
+        seasonUi,
       });
     }
     previousOpenLimitIds.current = new Set(
@@ -228,7 +226,7 @@ export default function RecordOrderListScreen({ route }: Props) {
         .map((item) => item.orderId ?? item.id)
         .filter((orderId): orderId is string => Boolean(orderId)),
     );
-  }, [items, queryClient, accountId]);
+  }, [items, queryClient, accountId, seasonUi]);
 
   const viewState = useMemo(() => {
     if (ordersQuery.isLoading) return 'record_orders_loading';
@@ -269,8 +267,16 @@ export default function RecordOrderListScreen({ route }: Props) {
   if (accountLookup.state === 'account_missing') {
     return (
       <ErrorState
-        title={ACCOUNT_MISSING_TITLE}
-        message={ACCOUNT_MISSING_MESSAGE}
+        title={
+          isGeneralScope
+            ? '일반 투자 계정을 찾을 수 없습니다.'
+            : ACCOUNT_MISSING_TITLE
+        }
+        message={
+          isGeneralScope
+            ? '이 화면이 가리키는 일반 투자 계정이 더 이상 내 계정 목록에 없습니다. 계정 정보를 다시 불러온 뒤에도 같으면 고객센터에 문의해주세요.'
+            : ACCOUNT_MISSING_MESSAGE
+        }
         onRetry={() => void refetchAccounts()}
       />
     );
@@ -321,8 +327,9 @@ export default function RecordOrderListScreen({ route }: Props) {
         onEndReachedThreshold={0.4}
         ListHeaderComponent={
           <View>
-            {/* Which account's orders these are. The season name doubles as
-                the account name here — they are the same thing. */}
+            {/* Which account owns every order below. The route pins this
+                subject, so changing the global account selection elsewhere
+                cannot retarget this history or its cancel button. */}
             {accountDisplay ? (
               <Text style={styles.accountHeader}>
                 {accountDisplay.title} · {accountDisplay.statusLabel}
@@ -402,8 +409,16 @@ export default function RecordOrderListScreen({ route }: Props) {
                       fill result and appears only once the order executed. */}
                   {display.hasNoExecutionResult ? (
                     <Text style={styles.itemTitle}>
-                      {display.isOpenLimitBuy ? '예약금' : '예약금 (해제)'}{' '}
-                      {display.reservedAmount ?? '-'}
+                      {display.side === 'buy'
+                        ? display.isOpenLimitBuy
+                          ? '예약금'
+                          : '예약금 (해제)'
+                        : display.isOpenLimitBuy
+                          ? '예약 수량'
+                          : '예약 수량 (해제)'}{' '}
+                      {display.side === 'buy'
+                        ? (display.reservedAmount ?? '-')
+                        : (display.reservedQuantity ?? '-')}
                     </Text>
                   ) : (
                     <>

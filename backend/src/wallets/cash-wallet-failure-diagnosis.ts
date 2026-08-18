@@ -67,7 +67,7 @@ export async function diagnoseCashWalletMutationFailure(
   input: {
     walletId: string;
     expected: {
-      seasonParticipantId: string;
+      seasonParticipantId: string | null;
       /** The VERIFIED trading account the mutation was scoped to. */
       tradingAccountId: string;
       /** CurrencyCode enum value. */

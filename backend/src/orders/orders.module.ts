@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AssetsModule } from '../assets/assets.module';
 import { RankingModule } from '../ranking/ranking.module';
 import { PortfolioModule } from '../portfolio/portfolio.module';
+import { GeneralPerformanceModule } from '../portfolio/general-performance.module';
 import { ProvidersModule } from '../providers/providers.module';
 import { RedisModule } from '../redis/redis.module';
 import { TradingAccountsModule } from '../trading-accounts/trading-accounts.module';
@@ -21,6 +22,7 @@ import { TradingAccountOrdersController } from './trading-account-orders.control
     AssetsModule,
     RankingModule,
     PortfolioModule,
+    GeneralPerformanceModule,
     ProvidersModule,
     RedisModule,
     TradingAccountsModule,

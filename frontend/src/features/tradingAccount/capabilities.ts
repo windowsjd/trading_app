@@ -14,16 +14,11 @@ import type { TradingAccountDto } from './api';
  * whose only possible outcome is a 409. Letting a user press it and reading
  * them an error is not "server-authoritative", it is a broken screen.
  *
- * Equally, this NEVER relaxes a gate: `canTrade` is false whenever the server
- * would refuse, and there is no path that turns a general account into a
- * tradable one. General-mode trading and FX are not implemented in the backend
- * (409 `GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED` /
- * `GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`) and are presented as "준비 중", not as
- * failures.
+ * General trading uses the same account-scoped backend core as season trading;
+ * general FX remains a separate unavailable capability.
  */
 
 export type CapabilityBlockReason =
-  | 'general_trading_not_implemented'
   | 'general_fx_not_implemented'
   | 'account_suspended'
   | 'account_closed'
@@ -53,8 +48,6 @@ export const CAPABILITY_BLOCK_MESSAGE: Record<
   Exclude<CapabilityBlockReason, null>,
   string
 > = {
-  general_trading_not_implemented:
-    '일반 투자 계정의 매매 기능은 아직 준비 중입니다. 현재는 잔고와 수익률 조회만 지원합니다.',
   general_fx_not_implemented:
     '일반 투자 계정의 환전 기능은 아직 준비 중입니다.',
   account_suspended:
@@ -91,11 +84,9 @@ export function getTradingAccountCapabilities(
   // one of them will never change.
   const tradeBlockReason: CapabilityBlockReason = statusBlock
     ? statusBlock
-    : isGeneral
-      ? 'general_trading_not_implemented'
-      : seasonActive
-        ? null
-        : 'season_not_active';
+    : isGeneral || seasonActive
+      ? null
+      : 'season_not_active';
 
   const exchangeBlockReason: CapabilityBlockReason = statusBlock
     ? statusBlock
@@ -116,7 +107,7 @@ export function getTradingAccountCapabilities(
     // Cancelling RELEASES a reservation, so the backend deliberately allows it
     // on suspended and closed accounts. Blocking it in the UI would strand a
     // user's own money behind a screen they can still see.
-    canCancelOrder: isSeason,
+    canCancelOrder: true,
     canExchange: exchangeBlockReason === null,
     canClaimAdReward: isGeneral && account.status === 'active',
     showsSeasonUi: isSeason,

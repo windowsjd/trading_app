@@ -148,8 +148,9 @@ export interface RecordOrderItemDto {
   netAmountLocal?: MoneyString;
   grossAmount?: MoneyString | null;
   feeAmount?: MoneyString | null;
-  // Limit-buy additive fields.
+  // Limit-order additive fields.
   reservedAmount?: MoneyString | null;
+  reservedQuantity?: QuantityString | null;
   reservationReleasedAt?: IsoDateTimeString | null;
   cancelReason?: string | null;
 }
@@ -251,7 +252,7 @@ export function getRecordOrderDisplay(item: RecordOrderItemDto) {
     name: nameDisplay.primary,
     executedAt: item.executedAt ?? item.submittedAt ?? '-',
     side: item.side,
-    // '지정가 매수' badge input; market rows keep their historical look.
+    // Side-aware limit badge input; market rows keep their historical look.
     isLimitOrder: item.orderType === 'limit',
     statusLabel: getOrderStatusLabel(item.status),
     isOpenLimitBuy: isOpenLimitBuyOrder(item),
@@ -261,6 +262,7 @@ export function getRecordOrderDisplay(item: RecordOrderItemDto) {
     reservedAmount: item.reservedAmount
       ? formatCurrency(item.reservedAmount, currencyCode)
       : null,
+    reservedQuantity: item.reservedQuantity ?? null,
     submittedAt: item.submittedAt ?? '-',
     quantity: item.quantity,
     price: noExecutionResult

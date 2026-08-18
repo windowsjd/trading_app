@@ -26,7 +26,7 @@ type AtomicCashClient = Pick<Prisma.TransactionClient, '$executeRaw'>;
 
 export type CashWalletAmountInput = {
   walletId: string;
-  seasonParticipantId: string;
+  seasonParticipantId: string | null;
   /** VERIFIED trading account id (never null; assert scope first). */
   tradingAccountId: string;
   /** CurrencyCode enum value (KRW | USD). */
@@ -49,7 +49,7 @@ export async function debitAvailableCash(
     SET "balance_amount" = "balance_amount" - ${input.amount}::numeric,
         "updated_at" = NOW()
     WHERE "id" = ${input.walletId}
-      AND "season_participant_id" = ${input.seasonParticipantId}
+      AND "season_participant_id" IS NOT DISTINCT FROM ${input.seasonParticipantId}
       AND "trading_account_id" = ${input.tradingAccountId}
       AND "currency_code" = ${input.currencyCode}::"CurrencyCode"
       AND "balance_amount" - "reserved_amount" >= ${input.amount}::numeric
@@ -70,7 +70,7 @@ export async function reserveAvailableCash(
     SET "reserved_amount" = "reserved_amount" + ${input.amount}::numeric,
         "updated_at" = NOW()
     WHERE "id" = ${input.walletId}
-      AND "season_participant_id" = ${input.seasonParticipantId}
+      AND "season_participant_id" IS NOT DISTINCT FROM ${input.seasonParticipantId}
       AND "trading_account_id" = ${input.tradingAccountId}
       AND "currency_code" = ${input.currencyCode}::"CurrencyCode"
       AND "balance_amount" - "reserved_amount" >= ${input.amount}::numeric
@@ -92,7 +92,7 @@ export async function releaseReservedCash(
     SET "reserved_amount" = "reserved_amount" - ${input.amount}::numeric,
         "updated_at" = NOW()
     WHERE "id" = ${input.walletId}
-      AND "season_participant_id" = ${input.seasonParticipantId}
+      AND "season_participant_id" IS NOT DISTINCT FROM ${input.seasonParticipantId}
       AND "trading_account_id" = ${input.tradingAccountId}
       AND "currency_code" = ${input.currencyCode}::"CurrencyCode"
       AND "reserved_amount" >= ${input.amount}::numeric
@@ -117,7 +117,7 @@ export async function settleLimitBuyReservedCash(
         "reserved_amount" = "reserved_amount" - ${input.orderReservation}::numeric,
         "updated_at" = clock_timestamp()
     WHERE "id" = ${input.walletId}
-      AND "season_participant_id" = ${input.seasonParticipantId}
+      AND "season_participant_id" IS NOT DISTINCT FROM ${input.seasonParticipantId}
       AND "trading_account_id" = ${input.tradingAccountId}
       AND "currency_code" = ${input.currencyCode}::"CurrencyCode"
       AND "reserved_amount" >= ${input.orderReservation}::numeric

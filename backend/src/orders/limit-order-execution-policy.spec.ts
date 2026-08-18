@@ -9,6 +9,7 @@ import { Prisma } from '../generated/prisma/client';
 import {
   calculateBuyPositionAverageCost,
   calculateLimitFillAmounts,
+  calculateLimitSellFillAmounts,
   isFillWithinReservation,
 } from './limit-order-execution-policy';
 
@@ -35,6 +36,19 @@ describe('calculateLimitFillAmounts', () => {
     });
     // 90 gross, 0.09 fee, 90.09 net — priced at 90, not a higher limit.
     expect(amounts.netAmount.toFixed(8)).toBe('90.09000000');
+  });
+});
+
+describe('calculateLimitSellFillAmounts', () => {
+  it('credits gross minus the pinned fee at the actual execution price', () => {
+    const amounts = calculateLimitSellFillAmounts({
+      executedPrice: d('120'),
+      quantity: d('2'),
+      reservationFeeRate: d('0.001'),
+    });
+    expect(amounts.grossAmount.toFixed(8)).toBe('240.00000000');
+    expect(amounts.feeAmount.toFixed(8)).toBe('0.24000000');
+    expect(amounts.netAmount.toFixed(8)).toBe('239.76000000');
   });
 });
 

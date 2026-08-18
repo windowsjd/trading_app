@@ -73,6 +73,15 @@ jest.mock('../generated/prisma/client', () => {
       ended: 'ended',
       settled: 'settled',
     },
+    TradingAccountMode: {
+      general: 'general',
+      season: 'season',
+    },
+    TradingAccountStatus: {
+      active: 'active',
+      suspended: 'suspended',
+      closed: 'closed',
+    },
     WalletTransactionDirection: {
       credit: 'credit',
       debit: 'debit',
@@ -368,7 +377,10 @@ describe('OrdersService', () => {
     quantity = '10.00000000',
   ) => {
     prisma.position.findUnique.mockResolvedValueOnce({
+      seasonParticipantId: 'sp-1',
+      tradingAccountId: 'trading-account-1',
       quantity: new Prisma.Decimal(quantity),
+      reservedQuantity: new Prisma.Decimal(0),
     });
   };
 
@@ -723,6 +735,14 @@ describe('OrdersService', () => {
       seasonParticipant: {
         ...participant,
         season: activeSeason,
+      },
+      tradingAccount: {
+        id: 'trading-account-1',
+        userId: 'user-1',
+        mode: 'season',
+        status: 'active',
+        initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
+        seasonParticipant: { id: 'sp-1' },
       },
       ...overrides,
     };
@@ -1680,7 +1700,10 @@ describe('OrdersService', () => {
         },
       },
       select: {
+        seasonParticipantId: true,
+        tradingAccountId: true,
         quantity: true,
+        reservedQuantity: true,
       },
     });
     expectNoOrderWrites(prisma);
@@ -1738,7 +1761,10 @@ describe('OrdersService', () => {
         },
       },
       select: {
+        seasonParticipantId: true,
+        tradingAccountId: true,
         quantity: true,
+        reservedQuantity: true,
       },
     });
     expectNoOrderWrites(prisma);
@@ -3060,6 +3086,7 @@ describe('OrdersService', () => {
           tradingAccountId: 'trading-account-1',
           assetId: 'asset-1',
           quantity: '2.00000000',
+          reservedQuantity: '0.00000000',
           averageCost: '100.10000000',
           currencyCode: CurrencyCode.KRW,
           realizedPnl: '0.00000000',
@@ -3091,6 +3118,7 @@ describe('OrdersService', () => {
         where: {
           id: 'order-execute-1',
           seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
           status: OrderStatus.submitted,
         },
         data: {
@@ -3204,6 +3232,7 @@ describe('OrdersService', () => {
           tradingAccountId: 'trading-account-1',
           assetId: 'asset-btc',
           quantity: '0.01000000',
+          reservedQuantity: '0.00000000',
           averageCost: '50050.00000000',
           currencyCode: CurrencyCode.USD,
           realizedPnl: '0.00000000',
@@ -3693,6 +3722,9 @@ describe('OrdersService', () => {
           quantity: {
             gte: '2.00000000',
           },
+          reservedQuantity: {
+            lte: '3.00000000',
+          },
         },
         data: {
           quantity: {
@@ -3859,6 +3891,9 @@ describe('OrdersService', () => {
           assetId: 'asset-btc',
           quantity: {
             gte: '0.01000000',
+          },
+          reservedQuantity: {
+            lte: '0.01000000',
           },
         },
         data: {

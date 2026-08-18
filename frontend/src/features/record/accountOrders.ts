@@ -14,7 +14,7 @@ import type { TradingAccountOrdersDto } from '../tradingAccount/api';
  *
  * WHY THE SCREEN MOVED TO THE ACCOUNT-SCOPED LIST AT ALL
  * -----------------------------------------------------
- * This list shows LIVE orders: it polls open limit buys and offers cancel. The
+ * This list shows LIVE orders: it polls open limit orders and offers cancel. The
  * record API selects by season participation; the account API selects by the
  * order's own `tradingAccountId` and fails closed when those two disagree. For
  * a screen whose buttons move money, the stricter source is the correct one,
@@ -53,6 +53,7 @@ export function toRecordOrderItem(row: AccountOrderRow): RecordOrderItemDto {
     feeAmount: strOrNull(row.feeAmount),
     netAmount: str(row.netAmount),
     reservedAmount: strOrNull(row.reservedAmount),
+    reservedQuantity: strOrNull(row.reservedQuantity),
     reservationReleasedAt: strOrNull(row.reservationReleasedAt),
     cancelReason: strOrNull(row.cancelReason),
     submittedAt: str(row.submittedAt),

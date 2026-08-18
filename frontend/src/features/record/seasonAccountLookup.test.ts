@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  canQueryRecordOrders,
   canQuerySeasonOrders,
+  resolveRecordOrderAccount,
   resolveSeasonAccount,
 } from './seasonAccountLookup.ts';
 import type { TradingAccountDto } from '../tradingAccount/api';
@@ -129,5 +131,50 @@ describe('season account lookup for the record order list', () => {
     assert.equal(lookup.state, 'ready');
     // A blank id would produce `/trading-accounts//orders`, which can only 404.
     assert.equal(canQuerySeasonOrders(lookup), false);
+  });
+});
+
+describe('general account lookup for the record order list', () => {
+  it('pins the directly named owned general account', () => {
+    const lookup = resolveRecordOrderAccount({
+      scope: { accountId: 'acc-general' },
+      accounts: [
+        seasonAccount('acc-season', 'season-1'),
+        generalAccount('acc-general'),
+      ],
+      isLoading: false,
+      isError: false,
+    });
+
+    assert.equal(lookup.state, 'ready');
+    assert.equal(lookup.account?.id, 'acc-general');
+    assert.equal(canQueryRecordOrders(lookup), true);
+  });
+
+  it('does not fall back to another general or season account', () => {
+    const lookup = resolveRecordOrderAccount({
+      scope: { accountId: 'acc-missing' },
+      accounts: [
+        generalAccount('acc-other'),
+        seasonAccount('acc-season', 'season-1'),
+      ],
+      isLoading: false,
+      isError: false,
+    });
+
+    assert.equal(lookup.state, 'account_missing');
+    assert.equal(canQueryRecordOrders(lookup), false);
+  });
+
+  it('keeps the existing season lookup when the route names a season', () => {
+    const lookup = resolveRecordOrderAccount({
+      scope: { seasonId: 'season-1' },
+      accounts: [seasonAccount('acc-season', 'season-1')],
+      isLoading: false,
+      isError: false,
+    });
+
+    assert.equal(lookup.state, 'ready');
+    assert.equal(lookup.account?.id, 'acc-season');
   });
 });

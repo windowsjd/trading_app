@@ -64,11 +64,8 @@ describe('structural integrity errors are never empty data', () => {
 });
 
 describe('capability limits are kept separate from damage', () => {
-  it('classifies the two not-implemented codes as capability limits', () => {
-    for (const code of [
-      'GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED',
-      'GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED',
-    ]) {
+  it('classifies the remaining FX gate as a capability limit', () => {
+    for (const code of ['GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED']) {
       assert.equal(classifyAccountError(apiError(409, code)), 'capability_limit');
       assert.ok(isCapabilityLimitCode(code));
       // And never as integrity: they are not damage and never will be.
