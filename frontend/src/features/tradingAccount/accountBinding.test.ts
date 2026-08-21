@@ -171,7 +171,7 @@ describe('bound-account capabilities gate the mutation, not just the button', ()
     assert.equal(binding.capabilities.tradeBlockReason, null);
   });
 
-  it('a general account cannot exchange either', () => {
+  it('an active general account can exchange', () => {
     const binding = resolveAccountBinding({
       boundAccountId: GENERAL.id,
       accounts: ACCOUNTS,
@@ -180,11 +180,8 @@ describe('bound-account capabilities gate the mutation, not just the button', ()
     });
 
     if (binding.state !== 'bound') throw new Error('expected bound');
-    assert.equal(binding.capabilities.canExchange, false);
-    assert.equal(
-      binding.capabilities.exchangeBlockReason,
-      'general_fx_not_implemented',
-    );
+    assert.equal(binding.capabilities.canExchange, true);
+    assert.equal(binding.capabilities.exchangeBlockReason, null);
   });
 
   for (const status of ['suspended', 'closed'] as const) {

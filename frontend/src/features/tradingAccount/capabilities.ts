@@ -14,12 +14,10 @@ import type { TradingAccountDto } from './api';
  * whose only possible outcome is a 409. Letting a user press it and reading
  * them an error is not "server-authoritative", it is a broken screen.
  *
- * General trading uses the same account-scoped backend core as season trading;
- * general FX remains a separate unavailable capability.
+ * General trading and FX use the same account-scoped backend cores as season.
  */
 
 export type CapabilityBlockReason =
-  | 'general_fx_not_implemented'
   | 'account_suspended'
   | 'account_closed'
   | 'season_not_active'
@@ -48,8 +46,6 @@ export const CAPABILITY_BLOCK_MESSAGE: Record<
   Exclude<CapabilityBlockReason, null>,
   string
 > = {
-  general_fx_not_implemented:
-    '일반 투자 계정의 환전 기능은 아직 준비 중입니다.',
   account_suspended:
     '일시정지된 계정입니다. 조회는 가능하지만 새 주문과 환전은 할 수 없습니다.',
   account_closed:
@@ -90,11 +86,9 @@ export function getTradingAccountCapabilities(
 
   const exchangeBlockReason: CapabilityBlockReason = statusBlock
     ? statusBlock
-    : isGeneral
-      ? 'general_fx_not_implemented'
-      : seasonActive
-        ? null
-        : 'season_not_active';
+    : isGeneral || seasonActive
+      ? null
+      : 'season_not_active';
 
   return {
     mode: account.mode,

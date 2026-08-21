@@ -167,7 +167,7 @@ describe('TradingAccount schema contract', () => {
 
     for (const model of ['ExchangeTransaction', 'FxExecuteRequest']) {
       const block = modelBlock(model);
-      expect(block).toMatch(/seasonParticipantId\s+String\s/);
+      expect(block).toMatch(/seasonParticipantId\s+String\?\s/);
       expect(block).toMatch(/tradingAccountId\s+String\?/);
       expect(block).toMatch(
         /tradingAccount\s+TradingAccount\?\s+@relation\([^)]*onDelete: Restrict/,

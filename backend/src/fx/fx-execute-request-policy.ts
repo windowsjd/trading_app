@@ -4,6 +4,7 @@ import {
 } from './fx-decimal-policy';
 import {
   computeFxExecuteRequestHash,
+  computeGeneralFxExecuteRequestHash,
   type BuildFxExecuteCanonicalPayloadInput,
 } from './fx-execute-idempotency-policy';
 import {
@@ -21,14 +22,24 @@ export type FxExecuteRequestBodyLike = {
   idempotencyKey?: unknown;
 };
 
-export type FxExecuteRequestContextLike = {
-  userId: string;
-  seasonParticipantId: string;
-};
+export type FxExecuteRequestContextLike =
+  | {
+      /** Omitted by existing callers to preserve the exact season v1 hash. */
+      mode?: 'season';
+      userId: string;
+      seasonParticipantId: string;
+    }
+  | {
+      mode: 'general';
+      userId: string;
+      tradingAccountId: string;
+      seasonParticipantId: null;
+    };
 
 export type NormalizedFxExecuteRequest = {
   userId: string;
-  seasonParticipantId: string;
+  seasonParticipantId: string | null;
+  tradingAccountId?: string | null;
   quoteId: string;
   fromCurrency: FxExecuteCurrency;
   toCurrency: FxExecuteCurrency;
@@ -46,10 +57,20 @@ export function preflightFxExecuteRequest(
   context: FxExecuteRequestContextLike,
 ): FxExecuteRequestPreflightResult {
   const userId = assertRequiredContextString(context.userId, 'userId');
-  const seasonParticipantId = assertRequiredContextString(
-    context.seasonParticipantId,
-    'seasonParticipantId',
-  );
+  const seasonParticipantId =
+    context.mode === 'general'
+      ? null
+      : assertRequiredContextString(
+          context.seasonParticipantId,
+          'seasonParticipantId',
+        );
+  const tradingAccountId =
+    context.mode === 'general'
+      ? assertRequiredContextString(
+          context.tradingAccountId,
+          'tradingAccountId',
+        )
+      : null;
 
   const idempotencyKey = parseIdempotencyKey(body.idempotencyKey);
 
@@ -78,22 +99,31 @@ export function preflightFxExecuteRequest(
     return { ok: false, errorCode: fxExecuteErrorCodes.INVALID_AMOUNT };
   }
 
-  const hashInput: BuildFxExecuteCanonicalPayloadInput = {
-    userId,
-    seasonParticipantId,
-    quoteId,
-    fromCurrency: currencyPair.fromCurrency,
-    toCurrency: currencyPair.toCurrency,
-    sourceAmount,
-  };
-
-  const requestHash = computeFxExecuteRequestHash(hashInput);
+  const requestHash =
+    context.mode === 'general'
+      ? computeGeneralFxExecuteRequestHash({
+          userId,
+          tradingAccountId: tradingAccountId!,
+          quoteId,
+          fromCurrency: currencyPair.fromCurrency,
+          toCurrency: currencyPair.toCurrency,
+          sourceAmount,
+        })
+      : computeFxExecuteRequestHash({
+          userId,
+          seasonParticipantId: seasonParticipantId!,
+          quoteId,
+          fromCurrency: currencyPair.fromCurrency,
+          toCurrency: currencyPair.toCurrency,
+          sourceAmount,
+        } satisfies BuildFxExecuteCanonicalPayloadInput);
 
   return {
     ok: true,
     value: {
       userId,
       seasonParticipantId,
+      ...(tradingAccountId ? { tradingAccountId } : {}),
       quoteId,
       fromCurrency: currencyPair.fromCurrency,
       toCurrency: currencyPair.toCurrency,

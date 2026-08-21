@@ -3,6 +3,7 @@ import { parseLimitOrderEnabled } from '../orders/limit-order.config';
 import { readLimitOrderMatchingConfig } from '../orders/limit-order-matching.config';
 import { readGeneralTradeFeeRate } from '../orders/general-trading.config';
 import { readLiveCandleConfig } from '../assets/live-candle.config';
+import { readGeneralFxFeeRate } from '../fx/general-fx.config';
 
 /**
  * Central startup validation for environment variables whose misconfiguration
@@ -40,6 +41,7 @@ export function validateEnv(
 
   collect(errors, () => readLiveCandleConfig(env));
   collect(errors, () => readGeneralTradeFeeRate(env));
+  collect(errors, () => readGeneralFxFeeRate(env));
 
   // AD_REWARD_*: absent → disabled, which is a complete valid state. With
   // AD_REWARD_ENABLED=true every operational value (provider, amount, daily

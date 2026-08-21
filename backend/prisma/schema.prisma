@@ -1028,7 +1028,7 @@ model AdRewardClaim {
 
 model ExchangeTransaction {
   id                  String       @id @default(uuid())
-  seasonParticipantId String       @map("season_participant_id")
+  seasonParticipantId String?      @map("season_participant_id")
   // Transitional dual identity (see CashWallet).
   tradingAccountId    String?      @map("trading_account_id")
   fxRateSnapshotId    String?      @map("fx_rate_snapshot_id")
@@ -1044,7 +1044,7 @@ model ExchangeTransaction {
   executedAt          DateTime     @map("executed_at")
   createdAt           DateTime     @default(now()) @map("created_at")
 
-  seasonParticipant SeasonParticipant  @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  seasonParticipant SeasonParticipant? @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
   tradingAccount    TradingAccount?    @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   fxRateSnapshot    FxRateSnapshot?    @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
   fxExecuteRequests FxExecuteRequest[]
@@ -1149,7 +1149,7 @@ model Quote {
 model FxExecuteRequest {
   id                    String                 @id @default(uuid())
   userId                String                 @map("user_id")
-  seasonParticipantId   String                 @map("season_participant_id")
+  seasonParticipantId   String?                @map("season_participant_id")
   // Transitional dual identity (see CashWallet).
   tradingAccountId      String?                @map("trading_account_id")
   idempotencyKey        String                 @map("idempotency_key")
@@ -1168,12 +1168,12 @@ model FxExecuteRequest {
   updatedAt             DateTime               @updatedAt @map("updated_at")
 
   user                User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
-  seasonParticipant   SeasonParticipant    @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  seasonParticipant   SeasonParticipant?   @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
   tradingAccount      TradingAccount?      @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   exchangeTransaction ExchangeTransaction? @relation(fields: [exchangeTransactionId], references: [id], onDelete: Restrict)
 
   // Account-scoped idempotency: the SAME user may reuse a key across two
-  // different trading accounts (e.g. a season and a future general account);
+  // different trading accounts (e.g. a season and a general account);
   // within one account the key stays unique. NULL legacy rows stay allowed.
   //
   // The former global per-user unique on (userId, idempotencyKey) was

@@ -98,6 +98,9 @@ import { SeasonsService } from './src/seasons/seasons.service';
 import { FxService } from './src/fx/fx.service';
 import { WalletsService } from './src/wallets/wallets.service';
 import { TradingAccountAccessService } from './src/trading-accounts/trading-account-access.service';
+import { PortfolioValuationService } from './src/portfolio/portfolio-valuation.service';
+import { GeneralExternalFundingService } from './src/portfolio/general-external-funding.service';
+import { GeneralAccountPerformanceService } from './src/portfolio/general-account-performance.service';
 import {
   deriveSeasonTradingAccountId,
   ensureSeasonTradingAccountLink,
@@ -118,7 +121,14 @@ const CAPITAL = '10000000.00000000';
 const prisma = new PrismaService();
 const seasonsService = new SeasonsService(prisma);
 const accessService = new TradingAccountAccessService(prisma);
-const fxService = new FxService(prisma, undefined, undefined, accessService);
+const valuationService = new PortfolioValuationService(prisma);
+const externalFundingService = new GeneralExternalFundingService(prisma);
+const performanceService = new GeneralAccountPerformanceService(
+  prisma, valuationService, externalFundingService,
+);
+const fxService = new FxService(
+  prisma, undefined, undefined, accessService, performanceService,
+);
 const walletsService = new WalletsService(prisma, accessService);
 
 const MIGRATION_PATH =
@@ -903,7 +913,8 @@ async function testAccountScopedFxGating() {
     assert.equal(foreign.getStatus(), 404);
     assert.equal(foreign.getResponse().error.code, 'TRADING_ACCOUNT_NOT_FOUND');
 
-    // General account: structured not-implemented block, nothing created.
+    // A manually-created general account without its financial foundation
+    // fails closed and FX never creates or repairs wallets.
     const generalAccount = await prisma.tradingAccount.create({
       data: {
         userId: generalUser.id,
@@ -925,7 +936,7 @@ async function testAccountScopedFxGating() {
     }
     assert.equal(
       general.getResponse().error.code,
-      'GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED',
+      'GENERAL_ACCOUNT_INTEGRITY',
     );
     assert.equal(
       await prisma.cashWallet.count({

@@ -23,7 +23,9 @@ import {
 import { buildPagination, type Pagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
+import type { OwnedTradingAccount } from '../trading-accounts/trading-account-access.service';
 import { assertSeasonAccountFinancialScopeIntegrity } from '../trading-accounts/trading-account-financial-integrity';
+import { GeneralAccountPerformanceService } from '../portfolio/general-account-performance.service';
 import { debitAvailableCash } from '../wallets/cash-wallet-atomic';
 import { diagnoseCashWalletMutationFailure } from '../wallets/cash-wallet-failure-diagnosis';
 import { assertCashWalletTradingAccountScope } from '../wallets/cash-wallet-scope';
@@ -67,6 +69,7 @@ import {
 import {
   buildQuoteExpiresAt,
   computeFxQuoteRequestHash,
+  computeGeneralFxQuoteRequestHash,
 } from '../providers/durable-quote.policy';
 import {
   calculateChangeBps,
@@ -86,6 +89,7 @@ import {
   ProviderConfigError,
   ProviderHttpError,
 } from '../providers/provider.types';
+import { readGeneralFxFeeRate } from './general-fx.config';
 
 export type FxQuoteRequestBody = {
   fromCurrency?: unknown;
@@ -229,6 +233,28 @@ type ActiveSeasonRecord = {
   fxFeeRate: Prisma.Decimal;
 };
 
+type SeasonFxTradingContext = {
+  mode: typeof TradingAccountMode.season;
+  account: OwnedTradingAccount;
+  participant: {
+    id: string;
+    participantStatus: ParticipantStatus;
+    tradingAccountId: string;
+  };
+  season: ActiveSeasonRecord;
+  feeRate: Prisma.Decimal;
+};
+
+type GeneralFxTradingContext = {
+  mode: typeof TradingAccountMode.general;
+  account: OwnedTradingAccount;
+  participant: null;
+  season: null;
+  feeRate: Prisma.Decimal;
+};
+
+type FxTradingContext = SeasonFxTradingContext | GeneralFxTradingContext;
+
 type FxParticipantRecord = {
   id: string;
   participantStatus: ParticipantStatus;
@@ -305,6 +331,7 @@ type FxExecuteQuoteRecord = {
   toCurrency: CurrencyCode | null;
   sourceAmount: Prisma.Decimal | null;
   quotedRate: Prisma.Decimal | null;
+  quotedFeeRate: Prisma.Decimal | null;
   maxChangeBps: Prisma.Decimal;
   expiresAt: Date;
   requestHash: string;
@@ -335,6 +362,8 @@ export class FxService {
     private readonly rankingRefreshService?: RankingRefreshService,
     @Optional()
     private readonly tradingAccountAccessService?: TradingAccountAccessService,
+    @Optional()
+    private readonly generalAccountPerformanceService?: GeneralAccountPerformanceService,
   ) {}
 
   async currentRate(
@@ -520,13 +549,18 @@ export class FxService {
           : tradingAccountId,
       );
 
-    // A season account whose participant still owns unscoped/mis-scoped
-    // financial rows must NOT look like a normally-empty account: fail
-    // closed (repair required) instead of silently omitting history.
-    await assertSeasonAccountFinancialScopeIntegrity(this.prisma, {
-      tradingAccountId: account.id,
-      seasonParticipantId: account.seasonParticipant?.id ?? null,
-    });
+    if (account.mode === TradingAccountMode.general) {
+      await this.requireGeneralPerformanceService().assertGeneralAccountReady(
+        account,
+      );
+    } else {
+      // A season account whose participant still owns unscoped/mis-scoped
+      // financial rows must NOT look like a normally-empty account.
+      await assertSeasonAccountFinancialScopeIntegrity(this.prisma, {
+        tradingAccountId: account.id,
+        seasonParticipantId: account.seasonParticipant?.id ?? null,
+      });
+    }
 
     const where = {
       tradingAccountId: account.id,
@@ -650,15 +684,16 @@ export class FxService {
       return await this.createFxQuote({
         userId,
         request,
-        season,
-        participant,
+        mode: TradingAccountMode.season,
+        tradingAccountId: participant.tradingAccountId,
+        seasonParticipantId: participant.id,
+        feeRate: season.fxFeeRate,
         now,
       });
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
       }
-
       this.throwApiError(
         HttpStatus.INTERNAL_SERVER_ERROR,
         'INTERNAL_ERROR',
@@ -693,14 +728,22 @@ export class FxService {
       );
       this.assertTradingAccountExchangeable(context.account);
       const now = new Date();
-      this.assertSeasonExchangeableForQuote(context.season, now);
-      this.assertParticipantExchangeableForQuote(context.participant);
+      if (context.mode === TradingAccountMode.season) {
+        this.assertSeasonExchangeableForQuote(context.season, now);
+        this.assertParticipantExchangeableForQuote(context.participant);
+      } else {
+        await this.requireGeneralPerformanceService().assertGeneralAccountReady(
+          context.account,
+        );
+      }
 
       return await this.createFxQuote({
         userId,
         request,
-        season: context.season,
-        participant: context.participant,
+        mode: context.mode,
+        tradingAccountId: context.account.id,
+        seasonParticipantId: context.participant?.id ?? null,
+        feeRate: context.feeRate,
         now,
       });
     } catch (error) {
@@ -719,27 +762,29 @@ export class FxService {
   private async createFxQuote(input: {
     userId: string;
     request: ReturnType<FxService['validateQuoteRequest']>;
-    season: ActiveSeasonRecord;
-    participant: { id: string; tradingAccountId: string | null };
+    mode: TradingAccountMode;
+    tradingAccountId: string | null;
+    seasonParticipantId: string | null;
+    feeRate: Prisma.Decimal;
     now: Date;
   }): Promise<FxQuoteResponse> {
-    const { userId, request, season, participant, now } = input;
+    const { userId, request, mode, seasonParticipantId, feeRate, now } = input;
 
     {
       // Dual-write guard: a quote grants later execution authority, so it
       // must never be minted for a participant whose account link is
       // missing (deploy-boundary state; repair-links fixes it).
-      if (!participant.tradingAccountId) {
+      if (!input.tradingAccountId) {
         this.throwApiError(
           HttpStatus.INTERNAL_SERVER_ERROR,
           'TRADING_ACCOUNT_LINK_INTEGRITY',
           'Participant has no trading account link; run trading-accounts:repair-links.',
         );
       }
-      const tradingAccountId = participant.tradingAccountId;
+      const tradingAccountId = input.tradingAccountId;
 
       await this.assertQuoteSourceWalletBalance({
-        seasonParticipantId: participant.id,
+        seasonParticipantId,
         tradingAccountId,
         fromCurrency: request.fromCurrency,
         sourceAmount: request.sourceAmount,
@@ -772,7 +817,7 @@ export class FxService {
         request.fromCurrency === CurrencyCode.KRW
           ? request.sourceAmount.div(appliedRate)
           : request.sourceAmount.mul(appliedRate);
-      const feeAmount = grossTargetAmount.mul(season.fxFeeRate);
+      const feeAmount = grossTargetAmount.mul(feeRate);
       const netTargetAmount = grossTargetAmount.sub(feeAmount);
       const feeCurrency =
         request.fromCurrency === CurrencyCode.KRW
@@ -785,17 +830,26 @@ export class FxService {
         quoteCurrency: CurrencyCode.KRW,
       });
       const rateSource = presentSourceDecision(rateSnapshot.sourceDecision);
-      const requestHash = computeFxQuoteRequestHash({
-        userId,
-        seasonParticipantId: participant.id,
-        fromCurrency: request.fromCurrency,
-        toCurrency: request.toCurrency,
-        sourceAmount: request.sourceAmount,
-      });
+      const requestHash =
+        mode === TradingAccountMode.general
+          ? computeGeneralFxQuoteRequestHash({
+              userId,
+              tradingAccountId,
+              fromCurrency: request.fromCurrency,
+              toCurrency: request.toCurrency,
+              sourceAmount: request.sourceAmount,
+            })
+          : computeFxQuoteRequestHash({
+              userId,
+              seasonParticipantId: seasonParticipantId!,
+              fromCurrency: request.fromCurrency,
+              toCurrency: request.toCurrency,
+              sourceAmount: request.sourceAmount,
+            });
       const durableQuote = await this.prisma.quote.create({
         data: {
           userId,
-          seasonParticipantId: participant.id,
+          seasonParticipantId,
           tradingAccountId,
           quoteType: QuoteType.fx,
           status: QuoteStatus.active,
@@ -804,6 +858,10 @@ export class FxService {
           sourceAmount: this.formatDecimal(request.sourceAmount, 8),
           targetAmount: this.formatDecimal(netTargetAmount, 8),
           quotedRate: this.formatDecimal(appliedRate, 8),
+          quotedFeeRate:
+            mode === TradingAccountMode.general
+              ? this.formatDecimal(feeRate, 6)
+              : null,
           fxRateSnapshotId: rateSnapshot.id,
           fxRateSourceJson: rateSource as unknown as Prisma.InputJsonValue,
           maxChangeBps: maxChangeBps.toFixed(4),
@@ -824,7 +882,7 @@ export class FxService {
           sourceAmount: this.formatDecimal(request.sourceAmount, 8),
           appliedRate: this.formatDecimal(appliedRate, 8),
           grossTargetAmount: this.formatDecimal(grossTargetAmount, 8),
-          feeRate: this.formatDecimal(season.fxFeeRate, 6),
+          feeRate: this.formatDecimal(feeRate, 6),
           feeAmount: this.formatDecimal(feeAmount, 8),
           feeCurrency,
           netTargetAmount: this.formatDecimal(netTargetAmount, 8),
@@ -899,10 +957,156 @@ export class FxService {
   }
 
   /**
-   * Account-scoped FX execute: same policy chain, fees, ledger writes,
-   * idempotency semantics, and transaction atomicity as the legacy execute —
-   * the account named in the path only replaces how the participant is
-   * resolved, and idempotency is looked up per trading account.
+   * General execution keeps the season engine's quote, repricing, wallet,
+   * ledger and response machinery. Its only distinct concern is the
+   * account-level authorization/TWR fence: lock the account first, then use a
+   * PostgreSQL wall clock and revalidate every row inside that transaction.
+   */
+  private async executeGeneralFxForContext(input: {
+    userId: string;
+    body: FxExecuteRequestBody;
+    context: GeneralFxTradingContext;
+  }): Promise<FxExecuteSkeletonResponse> {
+    const { userId, body, context } = input;
+    const preflightResult = preflightFxExecuteRequest(body, {
+      mode: 'general',
+      userId,
+      tradingAccountId: context.account.id,
+      seasonParticipantId: null,
+    });
+    if (!preflightResult.ok) {
+      this.throwFxExecuteError(preflightResult.errorCode);
+    }
+    const normalizedRequest = preflightResult.value;
+
+    // Committed replay is resolved before mutable account-status checks.
+    const committed = await this.findFxExecuteCommandForIdempotency({
+      tradingAccountId: context.account.id,
+      userId,
+      seasonParticipantId: null,
+      idempotencyKey: normalizedRequest.idempotencyKey,
+      allowLegacyFallback: false,
+    });
+    if (committed) {
+      return this.returnExistingFxCommandOrThrow({
+        body,
+        normalizedRequest,
+        command: committed,
+        feeRate: context.feeRate,
+        executeNow: new Date(),
+      });
+    }
+
+    this.assertTradingAccountExchangeable(context.account);
+    await this.requireGeneralPerformanceService().assertGeneralAccountReady(
+      context.account,
+    );
+
+    // Provider ingestion/network work stays outside the financial transaction.
+    // The selected row is re-read for freshness after the account lock.
+    await this.tryEnsureFreshKoreaEximUsdKrwSnapshot({
+      now: new Date(),
+      maxAgeSeconds: 60,
+    });
+
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const lockedAccount = await this.lockGeneralFxAccountInTransaction(
+          tx,
+          userId,
+          context.account.id,
+        );
+        const executeNow = await this.readTransactionWallClock(tx);
+
+        const racedCommand = await this.findFxExecuteCommandForIdempotency(
+          {
+            tradingAccountId: context.account.id,
+            userId,
+            seasonParticipantId: null,
+            idempotencyKey: normalizedRequest.idempotencyKey,
+            allowLegacyFallback: false,
+          },
+          tx,
+        );
+        if (racedCommand) {
+          return this.returnExistingFxCommandOrThrow({
+            body,
+            normalizedRequest,
+            command: racedCommand,
+            feeRate: context.feeRate,
+            executeNow,
+          }) as FxExecuteSuccessResponse;
+        }
+
+        const quoteId = this.parseQuoteId(body.quoteId);
+        const quote = await this.findActiveFxQuoteOrThrow(
+          {
+            mode: TradingAccountMode.general,
+            quoteId,
+            userId,
+            seasonParticipantId: null,
+            tradingAccountId: context.account.id,
+            normalizedRequest,
+            executeNow,
+          },
+          tx,
+        );
+        const [sourceWallet, targetWallet, providerSnapshot] =
+          await Promise.all([
+            this.findFxExecuteWalletCandidate(
+              null,
+              context.account.id,
+              normalizedRequest.fromCurrency,
+              tx,
+            ),
+            this.findFxExecuteWalletCandidate(
+              null,
+              context.account.id,
+              normalizedRequest.toCurrency,
+              tx,
+            ),
+            this.findProviderFxExecuteSnapshot(executeNow, tx, false),
+          ]);
+
+        for (const wallet of [sourceWallet, targetWallet]) {
+          if (wallet) {
+            assertCashWalletTradingAccountScope(wallet, {
+              seasonParticipantId: null,
+              tradingAccountId: context.account.id,
+            });
+          }
+        }
+
+        const plan = this.buildProviderFxExecutePlan({
+          normalizedRequest,
+          quote,
+          sourceWallet,
+          targetWallet,
+          fxFeeRate: this.resolveGeneralQuotedFeeRate(quote),
+          providerSnapshot,
+          executeNow,
+        });
+
+        return this.executeFxWritePathInTransaction(tx, {
+          normalizedRequest,
+          plan,
+          executeNow,
+          tradingAccountId: context.account.id,
+          mode: TradingAccountMode.general,
+          generalAccount: lockedAccount,
+        });
+      });
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.throwFxExecuteError(fxExecuteErrorCodes.EXECUTE_TRANSACTION_FAILED);
+    }
+  }
+
+  /**
+   * Account-scoped FX execute: same quote/repricing/wallet/ledger core and
+   * transaction atomicity for both modes. The path account resolves either
+   * the existing season context or a participant-free general context, and
+   * idempotency is always scoped per trading account.
    */
   async executeForTradingAccount(
     userId: string | undefined,
@@ -927,6 +1131,13 @@ export class FxService {
         userId,
         tradingAccountId,
       );
+      if (context.mode === TradingAccountMode.general) {
+        return await this.executeGeneralFxForContext({
+          userId,
+          body,
+          context,
+        });
+      }
       this.assertTradingAccountExchangeable(context.account);
       const executeNow = new Date();
       this.assertSeasonExchangeableForExecute(context.season, executeNow);
@@ -1012,6 +1223,7 @@ export class FxService {
 
     const quoteId = this.parseQuoteId(body.quoteId);
     const quote = await this.findActiveFxQuoteOrThrow({
+      mode: TradingAccountMode.season,
       quoteId,
       userId,
       seasonParticipantId: participantId,
@@ -1023,10 +1235,12 @@ export class FxService {
     const [sourceWallet, targetWallet, providerSnapshot] = await Promise.all([
       this.findFxExecuteWalletCandidate(
         participantId,
+        tradingAccountId,
         normalizedRequest.fromCurrency,
       ),
       this.findFxExecuteWalletCandidate(
         participantId,
+        tradingAccountId,
         normalizedRequest.toCurrency,
       ),
       this.findProviderFxExecuteSnapshot(executeNow),
@@ -1196,15 +1410,19 @@ export class FxService {
     };
   }
 
-  private async findActiveFxQuoteOrThrow(input: {
-    quoteId: string;
-    userId: string;
-    seasonParticipantId: string;
-    tradingAccountId: string;
-    normalizedRequest: NormalizedFxExecuteRequest;
-    executeNow: Date;
-  }): Promise<FxExecuteQuoteRecord> {
-    const quote = await this.prisma.quote.findFirst({
+  private async findActiveFxQuoteOrThrow(
+    input: {
+      mode: TradingAccountMode;
+      quoteId: string;
+      userId: string;
+      seasonParticipantId: string | null;
+      tradingAccountId: string;
+      normalizedRequest: NormalizedFxExecuteRequest;
+      executeNow: Date;
+    },
+    client: PrismaService | Prisma.TransactionClient = this.prisma,
+  ): Promise<FxExecuteQuoteRecord> {
+    const quote = await client.quote.findFirst({
       where: {
         id: input.quoteId,
         userId: input.userId,
@@ -1219,6 +1437,7 @@ export class FxService {
         toCurrency: true,
         sourceAmount: true,
         quotedRate: true,
+        quotedFeeRate: true,
         maxChangeBps: true,
         expiresAt: true,
         requestHash: true,
@@ -1234,8 +1453,11 @@ export class FxService {
     // (pre-transition rows) pass through, and those are still pinned to the
     // same participant + request hash below.
     if (
-      quote.tradingAccountId !== null &&
-      quote.tradingAccountId !== input.tradingAccountId
+      (input.mode === TradingAccountMode.general &&
+        quote.tradingAccountId !== input.tradingAccountId) ||
+      (input.mode === TradingAccountMode.season &&
+        quote.tradingAccountId !== null &&
+        quote.tradingAccountId !== input.tradingAccountId)
     ) {
       this.throwFxExecuteError(fxExecuteErrorCodes.QUOTE_MISMATCH);
     }
@@ -1245,7 +1467,7 @@ export class FxService {
     }
 
     if (input.executeNow.getTime() > quote.expiresAt.getTime()) {
-      await this.prisma.quote.updateMany({
+      await client.quote.updateMany({
         where: {
           id: quote.id,
           status: QuoteStatus.active,
@@ -1257,13 +1479,22 @@ export class FxService {
       this.throwFxExecuteError(fxExecuteErrorCodes.QUOTE_EXPIRED);
     }
 
-    const requestHash = computeFxQuoteRequestHash({
-      userId: input.userId,
-      seasonParticipantId: input.seasonParticipantId,
-      fromCurrency: input.normalizedRequest.fromCurrency,
-      toCurrency: input.normalizedRequest.toCurrency,
-      sourceAmount: input.normalizedRequest.sourceAmount,
-    });
+    const requestHash =
+      input.mode === TradingAccountMode.general
+        ? computeGeneralFxQuoteRequestHash({
+            userId: input.userId,
+            tradingAccountId: input.tradingAccountId,
+            fromCurrency: input.normalizedRequest.fromCurrency,
+            toCurrency: input.normalizedRequest.toCurrency,
+            sourceAmount: input.normalizedRequest.sourceAmount,
+          })
+        : computeFxQuoteRequestHash({
+            userId: input.userId,
+            seasonParticipantId: input.seasonParticipantId!,
+            fromCurrency: input.normalizedRequest.fromCurrency,
+            toCurrency: input.normalizedRequest.toCurrency,
+            sourceAmount: input.normalizedRequest.sourceAmount,
+          });
 
     if (
       quote.seasonParticipantId !== input.seasonParticipantId ||
@@ -1282,18 +1513,25 @@ export class FxService {
   }
 
   private async assertQuoteSourceWalletBalance(input: {
-    seasonParticipantId: string;
+    seasonParticipantId: string | null;
     tradingAccountId: string;
     fromCurrency: CurrencyCode;
     sourceAmount: Prisma.Decimal;
   }): Promise<void> {
     const wallet = await this.prisma.cashWallet.findUnique({
-      where: {
-        seasonParticipantId_currencyCode: {
-          seasonParticipantId: input.seasonParticipantId,
-          currencyCode: input.fromCurrency,
-        },
-      },
+      where: input.seasonParticipantId
+        ? {
+            seasonParticipantId_currencyCode: {
+              seasonParticipantId: input.seasonParticipantId,
+              currencyCode: input.fromCurrency,
+            },
+          }
+        : {
+            tradingAccountId_currencyCode: {
+              tradingAccountId: input.tradingAccountId,
+              currencyCode: input.fromCurrency,
+            },
+          },
       select: {
         id: true,
         seasonParticipantId: true,
@@ -1328,12 +1566,16 @@ export class FxService {
 
   private async findProviderFxExecuteSnapshot(
     executeNow: Date,
+    client: PrismaService | Prisma.TransactionClient = this.prisma,
+    allowRefresh = true,
   ): Promise<FxExecuteRateSnapshot> {
     const selection = await this.selectFreshProviderUsdKrwSnapshot({
       now: executeNow,
       freshnessThresholdSeconds: 60,
       expectedSourceNames: FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
       take: FX_EXECUTE_SNAPSHOT_CANDIDATE_LIMIT,
+      client,
+      allowRefresh,
     });
 
     if (selection.state === 'selected') {
@@ -1355,9 +1597,13 @@ export class FxService {
     freshnessThresholdSeconds: number;
     expectedSourceNames: readonly string[];
     take: number;
+    client?: PrismaService | Prisma.TransactionClient;
+    allowRefresh?: boolean;
   }) {
+    const client = input.client ?? this.prisma;
     let candidates = await this.findProviderUsdKrwSnapshotCandidates(
       input.take,
+      client,
     );
     const primarySelection = selectFreshProviderSnapshot({
       candidates,
@@ -1367,7 +1613,7 @@ export class FxService {
       isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
     });
 
-    if (primarySelection.state !== 'selected') {
+    if (primarySelection.state !== 'selected' && input.allowRefresh !== false) {
       const refreshed = await this.tryEnsureFreshKoreaEximUsdKrwSnapshot({
         now: input.now,
         maxAgeSeconds: input.freshnessThresholdSeconds,
@@ -1376,6 +1622,7 @@ export class FxService {
       if (refreshed) {
         candidates = await this.findProviderUsdKrwSnapshotCandidates(
           input.take,
+          client,
         );
       }
     }
@@ -1389,8 +1636,11 @@ export class FxService {
     });
   }
 
-  private findProviderUsdKrwSnapshotCandidates(take: number) {
-    return this.prisma.fxRateSnapshot.findMany({
+  private findProviderUsdKrwSnapshotCandidates(
+    take: number,
+    client: PrismaService | Prisma.TransactionClient = this.prisma,
+  ) {
+    return client.fxRateSnapshot.findMany({
       where: {
         baseCurrency: CurrencyCode.USD,
         quoteCurrency: CurrencyCode.KRW,
@@ -1972,22 +2222,38 @@ export class FxService {
    * can never be replayed. The former global (userId, idempotencyKey)
    * lookup is gone together with its unique index.
    */
-  private async findFxExecuteCommandForIdempotency(input: {
-    tradingAccountId: string;
-    userId: string;
-    seasonParticipantId: string;
-    idempotencyKey: string;
-  }): Promise<FxExecuteCommandCandidate | null> {
+  private async findFxExecuteCommandForIdempotency(
+    input: {
+      tradingAccountId: string;
+      userId: string;
+      seasonParticipantId: string | null;
+      idempotencyKey: string;
+      allowLegacyFallback?: boolean;
+    },
+    client: PrismaService | Prisma.TransactionClient = this.prisma,
+  ): Promise<FxExecuteCommandCandidate | null> {
     const accountCommand = await this.findFxExecuteCommandCandidateByAccount(
       input.tradingAccountId,
       input.idempotencyKey,
+      client,
     );
 
     if (accountCommand) {
       return accountCommand;
     }
 
-    return this.findLegacyFxExecuteCommandCandidate(input);
+    if (input.allowLegacyFallback === false || !input.seasonParticipantId) {
+      return null;
+    }
+
+    return this.findLegacyFxExecuteCommandCandidate(
+      {
+        userId: input.userId,
+        seasonParticipantId: input.seasonParticipantId,
+        idempotencyKey: input.idempotencyKey,
+      },
+      client,
+    );
   }
 
   /**
@@ -1996,12 +2262,15 @@ export class FxService {
    * index. The participant condition keeps the fallback from ever selecting
    * a different season's row for the same user.
    */
-  private async findLegacyFxExecuteCommandCandidate(input: {
-    userId: string;
-    seasonParticipantId: string;
-    idempotencyKey: string;
-  }): Promise<FxExecuteCommandCandidate | null> {
-    const command = await this.prisma.fxExecuteRequest.findFirst({
+  private async findLegacyFxExecuteCommandCandidate(
+    input: {
+      userId: string;
+      seasonParticipantId: string;
+      idempotencyKey: string;
+    },
+    client: PrismaService | Prisma.TransactionClient = this.prisma,
+  ): Promise<FxExecuteCommandCandidate | null> {
+    const command = await client.fxExecuteRequest.findFirst({
       where: {
         userId: input.userId,
         seasonParticipantId: input.seasonParticipantId,
@@ -2050,8 +2319,9 @@ export class FxService {
   private async findFxExecuteCommandCandidateByAccount(
     tradingAccountId: string,
     idempotencyKey: string,
+    client: PrismaService | Prisma.TransactionClient = this.prisma,
   ): Promise<FxExecuteCommandCandidate | null> {
-    const command = await this.prisma.fxExecuteRequest.findUnique({
+    const command = await client.fxExecuteRequest.findUnique({
       where: {
         tradingAccountId_idempotencyKey: {
           tradingAccountId,
@@ -2082,27 +2352,120 @@ export class FxService {
     };
   }
 
+  private returnExistingFxCommandOrThrow(input: {
+    body: FxExecuteRequestBody;
+    normalizedRequest: NormalizedFxExecuteRequest;
+    command: FxExecuteCommandCandidate;
+    feeRate: Prisma.Decimal | string;
+    executeNow: Date;
+  }): FxExecuteSkeletonResponse {
+    const context = input.normalizedRequest.seasonParticipantId
+      ? {
+          userId: input.normalizedRequest.userId,
+          seasonParticipantId: input.normalizedRequest.seasonParticipantId,
+        }
+      : {
+          mode: 'general' as const,
+          userId: input.normalizedRequest.userId,
+          tradingAccountId: input.normalizedRequest.tradingAccountId!,
+          seasonParticipantId: null,
+        };
+    const response = mapFxExecuteOrchestrationDecisionToSkeletonResponse(
+      orchestrateFxExecutePreMutation({
+        body: input.body,
+        context,
+        existingCommand: input.command,
+        sourceWallet: null,
+        targetWallet: null,
+        snapshots: [],
+        fxFeeRate: this.formatDecimal(this.toDecimal(input.feeRate), 6),
+        executeNow: input.executeNow,
+      }),
+    );
+    return this.returnFxExecuteSkeletonResponseOrThrow(response);
+  }
+
+  private resolveGeneralQuotedFeeRate(quote: FxExecuteQuoteRecord): string {
+    const feeRate = quote.quotedFeeRate;
+    if (
+      !feeRate ||
+      !feeRate.isFinite() ||
+      feeRate.lt(0) ||
+      feeRate.gt(1) ||
+      feeRate.decimalPlaces() > 6
+    ) {
+      // Rolling-deploy quotes created before fee pinning must be requoted;
+      // silently reading today's env would violate quote determinism.
+      this.throwFxExecuteError(fxExecuteErrorCodes.QUOTE_MISMATCH);
+    }
+    return this.formatDecimal(feeRate, 6);
+  }
+
+  private async lockGeneralFxAccountInTransaction(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    tradingAccountId: string,
+  ): Promise<OwnedTradingAccount> {
+    const rows = await tx.$queryRaw<
+      Array<{
+        id: string;
+        mode: TradingAccountMode;
+        status: TradingAccountStatus;
+      }>
+    >`
+      SELECT "id", "mode", "status"
+      FROM "trading_accounts"
+      WHERE "id" = ${tradingAccountId} AND "user_id" = ${userId}
+      FOR UPDATE
+    `;
+    const locked = rows[0];
+    if (
+      !locked ||
+      locked.mode !== TradingAccountMode.general ||
+      locked.status !== TradingAccountStatus.active
+    ) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'TRADING_ACCOUNT_NOT_ACTIVE',
+        'Trading account is not active',
+      );
+    }
+
+    const account =
+      await this.requireTradingAccountAccessService().getOwnedAccountOrThrow(
+        userId,
+        tradingAccountId,
+        tx,
+      );
+    await this.requireGeneralPerformanceService().assertGeneralAccountReady(
+      account,
+      tx,
+    );
+    return account;
+  }
+
+  private async readTransactionWallClock(
+    tx: Prisma.TransactionClient,
+  ): Promise<Date> {
+    const rows = await tx.$queryRaw<Array<{ now: Date }>>`
+      SELECT clock_timestamp() AS "now"
+    `;
+    const now = rows[0]?.now;
+    if (!now) {
+      this.throwFxExecuteError(fxExecuteErrorCodes.EXECUTE_TRANSACTION_FAILED);
+    }
+    return now;
+  }
+
   /**
-   * Resolve an owned season trading account into the FX context (account,
-   * participant, season). Ownership uses the shared access layer, so a
-   * nonexistent id and another user's id are the same 404.
+   * Resolve an owned account into its season/general FX context. Ownership
+   * uses the shared access layer, so a nonexistent id and another user's id
+   * are the same 404.
    */
   private async resolveTradingAccountFxContext(
     userId: string,
     tradingAccountId: string,
-  ): Promise<{
-    account: {
-      id: string;
-      mode: TradingAccountMode;
-      status: TradingAccountStatus;
-    };
-    participant: {
-      id: string;
-      participantStatus: ParticipantStatus;
-      tradingAccountId: string;
-    };
-    season: ActiveSeasonRecord;
-  }> {
+  ): Promise<FxTradingContext> {
     if (!this.tradingAccountAccessService) {
       this.throwApiError(
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -2119,16 +2482,21 @@ export class FxService {
           : tradingAccountId,
       );
 
-    // General-mode FX is not implemented yet: no general wallets or funding
-    // exist, so account-scoped FX is season-only for now.
-    if (
-      account.mode !== TradingAccountMode.season ||
-      !account.seasonParticipant
-    ) {
+    if (account.mode === TradingAccountMode.general) {
+      return {
+        mode: TradingAccountMode.general,
+        account,
+        participant: null,
+        season: null,
+        feeRate: readGeneralFxFeeRate(),
+      };
+    }
+
+    if (!account.seasonParticipant) {
       this.throwApiError(
-        HttpStatus.CONFLICT,
-        'GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED',
-        'FX is not available for general accounts yet.',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'TRADING_ACCOUNT_LINK_INTEGRITY',
+        'Season trading account has no participant link.',
       );
     }
 
@@ -2153,17 +2521,15 @@ export class FxService {
     }
 
     return {
-      account: {
-        id: account.id,
-        mode: account.mode,
-        status: account.status,
-      },
+      mode: TradingAccountMode.season,
+      account,
       participant: {
         id: account.seasonParticipant.id,
         participantStatus: account.seasonParticipant.participantStatus,
         tradingAccountId: account.id,
       },
       season,
+      feeRate: season.fxFeeRate,
     };
   }
 
@@ -2186,18 +2552,27 @@ export class FxService {
   }
 
   private async findFxExecuteWalletCandidate(
-    seasonParticipantId: string,
+    seasonParticipantId: string | null,
+    tradingAccountId: string,
     currencyCode: FxExecuteWalletCandidate['currencyCode'],
+    client: PrismaService | Prisma.TransactionClient = this.prisma,
   ): Promise<
     (FxExecuteWalletCandidate & { tradingAccountId: string | null }) | null
   > {
-    return this.prisma.cashWallet.findUnique({
-      where: {
-        seasonParticipantId_currencyCode: {
-          seasonParticipantId,
-          currencyCode,
-        },
-      },
+    return client.cashWallet.findUnique({
+      where: seasonParticipantId
+        ? {
+            seasonParticipantId_currencyCode: {
+              seasonParticipantId,
+              currencyCode,
+            },
+          }
+        : {
+            tradingAccountId_currencyCode: {
+              tradingAccountId,
+              currencyCode,
+            },
+          },
       select: {
         id: true,
         seasonParticipantId: true,
@@ -2250,12 +2625,15 @@ export class FxService {
   }): Promise<FxExecuteSuccessResponse> {
     try {
       const response = await this.prisma.$transaction(async (tx) => {
-        return this.executeFxWritePathInTransaction(tx, input);
+        return this.executeFxWritePathInTransaction(tx, {
+          ...input,
+          mode: TradingAccountMode.season,
+        });
       });
 
       this.refreshRankingAfterParticipantChange(
         input.seasonId,
-        input.normalizedRequest.seasonParticipantId,
+        input.normalizedRequest.seasonParticipantId!,
       );
 
       return response;
@@ -2283,7 +2661,7 @@ export class FxService {
               context: {
                 userId: input.normalizedRequest.userId,
                 seasonParticipantId:
-                  input.normalizedRequest.seasonParticipantId,
+                  input.normalizedRequest.seasonParticipantId!,
               },
               existingCommand,
               sourceWallet: null,
@@ -2311,12 +2689,14 @@ export class FxService {
       plan: ProviderFxExecutePlan;
       executeNow: Date;
       tradingAccountId: string;
+      mode: TradingAccountMode;
+      generalAccount?: OwnedTradingAccount;
     },
   ): Promise<FxExecuteSuccessResponse> {
     const { normalizedRequest, plan, executeNow, tradingAccountId } = input;
 
-    // Transitional dual-write: every row below records BOTH the legacy
-    // seasonParticipantId and the verified tradingAccountId.
+    // Season rows dual-write participant + account. General rows are purely
+    // account-scoped and deliberately keep seasonParticipantId NULL.
     const command = await tx.fxExecuteRequest.create({
       data: {
         userId: normalizedRequest.userId,
@@ -2344,7 +2724,9 @@ export class FxService {
         id: plan.quoteId,
         status: QuoteStatus.active,
         seasonParticipantId: plan.seasonParticipantId,
-        OR: [{ tradingAccountId }, { tradingAccountId: null }],
+        ...(input.mode === TradingAccountMode.general
+          ? { tradingAccountId }
+          : { OR: [{ tradingAccountId }, { tradingAccountId: null }] }),
       },
       data: {
         status: QuoteStatus.consumed,
@@ -2426,13 +2808,6 @@ export class FxService {
       },
     });
 
-    await this.recordExchangeExecutedPortfolioSnapshot(
-      tx,
-      plan,
-      executeNow,
-      tradingAccountId,
-    );
-
     const responsePayloadJson = this.buildFxExecuteSuccessResponse({
       exchangeId: exchangeTransaction.id,
       executedAt: executeNow,
@@ -2440,6 +2815,15 @@ export class FxService {
       sourceWallet,
       targetWallet,
     });
+
+    if (input.mode === TradingAccountMode.season) {
+      await this.recordExchangeExecutedPortfolioSnapshot(
+        tx,
+        plan,
+        executeNow,
+        tradingAccountId,
+      );
+    }
 
     await tx.fxExecuteRequest.update({
       where: {
@@ -2456,6 +2840,20 @@ export class FxService {
       },
     });
 
+    if (input.mode === TradingAccountMode.general) {
+      if (!input.generalAccount) {
+        throw new Error('General FX account context is missing.');
+      }
+      await this.requireGeneralPerformanceService().createOrdinarySnapshotInTransaction(
+        {
+          account: input.generalAccount,
+          reason: SnapshotReason.exchange_executed,
+          capturedAt: executeNow,
+          client: tx,
+        },
+      );
+    }
+
     return responsePayloadJson;
   }
 
@@ -2466,6 +2864,9 @@ export class FxService {
     /** The execution's ALREADY-VERIFIED account scope (작업 7 dual-write). */
     tradingAccountId: string,
   ): Promise<void> {
+    if (!plan.seasonParticipantId) {
+      throw new Error('Season FX participant context is missing.');
+    }
     const valuation = await this.calculateParticipantValuationInTransaction(
       tx,
       plan.seasonParticipantId,
@@ -2693,6 +3094,7 @@ export class FxService {
     return this.findPostUpdateWalletOrThrow(tx, {
       walletId: plan.sourceWalletId,
       seasonParticipantId: plan.seasonParticipantId,
+      tradingAccountId,
       currencyCode: plan.fromCurrency,
       missingErrorCode: fxExecuteErrorCodes.SOURCE_WALLET_NOT_FOUND,
     });
@@ -2742,6 +3144,7 @@ export class FxService {
     return this.findPostUpdateWalletOrThrow(tx, {
       walletId: plan.targetWalletId,
       seasonParticipantId: plan.seasonParticipantId,
+      tradingAccountId,
       currencyCode: plan.toCurrency,
       missingErrorCode: fxExecuteErrorCodes.TARGET_WALLET_NOT_FOUND,
     });
@@ -2783,7 +3186,8 @@ export class FxService {
     tx: FxExecuteTransactionClient,
     input: {
       walletId: string;
-      seasonParticipantId: string;
+      seasonParticipantId: string | null;
+      tradingAccountId: string;
       currencyCode: CurrencyCode;
       missingErrorCode: FxExecuteErrorCode;
     },
@@ -2792,6 +3196,7 @@ export class FxService {
       where: {
         id: input.walletId,
         seasonParticipantId: input.seasonParticipantId,
+        tradingAccountId: input.tradingAccountId,
         currencyCode: input.currencyCode,
       },
       select: {
@@ -2939,6 +3344,28 @@ export class FxService {
       buildFxExecuteErrorEnvelope(code),
       metadata.httpStatus,
     );
+  }
+
+  private requireTradingAccountAccessService(): TradingAccountAccessService {
+    if (!this.tradingAccountAccessService) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'INTERNAL_ERROR',
+        'Trading account access service unavailable',
+      );
+    }
+    return this.tradingAccountAccessService;
+  }
+
+  private requireGeneralPerformanceService(): GeneralAccountPerformanceService {
+    if (!this.generalAccountPerformanceService) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'INTERNAL_ERROR',
+        'General account performance service unavailable',
+      );
+    }
+    return this.generalAccountPerformanceService;
   }
 
   private refreshRankingAfterParticipantChange(

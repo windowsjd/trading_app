@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import {
   assertGeneralAccountFinancialIntegrity,
+  assertGeneralAccountFxRowsIntegrity,
   assertGeneralAccountTradingRowsIntegrity,
   throwGeneralAccountIntegrity,
   type GeneralAccountIntegrityTarget,
@@ -402,8 +403,9 @@ export class GeneralAccountPerformanceService {
 
   /**
    * Persists an ordinary, performance-bearing event inside the caller's
-   * financial transaction. A trade is not external funding: it advances TWR
-   * from the verified prior state and keeps cumulative funding unchanged.
+   * financial transaction. A trade or FX conversion is not external funding:
+   * it advances TWR from the verified prior state and keeps cumulative funding
+   * unchanged.
    */
   async createOrdinarySnapshotInTransaction(input: {
     account: GeneralAccountIntegrityTarget;
@@ -563,23 +565,11 @@ export class GeneralAccountPerformanceService {
 
     await assertGeneralAccountTradingRowsIntegrity(client, account.id);
 
-    const [exchanges, fxRequests] = await Promise.all([
-      client.exchangeTransaction.count({
-        where: { tradingAccountId: account.id },
-      }),
-      client.fxExecuteRequest.count({
-        where: { tradingAccountId: account.id },
-      }),
-    ]);
-
-    // General FX remains a separate, disabled domain. Its rows are still
-    // structural corruption for a general account in this release.
-    if (exchanges > 0 || fxRequests > 0) {
-      throwGeneralAccountIntegrity(
-        account.id,
-        `general FX is not enabled but the account has exchanges=${exchanges}, fxRequests=${fxRequests}`,
-      );
-    }
+    await assertGeneralAccountFxRowsIntegrity(
+      client,
+      account.id,
+      account.userId,
+    );
 
     return wallets;
   }

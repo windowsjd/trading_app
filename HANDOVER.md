@@ -12,12 +12,126 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 일반계정 KRW↔USD FX 공통 코어 활성화 (2026-08-18, WORK-ID GENERAL-ACCOUNT-FX-V1)
+
+**시작 SHA** `4b048f8783a9596024093d2e72d75d1d0aa6f26d` (`git fetch --prune`
+후 로컬 HEAD = `origin/main`, working tree clean). 이 작업은 현재 해당
+commit 위 working tree 변경이며 아직 커밋하지 않았다.
+
+#### 목표·공통화
+
+일반 FX 전용 API·service·screen을 만들지 않고 기존
+`/api/v1/trading-accounts/:accountId/fx/*`, `FxService`, `WalletFxScreen`을
+mode-aware하게 확장했다. 통화·금액 validation, provider snapshot
+선택/freshness, durable quote, execute-time repricing/30bps, 수수료 계산,
+available-balance 출금, 상대 지갑 입금, 두 원장, quote consumption,
+멱등 replay, rollback, response mapping은 하나의 기존 코어를 재사용한다.
+
+- season context는 기존 Season.status/startAt/endAt, participant
+  status/excluded, `Season.fxFeeRate`와 v1 quote/execute hash를 그대로 유지한다.
+- general context는 소유한 active account, participant-null foundation,
+  KRW/USD wallet·ledger·TWR continuity만 요구하며 현재 시즌을 조회하지
+  않는다. suspended/closed는 wallet/FX history 조회와 committed replay만
+  허용하고 신규 quote/execute는 차단한다.
+- source debit는 `balanceAmount - reservedAmount`를 원자적으로 검사하므로
+  submitted limit-buy 예약금을 FX가 소비할 수 없다. 주문 중 자동
+  KRW→USD 환전은 추가하지 않았다.
+
+#### DB·수수료·hash
+
+- DDL-only migration `20260818180000_enable_general_account_fx`은
+  `ExchangeTransaction.seasonParticipantId`/
+  `FxExecuteRequest.seasonParticipantId`만 nullable로 바꾸며 기존 season row를
+  UPDATE/삭제/재작성하지 않는다. 기존 account history/멱등 index를
+  재사용해 새 index는 없다.
+- `GENERAL_FX_FEE_RATE`는 season FX·general 주문 수수료와 독립된
+  단일 config다. 미설정 기본 `0.001000`, 0~1/소수 6자리를
+  startup에서 엄격히 검증한다. general quote는 이 값을 기존
+  `Quote.quotedFeeRate`에 pin하고 execute는 pinned fee만 쓴다. 환율은
+  fresh provider로 재가격한다. null/부적합 fee quote는 현재 env로
+  fallback하지 않고 409 `QUOTE_MISMATCH`로 재견적한다.
+- season `fx-quote:v1`/`fx-execute:v1` serializer·field order·고정 hash
+  vector를 바꾸지 않았다. general은 user+account scope를 담은 v2 hash를
+  쓴다. 기존 null-account replay fallback은 season user+participant에만 남고
+  general로 확장하지 않았다.
+
+#### 원자성·TWR·무결성
+
+- general execute는 account row `FOR UPDATE` 후 DB `clock_timestamp()`를
+  사용한다. 같은 transaction에 quote consume, request, 두 wallet, exchange,
+  source/target ledger, stored response, null-participant
+  `exchange_executed` ordinary TWR snapshot을 기록한다. 환전 fee는 투자
+  성과에 반영되지만 external-funding boundary가 아니고 cumulative funding은
+  불변이다. SeasonParticipant/Ranking/settlement는 쓰지 않는다.
+- general FX Quote/Request/Exchange와 두 ledger는 account non-null + participant
+  null을 요구한다. request↔exchange, user↔account, ledger↔wallet↔exchange scope,
+  succeeded command 1건/source debit 1건/target credit 1건을 runtime과
+  `audit-general`이 같은 의미로 fail-closed/보고한다. 자동 repair는 없다.
+- audit summary/finding에 participant pollution, invalid/missing account scope,
+  request/exchange mismatch, quote owner mismatch, invalid pinned fee,
+  exchange/ledger mismatch를 추가했다. production audit은 계속 SELECT-only다.
+
+#### Frontend·CI·문서
+
+- active general `canExchange=true`; suspended/closed는 false다. 기존
+  WalletFxScreen, account-scoped API/query keys, route account binding,
+  scopeEpoch/request-sequence stale response gate, acting-account invalidate를 그대로
+  쓴다. 계정 전환 시 amount/quote/key/success를 버리며 영역·방향
+  텍스트는 줄바꿈·shrink로 잘림을 줄였다.
+- GitHub Actions의 기존 serial `core-account-db-integration` job에
+  `GENERAL_FX_DB_INTEGRATION=1` +
+  `general-account-fx.integration.spec.ts`를 명시했다. 따라서 opt-in
+  spec은 CI에서 skip되지 않고 migration/drift·general trading/audit fixture와
+  같은 fresh PostgreSQL lifecycle를 쓴다. 별도 job은 만들지 않았다.
+- finance/FX/general/mode/policy/frontend switching 계약, backend README,
+  docs guide를 현재 상태로 갱신했다. 과거 기록의 “당시 차단”은
+  역사적 맥락을 남기고 후속 활성화를 명시했다. 직전 매매
+  하드닝이 현재도 working tree인 것처럼 쓰인 문장은 실제
+  commit `4b048f8783a9596024093d2e72d75d1d0aa6f26d`로 바로잡았다.
+
+#### 검증·최종 자체 검토
+
+- Prisma format/validate/generate, account lint + 변경 production FX/audit
+  ESLint, typecheck, build 통과. backend unit은 185 suites / 2,592 tests
+  PASS, env-gated 36 suites / 40 tests SKIP. E2E는 작업 중 126/126 PASS를
+  확인했지만 최종 재실행은 managed sandbox가 Supertest listen을
+  EPERM으로 막아 126건 모두 assertion 전 environment failure가 났다. frontend
+  `npm run check`는 38/38 PASS, `npm run export:web` PASS.
+- 실제 PostgreSQL에서 general FX 1/1과 general audit corruption 1/1이
+  초기 구현 상태에서 PASS했고 audit CLI도 `No findings`/exit 0을
+  확인했다. season `fx.execute.integration.spec.ts` 최종 1/1도 PASS.
+  최종 review에서 user-scope·동시 replay·null fee·closed account·wallet
+  corruption과 audit invalid-account/pinned-fee/ledger 손상 assertion을 추가했다.
+  이 확장 spec의 최종 재실행은 managed sandbox가 내부
+  `test:db:prepare`/`tsx` IPC를 EPERM으로 차단해 prepare 단계에서
+  실패했다(제품 assertion 실행 전). 같은 이유로 final
+  `migrate status`/`migrate diff`와 확장 audit clean-run은 재확인하지
+  못했고 CI의 fresh PostgreSQL 필수 job에서 실행된다.
+- 전체 diff에서 quote→execute fee source, reserved cash, account lock/TWR
+  ordering, committed replay, scope writer/read, season hash/gate/ranking/settlement,
+  CI env/spec path를 재추적했다. 자체 review 중 PostgreSQL `numeric`의
+  고정 scale를 `scale()`로 검사하면 정상 fee를 오탐하는 audit 결함을
+  발견해 `round(value, 6) <> value`로 수정했다. runtime에서
+  `GENERAL_ACCOUNT_INTEGRITY`가 나는 대표 FX scope·command·ledger 손상이
+  audit `No findings`로 숨지 않도록 검사 범위를 맞췄다. 문서 재검색에서
+  과거 작업 섹션의 “FX 차단만 현재도 유지”와 현재 배포 체크리스트의 차단
+  smoke 문구도 발견해, 과거 사실은 보존하면서 현재 lifecycle과 구분했다.
+- 의도적 제외: 주문 시 자동환전, 실은행/실제 외환 주문,
+  지정가/예약/partial FX·order book, KRW/USD 외 통화, 계정 간 이동,
+  general ranking/reward, 실제 광고 provider, queue/event bus/분산락,
+  `/api/v2`.
+
+---
+
 ### 작업 단위: 일반계정 매매 릴리스 하드닝 (2026-08-18, WORK-ID GENERAL-TRADING-RELEASE-HARDENING-V1)
 
 **시작 커밋** `1039eb6218971c545ebbc6821715eea70c5dc2fa`
 (parent `3be4b1e68b80bd3ff178bdec567dec012bc00213`; 작업 시작 시 `git fetch`
-완료, 로컬 HEAD = `origin/main`, working tree clean). 이 기록의 변경은 해당 커밋
-위 working tree에 있으며 최종 commit SHA는 커밋 후 `git log -1`로 확인한다.
+완료, 로컬 HEAD = `origin/main`, working tree clean). 이 작업은 수행 당시
+working tree 변경이었고, 이후 commit
+`4b048f8783a9596024093d2e72d75d1d0aa6f26d`로 main에 반영되었다(parent
+`1039eb6218971c545ebbc6821715eea70c5dc2fa`). 현재 uncommitted 작업이라는
+뜻이 아니다.
 
 #### 목표와 변경 영역
 
@@ -168,7 +282,9 @@ nullable participant/season, `feeRate`를 확정한 뒤 공통 코어에 전달�
 #### Frontend
 
 - active general은 `canTrade=true`, `canQuote=true`, `canCancelOrder=true`,
-  `canExchange=false`; suspended/closed는 read와 기존 limit cancel만 가능하다.
+  당시 `canExchange=false`였고 suspended/closed는 read와 기존 limit cancel만
+  가능했다. 후속 `GENERAL-ACCOUNT-FX-V1`에서 active general FX가
+  활성화됐다.
 - 기존 `OrderScreen`과 account-scoped quote/create/cancel API를 general도 그대로
   사용한다. 시장가/지정가 buy/sell, sell 예약수량·예상 순수령액, 주문 목록 row의
   체결·예약 상세, position 표시를 연결했다. General Home의 `주문 내역 보기`는
@@ -176,8 +292,9 @@ nullable participant/season, `feeRate`를 확정한 뒤 공통 코어에 전달�
   유지한다. general 전용 주문 화면이나 query/state framework는 없다.
 - 기존 `{accountId, scopeEpoch}` gate, 진입 account 고정, stale response 차단,
   행위 account만 invalidate하는 cache isolation은 유지했다.
-- 일반 투자 문구는 매매 가능/환전 준비 중을 구분한다. ranking/tier/season reward는
-  general에 노출하지 않는다.
+- 일반 투자 문구는 당시 매매 가능/환전 준비 중을 구분했다.
+  후속 FX 활성화가 이 문구를 갱신했고, ranking/tier/season reward는
+  general에 여전히 노출하지 않는다.
 
 #### 검증
 
@@ -322,14 +439,14 @@ clean이었다 — 직전 작업과 달리 미푸시 커밋은 없었다).
 
 **시작 시점 hosted CI 상태 (run 30928336606, `e8063c0e`)**
 
-| Job | 결과 |
-| --- | --- |
-| Backend quality | 성공 |
-| Frontend quality | 성공 |
-| Core account PostgreSQL integration | 성공 |
-| Limit order PostgreSQL integration | 성공 |
-| Candle fixture integration | 성공 |
-| **Release-critical E2E** | **실패** — `Canonical e2e (no environment variables)` step |
+| Job                                 | 결과                                                       |
+| ----------------------------------- | ---------------------------------------------------------- |
+| Backend quality                     | 성공                                                       |
+| Frontend quality                    | 성공                                                       |
+| Core account PostgreSQL integration | 성공                                                       |
+| Limit order PostgreSQL integration  | 성공                                                       |
+| Candle fixture integration          | 성공                                                       |
+| **Release-critical E2E**            | **실패** — `Canonical e2e (no environment variables)` step |
 
 ---
 
@@ -360,7 +477,7 @@ service도 없는 CI에서는 `redis: 'disabled'`가 나온다. 테스트는 `'o
 - `expectReadinessContract()`가 **양쪽 레벨 모두 `objectContaining`**으로
   검증한다. 진단 필드가 늘어나는 것은 additive 변경이고 계약 테스트를 깨서는
   안 된다. 비밀 노출 검사(`DATABASE_URL|REDIS_URL|KIS_APP_SECRET|approval_key|
-  access_token|secret`)는 유지·확장했다.
+access_token|secret`)는 유지·확장했다.
 - readiness 테스트 1개 → 5개: 설정 없음 → `disabled`+`ready`+`reasons: []`,
   공백 `REDIS_URL`(명시적 비활성화) → `disabled`, 설정+정상 → `ok`, 설정+연결
   실패 → `unavailable`이며 `ready`가 **아님**, 그리고 진단 필드가 존재해도
@@ -442,21 +559,21 @@ start 하는 경우** — 이 일이 일어날 가능성이 가장 높은 바로
 아예 실행되지 않았다. 사용자는 모든 요청이 401인 정상처럼 보이는 앱에, 이전
 세션의 캐시를 화면에 둔 채 남겨졌다.
 
-  → `pending`을 보존하고 다음에 등록되는 handler에게 **정확히 한 번** 전달한다.
-  단일 handler 구조 그대로 — emitter도 bus도 subscriber 목록도 없다.
-  `resetSessionExpiryNotice()`는 `notified`와 `pending`을 **둘 다** 지운다.
-  죽은 세션의 만료가 방금 성공한 로그인을 무너뜨리면 안 된다.
+→ `pending`을 보존하고 다음에 등록되는 handler에게 **정확히 한 번** 전달한다.
+단일 handler 구조 그대로 — emitter도 bus도 subscriber 목록도 없다.
+`resetSessionExpiryNotice()`는 `notified`와 `pending`을 **둘 다** 지운다.
+죽은 세션의 만료가 방금 성공한 로그인을 무너뜨리면 안 된다.
 
 **B. 순서.** bridge가 `void endSession(...)`과 `resetToLoginFromRef()`를 나란히
 호출했고, `endSession`은 AsyncStorage를 await한 **뒤에야** 캐시를 지웠다. 그
 사이 토큰은 없는데 이전 세션의 잔액은 캐시에서 읽히는 창이 있었다.
 
-  → `features/auth/sessionTeardown.ts`가 순서를 소유한다: **캐시(첫 await 이전에
-  동기적으로) → 토큰·storage → navigation reset(마지막, `finally`에서)**.
-  storage 쓰기가 실패해도 사용자는 로그인 화면에 도달한다 — 공용 기기에서
-  인증할 수 없는 앱 안에 갇히면 안 된다. `endSession`도 캐시를 먼저 지우도록
-  뒤집었다. 명시적 logout(`useLogout`)의 동작과 저장된 계정 선택 유지 정책은
-  그대로다.
+→ `features/auth/sessionTeardown.ts`가 순서를 소유한다: **캐시(첫 await 이전에
+동기적으로) → 토큰·storage → navigation reset(마지막, `finally`에서)**.
+storage 쓰기가 실패해도 사용자는 로그인 화면에 도달한다 — 공용 기기에서
+인증할 수 없는 앱 안에 갇히면 안 된다. `endSession`도 캐시를 먼저 지우도록
+뒤집었다. 명시적 logout(`useLogout`)의 동작과 저장된 계정 선택 유지 정책은
+그대로다.
 
 ---
 
@@ -538,18 +655,18 @@ backend 수정 1: `test/app.e2e-spec.ts` **(제품 코드 0줄)**. docs 2, CI 1.
 
 **검증 결과 (이 환경에서 실제 실행)**
 
-| 명령 | 결과 |
-| --- | --- |
-| `backend: pnpm run lint:accounts:check` | PASS |
-| `backend: pnpm run lint:candles:check` / `format:candles:check` | PASS |
-| `backend: pnpm run typecheck` / `pnpm run build` | PASS |
-| `backend: pnpm exec jest --runInBand` (unit) | PASS — 2551 pass / 37 skip |
-| `backend: pnpm run test:e2e` (`.env` 있는 로컬) | PASS — **126/126** (기준 122) |
-| `backend: pnpm run test:e2e` (`.env` 3개를 치우고 `env -i`, CI 모사) | PASS — **126/126** |
-| `frontend: npm run lint:accounts:check` | PASS — 0 errors (위반 주입 시 exit 1 확인) |
-| `frontend: npm run typecheck` | PASS |
-| `frontend: npm test` | PASS — **476** (기준 467) |
-| `frontend: npm run export:web` | PASS — 1.5MB 번들 |
+| 명령                                                                 | 결과                                       |
+| -------------------------------------------------------------------- | ------------------------------------------ |
+| `backend: pnpm run lint:accounts:check`                              | PASS                                       |
+| `backend: pnpm run lint:candles:check` / `format:candles:check`      | PASS                                       |
+| `backend: pnpm run typecheck` / `pnpm run build`                     | PASS                                       |
+| `backend: pnpm exec jest --runInBand` (unit)                         | PASS — 2551 pass / 37 skip                 |
+| `backend: pnpm run test:e2e` (`.env` 있는 로컬)                      | PASS — **126/126** (기준 122)              |
+| `backend: pnpm run test:e2e` (`.env` 3개를 치우고 `env -i`, CI 모사) | PASS — **126/126**                         |
+| `frontend: npm run lint:accounts:check`                              | PASS — 0 errors (위반 주입 시 exit 1 확인) |
+| `frontend: npm run typecheck`                                        | PASS                                       |
+| `frontend: npm test`                                                 | PASS — **476** (기준 467)                  |
+| `frontend: npm run export:web`                                       | PASS — 1.5MB 번들                          |
 
 > `pnpm test -- --runInBand`는 pnpm이 `--`를 그대로 전달해 jest가 `--runInBand`를
 > **테스트 경로 패턴**으로 해석하고 "No tests found"로 exit 1이 된다. 실제 명령은
@@ -588,11 +705,11 @@ typecheck·build·2550 unit / frontend typecheck·414 tests 전부 통과) 그 �
 **A. 앱 진입이 시즌에 묶여 있었다 (§3)**
 
 Splash·Login·Signup이 각각 `getCurrentSeason()`을 호출하고 그 답으로 라우팅했다.
-이건 서로 다른 두 질문을 하나로 합친 것이다 — *참가할 시즌이 있는가*(서버의
-성질)와 *이 사용자가 쓸 계정이 있는가*(사용자의 성질). 일반계정을 가지고 있고
+이건 서로 다른 두 질문을 하나로 합친 것이다 — _참가할 시즌이 있는가_(서버의
+성질)와 _이 사용자가 쓸 계정이 있는가_(사용자의 성질). 일반계정을 가지고 있고
 모든 시즌이 끝난 사용자는 멀쩡히 쓸 수 있는 앱을 두고 시즌 화면으로 보내졌다.
 
-이제 진입은 **소유 계정 목록**으로 결정한다: 토큰 → `me` seed → 
+이제 진입은 **소유 계정 목록**으로 결정한다: 토큰 → `me` seed →
 `tradingAccount.list(userId)` 조회 → 계정이 있으면 MainTabs, 없으면 계정 개설
 화면. 판단은 순수 함수(`features/auth/entry.ts`)이고 I/O는 `useEnterApp()`
 하나로 모았다. 목록 조회 **실패는 "계정 없음"으로 취급하지 않는다** — 네트워크
@@ -609,7 +726,7 @@ Splash·Login·Signup이 각각 `getCurrentSeason()`을 호출하고 그 답으�
 
 **C. 시즌 홈이 "현재 시즌"을 읽고 있었다 (§10.1·§12)**
 
-HomeScreen은 legacy `/home`을 호출했다. 그 엔드포인트는 *현재* 시즌의
+HomeScreen은 legacy `/home`을 호출했다. 그 엔드포인트는 _현재_ 시즌의
 participant를 서버에서 스스로 찾는다. 즉 선택 계정이 현재 시즌 계정일 때만
 맞고, 그 외에는 한 시즌의 이름 아래 다른 시즌의 돈을 보여준다. 그리고 선택
 정책 규칙 4(가장 최근 개설)가 정산된 시즌 계정에 착지할 수 있고, 사용자는
@@ -713,21 +830,21 @@ docs 7, CI 1. **backend 제품 로직 변경 0줄, migration 0건.**
 
 **검증 결과 (이 환경에서 실제 실행)**
 
-| 명령 | 결과 |
-| --- | --- |
-| `backend: pnpm typecheck` / `pnpm build` | PASS |
-| `backend: pnpm test` (unit) | PASS — 2551 pass / 37 skip |
-| `backend: 통합 (PG16, --runInBand)` | PASS — 21 suite (신규 CI job의 12 suite 포함), 실패 0 |
-| `backend: pnpm test:e2e` (환경변수 없음) | PASS — 122/122 |
-| `backend: prisma format/validate/generate/migrate status` | PASS |
-| `backend: prisma migrate diff --exit-code` | **PASS(0) — 수정 전에는 2** |
-| `backend: repair 5종 + audit-general dry-run` | PASS — findings 0, exit 0, 쓰기 없음 |
-| `backend: lint:accounts:check` | PASS — 0 errors |
-| `backend: lint:candles:check` / `format:candles:check` | PASS — **수정 전에는 17 errors로 실패(기준 커밋에서도 동일)** |
-| `backend: eslint 전체` | 기존 부채 잔존(이번 작업 증가분 0, 감소분 17) |
-| `frontend: tsc --noEmit` | PASS |
-| `frontend: npm test` | PASS — 429 (기준 414) |
-| `frontend: npm run export:web` | PASS — 1.5MB 번들 |
+| 명령                                                      | 결과                                                          |
+| --------------------------------------------------------- | ------------------------------------------------------------- |
+| `backend: pnpm typecheck` / `pnpm build`                  | PASS                                                          |
+| `backend: pnpm test` (unit)                               | PASS — 2551 pass / 37 skip                                    |
+| `backend: 통합 (PG16, --runInBand)`                       | PASS — 21 suite (신규 CI job의 12 suite 포함), 실패 0         |
+| `backend: pnpm test:e2e` (환경변수 없음)                  | PASS — 122/122                                                |
+| `backend: prisma format/validate/generate/migrate status` | PASS                                                          |
+| `backend: prisma migrate diff --exit-code`                | **PASS(0) — 수정 전에는 2**                                   |
+| `backend: repair 5종 + audit-general dry-run`             | PASS — findings 0, exit 0, 쓰기 없음                          |
+| `backend: lint:accounts:check`                            | PASS — 0 errors                                               |
+| `backend: lint:candles:check` / `format:candles:check`    | PASS — **수정 전에는 17 errors로 실패(기준 커밋에서도 동일)** |
+| `backend: eslint 전체`                                    | 기존 부채 잔존(이번 작업 증가분 0, 감소분 17)                 |
+| `frontend: tsc --noEmit`                                  | PASS                                                          |
+| `frontend: npm test`                                      | PASS — 429 (기준 414)                                         |
+| `frontend: npm run export:web`                            | PASS — 1.5MB 번들                                             |
 
 **주의: dry-run은 빈 DB 위에서 실행했다.** "0 findings"는 도구가 깨끗한 DB를
 깨끗하다고 말한다는 것만 증명한다. 손상이 있을 때 말하는지는 손상 주입 통합
@@ -753,8 +870,8 @@ suite(작업 10에서 6개 도구 전부 확보)가 증명하며, 그 쪽이 신
 
 작업 9가 만든 계정 선택 계층을 **모든 현재 금융 화면과 mutation까지** 확장하고
 (A), 그 위에서 backend·frontend·DB·배치·운영 도구·핵심 흐름을 최종 점검한다(B).
-핵심 목표 하나: *사용자가 보고 있는 계정과 실제로 조회·주문·환전되는 계정이
-달라지는 경로를 남기지 않는다.*
+핵심 목표 하나: _사용자가 보고 있는 계정과 실제로 조회·주문·환전되는 계정이
+달라지는 경로를 남기지 않는다._
 
 **작업 9 보완 (A)**
 
@@ -774,8 +891,10 @@ suite(작업 10에서 6개 도구 전부 확보)가 증명하며, 그 쪽이 신
   본다. 계정이 바뀌면 키가 바뀌므로 이전 계정 수량이 남을 구조가 없다.
 - **A-4 Wallet/FX.** WalletFxScreen·WalletTransactionsScreen을 account-scoped
   로 전환. 계정 변경 시 견적·idempotency key·금액·성공 결과를 초기화한다
-  (`useEffect([accountId])`). 일반계정은 `GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`
-  준비 중 화면을 보여주고 **요청을 보내지 않는다**. 공개 환율
+  (`useEffect([accountId])`). 당시 일반계정은
+  `GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED` 준비 중 화면을 보여주고 **요청을
+  보내지 않았다**. 후속 `GENERAL-ACCOUNT-FX-V1`에서 같은 화면과
+  reset/gate를 그대로 재사용해 active general FX를 열었다. 공개 환율
   (`/fx/rates/current`)은 공용이므로 계정 키를 붙이지 않았다.
 - **A-5 주문 목록·취소.** RecordOrderListScreen은 route `seasonId`로부터
   **그 시즌의 계정**을 찾아 account-scoped orders API를 쓴다. 전역 선택 계정을
@@ -837,20 +956,20 @@ suite(작업 10에서 6개 도구 전부 확보)가 증명하며, 그 쪽이 신
 - **B-3 e2e 기준선을 원인별로 정리했다.** 기준 커밋 4건 실패 → **0건**, 그리고
   이제 **환경변수 없이** 통과한다(이전에는 `JWT_ACCESS_SECRET=test-secret` 필요,
   없으면 62건 실패).
-  - *토큰 62건(공통 원인 수정).* 테스트가 하드코딩 `'test-secret'`으로 서명하고
+  - _토큰 62건(공통 원인 수정)._ 테스트가 하드코딩 `'test-secret'`으로 서명하고
     앱은 `.env`/`.env.development` 값으로 검증했다. 이제 앱의 ConfigService에서
     실제 secret을 읽어 서명한다. 미문서화 환경변수 의존이 사라졌다.
-  - *readiness(환경 의존).* `.env.local`의 `SCHEDULER_MARKET_CANDLE_SYNC_ENABLED=true`
+  - _readiness(환경 의존)._ `.env.local`의 `SCHEDULER_MARKET_CANDLE_SYNC_ENABLED=true`
     가 `scheduler.enabled`를 true로 만들어 개발 머신마다 실패했다. 캘린더 연도를
     이미 고정하던 것과 같은 방식으로 `SCHEDULER_*`/`ENABLE_*`도 고정했다
     (`getOpsSchedulerConfig()`는 요청마다 process.env를 읽는다). 추가로 prisma
     mock에 `marketSessionOverride`가 없어 override 로더 cold start가 실패,
     readiness가 늘 `degraded`였다.
-  - *wallets 500(obsolete fixture).* wallet fixture에 `reservedAmount`가 없어
+  - _wallets 500(obsolete fixture)._ wallet fixture에 `reservedAmount`가 없어
     `balanceAmount.sub(undefined)`가 던졌다. 예약금 컬럼 도입 이전 fixture다.
-  - *home settled 500(obsolete fixture).* 작업 8 A-4의 전체 set preflight
+  - _home settled 500(obsolete fixture)._ 작업 8 A-4의 전체 set preflight
     (`seasonRanking.findMany`)가 mock되지 않았다.
-  - *orders cancel 401(obsolete test).* cancel route가 **생겼는데** 테스트는
+  - _orders cancel 401(obsolete test)._ cancel route가 **생겼는데** 테스트는
     route-level 404(무인증)를 기대하고 있었다. 실제 계약(404 `ORDER_NOT_FOUND`
     masking, 쓰기 없음)으로 고쳤다.
   - 부수 발견: e2e의 `OpsJobName` mock에 `limit_order_*` 3개가 빠져 있어 세 개의
@@ -915,18 +1034,18 @@ backend 수정 1: `test/app.e2e-spec.ts`(테스트만). backend 신규 1:
 
 **검증 결과 (기준 커밋 → 최종)**
 
-| 명령 | 기준 | 최종 |
-| --- | --- | --- |
-| `backend: tsc -p tsconfig.build.json` | 통과 | 통과 |
-| `backend: nest build` | 통과 | 통과 (7.3s) |
-| `backend: jest` (unit) | 2550 pass / 0 fail / 36 skip | 동일 |
-| `backend: jest --testPathPatterns=integration` (DB opt-in) | 20 pass / 0 fail | 20 pass / 0 fail (+1 신규 suite) |
-| `backend: test:e2e` | 118 pass / **4 fail** (그리고 `JWT_ACCESS_SECRET` 필요) | **122 pass / 0 fail**, 환경변수 불필요 |
-| `backend: eslint --no-fix` | 934 errors / 11 warnings (기존 부채) | 동일 (내가 만든 증가분 0) |
-| `prisma format/validate/generate/migrate status` | 통과 / drift 없음 | 동일 |
-| `frontend: tsc --noEmit` | 통과 | 통과 |
-| `frontend: npm test` | 338 pass / 0 fail | **414 pass / 0 fail** |
-| `frontend: expo export --platform web` | 통과 | 통과 (839 modules) |
+| 명령                                                       | 기준                                                    | 최종                                   |
+| ---------------------------------------------------------- | ------------------------------------------------------- | -------------------------------------- |
+| `backend: tsc -p tsconfig.build.json`                      | 통과                                                    | 통과                                   |
+| `backend: nest build`                                      | 통과                                                    | 통과 (7.3s)                            |
+| `backend: jest` (unit)                                     | 2550 pass / 0 fail / 36 skip                            | 동일                                   |
+| `backend: jest --testPathPatterns=integration` (DB opt-in) | 20 pass / 0 fail                                        | 20 pass / 0 fail (+1 신규 suite)       |
+| `backend: test:e2e`                                        | 118 pass / **4 fail** (그리고 `JWT_ACCESS_SECRET` 필요) | **122 pass / 0 fail**, 환경변수 불필요 |
+| `backend: eslint --no-fix`                                 | 934 errors / 11 warnings (기존 부채)                    | 동일 (내가 만든 증가분 0)              |
+| `prisma format/validate/generate/migrate status`           | 통과 / drift 없음                                       | 동일                                   |
+| `frontend: tsc --noEmit`                                   | 통과                                                    | 통과                                   |
+| `frontend: npm test`                                       | 338 pass / 0 fail                                       | **414 pass / 0 fail**                  |
+| `frontend: expo export --platform web`                     | 통과                                                    | 통과 (839 modules)                     |
 
 **재현 명령**
 
@@ -961,13 +1080,14 @@ migration이 없고 backend 제품 코드가 그대로이므로 **frontend만 �
 (2) repair 5종 + `audit-general` dry-run → findings 0 확인(0이면 apply 하지 않는다),
 (3) backend 재배포는 선택(변경 없음), (4) frontend 배포,
 (5) 당시 스모크: 로그인 → 계정 자동 선택 → season/general 전환 → 주문·취소·지갑 반영
-→ 일반계정 거래·환전 차단 → 로그아웃 후 다른 사용자 캐시 격리. 현재는 2026-08-18
-작업으로 일반계정 주문이 활성화됐고 환전만 차단된다.
+→ 당시 일반계정 거래·환전 차단 → 로그아웃 후 다른 사용자 캐시 격리.
+현재는 2026-08-18 후속 작업으로 active general 주문과 KRW↔USD FX가
+모두 활성화됐다.
 
 **남은 제한사항**
 
-- 당시 일반계정 주문·환전은 backend 미구현이었다. 2026-08-18에 주문은
-  공통 코어로 활성화됐고, 환전만 계속 차단된다.
+- 당시 일반계정 주문·환전은 backend 미구현이었다. 2026-08-18에
+  주문과 KRW↔USD FX가 각각 기존 공통 코어로 활성화됐다.
 - 광고 provider 어댑터 없음(기본 비활성). eligibility/claim 화면은 아직 없고,
   claim wrapper와 무효화 경로만 준비되어 있다.
 - 주문 **상세** 전용 화면은 여전히 없다(백엔드 route는 있다). 목록이 상세 정보를
@@ -1078,8 +1198,9 @@ React Navigation, `@tanstack/react-query`, axios, AsyncStorage). **신규 전역
 - **capability.** mode·status 두 사실에서 파생된 작은 레코드. status를 mode보다
   **먼저** 본다 — 종료된 general 계정은 "준비 중"이 아니라 "종료"다. 서버 게이트를
   완화하는 경로는 없다. 취소는 예약 해제이므로 suspended/closed에서도 허용(백엔드
-  계약과 동일). 당시 일반계정 매매·환전은 준비 중으로 표시했다. 2026-08-18부터
-  active general 매매는 허용하고 환전만 준비 중으로 남긴다.
+  계약과 동일). 당시 일반계정 매매·환전은 준비 중으로 표시했다.
+  2026-08-18 후속 작업으로 active general 매매와 KRW↔USD FX가 모두
+  허용된다.
 - **오류.** 구조적 무결성 코드 16종은 빈 데이터가 아니라 전용 오류 상태로 간다.
   `GENERAL_ACCOUNT_*_NOT_IMPLEMENTED`는 무결성 집합에 넣지 않는다(준비 중 안내이지
   손상이 아니다). 선택 계정 404는 존재를 노출하지 않고 목록 재조회 + fallback.
@@ -1096,7 +1217,8 @@ React Navigation, `@tanstack/react-query`, axios, AsyncStorage). **신규 전역
 `src/batch/final-tier-assignment-job.service.ts`,
 `src/ranking/ranking-refresh.service.ts`, `src/ranking/ranking.service.ts`,
 `src/home/home.service.ts`, `src/records/records.service.ts`,
-+ 각 `.spec.ts`와 `src/ranking/season-ranking-scope.integration.spec.ts`.
+
+- 각 `.spec.ts`와 `src/ranking/season-ranking-scope.integration.spec.ts`.
 
 프런트엔드 (신규 10 · 수정 7):
 `src/features/tradingAccount/{api,accountSelection,capabilities,accountDisplay,
@@ -1125,19 +1247,19 @@ selectionStorage,integrityErrors,TradingAccountContext}.ts(x)`,
 
 **테스트 결과**
 
-| 명령 | 결과 |
-| --- | --- |
-| `prisma format` / `validate` / `generate` | 통과 |
-| `prisma migrate status` | 50 migrations, drift 없음 |
-| backend `tsc --noEmit -p tsconfig.build.json` | 통과 |
-| backend `nest build` | 통과 |
-| backend `jest` | 182 suites, **2550 passed** / 36 skipped (기준선 2512 → +38) |
-| backend PG 통합 (`TRADING_ACCOUNT_DB_INTEGRATION=1`) | 통과 — 8개 구간 전부 |
-| backend `jest --config test/jest-e2e.json` | 63 fail / 59 pass — **기준선과 동일** |
-| backend `eslint` | 943 problems (기준선 937, +6은 전부 spec 파일) |
-| frontend `tsc --noEmit` | 통과 |
-| frontend `node --test` | **338 passed** (기준선 290 → +48) |
-| frontend `expo export --platform web` | 통과 (831 modules) |
+| 명령                                                 | 결과                                                         |
+| ---------------------------------------------------- | ------------------------------------------------------------ |
+| `prisma format` / `validate` / `generate`            | 통과                                                         |
+| `prisma migrate status`                              | 50 migrations, drift 없음                                    |
+| backend `tsc --noEmit -p tsconfig.build.json`        | 통과                                                         |
+| backend `nest build`                                 | 통과                                                         |
+| backend `jest`                                       | 182 suites, **2550 passed** / 36 skipped (기준선 2512 → +38) |
+| backend PG 통합 (`TRADING_ACCOUNT_DB_INTEGRATION=1`) | 통과 — 8개 구간 전부                                         |
+| backend `jest --config test/jest-e2e.json`           | 63 fail / 59 pass — **기준선과 동일**                        |
+| backend `eslint`                                     | 943 problems (기준선 937, +6은 전부 spec 파일)               |
+| frontend `tsc --noEmit`                              | 통과                                                         |
+| frontend `node --test`                               | **338 passed** (기준선 290 → +48)                            |
+| frontend `expo export --platform web`                | 통과 (831 modules)                                           |
 
 **기준선 실패**
 
@@ -1175,8 +1297,9 @@ selectionStorage,integrityErrors,TradingAccountContext}.ts(x)`,
   주문 상세·포지션 화면은 query-key factory와 account-scoped API 계층이 준비되어
   있으나 화면 전환은 아직 하지 않았다(기존 시즌 동작 그대로 유지, 회귀 없음).
 - 당시 일반계정 거래·환전은 backend에서 미구현이었고 프런트는 준비 중으로만
-  표시했다. 2026-08-18부터 주문은 공통 코어로 활성화됐으며 FX와 광고 provider
-  연동·실제 reward 지급은 계속 닫혀 있다.
+  표시했다. 2026-08-18 후속 작업으로 주문과 KRW↔USD FX는 각각
+  기존 공통 코어로 활성화됐고, 광고 provider 연동·실제 reward 지급은
+  계속 닫혀 있다.
 - e2e 실행 환경(`.env.local` 플래그)이 정리되지 않아 e2e는 여전히 기준선 실패를
   안고 있다.
 
@@ -1197,7 +1320,7 @@ closed 계정 경쟁, history 과거 행 미검증, keyed replay payload shape �
 
 **핵심 변경**
 
-*작업 6·7 잔여*
+_작업 6·7 잔여_
 
 - 일반계정 `GET .../portfolio`·`.../portfolio/equity`를 Prisma
   `RepeatableRead` interactive transaction 하나로 감쌌다. 이전에는 한 응답을
@@ -1231,7 +1354,7 @@ closed 계정 경쟁, history 과거 행 미검증, keyed replay payload shape �
   `granted=true, duplicate=false`다. keyed rejected는 `refused=true`+code+
   message를 요구한다. legacy unkeyed claim에는 강제하지 않는다.
 
-*작업 8*
+_작업 8_
 
 - `SeasonRanking.tradingAccountId` nullable 추가(additive migration
   `20260804120000_add_season_ranking_trading_account_scope`) + FK(Restrict) +
@@ -1272,7 +1395,7 @@ closed 계정 경쟁, history 과거 행 미검증, keyed replay payload shape �
   dual-write) → participant final 결과 → participant 상태 전환 → **모든** 연결
   season account 종료 → `Season.status=settled`. excluded participant는 final
   ranking 대상이 아니지만 그 계정도 함께 closed된다. `closedAt =
-  COALESCE(기존, Season.endAt)`이고 모든 WHERE에 `mode='season'`을 고정해 general
+COALESCE(기존, Season.endAt)`이고 모든 WHERE에 `mode='season'`을 고정해 general
   account는 절대 건드리지 않는다. 하나라도 실패하면 전체 rollback이다.
 - `FinalTierAssignmentJob`이 final ranking account scope, settled season의
   account 종료 여부, participant final 결과 일치를 추가 검증한다. finalRank/
@@ -1292,8 +1415,8 @@ reward-grant gate 개방, 경쟁 순위(1,2,2,4), 랭킹 계산 규칙·티어 �
 시즌 수익률의 TWR 전환, SeasonParticipant 캐시 컬럼/모델 제거,
 `SeasonRanking.seasonParticipantId` nullable 전환, `tradingAccountId` NOT NULL
 강화, participant FK 제거, 랭킹 이벤트 로그 테이블, Redis 분산락, 메시지
-브로커, 작업 큐. 당시 일반 주문·FX 차단 유지(일반 주문 차단은 2026-08-18 해제,
-`GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`만 현재 유지).
+브로커, 작업 큐. 당시 일반 주문·FX 차단 유지(두 차단은
+2026-08-18 후속 작업에서 모두 해제).
 
 **검증**
 
@@ -1372,7 +1495,6 @@ batch job으로 해결했다.
 
 **실제 광고 provider는 여전히 미연동**이며 운영 registry는 비어 있다.
 
-
 ### 작업 단위: 일반모드 성과·TWR·snapshot 전환 + 작업 6 결함 3종 보완 (2026-08-03, 작업 7, WORK-ID GENERAL-PERFORMANCE-TWR-AND-AD-REPLAY-V1)
 
 **목적**
@@ -1387,7 +1509,7 @@ integrity만 검사, ③ granted claim을 원장 검증 없이 성공 replay) �
 
 - 보완 ①(광고 명령 멱등성): `AdRewardClaim`에 `idempotencyKey`·`requestHash`·
   `responsePayloadJson`을 additive 추가하고 `(tradingAccountId,
-  idempotencyKey)` unique를 신설했다. 기존 `(provider, providerEventId)`
+idempotencyKey)` unique를 신설했다. 기존 `(provider, providerEventId)`
   unique와 **합치지 않는다** — 전자는 클라이언트 명령 재시도, 후자는 광고
   이벤트 중복 지급이라는 다른 축이며 P2002는 두 축을 각각 재조회해 판정한다.
   claim 순서는 소유권 → 파싱 → keyed claim 조회 → replay로 바뀌었고, 계정
@@ -1728,8 +1850,8 @@ null/불일치 상태에서도 거래 허용, ② account-scoped 금융 조회�
   (`20260803120000_add_financial_trading_account_scope`): CashWallet·
   WalletTransaction·ExchangeTransaction·FxExecuteRequest에 nullable
   `tradingAccountId` + Restrict FK, `cash_wallets(trading_account_id,
-  currency_code)` unique, `fx_execute_requests(trading_account_id,
-  idempotency_key)` unique(legacy (userId,key) unique는 유지 — 같은 사용자의
+currency_code)` unique, `fx_execute_requests(trading_account_id,
+idempotency_key)` unique(legacy (userId,key) unique는 유지 — 같은 사용자의
   계정 간 키 재사용은 작업 10까지 차단됨), 조회 인덱스 3종, TradingAccount
   역관계 4종(캐시 컬럼 금지 유지). backfill은 참가자 링크 복사만(IS NULL 가드,
   멱등, 계정 생성 없음, null 링크 행은 null 유지). dev DB fingerprint 전후
@@ -1751,13 +1873,15 @@ null/불일치 상태에서도 거래 허용, ② account-scoped 금융 조회�
   `wallet-transactions`(조회 — active/suspended/closed 허용, GET은 아무것도
   생성 안 함), `POST .../fx/quote`·`execute`, `GET .../fx/transactions`.
   controller는 wallets/fx 모듈에 두고 TradingAccountsModule의 access service를
-  재사용(소유권 404 통일). FX 변경 게이트: mode=season(general은 409
-  GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED) + status=active(아니면 409
+  재사용(소유권 404 통일). 당시 FX 변경 게이트: mode=season(general은 409
+  `GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`) + status=active(아니면 409
   TRADING_ACCOUNT_NOT_ACTIVE) + 기존 시즌/참가자/quote 정책 전부. FxService·
   WalletsService의 같은 계산 코드를 legacy와 공유(수수료·환율·원장·멱등·오류
   코드·원자성 동일 — DB 통합으로 실측). idempotency는 계정 unique로 조회
   (같은 계정 replay 동일 응답, 다른 사용자 계정은 같은 키 허용). source/target
   지갑의 account scope 불일치는 fail-closed. legacy wallets/fx 계약 불변.
+  후속 `GENERAL-ACCOUNT-FX-V1`은 이 account-scoped 코어에 general context를
+  추가했으며 legacy season 게이트는 그대로 유지했다.
 - 계약 문서 신규 `docs/trading-account-finance-api-contract.md`.
 
 **검증 (로컬 실행 — hosted CI 없음)**
@@ -1904,7 +2028,7 @@ additive migration으로 추가한 뒤 기존 시즌 참가자를 season 계정�
 **DB 변경 (migration `20260801120000_add_trading_account_foundation`, additive)**
 
 - enum `TradingAccountMode(season|general)`, `TradingAccountStatus(active|
-  suspended|closed)` + `trading_accounts` 테이블(id uuid, userId FK RESTRICT,
+suspended|closed)` + `trading_accounts` 테이블(id uuid, userId FK RESTRICT,
   mode, status, initialCapitalKrw Decimal(24,8) `>0` CHECK, openedAt,
   closedAt nullable `>= openedAt` CHECK). 월 지급 필드 없음, 광고 누적 컬럼 없음
   (누적 보상금은 향후 원장 집계로 계산).
@@ -1980,15 +2104,15 @@ additive migration으로 추가한 뒤 기존 시즌 참가자를 season 계정�
 
 **A. 실제 재현 결과(수정 전, 로컬 백엔드 :3000, 2026-07-29 22:10 KST)**
 
-| 자산 | interval/range | HTTP | 코드 |
-| --- | --- | --- | --- |
-| 005930 | 5m/prev_open | 503 | ASSET_CANDLES_PROVIDER_UNAVAILABLE |
-| 005930 | 15m/prev_open | 503 | ASSET_CANDLES_PROVIDER_UNAVAILABLE |
-| 005930 | 30m/14d, 1h/14d, 4h/30d | 503 | ASSET_CANDLES_BASELINE_NOT_READY |
-| 005930 | 1d/1y | 200 | candles=243 |
-| BTCUSDT | 5m/prev_open | 200 | candles=447 |
-| BTCUSDT | 30m/14d, 4h/30d | 503 | ASSET_CANDLES_BASELINE_NOT_READY |
-| TSLA | 5m/prev_open | 503 | ASSET_CANDLES_PROVIDER_UNAVAILABLE |
+| 자산    | interval/range          | HTTP | 코드                               |
+| ------- | ----------------------- | ---- | ---------------------------------- |
+| 005930  | 5m/prev_open            | 503  | ASSET_CANDLES_PROVIDER_UNAVAILABLE |
+| 005930  | 15m/prev_open           | 503  | ASSET_CANDLES_PROVIDER_UNAVAILABLE |
+| 005930  | 30m/14d, 1h/14d, 4h/30d | 503  | ASSET_CANDLES_BASELINE_NOT_READY   |
+| 005930  | 1d/1y                   | 200  | candles=243                        |
+| BTCUSDT | 5m/prev_open            | 200  | candles=447                        |
+| BTCUSDT | 30m/14d, 4h/30d         | 503  | ASSET_CANDLES_BASELINE_NOT_READY   |
+| TSLA    | 5m/prev_open            | 503  | ASSET_CANDLES_PROVIDER_UNAVAILABLE |
 
 체크포인트 테이블(`market_candle_sync_states`)에서 확정한 원인:
 
@@ -2007,7 +2131,7 @@ additive migration으로 추가한 뒤 기존 시즌 참가자를 season 계정�
 
 - `findCompletedCoverageUnion(): boolean` → **`findCandleCoverage()`**:
   `{ startsAtRequestedFrom, contiguousCoveredTo, newestCompletedAt,
-  hasInteriorGap }`.
+hasInteriorGap }`.
 - 로더가 3단계로 분류한다(`CandleCoverageStatus`).
   - `complete`: 요청 시작~요청 시각까지 확인됨.
   - `stale_tail`: 과거는 확인됐고 최신 tail만 미확인(기본 1일 이내,
@@ -2052,9 +2176,9 @@ additive migration으로 추가한 뒤 기존 시즌 참가자를 season 계정�
   005930 14일 669행(coverage는 정직하게 미claim).
 - 수정 후 실제 HTTP 응답(자체 인스턴스 :3010, 괄호는 캔들 수):
 
-| 자산 | 5m | 15m | 30m/14d | 1h/14d | 4h/30d | 1d/1y |
-| --- | --- | --- | --- | --- | --- | --- |
-| 005930 | 200 (137) | 200 (43) | 200 (103) | 200 (51) | 200 (7) | 200 (243) |
+| 자산    | 5m        | 15m       | 30m/14d   | 1h/14d    | 4h/30d   | 1d/1y     |
+| ------- | --------- | --------- | --------- | --------- | -------- | --------- |
+| 005930  | 200 (137) | 200 (43)  | 200 (103) | 200 (51)  | 200 (7)  | 200 (243) |
 | BTCUSDT | 200 (453) | 200 (151) | 200 (672) | 200 (336) | 200 (84) | 200 (365) |
 
 - backend jest 2097 pass, typecheck·build·lint·format 통과, frontend typecheck·
@@ -2444,7 +2568,7 @@ additive migration으로 추가한 뒤 기존 시즌 참가자를 season 계정�
 **C. 빈 슬롯 크로스헤어**
 
 - `originalCandleIndexForX({x, paddingLeft, slotWidth, viewportVisibleCount,
-  startIndex, endIndex, leadingEmptySlots})` 추가. 빈 슬롯 위 포인터는 **첫
+startIndex, endIndex, leadingEmptySlots})` 추가. 빈 슬롯 위 포인터는 **첫
   실제 캔들로 snap**하고, 결과는 항상 `[startIndex, endIndex-1]` 안이라
   음수·미존재 인덱스가 생기지 않는다. `CandlestickChart`가 크로스헤어 인덱스를
   이 함수로 계산한다(기존 `visibleOffsetForX`는 슬롯 계산용으로 남는다).
@@ -2566,7 +2690,7 @@ additive migration으로 추가한 뒤 기존 시즌 참가자를 season 계정�
   정리" 작업에서 확대·축소 버튼과 개수 문구를 제거하고 `최신` 버튼 하나만
   남겼다. 반응형 높이도 이때 추가.)
 - 패키지: `npx expo install react-native-gesture-handler react-native-reanimated
-  react-native-worklets`, `babel.config.js`에 `react-native-worklets/plugin`,
+react-native-worklets`, `babel.config.js`에 `react-native-worklets/plugin`,
   `App.tsx`에 `GestureHandlerRootView` 1회 wrapping.
   → **2026-07-29 정정**: reanimated/worklets는 실제로 쓰이지 않아 제거했다.
   현재는 gesture-handler + `GestureHandlerRootView`만 남았고 babel plugin도 없다.
@@ -2754,6 +2878,57 @@ cd frontend && npm run typecheck && npm test
 
 ## 2. 최신 작업 시간순 기록
 
+### 2026-08-18 — 일반계정 KRW↔USD FX 공통 코어 활성화 (GENERAL-ACCOUNT-FX-V1)
+
+- 시작 SHA `4b048f8783a9596024093d2e72d75d1d0aa6f26d`(`git fetch --prune`
+  후 HEAD = origin/main, clean). 기존 account-scoped `/api/v1` FX,
+  `FxService`, `WalletFxScreen`을 재사용했고 general 전용 service/API/UI는
+  만들지 않았다. active general은 KRW↔USD quote/execute, suspended/
+  closed는 read/committed replay만 허용한다. season status/기간/participant/
+  excluded/`Season.fxFeeRate`는 약화하지 않았다.
+- DDL-only migration으로 ExchangeTransaction/FxExecuteRequest participant를
+  nullable화했다. season writer는 participant+account, general writer는
+  participant null+account를 기록하며 기존 season row DML은 없다.
+  `GENERAL_FX_FEE_RATE`(기본 `0.001000`, startup strict validation)는
+  `Season.fxFeeRate`/`GENERAL_TRADE_FEE_RATE`와 독립이다. fee는 durable
+  quote `quotedFeeRate`에 pin하고 환율만 execute-time fresh provider로 30bps
+  안에서 재가격한다. null/부적합 pinned fee는 `QUOTE_MISMATCH`다.
+- season v1 quote/execute hash 고정 vector를 보존하고 general에만
+  user+account v2 hash를 추가했다. 멱등성은 `(tradingAccountId,
+idempotencyKey)`이며 committed replay first, legacy null fallback은 season
+  user+participant로만 제한한다.
+- source 지갑은 available balance로 차감해 order cash reservation을 보호한다.
+  general execute는 account `FOR UPDATE` 후 DB clock을 쓰고 request/exchange/
+  두 wallet/두 ledger/stored response/`exchange_executed` ordinary TWR snapshot을
+  한 transaction에 쓴다. FX는 external funding이 아니며 season participant/
+  ranking/settlement를 변경하지 않는다.
+- runtime과 SELECT-only `audit-general`에 general FX participant/account/user,
+  request↔exchange, quote owner/pinned fee, exchange↔ledger↔wallet scope를 추가했다.
+  손상 fixture가 각 finding/exit 1, 원복 후 findings 0/exit 0을 검증하며
+  audit는 자동 복구하지 않는다. final review에서 numeric 고정 scale를
+  단순 `scale()`로 보면 정상 0.001을 오탐하는 결함을 발견해
+  값을 6자리로 round한 결과와 비교하도록 수정했다. 같은 재검색에서 남아
+  있던 과거 FX 차단 문구가 현재 상태처럼 읽히는 부분도 역사와 현재를
+  구분하도록 정정했다.
+- frontend active general `canExchange=true`, 기존 account binding/scopeEpoch/
+  stale response/cache invalidation을 유지했고 환전 문구·줄바꿈을 갱신했다.
+  CI는 기존 `core-account-db-integration` job에
+  `GENERAL_FX_DB_INTEGRATION=1` + spec 경로를 모두 넣어 skip될 수 없다.
+- 검증: Prisma format/validate/generate, account/production ESLint, typecheck,
+  build PASS; backend 185 suites/2,592 tests PASS, env opt-in 36 suites/40 tests
+  SKIP; E2E는 작업 중 126/126 PASS(최종 재실행은 sandbox listen
+  EPERM으로 126건 모두 assertion 전 실패); season FX PostgreSQL 1/1;
+  frontend check 38/38 + web export PASS. general FX/audit PostgreSQL는 초기
+  구현에서 각 1/1 PASS와 audit
+  `No findings`를 확인했다. 최종 review로 추가한 concurrency/user/null-fee/
+  closed/wallet·invalid-account/pinned-fee/ledger assertion의 재실행은 managed
+  sandbox의 내부 DB prepare/tsx IPC EPERM으로 assertion 실행 전 막혔다.
+  같은 제한으로 final migrate status/diff·audit clean-run은 재확인하지
+  못했으며 fresh PostgreSQL CI 필수 job에서 실행된다.
+- 제외: 주문 자동환전, 실제 은행/외환 주문, FX 지정가/예약/
+  partial/order book, 추가 통화/USDT, 계정 간 이동, general ranking/
+  reward, 실제 광고 provider, queue/event bus/분산락, `/api/v2`.
+
 ### 2026-08-18 — 일반계정 매매 릴리스 하드닝 (GENERAL-TRADING-RELEASE-HARDENING-V1)
 
 - 시작 SHA `1039eb6218971c545ebbc6821715eea70c5dc2fa`(parent `3be4b1e...`,
@@ -2811,8 +2986,9 @@ cd frontend && npm run typecheck && npm test
   갱신하지 않는다. season의 기존 snapshot/ranking 동작은 mode guard 안에 유지했다.
 - frontend active general capability를 trade/quote/cancel 가능, exchange 불가로
   열었다. 기존 OrderScreen/accountId endpoint와 scopeEpoch stale-response 방어를
-  재사용하고 limit sell/예약·주문기록 UI 및 “매매 가능, 환전 준비 중” 문구를
-  반영했다. 최종 read-path review에서 seasonId 전용이던 Record 주문 route를
+  재사용하고 limit sell/예약·주문기록 UI 및 당시의
+  “매매 가능, 환전 준비 중” 문구를 반영했다. 후속 FX 작업이
+  환전 문구와 capability를 갱신했다. 최종 read-path review에서 seasonId 전용이던 Record 주문 route를
   발견해 General Home의 고정 accountId 진입도 처리하도록 일반화했다.
 - Prisma format/validate/generate/status(51 migrations up to date), backend lint/
   typecheck/build, unit 2568 passed, E2E 126/126, general/account-scope/replay/matcher/
@@ -2832,11 +3008,11 @@ cd frontend && npm run typecheck && npm test
 ### 2026-08-10 — 투자 모드 선택 진입 + 일반계정 접근 완성 (작업 13)
 
 - **새 로그인이 더 이상 계정을 대신 골라주지 않는다.** "계정 있음 → 즉시 Home"
-  + "fallback이 active season 우선"의 합성으로, 시즌계정만 가진 사용자는 항상
-  시즌 Home에 떨어졌고 일반 투자로 가는 문이 없었다. 이제 새 로그인은 무조건
-  `ModeSelection`(일반 투자 / 시즌 투자 선택 화면)에 착지하고, 저장된 선택은
-  읽지도 않는다. 세션 복구만 — 저장 계정이 여전히 소유 목록에 있을 때 — Home
-  직행이 가능하다.
+  - "fallback이 active season 우선"의 합성으로, 시즌계정만 가진 사용자는 항상
+    시즌 Home에 떨어졌고 일반 투자로 가는 문이 없었다. 이제 새 로그인은 무조건
+    `ModeSelection`(일반 투자 / 시즌 투자 선택 화면)에 착지하고, 저장된 선택은
+    읽지도 않는다. 세션 복구만 — 저장 계정이 여전히 소유 목록에 있을 때 — Home
+    직행이 가능하다.
 - **general account가 없어도 일반 투자가 항상 선택지다.** ModeSelection·
   AccountSwitcher 시트("일반 투자 시작하기" action row)·AccountSetupPanel 세
   곳이 하나의 훅(`useOpenGeneralAccount`)으로 기존 idempotent
@@ -2997,7 +3173,6 @@ cd frontend && npm run typecheck && npm test
   통과 + production build 통과. e2e 63건 실패는 기준 커밋 worktree에서 같은
   명령으로 재현했고 실패 테스트 이름 집합이 완전히 동일하다(신규 실패 0건).
 - **migration 없음.**
-
 
 ### 2026-08-04 — 일반계정 동시성 보완 + SeasonRanking TradingAccount scope 전환 (작업 6·7 잔여 + 작업 8)
 
@@ -3191,8 +3366,8 @@ cd frontend && npm run typecheck && npm test
   **실제 광고 provider 미확정 — 운영 registry 비어 있어 503
   `AD_REWARD_PROVIDER_UNAVAILABLE`, fake verifier는 테스트 전용.**
 - 당시 일반모드 주문·환전은 모두 차단됐고 TWR·투자손익·프런트엔드도 미구현이었다.
-  2026-08-18 현재 주문·TWR·프런트엔드는 구현됐으며
-  `GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`만 유지한다.
+  2026-08-18 후속 작업으로 주문·TWR·프런트엔드·KRW↔USD FX가 모두
+  구현됐다.
   read-only 운영 점검 `pnpm trading-accounts:audit-general` 추가.
 - 검증: unit 2,315 pass, opt-in DB 통합 16종 직렬 PASS(신규 general-account·
   order-replay-and-cancel-scope 포함), e2e 119/122(실패 3건은 기준 커밋
@@ -3315,8 +3490,8 @@ cd frontend && npm run typecheck && npm test
   확정했다(baseline 미시딩, KIS repair의 `data_incomplete`, boolean coverage
   판정, KIS 레이트리밋, 프런트의 skeleton 은폐).
 - coverage 판정을 boolean에서 `{startsAtRequestedFrom, contiguousCoveredTo,
-  hasInteriorGap, newestCompletedAt}`로 바꾸고 `complete / stale_tail /
-  insufficient` 3단계로 분류했다. sync 직후 tail 몇 분이 미확인이어도(기본 1일
+hasInteriorGap, newestCompletedAt}`로 바꾸고 `complete / stale_tail /
+insufficient` 3단계로 분류했다. sync 직후 tail 몇 분이 미확인이어도(기본 1일
   허용) 차트는 정상 서빙되고, 중간 구멍은 여전히 절대 허용하지 않는다.
 - coverage가 미확인이어도 저장된 캔들이 있으면 그것으로 응답한다
   (`database_partial`). 반환 캔들은 전부 검증된 저장 캔들이며 불완전 버킷은

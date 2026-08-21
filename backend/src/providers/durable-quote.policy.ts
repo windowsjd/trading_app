@@ -4,6 +4,7 @@ import { formatMoneyScale8 } from '../fx/fx-decimal-policy';
 import { DEFAULT_QUOTE_TTL_SECONDS } from './realtime-execution-policy';
 
 export const FX_QUOTE_REQUEST_HASH_API_VERSION = 'fx-quote:v1' as const;
+export const GENERAL_FX_QUOTE_REQUEST_HASH_API_VERSION = 'fx-quote:v2' as const;
 export const ORDER_QUOTE_REQUEST_HASH_API_VERSION = 'order-quote:v1' as const;
 
 type DecimalInput = string | Prisma.Decimal;
@@ -11,6 +12,14 @@ type DecimalInput = string | Prisma.Decimal;
 export type FxQuoteRequestHashInput = {
   userId: string;
   seasonParticipantId: string;
+  fromCurrency: string;
+  toCurrency: string;
+  sourceAmount: DecimalInput;
+};
+
+export type GeneralFxQuoteRequestHashInput = {
+  userId: string;
+  tradingAccountId: string;
   fromCurrency: string;
   toCurrency: string;
   sourceAmount: DecimalInput;
@@ -45,6 +54,23 @@ export function computeFxQuoteRequestHash(
     seasonParticipantId: normalizeRequiredString(
       input.seasonParticipantId,
       'seasonParticipantId',
+    ),
+    fromCurrency: normalizeCurrency(input.fromCurrency, 'fromCurrency'),
+    toCurrency: normalizeCurrency(input.toCurrency, 'toCurrency'),
+    sourceAmount: formatMoneyScale8(input.sourceAmount),
+  });
+}
+
+/** Account-scoped v2. The season v1 payload above is deliberately unchanged. */
+export function computeGeneralFxQuoteRequestHash(
+  input: GeneralFxQuoteRequestHashInput,
+): string {
+  return sha256Json({
+    apiVersion: GENERAL_FX_QUOTE_REQUEST_HASH_API_VERSION,
+    userId: normalizeRequiredString(input.userId, 'userId'),
+    tradingAccountId: normalizeRequiredString(
+      input.tradingAccountId,
+      'tradingAccountId',
     ),
     fromCurrency: normalizeCurrency(input.fromCurrency, 'fromCurrency'),
     toCurrency: normalizeCurrency(input.toCurrency, 'toCurrency'),

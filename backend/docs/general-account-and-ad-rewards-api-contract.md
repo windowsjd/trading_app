@@ -27,9 +27,13 @@ General-mode market/limit orders and positions are now implemented through the
 existing account-scoped order API; see
 `docs/trading-account-orders-api-contract.md`.
 
+General-mode KRW↔USD quote, execute, and transaction history are also
+implemented through the existing account-scoped FX API; see
+`docs/trading-account-finance-api-contract.md`. FX never creates wallets,
+auto-converts for an order, or uses a current season.
+
 NOT implemented (deliberately still blocked):
 
-- general-mode FX (`GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`),
 - a real ad-network adapter, an ad SDK, and an ad-watching screen.
 
 **No real ad provider has been chosen.** No provider protocol, SDK, callback
@@ -180,15 +184,15 @@ another account's wallet. A violation is 500 `GENERAL_ACCOUNT_INTEGRITY`
 
 None of these values has a product default; nothing is hardcoded.
 
-| Variable | Meaning | Required when enabled |
-| --- | --- | --- |
-| `AD_REWARD_ENABLED` | Feature switch. Absent/empty → **false** | — |
-| `AD_REWARD_PROVIDER` | Registered provider key | yes |
-| `AD_REWARD_AMOUNT_KRW` | Reward per completed ad, > 0 | yes |
-| `AD_REWARD_DAILY_MAX_COUNT` | Max granted claims per day, positive integer | yes |
-| `AD_REWARD_DAILY_MAX_AMOUNT_KRW` | Max granted KRW per day, ≥ reward amount | yes |
-| `AD_REWARD_COOLDOWN_SECONDS` | Minimum seconds between grants, ≥ 0 | yes |
-| `AD_REWARD_DAY_TIME_ZONE` | IANA zone defining the daily boundary | yes |
+| Variable                         | Meaning                                      | Required when enabled |
+| -------------------------------- | -------------------------------------------- | --------------------- |
+| `AD_REWARD_ENABLED`              | Feature switch. Absent/empty → **false**     | —                     |
+| `AD_REWARD_PROVIDER`             | Registered provider key                      | yes                   |
+| `AD_REWARD_AMOUNT_KRW`           | Reward per completed ad, > 0                 | yes                   |
+| `AD_REWARD_DAILY_MAX_COUNT`      | Max granted claims per day, positive integer | yes                   |
+| `AD_REWARD_DAILY_MAX_AMOUNT_KRW` | Max granted KRW per day, ≥ reward amount     | yes                   |
+| `AD_REWARD_COOLDOWN_SECONDS`     | Minimum seconds between grants, ≥ 0          | yes                   |
+| `AD_REWARD_DAY_TIME_ZONE`        | IANA zone defining the daily boundary        | yes                   |
 
 Validated at boot by `src/common/env-validation.ts` through the single parser
 `readAdRewardConfig`. With `AD_REWARD_ENABLED=true` a missing or invalid value
@@ -412,21 +416,21 @@ closed accounts remain readable by their owner.
 
 ## Errors
 
-| Status | Code | Meaning |
-| --- | --- | --- |
-| 401 | `UNAUTHORIZED` | missing/invalid token |
-| 404 | `TRADING_ACCOUNT_NOT_FOUND` | unknown **or** foreign accountId |
-| 409 | `AD_REWARD_GENERAL_ACCOUNT_ONLY` | season account on an ad route |
-| 409 | `TRADING_ACCOUNT_NOT_ACTIVE` | suspended/closed general account claim |
-| 409 | `AD_REWARD_EVENT_ALREADY_USED` | event consumed elsewhere / unusable claim |
-| 400 | `AD_REWARD_INVALID_REQUEST` | missing/oversized proof, bad pagination |
-| 422 | `AD_REWARD_VERIFICATION_FAILED` | verifier rejected the proof |
-| 429 | `AD_REWARD_DAILY_COUNT_LIMIT` | daily count cap |
-| 429 | `AD_REWARD_DAILY_AMOUNT_LIMIT` | daily amount cap |
-| 429 | `AD_REWARD_COOLDOWN_ACTIVE` | cooldown not elapsed |
-| 503 | `AD_REWARD_DISABLED` | `AD_REWARD_ENABLED=false` (the default) |
-| 503 | `AD_REWARD_PROVIDER_UNAVAILABLE` | no registered verifier adapter |
-| 500 | `GENERAL_ACCOUNT_INTEGRITY` | damaged general-account structure |
+| Status | Code                             | Meaning                                   |
+| ------ | -------------------------------- | ----------------------------------------- |
+| 401    | `UNAUTHORIZED`                   | missing/invalid token                     |
+| 404    | `TRADING_ACCOUNT_NOT_FOUND`      | unknown **or** foreign accountId          |
+| 409    | `AD_REWARD_GENERAL_ACCOUNT_ONLY` | season account on an ad route             |
+| 409    | `TRADING_ACCOUNT_NOT_ACTIVE`     | suspended/closed general account claim    |
+| 409    | `AD_REWARD_EVENT_ALREADY_USED`   | event consumed elsewhere / unusable claim |
+| 400    | `AD_REWARD_INVALID_REQUEST`      | missing/oversized proof, bad pagination   |
+| 422    | `AD_REWARD_VERIFICATION_FAILED`  | verifier rejected the proof               |
+| 429    | `AD_REWARD_DAILY_COUNT_LIMIT`    | daily count cap                           |
+| 429    | `AD_REWARD_DAILY_AMOUNT_LIMIT`   | daily amount cap                          |
+| 429    | `AD_REWARD_COOLDOWN_ACTIVE`      | cooldown not elapsed                      |
+| 503    | `AD_REWARD_DISABLED`             | `AD_REWARD_ENABLED=false` (the default)   |
+| 503    | `AD_REWARD_PROVIDER_UNAVAILABLE` | no registered verifier adapter            |
+| 500    | `GENERAL_ACCOUNT_INTEGRITY`      | damaged general-account structure         |
 
 ---
 
@@ -491,8 +495,9 @@ season calculation, ranking, or settlement behavior was altered.
 The later shared TradingAccount order work implements general market/limit
 orders and account-scoped positions; the general daily snapshot job,
 SeasonRanking account transition, and account-aware frontend are also now
-implemented. Still not implemented here: general FX, general ranking/rewards,
-or a real ad-provider adapter.
+implemented. The later shared FX work also implements explicit general
+KRW↔USD exchange. Still not implemented here: general ranking/rewards or a
+real ad-provider adapter.
 
 ## Ad reward command idempotency (작업 6 보완 1)
 
@@ -504,11 +509,11 @@ removed.
 
 `POST .../ad-rewards/claim` now REQUIRES three fields:
 
-| Field | Meaning |
-| --- | --- |
-| `provider` | Required. Never defaulted from config, so a replay does not depend on what `AD_REWARD_PROVIDER` says at retry time. |
-| `proof` (or `verificationToken`) | Opaque provider proof. |
-| `idempotencyKey` | Client command key. Non-empty, ≤255 chars, no control characters. Never server-generated. |
+| Field                            | Meaning                                                                                                             |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `provider`                       | Required. Never defaulted from config, so a replay does not depend on what `AD_REWARD_PROVIDER` says at retry time. |
+| `proof` (or `verificationToken`) | Opaque provider proof.                                                                                              |
+| `idempotencyKey`                 | Client command key. Non-empty, ≤255 chars, no control characters. Never server-generated.                           |
 
 `requestHash = sha256({version: "ad-reward-claim:v1", provider, proofFingerprint})`.
 The RAW proof is never an input to anything stored, logged, or compared.
@@ -641,13 +646,13 @@ limit orders are enabled.
 
 ## Performance model
 
-| Value | Definition |
-| --- | --- |
-| 현재 총자산 | KRW cash + USD cash in KRW + domestic + US (KRW) + crypto (KRW) |
-| 누적 광고 보상금 | sum of valid `ad_reward` credits |
+| Value              | Definition                                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------------------ |
+| 현재 총자산        | KRW cash + USD cash in KRW + domestic + US (KRW) + crypto (KRW)                                        |
+| 누적 광고 보상금   | sum of valid `ad_reward` credits                                                                       |
 | 누적 외부 가상자금 | `initial_grant`/`general_account_open` + `ad_reward`/`ad_reward_claim` — an ALLOW-LIST, never inferred |
-| 누적 투자손익 | 현재 총자산 − 누적 외부 가상자금 |
-| 대표 수익률 | **TWR** |
+| 누적 투자손익      | 현재 총자산 − 누적 외부 가상자금                                                                       |
+| 대표 수익률        | **TWR**                                                                                                |
 
 `exchange_target`, `order_sell`, `settlement`, `adjustment`, and
 `manual_adjustment` are explicitly NOT external funding. `initialCapitalKrw`
@@ -706,11 +711,11 @@ perfectly committed payout — and rendered history as `after → before`.
 The order is now stated instead of inferred. Each snapshot has a **phase
 rank** within one `capturedAt`:
 
-| reason | rank |
-| --- | --- |
-| `external_funding_before` | 0 |
-| everything else (`scheduled`, origins, `order_executed`, …) | 1 |
-| `external_funding_after` | 2 |
+| reason                                                      | rank |
+| ----------------------------------------------------------- | ---- |
+| `external_funding_before`                                   | 0    |
+| everything else (`scheduled`, origins, `order_executed`, …) | 1    |
+| `external_funding_after`                                    | 2    |
 
 - History ascending: `capturedAt` → phase rank → `createdAt` → `id`, so a pair
   always reads **before → after**.
@@ -842,7 +847,7 @@ never an empty chart.
   Still read-only, still no `--apply`; financial data and TWR boundaries are
   never auto-corrected.
 - `pnpm tsx scripts/admin-run-batch-job.ts --job general-account-daily-snapshot
-  --snapshot-date <YYYY-MM-DD> [--dry-run]` — the general-account daily
+--snapshot-date <YYYY-MM-DD> [--dry-run]` — the general-account daily
   snapshot job (작업 7 보완 5). Details in `docs/batch-job-foundation.md`.
 
 ## 작업 8 — consistent reads, per-account serialization, strict replay payload
@@ -920,7 +925,6 @@ orderings are possible — daily-then-payout or payout-then-daily — and neithe
 produces a snapshot mixing a post-payout wallet with a pre-payout funding total.
 An account closed after the run listed it gets no snapshot at all and is counted
 in `excludedClosed` / `skippedClosedDuringRun`.
-
 
 ## Client status (작업 11)
 

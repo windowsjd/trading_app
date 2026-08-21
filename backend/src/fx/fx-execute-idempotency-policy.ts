@@ -5,6 +5,7 @@ import {
 } from './fx-decimal-policy';
 
 export const fxExecuteRequestHashApiVersion = 'fx-execute:v1' as const;
+export const generalFxExecuteRequestHashApiVersion = 'fx-execute:v2' as const;
 
 export type FxExecuteCanonicalPayload = {
   apiVersion: typeof fxExecuteRequestHashApiVersion;
@@ -19,6 +20,16 @@ export type FxExecuteCanonicalPayload = {
 export type BuildFxExecuteCanonicalPayloadInput = {
   userId: string;
   seasonParticipantId: string;
+  quoteId: string;
+  fromCurrency: string;
+  toCurrency: string;
+  sourceAmount: string;
+  [ignoredField: string]: unknown;
+};
+
+export type BuildGeneralFxExecuteCanonicalPayloadInput = {
+  userId: string;
+  tradingAccountId: string;
   quoteId: string;
   fromCurrency: string;
   toCurrency: string;
@@ -58,6 +69,31 @@ export function computeFxExecuteRequestHash(
   const canonicalJson = serializeFxExecuteCanonicalPayload(canonicalPayload);
 
   return createHash('sha256').update(canonicalJson, 'utf8').digest('hex');
+}
+
+/** Account-scoped v2. The season v1 serializer and field order stay exact. */
+export function computeGeneralFxExecuteRequestHash(
+  input: BuildGeneralFxExecuteCanonicalPayloadInput,
+): string {
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        apiVersion: generalFxExecuteRequestHashApiVersion,
+        userId: normalizeRequiredString(input.userId, 'userId'),
+        tradingAccountId: normalizeRequiredString(
+          input.tradingAccountId,
+          'tradingAccountId',
+        ),
+        quoteId: normalizeRequiredString(input.quoteId, 'quoteId'),
+        fromCurrency: normalizeCurrency(input.fromCurrency, 'fromCurrency'),
+        toCurrency: normalizeCurrency(input.toCurrency, 'toCurrency'),
+        sourceAmount: formatMoneyScale8(
+          parsePositiveDecimalString(input.sourceAmount),
+        ),
+      }),
+      'utf8',
+    )
+    .digest('hex');
 }
 
 function normalizeRequiredString(value: string, fieldName: string): string {

@@ -239,6 +239,8 @@ jobs:
       # limit buy/sell reservations, cancel/release, matcher fill/skip, TWR,
       # account isolation, and injected trading-scope corruption.
       GENERAL_TRADING_DB_INTEGRATION: "1"
+      # Complete general KRW/USD FX lifecycle and its account/TWR integrity.
+      GENERAL_FX_DB_INTEGRATION: "1"
       SEASON_JOIN_DB_INTEGRATION: "1"
       # Feature flags the account-scoped suites assert THROUGH; they gate
       # product behaviour, not the tests.
@@ -287,6 +289,7 @@ jobs:
           src/seasons/trading-account-trading-scope.integration.spec.ts
           src/trading-accounts/general-account.integration.spec.ts
           src/orders/general-account-trading.integration.spec.ts
+          src/fx/general-account-fx.integration.spec.ts
           src/orders/order-replay-and-cancel-scope.integration.spec.ts
           src/portfolio/general-performance-hardening.integration.spec.ts
           src/portfolio/snapshot-scope-audit.integration.spec.ts

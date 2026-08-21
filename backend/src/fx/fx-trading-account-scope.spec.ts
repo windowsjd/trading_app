@@ -94,6 +94,18 @@ jest.mock('../generated/prisma/client', () => {
       Decimal,
     },
     PrismaClient: class PrismaClient {},
+    SnapshotReason: {
+      exchange_executed: 'exchange_executed',
+    },
+    TradingAccountMode: {
+      season: 'season',
+      general: 'general',
+    },
+    TradingAccountStatus: {
+      active: 'active',
+      suspended: 'suspended',
+      closed: 'closed',
+    },
   };
 });
 
@@ -108,6 +120,7 @@ const ownedAccount = (overrides: Record<string, unknown> = {}) => ({
   userId: 'user-1',
   mode: 'season',
   status: 'active',
+  initialCapitalKrw: new Prisma.Decimal('10000000'),
   seasonParticipant: {
     id: 'sp-1',
     userId: 'user-1',
@@ -145,6 +158,20 @@ const createServices = () => {
     // them before listing): null means the participant has no anomalous rows.
     cashWallet: {
       findFirst: jest.fn().mockResolvedValue(null),
+      findUnique: jest.fn().mockImplementation(({ where }) => {
+        const currencyCode =
+          where.tradingAccountId_currencyCode?.currencyCode ?? 'KRW';
+        return Promise.resolve({
+          id: `wallet-${currencyCode}`,
+          seasonParticipantId: null,
+          tradingAccountId: 'ta-1',
+          currencyCode,
+          balanceAmount: new Prisma.Decimal(
+            currencyCode === 'KRW' ? '10000000' : '0',
+          ),
+          reservedAmount: new Prisma.Decimal('0'),
+        });
+      }),
     },
     walletTransaction: {
       findFirst: jest.fn().mockResolvedValue(null),
@@ -152,18 +179,45 @@ const createServices = () => {
     fxExecuteRequest: {
       findFirst: jest.fn().mockResolvedValue(null),
     },
+    fxRateSnapshot: {
+      findMany: jest.fn().mockImplementation(() => {
+        const fresh = new Date();
+        return Promise.resolve([
+          {
+            id: 'fx-rate-1',
+            rate: new Prisma.Decimal('1350'),
+            sourceType: 'provider_api',
+            sourceName: 'korea_exim_exchange_rate',
+            capturedAt: fresh,
+            effectiveAt: fresh,
+          },
+        ]);
+      }),
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    quote: {
+      create: jest.fn().mockResolvedValue({ id: 'quote-general-1' }),
+    },
   };
   const accessService = {
     getOwnedAccountOrThrow: jest.fn().mockResolvedValue(ownedAccount()),
+  };
+  const performanceService = {
+    assertGeneralAccountReady: jest.fn().mockResolvedValue({
+      krwWalletId: 'wallet-KRW',
+      usdWalletId: 'wallet-USD',
+      initialGrantId: 'grant-1',
+    }),
   };
   const service = new FxService(
     prisma as never,
     undefined,
     undefined,
     accessService as never,
+    performanceService as never,
   );
 
-  return { prisma, accessService, service };
+  return { prisma, accessService, performanceService, service };
 };
 
 const expectStatusAndCode = async (
@@ -230,16 +284,29 @@ describe('FxService account-scoped gating', () => {
     );
   });
 
-  it('blocks general accounts with a structured not-implemented error', async () => {
-    const { accessService, service } = createServices();
+  it('quotes active general accounts without consulting a season', async () => {
+    const { accessService, performanceService, prisma, service } =
+      createServices();
     accessService.getOwnedAccountOrThrow.mockResolvedValue(
       ownedAccount({ mode: 'general', seasonParticipant: null }),
     );
 
-    await expectStatusAndCode(
+    await expect(
       service.quoteForTradingAccount('user-1', 'ta-1', QUOTE_BODY),
-      409,
-      'GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED',
+    ).resolves.toMatchObject({
+      success: true,
+      data: { quoteId: 'quote-general-1', feeRate: '0.001000' },
+    });
+    expect(performanceService.assertGeneralAccountReady).toHaveBeenCalled();
+    expect(prisma.season.findUnique).not.toHaveBeenCalled();
+    expect(prisma.quote.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          seasonParticipantId: null,
+          tradingAccountId: 'ta-1',
+          quotedFeeRate: '0.001000',
+        }),
+      }),
     );
   });
 

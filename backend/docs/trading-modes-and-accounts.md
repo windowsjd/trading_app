@@ -80,7 +80,7 @@
   - 운영 스크립트 `trading-accounts:repair-snapshot-scope`,
     `trading-accounts:backfill-general-performance`, `audit-general` 성과 검사
     확장
-  (계약: `docs/general-account-and-ad-rewards-api-contract.md`)
+    (계약: `docs/general-account-and-ad-rewards-api-contract.md`)
 
 - **작업 6·7 보완 (2026-08-04):**
   - 외부자금 before/after 정렬을 UUID·createdAt에서 분리 — snapshot reason에
@@ -105,8 +105,8 @@
     scheduled EquitySnapshot + DailyPortfolioSnapshot 원자 생성
   - `audit-general`에 경계 순서·자금 연속성·경계 세부 불변식·일반 daily 행
     오염·closed 계정 daily 행 검사 추가(여전히 read-only, `--apply` 없음)
-  (계약: `docs/general-account-and-ad-rewards-api-contract.md`,
-   `docs/batch-job-foundation.md`)
+    (계약: `docs/general-account-and-ad-rewards-api-contract.md`,
+    `docs/batch-job-foundation.md`)
 - **일반계정 거래 활성화 (2026-08-18):** 기존 account-scoped 주문 API와
   시즌 주문 코어를 `TradingContext`로 일반화했다. 일반계정은 별도 엔진이나
   endpoint 없이 시장가·지정가 매수/매도, durable quote, 예약·취소, 공용
@@ -116,14 +116,21 @@
   성과는 `order_executed` ordinary TWR snapshot으로 전진하고 시즌 ranking은
   변경하지 않는다. 상세 계약은
   `docs/trading-account-orders-api-contract.md`를 따른다.
+- **일반계정 KRW↔USD FX 활성화 (2026-08-18):** 기존
+  account-scoped FX API·`FxService`·`WalletFxScreen`을 general context로
+  확장했다. active general account는 durable quote·execute-time provider
+  repricing(30bps)·available-balance·계정 멱등성을 season과 같은
+  코어에서 쓴다. 수수료는 시즌과 독립된
+  `GENERAL_FX_FEE_RATE`(기본 `0.001000`)를 quote에 pin하고, 체결은
+  null participant의 `exchange_executed` ordinary TWR snapshot을 남긴다.
+  자동환전·계정 간 이동은 없고 season ranking/settlement는 변경하지
+  않는다. 상세 계약은 `docs/trading-account-finance-api-contract.md`.
 
 **아직 구현되지 않음 (문서만 보고 사용 가능하다고 오해하지 말 것):**
 
-- 일반계정 실제 환전(409 `GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED` 유지)
 - 광고 SDK, 광고 시청 UI, **실제 광고 네트워크의 provider 전용 서버 검증
   어댑터** (인터페이스와 registry만 존재하며 운영 registry는 비어 있음),
   광고 1회당 지급액·일일 한도·대기시간의 확정값
-- ExchangeTransaction·FxExecuteRequest의 `seasonParticipantId` optional 전환
 - `tradingAccountId` NOT NULL 강화 (참가자: §3.5.5, 금융 4모델: §3.6.5)
 - 시즌 finished/rewarded/settled 전환 시 account `closed` 일괄 동기화,
   suspended 계정 재활성화, 운영자 일반계정 정지 API (§4.4의 잔여 범위)
@@ -136,21 +143,21 @@
 로그인한 사용자에게 장기적으로 두 투자 모드를 제공한다.
 
 - **시즌모드** — 기간제 대회형 가상투자 (현재 구현되어 있는 기능)
-- **일반모드** — 시즌 없는 무기한 가상투자 (계정·TWR·시장가/지정가 거래 구현,
-  FX는 별도 미구현)
+- **일반모드** — 시즌 없는 무기한 가상투자
+  (계정·TWR·시장가/지정가 거래·KRW↔USD FX 구현)
 
 두 모드는 하나의 사용자 계정을 공유하지만 **거래계정과 가상자산은 완전히 분리**한다. KRW/USD 지갑, 주문, 미체결 주문, 포지션, 평균단가, 실현/미실현손익, 환전 기록, 지갑 원장, 포트폴리오 스냅샷, 투자손익, 수익률은 모드 간에 공유하지 않는다. 예: 일반모드 KRW 800만 원과 시즌모드 KRW 950만 원은 서로 영향을 주지 않고, 일반모드에서 매수한 종목은 시즌모드 포지션에 나타나지 않는다. 거래계정 간 가상자금·자산 이전은 지원하지 않는다.
 
 ### 1.2 게임 흐름 (목표 구조)
 
 1. 회원가입과 로그인
-2. 시즌모드 또는 일반모드 선택 *(모드 선택 화면 구현)*
+2. 시즌모드 또는 일반모드 선택 _(모드 선택 화면 구현)_
 3. 선택한 모드의 독립 거래계정으로 진입
 4. 해당 거래계정의 지갑·포지션·주문 사용
 5. 시즌모드는 시즌 종료·랭킹·보상 적용
 6. 일반모드는 최초 1,000만 원으로 시작
 7. 일반모드에는 월별 자동 충전이 없음
-8. 추가 가상자금은 향후 보상형 광고를 통해 획득 *(광고 기능 미구현)*
+8. 추가 가상자금은 향후 보상형 광고를 통해 획득 _(광고 기능 미구현)_
 9. 광고 보상금은 투자수익으로 계산하지 않음
 10. 두 모드 사이의 자금과 자산은 공유하지 않음
 
@@ -213,13 +220,13 @@
 
 일반모드에서는 다음 값을 구분한다.
 
-| 항목 | 정의 |
-| --- | --- |
-| 현재 총자산 | KRW 현금 + USD 현금의 KRW 환산액 + 모든 포지션의 KRW 평가액 |
-| 최초 지급금 | 일반모드 계정 생성 시 지급한 10,000,000 KRW |
-| 누적 광고 보상금 | 정상 완료된 광고 보상 지급액의 총합 (원장의 완료된 광고 보상 거래 집계로 계산; 컬럼 누적 아님) |
-| 누적 외부 가상자금 | 최초 지급금 + 누적 광고 보상금 + 운영자가 명시적으로 외부자금으로 분류한 조정금 |
-| 누적 투자손익 | 현재 총자산 − 누적 외부 가상자금 |
+| 항목               | 정의                                                                                           |
+| ------------------ | ---------------------------------------------------------------------------------------------- |
+| 현재 총자산        | KRW 현금 + USD 현금의 KRW 환산액 + 모든 포지션의 KRW 평가액                                    |
+| 최초 지급금        | 일반모드 계정 생성 시 지급한 10,000,000 KRW                                                    |
+| 누적 광고 보상금   | 정상 완료된 광고 보상 지급액의 총합 (원장의 완료된 광고 보상 거래 집계로 계산; 컬럼 누적 아님) |
+| 누적 외부 가상자금 | 최초 지급금 + 누적 광고 보상금 + 운영자가 명시적으로 외부자금으로 분류한 조정금                |
+| 누적 투자손익      | 현재 총자산 − 누적 외부 가상자금                                                               |
 
 광고 보상금은 투자손익으로 취급하지 않는다. `TradingAccount.initialCapitalKrw`는 광고 보상으로 절대 변경하지 않는다.
 
@@ -278,16 +285,16 @@ Season → SeasonParticipant → TradingAccount
 
 `backend/prisma/schema.prisma`의 `TradingAccount`:
 
-| 필드 | 의미 |
-| --- | --- |
-| `id` | UUID PK (기존 모델과 동일한 `@default(uuid())` 관례) |
-| `userId` | 소유 사용자 FK (`onDelete: Restrict` — 금융 계정 식별 행은 사용자 삭제를 막는다) |
-| `mode` | `season` \| `general` |
-| `status` | `active` \| `suspended` \| `closed` (기본 `active`) |
-| `initialCapitalKrw` | 계정 최초 기준자산, `Decimal(24,8)`, `> 0` CHECK |
-| `openedAt` | 계정 시작 시각 (시즌 backfill은 `joinedAt` 복사) |
-| `closedAt` | 계정 종료 시각, 확실한 종료 시각이 없으면 `NULL` (`closedAt >= openedAt` CHECK) |
-| `createdAt`/`updatedAt` | 프로젝트 공통 관례 |
+| 필드                    | 의미                                                                             |
+| ----------------------- | -------------------------------------------------------------------------------- |
+| `id`                    | UUID PK (기존 모델과 동일한 `@default(uuid())` 관례)                             |
+| `userId`                | 소유 사용자 FK (`onDelete: Restrict` — 금융 계정 식별 행은 사용자 삭제를 막는다) |
+| `mode`                  | `season` \| `general`                                                            |
+| `status`                | `active` \| `suspended` \| `closed` (기본 `active`)                              |
+| `initialCapitalKrw`     | 계정 최초 기준자산, `Decimal(24,8)`, `> 0` CHECK                                 |
+| `openedAt`              | 계정 시작 시각 (시즌 backfill은 `joinedAt` 복사)                                 |
+| `closedAt`              | 계정 종료 시각, 확실한 종료 시각이 없으면 `NULL` (`closedAt >= openedAt` CHECK)  |
+| `createdAt`/`updatedAt` | 프로젝트 공통 관례                                                               |
 
 관계: `User.tradingAccounts TradingAccount[]`, `SeasonParticipant.tradingAccountId String? @unique` (1:1, `onDelete: Restrict`).
 
@@ -523,7 +530,7 @@ RewardFulfillmentRequest·LimitOrderCandleEvidence(Order 관계로 사용,
   자산에 집계 포지션 1개. 기존 `@@unique([seasonParticipantId, assetId])`
   유지. `(tradingAccountId)` 인덱스.
 - `Quote` `(tradingAccountId, createdAt)`·`(tradingAccountId, status,
-  expiresAt)` 인덱스. 신규 unique 없음(quote는 status/consume로 단일 사용을
+expiresAt)` 인덱스. 신규 unique 없음(quote는 status/consume로 단일 사용을
   보장한다).
 - TradingAccount 역관계 3개(orders/positions/quotes) 추가. 캐시 컬럼
   (totalAssetKrw·positionValue·orderCount·currentBalance·realizedPnl 등)은
@@ -617,7 +624,7 @@ tradingAccountId를 함께 기록한다. 참가자 링크가 null이면 신규 �
   `quote.tradingAccountId`가 non-null이면 실행 계정과 일치해야 하며(불일치 →
   `QUOTE_MISMATCH`), null legacy quote만 기존 참가자+requestHash 검증 경로로
   통과한다. quote 소비 updateMany WHERE는 `id + status=active +
-  seasonParticipantId + (계정 일치 OR null)`이라 다른 계정 quote의 상태를
+seasonParticipantId + (계정 일치 OR null)`이라 다른 계정 quote의 상태를
   바꿀 수 없다. requestHash 계산식은 교체하지 않았다(전면 재작성 금지;
   계정 격리는 저장된 tradingAccountId 검증으로 완성).
 - Order 멱등성: 계정 우선 조회(`tradingAccountId+key`) → legacy null 행
@@ -707,12 +714,12 @@ NULL은 후속 작업으로 보류. **구버전 writer가 실행 중인 상태�
 ### 4.3 ParticipantStatus → TradingAccountStatus backfill 매핑
 
 | ParticipantStatus | TradingAccountStatus |
-| --- | --- |
-| registered | active |
-| active | active |
-| excluded | suspended |
-| finished | closed |
-| rewarded | closed |
+| ----------------- | -------------------- |
+| registered        | active               |
+| active            | active               |
+| excluded          | suspended            |
+| finished          | closed               |
+| rewarded          | closed               |
 
 기존 `SeasonStatus`·`ParticipantStatus`는 삭제·대체하지 않는다. `WalletTransactionType.ad_reward`와 `WalletTransactionReferenceType.general_account_open`·`ad_reward_claim`, 그리고 `AdRewardClaimStatus`는 작업 6에서 추가했다(§6).
 
@@ -778,10 +785,11 @@ excluded+active 불일치는 `pnpm trading-accounts:repair-links`가 점검·보
 
 **account-scoped 금융 API (작업 4에서 추가):** 소유 계정 하위의
 `GET .../wallets`·`GET .../wallet-transactions`(조회, active/suspended/closed
-모두 허용), `POST .../fx/quote`·`POST .../fx/execute`(시즌계정 + account
-active + 기존 시즌/참가자 정책을 모두 통과해야 하며 suspended/closed는 409
-`TRADING_ACCOUNT_NOT_ACTIVE`, general 계정은 409
-`GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`), `GET .../fx/transactions`(조회).
+모두 허용), `POST .../fx/quote`·`POST .../fx/execute`(active
+season/general 계정 + 공통 durable quote/provider/available-balance 정책;
+season은 기존 시즌/참가자 gate, general은 참가자 없는 foundation/TWR
+integrity gate; suspended/closed는 409 `TRADING_ACCOUNT_NOT_ACTIVE`),
+`GET .../fx/transactions`(조회).
 legacy `/api/v1/wallets`·`/api/v1/fx/*`는 계약 그대로 유지되고 두 경로는 같은
 서비스 계산 규칙을 공유한다. 상세:
 `docs/trading-account-finance-api-contract.md`.
@@ -837,9 +845,10 @@ PostgreSQL이 같은 트랜잭션에서 새 enum 값을 사용할 수 없어 분
 (`DROP NOT NULL`)하고 관계도 optional. 일반계정에는 SeasonParticipant가
 없으므로 일반 지갑·원장은 `seasonParticipantId = null`,
 `tradingAccountId = general account id`다. **기존 시즌 행의
-`seasonParticipantId`는 변경하지 않는다.** Order·Position·
-ExchangeTransaction·FxExecuteRequest는 일반 주문·환전이 아직 비활성이므로
-이번 작업에서 변경하지 않았다.
+`seasonParticipantId`는 변경하지 않는다.** 작업 6 당시에는 일반 주문·환전이
+비활성이어서 Order·Position·ExchangeTransaction·FxExecuteRequest를 변경하지
+않았다. 이 네 모델의 후속 general 활성화는 2026-08-18의 별도 additive
+migration들로 완료됐다.
 
 **enum 추가:** `WalletTransactionType.ad_reward`,
 `WalletTransactionReferenceType.general_account_open`·`ad_reward_claim`,
@@ -951,7 +960,9 @@ AdRewardClaim 수.
 - [ ] repair-financial-scope: 기본 dry-run, null만 backfill, missing-link 보고 후 불변, mismatch 덮어쓰기 금지, apply 후 null·mismatch 0 검증, 잔여 시 exit 1, 멱등
 - [ ] 신규 writer dual-write: join 지갑/grant·환전 요청/거래/원장·시장가/지정가 원장 전부 participant accountId 기록, 링크 null이면 fail-closed
 - [ ] account-scoped wallets/ledger 조회: 소유권 404 통일, suspended/closed 조회 허용, GET이 지갑·계정 미생성, legacy와 값 일치
-- [ ] account-scoped FX: 시즌 정책 + account active 요구, suspended/closed 409, general 409, 소유권 404, source/target wallet 동일 계정 검증
+- [ ] account-scoped FX: account active 요구, suspended/closed 409, 소유권 404,
+      source/target wallet 동일 계정 검증. 이 체크리스트 작성 당시 general은
+      409였고, 현재는 active general도 participant 없이 같은 코어를 사용한다.
 - [ ] 계정 기준 idempotency: 같은 계정 replay 동일 응답, 다른 사용자 계정은 같은 키 사용 가능, 환전 트랜잭션 원자성 유지
 - [ ] legacy wallet/fx API 계약 불변, legacy와 account-scoped 계산 결과 동일
 
@@ -982,83 +993,83 @@ TradingAccount를 지우지 않아 해당 커밋 상태에서는 FK 오류로 �
 
 **2026-08-03 (이번 작업, 로컬 실행 — hosted CI 없음):**
 
-| 검증 | 결과 | 근거 |
-| --- | --- | --- |
-| prisma format / validate / generate | PASS | schema 변경 없음, client 재생성 |
-| typecheck / build | PASS | `pnpm typecheck`, `pnpm build` |
-| unit + script spec (`pnpm test`) | PASS | 2,189 pass (신규 +50) |
-| 7.1 opt-in DB 통합 (`TRADING_ACCOUNT_DB_INTEGRATION=1`) | PASS | 로컬 PostgreSQL 16 |
-| 7.2 opt-in DB 통합 (`trading-account-link.integration.spec.ts`) | PASS | 결정적 ID Postgres 대조·복구·race·rollback·404 등 12 케이스 |
-| 시즌 참가 / FX / 시장가·지정가 주문 DB 통합 (opt-in 5종) | PASS | `--runInBand` 직렬 실행 |
-| e2e (`pnpm test:e2e`) | 109/112 PASS | 실패 3건(readiness/wallets/orders-cancel)은 **BASELINE_FAIL** — `.env.local` env 기인으로 기준 커밋에서 동일 재현 |
-| 운영 복구 시나리오 A (스크립트 dry-run→apply→재실행) | PASS | 격리 dev DB, 금융 데이터 불변 확인 |
-| 운영 복구 시나리오 B (join 재요청 409+복구) / C (제외 시 복구+suspended) | PASS | 7.2 DB 통합 케이스로 실행 |
+| 검증                                                                     | 결과         | 근거                                                                                                              |
+| ------------------------------------------------------------------------ | ------------ | ----------------------------------------------------------------------------------------------------------------- |
+| prisma format / validate / generate                                      | PASS         | schema 변경 없음, client 재생성                                                                                   |
+| typecheck / build                                                        | PASS         | `pnpm typecheck`, `pnpm build`                                                                                    |
+| unit + script spec (`pnpm test`)                                         | PASS         | 2,189 pass (신규 +50)                                                                                             |
+| 7.1 opt-in DB 통합 (`TRADING_ACCOUNT_DB_INTEGRATION=1`)                  | PASS         | 로컬 PostgreSQL 16                                                                                                |
+| 7.2 opt-in DB 통합 (`trading-account-link.integration.spec.ts`)          | PASS         | 결정적 ID Postgres 대조·복구·race·rollback·404 등 12 케이스                                                       |
+| 시즌 참가 / FX / 시장가·지정가 주문 DB 통합 (opt-in 5종)                 | PASS         | `--runInBand` 직렬 실행                                                                                           |
+| e2e (`pnpm test:e2e`)                                                    | 109/112 PASS | 실패 3건(readiness/wallets/orders-cancel)은 **BASELINE_FAIL** — `.env.local` env 기인으로 기준 커밋에서 동일 재현 |
+| 운영 복구 시나리오 A (스크립트 dry-run→apply→재실행)                     | PASS         | 격리 dev DB, 금융 데이터 불변 확인                                                                                |
+| 운영 복구 시나리오 B (join 재요청 409+복구) / C (제외 시 복구+suspended) | PASS         | 7.2 DB 통합 케이스로 실행                                                                                         |
 
 **2026-08-03 2차 (작업 4 + 보완 3종, 로컬 실행 — hosted CI 없음):**
 
-| 검증 | 결과 | 근거 |
-| --- | --- | --- |
-| prisma format / validate / generate | PASS | 신규 migration 포함 |
-| typecheck / build | PASS | `pnpm typecheck`, `pnpm build` |
-| unit + script spec (`pnpm test`) | PASS | 2,231 pass (신규 +42) |
-| migration backfill·비파괴 (dev DB fingerprint 전후) | PASS | 행 수·금액 합계·ID 불변, legacy null 유지 |
-| opt-in DB 통합 12종 직렬 (`--runInBand`) | PASS | link/financial-scope/join/FX/시장가/지정가 5종/MVP flow 포함 |
-| 신규 financial-scope DB 통합 8케이스 | PASS | backfill·dual-write·repair·equivalence·idempotency·gating·excluded-active·ON CONFLICT race |
-| e2e (`pnpm test:e2e`, `JWT_ACCESS_SECRET=test-secret`) | 115/118 PASS | 신규 6건 포함. 실패 3건(readiness/wallets/orders-cancel)은 **BASELINE_FAIL** — 기준 커밋 a0bedb77에서 동일 재현되는 env 기인 실패 |
-| 운영 CLI 시나리오 (repair-links dry→apply→재실행, financial-scope 순서 포함) | PASS | 격리 dev DB, exit 0, null·mismatch 0, 지갑 잔액 불변 |
+| 검증                                                                         | 결과         | 근거                                                                                                                              |
+| ---------------------------------------------------------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| prisma format / validate / generate                                          | PASS         | 신규 migration 포함                                                                                                               |
+| typecheck / build                                                            | PASS         | `pnpm typecheck`, `pnpm build`                                                                                                    |
+| unit + script spec (`pnpm test`)                                             | PASS         | 2,231 pass (신규 +42)                                                                                                             |
+| migration backfill·비파괴 (dev DB fingerprint 전후)                          | PASS         | 행 수·금액 합계·ID 불변, legacy null 유지                                                                                         |
+| opt-in DB 통합 12종 직렬 (`--runInBand`)                                     | PASS         | link/financial-scope/join/FX/시장가/지정가 5종/MVP flow 포함                                                                      |
+| 신규 financial-scope DB 통합 8케이스                                         | PASS         | backfill·dual-write·repair·equivalence·idempotency·gating·excluded-active·ON CONFLICT race                                        |
+| e2e (`pnpm test:e2e`, `JWT_ACCESS_SECRET=test-secret`)                       | 115/118 PASS | 신규 6건 포함. 실패 3건(readiness/wallets/orders-cancel)은 **BASELINE_FAIL** — 기준 커밋 a0bedb77에서 동일 재현되는 env 기인 실패 |
+| 운영 CLI 시나리오 (repair-links dry→apply→재실행, financial-scope 순서 포함) | PASS         | 격리 dev DB, exit 0, null·mismatch 0, 지갑 잔액 불변                                                                              |
 
 **2026-08-03 3차 (작업 5 + 보완 3종, 로컬 실행 — hosted CI 없음):**
 
-| 검증 | 결과 | 근거 |
-| --- | --- | --- |
-| prisma format / validate / generate | PASS | 신규 migration(`…150000_add_trading_scope_and_fx_legacy_partial_unique`) 포함; `migrate diff`(DB↔schema) 차이 없음 |
-| typecheck / build | PASS | `pnpm typecheck`, `pnpm build` |
-| unit + script spec (`pnpm test`) | PASS | 2,243 pass (Order/Position/Quote scope·FX partial unique·probe 계약 반영) |
-| migration 적용·비파괴 (dev DB fingerprint 전후) | PASS | `migrate deploy` 1건 적용, 주문·포지션·quote·FX 값 해시 불변 |
-| opt-in DB 통합 14종 직렬 (`--runInBand`) | PASS | 기존 12종 + 신규 `trading-account-trading-scope` + 기존 러너 fixture dual-write 갱신 |
-| 신규 trading-scope DB 통합 6블록 | PASS | 인덱스/partial unique·insert-level unique 의미·repair 스크립트·지정가 생성/취소/체결 scope fail-closed·account 조회 동등성/404/probe·FX 동일 사용자 계정 간 키 재사용+legacy replay 고정 |
-| e2e (`pnpm test:e2e`, `JWT_ACCESS_SECRET=test-secret`) | 115/118 PASS | 실패 3건(readiness/wallets/orders-cancel)은 **BASELINE_FAIL** — 기준 커밋 e91921aa에서 git stash로 동일 재현 확인(env 기인) |
-| 운영 CLI 시나리오 (repair-trading-scope dry→apply→verify→재실행) | PASS | dev DB에 old-writer null scope 3행 심기 → dry-run 보고(변경 없음) → apply(3행 backfill, 잔여 0/0, exit 0) → 값 불변 확인 → 재실행 멱등 exit 0 |
-| §20 완료 기준 검증 쿼리 | PASS | null·mismatch·order-quote 불일치·계정별 idempotency/position 중복·legacy partial 위반·orphan/general 계정 전부 0 |
+| 검증                                                             | 결과         | 근거                                                                                                                                                                                     |
+| ---------------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| prisma format / validate / generate                              | PASS         | 신규 migration(`…150000_add_trading_scope_and_fx_legacy_partial_unique`) 포함; `migrate diff`(DB↔schema) 차이 없음                                                                       |
+| typecheck / build                                                | PASS         | `pnpm typecheck`, `pnpm build`                                                                                                                                                           |
+| unit + script spec (`pnpm test`)                                 | PASS         | 2,243 pass (Order/Position/Quote scope·FX partial unique·probe 계약 반영)                                                                                                                |
+| migration 적용·비파괴 (dev DB fingerprint 전후)                  | PASS         | `migrate deploy` 1건 적용, 주문·포지션·quote·FX 값 해시 불변                                                                                                                             |
+| opt-in DB 통합 14종 직렬 (`--runInBand`)                         | PASS         | 기존 12종 + 신규 `trading-account-trading-scope` + 기존 러너 fixture dual-write 갱신                                                                                                     |
+| 신규 trading-scope DB 통합 6블록                                 | PASS         | 인덱스/partial unique·insert-level unique 의미·repair 스크립트·지정가 생성/취소/체결 scope fail-closed·account 조회 동등성/404/probe·FX 동일 사용자 계정 간 키 재사용+legacy replay 고정 |
+| e2e (`pnpm test:e2e`, `JWT_ACCESS_SECRET=test-secret`)           | 115/118 PASS | 실패 3건(readiness/wallets/orders-cancel)은 **BASELINE_FAIL** — 기준 커밋 e91921aa에서 git stash로 동일 재현 확인(env 기인)                                                              |
+| 운영 CLI 시나리오 (repair-trading-scope dry→apply→verify→재실행) | PASS         | dev DB에 old-writer null scope 3행 심기 → dry-run 보고(변경 없음) → apply(3행 backfill, 잔여 0/0, exit 0) → 값 불변 확인 → 재실행 멱등 exit 0                                            |
+| §20 완료 기준 검증 쿼리                                          | PASS         | null·mismatch·order-quote 불일치·계정별 idempotency/position 중복·legacy partial 위반·orphan/general 계정 전부 0                                                                         |
 
 **2026-08-03 (작업 5 보완 3종 + 작업 6, 로컬 실행 — hosted CI 없음):**
 
-| 검증 | 결과 | 근거 |
-| --- | --- | --- |
-| prisma format / validate / generate | PASS | 신규 migration 2건 포함 |
-| typecheck / build | PASS | `pnpm typecheck`, `pnpm build` |
-| unit + script spec (`pnpm test`) | PASS | 2,315 pass (신규 +72: 광고 config, 지갑 실패 진단, 취소 scope 분류, general/ad schema contract) |
-| migration 적용·비파괴 (dev DB fingerprint 전후) | PASS | 시즌 데이터(계정 3, 지갑 6, 원장 15) 심은 뒤 `migrate deploy`; 통화별 balance/reserved 합계·txType별 amount·referenceType별 건수·전체 ID·seasonParticipantId 모두 동일. 유일한 차이는 빈 `ad_reward_claims` 테이블 |
-| opt-in DB 통합 16종 직렬 (`--runInBand`) | PASS | 기존 14종 + 신규 `general-account`·`order-replay-and-cancel-scope` |
-| 신규 general-account DB 통합 | PASS | 최초 생성 원자성·재호출 멱등·동시 생성 1건 수렴·지갑/원장 생성 실패 rollback·손상 계정 fail-closed·suspended/closed 미복구·partial unique·account-scoped 조회·season link 오염 fail-closed |
-| 신규 ad-reward DB 통합 | PASS | disabled/provider 미등록 차단·검증 실패 무기록·지급 원자성·중복 이벤트 replay·타 계정 재사용 409·동시 동일 이벤트 1회 지급·일일 count/amount race·cooldown·rejected 영구성·시즌계정/타인 차단·응답 비밀 미노출 |
-| 신규 market replay + cancel scope DB 통합 | PASS | responsePayloadJson 원자 저장, suspended/closed/ended/excluded/자산 비활성 이후 replay 및 금융 상태 불변, 다른 hash 409, 신규 주문 gate 유지, 취소 scope 6분기 + 지갑 scope 2종 fail-closed(상태·예약금 불변) |
-| e2e (`pnpm test:e2e`, `JWT_ACCESS_SECRET=test-secret`) | 119/122 PASS | 신규 4건 추가 통과. 실패 3건(readiness/wallets/orders-cancel)은 **BASELINE_FAIL** — 기준 커밋 c08ddc70에서 git stash로 동일 명령·환경 재현 확인 |
-| `pnpm trading-accounts:audit-general` | PASS | dev DB findings 0, exit 0 |
-| 실제 광고 provider 연동 | **PROVIDER_NOT_CONFIGURED** | provider 미확정, 운영 registry 비어 있음. backend 검증은 테스트 전용 fake verifier 기반이며 실제 provider end-to-end 검증이 아니다 |
+| 검증                                                   | 결과                        | 근거                                                                                                                                                                                                               |
+| ------------------------------------------------------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| prisma format / validate / generate                    | PASS                        | 신규 migration 2건 포함                                                                                                                                                                                            |
+| typecheck / build                                      | PASS                        | `pnpm typecheck`, `pnpm build`                                                                                                                                                                                     |
+| unit + script spec (`pnpm test`)                       | PASS                        | 2,315 pass (신규 +72: 광고 config, 지갑 실패 진단, 취소 scope 분류, general/ad schema contract)                                                                                                                    |
+| migration 적용·비파괴 (dev DB fingerprint 전후)        | PASS                        | 시즌 데이터(계정 3, 지갑 6, 원장 15) 심은 뒤 `migrate deploy`; 통화별 balance/reserved 합계·txType별 amount·referenceType별 건수·전체 ID·seasonParticipantId 모두 동일. 유일한 차이는 빈 `ad_reward_claims` 테이블 |
+| opt-in DB 통합 16종 직렬 (`--runInBand`)               | PASS                        | 기존 14종 + 신규 `general-account`·`order-replay-and-cancel-scope`                                                                                                                                                 |
+| 신규 general-account DB 통합                           | PASS                        | 최초 생성 원자성·재호출 멱등·동시 생성 1건 수렴·지갑/원장 생성 실패 rollback·손상 계정 fail-closed·suspended/closed 미복구·partial unique·account-scoped 조회·season link 오염 fail-closed                         |
+| 신규 ad-reward DB 통합                                 | PASS                        | disabled/provider 미등록 차단·검증 실패 무기록·지급 원자성·중복 이벤트 replay·타 계정 재사용 409·동시 동일 이벤트 1회 지급·일일 count/amount race·cooldown·rejected 영구성·시즌계정/타인 차단·응답 비밀 미노출     |
+| 신규 market replay + cancel scope DB 통합              | PASS                        | responsePayloadJson 원자 저장, suspended/closed/ended/excluded/자산 비활성 이후 replay 및 금융 상태 불변, 다른 hash 409, 신규 주문 gate 유지, 취소 scope 6분기 + 지갑 scope 2종 fail-closed(상태·예약금 불변)      |
+| e2e (`pnpm test:e2e`, `JWT_ACCESS_SECRET=test-secret`) | 119/122 PASS                | 신규 4건 추가 통과. 실패 3건(readiness/wallets/orders-cancel)은 **BASELINE_FAIL** — 기준 커밋 c08ddc70에서 git stash로 동일 명령·환경 재현 확인                                                                    |
+| `pnpm trading-accounts:audit-general`                  | PASS                        | dev DB findings 0, exit 0                                                                                                                                                                                          |
+| 실제 광고 provider 연동                                | **PROVIDER_NOT_CONFIGURED** | provider 미확정, 운영 registry 비어 있음. backend 검증은 테스트 전용 fake verifier 기반이며 실제 provider end-to-end 검증이 아니다                                                                                 |
 
 **2026-08-04 (작업 6·7 보완, 로컬 실행 — hosted CI는 이번 커밋 미실행):**
 
 기준 커밋 `d2713a9d` / 완료 커밋은 이 문서와 같은 커밋.
 
-| 검증 | 결과 | 근거 |
-| --- | --- | --- |
-| prisma format / validate / generate | PASS | schema 변경 없음(`git diff prisma/` 빈 결과), client 재생성 |
-| typecheck (`tsc --noEmit -p tsconfig.build.json`) | PASS | 오류 0 |
-| build (`nest build`) | PASS | exit 0 |
-| lint (`eslint --no-fix "{src,apps,libs,test}/**/*.ts"`) | BASELINE_FAIL | 944 error. 기준 커밋 936 error 대비 +8이며 전부 신규 spec 3종의 `jest.mock` 헤더에 대한 `no-unsafe-assignment`(기존 모든 spec과 동일 패턴). 저장소는 HEAD에서도 lint clean이 아니다 |
-| unit + script spec (`pnpm test`) | PASS | 178 suite / 2,413 pass, 35 skipped(opt-in DB). 신규 +30 (경계 정렬 12, claim 정합성 16 중 신규 16, daily job 9, 성과 서비스 10 — 합산 후 총계 기준 +30) |
-| opt-in DB 통합 15종 직렬 (`--runInBand`) | PASS | 최종 실행 15/15 PASS(기존 14종 + 신규 `general-performance-hardening`). 도중 1회 `limit-order-transaction-time`이 Prisma interactive transaction 5,000ms 초과로 실패했으나, 변경을 stash한 기준 커밋에서 1회차 PASS / 2회차 동일 실패, 변경 적용 상태에서 1·2회차 PASS / 3회차 동일 실패로 재현되는 **환경 기인 flaky**이며 본 작업과 무관하다. 별도로 `trading-account-financial-scope` 1회 실패는 운영 CLI 검증용으로 심어둔 일반계정 3건이 남아 있어 해당 suite의 전역 "general 계정 0" 단언을 건드린 것으로, 시드 정리 후 재실행에서 해소됐다(코드 회귀 아님) |
-| 신규 `general-performance-hardening` DB 통합 | PASS | 경계 UUID 양방향 정렬·연속성 5종·replay 16종·eligibility 6종·daily job 8종(동시 실행, 롤백, 시즌 행 불변 포함) |
-| e2e (`pnpm test:e2e`, `JWT_ACCESS_SECRET=test-secret`) | 119/122 PASS | 실패 3건(readiness/wallets/orders-cancel)은 **BASELINE_FAIL** — 기준 커밋 d2713a9d에서 `git stash`로 동일 명령·환경 재현, 실패 목록 완전 동일 |
-| `pnpm trading-accounts:audit-general` | PASS | dev DB findings 0, exit 0. 신규 검사 동작 확인: after 행 누적자금을 훼손하면 `GENERAL_PERFORMANCE_EXTERNAL_FUNDING_MISMATCH`·`EXTERNAL_FUNDING_PAIR_TOTAL_ASSET_MISMATCH` 포함 4건 검출, 복구 후 0건 |
-| `trading-accounts:repair-snapshot-scope` dry-run | PASS | null·mismatch 0, exit 0, 무변경 |
-| `trading-accounts:backfill-general-performance` dry-run | PASS | general 3계정 전부 already initialized, skipped 0, exit 0 |
-| 일반 daily snapshot job dry-run | PASS | total 2 / wouldCreate 2 / excludedClosed 1 / integrityFailed 0 / valuationFailed 0, daily·scheduled equity 행 0건 유지 |
-| 일반 daily snapshot job 실제 실행 | PASS | created 2(active·suspended), closed 계정 daily 0·scheduled equity 0, daily 행의 `seasonParticipantId` null·TWR 0%·누적자금·투자손익·factor 정상. 재실행 시 existing 2 / created 0 |
-| 실제 광고 provider 연동 | **PROVIDER_NOT_CONFIGURED** | provider 미확정, 운영 registry 비어 있음. 모든 검증은 테스트 전용 fake verifier 기반이며 실제 provider end-to-end 검증이 아니다 |
-| hosted CI (`.github/workflows/ci.yml`) | NOT_RUN (이번 커밋) / BASELINE_FAIL (기준 커밋) | workflow는 존재하며 `push`(main)·PR에서 동작한다. 이번 커밋은 push 자격증명이 없어 hosted 실행 결과가 없다(NOT_RUN). 기준 커밋 `d2713a9d`의 hosted run(id 30803274726)은 **failure**: `Backend quality → Candle-layer lint (check only, no fix)`, `Limit order PostgreSQL integration → Verify no schema drift against the deployed database`. 두 실패는 로컬에서 그대로 재현되며 이번 변경과 무관하다 — candle lint는 변경 전후 모두 15 error로 동일(`scripts/lib/repair-trading-scope.ts` 등), schema drift는 작업 7 migration이 만든 `equity_snapshots` 인덱스 3개의 **이름**이 schema.prisma에서 파생되는 이름과 달라 `migrate diff --exit-code`가 2를 반환하는 것으로, 컬럼·제약 자체의 차이는 없고 이번 작업은 schema를 변경하지 않았다. `Candle fixture integration`·`Frontend quality`는 기준 커밋에서 success. 위 표의 나머지 결과는 전부 로컬 실행이며 CI 결과가 아니다 |
-| CI에서 신규 DB 통합 suite 실행 여부 | NOT_RUN | `limit-order-db-integration` job은 `TRADING_ACCOUNT_DB_INTEGRATION`을 설정하지 않으므로 기존 `general-account`와 마찬가지로 신규 `general-performance-hardening` suite도 hosted CI에서는 skip된다. 로컬 opt-in 실행 결과만 존재한다 |
+| 검증                                                    | 결과                                            | 근거                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| prisma format / validate / generate                     | PASS                                            | schema 변경 없음(`git diff prisma/` 빈 결과), client 재생성                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| typecheck (`tsc --noEmit -p tsconfig.build.json`)       | PASS                                            | 오류 0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| build (`nest build`)                                    | PASS                                            | exit 0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| lint (`eslint --no-fix "{src,apps,libs,test}/**/*.ts"`) | BASELINE_FAIL                                   | 944 error. 기준 커밋 936 error 대비 +8이며 전부 신규 spec 3종의 `jest.mock` 헤더에 대한 `no-unsafe-assignment`(기존 모든 spec과 동일 패턴). 저장소는 HEAD에서도 lint clean이 아니다                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| unit + script spec (`pnpm test`)                        | PASS                                            | 178 suite / 2,413 pass, 35 skipped(opt-in DB). 신규 +30 (경계 정렬 12, claim 정합성 16 중 신규 16, daily job 9, 성과 서비스 10 — 합산 후 총계 기준 +30)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| opt-in DB 통합 15종 직렬 (`--runInBand`)                | PASS                                            | 최종 실행 15/15 PASS(기존 14종 + 신규 `general-performance-hardening`). 도중 1회 `limit-order-transaction-time`이 Prisma interactive transaction 5,000ms 초과로 실패했으나, 변경을 stash한 기준 커밋에서 1회차 PASS / 2회차 동일 실패, 변경 적용 상태에서 1·2회차 PASS / 3회차 동일 실패로 재현되는 **환경 기인 flaky**이며 본 작업과 무관하다. 별도로 `trading-account-financial-scope` 1회 실패는 운영 CLI 검증용으로 심어둔 일반계정 3건이 남아 있어 해당 suite의 전역 "general 계정 0" 단언을 건드린 것으로, 시드 정리 후 재실행에서 해소됐다(코드 회귀 아님)                                                                                                                                                                                                                                                                                                                 |
+| 신규 `general-performance-hardening` DB 통합            | PASS                                            | 경계 UUID 양방향 정렬·연속성 5종·replay 16종·eligibility 6종·daily job 8종(동시 실행, 롤백, 시즌 행 불변 포함)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| e2e (`pnpm test:e2e`, `JWT_ACCESS_SECRET=test-secret`)  | 119/122 PASS                                    | 실패 3건(readiness/wallets/orders-cancel)은 **BASELINE_FAIL** — 기준 커밋 d2713a9d에서 `git stash`로 동일 명령·환경 재현, 실패 목록 완전 동일                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `pnpm trading-accounts:audit-general`                   | PASS                                            | dev DB findings 0, exit 0. 신규 검사 동작 확인: after 행 누적자금을 훼손하면 `GENERAL_PERFORMANCE_EXTERNAL_FUNDING_MISMATCH`·`EXTERNAL_FUNDING_PAIR_TOTAL_ASSET_MISMATCH` 포함 4건 검출, 복구 후 0건                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `trading-accounts:repair-snapshot-scope` dry-run        | PASS                                            | null·mismatch 0, exit 0, 무변경                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `trading-accounts:backfill-general-performance` dry-run | PASS                                            | general 3계정 전부 already initialized, skipped 0, exit 0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 일반 daily snapshot job dry-run                         | PASS                                            | total 2 / wouldCreate 2 / excludedClosed 1 / integrityFailed 0 / valuationFailed 0, daily·scheduled equity 행 0건 유지                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 일반 daily snapshot job 실제 실행                       | PASS                                            | created 2(active·suspended), closed 계정 daily 0·scheduled equity 0, daily 행의 `seasonParticipantId` null·TWR 0%·누적자금·투자손익·factor 정상. 재실행 시 existing 2 / created 0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 실제 광고 provider 연동                                 | **PROVIDER_NOT_CONFIGURED**                     | provider 미확정, 운영 registry 비어 있음. 모든 검증은 테스트 전용 fake verifier 기반이며 실제 provider end-to-end 검증이 아니다                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| hosted CI (`.github/workflows/ci.yml`)                  | NOT_RUN (이번 커밋) / BASELINE_FAIL (기준 커밋) | workflow는 존재하며 `push`(main)·PR에서 동작한다. 이번 커밋은 push 자격증명이 없어 hosted 실행 결과가 없다(NOT_RUN). 기준 커밋 `d2713a9d`의 hosted run(id 30803274726)은 **failure**: `Backend quality → Candle-layer lint (check only, no fix)`, `Limit order PostgreSQL integration → Verify no schema drift against the deployed database`. 두 실패는 로컬에서 그대로 재현되며 이번 변경과 무관하다 — candle lint는 변경 전후 모두 15 error로 동일(`scripts/lib/repair-trading-scope.ts` 등), schema drift는 작업 7 migration이 만든 `equity_snapshots` 인덱스 3개의 **이름**이 schema.prisma에서 파생되는 이름과 달라 `migrate diff --exit-code`가 2를 반환하는 것으로, 컬럼·제약 자체의 차이는 없고 이번 작업은 schema를 변경하지 않았다. `Candle fixture integration`·`Frontend quality`는 기준 커밋에서 success. 위 표의 나머지 결과는 전부 로컬 실행이며 CI 결과가 아니다 |
+| CI에서 신규 DB 통합 suite 실행 여부                     | NOT_RUN                                         | `limit-order-db-integration` job은 `TRADING_ACCOUNT_DB_INTEGRATION`을 설정하지 않으므로 기존 `general-account`와 마찬가지로 신규 `general-performance-hardening` suite도 hosted CI에서는 skip된다. 로컬 opt-in 실행 결과만 존재한다                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 ### 7.4 일반계정·광고 영구 체크리스트 (작업 6에서 구현됨)
 
@@ -1181,7 +1192,7 @@ eligibility:
 11. enable 전 reward amount·일일 횟수·일일 금액·cooldown·timezone 검토
 12. enable 후에는 테스트용 이벤트가 아니라 provider sandbox 이벤트로 검증
 13. `pnpm trading-accounts:audit-general` 실행 (findings 0 기대)
-14. 일반계정 시장가·지정가 주문 lifecycle smoke + 일반 FX 차단 유지 확인
+14. 일반계정 시장가·지정가 주문 + KRW↔USD FX lifecycle smoke
 
 **migration만 적용한 상태에서 기존 사용자에게 general account를 자동 생성하지
 않는다.** general 계정은 사용자가 명시적으로 POST를 호출할 때만 생긴다.
@@ -1641,8 +1652,8 @@ Order·Position·ExchangeTransaction·FxExecuteRequest의 participant FK 제거,
 별도 랭킹 이벤트 로그 테이블, 랭킹 결과 무제한 버전 보관, Redis 분산락,
 메시지 브로커, 범용 작업 큐.
 
-당시에는 일반 주문과 FX 차단을 모두 유지했다. 일반 주문 차단은 2026-08-18
-일반계정 거래 활성화 작업에서 제거됐고, FX 차단만 현재도 유지된다.
+당시에는 일반 주문과 FX 차단을 모두 유지했다. 두 차단은 2026-08-18 후속
+작업에서 기존 account-scoped 공통 코어를 통해 모두 제거됐다.
 
 ## 8-B. 작업 8 보완 · 작업 9 — 랭킹/정산 무결성 잔여 결함 + 프런트엔드 계정 전환
 
@@ -1750,13 +1761,13 @@ refresh 정책은 delete-then-recreate이고 recreate는 항상 올바른 scope�
 `assertSettledSeasonFinalResultsPresent()`가 season row lock **이전**에,
 그리고 lock **이후**에 한 번 더 상태를 구분한다.
 
-| 상태 | 처리 |
-| --- | --- |
-| `ended` + final ranking 없음 | 신규 정산 허용 |
-| `ended` + final ranking 있음 | 검증 후 재사용 |
-| `settled` + 완전한 final ranking | 검증된 idempotent replay |
-| `settled` + final ranking 없음 | `FINAL_RESULTS_INTEGRITY`(409) |
-| `settled` + 일부 participant만 | `FINAL_RESULTS_INTEGRITY`(409) |
+| 상태                             | 처리                           |
+| -------------------------------- | ------------------------------ |
+| `ended` + final ranking 없음     | 신규 정산 허용                 |
+| `ended` + final ranking 있음     | 검증 후 재사용                 |
+| `settled` + 완전한 final ranking | 검증된 idempotent replay       |
+| `settled` + final ranking 없음   | `FINAL_RESULTS_INTEGRITY`(409) |
+| `settled` + 일부 participant만   | `FINAL_RESULTS_INTEGRITY`(409) |
 
 settled 상태에서는 현재 wallet·가격으로 final valuation을 다시 계산하지 않고,
 새 settlement snapshot·새 final ranking row를 만들지 않는다. 이미 게시된
@@ -1864,8 +1875,10 @@ microservice, 일반계정용 가짜 SeasonParticipant, 시즌/일반 wallet·po
 작업 10 hardening 선행 구현, 기존 API 주소 변경, 랭킹 계산·tier 비율 변경,
 프런트엔드 디자인 전면 개편.
 
-당시에는 일반 주문과 FX 차단을 모두 유지했다. 일반 주문 차단은 2026-08-18에
-해제됐고, `GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`만 현재도 유지된다.
+당시에는 일반 주문과 FX 차단을 모두 유지했다. 일반 주문과
+KRW↔USD FX는 모두 2026-08-18에 기존 account-scoped 코어로
+활성화됐다. 이 문단은 과거 작업 범위를 설명하며 현재 미구현
+상태를 의미하지 않는다.
 
 ## 9. 후속 작업 권장 순서
 
@@ -1873,13 +1886,12 @@ microservice, 일반계정용 가짜 SeasonParticipant, 시즌/일반 wallet·po
 2. ~~스냅샷 3모델(EquitySnapshot·DailyPortfolioSnapshot·SeasonRanking)의 accountId 전환~~
    — EquitySnapshot·DailyPortfolioSnapshot은 작업 7, SeasonRanking은 작업 8에서
    완료. 남은 것은 repair 수렴 이후의 `tradingAccountId` NOT NULL 강화
-3. ~~일반모드 주문·Position 활성화~~ — 2026-08-18 완료. 남은 것은
-   ExchangeTransaction·FxExecuteRequest participant optional 전환과 일반 FX 정책
+3. ~~일반모드 주문·Position·KRW↔USD FX 활성화~~ — 2026-08-18 완료.
+   후속 스키마 강화는 기존 전환 컷오버 전제를 따라 별도로 검토
 4. 시즌 lifecycle 격리: finished/rewarded/settled 전환 시 account closed 동기화, suspended 재활성화, 운영자 일반계정 정지
 5. 광고 제공자 선정 → `AdRewardVerifier` 구현체를 `AdRewardsModule`에 등록(additive) + 운영 설정값 확정 + sandbox 검증
 6. 시간가중수익률 계산 + 외부자금 유입 경계 스냅샷 (`initial_grant`/`ad_reward` 원장을 외부 유입으로 분리)
 7. tradingAccountId NOT NULL 강화·seasonParticipantId 제거(작업 10)는 스냅샷 전환과 구버전 writer 완전 종료 이후에만 검토
-
 
 ## Frontend account scope (작업 10)
 
@@ -1897,7 +1909,9 @@ screen and mutation**. The rules that matter to this document:
   An `ended` (settlement pending) or failed-to-close `settled` season account
   no longer outranks a live general account.
 - Active general accounts use the same account-scoped market/limit order flow
-  as season accounts. General FX alone remains 준비 중 and is not sent.
+  as season accounts and use the same account-scoped FX flow for explicit
+  KRW↔USD exchange. Suspended/closed accounts keep reads and order cancel but
+  cannot create an order/FX quote or execute FX.
 
 Full detail: `frontend/docs/trading-account-switching.md`.
 
@@ -1907,14 +1921,14 @@ Every repair/audit tool now has an injected-damage integration test, not just a
 clean-run one. A tool that reports "0 findings" is only meaningful if it is
 known to report non-zero when there is something to find:
 
-| Tool | Injected-damage coverage |
-| --- | --- |
-| `trading-accounts:repair-links` | `src/seasons/trading-account-link.integration.spec.ts` |
-| `trading-accounts:repair-financial-scope` | `src/seasons/trading-account-financial-scope.integration.spec.ts` |
-| `trading-accounts:repair-trading-scope` | `src/seasons/trading-account-trading-scope.integration.spec.ts` |
-| `trading-accounts:repair-ranking-scope` | `src/ranking/season-ranking-scope.integration.spec.ts` |
-| `trading-accounts:repair-snapshot-scope` | `src/portfolio/snapshot-scope-audit.integration.spec.ts` (작업 10) |
-| `trading-accounts:audit-general` | `src/portfolio/snapshot-scope-audit.integration.spec.ts` (작업 10) |
+| Tool                                      | Injected-damage coverage                                           |
+| ----------------------------------------- | ------------------------------------------------------------------ |
+| `trading-accounts:repair-links`           | `src/seasons/trading-account-link.integration.spec.ts`             |
+| `trading-accounts:repair-financial-scope` | `src/seasons/trading-account-financial-scope.integration.spec.ts`  |
+| `trading-accounts:repair-trading-scope`   | `src/seasons/trading-account-trading-scope.integration.spec.ts`    |
+| `trading-accounts:repair-ranking-scope`   | `src/ranking/season-ranking-scope.integration.spec.ts`             |
+| `trading-accounts:repair-snapshot-scope`  | `src/portfolio/snapshot-scope-audit.integration.spec.ts` (작업 10) |
+| `trading-accounts:audit-general`          | `src/portfolio/snapshot-scope-audit.integration.spec.ts` (작업 10) |
 
 Each asserts the same shape: damage is detected, a dry-run writes nothing,
 `--apply` repairs only what can be inferred, a row with nothing to infer from is

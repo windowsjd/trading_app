@@ -261,7 +261,7 @@ export type ExchangeTransactionGroupByArgs<ExtArgs extends runtime.Types.Extensi
 
 export type ExchangeTransactionGroupByOutputType = {
   id: string
-  seasonParticipantId: string
+  seasonParticipantId: string | null
   tradingAccountId: string | null
   fxRateSnapshotId: string | null
   fromCurrency: $Enums.CurrencyCode
@@ -302,7 +302,7 @@ export type ExchangeTransactionWhereInput = {
   OR?: Prisma.ExchangeTransactionWhereInput[]
   NOT?: Prisma.ExchangeTransactionWhereInput | Prisma.ExchangeTransactionWhereInput[]
   id?: Prisma.StringFilter<"ExchangeTransaction"> | string
-  seasonParticipantId?: Prisma.StringFilter<"ExchangeTransaction"> | string
+  seasonParticipantId?: Prisma.StringNullableFilter<"ExchangeTransaction"> | string | null
   tradingAccountId?: Prisma.StringNullableFilter<"ExchangeTransaction"> | string | null
   fxRateSnapshotId?: Prisma.StringNullableFilter<"ExchangeTransaction"> | string | null
   fromCurrency?: Prisma.EnumCurrencyCodeFilter<"ExchangeTransaction"> | $Enums.CurrencyCode
@@ -316,7 +316,7 @@ export type ExchangeTransactionWhereInput = {
   netTargetAmount?: Prisma.DecimalFilter<"ExchangeTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   executedAt?: Prisma.DateTimeFilter<"ExchangeTransaction"> | Date | string
   createdAt?: Prisma.DateTimeFilter<"ExchangeTransaction"> | Date | string
-  seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantScalarRelationFilter, Prisma.SeasonParticipantWhereInput>
+  seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantNullableScalarRelationFilter, Prisma.SeasonParticipantWhereInput> | null
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountNullableScalarRelationFilter, Prisma.TradingAccountWhereInput> | null
   fxRateSnapshot?: Prisma.XOR<Prisma.FxRateSnapshotNullableScalarRelationFilter, Prisma.FxRateSnapshotWhereInput> | null
   fxExecuteRequests?: Prisma.FxExecuteRequestListRelationFilter
@@ -324,7 +324,7 @@ export type ExchangeTransactionWhereInput = {
 
 export type ExchangeTransactionOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  seasonParticipantId?: Prisma.SortOrder
+  seasonParticipantId?: Prisma.SortOrderInput | Prisma.SortOrder
   tradingAccountId?: Prisma.SortOrderInput | Prisma.SortOrder
   fxRateSnapshotId?: Prisma.SortOrderInput | Prisma.SortOrder
   fromCurrency?: Prisma.SortOrder
@@ -349,7 +349,7 @@ export type ExchangeTransactionWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.ExchangeTransactionWhereInput | Prisma.ExchangeTransactionWhereInput[]
   OR?: Prisma.ExchangeTransactionWhereInput[]
   NOT?: Prisma.ExchangeTransactionWhereInput | Prisma.ExchangeTransactionWhereInput[]
-  seasonParticipantId?: Prisma.StringFilter<"ExchangeTransaction"> | string
+  seasonParticipantId?: Prisma.StringNullableFilter<"ExchangeTransaction"> | string | null
   tradingAccountId?: Prisma.StringNullableFilter<"ExchangeTransaction"> | string | null
   fxRateSnapshotId?: Prisma.StringNullableFilter<"ExchangeTransaction"> | string | null
   fromCurrency?: Prisma.EnumCurrencyCodeFilter<"ExchangeTransaction"> | $Enums.CurrencyCode
@@ -363,7 +363,7 @@ export type ExchangeTransactionWhereUniqueInput = Prisma.AtLeast<{
   netTargetAmount?: Prisma.DecimalFilter<"ExchangeTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   executedAt?: Prisma.DateTimeFilter<"ExchangeTransaction"> | Date | string
   createdAt?: Prisma.DateTimeFilter<"ExchangeTransaction"> | Date | string
-  seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantScalarRelationFilter, Prisma.SeasonParticipantWhereInput>
+  seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantNullableScalarRelationFilter, Prisma.SeasonParticipantWhereInput> | null
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountNullableScalarRelationFilter, Prisma.TradingAccountWhereInput> | null
   fxRateSnapshot?: Prisma.XOR<Prisma.FxRateSnapshotNullableScalarRelationFilter, Prisma.FxRateSnapshotWhereInput> | null
   fxExecuteRequests?: Prisma.FxExecuteRequestListRelationFilter
@@ -371,7 +371,7 @@ export type ExchangeTransactionWhereUniqueInput = Prisma.AtLeast<{
 
 export type ExchangeTransactionOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  seasonParticipantId?: Prisma.SortOrder
+  seasonParticipantId?: Prisma.SortOrderInput | Prisma.SortOrder
   tradingAccountId?: Prisma.SortOrderInput | Prisma.SortOrder
   fxRateSnapshotId?: Prisma.SortOrderInput | Prisma.SortOrder
   fromCurrency?: Prisma.SortOrder
@@ -397,7 +397,7 @@ export type ExchangeTransactionScalarWhereWithAggregatesInput = {
   OR?: Prisma.ExchangeTransactionScalarWhereWithAggregatesInput[]
   NOT?: Prisma.ExchangeTransactionScalarWhereWithAggregatesInput | Prisma.ExchangeTransactionScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"ExchangeTransaction"> | string
-  seasonParticipantId?: Prisma.StringWithAggregatesFilter<"ExchangeTransaction"> | string
+  seasonParticipantId?: Prisma.StringNullableWithAggregatesFilter<"ExchangeTransaction"> | string | null
   tradingAccountId?: Prisma.StringNullableWithAggregatesFilter<"ExchangeTransaction"> | string | null
   fxRateSnapshotId?: Prisma.StringNullableWithAggregatesFilter<"ExchangeTransaction"> | string | null
   fromCurrency?: Prisma.EnumCurrencyCodeWithAggregatesFilter<"ExchangeTransaction"> | $Enums.CurrencyCode
@@ -426,7 +426,7 @@ export type ExchangeTransactionCreateInput = {
   netTargetAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   executedAt: Date | string
   createdAt?: Date | string
-  seasonParticipant: Prisma.SeasonParticipantCreateNestedOneWithoutExchangeTransactionsInput
+  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutExchangeTransactionsInput
   tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutExchangeTransactionsInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutExchangeTransactionsInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutExchangeTransactionInput
@@ -434,7 +434,7 @@ export type ExchangeTransactionCreateInput = {
 
 export type ExchangeTransactionUncheckedCreateInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
   tradingAccountId?: string | null
   fxRateSnapshotId?: string | null
   fromCurrency: $Enums.CurrencyCode
@@ -464,7 +464,7 @@ export type ExchangeTransactionUpdateInput = {
   netTargetAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   executedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  seasonParticipant?: Prisma.SeasonParticipantUpdateOneRequiredWithoutExchangeTransactionsNestedInput
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutExchangeTransactionsNestedInput
   tradingAccount?: Prisma.TradingAccountUpdateOneWithoutExchangeTransactionsNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutExchangeTransactionsNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutExchangeTransactionNestedInput
@@ -472,7 +472,7 @@ export type ExchangeTransactionUpdateInput = {
 
 export type ExchangeTransactionUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fromCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -491,7 +491,7 @@ export type ExchangeTransactionUncheckedUpdateInput = {
 
 export type ExchangeTransactionCreateManyInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
   tradingAccountId?: string | null
   fxRateSnapshotId?: string | null
   fromCurrency: $Enums.CurrencyCode
@@ -524,7 +524,7 @@ export type ExchangeTransactionUpdateManyMutationInput = {
 
 export type ExchangeTransactionUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fromCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -782,14 +782,14 @@ export type ExchangeTransactionCreateWithoutTradingAccountInput = {
   netTargetAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   executedAt: Date | string
   createdAt?: Date | string
-  seasonParticipant: Prisma.SeasonParticipantCreateNestedOneWithoutExchangeTransactionsInput
+  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutExchangeTransactionsInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutExchangeTransactionsInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutExchangeTransactionInput
 }
 
 export type ExchangeTransactionUncheckedCreateWithoutTradingAccountInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
   fxRateSnapshotId?: string | null
   fromCurrency: $Enums.CurrencyCode
   toCurrency: $Enums.CurrencyCode
@@ -836,7 +836,7 @@ export type ExchangeTransactionScalarWhereInput = {
   OR?: Prisma.ExchangeTransactionScalarWhereInput[]
   NOT?: Prisma.ExchangeTransactionScalarWhereInput | Prisma.ExchangeTransactionScalarWhereInput[]
   id?: Prisma.StringFilter<"ExchangeTransaction"> | string
-  seasonParticipantId?: Prisma.StringFilter<"ExchangeTransaction"> | string
+  seasonParticipantId?: Prisma.StringNullableFilter<"ExchangeTransaction"> | string | null
   tradingAccountId?: Prisma.StringNullableFilter<"ExchangeTransaction"> | string | null
   fxRateSnapshotId?: Prisma.StringNullableFilter<"ExchangeTransaction"> | string | null
   fromCurrency?: Prisma.EnumCurrencyCodeFilter<"ExchangeTransaction"> | $Enums.CurrencyCode
@@ -927,14 +927,14 @@ export type ExchangeTransactionCreateWithoutFxRateSnapshotInput = {
   netTargetAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   executedAt: Date | string
   createdAt?: Date | string
-  seasonParticipant: Prisma.SeasonParticipantCreateNestedOneWithoutExchangeTransactionsInput
+  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutExchangeTransactionsInput
   tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutExchangeTransactionsInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutExchangeTransactionInput
 }
 
 export type ExchangeTransactionUncheckedCreateWithoutFxRateSnapshotInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
   tradingAccountId?: string | null
   fromCurrency: $Enums.CurrencyCode
   toCurrency: $Enums.CurrencyCode
@@ -989,14 +989,14 @@ export type ExchangeTransactionCreateWithoutFxExecuteRequestsInput = {
   netTargetAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   executedAt: Date | string
   createdAt?: Date | string
-  seasonParticipant: Prisma.SeasonParticipantCreateNestedOneWithoutExchangeTransactionsInput
+  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutExchangeTransactionsInput
   tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutExchangeTransactionsInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutExchangeTransactionsInput
 }
 
 export type ExchangeTransactionUncheckedCreateWithoutFxExecuteRequestsInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
   tradingAccountId?: string | null
   fxRateSnapshotId?: string | null
   fromCurrency: $Enums.CurrencyCode
@@ -1041,14 +1041,14 @@ export type ExchangeTransactionUpdateWithoutFxExecuteRequestsInput = {
   netTargetAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   executedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  seasonParticipant?: Prisma.SeasonParticipantUpdateOneRequiredWithoutExchangeTransactionsNestedInput
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutExchangeTransactionsNestedInput
   tradingAccount?: Prisma.TradingAccountUpdateOneWithoutExchangeTransactionsNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutExchangeTransactionsNestedInput
 }
 
 export type ExchangeTransactionUncheckedUpdateWithoutFxExecuteRequestsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fromCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -1066,7 +1066,7 @@ export type ExchangeTransactionUncheckedUpdateWithoutFxExecuteRequestsInput = {
 
 export type ExchangeTransactionCreateManyTradingAccountInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
   fxRateSnapshotId?: string | null
   fromCurrency: $Enums.CurrencyCode
   toCurrency: $Enums.CurrencyCode
@@ -1094,14 +1094,14 @@ export type ExchangeTransactionUpdateWithoutTradingAccountInput = {
   netTargetAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   executedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  seasonParticipant?: Prisma.SeasonParticipantUpdateOneRequiredWithoutExchangeTransactionsNestedInput
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutExchangeTransactionsNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutExchangeTransactionsNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutExchangeTransactionNestedInput
 }
 
 export type ExchangeTransactionUncheckedUpdateWithoutTradingAccountInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fromCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   toCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -1119,7 +1119,7 @@ export type ExchangeTransactionUncheckedUpdateWithoutTradingAccountInput = {
 
 export type ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fromCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   toCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -1206,7 +1206,7 @@ export type ExchangeTransactionUncheckedUpdateManyWithoutSeasonParticipantInput 
 
 export type ExchangeTransactionCreateManyFxRateSnapshotInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
   tradingAccountId?: string | null
   fromCurrency: $Enums.CurrencyCode
   toCurrency: $Enums.CurrencyCode
@@ -1234,14 +1234,14 @@ export type ExchangeTransactionUpdateWithoutFxRateSnapshotInput = {
   netTargetAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   executedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  seasonParticipant?: Prisma.SeasonParticipantUpdateOneRequiredWithoutExchangeTransactionsNestedInput
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutExchangeTransactionsNestedInput
   tradingAccount?: Prisma.TradingAccountUpdateOneWithoutExchangeTransactionsNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutExchangeTransactionNestedInput
 }
 
 export type ExchangeTransactionUncheckedUpdateWithoutFxRateSnapshotInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fromCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   toCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -1259,7 +1259,7 @@ export type ExchangeTransactionUncheckedUpdateWithoutFxRateSnapshotInput = {
 
 export type ExchangeTransactionUncheckedUpdateManyWithoutFxRateSnapshotInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fromCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   toCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -1321,7 +1321,7 @@ export type ExchangeTransactionSelect<ExtArgs extends runtime.Types.Extensions.I
   netTargetAmount?: boolean
   executedAt?: boolean
   createdAt?: boolean
-  seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
+  seasonParticipant?: boolean | Prisma.ExchangeTransaction$seasonParticipantArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.ExchangeTransaction$tradingAccountArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.ExchangeTransaction$fxRateSnapshotArgs<ExtArgs>
   fxExecuteRequests?: boolean | Prisma.ExchangeTransaction$fxExecuteRequestsArgs<ExtArgs>
@@ -1344,7 +1344,7 @@ export type ExchangeTransactionSelectCreateManyAndReturn<ExtArgs extends runtime
   netTargetAmount?: boolean
   executedAt?: boolean
   createdAt?: boolean
-  seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
+  seasonParticipant?: boolean | Prisma.ExchangeTransaction$seasonParticipantArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.ExchangeTransaction$tradingAccountArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.ExchangeTransaction$fxRateSnapshotArgs<ExtArgs>
 }, ExtArgs["result"]["exchangeTransaction"]>
@@ -1365,7 +1365,7 @@ export type ExchangeTransactionSelectUpdateManyAndReturn<ExtArgs extends runtime
   netTargetAmount?: boolean
   executedAt?: boolean
   createdAt?: boolean
-  seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
+  seasonParticipant?: boolean | Prisma.ExchangeTransaction$seasonParticipantArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.ExchangeTransaction$tradingAccountArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.ExchangeTransaction$fxRateSnapshotArgs<ExtArgs>
 }, ExtArgs["result"]["exchangeTransaction"]>
@@ -1390,19 +1390,19 @@ export type ExchangeTransactionSelectScalar = {
 
 export type ExchangeTransactionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "seasonParticipantId" | "tradingAccountId" | "fxRateSnapshotId" | "fromCurrency" | "toCurrency" | "sourceAmount" | "grossTargetAmount" | "feeRate" | "feeAmount" | "feeCurrency" | "appliedRate" | "netTargetAmount" | "executedAt" | "createdAt", ExtArgs["result"]["exchangeTransaction"]>
 export type ExchangeTransactionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
+  seasonParticipant?: boolean | Prisma.ExchangeTransaction$seasonParticipantArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.ExchangeTransaction$tradingAccountArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.ExchangeTransaction$fxRateSnapshotArgs<ExtArgs>
   fxExecuteRequests?: boolean | Prisma.ExchangeTransaction$fxExecuteRequestsArgs<ExtArgs>
   _count?: boolean | Prisma.ExchangeTransactionCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type ExchangeTransactionIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
+  seasonParticipant?: boolean | Prisma.ExchangeTransaction$seasonParticipantArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.ExchangeTransaction$tradingAccountArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.ExchangeTransaction$fxRateSnapshotArgs<ExtArgs>
 }
 export type ExchangeTransactionIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
+  seasonParticipant?: boolean | Prisma.ExchangeTransaction$seasonParticipantArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.ExchangeTransaction$tradingAccountArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.ExchangeTransaction$fxRateSnapshotArgs<ExtArgs>
 }
@@ -1410,14 +1410,14 @@ export type ExchangeTransactionIncludeUpdateManyAndReturn<ExtArgs extends runtim
 export type $ExchangeTransactionPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "ExchangeTransaction"
   objects: {
-    seasonParticipant: Prisma.$SeasonParticipantPayload<ExtArgs>
+    seasonParticipant: Prisma.$SeasonParticipantPayload<ExtArgs> | null
     tradingAccount: Prisma.$TradingAccountPayload<ExtArgs> | null
     fxRateSnapshot: Prisma.$FxRateSnapshotPayload<ExtArgs> | null
     fxExecuteRequests: Prisma.$FxExecuteRequestPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    seasonParticipantId: string
+    seasonParticipantId: string | null
     tradingAccountId: string | null
     fxRateSnapshotId: string | null
     fromCurrency: $Enums.CurrencyCode
@@ -1825,7 +1825,7 @@ readonly fields: ExchangeTransactionFieldRefs;
  */
 export interface Prisma__ExchangeTransactionClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
-  seasonParticipant<T extends Prisma.SeasonParticipantDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.SeasonParticipantDefaultArgs<ExtArgs>>): Prisma.Prisma__SeasonParticipantClient<runtime.Types.Result.GetResult<Prisma.$SeasonParticipantPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  seasonParticipant<T extends Prisma.ExchangeTransaction$seasonParticipantArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ExchangeTransaction$seasonParticipantArgs<ExtArgs>>): Prisma.Prisma__SeasonParticipantClient<runtime.Types.Result.GetResult<Prisma.$SeasonParticipantPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   tradingAccount<T extends Prisma.ExchangeTransaction$tradingAccountArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ExchangeTransaction$tradingAccountArgs<ExtArgs>>): Prisma.Prisma__TradingAccountClient<runtime.Types.Result.GetResult<Prisma.$TradingAccountPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   fxRateSnapshot<T extends Prisma.ExchangeTransaction$fxRateSnapshotArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ExchangeTransaction$fxRateSnapshotArgs<ExtArgs>>): Prisma.Prisma__FxRateSnapshotClient<runtime.Types.Result.GetResult<Prisma.$FxRateSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   fxExecuteRequests<T extends Prisma.ExchangeTransaction$fxExecuteRequestsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ExchangeTransaction$fxExecuteRequestsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FxExecuteRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -2271,6 +2271,25 @@ export type ExchangeTransactionDeleteManyArgs<ExtArgs extends runtime.Types.Exte
    * Limit how many ExchangeTransactions to delete.
    */
   limit?: number
+}
+
+/**
+ * ExchangeTransaction.seasonParticipant
+ */
+export type ExchangeTransaction$seasonParticipantArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the SeasonParticipant
+   */
+  select?: Prisma.SeasonParticipantSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the SeasonParticipant
+   */
+  omit?: Prisma.SeasonParticipantOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.SeasonParticipantInclude<ExtArgs> | null
+  where?: Prisma.SeasonParticipantWhereInput
 }
 
 /**

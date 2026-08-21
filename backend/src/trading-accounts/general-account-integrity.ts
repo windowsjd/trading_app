@@ -5,6 +5,8 @@ import {
   TradingAccountMode,
   WalletTransactionReferenceType,
   WalletTransactionType,
+  FxExecuteRequestStatus,
+  QuoteType,
 } from '../generated/prisma/client';
 import { GENERAL_ACCOUNT_INITIAL_CAPITAL_KRW } from './general-account.policy';
 
@@ -44,8 +46,15 @@ type GeneralTradingRowsClient = Pick<
   'order' | 'position' | 'quote'
 >;
 
+type GeneralFxRowsClient = Pick<
+  Prisma.TransactionClient,
+  'exchangeTransaction' | 'fxExecuteRequest' | 'quote' | 'walletTransaction'
+>;
+
 export type GeneralAccountIntegrityTarget = {
   id: string;
+  /** Present on every ownership-resolved account; optional for legacy helpers. */
+  userId?: string;
   mode: TradingAccountMode;
   initialCapitalKrw: Prisma.Decimal;
   seasonParticipant: { id: string } | null;
@@ -368,6 +377,173 @@ export async function assertGeneralAccountTradingRowsIntegrity(
     throwGeneralAccountIntegrity(
       accountId,
       'a general order, position, or quote has participant pollution or mismatched durable-quote scope',
+    );
+  }
+}
+
+/**
+ * Runtime invariants of account-scoped general FX. This is deliberately the
+ * same small shape reported by audit-general: participant-free quotes,
+ * commands, exchanges and their two ledger rows, all on one account.
+ */
+export async function assertGeneralAccountFxRowsIntegrity(
+  prisma: GeneralFxRowsClient,
+  accountId: string,
+  expectedUserId?: string,
+): Promise<void> {
+  const [exchange, request, quote] = await Promise.all([
+    prisma.exchangeTransaction.findFirst({
+      where: {
+        tradingAccountId: accountId,
+        OR: [
+          { seasonParticipantId: { not: null } },
+          {
+            fxExecuteRequests: {
+              some: {
+                OR: [
+                  { tradingAccountId: null },
+                  { tradingAccountId: { not: accountId } },
+                  { seasonParticipantId: { not: null } },
+                  ...(expectedUserId
+                    ? [{ userId: { not: expectedUserId } }]
+                    : []),
+                ],
+              },
+            },
+          },
+        ],
+      },
+      select: { id: true },
+    }),
+    prisma.fxExecuteRequest.findFirst({
+      where: {
+        tradingAccountId: accountId,
+        OR: [
+          { seasonParticipantId: { not: null } },
+          { status: { not: FxExecuteRequestStatus.succeeded } },
+          { exchangeTransactionId: null },
+          ...(expectedUserId ? [{ userId: { not: expectedUserId } }] : []),
+          {
+            exchangeTransaction: {
+              is: {
+                OR: [
+                  { tradingAccountId: null },
+                  { tradingAccountId: { not: accountId } },
+                  { seasonParticipantId: { not: null } },
+                ],
+              },
+            },
+          },
+        ],
+      },
+      select: { id: true },
+    }),
+    prisma.quote.findFirst({
+      where: {
+        tradingAccountId: accountId,
+        quoteType: QuoteType.fx,
+        OR: [
+          { seasonParticipantId: { not: null } },
+          ...(expectedUserId ? [{ userId: { not: expectedUserId } }] : []),
+        ],
+      },
+      select: { id: true },
+    }),
+  ]);
+
+  if (exchange || request || quote) {
+    throwGeneralAccountIntegrity(
+      accountId,
+      'a general FX quote, command, or exchange has participant pollution or mismatched account scope',
+    );
+  }
+
+  const exchanges = await prisma.exchangeTransaction.findMany({
+    where: { tradingAccountId: accountId },
+    select: {
+      id: true,
+      fromCurrency: true,
+      toCurrency: true,
+      fxExecuteRequests: {
+        select: {
+          id: true,
+          status: true,
+          tradingAccountId: true,
+          seasonParticipantId: true,
+        },
+      },
+    },
+  });
+  if (exchanges.length === 0) {
+    return;
+  }
+
+  const exchangeById = new Map(exchanges.map((row) => [row.id, row]));
+  const ledgers = await prisma.walletTransaction.findMany({
+    where: {
+      referenceType: WalletTransactionReferenceType.exchange_transaction,
+      referenceId: { in: exchanges.map((row) => row.id) },
+    },
+    select: {
+      id: true,
+      referenceId: true,
+      tradingAccountId: true,
+      seasonParticipantId: true,
+      currencyCode: true,
+      direction: true,
+      txType: true,
+      wallet: { select: { tradingAccountId: true } },
+    },
+  });
+
+  for (const exchange of exchanges) {
+    if (
+      exchange.fxExecuteRequests.length !== 1 ||
+      exchange.fxExecuteRequests[0]?.status !==
+        FxExecuteRequestStatus.succeeded ||
+      exchange.fxExecuteRequests[0]?.tradingAccountId !== accountId ||
+      exchange.fxExecuteRequests[0]?.seasonParticipantId !== null
+    ) {
+      throwGeneralAccountIntegrity(
+        accountId,
+        `general exchange ${exchange.id} does not have exactly one succeeded account-scoped execute request`,
+      );
+    }
+    const linked = ledgers.filter((row) => row.referenceId === exchange.id);
+    const source = linked.filter(
+      (row) => row.txType === WalletTransactionType.exchange_source,
+    );
+    const target = linked.filter(
+      (row) => row.txType === WalletTransactionType.exchange_target,
+    );
+    if (
+      linked.length !== 2 ||
+      source.length !== 1 ||
+      target.length !== 1 ||
+      source[0].direction !== 'debit' ||
+      source[0].currencyCode !== exchange.fromCurrency ||
+      target[0].direction !== 'credit' ||
+      target[0].currencyCode !== exchange.toCurrency
+    ) {
+      throwGeneralAccountIntegrity(
+        accountId,
+        `general exchange ${exchange.id} does not have exactly one valid source and target ledger row`,
+      );
+    }
+  }
+
+  const pollutedLedger = ledgers.find(
+    (row) =>
+      !row.referenceId ||
+      !exchangeById.has(row.referenceId) ||
+      row.tradingAccountId !== accountId ||
+      row.seasonParticipantId !== null ||
+      row.wallet.tradingAccountId !== accountId,
+  );
+  if (pollutedLedger) {
+    throwGeneralAccountIntegrity(
+      accountId,
+      `general exchange ledger ${pollutedLedger.id} has participant or account-scope pollution`,
     );
   }
 }

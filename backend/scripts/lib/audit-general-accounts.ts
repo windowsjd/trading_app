@@ -71,6 +71,15 @@ export type GeneralAccountAuditSummary = {
   generalQuotesWithSeasonParticipant: number;
   invalidGeneralSellReservations: number;
   generalPositionReservationMismatches: number;
+  // ---- general FX checks ----
+  generalFxExchangesWithSeasonParticipant: number;
+  generalFxRequestsWithSeasonParticipant: number;
+  generalFxQuotesWithSeasonParticipant: number;
+  generalFxRowsWithInvalidAccountScope: number;
+  generalFxRequestExchangeAccountMismatches: number;
+  generalFxQuoteAccountMismatches: number;
+  generalFxQuotesWithInvalidPinnedFee: number;
+  generalFxExchangeLedgerMismatches: number;
   // ---- 작업 7 performance checks ----
   accountsWithoutPerformanceOrigin: number;
   accountsWithDuplicatePerformanceOrigin: number;
@@ -339,6 +348,7 @@ export async function auditGeneralAccounts(
   }
 
   const trading = await auditGeneralTrading(prisma, add);
+  const fx = await auditGeneralFx(prisma, add);
 
   // ------------------------------------------------------------ 작업 7
   const performance = await auditGeneralPerformance(prisma, add);
@@ -360,8 +370,189 @@ export async function auditGeneralAccounts(
     adRewardLedgerRowsWithoutClaim,
     duplicateProviderEventGroups,
     ...trading,
+    ...fx,
     ...performance,
     findings,
+  };
+}
+
+/** SELECT-only mirror of assertGeneralAccountFxRowsIntegrity. */
+async function auditGeneralFx(
+  prisma: PrismaClient,
+  add: (code: string, tradingAccountId: string | null, detail: string) => void,
+) {
+  const reportRows = (rows: TradingAuditRow[], code: string): number => {
+    for (const row of rows) {
+      add(code, row.tradingAccountId, `${row.id}: ${row.detail}`);
+    }
+    return rows.length;
+  };
+
+  const generalFxExchangesWithSeasonParticipant = reportRows(
+    await prisma.$queryRaw<TradingAuditRow[]>`
+      SELECT e."id", e."trading_account_id" AS "tradingAccountId",
+        'seasonParticipantId=' || e."season_participant_id" AS "detail"
+      FROM "exchange_transactions" e
+      LEFT JOIN "trading_accounts" a ON a."id" = e."trading_account_id"
+      LEFT JOIN "fx_execute_requests" r ON r."exchange_transaction_id" = e."id"
+      LEFT JOIN "trading_accounts" ra ON ra."id" = r."trading_account_id"
+      WHERE e."season_participant_id" IS NOT NULL
+        AND (a."mode" = 'general' OR ra."mode" = 'general')
+      ORDER BY e."id"
+    `,
+    'GENERAL_FX_EXCHANGE_HAS_SEASON_PARTICIPANT',
+  );
+
+  const generalFxRequestsWithSeasonParticipant = reportRows(
+    await prisma.$queryRaw<TradingAuditRow[]>`
+      SELECT r."id", r."trading_account_id" AS "tradingAccountId",
+        'seasonParticipantId=' || r."season_participant_id" AS "detail"
+      FROM "fx_execute_requests" r
+      LEFT JOIN "trading_accounts" a ON a."id" = r."trading_account_id"
+      LEFT JOIN "exchange_transactions" e ON e."id" = r."exchange_transaction_id"
+      LEFT JOIN "trading_accounts" ea ON ea."id" = e."trading_account_id"
+      WHERE r."season_participant_id" IS NOT NULL
+        AND (a."mode" = 'general' OR ea."mode" = 'general')
+      ORDER BY r."id"
+    `,
+    'GENERAL_FX_REQUEST_HAS_SEASON_PARTICIPANT',
+  );
+
+  const generalFxQuotesWithSeasonParticipant = reportRows(
+    await prisma.$queryRaw<TradingAuditRow[]>`
+      SELECT q."id", q."trading_account_id" AS "tradingAccountId",
+        'seasonParticipantId=' || q."season_participant_id" AS "detail"
+      FROM "quotes" q
+      JOIN "trading_accounts" a ON a."id" = q."trading_account_id"
+      WHERE q."quote_type" = 'fx' AND a."mode" = 'general'
+        AND q."season_participant_id" IS NOT NULL
+      ORDER BY q."id"
+    `,
+    'GENERAL_FX_QUOTE_HAS_SEASON_PARTICIPANT',
+  );
+
+  const generalFxRowsWithInvalidAccountScope = reportRows(
+    await prisma.$queryRaw<TradingAuditRow[]>`
+      SELECT x."id", x."tradingAccountId", x."detail"
+      FROM (
+        SELECT e."id", e."trading_account_id" AS "tradingAccountId",
+          'participant-free exchange is not scoped to a general account' AS "detail"
+        FROM "exchange_transactions" e
+        LEFT JOIN "trading_accounts" a ON a."id" = e."trading_account_id"
+        WHERE e."season_participant_id" IS NULL
+          AND (a."id" IS NULL OR a."mode" <> 'general')
+        UNION ALL
+        SELECT r."id", r."trading_account_id",
+          'participant-free execute request is not scoped to a general account'
+        FROM "fx_execute_requests" r
+        LEFT JOIN "trading_accounts" a ON a."id" = r."trading_account_id"
+        WHERE r."season_participant_id" IS NULL
+          AND (a."id" IS NULL OR a."mode" <> 'general')
+        UNION ALL
+        SELECT q."id", q."trading_account_id",
+          'participant-free FX quote is not scoped to a general account'
+        FROM "quotes" q
+        LEFT JOIN "trading_accounts" a ON a."id" = q."trading_account_id"
+        WHERE q."quote_type" = 'fx'
+          AND q."season_participant_id" IS NULL
+          AND (a."id" IS NULL OR a."mode" <> 'general')
+      ) x
+      ORDER BY x."id"
+    `,
+    'GENERAL_FX_ACCOUNT_SCOPE_INVALID',
+  );
+
+  const generalFxRequestExchangeAccountMismatches = reportRows(
+    await prisma.$queryRaw<TradingAuditRow[]>`
+      SELECT r."id",
+        coalesce(r."trading_account_id", e."trading_account_id") AS "tradingAccountId",
+        'requestAccount=' || coalesce(r."trading_account_id", 'null')
+          || ', exchange=' || coalesce(e."id", 'null')
+          || ', exchangeAccount=' || coalesce(e."trading_account_id", 'null') AS "detail"
+      FROM "fx_execute_requests" r
+      LEFT JOIN "exchange_transactions" e ON e."id" = r."exchange_transaction_id"
+      LEFT JOIN "trading_accounts" ra ON ra."id" = r."trading_account_id"
+      LEFT JOIN "trading_accounts" ea ON ea."id" = e."trading_account_id"
+      WHERE (ra."mode" = 'general' OR ea."mode" = 'general')
+        AND (
+          r."status" <> 'succeeded'
+          OR e."id" IS NULL
+          OR (e."id" IS NOT NULL AND r."trading_account_id" IS DISTINCT FROM e."trading_account_id")
+          OR r."user_id" IS DISTINCT FROM coalesce(ra."user_id", ea."user_id")
+        )
+      ORDER BY r."id"
+    `,
+    'GENERAL_FX_REQUEST_EXCHANGE_ACCOUNT_MISMATCH',
+  );
+
+  const generalFxQuotesWithInvalidPinnedFee = reportRows(
+    await prisma.$queryRaw<TradingAuditRow[]>`
+      SELECT q."id", q."trading_account_id" AS "tradingAccountId",
+        'quotedFeeRate=' || coalesce(q."quoted_fee_rate"::text, 'null') AS "detail"
+      FROM "quotes" q
+      JOIN "trading_accounts" a ON a."id" = q."trading_account_id"
+      WHERE q."quote_type" = 'fx' AND a."mode" = 'general'
+        AND (q."quoted_fee_rate" IS NULL OR q."quoted_fee_rate" < 0
+          OR q."quoted_fee_rate" > 1
+          OR round(q."quoted_fee_rate", 6) <> q."quoted_fee_rate")
+      ORDER BY q."id"
+    `,
+    'GENERAL_FX_QUOTE_PINNED_FEE_INVALID',
+  );
+
+  const generalFxQuoteAccountMismatches = reportRows(
+    await prisma.$queryRaw<TradingAuditRow[]>`
+      SELECT q."id", q."trading_account_id" AS "tradingAccountId",
+        'quoteUser=' || q."user_id" || ', accountUser=' || a."user_id" AS "detail"
+      FROM "quotes" q
+      JOIN "trading_accounts" a ON a."id" = q."trading_account_id"
+      WHERE q."quote_type" = 'fx' AND a."mode" = 'general'
+        AND q."user_id" IS DISTINCT FROM a."user_id"
+      ORDER BY q."id"
+    `,
+    'GENERAL_FX_QUOTE_ACCOUNT_MISMATCH',
+  );
+
+  const generalFxExchangeLedgerMismatches = reportRows(
+    await prisma.$queryRaw<TradingAuditRow[]>`
+      SELECT e."id", e."trading_account_id" AS "tradingAccountId",
+        'sourceLedgers=' || sum(CASE WHEN wt."tx_type" = 'exchange_source' THEN 1 ELSE 0 END)::text
+          || ', targetLedgers=' || sum(CASE WHEN wt."tx_type" = 'exchange_target' THEN 1 ELSE 0 END)::text
+          || ', totalLedgers=' || count(wt."id")::text AS "detail"
+      FROM "exchange_transactions" e
+      JOIN "trading_accounts" a ON a."id" = e."trading_account_id"
+      LEFT JOIN "wallet_transactions" wt
+        ON wt."reference_type" = 'exchange_transaction' AND wt."reference_id" = e."id"
+      LEFT JOIN "cash_wallets" w ON w."id" = wt."wallet_id"
+      LEFT JOIN "fx_execute_requests" r ON r."exchange_transaction_id" = e."id"
+      WHERE a."mode" = 'general'
+      GROUP BY e."id", e."trading_account_id", e."from_currency", e."to_currency"
+      HAVING count(wt."id") <> 2
+        OR sum(CASE WHEN wt."tx_type" = 'exchange_source'
+          AND wt."direction" = 'debit' AND wt."currency_code" = e."from_currency" THEN 1 ELSE 0 END) <> 1
+        OR sum(CASE WHEN wt."tx_type" = 'exchange_target'
+          AND wt."direction" = 'credit' AND wt."currency_code" = e."to_currency" THEN 1 ELSE 0 END) <> 1
+        OR sum(CASE WHEN wt."trading_account_id" IS DISTINCT FROM e."trading_account_id"
+          OR wt."season_participant_id" IS NOT NULL
+          OR w."trading_account_id" IS DISTINCT FROM e."trading_account_id" THEN 1 ELSE 0 END) > 0
+        OR count(DISTINCT r."id") <> 1
+        OR count(DISTINCT CASE WHEN r."status" = 'succeeded'
+          AND r."trading_account_id" = e."trading_account_id"
+          AND r."season_participant_id" IS NULL THEN r."id" END) <> 1
+      ORDER BY e."id"
+    `,
+    'GENERAL_FX_EXCHANGE_LEDGER_MISMATCH',
+  );
+
+  return {
+    generalFxExchangesWithSeasonParticipant,
+    generalFxRequestsWithSeasonParticipant,
+    generalFxQuotesWithSeasonParticipant,
+    generalFxRowsWithInvalidAccountScope,
+    generalFxRequestExchangeAccountMismatches,
+    generalFxQuoteAccountMismatches,
+    generalFxQuotesWithInvalidPinnedFee,
+    generalFxExchangeLedgerMismatches,
   };
 }
 

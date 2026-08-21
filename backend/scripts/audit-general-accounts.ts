@@ -91,6 +91,32 @@ async function main() {
       `  position/live-sell reservation mismatches: ${summary.generalPositionReservationMismatches}`,
     );
 
+    console.log('\ngeneral FX:');
+    console.log(
+      `  exchanges with a season participant: ${summary.generalFxExchangesWithSeasonParticipant}`,
+    );
+    console.log(
+      `  execute requests with a season participant: ${summary.generalFxRequestsWithSeasonParticipant}`,
+    );
+    console.log(
+      `  quotes with a season participant: ${summary.generalFxQuotesWithSeasonParticipant}`,
+    );
+    console.log(
+      `  FX rows with invalid account scope: ${summary.generalFxRowsWithInvalidAccountScope}`,
+    );
+    console.log(
+      `  request/exchange account mismatches: ${summary.generalFxRequestExchangeAccountMismatches}`,
+    );
+    console.log(
+      `  quote/account owner mismatches: ${summary.generalFxQuoteAccountMismatches}`,
+    );
+    console.log(
+      `  quotes with invalid pinned fee: ${summary.generalFxQuotesWithInvalidPinnedFee}`,
+    );
+    console.log(
+      `  exchange/ledger mismatches: ${summary.generalFxExchangeLedgerMismatches}`,
+    );
+
     console.log('\nad rewards:');
     console.log(
       `  granted claims without a wallet transaction: ${summary.grantedClaimsWithoutWalletTransaction}`,

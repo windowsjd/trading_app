@@ -43,9 +43,8 @@ export type CashWalletScopeCandidate = {
   id: string;
   /**
    * Nullable since 작업 6: general-mode wallets have no SeasonParticipant.
-   * Every caller of this guard is a SEASON path with a non-null expected
-   * participant, so a null here is a mismatch — which is exactly right: a
-   * season trade must never reach a general wallet.
+   * Season callers expect their participant; general order/FX callers expect
+   * null. Either mode therefore rejects a wallet from the other mode.
    */
   seasonParticipantId: string | null;
   tradingAccountId: string | null;

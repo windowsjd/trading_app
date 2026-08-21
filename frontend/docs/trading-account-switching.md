@@ -9,7 +9,9 @@ extended to app ENTRY, per-user cache separation and the season Home itself by
 explicit investment-mode choice at login by
 `TRADING-MODE-ENTRY-AND-GENERAL-ACCOUNT-ACCESS-V1` (작업 13). General-account
 market/limit trading was enabled on 2026-08-18 without changing this accountId
-binding or cache-isolation design; general FX remains unavailable.
+binding or cache-isolation design. General KRW↔USD FX was enabled later the
+same day through the existing `WalletFxScreen` and the same accountId/scopeEpoch
+guards.
 
 Backend contracts this depends on:
 `backend/docs/trading-accounts-api-contract.md`,
@@ -27,47 +29,47 @@ plus one AsyncStorage entry.
 
 ## Files
 
-| File | Role |
-| --- | --- |
-| `features/tradingAccount/api.ts` | account-scoped API calls (existing backend routes only) |
-| `features/tradingAccount/accountSelection.ts` | pure selection policy + display ordering |
-| `features/tradingAccount/capabilities.ts` | mode/status → what the UI may offer |
-| `features/tradingAccount/accountDisplay.ts` | human-readable names, status labels, return-rate meaning |
-| `features/tradingAccount/selectionStorage.ts` | per-user AsyncStorage persistence |
-| `features/tradingAccount/integrityErrors.ts` | structural-error classification |
-| `features/tradingAccount/TradingAccountContext.tsx` | the single source of truth |
-| `features/tradingAccount/accountScope.ts` | response↔request accountId cross-check (작업 10) |
-| `features/tradingAccount/accountBinding.ts` | is this mutation flow still safe to continue (작업 10) |
-| `features/tradingAccount/invalidation.ts` | which cache entries a mutation refreshes (작업 10) |
-| `features/auth/sessionCache.ts` / `session.ts` / `useLogout.ts` | the session boundary (작업 10) |
-| `services/api/sessionExpiry.ts` | the one seam from a dead refresh token to teardown (작업 10) |
-| `features/record/accountOrders.ts` | account-scoped order row → record row shape (작업 10) |
-| `screens/home/GeneralAccountHome.tsx` | Home for a general account (작업 10) |
-| `screens/home/SeasonAccountHome.tsx` | Home for a season account, account-scoped (작업 11) |
-| `features/auth/entry.ts` / `useEnterApp.ts` | app entry decided by owned accounts (작업 11) |
-| `components/tradingAccount/AccountSetupPanel.tsx` | the no-account landing; opens a general account (작업 11) |
-| `features/tradingAccount/legacyFinancialCalls.test.ts` | the guard that keeps legacy implicit-account calls out (작업 11) |
-| `components/tradingAccount/AccountSwitcher.tsx` | switcher UI + first-time 일반 투자 start (작업 13) |
-| `screens/entry/ModeSelectionScreen.tsx` | the 일반/시즌 choice every fresh login answers (작업 13) |
-| `features/tradingAccount/modeSelection.ts` | pure view-model of what mode selection may offer (작업 13) |
-| `features/tradingAccount/useOpenGeneralAccount.ts` / `generalAccountOpen.ts` | the ONE general-open flow all three entry points share (작업 13) |
-| `features/auth/entry.ts` / `useEnterApp.ts` | intent-aware entry routing: new login vs session restore (작업 13) |
-| `constants/queryKeys.ts` → `QUERY_KEYS.tradingAccount.*` | account-scoped cache keys |
+| File                                                                         | Role                                                               |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `features/tradingAccount/api.ts`                                             | account-scoped API calls (existing backend routes only)            |
+| `features/tradingAccount/accountSelection.ts`                                | pure selection policy + display ordering                           |
+| `features/tradingAccount/capabilities.ts`                                    | mode/status → what the UI may offer                                |
+| `features/tradingAccount/accountDisplay.ts`                                  | human-readable names, status labels, return-rate meaning           |
+| `features/tradingAccount/selectionStorage.ts`                                | per-user AsyncStorage persistence                                  |
+| `features/tradingAccount/integrityErrors.ts`                                 | structural-error classification                                    |
+| `features/tradingAccount/TradingAccountContext.tsx`                          | the single source of truth                                         |
+| `features/tradingAccount/accountScope.ts`                                    | response↔request accountId cross-check (작업 10)                   |
+| `features/tradingAccount/accountBinding.ts`                                  | is this mutation flow still safe to continue (작업 10)             |
+| `features/tradingAccount/invalidation.ts`                                    | which cache entries a mutation refreshes (작업 10)                 |
+| `features/auth/sessionCache.ts` / `session.ts` / `useLogout.ts`              | the session boundary (작업 10)                                     |
+| `services/api/sessionExpiry.ts`                                              | the one seam from a dead refresh token to teardown (작업 10)       |
+| `features/record/accountOrders.ts`                                           | account-scoped order row → record row shape (작업 10)              |
+| `screens/home/GeneralAccountHome.tsx`                                        | Home for a general account (작업 10)                               |
+| `screens/home/SeasonAccountHome.tsx`                                         | Home for a season account, account-scoped (작업 11)                |
+| `features/auth/entry.ts` / `useEnterApp.ts`                                  | app entry decided by owned accounts (작업 11)                      |
+| `components/tradingAccount/AccountSetupPanel.tsx`                            | the no-account landing; opens a general account (작업 11)          |
+| `features/tradingAccount/legacyFinancialCalls.test.ts`                       | the guard that keeps legacy implicit-account calls out (작업 11)   |
+| `components/tradingAccount/AccountSwitcher.tsx`                              | switcher UI + first-time 일반 투자 start (작업 13)                 |
+| `screens/entry/ModeSelectionScreen.tsx`                                      | the 일반/시즌 choice every fresh login answers (작업 13)           |
+| `features/tradingAccount/modeSelection.ts`                                   | pure view-model of what mode selection may offer (작업 13)         |
+| `features/tradingAccount/useOpenGeneralAccount.ts` / `generalAccountOpen.ts` | the ONE general-open flow all three entry points share (작업 13)   |
+| `features/auth/entry.ts` / `useEnterApp.ts`                                  | intent-aware entry routing: new login vs session restore (작업 13) |
+| `constants/queryKeys.ts` → `QUERY_KEYS.tradingAccount.*`                     | account-scoped cache keys                                          |
 
 ## Which screen uses which account (작업 10)
 
-| Screen | accountId source | Endpoints |
-| --- | --- | --- |
-| Home (season) | selected | `/trading-accounts/:id/portfolio`, `/portfolio/equity`, `/wallets`, `/positions`, and `/ranking?seasonId=<the account's season>` (작업 11) |
-| Home (general) | selected | `/trading-accounts/:id/portfolio`, `/wallets`, `/positions` |
-| Home (no account) | — | nothing is read; `POST /trading-accounts/general` on an explicit press (작업 11) |
-| My (rank/tier) | selected | `/ranking?seasonId=<the account's season>` (작업 11) |
-| Portfolio | selected | `/portfolio`, `/portfolio/equity`, `/positions` |
-| AssetDetail | selected (positions only) | `/positions`; price/candles stay public |
-| Order | **route param**, fixed at entry | `/orders/quote`, `/orders`, `/positions`, `/wallets` |
-| Wallet FX | selected | `/wallets`, `/fx/quote`, `/fx/execute`; public `/fx/rates/current` |
-| Wallet ledger | selected | `/wallet-transactions` |
-| Order list + cancel | season record's account or General Home's pinned accountId | `/orders`, `/orders/:orderId/cancel` |
+| Screen              | accountId source                                           | Endpoints                                                                                                                                  |
+| ------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Home (season)       | selected                                                   | `/trading-accounts/:id/portfolio`, `/portfolio/equity`, `/wallets`, `/positions`, and `/ranking?seasonId=<the account's season>` (작업 11) |
+| Home (general)      | selected                                                   | `/trading-accounts/:id/portfolio`, `/wallets`, `/positions`                                                                                |
+| Home (no account)   | —                                                          | nothing is read; `POST /trading-accounts/general` on an explicit press (작업 11)                                                           |
+| My (rank/tier)      | selected                                                   | `/ranking?seasonId=<the account's season>` (작업 11)                                                                                       |
+| Portfolio           | selected                                                   | `/portfolio`, `/portfolio/equity`, `/positions`                                                                                            |
+| AssetDetail         | selected (positions only)                                  | `/positions`; price/candles stay public                                                                                                    |
+| Order               | **route param**, fixed at entry                            | `/orders/quote`, `/orders`, `/positions`, `/wallets`                                                                                       |
+| Wallet FX           | selected                                                   | `/wallets`, `/fx/quote`, `/fx/execute`; public `/fx/rates/current`                                                                         |
+| Wallet ledger       | selected                                                   | `/wallet-transactions`                                                                                                                     |
+| Order list + cancel | season record's account or General Home's pinned accountId | `/orders`, `/orders/:orderId/cancel`                                                                                                       |
 
 Market data (asset detail, price, candles, market list) keeps account-free cache
 keys: those rows are identical for every account and every user, and an order
@@ -104,8 +106,8 @@ place.
 Entry routes on the caller's INTENT plus the stored selection — never on
 `getCurrentSeason()`, and (since 작업 13) never on "owns anything → home".
 
-작업 11 removed the season from the decision: *is there a season to join* is a
-property of the server, *does this user have an account* a property of the
+작업 11 removed the season from the decision: _is there a season to join_ is a
+property of the server, _does this user have an account_ a property of the
 user. 작업 13 removes the remaining guess. "Owns an account → straight to
 Home" silently answered a question that belongs to the user: WHICH account is
 this session about? Because the fallback policy prefers the active season, a
@@ -115,11 +117,11 @@ season participant who wanted 일반 투자 had no doorway to it at all.
 `resolveAuthedEntryRoute(intent, accounts, storedAccountId)` in
 `features/auth/entry.ts`:
 
-| Intent | Stored selection | Route |
-| --- | --- | --- |
-| `new_login` (login, signup) | ignored — not even read | `ModeSelection`, always |
-| `session_restore` (splash) | still in the owned list | `MainTabs` on that account |
-| `session_restore` | missing / no longer owned | `ModeSelection` |
+| Intent                      | Stored selection          | Route                      |
+| --------------------------- | ------------------------- | -------------------------- |
+| `new_login` (login, signup) | ignored — not even read   | `ModeSelection`, always    |
+| `session_restore` (splash)  | still in the owned list   | `MainTabs` on that account |
+| `session_restore`           | missing / no longer owned | `ModeSelection`            |
 
 The order after authentication is:
 
@@ -150,7 +152,7 @@ reappears anywhere else. Mode selection is on that allowlist for exactly the
 - **일반 투자 — always offered.** With a general account (any status): use it.
   Without one: "일반 투자 계정 시작하기", which fires the explicit
   `POST /trading-accounts/general`. The card states the standing policy: 초기
-  자금 10,000,000원, 시간가중 수익률, 매매 가능, 환전은 준비 중.
+  자금 10,000,000원, 시간가중 수익률, 매매와 KRW↔USD 환전 가능.
 - **시즌 투자.** Season accounts the user is competing in ("시즌 투자
   계속하기"), or — when the current season is effectively active, the server
   says not joined, AND the owned list has no account for it — "시즌 참가하기"
@@ -291,12 +293,12 @@ refreshes. Two rules:
    share is worth; invalidating prices/candles here would replace a live chart
    with a spinner as a side effect of buying.
 
-| Mutation | Refreshes | Deliberately not |
-| --- | --- | --- |
-| create order | orders, positions, wallets, portfolio(+equity) | market data |
-| cancel order | orders, wallets, portfolio | **positions** — a cancel never fills |
-| FX execute | wallets, portfolio(+equity) | **positions** — cash moved, nothing was bought |
-| ad reward claim | ad rewards, wallets, portfolio | season UI (general-only) |
+| Mutation        | Refreshes                                      | Deliberately not                               |
+| --------------- | ---------------------------------------------- | ---------------------------------------------- |
+| create order    | orders, positions, wallets, portfolio(+equity) | market data                                    |
+| cancel order    | orders, wallets, portfolio                     | **positions** — a cancel never fills           |
+| FX execute      | wallets, portfolio(+equity)                    | **positions** — cash moved, nothing was bought |
+| ad reward claim | ad rewards, wallets, portfolio                 | season UI (general-only)                       |
 
 Season-keyed views (`record`, `ranking`, `home.dashboard`) are refreshed only
 for season accounts; they have no per-account key to be selective about.
@@ -306,12 +308,12 @@ for season accounts; they have no per-account key to be selective about.
 `resolveAccountBinding()` answers "is this flow still safe to continue" for the
 Order screen, from the id it was ENTERED with:
 
-| State | Meaning | Screen |
-| --- | --- | --- |
-| `loading` | owned list not in yet | spinner |
-| `account_changed` | the selection moved elsewhere | stop; drop quote/key/inputs/success; ask to re-enter |
-| `unknown_account` | route id not owned (unknown id and another user's id are the same answer) | error, no probing |
-| `bound` | proceed, with that account's capabilities | the form |
+| State             | Meaning                                                                   | Screen                                               |
+| ----------------- | ------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `loading`         | owned list not in yet                                                     | spinner                                              |
+| `account_changed` | the selection moved elsewhere                                             | stop; drop quote/key/inputs/success; ask to re-enter |
+| `unknown_account` | route id not owned (unknown id and another user's id are the same answer) | error, no probing                                    |
+| `bound`           | proceed, with that account's capabilities                                 | the form                                             |
 
 Following the selection would be the bug: the quote was priced for the old
 account, the server pins quotes to the account that issued them, and the amounts
@@ -340,12 +342,12 @@ Read the label from the RESPONSE's `returnRateMethod`, never from the selected
 account's mode — the two must agree, and if they disagree the response is the
 fact.
 
-| | season | general |
-| --- | --- | --- |
-| `returnRateMethod` | `initial_capital` | `time_weighted` |
-| label | 시즌 수익률 (초기자본 대비) | 시간가중 수익률 |
-| season ranking / tier / reward UI | shown | never shown |
-| external funding fields | `null` (no such concept) | shown, labelled as inflow |
+|                                   | season                      | general                   |
+| --------------------------------- | --------------------------- | ------------------------- |
+| `returnRateMethod`                | `initial_capital`           | `time_weighted`           |
+| label                             | 시즌 수익률 (초기자본 대비) | 시간가중 수익률           |
+| season ranking / tier / reward UI | shown                       | never shown               |
+| external funding fields           | `null` (no such concept)    | shown, labelled as inflow |
 
 General mode additionally shows `initialFundingKrw`,
 `cumulativeExternalFundingKrw`, `cumulativeAdRewardKrw`, `investmentPnlKrw`, with
@@ -360,20 +362,26 @@ Status is checked **before** mode, so a closed general account reads as closed
 rather than "not implemented yet" — different situations, and one of them will
 never change.
 
-| | active | suspended | closed |
-| --- | --- | --- | --- |
-| reads | ✓ | ✓ | ✓ |
-| new order / quote | season + general | ✗ | ✗ |
-| FX | season only | ✗ | ✗ |
-| cancel order | ✓ | ✓ | ✓ |
-| ad-reward claim | general only | ✗ | ✗ |
+|                    | active           | suspended | closed |
+| ------------------ | ---------------- | --------- | ------ |
+| reads              | ✓                | ✓         | ✓      |
+| new order / quote  | season + general | ✗         | ✗      |
+| FX quote / execute | season + general | ✗         | ✗      |
+| cancel order       | ✓                | ✓         | ✓      |
+| ad-reward claim    | general only     | ✗         | ✗      |
 
 Active general accounts can quote/create market and limit buy/sell orders through
-the same account-scoped endpoints as season accounts. Suspended/closed accounts
-remain readable and may cancel submitted limit orders, but cannot create new
-quotes/orders. General FX stays blocked as `general_fx_not_implemented` and is
-presented separately as 준비 중. The server remains authoritative for every
-capability.
+the same account-scoped endpoints as season accounts, and can quote/execute
+KRW↔USD FX through the existing account-scoped FX endpoints. Suspended/closed
+accounts remain readable and may cancel submitted limit orders, but cannot
+create new order or FX quotes and cannot execute FX. The server remains
+authoritative for every capability.
+
+`WalletFxScreen` stays shared. It pins the accountId that opened the flow and
+uses the existing scope epoch/request-sequence guards: switching accounts clears
+amount, quote, idempotency key, and success state; a late rate/quote/execute
+response cannot overwrite the newly selected account. Long balance/rate/amount
+labels wrap or shrink within the existing cards instead of clipping.
 
 General Home exposes `주문 내역 보기`, carrying its accountId into the existing
 Record order-list route. That route resolves the id against the owned-account

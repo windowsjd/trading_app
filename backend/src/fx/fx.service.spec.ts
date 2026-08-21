@@ -85,6 +85,15 @@ jest.mock('../generated/prisma/client', () => {
       ended: 'ended',
       settled: 'settled',
     },
+    TradingAccountMode: {
+      season: 'season',
+      general: 'general',
+    },
+    TradingAccountStatus: {
+      active: 'active',
+      suspended: 'suspended',
+      closed: 'closed',
+    },
   };
 });
 

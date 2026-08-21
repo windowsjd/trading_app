@@ -563,10 +563,8 @@ export default function WalletFxScreen({ navigation }: Props) {
   }
 
   /**
-   * General-mode FX is not implemented and suspended/closed accounts cannot
-   * exchange (작업 10 §A-4). This is 준비 중 / 제한 안내, NOT damage — and the
-   * request is never sent, so the user does not collect a 409 per press. The
-   * server gate is unchanged and still authoritative.
+   * Suspended/closed accounts cannot exchange. The request is never sent, so
+   * the user does not collect a 409 per press; the server remains authoritative.
    */
   const exchangeBlockMessage =
     capabilities && !capabilities.canExchange && capabilities.exchangeBlockReason
@@ -583,9 +581,7 @@ export default function WalletFxScreen({ navigation }: Props) {
             style={styles.card}
           >
             <Text style={styles.label}>환전</Text>
-            <Text style={styles.blockedTitle}>
-              {capabilities?.isGeneral ? '준비 중입니다.' : '환전이 제한된 계정입니다.'}
-            </Text>
+            <Text style={styles.blockedTitle}>환전이 제한된 계정입니다.</Text>
             <Text style={styles.blockedMessage}>{exchangeBlockMessage}</Text>
             <CTAButton
               label="원장 보기"
@@ -869,7 +865,7 @@ export default function WalletFxScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   content: { padding: 16, gap: 12, paddingBottom: 24 },
-  row: { flexDirection: 'row', gap: 10 },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   flex: { flex: 1 },
   card: {
     borderWidth: 1,
@@ -880,8 +876,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   label: { fontSize: 13, color: '#666' },
-  value: { fontSize: 16, fontWeight: '700' },
-  helper: { fontSize: 14, color: '#444' },
+  value: { fontSize: 16, fontWeight: '700', lineHeight: 24, flexShrink: 1 },
+  helper: { fontSize: 14, color: '#444', lineHeight: 21, flexShrink: 1 },
   // Full text, wrapped: a capability notice that is cut to one ellipsised line
   // stops explaining why the button is gone.
   blockedTitle: { fontSize: 17, fontWeight: '700', lineHeight: 24 },
@@ -898,6 +894,7 @@ const styles = StyleSheet.create({
   },
   directionChip: {
     flex: 1,
+    minWidth: 130,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 10,
@@ -912,9 +909,15 @@ const styles = StyleSheet.create({
   directionChipText: {
     color: '#111',
     fontWeight: '600',
+    lineHeight: 21,
+    textAlign: 'center',
+    flexShrink: 1,
   },
   directionChipTextActive: {
     color: '#fff',
     fontWeight: '600',
+    lineHeight: 21,
+    textAlign: 'center',
+    flexShrink: 1,
   },
 });

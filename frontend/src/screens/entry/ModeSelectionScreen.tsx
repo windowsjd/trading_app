@@ -142,8 +142,8 @@ export default function ModeSelectionScreen({
               10,000,000원으로 시작하고, 성과는 시간가중 수익률로 측정합니다.
             </Text>
             <Text style={styles.cardNotice}>
-              국내·미국·가상자산 매매를 지원합니다. 환전 기능은 준비 중이며,
-              USD 결제 자산은 보유 USD 잔액 안에서 주문할 수 있습니다.
+              국내·미국·가상자산 매매와 KRW↔USD 환전을 지원합니다. USD 결제
+              자산은 보유 USD 잔액 안에서 주문할 수 있습니다.
             </Text>
             <CTAButton
               testID={TEST_IDS.modeSelection.generalStart}

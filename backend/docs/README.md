@@ -24,9 +24,10 @@ Use this directory in this order:
 3. `docs/trading-modes-and-accounts.md` — season/general investment-mode and
    TradingAccount scope rules, general account funding/TWR, shared
    market/limit orders and positions, account-scoped frontend behavior,
-   integrity/repair boundaries, and the remaining exclusions (general FX,
-   general ranking/rewards, `tradingAccountId` NOT NULL, and a real ad-provider
-   adapter).
+   integrity/repair boundaries, and the remaining exclusions (general
+   ranking/rewards, `tradingAccountId` NOT NULL, and a real ad-provider
+   adapter). General KRW↔USD FX is implemented through the shared
+   account-scoped FX core.
 4. `docs/provider-ingestion-foundation.md` — how provider ingestion is configured and operated (env vars, operator commands, per-provider request/response mapping). The fixed 40-symbol KIS watchlist now lives in code at `src/providers/kis/kis-fixed-asset-universe.ts` (seed with `pnpm tsx scripts/seed-kis-fixed-asset-universe.ts`), not in a doc.
 5. `docs/scheduler-ops-foundation.md` — scheduler/ops foundation (disabled-by-default, dry-run-by-default).
 6. `docs/batch-job-foundation.md` — batch job foundation for daily snapshot/ranking/cycle/settlement/final-tier/reward-grant jobs.

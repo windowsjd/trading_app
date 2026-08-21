@@ -46,6 +46,16 @@ const generalTradingMigration = readFileSync(
   ),
   'utf8',
 );
+const generalFxMigration = readFileSync(
+  join(
+    root,
+    'prisma',
+    'migrations',
+    '20260818180000_enable_general_account_fx',
+    'migration.sql',
+  ),
+  'utf8',
+);
 
 const modelBlock = (name: string): string => {
   const match = schema.match(
@@ -109,10 +119,25 @@ describe('General account + ad reward schema contract', () => {
       expect(generalTradingMigration).not.toContain('fx_execute_requests');
     });
 
-    it('keeps ExchangeTransaction and FxExecuteRequest participant links REQUIRED', () => {
+    it('makes ExchangeTransaction and FxExecuteRequest participant links nullable for general FX', () => {
       for (const model of ['ExchangeTransaction', 'FxExecuteRequest']) {
-        expect(modelBlock(model)).toMatch(/seasonParticipantId\s+String\s/);
+        expect(modelBlock(model)).toMatch(/seasonParticipantId\s+String\?\s/);
       }
+    });
+
+    it('uses an additive DDL-only general-FX migration and rewrites no season row', () => {
+      for (const table of ['exchange_transactions', 'fx_execute_requests']) {
+        expect(generalFxMigration).toContain(`ALTER TABLE "${table}"`);
+      }
+      expect(
+        generalFxMigration.match(
+          /ALTER COLUMN "season_participant_id" DROP NOT NULL/g,
+        ),
+      ).toHaveLength(2);
+      expect(generalFxMigration).not.toMatch(
+        /\b(?:UPDATE|DELETE\s+FROM|INSERT\s+INTO|TRUNCATE)\b/i,
+      );
+      expect(generalFxMigration).not.toMatch(/DROP\s+(?:COLUMN|TABLE)/i);
     });
 
     it('drops NOT NULL for exactly the two financial tables and rewrites no row', () => {

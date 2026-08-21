@@ -1,10 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import {
-  CAPABILITY_BLOCK_MESSAGE,
-  getTradingAccountCapabilities,
-} from './capabilities.ts';
+import { getTradingAccountCapabilities } from './capabilities.ts';
 import { getAccountDisplay, getReturnRateMethodLabel } from './accountDisplay.ts';
 import type { TradingAccountDto } from './api.ts';
 
@@ -49,17 +46,15 @@ describe('mode capabilities', () => {
     assert.equal(caps.returnRateMethod, 'initial_capital');
   });
 
-  it('allows active general trading while keeping FX unavailable', () => {
+  it('allows active general trading and FX', () => {
     const caps = getTradingAccountCapabilities(generalAccount())!;
 
     assert.equal(caps.canTrade, true);
     assert.equal(caps.canQuote, true);
     assert.equal(caps.canCancelOrder, true);
-    assert.equal(caps.canExchange, false);
+    assert.equal(caps.canExchange, true);
     assert.equal(caps.tradeBlockReason, null);
-    assert.equal(caps.exchangeBlockReason, 'general_fx_not_implemented');
-    // The copy says "준비 중", never "오류" — the two are different situations.
-    assert.match(CAPABILITY_BLOCK_MESSAGE.general_fx_not_implemented, /준비 중/);
+    assert.equal(caps.exchangeBlockReason, null);
   });
 
   it('never shows season UI for a general account', () => {

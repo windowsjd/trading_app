@@ -96,6 +96,9 @@ const created = {
   quoteIds: [],
   orderIds: [],
   positionIds: [],
+  fxRateSnapshotIds: [],
+  exchangeIds: [],
+  fxRequestIds: [],
 };
 
 async function createUser(label) {
@@ -258,6 +261,75 @@ async function main() {
     });
     created.orderIds.push(order.id);
 
+    const wallets = await prisma.cashWallet.findMany({
+      where: { tradingAccountId: accountId },
+      select: { id: true, currencyCode: true, balanceAmount: true },
+    });
+    const krwWallet = wallets.find((wallet) => wallet.currencyCode === 'KRW');
+    const usdWallet = wallets.find((wallet) => wallet.currencyCode === 'USD');
+    assert.ok(krwWallet && usdWallet);
+    const fxSnapshot = await prisma.fxRateSnapshot.create({
+      data: {
+        baseCurrency: 'USD', quoteCurrency: 'KRW', rate: '1350',
+        sourceType: 'provider_api', sourceName: 'korea_exim_exchange_rate',
+        effectiveAt: new Date(), capturedAt: new Date(),
+      },
+      select: { id: true },
+    });
+    created.fxRateSnapshotIds.push(fxSnapshot.id);
+    const fxQuote = await prisma.quote.create({
+      data: {
+        userId: ownerId, tradingAccountId: accountId, seasonParticipantId: null,
+        quoteType: 'fx', status: 'consumed', fromCurrency: 'KRW', toCurrency: 'USD',
+        sourceAmount: '1350', targetAmount: '0.999', quotedRate: '1350',
+        quotedFeeRate: '0.001', fxRateSnapshotId: fxSnapshot.id,
+        maxChangeBps: '30', expiresAt: new Date(Date.now() + 60_000),
+        requestHash: 'audit-fx-' + randomUUID(), consumedAt: new Date(),
+      },
+      select: { id: true },
+    });
+    created.quoteIds.push(fxQuote.id);
+    const exchange = await prisma.exchangeTransaction.create({
+      data: {
+        tradingAccountId: accountId, seasonParticipantId: null,
+        fxRateSnapshotId: fxSnapshot.id, fromCurrency: 'KRW', toCurrency: 'USD',
+        sourceAmount: '1350', grossTargetAmount: '1', feeRate: '0.001',
+        feeAmount: '0.001', feeCurrency: 'USD', appliedRate: '1350',
+        netTargetAmount: '0.999', executedAt: new Date(),
+      },
+      select: { id: true },
+    });
+    created.exchangeIds.push(exchange.id);
+    await prisma.walletTransaction.createMany({
+      data: [
+        {
+          tradingAccountId: accountId, seasonParticipantId: null,
+          walletId: krwWallet.id, currencyCode: 'KRW', direction: 'debit',
+          txType: 'exchange_source', referenceType: 'exchange_transaction',
+          referenceId: exchange.id, amount: '1350',
+          balanceAfter: krwWallet.balanceAmount.sub('1350'), occurredAt: new Date(),
+        },
+        {
+          tradingAccountId: accountId, seasonParticipantId: null,
+          walletId: usdWallet.id, currencyCode: 'USD', direction: 'credit',
+          txType: 'exchange_target', referenceType: 'exchange_transaction',
+          referenceId: exchange.id, amount: '0.999', balanceAfter: '0.999',
+          occurredAt: new Date(),
+        },
+      ],
+    });
+    const fxRequest = await prisma.fxExecuteRequest.create({
+      data: {
+        userId: ownerId, tradingAccountId: accountId, seasonParticipantId: null,
+        idempotencyKey: 'audit-fx-' + randomUUID(), requestHash: 'audit-fx-' + randomUUID(),
+        fromCurrency: 'KRW', toCurrency: 'USD', sourceAmount: '1350',
+        status: 'succeeded', exchangeTransactionId: exchange.id,
+        responsePayloadJson: { success: true }, requestedAt: new Date(), completedAt: new Date(),
+      },
+      select: { id: true },
+    });
+    created.fxRequestIds.push(fxRequest.id);
+
     const clean = await auditGeneralAccounts(prisma);
     assert.equal(clean.findings.length, 0, JSON.stringify(clean.findings));
     assert.equal(resolveGeneralAccountAuditExitCode(clean), 0);
@@ -346,6 +418,93 @@ async function main() {
       data: { reservedQuantity: '3' },
     });
 
+    await prisma.exchangeTransaction.update({
+      where: { id: exchange.id }, data: { seasonParticipantId: participant.id },
+    });
+    await assertFinding('GENERAL_FX_EXCHANGE_HAS_SEASON_PARTICIPANT', () =>
+      prisma.exchangeTransaction.findUniqueOrThrow({ where: { id: exchange.id } }),
+    );
+    await prisma.exchangeTransaction.update({
+      where: { id: exchange.id }, data: { seasonParticipantId: null },
+    });
+
+    await prisma.fxExecuteRequest.update({
+      where: { id: fxRequest.id }, data: { seasonParticipantId: participant.id },
+    });
+    await assertFinding('GENERAL_FX_REQUEST_HAS_SEASON_PARTICIPANT', () =>
+      prisma.fxExecuteRequest.findUniqueOrThrow({ where: { id: fxRequest.id } }),
+    );
+    await prisma.fxExecuteRequest.update({
+      where: { id: fxRequest.id }, data: { seasonParticipantId: null },
+    });
+
+    await prisma.quote.update({
+      where: { id: fxQuote.id }, data: { seasonParticipantId: participant.id },
+    });
+    await assertFinding('GENERAL_FX_QUOTE_HAS_SEASON_PARTICIPANT', () =>
+      prisma.quote.findUniqueOrThrow({ where: { id: fxQuote.id } }),
+    );
+    await prisma.quote.update({
+      where: { id: fxQuote.id }, data: { seasonParticipantId: null },
+    });
+
+    await prisma.fxExecuteRequest.update({
+      where: { id: fxRequest.id }, data: { tradingAccountId: otherAccountId },
+    });
+    await assertFinding('GENERAL_FX_REQUEST_EXCHANGE_ACCOUNT_MISMATCH', () =>
+      prisma.fxExecuteRequest.findUniqueOrThrow({ where: { id: fxRequest.id } }),
+    );
+    await prisma.fxExecuteRequest.update({
+      where: { id: fxRequest.id }, data: { tradingAccountId: accountId },
+    });
+
+    await prisma.fxExecuteRequest.update({
+      where: { id: fxRequest.id }, data: { tradingAccountId: null },
+    });
+    await assertFinding('GENERAL_FX_ACCOUNT_SCOPE_INVALID', () =>
+      prisma.fxExecuteRequest.findUniqueOrThrow({ where: { id: fxRequest.id } }),
+    );
+    await prisma.fxExecuteRequest.update({
+      where: { id: fxRequest.id }, data: { tradingAccountId: accountId },
+    });
+
+    await prisma.quote.update({
+      where: { id: fxQuote.id }, data: { tradingAccountId: otherAccountId },
+    });
+    await assertFinding('GENERAL_FX_QUOTE_ACCOUNT_MISMATCH', () =>
+      prisma.quote.findUniqueOrThrow({ where: { id: fxQuote.id } }),
+    );
+    await prisma.quote.update({
+      where: { id: fxQuote.id }, data: { tradingAccountId: accountId },
+    });
+
+    await prisma.quote.update({
+      where: { id: fxQuote.id }, data: { quotedFeeRate: '0.00000001' },
+    });
+    await assertFinding('GENERAL_FX_QUOTE_PINNED_FEE_INVALID', () =>
+      prisma.quote.findUniqueOrThrow({ where: { id: fxQuote.id } }),
+    );
+    await prisma.quote.update({
+      where: { id: fxQuote.id }, data: { quotedFeeRate: '0.001000' },
+    });
+
+    const sourceLedger = await prisma.walletTransaction.findFirstOrThrow({
+      where: {
+        referenceType: 'exchange_transaction',
+        referenceId: exchange.id,
+        txType: 'exchange_source',
+      },
+    });
+    await prisma.walletTransaction.update({
+      where: { id: sourceLedger.id }, data: { tradingAccountId: otherAccountId },
+    });
+    await assertFinding('GENERAL_FX_EXCHANGE_LEDGER_MISMATCH', () =>
+      prisma.walletTransaction.findUniqueOrThrow({ where: { id: sourceLedger.id } }),
+    );
+    await prisma.walletTransaction.update({
+      where: { id: sourceLedger.id }, data: { tradingAccountId: accountId },
+    });
+
     const restored = await auditGeneralAccounts(prisma);
     assert.equal(restored.findings.length, 0, JSON.stringify(restored.findings));
     assert.equal(resolveGeneralAccountAuditExitCode(restored), 0);
@@ -357,6 +516,9 @@ async function main() {
 }
 
 async function cleanup() {
+  if (created.fxRequestIds.length) {
+    await prisma.fxExecuteRequest.deleteMany({ where: { id: { in: created.fxRequestIds } } });
+  }
   if (created.orderIds.length) {
     await prisma.order.deleteMany({ where: { id: { in: created.orderIds } } });
   }
@@ -365,6 +527,9 @@ async function cleanup() {
   }
   if (created.positionIds.length) {
     await prisma.position.deleteMany({ where: { id: { in: created.positionIds } } });
+  }
+  if (created.exchangeIds.length) {
+    await prisma.exchangeTransaction.deleteMany({ where: { id: { in: created.exchangeIds } } });
   }
   if (created.accountIds.length) {
     await prisma.equitySnapshot.deleteMany({
@@ -395,6 +560,9 @@ async function cleanup() {
   }
   if (created.assetIds.length) {
     await prisma.asset.deleteMany({ where: { id: { in: created.assetIds } } });
+  }
+  if (created.fxRateSnapshotIds.length) {
+    await prisma.fxRateSnapshot.deleteMany({ where: { id: { in: created.fxRateSnapshotIds } } });
   }
   if (created.userIds.length) {
     await prisma.user.deleteMany({ where: { id: { in: created.userIds } } });

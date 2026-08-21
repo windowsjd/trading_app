@@ -20,10 +20,9 @@ import { isTradingAccountScopeMismatchError } from './accountScope.ts';
  *     notice, and
  *   - a genuinely empty account, which returns 200 with no rows.
  *
- * `GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED` is deliberately NOT in this set. It is
- * an expected capability limit with a known answer ("준비 중"), and folding it
- * in with data corruption would tell a user to contact support about a feature
- * that simply does not exist yet.
+ * The legacy `GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED` code is deliberately NOT in
+ * this set. It may appear briefly from an older server during rolling deploy;
+ * it is a capability response, not evidence that stored money is damaged.
  */
 
 export const TRADING_ACCOUNT_INTEGRITY_CODES = [

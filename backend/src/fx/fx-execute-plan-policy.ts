@@ -27,9 +27,8 @@ type DecimalInput = string | Prisma.Decimal;
 export type FxExecuteWalletCandidate = {
   id: string;
   /**
-   * Nullable since 작업 6 (general-mode wallets have no SeasonParticipant).
-   * FX is season-only today, so a null here never satisfies the season
-   * participant scope guard and the execution fails closed.
+   * General-mode wallets and FX executions have no SeasonParticipant; season
+   * executions retain their participant scope.
    */
   seasonParticipantId: string | null;
   currencyCode: FxExecuteCurrency;
@@ -57,7 +56,7 @@ export type FxExecutePlanInput = {
 
 export type FxExecutePlan = {
   userId: string;
-  seasonParticipantId: string;
+  seasonParticipantId: string | null;
   fromCurrency: FxExecuteCurrency;
   toCurrency: FxExecuteCurrency;
   sourceWalletId: string;
@@ -198,7 +197,7 @@ export function buildFxExecutePlan(
 
 function isMatchingWallet(
   wallet: FxExecuteWalletCandidate | null,
-  seasonParticipantId: string,
+  seasonParticipantId: string | null,
   currencyCode: FxExecuteCurrency,
 ): wallet is FxExecuteWalletCandidate {
   return (

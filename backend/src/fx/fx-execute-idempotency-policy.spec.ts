@@ -15,6 +15,7 @@ jest.mock('../generated/prisma/client', () => {
 import {
   buildFxExecuteCanonicalPayload,
   computeFxExecuteRequestHash,
+  computeGeneralFxExecuteRequestHash,
   serializeFxExecuteCanonicalPayload,
 } from './fx-execute-idempotency-policy';
 
@@ -116,6 +117,31 @@ describe('fx execute idempotency policy', () => {
     expect(serializeFxExecuteCanonicalPayload(canonicalPayload)).toBe(
       '{"apiVersion":"fx-execute:v1","userId":"user-1","seasonParticipantId":"participant-1","quoteId":"quote-fx-1","fromCurrency":"KRW","toCurrency":"USD","sourceAmount":"1000.00000000"}',
     );
+  });
+
+  it('keeps the released season v1 hash vector fixed', () => {
+    expect(computeFxExecuteRequestHash(baseInput)).toBe(
+      '73268018e85fae58a5cda41b53f586ad0fa73dcf3d3641a47f6766c79ef6d441',
+    );
+  });
+
+  it('uses account-scoped v2 identity for general FX', () => {
+    const general = {
+      userId: 'user-1',
+      tradingAccountId: 'account-1',
+      quoteId: 'quote-fx-1',
+      fromCurrency: 'KRW',
+      toCurrency: 'USD',
+      sourceAmount: '1000',
+    };
+    const hash = computeGeneralFxExecuteRequestHash(general);
+    expect(hash).not.toBe(computeFxExecuteRequestHash(baseInput));
+    expect(
+      computeGeneralFxExecuteRequestHash({
+        ...general,
+        tradingAccountId: 'account-2',
+      }),
+    ).not.toBe(hash);
   });
 
   it('fails before hashing when sourceAmount is invalid', () => {

@@ -1,14 +1,17 @@
-# FX API Contract Draft
+# FX API Contract
 
 ## Status
 
-- This document records the implemented `/fx quote` contract and `/fx execute` MVP behavior.
+- This document records the implemented legacy `/api/v1/fx/*` season contract
+  and the shared account-scoped
+  `/api/v1/trading-accounts/:accountId/fx/*` season/general behavior.
 - `/fx quote` can use fresh `provider_api` USD/KRW first, preferring Korea EXIM exchange (`korea_exim_exchange_rate`) and falling back to ExchangeRate-API (`exchange_rate_api`), with approved safe `admin_manual` fallback only.
 - `GET /api/v1/fx/rates/current` uses the same fresh provider source priority for DB rows: fresh Korea EXIM first, then fresh ExchangeRate-API, then approved `admin_manual` fallback only. A stale Korea EXIM row must not outrank a fresh ExchangeRate-API row.
 - `/fx quote` stores an active durable quote and returns `quoteId`, `expiresAt`, and `maxChangeBps`.
 - `/fx execute` requires a durable quote for new mutations, reprices at execute time from fresh `provider_api` USD/KRW, enforces quote movement threshold, and forbids default `admin_manual` fallback.
 - `docs/policy-decisions.md` records the active provider-backed execute/write policy decisions (freshness thresholds, maxChangeBps, quote TTL).
-- Do not add fake FX rates, temporary FX rates, Prisma schema changes, migrations, seed changes, package changes, scheduler/cron, provider ingestion trigger APIs, or real trading/account APIs from this document.
+- Do not add fake/temporary FX rates, new currencies, automatic order-time FX,
+  scheduled/limit FX, or real bank/exchange orders from this document.
 
 ## Source Rules
 
@@ -21,9 +24,17 @@
   - `USD -> KRW`
 - `fromCurrency` and `toCurrency` must not be equal.
 - `sourceAmount` must be greater than 0.
-- Quote and execute are allowed only when the user has joined an active season.
-- Upcoming, ended, and settled seasons block quote and execute.
-- `/fx quote` verifies the joined participant's source cash wallet before rate selection and durable quote creation. `KRW -> USD` checks the KRW wallet; `USD -> KRW` checks the USD wallet. Missing source wallet or `balanceAmount < sourceAmount` returns `INSUFFICIENT_BALANCE` without creating a quote.
+- Legacy quote/execute remain season-only and require the joined active
+  participant. Upcoming, ended, and settled seasons block them unchanged.
+- Account-scoped quote/execute accept either that same verified season context
+  or an owned active general account. General never requires or queries a
+  season/participant. Suspended/closed accounts remain readable but cannot
+  quote or execute.
+- Quote verifies the source cash wallet before rate selection and persistence.
+  `KRW -> USD` checks KRW; `USD -> KRW` checks USD. The usable amount is
+  `balanceAmount - reservedAmount`, so limit-buy cash cannot be spent by FX.
+  Missing/insufficient source balance returns `INSUFFICIENT_BALANCE` without
+  creating a quote.
 - Fake FX rates and temporary FX rates are forbidden.
 - `/fx quote` first tries an eligible `provider_api` USD/KRW `fx_rate_snapshots` row by source priority: `korea_exim_exchange_rate`, then `exchange_rate_api`.
 - `/fx quote` provider freshness uses `capturedAt <= now`, `effectiveAt <= now`, positive rate, and capturedAt age <= 300 seconds.
@@ -163,7 +174,9 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
 
 ### Quote Persistence
 
-- `/fx quote` performs source wallet balance preflight after participant validation and before FX rate selection or durable quote persistence. This preflight does not replace execute-time guarded balance validation.
+- `/fx quote` performs source wallet available-balance preflight after the
+  mode-specific context validation and before FX rate selection or durable
+  quote persistence. This does not replace execute-time guarded validation.
 - `/fx quote` creates a `Quote` row with `quoteType=fx`, `status=active`, `sourceAmount`, `targetAmount`, `quotedRate`, `fxRateSnapshotId`, public-safe `fxRateSourceJson`, `maxChangeBps=30.0000`, `expiresAt=quoteAt+15s`, and canonical SHA-256 `requestHash`.
 - `quoteId` is non-null when quote creation succeeds.
 - `expiresAt` is non-null and defaults to 15 seconds after quote time.
@@ -174,6 +187,11 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
 - Selected provider snapshot older than 300 seconds by `capturedAt`, or selected manual snapshot older than 60 seconds by `effectiveAt`, returns `FX_RATE_STALE` only when no safe fallback is available.
 - Quote metadata stores only public-safe source decision fields; raw provider payloads and secrets are not stored in quote metadata.
 - Execute after durable quote expiry returns `QUOTE_EXPIRED`.
+- A general durable quote records `tradingAccountId`, null participant, and
+  quote-time `GENERAL_FX_FEE_RATE` (default `0.001000`) in `quotedFeeRate`.
+  Execute uses that pinned fee while still repricing the FX rate. Null/invalid
+  general pinned fees return `QUOTE_MISMATCH`; there is no current-env fallback.
+  Season fee behavior remains `Season.fxFeeRate`.
 
 ### Quote Balance Error
 
@@ -208,9 +226,14 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 ```
 
 - `quoteId` and `idempotencyKey` are required for new mutations.
-- FX execute idempotency `requestHash` includes the trimmed `quoteId` together with user, participant, currency pair, and normalized `sourceAmount`.
+- Season FX execute retains the exact `fx-execute:v1` hash containing user and
+  participant. General uses `fx-execute:v2`, binding user + trading account +
+  quote + pair + normalized source amount. The quote hash follows the same
+  v1-season/v2-general split.
 - Existing idempotency replay is checked before quote validation, so a duplicate completed command can return the stored response without consuming a quote again.
-- Same `userId + idempotencyKey + quoteId + request fields` can replay a stored successful response. Same `userId + idempotencyKey` with a different `quoteId` returns `IDEMPOTENCY_CONFLICT` and must not replay the previous response.
+- Same account + key + request replays the stored response; same account + key
+  with a different request returns `IDEMPOTENCY_CONFLICT`. Different accounts
+  may reuse a key. Committed replay precedes mutable status checks.
 - `fromCurrency`, `toCurrency`, and `sourceAmount` must match the stored quote requestHash and fields.
 
 ### Execute-Time Snapshot Selection
@@ -237,7 +260,7 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - Snapshot selection/freshness failure must happen before wallet mutation.
 - If `abs(executeRate - quotedRate) / quotedRate * 10000 > quote.maxChangeBps`, execute returns `RATE_CHANGED_REQUOTE_REQUIRED`.
 
-### Success Response Shape Candidate
+### Implemented Success Response Shape
 
 ```json
 {
@@ -324,49 +347,15 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 
 ## Execute Idempotency
 
-### Current State
-
-- `exchange_transactions` has no `idempotencyKey` column.
-- `fx_execute_requests` exists as the command/request table foundation.
-- `fx_execute_requests` has `unique(userId, idempotencyKey)` for execute retry deduplication.
-- `wallet_transactions` has `[referenceType, referenceId]` index only, not an idempotency unique key.
-- `/fx execute` lifecycle code is implemented.
-
-### Candidate A: Add `exchange_transactions.idempotencyKey`
-
-- Pros: simple lookup against the executed exchange row.
-- Pros: can make duplicate execute return the original exchange response.
-- Cons: would require a new schema/migration change because this column is intentionally absent.
-- Cons: less flexible for recording pending/failed command state before exchange row creation.
-
-### Candidate B: Use Reflected `fx_execute_requests` Command Table
-
-- Pros: can record request lifecycle before wallet mutation.
-- Pros: can store request hash, status, response payload, failure reason, and linked `exchangeTransactionId`.
-- Pros: provides `unique(userId, idempotencyKey)`.
-- Pros: clearer boundary for idempotent retries and conflicts.
-- Cons: command recovery tooling for stale pending rows remains future hardening work.
-
-### Candidate C: API Layer Durable Store
-
-- Pros: can avoid touching exchange table shape.
-- Pros: may be reusable across order/fx commands.
-- Cons: still needs durable storage semantics.
-- Cons: must be transactionally consistent with DB writes or it can drift.
-
-### Candidate D: Implement Without Idempotency
-
-- Not recommended.
-- Exchange execute is a financial write path.
-- Client retry or network timeout could duplicate wallet debits and credits.
-- Duplicate `exchange_transactions` and `wallet_transactions` rows would be hard to distinguish from real user actions.
-
-### Recommendation
-
-- Use the reflected `fx_execute_requests` command table.
-- Keep `exchange_transactions.idempotencyKey` absent unless a later schema review deliberately changes ownership.
-- Use accepted requestHash conflict handling, pending/succeeded/failed lifecycle, and response replay policy.
-- This is the implemented approach.
+- `fx_execute_requests` is the durable command table;
+  `exchange_transactions` intentionally has no idempotency key.
+- New requests are unique by `(tradingAccountId, idempotencyKey)`. The partial
+  legacy `(userId, idempotencyKey) WHERE tradingAccountId IS NULL` index only
+  preserves pre-transition season rows.
+- Legacy null-account replay is pinned to the same season user+participant and
+  is never available to general requests.
+- Request, quote consumption, both wallet mutations, exchange, two ledger
+  rows, stored response, and snapshot commit or roll back together.
 
 ## Wallet Concurrency And Overspend Prevention
 
@@ -427,7 +416,10 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 
 ## Equity Snapshots
 
-- `/fx execute` creates an `exchange_executed` `equity_snapshots` row inside the ledger transaction and triggers current ranking refresh after the ledger transaction.
+- `/fx execute` creates an `exchange_executed` `equity_snapshots` row inside
+  the ledger transaction. Season retains its participant/ranking refresh.
+  General writes a participant-null ordinary TWR snapshot, does not create an
+  external-funding boundary, and never touches season ranking/settlement.
 - Authoritative total equity snapshots require positions, asset price snapshots, and FX snapshot evidence together.
 - Ranking refresh failure after `/fx execute` is logged and must not roll back the successful financial ledger transaction.
 

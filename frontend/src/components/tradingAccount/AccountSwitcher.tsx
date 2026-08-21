@@ -183,7 +183,7 @@ export default function AccountSwitcher({ compact = false }: Props) {
                       측정합니다.
                     </Text>
                     <Text style={styles.rowMeaning}>
-                      매매 가능 · 환전 기능 준비 중
+                      매매 가능 · KRW↔USD 환전 가능
                     </Text>
                   </View>
                   <View style={styles.rowBadgeColumn}>

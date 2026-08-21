@@ -40,3 +40,21 @@ describe('validateEnv limit-order flags', () => {
     ).not.toThrow();
   });
 });
+
+describe('validateEnv general FX fee', () => {
+  it('accepts the documented default and valid explicit values', () => {
+    expect(() => validateEnv({ ...BASE })).not.toThrow();
+    expect(() =>
+      validateEnv({ ...BASE, GENERAL_FX_FEE_RATE: '0.001000' }),
+    ).not.toThrow();
+  });
+
+  it.each(['', '-0.1', '1.000001', '0.1234567', 'NaN'])(
+    'fails startup for invalid GENERAL_FX_FEE_RATE=%j',
+    (value) => {
+      expect(() =>
+        validateEnv({ ...BASE, GENERAL_FX_FEE_RATE: value }),
+      ).toThrow(/GENERAL_FX_FEE_RATE/u);
+    },
+  );
+});

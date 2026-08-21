@@ -4,13 +4,14 @@ Season-based virtual trading app backend built with NestJS, Prisma 7 adapter sty
 
 This service owns backend APIs, database access, financial calculations, and server-side write paths for the MVP. Financial values are exchanged as strings.
 
-Current release status (2026-08-18): general-mode market/limit orders and
-account-scoped positions are implemented through the shared TradingAccount
-core. General FX and general ranking remain intentionally unavailable. General
-market fee is independently configured by `GENERAL_TRADE_FEE_RATE` (default
-`0.001000`), pinned on the durable quote, and reused at execution while price
-continues to use execute-time repricing. `pnpm trading-accounts:audit-general`
-also audits general Order/Position/Quote scope and sell reservations read-only.
+Current release status (2026-08-18): general-mode market/limit orders,
+positions, and explicit KRW↔USD FX are implemented through the shared
+TradingAccount-scoped cores. General ranking remains intentionally unavailable.
+General market and FX fees use independent `GENERAL_TRADE_FEE_RATE` and
+`GENERAL_FX_FEE_RATE` settings (both default `0.001000`) and are pinned on
+durable quotes; execution price/rate still reprices from fresh provider data.
+`pnpm trading-accounts:audit-general` audits general trading and FX scope,
+reservation, command/exchange/ledger, and performance integrity read-only.
 
 ## Current MVP Scope
 
@@ -22,8 +23,8 @@ also audits general Order/Position/Quote scope and sell reservations read-only.
 - TradingAccount is the shared season/general financial scope. General account
   entry, KRW/USD wallets, one-time 10,000,000 KRW grant, rewarded-ad funding,
   TWR portfolio/equity history, market/limit orders, and account-scoped
-  positions are implemented. General FX and general ranking/rewards remain
-  unavailable; see `docs/trading-modes-and-accounts.md` and
+  positions and explicit KRW↔USD FX are implemented. General ranking/rewards
+  remain unavailable; see `docs/trading-modes-and-accounts.md` and
   `docs/general-account-and-ad-rewards-api-contract.md`. Ad rewards are disabled
   by default (`AD_REWARD_ENABLED`) and no real ad-network adapter exists yet.
 - Season write paths require effective active season state: `status=active` and `startAt <= now < endAt` for join, FX quote/execute, and orders quote/create/execute. Public order cancel is currently blocked with `ORDER_CANCEL_NOT_SUPPORTED`.
@@ -257,6 +258,7 @@ WebSocket current/higher candle updates and disabled-by-default canonical reconc
 CI: `.github/workflows/ci.yml` gates every PR and `main` push with three jobs — **Backend quality** (`pnpm run lint:candles:check`, `pnpm run format:candles:check`, `pnpm run typecheck`, `pnpm run build`, `pnpm test`), **Frontend quality** (`npm run typecheck`, `npm test`; the Expo app has no build script — typecheck is the compile gate), and **Candle fixture integration** (PostgreSQL+Redis services, `prisma migrate deploy`, the fixture smoke with artifact commit/dirty verification). The candle layer is the required lint/format gate; repository-wide lint debt outside it is known and not yet gated. Long real-provider smokes are never run in CI — see the runbook in [`docs/candle-live-operations.md`](docs/candle-live-operations.md).
 
 Important operational behavior:
+
 - KIS REST rate limiting is active on the actual `KisAuthClient` OAuth and `KisQuoteClient` quote request paths. It does not affect Binance REST or either provider's WebSocket traffic. Redis atomically reserves account-wide slots using Redis server time; if Redis is unavailable, each process continues with a conservative FIFO in-process limiter instead of calling KIS without limits. Multi-instance fallback cannot enforce a shared account limit and emits one outage warning until recovery.
 - Single-flight uses local Promise sharing plus token-owned Redis locks, bounded cache polling, double-check after acquisition, and periodic ownership renewal. It is intended for bounded serving loads only; minute-scale historical backfills require a later job queue/backfill-lock design.
 - Single-flight snapshots the asset cache generation once. Local Promise and distributed lock identities include that generation, and the final cache write is one Lua operation that verifies both the owner token and unchanged generation. A successful stale loader result may be returned to its caller but is never written into a newer generation.
@@ -329,11 +331,11 @@ Checkpointed sync of the persisted candle feeds is used by database-mode HTTP se
 
 Providers per asset type and feed:
 
-| Asset type | 5m | 1d / 1w | sourceProvider |
-| --- | --- | --- | --- |
-| domestic_stock | KIS `inquire-time-dailychartprice` (2-1 service) | KIS `inquire-daily-itemchartprice` (`FHKST03010100`) | `kis_domestic_minute` / `kis_domestic_period` |
-| us_stock | KIS `inquire-time-itemchartprice` NMIN=5 (2-2 service) | KIS `dailyprice` (`HHDFS76240000`) | `kis_overseas_minute` / `kis_overseas_period` |
-| crypto | Binance Spot `GET /api/v3/klines` | Binance Spot `GET /api/v3/klines` | `binance_klines` |
+| Asset type     | 5m                                                     | 1d / 1w                                              | sourceProvider                                |
+| -------------- | ------------------------------------------------------ | ---------------------------------------------------- | --------------------------------------------- |
+| domestic_stock | KIS `inquire-time-dailychartprice` (2-1 service)       | KIS `inquire-daily-itemchartprice` (`FHKST03010100`) | `kis_domestic_minute` / `kis_domestic_period` |
+| us_stock       | KIS `inquire-time-itemchartprice` NMIN=5 (2-2 service) | KIS `dailyprice` (`HHDFS76240000`)                   | `kis_overseas_minute` / `kis_overseas_period` |
+| crypto         | Binance Spot `GET /api/v3/klines`                      | Binance Spot `GET /api/v3/klines`                    | `binance_klines`                              |
 
 Storage policy: only `5m`, `1d`, and `1w` are persisted (5m ≈ 35 days, 1d ≈ 1 year/max ~400 rows, 1w ≈ 1 year/max ~60 rows). `1m` is never stored; `15m`/`30m`/`1h`/`4h` are derived from stored 5m at read time and never stored. Daily/weekly candles store provider-native rows — they are never rebuilt from 5m data.
 
@@ -360,11 +362,11 @@ Manual Ops execution (no unauthenticated endpoint, no scheduler):
 await opsJobRunnerService.runMarketCandleSyncJob({
   trigger: OpsJobTrigger.operator,
   requestedBy: 'ops@example.com',
-  dryRun: false,            // true: plan only — no provider calls, no candle/checkpoint writes
-  assetIds: undefined,      // default: all active supported assets
-  assetTypes: ['crypto'],   // domestic_stock | us_stock | crypto
+  dryRun: false, // true: plan only — no provider calls, no candle/checkpoint writes
+  assetIds: undefined, // default: all active supported assets
+  assetTypes: ['crypto'], // domestic_stock | us_stock | crypto
   targets: ['5m', '1d', '1w'],
-  mode: 'incremental',      // initial | incremental | repair (repair needs from/to)
+  mode: 'incremental', // initial | incremental | repair (repair needs from/to)
   from: undefined,
   to: undefined,
   resume: true,
@@ -536,6 +538,12 @@ carrying a `seasonParticipantId`, missing/duplicate/wrong-amount initial
 grants, wrong `initialCapitalKrw`, granted claims with no wallet
 transaction, claim↔ledger mismatches, `ad_reward` ledger rows with no claim,
 and duplicate `(provider, providerEventId)` groups.
+
+The same audit reports general Order/Position/Quote scope and sell-reservation
+findings plus participant/account pollution across FX Quote,
+FxExecuteRequest, ExchangeTransaction, and the two exchange ledger rows. It
+also verifies each general exchange has one succeeded account-scoped command
+and exactly one valid source debit and target credit.
 
 작업 6·7 보완 adds a boundary-order + funding-continuity section: accounts
 whose newest performance state is an unpaired `external_funding_before` row,

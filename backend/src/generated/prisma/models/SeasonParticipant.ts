@@ -1197,10 +1197,12 @@ export type SeasonParticipantCreateNestedOneWithoutExchangeTransactionsInput = {
   connect?: Prisma.SeasonParticipantWhereUniqueInput
 }
 
-export type SeasonParticipantUpdateOneRequiredWithoutExchangeTransactionsNestedInput = {
+export type SeasonParticipantUpdateOneWithoutExchangeTransactionsNestedInput = {
   create?: Prisma.XOR<Prisma.SeasonParticipantCreateWithoutExchangeTransactionsInput, Prisma.SeasonParticipantUncheckedCreateWithoutExchangeTransactionsInput>
   connectOrCreate?: Prisma.SeasonParticipantCreateOrConnectWithoutExchangeTransactionsInput
   upsert?: Prisma.SeasonParticipantUpsertWithoutExchangeTransactionsInput
+  disconnect?: Prisma.SeasonParticipantWhereInput | boolean
+  delete?: Prisma.SeasonParticipantWhereInput | boolean
   connect?: Prisma.SeasonParticipantWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.SeasonParticipantUpdateToOneWithWhereWithoutExchangeTransactionsInput, Prisma.SeasonParticipantUpdateWithoutExchangeTransactionsInput>, Prisma.SeasonParticipantUncheckedUpdateWithoutExchangeTransactionsInput>
 }
@@ -1227,10 +1229,12 @@ export type SeasonParticipantCreateNestedOneWithoutFxExecuteRequestsInput = {
   connect?: Prisma.SeasonParticipantWhereUniqueInput
 }
 
-export type SeasonParticipantUpdateOneRequiredWithoutFxExecuteRequestsNestedInput = {
+export type SeasonParticipantUpdateOneWithoutFxExecuteRequestsNestedInput = {
   create?: Prisma.XOR<Prisma.SeasonParticipantCreateWithoutFxExecuteRequestsInput, Prisma.SeasonParticipantUncheckedCreateWithoutFxExecuteRequestsInput>
   connectOrCreate?: Prisma.SeasonParticipantCreateOrConnectWithoutFxExecuteRequestsInput
   upsert?: Prisma.SeasonParticipantUpsertWithoutFxExecuteRequestsInput
+  disconnect?: Prisma.SeasonParticipantWhereInput | boolean
+  delete?: Prisma.SeasonParticipantWhereInput | boolean
   connect?: Prisma.SeasonParticipantWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.SeasonParticipantUpdateToOneWithWhereWithoutFxExecuteRequestsInput, Prisma.SeasonParticipantUpdateWithoutFxExecuteRequestsInput>, Prisma.SeasonParticipantUncheckedUpdateWithoutFxExecuteRequestsInput>
 }
