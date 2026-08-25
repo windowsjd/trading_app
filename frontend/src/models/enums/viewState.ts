@@ -80,7 +80,6 @@ export type MarketViewState =
   | 'market_search_empty'
   | 'market_search_error'
   | 'market_paginating'
-  | 'market_partial_price_unavailable'
   | 'market_error';
 
 export type AssetDetailViewState =

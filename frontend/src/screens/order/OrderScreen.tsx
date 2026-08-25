@@ -29,7 +29,11 @@ import {
   quoteTradingAccountOrder,
 } from '../../features/tradingAccount/api';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
-import { CAPABILITY_BLOCK_MESSAGE } from '../../features/tradingAccount/capabilities';
+import {
+  getAssetTradeBlockedReasonDisplay,
+  getCapabilityBlockMessage,
+  isSeasonNotActiveReason,
+} from '../../features/tradingAccount/capabilities';
 import {
   resolveAccountBinding,
   shouldResetBoundFlow,
@@ -102,7 +106,13 @@ function isPriceAvailable(price?: AssetDetailPriceDto | null) {
   return price?.state === 'available' && !!price.currentPrice;
 }
 
-function getOrderDomainErrorMessage(code?: string | null) {
+function getOrderDomainErrorMessage(
+  code?: string | null,
+  isGeneralAccount = false,
+) {
+  if (isGeneralAccount && isSeasonNotActiveReason(code)) {
+    return '주문을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.';
+  }
   const blockedReason = mapOrderErrorCodeToBlockedReason(code);
   return blockedReason
     ? BLOCKED_REASON_MESSAGE[blockedReason]
@@ -320,7 +330,10 @@ export default function OrderScreen({ route, navigation }: Props) {
       setDomainError(
         isOrderRequoteRequiredCode(code)
           ? REQUOTE_REQUIRED_MESSAGE
-          : getOrderDomainErrorMessage(code),
+          : getOrderDomainErrorMessage(
+              code,
+              capabilities?.isGeneral === true,
+            ),
       );
     },
   });
@@ -376,7 +389,9 @@ export default function OrderScreen({ route, navigation }: Props) {
       }
 
       setOrderDomainState('order_failed');
-      setDomainError(getOrderDomainErrorMessage(code));
+      setDomainError(
+        getOrderDomainErrorMessage(code, capabilities?.isGeneral === true),
+      );
     },
   });
 
@@ -477,16 +492,17 @@ export default function OrderScreen({ route, navigation }: Props) {
     ? '계정 정보를 확인하는 중입니다.'
     : !routeAccount
       ? '이 주문 화면의 계정을 찾을 수 없습니다. 계정을 다시 선택해주세요.'
-      : capabilities?.tradeBlockReason
-        ? CAPABILITY_BLOCK_MESSAGE[capabilities.tradeBlockReason]
-        : null;
+      : getCapabilityBlockMessage(capabilities, capabilities?.tradeBlockReason);
 
   const assetHardBlockedReason =
     asset && !asset.isActive ? '비활성 자산입니다.' : null;
 
   const assetWarningReason =
     asset && !asset.tradable
-      ? (asset.tradeBlockedReason ??
+      ? (getAssetTradeBlockedReasonDisplay(
+          asset.tradeBlockedReason,
+          capabilities?.mode,
+        ) ??
         '거래 제한 가능성이 있습니다. 서버 견적에서 최종 확인됩니다.')
       : asset && !isTradableMarketStatus(asset.marketStatus)
         ? '장 상태는 서버 견적에서 최종 확인됩니다.'

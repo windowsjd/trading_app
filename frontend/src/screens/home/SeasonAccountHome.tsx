@@ -20,7 +20,7 @@ import {
   ACCOUNT_INTEGRITY_TITLE,
   findAccountIntegrityFailure,
 } from '../../features/tradingAccount/accountIntegrityGate';
-import { CAPABILITY_BLOCK_MESSAGE } from '../../features/tradingAccount/capabilities';
+import { getCapabilityBlockMessage } from '../../features/tradingAccount/capabilities';
 import type { TradingAccountCapabilities } from '../../features/tradingAccount/capabilities';
 import { getRankings, getRankingTier } from '../../features/ranking/api';
 import { getPositionDisplay } from '../../features/position/display';
@@ -257,10 +257,9 @@ export default function SeasonAccountHome({
       ? '-'
       : `#${myRanking.rank}`;
   const tier = getRankingTier(myRanking, rankType);
-  const tradeNotice =
-    capabilities && !capabilities.canTrade && capabilities.tradeBlockReason
-      ? CAPABILITY_BLOCK_MESSAGE[capabilities.tradeBlockReason]
-      : null;
+  const tradeNotice = capabilities?.canTrade
+    ? null
+    : getCapabilityBlockMessage(capabilities, capabilities?.tradeBlockReason);
   const allocationSegments = getAllocationSegments(portfolio.allocation);
   const equityPoints: LineChartPoint[] = (equityQuery.data?.points ?? [])
     .map<LineChartPoint | null>((point) => {

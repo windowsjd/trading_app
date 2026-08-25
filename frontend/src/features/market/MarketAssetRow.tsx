@@ -9,6 +9,10 @@ import {
   getAssetSymbolMarketDisplay,
 } from '../../utils/format';
 import type { AssetTickerMessage } from '../asset/assetTickerPolicy';
+import {
+  getAssetTradeBlockedReasonDisplay,
+  type TradingAccountCapabilities,
+} from '../tradingAccount/capabilities';
 import type { MarketAssetItemDto } from './api';
 import { mergeMarketAssetTicker } from './mergeMarketAssetTicker';
 
@@ -19,12 +23,19 @@ type Props = {
   ticker?: AssetTickerMessage | null;
   /** True when this row's realtime price is past the freshness threshold. */
   isStale?: boolean;
+  accountMode?: TradingAccountCapabilities['mode'] | null;
   onPress: (assetId: string) => void;
 };
 
-function getChangeRateText(item: MarketAssetItemDto) {
+function getChangeRateText(
+  item: MarketAssetItemDto,
+  accountMode?: TradingAccountCapabilities['mode'] | null,
+) {
   if (item.price?.state !== 'available' || !item.price.changeRate) {
-    return item.tradeBlockedReason ?? item.marketStatus;
+    return (
+      getAssetTradeBlockedReasonDisplay(item.tradeBlockedReason, accountMode) ??
+      item.marketStatus
+    );
   }
 
   return `${formatPercent(item.price.changeRate)}%`;
@@ -38,7 +49,13 @@ function getChangeRateText(item: MarketAssetItemDto) {
  * prop, so the memo comparator below short-circuits every other row instead of
  * the screen rebuilding a merged object per row on every tick.
  */
-function MarketAssetRowComponent({ item, ticker, isStale, onPress }: Props) {
+function MarketAssetRowComponent({
+  item,
+  ticker,
+  isStale,
+  accountMode,
+  onPress,
+}: Props) {
   const displayItem = useMemo(
     () => mergeMarketAssetTicker(item, ticker ?? undefined),
     [item, ticker],
@@ -63,7 +80,9 @@ function MarketAssetRowComponent({ item, ticker, isStale, onPress }: Props) {
         <Text style={[styles.itemPrice, isStale && styles.itemPriceStale]}>
           {getAssetPriceText(displayItem)}
         </Text>
-        <Text style={styles.helper}>{getChangeRateText(displayItem)}</Text>
+        <Text style={styles.helper}>
+          {getChangeRateText(displayItem, accountMode)}
+        </Text>
         <Text style={styles.helper}>
           {displayItem.marketStatus} ·{' '}
           {displayItem.tradable ? '거래 가능' : '거래 제한'}
@@ -81,6 +100,7 @@ export const MarketAssetRow = React.memo(
     // that asset actually receives a newer accepted ticker.
     (previous.ticker ?? null) === (next.ticker ?? null) &&
     previous.isStale === next.isStale &&
+    previous.accountMode === next.accountMode &&
     previous.onPress === next.onPress,
 );
 

@@ -53,6 +53,44 @@ export const CAPABILITY_BLOCK_MESSAGE: Record<
   season_not_active: '현재 거래 가능한 시즌이 아닙니다.',
 };
 
+export function isSeasonNotActiveReason(reason?: string | null): boolean {
+  return reason?.trim().toLowerCase() === 'season_not_active';
+}
+
+/**
+ * A general account is independent of seasons. Even if a stale or malformed
+ * capability payload carries a season-only reason, it must not surface in the
+ * general-account UI.
+ */
+export function getCapabilityBlockMessage(
+  capabilities:
+    | Pick<TradingAccountCapabilities, 'isGeneral'>
+    | null
+    | undefined,
+  reason?: CapabilityBlockReason,
+): string | null {
+  if (!reason) return null;
+  if (capabilities?.isGeneral && reason === 'season_not_active') return null;
+  return CAPABILITY_BLOCK_MESSAGE[reason];
+}
+
+/**
+ * Asset APIs can carry a legacy season-scoped `tradeBlockedReason`. General
+ * accounts ignore that reason; other account modes receive stable Korean copy
+ * instead of a raw backend identifier.
+ */
+export function getAssetTradeBlockedReasonDisplay(
+  reason: string | null | undefined,
+  accountMode: TradingAccountDto['mode'] | null | undefined,
+): string | null {
+  const normalized = reason?.trim() || null;
+  if (!normalized) return null;
+  if (!isSeasonNotActiveReason(normalized)) return normalized;
+  return accountMode === 'general'
+    ? null
+    : CAPABILITY_BLOCK_MESSAGE.season_not_active;
+}
+
 type CapabilityInput = Pick<TradingAccountDto, 'mode' | 'status' | 'season'>;
 
 function statusBlockReason(

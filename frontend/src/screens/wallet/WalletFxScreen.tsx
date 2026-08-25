@@ -25,7 +25,10 @@ import {
   quoteTradingAccountFx,
 } from '../../features/tradingAccount/api';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
-import { CAPABILITY_BLOCK_MESSAGE } from '../../features/tradingAccount/capabilities';
+import {
+  getCapabilityBlockMessage,
+  isSeasonNotActiveReason,
+} from '../../features/tradingAccount/capabilities';
 import { getAccountDisplay } from '../../features/tradingAccount/accountDisplay';
 import {
   ACCOUNT_INTEGRITY_TITLE,
@@ -99,7 +102,13 @@ function displayValue(value?: string | number | boolean | null) {
   return String(value);
 }
 
-function getFxDomainErrorMessage(code?: string | null) {
+function getFxDomainErrorMessage(
+  code?: string | null,
+  isGeneralAccount = false,
+) {
+  if (isGeneralAccount && isSeasonNotActiveReason(code)) {
+    return '환전을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.';
+  }
   const blockedReason = mapFxErrorCodeToBlockedReason(code);
   return blockedReason
     ? BLOCKED_REASON_MESSAGE[blockedReason]
@@ -246,7 +255,10 @@ export default function WalletFxScreen({ navigation }: Props) {
       setDomainError(
         isFxRequoteRequiredCode(code)
           ? REQUOTE_REQUIRED_MESSAGE
-          : getFxDomainErrorMessage(code),
+          : getFxDomainErrorMessage(
+              code,
+              capabilities?.isGeneral === true,
+            ),
       );
     },
   });
@@ -320,7 +332,9 @@ export default function WalletFxScreen({ navigation }: Props) {
       }
 
       setFxDomainState('fx_execute_rejected');
-      setDomainError(getFxDomainErrorMessage(code));
+      setDomainError(
+        getFxDomainErrorMessage(code, capabilities?.isGeneral === true),
+      );
     },
   });
 
@@ -571,10 +585,12 @@ export default function WalletFxScreen({ navigation }: Props) {
    * Suspended/closed accounts cannot exchange. The request is never sent, so
    * the user does not collect a 409 per press; the server remains authoritative.
    */
-  const exchangeBlockMessage =
-    capabilities && !capabilities.canExchange && capabilities.exchangeBlockReason
-      ? CAPABILITY_BLOCK_MESSAGE[capabilities.exchangeBlockReason]
-      : null;
+  const exchangeBlockMessage = capabilities?.canExchange
+    ? null
+    : getCapabilityBlockMessage(
+        capabilities,
+        capabilities?.exchangeBlockReason,
+      );
 
   if (exchangeBlockMessage) {
     return (

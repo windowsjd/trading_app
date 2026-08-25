@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { getTradingAccountCapabilities } from './capabilities.ts';
+import {
+  getAssetTradeBlockedReasonDisplay,
+  getCapabilityBlockMessage,
+  getTradingAccountCapabilities,
+  isSeasonNotActiveReason,
+} from './capabilities.ts';
 import { getAccountDisplay, getReturnRateMethodLabel } from './accountDisplay.ts';
 import type { TradingAccountDto } from './api.ts';
 
@@ -63,6 +68,38 @@ describe('mode capabilities', () => {
     assert.equal(caps.showsSeasonUi, false);
     assert.equal(caps.isSeason, false);
     assert.equal(caps.returnRateMethod, 'time_weighted');
+  });
+
+  it('never exposes a season-not-active reason for a general account', () => {
+    const caps = getTradingAccountCapabilities(generalAccount())!;
+
+    assert.equal(getCapabilityBlockMessage(caps, 'season_not_active'), null);
+    assert.equal(
+      getAssetTradeBlockedReasonDisplay('season_not_active', caps.mode),
+      null,
+    );
+    assert.equal(
+      getAssetTradeBlockedReasonDisplay(' SEASON_NOT_ACTIVE ', caps.mode),
+      null,
+    );
+  });
+
+  it('keeps season-account copy and unrelated asset reasons', () => {
+    const caps = getTradingAccountCapabilities(account())!;
+
+    assert.equal(
+      getCapabilityBlockMessage(caps, 'season_not_active'),
+      '현재 거래 가능한 시즌이 아닙니다.',
+    );
+    assert.equal(
+      getAssetTradeBlockedReasonDisplay('season_not_active', caps.mode),
+      '현재 거래 가능한 시즌이 아닙니다.',
+    );
+    assert.equal(
+      getAssetTradeBlockedReasonDisplay('market_closed', 'general'),
+      'market_closed',
+    );
+    assert.equal(isSeasonNotActiveReason('SEASON_NOT_ACTIVE'), true);
   });
 
   it('allows an ad-reward claim only on an ACTIVE general account', () => {

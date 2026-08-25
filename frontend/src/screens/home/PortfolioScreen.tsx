@@ -33,7 +33,7 @@ import {
   findAccountIntegrityFailure,
 } from '../../features/tradingAccount/accountIntegrityGate';
 import { getReturnRateMethodLabel } from '../../features/tradingAccount/accountDisplay';
-import { CAPABILITY_BLOCK_MESSAGE } from '../../features/tradingAccount/capabilities';
+import { getCapabilityBlockMessage } from '../../features/tradingAccount/capabilities';
 import { getPositionDisplay } from '../../features/position/display';
 import { getPortfolioNotice as getTradingAccountPortfolioNotice } from '../../features/tradingAccount/portfolioMessage';
 import AccountSwitcher from '../../components/tradingAccount/AccountSwitcher';
@@ -327,10 +327,9 @@ export default function PortfolioScreen({ navigation }: Props) {
    * up front that general-mode trading and FX are 준비 중, instead of being
    * handed a live-looking button whose only outcome is a 409.
    */
-  const capabilityNotice =
-    capabilities && !capabilities.canTrade && capabilities.tradeBlockReason
-      ? CAPABILITY_BLOCK_MESSAGE[capabilities.tradeBlockReason]
-      : null;
+  const capabilityNotice = capabilities?.canTrade
+    ? null
+    : getCapabilityBlockMessage(capabilities, capabilities?.tradeBlockReason);
   const portfolioNotice = getTradingAccountPortfolioNotice(overview);
   const equity = equityQuery.data?.points ?? [];
   const allocationSegments = getAllocationSegments(overview.allocation);

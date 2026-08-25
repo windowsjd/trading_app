@@ -8,12 +8,15 @@ function read(sourcePath: string) {
 }
 
 const marketRow = read('features/market/MarketAssetRow.tsx');
+const marketScreen = read('screens/market/MarketScreen.tsx');
 const marketSearch = read('screens/market/MarketSearchScreen.tsx');
 const assetDetail = read('screens/asset/AssetDetailScreen.tsx');
 const orderScreen = read('screens/order/OrderScreen.tsx');
 const orderMapper = read('features/order/mapper.ts');
 const recordMapper = read('features/record/api.ts');
 const recordOrderList = read('screens/record/RecordOrderListScreen.tsx');
+const generalAccountHome = read('screens/home/GeneralAccountHome.tsx');
+const walletFxScreen = read('screens/wallet/WalletFxScreen.tsx');
 
 describe('numeric asset symbol display contract', () => {
   it('uses shared helpers across market, detail, order and record surfaces', () => {
@@ -35,6 +38,28 @@ describe('numeric asset symbol display contract', () => {
   it('does not render raw market-row symbols or dangling separators', () => {
     assert.doesNotMatch(marketRow, /\{displayItem\.symbol\}\s*·/u);
     assert.doesNotMatch(marketSearch, /\{item\.symbol\}\s*·/u);
+  });
+});
+
+describe('general-account season reason display contract', () => {
+  it('passes the selected account mode through market list and search rows', () => {
+    assert.match(marketScreen, /accountMode=\{selectedAccount\?\.mode\}/u);
+    assert.match(marketRow, /getAssetTradeBlockedReasonDisplay\(/u);
+    assert.match(marketSearch, /getAssetTradeBlockedReasonDisplay\(/u);
+  });
+
+  it('sanitizes asset reasons on detail and order surfaces', () => {
+    assert.match(assetDetail, /getAssetTradeBlockedReasonDisplay\(/u);
+    assert.match(orderScreen, /getAssetTradeBlockedReasonDisplay\(/u);
+    assert.doesNotMatch(assetDetail, /asset\.tradeBlockedReason\s*\?\?/u);
+    assert.doesNotMatch(orderScreen, /asset\.tradeBlockedReason\s*\?\?/u);
+  });
+
+  it('uses account-aware capability and API-error messages', () => {
+    assert.match(generalAccountHome, /getCapabilityBlockMessage\(/u);
+    assert.match(orderScreen, /capabilities\?\.isGeneral === true/u);
+    assert.match(walletFxScreen, /capabilities\?\.isGeneral === true/u);
+    assert.doesNotMatch(generalAccountHome, /CAPABILITY_BLOCK_MESSAGE\[/u);
   });
 });
 

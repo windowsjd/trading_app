@@ -39,4 +39,10 @@ describe('GeneralAccountHome independent financial reads', () => {
     assert.ok(!source.includes('sectionErrors[0]?.message'));
     assert.match(source, /getPortfolioNotice\(portfolio\)/u);
   });
+
+  it('never renders a season-only capability reason', () => {
+    assert.match(source, /getCapabilityBlockMessage\(/u);
+    assert.ok(!source.includes('CAPABILITY_BLOCK_MESSAGE['));
+    assert.doesNotMatch(source, /season_not_active/iu);
+  });
 });

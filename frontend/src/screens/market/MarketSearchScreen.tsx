@@ -20,6 +20,8 @@ import {
   type AssetType,
   type MarketAssetItemDto,
 } from '../../features/market/api';
+import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
+import { getAssetTradeBlockedReasonDisplay } from '../../features/tradingAccount/capabilities';
 import {
   formatPercent,
   getAssetNameDisplay,
@@ -41,15 +43,22 @@ const SEARCH_SCOPE: Array<{ key: SearchScope; label: string }> = [
   { key: 'crypto', label: '암호화폐' },
 ];
 
-function getChangeRateText(item: MarketAssetItemDto) {
+function getChangeRateText(
+  item: MarketAssetItemDto,
+  accountMode: 'general' | 'season' | null,
+) {
   if (item.price?.state !== 'available' || !item.price.changeRate) {
-    return item.tradeBlockedReason ?? item.marketStatus;
+    return (
+      getAssetTradeBlockedReasonDisplay(item.tradeBlockedReason, accountMode) ??
+      item.marketStatus
+    );
   }
 
   return `${formatPercent(item.price.changeRate)}%`;
 }
 
 export default function MarketSearchScreen({ navigation }: Props) {
+  const { selectedAccount } = useTradingAccount();
   const [assetType, setAssetType] = useState<SearchScope>('all');
   const [searchText, setSearchText] = useState('');
   const trimmedSearchText = searchText.trim();
@@ -206,7 +215,9 @@ export default function MarketSearchScreen({ navigation }: Props) {
 
               <View style={styles.alignEnd}>
                 <Text style={styles.itemPrice}>{getAssetPriceText(item)}</Text>
-                <Text style={styles.helper}>{getChangeRateText(item)}</Text>
+                <Text style={styles.helper}>
+                  {getChangeRateText(item, selectedAccount?.mode ?? null)}
+                </Text>
                 <Text style={styles.helper}>
                   {item.marketStatus} ·{' '}
                   {item.tradable ? '거래 가능' : '거래 제한'}

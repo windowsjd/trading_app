@@ -21,6 +21,7 @@ import {
 } from '../../features/market/api';
 import { MarketAssetRow } from '../../features/market/MarketAssetRow';
 import { useMarketTickers } from '../../features/market/useMarketTickers';
+import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -37,6 +38,7 @@ const TABS: Array<{ key: AssetType; label: string }> = [
 const CRYPTO_PRICE_BASIS_TEXT = '가격 기준: Binance Spot 최근 체결가';
 
 export default function MarketScreen({ navigation }: Props) {
+  const { selectedAccount } = useTradingAccount();
   const [selectedTab, setSelectedTab] = useState<AssetType>('domestic_stock');
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
 
@@ -93,20 +95,12 @@ export default function MarketScreen({ navigation }: Props) {
     [navigation],
   );
 
-  const hasPriceErrors = useMemo(
-    () =>
-      marketQuery.data?.pages.some((page) => (page.priceErrors?.length ?? 0) > 0) ??
-      false,
-    [marketQuery.data],
-  );
-
   const viewState = useMemo(() => {
     if (marketQuery.isLoading) return 'market_loading';
     if (marketQuery.isError) return 'market_error';
     if (!items.length) return 'market_empty';
-    if (hasPriceErrors) return 'market_partial_price_unavailable';
     return 'market_ready';
-  }, [marketQuery.isLoading, marketQuery.isError, items.length, hasPriceErrors]);
+  }, [marketQuery.isLoading, marketQuery.isError, items.length]);
 
   if (viewState === 'market_loading') {
     return <FullPageLoading message="종목 목록을 불러오는 중입니다." />;
@@ -117,7 +111,9 @@ export default function MarketScreen({ navigation }: Props) {
       <ErrorState
         title="종목 목록을 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
-        onRetry={() => marketQuery.refetch()}
+        onRetry={() => {
+          void marketQuery.refetch();
+        }}
       />
     );
   }
@@ -131,7 +127,7 @@ export default function MarketScreen({ navigation }: Props) {
         contentContainerStyle={styles.content}
         onEndReached={() => {
           if (marketQuery.hasNextPage && !marketQuery.isFetchingNextPage) {
-            marketQuery.fetchNextPage();
+            void marketQuery.fetchNextPage();
           }
         }}
         onEndReachedThreshold={0.4}
@@ -175,14 +171,6 @@ export default function MarketScreen({ navigation }: Props) {
               </Text>
             ) : null}
 
-            {viewState === 'market_partial_price_unavailable' ? (
-              <View style={styles.inlineWarning}>
-                <Text style={styles.inlineWarningText}>
-                  일부 종목 시세를 아직 불러오지 못했습니다.
-                </Text>
-              </View>
-            ) : null}
-
             {/* One screen-level notice; rows never repeat a connection error. */}
             {showReconnectBanner ? (
               <View
@@ -208,6 +196,7 @@ export default function MarketScreen({ navigation }: Props) {
             item={item}
             ticker={tickersByAssetId.get(item.id) ?? null}
             isStale={staleAssetIds.has(item.id)}
+            accountMode={selectedAccount?.mode}
             onPress={openAsset}
           />
         )}

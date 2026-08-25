@@ -25,7 +25,11 @@ import {
 } from "../../features/tradingAccount/api";
 import { getPositionDisplay } from "../../features/position/display";
 import { useTradingAccount } from "../../features/tradingAccount/TradingAccountContext";
-import { CAPABILITY_BLOCK_MESSAGE } from "../../features/tradingAccount/capabilities";
+import {
+  getAssetTradeBlockedReasonDisplay,
+  getCapabilityBlockMessage,
+  isSeasonNotActiveReason,
+} from "../../features/tradingAccount/capabilities";
 import { getIntegrityErrorMessage } from "../../features/tradingAccount/integrityErrors";
 import { getAccountDisplay } from "../../features/tradingAccount/accountDisplay";
 import { useAssetTicker } from "../../features/asset/useAssetTicker";
@@ -222,9 +226,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
     ? "계정 정보를 확인하는 중입니다."
     : noAccounts || !capabilities
       ? "거래 가능한 계정이 없습니다."
-      : capabilities.tradeBlockReason
-        ? CAPABILITY_BLOCK_MESSAGE[capabilities.tradeBlockReason]
-        : null;
+      : getCapabilityBlockMessage(capabilities, capabilities.tradeBlockReason);
 
   // Server-detected damage is never presented as "you hold nothing".
   const positionIntegrityMessage = positionQuery.isError
@@ -234,7 +236,10 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
   const assetHardBlockedReason = !asset.isActive ? "비활성 자산입니다." : null;
 
   const assetWarningReason = !asset.tradable
-    ? (asset.tradeBlockedReason ??
+    ? (getAssetTradeBlockedReasonDisplay(
+        asset.tradeBlockedReason,
+        capabilities?.mode,
+      ) ??
       "거래 제한 가능성이 있습니다. 서버 견적에서 최종 확인됩니다.")
     : !isTradableMarketStatus(asset.marketStatus)
       ? "장 상태는 주문 견적에서 최종 확인됩니다."
@@ -322,7 +327,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
             >
               <Text style={styles.inlineWarningText}>{buyBlockedReason}</Text>
               {capabilities?.isSeason &&
-              capabilities.tradeBlockReason === "season_not_active" ? (
+                isSeasonNotActiveReason(capabilities.tradeBlockReason) ? (
                 <Pressable
                   style={styles.retryButton}
                   onPress={() => rootNavigation.navigate("SeasonJoin")}

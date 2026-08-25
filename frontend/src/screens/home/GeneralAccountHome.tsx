@@ -15,7 +15,7 @@ import {
   ACCOUNT_INTEGRITY_TITLE,
   findAccountIntegrityFailure,
 } from '../../features/tradingAccount/accountIntegrityGate';
-import { CAPABILITY_BLOCK_MESSAGE } from '../../features/tradingAccount/capabilities';
+import { getCapabilityBlockMessage } from '../../features/tradingAccount/capabilities';
 import type { TradingAccountCapabilities } from '../../features/tradingAccount/capabilities';
 import { getPositionDisplay } from '../../features/position/display';
 import { getPortfolioNotice } from '../../features/tradingAccount/portfolioMessage';
@@ -158,12 +158,12 @@ export default function GeneralAccountHome({
   const positions = positionsQuery.data?.positions;
   const krwBalance = getKnownWalletBalanceAmount(walletsQuery.data, 'KRW');
   const usdBalance = getKnownWalletBalanceAmount(walletsQuery.data, 'USD');
-  const capabilityNotice =
-    capabilities &&
-    !capabilities.canExchange &&
-    capabilities.exchangeBlockReason
-      ? CAPABILITY_BLOCK_MESSAGE[capabilities.exchangeBlockReason]
-      : null;
+  const capabilityNotice = capabilities?.canExchange
+    ? null
+    : getCapabilityBlockMessage(
+        capabilities,
+        capabilities?.exchangeBlockReason,
+      );
 
   return (
     <ScrollView
