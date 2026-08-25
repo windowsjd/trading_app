@@ -29,6 +29,7 @@ jest.mock('../../generated/prisma/client', () => {
 
 import type { ProviderConfigService } from '../provider-config.service';
 import type { KisAuthClient } from './kis-auth.client';
+import type { KisKrxStartupCatchUpService } from './kis-krx-startup-catch-up.service';
 import { KisRealtimePriceCacheService } from './kis-realtime-price-cache.service';
 import { KisRealtimePriceEventBus } from './kis-realtime-price-event-bus.service';
 import type { KisWebSocketIngestionService } from './kis-websocket.ingestion.service';
@@ -103,6 +104,38 @@ describe('KIS WebSocket streaming service', () => {
       subscribedSymbolCount: 1,
       lastErrorCode: null,
     });
+  });
+
+  it('awaits the one-shot KRX catch-up before starting persistent streaming', async () => {
+    const callOrder: string[] = [];
+    const startupCatchUpService = {
+      startOnce: jest.fn().mockImplementation(async () => {
+        callOrder.push('rest-catch-up');
+        return {
+          state: 'not_needed',
+          reason: 'LATEST_COMPLETED_SESSION_COVERED',
+        };
+      }),
+    };
+    const authClient = createAuthClient();
+    authClient.requestConfiguredWebSocketApprovalKey = jest
+      .fn()
+      .mockImplementation(async () => {
+        callOrder.push('websocket-approval');
+        return {
+          state: 'available',
+          response: { approvalKey: 'approval-secret-for-test' },
+          receivedAt: new Date('2026-05-27T00:00:00.000Z'),
+        };
+      });
+    service = createService({ authClient, startupCatchUpService });
+
+    service.start();
+    await flushAsync();
+
+    expect(callOrder).toEqual(['rest-catch-up', 'websocket-approval']);
+    expect(startupCatchUpService.startOnce).toHaveBeenCalledTimes(1);
+    expect(service.getStatus().connected).toBe(true);
   });
 
   it('updates latest price cache and publishes an event when trade messages arrive', async () => {
@@ -334,6 +367,7 @@ function createService(
     ingestionService?: Partial<KisWebSocketIngestionService>;
     latestPriceCache?: KisRealtimePriceCacheService;
     eventBus?: KisRealtimePriceEventBus;
+    startupCatchUpService?: Partial<KisKrxStartupCatchUpService>;
   } = {},
 ): KisWebSocketStreamingService {
   return new KisWebSocketStreamingService(
@@ -342,6 +376,7 @@ function createService(
     input.ingestionService ?? createIngestionService(),
     input.latestPriceCache ?? new KisRealtimePriceCacheService(),
     input.eventBus ?? new KisRealtimePriceEventBus(),
+    input.startupCatchUpService as KisKrxStartupCatchUpService | undefined,
   );
 }
 

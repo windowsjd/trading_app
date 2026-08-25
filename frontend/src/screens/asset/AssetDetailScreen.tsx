@@ -23,6 +23,7 @@ import {
   findAccountPosition,
   getTradingAccountPositions,
 } from "../../features/tradingAccount/api";
+import { getPositionDisplay } from "../../features/position/display";
 import { useTradingAccount } from "../../features/tradingAccount/TradingAccountContext";
 import { CAPABILITY_BLOCK_MESSAGE } from "../../features/tradingAccount/capabilities";
 import { getIntegrityErrorMessage } from "../../features/tradingAccount/integrityErrors";
@@ -171,6 +172,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
   // previous account's holdings under the new account's heading.
   const position = findAccountPosition(positionQuery.data, assetId);
   const hasPosition = Number(position?.quantity ?? "0") > 0;
+  const positionDisplay = position ? getPositionDisplay(position) : null;
   const accountDisplay = selectedAccount
     ? getAccountDisplay(selectedAccount)
     : null;
@@ -350,12 +352,10 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
           </Text>
           <Text style={styles.helper}>실시간 연결 {connectionState}</Text>
           <Text style={styles.helper}>
-            가격 소스{" "}
-            {formatSourceMetadata(displayPriceSource)}
+            가격 소스 {formatSourceMetadata(displayPriceSource)}
           </Text>
           <Text style={styles.helper}>
-            환율 소스{" "}
-            {formatSourceMetadata(displayFxRateSource)}
+            환율 소스 {formatSourceMetadata(displayFxRateSource)}
           </Text>
 
           {tradingNote ? (
@@ -444,24 +444,29 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
             </>
           ) : hasPosition && position ? (
             <>
-              <Text style={styles.helper}>수량 {position.quantity}</Text>
               <Text style={styles.helper}>
-                평균단가{" "}
-                {formatAssetPrice(
-                  position.avgEntryPriceLocal ?? position.avgEntryPrice,
-                  displayPriceCurrency,
-                  displayPriceDecimals,
-                )}
+                수량 {positionDisplay?.quantity ?? "-"}
               </Text>
               <Text style={styles.helper}>
-                평가금액 {formatKrw(position.marketValueKrw)}
+                평균단가 {positionDisplay?.averageCost ?? "-"}
               </Text>
               <Text style={styles.helper}>
-                평가손익 {formatKrw(position.unrealizedPnlKrw)}
+                현재가 {positionDisplay?.currentPrice ?? "시세 조회 불가"}
               </Text>
               <Text style={styles.helper}>
-                수익률 {formatPercent(position.returnRate)}%
+                평가금액 {positionDisplay?.positionValueKrw ?? "-"}
               </Text>
+              <Text style={styles.helper}>
+                평가손익 {positionDisplay?.unrealizedPnlKrw ?? "-"}
+              </Text>
+              <Text style={styles.helper}>
+                수익률 {positionDisplay?.returnRate ?? "-"}
+              </Text>
+              {positionDisplay?.priceNotice ? (
+                <Text style={styles.inlineWarningText}>
+                  {positionDisplay.priceNotice}
+                </Text>
+              ) : null}
             </>
           ) : (
             <InlineEmptyState

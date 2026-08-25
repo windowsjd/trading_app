@@ -87,6 +87,18 @@ export function getWalletBalanceAmount(
   return wallet?.balanceAmount ?? wallet?.balance ?? '0';
 }
 
+/**
+ * Balance reader for status-aware screens. Unlike the legacy helper above,
+ * an absent/not-yet-fetched wallet stays unknown instead of becoming zero.
+ */
+export function getKnownWalletBalanceAmount(
+  walletsDto: WalletBalanceSource | null | undefined,
+  currencyCode: WalletCurrency,
+): string | null {
+  const wallet = getWalletByCurrency(walletsDto, currencyCode);
+  return wallet?.balanceAmount ?? wallet?.balance ?? null;
+}
+
 /** Cash locked by submitted limit-buy orders ('0' when absent). */
 export function getWalletReservedAmount(
   walletsDto: WalletBalanceSource | null | undefined,
@@ -151,7 +163,10 @@ export function getFxQuoteDisplay(quote: FxQuoteDto) {
     direction: `${quote.fromCurrency} → ${quote.toCurrency}`,
     sourceAmount: formatCurrency(quote.sourceAmount, quote.fromCurrency),
     appliedRate: displayValue(quote.appliedRate),
-    grossTargetAmount: formatCurrency(quote.grossTargetAmount, quote.toCurrency),
+    grossTargetAmount: formatCurrency(
+      quote.grossTargetAmount,
+      quote.toCurrency,
+    ),
     feeRate: displayValue(quote.feeRate),
     feeAmount: formatMoney(quote.feeAmount, quote.feeCurrency),
     netTargetAmount: formatCurrency(quote.netTargetAmount, quote.toCurrency),
@@ -213,7 +228,10 @@ export function getFxExecuteSuccessDisplay(result: FxExecuteDto) {
     executedAt: displayValue(result.executedAt),
     direction: `${result.fromCurrency} → ${result.toCurrency}`,
     sourceAmount: formatCurrency(result.sourceAmount, result.fromCurrency),
-    grossTargetAmount: formatCurrency(result.grossTargetAmount, result.toCurrency),
+    grossTargetAmount: formatCurrency(
+      result.grossTargetAmount,
+      result.toCurrency,
+    ),
     netTargetAmount: formatCurrency(result.netTargetAmount, result.toCurrency),
     appliedRate: displayValue(result.appliedRate),
     quotedRate: displayValue(result.quotedRate),

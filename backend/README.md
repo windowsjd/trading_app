@@ -173,7 +173,9 @@ KIS_WEBSOCKET_STREAMING_RECONNECT_MAX_MS=30000
 KIS_WEBSOCKET_STREAMING_HEARTBEAT_TIMEOUT_MS=60000
 ```
 
-The streaming service uses `KIS_REST_BASE_URL` only to issue/cache `/oauth2/Approval` approval keys through `KisAuthClient`; the cache is in-memory and is lost on process restart. It keeps the KIS WebSocket open, resubscribes after reconnect, updates an in-memory latest-price cache on every tick, and writes `asset_price_snapshots` only through the existing `KIS_WS_SNAPSHOT_THROTTLE_MS` DB throttle. `KIS_WS_MAX_RUNTIME_MS` is only for the one-shot WebSocket ingestion job. KIS REST current price ingestion remains available for fallback/manual/debug use with `KIS_PRICE_INGESTION_MODE=rest_current_price`.
+The streaming service uses `KIS_REST_BASE_URL` to issue/cache `/oauth2/Approval` approval keys through `KisAuthClient`; the cache is in-memory and is lost on process restart. It keeps the KIS WebSocket open, resubscribes after reconnect, updates an in-memory latest-price cache on every tick, and writes `asset_price_snapshots` only through the existing `KIS_WS_SNAPSHOT_THROTTLE_MS` DB throttle. `KIS_WS_MAX_RUNTIME_MS` is only for the one-shot WebSocket ingestion job. KIS REST current price ingestion remains available for fallback/manual/debug use with `KIS_PRICE_INGESTION_MODE=rest_current_price`.
+
+There is one narrow automatic REST exception: on application startup, after a real KRX session has already closed, the backend checks active domestic-stock coverage for that same completed session. Missing symbols receive one best-effort pass through the existing KIS REST current-price ingestion. Weekends, KRX holidays, pre-open/live sessions, missing calendar coverage, disabled KIS, and already-covered sessions make no provider call. The provider's `stck_bsop_date + stck_cntg_hour` remains `effectiveAt`; startup time is never substituted when that timestamp is present. Failure is logged and never blocks application bootstrap. This is a one-shot gap fill, not REST polling; the WebSocket remains the continuous real-time owner.
 
 Market snapshot readiness requires provider ingestion and at least one USD/KRW FX provider:
 

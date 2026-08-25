@@ -32,10 +32,10 @@ import {
   ACCOUNT_INTEGRITY_TITLE,
   findAccountIntegrityFailure,
 } from '../../features/tradingAccount/accountIntegrityGate';
-import {
-  getReturnRateMethodLabel,
-} from '../../features/tradingAccount/accountDisplay';
+import { getReturnRateMethodLabel } from '../../features/tradingAccount/accountDisplay';
 import { CAPABILITY_BLOCK_MESSAGE } from '../../features/tradingAccount/capabilities';
+import { getPositionDisplay } from '../../features/position/display';
+import { getPortfolioNotice as getTradingAccountPortfolioNotice } from '../../features/tradingAccount/portfolioMessage';
 import AccountSwitcher from '../../components/tradingAccount/AccountSwitcher';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
@@ -49,7 +49,11 @@ import {
   type DonutChartSegment,
   type LineChartPoint,
 } from '../../components/charts';
-import { formatKrw, formatPercent, getAssetNameDisplay } from '../../utils/format';
+import {
+  formatKrw,
+  formatPercent,
+  getAssetNameDisplay,
+} from '../../utils/format';
 
 type Props = PortfolioScreenProps;
 
@@ -76,20 +80,26 @@ const POSITIONS_PAGE_SIZE = 20;
 
 /** One row of the position list, normalised from the account-scoped payload. */
 type PortfolioPositionRow = {
+  positionId: string;
   assetId: string;
   symbol: string;
   name: string;
   quantity: string;
-  marketValueKrw: string;
+  averageCost: string;
+  currentPrice: string | null;
+  positionValueKrw: string;
   unrealizedPnlKrw: string;
   returnRate: string;
+  priceNotice: string | null;
 };
 
 function formatKrwChartValue(value: number) {
   return `${formatKrw(value)}원`;
 }
 
-function getAllocationSegments(allocation: PortfolioAllocationDto): DonutChartSegment[] {
+function getAllocationSegments(
+  allocation: PortfolioAllocationDto,
+): DonutChartSegment[] {
   return [
     { key: 'cash', label: '현금', value: allocation.cashKrwValue },
     {
@@ -110,32 +120,6 @@ function getEquityChartPoints(
     y: point.totalAssetKrw,
     label: point.time,
   }));
-}
-
-function getPortfolioNotice(
-  state: string,
-  summary: TradingAccountPortfolioSummaryDto | null,
-  message?: string,
-) {
-  if (state === 'not_joined') {
-    return {
-      title: '시즌 참가가 필요합니다.',
-      message: message ?? '시즌에 참가하면 포트폴리오 현황을 확인할 수 있습니다.',
-      cta: true,
-    };
-  }
-
-  if (state === 'unavailable' || !summary) {
-    return {
-      title: '포트폴리오 데이터를 준비 중입니다.',
-      message:
-        message ??
-        '시세 또는 평가 데이터가 충분히 준비되면 포트폴리오가 표시됩니다.',
-      cta: false,
-    };
-  }
-
-  return null;
 }
 
 export default function PortfolioScreen({ navigation }: Props) {
@@ -179,10 +163,9 @@ export default function PortfolioScreen({ navigation }: Props) {
         limit: POSITIONS_PAGE_SIZE,
         offset: pageParam,
       }),
-    getNextPageParam: (lastPage) =>
-      lastPage.pagination.nextOffset ?? undefined,
+    getNextPageParam: (lastPage) => lastPage.pagination.nextOffset ?? undefined,
     initialPageParam: 0,
-    enabled: hasAccount && isPortfolioAvailable,
+    enabled: hasAccount,
   });
 
   const equityQuery = useQuery({
@@ -209,14 +192,19 @@ export default function PortfolioScreen({ navigation }: Props) {
 
     positionsQuery.data?.pages.forEach((page) => {
       page.positions.forEach((item) => {
+        const display = getPositionDisplay(item);
         byAssetId.set(item.assetId, {
+          positionId: item.positionId,
           assetId: item.assetId,
-          symbol: item.symbol ?? item.asset?.symbol ?? item.assetId,
-          name: item.name ?? item.asset?.name ?? '-',
-          quantity: item.quantity,
-          marketValueKrw: item.marketValueKrw ?? '0',
-          unrealizedPnlKrw: item.unrealizedPnlKrw ?? '0',
-          returnRate: item.returnRate ?? '0',
+          symbol: item.symbol,
+          name: item.name,
+          quantity: display.quantity,
+          averageCost: display.averageCost,
+          currentPrice: display.currentPrice,
+          positionValueKrw: display.positionValueKrw,
+          unrealizedPnlKrw: display.unrealizedPnlKrw,
+          returnRate: display.returnRate,
+          priceNotice: display.priceNotice,
         });
       });
     });
@@ -233,11 +221,14 @@ export default function PortfolioScreen({ navigation }: Props) {
       return 'portfolio_error';
     }
 
-    if (isPortfolioAvailable && positionsQuery.isSuccess && !positions.length) {
+    if (positionsQuery.isSuccess && !positions.length) {
       return 'portfolio_no_positions';
     }
 
-    if (isPortfolioAvailable && (positionsQuery.isError || equityQuery.isError)) {
+    if (
+      positionsQuery.isError ||
+      (isPortfolioAvailable && equityQuery.isError)
+    ) {
       return 'portfolio_partial_unavailable';
     }
 
@@ -297,7 +288,10 @@ export default function PortfolioScreen({ navigation }: Props) {
 
   if (integrityFailure) {
     return (
-      <SafeAreaView style={styles.container} testID={TEST_IDS.tradingAccount.integrityError}>
+      <SafeAreaView
+        style={styles.container}
+        testID={TEST_IDS.tradingAccount.integrityError}
+      >
         <View style={styles.content}>
           <AccountSwitcher />
           <ErrorState
@@ -336,11 +330,7 @@ export default function PortfolioScreen({ navigation }: Props) {
     capabilities && !capabilities.canTrade && capabilities.tradeBlockReason
       ? CAPABILITY_BLOCK_MESSAGE[capabilities.tradeBlockReason]
       : null;
-  const portfolioNotice = getPortfolioNotice(
-    overview.state,
-    summary,
-    overview.message,
-  );
+  const portfolioNotice = getTradingAccountPortfolioNotice(overview);
   const equity = equityQuery.data?.points ?? [];
   const allocationSegments = getAllocationSegments(overview.allocation);
   const equityChartPoints = getEquityChartPoints(equity);
@@ -350,10 +340,13 @@ export default function PortfolioScreen({ navigation }: Props) {
       <FlatList
         testID={TEST_IDS.portfolio.screen}
         data={positions}
-        keyExtractor={(item) => item.assetId}
+        keyExtractor={(item) => item.positionId}
         contentContainerStyle={styles.content}
         onEndReached={() => {
-          if (positionsQuery.hasNextPage && !positionsQuery.isFetchingNextPage) {
+          if (
+            positionsQuery.hasNextPage &&
+            !positionsQuery.isFetchingNextPage
+          ) {
             void positionsQuery.fetchNextPage();
           }
         }}
@@ -375,14 +368,10 @@ export default function PortfolioScreen({ navigation }: Props) {
 
             {portfolioNotice ? (
               <View style={styles.inlineWarning}>
-                <Text style={styles.inlineWarningText}>{portfolioNotice.title}</Text>
+                <Text style={styles.inlineWarningText}>
+                  {portfolioNotice.title}
+                </Text>
                 <Text style={styles.helper}>{portfolioNotice.message}</Text>
-                {portfolioNotice.cta ? (
-                  <CTAButton
-                    label="시즌 참가하기"
-                    onPress={() => rootNavigation.navigate('SeasonJoin')}
-                  />
-                ) : null}
               </View>
             ) : null}
 
@@ -405,53 +394,56 @@ export default function PortfolioScreen({ navigation }: Props) {
 
             {isPortfolioAvailable ? (
               <View style={styles.card}>
-              <Text style={styles.label}>자산 추이</Text>
+                <Text style={styles.label}>자산 추이</Text>
 
-              <View style={styles.row}>
-                {RANGE_TABS.map((tab) => {
-                  const active = tab.key === range;
-                  return (
-                    <Pressable
-                      key={tab.key}
-                      testID={TEST_IDS.portfolio.equityRange(tab.key)}
-                      style={[styles.chip, active && styles.chipActive]}
-                      onPress={() => setRange(tab.key)}
-                    >
-                      <Text style={active ? styles.chipTextActive : styles.chipText}>
-                        {tab.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              {equityQuery.isLoading ? (
-                <SectionSkeleton lines={5} />
-              ) : equityQuery.isError ? (
-                <View style={styles.sectionFallback}>
-                  <InlineEmptyState
-                    title="자산 추이를 불러오지 못했습니다."
-                    message="잠시 후 다시 시도해주세요."
-                  />
-                  <CTAButton
-                    label="자산 추이 다시 불러오기"
-                    onPress={() => void equityQuery.refetch()}
-                  />
+                <View style={styles.row}>
+                  {RANGE_TABS.map((tab) => {
+                    const active = tab.key === range;
+                    return (
+                      <Pressable
+                        key={tab.key}
+                        testID={TEST_IDS.portfolio.equityRange(tab.key)}
+                        style={[styles.chip, active && styles.chipActive]}
+                        onPress={() => setRange(tab.key)}
+                      >
+                        <Text
+                          style={
+                            active ? styles.chipTextActive : styles.chipText
+                          }
+                        >
+                          {tab.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
-              ) : equity.length ? (
-                <LineChart
-                  points={equityChartPoints}
-                  valueFormatter={formatKrwChartValue}
-                  emptyMessage="자산 추이를 표시하려면 데이터가 더 필요합니다."
-                />
-              ) : (
-                <InlineEmptyState message="표시할 차트 데이터가 없습니다." />
-              )}
+
+                {equityQuery.isLoading ? (
+                  <SectionSkeleton lines={5} />
+                ) : equityQuery.isError ? (
+                  <View style={styles.sectionFallback}>
+                    <InlineEmptyState
+                      title="자산 추이를 불러오지 못했습니다."
+                      message="잠시 후 다시 시도해주세요."
+                    />
+                    <CTAButton
+                      label="자산 추이 다시 불러오기"
+                      onPress={() => void equityQuery.refetch()}
+                    />
+                  </View>
+                ) : equity.length ? (
+                  <LineChart
+                    points={equityChartPoints}
+                    valueFormatter={formatKrwChartValue}
+                    emptyMessage="자산 추이를 표시하려면 데이터가 더 필요합니다."
+                  />
+                ) : (
+                  <InlineEmptyState message="표시할 차트 데이터가 없습니다." />
+                )}
               </View>
             ) : null}
 
-            {isPortfolioAvailable ? (
-              <View style={styles.card}>
+            <View style={styles.card}>
               <Text style={styles.label}>보유 포지션</Text>
 
               <View style={styles.row}>
@@ -464,15 +456,16 @@ export default function PortfolioScreen({ navigation }: Props) {
                       style={[styles.chip, active && styles.chipActive]}
                       onPress={() => setAssetType(tab.key)}
                     >
-                      <Text style={active ? styles.chipTextActive : styles.chipText}>
+                      <Text
+                        style={active ? styles.chipTextActive : styles.chipText}
+                      >
                         {tab.label}
                       </Text>
                     </Pressable>
                   );
                 })}
               </View>
-              </View>
-            ) : null}
+            </View>
           </>
         }
         ListEmptyComponent={
@@ -499,31 +492,46 @@ export default function PortfolioScreen({ navigation }: Props) {
         renderItem={({ item }) => {
           const nameDisplay = getAssetNameDisplay(item);
           return (
-          <Pressable
-            testID={TEST_IDS.portfolio.positionItem(item.assetId)}
-            style={styles.positionRow}
-            onPress={() =>
-              rootNavigation.navigate('MainTabs', {
-                screen: 'MarketTab',
-                params: {
-                  screen: 'AssetDetail',
-                  params: { assetId: item.assetId },
-                },
-              })
-            }
-          >
-            <View>
-              <Text style={styles.itemTitle}>{nameDisplay.primary}</Text>
-              <Text style={styles.helper}>{nameDisplay.secondary ?? item.symbol}</Text>
-              <Text style={styles.helper}>수량 {item.quantity}</Text>
-            </View>
+            <Pressable
+              testID={TEST_IDS.portfolio.positionItem(item.assetId)}
+              style={styles.positionRow}
+              onPress={() =>
+                rootNavigation.navigate('MainTabs', {
+                  screen: 'MarketTab',
+                  params: {
+                    screen: 'AssetDetail',
+                    params: { assetId: item.assetId },
+                  },
+                })
+              }
+            >
+              <View>
+                <Text style={styles.itemTitle}>{nameDisplay.primary}</Text>
+                <Text style={styles.helper}>
+                  {nameDisplay.secondary ?? item.symbol}
+                </Text>
+                <Text style={styles.helper}>수량 {item.quantity}</Text>
+                <Text style={styles.helper}>
+                  평균 매입가 {item.averageCost}
+                </Text>
+              </View>
 
-            <View style={styles.alignEnd}>
-              <Text style={styles.itemTitle}>{formatKrw(item.marketValueKrw)}</Text>
-              <Text style={styles.helper}>{formatPercent(item.returnRate)}%</Text>
-              <Text style={styles.helper}>{formatKrw(item.unrealizedPnlKrw)}</Text>
-            </View>
-          </Pressable>
+              <View style={styles.alignEnd}>
+                <Text style={styles.itemTitle}>{item.positionValueKrw}</Text>
+                <Text style={styles.helper}>
+                  현재가 {item.currentPrice ?? '시세 조회 불가'}
+                </Text>
+                <Text style={styles.helper}>수익률 {item.returnRate}</Text>
+                <Text style={styles.helper}>
+                  평가손익 {item.unrealizedPnlKrw}
+                </Text>
+                {item.priceNotice ? (
+                  <Text style={styles.inlineWarningText}>
+                    {item.priceNotice}
+                  </Text>
+                ) : null}
+              </View>
+            </Pressable>
           );
         }}
         ListFooterComponent={
@@ -542,10 +550,7 @@ export default function PortfolioScreen({ navigation }: Props) {
                 })
               }
             />
-            <CTAButton
-              label="뒤로가기"
-              onPress={() => navigation.goBack()}
-            />
+            <CTAButton label="뒤로가기" onPress={() => navigation.goBack()} />
           </View>
         }
       />
@@ -630,9 +635,15 @@ function AccountSummaryCard({
       <Text style={styles.helper}>
         USD 환산 KRW {formatKrw(summary.usdCashKrw)}
       </Text>
-      <Text style={styles.helper}>자산 평가 {formatKrw(summary.assetValueKrw)}</Text>
-      <Text style={styles.helper}>실현손익 {formatKrw(summary.realizedPnlKrw)}</Text>
-      <Text style={styles.helper}>평가손익 {formatKrw(summary.unrealizedPnlKrw)}</Text>
+      <Text style={styles.helper}>
+        자산 평가 {formatKrw(summary.assetValueKrw)}
+      </Text>
+      <Text style={styles.helper}>
+        실현손익 {formatKrw(summary.realizedPnlKrw)}
+      </Text>
+      <Text style={styles.helper}>
+        평가손익 {formatKrw(summary.unrealizedPnlKrw)}
+      </Text>
     </View>
   );
 }

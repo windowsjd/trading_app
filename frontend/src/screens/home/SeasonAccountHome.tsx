@@ -23,8 +23,14 @@ import {
 import { CAPABILITY_BLOCK_MESSAGE } from '../../features/tradingAccount/capabilities';
 import type { TradingAccountCapabilities } from '../../features/tradingAccount/capabilities';
 import { getRankings, getRankingTier } from '../../features/ranking/api';
-import { getWalletBalanceAmount } from '../../features/wallet/mapper';
-import { formatKrw, formatPercent, getAssetNameDisplay } from '../../utils/format';
+import { getPositionDisplay } from '../../features/position/display';
+import { getPortfolioNotice } from '../../features/tradingAccount/portfolioMessage';
+import { getKnownWalletBalanceAmount } from '../../features/wallet/mapper';
+import {
+  formatKrw,
+  formatPercent,
+  getAssetNameDisplay,
+} from '../../utils/format';
 
 import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
@@ -117,12 +123,11 @@ export default function SeasonAccountHome({
     queryFn: () => getTradingAccountPortfolio(accountId),
   });
 
-  const available = portfolioQuery.data?.state === 'available';
+  const portfolioAvailable = portfolioQuery.data?.state === 'available';
 
   const walletsQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.wallets(accountId),
     queryFn: () => getTradingAccountWallets(accountId),
-    enabled: available,
   });
 
   const positionsQuery = useQuery({
@@ -134,13 +139,15 @@ export default function SeasonAccountHome({
         limit: POSITIONS_PREVIEW_LIMIT,
         offset: 0,
       }),
-    enabled: available,
   });
 
   const equityQuery = useQuery({
-    queryKey: QUERY_KEYS.tradingAccount.portfolioEquity(accountId, EQUITY_RANGE),
+    queryKey: QUERY_KEYS.tradingAccount.portfolioEquity(
+      accountId,
+      EQUITY_RANGE,
+    ),
     queryFn: () => getTradingAccountEquity(accountId, EQUITY_RANGE),
-    enabled: available,
+    enabled: portfolioAvailable,
   });
 
   /**
@@ -238,7 +245,10 @@ export default function SeasonAccountHome({
 
   const portfolio = portfolioQuery.data;
   const summary = portfolio.summary;
-  const positions = positionsQuery.data?.positions ?? [];
+  const portfolioNotice = getPortfolioNotice(portfolio);
+  const positions = positionsQuery.data?.positions;
+  const krwBalance = getKnownWalletBalanceAmount(walletsQuery.data, 'KRW');
+  const usdBalance = getKnownWalletBalanceAmount(walletsQuery.data, 'USD');
   const myRanking = rankingQuery.data?.myRanking ?? null;
   const rank =
     myRanking?.rank === undefined || myRanking?.rank === null
@@ -273,13 +283,10 @@ export default function SeasonAccountHome({
         <Text style={styles.helper}>계정 상태 {display.statusLabel}</Text>
       </View>
 
-      {portfolio.sectionErrors.length > 0 ? (
+      {portfolioNotice ? (
         <View style={styles.warningBox}>
-          <Text style={styles.warningTitle}>일부 정보 지연</Text>
-          <Text style={styles.warningText}>
-            {portfolio.sectionErrors[0]?.message ??
-              '일부 계정 정보를 불러오지 못했습니다.'}
-          </Text>
+          <Text style={styles.warningTitle}>{portfolioNotice.title}</Text>
+          <Text style={styles.warningText}>{portfolioNotice.message}</Text>
         </View>
       ) : null}
 
@@ -315,8 +322,8 @@ export default function SeasonAccountHome({
           <InlineEmptyState
             title="수익률을 계산할 수 없습니다."
             message={
-              portfolio.message ??
-              '계정 성과 데이터가 아직 준비되지 않았습니다. 0%가 아니라 알 수 없는 상태입니다.'
+              portfolioNotice?.message ??
+              '계정 성과 데이터가 아직 준비되지 않았습니다.'
             }
           />
         )}
@@ -324,7 +331,9 @@ export default function SeasonAccountHome({
 
       <View style={styles.row}>
         <View style={[styles.card, styles.flex]}>
-          <Text style={styles.label}>{isSettled ? '최종 순위' : '현재 순위'}</Text>
+          <Text style={styles.label}>
+            {isSettled ? '최종 순위' : '현재 순위'}
+          </Text>
           {rankingQuery.isLoading ? (
             <SectionSkeleton lines={1} />
           ) : (
@@ -332,7 +341,9 @@ export default function SeasonAccountHome({
           )}
         </View>
         <View style={[styles.card, styles.flex]}>
-          <Text style={styles.label}>{isSettled ? '최종 등급' : '현재 등급'}</Text>
+          <Text style={styles.label}>
+            {isSettled ? '최종 등급' : '현재 등급'}
+          </Text>
           {rankingQuery.isLoading ? (
             <SectionSkeleton lines={1} />
           ) : (
@@ -354,11 +365,9 @@ export default function SeasonAccountHome({
         ) : (
           <>
             <Text style={styles.helper}>
-              KRW {formatKrw(getWalletBalanceAmount(walletsQuery.data, 'KRW'))}
+              KRW {krwBalance === null ? '-' : formatKrw(krwBalance)}
             </Text>
-            <Text style={styles.helper}>
-              USD {getWalletBalanceAmount(walletsQuery.data, 'USD')}
-            </Text>
+            <Text style={styles.helper}>USD {usdBalance ?? '-'}</Text>
             <Pressable style={styles.secondaryButton} onPress={onOpenLedger}>
               <Text style={styles.secondaryText}>원장 보기</Text>
             </Pressable>
@@ -407,6 +416,8 @@ export default function SeasonAccountHome({
           <SectionSkeleton lines={3} />
         ) : positionsQuery.isError ? (
           <InlineEmptyState message="보유 종목을 불러오지 못했습니다." />
+        ) : !positions ? (
+          <InlineEmptyState message="보유 종목을 확인할 수 없습니다." />
         ) : positions.length === 0 ? (
           <InlineEmptyState
             title="보유 종목이 없습니다."
@@ -415,20 +426,35 @@ export default function SeasonAccountHome({
         ) : (
           positions.map((position) => {
             const nameDisplay = getAssetNameDisplay({
-              name: position.name ?? position.asset?.name,
-              symbol: position.symbol ?? position.asset?.symbol,
+              name: position.name,
+              symbol: position.symbol,
             });
+            const positionDisplay = getPositionDisplay(position);
             return (
               <Pressable
-                key={position.assetId}
+                key={position.positionId}
                 testID={TEST_IDS.home.positionItem(position.assetId)}
-                style={styles.positionRow}
+                style={styles.positionCard}
                 onPress={() => onOpenAsset(position.assetId)}
               >
-                <Text style={styles.positionName}>{nameDisplay.primary}</Text>
-                <Text style={styles.positionValue}>
-                  {formatKrw(position.marketValueKrw)}
+                <View style={styles.positionRow}>
+                  <Text style={styles.positionName}>{nameDisplay.primary}</Text>
+                  <Text style={styles.positionValue}>
+                    {positionDisplay.positionValueKrw}
+                  </Text>
+                </View>
+                <Text style={styles.positionMeta}>
+                  보유 수량 {positionDisplay.quantity}주 · 평균 매입가{' '}
+                  {positionDisplay.averageCost}
                 </Text>
+                <Text style={styles.positionMeta}>
+                  현재가 {positionDisplay.currentPrice ?? '시세 조회 불가'}
+                </Text>
+                {positionDisplay.priceNotice ? (
+                  <Text style={styles.priceNotice}>
+                    {positionDisplay.priceNotice}
+                  </Text>
+                ) : null}
               </Pressable>
             );
           })
@@ -460,7 +486,11 @@ export default function SeasonAccountHome({
             style={styles.flex}
           />
         ) : null}
-        <CTAButton label="랭킹 보기" onPress={onOpenRanking} style={styles.flex} />
+        <CTAButton
+          label="랭킹 보기"
+          onPress={onOpenRanking}
+          style={styles.flex}
+        />
       </View>
 
       {isSettled ? (
@@ -519,8 +549,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
+  positionCard: { gap: 4, paddingVertical: 4 },
   positionName: { flex: 1, minWidth: 0, fontSize: 14, lineHeight: 20 },
   positionValue: { flexShrink: 0, fontSize: 14, fontWeight: '600' },
+  positionMeta: { fontSize: 13, color: '#555', lineHeight: 19 },
+  priceNotice: { fontSize: 13, color: '#9A6700', lineHeight: 19 },
   secondaryButton: {
     alignSelf: 'flex-start',
     borderWidth: 1,

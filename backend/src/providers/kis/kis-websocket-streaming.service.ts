@@ -3,6 +3,7 @@ import {
   Logger,
   OnModuleDestroy,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { readLiveCandleConfig } from '../../assets/live-candle.config';
 import {
@@ -11,6 +12,7 @@ import {
 } from '../provider-config.service';
 import { ProviderConfigError, ProviderHttpError } from '../provider.types';
 import { KisAuthClient } from './kis-auth.client';
+import { KisKrxStartupCatchUpService } from './kis-krx-startup-catch-up.service';
 import {
   KisRealtimePriceCacheService,
   type KisRealtimePriceCacheEntry,
@@ -134,6 +136,8 @@ export class KisWebSocketStreamingService
     private readonly ingestionService: KisWebSocketIngestionService,
     private readonly latestPriceCache: KisRealtimePriceCacheService,
     private readonly realtimePriceEventBus: KisRealtimePriceEventBus,
+    @Optional()
+    private readonly startupCatchUpService?: KisKrxStartupCatchUpService,
   ) {}
 
   onModuleInit(): void {
@@ -255,6 +259,11 @@ export class KisWebSocketStreamingService
         this.scheduleReconnect(config);
         return;
       }
+
+      // One best-effort REST gap fill may precede the persistent socket. The
+      // shared promise means reconnects never turn this into REST polling.
+      await this.startupCatchUpService?.startOnce();
+      if (!this.status.running || this.stopping) return;
 
       const approval =
         await this.authClient.requestConfiguredWebSocketApprovalKey();

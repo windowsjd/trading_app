@@ -1,9 +1,20 @@
 jest.mock('./generated/prisma/client', () => ({
   PrismaClient: class PrismaClient {},
+  AssetPriceSourceType: {
+    admin_manual: 'admin_manual',
+    official_batch: 'official_batch',
+    provider_api: 'provider_api',
+  },
   AssetType: {
     domestic_stock: 'domestic_stock',
     us_stock: 'us_stock',
     crypto: 'crypto',
+  },
+  CurrencyCode: { KRW: 'KRW', USD: 'USD' },
+  FxRateSourceType: {
+    admin_manual: 'admin_manual',
+    official_batch: 'official_batch',
+    provider_api: 'provider_api',
   },
   OpsJobName: {
     provider_fx_ingest: 'provider_fx_ingest',

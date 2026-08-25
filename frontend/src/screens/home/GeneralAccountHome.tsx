@@ -17,8 +17,14 @@ import {
 } from '../../features/tradingAccount/accountIntegrityGate';
 import { CAPABILITY_BLOCK_MESSAGE } from '../../features/tradingAccount/capabilities';
 import type { TradingAccountCapabilities } from '../../features/tradingAccount/capabilities';
-import { getWalletBalanceAmount } from '../../features/wallet/mapper';
-import { formatKrw, formatPercent, getAssetNameDisplay } from '../../utils/format';
+import { getPositionDisplay } from '../../features/position/display';
+import { getPortfolioNotice } from '../../features/tradingAccount/portfolioMessage';
+import { getKnownWalletBalanceAmount } from '../../features/wallet/mapper';
+import {
+  formatKrw,
+  formatPercent,
+  getAssetNameDisplay,
+} from '../../utils/format';
 
 import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
@@ -54,7 +60,8 @@ const POSITIONS_PREVIEW_LIMIT = 5;
 
 /** Unknown is rendered as unknown. `0%` is a claim, and often a false one. */
 function formatUnknownable(value: string | null | undefined, suffix = '') {
-  if (value === null || value === undefined || value === '') return '알 수 없음';
+  if (value === null || value === undefined || value === '')
+    return '알 수 없음';
   return `${value}${suffix}`;
 }
 
@@ -71,12 +78,9 @@ export default function GeneralAccountHome({
     queryFn: () => getTradingAccountPortfolio(accountId),
   });
 
-  const available = portfolioQuery.data?.state === 'available';
-
   const walletsQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.wallets(accountId),
     queryFn: () => getTradingAccountWallets(accountId),
-    enabled: available,
   });
 
   const positionsQuery = useQuery({
@@ -88,7 +92,6 @@ export default function GeneralAccountHome({
         limit: POSITIONS_PREVIEW_LIMIT,
         offset: 0,
       }),
-    enabled: available,
   });
 
   /**
@@ -150,7 +153,10 @@ export default function GeneralAccountHome({
 
   const portfolio = portfolioQuery.data;
   const summary = portfolio.summary;
-  const positions = positionsQuery.data?.positions ?? [];
+  const portfolioNotice = getPortfolioNotice(portfolio);
+  const positions = positionsQuery.data?.positions;
+  const krwBalance = getKnownWalletBalanceAmount(walletsQuery.data, 'KRW');
+  const usdBalance = getKnownWalletBalanceAmount(walletsQuery.data, 'USD');
   const capabilityNotice =
     capabilities &&
     !capabilities.canExchange &&
@@ -165,13 +171,10 @@ export default function GeneralAccountHome({
     >
       {/* Section-level gaps arrive INSIDE a success envelope and stay
           section-level notices — they are not the same thing as damage. */}
-      {portfolio.sectionErrors.length > 0 ? (
+      {portfolioNotice ? (
         <View style={styles.warningBox}>
-          <Text style={styles.warningTitle}>일부 정보 지연</Text>
-          <Text style={styles.warningText}>
-            {portfolio.sectionErrors[0]?.message ??
-              '일부 계정 정보를 불러오지 못했습니다.'}
-          </Text>
+          <Text style={styles.warningTitle}>{portfolioNotice.title}</Text>
+          <Text style={styles.warningText}>{portfolioNotice.message}</Text>
         </View>
       ) : null}
 
@@ -200,8 +203,8 @@ export default function GeneralAccountHome({
           <InlineEmptyState
             title="수익률을 계산할 수 없습니다."
             message={
-              portfolio.message ??
-              '계정 성과 데이터가 아직 준비되지 않았습니다. 0%가 아니라 알 수 없는 상태입니다.'
+              portfolioNotice?.message ??
+              '계정 성과 데이터가 아직 준비되지 않았습니다.'
             }
           />
         )}
@@ -240,11 +243,9 @@ export default function GeneralAccountHome({
         ) : (
           <>
             <Text style={styles.helper}>
-              KRW {formatKrw(getWalletBalanceAmount(walletsQuery.data, 'KRW'))}
+              KRW {krwBalance === null ? '-' : formatKrw(krwBalance)}
             </Text>
-            <Text style={styles.helper}>
-              USD {getWalletBalanceAmount(walletsQuery.data, 'USD')}
-            </Text>
+            <Text style={styles.helper}>USD {usdBalance ?? '-'}</Text>
             <Pressable style={styles.retryButton} onPress={onOpenLedger}>
               <Text style={styles.retryText}>원장 보기</Text>
             </Pressable>
@@ -261,6 +262,8 @@ export default function GeneralAccountHome({
           <SectionSkeleton lines={3} />
         ) : positionsQuery.isError ? (
           <InlineEmptyState message="보유 종목을 불러오지 못했습니다." />
+        ) : !positions ? (
+          <InlineEmptyState message="보유 종목을 확인할 수 없습니다." />
         ) : positions.length === 0 ? (
           <InlineEmptyState
             title="보유 종목이 없습니다."
@@ -269,15 +272,39 @@ export default function GeneralAccountHome({
         ) : (
           positions.map((position) => {
             const nameDisplay = getAssetNameDisplay({
-              name: position.name ?? position.asset?.name,
-              symbol: position.symbol ?? position.asset?.symbol,
+              name: position.name,
+              symbol: position.symbol,
             });
+            const display = getPositionDisplay(position);
             return (
-              <View key={position.assetId} style={styles.positionRow}>
-                <Text style={styles.positionName}>{nameDisplay.primary}</Text>
-                <Text style={styles.positionValue}>
-                  {formatKrw(position.marketValueKrw)}
+              <View key={position.positionId} style={styles.positionCard}>
+                <View style={styles.positionRow}>
+                  <Text style={styles.positionName}>{nameDisplay.primary}</Text>
+                  <Text style={styles.positionValue}>
+                    {display.positionValueKrw}
+                  </Text>
+                </View>
+                {nameDisplay.secondary ? (
+                  <Text style={styles.positionMeta}>
+                    {nameDisplay.secondary}
+                  </Text>
+                ) : null}
+                <Text style={styles.positionMeta}>
+                  보유 수량 {display.quantity}주
                 </Text>
+                <Text style={styles.positionMeta}>
+                  평균 매입가 {display.averageCost}
+                </Text>
+                <Text style={styles.positionMeta}>
+                  현재가 {display.currentPrice ?? '시세 조회 불가'}
+                </Text>
+                <Text style={styles.positionMeta}>
+                  평가손익 {display.unrealizedPnlKrw} · 수익률{' '}
+                  {display.returnRate}
+                </Text>
+                {display.priceNotice ? (
+                  <Text style={styles.priceNotice}>{display.priceNotice}</Text>
+                ) : null}
               </View>
             );
           })
@@ -332,10 +359,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
+  positionCard: { gap: 4, paddingVertical: 4 },
   // A long Korean asset name wraps; the amount keeps its own track and is
   // never pushed off the row.
   positionName: { flex: 1, minWidth: 0, fontSize: 14, lineHeight: 20 },
   positionValue: { flexShrink: 0, fontSize: 14, fontWeight: '600' },
+  positionMeta: { fontSize: 13, color: '#555', lineHeight: 19 },
+  priceNotice: { fontSize: 13, color: '#9A6700', lineHeight: 19 },
   retryButton: {
     marginTop: 8,
     alignSelf: 'flex-start',
