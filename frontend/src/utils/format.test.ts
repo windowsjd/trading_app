@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import {
   formatCurrency,
+  formatDisplayDecimal,
   formatKrw,
   formatMoney,
   formatPercent,
@@ -10,6 +11,48 @@ import {
   getAssetNameDisplay,
   normalizeCurrencyCode,
 } from './format.ts';
+
+test('formatDisplayDecimal trims fractional padding without parsing identifiers', async (t) => {
+  await t.test('removes only trailing fractional zeros', () => {
+    assert.equal(formatDisplayDecimal('1.000000'), '1');
+    assert.equal(formatDisplayDecimal('1.230000'), '1.23');
+    assert.equal(formatDisplayDecimal('18.97345900'), '18.973459');
+    assert.equal(formatDisplayDecimal('0.001000'), '0.001');
+    assert.equal(formatDisplayDecimal('1.0200'), '1.02');
+    assert.equal(formatDisplayDecimal('1.0020'), '1.002');
+    assert.equal(formatDisplayDecimal('0.000100'), '0.0001');
+    assert.equal(formatDisplayDecimal('10.0100'), '10.01');
+    assert.equal(formatDisplayDecimal('100.0010'), '100.001');
+    assert.equal(formatDisplayDecimal('30.0000'), '30');
+    assert.equal(formatDisplayDecimal('30.5000'), '30.5');
+  });
+
+  await t.test('preserves integer zeros, separators and meaningful signs', () => {
+    assert.equal(formatDisplayDecimal('1000'), '1000');
+    assert.equal(formatDisplayDecimal('1200'), '1200');
+    assert.equal(formatDisplayDecimal('1,234.00'), '1,234');
+    assert.equal(formatDisplayDecimal('1,234.50'), '1,234.5');
+    assert.equal(formatDisplayDecimal('1,234.56'), '1,234.56');
+    assert.equal(formatDisplayDecimal('-1.2300'), '-1.23');
+    assert.equal(formatDisplayDecimal('-0.0100'), '-0.01');
+    assert.equal(formatDisplayDecimal('-0.00'), '0');
+  });
+
+  await t.test('does not reinterpret symbols, timestamps, UUIDs or IDs', () => {
+    assert.equal(formatDisplayDecimal('000270'), '000270');
+    assert.equal(formatDisplayDecimal('2026-08-25'), '2026-08-25');
+    assert.equal(formatDisplayDecimal('15:30:00'), '15:30:00');
+    assert.equal(
+      formatDisplayDecimal('2026-08-25T03:44:48.000Z'),
+      '2026-08-25T03:44:48.000Z',
+    );
+    assert.equal(
+      formatDisplayDecimal('f1bda54a-5762-4d16-a5b0-76f56327356c'),
+      'f1bda54a-5762-4d16-a5b0-76f56327356c',
+    );
+    assert.equal(formatDisplayDecimal('order-1000'), 'order-1000');
+  });
+});
 
 test('formatKrw', async (t) => {
   await t.test('null / undefined / "" render as "-"', () => {
@@ -38,14 +81,21 @@ test('formatUsd', async (t) => {
     assert.equal(formatUsd(''), '-');
   });
 
-  await t.test('fixes to 2 decimals with thousands separators', () => {
+  await t.test('rounds to 2 decimals, trims padding and adds separators', () => {
     assert.equal(formatUsd(1234.5678), '1,234.57');
-    assert.equal(formatUsd(1000000), '1,000,000.00');
-    assert.equal(formatUsd('0.1'), '0.10');
+    assert.equal(formatUsd(1000000), '1,000,000');
+    assert.equal(formatUsd('0.1'), '0.1');
+    assert.equal(formatUsd(10), '10');
+    assert.equal(formatUsd(10.5), '10.5');
+    assert.equal(formatUsd(10.55), '10.55');
+    assert.equal(formatUsd(10.556), '10.56');
+    assert.equal(formatUsd('1234.00'), '1,234');
+    assert.equal(formatUsd('1234.50'), '1,234.5');
   });
 
   await t.test('handles negative amounts', () => {
     assert.equal(formatUsd(-1234.5678), '-1,234.57');
+    assert.equal(formatUsd(-0.001), '0');
   });
 });
 
@@ -73,9 +123,10 @@ test('formatCurrency (bare magnitude, currency shown separately)', async (t) => 
     assert.equal(formatCurrency(1000000, 'KRW'), '1,000,000');
   });
 
-  await t.test('USD renders as a bare 2-decimal number', () => {
+  await t.test('USD rounds to 2 places and removes padding', () => {
     assert.equal(formatCurrency(1234.5678, 'USD'), '1,234.57');
-    assert.equal(formatCurrency(1000000, 'USD'), '1,000,000.00');
+    assert.equal(formatCurrency(1000000, 'USD'), '1,000,000');
+    assert.equal(formatCurrency(1234.5, 'USD'), '1,234.5');
   });
 
   await t.test('negative amounts keep their sign', () => {
@@ -110,9 +161,11 @@ test('formatMoney (unit-carrying display)', async (t) => {
     assert.equal(formatMoney(1000000, 'KRW'), '1,000,000원');
   });
 
-  await t.test('USD renders with a $ prefix and 2 decimals', () => {
+  await t.test('USD renders with a $ prefix and trimmed 2-place rounding', () => {
     assert.equal(formatMoney(1234.5678, 'USD'), '$1,234.57');
-    assert.equal(formatMoney(1000000, 'USD'), '$1,000,000.00');
+    assert.equal(formatMoney(1000000, 'USD'), '$1,000,000');
+    assert.equal(formatMoney(10, 'USD'), '$10');
+    assert.equal(formatMoney(10.5, 'USD'), '$10.5');
   });
 
   await t.test('negative amounts keep their sign', () => {
@@ -141,10 +194,15 @@ test('formatPercent', async (t) => {
     assert.equal(formatPercent(''), '-');
   });
 
-  await t.test('fixes to the requested number of decimals', () => {
+  await t.test('rounds to the requested precision and trims padding', () => {
     assert.equal(formatPercent(12.3456), '12.35');
-    assert.equal(formatPercent(-1.5), '-1.50');
+    assert.equal(formatPercent(-1.5), '-1.5');
     assert.equal(formatPercent(12.3456, 1), '12.3');
+    assert.equal(formatPercent(5), '5');
+    assert.equal(formatPercent(5.2), '5.2');
+    assert.equal(formatPercent(5.25), '5.25');
+    assert.equal(formatPercent(5.256), '5.26');
+    assert.equal(formatPercent(-0.001), '0');
   });
 });
 

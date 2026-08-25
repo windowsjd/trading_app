@@ -17,6 +17,29 @@ function withThousandsSeparator(digits: string): string {
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
+/**
+ * Final display cleanup for a known decimal value. It never parses through a
+ * float, so long decimal strings keep every meaningful digit. Integer digits,
+ * leading zeros and separators are preserved; only fractional padding is
+ * removed. Non-decimal strings are returned unchanged.
+ */
+export function formatDisplayDecimal(
+  value: string | number | null | undefined,
+): string {
+  if (value === null || value === undefined || value === '') return '-';
+  if (typeof value === 'number' && !Number.isFinite(value)) return '-';
+
+  const text = String(value).trim();
+  const match = /^([+-]?)(\d[\d,]*)(?:\.(\d*))?$/u.exec(text);
+  if (!match) return text;
+
+  const [, rawSign, integerPart, rawFraction = ''] = match;
+  const fraction = rawFraction.replace(/0+$/u, '');
+  const isZero = !/[1-9]/u.test(`${integerPart}${fraction}`);
+  const sign = isZero ? '' : rawSign;
+  return `${sign}${integerPart}${fraction ? `.${fraction}` : ''}`;
+}
+
 /** KRW/원 magnitude: rounded to an integer, thousands-separated. No unit. */
 export function formatKrw(value: string | number | null | undefined): string {
   const parsed = toFiniteNumber(value);
@@ -27,14 +50,16 @@ export function formatKrw(value: string | number | null | undefined): string {
   return `${sign}${withThousandsSeparator(String(Math.abs(rounded)))}`;
 }
 
-/** USD magnitude: fixed to 2 decimal places, thousands-separated. No symbol. */
+/** USD magnitude: rounded to 2 places, trimmed, thousands-separated. No symbol. */
 export function formatUsd(value: string | number | null | undefined): string {
   const parsed = toFiniteNumber(value);
   if (parsed === null) return '-';
 
   const sign = parsed < 0 ? '-' : '';
   const [integerPart, decimalPart] = Math.abs(parsed).toFixed(2).split('.');
-  return `${sign}${withThousandsSeparator(integerPart)}.${decimalPart}`;
+  return formatDisplayDecimal(
+    `${sign}${withThousandsSeparator(integerPart)}.${decimalPart}`,
+  );
 }
 
 const MAX_DISPLAY_PRICE_DECIMALS = 8;
@@ -85,9 +110,11 @@ function toFixedDecimalString(value: string, decimals: number): string | null {
   const isZero = !/[1-9]/u.test(kept);
   const sign = rawSign === '-' && !isZero ? '-' : '';
 
-  return `${sign}${withThousandsSeparator(integerPart)}${
-    decimals > 0 ? `.${fractionPart}` : ''
-  }`;
+  return formatDisplayDecimal(
+    `${sign}${withThousandsSeparator(integerPart)}${
+      decimals > 0 ? `.${fractionPart}` : ''
+    }`,
+  );
 }
 
 function normalizeDisplayPriceDecimals(
@@ -106,8 +133,8 @@ function normalizeDisplayPriceDecimals(
  * declared precision so a 0.24560 coin is not rendered as $0.25.
  *
  *   - KRW assets  → 원 units, unchanged.
- *   - USD assets with `displayPriceDecimals` (Binance tickSize) → that many
- *     decimals, trailing zeros kept to match the exchange's own display.
+ *   - USD assets with `displayPriceDecimals` (Binance tickSize) → round to that
+ *     precision, then remove fractional zero padding.
  *   - USD assets without it → the existing 2-decimal policy.
  *
  * Missing/invalid values render as '-'; callers use the '시세 준비 중'
@@ -157,27 +184,26 @@ const warnedUnknownCurrencies = new Set<string>();
 
 function warnUnknownCurrency(currencyCode?: FormatCurrencyCode | null): void {
   // Only KRW/USD are officially supported. Rather than silently rendering an
-  // unknown currency as KRW (which hides bugs), we fall back to a plain
-  // 2-decimal number and surface the cause to developers in dev builds.
+  // unknown currency as KRW (which hides bugs), we fall back to a plain number
+  // rounded to 2 decimals and surface the cause to developers in dev builds.
   const isDev = (globalThis as { __DEV__?: boolean }).__DEV__ === true;
   if (!isDev) return;
 
   const key = String(currencyCode ?? '');
   if (warnedUnknownCurrencies.has(key)) return;
   warnedUnknownCurrencies.add(key);
-  // eslint-disable-next-line no-console
   console.warn(
-    `[format] Unsupported currencyCode "${key}"; falling back to plain 2-decimal formatting. Only KRW/USD are supported.`,
+    `[format] Unsupported currencyCode "${key}"; falling back to plain 2-decimal rounding. Only KRW/USD are supported.`,
   );
 }
 
 /**
  * Currency-aware magnitude (no unit/symbol), chosen by currency code:
  *   - KRW → "1,235"    (integer)
- *   - USD → "1,234.57" (2 decimals)
- *   - unknown/unsupported → "1,234.57" (plain 2-decimal fallback)
+ *   - USD → "1,234.57" (rounded to 2 decimals, then trimmed)
+ *   - unknown/unsupported → "1,234.57" (plain 2-decimal rounding fallback)
  * Never silently treats an unknown currency as KRW. Use this when the currency
- * is shown separately (e.g. a "USD 1,234.57" row); use `formatMoney` when the
+ * is shown separately (e.g. a "USD 1,234.5" row); use `formatMoney` when the
  * amount should carry its own unit.
  */
 export function formatCurrency(
@@ -196,8 +222,8 @@ export function formatCurrency(
 /**
  * Currency-aware money display that carries its own unit:
  *   - KRW → "1,235원"   (integer, 원 suffix)
- *   - USD → "$1,234.57" ($ prefix, 2 decimals)
- *   - unknown/unsupported → "1,234.57" (plain 2-decimal fallback, no symbol)
+ *   - USD → "$1,234.57" ($ prefix, rounded to 2 decimals then trimmed)
+ *   - unknown/unsupported → "1,234.57" (2-decimal rounding, no symbol)
  * Missing/invalid values render as "-". Never mixes "$" and "USD" for one amount.
  * Prefer this over appending a raw code (" USD"/" KRW") next to a bare number.
  */
@@ -266,14 +292,14 @@ export function getAssetPriceText(item: AssetPriceTextInput): string {
   );
 }
 
-/** Percent/return-rate display: fixed decimal places (default 2), no '%'. */
+/** Percent/return-rate display: rounded then trimmed (default 2), no '%'. */
 export function formatPercent(
   value: string | number | null | undefined,
   digits = 2,
 ): string {
   const parsed = toFiniteNumber(value);
   if (parsed === null) return '-';
-  return parsed.toFixed(digits);
+  return formatDisplayDecimal(parsed.toFixed(digits));
 }
 
 export type AssetNameDisplay = {

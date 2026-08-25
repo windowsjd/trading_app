@@ -23,6 +23,7 @@ import { getKnownWalletBalanceAmount } from '../../features/wallet/mapper';
 import {
   formatKrw,
   formatPercent,
+  formatUsd,
   getAssetNameDisplay,
 } from '../../utils/format';
 
@@ -59,10 +60,10 @@ type Props = {
 const POSITIONS_PREVIEW_LIMIT = 5;
 
 /** Unknown is rendered as unknown. `0%` is a claim, and often a false one. */
-function formatUnknownable(value: string | null | undefined, suffix = '') {
+function formatUnknownKrw(value: string | null | undefined) {
   if (value === null || value === undefined || value === '')
     return '알 수 없음';
-  return `${value}${suffix}`;
+  return formatKrw(value);
 }
 
 export default function GeneralAccountHome({
@@ -214,17 +215,17 @@ export default function GeneralAccountHome({
         <View style={styles.card}>
           <Text style={styles.label}>자금 구성</Text>
           <Text style={styles.helper}>
-            최초 지급 자본 {formatUnknownable(summary.initialFundingKrw)}
+            최초 지급 자본 {formatUnknownKrw(summary.initialFundingKrw)}
           </Text>
           <Text style={styles.helper}>
             누적 외부 자금 유입{' '}
-            {formatUnknownable(summary.cumulativeExternalFundingKrw)}
+            {formatUnknownKrw(summary.cumulativeExternalFundingKrw)}
           </Text>
           <Text style={styles.helper}>
-            누적 광고 보상 {formatUnknownable(summary.cumulativeAdRewardKrw)}
+            누적 광고 보상 {formatUnknownKrw(summary.cumulativeAdRewardKrw)}
           </Text>
           <Text style={styles.helper}>
-            투자 손익 {formatUnknownable(summary.investmentPnlKrw)}
+            투자 손익 {formatUnknownKrw(summary.investmentPnlKrw)}
           </Text>
           {/* Said plainly, because the distinction is the point of TWR. */}
           <Text style={styles.note}>
@@ -245,7 +246,9 @@ export default function GeneralAccountHome({
             <Text style={styles.helper}>
               KRW {krwBalance === null ? '-' : formatKrw(krwBalance)}
             </Text>
-            <Text style={styles.helper}>USD {usdBalance ?? '-'}</Text>
+            <Text style={styles.helper}>
+              USD {usdBalance === null ? '-' : formatUsd(usdBalance)}
+            </Text>
             <Pressable style={styles.retryButton} onPress={onOpenLedger}>
               <Text style={styles.retryText}>원장 보기</Text>
             </Pressable>

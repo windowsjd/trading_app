@@ -11,6 +11,7 @@ import { formatSourceMetadata } from '../../models/dto/common.ts';
 import {
   formatAssetPrice,
   formatCurrency,
+  formatDisplayDecimal,
   formatKrw,
   getAssetNameDisplay,
 } from '../../utils/format.ts';
@@ -68,9 +69,9 @@ export function getOrderQuoteDisplay(
       quote.currencyCode,
       displayPriceDecimals,
     ),
-    quantity: displayValue(quote.quantity),
+    quantity: formatDisplayDecimal(quote.quantity),
     grossAmount: formatCurrency(quote.grossAmount, quote.currencyCode),
-    feeRate: displayValue(quote.feeRate),
+    feeRate: formatDisplayDecimal(quote.feeRate),
     feeAmount: formatCurrency(quote.feeAmount, quote.currencyCode),
     netAmount: formatCurrency(quote.netAmount, quote.currencyCode),
     walletBalanceBefore: formatCurrency(
@@ -81,15 +82,15 @@ export function getOrderQuoteDisplay(
       quote.estimatedWalletBalanceAfter,
       quote.currencyCode,
     ),
-    positionQuantityBefore: displayValue(quote.positionQuantityBefore),
-    estimatedPositionQuantityAfter: displayValue(
+    positionQuantityBefore: formatDisplayDecimal(quote.positionQuantityBefore),
+    estimatedPositionQuantityAfter: formatDisplayDecimal(
       quote.estimatedPositionQuantityAfter,
     ),
     krwGrossAmount: formatKrw(quote.krwGrossAmount),
     krwFeeAmount: formatKrw(quote.krwFeeAmount),
     krwNetAmount: formatKrw(quote.krwNetAmount),
     expiresAt: displayValue(quote.expiresAt),
-    maxChangeBps: displayValue(quote.maxChangeBps),
+    maxChangeBps: formatDisplayDecimal(quote.maxChangeBps),
     quoteAt: displayValue(quote.quoteAt),
     assetPriceSource: formatSourceMetadata(quote.assetPriceSource),
     fxRateSource: formatSourceMetadata(quote.fxRateSource),
@@ -172,13 +173,13 @@ export function getLimitQuoteEstimateDisplay(
       quote.quotedFeeAmount,
       quote.currencyCode,
     ),
-    quotedFeeRate: displayValue(quote.quotedFeeRate),
+    quotedFeeRate: formatDisplayDecimal(quote.quotedFeeRate),
     reservedAmount: formatCurrency(reserved, quote.currencyCode),
     expectedNetAmount: formatCurrency(
       quote.quotedNetAmount,
       quote.currencyCode,
     ),
-    reservedQuantity: displayValue(quote.reservedQuantity),
+    reservedQuantity: formatDisplayDecimal(quote.reservedQuantity),
   };
 }
 
@@ -207,7 +208,7 @@ export function getOrderSuccessDisplay(
         : assetNameDisplay.primary
       : displayValue(order.assetId ?? execution.assetId),
     side: order.side ?? execution.side,
-    quantity: displayValue(order.quantity ?? execution.quantity),
+    quantity: formatDisplayDecimal(order.quantity ?? execution.quantity),
     executedPrice: isSubmittedLimit
       ? displayValue(null)
       : formatAssetPrice(
@@ -242,10 +243,10 @@ export function getOrderSuccessDisplay(
       currencyCode,
       displayPriceDecimals,
     ),
-    priceChangeBps: displayValue(execution.priceChangeBps),
-    quotedRate: displayValue(execution.quotedRate),
-    executeRate: displayValue(execution.executeRate),
-    rateChangeBps: displayValue(execution.rateChangeBps),
+    priceChangeBps: formatDisplayDecimal(execution.priceChangeBps),
+    quotedRate: formatDisplayDecimal(execution.quotedRate),
+    executeRate: formatDisplayDecimal(execution.executeRate),
+    rateChangeBps: formatDisplayDecimal(execution.rateChangeBps),
     assetPriceSource: formatSourceMetadata(execution.assetPriceSource),
     fxRateSource: formatSourceMetadata(execution.fxRateSource),
     walletBalanceAfter: formatCurrency(
@@ -261,10 +262,10 @@ export function getOrderSuccessDisplay(
       execution.reservedAmount ?? order.reservedAmount,
       currencyCode,
     ),
-    reservedQuantity: displayValue(
+    reservedQuantity: formatDisplayDecimal(
       execution.reservedQuantity ?? order.reservedQuantity,
     ),
-    reservationFeeRate: displayValue(execution.reservationFeeRate),
+    reservationFeeRate: formatDisplayDecimal(execution.reservationFeeRate),
     isAlreadyExecuted: execution.state === 'already_executed',
     isSubmittedLimitOrder: isSubmittedLimit,
   };

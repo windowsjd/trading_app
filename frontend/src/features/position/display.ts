@@ -1,4 +1,9 @@
-import { formatKrw, formatMoney, formatPercent } from '../../utils/format.ts';
+import {
+  formatDisplayDecimal,
+  formatKrw,
+  formatMoney,
+  formatPercent,
+} from '../../utils/format.ts';
 import type { PositionItemDto } from './api.ts';
 
 export type PositionDisplay = {
@@ -14,11 +19,7 @@ export type PositionDisplay = {
 
 /** Backend quantities use a fixed scale; display keeps precision but drops padding. */
 export function formatPositionQuantity(quantity: string): string {
-  const match = /^([+-]?\d+)(?:\.(\d+))?$/u.exec(quantity.trim());
-  if (!match) return quantity;
-
-  const fraction = match[2]?.replace(/0+$/u, '') ?? '';
-  return fraction ? `${match[1]}.${fraction}` : match[1];
+  return formatDisplayDecimal(quantity);
 }
 
 /**

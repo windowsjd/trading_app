@@ -70,6 +70,7 @@ import { createIdempotencyKey } from '../../utils/idempotency';
 import {
   formatAssetPrice,
   formatCurrency,
+  formatDisplayDecimal,
   getAssetNameDisplay,
 } from '../../utils/format';
 
@@ -802,7 +803,9 @@ export default function OrderScreen({ route, navigation }: Props) {
               asset.displayPriceDecimals,
             )}
           </Text>
-          <Text style={styles.helper}>보유 수량 {positionQuantity}</Text>
+          <Text style={styles.helper}>
+            보유 수량 {formatDisplayDecimal(positionQuantity)}
+          </Text>
           <Text style={styles.helper}>
             가격 통화 {asset.priceCurrency} · 결제 통화{' '}
             {asset.settlementCurrency}
@@ -1007,7 +1010,6 @@ export default function OrderScreen({ route, navigation }: Props) {
             <SectionSkeleton lines={7} />
           ) : quoteDisplay ? (
             <>
-              <Text style={styles.helper}>견적 ID {quoteDisplay.quoteId}</Text>
               {quoteData?.orderType === 'limit' ? (
                 <>
                   <Text style={styles.helper}>
@@ -1077,15 +1079,8 @@ export default function OrderScreen({ route, navigation }: Props) {
                         )}
                       </Text>
                       <Text style={styles.helper}>
-                        예약 예정 수량 {quoteData.reservedQuantity ?? '-'}
-                      </Text>
-                      <Text style={styles.helper}>
-                        주문 전 사용 가능 수량{' '}
-                        {quoteData.positionAvailableBefore ?? '-'}
-                      </Text>
-                      <Text style={styles.helper}>
-                        주문 후 사용 가능 수량{' '}
-                        {quoteData.estimatedPositionAvailableAfter ?? '-'}
+                        예약 예정 수량{' '}
+                        {formatDisplayDecimal(quoteData.reservedQuantity)}
                       </Text>
                     </>
                   )}
@@ -1123,26 +1118,13 @@ export default function OrderScreen({ route, navigation }: Props) {
                     주문 후 예상 잔액 {quoteDisplay.estimatedWalletBalanceAfter}
                   </Text>
                   <Text style={styles.helper}>
-                    주문 전 포지션 {quoteDisplay.positionQuantityBefore}
-                  </Text>
-                  <Text style={styles.helper}>
-                    주문 후 예상 포지션{' '}
-                    {quoteDisplay.estimatedPositionQuantityAfter}
-                  </Text>
-                  <Text style={styles.helper}>
                     KRW 순금액 {quoteDisplay.krwNetAmount}
-                  </Text>
-                  <Text style={styles.helper}>
-                    허용 변동 {quoteDisplay.maxChangeBps}bps
                   </Text>
                   <Text style={styles.helper}>
                     자산 가격 소스 {quoteDisplay.assetPriceSource}
                   </Text>
                 </>
               )}
-              <Text style={styles.helper}>
-                만료 시각 {quoteDisplay.expiresAt}
-              </Text>
               <Text style={styles.helper}>
                 남은 시간 {quoteExpiresInSeconds}초
               </Text>

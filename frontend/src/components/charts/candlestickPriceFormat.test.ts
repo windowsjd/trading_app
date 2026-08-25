@@ -11,7 +11,7 @@ import { formatChartPrice } from './candlestickPriceFormat.ts';
 describe('formatChartPrice', () => {
   it('renders a low-priced coin at its declared precision', () => {
     // DOGE tickSize 0.00001 → 5. The old chart formatter showed $0.25 here.
-    assert.equal(formatChartPrice(0.2456, 'USD', 5), '$0.24560');
+    assert.equal(formatChartPrice(0.2456, 'USD', 5), '$0.2456');
     assert.notEqual(formatChartPrice(0.2456, 'USD', 5), '$0.25');
     // XRP / XLM tickSize 0.0001 → 4.
     assert.equal(formatChartPrice(2.1457, 'USD', 4), '$2.1457');
@@ -43,10 +43,10 @@ describe('formatChartPrice', () => {
     const minY = 0.2451;
     const range = 0.0009999999999999998;
     const gridValue = minY + (range * 2) / 4;
-    assert.equal(formatChartPrice(gridValue, 'USD', 5), '$0.24560');
+    assert.equal(formatChartPrice(gridValue, 'USD', 5), '$0.2456');
 
     const crosshairPrice = minY + (1 - 40 / 200) * range;
-    assert.equal(formatChartPrice(crosshairPrice, 'USD', 5), '$0.24590');
+    assert.equal(formatChartPrice(crosshairPrice, 'USD', 5), '$0.2459');
   });
 
   it('renders a missing price as "-" rather than a wrong number', () => {

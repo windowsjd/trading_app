@@ -7,6 +7,7 @@ import Svg, {
 } from 'react-native-svg';
 
 import ChartEmptyState from './ChartEmptyState';
+import { formatDisplayDecimal } from '../../utils/format';
 
 export type LineChartPoint = {
   x?: string | number | Date;
@@ -42,7 +43,7 @@ function parseDecimal(value: string | number) {
 }
 
 function formatDefaultValue(value: number) {
-  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+  return formatDisplayDecimal(value.toFixed(2));
 }
 
 function downsample(points: SanitizedPoint[], maxPoints: number) {

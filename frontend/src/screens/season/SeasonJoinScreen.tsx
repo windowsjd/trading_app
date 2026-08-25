@@ -25,7 +25,7 @@ import {
 } from '../../services/api/errorMapper';
 import { ERROR_CODE } from '../../models/enums/errorCode';
 import type { SeasonJoinViewState } from '../../models/enums/viewState';
-import { formatKrw } from '../../utils/format';
+import { formatDisplayDecimal, formatKrw } from '../../utils/format';
 
 import AccountSetupPanel from '../../components/tradingAccount/AccountSetupPanel';
 import FullPageLoading from '../../components/states/FullPageLoading';
@@ -228,7 +228,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
             : '시즌 정보를 불러오지 못했습니다.'
         }
         message={getErrorMessageFromCode(code)}
-        onRetry={() => seasonQuery.refetch()}
+        onRetry={() => void seasonQuery.refetch()}
       />
     );
   }
@@ -276,7 +276,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
         actionLabel="시즌 정보 다시 확인"
         onAction={() => {
           setJoinErrorCode(null);
-          seasonQuery.refetch();
+          void seasonQuery.refetch();
         }}
       />
     ) : (
@@ -341,8 +341,12 @@ export default function SeasonJoinScreen({ navigation }: Props) {
           <Text style={styles.helper}>
             시작 자산: {formatKrw(season.initialCapitalKrw)}원
           </Text>
-          <Text style={styles.helper}>거래 수수료: {season.tradeFeeRate}</Text>
-          <Text style={styles.helper}>환전 수수료: {season.fxFeeRate}</Text>
+          <Text style={styles.helper}>
+            거래 수수료: {formatDisplayDecimal(season.tradeFeeRate)}
+          </Text>
+          <Text style={styles.helper}>
+            환전 수수료: {formatDisplayDecimal(season.fxFeeRate)}
+          </Text>
           <Text style={styles.helper}>지원 자산: 국내 주식 / 미국 주식 / 암호화폐</Text>
           <Text style={styles.helper}>랭킹 기준: KRW 기준 총자산 수익률</Text>
         </View>

@@ -15,7 +15,11 @@ import {
   isRequoteRequiredError,
 } from '../../services/api/errorMapper.ts';
 import { formatSourceMetadata } from '../../models/dto/common.ts';
-import { formatCurrency, formatMoney } from '../../utils/format.ts';
+import {
+  formatCurrency,
+  formatDisplayDecimal,
+  formatMoney,
+} from '../../utils/format.ts';
 
 type WalletQueryState = {
   isLoading?: boolean;
@@ -162,16 +166,16 @@ export function getFxQuoteDisplay(quote: FxQuoteDto) {
     quoteId: displayValue(quote.quoteId),
     direction: `${quote.fromCurrency} → ${quote.toCurrency}`,
     sourceAmount: formatCurrency(quote.sourceAmount, quote.fromCurrency),
-    appliedRate: displayValue(quote.appliedRate),
+    appliedRate: formatDisplayDecimal(quote.appliedRate),
     grossTargetAmount: formatCurrency(
       quote.grossTargetAmount,
       quote.toCurrency,
     ),
-    feeRate: displayValue(quote.feeRate),
+    feeRate: formatDisplayDecimal(quote.feeRate),
     feeAmount: formatMoney(quote.feeAmount, quote.feeCurrency),
     netTargetAmount: formatCurrency(quote.netTargetAmount, quote.toCurrency),
     expiresAt: displayValue(quote.expiresAt),
-    maxChangeBps: displayValue(quote.maxChangeBps),
+    maxChangeBps: formatDisplayDecimal(quote.maxChangeBps),
     rateCapturedAt: displayValue(quote.rateCapturedAt),
     rateEffectiveAt: displayValue(quote.rateEffectiveAt),
     rateSource: formatSourceMetadata(quote.rateSource),
@@ -233,10 +237,10 @@ export function getFxExecuteSuccessDisplay(result: FxExecuteDto) {
       result.toCurrency,
     ),
     netTargetAmount: formatCurrency(result.netTargetAmount, result.toCurrency),
-    appliedRate: displayValue(result.appliedRate),
-    quotedRate: displayValue(result.quotedRate),
-    executeRate: displayValue(result.executeRate),
-    rateChangeBps: displayValue(result.rateChangeBps),
+    appliedRate: formatDisplayDecimal(result.appliedRate),
+    quotedRate: formatDisplayDecimal(result.quotedRate),
+    executeRate: formatDisplayDecimal(result.executeRate),
+    rateChangeBps: formatDisplayDecimal(result.rateChangeBps),
     fee: formatMoney(result.feeAmount, result.feeCurrency),
     sourceWalletBalanceAfter: formatCurrency(
       result.sourceWalletBalanceAfter,

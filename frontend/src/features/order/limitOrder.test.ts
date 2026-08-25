@@ -4,7 +4,9 @@ import { test } from 'node:test';
 import {
   getLimitQuoteEstimateDisplay,
   getLimitOrderSuccessMessage,
+  getOrderQuoteExpiresInSeconds,
   getOrderSuccessDisplay,
+  isOrderQuoteExpired,
   isOrderSuccess,
   isSubmittedLimitOrder,
 } from './mapper.ts';
@@ -96,14 +98,31 @@ test('isSubmittedLimitOrder identifies only submitted registrations', () => {
   );
 });
 
+test('order quote expiration stays active independently of the visible timestamp', () => {
+  const quote = { expiresAt: '2026-08-25T03:45:00.000Z' };
+  const beforeExpiry = new Date('2026-08-25T03:44:30.000Z');
+  const atExpiry = new Date('2026-08-25T03:45:00.000Z');
+
+  assert.equal(isOrderQuoteExpired(quote, beforeExpiry), false);
+  assert.equal(getOrderQuoteExpiresInSeconds(quote, beforeExpiry), 30);
+  assert.equal(isOrderQuoteExpired(quote, atExpiry), true);
+  assert.equal(getOrderQuoteExpiresInSeconds(quote, atExpiry), 0);
+  assert.equal(isOrderQuoteExpired({ expiresAt: 'invalid' }), true);
+});
+
 test('getOrderSuccessDisplay surfaces reservation fields for submitted limit orders', () => {
   const display = getOrderSuccessDisplay(submittedLimitResult);
   assert.equal(display.isSubmittedLimitOrder, true);
   assert.equal(display.isAlreadyExecuted, false);
+  // Hidden from the completion sheet, but still retained in the display model
+  // and untouched in the API DTO for audit/requery flows.
+  assert.equal(display.orderId, 'order-1');
+  assert.equal(display.quoteId, 'quote-1');
+  assert.equal(display.submittedAt, '2026-05-07T00:01:00.000Z');
   // Server-final decimal strings are only formatted, never recomputed.
   assert.equal(display.limitPrice, '50,000원');
   assert.equal(display.reservedAmount, '150,150');
-  assert.equal(display.quantity, '3.000000');
+  assert.equal(display.quantity, '3');
 });
 
 test('getOrderSuccessDisplay never shows execution amounts for an unfilled limit order', () => {
@@ -115,7 +134,7 @@ test('getOrderSuccessDisplay never shows execution amounts for an unfilled limit
   assert.equal(display.executedAt, '-');
   // The reservation IS the order's monetary fact while it is unfilled.
   assert.equal(display.reservedAmount, '150,150');
-  assert.equal(display.reservationFeeRate, '0.001000');
+  assert.equal(display.reservationFeeRate, '0.001');
 });
 
 test('a stale server fill amount cannot leak into a submitted limit display', () => {
@@ -185,7 +204,7 @@ test('limit quote estimates come from the pinned quote basis and are labeled as 
   assert.ok(estimate);
   assert.equal(estimate.estimatedGrossAmount, '150,000');
   assert.equal(estimate.estimatedFeeAmount, '150');
-  assert.equal(estimate.quotedFeeRate, '0.001000');
+  assert.equal(estimate.quotedFeeRate, '0.001');
   assert.equal(estimate.reservedAmount, '150,150');
 });
 
@@ -393,7 +412,7 @@ test('submitted limit sell displays reserved quantity and expected proceeds', ()
   const display = getOrderSuccessDisplay(sellResult);
   assert.equal(display.side, 'sell');
   assert.equal(display.reservedAmount, '-');
-  assert.equal(display.reservedQuantity, '2.000000');
+  assert.equal(display.reservedQuantity, '2');
 
   const estimate = getLimitQuoteEstimateDisplay({
     quotedGrossAmount: '120000.00000000',
@@ -404,7 +423,7 @@ test('submitted limit sell displays reserved quantity and expected proceeds', ()
   });
   assert.ok(estimate);
   assert.equal(estimate.expectedNetAmount, '119,880');
-  assert.equal(estimate.reservedQuantity, '2.000000');
+  assert.equal(estimate.reservedQuantity, '2');
 });
 
 test('submitted-limit polling requires foreground, focus, and an open order', () => {

@@ -7,7 +7,11 @@ import type {
   QuantityString,
   RateString,
 } from '../../models/dto/common';
-import { formatCurrency, getAssetNameDisplay } from '../../utils/format';
+import {
+  formatCurrency,
+  formatDisplayDecimal,
+  getAssetNameDisplay,
+} from '../../utils/format';
 import {
   getOrderStatusLabel,
   hasNoExecutionResult,
@@ -262,9 +266,11 @@ export function getRecordOrderDisplay(item: RecordOrderItemDto) {
     reservedAmount: item.reservedAmount
       ? formatCurrency(item.reservedAmount, currencyCode)
       : null,
-    reservedQuantity: item.reservedQuantity ?? null,
+    reservedQuantity: item.reservedQuantity
+      ? formatDisplayDecimal(item.reservedQuantity)
+      : null,
     submittedAt: item.submittedAt ?? '-',
-    quantity: item.quantity,
+    quantity: formatDisplayDecimal(item.quantity),
     price: noExecutionResult
       ? formatCurrency(item.limitPrice, currencyCode)
       : formatCurrency(
@@ -296,7 +302,9 @@ export function getRecordExchangeDisplay(item: RecordExchangeItemDto) {
     executedAt: item.executedAt ?? '-',
     direction: `${item.fromCurrency} → ${item.toCurrency}`,
     sourceAmount: formatCurrency(item.sourceAmount, item.fromCurrency),
-    rate: item.appliedRate ?? item.executeRate ?? item.rate ?? '-',
+    rate: formatDisplayDecimal(
+      item.appliedRate ?? item.executeRate ?? item.rate,
+    ),
     feeAmount: formatCurrency(item.feeAmount, feeCurrency),
     feeCurrency,
     netTargetAmount: formatCurrency(item.netTargetAmount, item.toCurrency),

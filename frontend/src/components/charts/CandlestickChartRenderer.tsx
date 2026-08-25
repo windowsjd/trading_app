@@ -64,8 +64,8 @@ export type CandlestickChartRendererProps = {
   currencyCode?: string | null;
   /**
    * Provider-declared unit-price decimals, so the axis / current price /
-   * crosshair show a 0.24560 coin as 0.24560 rather than 0.25. Null keeps the
-   * currency's default policy.
+   * crosshair round a 0.24560 coin at 5 places and show 0.2456 rather than
+   * 0.25. Null keeps the currency's default policy.
    */
   displayPriceDecimals?: number | null;
   /** Only supplied while the latest candle is on screen. */

@@ -82,8 +82,8 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
     return {
       seasonCount: items.length,
       bestRank: displayValue(bestRank),
-      bestReturnRate: bestReturn === null ? '-' : bestReturn.toFixed(2),
-      avgReturnRate: avgReturn === null ? '-' : avgReturn.toFixed(2),
+      bestReturnRate: formatPercent(bestReturn),
+      avgReturnRate: formatPercent(avgReturn),
     };
   }, [items]);
 
@@ -117,7 +117,7 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
       <ErrorState
         title="전적 목록을 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
-        onRetry={() => recordsQuery.refetch()}
+        onRetry={() => void recordsQuery.refetch()}
       />
     );
   }
@@ -148,7 +148,7 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
         contentContainerStyle={styles.content}
         onEndReached={() => {
           if (recordsQuery.hasNextPage && !recordsQuery.isFetchingNextPage) {
-            recordsQuery.fetchNextPage();
+            void recordsQuery.fetchNextPage();
           }
         }}
         onEndReachedThreshold={0.4}

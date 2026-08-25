@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 import ChartEmptyState from './ChartEmptyState';
+import { formatDisplayDecimal, formatPercent } from '../../utils/format';
 
 export type DonutChartSegment = {
   key: string;
@@ -26,7 +27,7 @@ function parseDecimal(value: string | number) {
 }
 
 function formatDefaultValue(value: number) {
-  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+  return formatDisplayDecimal(value.toFixed(2));
 }
 
 export default function DonutChart({
@@ -138,7 +139,7 @@ export default function DonutChart({
                     {segment.label}
                   </Text>
                   <Text style={styles.legendValue} numberOfLines={1}>
-                    {valueFormatter(segment.value)} · {percentage.toFixed(1)}%
+                    {valueFormatter(segment.value)} · {formatPercent(percentage, 1)}%
                   </Text>
                 </View>
               </View>

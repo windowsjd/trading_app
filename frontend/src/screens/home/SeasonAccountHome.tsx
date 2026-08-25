@@ -29,6 +29,7 @@ import { getKnownWalletBalanceAmount } from '../../features/wallet/mapper';
 import {
   formatKrw,
   formatPercent,
+  formatUsd,
   getAssetNameDisplay,
 } from '../../utils/format';
 
@@ -367,7 +368,9 @@ export default function SeasonAccountHome({
             <Text style={styles.helper}>
               KRW {krwBalance === null ? '-' : formatKrw(krwBalance)}
             </Text>
-            <Text style={styles.helper}>USD {usdBalance ?? '-'}</Text>
+            <Text style={styles.helper}>
+              USD {usdBalance === null ? '-' : formatUsd(usdBalance)}
+            </Text>
             <Pressable style={styles.secondaryButton} onPress={onOpenLedger}>
               <Text style={styles.secondaryText}>원장 보기</Text>
             </Pressable>

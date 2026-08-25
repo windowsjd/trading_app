@@ -181,7 +181,7 @@ test('getAssetPriceText (market list rows)', async (t) => {
           priceCurrency: 'USD',
         },
       }),
-      '$65,000.50',
+      '$65,000.5',
     );
   });
 });

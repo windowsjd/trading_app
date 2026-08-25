@@ -7,8 +7,8 @@ import { formatAssetPrice, type FormatCurrencyCode } from '../../utils/format.ts
  *
  * The y-axis labels, the current-price label, the crosshair price label and the
  * accessibility summary all go through it, so they can never disagree about
- * precision: a DOGE chart shows $0.24560 everywhere instead of a $0.25 axis
- * next to a $0.24560 header.
+ * precision: a DOGE chart rounds at 5 places and shows $0.2456 everywhere
+ * instead of a $0.25 axis next to a $0.2456 header.
  *
  * Unlike the header price, the values arriving here are COMPUTED floats — an
  * interpolated grid value, the price under the crosshair — so they carry float

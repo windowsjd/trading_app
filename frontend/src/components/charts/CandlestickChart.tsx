@@ -55,8 +55,8 @@ export type CandlestickChartProps = {
   currencyCode?: string | null;
   /**
    * Provider-declared unit-price decimals for this asset (the same value the
-   * detail header prices with). Without it a 0.24560 coin would render as
-   * $0.25 on the axis, the current-price label and the crosshair.
+   * detail header prices with). Without it a 0.24560 coin would round to $0.25
+   * instead of $0.2456 on the axis, current-price label and crosshair.
    */
   displayPriceDecimals?: number | null;
   /** Live price for the current-price line. Falls back to the last candle close. */

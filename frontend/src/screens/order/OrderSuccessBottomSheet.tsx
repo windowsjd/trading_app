@@ -68,8 +68,6 @@ export default function OrderSuccessBottomSheet({
 
       {display && isSubmittedLimit ? (
         <View style={styles.card}>
-          <Row label="주문 ID" value={display.orderId} />
-          <Row label="견적 ID" value={display.quoteId} />
           <Row label="종목" value={display.assetLabel} />
           <Row
             label="주문 유형"
@@ -112,12 +110,9 @@ export default function OrderSuccessBottomSheet({
                 : display.reservedQuantity
             }
           />
-          <Row label="제출 시각" value={display.submittedAt} />
         </View>
       ) : display ? (
         <View style={styles.card}>
-          <Row label="주문 ID" value={display.orderId} />
-          <Row label="견적 ID" value={display.quoteId} />
           <Row label="종목" value={display.assetLabel} />
           <Row
             label="주문 유형"
@@ -133,8 +128,6 @@ export default function OrderSuccessBottomSheet({
           <Row label="체결 가격" value={display.executedPrice} />
           <Row label="총 주문 금액" value={display.grossAmount} />
           <Row label="수수료" value={display.feeAmount} />
-          <Row label="순금액" value={display.netAmount} />
-          <Row label="제출 시각" value={display.submittedAt} />
           <Row label="체결 시각" value={display.executedAt} />
           <Row label="견적 가격" value={display.quotedPrice} />
           <Row label="실행 가격" value={display.executePrice} />
@@ -144,16 +137,6 @@ export default function OrderSuccessBottomSheet({
               display.priceChangeBps === '-'
                 ? '-'
                 : `${display.priceChangeBps}bps`
-            }
-          />
-          <Row label="견적 환율" value={display.quotedRate} />
-          <Row label="실행 환율" value={display.executeRate} />
-          <Row
-            label="환율 변동"
-            value={
-              display.rateChangeBps === '-'
-                ? '-'
-                : `${display.rateChangeBps}bps`
             }
           />
           <Row label="체결 후 잔액" value={display.walletBalanceAfter} />
