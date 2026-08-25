@@ -33,14 +33,10 @@ import { selectDisplayPrice } from "../../features/asset/displayPricePolicy";
 import { useAssetCandle } from "../../features/asset/useAssetCandle";
 import { describeCandleError } from "../../features/asset/candleErrors";
 import { mergeAssetCandleSnapshot } from "../../features/asset/liveCandle";
-import {
-  formatTradingNote,
-  isTradableMarketStatus,
-} from "../../features/asset/mapper";
+import { isTradableMarketStatus } from "../../features/asset/mapper";
 import { QUERY_KEYS } from "../../constants/queryKeys";
 import { TEST_IDS } from "../../constants/testIds";
 import { buildWsUrl } from "../../constants/env";
-import { formatSourceMetadata } from "../../models/dto/common";
 import {
   formatAssetPrice,
   formatKrw,
@@ -57,13 +53,6 @@ import CTAButton from "../../components/common/CTAButton";
 import { CandlestickChart } from "../../components/charts";
 
 type Props = AssetDetailScreenProps;
-
-const BINANCE_PRICE_BASIS_TEXT = "가격 기준: Binance Spot 최근 체결가";
-
-function displayValue(value?: string | number | boolean | null) {
-  if (value === null || value === undefined || value === "") return "-";
-  return String(value);
-}
 
 function isPriceAvailable(price?: AssetDetailPriceDto | null) {
   return price?.state === "available" && !!price.currentPrice;
@@ -122,7 +111,6 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
   });
 
   const {
-    connectionState,
     latestTicker,
     showReconnectBanner,
     isStale: isTickerStale,
@@ -181,9 +169,8 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
   const orderPriceAvailable = priceAvailable || livePriceAvailable;
 
   // ONE basis for the whole price block: while a realtime ticker is shown,
-  // its local price, KRW state/reason, price source, FX source, timestamps and
-  // freshness are all taken from that ticker — REST and realtime metadata are
-  // never mixed (see displayPricePolicy).
+  // its local price and KRW state/reason are taken from that ticker — REST and
+  // realtime values are never mixed (see displayPricePolicy).
   const displayPrice = selectDisplayPrice({
     latestTicker,
     restPrice: price,
@@ -195,20 +182,12 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
     displayPrice.priceCurrency ?? asset.priceCurrency;
   const displayPriceKrw = displayPrice.priceKrw;
   const displayPriceKrwState = displayPrice.priceKrwState;
-  const displayPriceSource = displayPrice.priceSource;
-  const displayFxRateSource = displayPrice.fxRateSource;
   // Same basis as every other price field: a realtime ticker without a change
   // rate shows no change rate — the older REST one never fills in next to a
   // newer realtime price.
   const displayChangeRate = displayPrice.changeRate;
-  const displayCapturedAt = displayPrice.priceCapturedAt;
-  const displayEffectiveAt = displayPrice.priceEffectiveAt;
-  const displayFreshnessAgeSeconds = displayPrice.freshnessAgeSeconds;
   const displayPriceDecimals = displayPrice.displayPriceDecimals;
   const displayPriceKrwMessage = displayPrice.priceKrwMessage;
-  const isBinanceSpotAsset =
-    asset.assetType === "crypto" && asset.market?.toUpperCase() === "BINANCE";
-  const tradingNote = formatTradingNote(asset.tradingNote);
   const assetNameDisplay = getAssetNameDisplay(asset);
   // Dev-only chart diagnostics (never rendered in production builds): how many
   // candles the API returned vs requested for the selected range/interval, and
@@ -313,9 +292,6 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
                 )
               : getUnavailablePriceText(asset)}
           </Text>
-          {isBinanceSpotAsset ? (
-            <Text style={styles.helper}>{BINANCE_PRICE_BASIS_TEXT}</Text>
-          ) : null}
           <Text style={styles.helper}>
             KRW 환산{" "}
             {displayPriceKrwState === "available"
@@ -329,37 +305,15 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
           <Text style={styles.helper}>
             등락률 {formatPercent(displayChangeRate)}%
           </Text>
-          <Text style={styles.helper}>시장 {asset.market}</Text>
-          <Text style={styles.helper}>시장 상태 {asset.marketStatus}</Text>
+          <Text style={styles.helper}>시장 상태: {asset.marketStatus}</Text>
           <Text style={styles.helper}>
-            거래 상태 {asset.tradable ? "거래 가능" : "거래 제한"}
+            거래 상태: {asset.tradable ? "거래 가능" : "거래 제한"}
           </Text>
           <Text style={styles.helper}>
-            가격 통화 {asset.priceCurrency} · 결제 통화{" "}
-            {asset.settlementCurrency}
+            결제 통화 {asset.settlementCurrency}
           </Text>
           {asset.settlementCurrency === "USD" ? (
             <Text style={styles.helper}>USD Wallet으로 결제됩니다.</Text>
-          ) : null}
-          <Text style={styles.helper}>
-            가격 수집 {displayValue(displayCapturedAt)}
-          </Text>
-          <Text style={styles.helper}>
-            가격 기준 {displayValue(displayEffectiveAt)}
-          </Text>
-          <Text style={styles.helper}>
-            최신성 {displayValue(displayFreshnessAgeSeconds)}초
-          </Text>
-          <Text style={styles.helper}>실시간 연결 {connectionState}</Text>
-          <Text style={styles.helper}>
-            가격 소스 {formatSourceMetadata(displayPriceSource)}
-          </Text>
-          <Text style={styles.helper}>
-            환율 소스 {formatSourceMetadata(displayFxRateSource)}
-          </Text>
-
-          {tradingNote ? (
-            <Text style={styles.helper}>{tradingNote}</Text>
           ) : null}
           {buyBlockedReason ? (
             <View

@@ -1,10 +1,11 @@
 import type { AssetTickerMessage } from './assetTickerPolicy';
 
 /**
- * ONE basis for every price field the detail screen shows.
+ * ONE basis for every price value and metadata selected for the detail screen.
  *
  * A realtime ticker and the REST snapshot describe two different moments, so
- * the screen picks a basis and takes the WHOLE set from it:
+ * the screen picks a basis and takes the WHOLE set from it, even though its
+ * user-facing card renders only a subset of the returned metadata:
  *   - a latest ticker exists  → local price, KRW state/value/reason, price
  *     source, FX source, captured/effective time and freshness all come from
  *     that ticker (a ticker whose KRW is unavailable shows KRW unavailable —
@@ -80,8 +81,8 @@ export function selectDisplayPrice(input: {
         latestTicker.priceCapturedAt ?? latestTicker.capturedAt ?? null,
       priceEffectiveAt: latestTicker.priceEffectiveAt ?? null,
       freshnessAgeSeconds: latestTicker.freshnessAgeSeconds ?? null,
-      // Realtime payloads always carry their own source; the REST source is a
-      // last resort so the row is never blank.
+      // Realtime payloads normally carry their own source; keep the REST source
+      // as a last resort so the selected metadata remains complete.
       priceSource: latestTicker.priceSource ?? restPrice?.priceSource ?? null,
       // FX source belongs to the ticker's own conversion attempt (present for
       // both available and unavailable outcomes), never the REST snapshot's.
