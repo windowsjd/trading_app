@@ -12,6 +12,7 @@ import {
   formatAssetPrice,
   formatCurrency,
   formatDisplayDecimal,
+  formatKstDateTime,
   formatKrw,
   getAssetNameDisplay,
 } from '../../utils/format.ts';
@@ -89,9 +90,9 @@ export function getOrderQuoteDisplay(
     krwGrossAmount: formatKrw(quote.krwGrossAmount),
     krwFeeAmount: formatKrw(quote.krwFeeAmount),
     krwNetAmount: formatKrw(quote.krwNetAmount),
-    expiresAt: displayValue(quote.expiresAt),
+    expiresAt: formatKstDateTime(quote.expiresAt),
     maxChangeBps: formatDisplayDecimal(quote.maxChangeBps),
-    quoteAt: displayValue(quote.quoteAt),
+    quoteAt: formatKstDateTime(quote.quoteAt),
     assetPriceSource: formatSourceMetadata(quote.assetPriceSource),
     fxRateSource: formatSourceMetadata(quote.fxRateSource),
   };
@@ -229,10 +230,12 @@ export function getOrderSuccessDisplay(
     netAmount: isSubmittedLimit
       ? displayValue(null)
       : formatCurrency(execution.netAmount ?? order.netAmount, currencyCode),
-    submittedAt: displayValue(execution.submittedAt ?? order.submittedAt),
+    submittedAt: formatKstDateTime(
+      execution.submittedAt ?? order.submittedAt,
+    ),
     executedAt: isSubmittedLimit
       ? displayValue(null)
-      : displayValue(execution.executedAt),
+      : formatKstDateTime(execution.executedAt),
     quotedPrice: formatAssetPrice(
       execution.quotedPrice,
       currencyCode,

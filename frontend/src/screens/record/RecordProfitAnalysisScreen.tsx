@@ -25,7 +25,12 @@ import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
 import { LineChart, type LineChartPoint } from '../../components/charts';
-import { formatKrw, formatPercent, getAssetNameDisplay } from '../../utils/format';
+import {
+  formatKrw,
+  formatKstDateTime,
+  formatPercent,
+  getAssetNameDisplay,
+} from '../../utils/format';
 
 type Props = NativeStackScreenProps<
   RecordStackParamList,
@@ -51,7 +56,7 @@ function getEquityChartPoints(
   return points.map((point) => ({
     x: point.time,
     y: point.totalAssetKrw,
-    label: point.time,
+    label: formatKstDateTime(point.time),
   }));
 }
 
@@ -142,7 +147,8 @@ export default function RecordProfitAnalysisScreen({
         <View style={styles.card}>
           <Text style={styles.title}>{season.name}</Text>
           <Text style={styles.helper}>
-            {season.startAt} ~ {season.endAt}
+            {formatKstDateTime(season.startAt)} ~{' '}
+            {formatKstDateTime(season.endAt)}
           </Text>
           <Text style={styles.helper}>시즌 상태 {season.status}</Text>
         </View>
@@ -168,7 +174,7 @@ export default function RecordProfitAnalysisScreen({
             스냅샷 일자 {displayValue(performance.snapshotDate)}
           </Text>
           <Text style={styles.helper}>
-            수집 시각 {displayValue(performance.capturedAt)}
+            수집 시각 {formatKstDateTime(performance.capturedAt)}
           </Text>
           {performance.state === 'unavailable' ? (
             <InlineEmptyState
@@ -224,7 +230,9 @@ export default function RecordProfitAnalysisScreen({
               return (
                 <View key={item.assetId} style={styles.assetRow}>
                   <Text style={styles.itemTitle}>{nameDisplay.primary}</Text>
-                  <Text style={styles.helper}>{nameDisplay.secondary ?? item.symbol}</Text>
+                  {nameDisplay.secondary ? (
+                    <Text style={styles.helper}>{nameDisplay.secondary}</Text>
+                  ) : null}
                   <Text style={styles.helper}>
                     {item.assetType} · {item.positionState} · {item.valuationState}
                   </Text>

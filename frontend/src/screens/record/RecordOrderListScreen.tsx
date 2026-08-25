@@ -376,7 +376,9 @@ export default function RecordOrderListScreen({ route }: Props) {
               <View style={styles.rowBody}>
                 <View style={styles.rowNameColumn}>
                   <Text style={styles.itemTitle}>{display.name}</Text>
-                  <Text style={styles.helper}>{display.symbol}</Text>
+                  {display.symbol ? (
+                    <Text style={styles.helper}>{display.symbol}</Text>
+                  ) : null}
                   <Text style={styles.helper}>
                     {display.isOpenLimitBuy
                       ? display.submittedAt

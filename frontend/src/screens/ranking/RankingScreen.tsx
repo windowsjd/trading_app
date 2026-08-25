@@ -26,7 +26,11 @@ import {
 } from '../../features/ranking/api';
 import { ERROR_CODE } from '../../models/enums/errorCode';
 import { getApiErrorCode } from '../../services/api/errorMapper';
-import { formatKrw, formatPercent } from '../../utils/format';
+import {
+  formatKrw,
+  formatKstDateTime,
+  formatPercent,
+} from '../../utils/format';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -280,7 +284,8 @@ export default function RankingScreen({ navigation }: Props) {
             <View style={styles.card}>
               <Text style={styles.label}>{getRankTypeLabel(rankType)}</Text>
               <Text style={styles.helper}>
-                기준일 {displayValue(firstPage?.rankingDate)} · 캡처 {displayValue(firstPage?.capturedAt)}
+                기준일 {displayValue(firstPage?.rankingDate)} · 캡처{' '}
+                {formatKstDateTime(firstPage?.capturedAt)}
               </Text>
             </View>
 

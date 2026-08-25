@@ -22,7 +22,7 @@ import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import EmptyState from '../../components/states/EmptyState';
 import CTAButton from '../../components/common/CTAButton';
-import { formatPercent } from '../../utils/format';
+import { formatKstDateTime, formatPercent } from '../../utils/format';
 
 type Props = RecordSeasonListScreenProps;
 
@@ -173,7 +173,9 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
           >
             <View>
               <Text style={styles.itemTitle}>{item.seasonName}</Text>
-              <Text style={styles.helper}>참가 시각 {item.joinedAt}</Text>
+              <Text style={styles.helper}>
+                참가 시각 {formatKstDateTime(item.joinedAt)}
+              </Text>
             </View>
 
             <View style={styles.alignEnd}>

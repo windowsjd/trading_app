@@ -31,7 +31,7 @@ describe('status-aware wallet balance display', () => {
 });
 
 describe('FX decimal display', () => {
-  it('trims quote rates, fee rates and bps without touching identifiers or times', () => {
+  it('trims quote rates and formats display timestamps in KST', () => {
     const quote = {
       quoteId: 'quote-1000',
       fromCurrency: 'USD',
@@ -52,7 +52,9 @@ describe('FX decimal display', () => {
 
     const display = getFxQuoteDisplay(quote);
     assert.equal(display.quoteId, 'quote-1000');
-    assert.equal(display.expiresAt, '2026-08-25T03:45:00.000Z');
+    assert.equal(display.expiresAt, '2026-08-25 12:45');
+    assert.equal(display.rateCapturedAt, '2026-08-25 12:44');
+    assert.equal(display.rateEffectiveAt, '2026-08-25 12:44');
     assert.equal(display.sourceAmount, '10.5');
     assert.equal(display.appliedRate, '1337.5');
     assert.equal(display.feeRate, '0.001');
@@ -84,7 +86,7 @@ describe('FX decimal display', () => {
 
     const display = getFxExecuteSuccessDisplay(result);
     assert.equal(display.exchangeId, 'exchange-1000');
-    assert.equal(display.executedAt, '2026-08-25T03:44:48.000Z');
+    assert.equal(display.executedAt, '2026-08-25 12:44');
     assert.equal(display.sourceAmount, '10.5');
     assert.equal(display.quotedRate, '1337.5');
     assert.equal(display.executeRate, '1337.6');

@@ -4,6 +4,7 @@ import type {
   IsoDateTimeString,
   SectionState,
 } from '../../models/dto/common';
+import { formatKstDateTime } from '../../utils/format';
 
 export type RewardStatus =
   | SectionState
@@ -64,7 +65,9 @@ export function isRewardResponseFailed(
 export function getRewardItemDate(
   item: Pick<RewardItemDto | BadgeItemDto, 'grantedAt' | 'awardedAt' | 'createdAt'>,
 ) {
-  return item.grantedAt ?? item.awardedAt ?? item.createdAt ?? '-';
+  return formatKstDateTime(
+    item.grantedAt ?? item.awardedAt ?? item.createdAt,
+  );
 }
 
 export async function getMyRewards() {

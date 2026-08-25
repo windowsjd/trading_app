@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import {
   getLimitQuoteEstimateDisplay,
   getLimitOrderSuccessMessage,
+  getOrderQuoteDisplay,
   getOrderQuoteExpiresInSeconds,
   getOrderSuccessDisplay,
   isOrderQuoteExpired,
@@ -110,6 +111,16 @@ test('order quote expiration stays active independently of the visible timestamp
   assert.equal(isOrderQuoteExpired({ expiresAt: 'invalid' }), true);
 });
 
+test('order quote display timestamps use KST without changing expiry calculation', () => {
+  const display = getOrderQuoteDisplay({
+    expiresAt: '2026-08-25T03:45:00.000Z',
+    quoteAt: '2026-08-25T03:44:30.000Z',
+  } as OrderQuoteDto);
+
+  assert.equal(display.expiresAt, '2026-08-25 12:45');
+  assert.equal(display.quoteAt, '2026-08-25 12:44');
+});
+
 test('getOrderSuccessDisplay surfaces reservation fields for submitted limit orders', () => {
   const display = getOrderSuccessDisplay(submittedLimitResult);
   assert.equal(display.isSubmittedLimitOrder, true);
@@ -118,7 +129,8 @@ test('getOrderSuccessDisplay surfaces reservation fields for submitted limit ord
   // and untouched in the API DTO for audit/requery flows.
   assert.equal(display.orderId, 'order-1');
   assert.equal(display.quoteId, 'quote-1');
-  assert.equal(display.submittedAt, '2026-05-07T00:01:00.000Z');
+  assert.equal(display.assetLabel, '삼성전자');
+  assert.equal(display.submittedAt, '2026-05-07 09:01');
   // Server-final decimal strings are only formatted, never recomputed.
   assert.equal(display.limitPrice, '50,000원');
   assert.equal(display.reservedAmount, '150,150');
@@ -189,7 +201,20 @@ test('executed market orders keep their real execution amounts', () => {
   assert.equal(display.feeAmount, '150');
   assert.equal(display.netAmount, '150,150');
   assert.equal(display.executedPrice, '50,000원');
-  assert.equal(display.executedAt, '2026-05-07T00:01:30.000Z');
+  assert.equal(display.assetLabel, '삼성전자');
+  assert.equal(display.executedAt, '2026-05-07 09:01');
+});
+
+test('order asset labels keep non-numeric symbols', () => {
+  const display = getOrderSuccessDisplay({
+    order: {
+      orderId: 'order-aapl',
+      asset: { id: 'asset-aapl', name: 'Apple', symbol: 'AAPL' },
+    },
+    execution: { state: 'executed' },
+  } as CreateOrderDto);
+
+  assert.equal(display.assetLabel, 'Apple · AAPL');
 });
 
 test('limit quote estimates come from the pinned quote basis and are labeled as estimates', () => {

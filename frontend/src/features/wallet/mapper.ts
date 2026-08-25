@@ -18,6 +18,7 @@ import { formatSourceMetadata } from '../../models/dto/common.ts';
 import {
   formatCurrency,
   formatDisplayDecimal,
+  formatKstDateTime,
   formatMoney,
 } from '../../utils/format.ts';
 
@@ -174,10 +175,10 @@ export function getFxQuoteDisplay(quote: FxQuoteDto) {
     feeRate: formatDisplayDecimal(quote.feeRate),
     feeAmount: formatMoney(quote.feeAmount, quote.feeCurrency),
     netTargetAmount: formatCurrency(quote.netTargetAmount, quote.toCurrency),
-    expiresAt: displayValue(quote.expiresAt),
+    expiresAt: formatKstDateTime(quote.expiresAt),
     maxChangeBps: formatDisplayDecimal(quote.maxChangeBps),
-    rateCapturedAt: displayValue(quote.rateCapturedAt),
-    rateEffectiveAt: displayValue(quote.rateEffectiveAt),
+    rateCapturedAt: formatKstDateTime(quote.rateCapturedAt),
+    rateEffectiveAt: formatKstDateTime(quote.rateEffectiveAt),
     rateSource: formatSourceMetadata(quote.rateSource),
   };
 }
@@ -229,7 +230,7 @@ function getWalletRows(wallets: unknown) {
 export function getFxExecuteSuccessDisplay(result: FxExecuteDto) {
   return {
     exchangeId: displayValue(result.exchangeId),
-    executedAt: displayValue(result.executedAt),
+    executedAt: formatKstDateTime(result.executedAt),
     direction: `${result.fromCurrency} → ${result.toCurrency}`,
     sourceAmount: formatCurrency(result.sourceAmount, result.fromCurrency),
     grossTargetAmount: formatCurrency(

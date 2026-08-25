@@ -10,7 +10,9 @@ import type {
 import {
   formatCurrency,
   formatDisplayDecimal,
+  formatKstDateTime,
   getAssetNameDisplay,
+  getAssetSymbolDisplay,
 } from '../../utils/format';
 import {
   getOrderStatusLabel,
@@ -245,6 +247,9 @@ export function getRecordOrderDisplay(item: RecordOrderItemDto) {
   // amounts are suppressed here rather than trusted to arrive null — the
   // reservation figures are what such a row is allowed to show.
   const noExecutionResult = hasNoExecutionResult(item);
+  const symbol = item.symbol
+    ? getAssetSymbolDisplay(item.symbol)
+    : item.assetId?.trim() || null;
 
   return {
     key:
@@ -252,9 +257,9 @@ export function getRecordOrderDisplay(item: RecordOrderItemDto) {
       item.id ??
       `${item.assetId ?? item.symbol}-${item.executedAt}`,
     orderId: item.orderId ?? item.id ?? null,
-    symbol: item.symbol ?? item.assetId ?? '-',
+    symbol: symbol === nameDisplay.primary ? null : symbol,
     name: nameDisplay.primary,
-    executedAt: item.executedAt ?? item.submittedAt ?? '-',
+    executedAt: formatKstDateTime(item.executedAt ?? item.submittedAt),
     side: item.side,
     // Side-aware limit badge input; market rows keep their historical look.
     isLimitOrder: item.orderType === 'limit',
@@ -269,7 +274,7 @@ export function getRecordOrderDisplay(item: RecordOrderItemDto) {
     reservedQuantity: item.reservedQuantity
       ? formatDisplayDecimal(item.reservedQuantity)
       : null,
-    submittedAt: item.submittedAt ?? '-',
+    submittedAt: formatKstDateTime(item.submittedAt),
     quantity: formatDisplayDecimal(item.quantity),
     price: noExecutionResult
       ? formatCurrency(item.limitPrice, currencyCode)
@@ -299,7 +304,7 @@ export function getRecordExchangeDisplay(item: RecordExchangeItemDto) {
       item.exchangeId ??
       item.id ??
       `${item.fromCurrency}-${item.toCurrency}-${item.executedAt}`,
-    executedAt: item.executedAt ?? '-',
+    executedAt: formatKstDateTime(item.executedAt),
     direction: `${item.fromCurrency} → ${item.toCurrency}`,
     sourceAmount: formatCurrency(item.sourceAmount, item.fromCurrency),
     rate: formatDisplayDecimal(

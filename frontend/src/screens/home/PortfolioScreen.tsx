@@ -51,6 +51,7 @@ import {
 } from '../../components/charts';
 import {
   formatKrw,
+  formatKstDateTime,
   formatPercent,
   getAssetNameDisplay,
 } from '../../utils/format';
@@ -118,7 +119,7 @@ function getEquityChartPoints(
   return points.map((point) => ({
     x: point.time,
     y: point.totalAssetKrw,
-    label: point.time,
+    label: formatKstDateTime(point.time),
   }));
 }
 
@@ -507,9 +508,9 @@ export default function PortfolioScreen({ navigation }: Props) {
             >
               <View>
                 <Text style={styles.itemTitle}>{nameDisplay.primary}</Text>
-                <Text style={styles.helper}>
-                  {nameDisplay.secondary ?? item.symbol}
-                </Text>
+                {nameDisplay.secondary ? (
+                  <Text style={styles.helper}>{nameDisplay.secondary}</Text>
+                ) : null}
                 <Text style={styles.helper}>수량 {item.quantity}</Text>
                 <Text style={styles.helper}>
                   평균 매입가 {item.averageCost}

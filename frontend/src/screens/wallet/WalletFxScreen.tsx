@@ -61,6 +61,7 @@ import { createIdempotencyKey } from '../../utils/idempotency';
 import {
   formatDisplayDecimal,
   formatKrw,
+  formatKstDateTime,
   formatUsd,
 } from '../../utils/format';
 
@@ -686,10 +687,10 @@ export default function WalletFxScreen({ navigation }: Props) {
             환율 {formatDisplayDecimal(rateQuery.data.rate)}
           </Text>
           <Text style={styles.helper}>
-            기준 시각 {displayValue(rateQuery.data.effectiveAt)}
+            기준 시각 {formatKstDateTime(rateQuery.data.effectiveAt)}
           </Text>
           <Text style={styles.helper}>
-            수집 시각 {displayValue(rateQuery.data.capturedAt)}
+            수집 시각 {formatKstDateTime(rateQuery.data.capturedAt)}
           </Text>
           <Text style={styles.helper}>
             최신성 {displayValue(rateQuery.data.freshnessAgeSeconds)}초

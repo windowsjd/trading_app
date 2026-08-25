@@ -19,7 +19,12 @@ import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import CTAButton from '../../components/common/CTAButton';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
-import { formatKrw, formatPercent, getAssetNameDisplay } from '../../utils/format';
+import {
+  formatKrw,
+  formatKstDateTime,
+  formatPercent,
+  getAssetNameDisplay,
+} from '../../utils/format';
 
 type Props = NativeStackScreenProps<RecordStackParamList, 'RecordSeasonDetail'>;
 
@@ -95,7 +100,8 @@ export default function RecordSeasonDetailScreen({ route, navigation }: Props) {
         <View style={styles.card}>
           <Text style={styles.title}>{season.name}</Text>
           <Text style={styles.helper}>
-            {season.startAt} ~ {season.endAt}
+            {formatKstDateTime(season.startAt)} ~{' '}
+            {formatKstDateTime(season.endAt)}
           </Text>
         </View>
 
@@ -116,7 +122,7 @@ export default function RecordSeasonDetailScreen({ route, navigation }: Props) {
             스냅샷 일자 {displayValue(performance.snapshotDate)}
           </Text>
           <Text style={styles.helper}>
-            수집 시각 {displayValue(performance.capturedAt)}
+            수집 시각 {formatKstDateTime(performance.capturedAt)}
           </Text>
           {performance.state === 'unavailable' ? (
             <InlineEmptyState

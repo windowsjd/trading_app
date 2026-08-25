@@ -7,7 +7,7 @@ import Svg, {
 } from 'react-native-svg';
 
 import ChartEmptyState from './ChartEmptyState';
-import { formatDisplayDecimal } from '../../utils/format';
+import { formatDisplayDecimal, formatKstDateTime } from '../../utils/format';
 
 export type LineChartPoint = {
   x?: string | number | Date;
@@ -59,7 +59,7 @@ function downsample(points: SanitizedPoint[], maxPoints: number) {
 
 function getPointLabel(point: LineChartPoint) {
   if (point.label) return point.label;
-  if (point.x instanceof Date) return point.x.toISOString();
+  if (point.x instanceof Date) return formatKstDateTime(point.x);
   if (point.x !== undefined) return String(point.x);
   return '';
 }

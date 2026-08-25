@@ -25,7 +25,11 @@ import {
 } from '../../services/api/errorMapper';
 import { ERROR_CODE } from '../../models/enums/errorCode';
 import type { SeasonJoinViewState } from '../../models/enums/viewState';
-import { formatDisplayDecimal, formatKrw } from '../../utils/format';
+import {
+  formatDisplayDecimal,
+  formatKrw,
+  formatKstDateTime,
+} from '../../utils/format';
 
 import AccountSetupPanel from '../../components/tradingAccount/AccountSetupPanel';
 import FullPageLoading from '../../components/states/FullPageLoading';
@@ -336,7 +340,8 @@ export default function SeasonJoinScreen({ navigation }: Props) {
         <View style={styles.card}>
           <Text style={styles.title}>{season.name}</Text>
           <Text style={styles.helper}>
-            시즌 기간: {season.startAt} ~ {season.endAt}
+            시즌 기간: {formatKstDateTime(season.startAt)} ~{' '}
+            {formatKstDateTime(season.endAt)}
           </Text>
           <Text style={styles.helper}>
             시작 자산: {formatKrw(season.initialCapitalKrw)}원

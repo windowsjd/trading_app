@@ -39,6 +39,7 @@ import {
   type CandleViewport,
 } from './candlestickViewport';
 import ChartEmptyState from './ChartEmptyState';
+import { formatKstDateTime } from '../../utils/format';
 
 export type CandlestickChartCandle = {
   time: string;
@@ -90,35 +91,9 @@ const DEFAULT_WIDTH = 320;
 const MAX_PARSED_CANDLES = 1000;
 const PADDING = { top: 12, right: 66, bottom: 26, left: 8 };
 
-const WEEKDAY_KO: Record<string, string> = {
-  Sun: '일',
-  Mon: '월',
-  Tue: '화',
-  Wed: '수',
-  Thu: '목',
-  Fri: '금',
-  Sat: '토',
-};
-
-const seoulDateTimeFormatter = new Intl.DateTimeFormat('en-US', {
-  timeZone: 'Asia/Seoul',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  weekday: 'short',
-  hourCycle: 'h23',
-});
-
-/** "목, 2026-07-09, 12:30" in Asia/Seoul (Korean weekday). */
+/** Shared fixed-KST `YYYY-MM-DD HH:mm` display policy for chart labels. */
 function formatSeoulDateTimeLabel(timeMs: number): string {
-  if (!Number.isFinite(timeMs)) return '-';
-  const parts = seoulDateTimeFormatter.formatToParts(new Date(timeMs));
-  const get = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((part) => part.type === type)?.value ?? '';
-  const weekday = WEEKDAY_KO[get('weekday')] ?? get('weekday');
-  return `${weekday}, ${get('year')}-${get('month')}-${get('day')}, ${get('hour')}:${get('minute')}`;
+  return formatKstDateTime(new Date(timeMs));
 }
 
 function toNumber(value: string | number | null | undefined): number | null {

@@ -28,6 +28,7 @@ import { getPortfolioNotice } from '../../features/tradingAccount/portfolioMessa
 import { getKnownWalletBalanceAmount } from '../../features/wallet/mapper';
 import {
   formatKrw,
+  formatKstDateTime,
   formatPercent,
   formatUsd,
   getAssetNameDisplay,
@@ -265,7 +266,7 @@ export default function SeasonAccountHome({
     .map<LineChartPoint | null>((point) => {
       const value = Number(point.totalAssetKrw);
       if (!Number.isFinite(value)) return null;
-      return { x: point.time, y: value, label: point.time };
+      return { x: point.time, y: value, label: formatKstDateTime(point.time) };
     })
     .filter((point): point is LineChartPoint => point !== null);
 

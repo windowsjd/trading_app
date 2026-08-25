@@ -6,6 +6,7 @@ import {
   formatPercent,
   getAssetNameDisplay,
   getAssetPriceText,
+  getAssetSymbolMarketDisplay,
 } from '../../utils/format';
 import type { AssetTickerMessage } from '../asset/assetTickerPolicy';
 import type { MarketAssetItemDto } from './api';
@@ -43,6 +44,7 @@ function MarketAssetRowComponent({ item, ticker, isStale, onPress }: Props) {
     [item, ticker],
   );
   const nameDisplay = getAssetNameDisplay(displayItem);
+  const symbolMarketDisplay = getAssetSymbolMarketDisplay(displayItem);
 
   return (
     <Pressable
@@ -52,9 +54,9 @@ function MarketAssetRowComponent({ item, ticker, isStale, onPress }: Props) {
     >
       <View>
         <Text style={styles.itemSymbol}>{nameDisplay.primary}</Text>
-        <Text style={styles.helper}>
-          {displayItem.symbol} · {displayItem.market}
-        </Text>
+        {symbolMarketDisplay ? (
+          <Text style={styles.helper}>{symbolMarketDisplay}</Text>
+        ) : null}
       </View>
 
       <View style={styles.alignEnd}>

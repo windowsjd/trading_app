@@ -26,7 +26,7 @@ import {
   findAccountIntegrityFailure,
 } from '../../features/tradingAccount/accountIntegrityGate';
 import AccountSwitcher from '../../components/tradingAccount/AccountSwitcher';
-import { formatMoney } from '../../utils/format';
+import { formatKstDateTime, formatMoney } from '../../utils/format';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -92,21 +92,6 @@ function getTxTypeLabel(txType?: string | null) {
 
   const normalized = txType.trim().toLowerCase();
   return TX_TYPE_LABELS[normalized] ?? txType;
-}
-
-function formatOccurredAt(value?: string | null) {
-  if (!value) return '-';
-
-  const timestamp = Date.parse(value);
-  if (!Number.isFinite(timestamp)) return value;
-
-  return new Date(timestamp).toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
 function getSignedAmount(item: WalletTransactionDto) {
@@ -331,7 +316,7 @@ export default function WalletTransactionsScreen({ route }: Props) {
                   잔액 {formatMoney(item.balanceAfter, item.currencyCode)}
                 </Text>
                 <Text style={styles.helper}>
-                  {formatOccurredAt(item.occurredAt)}
+                  {formatKstDateTime(item.occurredAt)}
                 </Text>
               </View>
               {item.referenceType ? (

@@ -6,6 +6,18 @@ export type FormatCurrencyCode = 'KRW' | 'USD' | (string & {});
 
 const KRW_UNIT = '원';
 const USD_SYMBOL = '$';
+const PURE_NUMERIC_ASSET_SYMBOL = /^\d+$/u;
+const KST_DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Seoul',
+  calendar: 'gregory',
+  numberingSystem: 'latn',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
 
 function toFiniteNumber(value: string | number | null | undefined): number | null {
   if (value === null || value === undefined || value === '') return null;
@@ -302,6 +314,59 @@ export function formatPercent(
   return formatDisplayDecimal(parsed.toFixed(digits));
 }
 
+/**
+ * Display-only timestamp formatter. The device timezone is deliberately
+ * ignored: every valid instant is rendered in Asia/Seoul as
+ * `YYYY-MM-DD HH:mm`, without seconds or an offset. Date-only domain fields
+ * must not be passed here.
+ */
+export function formatKstDateTime(
+  value: string | Date | null | undefined,
+): string {
+  if (value === null || value === undefined || value === '') return '-';
+
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    // A date-only value is not an instant, and a timezone-less datetime would
+    // be interpreted in the device timezone. Reject both at this boundary so
+    // the formatter never invents a time or varies by device settings.
+    if (
+      !/^\d{4}-\d{2}-\d{2}T/u.test(normalized) ||
+      !/(?:Z|[+-]\d{2}:?\d{2})$/iu.test(normalized)
+    ) {
+      return '-';
+    }
+  }
+
+  const date = value instanceof Date ? value : new Date(value.trim());
+  if (!Number.isFinite(date.getTime())) return '-';
+
+  const parts = KST_DATE_TIME_FORMATTER.formatToParts(date);
+  const getPart = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value;
+  const year = getPart('year');
+  const month = getPart('month');
+  const day = getPart('day');
+  const hour = getPart('hour');
+  const minute = getPart('minute');
+
+  if (!year || !month || !day || !hour || !minute) return '-';
+  return `${year}-${month}-${day} ${hour}:${minute}`;
+}
+
+/**
+ * Asset-symbol display policy. Pure numeric symbols are searchable/provider
+ * identifiers (for example KRX 000270), but are not user-facing labels.
+ * Alphanumeric symbols such as 1INCHUSDT remain visible.
+ */
+export function getAssetSymbolDisplay(
+  symbol?: string | null,
+): string | null {
+  const normalized = symbol?.trim() || null;
+  if (!normalized || PURE_NUMERIC_ASSET_SYMBOL.test(normalized)) return null;
+  return normalized;
+}
+
 export type AssetNameDisplay = {
   primary: string;
   secondary: string | null;
@@ -314,11 +379,25 @@ export type AssetNameDisplay = {
 export function getAssetNameDisplay(
   asset?: { name?: string | null; symbol?: string | null } | null,
 ): AssetNameDisplay {
-  const name = asset?.name?.trim() || null;
-  const symbol = asset?.symbol?.trim() || null;
+  const rawName = asset?.name?.trim() || null;
+  const rawSymbol = asset?.symbol?.trim() || null;
+  const symbol = getAssetSymbolDisplay(rawSymbol);
+  // Some fallback payloads may repeat the symbol in `name`. Do not let a
+  // hidden numeric symbol re-enter the UI through that duplicate field.
+  const name = rawName === rawSymbol && rawSymbol && !symbol ? null : rawName;
 
   if (name && symbol && name !== symbol) return { primary: name, secondary: symbol };
   if (name) return { primary: name, secondary: null };
   if (symbol) return { primary: symbol, secondary: null };
   return { primary: '-', secondary: null };
+}
+
+/** Symbol/market secondary line with empty parts and separators removed. */
+export function getAssetSymbolMarketDisplay(
+  asset?: { symbol?: string | null; market?: string | null } | null,
+): string | null {
+  const symbol = getAssetSymbolDisplay(asset?.symbol);
+  const market = asset?.market?.trim() || null;
+  const display = [symbol, market].filter((value): value is string => !!value);
+  return display.length > 0 ? display.join(' · ') : null;
 }

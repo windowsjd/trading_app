@@ -24,6 +24,7 @@ import {
   formatPercent,
   getAssetNameDisplay,
   getAssetPriceText,
+  getAssetSymbolMarketDisplay,
 } from '../../utils/format';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
@@ -184,30 +185,36 @@ export default function MarketSearchScreen({ navigation }: Props) {
             />
           )
         }
-        renderItem={({ item }) => (
-          <Pressable
-            testID={TEST_IDS.market.item(item.id)}
-            style={styles.itemRow}
-            onPress={() =>
-              navigation.navigate('AssetDetail', { assetId: item.id })
-            }
-          >
-            <View>
-              <Text style={styles.itemSymbol}>{getAssetNameDisplay(item).primary}</Text>
-              <Text style={styles.helper}>
-                {item.symbol} · {item.market}
-              </Text>
-            </View>
+        renderItem={({ item }) => {
+          const nameDisplay = getAssetNameDisplay(item);
+          const symbolMarketDisplay = getAssetSymbolMarketDisplay(item);
 
-            <View style={styles.alignEnd}>
-              <Text style={styles.itemPrice}>{getAssetPriceText(item)}</Text>
-              <Text style={styles.helper}>{getChangeRateText(item)}</Text>
-              <Text style={styles.helper}>
-                {item.marketStatus} · {item.tradable ? '거래 가능' : '거래 제한'}
-              </Text>
-            </View>
-          </Pressable>
-        )}
+          return (
+            <Pressable
+              testID={TEST_IDS.market.item(item.id)}
+              style={styles.itemRow}
+              onPress={() =>
+                navigation.navigate('AssetDetail', { assetId: item.id })
+              }
+            >
+              <View>
+                <Text style={styles.itemSymbol}>{nameDisplay.primary}</Text>
+                {symbolMarketDisplay ? (
+                  <Text style={styles.helper}>{symbolMarketDisplay}</Text>
+                ) : null}
+              </View>
+
+              <View style={styles.alignEnd}>
+                <Text style={styles.itemPrice}>{getAssetPriceText(item)}</Text>
+                <Text style={styles.helper}>{getChangeRateText(item)}</Text>
+                <Text style={styles.helper}>
+                  {item.marketStatus} ·{' '}
+                  {item.tradable ? '거래 가능' : '거래 제한'}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        }}
         ListFooterComponent={
           searchQuery.isFetchingNextPage ? (
             <View style={styles.footerLoader}>

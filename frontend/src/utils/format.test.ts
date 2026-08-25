@@ -4,11 +4,14 @@ import { test } from 'node:test';
 import {
   formatCurrency,
   formatDisplayDecimal,
+  formatKstDateTime,
   formatKrw,
   formatMoney,
   formatPercent,
   formatUsd,
   getAssetNameDisplay,
+  getAssetSymbolDisplay,
+  getAssetSymbolMarketDisplay,
   normalizeCurrencyCode,
 } from './format.ts';
 
@@ -207,11 +210,34 @@ test('formatPercent', async (t) => {
 });
 
 test('getAssetNameDisplay', async (t) => {
-  await t.test('name primary, symbol secondary when both present', () => {
+  await t.test('hides pure numeric stock symbols while keeping the name', () => {
     assert.deepEqual(getAssetNameDisplay({ name: '삼성전자', symbol: '005930' }), {
       primary: '삼성전자',
-      secondary: '005930',
+      secondary: null,
     });
+    assert.deepEqual(getAssetNameDisplay({ name: 'Kia', symbol: '000270' }), {
+      primary: 'Kia',
+      secondary: null,
+    });
+    assert.deepEqual(getAssetNameDisplay({ name: 'SK Hynix', symbol: '000660' }), {
+      primary: 'SK Hynix',
+      secondary: null,
+    });
+    assert.deepEqual(getAssetNameDisplay({ name: '005930', symbol: '005930' }), {
+      primary: '-',
+      secondary: null,
+    });
+  });
+
+  await t.test('keeps useful non-numeric symbols as secondary text', () => {
+    assert.deepEqual(getAssetNameDisplay({ name: 'Apple', symbol: 'AAPL' }), {
+      primary: 'Apple',
+      secondary: 'AAPL',
+    });
+    assert.deepEqual(
+      getAssetNameDisplay({ name: '1inch', symbol: '1INCHUSDT' }),
+      { primary: '1inch', secondary: '1INCHUSDT' },
+    );
   });
 
   await t.test('falls back to symbol as primary when name is missing', () => {
@@ -242,5 +268,96 @@ test('getAssetNameDisplay', async (t) => {
   await t.test('empty asset renders as "-"', () => {
     assert.deepEqual(getAssetNameDisplay(null), { primary: '-', secondary: null });
     assert.deepEqual(getAssetNameDisplay({}), { primary: '-', secondary: null });
+  });
+});
+
+test('asset symbol display policy', async (t) => {
+  await t.test('hides only pure numeric symbols', () => {
+    assert.equal(getAssetSymbolDisplay('000270'), null);
+    assert.equal(getAssetSymbolDisplay('005930'), null);
+    assert.equal(getAssetSymbolDisplay('000660'), null);
+    assert.equal(getAssetSymbolDisplay('AAPL'), 'AAPL');
+    assert.equal(getAssetSymbolDisplay('NVDA'), 'NVDA');
+    assert.equal(getAssetSymbolDisplay('BTCUSDT'), 'BTCUSDT');
+    assert.equal(getAssetSymbolDisplay('ETHUSDT'), 'ETHUSDT');
+    assert.equal(getAssetSymbolDisplay('1INCHUSDT'), '1INCHUSDT');
+    assert.equal(getAssetSymbolDisplay(' 000270 '), null);
+  });
+
+  await t.test('keeps market text without an empty separator', () => {
+    assert.equal(
+      getAssetSymbolMarketDisplay({ symbol: '000270', market: 'KRX' }),
+      'KRX',
+    );
+    assert.equal(
+      getAssetSymbolMarketDisplay({ symbol: 'AAPL', market: 'NASDAQ' }),
+      'AAPL · NASDAQ',
+    );
+    assert.equal(
+      getAssetSymbolMarketDisplay({ symbol: '000270', market: null }),
+      null,
+    );
+  });
+});
+
+test('formatKstDateTime', async (t) => {
+  await t.test('converts UTC instants to fixed KST minute precision', () => {
+    assert.equal(
+      formatKstDateTime('2026-06-29T07:45:12.702Z'),
+      '2026-06-29 16:45',
+    );
+    assert.equal(
+      formatKstDateTime('2026-08-25T03:44:48.000Z'),
+      '2026-08-25 12:44',
+    );
+  });
+
+  await t.test('handles date rollover and explicit KST offsets', () => {
+    assert.equal(
+      formatKstDateTime('2026-12-31T15:30:00.000Z'),
+      '2027-01-01 00:30',
+    );
+    assert.equal(
+      formatKstDateTime('2026-08-25T12:44:48+09:00'),
+      '2026-08-25 12:44',
+    );
+    assert.equal(
+      formatKstDateTime(new Date('2026-08-25T03:44:48.000Z')),
+      '2026-08-25 12:44',
+    );
+  });
+
+  await t.test('returns a placeholder for missing and invalid values', () => {
+    assert.equal(formatKstDateTime(null), '-');
+    assert.equal(formatKstDateTime(undefined), '-');
+    assert.equal(formatKstDateTime(''), '-');
+    assert.equal(formatKstDateTime('not-a-date'), '-');
+    assert.equal(formatKstDateTime(new Date(Number.NaN)), '-');
+    assert.equal(formatKstDateTime('2026-08-25'), '-');
+    assert.equal(formatKstDateTime('2026-08-25T12:44:48'), '-');
+  });
+
+  await t.test('does not expose seconds, milliseconds or offsets', () => {
+    const display = formatKstDateTime('2026-06-29T07:45:12.702Z');
+    assert.match(display, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/u);
+    assert.ok(!display.includes(':12'));
+    assert.ok(!display.includes('.702'));
+    assert.ok(!display.includes('Z'));
+    assert.ok(!display.includes('+09:00'));
+  });
+
+  await t.test('is independent of the process/device timezone', () => {
+    const previousTimezone = process.env.TZ;
+    try {
+      process.env.TZ = 'America/New_York';
+      const newYork = formatKstDateTime('2026-08-25T03:44:48.000Z');
+      process.env.TZ = 'Europe/London';
+      const london = formatKstDateTime('2026-08-25T03:44:48.000Z');
+      assert.equal(newYork, '2026-08-25 12:44');
+      assert.equal(london, '2026-08-25 12:44');
+    } finally {
+      if (previousTimezone === undefined) delete process.env.TZ;
+      else process.env.TZ = previousTimezone;
+    }
   });
 });
