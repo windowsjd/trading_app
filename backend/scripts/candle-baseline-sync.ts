@@ -17,6 +17,10 @@
  *   # seed the 35-day 5m baseline for every active asset (resumable)
  *   pnpm exec tsx scripts/candle-baseline-sync.ts --apply
  *
+ *   # seed provider-native daily/weekly baselines for selected assets
+ *   pnpm exec tsx scripts/candle-baseline-sync.ts --apply --days 365 \
+ *     --target 1d --target 1w --asset-id <uuid>
+ *
  *   # keep the tail fresh afterwards (cheap; run on a schedule)
  *   pnpm exec tsx scripts/candle-baseline-sync.ts --apply --mode incremental
  *
@@ -25,6 +29,7 @@
  *   --apply | --dry-run      run for real / plan only (default: --dry-run)
  *   --mode initial|incremental|repair   default: initial
  *   --days N                 baseline window, default 35 (the 5m retention)
+ *   --target 5m|1d|1w        repeatable; default: 5m
  *   --asset-type domestic_stock|us_stock|crypto   repeatable
  *   --asset-id <uuid>        repeatable; overrides --asset-type
  *   --max-assets N           process at most N assets
@@ -43,6 +48,10 @@ import {
   loadRuntimeEnv,
   requireDatabaseUrl,
 } from './lib/load-runtime-env';
+import {
+  parseCandleBaselineArgs,
+  type CandleBaselineArgs,
+} from './lib/candle-baseline-args';
 
 loadRuntimeEnv();
 
@@ -72,13 +81,9 @@ import { KisDomesticFiveMinuteBuilder } from '../src/providers/kis/candles/kis-d
 import { KisDomesticPeriodAdapter } from '../src/providers/kis/candles/kis-domestic-period.adapter';
 import { KisOverseasPeriodAdapter } from '../src/providers/kis/candles/kis-overseas-period.adapter';
 import { KisPeriodCandleNormalizerService } from '../src/providers/kis/candles/kis-period-candle-normalizer.service';
-import {
-  MarketCandleSyncMode,
-  AssetType,
-} from '../src/generated/prisma/client';
+import { MarketCandleSyncMode } from '../src/generated/prisma/client';
 
 const DAY_MS = 24 * 60 * 60_000;
-const DEFAULT_BASELINE_DAYS = 35;
 
 /**
  * The sync dependencies, wired explicitly (the same objects the Nest module
@@ -120,97 +125,6 @@ function createSyncService(prisma: PrismaService, redis: RedisService) {
   );
 }
 
-type Args = {
-  report: boolean;
-  apply: boolean;
-  mode: MarketCandleSyncMode;
-  days: number;
-  assetTypes: AssetType[];
-  assetIds: string[];
-  maxAssets?: number;
-  resume: boolean;
-};
-
-function parseArgs(argv: string[]): Args {
-  const args: Args = {
-    report: false,
-    apply: false,
-    mode: MarketCandleSyncMode.initial,
-    days: DEFAULT_BASELINE_DAYS,
-    assetTypes: [],
-    assetIds: [],
-    resume: true,
-  };
-  for (let index = 0; index < argv.length; index += 1) {
-    const flag = argv[index];
-    const value = argv[index + 1];
-    switch (flag) {
-      case '--report':
-        args.report = true;
-        break;
-      case '--apply':
-        args.apply = true;
-        break;
-      case '--dry-run':
-        args.apply = false;
-        break;
-      case '--no-resume':
-        args.resume = false;
-        break;
-      case '--mode':
-        if (
-          value !== 'initial' &&
-          value !== 'incremental' &&
-          value !== 'repair'
-        ) {
-          throw new Error('--mode must be initial, incremental, or repair.');
-        }
-        args.mode = value as MarketCandleSyncMode;
-        index += 1;
-        break;
-      case '--days': {
-        const days = Number(value);
-        if (!Number.isSafeInteger(days) || days < 1 || days > 365) {
-          throw new Error('--days must be an integer between 1 and 365.');
-        }
-        args.days = days;
-        index += 1;
-        break;
-      }
-      case '--asset-type':
-        if (
-          value !== 'domestic_stock' &&
-          value !== 'us_stock' &&
-          value !== 'crypto'
-        ) {
-          throw new Error(
-            '--asset-type must be domestic_stock, us_stock, or crypto.',
-          );
-        }
-        args.assetTypes.push(value as AssetType);
-        index += 1;
-        break;
-      case '--asset-id':
-        if (!value) throw new Error('--asset-id requires a value.');
-        args.assetIds.push(value);
-        index += 1;
-        break;
-      case '--max-assets': {
-        const max = Number(value);
-        if (!Number.isSafeInteger(max) || max < 1) {
-          throw new Error('--max-assets must be a positive integer.');
-        }
-        args.maxAssets = max;
-        index += 1;
-        break;
-      }
-      default:
-        if (flag.startsWith('--')) throw new Error(`Unknown flag ${flag}.`);
-    }
-  }
-  return args;
-}
-
 function iso(value: Date | null | undefined): string {
   return value ? value.toISOString() : '-';
 }
@@ -218,7 +132,7 @@ function iso(value: Date | null | undefined): string {
 async function report(
   prisma: PrismaService,
   states: MarketCandleSyncStateRepository,
-  args: Args,
+  args: CandleBaselineArgs,
   now: Date,
 ): Promise<number> {
   const from = new Date(now.getTime() - args.days * DAY_MS);
@@ -272,7 +186,7 @@ async function report(
  * live-candle pipeline). Operators can therefore check readiness on a machine
  * that has nothing but the database.
  */
-async function runReport(args: Args): Promise<number> {
+async function runReport(args: CandleBaselineArgs): Promise<number> {
   const prisma = new PrismaService();
   try {
     await prisma.$connect();
@@ -288,7 +202,7 @@ async function runReport(args: Args): Promise<number> {
 }
 
 async function main(): Promise<number> {
-  const args = parseArgs(process.argv.slice(2));
+  const args = parseCandleBaselineArgs(process.argv.slice(2));
   requireDatabaseUrl();
   console.log(`database: ${formatDatabaseTarget(process.env.DATABASE_URL)}`);
 
@@ -304,10 +218,10 @@ async function main(): Promise<number> {
     const now = new Date();
     const from = new Date(now.getTime() - args.days * DAY_MS);
     console.log(
-      `mode=${args.mode} dryRun=${!args.apply} window=${iso(from)} → ${iso(now)} feed=5m`,
+      `mode=${args.mode} dryRun=${!args.apply} window=${iso(from)} → ${iso(now)} feeds=${args.targets.join(',')}`,
     );
     const summary = await syncService.syncAssets({
-      targets: ['5m'],
+      targets: args.targets,
       mode: args.mode,
       // incremental resolves its own start from the newest stored candle; an
       // explicit from/to is what makes initial/repair cover the baseline.
@@ -354,11 +268,13 @@ async function main(): Promise<number> {
   }
 }
 
-main()
-  .then((code) => {
-    process.exitCode = code;
-  })
-  .catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  });
+if (require.main === module) {
+  main()
+    .then((code) => {
+      process.exitCode = code;
+    })
+    .catch((error: unknown) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    });
+}
