@@ -26,6 +26,7 @@ jest.mock('../../generated/prisma/client', () => {
 import { Logger } from '@nestjs/common';
 import type { MarketSnapshotHealthService } from '../market-snapshot-health.service';
 import type { ProviderConfigService } from '../provider-config.service';
+import { KIS_FIXED_DOMESTIC_SYMBOLS } from './kis-fixed-asset-universe';
 import type { KisRestCurrentPriceIngestionService } from './kis-rest-current-price.ingestion.service';
 import { KisKrxStartupCatchUpService } from './kis-krx-startup-catch-up.service';
 
@@ -59,6 +60,49 @@ describe('KIS KRX startup catch-up', () => {
       usSymbols: [],
       maxSnapshots: 1,
     });
+  });
+
+  it('limits 15 missing KRX health assets to the configured two-symbol universe', async () => {
+    const healthAssets = KIS_FIXED_DOMESTIC_SYMBOLS.slice(0, 15).map(
+      missingKrxAsset,
+    );
+    expect(healthAssets).toHaveLength(15);
+    const { service, restIngestionService } = createService({
+      domesticSymbols: [' 005930 ', '000270'],
+      assets: healthAssets,
+    });
+
+    await expect(service.runStartupCatchUp(POST_CLOSE)).resolves.toMatchObject({
+      state: 'completed',
+      requestedSymbols: ['005930', '000270'],
+    });
+    expect(restIngestionService.ingestCurrentPrices).toHaveBeenCalledWith(
+      expect.objectContaining({
+        domesticSymbols: ['005930', '000270'],
+        maxSnapshots: 2,
+      }),
+    );
+    expect(
+      restIngestionService.ingestCurrentPrices.mock.calls[0][0].domesticSymbols,
+    ).not.toContain('000660');
+  });
+
+  it('still excludes configured symbols that do not meet the health conditions', async () => {
+    const { service, restIngestionService } = createService({
+      domesticSymbols: ['005930', '000270'],
+      assets: [missingKrxAsset('005930'), availableKrxAsset('000270')],
+    });
+
+    await expect(service.runStartupCatchUp(POST_CLOSE)).resolves.toMatchObject({
+      state: 'completed',
+      requestedSymbols: ['005930'],
+    });
+    expect(restIngestionService.ingestCurrentPrices).toHaveBeenCalledWith(
+      expect.objectContaining({
+        domesticSymbols: ['005930'],
+        maxSnapshots: 1,
+      }),
+    );
   });
 
   it('does not call KIS when the latest completed session is already covered', async () => {
@@ -170,6 +214,7 @@ describe('KIS KRX startup catch-up', () => {
 function createService(input: {
   providerEnabled?: boolean;
   websocketStreamingEnabled?: boolean;
+  domesticSymbols?: string[];
   assets: object[];
 }) {
   const providerEnabled = input.providerEnabled ?? true;
@@ -180,6 +225,7 @@ function createService(input: {
         enabled: providerEnabled,
         canCallRestLive: providerEnabled,
         wsStreamingEnabled: input.websocketStreamingEnabled ?? true,
+        domesticSymbols: input.domesticSymbols ?? ['000270'],
       },
     }),
   };

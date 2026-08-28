@@ -1,6 +1,7 @@
 import { buildProviderConfig } from './provider-config.service';
 import { ProviderConfigError } from './provider.types';
 import { BINANCE_FIXED_SYMBOLS } from './binance/binance-fixed-asset-universe';
+import { KIS_FIXED_DOMESTIC_SYMBOLS } from './kis/kis-fixed-asset-universe';
 
 describe('provider config', () => {
   it('allows all providers disabled with missing secrets', () => {
@@ -122,6 +123,15 @@ describe('provider config', () => {
     expect(config.kis.wsStreamingReconnectMinMs).toBe(1000);
     expect(config.kis.wsStreamingReconnectMaxMs).toBe(30000);
     expect(config.kis.wsStreamingHeartbeatTimeoutMs).toBe(60000);
+  });
+
+  it('keeps the fixed domestic universe fallback when KIS symbols are unset or blank', () => {
+    expect(buildProviderConfig({}).kis.domesticSymbols).toEqual([
+      ...KIS_FIXED_DOMESTIC_SYMBOLS,
+    ]);
+    expect(
+      buildProviderConfig({ KIS_DOMESTIC_SYMBOLS: '   ' }).kis.domesticSymbols,
+    ).toEqual([...KIS_FIXED_DOMESTIC_SYMBOLS]);
   });
 
   it('parses KIS long-lived WebSocket streaming env overrides', () => {

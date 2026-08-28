@@ -106,6 +106,9 @@ export class KisKrxStartupCatchUpService implements OnApplicationBootstrap {
       }
 
       const health = await this.healthService.checkActiveAssetCoverage({ now });
+      const configuredDomesticSymbols = new Set(
+        config.kis.domesticSymbols.map((symbol) => symbol.trim().toUpperCase()),
+      );
       const requestedSymbols = [
         ...new Set(
           health.assets
@@ -114,6 +117,9 @@ export class KisKrxStartupCatchUpService implements OnApplicationBootstrap {
                 asset.state === 'unavailable' &&
                 asset.assetType === ('domestic_stock' as AssetType) &&
                 KRX_MARKETS.has(asset.market.trim().toUpperCase()) &&
+                configuredDomesticSymbols.has(
+                  asset.symbol.trim().toUpperCase(),
+                ) &&
                 asset.reason !== null &&
                 MISSING_COMPLETED_SESSION_REASONS.has(asset.reason),
             )
