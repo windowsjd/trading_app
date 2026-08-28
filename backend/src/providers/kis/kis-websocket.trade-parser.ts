@@ -237,6 +237,7 @@ function parseJsonAck(
         message ?? code ?? 'KIS WebSocket subscription ack failed.',
         trId,
         { frame, receivedAt },
+        code,
       );
     }
 
@@ -620,11 +621,13 @@ function failed(
   message: string,
   trId: string | null,
   input: { frame: string; receivedAt: Date },
+  code: string | null = null,
 ): KisWebSocketParsedMessage {
   return {
     state: 'failed',
     reason,
     message,
+    code,
     trId,
     rawFrame: input.frame,
     receivedAt: input.receivedAt,

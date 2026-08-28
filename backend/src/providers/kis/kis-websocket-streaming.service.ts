@@ -10,6 +10,7 @@ import {
   ProviderConfigService,
   type ProviderConfig,
 } from '../provider-config.service';
+import { redactText } from '../provider-secret-redaction';
 import { ProviderConfigError, ProviderHttpError } from '../provider.types';
 import { KisAuthClient } from './kis-auth.client';
 import { KisKrxStartupCatchUpService } from './kis-krx-startup-catch-up.service';
@@ -82,6 +83,10 @@ export type KisWebSocketStreamingStatus = {
 };
 
 const KIS_STREAMING_CONNECT_TIMEOUT_MS = 10_000;
+// WHATWG WebSocket.close() permits application codes in 3000..4999. Keep
+// 4000 for heartbeat timeout and 4001 for the existing scheduled-reconnect
+// convention; 4002 identifies a provider subscription rejection.
+const KIS_SUBSCRIPTION_ACK_FAILURE_CLOSE_CODE = 4002;
 
 @Injectable()
 export class KisWebSocketStreamingService
@@ -362,10 +367,12 @@ export class KisWebSocketStreamingService
       this.markDisconnected();
       this.clearHeartbeatTimer();
       if (this.status.running && !this.stopping) {
-        this.recordError(
-          'KIS_WEBSOCKET_CLOSED',
-          'KIS WebSocket connection closed.',
-        );
+        if (this.status.lastErrorCode !== 'KIS_SUBSCRIPTION_ACK_FAILED') {
+          this.recordError(
+            'KIS_WEBSOCKET_CLOSED',
+            'KIS WebSocket connection closed.',
+          );
+        }
         this.scheduleReconnect(input.config);
       }
     });
@@ -462,7 +469,7 @@ export class KisWebSocketStreamingService
     if (result.created > 0) {
       this.status.lastSnapshotAt = receivedAt.toISOString();
     }
-    if (result.errorCode) {
+    if (result.errorCode && parsed.state !== 'failed') {
       this.recordError(
         result.errorCode,
         result.errorMessage ?? result.errorCode,
@@ -472,11 +479,46 @@ export class KisWebSocketStreamingService
     this.publishLatestPriceEvents(cacheEntries, result.snapshots);
 
     if (parsed.state === 'failed') {
-      this.recordError(parsed.reason, parsed.message);
+      const diagnostic = this.buildFailedMessageDiagnostic(
+        parsed,
+        input.approvalKey,
+      );
+      this.recordError(parsed.reason, diagnostic);
       if (parsed.reason === 'KIS_SUBSCRIPTION_ACK_FAILED') {
-        this.socket?.close(1011, 'subscription ack failed');
+        this.logger.warn(diagnostic);
+        this.socket?.close(
+          KIS_SUBSCRIPTION_ACK_FAILURE_CLOSE_CODE,
+          'subscription ack failed',
+        );
       }
     }
+  }
+
+  private buildFailedMessageDiagnostic(
+    parsed: Extract<KisWebSocketParsedMessage, { state: 'failed' }>,
+    approvalKey: string,
+  ): string {
+    let appKey: string | null = null;
+    let appSecret: string | null = null;
+    try {
+      const config = this.configService.getConfig();
+      appKey = config.kis.appKey ?? null;
+      appSecret = config.kis.appSecret ?? null;
+    } catch {
+      // The failure remains observable even if config cannot be re-read.
+    }
+    const secrets = [approvalKey, appKey, appSecret];
+
+    if (parsed.reason !== 'KIS_SUBSCRIPTION_ACK_FAILED') {
+      return redactText(parsed.message, { secrets });
+    }
+
+    return [
+      'KIS subscription ACK failed:',
+      `trId=${redactText(parsed.trId ?? 'UNKNOWN', { secrets })}`,
+      `code=${redactText(parsed.code ?? 'UNKNOWN', { secrets })}`,
+      `message=${redactText(parsed.message, { secrets })}`,
+    ].join(' ');
   }
 
   private updateLatestCache(

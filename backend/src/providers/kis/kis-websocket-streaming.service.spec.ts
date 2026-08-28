@@ -28,6 +28,7 @@ jest.mock('../../generated/prisma/client', () => {
 });
 
 import type { ProviderConfigService } from '../provider-config.service';
+import { Logger } from '@nestjs/common';
 import type { KisAuthClient } from './kis-auth.client';
 import type { KisKrxStartupCatchUpService } from './kis-krx-startup-catch-up.service';
 import { KisRealtimePriceCacheService } from './kis-realtime-price-cache.service';
@@ -104,6 +105,94 @@ describe('KIS WebSocket streaming service', () => {
       subscribedSymbolCount: 1,
       lastErrorCode: null,
     });
+  });
+
+  it('keeps successful subscription acknowledgements unchanged', async () => {
+    const ingestionService = createIngestionService({
+      ingestParsedMessage: jest.fn().mockResolvedValue({
+        success: true,
+        provider: 'kis',
+        dryRun: false,
+        received: 1,
+        acknowledged: 1,
+        created: 0,
+        skipped: 0,
+        wouldCreate: 0,
+        failed: 0,
+        snapshots: [],
+      }),
+    });
+    service = createService({ ingestionService });
+
+    service.start();
+    await flushAsync();
+    const socket = FakeWebSocket.instances[0];
+    socket.emitMessage(
+      JSON.stringify({
+        header: { tr_id: 'H0STCNT0' },
+        body: {
+          rt_cd: '0',
+          msg_cd: 'OPSP0000',
+          msg1: 'SUBSCRIBE SUCCESS',
+        },
+      }),
+    );
+    await flushAsync();
+
+    expect(service.getStatus()).toMatchObject({
+      connected: true,
+      acknowledged: 1,
+      lastErrorCode: null,
+    });
+    expect(socket.closeCalls).toHaveLength(0);
+  });
+
+  it('surfaces redacted ACK failure details, closes with 4002, and schedules reconnect', async () => {
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn');
+    service = createService({
+      configService: configServiceForTest({
+        reconnectMinMs: 250,
+        reconnectMaxMs: 1000,
+      }),
+    });
+
+    service.start();
+    await flushAsync();
+    const socket = FakeWebSocket.instances[0];
+    socket.emitMessage(
+      JSON.stringify({
+        header: { tr_id: 'H0STCNT0' },
+        body: {
+          rt_cd: '1',
+          msg_cd: 'OPSP9999',
+          msg1: 'Rejected app-key-for-test app-secret-for-test approval-secret-for-test',
+        },
+      }),
+    );
+    await flushAsync();
+
+    expect(socket.closeCalls).toEqual([
+      { code: 4002, reason: 'subscription ack failed' },
+    ]);
+    expect(socket.closeCalls).not.toContainEqual(
+      expect.objectContaining({ code: 1011 }),
+    );
+    expect(service.getStatus()).toMatchObject({
+      connected: false,
+      reconnecting: true,
+      reconnectCount: 1,
+      nextReconnectDelayMs: 250,
+      lastErrorCode: 'KIS_SUBSCRIPTION_ACK_FAILED',
+      lastErrorMessage:
+        'KIS subscription ACK failed: trId=H0STCNT0 code=OPSP9999 message=Rejected [REDACTED] [REDACTED] [REDACTED]',
+    });
+    const warnings = warnSpy.mock.calls.flat().join(' ');
+    expect(warnings).toContain(
+      'KIS subscription ACK failed: trId=H0STCNT0 code=OPSP9999',
+    );
+    expect(warnings).not.toContain('app-key-for-test');
+    expect(warnings).not.toContain('app-secret-for-test');
+    expect(warnings).not.toContain('approval-secret-for-test');
   });
 
   it('awaits the one-shot KRX catch-up before starting persistent streaming', async () => {
@@ -358,6 +447,20 @@ describe('KIS WebSocket streaming service', () => {
       lastErrorCode: 'KIS_WEBSOCKET_CLOSED',
     });
   });
+
+  it('keeps close code 1000 for normal streaming shutdown', async () => {
+    service = createService();
+    service.start();
+    await flushAsync();
+    const socket = FakeWebSocket.instances[0];
+
+    await service.stop();
+
+    expect(socket.closeCalls.at(-1)).toEqual({
+      code: 1000,
+      reason: 'streaming shutdown',
+    });
+  });
 });
 
 function createService(
@@ -501,6 +604,7 @@ class FakeWebSocket {
   static instances: FakeWebSocket[] = [];
 
   readonly sent: string[] = [];
+  readonly closeCalls: Array<{ code?: number; reason?: string }> = [];
   readonly listeners = new Map<string, Set<(event: unknown) => void>>();
   readyState = 1;
 
@@ -512,7 +616,8 @@ class FakeWebSocket {
     this.sent.push(data);
   }
 
-  close(): void {
+  close(code?: number, reason?: string): void {
+    this.closeCalls.push({ code, reason });
     this.emitClose();
   }
 

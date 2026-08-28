@@ -42,6 +42,7 @@ export type KisWebSocketParsedFailed = {
   state: 'failed';
   reason: string;
   message: string;
+  code: string | null;
   trId: string | null;
   rawFrame: string;
   receivedAt: Date;

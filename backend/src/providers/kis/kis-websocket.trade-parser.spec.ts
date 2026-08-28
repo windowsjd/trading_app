@@ -17,7 +17,11 @@ describe('KIS WebSocket trade parser', () => {
     const parsed = parseKisWebSocketMessage({
       frame: JSON.stringify({
         header: { tr_id: 'H0STCNT0' },
-        body: { msg1: 'SUBSCRIBE SUCCESS' },
+        body: {
+          rt_cd: '0',
+          msg_cd: 'OPSP0000',
+          msg1: 'SUBSCRIBE SUCCESS',
+        },
       }),
       receivedAt,
     });
@@ -26,8 +30,8 @@ describe('KIS WebSocket trade parser', () => {
       state: 'ack',
       trId: 'H0STCNT0',
       message: 'SUBSCRIBE SUCCESS',
-      code: null,
-      success: null,
+      code: 'OPSP0000',
+      success: true,
     });
   });
 
@@ -49,7 +53,10 @@ describe('KIS WebSocket trade parser', () => {
       frame: '{"header": {"tr_id": "PINGPONG"',
       receivedAt,
     });
-    expect(parsed).toMatchObject({ state: 'failed', reason: 'INVALID_JSON_ACK' });
+    expect(parsed).toMatchObject({
+      state: 'failed',
+      reason: 'INVALID_JSON_ACK',
+    });
   });
 
   it('returns failed for KIS subscription failure ack frames', () => {
@@ -69,6 +76,7 @@ describe('KIS WebSocket trade parser', () => {
       state: 'failed',
       trId: 'H0STCNT0',
       reason: 'KIS_SUBSCRIPTION_ACK_FAILED',
+      code: 'OPSP9999',
       message: 'SUBSCRIBE FAILED',
     });
   });
