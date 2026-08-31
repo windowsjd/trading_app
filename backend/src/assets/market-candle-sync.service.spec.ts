@@ -1116,6 +1116,189 @@ describe('MarketCandleSyncService', () => {
     ]);
   });
 
+  describe('KIS period lower-bound market session alignment', () => {
+    const productionFrom = new Date('2025-08-31T07:58:58.798Z');
+    const productionTo = new Date('2026-08-31T07:58:58.798Z');
+    const receivedAt = new Date('2026-08-31T07:00:00Z');
+    const domesticRow = (date: string) => ({
+      value: {
+        stck_bsop_date: date,
+        stck_clpr: '101',
+        stck_oprc: '100',
+        stck_hgpr: '102',
+        stck_lwpr: '99',
+        acml_vol: '1000',
+        acml_tr_pbmn: '101000',
+      },
+      receivedAt,
+      sequence: 0,
+    });
+    const emptyPeriodPage = {
+      state: 'ok' as const,
+      rows: [],
+      providerReturnedRows: 0,
+      blankRows: 0,
+      oldestDate: null,
+      latestDate: null,
+      trCont: null,
+    };
+
+    for (const interval of ['1d', '1w'] as const) {
+      it(`completes KRX ${interval} at the first session after a weekend lower bound`, async () => {
+        const harness = createHarness({ assets: [DOMESTIC_ASSET] });
+        harness.domesticPeriodAdapter.fetchPeriodPage
+          .mockResolvedValueOnce({
+            state: 'ok',
+            rows: [domesticRow('20260831'), domesticRow('20250901')],
+            providerReturnedRows: 2,
+            blankRows: 0,
+            oldestDate: '20250901',
+            latestDate: '20260831',
+            trCont: 'D',
+          })
+          // Old behavior makes this unnecessary Sunday request and terminates
+          // empty_page_before_target instead of completing on Monday.
+          .mockResolvedValueOnce(emptyPeriodPage);
+
+        const result = await harness.service.syncAsset({
+          assetId: DOMESTIC_ASSET.id,
+          targets: [interval],
+          mode: 'repair' as never,
+          from: productionFrom,
+          to: productionTo,
+          now: productionTo,
+        });
+
+        expect(
+          harness.domesticPeriodAdapter.fetchPeriodPage,
+        ).toHaveBeenCalledTimes(1);
+        const call = callArg<{
+          interval: string;
+          fromDate: string;
+          endDate: string;
+        }>(harness.domesticPeriodAdapter.fetchPeriodPage);
+        expect(call).toMatchObject({
+          interval,
+          fromDate: '20250901',
+          endDate: '20260831',
+        });
+        const feed = result.feeds[0];
+        expect(feed.stopReason).toBe('target_reached');
+        expect(feed.completionReason).toBe('target_reached');
+        expect(feed.coverageComplete).toBe(true);
+        expect(feed.coveredFrom).toEqual(productionFrom);
+        expect(feed.coveredTo).toEqual(productionTo);
+        const state = harness.stateRepository.rows[0];
+        expect(state.targetFrom).toEqual(productionFrom);
+        expect(state.targetTo).toEqual(productionTo);
+        expect(state.coveredFrom).toEqual(productionFrom);
+      });
+    }
+
+    it('completes from the first KRX session after a calendar holiday block', async () => {
+      const harness = createHarness({ assets: [DOMESTIC_ASSET] });
+      const from = new Date('2026-02-16T00:00:00Z');
+      const to = new Date('2026-02-20T07:00:00Z');
+      harness.domesticPeriodAdapter.fetchPeriodPage
+        .mockResolvedValueOnce({
+          state: 'ok',
+          rows: [domesticRow('20260220'), domesticRow('20260219')],
+          providerReturnedRows: 2,
+          blankRows: 0,
+          oldestDate: '20260219',
+          latestDate: '20260220',
+          trCont: 'D',
+        })
+        .mockResolvedValueOnce(emptyPeriodPage);
+
+      const result = await harness.service.syncAsset({
+        assetId: DOMESTIC_ASSET.id,
+        targets: ['1d'],
+        mode: 'repair' as never,
+        from,
+        to,
+        now: to,
+      });
+
+      expect(
+        harness.domesticPeriodAdapter.fetchPeriodPage,
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        callArg<{ fromDate: string }>(
+          harness.domesticPeriodAdapter.fetchPeriodPage,
+        ).fromDate,
+      ).toBe('20260219');
+      const feed = result.feeds[0];
+      expect(feed.stopReason).toBe('target_reached');
+      expect(feed.completionReason).toBe('target_reached');
+      expect(feed.coverageComplete).toBe(true);
+      expect(feed.coveredFrom).toEqual(from);
+      expect(feed.coveredTo).toEqual(to);
+    });
+
+    it('applies the same calendar-driven lower bound to a KIS US period feed', async () => {
+      const usAsset = {
+        id: 'us-1',
+        symbol: 'AAPL',
+        market: 'NAS',
+        assetType: 'us_stock',
+        isActive: true,
+      };
+      const harness = createHarness({ assets: [usAsset] });
+      const from = new Date('2026-07-05T12:00:00Z'); // Sunday in New York
+      const to = new Date('2026-07-10T21:00:00Z');
+      const overseasRow = (date: string) => ({
+        value: {
+          xymd: date,
+          open: '100',
+          high: '102',
+          low: '99',
+          clos: '101',
+          tvol: '1000',
+          tamt: '101000',
+        },
+        receivedAt: to,
+        sequence: 0,
+      });
+      harness.overseasPeriodAdapter.fetchPeriodPage
+        .mockResolvedValueOnce({
+          state: 'ok',
+          rows: [overseasRow('20260710'), overseasRow('20260706')],
+          providerReturnedRows: 2,
+          blankRows: 0,
+          oldestDate: '20260706',
+          latestDate: '20260710',
+          trCont: 'D',
+        })
+        .mockResolvedValueOnce(emptyPeriodPage);
+
+      const result = await harness.service.syncAsset({
+        assetId: usAsset.id,
+        targets: ['1d'],
+        mode: 'repair' as never,
+        from,
+        to,
+        now: to,
+      });
+
+      expect(
+        harness.overseasPeriodAdapter.fetchPeriodPage,
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        callArg<{ fromDate: string }>(
+          harness.overseasPeriodAdapter.fetchPeriodPage,
+        ).fromDate,
+      ).toBe('20260706');
+      expect(result.feeds[0]).toMatchObject({
+        stopReason: 'target_reached',
+        completionReason: 'target_reached',
+        coverageComplete: true,
+        coveredFrom: from,
+        coveredTo: to,
+      });
+    });
+  });
+
   describe('coverage completeness', () => {
     it('records a fully swept Binance run as coverage-complete (target_reached)', async () => {
       const harness = createHarness();
@@ -1251,8 +1434,10 @@ describe('MarketCandleSyncService', () => {
       });
       const feed = result.feeds[0];
       expect(feed.status).toBe('completed');
+      expect(feed.stopReason).toBe('empty_page');
       expect(feed.coverageComplete).toBe(false);
       expect(feed.completionReason).toBe('empty_page_before_target');
+      expect(feed.coveredFrom).toBeNull();
       expect(harness.stateRepository.rows[0].coveredFrom).toBeNull();
       expect(harness.stateRepository.rows[0].coveredTo).toBeNull();
     });
@@ -1321,7 +1506,7 @@ describe('MarketCandleSyncService', () => {
       expect(row.coveredTo?.getTime()).toBe(to.getTime());
     });
 
-    it('keeps a KIS period run that hit an empty page before targetFrom as incomplete', async () => {
+    it('keeps a KIS period run that exhausts before a real lower-bound session incomplete', async () => {
       const harness = createHarness({ assets: [DOMESTIC_ASSET] });
       const receivedAt = new Date('2026-07-10T07:00:00Z');
       harness.domesticPeriodAdapter.fetchPeriodPage
@@ -1361,7 +1546,9 @@ describe('MarketCandleSyncService', () => {
         assetId: DOMESTIC_ASSET.id,
         targets: ['1d'],
         mode: 'repair' as never,
-        from: new Date('2026-01-01T00:00:00Z'),
+        // 09:00 KST on an actual Friday session: calendar alignment must not
+        // hide provider exhaustion after this lower bound.
+        from: new Date('2026-01-02T00:00:00Z'),
         to: new Date('2026-07-10T15:00:00Z'),
         now: NOW,
       });
@@ -1369,6 +1556,11 @@ describe('MarketCandleSyncService', () => {
       expect(feed.status).toBe('completed');
       expect(feed.coverageComplete).toBe(false);
       expect(feed.completionReason).toBe('empty_page_before_target');
+      expect(
+        callArg<{ fromDate: string }>(
+          harness.domesticPeriodAdapter.fetchPeriodPage,
+        ).fromDate,
+      ).toBe('20260102');
     });
 
     it('accumulates coverage across a resumed run before declaring completeness', async () => {
@@ -1888,7 +2080,8 @@ describe('MarketCandleSyncService', () => {
   // dataset regression) nor be mislabeled expected_no_data.
   describe('default 365-day stock range across the year boundary', () => {
     // Monday 2026-07-20 18:00 KST / 05:00 EDT: KRX closed for the day, US
-    // pre-open. Default range = [2025-07-20T09:00Z, 2026-07-20T09:00Z).
+    // pre-open. Default range = [2025-07-20T09:00Z, 2026-07-20T09:00Z);
+    // its lower local date is Sunday, so provider paging begins on Monday 21.
     const SYNC_NOW = new Date('2026-07-20T09:00:00Z');
     const US_ASSET = {
       id: 'us-1',
@@ -1932,7 +2125,7 @@ describe('MarketCandleSyncService', () => {
         rows: [domesticRow('20260720'), domesticRow('20250721')],
         providerReturnedRows: 2,
         blankRows: 0,
-        oldestDate: '20250718',
+        oldestDate: '20250721',
         latestDate: '20260720',
         trCont: 'D',
       });
@@ -1952,7 +2145,7 @@ describe('MarketCandleSyncService', () => {
       const call = callArg<{ fromDate: string; endDate: string }>(
         harness.domesticPeriodAdapter.fetchPeriodPage,
       );
-      expect(call.fromDate).toBe('20250720');
+      expect(call.fromDate).toBe('20250721');
       expect(call.endDate).toBe('20260720');
       expect(feed.rangeFrom).toEqual(new Date('2025-07-20T09:00:00Z'));
       expect(feed.rangeTo).toEqual(SYNC_NOW);
@@ -1973,7 +2166,7 @@ describe('MarketCandleSyncService', () => {
         rows: [overseasRow('20260717'), overseasRow('20250721')],
         providerReturnedRows: 2,
         blankRows: 0,
-        oldestDate: '20250718',
+        oldestDate: '20250721',
         latestDate: '20260717',
         trCont: 'D',
       });
@@ -1992,7 +2185,7 @@ describe('MarketCandleSyncService', () => {
       const call = callArg<{ fromDate: string; endDate: string }>(
         harness.overseasPeriodAdapter.fetchPeriodPage,
       );
-      expect(call.fromDate).toBe('20250720');
+      expect(call.fromDate).toBe('20250721');
       // Upper bound: latest completed US session (Fri 2026-07-17), since the
       // US session has not opened yet at 05:00 EDT.
       expect(call.endDate).toBe('20260717');
@@ -2006,10 +2199,10 @@ describe('MarketCandleSyncService', () => {
       const harness = createHarness({ assets: [DOMESTIC_ASSET] });
       harness.domesticPeriodAdapter.fetchPeriodPage.mockResolvedValueOnce({
         state: 'ok',
-        rows: [domesticRow('20260717'), domesticRow('20250714')],
+        rows: [domesticRow('20260717'), domesticRow('20250721')],
         providerReturnedRows: 2,
         blankRows: 0,
-        oldestDate: '20250714',
+        oldestDate: '20250721',
         latestDate: '20260717',
         trCont: 'D',
       });
@@ -2031,18 +2224,18 @@ describe('MarketCandleSyncService', () => {
         interval: string;
       }>(harness.domesticPeriodAdapter.fetchPeriodPage);
       expect(call.interval).toBe('1w');
-      expect(call.fromDate).toBe('20250720');
+      expect(call.fromDate).toBe('20250721');
       expect(call.endDate).toBe('20260720');
       expect(feed.status).toBe('completed');
       expect(feed.stopReason).toBe('target_reached');
       expect(feed.coverageComplete).toBe(true);
-      // Weekly candles anchor to the ISO Monday, incl. the 2025 week.
+      // Weekly candles anchor to the ISO Monday, incl. the first session week.
       const written = harness.upserted.flat() as { openTime: Date }[];
       expect(
         written.some(
           (row) =>
             row.openTime.getTime() ===
-            new Date('2025-07-13T15:00:00Z').getTime(),
+            new Date('2025-07-20T15:00:00Z').getTime(),
         ),
       ).toBe(true);
     });
@@ -2060,12 +2253,16 @@ describe('MarketCandleSyncService', () => {
           adapterKey === 'domesticPeriodAdapter'
             ? domesticRow('20260716')
             : overseasRow('20260716');
+        const lowerRow =
+          adapterKey === 'domesticPeriodAdapter'
+            ? domesticRow('20250721')
+            : overseasRow('20250721');
         adapter.fetchPeriodPage.mockResolvedValueOnce({
           state: 'ok',
-          rows: [row],
-          providerReturnedRows: 1,
+          rows: [row, lowerRow],
+          providerReturnedRows: 2,
           blankRows: 0,
-          oldestDate: '20250718',
+          oldestDate: '20250721',
           latestDate: '20260716',
           trCont: 'D',
         });
@@ -2082,7 +2279,7 @@ describe('MarketCandleSyncService', () => {
         const call = callArg<{ fromDate: string; endDate: string }>(
           adapter.fetchPeriodPage,
         );
-        expect(call.fromDate).toBe('20250720');
+        expect(call.fromDate).toBe('20250721');
         expect(call.endDate).toBe(endDate);
         expect(feed.status).toBe('completed');
         expect(feed.stopReason).toBe('target_reached');

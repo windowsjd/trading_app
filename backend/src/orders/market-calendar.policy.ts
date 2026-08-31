@@ -125,6 +125,31 @@ export function resolveMarketSession(
   };
 }
 
+/**
+ * Finds the first real exchange session on or after one local calendar date.
+ * Weekend/holiday/override semantics stay centralized in resolveMarketSession;
+ * callers must provide a bounded, calendar-covered search range.
+ */
+export function findFirstMarketSessionOnOrAfter(
+  market: 'KRX' | 'US',
+  localDate: string,
+  throughLocalDate: string,
+  scheduleLookup: typeof findEffectiveMarketSchedule = findEffectiveMarketSchedule,
+): MarketSessionWindow | null {
+  const startMs = compactDateToUtcMs(localDate);
+  const endMs = compactDateToUtcMs(throughLocalDate);
+  if (startMs === null || endMs === null || startMs > endMs) return null;
+  for (let cursor = startMs; cursor <= endMs; cursor += 86_400_000) {
+    const session = resolveMarketSession(
+      market,
+      compactDateFromUtcMs(cursor),
+      scheduleLookup,
+    );
+    if (session) return session;
+  }
+  return null;
+}
+
 export function findLatestCompletedMarketSession(
   asset: MarketCalendarAsset,
   now: Date,

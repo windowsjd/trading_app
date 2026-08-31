@@ -54,7 +54,9 @@ import {
 import { AssetCandlesCacheService } from './asset-candles-cache.service';
 import { ProviderConfigError } from '../providers/provider.types';
 import {
+  findFirstMarketSessionOnOrAfter,
   inspectMarketSessionsInRange,
+  resolveCalendarMarket,
   resolveStockMarketDataUpperBound,
 } from '../orders/market-calendar.policy';
 
@@ -1091,7 +1093,7 @@ export class MarketCandleSyncService {
   ): Promise<MarketCandleFeedPage> {
     const domestic = descriptor.kind === 'kis_domestic';
     const timeZone = domestic ? 'Asia/Seoul' : 'America/New_York';
-    const fromDate = formatZonedCursor(input.from, timeZone).date;
+    const targetFromDate = formatZonedCursor(input.from, timeZone).date;
     const providerTo = resolveStockMarketDataUpperBound(
       input.asset,
       input.to,
@@ -1104,12 +1106,31 @@ export class MarketCandleSyncService {
       new Date(providerTo.getTime() - 1),
       timeZone,
     ).date;
+    const calendarMarket = resolveCalendarMarket(input.asset);
+    const firstSession = calendarMarket
+      ? findFirstMarketSessionOnOrAfter(
+          calendarMarket,
+          targetFromDate,
+          defaultEndDate,
+        )
+      : null;
+    if (!firstSession) {
+      // fetchFeedPage already verified that the whole range is calendar
+      // covered and contains a session. A disagreement here is therefore a
+      // calendar-policy failure and must fail closed, never imply coverage.
+      return emptyFeedPage('calendar_unavailable', false);
+    }
+    // Provider date paging only needs to reach the first actual session on or
+    // after targetFrom. The persisted target and eventual coverage claim stay
+    // at the original instant: the skipped local dates are calendar-confirmed
+    // non-trading dates, so no provider rows can exist there.
+    const providerFromDate = firstSession.localDate.replace(/-/gu, '');
     const cursorEndDate = readDateField(input.cursor, 'endDate');
     const endDate =
       cursorEndDate !== null && cursorEndDate <= defaultEndDate
         ? cursorEndDate
         : defaultEndDate;
-    if (endDate < fromDate) {
+    if (endDate < providerFromDate) {
       // The persisted date cursor already moved past targetFrom: the previous
       // pages confirmed the whole range (their coverage is in the checkpoint).
       return emptyFeedPage('target_reached', true);
@@ -1125,7 +1146,7 @@ export class MarketCandleSyncService {
         marketCode: descriptor.marketCode,
       },
       interval: input.feed as KisPeriodInterval,
-      fromDate,
+      fromDate: providerFromDate,
       endDate,
       signal: input.signal,
       timeoutMs: Math.min(
@@ -1178,10 +1199,11 @@ export class MarketCandleSyncService {
           now: input.now,
         });
 
-    if (page.oldestDate <= fromDate) {
+    if (page.oldestDate <= providerFromDate) {
       // The date cursor chained contiguously from targetTo down past
-      // targetFrom, so the whole target range is provider-confirmed. Clamp to
-      // `now`: a target ending in the future cannot be confirmed beyond now.
+      // the first real session at/after targetFrom, so the original target
+      // range is provider-confirmed. Clamp to `now`: a target ending in the
+      // future cannot be confirmed beyond now.
       const coveredToMs = Math.min(input.to.getTime(), input.now.getTime());
       return {
         candles: normalized.candles,
