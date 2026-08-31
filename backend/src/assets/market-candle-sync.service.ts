@@ -1258,9 +1258,32 @@ export class MarketCandleSyncService {
       cursorTo <= input.to.getTime()
         ? new Date(cursorTo)
         : input.to;
-    const segmentFrom = new Date(
-      Math.max(input.from.getTime(), segmentTo.getTime() - segmentMs),
+    const unalignedSegmentFromMs = Math.max(
+      input.from.getTime(),
+      segmentTo.getTime() - segmentMs,
     );
+    const domestic = descriptor.kind === 'kis_domestic';
+    // Keep the persisted target exact, but never use an internal domestic
+    // segment boundary that cuts through a 5m bucket. The oldest segment may
+    // still begin at the exact (unaligned) targetFrom for coverage semantics;
+    // its provider fetch is expanded down to the bucket boundary below.
+    const segmentFromMs =
+      domestic && unalignedSegmentFromMs > input.from.getTime()
+        ? Math.max(
+            input.from.getTime(),
+            floorToFiveMinutes(unalignedSegmentFromMs),
+          )
+        : unalignedSegmentFromMs;
+    const segmentFrom = new Date(segmentFromMs);
+    // KIS domestic normalization is range-strict. Expand only the two target
+    // edge buckets (less than 5m each); internal segment edges are aligned and
+    // shared exactly, so adjacent segments have neither gaps nor overlap.
+    const providerFrom = domestic
+      ? new Date(floorToFiveMinutes(segmentFromMs))
+      : segmentFrom;
+    const providerTo = domestic
+      ? new Date(ceilToFiveMinutes(segmentTo.getTime()))
+      : segmentTo;
 
     const fetchInput = {
       asset: {
@@ -1268,8 +1291,8 @@ export class MarketCandleSyncService {
         symbol: descriptor.symbol,
         marketCode: descriptor.marketCode,
       },
-      from: segmentFrom,
-      to: segmentTo,
+      from: providerFrom,
+      to: providerTo,
       maxPages: Math.min(KIS_SEGMENT_MAX_PAGES, input.budget.pagesLeft),
       maxRows: KIS_SEGMENT_MAX_RAW_ROWS,
       maxDurationMs: Math.max(1, input.budget.deadlineMs - Date.now()),
@@ -1679,6 +1702,10 @@ function emptyFeedPage(
 
 function ceilToFiveMinutes(ms: number): number {
   return Math.ceil(ms / 300_000) * 300_000;
+}
+
+function floorToFiveMinutes(ms: number): number {
+  return Math.floor(ms / 300_000) * 300_000;
 }
 
 function asJsonObject(

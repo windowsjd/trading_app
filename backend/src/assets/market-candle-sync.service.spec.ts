@@ -957,6 +957,76 @@ describe('MarketCandleSyncService', () => {
     expect(harness.stateRepository.rows[0].pagesFetched).toBe(6);
   });
 
+  it('aligns unaligned domestic provider segments without changing target coverage', async () => {
+    const harness = createHarness({ assets: [DOMESTIC_ASSET] });
+    harness.fiveMinuteIngestion.fetchDomesticFiveMinuteCandles.mockImplementation(
+      ({ from, to }: { from: Date; to: Date }) =>
+        Promise.resolve({
+          provider: 'kis_domestic_minute',
+          assetId: DOMESTIC_ASSET.id,
+          rangeFrom: from,
+          rangeTo: to,
+          pagesFetched: 2,
+          providerReturnedRows: 10,
+          acceptedRows: 10,
+          rejectedRows: 0,
+          duplicateRows: 0,
+          candles: [syntheticCandle(from.getTime())],
+          complete: true,
+          stopReason: 'target_reached',
+          oldestOpenTime: from,
+          latestOpenTime: from,
+          completeBuckets: 1,
+          incompleteBuckets: 0,
+          rejectedBuckets: 0,
+        }),
+    );
+    const to = new Date('2026-07-10T05:25:00.967Z');
+    const from = new Date(to.getTime() - 5 * DAY);
+
+    const result = await harness.service.syncAsset({
+      assetId: DOMESTIC_ASSET.id,
+      targets: ['5m'],
+      mode: 'repair' as never,
+      from,
+      to,
+      now: NOW,
+    });
+
+    const calls = (
+      harness.fiveMinuteIngestion.fetchDomesticFiveMinuteCandles.mock
+        .calls as unknown[][]
+    ).map((call) => call[0] as { from: Date; to: Date });
+    expect(calls).toHaveLength(3);
+    for (const call of calls) {
+      expect(call.from.getTime() % FIVE_MIN).toBe(0);
+      expect(call.to.getTime() % FIVE_MIN).toBe(0);
+    }
+    // Newest-first adjacent segments share one aligned boundary: neither a
+    // one-minute hole nor a bucket split can be introduced between them.
+    for (let index = 0; index < calls.length - 1; index += 1) {
+      expect(calls[index].from.getTime()).toBe(calls[index + 1].to.getTime());
+    }
+    // Provider expansion is bounded to the two target-edge buckets.
+    expect(calls[0].to.getTime() - to.getTime()).toBeGreaterThanOrEqual(0);
+    expect(calls[0].to.getTime() - to.getTime()).toBeLessThan(FIVE_MIN);
+    expect(
+      from.getTime() - calls.at(-1)!.from.getTime(),
+    ).toBeGreaterThanOrEqual(0);
+    expect(from.getTime() - calls.at(-1)!.from.getTime()).toBeLessThan(
+      FIVE_MIN,
+    );
+
+    const feed = result.feeds[0];
+    expect(feed.coverageComplete).toBe(true);
+    expect(feed.completionReason).toBe('target_reached');
+    const row = harness.stateRepository.rows[0];
+    expect(row.targetFrom.getTime()).toBe(from.getTime());
+    expect(row.targetTo.getTime()).toBe(to.getTime());
+    expect(row.coveredFrom?.getTime()).toBe(from.getTime());
+    expect(row.coveredTo?.getTime()).toBe(to.getTime());
+  });
+
   it('honors continueOnError=false by skipping later assets after a failure', async () => {
     const secondAsset = { ...CRYPTO_ASSET, id: 'crypto-2', symbol: 'ETH' };
     const harness = createHarness({ assets: [CRYPTO_ASSET, secondAsset] });
