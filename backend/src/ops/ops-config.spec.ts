@@ -65,6 +65,7 @@ describe('getOpsSchedulerConfig', () => {
     expect(config.marketCandleSync).toEqual({
       enabled: false,
       intervalSeconds: 600,
+      assetIds: undefined,
     });
   });
 
@@ -81,6 +82,7 @@ describe('getOpsSchedulerConfig', () => {
     expect(config.marketCandleSync).toEqual({
       enabled: true,
       intervalSeconds: 300,
+      assetIds: undefined,
     });
 
     expect(() =>
@@ -89,6 +91,30 @@ describe('getOpsSchedulerConfig', () => {
       }),
     ).toThrow('SCHEDULER_MARKET_CANDLE_SYNC_ENABLED');
   });
+
+  it.each([
+    ['id1,id2', ['id1', 'id2']],
+    [' id1 , id2 ', ['id1', 'id2']],
+    ['id1,id2,id1', ['id1', 'id2']],
+    ['id1,, ,id2', ['id1', 'id2']],
+  ])('parses scheduled candle asset IDs from %j', (value, expected) => {
+    const config = getOpsSchedulerConfig({
+      SCHEDULER_MARKET_CANDLE_SYNC_ASSET_IDS: value,
+    });
+
+    expect(config.marketCandleSync.assetIds).toEqual(expected);
+  });
+
+  it.each([undefined, '', ' , , '])(
+    'keeps scheduled candle asset IDs unrestricted for %j',
+    (value) => {
+      const config = getOpsSchedulerConfig({
+        SCHEDULER_MARKET_CANDLE_SYNC_ASSET_IDS: value,
+      });
+
+      expect(config.marketCandleSync.assetIds).toBeUndefined();
+    },
+  );
 
   it('validates retention schedule settings strictly', () => {
     const config = getOpsSchedulerConfig({
@@ -228,6 +254,7 @@ describe('getOpsSchedulerConfig', () => {
 
     expect(envExample).toContain('SCHEDULER_TICK_INTERVAL_MS=60000');
     expect(envExample).toContain('SCHEDULER_PROVIDER_KIS_ENABLED=false');
+    expect(envExample).toContain('SCHEDULER_MARKET_CANDLE_SYNC_ASSET_IDS=');
     expect(envExample).toContain('KIS_PRICE_INGESTION_MODE=websocket_trade');
     expect(envExample).toContain('SCHEDULER_PROVIDER_FX_INTERVAL_SECONDS=3600');
     expect(envExample).toContain(

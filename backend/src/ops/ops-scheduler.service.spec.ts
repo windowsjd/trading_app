@@ -199,6 +199,7 @@ describe('OpsSchedulerService', () => {
 
   it('does not schedule market candle sync unless its flag is set', async () => {
     process.env.SCHEDULER_ENABLED = 'true';
+    process.env.SCHEDULER_MARKET_CANDLE_SYNC_ASSET_IDS = 'id1,id2';
     const { runner, service } = createService();
 
     await service.runEnabledJobs(new Date('2026-07-10T03:00:00.000Z'));
@@ -219,6 +220,7 @@ describe('OpsSchedulerService', () => {
         continueOnError: true,
         requestedBy: 'scheduler',
         now: '2026-07-10T03:00:00.000Z',
+        assetIds: undefined,
       }),
     );
 
@@ -234,6 +236,22 @@ describe('OpsSchedulerService', () => {
     // Past the interval: due again.
     await service.runEnabledJobs(new Date('2026-07-10T03:11:30.000Z'));
     expect(runner.runMarketCandleSyncJob).toHaveBeenCalledTimes(2);
+  });
+
+  it('passes the configured asset allowlist to the candle sync job', async () => {
+    process.env.SCHEDULER_MARKET_CANDLE_SYNC_ENABLED = 'true';
+    process.env.SCHEDULER_MARKET_CANDLE_SYNC_ASSET_IDS = ' id1 , id2 , id1 ';
+    const { runner, service } = createService();
+
+    await service.runEnabledJobs(new Date('2026-07-10T03:00:00.000Z'));
+
+    expect(runner.runMarketCandleSyncJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'incremental',
+        continueOnError: true,
+        assetIds: ['id1', 'id2'],
+      }),
+    );
   });
 
   it('does not fast-retry a failed candle sync before its interval', async () => {

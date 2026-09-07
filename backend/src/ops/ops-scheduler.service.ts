@@ -309,6 +309,7 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
           mode: 'incremental',
           continueOnError: true,
           now: now.toISOString(),
+          assetIds: config.marketCandleSync.assetIds,
         });
       } catch {
         // Recorded on the run row; the next interval retries from checkpoints.

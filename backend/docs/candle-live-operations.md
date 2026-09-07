@@ -354,13 +354,15 @@ The scheduled form of that incremental upkeep is built in: setting
 `SCHEDULER_MARKET_CANDLE_SYNC_ENABLED=true` (interval
 `SCHEDULER_MARKET_CANDLE_SYNC_INTERVAL_SECONDS`, default 600) makes the Ops
 scheduler run the SAME checkpointed `market_candle_sync` job with
-`mode=incremental` for every active asset and all three persisted feeds
-(`5m`/`1d`/`1w`). Warm assets re-fetch their tail from the latest stored row
-minus the revision overlap; an asset whose store is empty falls back to the
-feed-default lookback (35 days for `5m`), so cold assets self-seed over
-successive runs. The one-off `--apply` seeding above is still the fastest way
-to fill a fresh environment; the scheduled job is what keeps every window
-servable afterwards. Overlap safety is unchanged: the Ops DB job lock
+`mode=incremental` for every active asset by default, or only the Asset UUIDs
+listed in `SCHEDULER_MARKET_CANDLE_SYNC_ASSET_IDS`, and all three persisted
+feeds (`5m`/`1d`/`1w`). Empty or unset preserves the all-active default. Warm
+assets re-fetch their tail from the latest stored row minus the revision
+overlap; an asset whose store is empty falls back to the feed-default lookback
+(35 days for `5m`), so cold assets self-seed over successive runs. The one-off
+`--apply` seeding above is still the fastest way to fill a fresh environment;
+the scheduled job is what keeps every window servable afterwards. Overlap
+safety is unchanged: the Ops DB job lock
 serializes whole runs across instances, per-asset/feed Redis backfill locks
 serialize with on-demand HTTP refreshes, and the scheduler skips a tick while
 its previous sync is still in flight.

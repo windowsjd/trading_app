@@ -41,6 +41,7 @@ export type OpsSchedulerConfig = {
   marketCandleSync: {
     enabled: boolean;
     intervalSeconds: number;
+    assetIds?: string[];
   };
   marketCandleReconciliation: MarketCandleReconciliationConfig;
   /** Dedicated (non-tick) interval for the limit-order matching job. */
@@ -146,6 +147,9 @@ export function getOpsSchedulerConfig(
     env.SCHEDULER_MARKET_CANDLE_SYNC_INTERVAL_SECONDS,
     DEFAULT_MARKET_CANDLE_SYNC_INTERVAL_SECONDS,
   );
+  const marketCandleSyncAssetIds = parseOptionalCommaSeparatedEnv(
+    env.SCHEDULER_MARKET_CANDLE_SYNC_ASSET_IDS,
+  );
 
   return {
     enabled:
@@ -231,6 +235,7 @@ export function getOpsSchedulerConfig(
     marketCandleSync: {
       enabled: marketCandleSyncEnabled,
       intervalSeconds: marketCandleSyncIntervalSeconds,
+      assetIds: marketCandleSyncAssetIds,
     },
     marketCandleReconciliation,
     limitOrderMatchingIntervalMs: limitOrderMatching.intervalMs,
@@ -375,6 +380,19 @@ function parseTextEnv(value: string | undefined, fallback: string) {
   }
 
   return value.trim();
+}
+
+function parseOptionalCommaSeparatedEnv(
+  value: string | undefined,
+): string[] | undefined {
+  if (value === undefined || value.trim() === '') {
+    return undefined;
+  }
+
+  const values = [
+    ...new Set(value.split(',').map((entry) => entry.trim())),
+  ].filter((entry) => entry !== '');
+  return values.length > 0 ? values : undefined;
 }
 
 function parsePositiveIntegerEnv(value: string | undefined, fallback: number) {
