@@ -181,7 +181,7 @@ const createServices = () => {
     },
     fxRateSnapshot: {
       findMany: jest.fn().mockImplementation(() => {
-        const fresh = new Date();
+        const fresh = new Date(Date.now() - 1_000);
         return Promise.resolve([
           {
             id: 'fx-rate-1',

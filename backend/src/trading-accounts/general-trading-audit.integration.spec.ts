@@ -479,7 +479,7 @@ async function main() {
     });
 
     await prisma.quote.update({
-      where: { id: fxQuote.id }, data: { quotedFeeRate: '0.00000001' },
+      where: { id: fxQuote.id }, data: { quotedFeeRate: '1.000001' },
     });
     await assertFinding('GENERAL_FX_QUOTE_PINNED_FEE_INVALID', () =>
       prisma.quote.findUniqueOrThrow({ where: { id: fxQuote.id } }),
