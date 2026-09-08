@@ -251,11 +251,10 @@ export default function SeasonAccountHome({
   const positions = positionsQuery.data?.positions;
   const krwBalance = getKnownWalletBalanceAmount(walletsQuery.data, 'KRW');
   const usdBalance = getKnownWalletBalanceAmount(walletsQuery.data, 'USD');
-  const myRanking = rankingQuery.data?.myRanking ?? null;
-  const rank =
-    myRanking?.rank === undefined || myRanking?.rank === null
-      ? '-'
-      : `#${myRanking.rank}`;
+  const myRanking = rankingQuery.data?.myRanking.state === 'available'
+    ? rankingQuery.data.myRanking
+    : null;
+  const rank = myRanking ? `#${myRanking.rank}` : '-';
   const tier = getRankingTier(myRanking, rankType);
   const tradeNotice = capabilities?.canTrade
     ? null

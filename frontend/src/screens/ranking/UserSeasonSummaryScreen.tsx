@@ -16,10 +16,12 @@ import {
   getUserSeasonSummary,
 } from '../../features/ranking/api';
 import { formatKrw, formatPercent, getAssetNameDisplay } from '../../utils/format';
+import { getApiErrorCode } from '../../services/api/errorMapper';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
+import EmptyState from '../../components/states/EmptyState';
 
 type Props = UserSeasonSummaryScreenProps;
 
@@ -39,10 +41,11 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
   const viewState = useMemo(() => {
     if (summaryQuery.isLoading) return 'user_summary_loading';
 
-    const errorCode =
-      (summaryQuery.error as any)?.response?.data?.error?.code ?? null;
+    const errorCode = getApiErrorCode(summaryQuery.error);
 
-    if (errorCode === 'NOT_FOUND') return 'user_summary_not_found';
+    if (errorCode === 'USER_NOT_FOUND' || errorCode === 'NOT_FOUND') {
+      return 'user_summary_not_found';
+    }
     if (!summaryQuery.data) return 'user_summary_error';
 
     return 'user_summary_ready';
@@ -73,7 +76,16 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
   }
 
   const { user, season, allocation } = summaryQuery.data;
-  const topPositions = summaryQuery.data.topPositions ?? [];
+  const topPositions = summaryQuery.data.topPositions;
+
+  if (!season) {
+    return (
+      <EmptyState
+        title="현재 시즌 정보가 없습니다."
+        message="시즌이 준비되면 유저 시즌 요약을 확인할 수 있습니다."
+      />
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>

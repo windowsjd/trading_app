@@ -6,76 +6,85 @@ import type {
   OffsetPagination,
   PercentString,
   RateString,
-  SectionState,
 } from '../../models/dto/common';
+import type { SeasonStatus } from '../../models/dto/season';
 
 export type RankingScope = 'all' | 'near_me' | 'top10';
 export type RankingRankType = 'daily' | 'final';
-export type MyRankingState = 'available' | 'not_joined' | 'unavailable';
-
-export interface RankingUserDto {
-  id: string;
-  nickname: string;
-}
-
-export interface RankingItemDto {
-  seasonParticipantId?: string;
-  userId?: string;
+interface RankingMetricsDto {
+  seasonParticipantId: string;
   rank: number;
-  tier?: string | null;
-  provisionalTier?: string | null;
-  finalTier?: string | null;
+  provisionalTier: string | null;
+  finalTier: string | null;
   returnRate: RateString;
-  percentile?: PercentString | null;
+  percentile: PercentString;
   totalAssetKrw: MoneyString;
-  user: RankingUserDto;
+  maxDrawdown: PercentString;
+  totalFillCount: number;
+  reachedReturnAt: IsoDateTimeString | null;
+  capturedAt: IsoDateTimeString;
 }
 
-export interface MyRankingDto extends Partial<RankingItemDto> {
-  state?: MyRankingState;
+export interface RankingItemDto extends RankingMetricsDto {
+  userId: string;
+  nickname: string;
+  profileImageUrl: string | null;
 }
+
+export type MyRankingDto =
+  | (RankingMetricsDto & { state: 'available'; rankingDate: string })
+  | { state: 'not_joined' | 'unavailable'; reason: string; message: string };
 
 export interface RankingsResponseDto {
-  state: SectionState;
-  season?: {
-    id?: string;
-    name?: string;
-    status?: string;
+  state: 'available' | 'unavailable';
+  season: {
+    id: string;
+    name: string;
+    status: SeasonStatus;
+    startAt: IsoDateTimeString;
+    endAt: IsoDateTimeString;
   } | null;
   rankType: RankingRankType;
-  rankingDate?: string | null;
-  capturedAt?: IsoDateTimeString | null;
+  rankingDate: string | null;
+  capturedAt: IsoDateTimeString | null;
   pagination: OffsetPagination;
   rankings: RankingItemDto[];
-  myRanking?: MyRankingDto | null;
+  myRanking: MyRankingDto;
+  reason?: string;
+  message?: string;
 }
 
 export interface UserSeasonSummaryDto {
+  state: 'available' | 'not_joined' | 'unavailable';
   user: {
     id: string;
     nickname: string;
   };
   season: {
-    rank?: number | null;
-    tier?: string | null;
-    provisionalTier?: string | null;
-    finalTier?: string | null;
-    returnRate?: RateString | null;
-    percentile?: PercentString | null;
-    totalAssetKrw?: MoneyString | null;
-  };
+    id: string;
+    status: SeasonStatus;
+    rank: number | null;
+    provisionalTier: string | null;
+    finalTier: string | null;
+    returnRate: RateString | null;
+    percentile: PercentString | null;
+    totalAssetKrw: MoneyString | null;
+    totalFillCount: number;
+  } | null;
   allocation: {
-    cashKrwValue?: MoneyString | null;
-    domesticStockValueKrw?: MoneyString | null;
-    usStockValueKrw?: MoneyString | null;
-    cryptoValueKrw?: MoneyString | null;
+    cashKrwValue: MoneyString;
+    domesticStockValueKrw: MoneyString;
+    usStockValueKrw: MoneyString;
+    cryptoValueKrw: MoneyString;
   };
   topPositions: Array<{
     assetId: string;
     symbol: string;
-    name?: string;
+    name: string;
     weight: string;
   }>;
+  reason?: string;
+  message?: string;
 }
 
 export interface GetRankingsParams {
@@ -95,32 +104,18 @@ export interface GetRankingsParams {
   capturedAt?: string | null;
 }
 
-function buildFallbackPagination(
-  limit: number,
-  offset: number,
-  returned: number,
-): OffsetPagination {
-  return {
-    limit,
-    offset,
-    total: offset + returned,
-    returned,
-    nextOffset: returned >= limit ? offset + returned : null,
-  };
-}
-
 export function getRankingTier(
-  item: Partial<RankingItemDto | MyRankingDto> | null | undefined,
+  item: Pick<RankingMetricsDto, 'provisionalTier' | 'finalTier'> | null | undefined,
   rankType?: RankingRankType,
 ) {
   if (rankType === 'final') {
-    return item?.finalTier ?? item?.tier ?? '-';
+    return item?.finalTier ?? '-';
   }
 
-  return item?.provisionalTier ?? item?.tier ?? item?.finalTier ?? '-';
+  return item?.provisionalTier ?? item?.finalTier ?? '-';
 }
 
-export async function getRankings(params: GetRankingsParams) {
+export async function getRankings(params: GetRankingsParams): Promise<RankingsResponseDto> {
   const limit = params.limit ?? (params.scope === 'top10' ? 10 : 50);
   const offset = params.offset ?? 0;
   const searchParams = new URLSearchParams();
@@ -134,25 +129,10 @@ export async function getRankings(params: GetRankingsParams) {
   if (params.capturedAt) searchParams.set('capturedAt', params.capturedAt);
 
   const response = await apiClient.get<
-    ApiSuccessResponse<
-      RankingsResponseDto & {
-        items?: RankingItemDto[];
-        myRank?: MyRankingDto | null;
-      }
-    >
+    ApiSuccessResponse<RankingsResponseDto>
   >(`/ranking?${searchParams.toString()}`);
 
-  const data = response.data.data;
-  const rankings = data.rankings ?? data.items ?? [];
-
-  return {
-    ...data,
-    state: data.state ?? 'available',
-    rankings,
-    myRanking: data.myRanking ?? data.myRank ?? null,
-    pagination:
-      data.pagination ?? buildFallbackPagination(limit, offset, rankings.length),
-  };
+  return response.data.data;
 }
 
 export async function getUserSeasonSummary(userId: string) {

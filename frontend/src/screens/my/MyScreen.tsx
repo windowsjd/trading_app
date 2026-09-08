@@ -162,13 +162,13 @@ export default function MyScreen({ navigation }: Props) {
   }
 
   const me = meQuery.data;
-  const myRanking = rankingQuery.data?.myRanking ?? null;
+  const myRanking = rankingQuery.data?.myRanking.state === 'available'
+    ? rankingQuery.data.myRanking
+    : null;
   const ranking = showsSeasonUi
     ? {
         rank:
-          myRanking?.rank === undefined || myRanking?.rank === null
-            ? '-'
-            : String(myRanking.rank),
+          myRanking ? String(myRanking.rank) : '-',
         tier: getRankingTier(myRanking, rankType),
       }
     : null;

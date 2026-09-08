@@ -51,11 +51,7 @@ function displayValue(value?: string | number | null) {
 }
 
 function getRankingItemKey(item: RankingItemDto) {
-  return (
-    item.seasonParticipantId ??
-    item.userId ??
-    `${item.user.id}-${item.rank}`
-  );
+  return item.seasonParticipantId;
 }
 
 function getRankTypeLabel(rankType?: RankingRankType) {
@@ -141,6 +137,7 @@ export default function RankingScreen({ navigation }: Props) {
   }, [rankingQuery.data]);
 
   const myRanking = firstPage?.myRanking ?? null;
+  const hasNotJoined = myRanking?.state === 'not_joined' || seasonQuery.data?.joined === false;
   const rankingErrorCode = getApiErrorCode(rankingQuery.error);
 
   React.useEffect(() => {
@@ -244,6 +241,8 @@ export default function RankingScreen({ navigation }: Props) {
       <EmptyState
         title="랭킹 생성 대기 중입니다."
         message="랭킹 스냅샷이 생성되면 이곳에 표시됩니다."
+        actionLabel={hasNotJoined ? '시즌 참가하기' : undefined}
+        onAction={hasNotJoined ? () => rootNavigation.navigate('SeasonJoin') : undefined}
       />
     );
   }
@@ -253,6 +252,8 @@ export default function RankingScreen({ navigation }: Props) {
       <EmptyState
         title="아직 랭킹 데이터가 없습니다."
         message="참가자가 쌓이면 랭킹이 표시됩니다."
+        actionLabel={hasNotJoined ? '시즌 참가하기' : undefined}
+        onAction={hasNotJoined ? () => rootNavigation.navigate('SeasonJoin') : undefined}
       />
     );
   }
@@ -299,12 +300,12 @@ export default function RankingScreen({ navigation }: Props) {
                       style={styles.topCard}
                       onPress={() =>
                         navigation.navigate('UserSeasonSummary', {
-                          userId: item.user.id,
+                          userId: item.userId,
                         })
                       }
                     >
                       <Text style={styles.topRank}>#{item.rank}</Text>
-                      <Text style={styles.topName}>{item.user.nickname}</Text>
+                      <Text style={styles.topName}>{item.nickname}</Text>
                       <Text style={styles.helper}>{formatPercent(item.returnRate)}%</Text>
                     </Pressable>
                   ))}
@@ -344,7 +345,7 @@ export default function RankingScreen({ navigation }: Props) {
             rankType={rankType}
             onPress={() =>
               navigation.navigate('UserSeasonSummary', {
-                userId: item.user.id,
+                userId: item.userId,
               })
             }
           />
@@ -394,16 +395,18 @@ function MyRankingCard({
     );
   }
 
+  const availableRanking = myRanking?.state === 'available' ? myRanking : null;
+
   return (
     <View style={styles.card}>
       <Text style={styles.label}>내 순위</Text>
       <Text style={styles.big}>
-        {myRanking?.rank ? `#${myRanking.rank}` : '-'}
+        {availableRanking ? `#${availableRanking.rank}` : '-'}
       </Text>
       <Text style={styles.helper}>
-        등급 {getRankingTier(myRanking, rankType)} · 수익률 {formatPercent(myRanking?.returnRate)}%
+        등급 {getRankingTier(availableRanking, rankType)} · 수익률 {formatPercent(availableRanking?.returnRate)}%
       </Text>
-      <Text style={styles.helper}>퍼센타일 {formatPercent(myRanking?.percentile)}%</Text>
+      <Text style={styles.helper}>퍼센타일 {formatPercent(availableRanking?.percentile)}%</Text>
       {rankType === 'final' ? (
         <Text style={styles.settledText}>최종 랭킹 확정</Text>
       ) : null}
@@ -422,14 +425,14 @@ function RankingRow({
 }) {
   return (
     <Pressable
-      testID={TEST_IDS.ranking.item(item.user.id)}
+      testID={TEST_IDS.ranking.item(item.userId)}
       style={styles.rankRow}
       onPress={onPress}
     >
       <View style={styles.rankLeft}>
         <Text style={styles.rankNumber}>#{item.rank}</Text>
-        <View>
-          <Text style={styles.name}>{item.user.nickname}</Text>
+        <View style={styles.rankIdentity}>
+          <Text style={styles.name}>{item.nickname}</Text>
           <Text style={styles.helper}>등급 {getRankingTier(item, rankType)}</Text>
           <Text style={styles.helper}>퍼센타일 {formatPercent(item.percentile)}%</Text>
         </View>
@@ -476,6 +479,7 @@ const styles = StyleSheet.create({
   topRow: { flexDirection: 'row', gap: 10 },
   topCard: {
     flex: 1,
+    minWidth: 0,
     borderWidth: 1,
     borderColor: '#eee',
     borderRadius: 12,
@@ -492,13 +496,24 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#fff',
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
     justifyContent: 'space-between',
     marginBottom: 10,
   },
-  rankLeft: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+  rankLeft: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 160,
+    minWidth: 0,
+  },
+  rankIdentity: { flex: 1, minWidth: 0 },
   rankNumber: { fontSize: 18, fontWeight: '700' },
   name: { fontSize: 15, fontWeight: '700' },
   value: { fontSize: 15, fontWeight: '700' },
-  alignEnd: { alignItems: 'flex-end' },
+  alignEnd: { alignItems: 'flex-end', flexGrow: 1, flexShrink: 1, minWidth: 0 },
   footerLoader: { paddingVertical: 16 },
 });
