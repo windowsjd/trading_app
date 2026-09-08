@@ -85,7 +85,7 @@ const FORBIDDEN_SYMBOLS = [
   'executeFx',
 ];
 
-/** Screens whose subject genuinely IS the current/public season. */
+/** Surfaces that read the current/public season for participation or ranking. */
 const CURRENT_SEASON_ALLOWLIST = new Set([
   'features/season/api.ts',
   'screens/season/SeasonJoinScreen.tsx',
@@ -96,6 +96,9 @@ const CURRENT_SEASON_ALLOWLIST = new Set([
   // (home vs mode_selection, in features/auth/entry.ts) still never consults
   // the season, and neither does any per-account capability.
   'screens/entry/ModeSelectionScreen.tsx',
+  // The switcher offers joining only; owned-account selection and trading
+  // permission remain independent of this optional season lookup.
+  'components/tradingAccount/AccountSwitcher.tsx',
 ]);
 
 describe('current financial screens never call a legacy implicit-account API', () => {

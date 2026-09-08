@@ -5,13 +5,22 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
 
 import BottomSheetBackdrop from '../common/BottomSheetBackdrop';
+import CTAButton from '../common/CTAButton';
+import { useRootNavigation } from '../../app/navigation/navigationHooks';
+import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
+import { getCurrentSeason } from '../../features/season/api';
 import { getAccountDisplay } from '../../features/tradingAccount/accountDisplay';
-import { hasGeneralAccount } from '../../features/tradingAccount/modeSelection';
+import {
+  buildModeSelectionModel,
+  hasGeneralAccount,
+} from '../../features/tradingAccount/modeSelection';
 import { useOpenGeneralAccount } from '../../features/tradingAccount/useOpenGeneralAccount';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import type { TradingAccountDto } from '../../features/tradingAccount/api';
@@ -55,6 +64,20 @@ export default function AccountSwitcher({ compact = false }: Props) {
     refetchAccounts,
   } = useTradingAccount();
   const [open, setOpen] = useState(false);
+  const rootNavigation = useRootNavigation();
+  const { height } = useWindowDimensions();
+  const seasonQuery = useQuery({
+    queryKey: QUERY_KEYS.season.current,
+    queryFn: getCurrentSeason,
+    enabled: open,
+    staleTime: 30_000,
+  });
+  // Use the same eligibility as ModeSelection. Loading/errors hide only this
+  // offer; the owned accounts remain selectable, including past seasons.
+  const { seasonJoin } = buildModeSelectionModel(
+    accounts,
+    seasonQuery.isSuccess ? seasonQuery.data : null,
+  );
 
   // First doorway to 일반 투자 for a user who only ever joined seasons
   // (작업 13 §7): the sheet offers STARTING the general account when none
@@ -147,67 +170,84 @@ export default function AccountSwitcher({ compact = false }: Props) {
       </Pressable>
 
       <BottomSheetBackdrop visible={open} onClose={() => setOpen(false)}>
-        <View testID={TEST_IDS.tradingAccount.switcherSheet}>
+        <ScrollView
+          testID={TEST_IDS.tradingAccount.switcherSheet}
+          style={{ maxHeight: Math.min(480, height * 0.7) }}
+        >
           <Text style={styles.sheetTitle}>투자 계정 선택</Text>
           <Text style={styles.sheetHelp}>
             계정마다 지갑, 보유 종목, 주문, 수익률이 완전히 분리되어 있습니다.
           </Text>
-          <ScrollView style={styles.sheetList}>
-            {accounts.map((account) => (
-              <AccountRow
-                key={account.id}
-                account={account}
-                selected={account.id === selectedAccountId}
-                onSelect={() => {
-                  selectAccount(account.id);
+          {accounts.map((account) => (
+            <AccountRow
+              key={account.id}
+              account={account}
+              selected={account.id === selectedAccountId}
+              onSelect={() => {
+                selectAccount(account.id);
+                setOpen(false);
+              }}
+            />
+          ))}
+
+          {seasonJoin.kind === 'available' ? (
+            <View style={[styles.startRow, styles.seasonJoinBox]}>
+              <Text style={styles.rowTitle}>{seasonJoin.seasonName}</Text>
+              <Text style={styles.rowSubtitle}>현재 진행 중인 시즌입니다.</Text>
+              <Text style={styles.rowSubtitle}>아직 참가하지 않았습니다.</Text>
+              <CTAButton
+                testID={TEST_IDS.tradingAccount.switcherSeasonJoin}
+                label="시즌 참가하기"
+                onPress={() => {
                   setOpen(false);
+                  rootNavigation.navigate('SeasonJoin');
                 }}
               />
-            ))}
+            </View>
+          ) : null}
 
-            {!hasGeneralAccount(accounts) ? (
-              <View style={styles.startBox}>
-                <Pressable
-                  style={styles.startRow}
-                  onPress={startGeneral.start}
-                  disabled={startGeneral.isPending}
-                  accessibilityRole="button"
-                  accessibilityState={{ busy: startGeneral.isPending }}
-                  testID={TEST_IDS.tradingAccount.switcherStartGeneral}
-                >
-                  <View style={styles.rowTextColumn}>
-                    <Text style={styles.rowTitle}>일반 투자 시작하기</Text>
-                    <Text style={styles.rowSubtitle}>
-                      시즌과 무관하게 유지되는 일반 투자 계정을 새로 만듭니다.
-                      초기 자금 10,000,000원, 시간가중 수익률로 성과를
-                      측정합니다.
-                    </Text>
-                    <Text style={styles.rowMeaning}>
-                      매매 가능 · KRW↔USD 환전 가능
-                    </Text>
-                  </View>
-                  <View style={styles.rowBadgeColumn}>
-                    {startGeneral.isPending ? (
-                      <ActivityIndicator size="small" color="#1565c0" />
-                    ) : (
-                      <Text style={styles.startAction}>시작</Text>
-                    )}
-                  </View>
-                </Pressable>
-                {startGeneral.errorMessage ? (
-                  <Text
-                    style={styles.startError}
-                    testID={
-                      TEST_IDS.tradingAccount.switcherStartGeneralError
-                    }
-                  >
-                    {startGeneral.errorMessage}
+          {!hasGeneralAccount(accounts) ? (
+            <View style={styles.startBox}>
+              <Pressable
+                style={styles.startRow}
+                onPress={startGeneral.start}
+                disabled={startGeneral.isPending}
+                accessibilityRole="button"
+                accessibilityState={{ busy: startGeneral.isPending }}
+                testID={TEST_IDS.tradingAccount.switcherStartGeneral}
+              >
+                <View style={styles.rowTextColumn}>
+                  <Text style={styles.rowTitle}>일반 투자 시작하기</Text>
+                  <Text style={styles.rowSubtitle}>
+                    시즌과 무관하게 유지되는 일반 투자 계정을 새로 만듭니다.
+                    초기 자금 10,000,000원, 시간가중 수익률로 성과를
+                    측정합니다.
                   </Text>
-                ) : null}
-              </View>
-            ) : null}
-          </ScrollView>
-        </View>
+                  <Text style={styles.rowMeaning}>
+                    매매 가능 · KRW↔USD 환전 가능
+                  </Text>
+                </View>
+                <View style={styles.rowBadgeColumn}>
+                  {startGeneral.isPending ? (
+                    <ActivityIndicator size="small" color="#1565c0" />
+                  ) : (
+                    <Text style={styles.startAction}>시작</Text>
+                  )}
+                </View>
+              </Pressable>
+              {startGeneral.errorMessage ? (
+                <Text
+                  style={styles.startError}
+                  testID={
+                    TEST_IDS.tradingAccount.switcherStartGeneralError
+                  }
+                >
+                  {startGeneral.errorMessage}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+        </ScrollView>
       </BottomSheetBackdrop>
     </>
   );
@@ -315,7 +355,6 @@ const styles = StyleSheet.create({
 
   sheetTitle: { fontSize: 18, fontWeight: '700', marginBottom: 4 },
   sheetHelp: { fontSize: 13, color: '#546e7a', marginBottom: 12 },
-  sheetList: { maxHeight: 380 },
 
   row: {
     flexDirection: 'row',
@@ -355,6 +394,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5faff',
   },
   startAction: { fontSize: 12, color: '#1565c0', fontWeight: '700' },
+  // Full-width copy and CTA grow vertically, even with large Android fonts.
+  seasonJoinBox: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    minWidth: 0,
+    gap: 8,
+    marginBottom: 8,
+  },
   // Full message, wrapping: a Korean error must never be clipped to fit a row.
   startError: { marginTop: 6, fontSize: 13, color: '#c62828', lineHeight: 20 },
 });

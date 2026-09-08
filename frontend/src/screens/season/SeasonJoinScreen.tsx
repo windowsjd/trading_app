@@ -365,13 +365,6 @@ export default function SeasonJoinScreen({ navigation }: Props) {
           }}
         />
 
-        <Pressable
-          style={styles.secondaryButton}
-          onPress={resetToHome}
-        >
-          <Text style={styles.secondaryButtonText}>지금은 둘러보기</Text>
-        </Pressable>
-
         {/* A user who owns nothing needs the other entrance visible here too:
             joining is not the only way to have an account (작업 11 §3.3). */}
         {!hasUsableAccount ? (

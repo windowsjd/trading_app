@@ -138,8 +138,9 @@ describe('buildModeSelectionModel — 시즌 투자 column', () => {
   });
 
   it('offers JOINING an active season the user has not joined (13.2·13.4)', () => {
+    const general = generalAccount('g1');
     const model = buildModeSelectionModel(
-      [generalAccount('g1')],
+      [general],
       currentSeason(),
       NOW,
     );
@@ -150,6 +151,7 @@ describe('buildModeSelectionModel — 시즌 투자 column', () => {
       seasonName: 'Season 1',
     });
     assert.deepEqual(model.seasonContinue, []);
+    assert.deepEqual(model.general, { kind: 'existing', account: general });
   });
 
   it('offers no join when there is no season at all', () => {
@@ -190,6 +192,55 @@ describe('buildModeSelectionModel — 시즌 투자 column', () => {
     );
 
     assert.deepEqual(model.seasonJoin, { kind: 'none' });
+  });
+
+  it('does not offer joining when membership is known but the account list is stale', () => {
+    const model = buildModeSelectionModel(
+      [generalAccount('g1')],
+      currentSeason({ joined: true }),
+      NOW,
+    );
+    assert.deepEqual(model.seasonJoin, { kind: 'none' });
+  });
+
+  it('honours server effective mode and expired dates despite an active status', () => {
+    for (const overrides of [
+      { effectiveMode: 'upcoming' },
+      { effectiveMode: 'ended' },
+      { effectiveMode: 'settled' },
+      { effectiveStatus: 'ended' },
+      { endAt: '2026-08-01T00:00:00.000Z' },
+      { status: 'settled' },
+    ] satisfies Partial<CurrentSeasonDto>[]) {
+      const general = generalAccount('g1');
+      const model = buildModeSelectionModel([general], currentSeason(overrides), NOW);
+      assert.deepEqual(model.seasonJoin, { kind: 'none' });
+      assert.deepEqual(model.general, { kind: 'existing', account: general });
+    }
+  });
+
+  it('keeps general and past accounts available when the season lookup has no usable result', () => {
+    const general = generalAccount('g1');
+    const past = seasonAccount('old', { status: 'closed', seasonStatus: 'settled' });
+    for (const unavailable of [null, undefined]) {
+      const model = buildModeSelectionModel([general, past], unavailable, NOW);
+      assert.deepEqual(model.seasonJoin, { kind: 'none' });
+      assert.deepEqual(model.general, { kind: 'existing', account: general });
+      assert.deepEqual(model.seasonPast, [past]);
+    }
+  });
+
+  it('offers the current season alongside past accounts without fabricating an account or shortening its name', () => {
+    const past = seasonAccount('old', { status: 'closed', seasonStatus: 'settled' });
+    const accounts = [generalAccount('g1'), past];
+    const before = structuredClone(accounts);
+    const name = '대한민국 모의투자 챔피언십 국내주식 미국주식 암호화폐 통합 시즌 '.repeat(4);
+    const model = buildModeSelectionModel(accounts, currentSeason({ name }), NOW);
+    assert.deepEqual(model.seasonJoin, {
+      kind: 'available', seasonId: 'season-1', seasonName: name,
+    });
+    assert.deepEqual(model.seasonPast, [past]);
+    assert.deepEqual(accounts, before);
   });
 
   it('shows both options to a user holding general + active season (13.3), deciding nothing', () => {

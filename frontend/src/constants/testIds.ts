@@ -168,6 +168,7 @@ export const TEST_IDS = {
     switcherOption: (accountId: string) =>
       `trading-account-switcher-option-${accountId}`,
     switcherStartGeneral: 'trading-account-switcher-start-general',
+    switcherSeasonJoin: 'trading-account-switcher-season-join',
     switcherStartGeneralError: 'trading-account-switcher-start-general-error',
     integrityError: 'trading-account-integrity-error',
     capabilityNotice: 'trading-account-capability-notice',
