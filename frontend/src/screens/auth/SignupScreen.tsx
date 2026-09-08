@@ -164,6 +164,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           value={email}
           onChangeText={setEmail}
           placeholder="이메일"
+          placeholderTextColor="#546e7a"
           keyboardType="email-address"
           autoCapitalize="none"
           style={styles.input}
@@ -174,6 +175,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           value={nickname}
           onChangeText={setNickname}
           placeholder="닉네임"
+          placeholderTextColor="#546e7a"
           style={styles.input}
         />
 
@@ -182,6 +184,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           value={password}
           onChangeText={setPassword}
           placeholder="비밀번호"
+          placeholderTextColor="#546e7a"
           secureTextEntry
           style={styles.input}
         />
@@ -191,6 +194,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           placeholder="비밀번호 확인"
+          placeholderTextColor="#546e7a"
           secureTextEntry
           style={styles.input}
         />
@@ -250,6 +254,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
     backgroundColor: '#fff',
+    color: '#111',
   },
   primaryButton: {
     backgroundColor: '#111',

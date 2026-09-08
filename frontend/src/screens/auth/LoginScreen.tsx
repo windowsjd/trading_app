@@ -154,6 +154,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           value={email}
           onChangeText={setEmail}
           placeholder="이메일"
+          placeholderTextColor="#546e7a"
           keyboardType="email-address"
           autoCapitalize="none"
           style={styles.input}
@@ -164,6 +165,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           value={password}
           onChangeText={setPassword}
           placeholder="비밀번호"
+          placeholderTextColor="#546e7a"
           secureTextEntry
           style={styles.input}
         />
@@ -223,6 +225,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
     backgroundColor: '#fff',
+    color: '#111',
   },
   primaryButton: {
     backgroundColor: '#111',
