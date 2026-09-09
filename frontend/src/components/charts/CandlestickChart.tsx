@@ -22,6 +22,7 @@ import CandlestickChartRenderer, {
 // base file is the type contract + no-gesture fallback).
 import CandlestickGestures from './CandlestickGestures';
 import {
+  chartLabelWidth,
   computeLeadingEmptySlots,
   computeSlotLayout,
   originalCandleIndexForX,
@@ -135,6 +136,32 @@ function parseCandles(candles: CandlestickChartCandle[]): ParsedCandle[] {
     : parsed;
 }
 
+function getPriceRange(candles: ParsedCandle[], currentPriceValue: number | null) {
+  if (candles.length === 0) return { minY: 0, maxY: 1, range: 1 };
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const candle of candles) {
+    if (candle.low < minY) minY = candle.low;
+    if (candle.high > maxY) maxY = candle.high;
+  }
+  if (currentPriceValue !== null && Number.isFinite(currentPriceValue)) {
+    minY = Math.min(minY, currentPriceValue);
+    maxY = Math.max(maxY, currentPriceValue);
+  }
+  let range = maxY - minY;
+  if (range <= 0) {
+    const bump = Math.max(Math.abs(maxY) * 0.01, 1);
+    minY -= bump;
+    maxY += bump;
+    range = maxY - minY;
+  }
+  const pad = range * 0.08;
+  minY -= pad;
+  maxY += pad;
+  range = maxY - minY;
+  return { minY, maxY, range };
+}
+
 /**
  * Candlestick chart with a pan/zoom viewport over the ALREADY LOADED candles.
  *
@@ -184,8 +211,26 @@ export default function CandlestickChart({
     createDefaultViewport(total),
   );
 
+  // Width is based on all loaded prices so panning cannot resize the plot
+  // underneath the finger. Y-axis values still use only the visible candles.
+  const labelPriceRange = useMemo(
+    () => getPriceRange(parsed, toNumber(currentPrice ?? null)),
+    [parsed, currentPrice],
+  );
+
   const chartWidth = Math.max(width, 160);
-  const innerWidth = Math.max(chartWidth - PADDING.left - PADDING.right, 1);
+  // Reserve the longest integer part in this range plus the declared decimal
+  // precision, including digits that the formatter trims on round endpoints.
+  const priceLabelSample = formatChartPrice(
+    `${labelPriceRange.minY < 0 ? '-' : ''}${Math.ceil(Math.max(Math.abs(labelPriceRange.minY), Math.abs(labelPriceRange.maxY)))}.12345678`,
+    currencyCode,
+    displayPriceDecimals,
+  );
+  const paddingRight = Math.min(
+    Math.max(PADDING.right, Math.ceil(chartLabelWidth(priceLabelSample)) + 8),
+    chartWidth * 0.45,
+  );
+  const innerWidth = Math.max(chartWidth - PADDING.left - paddingRight, 1);
   const innerHeight = Math.max(chartHeight - PADDING.top - PADDING.bottom, 1);
   const { slotWidth, bodyWidth } = computeSlotLayout(
     innerWidth,
@@ -298,43 +343,12 @@ export default function CandlestickChart({
     const { startIndex, endIndex } = getVisibleIndexRange(total, viewport);
     if (endIndex <= startIndex) return null;
 
-    const viewingLatest = isViewingLatest(viewport);
-    const livePrice = toNumber(currentPrice ?? null);
-    const currentPriceValue = viewingLatest
-      ? (livePrice ?? parsed[total - 1].close)
-      : null;
-
-    // Y axis from the candles ACTUALLY on screen. In history the current price
-    // is excluded entirely so it cannot distort the range.
-    let minY = Number.POSITIVE_INFINITY;
-    let maxY = Number.NEGATIVE_INFINITY;
-    for (let index = startIndex; index < endIndex; index += 1) {
-      const candle = parsed[index];
-      if (candle.low < minY) minY = candle.low;
-      if (candle.high > maxY) maxY = candle.high;
-    }
-    if (currentPriceValue !== null && Number.isFinite(currentPriceValue)) {
-      minY = Math.min(minY, currentPriceValue);
-      maxY = Math.max(maxY, currentPriceValue);
-    }
-    let range = maxY - minY;
-    if (range <= 0) {
-      const bump = Math.max(Math.abs(maxY) * 0.01, 1);
-      minY -= bump;
-      maxY += bump;
-      range = maxY - minY;
-    }
-    const pad = range * 0.08;
-    minY -= pad;
-    maxY += pad;
-    range = maxY - minY;
-
     return {
       width: chartWidth,
       height: chartHeight,
       innerWidth,
       innerHeight,
-      padding: PADDING,
+      padding: { ...PADDING, right: paddingRight },
       slotWidth,
       bodyWidth,
       startIndex,
@@ -344,15 +358,19 @@ export default function CandlestickChart({
         viewport.visibleCount,
         endIndex - startIndex,
       ),
-      minY,
-      maxY,
-      range,
+      ...getPriceRange(
+        parsed.slice(startIndex, endIndex),
+        isViewingLatest(viewport)
+          ? (toNumber(currentPrice ?? null) ?? parsed[total - 1].close)
+          : null,
+      ),
     };
   }, [
     parsed,
     total,
     viewport,
     currentPrice,
+    paddingRight,
     chartWidth,
     chartHeight,
     innerWidth,
@@ -426,6 +444,7 @@ export default function CandlestickChart({
         accessibilityLabel={accessibilityLabel}
       >
         <CandlestickGestures
+          key={viewportResetKey}
           innerWidth={innerWidth}
           paddingLeft={PADDING.left}
           slotWidth={slotWidth}

@@ -1,10 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import {
   HORIZONTAL_PAN_SLOP_PX,
-  LONG_PRESS_MOVE_SLOP_PX,
   LONG_PRESS_MS,
   createChartGestureSession,
   isWithinChartBounds,
@@ -20,13 +19,10 @@ import type { CandlestickGesturesProps } from './CandlestickGestures';
  *  - PINCH (two fingers) zooms about the finger midpoint. It TAKES OVER the
  *    session, so a long press that turns into a pinch ends the crosshair first
  *    and the pinch still reports exactly one start and one end.
- *  - LONG PRESS (~300ms, held still) turns crosshair mode ON. Scrubbing then
- *    runs through `crosshairPan`, a manually-activated pan that only claims
- *    the touch once crosshair mode is on — which is why a vertical scrub works
- *    while a normal vertical swipe still belongs to the parent ScrollView.
- *    Leaving the chart box ends the crosshair (`shouldCancelWhenOutside` plus
- *    an explicit bounds check on the scrub itself), and BOTH recognizers may
- *    finalize it — the session ignores everything but the first.
+ *  - A delayed PAN activates after a stationary hold (~300ms), then tracks
+ *    crosshair scrubbing in both directions. RNGH enforces its native movement
+ *    slop before activation; afterwards movement does not cancel the hold.
+ *    This needs neither a manual state manager nor Reanimated.
  *  - CHART PAN is a one-finger pan constrained with `activeOffsetX` /
  *    `failOffsetY`: it activates only for clearly horizontal drags, so the
  *    detail screen keeps scrolling vertically. It claims the session on
@@ -34,6 +30,9 @@ import type { CandlestickGesturesProps } from './CandlestickGestures';
  *    measures translation from the activation point so the chart does not jump
  *    by the activation slop.
  *
+ * Crosshair and chart pan RACE: the first active recognizer cancels the other.
+ * Pinch is simultaneous with that race, so adding a second finger can zoom.
+ * Pending recognizers never claim the JS session or disable page scrolling.
  * Every start/end goes through `createChartGestureSession`, so the chart sees
  * one `onGestureStart`/`onGestureEnd` per real gesture no matter how many of
  * these simultaneous recognizers finalize for a single lift.
@@ -52,7 +51,7 @@ export default function CandlestickGestures({
   onCrosshair,
   onGestureEnd,
 }: CandlestickGesturesProps) {
-  const gesture = useMemo(() => {
+  const { gesture, session } = useMemo(() => {
     // Read synchronously by several recognizers, so it lives outside React
     // state (the state machine itself is in the shared policy).
     const session = createChartGestureSession({
@@ -65,34 +64,16 @@ export default function CandlestickGestures({
     // at ACTIVATION, so the slop travelled before that is subtracted.
     let panOriginX = 0;
 
-    const longPress = Gesture.LongPress()
-      .minDuration(LONG_PRESS_MS)
-      .maxDistance(LONG_PRESS_MOVE_SLOP_PX)
-      // A finger that leaves the chart cancels the hold, which finalizes here
-      // and clears the crosshair.
+    const crosshairPan = Gesture.Pan()
+      .activateAfterLongPress(LONG_PRESS_MS)
+      .minPointers(1)
+      .maxPointers(1)
       .shouldCancelWhenOutside(true)
       .onStart((event) => {
         session.startCrosshair({ x: event.x, y: event.y });
       })
-      // A hold released WITHOUT moving never reaches `crosshairPan` (it only
-      // activates on touch move), and a cancelled/failed hold has no end event
-      // of its own — so the long press must end the crosshair too. The session
-      // ignores it when the crosshair is already gone.
-      .onFinalize(() => {
-        session.end('crosshair');
-      })
-      .runOnJS(true);
-
-    const crosshairPan = Gesture.Pan()
-      // Stays out of the way until a long press has armed crosshair mode.
-      .manualActivation(true)
-      .shouldCancelWhenOutside(true)
-      .onTouchesMove((event, manager) => {
-        if (!session.isCrosshairActive()) return;
-        manager.activate();
-        const touch = event.changedTouches[0] ?? event.allTouches[0];
-        if (!touch) return;
-        const point = { x: touch.x, y: touch.y };
+      .onUpdate((event) => {
+        const point = { x: event.x, y: event.y };
         // Scrubbed off the chart: end crosshair mode instead of tracking a
         // finger that is no longer over the plot.
         if (!isWithinChartBounds(point, chartBox)) {
@@ -108,7 +89,7 @@ export default function CandlestickGestures({
 
     const chartPan = Gesture.Pan()
       .activeOffsetX([-HORIZONTAL_PAN_SLOP_PX, HORIZONTAL_PAN_SLOP_PX])
-      .failOffsetY([-HORIZONTAL_PAN_SLOP_PX * 2, HORIZONTAL_PAN_SLOP_PX * 2])
+      .failOffsetY([-HORIZONTAL_PAN_SLOP_PX, HORIZONTAL_PAN_SLOP_PX])
       .minPointers(1)
       .maxPointers(1)
       .onStart((event) => {
@@ -125,7 +106,9 @@ export default function CandlestickGestures({
       .runOnJS(true);
 
     const pinch = Gesture.Pinch()
-      .onBegin(() => {
+      .onStart(() => {
+        // Android enters BEGAN on the FIRST finger, before a pinch exists.
+        // Claiming onBegin would block every one-finger pan and long press.
         // A long press (or an in-flight pan) that turns into a pinch hands the
         // session over: the previous gesture ends once, the pinch starts once.
         session.takeOver('pinch');
@@ -141,7 +124,10 @@ export default function CandlestickGestures({
       })
       .runOnJS(true);
 
-    return Gesture.Simultaneous(pinch, longPress, crosshairPan, chartPan);
+    return {
+      gesture: Gesture.Simultaneous(pinch, Gesture.Race(crosshairPan, chartPan)),
+      session,
+    };
   }, [
     paddingLeft,
     chartWidth,
@@ -152,6 +138,15 @@ export default function CandlestickGestures({
     onCrosshair,
     onGestureEnd,
   ]);
+
+  // Rotation, timeframe changes and unmount detach the old recognizers. Close
+  // their session even when native cannot deliver a final event after detach.
+  useEffect(() => {
+    return () => {
+      const owner = session.owner();
+      if (owner !== 'none') session.end(owner);
+    };
+  }, [session]);
 
   return (
     <GestureDetector gesture={gesture}>

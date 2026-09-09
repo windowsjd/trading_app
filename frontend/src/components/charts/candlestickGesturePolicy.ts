@@ -7,8 +7,6 @@
 export const HORIZONTAL_PAN_SLOP_PX = 10;
 /** Hold this long without moving to enter crosshair mode on touch screens. */
 export const LONG_PRESS_MS = 300;
-/** Movement past this during the hold cancels the pending long press. */
-export const LONG_PRESS_MOVE_SLOP_PX = 10;
 
 /**
  * A one-finger drag belongs to the chart only when it is clearly horizontal:
@@ -151,8 +149,8 @@ export type ChartGestureSession = {
  * Chart gesture lifecycle as a tiny state machine, outside React state because
  * several recognizers read it synchronously mid-gesture.
  *
- * Native composes long press, crosshair pan, chart pan and pinch
- * SIMULTANEOUSLY, so more than one recognizer can finalize for a single lift.
+ * Native allows pinch alongside a race between chart pan and delayed crosshair
+ * pan, so more than one recognizer can finalize for a single lift.
  * Routing every start/end through this owner model is what keeps
  * `onGestureStart`/`onGestureEnd` at exactly one call per real gesture: a
  * finalize from a recognizer that never owned the chart changes nothing.

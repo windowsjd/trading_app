@@ -7,6 +7,22 @@ export const MIN_BODY_WIDTH = 1;
 export const MAX_BODY_WIDTH = 16;
 const BODY_RATIO = 0.62;
 
+/** Conservative width for chart digits/punctuation and full-width currency units. */
+export function chartLabelWidth(text: string, fontSize = 9): number {
+  return Array.from(text).reduce(
+    (width, character) =>
+      width + fontSize * (character.charCodeAt(0) > 255 ? 1 : 0.65),
+    0,
+  );
+}
+
+export function chartLabelFontSize(text: string, availableWidth: number): number {
+  return Math.min(
+    9,
+    9 * Math.max(availableWidth, 1) / Math.max(chartLabelWidth(text), 1),
+  );
+}
+
 export type CandleSlotLayout = {
   /** Horizontal space for one candle (body + gap). */
   slotWidth: number;

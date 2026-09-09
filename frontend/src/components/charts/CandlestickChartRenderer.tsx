@@ -9,7 +9,11 @@ import Svg, {
   Text as SvgText,
 } from 'react-native-svg';
 
-import { candleXCenter } from './candlestickLayout';
+import {
+  candleXCenter,
+  chartLabelFontSize,
+  chartLabelWidth,
+} from './candlestickLayout';
 import { formatChartPrice } from './candlestickPriceFormat';
 
 /**
@@ -177,6 +181,7 @@ export default function CandlestickChartRenderer({
     return Array.from({ length: GRID_LINES + 1 }, (_, index) => {
       const value = minY + (range * index) / GRID_LINES;
       const y = yForPrice(value);
+      const label = formatChartPrice(value, currencyCode, displayPriceDecimals);
       return (
         <G key={`grid-${index}`}>
           <SvgLine
@@ -187,8 +192,13 @@ export default function CandlestickChartRenderer({
             stroke={GRID_COLOR}
             strokeWidth={1}
           />
-          <SvgText x={rightEdgeX + 4} y={y + 3} fontSize={9} fill={AXIS_TEXT_COLOR}>
-            {formatChartPrice(value, currencyCode, displayPriceDecimals)}
+          <SvgText
+            x={rightEdgeX + 4}
+            y={y + 3}
+            fontSize={chartLabelFontSize(label, padding.right - 8)}
+            fill={AXIS_TEXT_COLOR}
+          >
+            {label}
           </SvgText>
         </G>
       );
@@ -197,6 +207,7 @@ export default function CandlestickChartRenderer({
     geometry,
     yForPrice,
     padding.left,
+    padding.right,
     rightEdgeX,
     currencyCode,
     displayPriceDecimals,
@@ -229,6 +240,23 @@ export default function CandlestickChartRenderer({
     currentPriceY >= padding.top - 1 &&
     currentPriceY <= bottomY + 1;
   const currentColor = currentBullish ? UP_COLOR : DOWN_COLOR;
+  const currentPriceLabel = formatPrice(currentPrice);
+  const crosshairPriceLabel = formatPrice(crosshairPrice);
+  const firstTimeLabel = firstVisibleTime === null
+    ? '' : formatTimeLabel(firstVisibleTime);
+  const lastTimeLabel = lastVisibleTime === null
+    ? '' : formatTimeLabel(lastVisibleTime);
+  // Two full timestamps overlap on a narrow phone. Keep the last visible
+  // time there; the crosshair always supplies the selected candle's full time.
+  const showBothTimes =
+    chartLabelWidth(firstTimeLabel) + chartLabelWidth(lastTimeLabel) + 12 <= innerWidth;
+  const crosshairTimeLabel = crosshairCandle
+    ? formatTimeLabel(crosshairCandle.time) : '';
+  const timeLabelWidth = Math.min(124, innerWidth);
+  const timeLabelX = Math.max(
+    padding.left,
+    Math.min(crosshairX - timeLabelWidth / 2, rightEdgeX - timeLabelWidth),
+  );
 
   return (
     <View style={styles.container}>
@@ -275,11 +303,11 @@ export default function CandlestickChartRenderer({
             <SvgText
               x={rightEdgeX + 4}
               y={currentPriceY + 3}
-              fontSize={9}
+              fontSize={chartLabelFontSize(currentPriceLabel, padding.right - 8)}
               fontWeight="bold"
               fill="#ffffff"
             >
-              {formatPrice(currentPrice)}
+              {currentPriceLabel}
             </SvgText>
           </G>
         ) : null}
@@ -315,55 +343,51 @@ export default function CandlestickChartRenderer({
             <SvgText
               x={rightEdgeX + 4}
               y={crosshair.y + 3}
-              fontSize={9}
+              fontSize={chartLabelFontSize(crosshairPriceLabel, padding.right - 8)}
               fontWeight="bold"
               fill="#ffffff"
             >
-              {formatPrice(crosshairPrice)}
+              {crosshairPriceLabel}
             </SvgText>
             <Rect
-              x={Math.max(
-                padding.left,
-                Math.min(crosshairX - 62, rightEdgeX - 124),
-              )}
+              x={timeLabelX}
               y={bottomY + 4}
-              width={124}
+              width={timeLabelWidth}
               height={16}
               fill={CROSSHAIR_COLOR}
               rx={2}
             />
             <SvgText
-              x={Math.max(
-                padding.left + 62,
-                Math.min(crosshairX, rightEdgeX - 62),
-              )}
+              x={timeLabelX + timeLabelWidth / 2}
               y={bottomY + 15}
-              fontSize={9}
+              fontSize={chartLabelFontSize(crosshairTimeLabel, timeLabelWidth - 8)}
               fontWeight="bold"
               fill="#ffffff"
               textAnchor="middle"
             >
-              {formatTimeLabel(crosshairCandle.time)}
+              {crosshairTimeLabel}
             </SvgText>
           </G>
         ) : (
           <G>
-            <SvgText
-              x={padding.left}
-              y={bottomY + 15}
-              fontSize={9}
-              fill={AXIS_TEXT_COLOR}
-            >
-              {firstVisibleTime === null ? '' : formatTimeLabel(firstVisibleTime)}
-            </SvgText>
+            {showBothTimes ? (
+              <SvgText
+                x={padding.left}
+                y={bottomY + 15}
+                fontSize={9}
+                fill={AXIS_TEXT_COLOR}
+              >
+                {firstTimeLabel}
+              </SvgText>
+            ) : null}
             <SvgText
               x={rightEdgeX}
               y={bottomY + 15}
-              fontSize={9}
+              fontSize={chartLabelFontSize(lastTimeLabel, innerWidth)}
               fill={AXIS_TEXT_COLOR}
               textAnchor="end"
             >
-              {lastVisibleTime === null ? '' : formatTimeLabel(lastVisibleTime)}
+              {lastTimeLabel}
             </SvgText>
           </G>
         )}
