@@ -6,6 +6,7 @@ import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 import {
   getTradingAccountPortfolio,
+  getTradingAccountEquity,
   getTradingAccountPositions,
   getTradingAccountWallets,
   type TradingAccountDto,
@@ -30,6 +31,7 @@ import {
 import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
+import HomePortfolioCharts from './HomePortfolioCharts';
 
 /**
  * Home for a GENERAL account (작업 10 §A-6).
@@ -95,6 +97,11 @@ export default function GeneralAccountHome({
       }),
   });
 
+  const equityQuery = useQuery({
+    queryKey: QUERY_KEYS.tradingAccount.portfolioEquity(accountId, '30d', 'daily'),
+    queryFn: () => getTradingAccountEquity(accountId, '30d', 'daily'),
+  });
+
   /**
    * EVERY account-scoped query on this screen, not just the overview
    * (작업 12 §3).
@@ -106,6 +113,12 @@ export default function GeneralAccountHome({
    * presenting the account as readable at all.
    */
   const integrityFailure = findAccountIntegrityFailure([
+    {
+      section: '자산 추이',
+      isError: equityQuery.isError,
+      error: equityQuery.error,
+      retry: () => void equityQuery.refetch(),
+    },
     {
       section: '총 자산',
       isError: portfolioQuery.isError,
@@ -258,6 +271,14 @@ export default function GeneralAccountHome({
           </>
         )}
       </View>
+
+      <HomePortfolioCharts
+        portfolio={portfolio}
+        equity={equityQuery.data}
+        loading={equityQuery.isLoading}
+        failed={equityQuery.isError}
+        general
+      />
 
       <View style={styles.card}>
         <Text style={styles.label}>보유 종목</Text>

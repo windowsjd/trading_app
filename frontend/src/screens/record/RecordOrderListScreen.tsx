@@ -64,7 +64,7 @@ type Filter = 'all' | 'buy' | 'sell';
 
 export default function RecordOrderListScreen({ route }: Props) {
   const recordScope = route.params;
-  const isGeneralScope = 'accountId' in recordScope;
+  const isAccountScope = 'accountId' in recordScope;
   const [filter, setFilter] = useState<Filter>('all');
   const queryClient = useQueryClient();
   const {
@@ -76,7 +76,7 @@ export default function RecordOrderListScreen({ route }: Props) {
 
   /**
    * The account is derived from the immutable route subject — a season for a
-   * historical season record, or an explicit accountId from General Home —
+   * historical season record, or an explicit accountId from either home —
    * never from whatever account happens to be selected now (작업 10 §A-5).
    *
    * Reads are status-blind by contract, so an ended or settled season's closed
@@ -268,13 +268,13 @@ export default function RecordOrderListScreen({ route }: Props) {
     return (
       <ErrorState
         title={
-          isGeneralScope
-            ? '일반 투자 계정을 찾을 수 없습니다.'
+          isAccountScope
+            ? '투자 계정을 찾을 수 없습니다.'
             : ACCOUNT_MISSING_TITLE
         }
         message={
-          isGeneralScope
-            ? '이 화면이 가리키는 일반 투자 계정이 더 이상 내 계정 목록에 없습니다. 계정 정보를 다시 불러온 뒤에도 같으면 고객센터에 문의해주세요.'
+          isAccountScope
+            ? '이 화면이 가리키는 투자 계정이 더 이상 내 계정 목록에 없습니다. 계정 정보를 다시 불러온 뒤에도 같으면 고객센터에 문의해주세요.'
             : ACCOUNT_MISSING_MESSAGE
         }
         onRetry={() => void refetchAccounts()}

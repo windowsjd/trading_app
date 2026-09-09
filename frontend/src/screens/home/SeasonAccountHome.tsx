@@ -9,7 +9,6 @@ import {
   getTradingAccountPortfolio,
   getTradingAccountPositions,
   getTradingAccountWallets,
-  type TradingAccountAllocationDto,
   type TradingAccountDto,
 } from '../../features/tradingAccount/api';
 import {
@@ -28,7 +27,6 @@ import { getPortfolioNotice } from '../../features/tradingAccount/portfolioMessa
 import { getKnownWalletBalanceAmount } from '../../features/wallet/mapper';
 import {
   formatKrw,
-  formatKstDateTime,
   formatPercent,
   formatUsd,
   getAssetNameDisplay,
@@ -38,11 +36,7 @@ import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
-import {
-  DonutChart,
-  LineChart,
-  type LineChartPoint,
-} from '../../components/charts';
+import HomePortfolioCharts from './HomePortfolioCharts';
 
 /**
  * Home for a SEASON account (작업 11 §10.1).
@@ -72,6 +66,7 @@ type Props = {
   account: TradingAccountDto;
   capabilities: TradingAccountCapabilities | null;
   onOpenLedger: () => void;
+  onOpenOrders: () => void;
   onOpenFx: () => void;
   onOpenPortfolio: () => void;
   onOpenMarket: () => void;
@@ -83,26 +78,11 @@ type Props = {
 const POSITIONS_PREVIEW_LIMIT = 5;
 const EQUITY_RANGE = '30d' as const;
 
-function formatKrwChartValue(value: number) {
-  return `${formatKrw(value)}원`;
-}
-
-/** Allocation rows for the donut, from the ACCOUNT's own portfolio payload. */
-function getAllocationSegments(allocation: TradingAccountAllocationDto | null) {
-  if (!allocation || allocation.state !== 'available') return [];
-
-  return [
-    { key: 'cash', label: '현금', value: allocation.cashKrwValue },
-    { key: 'domestic', label: '국내', value: allocation.domesticStockValueKrw },
-    { key: 'us', label: '미국', value: allocation.usStockValueKrw },
-    { key: 'crypto', label: '암호화폐', value: allocation.cryptoValueKrw },
-  ].filter((item) => !!item.value);
-}
-
 export default function SeasonAccountHome({
   account,
   capabilities,
   onOpenLedger,
+  onOpenOrders,
   onOpenFx,
   onOpenPortfolio,
   onOpenMarket,
@@ -125,8 +105,6 @@ export default function SeasonAccountHome({
     queryFn: () => getTradingAccountPortfolio(accountId),
   });
 
-  const portfolioAvailable = portfolioQuery.data?.state === 'available';
-
   const walletsQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.wallets(accountId),
     queryFn: () => getTradingAccountWallets(accountId),
@@ -147,9 +125,9 @@ export default function SeasonAccountHome({
     queryKey: QUERY_KEYS.tradingAccount.portfolioEquity(
       accountId,
       EQUITY_RANGE,
+      'daily',
     ),
-    queryFn: () => getTradingAccountEquity(accountId, EQUITY_RANGE),
-    enabled: portfolioAvailable,
+    queryFn: () => getTradingAccountEquity(accountId, EQUITY_RANGE, 'daily'),
   });
 
   /**
@@ -259,14 +237,6 @@ export default function SeasonAccountHome({
   const tradeNotice = capabilities?.canTrade
     ? null
     : getCapabilityBlockMessage(capabilities, capabilities?.tradeBlockReason);
-  const allocationSegments = getAllocationSegments(portfolio.allocation);
-  const equityPoints: LineChartPoint[] = (equityQuery.data?.points ?? [])
-    .map<LineChartPoint | null>((point) => {
-      const value = Number(point.totalAssetKrw);
-      if (!Number.isFinite(value)) return null;
-      return { x: point.time, y: value, label: formatKstDateTime(point.time) };
-    })
-    .filter((point): point is LineChartPoint => point !== null);
 
   return (
     <ScrollView
@@ -373,44 +343,20 @@ export default function SeasonAccountHome({
             <Pressable style={styles.secondaryButton} onPress={onOpenLedger}>
               <Text style={styles.secondaryText}>원장 보기</Text>
             </Pressable>
+            <Pressable style={styles.secondaryButton} onPress={onOpenOrders}>
+              <Text style={styles.secondaryText}>주문 내역 보기</Text>
+            </Pressable>
           </>
         )}
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.label}>자산 배분</Text>
-        {allocationSegments.length > 0 ? (
-          <DonutChart
-            segments={allocationSegments}
-            valueFormatter={formatKrwChartValue}
-            emptyMessage="자산 배분 정보를 표시할 수 없습니다."
-          />
-        ) : (
-          <InlineEmptyState
-            message={
-              portfolio.allocation.message ??
-              '자산 배분 정보를 표시할 수 없습니다.'
-            }
-          />
-        )}
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.label}>자산 추이</Text>
-        {equityQuery.isLoading ? (
-          <SectionSkeleton lines={4} />
-        ) : equityQuery.isError ? (
-          <InlineEmptyState message="자산 추이를 불러오지 못했습니다." />
-        ) : equityPoints.length > 0 ? (
-          <LineChart
-            points={equityPoints}
-            valueFormatter={formatKrwChartValue}
-            emptyMessage="수익 추이를 표시하려면 데이터가 더 필요합니다."
-          />
-        ) : (
-          <InlineEmptyState message="표시할 차트 데이터가 없습니다." />
-        )}
-      </View>
+      <HomePortfolioCharts
+        portfolio={portfolio}
+        equity={equityQuery.data}
+        loading={equityQuery.isLoading}
+        failed={equityQuery.isError}
+        general={false}
+      />
 
       <View style={styles.card}>
         <Text style={styles.label}>보유 종목</Text>

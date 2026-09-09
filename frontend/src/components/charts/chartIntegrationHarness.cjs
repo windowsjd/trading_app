@@ -67,7 +67,7 @@ function createChartHarness(platform = 'android') {
       if (name === 'react-native') return native;
       if (name === 'react-native-svg') return {
         __esModule: true, default: 'svg', ClipPath: 'clipPath', Defs: 'defs',
-        G: 'g', Line: 'line', Rect: 'rect', Text: 'text',
+        G: 'g', Line: 'line', Rect: 'rect', Text: 'text', Circle: 'circle', Path: 'path',
       };
       if (name === 'react-native-gesture-handler') return {
         GestureDetector: 'GestureDetector',

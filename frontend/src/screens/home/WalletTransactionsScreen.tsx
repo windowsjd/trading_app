@@ -249,6 +249,7 @@ export default function WalletTransactionsScreen({ route }: Props) {
             <View testID={TEST_IDS.walletTransactions.item(item.id)} style={styles.rowCard}>
               <Text style={styles.itemTitle}>{display.title}</Text>
               {display.asset ? <Text style={styles.asset}>{display.asset}</Text> : null}
+              {display.quantity ? <Text style={styles.asset}>{display.quantity}</Text> : null}
               <Text style={styles.helper}>{item.currencyCode} · {display.direction}</Text>
               {item.txType === 'ad_reward' ? (
                 <Text style={styles.helper}>외부 가상자금 유입</Text>

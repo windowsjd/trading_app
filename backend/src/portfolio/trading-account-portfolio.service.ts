@@ -45,12 +45,14 @@ import { PortfolioValuationService } from './portfolio-valuation.service';
 
 export type TradingAccountEquityQuery = {
   range?: string;
+  granularity?: string;
 };
 
 type EquityRange = '1d' | '7d' | '30d' | 'all';
 
 type EquityHistoryPoint = {
   time: string;
+  snapshotDate?: string;
   totalAssetKrw: string;
   returnRate: string;
   returnRateMethod: 'time_weighted' | 'initial_capital';
@@ -103,15 +105,31 @@ export class TradingAccountPortfolioService {
     const owner = this.requireUserId(userId);
     const account = await this.resolveOwnedAccount(owner, accountId);
     const range = this.parseRange(query.range);
+    if (query.granularity !== undefined && query.granularity !== 'daily') {
+      throw new HttpException(
+        {
+          success: false,
+          error: {
+            code: 'INVALID_GRANULARITY',
+            message: 'granularity must be daily when supplied.',
+          },
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const daily = query.granularity === 'daily';
 
     if (account.mode !== TradingAccountMode.general) {
       return this.buildEquityResponse(
         account,
         range,
-        await this.findEquityPointsForSeason(
-          account.id,
-          this.resolveSince(range, account.openedAt, Date.now()),
-        ),
+        daily
+          ? await this.findDailyPoints(this.prisma, account, range, new Date())
+          : await this.findEquityPointsForSeason(
+              account.id,
+              this.resolveSince(range, account.openedAt, Date.now()),
+            ),
+        daily,
       );
     }
 
@@ -130,13 +148,14 @@ export class TradingAccountPortfolioService {
         });
 
         const since = this.resolveSince(range, locked.openedAt, now.getTime());
-        const points =
-          range === '1d'
+        const points = daily
+          ? await this.findDailyPoints(tx, locked, range, now)
+          : range === '1d'
             ? await this.findGeneralEquityPoints(tx, locked.id, since)
             : ((await this.findGeneralDailyPoints(tx, locked.id, since)) ??
               (await this.findGeneralEquityPoints(tx, locked.id, since)));
 
-        return this.buildEquityResponse(locked, range, points);
+        return this.buildEquityResponse(locked, range, points, daily);
       },
     );
   }
@@ -145,6 +164,7 @@ export class TradingAccountPortfolioService {
     account: Pick<OwnedTradingAccount, 'id' | 'mode'>,
     range: EquityRange,
     points: EquityHistoryPoint[],
+    daily = false,
   ) {
     return {
       success: true as const,
@@ -154,6 +174,7 @@ export class TradingAccountPortfolioService {
         state:
           points.length === 0 ? ('empty' as const) : ('available' as const),
         range,
+        ...(daily ? { granularity: 'daily' as const } : {}),
         returnRateMethod: this.returnRateMethod(account.mode),
         points,
       },
@@ -384,6 +405,93 @@ export class TradingAccountPortfolioService {
   }
 
   // ------------------------------------------------------------- helpers
+
+  /** Explicit daily read: job date is authoritative, even for late captures.
+   * Never substitute intraday/funding-boundary rows for missing daily history. */
+  private async findDailyPoints(
+    client: Prisma.TransactionClient,
+    account: OwnedTradingAccount,
+    range: EquityRange,
+    now: Date,
+  ): Promise<EquityHistoryPoint[]> {
+    const dateKey = (date: Date) =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(date);
+    const end = new Date(`${dateKey(now)}T00:00:00.000Z`);
+    const days = range === '1d' ? 1 : range === '7d' ? 7 : 30;
+    const start =
+      range === 'all'
+        ? new Date(`${dateKey(account.openedAt)}T00:00:00.000Z`)
+        : new Date(end.getTime() - (days - 1) * 86_400_000);
+    const participantId = account.seasonParticipant?.id ?? null;
+    const rows = await client.dailyPortfolioSnapshot.findMany({
+      // Include conflicting participant links so corruption cannot look empty.
+      where: {
+        ...(account.mode === TradingAccountMode.season
+          ? {
+              OR: [
+                { tradingAccountId: account.id },
+                { seasonParticipantId: participantId },
+              ],
+            }
+          : { tradingAccountId: account.id }),
+        snapshotDate: { gte: start, lte: end },
+      },
+      orderBy: { snapshotDate: 'asc' },
+      select: {
+        id: true,
+        tradingAccountId: true,
+        seasonParticipantId: true,
+        snapshotDate: true,
+        capturedAt: true,
+        totalAssetKrw: true,
+        returnRate: true,
+        cumulativeExternalFundingKrw: true,
+        investmentPnlKrw: true,
+        timeWeightedReturnFactor: true,
+      },
+    });
+    if (account.mode === TradingAccountMode.general) {
+      assertGeneralDailyHistoryRows(account.id, rows);
+    }
+    const dates = new Set<string>();
+    for (const row of rows) {
+      const date = row.snapshotDate.toISOString().slice(0, 10);
+      if (
+        row.tradingAccountId !== account.id ||
+        row.seasonParticipantId !== participantId ||
+        dates.has(date)
+      ) {
+        throw new HttpException(
+          {
+            success: false,
+            error: {
+              code: 'TRADING_ACCOUNT_INTEGRITY',
+              message: 'Daily history scope or date is inconsistent.',
+            },
+          },
+          HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+      }
+      dates.add(date);
+    }
+    return rows.map((row) => ({
+      time: row.capturedAt.toISOString(),
+      snapshotDate: row.snapshotDate.toISOString().slice(0, 10),
+      totalAssetKrw: row.totalAssetKrw.toFixed(MONEY_SCALE),
+      returnRate: row.returnRate.toFixed(RETURN_RATE_SCALE),
+      returnRateMethod: this.returnRateMethod(account.mode),
+      cumulativeExternalFundingKrw:
+        row.cumulativeExternalFundingKrw?.toFixed(MONEY_SCALE) ?? null,
+      investmentPnlKrw: row.investmentPnlKrw?.toFixed(MONEY_SCALE) ?? null,
+      snapshotReason: SnapshotReason.scheduled,
+      externalFundingAmountKrw: null,
+    }));
+  }
 
   private buildAllocation(valuation: {
     krwCash: string;

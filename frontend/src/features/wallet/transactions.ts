@@ -9,7 +9,7 @@ import type {
   TradingAccountWalletTransactionsDto,
   TradingAccountWalletTransactionsParams,
 } from '../tradingAccount/api';
-import { formatKstDateTime, formatMoney } from '../../utils/format.ts';
+import { formatDisplayDecimal, formatKstDateTime, formatMoney } from '../../utils/format.ts';
 
 export type LedgerDirection = 'all' | WalletTransactionDirection;
 export type LedgerType = 'all' | WalletTransactionFilter;
@@ -59,6 +59,9 @@ export function getLedgerRowDisplay(item: WalletTransactionDto) {
   return {
     title: TYPE_LABELS[item.txType] ?? item.txType,
     asset: item.asset ? `${item.asset.name} · ${item.asset.symbol}` : null,
+    quantity: item.trade && item.asset
+      ? `${formatDisplayDecimal(item.trade.quantity)}${item.asset.assetType === 'crypto' ? ` ${item.asset.symbol}` : '주'}`
+      : null,
     direction: item.direction === 'credit' ? '입금' : '출금',
     amount: `${item.direction === 'credit' ? '+' : '-'} ${formatMoney(item.amount, item.currencyCode)}`,
     balance: `잔액 ${formatMoney(item.balanceAfter, item.currencyCode)}`,
@@ -127,8 +130,11 @@ export function parseWalletLedgerResponse(
     if (row.txType === 'order_buy' || row.txType === 'order_sell') {
       if (row.referenceType !== 'order' || !text(row.referenceId) ||
           !isRecord(row.asset) || !text(row.asset.id) || !text(row.asset.name) || !text(row.asset.symbol) ||
+          !text(row.asset.assetType) || !['domestic_stock', 'us_stock', 'crypto'].includes(row.asset.assetType) ||
+          !isRecord(row.trade) || !text(row.trade.quantity) ||
+          !/^\d+(\.\d{1,8})?$/.test(row.trade.quantity) || !/[1-9]/.test(row.trade.quantity) ||
           row.direction !== (row.txType === 'order_buy' ? 'debit' : 'credit')) return fail();
-    } else if (row.asset !== null) return fail();
+    } else if (row.asset !== null || row.trade !== null) return fail();
     ids.add(row.id);
   }
   return payload as unknown as TradingAccountWalletTransactionsDto;

@@ -1,3 +1,4 @@
+import { assertDailyEquity } from './dailyEquity.ts';
 import { apiClient } from '../../services/api/client';
 import type {
   ApiSuccessResponse,
@@ -134,6 +135,7 @@ export type TradingAccountEquityRange = '1d' | '7d' | '30d' | 'all';
 
 export interface TradingAccountEquityPointDto {
   time: string;
+  snapshotDate?: string;
   totalAssetKrw: MoneyString;
   returnRate: PercentString;
   returnRateMethod: ReturnRateMethod;
@@ -145,6 +147,7 @@ export interface TradingAccountEquityPointDto {
 
 export interface TradingAccountEquityDto {
   tradingAccountId: string;
+  granularity?: 'daily';
   range: TradingAccountEquityRange;
   returnRateMethod: ReturnRateMethod;
   points: TradingAccountEquityPointDto[];
@@ -255,16 +258,20 @@ export async function getTradingAccountPortfolio(accountId: string) {
 export async function getTradingAccountEquity(
   accountId: string,
   range: TradingAccountEquityRange,
+  granularity?: 'daily',
 ) {
   const response = await apiClient.get<
     ApiSuccessResponse<TradingAccountEquityDto>
-  >(accountPath(accountId, '/portfolio/equity'), { params: { range } });
+  >(accountPath(accountId, '/portfolio/equity'), {
+    params: { range, ...(granularity ? { granularity } : {}) },
+  });
 
-  return assertAccountScope(
+  const data = assertAccountScope(
     'GET /trading-accounts/:accountId/portfolio/equity',
     accountId,
     response.data.data,
   );
+  return granularity === 'daily' ? assertDailyEquity(data, range) : data;
 }
 
 export async function getTradingAccountWallets(accountId: string) {

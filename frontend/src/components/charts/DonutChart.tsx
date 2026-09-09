@@ -14,6 +14,8 @@ export type DonutChartSegment = {
 export type DonutChartProps = {
   segments: DonutChartSegment[];
   size?: number;
+  totalLabel?: string;
+  segmentValueFormatter?: (segment: DonutChartSegment) => string;
   thickness?: number;
   valueFormatter?: (value: number) => string;
   emptyMessage?: string;
@@ -33,6 +35,8 @@ function formatDefaultValue(value: number) {
 export default function DonutChart({
   segments,
   size = 176,
+  totalLabel,
+  segmentValueFormatter,
   thickness = 22,
   valueFormatter = formatDefaultValue,
   emptyMessage = '자산 배분 데이터가 없습니다.',
@@ -45,6 +49,7 @@ export default function DonutChart({
           return value !== null && value > 0
             ? {
                 ...segment,
+                original: segment,
                 value,
                 color: PALETTE[index % PALETTE.length],
               }
@@ -53,7 +58,7 @@ export default function DonutChart({
         .filter(
           (
             segment,
-          ): segment is DonutChartSegment & { value: number; color: string } =>
+          ): segment is DonutChartSegment & { value: number; color: string; original: DonutChartSegment } =>
             segment !== null,
         ),
     [segments],
@@ -80,7 +85,7 @@ export default function DonutChart({
       style={styles.container}
       accessible
       accessibilityRole="image"
-      accessibilityLabel={`도넛 차트. 총 ${valueFormatter(total)}`}
+      accessibilityLabel={`도넛 차트. 총 ${totalLabel ?? valueFormatter(total)}`}
     >
       <View style={styles.chartRow}>
         <View style={{ width: safeSize, height: safeSize }}>
@@ -119,8 +124,8 @@ export default function DonutChart({
           </Svg>
           <View style={styles.centerLabel}>
             <Text style={styles.centerTitle}>총계</Text>
-            <Text style={styles.centerValue} numberOfLines={1}>
-              {valueFormatter(total)}
+            <Text style={styles.centerValue} adjustsFontSizeToFit minimumFontScale={0.7}>
+              {totalLabel ?? valueFormatter(total)}
             </Text>
           </View>
         </View>
@@ -135,11 +140,11 @@ export default function DonutChart({
                   style={[styles.swatch, { backgroundColor: segment.color }]}
                 />
                 <View style={styles.legendTextWrap}>
-                  <Text style={styles.legendLabel} numberOfLines={1}>
+                  <Text style={styles.legendLabel}>
                     {segment.label}
                   </Text>
-                  <Text style={styles.legendValue} numberOfLines={1}>
-                    {valueFormatter(segment.value)} · {formatPercent(percentage, 1)}%
+                  <Text style={styles.legendValue}>
+                    {segmentValueFormatter?.(segment.original) ?? valueFormatter(segment.value)} · {formatPercent(percentage, 1)}%
                   </Text>
                 </View>
               </View>

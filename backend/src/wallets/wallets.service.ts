@@ -247,7 +247,8 @@ export class WalletsService {
     ]);
 
     // WalletTransaction has a polymorphic reference, not an Order relation.
-    // Resolve all order assets in ONE read; never request metadata per row.
+    // Resolve executed quantities and assets in ONE read. Both execution paths
+    // fill the entire Order.quantity and write one ledger row per order.
     const orderRows = transactions.filter(
       (row) => row.txType === 'order_buy' || row.txType === 'order_sell',
     );
@@ -272,7 +273,10 @@ export class WalletsService {
             side: true,
             status: true,
             currencyCode: true,
-            asset: { select: { id: true, name: true, symbol: true } },
+            quantity: true,
+            asset: {
+              select: { id: true, name: true, symbol: true, assetType: true },
+            },
           },
         })
       : [];
@@ -283,6 +287,8 @@ export class WalletsService {
       if (
         !order ||
         order.status !== 'executed' ||
+        !order.quantity?.isFinite() ||
+        !order.quantity.gt(0) ||
         order.side !== (buy ? 'buy' : 'sell') ||
         row.direction !== (buy ? 'debit' : 'credit') ||
         order.currencyCode !== row.currencyCode
@@ -311,6 +317,15 @@ export class WalletsService {
           balanceAfter: this.formatDecimal(transaction.balanceAfter, 8),
           occurredAt: transaction.occurredAt.toISOString(),
           createdAt: transaction.createdAt.toISOString(),
+          trade:
+            transaction.txType === 'order_buy' ||
+            transaction.txType === 'order_sell'
+              ? {
+                  quantity: ordersById
+                    .get(transaction.referenceId!)!
+                    .quantity.toFixed(8),
+                }
+              : null,
           asset:
             transaction.txType === 'order_buy' ||
             transaction.txType === 'order_sell'

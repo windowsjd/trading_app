@@ -76,6 +76,12 @@ export default function HomeScreen({ navigation }: Props) {
     );
   }
 
+  const openOrders = () =>
+    rootNavigation.navigate('MainTabs', {
+      screen: 'RecordTab',
+      params: { screen: 'RecordOrderList', params: { accountId: selectedAccount.id } },
+    });
+
   const openAsset = (assetId: string) =>
     rootNavigation.navigate('MainTabs', {
       screen: 'MarketTab',
@@ -92,21 +98,16 @@ export default function HomeScreen({ navigation }: Props) {
 
       {selectedAccount.mode === 'general' ? (
         <GeneralAccountHome
+          key={selectedAccount.id}
           account={selectedAccount}
           capabilities={capabilities}
           onOpenLedger={() => navigation.navigate('WalletTransactions')}
-          onOpenOrders={() =>
-            rootNavigation.navigate('MainTabs', {
-              screen: 'RecordTab',
-              params: {
-                screen: 'RecordOrderList',
-                params: { accountId: selectedAccount.id },
-              },
-            })
-          }
+          onOpenOrders={openOrders}
         />
       ) : (
         <SeasonAccountHome
+          key={selectedAccount.id}
+          onOpenOrders={openOrders}
           account={selectedAccount}
           capabilities={capabilities}
           onOpenLedger={() => navigation.navigate('WalletTransactions')}

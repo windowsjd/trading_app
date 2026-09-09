@@ -128,7 +128,11 @@ The account-scoped response is `success/data`, with required data fields:
     balanceAfter: string; // persisted wallet balance AFTER this row
     occurredAt: string; // UTC ISO
     createdAt: string; // UTC ISO
-    asset: { id: string; name: string; symbol: string } | null;
+    asset: {
+      id: string; name: string; symbol: string;
+      assetType: 'domestic_stock' | 'us_stock' | 'crypto';
+    } | null;
+    trade: { quantity: string } | null;
   }>;
   pagination: { limit: number; offset: number; total: number; returned: number; nextOffset: number | null };
 }
@@ -145,7 +149,9 @@ For `order_buy` / `order_sell`, `asset` is loaded with one batched Order/Asset
 read per page, restricted to the same account and participant identity. Missing
 or inconsistent order references fail with `TRADING_ACCOUNT_INTEGRITY`; no row
 is silently discarded and no foreign order metadata is returned. Other rows
-have `asset: null`.
+have `asset: null` and `trade: null`. Trade quantities come from the referenced
+executed Order's full fill, in the same batch read; see the daily equity and
+trade metadata contract below.
 
 The mobile ledger always requests one currency (route currency, else KRW),
 never sums currencies, and reads `balanceAfter` as supplied. Its filter labels
@@ -284,3 +290,24 @@ Applied to every 0-row path, not a subset:
 
 The `tradingAccountId` in each atomic UPDATE's WHERE is unchanged — the
 diagnosis explains a 0-row result, it never relaxes the guard.
+
+## Home daily equity and ledger trade metadata (2026-09-09)
+
+- Existing `/api/v1/trading-accounts/:accountId/portfolio/equity` accepts optional
+  `granularity=daily`. Omission preserves every existing range/source/fallback.
+- Daily reads use only `DailyPortfolioSnapshot` in both modes, sorted and bounded
+  by canonical `snapshotDate` (YYYY-MM-DD), never by job execution `capturedAt`.
+  `30d` means today and the preceding 29 KST calendar dates; `1d`/`7d` use 1/7
+  calendar dates and `all` starts at the account opening date in KST.
+- Daily responses include `granularity: "daily"` and each point's `snapshotDate`;
+  `time` remains the original UTC `capturedAt`. Missing dates remain missing,
+  including empty histories; no intraday fallback, averaging or interpolation.
+  Stored amounts and mode-specific return/performance columns remain unchanged.
+  General reads retain RepeatableRead and continuity/history integrity checks.
+  Season daily reads reject conflicting account/participant scope.
+- Account wallet ledger trade rows add required `trade: { quantity: string }`
+  and `asset.assetType` (`domestic_stock`, `us_stock`, `crypto`). Other rows have
+  `trade: null` and `asset: null`. Quantity is the referenced executed Order's
+  full-fill quantity, serialized to eight decimal places in the existing batch
+  metadata read. Invalid/missing order metadata fails closed. No financial writes
+  or initial-grant visibility, currency, filter or pagination changes.

@@ -96,8 +96,8 @@ export function resolveSeasonAccount({
  * Resolves the immutable subject carried by the order-history route.
  *
  * Historical season entry points name a season and retain the strict
- * participant/account-link lookup above. General Home has no season to name,
- * so it carries the already-owned general account id directly. In both cases
+ * participant/account-link lookup above. Both home modes carry their selected
+ * account id directly. In both cases
  * the id must still be present in the authenticated account list; this helper
  * never probes an arbitrary id and never falls back to the currently selected
  * account after the route has been opened.
@@ -120,8 +120,7 @@ export function resolveRecordOrderAccount(input: {
   if (input.isLoading) return { state: 'loading', account: null };
 
   const account = input.accounts.find(
-    (candidate) =>
-      candidate.id === input.scope.accountId && candidate.mode === 'general',
+    (candidate) => candidate.id === input.scope.accountId,
   );
   if (account) return { state: 'ready', account };
   if (input.isError) return { state: 'account_list_error', account: null };

@@ -3,7 +3,11 @@
     "success": true,
     "data": {
       "tradingAccountId": "ta-1",
-      "filters": { "currency": "KRW", "direction": null, "txType": null },
+      "filters": {
+        "currency": "KRW",
+        "direction": null,
+        "txType": null
+      },
       "transactions": [
         {
           "id": "wtx-fx-source",
@@ -16,7 +20,8 @@
           "balanceAfter": "8001000.00000000",
           "occurredAt": "2026-09-04T00:00:00.000Z",
           "createdAt": "2026-09-04T00:00:00.000Z",
-          "asset": null
+          "asset": null,
+          "trade": null
         },
         {
           "id": "wtx-ad",
@@ -29,7 +34,8 @@
           "balanceAfter": "9001000.00000000",
           "occurredAt": "2026-09-03T00:00:00.000Z",
           "createdAt": "2026-09-03T00:00:00.000Z",
-          "asset": null
+          "asset": null,
+          "trade": null
         },
         {
           "id": "wtx-buy",
@@ -45,7 +51,11 @@
           "asset": {
             "id": "asset-samsung",
             "name": "삼성전자",
-            "symbol": "005930"
+            "symbol": "005930",
+            "assetType": "domestic_stock"
+          },
+          "trade": {
+            "quantity": "10.00000000"
           }
         }
       ],
@@ -62,7 +72,11 @@
     "success": true,
     "data": {
       "tradingAccountId": "ta-1",
-      "filters": { "currency": "USD", "direction": null, "txType": null },
+      "filters": {
+        "currency": "USD",
+        "direction": null,
+        "txType": null
+      },
       "transactions": [
         {
           "id": "wtx-sell",
@@ -75,7 +89,15 @@
           "balanceAfter": "1200.00000000",
           "occurredAt": "2026-09-05T00:00:00.000Z",
           "createdAt": "2026-09-05T00:00:00.000Z",
-          "asset": { "id": "asset-apple", "name": "Apple", "symbol": "AAPL" }
+          "asset": {
+            "id": "asset-apple",
+            "name": "Apple",
+            "symbol": "AAPL",
+            "assetType": "us_stock"
+          },
+          "trade": {
+            "quantity": "2.00000000"
+          }
         },
         {
           "id": "wtx-fx-target",
@@ -88,7 +110,8 @@
           "balanceAfter": "750.00000000",
           "occurredAt": "2026-09-04T00:00:00.000Z",
           "createdAt": "2026-09-04T00:00:00.000Z",
-          "asset": null
+          "asset": null,
+          "trade": null
         }
       ],
       "pagination": {

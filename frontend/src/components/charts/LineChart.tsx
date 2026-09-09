@@ -1,12 +1,8 @@
-import React, { useMemo, useState } from 'react';
-import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
-import Svg, {
-  Circle,
-  Line as SvgLine,
-  Path,
-} from 'react-native-svg';
-
+import React, { useCallback, useMemo, useState } from 'react';
+import { type LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
+import Svg, { Circle, Line as SvgLine, Path } from 'react-native-svg';
 import ChartEmptyState from './ChartEmptyState';
+import LineChartGestures from './LineChartGestures';
 import { formatDisplayDecimal, formatKstDateTime } from '../../utils/format';
 
 export type LineChartPoint = {
@@ -14,218 +10,218 @@ export type LineChartPoint = {
   y: string | number;
   label?: string;
 };
-
 export type LineChartProps = {
   points: LineChartPoint[];
   height?: number;
   valueFormatter?: (value: number) => string;
+  /** Format the original decimal string, without using plot coordinates. */
+  pointValueFormatter?: (point: LineChartPoint) => string;
   labelFormatter?: (point: LineChartPoint) => string;
   emptyMessage?: string;
 };
-
-type SanitizedPoint = {
-  point: LineChartPoint;
-  y: number;
-};
-
-const DEFAULT_WIDTH = 320;
-const MAX_POINTS = 80;
-const PADDING = {
-  top: 16,
-  right: 12,
-  bottom: 16,
-  left: 12,
-};
-
-function parseDecimal(value: string | number) {
-  const parsed = typeof value === 'number' ? value : Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
+const PADDING = 12;
 
 function formatDefaultValue(value: number) {
   return formatDisplayDecimal(value.toFixed(2));
 }
 
-function downsample(points: SanitizedPoint[], maxPoints: number) {
-  if (points.length <= maxPoints) return points;
-
-  const step = (points.length - 1) / (maxPoints - 1);
-  return Array.from({ length: maxPoints }, (_, index) => {
-    const sourceIndex =
-      index === maxPoints - 1 ? points.length - 1 : Math.floor(index * step);
-    return points[sourceIndex];
-  });
-}
-
 function getPointLabel(point: LineChartPoint) {
   if (point.label) return point.label;
   if (point.x instanceof Date) return formatKstDateTime(point.x);
-  if (point.x !== undefined) return String(point.x);
-  return '';
+  return point.x === undefined ? '' : String(point.x);
 }
 
 export default function LineChart({
   points,
   height = 180,
   valueFormatter = formatDefaultValue,
+  pointValueFormatter,
   labelFormatter,
   emptyMessage = '차트 데이터가 충분하지 않습니다.',
 }: LineChartProps) {
-  const [width, setWidth] = useState(DEFAULT_WIDTH);
-
-  const sanitizedPoints = useMemo(
+  const [width, setWidth] = useState(320);
+  // Bind selection to the dataset and layout. Account/range changes cannot
+  // momentarily show the old point, even before an effect gets to run.
+  const [selection, setSelection] = useState<{
+    points: LineChartPoint[];
+    width: number;
+    height: number;
+    index: number;
+  } | null>(null);
+  const coordinates = useMemo(() => {
+    const valid = points.flatMap((point) => {
+      const value = Number(point.y);
+      return Number.isFinite(value) ? [{ point, value }] : [];
+    });
+    if (valid.length === 0) return [];
+    const min = valid.reduce(
+      (value, row) => Math.min(value, row.value),
+      Infinity,
+    );
+    const max = valid.reduce(
+      (value, row) => Math.max(value, row.value),
+      -Infinity,
+    );
+    const innerWidth = Math.max(width - 2 * PADDING, 1);
+    const innerHeight = Math.max(height - 2 * PADDING, 1);
+    // All actual points remain selectable. Numbers are only SVG geometry;
+    // labels can always use the unmodified source string.
+    return valid.map((row, index) => ({
+      ...row,
+      x:
+        PADDING +
+        (valid.length === 1 ? 0.5 : index / (valid.length - 1)) * innerWidth,
+      y:
+        PADDING +
+        (max === min ? 0.5 : 1 - (row.value - min) / (max - min)) * innerHeight,
+    }));
+  }, [points, width, height]);
+  const path = useMemo(
     () =>
-      points
-        .map((point) => {
-          const y = parseDecimal(point.y);
-          return y === null ? null : { point, y };
-        })
-        .filter((point): point is SanitizedPoint => point !== null),
-    [points],
+      coordinates
+        .map((point, i) => `${i === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+        .join(' '),
+    [coordinates],
   );
-
-  const chartPoints = useMemo(
-    () => downsample(sanitizedPoints, MAX_POINTS),
-    [sanitizedPoints],
+  const onSelect = useCallback(
+    (x: number | null) => {
+      if (x === null || coordinates.length === 0) {
+        setSelection(null);
+        return;
+      }
+      const index = coordinates.reduce(
+        (best, point, i) =>
+          Math.abs(point.x - x) < Math.abs(coordinates[best].x - x) ? i : best,
+        0,
+      );
+      setSelection({ points, width, height, index });
+    },
+    [coordinates, points, width, height],
   );
-
   const onLayout = (event: LayoutChangeEvent) => {
-    const nextWidth = Math.floor(event.nativeEvent.layout.width);
-    if (nextWidth > 0 && nextWidth !== width) {
-      setWidth(nextWidth);
-    }
+    const next = Math.floor(event.nativeEvent.layout.width);
+    if (next > 0) setWidth(next);
   };
-
-  if (sanitizedPoints.length < 2) {
+  if (coordinates.length === 0)
     return <ChartEmptyState message={emptyMessage} />;
-  }
-
-  const values = chartPoints.map((point) => point.y);
-  const minY = Math.min(...values);
-  const maxY = Math.max(...values);
-  const isFlat = minY === maxY;
-  const chartWidth = Math.max(width, 120);
-  const innerWidth = Math.max(chartWidth - PADDING.left - PADDING.right, 1);
-  const innerHeight = Math.max(height - PADDING.top - PADDING.bottom, 1);
-  const yRange = isFlat ? 1 : maxY - minY;
-
-  const coordinates = chartPoints.map((point, index) => {
-    const x =
-      chartPoints.length === 1
-        ? PADDING.left + innerWidth / 2
-        : PADDING.left + (index / (chartPoints.length - 1)) * innerWidth;
-    const y = isFlat
-      ? PADDING.top + innerHeight / 2
-      : PADDING.top + (1 - (point.y - minY) / yRange) * innerHeight;
-
-    return { x, y, value: point.y, point: point.point };
-  });
-
-  const linePath = coordinates
-    .map((coordinate, index) =>
-      `${index === 0 ? 'M' : 'L'} ${coordinate.x.toFixed(2)} ${coordinate.y.toFixed(2)}`,
-    )
-    .join(' ');
-  const lastCoordinate = coordinates[coordinates.length - 1];
-  const lastLabel =
-    labelFormatter?.(lastCoordinate.point) ?? getPointLabel(lastCoordinate.point);
-  const lastValue = valueFormatter(lastCoordinate.value);
-  const accessibilityLabel = lastLabel
-    ? `차트. 마지막 값 ${lastLabel}, ${lastValue}`
-    : `차트. 마지막 값 ${lastValue}`;
-
+  const selected =
+    selection?.points === points &&
+    selection.width === width &&
+    selection.height === height;
+  const coordinate =
+    coordinates[selected ? selection.index : coordinates.length - 1];
+  const label =
+    labelFormatter?.(coordinate.point) ?? getPointLabel(coordinate.point);
+  const value =
+    pointValueFormatter?.(coordinate.point) ?? valueFormatter(coordinate.value);
   return (
     <View
       onLayout={onLayout}
       style={styles.container}
       accessible
       accessibilityRole="image"
-      accessibilityLabel={accessibilityLabel}
+      accessibilityLabel={`차트. ${selected ? '선택' : '마지막'} 값 ${label}, ${value}`}
     >
-      <Svg width="100%" height={height}>
-        <SvgLine
-          x1={PADDING.left}
-          y1={PADDING.top}
-          x2={PADDING.left + innerWidth}
-          y2={PADDING.top}
-          stroke="#eceff3"
-          strokeWidth={1}
-        />
-        <SvgLine
-          x1={PADDING.left}
-          y1={PADDING.top + innerHeight / 2}
-          x2={PADDING.left + innerWidth}
-          y2={PADDING.top + innerHeight / 2}
-          stroke="#eceff3"
-          strokeWidth={1}
-        />
-        <SvgLine
-          x1={PADDING.left}
-          y1={PADDING.top + innerHeight}
-          x2={PADDING.left + innerWidth}
-          y2={PADDING.top + innerHeight}
-          stroke="#eceff3"
-          strokeWidth={1}
-        />
-        <Path
-          d={linePath}
-          fill="none"
-          stroke="#2563eb"
-          strokeWidth={3}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        {isFlat ? (
-          <SvgLine
-            x1={PADDING.left}
-            y1={PADDING.top + innerHeight / 2}
-            x2={PADDING.left + innerWidth}
-            y2={PADDING.top + innerHeight / 2}
-            stroke="#93c5fd"
-            strokeWidth={1}
-            strokeDasharray="5 5"
+      <Text style={styles.value}>
+        {selected ? '선택 값' : '최신 값'} {value}
+      </Text>
+      <LineChartGestures onSelect={onSelect}>
+        <Svg width="100%" height={height}>
+          {[0, 0.5, 1].map((ratio) => (
+            <SvgLine
+              key={ratio}
+              x1={PADDING}
+              x2={width - PADDING}
+              y1={PADDING + ratio * (height - 2 * PADDING)}
+              y2={PADDING + ratio * (height - 2 * PADDING)}
+              stroke="#eceff3"
+            />
+          ))}
+          <Path
+            d={path}
+            fill="none"
+            stroke="#2563eb"
+            strokeWidth={3}
+            strokeLinecap="round"
+            strokeLinejoin="round"
           />
+          {selected ? (
+            <>
+              <SvgLine
+                x1={PADDING}
+                x2={width - PADDING}
+                y1={coordinate.y}
+                y2={coordinate.y}
+                stroke="#64748b"
+                strokeDasharray="4 4"
+              />
+              <SvgLine
+                x1={coordinate.x}
+                x2={coordinate.x}
+                y1={PADDING}
+                y2={height - PADDING}
+                stroke="#64748b"
+                strokeDasharray="4 4"
+              />
+            </>
+          ) : null}
+          <Circle
+            cx={coordinate.x}
+            cy={coordinate.y}
+            r={4}
+            fill={selected ? '#2563eb' : '#fff'}
+            stroke={selected ? '#fff' : '#2563eb'}
+            strokeWidth={2}
+          />
+        </Svg>
+        {selected ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.guideValue,
+              {
+                top: Math.max(0, Math.min(coordinate.y - 22, height - 40)),
+                ...(coordinate.x < width / 2
+                  ? { right: PADDING }
+                  : { left: PADDING }),
+              },
+            ]}
+          >
+            <Text style={styles.guideValueText}>{value}</Text>
+          </View>
         ) : null}
-        <Circle
-          cx={lastCoordinate.x}
-          cy={lastCoordinate.y}
-          r={5}
-          fill="#fff"
-          stroke="#2563eb"
-          strokeWidth={3}
-        />
-      </Svg>
-      <View style={styles.footer}>
-        <Text style={styles.footerLabel} numberOfLines={1}>
-          {lastLabel || '마지막 값'}
-        </Text>
-        <Text style={styles.footerValue} numberOfLines={1}>
-          {lastValue}
-        </Text>
-      </View>
+      </LineChartGestures>
+      <Text style={styles.date}>{label || '마지막 값'}</Text>
     </View>
   );
 }
-
 const styles = StyleSheet.create({
-  container: {
-    minHeight: 128,
-    gap: 6,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 12,
-  },
-  footerLabel: {
-    flex: 1,
-    color: '#666',
-    fontSize: 12,
-  },
-  footerValue: {
+  container: { minHeight: 128, gap: 6, minWidth: 0 },
+  value: {
     color: '#111',
     fontSize: 14,
     fontWeight: '700',
+    lineHeight: 21,
+    flexShrink: 1,
+  },
+  date: {
+    color: '#666',
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
+    flexShrink: 1,
+  },
+  guideValue: {
+    position: 'absolute',
+    maxWidth: '85%',
+    backgroundColor: '#eff6ff',
+    borderRadius: 4,
+    paddingHorizontal: 4,
+  },
+  guideValueText: {
+    color: '#1d4ed8',
+    fontSize: 11,
+    lineHeight: 18,
+    flexShrink: 1,
   },
 });

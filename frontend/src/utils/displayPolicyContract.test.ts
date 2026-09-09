@@ -70,8 +70,7 @@ const datetimeSources = [
   'features/reward/api.ts',
   'features/wallet/mapper.ts',
   'screens/home/PortfolioScreen.tsx',
-  'screens/home/SeasonAccountHome.tsx',
-  'screens/home/WalletTransactionsScreen.tsx',
+  'features/wallet/transactions.ts',
   'screens/ranking/RankingScreen.tsx',
   'screens/record/RecordProfitAnalysisScreen.tsx',
   'screens/record/RecordSeasonDetailScreen.tsx',
@@ -88,6 +87,9 @@ describe('KST timestamp display contract', () => {
   });
 
   it('keeps date-only fields out of the datetime formatter', () => {
+    const homeCharts = read('screens/home/HomePortfolioCharts.tsx');
+    assert.match(homeCharts, /label: point\.snapshotDate/u);
+    assert.doesNotMatch(homeCharts, /formatKstDateTime/u);
     const ranking = read('screens/ranking/RankingScreen.tsx');
     const recordDetail = read('screens/record/RecordSeasonDetailScreen.tsx');
     assert.doesNotMatch(ranking, /formatKstDateTime\([^)]*rankingDate/u);

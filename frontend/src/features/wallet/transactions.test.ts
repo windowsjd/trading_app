@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { URL } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import { createLedgerHarness, elements } from '../../../test/ledgerTestHarness.cjs';
@@ -52,6 +53,7 @@ describe('wallet ledger contract and real screen integration', () => {
     const buy = list.props.renderItem({ item: list.props.data[2] });
     assert.ok(labels(buy).includes('매수'));
     assert.ok(labels(buy).includes('삼성전자 · 005930'));
+    assert.ok(labels(buy).includes('10주'));
     assert.ok(labels(buy).includes('- 1,000,000원'));
     assert.ok(labels(buy).includes('잔액 9,000,000원'));
     assert.ok(labels(buy).includes('2026-09-02 09:00'));
@@ -65,6 +67,7 @@ describe('wallet ledger contract and real screen integration', () => {
     const sell = labels(list.props.renderItem({ item: list.props.data[0] }));
     assert.ok(sell.includes('매도'));
     assert.ok(sell.includes('Apple · AAPL'));
+    assert.ok(sell.includes('2주'));
     assert.ok(sell.includes('+ $450'));
     assert.ok(sell.includes('잔액 $1,200'));
     const fx = labels(list.props.renderItem({ item: list.props.data[1] }));
@@ -221,5 +224,35 @@ describe('wallet ledger contract and real screen integration', () => {
     assert.ok(elements(rendered, 'Text').every((text) => text.props.numberOfLines === undefined));
     const currencyChip = chips(h, '통화')[0];
     assert.equal(currencyChip.type(currencyChip.props).props.accessibilityState.selected, true);
+  });
+});
+
+describe('ledger executed quantity contract', () => {
+  it('preserves fractional and large Decimal strings and uses stock/crypto units', () => {
+    for (const [quantity, display] of [['0.50000000', '0.5'], ['0.00001000', '0.00001'], ['9007199254740993.12345678', '9007199254740993.12345678']]) {
+      const data = page();
+      const row = data.transactions.find((item) => item.txType === 'order_buy');
+      row.trade.quantity = quantity;
+      const parsed = parseWalletLedgerResponse(data, 'ta-1', { currency: 'KRW' });
+      assert.equal(getLedgerRowDisplay(parsed.transactions.at(-1)!).quantity, `${display}주`);
+      row.asset.assetType = 'crypto'; row.asset.symbol = 'BTC';
+      assert.equal(getLedgerRowDisplay(row).quantity, `${display} BTC`);
+    }
+  });
+  it('rejects absent, zero, malformed quantity and unknown asset types at the API boundary', () => {
+    for (const mutate of [
+      (row) => { delete row.trade; }, (row) => { row.trade = null; },
+      ...[0, '0.00000000', '-1', 'NaN', '1e-5', '0.000000001'].map((quantity) => (row) => { row.trade.quantity = quantity; }),
+      (row) => { delete row.asset.assetType; },
+    ]) {
+      const data = page(); mutate(data.transactions.at(-1));
+      assert.throws(() => parseWalletLedgerResponse(data, 'ta-1', { currency: 'KRW' }), WalletLedgerContractError);
+    }
+  });
+  it('does not show trade quantity for FX or ad rewards, and rejects unexpected metadata', () => {
+    const data = page();
+    for (const row of data.transactions.slice(0, 2)) assert.equal(getLedgerRowDisplay(row).quantity, null);
+    data.transactions[0].trade = { quantity: '1.00000000' };
+    assert.throws(() => parseWalletLedgerResponse(data, 'ta-1', { currency: 'KRW' }), WalletLedgerContractError);
   });
 });

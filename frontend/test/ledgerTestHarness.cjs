@@ -20,6 +20,7 @@ function load(file, mocks) {
   return module.exports;
 }
 
+/** @param {{ data?: any, currencyCode?: string, mode?: string, source?: string }} options */
 function createLedgerHarness({ data, currencyCode, mode = 'general', source } = {}) {
   const slots = [];
   let index = 0;
@@ -56,4 +57,4 @@ function elements(node, type) {
   return [...(!type || node.type === type ? [node] : []), ...elements(node.props.children, type)];
 }
 
-module.exports = { createLedgerHarness, elements };
+module.exports = { createLedgerHarness, elements, load };

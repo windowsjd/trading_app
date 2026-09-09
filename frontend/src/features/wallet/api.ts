@@ -157,7 +157,13 @@ export interface WalletTransactionDto {
   balanceAfter: MoneyString;
   occurredAt: IsoDateTimeString;
   createdAt: IsoDateTimeString;
-  asset: { id: string; name: string; symbol: string } | null;
+  asset: {
+    id: string;
+    name: string;
+    symbol: string;
+    assetType: 'domestic_stock' | 'us_stock' | 'crypto';
+  } | null;
+  trade: { quantity: string } | null;
 }
 
 
@@ -180,5 +186,3 @@ export async function getCurrentFxRate(
 
   return response.data.data;
 }
-
-

@@ -1,0 +1,94 @@
+{
+  "general": {
+    "success": true,
+    "data": {
+      "tradingAccountId": "general-1",
+      "mode": "general",
+      "state": "available",
+      "range": "30d",
+      "granularity": "daily",
+      "returnRateMethod": "time_weighted",
+      "points": [
+        {
+          "time": "2026-09-08T14:59:59.000Z",
+          "snapshotDate": "2026-09-07",
+          "totalAssetKrw": "10000000.00000000",
+          "returnRate": "0.00000000",
+          "returnRateMethod": "time_weighted",
+          "cumulativeExternalFundingKrw": "10000000.00000000",
+          "investmentPnlKrw": "0.00000000",
+          "snapshotReason": "scheduled",
+          "externalFundingAmountKrw": null
+        },
+        {
+          "time": "2026-09-08T15:00:01.000Z",
+          "snapshotDate": "2026-09-08",
+          "totalAssetKrw": "10001000.00000000",
+          "returnRate": "0.00000000",
+          "returnRateMethod": "time_weighted",
+          "cumulativeExternalFundingKrw": "10001000.00000000",
+          "investmentPnlKrw": "0.00000000",
+          "snapshotReason": "scheduled",
+          "externalFundingAmountKrw": null
+        },
+        {
+          "time": "2026-09-09T00:00:00.000Z",
+          "snapshotDate": "2026-09-09",
+          "totalAssetKrw": "10001000.00000000",
+          "returnRate": "0.00000000",
+          "returnRateMethod": "time_weighted",
+          "cumulativeExternalFundingKrw": "10001000.00000000",
+          "investmentPnlKrw": "0.00000000",
+          "snapshotReason": "scheduled",
+          "externalFundingAmountKrw": null
+        }
+      ]
+    }
+  },
+  "season": {
+    "success": true,
+    "data": {
+      "tradingAccountId": "season-1",
+      "mode": "season",
+      "state": "available",
+      "range": "30d",
+      "granularity": "daily",
+      "returnRateMethod": "initial_capital",
+      "points": [
+        {
+          "time": "2026-09-08T14:59:59.000Z",
+          "snapshotDate": "2026-09-07",
+          "totalAssetKrw": "10000000.00000000",
+          "returnRate": "0.00000000",
+          "returnRateMethod": "initial_capital",
+          "cumulativeExternalFundingKrw": null,
+          "investmentPnlKrw": null,
+          "snapshotReason": "scheduled",
+          "externalFundingAmountKrw": null
+        },
+        {
+          "time": "2026-09-08T15:00:01.000Z",
+          "snapshotDate": "2026-09-08",
+          "totalAssetKrw": "10001000.00000000",
+          "returnRate": "0.00000000",
+          "returnRateMethod": "initial_capital",
+          "cumulativeExternalFundingKrw": null,
+          "investmentPnlKrw": null,
+          "snapshotReason": "scheduled",
+          "externalFundingAmountKrw": null
+        },
+        {
+          "time": "2026-09-09T00:00:00.000Z",
+          "snapshotDate": "2026-09-09",
+          "totalAssetKrw": "10001000.00000000",
+          "returnRate": "0.00000000",
+          "returnRateMethod": "initial_capital",
+          "cumulativeExternalFundingKrw": null,
+          "investmentPnlKrw": null,
+          "snapshotReason": "scheduled",
+          "externalFundingAmountKrw": null
+        }
+      ]
+    }
+  }
+}

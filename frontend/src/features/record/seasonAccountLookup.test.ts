@@ -178,3 +178,18 @@ describe('general account lookup for the record order list', () => {
     assert.equal(lookup.account?.id, 'acc-season');
   });
 });
+
+describe('explicit season account entry from home', () => {
+  for (const status of ['active', 'closed', 'suspended'] as const) {
+    it(`keeps owned ${status} season account reads available by accountId`, () => {
+      const account = { ...seasonAccount('chosen-season-account', 'old-season'), status };
+      const lookup = resolveRecordOrderAccount({
+        scope: { accountId: account.id },
+        accounts: [generalAccount('general'), seasonAccount('current-season-account', 'current-season'), account],
+        isLoading: false, isError: false,
+      });
+      assert.equal(lookup.account, account);
+      assert.equal(canQueryRecordOrders(lookup), true);
+    });
+  }
+});

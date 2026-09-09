@@ -286,8 +286,8 @@ export const QUERY_KEYS = {
       ['tradingAccount', 'portfolio', accountId] as const,
     portfolio: (accountId: string) =>
       ['tradingAccount', 'portfolio', accountId, 'overview'] as const,
-    portfolioEquity: (accountId: string, range: string) =>
-      ['tradingAccount', 'portfolio', accountId, 'equity', range] as const,
+    portfolioEquity: (accountId: string, range: string, granularity?: 'daily') =>
+      ['tradingAccount', 'portfolio', accountId, 'equity', range, ...(granularity ? [granularity] : [])] as const,
 
     walletsAll: (accountId: string) =>
       ['tradingAccount', 'wallets', accountId] as const,

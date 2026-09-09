@@ -129,6 +129,11 @@ function toFixedDecimalString(value: string, decimals: number): string | null {
   );
 }
 
+/** KRW chart labels from API Decimal strings; preserves large integer digits. */
+export function formatKrwDecimal(value: string | number): string {
+  return toFixedDecimalString(String(value), 0) ?? '-';
+}
+
 function normalizeDisplayPriceDecimals(
   displayPriceDecimals?: number | null,
 ): number | null {
