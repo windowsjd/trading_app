@@ -169,8 +169,10 @@ re-created, and never re-granted. One general account per user, for life.
 ## Account-scoped finance reads for a general account
 
 `GET /api/v1/trading-accounts/:accountId/wallets` and
-`.../wallet-transactions` return the general account's KRW 10,000,000 / USD 0
-wallets and its single `initial_grant` ledger row.
+`.../wallet-transactions` return the general account's wallets and user cash
+ledger. The user ledger excludes `initial_grant` before count/pagination;
+the single opening row is still stored and verified by the integrity gate.
+Its amount and all subsequent `balanceAfter` values remain unchanged.
 
 General accounts have no participant, so the season scope probes do not apply.
 Instead the read asserts the inverse: no wallet and no ledger row of this

@@ -506,12 +506,14 @@ async function verifyAccountScopedReadsForGeneralAccount(userId, accountId) {
     userId,
     accountId,
   );
-  const grants = ledgerView.data.transactions.filter(
-    (t) => t.referenceType === 'general_account_open',
-  );
+  assert.equal(ledgerView.data.transactions.length, 0);
+  assert.equal(ledgerView.data.pagination.total, 0);
+  const grants = await prisma.walletTransaction.findMany({
+    where: { tradingAccountId: accountId, referenceType: 'general_account_open' },
+  });
   assert.equal(grants.length, 1);
   assert.equal(grants[0].txType, 'initial_grant');
-  assert.equal(grants[0].amount, '10000000.00000000');
+  assert.equal(grants[0].amount.toFixed(8), '10000000.00000000');
   assert.equal(grants[0].referenceId, accountId);
 }
 

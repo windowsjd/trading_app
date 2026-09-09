@@ -4,7 +4,6 @@ import type {
   BpsString,
   IsoDateTimeString,
   MoneyString,
-  OffsetPagination,
   RateString,
   SectionState,
   SourceMetadata,
@@ -134,41 +133,31 @@ export interface FxExecuteDto {
 
 export type WalletTransactionDirection = 'credit' | 'debit';
 
+export type WalletTransactionType =
+  | 'initial_grant' | 'exchange_source' | 'exchange_target'
+  | 'order_buy' | 'order_sell' | 'fee' | 'adjustment' | 'settlement' | 'ad_reward';
+/** `exchange` groups two canonical wallet legs; it is never a stored txType. */
+export type WalletTransactionFilter = WalletTransactionType | 'exchange';
+
+export interface WalletTransactionFiltersDto {
+  currency: WalletCurrency | null;
+  direction: WalletTransactionDirection | null;
+  txType: WalletTransactionFilter | null;
+}
+
 export interface WalletTransactionDto {
-  transactionId: string;
-  walletId?: string;
+  id: string;
   currencyCode: WalletCurrency;
   direction: WalletTransactionDirection;
+  /** Canonical DB value. Unknown historical/future values remain visible. */
   txType: string;
-  referenceType?: string | null;
-  referenceId?: string | null;
+  referenceType: string;
+  referenceId: string | null;
   amount: MoneyString;
   balanceAfter: MoneyString;
   occurredAt: IsoDateTimeString;
-  createdAt?: IsoDateTimeString;
-}
-
-export interface WalletTransactionsDto {
-  state: WalletState;
-  season: WalletSeasonDto | null;
-  participant: WalletParticipantDto | null;
-  filters?: {
-    currency: WalletCurrency | null;
-    direction: WalletTransactionDirection | null;
-    txType: string | null;
-  };
-  items: WalletTransactionDto[];
-  pagination: OffsetPagination;
-  reason?: string;
-  message?: string;
-}
-
-export interface GetWalletTransactionsParams {
-  currency?: WalletCurrency;
-  limit?: number;
-  offset?: number;
-  direction?: WalletTransactionDirection;
-  txType?: string;
+  createdAt: IsoDateTimeString;
+  asset: { id: string; name: string; symbol: string } | null;
 }
 
 
@@ -191,6 +180,5 @@ export async function getCurrentFxRate(
 
   return response.data.data;
 }
-
 
 

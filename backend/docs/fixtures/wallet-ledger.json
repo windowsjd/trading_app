@@ -1,0 +1,103 @@
+{
+  "krw": {
+    "success": true,
+    "data": {
+      "tradingAccountId": "ta-1",
+      "filters": { "currency": "KRW", "direction": null, "txType": null },
+      "transactions": [
+        {
+          "id": "wtx-fx-source",
+          "currencyCode": "KRW",
+          "direction": "debit",
+          "txType": "exchange_source",
+          "referenceType": "exchange_transaction",
+          "referenceId": "fx-1",
+          "amount": "1000000.00000000",
+          "balanceAfter": "8001000.00000000",
+          "occurredAt": "2026-09-04T00:00:00.000Z",
+          "createdAt": "2026-09-04T00:00:00.000Z",
+          "asset": null
+        },
+        {
+          "id": "wtx-ad",
+          "currencyCode": "KRW",
+          "direction": "credit",
+          "txType": "ad_reward",
+          "referenceType": "ad_reward_claim",
+          "referenceId": "claim-1",
+          "amount": "1000.00000000",
+          "balanceAfter": "9001000.00000000",
+          "occurredAt": "2026-09-03T00:00:00.000Z",
+          "createdAt": "2026-09-03T00:00:00.000Z",
+          "asset": null
+        },
+        {
+          "id": "wtx-buy",
+          "currencyCode": "KRW",
+          "direction": "debit",
+          "txType": "order_buy",
+          "referenceType": "order",
+          "referenceId": "order-buy-1",
+          "amount": "1000000.00000000",
+          "balanceAfter": "9000000.00000000",
+          "occurredAt": "2026-09-02T00:00:00.000Z",
+          "createdAt": "2026-09-02T00:00:00.000Z",
+          "asset": {
+            "id": "asset-samsung",
+            "name": "삼성전자",
+            "symbol": "005930"
+          }
+        }
+      ],
+      "pagination": {
+        "limit": 20,
+        "offset": 0,
+        "total": 3,
+        "returned": 3,
+        "nextOffset": null
+      }
+    }
+  },
+  "usd": {
+    "success": true,
+    "data": {
+      "tradingAccountId": "ta-1",
+      "filters": { "currency": "USD", "direction": null, "txType": null },
+      "transactions": [
+        {
+          "id": "wtx-sell",
+          "currencyCode": "USD",
+          "direction": "credit",
+          "txType": "order_sell",
+          "referenceType": "order",
+          "referenceId": "order-sell-1",
+          "amount": "450.00000000",
+          "balanceAfter": "1200.00000000",
+          "occurredAt": "2026-09-05T00:00:00.000Z",
+          "createdAt": "2026-09-05T00:00:00.000Z",
+          "asset": { "id": "asset-apple", "name": "Apple", "symbol": "AAPL" }
+        },
+        {
+          "id": "wtx-fx-target",
+          "currencyCode": "USD",
+          "direction": "credit",
+          "txType": "exchange_target",
+          "referenceType": "exchange_transaction",
+          "referenceId": "fx-1",
+          "amount": "750.00000000",
+          "balanceAfter": "750.00000000",
+          "occurredAt": "2026-09-04T00:00:00.000Z",
+          "createdAt": "2026-09-04T00:00:00.000Z",
+          "asset": null
+        }
+      ],
+      "pagination": {
+        "limit": 20,
+        "offset": 0,
+        "total": 2,
+        "returned": 2,
+        "nextOffset": null
+      }
+    }
+  }
+}

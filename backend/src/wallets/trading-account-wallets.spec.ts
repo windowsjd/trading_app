@@ -41,6 +41,7 @@ jest.mock('../generated/prisma/client', () => {
       fee: 'fee',
       adjustment: 'adjustment',
       settlement: 'settlement',
+      ad_reward: 'ad_reward',
     },
   };
 });
@@ -48,11 +49,22 @@ jest.mock('../generated/prisma/client', () => {
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { WalletsService } from './wallets.service';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import * as generalIntegrity from '../trading-accounts/general-account-integrity';
+
+const fixture = JSON.parse(
+  readFileSync(
+    join(__dirname, '../../docs/fixtures/wallet-ledger.json'),
+    'utf8',
+  ),
+);
 
 const NOW = new Date('2026-08-03T00:00:00.000Z');
 
 const createServices = (accountStatus = 'active') => {
   const prisma = {
+    order: { findMany: jest.fn().mockResolvedValue([]) },
     cashWallet: {
       findMany: jest.fn().mockResolvedValue([]),
       // Scope-integrity probe (assertSeasonAccountFinancialScopeIntegrity):
@@ -194,28 +206,37 @@ describe('WalletsService account-scoped reads', () => {
     }
   });
 
-  it('scopes wallet transactions by the account and keeps legacy filters', async () => {
+  it('scopes wallet transactions by the account and serializes canonical ids and metadata', async () => {
     const { prisma, service } = createServices();
     prisma.walletTransaction.count.mockResolvedValueOnce(1);
     prisma.walletTransaction.findMany.mockResolvedValueOnce([
       {
         id: 'wtx-1',
         currencyCode: 'KRW',
-        direction: 'credit',
-        txType: 'initial_grant',
-        referenceType: 'season_join',
-        referenceId: 'sp-1',
-        amount: new Prisma.Decimal('10000000.00000000'),
-        balanceAfter: new Prisma.Decimal('10000000.00000000'),
+        direction: 'debit',
+        txType: 'order_buy',
+        referenceType: 'order',
+        referenceId: 'order-1',
+        amount: new Prisma.Decimal('1000000.00000000'),
+        balanceAfter: new Prisma.Decimal('9000000.00000000'),
         occurredAt: NOW,
         createdAt: NOW,
+      },
+    ]);
+    prisma.order.findMany.mockResolvedValueOnce([
+      {
+        id: 'order-1',
+        side: 'buy',
+        status: 'executed',
+        currencyCode: 'KRW',
+        asset: { id: 'asset-1', name: '삼성전자', symbol: '005930' },
       },
     ]);
 
     const response = await service.getWalletTransactionsForTradingAccount(
       'user-1',
       'ta-1',
-      { currency: 'KRW', direction: 'credit' },
+      { currency: 'KRW', direction: 'debit' },
     );
 
     expect(prisma.walletTransaction.findMany).toHaveBeenCalledWith(
@@ -223,17 +244,277 @@ describe('WalletsService account-scoped reads', () => {
         where: expect.objectContaining({
           tradingAccountId: 'ta-1',
           currencyCode: 'KRW',
-          direction: 'credit',
+          direction: 'debit',
+          AND: [{ txType: { not: 'initial_grant' } }, {}],
         }),
         orderBy: [{ occurredAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
       }),
     );
     expect(response.data.transactions[0]).toMatchObject({
       id: 'wtx-1',
-      amount: '10000000.00000000',
-      balanceAfter: '10000000.00000000',
+      amount: '1000000.00000000',
+      balanceAfter: '9000000.00000000',
+      asset: { id: 'asset-1', name: '삼성전자', symbol: '005930' },
       occurredAt: NOW.toISOString(),
     });
     expect(response.data.pagination.total).toBe(1);
+  });
+});
+
+// Evaluate the read predicates against a small in-memory ledger, including the
+// hidden audit row. This catches count/where/offset mistakes that canned pages
+// cannot catch. It does not simulate PostgreSQL transactions or writer logic.
+function ledgerServices(mode: 'general' | 'season' = 'season') {
+  const h = createServices();
+  if (mode === 'general') {
+    h.accessService.getOwnedAccountOrThrow.mockResolvedValue({
+      id: 'ta-1',
+      userId: 'user-1',
+      mode,
+      status: 'active',
+      seasonParticipant: null,
+    } as never);
+    jest
+      .spyOn(generalIntegrity, 'assertGeneralAccountFinancialIntegrity')
+      .mockResolvedValue();
+  }
+  const all = [
+    ...fixture.krw.data.transactions,
+    ...fixture.usd.data.transactions,
+  ];
+  const opening = {
+    id: 'opening',
+    currencyCode: 'KRW',
+    direction: 'credit',
+    txType: 'initial_grant',
+    referenceType: mode === 'general' ? 'general_account_open' : 'season_join',
+    referenceId: mode === 'general' ? 'ta-1' : 'sp-1',
+    amount: '10000000.00000000',
+    balanceAfter: '10000000.00000000',
+    occurredAt: '2026-09-01T00:00:00.000Z',
+    createdAt: '2026-09-01T00:00:00.000Z',
+  };
+  const rows = [opening, ...all]
+    .filter((row) => mode === 'general' || row.txType !== 'ad_reward')
+    .map((row) => ({
+      ...row,
+      tradingAccountId: 'ta-1',
+      amount: new Prisma.Decimal(row.amount),
+      balanceAfter: new Prisma.Decimal(row.balanceAfter),
+      occurredAt: new Date(row.occurredAt),
+      createdAt: new Date(row.createdAt),
+    }));
+  const matches = (row, where) =>
+    Object.entries(where).every(([key, value]: [string, any]) => {
+      if (key === 'AND')
+        return value.every((condition) => matches(row, condition));
+      if (value && typeof value === 'object') {
+        if ('not' in value) return row[key] !== value.not;
+        if ('in' in value) return value.in.includes(row[key]);
+      }
+      return row[key] === value;
+    });
+  h.prisma.walletTransaction.count.mockImplementation(
+    async ({ where }) => rows.filter((row) => matches(row, where)).length,
+  );
+  h.prisma.walletTransaction.findMany.mockImplementation(
+    async ({ where, skip, take }) =>
+      rows
+        .filter((row) => matches(row, where))
+        .sort(
+          (a, b) =>
+            b.occurredAt.getTime() - a.occurredAt.getTime() ||
+            a.id.localeCompare(b.id),
+        )
+        .slice(skip, skip + take),
+  );
+  h.prisma.order.findMany.mockImplementation(async ({ where }) =>
+    all
+      .filter((row) => row.asset && where.id.in.includes(row.referenceId))
+      .map((row) => ({
+        id: row.referenceId,
+        side: row.txType === 'order_buy' ? 'buy' : 'sell',
+        status: 'executed',
+        currencyCode: row.currencyCode,
+        asset: row.asset,
+      })),
+  );
+  return { ...h, rows };
+}
+
+describe('user cash ledger read contract', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('serializes the exact fixture shared with frontend, without mutating financial rows', async () => {
+    const h = ledgerServices('general');
+    const before = JSON.stringify(h.rows);
+    for (const currency of ['KRW', 'USD']) {
+      const result = await h.service.getWalletTransactionsForTradingAccount(
+        'user-1',
+        'ta-1',
+        { currency, limit: '20' },
+      );
+      expect(result).toEqual(fixture[currency.toLowerCase()]);
+    }
+    expect(JSON.stringify(h.rows)).toBe(before);
+    expect(
+      generalIntegrity.assertGeneralAccountFinancialIntegrity,
+    ).toHaveBeenCalledTimes(2);
+    expect(h.prisma.order.findMany).toHaveBeenCalledTimes(2);
+    expect(h.prisma.order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tradingAccountId: 'ta-1',
+          seasonParticipantId: null,
+        }),
+      }),
+    );
+  });
+
+  it.each(['general', 'season'] as const)(
+    'excludes only opening grants before count and pagination for %s',
+    async (mode) => {
+      const h = ledgerServices(mode);
+      const ids: string[] = [];
+      let offset: number | null = 0;
+      while (offset !== null) {
+        const result = await h.service.getWalletTransactionsForTradingAccount(
+          'user-1',
+          'ta-1',
+          { currency: 'KRW', limit: '1', offset: String(offset) },
+        );
+        expect(result.data.transactions).toHaveLength(1);
+        expect(result.data.pagination.total).toBe(mode === 'general' ? 3 : 2);
+        ids.push(result.data.transactions[0].id);
+        offset = result.data.pagination.nextOffset;
+      }
+      expect(ids.at(-1)).toBe('wtx-buy');
+      expect(ids).not.toContain('opening');
+      expect(
+        h.rows.find((row) => row.id === 'opening')!.balanceAfter.toFixed(8),
+      ).toBe('10000000.00000000');
+      const explicit = await h.service.getWalletTransactionsForTradingAccount(
+        'user-1',
+        'ta-1',
+        { txType: 'initial_grant' },
+      );
+      expect(explicit.data.transactions).toEqual([]);
+      expect(explicit.data.pagination).toMatchObject({
+        total: 0,
+        returned: 0,
+        nextOffset: null,
+      });
+    },
+  );
+
+  it('filters canonical buy/sell, currency, direction and both exchange legs', async () => {
+    const h = ledgerServices('general');
+    for (const [currency, direction, txType, expected] of [
+      ['KRW', 'debit', 'order_buy', 'wtx-buy'],
+      ['USD', 'credit', 'order_sell', 'wtx-sell'],
+      ['KRW', 'debit', 'exchange', 'wtx-fx-source'],
+      ['USD', 'credit', 'exchange', 'wtx-fx-target'],
+      ['KRW', 'credit', 'ad_reward', 'wtx-ad'],
+    ]) {
+      const result = await h.service.getWalletTransactionsForTradingAccount(
+        'user-1',
+        'ta-1',
+        { currency, direction, txType },
+      );
+      expect(result.data.transactions.map((row) => row.id)).toEqual([expected]);
+      expect(result.data.filters).toEqual({ currency, direction, txType });
+    }
+  });
+
+  it('batch-loads multiple trade assets in one account-scoped query for market and limit ledger shapes', async () => {
+    const h = ledgerServices();
+    const result = await h.service.getWalletTransactionsForTradingAccount(
+      'user-1',
+      'ta-1',
+    );
+    expect(result.data.transactions.filter((row) => row.asset)).toHaveLength(2);
+    expect(h.prisma.order.findMany).toHaveBeenCalledTimes(1);
+    expect(h.prisma.order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tradingAccountId: 'ta-1',
+          seasonParticipantId: 'sp-1',
+          id: { in: expect.arrayContaining(['order-buy-1', 'order-sell-1']) },
+        },
+      }),
+    );
+  });
+
+  it.each(['season_join', 'fx_execute', 'order', 'order_fill', 'nonsense'])(
+    'rejects unsupported account filter %s before querying',
+    async (txType) => {
+      const h = ledgerServices();
+      await expectStatusAndCode(
+        h.service.getWalletTransactionsForTradingAccount('user-1', 'ta-1', {
+          txType,
+        }),
+        400,
+        'INVALID_TX_TYPE',
+      );
+      expect(h.prisma.walletTransaction.count).not.toHaveBeenCalled();
+    },
+  );
+
+  it('fails closed for missing/foreign/mismatched order metadata instead of dropping a financial row', async () => {
+    for (const override of [
+      [],
+      [
+        {
+          id: 'order-buy-1',
+          side: 'sell',
+          status: 'executed',
+          currencyCode: 'KRW',
+        },
+      ],
+    ]) {
+      const h = ledgerServices();
+      h.prisma.order.findMany.mockResolvedValueOnce(override);
+      await expectStatusAndCode(
+        h.service.getWalletTransactionsForTradingAccount('user-1', 'ta-1', {
+          txType: 'order_buy',
+        }),
+        500,
+        'TRADING_ACCOUNT_INTEGRITY',
+      );
+    }
+  });
+
+  it('runs the existing integrity gate before filtering even hidden audit rows', async () => {
+    const h = ledgerServices();
+    h.prisma.walletTransaction.findFirst.mockResolvedValueOnce({
+      id: 'damaged-opening',
+    } as never);
+    await expectStatusAndCode(
+      h.service.getWalletTransactionsForTradingAccount('user-1', 'ta-1'),
+      500,
+      'FINANCIAL_SCOPE_REPAIR_REQUIRED',
+    );
+    expect(h.prisma.walletTransaction.count).not.toHaveBeenCalled();
+    expect(h.prisma.walletTransaction.findMany).not.toHaveBeenCalled();
+  });
+
+  it('retains historical fee/adjustment/settlement rows without inventing writers or changing values', async () => {
+    const h = ledgerServices();
+    const base = h.rows.find((row) => row.id === 'opening')!;
+    h.rows.push(
+      ...['fee', 'adjustment', 'settlement'].map((txType) => ({
+        ...base,
+        id: txType,
+        txType,
+      })),
+    );
+    const result = await h.service.getWalletTransactionsForTradingAccount(
+      'user-1',
+      'ta-1',
+      { currency: 'KRW' },
+    );
+    expect(result.data.transactions.map((row) => row.txType)).toEqual(
+      expect.arrayContaining(['fee', 'adjustment', 'settlement']),
+    );
   });
 });

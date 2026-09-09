@@ -186,8 +186,7 @@ export class WalletsService {
   }
 
   /**
-   * Account-scoped ledger view: same filters, ordering, pagination, and row
-   * serialization as the legacy /wallets/transactions response, scoped by
+   * User cash ledger: excludes opening grants before count/pagination, scoped by
    * the ledger rows' own tradingAccountId (never a client-provided
    * participant id).
    */
@@ -197,6 +196,19 @@ export class WalletsService {
     query: WalletTransactionsQuery = {},
   ) {
     const parsedQuery = this.parseWalletTransactionsQuery(query);
+    if (
+      parsedQuery.txType &&
+      parsedQuery.txType !== 'exchange' &&
+      !Object.values(WalletTransactionType).includes(
+        parsedQuery.txType as WalletTransactionType,
+      )
+    ) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'INVALID_TX_TYPE',
+        'Invalid txType.',
+      );
+    }
     const account = await this.resolveOwnedAccount(userId, tradingAccountId);
 
     // Same fail-closed rule as the wallet view: unscoped/mis-scoped ledger
@@ -207,7 +219,10 @@ export class WalletsService {
       tradingAccountId: account.id,
       ...(parsedQuery.currency ? { currencyCode: parsedQuery.currency } : {}),
       ...(parsedQuery.direction ? { direction: parsedQuery.direction } : {}),
-      ...this.walletTransactionTxTypeWhere(parsedQuery.txType),
+      AND: [
+        { txType: { not: WalletTransactionType.initial_grant } },
+        this.walletTransactionTxTypeWhere(parsedQuery.txType),
+      ],
     };
     const [total, transactions] = await Promise.all([
       this.prisma.walletTransaction.count({ where }),
@@ -231,6 +246,55 @@ export class WalletsService {
       }),
     ]);
 
+    // WalletTransaction has a polymorphic reference, not an Order relation.
+    // Resolve all order assets in ONE read; never request metadata per row.
+    const orderRows = transactions.filter(
+      (row) => row.txType === 'order_buy' || row.txType === 'order_sell',
+    );
+    if (
+      orderRows.some((row) => row.referenceType !== 'order' || !row.referenceId)
+    ) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'TRADING_ACCOUNT_INTEGRITY',
+        'Invalid ledger order reference.',
+      );
+    }
+    const orders = orderRows.length
+      ? await this.prisma.order.findMany({
+          where: {
+            id: { in: [...new Set(orderRows.map((row) => row.referenceId!))] },
+            tradingAccountId: account.id,
+            seasonParticipantId: account.seasonParticipant?.id ?? null,
+          },
+          select: {
+            id: true,
+            side: true,
+            status: true,
+            currencyCode: true,
+            asset: { select: { id: true, name: true, symbol: true } },
+          },
+        })
+      : [];
+    const ordersById = new Map(orders.map((order) => [order.id, order]));
+    for (const row of orderRows) {
+      const order = ordersById.get(row.referenceId!);
+      const buy = row.txType === 'order_buy';
+      if (
+        !order ||
+        order.status !== 'executed' ||
+        order.side !== (buy ? 'buy' : 'sell') ||
+        row.direction !== (buy ? 'debit' : 'credit') ||
+        order.currencyCode !== row.currencyCode
+      ) {
+        this.throwApiError(
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          'TRADING_ACCOUNT_INTEGRITY',
+          'Ledger order reference is missing or inconsistent.',
+        );
+      }
+    }
+
     return {
       success: true as const,
       data: {
@@ -247,6 +311,11 @@ export class WalletsService {
           balanceAfter: this.formatDecimal(transaction.balanceAfter, 8),
           occurredAt: transaction.occurredAt.toISOString(),
           createdAt: transaction.createdAt.toISOString(),
+          asset:
+            transaction.txType === 'order_buy' ||
+            transaction.txType === 'order_sell'
+              ? ordersById.get(transaction.referenceId!)!.asset
+              : null,
         })),
         pagination: this.pagination(parsedQuery, total, transactions.length),
       },

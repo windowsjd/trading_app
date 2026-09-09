@@ -105,10 +105,55 @@ current server contract.
 
 `availableAmount = balanceAmount - reservedAmount`, same as the legacy API.
 
-`GET .../wallet-transactions` keeps the legacy filters
-(`currency`, `direction`, `txType`), pagination, deterministic ordering
-(`occurredAt desc, createdAt desc, id asc`), and row shape; data carries
-`tradingAccountId` instead of the legacy season/participant context.
+`GET .../wallet-transactions` is the user's cash ledger. `initial_grant` is
+excluded BEFORE both count and pagination; its DB rows, integrity checks and
+writers remain intact. No amount or balance is recalculated. The legacy
+`GET /api/v1/wallets/transactions` remains unchanged, including opening rows
+and its historical filter aliases.
+
+The account-scoped response is `success/data`, with required data fields:
+
+```ts
+{
+  tradingAccountId: string;
+  filters: { currency: 'KRW' | 'USD' | null; direction: 'credit' | 'debit' | null; txType: string | null };
+  transactions: Array<{
+    id: string;
+    currencyCode: 'KRW' | 'USD';
+    direction: 'credit' | 'debit';
+    txType: string; // DB canonical value, never a legacy/UI alias
+    referenceType: string;
+    referenceId: string | null;
+    amount: string;
+    balanceAfter: string; // persisted wallet balance AFTER this row
+    occurredAt: string; // UTC ISO
+    createdAt: string; // UTC ISO
+    asset: { id: string; name: string; symbol: string } | null;
+  }>;
+  pagination: { limit: number; offset: number; total: number; returned: number; nextOffset: number | null };
+}
+```
+
+Query fields remain `currency`, `direction`, `txType`, `limit`, `offset`.
+Account-scoped `txType` accepts canonical WalletTransactionType values plus
+`exchange` (the group `exchange_source` + `exchange_target`). Unsupported values
+including `season_join`, `fx_execute`, `order`, `order_fill` return
+`INVALID_TX_TYPE`. Filtering explicitly by `initial_grant` returns no visible
+rows. Ordering stays `occurredAt desc, createdAt desc, id asc`.
+
+For `order_buy` / `order_sell`, `asset` is loaded with one batched Order/Asset
+read per page, restricted to the same account and participant identity. Missing
+or inconsistent order references fail with `TRADING_ACCOUNT_INTEGRITY`; no row
+is silently discarded and no foreign order metadata is returned. Other rows
+have `asset: null`.
+
+The mobile ledger always requests one currency (route currency, else KRW),
+never sums currencies, and reads `balanceAfter` as supplied. Its filter labels
+are 매수 (`order_buy`), 매도 (`order_sell`), 환전 (`exchange`) and 광고 보상
+(`ad_reward`, general KRW credit only). Direction changes clear incompatible
+type selection. Current writers do not create standalone `fee`, `adjustment`
+or `settlement` ledger rows, so there are no chips for them. Existing such rows
+are still returned under all types and displayed; only `initial_grant` is hidden.
 
 `GET .../fx/transactions` returns the legacy exchange item shape under
 `data.exchanges` with `data.tradingAccountId`.

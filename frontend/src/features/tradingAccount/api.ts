@@ -13,6 +13,10 @@ import type {
   FxQuoteRequestDto,
   WalletBalanceDto,
   WalletTransactionDto,
+  WalletCurrency,
+  WalletTransactionDirection,
+  WalletTransactionFilter,
+  WalletTransactionFiltersDto,
 } from '../wallet/api';
 import type { PositionItemDto } from '../position/api';
 import type {
@@ -23,6 +27,7 @@ import type {
   OrderQuoteRequestDto,
 } from '../order/api';
 import { assertAccountScope } from './accountScope';
+import { parseWalletLedgerResponse } from '../wallet/transactions';
 
 /**
  * Account-scoped API surface (작업 9).
@@ -276,15 +281,15 @@ export async function getTradingAccountWallets(accountId: string) {
 
 export interface TradingAccountWalletTransactionsDto {
   tradingAccountId: string;
-  filters?: Record<string, unknown>;
-  items: WalletTransactionDto[];
+  filters: WalletTransactionFiltersDto;
+  transactions: WalletTransactionDto[];
   pagination: OffsetPagination;
 }
 
 export interface TradingAccountWalletTransactionsParams {
-  currency?: string;
-  direction?: string;
-  txType?: string;
+  currency?: WalletCurrency;
+  direction?: WalletTransactionDirection;
+  txType?: WalletTransactionFilter;
   limit?: number;
   offset?: number;
 }
@@ -305,11 +310,12 @@ export async function getTradingAccountWalletTransactions(
     },
   });
 
-  return assertAccountScope(
+  const data = assertAccountScope(
     'GET /trading-accounts/:accountId/wallet-transactions',
     accountId,
     response.data.data,
   );
+  return parseWalletLedgerResponse(data, accountId, params);
 }
 
 export interface TradingAccountPositionsParams {

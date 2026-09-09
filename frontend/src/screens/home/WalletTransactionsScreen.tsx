@@ -15,8 +15,6 @@ import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 import {
   type WalletCurrency,
-  type WalletTransactionDirection,
-  type WalletTransactionDto,
 } from '../../features/wallet/api';
 import { getTradingAccountWalletTransactions } from '../../features/tradingAccount/api';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
@@ -26,78 +24,34 @@ import {
   findAccountIntegrityFailure,
 } from '../../features/tradingAccount/accountIntegrityGate';
 import AccountSwitcher from '../../components/tradingAccount/AccountSwitcher';
-import { formatKstDateTime, formatMoney } from '../../utils/format';
+import {
+  compatibleLedgerType,
+  getLedgerRowDisplay,
+  getLedgerTypeFilters,
+  mergeLedgerPages,
+  type LedgerDirection,
+  type LedgerType,
+} from '../../features/wallet/transactions';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import EmptyState from '../../components/states/EmptyState';
 
 type Props = WalletTransactionsScreenProps;
-type CurrencyFilter = 'all' | WalletCurrency;
-type DirectionFilter = 'all' | WalletTransactionDirection;
-// 'all' plus whatever transaction types the ledger actually returns, which
-// the server owns — so this is a plain string rather than a closed union.
-type TxTypeFilter = string;
+
 
 const PAGE_SIZE = 20;
 
-const CURRENCY_FILTERS: Array<{ key: CurrencyFilter; label: string }> = [
-  { key: 'all', label: '전체' },
+const CURRENCY_FILTERS: Array<{ key: WalletCurrency; label: string }> = [
   { key: 'KRW', label: 'KRW' },
   { key: 'USD', label: 'USD' },
 ];
 
-const DIRECTION_FILTERS: Array<{ key: DirectionFilter; label: string }> = [
+const DIRECTION_FILTERS: Array<{ key: LedgerDirection; label: string }> = [
   { key: 'all', label: '전체' },
   { key: 'credit', label: '입금' },
   { key: 'debit', label: '출금' },
 ];
-
-const TX_TYPE_FILTERS: Array<{ key: TxTypeFilter; label: string }> = [
-  { key: 'all', label: '전체' },
-  { key: 'season_join', label: '시즌 참가' },
-  { key: 'fx_execute', label: '환전' },
-  { key: 'exchange', label: '환전' },
-  { key: 'order', label: '주문' },
-  { key: 'order_fill', label: '주문 체결' },
-  { key: 'fee', label: '수수료' },
-  { key: 'adjustment', label: '조정' },
-];
-
-const TX_TYPE_LABELS: Record<string, string> = {
-  season_join: '시즌 참가',
-  season_reward: '시즌 보상',
-  fx_quote: '환전 견적',
-  fx_execute: '환전',
-  exchange: '환전',
-  order: '주문',
-  order_fill: '주문 체결',
-  fee: '수수료',
-  adjustment: '조정',
-  deposit: '입금',
-  withdraw: '출금',
-  withdrawal: '출금',
-};
-
-function getTransactionKey(item: WalletTransactionDto) {
-  return item.transactionId;
-}
-
-function getDirectionLabel(direction: WalletTransactionDirection) {
-  return direction === 'credit' ? '입금' : '출금';
-}
-
-function getTxTypeLabel(txType?: string | null) {
-  if (!txType) return '기타';
-
-  const normalized = txType.trim().toLowerCase();
-  return TX_TYPE_LABELS[normalized] ?? txType;
-}
-
-function getSignedAmount(item: WalletTransactionDto) {
-  const sign = item.direction === 'credit' ? '+' : '-';
-  return `${sign}${formatMoney(item.amount, item.currencyCode)}`;
-}
 
 export default function WalletTransactionsScreen({ route }: Props) {
   // The ledger belongs to ONE account (작업 10 §A-4). Reads are status-blind by
@@ -114,16 +68,28 @@ export default function WalletTransactionsScreen({ route }: Props) {
     ? getAccountDisplay(selectedAccount)
     : null;
 
-  const [currencyFilter, setCurrencyFilter] = useState<CurrencyFilter>(
-    route.params?.currencyCode ?? 'all',
-  );
-  const [directionFilter, setDirectionFilter] =
-    useState<DirectionFilter>('all');
-  const [txTypeFilter, setTxTypeFilter] = useState<TxTypeFilter>('all');
-
-  const currency = currencyFilter === 'all' ? undefined : currencyFilter;
-  const direction = directionFilter === 'all' ? undefined : directionFilter;
-  const txType = txTypeFilter === 'all' ? undefined : txTypeFilter;
+  const [filters, setFilters] = useState<{
+    currency: WalletCurrency;
+    direction: LedgerDirection;
+    txType: LedgerType;
+  }>({ currency: route.params?.currencyCode ?? 'KRW', direction: 'all', txType: 'all' });
+  const mode = selectedAccount?.mode;
+  // Also derive the valid type before querying when the selected account changes.
+  const selectedType = compatibleLedgerType(filters.txType, filters.direction, mode, filters.currency);
+  const typeFilters = getLedgerTypeFilters(filters.direction, mode, filters.currency);
+  const currency = filters.currency;
+  const direction = filters.direction === 'all' ? undefined : filters.direction;
+  const txType = selectedType === 'all' ? undefined : selectedType;
+  const changeDirection = (next: LedgerDirection) => setFilters((current) => ({
+    ...current,
+    direction: next,
+    txType: compatibleLedgerType(current.txType, next, mode, current.currency),
+  }));
+  const changeCurrency = (next: WalletCurrency) => setFilters((current) => ({
+    ...current,
+    currency: next,
+    txType: compatibleLedgerType(current.txType, current.direction, mode, next),
+  }));
 
   const transactionsQuery = useInfiniteQuery({
     queryKey: QUERY_KEYS.tradingAccount.walletTransactions(accountId, {
@@ -146,17 +112,10 @@ export default function WalletTransactionsScreen({ route }: Props) {
     enabled: hasAccount,
   });
 
-  const items = useMemo(() => {
-    const byId = new Map<string, WalletTransactionDto>();
-
-    transactionsQuery.data?.pages.forEach((page) => {
-      page.items.forEach((item) => {
-        byId.set(item.transactionId, item);
-      });
-    });
-
-    return Array.from(byId.values());
-  }, [transactionsQuery.data]);
+  const items = useMemo(
+    () => mergeLedgerPages(transactionsQuery.data?.pages ?? []),
+    [transactionsQuery.data],
+  );
 
   if (accountsLoading || (hasAccount && transactionsQuery.isLoading)) {
     return <FullPageLoading message="지갑 원장을 불러오는 중입니다." />;
@@ -208,7 +167,7 @@ export default function WalletTransactionsScreen({ route }: Props) {
       <FlatList
         testID={TEST_IDS.walletTransactions.screen}
         data={items}
-        keyExtractor={getTransactionKey}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={styles.content}
         refreshing={
           transactionsQuery.isRefetching &&
@@ -241,9 +200,9 @@ export default function WalletTransactionsScreen({ route }: Props) {
                 {CURRENCY_FILTERS.map((filter) => (
                   <FilterChip
                     key={filter.key}
-                    active={currencyFilter === filter.key}
+                    active={currency === filter.key}
                     label={filter.label}
-                    onPress={() => setCurrencyFilter(filter.key)}
+                    onPress={() => changeCurrency(filter.key)}
                   />
                 ))}
               </View>
@@ -255,9 +214,9 @@ export default function WalletTransactionsScreen({ route }: Props) {
                 {DIRECTION_FILTERS.map((filter) => (
                   <FilterChip
                     key={filter.key}
-                    active={directionFilter === filter.key}
+                    active={filters.direction === filter.key}
                     label={filter.label}
-                    onPress={() => setDirectionFilter(filter.key)}
+                    onPress={() => changeDirection(filter.key)}
                   />
                 ))}
               </View>
@@ -266,12 +225,12 @@ export default function WalletTransactionsScreen({ route }: Props) {
             <View style={styles.filterGroup}>
               <Text style={styles.label}>유형</Text>
               <View style={styles.filterRow}>
-                {TX_TYPE_FILTERS.map((filter) => (
+                {typeFilters.map((filter) => (
                   <FilterChip
                     key={filter.key}
-                    active={txTypeFilter === filter.key}
+                    active={selectedType === filter.key}
                     label={filter.label}
-                    onPress={() => setTxTypeFilter(filter.key)}
+                    onPress={() => setFilters((current) => ({ ...current, txType: filter.key }))}
                   />
                 ))}
               </View>
@@ -284,49 +243,24 @@ export default function WalletTransactionsScreen({ route }: Props) {
             message="해당 조건의 지갑 거래 내역이 없습니다."
           />
         }
-        renderItem={({ item }) => (
-          <View
-            testID={TEST_IDS.walletTransactions.item(getTransactionKey(item))}
-            style={styles.rowCard}
-          >
-            <View style={styles.rowTop}>
-              <View style={styles.rowTitleWrap}>
-                <Text style={styles.itemTitle}>
-                  {getTxTypeLabel(item.txType)}
-                </Text>
-                <Text style={styles.helper}>
-                  {item.currencyCode} · {getDirectionLabel(item.direction)}
-                </Text>
-              </View>
-              <Text
-                style={[
-                  styles.amount,
-                  item.direction === 'credit'
-                    ? styles.creditAmount
-                    : styles.debitAmount,
-                ]}
-              >
-                {getSignedAmount(item)}
-              </Text>
-            </View>
-
-            <View style={styles.rowBottom}>
-              <View>
-                <Text style={styles.helper}>
-                  잔액 {formatMoney(item.balanceAfter, item.currencyCode)}
-                </Text>
-                <Text style={styles.helper}>
-                  {formatKstDateTime(item.occurredAt)}
-                </Text>
-              </View>
-              {item.referenceType ? (
-                <Text style={styles.reference} numberOfLines={1}>
-                  {item.referenceType}
-                </Text>
+        renderItem={({ item }) => {
+          const display = getLedgerRowDisplay(item);
+          return (
+            <View testID={TEST_IDS.walletTransactions.item(item.id)} style={styles.rowCard}>
+              <Text style={styles.itemTitle}>{display.title}</Text>
+              {display.asset ? <Text style={styles.asset}>{display.asset}</Text> : null}
+              <Text style={styles.helper}>{item.currencyCode} · {display.direction}</Text>
+              {item.txType === 'ad_reward' ? (
+                <Text style={styles.helper}>외부 가상자금 유입</Text>
               ) : null}
+              <Text style={[styles.amount, item.direction === 'credit' ? styles.creditAmount : styles.debitAmount]}>
+                {display.amount}
+              </Text>
+              <Text style={styles.balance}>{display.balance}</Text>
+              <Text style={styles.helper}>{display.date}</Text>
             </View>
-          </View>
-        )}
+          );
+        }}
         ListFooterComponent={
           transactionsQuery.isFetchingNextPage ? (
             <View style={styles.footerLoader}>
@@ -350,6 +284,8 @@ function FilterChip({
 }) {
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
       style={[styles.chip, active && styles.chipActive]}
       onPress={onPress}
     >
@@ -376,7 +312,6 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 24, fontWeight: '700' },
   label: { fontSize: 13, color: '#666' },
-  filterHint: { fontSize: 12, color: '#777' },
   filterGroup: { gap: 8 },
   filterRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   chip: {
@@ -399,17 +334,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     gap: 12,
   },
-  rowTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  rowTitleWrap: { flex: 1 },
-  rowBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
+  asset: { fontSize: 15, lineHeight: 22, color: '#222', flexShrink: 1 },
+  balance: { fontSize: 14, color: '#444', textAlign: 'right' },
   itemTitle: { fontSize: 15, fontWeight: '700' },
   helper: { fontSize: 14, color: '#444' },
   amount: {
@@ -420,11 +346,5 @@ const styles = StyleSheet.create({
   },
   creditAmount: { color: '#166534' },
   debitAmount: { color: '#b91c1c' },
-  reference: {
-    flexShrink: 1,
-    color: '#777',
-    fontSize: 12,
-    textAlign: 'right',
-  },
   footerLoader: { paddingVertical: 16 },
 });

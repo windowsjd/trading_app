@@ -679,14 +679,17 @@ async function testJoinDualWriteAndWalletEquivalence() {
     assert.deepEqual(scoped.data.wallets, legacy.data.wallets);
     assert.deepEqual(scoped.data.summary, legacy.data.summary);
 
-    // And the ledger views agree row-for-row.
+    // The user read hides opening grants; legacy/audit rows remain intact.
     const legacyTx = await walletsService.getWalletTransactions(user.id, {});
     const scopedTx = await walletsService.getWalletTransactionsForTradingAccount(
       user.id,
       participant.tradingAccountId,
       {},
     );
-    assert.deepEqual(scopedTx.data.transactions, legacyTx.data.transactions);
+    assert.equal(legacyTx.data.transactions.length, 1);
+    assert.equal(legacyTx.data.transactions[0].txType, 'initial_grant');
+    assert.deepEqual(scopedTx.data.transactions, []);
+    assert.equal(scopedTx.data.pagination.total, 0);
 
     // Foreign/missing account: identical 404.
     const other = await createUser('join-dual-other');
