@@ -271,7 +271,7 @@ export async function getTradingAccountEquity(
     accountId,
     response.data.data,
   );
-  return granularity === 'daily' ? assertDailyEquity(data, range) : data;
+  return granularity === 'daily' ? assertDailyEquity(data, range, accountId) : data;
 }
 
 export async function getTradingAccountWallets(accountId: string) {

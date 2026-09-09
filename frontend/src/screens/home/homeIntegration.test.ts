@@ -3,7 +3,10 @@ import { readFileSync } from 'node:fs';
 import { URL } from 'node:url';
 import { describe, it } from 'node:test';
 import { createHomeHarness, elements } from '../../../test/homeTestHarness.cjs';
-import { assertDailyEquity } from '../../features/tradingAccount/dailyEquity.ts';
+import {
+  assertDailyEquity,
+  DailyEquityContractError,
+} from '../../features/tradingAccount/dailyEquity.ts';
 const fixture = JSON.parse(
   readFileSync(
     new URL(
@@ -167,12 +170,101 @@ describe('general/season home API, queries, rendering and navigation integration
     ]) {
       const data = structuredClone(fixture.general.data);
       mutate(data);
-      assert.throws(() => assertDailyEquity(data, '30d'));
+      assert.throws(
+        () => assertDailyEquity(data, '30d', 'general-1'),
+        DailyEquityContractError,
+      );
     }
     const gap = structuredClone(fixture.general.data);
     gap.points.splice(1, 1);
-    assert.equal(assertDailyEquity(gap, '30d'), gap);
+    assert.equal(assertDailyEquity(gap, '30d', 'general-1'), gap);
   });
+  for (const mode of ['general', 'season']) {
+    it(`${mode} refuses malformed daily envelopes at the API boundary and closes the whole home`, async () => {
+      for (const mutate of [
+        (data) => {
+          delete data.tradingAccountId;
+        },
+        (data) => {
+          data.state = 'empty';
+        },
+        (data) => {
+          data.state = 'unavailable';
+        },
+        (data) => {
+          data.mode = 'unknown';
+        },
+        (data) => {
+          data.returnRateMethod = 'wrong';
+          data.points.forEach((point) => {
+            point.returnRateMethod = 'wrong';
+          });
+        },
+        (data) => {
+          data.points[0] = null;
+        },
+        (data) => {
+          delete data.points[0].time;
+        },
+        (data) => {
+          data.points[0].totalAssetKrw = '9'.repeat(400);
+        },
+        (data) => {
+          data.points[0].returnRate = 'NaN';
+        },
+        (data) => {
+          data.points[0].snapshotReason = 'external_funding_before';
+        },
+        (data) => {
+          delete data.points[0].cumulativeExternalFundingKrw;
+        },
+      ]) {
+        const h = createHomeHarness(mode);
+        h.seed(h.account, fixture[mode].data);
+        h.render();
+        const data = structuredClone(fixture[mode].data);
+        mutate(data);
+        h.response = { success: true, data };
+        const equityQuery = h.queries.find((query) =>
+          query.queryKey.includes('equity'),
+        );
+        let error;
+        try {
+          await equityQuery.queryFn();
+        } catch (caught) {
+          error = caught;
+        }
+        assert.ok(error instanceof DailyEquityContractError);
+        h.failEquity(error);
+        const result = h.render();
+        assert.equal(result.chart, null);
+        assert.equal(elements(result.tree, 'ErrorState').length, 1);
+        h.close();
+      }
+    });
+    it(`${mode} accepts only an explicit empty history, never an unavailable response as empty`, () => {
+      const empty = structuredClone(fixture[mode].data);
+      empty.state = 'empty';
+      empty.points = [];
+      assert.equal(
+        assertDailyEquity(empty, '30d', empty.tradingAccountId),
+        empty,
+      );
+      empty.state = 'unavailable';
+      assert.throws(
+        () => assertDailyEquity(empty, '30d', empty.tradingAccountId),
+        DailyEquityContractError,
+      );
+      assert.throws(
+        () => assertDailyEquity(null, '30d', empty.tradingAccountId),
+        DailyEquityContractError,
+      );
+      assert.throws(
+        () => assertDailyEquity(empty, '30d', 'other-account'),
+        DailyEquityContractError,
+      );
+    });
+  }
 });
 
 describe('home button through destination RecordOrderList account lookup and API', () => {
@@ -181,15 +273,27 @@ describe('home button through destination RecordOrderList account lookup and API
       const h = createHomeHarness(mode);
       h.seed(h.account, fixture[mode].data);
       const home = h.render();
-      const orderButton = elements(home.tree, 'Pressable').find((node) => texts(node) === '주문 내역 보기');
+      const orderButton = elements(home.tree, 'Pressable').find(
+        (node) => texts(node) === '주문 내역 보기',
+      );
       orderButton.props.onPress();
       const scope = h.navigation.at(-1)[1].params.params;
       h.renderOrders(scope, [h.account, { ...h.account, id: 'other-account' }]);
       assert.equal(h.orderQuery.enabled, true);
       assert.ok(h.orderQuery.queryKey.includes(h.account.id));
-      h.response = { success: true, data: { tradingAccountId: h.account.id, orders: [], pagination: { nextOffset: null } } };
+      h.response = {
+        success: true,
+        data: {
+          tradingAccountId: h.account.id,
+          orders: [],
+          pagination: { nextOffset: null },
+        },
+      };
       await h.orderQuery.queryFn({ pageParam: 0 });
-      assert.equal(h.requests.at(-1).path, `/trading-accounts/${h.account.id}/orders`);
+      assert.equal(
+        h.requests.at(-1).path,
+        `/trading-accounts/${h.account.id}/orders`,
+      );
       h.renderOrders({ accountId: 'foreign' }, [h.account]);
       assert.equal(h.orderQuery.enabled, false);
       h.close();
