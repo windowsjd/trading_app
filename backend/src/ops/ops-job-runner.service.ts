@@ -11,6 +11,10 @@ import {
   SeasonStatus,
 } from '../generated/prisma/client';
 import { DailyPortfolioSnapshotJobService } from '../batch/daily-portfolio-snapshot-job.service';
+import { GeneralDailySnapshotJobService } from '../batch/general-daily-snapshot-job.service';
+import { GENERAL_DAILY_SNAPSHOT_JOB_NAME } from '../batch/general-daily-snapshot-job.types';
+import { DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME } from '../batch/daily-portfolio-snapshot-job.types';
+import { randomUUID } from 'node:crypto';
 import { SeasonLifecycleTransitionJobService } from '../batch/season-lifecycle-transition-job.service';
 import { SeasonSettlementJobService } from '../batch/season-settlement-job.service';
 import { SEASON_SETTLEMENT_JOB_NAME } from '../batch/season-settlement-job.types';
@@ -28,6 +32,7 @@ import { RankingRefreshService } from '../ranking/ranking-refresh.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   getOpsSchedulerConfig,
+  getSchedulerBusinessDate,
   type KisPriceIngestionMode,
 } from './ops-config';
 import { OpsJobLockService } from './ops-job-lock.service';
@@ -92,6 +97,7 @@ export type OpsJobRunnerInput = {
 export type DailySnapshotOpsJobInput = OpsJobRunnerInput & {
   seasonId?: string | null;
   snapshotDate?: string | null;
+  snapshotTimezone?: string;
 };
 
 export type TimedOpsJobInput = OpsJobRunnerInput & {
@@ -162,6 +168,7 @@ export class OpsJobRunnerService {
     private readonly prisma: PrismaService,
     private readonly lockService: OpsJobLockService,
     private readonly runService: OpsJobRunService,
+    private readonly generalDailySnapshotJobService: GeneralDailySnapshotJobService,
     @Optional()
     private readonly marketCandleReconciliationService?: MarketCandleReconciliationService,
     @Optional()
@@ -875,6 +882,101 @@ export class OpsJobRunnerService {
     return JSON.parse(JSON.stringify(summary)) as Record<string, unknown>;
   }
 
+  async runScheduledDailySnapshotJobs(
+    input: DailySnapshotOpsJobInput,
+  ): Promise<OpsJobRunnerResponse[]> {
+    const timezone = getOpsSchedulerConfig().timezone;
+    // Use dispatch time, not the tick time before potentially slow ingestion.
+    const now = new Date();
+    const snapshotDate = getSchedulerBusinessDate(now, timezone);
+    const attempt = randomUUID();
+    const scheduledInput = {
+      ...input,
+      snapshotDate,
+      snapshotTimezone: timezone,
+    };
+    // General history must not depend on the existence of a season.
+    const results = [
+      await this.runGeneralDailySnapshotJob({
+        ...scheduledInput,
+        idempotencyKey: `${GENERAL_DAILY_SNAPSHOT_JOB_NAME}:${snapshotDate}:${attempt}`,
+      }),
+    ];
+    const seasonId = this.optionalString(input.seasonId);
+    const seasons = await this.prisma.season.findMany({
+      where: {
+        ...(seasonId ? { id: seasonId } : {}),
+        status: SeasonStatus.active,
+        startAt: { lte: now },
+        endAt: { gt: now },
+      },
+      orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
+      select: { id: true },
+    });
+    for (const season of seasons) {
+      results.push(
+        await this.runDailyPortfolioSnapshotJob({
+          ...scheduledInput,
+          seasonId: season.id,
+          idempotencyKey: `${DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME}:${season.id}:${snapshotDate}:${attempt}`,
+        }),
+      );
+    }
+    return results;
+  }
+
+  runGeneralDailySnapshotJob(input: DailySnapshotOpsJobInput) {
+    const snapshotDate = this.optionalString(input.snapshotDate);
+    return this.runLockedOpsJob(
+      OpsJobName.daily_portfolio_snapshot,
+      input,
+      `daily_portfolio_snapshot:general:${snapshotDate ?? 'missing-date'}`,
+      async () => {
+        const response = await this.generalDailySnapshotJobService.run({
+          snapshotDate: snapshotDate ?? undefined,
+          snapshotTimezone: input.snapshotTimezone,
+          requestedBy: input.requestedBy ?? undefined,
+          idempotencyKey: input.idempotencyKey ?? undefined,
+          dryRun: false,
+        });
+        this.assertDailySnapshotBatchComplete(
+          response.data.run.resultPayloadJson,
+        );
+        return response.data;
+      },
+    );
+  }
+
+  private assertDailySnapshotBatchComplete(result: unknown) {
+    if (!result || typeof result !== 'object') return;
+    const summary =
+      'accounts' in result
+        ? result.accounts
+        : 'participants' in result
+          ? result.participants
+          : null;
+    if (
+      summary &&
+      typeof summary === 'object' &&
+      'failed' in summary &&
+      typeof summary.failed === 'number' &&
+      summary.failed > 0
+    ) {
+      throw new HttpException(
+        {
+          success: false,
+          error: {
+            code: 'DAILY_SNAPSHOT_PARTIAL_FAILURE',
+            message:
+              'Some daily snapshots could not be generated; the next scheduled tick retries missing rows.',
+          },
+          data: { resultPayloadJson: result },
+        },
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+  }
+
   async runDailyPortfolioSnapshotJob(
     input: DailySnapshotOpsJobInput,
   ): Promise<OpsJobRunnerResponse> {
@@ -956,7 +1058,16 @@ export class OpsJobRunnerService {
         snapshotDate,
         dryRun,
         requestedBy: input.requestedBy ?? undefined,
+        ...(input.idempotencyKey
+          ? { idempotencyKey: input.idempotencyKey }
+          : {}),
+        ...(input.snapshotTimezone
+          ? { snapshotTimezone: input.snapshotTimezone }
+          : {}),
       });
+      this.assertDailySnapshotBatchComplete(
+        batchResponse.data.run.resultPayloadJson,
+      );
       const succeeded = await this.runService.recordSucceeded(run, {
         resultJson: {
           batchRunId: batchResponse.data.run.id,

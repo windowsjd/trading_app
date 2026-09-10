@@ -33,6 +33,9 @@ jest.mock('../generated/prisma/client', () => ({
 jest.mock('../batch/daily-portfolio-snapshot-job.service', () => ({
   DailyPortfolioSnapshotJobService: class DailyPortfolioSnapshotJobService {},
 }));
+jest.mock('../batch/general-daily-snapshot-job.service', () => ({
+  GeneralDailySnapshotJobService: class GeneralDailySnapshotJobService {},
+}));
 jest.mock('../batch/season-lifecycle-transition-job.service', () => ({
   SeasonLifecycleTransitionJobService: class SeasonLifecycleTransitionJobService {},
 }));
@@ -80,9 +83,7 @@ describe('OpsSchedulerService', () => {
         .fn()
         .mockResolvedValue({ success: true }),
       runProviderKisIngestJob: jest.fn().mockResolvedValue({ success: true }),
-      runDailyPortfolioSnapshotJob: jest
-        .fn()
-        .mockResolvedValue({ success: true }),
+      runScheduledDailySnapshotJobs: jest.fn().mockResolvedValue([]),
       runSeasonRankingGenerationJob: jest
         .fn()
         .mockResolvedValue({ success: true }),
@@ -352,7 +353,7 @@ describe('OpsSchedulerService', () => {
         createEquitySnapshots: true,
       }),
     );
-    expect(runner.runDailyPortfolioSnapshotJob).not.toHaveBeenCalled();
+    expect(runner.runScheduledDailySnapshotJobs).not.toHaveBeenCalled();
   });
 
   it('runs enabled provider jobs and passes KIS max snapshots', async () => {
@@ -506,24 +507,54 @@ describe('OpsSchedulerService', () => {
     );
   });
 
-  it('passes Asia/Seoul business date to daily snapshot scheduler runner', async () => {
-    process.env.SCHEDULER_ENABLED = 'true';
+  it('dispatches daily season and general jobs with the daily flag alone', async () => {
     process.env.SCHEDULER_DAILY_SNAPSHOT_ENABLED = 'true';
     process.env.SCHEDULER_DAILY_SNAPSHOT_SEASON_ID = 'season-1';
     const { runner, service } = createService();
 
     await service.runEnabledJobs(new Date('2026-06-07T15:00:00.000Z'));
 
-    expect(runner.runDailyPortfolioSnapshotJob).toHaveBeenCalledWith(
+    expect(runner.runScheduledDailySnapshotJobs).toHaveBeenCalledWith(
       expect.objectContaining({
         dryRun: false,
         seasonId: 'season-1',
-        snapshotDate: '2026-06-08',
       }),
     );
     expect(
       getOpsSchedulerConfig().jobs[OpsJobName.daily_portfolio_snapshot],
     ).toBe(true);
+  });
+
+  it('registers the existing interval with only the daily flag and clears it on shutdown', () => {
+    process.env.SCHEDULER_DAILY_SNAPSHOT_ENABLED = 'true';
+    const { service } = createService();
+    service.onModuleInit();
+    expect(service.isIntervalRegistered()).toBe(true);
+    service.onModuleDestroy();
+    expect(service.isIntervalRegistered()).toBe(false);
+  });
+
+  it('skips overlapping daily sweeps and permits a later tick after a failure', async () => {
+    process.env.SCHEDULER_DAILY_SNAPSHOT_ENABLED = 'true';
+    const { runner, service } = createService();
+    let rejectSweep!: (error: Error) => void;
+    runner.runScheduledDailySnapshotJobs.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectSweep = reject;
+        }),
+    );
+    const first = service.runEnabledJobs();
+    const failed = expect(first).rejects.toThrow('DB unavailable');
+    // Let the first tick reach the suspended daily runner.
+    await Promise.resolve();
+    await Promise.resolve();
+    await service.runEnabledJobs();
+    expect(runner.runScheduledDailySnapshotJobs).toHaveBeenCalledTimes(1);
+    rejectSweep(new Error('DB unavailable'));
+    await failed;
+    await service.runEnabledJobs();
+    expect(runner.runScheduledDailySnapshotJobs).toHaveBeenCalledTimes(2);
   });
 
   it('runs KRX reconciliation after the actual session close grace and only once per successful date', async () => {

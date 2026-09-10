@@ -12,6 +12,7 @@ import {
 import { PortfolioValuationError } from '../portfolio/portfolio-valuation.policy';
 import { PrismaService } from '../prisma/prisma.service';
 import { BatchService } from './batch.service';
+import { getSchedulerBusinessDate } from '../ops/ops-config';
 import {
   GENERAL_DAILY_SNAPSHOT_JOB_NAME,
   GeneralDailySnapshotJobAccountError,
@@ -182,6 +183,7 @@ export class GeneralDailySnapshotJobService {
       await this.processAccount({
         account,
         snapshotDate,
+        snapshotTimezone: input.snapshotTimezone,
         capturedAt,
         dryRun,
         result,
@@ -194,6 +196,7 @@ export class GeneralDailySnapshotJobService {
   private async processAccount(input: {
     account: GeneralAccountRow;
     snapshotDate: Date;
+    snapshotTimezone?: string;
     capturedAt: Date;
     dryRun: boolean;
     result: GeneralDailySnapshotJobResult;
@@ -261,6 +264,15 @@ export class GeneralDailySnapshotJobService {
         // have waited behind an ad payout. Stamping every account with the run
         // clock would date a valuation to an instant its wallets never held.
         const capturedAt = new Date();
+        if (
+          input.snapshotTimezone &&
+          getSchedulerBusinessDate(capturedAt, input.snapshotTimezone) !==
+            input.snapshotDate.toISOString().slice(0, 10)
+        ) {
+          throw new Error(
+            'Daily snapshot date changed while waiting for the account lock; retry on the next tick.',
+          );
+        }
 
         // Computed INSIDE the transaction so the values written are the ones
         // read from a single consistent snapshot of wallets, ledger, and

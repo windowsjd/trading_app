@@ -28,6 +28,7 @@ jest.mock('../generated/prisma/client', () => ({
     manual_script: 'manual_script',
     test: 'test',
   },
+  SeasonStatus: { active: 'active' },
   AssetType: {
     domestic_stock: 'domestic_stock',
     us_stock: 'us_stock',
@@ -52,6 +53,9 @@ jest.mock('../orders/limit-order-matching.service', () => ({
 
 jest.mock('../batch/daily-portfolio-snapshot-job.service', () => ({
   DailyPortfolioSnapshotJobService: class DailyPortfolioSnapshotJobService {},
+}));
+jest.mock('../batch/general-daily-snapshot-job.service', () => ({
+  GeneralDailySnapshotJobService: class GeneralDailySnapshotJobService {},
 }));
 jest.mock('../batch/season-lifecycle-transition-job.service', () => ({
   SeasonLifecycleTransitionJobService: class SeasonLifecycleTransitionJobService {},
@@ -126,6 +130,7 @@ describe('OpsJobRunnerService', () => {
     const dailyPortfolioSnapshotJobService = {
       run: jest.fn(),
     };
+    const generalDailySnapshotJobService = { run: jest.fn() };
     const seasonLifecycleTransitionJobService = {
       run: jest.fn(),
     };
@@ -191,6 +196,7 @@ describe('OpsJobRunnerService', () => {
 
     return {
       dailyPortfolioSnapshotJobService,
+      generalDailySnapshotJobService,
       lockService,
       runService,
       seasonLifecycleTransitionJobService,
@@ -222,10 +228,163 @@ describe('OpsJobRunnerService', () => {
         prisma as never,
         lockService as never,
         runService as never,
+        generalDailySnapshotJobService as never,
         marketCandleReconciliationService as never,
       ),
     };
   };
+
+  describe('scheduled daily history', () => {
+    const originalEnv = { ...process.env };
+    beforeEach(() => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-06-07T15:00:00.000Z'));
+      process.env.SCHEDULER_TIMEZONE = 'Asia/Seoul';
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+      process.env = { ...originalEnv };
+    });
+
+    function setup() {
+      const fixture = createService();
+      fixture.prisma.season.findMany.mockResolvedValue([
+        { id: 'season-1' },
+        { id: 'season-2' },
+      ]);
+      fixture.lockService.acquireLock.mockImplementation(({ lockKey }) =>
+        Promise.resolve({ acquired: true, lockKey, ownerId: 'owner' }),
+      );
+      fixture.runService.createRunning.mockResolvedValue({
+        id: 'run-1',
+        startedAt,
+      });
+      fixture.runService.recordSucceeded.mockResolvedValue({
+        serialized: serializedRun(),
+      });
+      fixture.runService.recordFailed.mockResolvedValue({
+        serialized: serializedRun({ status: OpsJobRunStatus.failed }),
+      });
+      const batch = (summary: unknown) => ({
+        success: true,
+        data: {
+          run: {
+            id: 'batch-1',
+            status: 'succeeded',
+            resultPayloadJson: summary,
+          },
+          deduplicated: false,
+          skipped: false,
+        },
+      });
+      fixture.dailyPortfolioSnapshotJobService.run.mockResolvedValue(
+        batch({ participants: { failed: 0 } }),
+      );
+      fixture.generalDailySnapshotJobService.run.mockResolvedValue(
+        batch({ accounts: { failed: 0 } }),
+      );
+      return { ...fixture, batch };
+    }
+
+    it('selects all currently active seasons and separately runs general under existing Ops locks', async () => {
+      const f = setup();
+      await f.service.runScheduledDailySnapshotJobs({
+        trigger: OpsJobTrigger.scheduler,
+      });
+      expect(f.prisma.season.findMany).toHaveBeenCalledWith({
+        where: {
+          status: 'active',
+          startAt: { lte: new Date() },
+          endAt: { gt: new Date() },
+        },
+        orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
+        select: { id: true },
+      });
+      expect(f.generalDailySnapshotJobService.run).toHaveBeenCalledWith(
+        expect.objectContaining({
+          snapshotDate: '2026-06-08',
+          snapshotTimezone: 'Asia/Seoul',
+          dryRun: false,
+        }),
+      );
+      for (const seasonId of ['season-1', 'season-2']) {
+        expect(f.dailyPortfolioSnapshotJobService.run).toHaveBeenCalledWith(
+          expect.objectContaining({
+            seasonId,
+            snapshotDate: '2026-06-08',
+            snapshotTimezone: 'Asia/Seoul',
+          }),
+        );
+      }
+      expect(f.lockService.acquireLock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jobName: OpsJobName.daily_portfolio_snapshot,
+          lockKey: 'daily_portfolio_snapshot:general:2026-06-08',
+        }),
+      );
+      expect(f.lockService.releaseLock).toHaveBeenCalledTimes(3);
+      expect(
+        f.rankingRefreshService.refreshCurrentRankingsForActiveSeasons,
+      ).not.toHaveBeenCalled();
+      expect(f.seasonSettlementJobService.run).not.toHaveBeenCalled();
+    });
+
+    it('keeps general independent of a missing or expired optional season filter', async () => {
+      const f = setup();
+      f.prisma.season.findMany.mockResolvedValue([]);
+      await f.service.runScheduledDailySnapshotJobs({
+        seasonId: 'expired-season',
+      });
+      expect(f.prisma.season.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: 'expired-season',
+            status: 'active',
+          }),
+        }),
+      );
+      expect(f.generalDailySnapshotJobService.run).toHaveBeenCalledTimes(1);
+      expect(f.dailyPortfolioSnapshotJobService.run).not.toHaveBeenCalled();
+    });
+
+    it('retries missing rows after partial failures with new batch keys and keeps other scopes running', async () => {
+      const f = setup();
+      f.generalDailySnapshotJobService.run.mockResolvedValueOnce(
+        f.batch({ accounts: { failed: 1 }, errors: ['unavailable'] }),
+      );
+      f.dailyPortfolioSnapshotJobService.run.mockResolvedValueOnce(
+        f.batch({ participants: { failed: 1 } }),
+      );
+      const first = await f.service.runScheduledDailySnapshotJobs({});
+      expect(first.map((r) => r.success)).toEqual([false, false, true]);
+      const second = await f.service.runScheduledDailySnapshotJobs({});
+      expect(second.every((r) => r.success)).toBe(true);
+      const keys = f.generalDailySnapshotJobService.run.mock.calls.map(
+        ([input]) => input.idempotencyKey,
+      );
+      expect(new Set(keys).size).toBe(2);
+      const seasonKeys = f.dailyPortfolioSnapshotJobService.run.mock.calls.map(
+        ([input]) => input.idempotencyKey,
+      );
+      expect(new Set(seasonKeys).size).toBe(4);
+      expect(f.runService.recordFailed).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          errorCode: 'DAILY_SNAPSHOT_PARTIAL_FAILURE',
+        }),
+      );
+    });
+
+    it('retries a thrown batch failure on the next tick', async () => {
+      const f = setup();
+      f.generalDailySnapshotJobService.run.mockRejectedValueOnce(
+        new Error('temporary DB failure'),
+      );
+      await f.service.runScheduledDailySnapshotJobs({});
+      await f.service.runScheduledDailySnapshotJobs({});
+      expect(f.generalDailySnapshotJobService.run).toHaveBeenCalledTimes(2);
+      expect(f.dailyPortfolioSnapshotJobService.run).toHaveBeenCalledTimes(4);
+    });
+  });
 
   it('runs market candle reconciliation through the market lock and Ops audit path', async () => {
     const {

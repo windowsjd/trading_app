@@ -21,6 +21,14 @@ import { getOpsSchedulerConfig } from './ops-config';
 import { OpsConfigError } from './ops-config';
 
 describe('getOpsSchedulerConfig', () => {
+  it('enables the scheduler with the daily snapshot flag alone', () => {
+    const config = getOpsSchedulerConfig({
+      SCHEDULER_DAILY_SNAPSHOT_ENABLED: 'true',
+    });
+    expect(config.enabled).toBe(true);
+    expect(config.jobs[OpsJobName.daily_portfolio_snapshot]).toBe(true);
+    expect(config.timezone).toBe('Asia/Seoul');
+  });
   it('defaults scheduler disabled, dry-run-compatible timing to 60000ms', () => {
     const config = getOpsSchedulerConfig({});
 

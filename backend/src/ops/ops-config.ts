@@ -76,6 +76,10 @@ export function getOpsSchedulerConfig(
 ): OpsSchedulerConfig {
   const marketCandleReconciliation = readMarketCandleReconciliationConfig(env);
   const limitOrderMatching = readLimitOrderMatchingConfig(env);
+  const dailySnapshotEnabled = parseBooleanEnv(
+    env.SCHEDULER_DAILY_SNAPSHOT_ENABLED,
+    false,
+  );
   const rankingEnabled = parseBooleanEnv(
     env.SCHEDULER_RANKING_ENABLED ?? env.ENABLE_RANKING_SCHEDULER,
     false,
@@ -154,6 +158,7 @@ export function getOpsSchedulerConfig(
   return {
     enabled:
       parseBooleanEnv(env.SCHEDULER_ENABLED, false) ||
+      dailySnapshotEnabled ||
       rankingEnabled ||
       lifecycleEnabled ||
       settlementEnabled ||
@@ -178,10 +183,7 @@ export function getOpsSchedulerConfig(
       [OpsJobName.provider_fx_ingest]: providerFxEnabled,
       [OpsJobName.provider_binance_ingest]: providerBinanceEnabled,
       [OpsJobName.provider_kis_ingest]: providerKisEnabled,
-      [OpsJobName.daily_portfolio_snapshot]: parseBooleanEnv(
-        env.SCHEDULER_DAILY_SNAPSHOT_ENABLED,
-        false,
-      ),
+      [OpsJobName.daily_portfolio_snapshot]: dailySnapshotEnabled,
       [OpsJobName.season_ranking_generation]: rankingEnabled,
       [OpsJobName.season_lifecycle_transition]: lifecycleEnabled,
       [OpsJobName.season_settlement]: settlementEnabled,

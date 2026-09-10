@@ -8,6 +8,7 @@ import {
 import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { BatchService } from './batch.service';
+import { getSchedulerBusinessDate } from '../ops/ops-config';
 import {
   DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME,
   DailyPortfolioSnapshotJobErrorCode,
@@ -116,6 +117,21 @@ export class DailyPortfolioSnapshotJobService {
     };
 
     for (const participant of participants) {
+      if (input.snapshotTimezone) {
+        capturedAt = new Date();
+        if (
+          getSchedulerBusinessDate(capturedAt, input.snapshotTimezone) !==
+          snapshotDateText
+        ) {
+          result.participants.skipped =
+            participants.length -
+            result.participants.created -
+            result.participants.wouldCreate -
+            result.participants.existing -
+            result.participants.failed;
+          break;
+        }
+      }
       const existing = await this.prisma.dailyPortfolioSnapshot.findUnique({
         where: {
           seasonParticipantId_snapshotDate: {

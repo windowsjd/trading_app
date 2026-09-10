@@ -4,6 +4,8 @@ export const GENERAL_DAILY_SNAPSHOT_JOB_NAME = 'general-account-daily-snapshot';
 
 export type GeneralDailySnapshotJobInput = {
   snapshotDate?: string;
+  /** Scheduler-only guard, checked after the account lock. */
+  snapshotTimezone?: string;
   dryRun?: boolean;
   requestedBy?: string;
   idempotencyKey?: string;

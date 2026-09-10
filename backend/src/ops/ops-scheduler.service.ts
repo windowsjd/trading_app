@@ -44,6 +44,7 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
   private marketCandleSyncInFlight = false;
   /** Guards against a slow matching cycle overlapping the next dedicated tick. */
   private limitOrderMatchingRunning = false;
+  private dailySnapshotsRunning = false;
 
   constructor(
     private readonly runner: OpsJobRunnerService,
@@ -192,14 +193,21 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
       })),
     );
 
-    if (config.jobs[OpsJobName.daily_portfolio_snapshot]) {
-      results.push(
-        await this.runner.runDailyPortfolioSnapshotJob({
-          ...baseInput,
-          seasonId: process.env.SCHEDULER_DAILY_SNAPSHOT_SEASON_ID,
-          snapshotDate: getSchedulerBusinessDate(now, config.timezone),
-        }),
-      );
+    if (
+      config.jobs[OpsJobName.daily_portfolio_snapshot] &&
+      !this.dailySnapshotsRunning
+    ) {
+      this.dailySnapshotsRunning = true;
+      try {
+        results.push(
+          ...(await this.runner.runScheduledDailySnapshotJobs({
+            ...baseInput,
+            seasonId: process.env.SCHEDULER_DAILY_SNAPSHOT_SEASON_ID,
+          })),
+        );
+      } finally {
+        this.dailySnapshotsRunning = false;
+      }
     }
 
     if (config.jobs[OpsJobName.season_lifecycle_transition]) {

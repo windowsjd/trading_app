@@ -5,6 +5,8 @@ export const DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME = 'daily-portfolio-snapshot';
 export type DailyPortfolioSnapshotJobInput = {
   seasonId?: string;
   snapshotDate?: string;
+  /** Scheduler-only guard: never write a capture under a different local day. */
+  snapshotTimezone?: string;
   dryRun?: boolean;
   requestedBy?: string;
   idempotencyKey?: string;

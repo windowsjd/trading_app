@@ -207,6 +207,56 @@ function structuredError(code: string): HttpException {
  * account selection, per-account atomicity, and the dry-run report.
  */
 describe('GeneralDailySnapshotJobService', () => {
+  it('defers a scheduled capture if its account lock crosses the local midnight', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-04T14:59:59.000Z'));
+    try {
+      const { service, tx, setAccounts, performanceService } = createService();
+      setAccounts([account('account-1')]);
+      tx.$queryRaw.mockImplementationOnce(() => {
+        jest.setSystemTime(new Date('2026-08-04T15:00:00.000Z'));
+        return Promise.resolve([{ id: 'account-1', status: 'active' }]);
+      });
+      const result = await runAndGetResult(service, {
+        snapshotDate: SNAPSHOT_DATE,
+        snapshotTimezone: 'Asia/Seoul',
+      });
+      expect(result.accounts.failed).toBe(1);
+      expect(
+        performanceService.buildOrdinarySnapshotValues,
+      ).not.toHaveBeenCalled();
+      expect(tx.equitySnapshot.create).not.toHaveBeenCalled();
+      expect(tx.dailyPortfolioSnapshot.create).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('captures a later account on a same-day rerun while preserving the first account row', async () => {
+    const { service, prisma, tx, setAccounts } = createService();
+    setAccounts([account('account-1')]);
+    await runAndGetResult(service, {
+      snapshotDate: SNAPSHOT_DATE,
+      idempotencyKey: 'tick-1',
+    });
+    setAccounts([account('account-1'), account('account-2')]);
+    prisma.dailyPortfolioSnapshot.findUnique.mockResolvedValueOnce({
+      id: 'daily-1',
+    });
+    const result = await runAndGetResult(service, {
+      snapshotDate: SNAPSHOT_DATE,
+      idempotencyKey: 'tick-2',
+    });
+    expect(result.accounts).toMatchObject({ existing: 1, created: 1 });
+    expect(tx.dailyPortfolioSnapshot.create).toHaveBeenCalledTimes(2);
+    expect(tx.dailyPortfolioSnapshot.create).toHaveBeenLastCalledWith({
+      data: containing({
+        tradingAccountId: 'account-2',
+        seasonParticipantId: null,
+      }),
+      select: { id: true },
+    });
+  });
+
   it('runs through BatchService with the date as its default business key', async () => {
     const { service, batchService } = createService();
 

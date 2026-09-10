@@ -77,6 +77,79 @@ describe('DailyPortfolioSnapshotJobService', () => {
   const startedAt = new Date('2026-05-20T00:00:30.000Z');
   const snapshotDate = '2026-05-20';
 
+  it('uses the actual scheduled capture time and defers remaining participants at local midnight', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-20T14:59:59.000Z'));
+    try {
+      const { service, prisma, valuationService } = createService();
+      mockSeason(prisma, SeasonStatus.active);
+      mockParticipants(prisma, [
+        { id: 'sp-1', userId: 'user-1' },
+        { id: 'sp-2', userId: 'user-2' },
+      ]);
+      prisma.dailyPortfolioSnapshot.findUnique.mockResolvedValue(null);
+      valuationService.calculateSeasonParticipantValuation.mockResolvedValue(
+        valuation('sp-1'),
+      );
+      prisma.dailyPortfolioSnapshot.create.mockImplementationOnce(() => {
+        jest.setSystemTime(new Date('2026-05-20T15:00:00.000Z'));
+        return Promise.resolve({ id: 'snap-1' });
+      });
+      const result = await runAndGetResult(service, {
+        seasonId: 'season-1',
+        snapshotDate,
+        snapshotTimezone: 'Asia/Seoul',
+      });
+      expect(result.participants).toMatchObject({ created: 1, skipped: 1 });
+      expect(prisma.dailyPortfolioSnapshot.create).toHaveBeenCalledTimes(1);
+      expect(
+        valuationService.calculateSeasonParticipantValuation,
+      ).toHaveBeenCalledWith(
+        'sp-1',
+        new Date('2026-05-20T14:59:59.000Z'),
+        'daily_portfolio_snapshot',
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('fills a later participant on rerun without overwriting existing same-day rows', async () => {
+    const { service, prisma, valuationService } = createService();
+    mockSeason(prisma, SeasonStatus.active);
+    mockParticipants(prisma, [{ id: 'sp-1', userId: 'user-1' }]);
+    prisma.dailyPortfolioSnapshot.findUnique.mockResolvedValue(null);
+    valuationService.calculateSeasonParticipantValuation.mockImplementation(
+      (id: string) => Promise.resolve(valuation(id)),
+    );
+    prisma.dailyPortfolioSnapshot.create.mockResolvedValue({ id: 'snap' });
+    await runAndGetResult(service, {
+      seasonId: 'season-1',
+      snapshotDate,
+      idempotencyKey: 'tick-1',
+    });
+    mockParticipants(prisma, [
+      { id: 'sp-1', userId: 'user-1' },
+      { id: 'sp-2', userId: 'user-2' },
+    ]);
+    prisma.dailyPortfolioSnapshot.findUnique.mockResolvedValueOnce({
+      id: 'snap',
+    });
+    const result = await runAndGetResult(service, {
+      seasonId: 'season-1',
+      snapshotDate,
+      idempotencyKey: 'tick-2',
+    });
+    expect(result.participants).toMatchObject({ existing: 1, created: 1 });
+    expect(prisma.dailyPortfolioSnapshot.create).toHaveBeenCalledTimes(2);
+    expect(prisma.dailyPortfolioSnapshot.create).toHaveBeenLastCalledWith({
+      data: expect.objectContaining({
+        seasonParticipantId: 'sp-2',
+        tradingAccountId: 'account-of-sp-2',
+      }),
+      select: { id: true },
+    });
+  });
+
   it('uses BatchService.runJob with the fixed jobName and generated idempotencyKey', async () => {
     const { service, batchService, prisma, valuationService } = createService();
     mockSeason(prisma, SeasonStatus.active);

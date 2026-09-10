@@ -64,6 +64,32 @@ EVENT-based matching layer and nothing schedules them.
 
 `daily_portfolio_snapshot` can call the existing `DailyPortfolioSnapshotJobService` through the internal runner. It supports `dryRun`, job lock, and ops audit. The existing batch service still owns actual snapshot creation rules and idempotency.
 
+### Home daily history automation
+
+`SCHEDULER_DAILY_SNAPSHOT_ENABLED=true` enables the existing scheduler and
+dispatches both season and general daily batches on every shared tick (default
+60 seconds). No new scheduler or database enum is needed: both use the existing
+`daily_portfolio_snapshot` Ops name, with distinct season/general lock keys.
+`SCHEDULER_DAILY_SNAPSHOT_SEASON_ID` is an optional season filter; without it,
+all active seasons within `startAt <= now < endAt` are selected, matching the
+current ranking season-selection policy. General accounts run even if there
+are no active seasons or the optional season filter matches nothing.
+
+Each scheduled attempt uses a fresh batch idempotency key, while the existing
+account/date and participant/date unique constraints preserve the first daily
+row. This also picks up later joins/new accounts and retries valuation failures
+on the next tick. Manual batch date keys and dry-run semantics stay unchanged.
+Partial account failures are visible as failed Ops runs with batch results.
+Scheduled writers check the actual capture date in `SCHEDULER_TIMEZONE`
+(default `Asia/Seoul`); work crossing midnight is deferred to the next tick,
+never stamped onto yesterday. Missing historical dates are never backfilled.
+
+The flag defaults to false. After deploying this code, enable it in the service
+environment and restart/redeploy the backend. The first eligible tick records
+today's real valuation; it cannot restore missing past history. Home explicit
+daily reads remain DailyPortfolioSnapshot-only; ranking, settlement valuation,
+and Portfolio's non-daily fallback are unchanged.
+
 ## Run Audit
 
 `OpsJobRun` records:
@@ -142,7 +168,11 @@ No secret scheduler env is introduced.
 
 `SCHEDULER_TICK_INTERVAL_MS` is non-secret and defaults to `60000`.
 
-When `SCHEDULER_ENABLED=false`, no interval is registered and no automatic job runs. When enabled, individual job flags decide which internal runner methods are called. The foundation uses an internal `setInterval` shell without adding package dependencies.
+The interval is registered when `SCHEDULER_ENABLED=true` or an enabling job flag
+(including daily snapshots) is true. `SCHEDULER_ENABLED=false` is not a global
+kill switch for those flags. When enabled, individual job flags decide which
+internal runner methods are called. The foundation uses the existing internal
+`setInterval` shell without adding package dependencies.
 
 To run current ranking automation in production, enable at least one ranking scheduler flag in the deployment environment. Recommended production example:
 
