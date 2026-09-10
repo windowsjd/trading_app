@@ -746,6 +746,65 @@ describe('OpsJobRunnerService', () => {
     });
   });
 
+  it.each([
+    [true, false],
+    [false, true],
+    [false, false],
+  ])(
+    'preserves combined FX provider success (EXIM=%s, ExchangeRate=%s)',
+    async (eximSuccess, exchangeSuccess) => {
+      const f = createService();
+      f.lockService.acquireLock.mockResolvedValue({
+        acquired: true,
+        lockKey: 'provider_fx_ingest:usd_krw',
+        ownerId: 'owner-fx',
+      });
+      f.runService.createRunning.mockResolvedValue({ id: 'run-fx', startedAt });
+      f.runService.recordSucceeded.mockResolvedValue({
+        serialized: serializedRun(),
+      });
+      f.runService.recordFailed.mockResolvedValue({
+        serialized: serializedRun({ status: OpsJobRunStatus.failed }),
+      });
+      const result = (success: boolean) => ({
+        success,
+        created: success ? 1 : 0,
+        skipped: 0,
+        wouldCreate: 0,
+      });
+      f.koreaEximExchangeIngestionService.ingestUsdKrw.mockResolvedValue(
+        result(eximSuccess),
+      );
+      f.exchangeRateIngestionService.ingestUsdKrw.mockResolvedValue(
+        result(exchangeSuccess),
+      );
+      const response = await f.service.runProviderFxIngestJob({
+        trigger: OpsJobTrigger.scheduler,
+      });
+      expect(
+        f.koreaEximExchangeIngestionService.ingestUsdKrw,
+      ).toHaveBeenCalledTimes(1);
+      expect(f.exchangeRateIngestionService.ingestUsdKrw).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(response.success).toBe(eximSuccess || exchangeSuccess);
+      if (eximSuccess || exchangeSuccess) {
+        expect(f.runService.recordSucceeded).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            resultJson: expect.objectContaining({ state: 'completed' }),
+          }),
+        );
+      } else {
+        expect(f.runService.recordFailed).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ errorCode: 'PROVIDER_FX_INGEST_FAILED' }),
+        );
+      }
+      expect(f.lockService.releaseLock).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it('runs retention through the shared lock/run path and records its result', async () => {
     const { lockService, runService, marketCandleRetentionService, service } =
       createService();

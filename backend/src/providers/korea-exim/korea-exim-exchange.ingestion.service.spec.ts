@@ -20,6 +20,10 @@ jest.mock('../../generated/prisma/client', () => {
 
 import { CurrencyCode, Prisma } from '../../generated/prisma/client';
 import { ProviderConfigService } from '../provider-config.service';
+import {
+  FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
+  selectFreshProviderSnapshotBySourcePriority,
+} from '../source-eligibility.policy';
 import { KoreaEximExchangeClient } from './korea-exim-exchange.client';
 import {
   formatKstSearchDate,
@@ -29,6 +33,138 @@ import {
 } from './korea-exim-exchange.ingestion.service';
 
 describe('KoreaEximExchangeIngestionService', () => {
+  it.each(['scheduled', 'on-demand'])(
+    'preserves an unchanged rate as a new %s observation and selects it as fresh',
+    async (path) => {
+      const oldAt = new Date('2026-06-19T00:00:00.000Z');
+      const receivedAt = new Date('2026-06-19T01:00:00.000Z');
+      const effectiveAt = new Date('2026-06-18T15:00:00.000Z');
+      jest.useFakeTimers().setSystemTime(receivedAt);
+      try {
+        const prisma = createPrismaMock();
+        const old = {
+          id: 'old-observation',
+          rate: new Prisma.Decimal('1390'),
+          effectiveAt,
+          capturedAt: oldAt,
+          sourceType: 'provider_api',
+          sourceName: 'korea_exim_exchange_rate',
+        };
+        const stored = [old];
+        prisma.fxRateSnapshot.findFirst.mockImplementation(
+          async ({ where }) => {
+            // Freshness precheck excludes the old row; a rate/effectiveAt duplicate
+            // lookup would return it and fail this regression test.
+            if (where.capturedAt) return null;
+            return old;
+          },
+        );
+        prisma.fxRateSnapshot.create.mockImplementation(async ({ data }) => {
+          const row = {
+            ...data,
+            id: 'new-observation',
+            rate: new Prisma.Decimal(data.rate),
+          };
+          stored.push(row);
+          return row;
+        });
+        const client = {
+          fetchDailyExchangeRates: jest
+            .fn()
+            .mockResolvedValue({
+              receivedAt,
+              rows: [{ RESULT: 1, CUR_UNIT: 'USD', DEAL_BAS_R: '1390' }],
+            }),
+        };
+        const service = new KoreaEximExchangeIngestionService(
+          prisma as never,
+          createConfigService(),
+          client as never,
+        );
+        if (path === 'scheduled') {
+          await expect(service.ingestUsdKrw()).resolves.toMatchObject({
+            success: true,
+            created: 1,
+            skipped: 0,
+          });
+          expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+        } else {
+          await expect(
+            service.ensureFreshUsdKrwSnapshot({
+              now: receivedAt,
+              maxAgeSeconds: 300,
+            }),
+          ).resolves.toMatchObject({
+            snapshotId: 'new-observation',
+            capturedAt: receivedAt,
+            effectiveAt,
+            reused: false,
+          });
+          expect(prisma.fxRateSnapshot.findFirst).toHaveBeenCalledTimes(1);
+          expect(prisma.fxRateSnapshot.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+              where: expect.objectContaining({
+                capturedAt: {
+                  gte: new Date(receivedAt.getTime() - 300_000),
+                  lte: receivedAt,
+                },
+              }),
+            }),
+          );
+        }
+        expect(client.fetchDailyExchangeRates).toHaveBeenCalledTimes(1);
+        expect(prisma.fxRateSnapshot.create).toHaveBeenCalledTimes(1);
+        expect(stored).toHaveLength(2);
+        expect(old.capturedAt).toEqual(oldAt);
+        expect(stored[1]).toMatchObject({
+          rate: new Prisma.Decimal('1390'),
+          effectiveAt,
+          capturedAt: receivedAt,
+        });
+        for (const freshnessThresholdSeconds of [300, 7200]) {
+          expect(
+            selectFreshProviderSnapshotBySourcePriority({
+              candidates: [...stored].reverse(),
+              expectedSourceNames: FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
+              now: receivedAt,
+              freshnessThresholdSeconds,
+              isPositiveValue: (row) => row.rate.gt(0),
+            }),
+          ).toMatchObject({
+            state: 'selected',
+            snapshot: { id: 'new-observation', capturedAt: receivedAt },
+          });
+        }
+      } finally {
+        jest.useRealTimers();
+      }
+    },
+  );
+
+  it('reports a same-rate observation as wouldCreate in dry-run without writing', async () => {
+    const prisma = createPrismaMock();
+    prisma.fxRateSnapshot.findFirst.mockResolvedValue({
+      id: 'same-rate-existing',
+    });
+    const client = {
+      fetchDailyExchangeRates: jest
+        .fn()
+        .mockResolvedValue({
+          receivedAt: new Date(),
+          rows: [{ RESULT: 1, CUR_UNIT: 'USD', DEAL_BAS_R: '1390' }],
+        }),
+    };
+    const service = new KoreaEximExchangeIngestionService(
+      prisma as never,
+      createConfigService(),
+      client as never,
+    );
+    await expect(service.ingestUsdKrw({ dryRun: true })).resolves.toMatchObject(
+      { success: true, created: 0, skipped: 0, wouldCreate: 1 },
+    );
+    expect(prisma.fxRateSnapshot.create).not.toHaveBeenCalled();
+  });
+
   it('parses lowercase response fields and comma-formatted USD DEAL_BAS_R', () => {
     const parsed = parseKoreaEximUsdKrwRate(
       [
@@ -211,8 +347,8 @@ describe('KoreaEximExchangeIngestionService', () => {
 
     await expect(
       service.ensureFreshUsdKrwSnapshot({
-        now: new Date('2026-06-19T00:01:00.000Z'),
-        maxAgeSeconds: 60,
+        now: new Date('2026-06-19T00:02:30.000Z'),
+        maxAgeSeconds: 300,
       }),
     ).resolves.toMatchObject({
       snapshotId: 'fx-korea-exim-existing',

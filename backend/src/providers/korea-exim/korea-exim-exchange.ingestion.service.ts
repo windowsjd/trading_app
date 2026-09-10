@@ -102,17 +102,6 @@ export class KoreaEximExchangeIngestionService {
           continue;
         }
 
-        const duplicate = await this.findDuplicateSnapshot(parsed);
-        if (duplicate) {
-          return this.ingestionResult({
-            parsed,
-            dryRun,
-            created: 0,
-            skipped: 1,
-            wouldCreate: 0,
-          });
-        }
-
         if (dryRun) {
           return this.ingestionResult({
             parsed,
@@ -123,6 +112,7 @@ export class KoreaEximExchangeIngestionService {
           });
         }
 
+        // A successful fetch is a new observation, even at an unchanged rate.
         await this.prisma.fxRateSnapshot.create({
           data: {
             baseCurrency: CurrencyCode.USD,
@@ -237,19 +227,7 @@ export class KoreaEximExchangeIngestionService {
         continue;
       }
 
-      const duplicate = await this.findDuplicateSnapshot(parsed);
-      if (duplicate) {
-        return {
-          snapshotId: duplicate.id,
-          rate: duplicate.rate.toFixed(8),
-          sourceName: KOREA_EXIM_EXCHANGE_SOURCE_NAME,
-          searchDate,
-          effectiveAt: duplicate.effectiveAt,
-          capturedAt: duplicate.capturedAt,
-          reused: true,
-        };
-      }
-
+      // Preserve the new observation instead of returning an old same-rate row.
       const created = await this.prisma.fxRateSnapshot.create({
         data: {
           baseCurrency: CurrencyCode.USD,
@@ -320,25 +298,6 @@ export class KoreaEximExchangeIngestionService {
         { capturedAt: 'desc' },
         { createdAt: 'desc' },
       ],
-      select: {
-        id: true,
-        rate: true,
-        effectiveAt: true,
-        capturedAt: true,
-      },
-    });
-  }
-
-  private findDuplicateSnapshot(parsed: ParsedKoreaEximUsdKrwRate) {
-    return this.prisma.fxRateSnapshot.findFirst({
-      where: {
-        baseCurrency: CurrencyCode.USD,
-        quoteCurrency: CurrencyCode.KRW,
-        sourceType: FxRateSourceType.provider_api,
-        sourceName: KOREA_EXIM_EXCHANGE_SOURCE_NAME,
-        effectiveAt: parsed.effectiveAt,
-        rate: parsed.rate,
-      },
       select: {
         id: true,
         rate: true,

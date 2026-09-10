@@ -378,9 +378,9 @@ describe('PortfolioValuationService source eligibility', () => {
         rate: new Prisma.Decimal('1500.00000000'),
         sourceType: FxRateSourceType.provider_api,
         sourceName: 'exchange_rate_api',
-        effectiveAt: new Date('2026-06-02T23:50:00.000Z'),
-        capturedAt: new Date('2026-06-02T23:54:59.000Z'),
-        createdAt: new Date('2026-06-02T23:55:00.000Z'),
+        effectiveAt: new Date('2026-06-02T21:50:00.000Z'),
+        capturedAt: new Date('2026-06-02T21:59:59.000Z'),
+        createdAt: new Date('2026-06-02T22:00:00.000Z'),
         approvedByUserId: null,
       },
     ]);

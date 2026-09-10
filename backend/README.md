@@ -202,7 +202,9 @@ KIS_DOMESTIC_SYMBOLS=005930,000660
 KIS_US_SYMBOLS=AAPL,TSLA
 ```
 
-Display/read freshness is intentionally wider than execute freshness. Asset list/detail/price, Home, positions, and live portfolio valuation use display defaults of 300 seconds for asset prices and 7200 seconds for USD/KRW. Quote paths keep shorter quote defaults, and order/FX execute paths keep the strict existing execute defaults of 10 seconds for asset prices and 60 seconds for USD/KRW.
+Display/read freshness is intentionally wider than execute freshness. Asset list/detail/price, Home, positions, live portfolio valuation, and `daily_portfolio_snapshot` use display defaults of 300 seconds for asset prices and 7200 seconds for USD/KRW. `GET /api/v1/fx/rates/current` also uses the USD/KRW display threshold, including `PROVIDER_FX_RATE_DISPLAY_FRESHNESS_SECONDS` overrides. Quote paths keep their existing defaults (300 seconds for USD/KRW, 60 seconds for asset prices), and order/FX execute paths keep the strict existing execute defaults of 10 seconds for asset prices and 60 seconds for USD/KRW. Settlement's endAt-based valuation policy is unchanged.
+
+Korea EXIM and ExchangeRate-API preserve each successful fetch as a new FX observation with a new `capturedAt`, even if the published rate/effectiveAt are unchanged. Existing rows are never re-timestamped. Korea EXIM on-demand refresh reuses sufficiently fresh rows without fetching or writing; scheduled FX ingestion retains its default one-hour interval. Provider scheduler failures emit the job name, a safe error code when available, and a fixed error summary; raw error messages/payloads are not logged because they may contain credentials or financial data. Daily history still records only the first successful valuation for the current date and never fabricates past snapshots.
 
 ### Redis and the candle response cache
 

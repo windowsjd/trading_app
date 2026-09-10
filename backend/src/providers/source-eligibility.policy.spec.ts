@@ -54,6 +54,87 @@ import {
 describe('provider source eligibility policy', () => {
   const now = new Date('2026-06-03T00:00:00.000Z');
 
+  it.each([
+    ['daily_portfolio_snapshot', 7200, 300],
+    ['fx_quote', 300, 60],
+    ['fx_execute', 60, 60],
+    ['orders_quote', 300, 60],
+    ['orders_execute', 60, 10],
+    ['season_settlement', 300, 60],
+  ] as const)(
+    'keeps %s FX/asset thresholds at %s/%s',
+    (workflow, fxSeconds, assetSeconds) => {
+      expect(
+        resolveFxProviderEligibility({
+          workflow,
+          baseCurrency: CurrencyCode.USD,
+          quoteCurrency: CurrencyCode.KRW,
+        }),
+      ).toMatchObject({ eligible: true, freshnessThresholdSeconds: fxSeconds });
+      expect(
+        resolveAssetProviderEligibility({
+          workflow,
+          asset: {
+            assetType: AssetType.crypto,
+            market: 'BINANCE',
+            currencyCode: CurrencyCode.USD,
+          },
+        }),
+      ).toMatchObject({
+        eligible: true,
+        freshnessThresholdSeconds: assetSeconds,
+      });
+    },
+  );
+
+  it('uses display overrides for daily valuation without changing mutation or settlement thresholds', () => {
+    const originalEnv = { ...process.env };
+    try {
+      process.env.PROVIDER_FX_RATE_DISPLAY_FRESHNESS_SECONDS = '9000';
+      process.env.PROVIDER_ASSET_PRICE_DISPLAY_FRESHNESS_SECONDS = '400';
+      for (const workflow of [
+        'daily_portfolio_snapshot',
+        'fx_quote',
+        'orders_execute',
+        'season_settlement',
+      ] as const) {
+        expect(
+          resolveFxProviderEligibility({
+            workflow,
+            baseCurrency: CurrencyCode.USD,
+            quoteCurrency: CurrencyCode.KRW,
+          }),
+        ).toMatchObject({
+          freshnessThresholdSeconds:
+            workflow === 'daily_portfolio_snapshot'
+              ? 9000
+              : workflow === 'orders_execute'
+                ? 60
+                : 300,
+        });
+        expect(
+          resolveAssetProviderEligibility({
+            workflow,
+            asset: {
+              assetType: AssetType.crypto,
+              market: 'BINANCE',
+              currencyCode: CurrencyCode.USD,
+            },
+          }),
+        ).toMatchObject({
+          freshnessThresholdSeconds:
+            workflow === 'daily_portfolio_snapshot'
+              ? 400
+              : workflow === 'orders_execute'
+                ? 10
+                : 60,
+        });
+      }
+    } finally {
+      process.env = originalEnv;
+    }
+  });
+
   it('uses only the latest completed KRX session price while the market is closed', () => {
     const selected = selectMarketAwareAssetPriceSnapshotBySourcePriority({
       asset: { assetType: AssetType.domestic_stock, market: 'KRX' },

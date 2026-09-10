@@ -81,17 +81,6 @@ export class ExchangeRateIngestionService {
         fetched.response,
         fetched.receivedAt,
       );
-      const duplicate = await this.findDuplicateSnapshot(parsed);
-      if (duplicate) {
-        return this.successResult({
-          parsed,
-          dryRun,
-          created: 0,
-          skipped: 1,
-          wouldCreate: 0,
-        });
-      }
-
       if (dryRun) {
         return this.successResult({
           parsed,
@@ -111,6 +100,7 @@ export class ExchangeRateIngestionService {
         ].filter((secret): secret is string => Boolean(secret)),
       });
 
+      // A successful fetch is a new observation, even at an unchanged rate.
       await this.prisma.fxRateSnapshot.create({
         data: {
           baseCurrency: CurrencyCode.USD,
@@ -160,22 +150,6 @@ export class ExchangeRateIngestionService {
 
       throw error;
     }
-  }
-
-  private async findDuplicateSnapshot(parsed: ParsedUsdKrwExchangeRate) {
-    return this.prisma.fxRateSnapshot.findFirst({
-      where: {
-        baseCurrency: CurrencyCode.USD,
-        quoteCurrency: CurrencyCode.KRW,
-        sourceType: FxRateSourceType.provider_api,
-        sourceName: EXCHANGE_RATE_SOURCE_NAME,
-        effectiveAt: parsed.effectiveAt,
-        rate: parsed.rate,
-      },
-      select: {
-        id: true,
-      },
-    });
   }
 
   private successResult(input: {

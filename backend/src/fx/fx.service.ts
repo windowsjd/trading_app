@@ -56,6 +56,7 @@ import {
   FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
   PROVIDER_FRESHNESS_THRESHOLDS_SECONDS,
   buildAdminManualFallbackDecision,
+  getProviderFreshnessThresholdsSeconds,
   isPositiveDecimal,
   resolveFxProviderEligibility,
   selectFreshProviderSnapshot,
@@ -370,13 +371,15 @@ export class FxService {
     query: FxCurrentRateQuery = {},
   ): Promise<FxCurrentRateResponse> {
     const request = this.validateCurrentRateQuery(query);
-    const now = new Date();
+    let now = new Date();
 
     if (request.refresh) {
       await this.tryEnsureFreshKoreaEximUsdKrwSnapshot({
         now,
         maxAgeSeconds: PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.fxUsdKrwQuote,
       });
+      // A successful fetch is observed after request start, not in its future.
+      now = new Date();
     }
 
     const snapshot = await this.findCurrentUsdKrwRateSnapshot(now);
@@ -1699,7 +1702,7 @@ export class FxService {
       expectedSourceNames: FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
       now,
       freshnessThresholdSeconds:
-        PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.fxUsdKrwQuote,
+        getProviderFreshnessThresholdsSeconds().fxUsdKrwDisplay,
       isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
     });
 

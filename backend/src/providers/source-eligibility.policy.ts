@@ -872,7 +872,8 @@ function isDisplayFreshnessWorkflow(
     workflow === 'assets_with_price' ||
     workflow === 'home_live_valuation' ||
     workflow === 'positions_live_valuation' ||
-    workflow === 'live_portfolio_valuation'
+    workflow === 'live_portfolio_valuation' ||
+    workflow === 'daily_portfolio_snapshot'
   );
 }
 

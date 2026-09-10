@@ -24,6 +24,7 @@ import {
 import { OpsJobRunService } from './ops-job-run.service';
 import { MarketSnapshotHealthService } from '../providers/market-snapshot-health.service';
 import { ProviderConfigService } from '../providers/provider-config.service';
+import { collectProviderSecretsFromEnv } from '../providers/provider-secret-redaction';
 import {
   MarketCandleReconciliationService,
   type ReconciliationMarket,
@@ -671,10 +672,40 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      return await input.run();
-    } catch {
+      const result = await input.run();
+      if (!result.success) {
+        this.warnProviderJobFailed(input.jobName, result.error.code);
+      }
+      return result;
+    } catch (error) {
+      this.warnProviderJobFailed(
+        input.jobName,
+        error && typeof error === 'object' && 'code' in error
+          ? error.code
+          : undefined,
+      );
       return undefined;
     }
+  }
+
+  private warnProviderJobFailed(jobName: OpsJobName, code: unknown) {
+    const secrets = [
+      ...collectProviderSecretsFromEnv(),
+      process.env.DATABASE_URL,
+    ].filter((value): value is string => Boolean(value));
+    const errorCode =
+      typeof code === 'string' &&
+      /^[A-Z][A-Z0-9_]{1,79}$/.test(code) &&
+      !secrets.some((secret) => code.includes(secret))
+        ? code
+        : undefined;
+    // Error.message can contain a provider URL, response body, or DB values.
+    // Log only a bounded code and a fixed summary, never the exception/payload.
+    console.warn('Provider scheduler job failed.', {
+      jobName,
+      errorCode,
+      error: 'Provider job execution failed.',
+    });
   }
 
   private async isProviderJobDue(

@@ -38,6 +38,47 @@ describe('ExchangeRate ingestion', () => {
     },
   };
 
+  it('stores two successful same-rate/effectiveAt fetches as distinct observations', async () => {
+    const prisma = createPrismaMock();
+    prisma.fxRateSnapshot.findFirst.mockResolvedValue({
+      id: 'old-observation',
+    });
+    const laterAt = new Date(receivedAt.getTime() + 3_600_000);
+    const client = {
+      fetchLatestUsd: jest
+        .fn()
+        .mockResolvedValueOnce({ response, receivedAt })
+        .mockResolvedValueOnce({ response, receivedAt: laterAt }),
+    };
+    const service = new ExchangeRateIngestionService(
+      prisma as never,
+      configServiceFor('test-key'),
+      client as never,
+    );
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await expect(service.ingestUsdKrw()).resolves.toMatchObject({
+        success: true,
+        created: 1,
+        skipped: 0,
+      });
+    }
+    expect(client.fetchLatestUsd).toHaveBeenCalledTimes(2);
+    expect(prisma.fxRateSnapshot.create).toHaveBeenCalledTimes(2);
+    const rows = prisma.fxRateSnapshot.create.mock.calls.map(
+      ([input]) => input.data,
+    );
+    expect(rows[0]).toMatchObject({
+      rate: '1365.12345679',
+      capturedAt: receivedAt,
+    });
+    expect(rows[1]).toMatchObject({
+      rate: rows[0].rate,
+      effectiveAt: rows[0].effectiveAt,
+      capturedAt: laterAt,
+    });
+    expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+  });
+
   it('parses conversion_rates.KRW into a decimal string rate', () => {
     const parsed = parseUsdKrwExchangeRateResponse(response, receivedAt);
 
@@ -52,6 +93,9 @@ describe('ExchangeRate ingestion', () => {
 
   it('dry-run fetches and parses without writing DB rows', async () => {
     const prisma = createPrismaMock();
+    prisma.fxRateSnapshot.findFirst.mockResolvedValue({
+      id: 'same-rate-existing',
+    });
     const service = createService({
       prisma,
       clientResponse: response,

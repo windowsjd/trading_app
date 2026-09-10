@@ -77,6 +77,113 @@ describe('DailyPortfolioSnapshotJobService', () => {
   const startedAt = new Date('2026-05-20T00:00:30.000Z');
   const snapshotDate = '2026-05-20';
 
+  it.each([
+    [600, 120, true],
+    [7201, 120, false],
+    [600, 301, false],
+  ])(
+    'values and writes daily history with FX age %s and asset age %s (success=%s)',
+    async (fxAge, assetAge, succeeds) => {
+      const { service, prisma } = createServiceWithRealValuation();
+      mockSeason(prisma, SeasonStatus.active);
+      mockParticipants(prisma, [{ id: 'sp-usd', userId: 'user-usd' }]);
+      prisma.seasonParticipant.findUnique.mockResolvedValue(
+        participantDetail({
+          id: 'sp-usd',
+          krwCash: '1000',
+          usdCash: '10',
+          positions: [
+            positionDetail({
+              assetId: 'crypto-usd',
+              assetType: AssetType.crypto,
+              currencyCode: CurrencyCode.USD,
+            }),
+          ],
+        }),
+      );
+      const fxAt = new Date(startedAt.getTime() - fxAge * 1000);
+      const priceAt = new Date(startedAt.getTime() - assetAge * 1000);
+      prisma.fxRateSnapshot.findMany.mockResolvedValue([
+        {
+          id: 'display-fx',
+          baseCurrency: CurrencyCode.USD,
+          quoteCurrency: CurrencyCode.KRW,
+          rate: new Prisma.Decimal('1390'),
+          sourceType: FxRateSourceType.provider_api,
+          sourceName: 'korea_exim_exchange_rate',
+          effectiveAt: fxAt,
+          capturedAt: fxAt,
+          createdAt: fxAt,
+        },
+      ]);
+      prisma.assetPriceSnapshot.findMany.mockResolvedValue([
+        {
+          id: 'display-crypto',
+          assetId: 'crypto-usd',
+          currencyCode: CurrencyCode.USD,
+          price: new Prisma.Decimal('100'),
+          sourceType: AssetPriceSourceType.provider_api,
+          sourceName: 'binance_spot_ws_ticker',
+          effectiveAt: priceAt,
+          capturedAt: priceAt,
+          createdAt: priceAt,
+        },
+      ]);
+      prisma.fxRateSnapshot.findFirst.mockResolvedValue(null);
+      prisma.assetPriceSnapshot.findFirst.mockResolvedValue(null);
+      prisma.dailyPortfolioSnapshot.create.mockResolvedValue({
+        id: 'daily-display',
+      });
+      const result = await runAndGetResult(service, {
+        seasonId: 'season-1',
+        snapshotDate,
+      });
+      if (succeeds) {
+        expect(result.participants).toMatchObject({ created: 1, failed: 0 });
+        expect(result.sourceSummary).toMatchObject({
+          providerApiUsed: true,
+          fallbackUsed: false,
+        });
+        expect(prisma.dailyPortfolioSnapshot.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            totalAssetKrw: '153900.00000000',
+            usdCashKrw: '13900.00000000',
+            assetValueKrw: '139000.00000000',
+            snapshotDate: new Date(`${snapshotDate}T00:00:00.000Z`),
+            capturedAt: startedAt,
+          }),
+          select: { id: true },
+        });
+      } else {
+        expect(result.participants).toMatchObject({ created: 0, failed: 1 });
+        expect(result.errors).toMatchObject([
+          {
+            code:
+              fxAge > 7200 ? 'FX_RATE_UNAVAILABLE' : 'ASSET_PRICE_UNAVAILABLE',
+          },
+        ]);
+        expect(prisma.dailyPortfolioSnapshot.create).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it('writes KRW-only daily history without reading any FX snapshot', async () => {
+    const { service, prisma } = createServiceWithRealValuation();
+    mockSeason(prisma, SeasonStatus.active);
+    mockParticipants(prisma, [{ id: 'sp-krw', userId: 'user-krw' }]);
+    prisma.seasonParticipant.findUnique.mockResolvedValue(
+      participantDetail({ id: 'sp-krw', usdCash: '0', positions: [] }),
+    );
+    prisma.dailyPortfolioSnapshot.create.mockResolvedValue({ id: 'daily-krw' });
+    const result = await runAndGetResult(service, {
+      seasonId: 'season-1',
+      snapshotDate,
+    });
+    expect(result.participants).toMatchObject({ created: 1, failed: 0 });
+    expect(prisma.fxRateSnapshot.findMany).not.toHaveBeenCalled();
+    expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+  });
+
   it('bulk checks 100 participants once and values only the missing participant', async () => {
     const { service, prisma, valuationService } = createService();
     mockSeason(prisma, SeasonStatus.active);

@@ -380,6 +380,110 @@ describe('FxService', () => {
     expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
   });
 
+  it.each([
+    [undefined, 600, true],
+    [undefined, 7200, true],
+    [undefined, 7201, false],
+    ['900', 600, true],
+    ['599', 600, false],
+    ['invalid', 600, true],
+    ['0', 600, true],
+  ])(
+    'uses current-rate display override %s for age %s seconds (available=%s)',
+    async (override, age, available) => {
+      const previous = process.env.PROVIDER_FX_RATE_DISPLAY_FRESHNESS_SECONDS;
+      try {
+        if (override === undefined)
+          delete process.env.PROVIDER_FX_RATE_DISPLAY_FRESHNESS_SECONDS;
+        else process.env.PROVIDER_FX_RATE_DISPLAY_FRESHNESS_SECONDS = override;
+        const { prisma, service } = createService();
+        const observedAt = new Date(now.getTime() - age * 1000);
+        prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+          {
+            id: 'display-rate',
+            rate: new Prisma.Decimal('1390'),
+            sourceType: FxRateSourceType.provider_api,
+            sourceName: 'korea_exim_exchange_rate',
+            capturedAt: observedAt,
+            effectiveAt: observedAt,
+          },
+        ]);
+        prisma.fxRateSnapshot.findFirst.mockResolvedValue(null);
+        if (available) {
+          await expect(service.currentRate()).resolves.toMatchObject({
+            data: { state: 'available', freshnessAgeSeconds: age },
+          });
+        } else {
+          await expectErrorCode(service.currentRate(), 'FX_RATE_UNAVAILABLE');
+        }
+      } finally {
+        if (previous === undefined)
+          delete process.env.PROVIDER_FX_RATE_DISPLAY_FRESHNESS_SECONDS;
+        else process.env.PROVIDER_FX_RATE_DISPLAY_FRESHNESS_SECONDS = previous;
+      }
+    },
+  );
+
+  it('selects a new observation received after current-rate refresh started', async () => {
+    const receivedAt = new Date(now.getTime() + 1000);
+    const ingestion = {
+      ensureFreshUsdKrwSnapshot: jest.fn().mockImplementation(async () => {
+        jest.setSystemTime(receivedAt);
+      }),
+    };
+    const { prisma, service } = createService(ingestion);
+    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'new-observation',
+        rate: new Prisma.Decimal('1390'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'korea_exim_exchange_rate',
+        effectiveAt: freshEffectiveAt,
+        capturedAt: receivedAt,
+      },
+    ]);
+    await expect(service.currentRate({ refresh: true })).resolves.toMatchObject(
+      {
+        data: { capturedAt: receivedAt.toISOString(), freshnessAgeSeconds: 0 },
+      },
+    );
+    expect(ingestion.ensureFreshUsdKrwSnapshot).toHaveBeenCalledWith({
+      now,
+      maxAgeSeconds: 300,
+    });
+  });
+
+  it('rejects a 301-second provider quote even though current-rate display accepts it', async () => {
+    const { prisma, service } = createService();
+    const observedAt = new Date(now.getTime() - 301_000);
+    prisma.fxRateSnapshot.findMany.mockResolvedValue([
+      {
+        id: 'display-only',
+        rate: new Prisma.Decimal('1390'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'korea_exim_exchange_rate',
+        effectiveAt: observedAt,
+        capturedAt: observedAt,
+      },
+    ]);
+    prisma.fxRateSnapshot.findFirst.mockResolvedValue(null);
+    await expect(service.currentRate()).resolves.toMatchObject({
+      data: { state: 'available' },
+    });
+    mockActiveSeason(prisma);
+    mockJoinedParticipant(prisma);
+    mockQuoteSourceWallet(prisma, CurrencyCode.KRW, '140000');
+    await expectErrorCode(
+      service.quote('user-1', {
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '1000',
+      }),
+      'FX_RATE_UNAVAILABLE',
+    );
+    expect(prisma.quote.create).not.toHaveBeenCalled();
+  });
+
   it('returns fresh ExchangeRate-API when Korea EXIM current rate row is stale', async () => {
     const { prisma, service } = createService();
     prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
@@ -388,8 +492,8 @@ describe('FxService', () => {
         rate: new Prisma.Decimal('1389.50000000'),
         sourceType: FxRateSourceType.provider_api,
         sourceName: 'korea_exim_exchange_rate',
-        capturedAt: new Date('2026-04-30T23:55:59.000Z'),
-        effectiveAt: new Date('2026-04-30T23:55:59.000Z'),
+        capturedAt: new Date('2026-04-30T22:00:59.000Z'),
+        effectiveAt: new Date('2026-04-30T22:00:59.000Z'),
       },
       {
         id: 'fx-exchange-rate-api-fresh',
@@ -422,16 +526,16 @@ describe('FxService', () => {
         rate: new Prisma.Decimal('1389.50000000'),
         sourceType: FxRateSourceType.provider_api,
         sourceName: 'korea_exim_exchange_rate',
-        capturedAt: new Date('2026-04-30T23:55:59.000Z'),
-        effectiveAt: new Date('2026-04-30T23:55:59.000Z'),
+        capturedAt: new Date('2026-04-30T22:00:59.000Z'),
+        effectiveAt: new Date('2026-04-30T22:00:59.000Z'),
       },
       {
         id: 'fx-exchange-rate-api-stale',
         rate: new Prisma.Decimal('1401.25000000'),
         sourceType: FxRateSourceType.provider_api,
         sourceName: 'exchange_rate_api',
-        capturedAt: new Date('2026-04-30T23:55:58.000Z'),
-        effectiveAt: new Date('2026-04-30T23:55:58.000Z'),
+        capturedAt: new Date('2026-04-30T22:00:58.000Z'),
+        effectiveAt: new Date('2026-04-30T22:00:58.000Z'),
       },
     ]);
     mockApprovedRateSnapshot(prisma);
@@ -482,16 +586,16 @@ describe('FxService', () => {
         rate: new Prisma.Decimal('1389.50000000'),
         sourceType: FxRateSourceType.provider_api,
         sourceName: 'korea_exim_exchange_rate',
-        capturedAt: new Date('2026-04-30T23:55:59.000Z'),
-        effectiveAt: new Date('2026-04-30T23:55:59.000Z'),
+        capturedAt: new Date('2026-04-30T22:00:59.000Z'),
+        effectiveAt: new Date('2026-04-30T22:00:59.000Z'),
       },
       {
         id: 'fx-exchange-rate-api-stale',
         rate: new Prisma.Decimal('1401.25000000'),
         sourceType: FxRateSourceType.provider_api,
         sourceName: 'exchange_rate_api',
-        capturedAt: new Date('2026-04-30T23:55:58.000Z'),
-        effectiveAt: new Date('2026-04-30T23:55:58.000Z'),
+        capturedAt: new Date('2026-04-30T22:00:58.000Z'),
+        effectiveAt: new Date('2026-04-30T22:00:58.000Z'),
       },
     ]);
     prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce(null);

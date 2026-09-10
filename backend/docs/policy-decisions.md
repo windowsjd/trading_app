@@ -28,14 +28,19 @@
 
 개장 중 `capturedAt` 기준:
 
-| 대상               | Quote/Read                                     | Execute |
-| ------------------ | ---------------------------------------------- | ------- |
-| KRX 국내주식       | 60초                                           | 10초    |
-| 미국주식 (NAS/NYS) | 60초                                           | 10초    |
-| BINANCE 암호화폐   | 60초                                           | 10초    |
-| USD/KRW FX         | 300초 (admin_manual 폴백은 `effectiveAt` 60초) | 60초    |
+| 대상 | Display / Valuation | Quote | Execute |
+| --- | --- | --- | --- |
+| KRX 국내주식 | 300초 | 60초 | 10초 |
+| 미국주식 (NAS/NYS) | 300초 | 60초 | 10초 |
+| BINANCE 암호화폐 | 300초 | 60초 | 10초 |
+| USD/KRW FX | 7200초 | 300초 (admin_manual 폴백은 `effectiveAt` 60초) | 60초 |
 
-근거: quote/read는 참고용이라 완화된 기준을 적용하고, execute는 자금 이동을 수반하므로 더 타이트한 기준을 강제한다. 닫힌 주식시장의 허용 여부는 절대 age가 아니라 최근 완료 세션 소속 여부로 판정한다. FX 60초 기준은 provider 도입 이전부터 쓰이던 기존 admin_manual 정책을 그대로 승계했다.
+근거: 표시·일별 평가는 거래 견적과 구분하고, execute는 자금 이동을 수반하므로 더 타이트한 기준을 강제한다. 닫힌 주식시장의 허용 여부는 절대 age가 아니라 최근 완료 세션 소속 여부로 판정한다. FX 60초 기준은 provider 도입 이전부터 쓰이던 기존 admin_manual 정책을 그대로 승계했다.
+
+- `GET /fx/rates/current`와 `daily_portfolio_snapshot`은 display freshness를 사용한다. 표는 기본값이며 display/quote의 기존 환경변수 override를 유지한다. USD/KRW 표시는 `PROVIDER_FX_RATE_DISPLAY_FRESHNESS_SECONDS`를 따른다. 정산은 기존 endAt 기준 정책을 유지한다.
+  근거: 표시·일별 평가를 quote 유효기간으로 차단하면 정상 수집 중에도 환율과 일별 이력이 비게 된다.
+- Korea EXIM과 ExchangeRate-API의 실제 fetch가 성공하면 같은 rate/effectiveAt이어도 receivedAt을 capturedAt으로 새 observation을 저장한다. 기존 row는 수정하지 않으며, Korea EXIM의 fresh row 재사용 시에는 fetch/write를 하지 않는다.
+  근거: 환율 값이 같다는 사실은 새 관측이 없었다는 뜻이 아니며, 과거 관측 시각을 덮어쓰면 이력의 의미가 바뀐다.
 
 ## Market-Date Calculation Inventory
 

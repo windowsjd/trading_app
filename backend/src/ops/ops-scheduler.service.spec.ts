@@ -449,6 +449,80 @@ describe('OpsSchedulerService', () => {
     expect(runner.runProviderBinanceIngestJob).toHaveBeenCalledTimes(1);
   });
 
+  it.each(['throw', 'failed-result'])(
+    'logs a safe provider warning for %s and continues other jobs',
+    async (failure) => {
+      process.env.SCHEDULER_ENABLED = 'true';
+      process.env.SCHEDULER_PROVIDER_FX_ENABLED = 'true';
+      process.env.SCHEDULER_PROVIDER_BINANCE_ENABLED = 'true';
+      process.env.EXCHANGE_RATE_API_KEY = 'private-test-key';
+      process.env.KOREA_EXIM_EXCHANGE_AUTH_KEY = 'private-auth-key';
+      process.env.DATABASE_URL = 'postgresql://user:password@db/private';
+      const { runner, service } = createService();
+      const message =
+        'https://provider/private-test-key?authkey=private-auth-key postgresql://user:password@db/private {"balance":12345,"rawPayload":"private-data"}';
+      if (failure === 'throw') {
+        runner.runProviderFxIngestJob.mockRejectedValueOnce(
+          Object.assign(new Error(message), { code: 'PROVIDER_HTTP_ERROR' }),
+        );
+      } else {
+        runner.runProviderFxIngestJob.mockResolvedValueOnce({
+          success: false,
+          error: { code: 'PROVIDER_HTTP_ERROR', message },
+          data: { rawPayload: message },
+        });
+      }
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        await service.runEnabledJobs(new Date('2026-06-08T00:00:00.000Z'));
+        expect(warn).toHaveBeenCalledWith('Provider scheduler job failed.', {
+          jobName: OpsJobName.provider_fx_ingest,
+          errorCode: 'PROVIDER_HTTP_ERROR',
+          error: 'Provider job execution failed.',
+        });
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(runner.runProviderBinanceIngestJob).toHaveBeenCalledTimes(1);
+        for (const secret of [
+          'private-test-key',
+          'private-auth-key',
+          'postgresql://',
+          '12345',
+          'private-data',
+          'rawPayload',
+          'https://',
+        ]) {
+          expect(JSON.stringify(warn.mock.calls)).not.toContain(secret);
+        }
+      } finally {
+        warn.mockRestore();
+      }
+    },
+  );
+
+  it.each(['https://provider/secret', 'PRIVATE_AUTH_KEY'])(
+    'omits unsafe provider error codes (%s)',
+    async (code) => {
+      process.env.SCHEDULER_ENABLED = 'true';
+      process.env.SCHEDULER_PROVIDER_FX_ENABLED = 'true';
+      process.env.KOREA_EXIM_EXCHANGE_AUTH_KEY = 'PRIVATE_AUTH_KEY';
+      const { runner, service } = createService();
+      runner.runProviderFxIngestJob.mockRejectedValueOnce(
+        Object.assign(new Error('private payload'), { code }),
+      );
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        await service.runEnabledJobs(new Date('2026-06-08T00:00:00.000Z'));
+        expect(warn).toHaveBeenCalledWith('Provider scheduler job failed.', {
+          jobName: OpsJobName.provider_fx_ingest,
+          errorCode: undefined,
+          error: 'Provider job execution failed.',
+        });
+      } finally {
+        warn.mockRestore();
+      }
+    },
+  );
+
   it('does not run provider jobs on startup when the startup flag is false', async () => {
     process.env.SCHEDULER_ENABLED = 'true';
     process.env.SCHEDULER_PROVIDER_KIS_ENABLED = 'true';
