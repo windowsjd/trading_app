@@ -50,6 +50,7 @@ import {
   type EligibleClosedCandle,
 } from './limit-order-candle-evidence.service';
 import { OrdersService } from './orders.service';
+import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
 
 const ZERO_MONEY = '0.00000000';
 
@@ -816,26 +817,9 @@ export class LimitOrderExecutionService {
     });
     if (!eligibility.eligible) return null;
 
-    const candidates = await tx.fxRateSnapshot.findMany({
-      where: {
-        baseCurrency: CurrencyCode.USD,
-        quoteCurrency: CurrencyCode.KRW,
-        sourceType: FxRateSourceType.provider_api,
-      },
-      orderBy: [
-        { effectiveAt: 'desc' },
-        { capturedAt: 'desc' },
-        { createdAt: 'desc' },
-      ],
+    const candidates = await findUsdKrwProviderSnapshotCandidates(tx, {
+      sourceNames: eligibility.sourceNames,
       take: 10,
-      select: {
-        id: true,
-        rate: true,
-        sourceType: true,
-        sourceName: true,
-        effectiveAt: true,
-        capturedAt: true,
-      },
     });
 
     const selection = selectFreshProviderSnapshotBySourcePriority({

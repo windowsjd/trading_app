@@ -34,6 +34,7 @@ import {
   getEffectiveSeasonMode,
   type SeasonLifecycleMode,
 } from '../seasons/season-lifecycle.policy';
+import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
 
 type HomeSectionState = 'available' | 'blocked' | 'unavailable' | 'error';
 type HomeMode =
@@ -1197,28 +1198,10 @@ export class HomeService {
       quoteCurrency: CurrencyCode.KRW,
     });
     const providerCandidates = providerEligibility.eligible
-      ? ((await this.prisma.fxRateSnapshot.findMany({
-          where: {
-            baseCurrency: CurrencyCode.USD,
-            quoteCurrency: CurrencyCode.KRW,
-            sourceType: FxRateSourceType.provider_api,
-          },
-          orderBy: [
-            { effectiveAt: 'desc' },
-            { capturedAt: 'desc' },
-            { createdAt: 'desc' },
-          ],
+      ? await findUsdKrwProviderSnapshotCandidates(this.prisma, {
+          sourceNames: providerEligibility.sourceNames,
           take: 10,
-          select: {
-            id: true,
-            rate: true,
-            sourceType: true,
-            sourceName: true,
-            effectiveAt: true,
-            capturedAt: true,
-            approvedByUserId: true,
-          },
-        })) ?? [])
+        })
       : [];
     const providerSelection = providerEligibility.eligible
       ? selectFreshProviderSnapshotBySourcePriority({

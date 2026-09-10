@@ -675,6 +675,8 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
       const result = await input.run();
       if (!result.success) {
         this.warnProviderJobFailed(input.jobName, result.error.code);
+      } else {
+        this.warnProviderPartialFailures(input.jobName, result);
       }
       return result;
     } catch (error) {
@@ -689,23 +691,60 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private warnProviderJobFailed(jobName: OpsJobName, code: unknown) {
-    const secrets = [
-      ...collectProviderSecretsFromEnv(),
-      process.env.DATABASE_URL,
-    ].filter((value): value is string => Boolean(value));
-    const errorCode =
-      typeof code === 'string' &&
-      /^[A-Z][A-Z0-9_]{1,79}$/.test(code) &&
-      !secrets.some((secret) => code.includes(secret))
-        ? code
-        : undefined;
     // Error.message can contain a provider URL, response body, or DB values.
     // Log only a bounded code and a fixed summary, never the exception/payload.
     console.warn('Provider scheduler job failed.', {
       jobName,
-      errorCode,
+      errorCode: this.safeProviderErrorCode(code),
       error: 'Provider job execution failed.',
     });
+  }
+
+  private warnProviderPartialFailures(
+    jobName: OpsJobName,
+    result: OpsJobRunnerResponse,
+  ): void {
+    if (jobName !== OpsJobName.provider_fx_ingest || !result.success) {
+      return;
+    }
+
+    const response = result as unknown as Record<string, unknown>;
+    const data = isJsonRecord(response.data) ? response.data : null;
+    const run = data && isJsonRecord(data.run) ? data.run : null;
+    const resultJson = run?.resultJson;
+    if (!isJsonRecord(resultJson) || !Array.isArray(resultJson.providers)) {
+      return;
+    }
+
+    for (const providerResult of resultJson.providers) {
+      if (!isJsonRecord(providerResult) || providerResult.success !== false) {
+        continue;
+      }
+
+      const provider =
+        providerResult.provider === 'korea_exim_exchange_rate' ||
+        providerResult.provider === 'exchange_rate_api'
+          ? providerResult.provider
+          : 'unknown';
+      console.warn('Provider scheduler job partially failed.', {
+        jobName,
+        provider,
+        errorCode: this.safeProviderErrorCode(providerResult.errorCode),
+        error: 'One FX provider failed while another succeeded.',
+      });
+    }
+  }
+
+  private safeProviderErrorCode(code: unknown): string | undefined {
+    const secrets = [
+      ...collectProviderSecretsFromEnv(),
+      process.env.DATABASE_URL,
+    ].filter((value): value is string => Boolean(value));
+    return typeof code === 'string' &&
+      /^[A-Z][A-Z0-9_]{1,79}$/.test(code) &&
+      !secrets.some((secret) => code.includes(secret))
+      ? code
+      : undefined;
   }
 
   private async isProviderJobDue(
@@ -792,4 +831,8 @@ function utcWeek(value: Date): string {
     ((date.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7,
   );
   return `${date.getUTCFullYear()}-${String(week).padStart(2, '0')}`;
+}
+
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

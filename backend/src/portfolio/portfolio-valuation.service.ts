@@ -24,6 +24,7 @@ import {
   selectProviderSnapshotAtOrBeforeBySourcePriority,
   type ProviderWorkflow,
 } from '../providers/source-eligibility.policy';
+import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
 
 type PortfolioSourceWorkflow = ProviderWorkflow;
 
@@ -417,46 +418,14 @@ export class PortfolioValuationService {
       quoteCurrency: CurrencyCode.KRW,
     });
     const providerCandidates = providerEligibility.eligible
-      ? ((await client.fxRateSnapshot.findMany({
-          where: {
-            baseCurrency: CurrencyCode.USD,
-            quoteCurrency: CurrencyCode.KRW,
-            sourceType: FxRateSourceType.provider_api,
-            ...(useSettlementPricePolicy
-              ? {
-                  sourceName: {
-                    in: [...providerEligibility.sourceNames],
-                  },
-                  effectiveAt: {
-                    lte: valuationAt,
-                  },
-                  rate: {
-                    gt: 0,
-                  },
-                }
-              : {}),
-          },
-          orderBy: [
-            { effectiveAt: 'desc' },
-            { capturedAt: 'desc' },
-            { createdAt: 'desc' },
-          ],
-          take: useSettlementPricePolicy
-            ? providerEligibility.sourceNames.length * 10
-            : 10,
-          select: {
-            id: true,
-            baseCurrency: true,
-            quoteCurrency: true,
-            rate: true,
-            sourceType: true,
-            sourceName: true,
-            effectiveAt: true,
-            capturedAt: true,
-            createdAt: true,
-            approvedByUserId: true,
-          },
-        })) ?? [])
+      ? await findUsdKrwProviderSnapshotCandidates(client, {
+          sourceNames: providerEligibility.sourceNames,
+          take: 10,
+          effectiveAtLte: useSettlementPricePolicy
+            ? valuationAt
+            : undefined,
+          positiveRateOnly: useSettlementPricePolicy,
+        })
       : [];
     const providerSelection = providerEligibility.eligible
       ? useSettlementPricePolicy

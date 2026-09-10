@@ -28,7 +28,7 @@ describe('app-wide decimal display coverage', () => {
     );
     assert.match(
       walletScreen,
-      /formatDisplayDecimal\(rateQuery\.data\.rate\)/u,
+      /formatDisplayDecimal\(availableRate\.rate\)/u,
     );
   });
 

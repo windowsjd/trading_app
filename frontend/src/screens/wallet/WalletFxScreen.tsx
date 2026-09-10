@@ -88,7 +88,7 @@ type FxDomainState = Extract<
 const FX_RATE_PARAMS = {
   baseCurrency: 'USD' as const,
   quoteCurrency: 'KRW' as const,
-  refresh: false,
+  refresh: true,
 };
 
 const QUOTE_EXPIRED_MESSAGE =
@@ -210,6 +210,12 @@ export default function WalletFxScreen({ navigation }: Props) {
         FX_RATE_PARAMS.refresh,
       ),
   });
+  const availableRate =
+    !rateQuery.isError &&
+    rateQuery.data?.state === 'available' &&
+    rateQuery.data.rate
+      ? rateQuery.data
+      : null;
 
   /** The quote inputs the screen is currently asking about. */
   const readQuoteScope = (): FxQuoteRequestScope => ({
@@ -358,8 +364,10 @@ export default function WalletFxScreen({ navigation }: Props) {
   const walletLookupState = useMemo(
     () =>
       getWalletViewState(walletsQuery.data, rateQuery.data, {
-        isLoading: walletsQuery.isLoading || rateQuery.isLoading,
-        isError: walletsQuery.isError || rateQuery.isError,
+        walletIsLoading: walletsQuery.isLoading,
+        walletIsError: walletsQuery.isError,
+        rateIsLoading: rateQuery.isLoading,
+        rateIsError: rateQuery.isError,
         walletError: walletsQuery.error,
         rateError: rateQuery.error,
       }),
@@ -441,7 +449,15 @@ export default function WalletFxScreen({ navigation }: Props) {
     isFxResponseInScope(executeVariables.scope, currentScope);
 
   const viewState = useMemo<WalletFxViewState>(() => {
-    if (walletLookupState !== 'wallet_ready') return walletLookupState;
+    if (
+      walletLookupState !== 'wallet_ready' &&
+      walletLookupState !== 'fx_rate_unavailable'
+    ) {
+      return walletLookupState;
+    }
+    if (walletLookupState === 'fx_rate_unavailable') {
+      return walletLookupState;
+    }
     if (executePendingInScope) return 'fx_execute_submitting';
     if (quotePendingInScope) return 'fx_quote_loading';
     if (successData) return 'fx_execute_success';
@@ -474,6 +490,7 @@ export default function WalletFxScreen({ navigation }: Props) {
 
   const canExecute =
     walletLookupState === 'wallet_ready' &&
+    !!availableRate &&
     !inputInvalidReason &&
     !!quoteData &&
     !quoteExpired &&
@@ -502,6 +519,13 @@ export default function WalletFxScreen({ navigation }: Props) {
   };
 
   const requestQuote = () => {
+    if (!availableRate) {
+      setDomainError(
+        '현재 환율을 사용할 수 없습니다. 환율을 다시 불러온 뒤 시도해주세요.',
+      );
+      return;
+    }
+
     if (inputInvalidReason) {
       setFieldError(inputInvalidReason);
       return;
@@ -660,21 +684,17 @@ export default function WalletFxScreen({ navigation }: Props) {
     return (
       <ErrorState
         title="지갑 정보를 사용할 수 없습니다."
-        message={
-          rateQuery.data?.state && rateQuery.data.state !== 'available'
-            ? '현재 환율 정보를 사용할 수 없습니다. 잠시 후 다시 시도해주세요.'
-            : '지갑 또는 환율 정보가 아직 준비되지 않았습니다.'
-        }
+        message="지갑 정보가 아직 준비되지 않았습니다."
         onRetry={retryWalletLookup}
       />
     );
   }
 
-  if (viewState === 'wallet_error' || !walletsQuery.data || !rateQuery.data) {
+  if (viewState === 'wallet_error' || !walletsQuery.data) {
     return (
       <ErrorState
         title="지갑 정보를 불러오지 못했습니다."
-        message="지갑 또는 환율 조회에 실패했습니다."
+        message="지갑 조회에 실패했습니다."
         onRetry={retryWalletLookup}
       />
     );
@@ -682,7 +702,9 @@ export default function WalletFxScreen({ navigation }: Props) {
 
   const krwWallet = getWalletBalanceAmount(walletsQuery.data, 'KRW');
   const usdWallet = getWalletBalanceAmount(walletsQuery.data, 'USD');
-  const usdBalanceKrw = calculateUsdBalanceKrw(usdWallet, rateQuery.data);
+  const usdBalanceKrw = availableRate
+    ? calculateUsdBalanceKrw(usdWallet, availableRate)
+    : null;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -698,22 +720,41 @@ export default function WalletFxScreen({ navigation }: Props) {
           </Text>
           <Text style={styles.value}>KRW Wallet {formatKrw(krwWallet)}</Text>
           <Text style={styles.value}>USD Wallet {formatUsd(usdWallet)}</Text>
-          <Text style={styles.helper}>USD 환산 KRW {formatKrw(usdBalanceKrw)}</Text>
           <Text style={styles.helper}>
-            환율 {formatDisplayDecimal(rateQuery.data.rate)}
+            USD 환산 KRW {usdBalanceKrw === null ? '-' : formatKrw(usdBalanceKrw)}
           </Text>
-          <Text style={styles.helper}>
-            기준 시각 {formatKstDateTime(rateQuery.data.effectiveAt)}
-          </Text>
-          <Text style={styles.helper}>
-            수집 시각 {formatKstDateTime(rateQuery.data.capturedAt)}
-          </Text>
-          <Text style={styles.helper}>
-            최신성 {displayValue(rateQuery.data.freshnessAgeSeconds)}초
-          </Text>
-          {rateQuery.data.fallbackUsed ? (
-            <Text style={styles.helper}>대체 환율 소스가 적용되었습니다.</Text>
-          ) : null}
+          {availableRate ? (
+            <>
+              <Text style={styles.helper}>
+                환율 {formatDisplayDecimal(availableRate.rate)}
+              </Text>
+              <Text style={styles.helper}>
+                기준 시각 {formatKstDateTime(availableRate.effectiveAt)}
+              </Text>
+              <Text style={styles.helper}>
+                수집 시각 {formatKstDateTime(availableRate.capturedAt)}
+              </Text>
+              <Text style={styles.helper}>
+                최신성 {displayValue(availableRate.freshnessAgeSeconds)}초
+              </Text>
+              {availableRate.fallbackUsed ? (
+                <Text style={styles.helper}>
+                  대체 환율 소스가 적용되었습니다.
+                </Text>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <Text style={styles.errorText}>
+                현재 환율을 사용할 수 없어 환전 기능이 잠시 중단되었습니다.
+              </Text>
+              <CTAButton
+                label={rateQuery.isLoading ? '환율 불러오는 중' : '환율 다시 불러오기'}
+                state={rateQuery.isLoading ? 'loading' : 'enabled'}
+                onPress={() => void rateQuery.refetch()}
+              />
+            </>
+          )}
           <CTAButton
             label="원장 보기"
             onPress={() =>
@@ -845,7 +886,9 @@ export default function WalletFxScreen({ navigation }: Props) {
             state={
               viewState === 'fx_quote_loading'
                 ? 'loading'
-                : inputInvalidReason || viewState === 'fx_execute_submitting'
+                : !availableRate ||
+                    inputInvalidReason ||
+                    viewState === 'fx_execute_submitting'
                 ? 'disabled'
                 : 'enabled'
             }

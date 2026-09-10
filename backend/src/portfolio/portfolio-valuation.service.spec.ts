@@ -700,7 +700,7 @@ describe('PortfolioValuationService source eligibility', () => {
             gt: 0,
           },
         }),
-        take: 20,
+        take: 10,
       }),
     );
     expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();

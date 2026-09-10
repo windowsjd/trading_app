@@ -57,6 +57,7 @@ export type WalletFxViewState =
   | 'wallet_not_joined'
   | 'wallet_unavailable'
   | 'wallet_error'
+  | 'fx_rate_unavailable'
   | 'fx_input_idle'
   | 'fx_input_invalid'
   | 'fx_quote_loading'

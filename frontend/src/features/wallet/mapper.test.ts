@@ -5,8 +5,9 @@ import {
   getFxExecuteSuccessDisplay,
   getFxQuoteDisplay,
   getKnownWalletBalanceAmount,
+  getWalletViewState,
 } from './mapper.ts';
-import type { FxExecuteDto, FxQuoteDto } from './api.ts';
+import type { FxExecuteDto, FxQuoteDto, FxRateDto } from './api.ts';
 
 describe('status-aware wallet balance display', () => {
   it('keeps an unfetched or absent wallet unknown', () => {
@@ -27,6 +28,58 @@ describe('status-aware wallet balance display', () => {
       '7502495.13164150',
     );
     assert.equal(getKnownWalletBalanceAmount(wallets, 'USD'), '0.00000000');
+  });
+});
+
+describe('wallet and FX rate failure isolation', () => {
+  const wallets = {
+    wallets: [
+      { currencyCode: 'KRW' as const, balanceAmount: '1000000.00000000' },
+      { currencyCode: 'USD' as const, balanceAmount: '10.00000000' },
+    ],
+  };
+  const rate = {
+    state: 'available',
+    baseCurrency: 'USD',
+    quoteCurrency: 'KRW',
+    rate: '1390.00000000',
+  } as FxRateDto;
+
+  it('keeps loaded wallets renderable when only the FX rate request fails', () => {
+    assert.equal(
+      getWalletViewState(wallets, undefined, {
+        walletIsLoading: false,
+        walletIsError: false,
+        rateIsLoading: false,
+        rateIsError: true,
+        rateError: new Error('FX_RATE_UNAVAILABLE'),
+      }),
+      'fx_rate_unavailable',
+    );
+  });
+
+  it('returns to ready after the FX rate query recovers', () => {
+    assert.equal(
+      getWalletViewState(wallets, rate, {
+        walletIsLoading: false,
+        walletIsError: false,
+        rateIsLoading: false,
+        rateIsError: false,
+      }),
+      'wallet_ready',
+    );
+  });
+
+  it('still treats a wallet request failure as a wallet error', () => {
+    assert.equal(
+      getWalletViewState(undefined, rate, {
+        walletIsLoading: false,
+        walletIsError: true,
+        rateIsLoading: false,
+        rateIsError: false,
+      }),
+      'wallet_error',
+    );
   });
 });
 

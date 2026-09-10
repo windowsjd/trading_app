@@ -31,6 +31,7 @@ import { BinanceSymbolMetadataService } from '../providers/binance/binance-symbo
 import { buildPagination, type Pagination } from '../common/pagination';
 import { isSeasonCurrentlyActive } from '../seasons/season-lifecycle.policy';
 import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
+import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
 
 export type AssetsQuery = {
   assetType?: string;
@@ -972,27 +973,10 @@ export class AssetsService {
       quoteCurrency: CurrencyCode.KRW,
     });
     const providerCandidates = providerEligibility.eligible
-      ? ((await this.prisma.fxRateSnapshot.findMany({
-          where: {
-            baseCurrency: CurrencyCode.USD,
-            quoteCurrency: CurrencyCode.KRW,
-            sourceType: FxRateSourceType.provider_api,
-          },
-          orderBy: [
-            { effectiveAt: 'desc' },
-            { capturedAt: 'desc' },
-            { createdAt: 'desc' },
-          ],
+      ? await findUsdKrwProviderSnapshotCandidates(this.prisma, {
+          sourceNames: providerEligibility.sourceNames,
           take: 10,
-          select: {
-            id: true,
-            rate: true,
-            sourceType: true,
-            sourceName: true,
-            effectiveAt: true,
-            capturedAt: true,
-          },
-        })) ?? [])
+        })
       : [];
     const providerSelection = providerEligibility.eligible
       ? selectFreshProviderSnapshotBySourcePriority({

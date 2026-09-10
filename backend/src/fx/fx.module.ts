@@ -3,6 +3,7 @@ import { ProvidersModule } from '../providers/providers.module';
 import { RankingModule } from '../ranking/ranking.module';
 import { TradingAccountsModule } from '../trading-accounts/trading-accounts.module';
 import { GeneralPerformanceModule } from '../portfolio/general-performance.module';
+import { PortfolioModule } from '../portfolio/portfolio.module';
 import { FxController } from './fx.controller';
 import { FxService } from './fx.service';
 import { TradingAccountFxController } from './trading-account-fx.controller';
@@ -13,6 +14,7 @@ import { TradingAccountFxController } from './trading-account-fx.controller';
     RankingModule,
     TradingAccountsModule,
     GeneralPerformanceModule,
+    PortfolioModule,
   ],
   controllers: [FxController, TradingAccountFxController],
   providers: [FxService],

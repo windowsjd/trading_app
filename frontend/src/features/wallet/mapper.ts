@@ -25,6 +25,10 @@ import {
 type WalletQueryState = {
   isLoading?: boolean;
   isError?: boolean;
+  walletIsLoading?: boolean;
+  walletIsError?: boolean;
+  rateIsLoading?: boolean;
+  rateIsError?: boolean;
   walletError?: unknown;
   rateError?: unknown;
 };
@@ -283,27 +287,37 @@ export function getWalletViewState(
   fxRateDto?: FxRateDto | null,
   queryState?: WalletQueryState,
 ): WalletFxViewState {
-  if (queryState?.isLoading) return 'wallet_loading';
+  const walletIsLoading =
+    queryState?.walletIsLoading ?? queryState?.isLoading ?? false;
+  const walletIsError =
+    queryState?.walletIsError ?? queryState?.isError ?? false;
+  const rateIsLoading = queryState?.rateIsLoading ?? false;
+  const rateIsError = queryState?.rateIsError ?? false;
 
-  const errorCode =
-    getApiErrorCode(queryState?.walletError) ??
-    getApiErrorCode(queryState?.rateError);
+  if (walletIsLoading) return 'wallet_loading';
+
+  const errorCode = getApiErrorCode(queryState?.walletError);
 
   if (errorCode === ERROR_CODE.SEASON_NOT_JOINED) {
     return 'wallet_not_joined';
   }
 
-  if (queryState?.isError) return 'wallet_error';
-  if (!walletsDto || !fxRateDto) return 'wallet_error';
+  if (walletIsError || !walletsDto) return 'wallet_error';
 
   if (walletsDto.state === 'blocked') return 'wallet_not_joined';
 
+  if (isUnavailableState(walletsDto.state)) {
+    return 'wallet_unavailable';
+  }
+
   if (
-    isUnavailableState(walletsDto.state) ||
+    rateIsLoading ||
+    rateIsError ||
+    !fxRateDto ||
     isUnavailableState(fxRateDto.state) ||
     !fxRateDto.rate
   ) {
-    return 'wallet_unavailable';
+    return 'fx_rate_unavailable';
   }
 
   return 'wallet_ready';

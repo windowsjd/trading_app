@@ -259,19 +259,40 @@ describe('FxService', () => {
     expect(prisma.fxExecuteRequest.findUnique).toHaveBeenCalledTimes(1);
     expect(prisma.quote.findFirst).toHaveBeenCalledTimes(1);
     expect(prisma.cashWallet.findUnique).toHaveBeenCalledTimes(2);
-    expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalled();
   };
 
-  const createService = (koreaEximIngestionService?: {
-    ensureFreshUsdKrwSnapshot: jest.Mock;
-  }) => {
+  const createService = (
+    koreaEximIngestionService?: {
+      ensureFreshUsdKrwSnapshot: jest.Mock;
+    },
+    exchangeRateIngestionService?: {
+      ingestUsdKrw: jest.Mock;
+    },
+    valuationService = {
+      calculateSeasonParticipantValuation: jest.fn().mockResolvedValue({
+        totalAssetKrw: '999.00000000',
+        returnRate: '-0.10000000',
+        krwCash: '0.00000000',
+        usdCashKrw: '999.00000000',
+        domesticStockValueKrw: '0.00000000',
+        usStockValueKrw: '0.00000000',
+        cryptoValueKrw: '0.00000000',
+      }),
+    },
+  ) => {
     const prisma = createPrisma();
     const service = new FxService(
       prisma as never,
       koreaEximIngestionService as never,
+      undefined,
+      undefined,
+      undefined,
+      exchangeRateIngestionService as never,
+      valuationService as never,
     );
 
-    return { prisma, service };
+    return { prisma, service, valuationService };
   };
 
   const mockActiveSeason = (prisma: ReturnType<typeof createPrisma>) => {
@@ -432,16 +453,24 @@ describe('FxService', () => {
       }),
     };
     const { prisma, service } = createService(ingestion);
-    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
-      {
-        id: 'new-observation',
-        rate: new Prisma.Decimal('1390'),
-        sourceType: FxRateSourceType.provider_api,
-        sourceName: 'korea_exim_exchange_rate',
-        effectiveAt: freshEffectiveAt,
-        capturedAt: receivedAt,
-      },
-    ]);
+    prisma.fxRateSnapshot.findMany.mockImplementation(async (args) => {
+      if (
+        Date.now() < receivedAt.getTime() ||
+        args.where.sourceName === 'exchange_rate_api'
+      ) {
+        return [];
+      }
+      return [
+        {
+          id: 'new-observation',
+          rate: new Prisma.Decimal('1390'),
+          sourceType: FxRateSourceType.provider_api,
+          sourceName: 'korea_exim_exchange_rate',
+          effectiveAt: freshEffectiveAt,
+          capturedAt: receivedAt,
+        },
+      ];
+    });
     await expect(service.currentRate({ refresh: true })).resolves.toMatchObject(
       {
         data: { capturedAt: receivedAt.toISOString(), freshnessAgeSeconds: 0 },
@@ -603,7 +632,7 @@ describe('FxService', () => {
     await expectErrorCode(service.currentRate({}), 'FX_RATE_UNAVAILABLE');
   });
 
-  it('falls back to existing DB rows when Korea EXIM current rate refresh is config-disabled', async () => {
+  it('reuses a fresh fallback DB row without calling Korea EXIM', async () => {
     const koreaEximIngestionService = {
       ensureFreshUsdKrwSnapshot: jest
         .fn()
@@ -639,7 +668,126 @@ describe('FxService', () => {
     });
     expect(
       koreaEximIngestionService.ensureFreshUsdKrwSnapshot,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('recovers a cold current-rate request through ExchangeRate-API when Korea EXIM fails', async () => {
+    let fallbackCreated = false;
+    const koreaEximIngestionService = {
+      ensureFreshUsdKrwSnapshot: jest.fn().mockRejectedValue(
+        new ProviderConfigError(
+          'korea_exim_exchange_rate',
+          'KOREA_EXIM_PROVIDER_DISABLED',
+          'provider disabled',
+        ),
+      ),
+    };
+    const exchangeRateIngestionService = {
+      ingestUsdKrw: jest.fn().mockImplementation(async () => {
+        fallbackCreated = true;
+        return { success: true };
+      }),
+    };
+    const { prisma, service } = createService(
+      koreaEximIngestionService,
+      exchangeRateIngestionService,
+    );
+    const fallback = {
+      id: 'fx-exchange-rate-api-recovered',
+      baseCurrency: CurrencyCode.USD,
+      quoteCurrency: CurrencyCode.KRW,
+      rate: new Prisma.Decimal('1400.00000000'),
+      sourceType: FxRateSourceType.provider_api,
+      sourceName: 'exchange_rate_api',
+      capturedAt: now,
+      effectiveAt: now,
+      createdAt: now,
+      approvedByUserId: null,
+    };
+    prisma.fxRateSnapshot.findMany.mockImplementation(async (args) => {
+      if (
+        !fallbackCreated ||
+        args.where.sourceName === 'korea_exim_exchange_rate'
+      ) {
+        return [];
+      }
+      return [fallback];
+    });
+
+    await expect(service.currentRate({ refresh: true })).resolves.toMatchObject({
+      data: {
+        state: 'available',
+        sourceName: 'exchange_rate_api',
+        fallbackUsed: true,
+      },
+    });
+    expect(
+      koreaEximIngestionService.ensureFreshUsdKrwSnapshot,
     ).toHaveBeenCalledTimes(1);
+    expect(exchangeRateIngestionService.ingestUsdKrw).toHaveBeenCalledWith({
+      dryRun: false,
+      requestedBy: 'fx_on_demand_refresh',
+    });
+  });
+
+  it('single-flights concurrent stale current-rate refreshes per freshness policy', async () => {
+    let releasePrimary!: () => void;
+    let fallbackCreated = false;
+    const primaryAttempt = new Promise<void>((resolve) => {
+      releasePrimary = resolve;
+    });
+    const koreaEximIngestionService = {
+      ensureFreshUsdKrwSnapshot: jest.fn().mockImplementation(async () => {
+        await primaryAttempt;
+        throw new ProviderConfigError(
+          'korea_exim_exchange_rate',
+          'KOREA_EXIM_PROVIDER_DISABLED',
+          'provider disabled',
+        );
+      }),
+    };
+    const exchangeRateIngestionService = {
+      ingestUsdKrw: jest.fn().mockImplementation(async () => {
+        fallbackCreated = true;
+        return { success: true };
+      }),
+    };
+    const { prisma, service } = createService(
+      koreaEximIngestionService,
+      exchangeRateIngestionService,
+    );
+    const fallback = {
+      id: 'fx-exchange-rate-api-single-flight',
+      baseCurrency: CurrencyCode.USD,
+      quoteCurrency: CurrencyCode.KRW,
+      rate: new Prisma.Decimal('1400.00000000'),
+      sourceType: FxRateSourceType.provider_api,
+      sourceName: 'exchange_rate_api',
+      capturedAt: now,
+      effectiveAt: now,
+      createdAt: now,
+      approvedByUserId: null,
+    };
+    prisma.fxRateSnapshot.findMany.mockImplementation(async (args) => {
+      if (
+        !fallbackCreated ||
+        args.where.sourceName === 'korea_exim_exchange_rate'
+      ) {
+        return [];
+      }
+      return [fallback];
+    });
+
+    const first = service.currentRate({ refresh: true });
+    const second = service.currentRate({ refresh: true });
+    await Promise.resolve();
+    releasePrimary();
+
+    await expect(Promise.all([first, second])).resolves.toHaveLength(2);
+    expect(
+      koreaEximIngestionService.ensureFreshUsdKrwSnapshot,
+    ).toHaveBeenCalledTimes(1);
+    expect(exchangeRateIngestionService.ingestUsdKrw).toHaveBeenCalledTimes(1);
   });
 
   it('does not call provider refresh when current rate refresh=false', async () => {
@@ -712,7 +860,7 @@ describe('FxService', () => {
     ['refresh is true', { refresh: true }],
     ['refresh is "true"', { refresh: 'true' }],
     ['refresh is "1"', { refresh: '1' }],
-  ])('calls provider refresh when current rate %s', async (_label, query) => {
+  ])('reuses a fresh provider when current rate %s', async (_label, query) => {
     const koreaEximIngestionService = {
       ensureFreshUsdKrwSnapshot: jest.fn().mockResolvedValueOnce(null),
     };
@@ -736,7 +884,7 @@ describe('FxService', () => {
     });
     expect(
       koreaEximIngestionService.ensureFreshUsdKrwSnapshot,
-    ).toHaveBeenCalledTimes(1);
+    ).not.toHaveBeenCalled();
   });
 
   it('rejects invalid current rate refresh values', async () => {
@@ -1793,6 +1941,26 @@ describe('FxService', () => {
               return { id: 'wallet-tx-target' };
             }),
           },
+          equitySnapshot: {
+            ...prisma.equitySnapshot,
+            create: jest.fn(async () => {
+              stage('equitySnapshot.create');
+              return { id: 'equity-1' };
+            }),
+            findMany: jest.fn(async () => [
+              {
+                totalAssetKrw: new Prisma.Decimal('999.00000000'),
+                capturedAt: now,
+              },
+            ]),
+          },
+          seasonParticipant: {
+            ...prisma.seasonParticipant,
+            update: jest.fn(async () => {
+              stage('seasonParticipant.update');
+              return { id: 'participant-1' };
+            }),
+          },
         };
 
         try {
@@ -2283,7 +2451,7 @@ describe('FxService', () => {
     });
 
     it('executes a valid new request and stores the exact responsePayloadJson', async () => {
-      const { prisma, service } = createService();
+      const { prisma, service, valuationService } = createService();
       mockActiveSeason(prisma);
       mockJoinedParticipant(prisma);
       mockExecuteReadCandidates(prisma);
@@ -2336,6 +2504,14 @@ describe('FxService', () => {
       });
       expectExecutePlanReads(prisma);
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(
+        valuationService.calculateSeasonParticipantValuation,
+      ).toHaveBeenCalledWith(
+        'participant-1',
+        now,
+        'live_portfolio_valuation',
+        prisma,
+      );
       expectWritePathBeforeSuccessFinalization(prisma);
       expect(prisma.walletTransaction.create).toHaveBeenCalledTimes(2);
       expect(prisma.walletTransaction.create).toHaveBeenNthCalledWith(1, {
@@ -2714,6 +2890,8 @@ describe('FxService', () => {
           'exchangeTransaction.create',
           'walletTransaction.create:source',
           'walletTransaction.create:target',
+          'equitySnapshot.create',
+          'seasonParticipant.update',
         ],
       ],
     ])(
@@ -2832,27 +3010,19 @@ describe('FxService', () => {
           reservedAmount: true,
         },
       });
-      expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalledWith({
-        where: {
+      expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
           baseCurrency: CurrencyCode.USD,
           quoteCurrency: CurrencyCode.KRW,
           sourceType: FxRateSourceType.provider_api,
-        },
-        orderBy: [
-          { effectiveAt: 'desc' },
-          { capturedAt: 'desc' },
-          { createdAt: 'desc' },
-        ],
-        take: 5,
-        select: {
-          id: true,
-          sourceType: true,
-          sourceName: true,
-          rate: true,
-          effectiveAt: true,
-          capturedAt: true,
-        },
-      });
+          sourceName: {
+            in: ['korea_exim_exchange_rate', 'exchange_rate_api'],
+          },
+          }),
+          take: 5,
+        }),
+      );
       expectNoExecuteWrites(prisma);
     });
 

@@ -54,12 +54,10 @@ import {
 } from './fx-execute-request-policy';
 import {
   FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
-  PROVIDER_FRESHNESS_THRESHOLDS_SECONDS,
   buildAdminManualFallbackDecision,
   getProviderFreshnessThresholdsSeconds,
   isPositiveDecimal,
   resolveFxProviderEligibility,
-  selectFreshProviderSnapshot,
   selectFreshProviderSnapshotBySourcePriority,
   type SourceDecision,
 } from '../providers/source-eligibility.policy';
@@ -85,12 +83,14 @@ import {
   RankingRefreshService,
 } from '../ranking/ranking-refresh.service';
 import { KoreaEximExchangeIngestionService } from '../providers/korea-exim/korea-exim-exchange.ingestion.service';
-import { KOREA_EXIM_EXCHANGE_SOURCE_NAME } from '../providers/korea-exim/korea-exim-exchange.types';
+import { ExchangeRateIngestionService } from '../providers/exchange-rate/exchange-rate.ingestion.service';
 import {
   ProviderConfigError,
   ProviderHttpError,
 } from '../providers/provider.types';
 import { readGeneralFxFeeRate } from './general-fx.config';
+import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
+import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
 
 export type FxQuoteRequestBody = {
   fromCurrency?: unknown;
@@ -355,6 +355,8 @@ export function mapFxExecuteOrchestrationDecisionToSkeletonResponse(
 
 @Injectable()
 export class FxService {
+  private readonly providerRefreshInFlight = new Map<number, Promise<boolean>>();
+
   constructor(
     private readonly prisma: PrismaService,
     @Optional()
@@ -365,6 +367,10 @@ export class FxService {
     private readonly tradingAccountAccessService?: TradingAccountAccessService,
     @Optional()
     private readonly generalAccountPerformanceService?: GeneralAccountPerformanceService,
+    @Optional()
+    private readonly exchangeRateIngestionService?: ExchangeRateIngestionService,
+    @Optional()
+    private readonly portfolioValuationService?: PortfolioValuationService,
   ) {}
 
   async currentRate(
@@ -372,17 +378,33 @@ export class FxService {
   ): Promise<FxCurrentRateResponse> {
     const request = this.validateCurrentRateQuery(query);
     let now = new Date();
+    let refreshedProviderSnapshot: FxProviderRateSnapshot | null = null;
 
     if (request.refresh) {
-      await this.tryEnsureFreshKoreaEximUsdKrwSnapshot({
-        now,
-        maxAgeSeconds: PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.fxUsdKrwQuote,
+      const refreshEligibility = resolveFxProviderEligibility({
+        workflow: 'fx_quote',
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
       });
+      if (refreshEligibility.eligible) {
+        const selection = await this.selectFreshProviderUsdKrwSnapshot({
+          now,
+          freshnessThresholdSeconds:
+            refreshEligibility.freshnessThresholdSeconds,
+          expectedSourceNames: refreshEligibility.sourceNames,
+          take: 10,
+        });
+        if (selection.state === 'selected') {
+          refreshedProviderSnapshot = selection.snapshot;
+        }
+      }
       // A successful fetch is observed after request start, not in its future.
       now = new Date();
     }
 
-    const snapshot = await this.findCurrentUsdKrwRateSnapshot(now);
+    const snapshot =
+      refreshedProviderSnapshot ??
+      (await this.findCurrentUsdKrwRateSnapshot(now));
     if (!snapshot) {
       this.throwApiError(
         HttpStatus.SERVICE_UNAVAILABLE,
@@ -1007,10 +1029,20 @@ export class FxService {
 
     // Provider ingestion/network work stays outside the financial transaction.
     // The selected row is re-read for freshness after the account lock.
-    await this.tryEnsureFreshKoreaEximUsdKrwSnapshot({
-      now: new Date(),
-      maxAgeSeconds: 60,
+    const executeRefreshAt = new Date();
+    const executeEligibility = resolveFxProviderEligibility({
+      workflow: 'fx_execute',
+      baseCurrency: CurrencyCode.USD,
+      quoteCurrency: CurrencyCode.KRW,
     });
+    if (executeEligibility.eligible) {
+      await this.selectFreshProviderUsdKrwSnapshot({
+        now: executeRefreshAt,
+        freshnessThresholdSeconds: executeEligibility.freshnessThresholdSeconds,
+        expectedSourceNames: executeEligibility.sourceNames,
+        take: FX_EXECUTE_SNAPSHOT_CANDIDATE_LIMIT,
+      });
+    }
 
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -1572,10 +1604,18 @@ export class FxService {
     client: PrismaService | Prisma.TransactionClient = this.prisma,
     allowRefresh = true,
   ): Promise<FxExecuteRateSnapshot> {
+    const providerEligibility = resolveFxProviderEligibility({
+      workflow: 'fx_execute',
+      baseCurrency: CurrencyCode.USD,
+      quoteCurrency: CurrencyCode.KRW,
+    });
+    if (!providerEligibility.eligible) {
+      this.throwFxExecuteError(fxExecuteErrorCodes.PROVIDER_RATE_UNAVAILABLE);
+    }
     const selection = await this.selectFreshProviderUsdKrwSnapshot({
       now: executeNow,
-      freshnessThresholdSeconds: 60,
-      expectedSourceNames: FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
+      freshnessThresholdSeconds: providerEligibility.freshnessThresholdSeconds,
+      expectedSourceNames: providerEligibility.sourceNames,
       take: FX_EXECUTE_SNAPSHOT_CANDIDATE_LIMIT,
       client,
       allowRefresh,
@@ -1607,63 +1647,92 @@ export class FxService {
     let candidates = await this.findProviderUsdKrwSnapshotCandidates(
       input.take,
       client,
+      input.expectedSourceNames,
     );
-    const primarySelection = selectFreshProviderSnapshot({
+    let selectionNow = input.now;
+    let selection = selectFreshProviderSnapshotBySourcePriority({
       candidates,
-      expectedSourceName: KOREA_EXIM_EXCHANGE_SOURCE_NAME,
-      now: input.now,
+      expectedSourceNames: input.expectedSourceNames,
+      now: selectionNow,
       freshnessThresholdSeconds: input.freshnessThresholdSeconds,
       isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
     });
 
-    if (primarySelection.state !== 'selected' && input.allowRefresh !== false) {
-      const refreshed = await this.tryEnsureFreshKoreaEximUsdKrwSnapshot({
+    if (selection.state !== 'selected' && input.allowRefresh !== false) {
+      const refreshed = await this.tryRefreshUsdKrwProviders({
         now: input.now,
         maxAgeSeconds: input.freshnessThresholdSeconds,
       });
 
       if (refreshed) {
+        selectionNow = new Date();
         candidates = await this.findProviderUsdKrwSnapshotCandidates(
           input.take,
           client,
+          input.expectedSourceNames,
         );
+        selection = selectFreshProviderSnapshotBySourcePriority({
+          candidates,
+          expectedSourceNames: input.expectedSourceNames,
+          now: selectionNow,
+          freshnessThresholdSeconds: input.freshnessThresholdSeconds,
+          isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+        });
       }
     }
 
-    return selectFreshProviderSnapshotBySourcePriority({
-      candidates,
-      expectedSourceNames: input.expectedSourceNames,
-      now: input.now,
-      freshnessThresholdSeconds: input.freshnessThresholdSeconds,
-      isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
-    });
+    return selection;
   }
 
   private findProviderUsdKrwSnapshotCandidates(
     take: number,
     client: PrismaService | Prisma.TransactionClient = this.prisma,
+    sourceNames: readonly string[] = FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
   ) {
-    return client.fxRateSnapshot.findMany({
-      where: {
-        baseCurrency: CurrencyCode.USD,
-        quoteCurrency: CurrencyCode.KRW,
-        sourceType: FxRateSourceType.provider_api,
-      },
-      orderBy: [
-        { effectiveAt: 'desc' },
-        { capturedAt: 'desc' },
-        { createdAt: 'desc' },
-      ],
+    return findUsdKrwProviderSnapshotCandidates(client, {
+      sourceNames,
       take,
-      select: {
-        id: true,
-        rate: true,
-        sourceType: true,
-        sourceName: true,
-        effectiveAt: true,
-        capturedAt: true,
-      },
     });
+  }
+
+  private async tryRefreshUsdKrwProviders(input: {
+    now: Date;
+    maxAgeSeconds: number;
+  }): Promise<boolean> {
+    const key = input.maxAgeSeconds;
+    const inFlight = this.providerRefreshInFlight.get(key);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const refresh = this.runUsdKrwProviderRefresh(input);
+    this.providerRefreshInFlight.set(key, refresh);
+    try {
+      return await refresh;
+    } finally {
+      if (this.providerRefreshInFlight.get(key) === refresh) {
+        this.providerRefreshInFlight.delete(key);
+      }
+    }
+  }
+
+  private async runUsdKrwProviderRefresh(input: {
+    now: Date;
+    maxAgeSeconds: number;
+  }): Promise<boolean> {
+    if (await this.tryEnsureFreshKoreaEximUsdKrwSnapshot(input)) {
+      return true;
+    }
+
+    if (!this.exchangeRateIngestionService) {
+      return false;
+    }
+
+    const result = await this.exchangeRateIngestionService.ingestUsdKrw({
+      dryRun: false,
+      requestedBy: 'fx_on_demand_refresh',
+    });
+    return result.success;
   }
 
   private async tryEnsureFreshKoreaEximUsdKrwSnapshot(input: {
@@ -1715,10 +1784,16 @@ export class FxService {
         baseCurrency: CurrencyCode.USD,
         quoteCurrency: CurrencyCode.KRW,
         sourceType: FxRateSourceType.admin_manual,
+        rate: {
+          gt: 0,
+        },
         approvedByUserId: {
           not: null,
         },
         effectiveAt: {
+          lte: now,
+        },
+        capturedAt: {
           lte: now,
         },
       },
@@ -2870,11 +2945,12 @@ export class FxService {
     if (!plan.seasonParticipantId) {
       throw new Error('Season FX participant context is missing.');
     }
-    const valuation = await this.calculateParticipantValuationInTransaction(
-      tx,
+    const valuation =
+      await this.requirePortfolioValuationService().calculateSeasonParticipantValuation(
       plan.seasonParticipantId,
-      new Prisma.Decimal(plan.appliedRate),
       capturedAt,
+      'live_portfolio_valuation',
+      tx,
     );
 
     await tx.equitySnapshot.create({
@@ -2917,142 +2993,6 @@ export class FxService {
         id: true,
       },
     });
-  }
-
-  private async calculateParticipantValuationInTransaction(
-    tx: FxExecuteTransactionClient,
-    seasonParticipantId: string,
-    usdKrwRate: Prisma.Decimal,
-    valuationAt: Date,
-  ): Promise<{
-    totalAssetKrw: string;
-    returnRate: string;
-    krwCash: string;
-    usdCashKrw: string;
-    domesticStockValueKrw: string;
-    usStockValueKrw: string;
-    cryptoValueKrw: string;
-  }> {
-    const participant = await tx.seasonParticipant.findUnique({
-      where: {
-        id: seasonParticipantId,
-      },
-      select: {
-        initialCapitalKrw: true,
-        cashWallets: {
-          select: {
-            currencyCode: true,
-            balanceAmount: true,
-          },
-        },
-        positions: {
-          where: {
-            quantity: {
-              gt: '0.00000000',
-            },
-          },
-          select: {
-            assetId: true,
-            quantity: true,
-            asset: {
-              select: {
-                assetType: true,
-                priceCurrency: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!participant) {
-      throw new Error('Season participant not found.');
-    }
-
-    const krwCash = participant.cashWallets
-      .filter((wallet) => wallet.currencyCode === CurrencyCode.KRW)
-      .reduce(
-        (sum, wallet) => sum.add(wallet.balanceAmount),
-        new Prisma.Decimal(0),
-      );
-    const usdCash = participant.cashWallets
-      .filter((wallet) => wallet.currencyCode === CurrencyCode.USD)
-      .reduce(
-        (sum, wallet) => sum.add(wallet.balanceAmount),
-        new Prisma.Decimal(0),
-      );
-    const usdCashKrw = usdCash.mul(usdKrwRate);
-    let domesticStockValueKrw = new Prisma.Decimal(0);
-    let usStockValueKrw = new Prisma.Decimal(0);
-    let cryptoValueKrw = new Prisma.Decimal(0);
-
-    for (const position of participant.positions) {
-      const latestPrice = await tx.assetPriceSnapshot.findFirst({
-        where: {
-          assetId: position.assetId,
-          currencyCode: position.asset.priceCurrency,
-          price: {
-            gt: 0,
-          },
-          effectiveAt: {
-            lte: valuationAt,
-          },
-        },
-        orderBy: [
-          { effectiveAt: 'desc' },
-          { capturedAt: 'desc' },
-          { createdAt: 'desc' },
-        ],
-        select: {
-          price: true,
-          priceKrw: true,
-          currencyCode: true,
-        },
-      });
-
-      if (!latestPrice) {
-        throw new Error('Asset price unavailable.');
-      }
-
-      const priceKrw =
-        latestPrice.priceKrw ??
-        (latestPrice.currencyCode === CurrencyCode.KRW
-          ? latestPrice.price
-          : latestPrice.price.mul(usdKrwRate));
-      const marketValueKrw = position.quantity.mul(priceKrw);
-
-      switch (position.asset.assetType) {
-        case 'domestic_stock':
-          domesticStockValueKrw = domesticStockValueKrw.add(marketValueKrw);
-          break;
-        case 'us_stock':
-          usStockValueKrw = usStockValueKrw.add(marketValueKrw);
-          break;
-        case 'crypto':
-          cryptoValueKrw = cryptoValueKrw.add(marketValueKrw);
-          break;
-      }
-    }
-
-    const totalAssetKrw = krwCash
-      .add(usdCashKrw)
-      .add(domesticStockValueKrw)
-      .add(usStockValueKrw)
-      .add(cryptoValueKrw);
-    const returnRate = totalAssetKrw
-      .sub(participant.initialCapitalKrw)
-      .div(participant.initialCapitalKrw)
-      .mul(100);
-
-    return {
-      totalAssetKrw: this.formatDecimal(totalAssetKrw, 8),
-      returnRate: this.formatDecimal(returnRate, 8),
-      krwCash: this.formatDecimal(krwCash, 8),
-      usdCashKrw: this.formatDecimal(usdCashKrw, 8),
-      domesticStockValueKrw: this.formatDecimal(domesticStockValueKrw, 8),
-      usStockValueKrw: this.formatDecimal(usStockValueKrw, 8),
-      cryptoValueKrw: this.formatDecimal(cryptoValueKrw, 8),
-    };
   }
 
   private async calculateParticipantMaxDrawdownFromEquitySnapshots(
@@ -3369,6 +3309,17 @@ export class FxService {
       );
     }
     return this.generalAccountPerformanceService;
+  }
+
+  private requirePortfolioValuationService(): PortfolioValuationService {
+    if (!this.portfolioValuationService) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'INTERNAL_ERROR',
+        'Portfolio valuation service unavailable',
+      );
+    }
+    return this.portfolioValuationService;
   }
 
   private refreshRankingAfterParticipantChange(

@@ -523,6 +523,51 @@ describe('OpsSchedulerService', () => {
     },
   );
 
+  it('warns safely when one FX provider fails but the combined job succeeds', async () => {
+    process.env.SCHEDULER_ENABLED = 'true';
+    process.env.SCHEDULER_PROVIDER_FX_ENABLED = 'true';
+    const { runner, service } = createService();
+    runner.runProviderFxIngestJob.mockResolvedValueOnce({
+      success: true,
+      data: {
+        locked: false,
+        skipped: false,
+        run: {
+          resultJson: {
+            state: 'completed',
+            providers: [
+              {
+                provider: 'korea_exim_exchange_rate',
+                success: false,
+                errorCode: 'KOREA_EXIM_DAILY_LIMIT_EXCEEDED',
+                errorMessage: 'sensitive provider response',
+              },
+              { provider: 'exchange_rate_api', success: true },
+            ],
+          },
+        },
+      },
+    });
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await service.runEnabledJobs(new Date('2026-06-08T00:00:00.000Z'));
+      expect(warn).toHaveBeenCalledWith(
+        'Provider scheduler job partially failed.',
+        {
+          jobName: OpsJobName.provider_fx_ingest,
+          provider: 'korea_exim_exchange_rate',
+          errorCode: 'KOREA_EXIM_DAILY_LIMIT_EXCEEDED',
+          error: 'One FX provider failed while another succeeded.',
+        },
+      );
+      expect(JSON.stringify(warn.mock.calls)).not.toContain(
+        'sensitive provider response',
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('does not run provider jobs on startup when the startup flag is false', async () => {
     process.env.SCHEDULER_ENABLED = 'true';
     process.env.SCHEDULER_PROVIDER_KIS_ENABLED = 'true';
