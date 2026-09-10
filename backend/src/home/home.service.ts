@@ -75,20 +75,24 @@ type SectionError = {
 
 type JoinedParticipant = {
   id: string;
+  tradingAccountId: string;
   participantStatus: ParticipantStatus;
   joinedAt: Date;
   initialCapitalKrw: Prisma.Decimal;
-  cashWallets: Array<{
-    currencyCode: CurrencyCode;
-    balanceAmount: Prisma.Decimal;
-  }>;
-  positions: Array<{
-    quantity: Prisma.Decimal;
-  }>;
+  tradingAccount: {
+    cashWallets: Array<{
+      currencyCode: CurrencyCode;
+      balanceAmount: Prisma.Decimal;
+    }>;
+    positions: Array<{
+      quantity: Prisma.Decimal;
+    }>;
+  };
 };
 
 type SettledParticipant = {
   id: string;
+  tradingAccountId: string;
   participantStatus: ParticipantStatus;
   joinedAt: Date;
   initialCapitalKrw: Prisma.Decimal;
@@ -155,18 +159,23 @@ export class HomeService {
         participantStatus: true,
         joinedAt: true,
         initialCapitalKrw: true,
-        cashWallets: {
+        tradingAccountId: true,
+        tradingAccount: {
           select: {
-            currencyCode: true,
-            balanceAmount: true,
-          },
-          orderBy: {
-            currencyCode: 'asc',
-          },
-        },
-        positions: {
-          select: {
-            quantity: true,
+            cashWallets: {
+              select: {
+                currencyCode: true,
+                balanceAmount: true,
+              },
+              orderBy: {
+                currencyCode: 'asc',
+              },
+            },
+            positions: {
+              select: {
+                quantity: true,
+              },
+            },
           },
         },
       },
@@ -186,16 +195,24 @@ export class HomeService {
     const sectionErrors: SectionError[] = [];
     const valuationAt = new Date();
     const getLiveValuation = this.createLiveValuationLoader(
-      participant.id,
+      participant.tradingAccountId,
       valuationAt,
     );
     const [summary, ranking, allocation, topPositions, equityChart] =
       await Promise.all([
         this.buildSummary(sectionErrors, getLiveValuation),
-        this.buildRanking(season.id, participant.id),
+        this.buildRanking(
+          season.id,
+          participant.id,
+          participant.tradingAccountId,
+        ),
         this.buildAllocation(sectionErrors, getLiveValuation),
-        this.buildTopPositions(participant.id, sectionErrors, valuationAt),
-        this.buildEquityChart(participant.id),
+        this.buildTopPositions(
+          participant.tradingAccountId,
+          sectionErrors,
+          valuationAt,
+        ),
+        this.buildEquityChart(participant.tradingAccountId),
       ]);
 
     return {
@@ -350,6 +367,7 @@ export class HomeService {
         participantStatus: true,
         joinedAt: true,
         initialCapitalKrw: true,
+        tradingAccountId: true,
         finalTier: true,
         rewardGrantedAt: true,
       },
@@ -400,7 +418,10 @@ export class HomeService {
     const sectionErrors: SectionError[] = [];
     const [finalResult, equityChart] = await Promise.all([
       this.buildFinalResult(season.id, participant, sectionErrors),
-      this.buildSettledEquityChart(participant.id, sectionErrors),
+      this.buildSettledEquityChart(
+        participant.tradingAccountId,
+        sectionErrors,
+      ),
     ]);
 
     return {
@@ -439,7 +460,11 @@ export class HomeService {
     participant: SettledParticipant,
     sectionErrors: SectionError[],
   ) {
-    const ranking = await this.findLatestFinalRanking(seasonId, participant.id);
+    const ranking = await this.findLatestFinalRanking(
+      seasonId,
+      participant.id,
+      participant.tradingAccountId,
+    );
     const tier = this.buildFinalTier(participant, sectionErrors);
     const reward = this.buildRewardState(participant, sectionErrors);
 
@@ -499,11 +524,13 @@ export class HomeService {
   private async findLatestFinalRanking(
     seasonId: string,
     seasonParticipantId: string,
+    tradingAccountId: string,
   ) {
     const ranking = await this.prisma.seasonRanking.findFirst({
       where: {
         seasonId,
         seasonParticipantId,
+        tradingAccountId,
         rankType: SeasonRankingType.final,
       },
       orderBy: [
@@ -587,10 +614,10 @@ export class HomeService {
   }
 
   private async buildSettledEquityChart(
-    seasonParticipantId: string,
+    tradingAccountId: string,
     sectionErrors: SectionError[],
   ) {
-    const equityChart = await this.buildEquityChart(seasonParticipantId);
+    const equityChart = await this.buildEquityChart(tradingAccountId);
 
     if (equityChart.state !== 'available') {
       const message =
@@ -612,15 +639,15 @@ export class HomeService {
   }
 
   private createLiveValuationLoader(
-    seasonParticipantId: string,
+    tradingAccountId: string,
     valuationAt: Date,
   ) {
     let valuationPromise: Promise<PortfolioValuationResult> | null = null;
 
     return () => {
       valuationPromise ??=
-        this.portfolioValuationService.calculateSeasonParticipantValuation(
-          seasonParticipantId,
+        this.portfolioValuationService.calculateTradingAccountValuation(
+          tradingAccountId,
           valuationAt,
           'home_live_valuation',
         );
@@ -770,14 +797,14 @@ export class HomeService {
   }
 
   private async buildTopPositions(
-    seasonParticipantId: string,
+    tradingAccountId: string,
     sectionErrors: SectionError[],
     valuationAt: Date,
   ) {
     try {
       const positions = await this.prisma.position.findMany({
         where: {
-          seasonParticipantId,
+          tradingAccountId,
           quantity: {
             gt: 0,
           },
@@ -928,10 +955,10 @@ export class HomeService {
     }
   }
 
-  private async buildEquityChart(seasonParticipantId: string) {
+  private async buildEquityChart(tradingAccountId: string) {
     const snapshots = await this.prisma.dailyPortfolioSnapshot.findMany({
       where: {
-        seasonParticipantId,
+        tradingAccountId,
       },
       orderBy: [
         { snapshotDate: 'desc' },
@@ -973,11 +1000,16 @@ export class HomeService {
     };
   }
 
-  private async buildRanking(seasonId: string, seasonParticipantId: string) {
+  private async buildRanking(
+    seasonId: string,
+    seasonParticipantId: string,
+    tradingAccountId: string,
+  ) {
     const ranking = await this.prisma.seasonRanking.findFirst({
       where: {
         seasonId,
         seasonParticipantId,
+        tradingAccountId,
       },
       orderBy: [
         { rankingDate: 'desc' },
@@ -1047,7 +1079,10 @@ export class HomeService {
 
   private buildWalletSummary(participant: JoinedParticipant) {
     const walletByCurrency = new Map(
-      participant.cashWallets.map((wallet) => [wallet.currencyCode, wallet]),
+      participant.tradingAccount.cashWallets.map((wallet) => [
+        wallet.currencyCode,
+        wallet,
+      ]),
     );
     const zeroAmount = new Prisma.Decimal(0);
 
@@ -1061,12 +1096,12 @@ export class HomeService {
         walletByCurrency.get(CurrencyCode.USD)?.balanceAmount ?? zeroAmount,
         8,
       ),
-      cashWallets: participant.cashWallets.map((wallet) => ({
+      cashWallets: participant.tradingAccount.cashWallets.map((wallet) => ({
         currencyCode: wallet.currencyCode,
         balanceAmount: this.formatDecimal(wallet.balanceAmount, 8),
       })),
-      positionsCount: participant.positions.length,
-      openPositionsCount: participant.positions.filter(
+      positionsCount: participant.tradingAccount.positions.length,
+      openPositionsCount: participant.tradingAccount.positions.filter(
         (position) => !position.quantity.eq(0),
       ).length,
     };

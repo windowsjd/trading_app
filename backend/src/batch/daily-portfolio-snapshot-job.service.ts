@@ -102,14 +102,16 @@ export class DailyPortfolioSnapshotJobService {
     const existingSnapshots = await this.prisma.dailyPortfolioSnapshot.findMany(
       {
         where: {
-          seasonParticipantId: { in: participants.map(({ id }) => id) },
+          tradingAccountId: {
+            in: participants.map(({ tradingAccountId }) => tradingAccountId),
+          },
           snapshotDate,
         },
-        select: { seasonParticipantId: true },
+        select: { tradingAccountId: true },
       },
     );
-    const existingParticipantIds = new Set(
-      existingSnapshots.map(({ seasonParticipantId }) => seasonParticipantId),
+    const existingAccountIds = new Set(
+      existingSnapshots.map(({ tradingAccountId }) => tradingAccountId),
     );
     const result: DailyPortfolioSnapshotJobResult = {
       seasonId,
@@ -144,7 +146,7 @@ export class DailyPortfolioSnapshotJobService {
           break;
         }
       }
-      if (existingParticipantIds.has(participant.id)) {
+      if (existingAccountIds.has(participant.tradingAccountId)) {
         result.participants.existing += 1;
         continue;
       }
@@ -152,11 +154,16 @@ export class DailyPortfolioSnapshotJobService {
       let valuation: PortfolioValuationResult;
       try {
         valuation =
-          await this.portfolioValuationService.calculateSeasonParticipantValuation(
-            participant.id,
+          await this.portfolioValuationService.calculateTradingAccountValuation(
+            participant.tradingAccountId,
             capturedAt,
             'daily_portfolio_snapshot',
           );
+        if (valuation.seasonParticipantId !== participant.id) {
+          throw new Error(
+            `Trading account ${participant.tradingAccountId} is not owned by snapshot participant ${participant.id}.`,
+          );
+        }
       } catch (error) {
         this.recordParticipantError(result, participant, error);
         continue;
@@ -165,21 +172,6 @@ export class DailyPortfolioSnapshotJobService {
       if (dryRun) {
         result.participants.wouldCreate += 1;
         this.recordSourceSummary(result, valuation);
-        continue;
-      }
-
-      // A participant with no account link must NOT produce a silently
-      // unscoped snapshot — that is exactly the corruption the account-scoped
-      // reads later have to fail closed on. Run
-      // `pnpm trading-accounts:repair-links --apply` first.
-      if (!participant.tradingAccountId) {
-        this.recordParticipantError(
-          result,
-          participant,
-          new Error(
-            'TRADING_ACCOUNT_LINK_INTEGRITY: season participant has no trading account link; run trading-accounts:repair-links before generating snapshots.',
-          ),
-        );
         continue;
       }
 

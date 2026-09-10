@@ -129,7 +129,7 @@ type OrdersParticipant = {
   id: string;
   participantStatus: ParticipantStatus;
   joinedAt: Date;
-  tradingAccountId: string | null;
+  tradingAccountId: string;
 };
 
 /**
@@ -1933,7 +1933,7 @@ export class OrdersService {
     }
 
     const where = {
-      seasonParticipantId: participant.id,
+      tradingAccountId: participant.tradingAccountId,
       ...(parsedQuery.status ? { status: parsedQuery.status } : {}),
       ...(parsedQuery.side ? { side: parsedQuery.side } : {}),
       ...(parsedQuery.assetId ? { assetId: parsedQuery.assetId } : {}),
@@ -2013,8 +2013,9 @@ export class OrdersService {
     const order = await this.prisma.order.findFirst({
       where: {
         id: parsedOrderId,
-        seasonParticipant: {
+        tradingAccount: {
           userId,
+          mode: TradingAccountMode.season,
         },
       },
       select: {
@@ -2965,20 +2966,12 @@ export class OrdersService {
     const tradingAccountId = this.requireOrderTradingScope(order);
     await this.consumeOrderQuoteInTransaction(tx, order, plan.executedAt);
     const position = await tx.position.findUnique({
-      where:
-        order.seasonParticipantId === null
-          ? {
-              tradingAccountId_assetId: {
-                tradingAccountId,
-                assetId: order.assetId,
-              },
-            }
-          : {
-              seasonParticipantId_assetId: {
-                seasonParticipantId: order.seasonParticipantId,
-                assetId: order.assetId,
-              },
-            },
+      where: {
+        tradingAccountId_assetId: {
+          tradingAccountId,
+          assetId: order.assetId,
+        },
+      },
       select: {
         id: true,
         seasonParticipantId: true,
@@ -3053,6 +3046,7 @@ export class OrdersService {
       await this.throwPositionDecrementFailure(tx, {
         positionId: position.id,
         seasonParticipantId: order.seasonParticipantId,
+        tradingAccountId,
         assetId: order.assetId,
         quantity: order.quantity,
       });
@@ -3154,27 +3148,38 @@ export class OrdersService {
     // only when its scope is the order's verified account (NULL legacy
     // quotes stay consumable — they were already pinned to the participant
     // and request hash by the execution-time validation).
-    const result = await tx.quote.updateMany({
-      where: {
-        id: order.quoteId,
-        status: QuoteStatus.active,
-        seasonParticipantId: order.seasonParticipantId,
-        ...(order.seasonParticipantId === null
-          ? { tradingAccountId: this.requireOrderTradingScope(order) }
-          : {
-              OR: [
-                { tradingAccountId: this.requireOrderTradingScope(order) },
-                { tradingAccountId: null },
-              ],
-            }),
-      },
-      data: {
-        status: QuoteStatus.consumed,
-        consumedAt,
-      },
-    });
+    const tradingAccountId = this.requireOrderTradingScope(order);
+    const consumedCount =
+      order.seasonParticipantId === null
+        ? (
+            await tx.quote.updateMany({
+              where: {
+                id: order.quoteId,
+                status: QuoteStatus.active,
+                seasonParticipantId: null,
+                tradingAccountId,
+              },
+              data: {
+                status: QuoteStatus.consumed,
+                consumedAt,
+              },
+            })
+          ).count
+        : await tx.$executeRaw`
+            UPDATE "quotes"
+            SET "status" = 'consumed',
+                "consumed_at" = ${consumedAt},
+                "updated_at" = clock_timestamp()
+            WHERE "id" = ${order.quoteId}
+              AND "status" = 'active'
+              AND "season_participant_id" = ${order.seasonParticipantId}
+              AND (
+                "trading_account_id" = ${tradingAccountId}
+                OR "trading_account_id" IS NULL
+              )
+          `;
 
-    if (result.count !== 1) {
+    if (consumedCount !== 1) {
       this.throwApiError(
         HttpStatus.CONFLICT,
         'QUOTE_NOT_ACTIVE',
@@ -3190,20 +3195,12 @@ export class OrdersService {
     tradingAccountId: string,
   ) {
     const wallet = await tx.cashWallet.findUnique({
-      where:
-        seasonParticipantId === null
-          ? {
-              tradingAccountId_currencyCode: {
-                tradingAccountId,
-                currencyCode,
-              },
-            }
-          : {
-              seasonParticipantId_currencyCode: {
-                seasonParticipantId,
-                currencyCode,
-              },
-            },
+      where: {
+        tradingAccountId_currencyCode: {
+          tradingAccountId,
+          currencyCode,
+        },
+      },
       select: {
         id: true,
         seasonParticipantId: true,
@@ -3352,20 +3349,12 @@ export class OrdersService {
     tradingAccountId: string,
   ): Promise<string> {
     const position = await tx.position.findUnique({
-      where:
-        order.seasonParticipantId === null
-          ? {
-              tradingAccountId_assetId: {
-                tradingAccountId,
-                assetId: order.assetId,
-              },
-            }
-          : {
-              seasonParticipantId_assetId: {
-                seasonParticipantId: order.seasonParticipantId,
-                assetId: order.assetId,
-              },
-            },
+      where: {
+        tradingAccountId_assetId: {
+          tradingAccountId,
+          assetId: order.assetId,
+        },
+      },
       select: {
         id: true,
         seasonParticipantId: true,
@@ -3491,6 +3480,7 @@ export class OrdersService {
       valuation = await this.calculateParticipantValuationInTransaction(
         tx,
         seasonParticipantId,
+        tradingAccountId,
         capturedAt,
       );
     } catch (error) {
@@ -3528,7 +3518,7 @@ export class OrdersService {
     const maxDrawdown =
       await this.calculateParticipantMaxDrawdownFromEquitySnapshots(
         tx,
-        seasonParticipantId,
+        tradingAccountId,
       );
 
     await tx.seasonParticipant.update({
@@ -3553,11 +3543,11 @@ export class OrdersService {
 
   private async calculateParticipantMaxDrawdownFromEquitySnapshots(
     tx: OrderExecuteTransactionClient,
-    seasonParticipantId: string,
+    tradingAccountId: string,
   ) {
     const snapshots = await tx.equitySnapshot.findMany({
       where: {
-        seasonParticipantId,
+        tradingAccountId,
       },
       orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
       select: {
@@ -3572,6 +3562,7 @@ export class OrdersService {
   private async calculateParticipantValuationInTransaction(
     tx: OrderExecuteTransactionClient,
     seasonParticipantId: string,
+    tradingAccountId: string,
     valuationAt: Date,
   ): Promise<{
     totalAssetKrw: string;
@@ -3582,12 +3573,16 @@ export class OrdersService {
     usStockValueKrw: string;
     cryptoValueKrw: string;
   }> {
-    const participant = await tx.seasonParticipant.findUnique({
+    const account = await tx.tradingAccount.findUnique({
       where: {
-        id: seasonParticipantId,
+        id: tradingAccountId,
       },
       select: {
+        mode: true,
         initialCapitalKrw: true,
+        seasonParticipant: {
+          select: { id: true },
+        },
         cashWallets: {
           select: {
             currencyCode: true,
@@ -3621,7 +3616,11 @@ export class OrdersService {
       },
     });
 
-    if (!participant) {
+    if (
+      !account ||
+      account.mode !== TradingAccountMode.season ||
+      account.seasonParticipant?.id !== seasonParticipantId
+    ) {
       this.throwApiError(
         HttpStatus.CONFLICT,
         'SEASON_PARTICIPANT_NOT_FOUND',
@@ -3630,23 +3629,23 @@ export class OrdersService {
     }
 
     const usdKrwRate =
-      participant.cashWallets.some(
+      account.cashWallets.some(
         (wallet) =>
           wallet.currencyCode === CurrencyCode.USD &&
           !wallet.balanceAmount.eq(0),
       ) ||
-      participant.positions.some(
+      account.positions.some(
         (position) => position.currencyCode === CurrencyCode.USD,
       )
         ? await this.findLatestUsdKrwRateForPortfolio(tx, valuationAt)
         : null;
-    const krwCash = participant.cashWallets
+    const krwCash = account.cashWallets
       .filter((wallet) => wallet.currencyCode === CurrencyCode.KRW)
       .reduce(
         (sum, wallet) => sum.add(wallet.balanceAmount),
         new Prisma.Decimal(0),
       );
-    const usdCash = participant.cashWallets
+    const usdCash = account.cashWallets
       .filter((wallet) => wallet.currencyCode === CurrencyCode.USD)
       .reduce(
         (sum, wallet) => sum.add(wallet.balanceAmount),
@@ -3659,7 +3658,7 @@ export class OrdersService {
     let usStockValueKrw = new Prisma.Decimal(0);
     let cryptoValueKrw = new Prisma.Decimal(0);
 
-    for (const position of participant.positions) {
+    for (const position of account.positions) {
       if (
         this.getAssetPriceCurrency(position.asset) !==
         this.getAssetSettlementCurrency(position.asset)
@@ -3748,8 +3747,8 @@ export class OrdersService {
       .add(usStockValueKrw)
       .add(cryptoValueKrw);
     const returnRate = totalAssetKrw
-      .sub(participant.initialCapitalKrw)
-      .div(participant.initialCapitalKrw)
+      .sub(account.initialCapitalKrw)
+      .div(account.initialCapitalKrw)
       .mul(100);
 
     return {
@@ -4081,6 +4080,7 @@ export class OrdersService {
     input: {
       positionId: string;
       seasonParticipantId: string | null;
+      tradingAccountId: string;
       assetId: string;
       quantity: Prisma.Decimal;
     },
@@ -4089,6 +4089,7 @@ export class OrdersService {
       where: {
         id: input.positionId,
         seasonParticipantId: input.seasonParticipantId,
+        tradingAccountId: input.tradingAccountId,
         assetId: input.assetId,
       },
       select: {
@@ -5013,13 +5014,28 @@ export class OrdersService {
       return null;
     }
 
-    return this.prisma.order.findFirst({
-      where: {
-        seasonParticipantId: input.seasonParticipantId,
-        idempotencyKey: input.idempotencyKey,
-        tradingAccountId: null,
-        seasonParticipant: { userId: input.userId },
-      },
+    // Compatibility only: Prisma's canonical schema now models the account
+    // column as required, so the pre-hardening NULL predicate lives in
+    // explicit SQL. The normal lookup above remains account-scoped.
+    const legacyRows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT o."id"
+      FROM "orders" o
+      JOIN "season_participants" sp
+        ON sp."id" = o."season_participant_id"
+      WHERE o."season_participant_id" = ${input.seasonParticipantId}
+        AND o."idempotency_key" = ${input.idempotencyKey}
+        AND o."trading_account_id" IS NULL
+        AND sp."user_id" = ${input.userId}
+      ORDER BY o."created_at" DESC, o."id" ASC
+      LIMIT 1
+    `;
+    const legacyId = legacyRows[0]?.id;
+    if (!legacyId) {
+      return null;
+    }
+
+    return this.prisma.order.findUnique({
+      where: { id: legacyId },
       select: IDEMPOTENT_CREATE_ORDER_SELECT,
     });
   }
@@ -5563,20 +5579,12 @@ export class OrdersService {
   }> {
     if (input.side === OrderSide.buy) {
       const wallet = await this.prisma.cashWallet.findUnique({
-        where:
-          input.participantId === null
-            ? {
-                tradingAccountId_currencyCode: {
-                  tradingAccountId: input.tradingAccountId,
-                  currencyCode: input.currencyCode,
-                },
-              }
-            : {
-                seasonParticipantId_currencyCode: {
-                  seasonParticipantId: input.participantId,
-                  currencyCode: input.currencyCode,
-                },
-              },
+        where: {
+          tradingAccountId_currencyCode: {
+            tradingAccountId: input.tradingAccountId,
+            currencyCode: input.currencyCode,
+          },
+        },
         select: {
           id: true,
           seasonParticipantId: true,
@@ -5613,20 +5621,12 @@ export class OrdersService {
       }
 
       const position = await this.prisma.position.findUnique({
-        where:
-          input.participantId === null
-            ? {
-                tradingAccountId_assetId: {
-                  tradingAccountId: input.tradingAccountId,
-                  assetId: input.assetId,
-                },
-              }
-            : {
-                seasonParticipantId_assetId: {
-                  seasonParticipantId: input.participantId,
-                  assetId: input.assetId,
-                },
-              },
+        where: {
+          tradingAccountId_assetId: {
+            tradingAccountId: input.tradingAccountId,
+            assetId: input.assetId,
+          },
+        },
         select: {
           seasonParticipantId: true,
           tradingAccountId: true,
@@ -5648,20 +5648,12 @@ export class OrdersService {
     }
 
     const position = await this.prisma.position.findUnique({
-      where:
-        input.participantId === null
-          ? {
-              tradingAccountId_assetId: {
-                tradingAccountId: input.tradingAccountId,
-                assetId: input.assetId,
-              },
-            }
-          : {
-              seasonParticipantId_assetId: {
-                seasonParticipantId: input.participantId,
-                assetId: input.assetId,
-              },
-            },
+      where: {
+        tradingAccountId_assetId: {
+          tradingAccountId: input.tradingAccountId,
+          assetId: input.assetId,
+        },
+      },
       select: {
         seasonParticipantId: true,
         tradingAccountId: true,
@@ -5691,20 +5683,12 @@ export class OrdersService {
     }
 
     const wallet = await this.prisma.cashWallet.findUnique({
-      where:
-        input.participantId === null
-          ? {
-              tradingAccountId_currencyCode: {
-                tradingAccountId: input.tradingAccountId,
-                currencyCode: input.currencyCode,
-              },
-            }
-          : {
-              seasonParticipantId_currencyCode: {
-                seasonParticipantId: input.participantId,
-                currencyCode: input.currencyCode,
-              },
-            },
+      where: {
+        tradingAccountId_currencyCode: {
+          tradingAccountId: input.tradingAccountId,
+          currencyCode: input.currencyCode,
+        },
+      },
       select: {
         id: true,
         seasonParticipantId: true,

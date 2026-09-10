@@ -135,6 +135,9 @@ export class SeasonRankingJobService {
       where: {
         snapshotDate,
         ...seasonSnapshotWhere,
+        tradingAccountId: {
+          in: [...participantScopes.values()],
+        },
         seasonParticipant: {
           seasonId,
           participantStatus: {
@@ -390,6 +393,9 @@ export class SeasonRankingJobService {
           lte: rankingDate,
         },
         ...seasonSnapshotWhere,
+        tradingAccountId: {
+          in: [...participantScopes.values()],
+        },
         seasonParticipant: {
           seasonId,
           participantStatus: {
@@ -455,6 +461,9 @@ export class SeasonRankingJobService {
         executedAt: {
           not: null,
           lte: latestCapturedAt,
+        },
+        tradingAccountId: {
+          in: [...participantScopes.values()],
         },
         seasonParticipant: {
           seasonId,

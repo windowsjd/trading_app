@@ -196,20 +196,12 @@ export class LimitOrderCreateService {
 
     const [wallet, position] = await Promise.all([
       this.prisma.cashWallet.findUnique({
-        where:
-          input.participantId === null
-            ? {
-                tradingAccountId_currencyCode: {
-                  tradingAccountId: input.tradingAccountId,
-                  currencyCode: input.currencyCode,
-                },
-              }
-            : {
-                seasonParticipantId_currencyCode: {
-                  seasonParticipantId: input.participantId,
-                  currencyCode: input.currencyCode,
-                },
-              },
+        where: {
+          tradingAccountId_currencyCode: {
+            tradingAccountId: input.tradingAccountId,
+            currencyCode: input.currencyCode,
+          },
+        },
         select: {
           id: true,
           seasonParticipantId: true,
@@ -219,20 +211,12 @@ export class LimitOrderCreateService {
         },
       }),
       this.prisma.position.findUnique({
-        where:
-          input.participantId === null
-            ? {
-                tradingAccountId_assetId: {
-                  tradingAccountId: input.tradingAccountId,
-                  assetId: input.assetId,
-                },
-              }
-            : {
-                seasonParticipantId_assetId: {
-                  seasonParticipantId: input.participantId,
-                  assetId: input.assetId,
-                },
-              },
+        where: {
+          tradingAccountId_assetId: {
+            tradingAccountId: input.tradingAccountId,
+            assetId: input.assetId,
+          },
+        },
         select: {
           id: true,
           seasonParticipantId: true,
@@ -312,20 +296,12 @@ export class LimitOrderCreateService {
     });
     const [wallet, position] = await Promise.all([
       this.prisma.cashWallet.findUnique({
-        where:
-          input.participantId === null
-            ? {
-                tradingAccountId_currencyCode: {
-                  tradingAccountId: input.tradingAccountId,
-                  currencyCode: input.currencyCode,
-                },
-              }
-            : {
-                seasonParticipantId_currencyCode: {
-                  seasonParticipantId: input.participantId,
-                  currencyCode: input.currencyCode,
-                },
-              },
+        where: {
+          tradingAccountId_currencyCode: {
+            tradingAccountId: input.tradingAccountId,
+            currencyCode: input.currencyCode,
+          },
+        },
         select: {
           id: true,
           seasonParticipantId: true,
@@ -334,20 +310,12 @@ export class LimitOrderCreateService {
         },
       }),
       this.prisma.position.findUnique({
-        where:
-          input.participantId === null
-            ? {
-                tradingAccountId_assetId: {
-                  tradingAccountId: input.tradingAccountId,
-                  assetId: input.assetId,
-                },
-              }
-            : {
-                seasonParticipantId_assetId: {
-                  seasonParticipantId: input.participantId,
-                  assetId: input.assetId,
-                },
-              },
+        where: {
+          tradingAccountId_assetId: {
+            tradingAccountId: input.tradingAccountId,
+            assetId: input.assetId,
+          },
+        },
         select: {
           seasonParticipantId: true,
           tradingAccountId: true,
@@ -677,27 +645,37 @@ export class LimitOrderCreateService {
     // only this participant's quote flips, and only when its scope is the
     // verified account (NULL legacy quotes stay consumable — the caller
     // already pinned them to the participant + request hash).
-    const consumeResult = await tx.quote.updateMany({
-      where: {
-        id: input.quote.id,
-        status: QuoteStatus.active,
-        seasonParticipantId: input.participant.id,
-        ...(input.participant.id === null
-          ? { tradingAccountId: input.participant.tradingAccountId }
-          : {
-              OR: [
-                { tradingAccountId: input.participant.tradingAccountId },
-                { tradingAccountId: null },
-              ],
-            }),
-      },
-      data: {
-        status: QuoteStatus.consumed,
-        consumedAt: input.submittedAt,
-      },
-    });
+    const consumeCount =
+      input.participant.id === null
+        ? (
+            await tx.quote.updateMany({
+              where: {
+                id: input.quote.id,
+                status: QuoteStatus.active,
+                seasonParticipantId: null,
+                tradingAccountId: input.participant.tradingAccountId,
+              },
+              data: {
+                status: QuoteStatus.consumed,
+                consumedAt: input.submittedAt,
+              },
+            })
+          ).count
+        : await tx.$executeRaw`
+            UPDATE "quotes"
+            SET "status" = 'consumed',
+                "consumed_at" = ${input.submittedAt},
+                "updated_at" = clock_timestamp()
+            WHERE "id" = ${input.quote.id}
+              AND "status" = 'active'
+              AND "season_participant_id" = ${input.participant.id}
+              AND (
+                "trading_account_id" = ${input.participant.tradingAccountId}
+                OR "trading_account_id" IS NULL
+              )
+          `;
 
-    if (consumeResult.count !== 1) {
+    if (consumeCount !== 1) {
       throw new HttpException(
         {
           success: false,
@@ -809,20 +787,12 @@ export class LimitOrderCreateService {
     }
 
     const position = await tx.position.findUnique({
-      where:
-        input.participant.id === null
-          ? {
-              tradingAccountId_assetId: {
-                tradingAccountId: input.participant.tradingAccountId,
-                assetId: input.quote.asset.id,
-              },
-            }
-          : {
-              seasonParticipantId_assetId: {
-                seasonParticipantId: input.participant.id,
-                assetId: input.quote.asset.id,
-              },
-            },
+      where: {
+        tradingAccountId_assetId: {
+          tradingAccountId: input.participant.tradingAccountId,
+          assetId: input.quote.asset.id,
+        },
+      },
       select: {
         id: true,
         seasonParticipantId: true,
@@ -897,23 +867,36 @@ export class LimitOrderCreateService {
       },
       select: { id: true },
     });
-    const consumed = await tx.quote.updateMany({
-      where: {
-        id: input.quote.id,
-        status: QuoteStatus.active,
-        seasonParticipantId: input.participant.id,
-        ...(input.participant.id === null
-          ? { tradingAccountId: input.participant.tradingAccountId }
-          : {
-              OR: [
-                { tradingAccountId: input.participant.tradingAccountId },
-                { tradingAccountId: null },
-              ],
-            }),
-      },
-      data: { status: QuoteStatus.consumed, consumedAt: input.submittedAt },
-    });
-    if (consumed.count !== 1) {
+    const consumedCount =
+      input.participant.id === null
+        ? (
+            await tx.quote.updateMany({
+              where: {
+                id: input.quote.id,
+                status: QuoteStatus.active,
+                seasonParticipantId: null,
+                tradingAccountId: input.participant.tradingAccountId,
+              },
+              data: {
+                status: QuoteStatus.consumed,
+                consumedAt: input.submittedAt,
+              },
+            })
+          ).count
+        : await tx.$executeRaw`
+            UPDATE "quotes"
+            SET "status" = 'consumed',
+                "consumed_at" = ${input.submittedAt},
+                "updated_at" = clock_timestamp()
+            WHERE "id" = ${input.quote.id}
+              AND "status" = 'active'
+              AND "season_participant_id" = ${input.participant.id}
+              AND (
+                "trading_account_id" = ${input.participant.tradingAccountId}
+                OR "trading_account_id" IS NULL
+              )
+          `;
+    if (consumedCount !== 1) {
       this.throwApiError(
         HttpStatus.CONFLICT,
         'QUOTE_NOT_ACTIVE',

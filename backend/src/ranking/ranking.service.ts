@@ -92,6 +92,7 @@ type MyRankingRow = SeasonRankingScopeRow & {
 
 type RankingParticipantVisibility = {
   id: string;
+  tradingAccountId: string;
   participantStatus: ParticipantStatus;
   rankingHiddenAt: Date | null;
 };
@@ -265,11 +266,11 @@ export class RankingService {
       participant && participantRankingVisible
         ? this.prisma.seasonRanking.findUnique({
             where: {
-              seasonId_rankType_rankingDate_seasonParticipantId: {
+              seasonId_rankType_rankingDate_tradingAccountId: {
                 seasonId: season.id,
                 rankType: parsedQuery.rankType,
                 rankingDate: selectedRanking.rankingDate,
-                seasonParticipantId: participant.id,
+                tradingAccountId: participant.tradingAccountId,
               },
             },
             select: {
@@ -628,6 +629,7 @@ export class RankingService {
       },
       select: {
         id: true,
+        tradingAccountId: true,
         participantStatus: true,
         rankingHiddenAt: true,
       },

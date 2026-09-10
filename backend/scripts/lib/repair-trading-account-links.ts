@@ -68,25 +68,14 @@ export type RepairLinksSummary = {
   remainingExcludedActiveMismatchCount: number | null;
 };
 
-type RepairPrismaClient = Pick<PrismaClient, '$transaction'> &
+type RepairPrismaClient = Pick<PrismaClient, '$transaction' | '$queryRaw'> &
   Pick<Prisma.TransactionClient, 'seasonParticipant' | 'tradingAccount'>;
-
-const NULL_LINK_PARTICIPANT_SELECT = {
-  id: true,
-  seasonId: true,
-  userId: true,
-  joinedAt: true,
-  participantStatus: true,
-  initialCapitalKrw: true,
-  tradingAccountId: true,
-} as const;
 
 // Excluded participants whose linked SEASON account is still active. Closed
 // and suspended accounts, general accounts, and non-excluded participants are
 // excluded by the query itself and are never touched.
 const EXCLUDED_ACTIVE_MISMATCH_WHERE = {
   participantStatus: ParticipantStatus.excluded,
-  tradingAccountId: { not: null },
   tradingAccount: {
     mode: TradingAccountMode.season,
     status: TradingAccountStatus.active,
@@ -100,11 +89,28 @@ export async function repairMissingTradingAccountLinks(
   const failures: RepairLinksFailure[] = [];
 
   // --- 1) tradingAccountId = null participants -------------------------
-  const nullParticipants = await prisma.seasonParticipant.findMany({
-    where: { tradingAccountId: null },
-    orderBy: [{ joinedAt: 'asc' }, { id: 'asc' }],
-    select: NULL_LINK_PARTICIPANT_SELECT,
-  });
+  const nullParticipants = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      seasonId: string;
+      userId: string;
+      joinedAt: Date;
+      participantStatus: ParticipantStatus;
+      initialCapitalKrw: Prisma.Decimal;
+      tradingAccountId: null;
+    }>
+  >`
+    SELECT "id",
+           "season_id" AS "seasonId",
+           "user_id" AS "userId",
+           "joined_at" AS "joinedAt",
+           "participant_status" AS "participantStatus",
+           "initial_capital_krw" AS "initialCapitalKrw",
+           "trading_account_id" AS "tradingAccountId"
+    FROM "season_participants"
+    WHERE "trading_account_id" IS NULL
+    ORDER BY "joined_at" ASC, "id" ASC
+  `;
 
   const outcomes: RepairLinksOutcome[] = [];
   for (const participant of nullParticipants) {
@@ -198,9 +204,15 @@ export async function repairMissingTradingAccountLinks(
 
   // --- post-apply verification -----------------------------------------
   const remainingNullLinkCount = options.apply
-    ? await prisma.seasonParticipant.count({
-        where: { tradingAccountId: null },
-      })
+    ? Number(
+        (
+          await prisma.$queryRaw<Array<{ count: bigint }>>`
+            SELECT count(*)::bigint AS "count"
+            FROM "season_participants"
+            WHERE "trading_account_id" IS NULL
+          `
+        )[0]?.count ?? 0n,
+      )
     : null;
   const remainingExcludedActiveMismatchCount = options.apply
     ? await prisma.seasonParticipant.count({

@@ -5,6 +5,7 @@ import {
   CurrencyCode,
   FxRateSourceType,
   Prisma,
+  TradingAccountMode,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -54,28 +55,38 @@ export class PortfolioValuationService {
       },
       select: {
         id: true,
+        userId: true,
         initialCapitalKrw: true,
-        cashWallets: {
+        tradingAccountId: true,
+        tradingAccount: {
           select: {
-            currencyCode: true,
-            balanceAmount: true,
-          },
-        },
-        positions: {
-          select: {
-            assetId: true,
-            quantity: true,
-            averageCost: true,
-            currencyCode: true,
-            realizedPnl: true,
-            realizedPnlKrw: true,
-            asset: {
+            id: true,
+            userId: true,
+            mode: true,
+            initialCapitalKrw: true,
+            cashWallets: {
               select: {
-                id: true,
-                assetType: true,
-                market: true,
                 currencyCode: true,
-                priceCurrency: true,
+                balanceAmount: true,
+              },
+            },
+            positions: {
+              select: {
+                assetId: true,
+                quantity: true,
+                averageCost: true,
+                currencyCode: true,
+                realizedPnl: true,
+                realizedPnlKrw: true,
+                asset: {
+                  select: {
+                    id: true,
+                    assetType: true,
+                    market: true,
+                    currencyCode: true,
+                    priceCurrency: true,
+                  },
+                },
               },
             },
           },
@@ -90,11 +101,27 @@ export class PortfolioValuationService {
       );
     }
 
+    const account = participant.tradingAccount;
+    if (
+      account.id !== participant.tradingAccountId ||
+      account.mode !== TradingAccountMode.season ||
+      account.userId !== participant.userId ||
+      !account.initialCapitalKrw.eq(participant.initialCapitalKrw)
+    ) {
+      throw new PortfolioValuationError(
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+        'Season participant is not linked to its canonical season trading account.',
+      );
+    }
+
     return this.calculateValuationForHoldings({
-      subject: { seasonParticipantId: participant.id, tradingAccountId: null },
-      initialCapitalKrw: participant.initialCapitalKrw,
-      cashWallets: participant.cashWallets,
-      positions: participant.positions,
+      subject: {
+        seasonParticipantId: participant.id,
+        tradingAccountId: account.id,
+      },
+      initialCapitalKrw: account.initialCapitalKrw,
+      cashWallets: account.cashWallets,
+      positions: account.positions,
       valuationAt,
       sourceEligibilityWorkflow,
       useSettlementPricePolicy,

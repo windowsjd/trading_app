@@ -122,11 +122,13 @@ export async function repairRankingScope(
 
       // IS NULL guarded: a concurrent new-version writer that already set the
       // scope wins, and this becomes a no-op rather than an overwrite.
-      const updated = await prisma.seasonRanking.updateMany({
-        where: { id: row.id, tradingAccountId: null },
-        data: { tradingAccountId: row.participant_trading_account_id },
-      });
-      summary.backfilledCount += updated.count;
+      const updatedCount = await prisma.$executeRaw`
+        UPDATE "season_rankings"
+        SET "trading_account_id" = ${row.participant_trading_account_id}
+        WHERE "id" = ${row.id}
+          AND "trading_account_id" IS NULL
+      `;
+      summary.backfilledCount += updatedCount;
     }
 
     if (rows.length < BATCH_SIZE) break;

@@ -392,20 +392,12 @@ export class LimitOrderExecutionService {
       // The wallet must carry the ORDER's verified account scope — null or
       // foreign scope rolls the whole fill back before any money moves.
       const wallet = await tx.cashWallet.findUnique({
-        where:
-          order.seasonParticipantId === null
-            ? {
-                tradingAccountId_currencyCode: {
-                  tradingAccountId,
-                  currencyCode: order.currencyCode,
-                },
-              }
-            : {
-                seasonParticipantId_currencyCode: {
-                  seasonParticipantId: order.seasonParticipantId,
-                  currencyCode: order.currencyCode,
-                },
-              },
+        where: {
+          tradingAccountId_currencyCode: {
+            tradingAccountId,
+            currencyCode: order.currencyCode,
+          },
+        },
         select: { id: true, seasonParticipantId: true, tradingAccountId: true },
       });
       if (!wallet) {
@@ -630,20 +622,12 @@ export class LimitOrderExecutionService {
     },
   ): Promise<void> {
     const position = await tx.position.findUnique({
-      where:
-        input.seasonParticipantId === null
-          ? {
-              tradingAccountId_assetId: {
-                tradingAccountId: input.tradingAccountId,
-                assetId: input.assetId,
-              },
-            }
-          : {
-              seasonParticipantId_assetId: {
-                seasonParticipantId: input.seasonParticipantId,
-                assetId: input.assetId,
-              },
-            },
+      where: {
+        tradingAccountId_assetId: {
+          tradingAccountId: input.tradingAccountId,
+          assetId: input.assetId,
+        },
+      },
       select: {
         id: true,
         seasonParticipantId: true,
@@ -710,20 +694,12 @@ export class LimitOrderExecutionService {
     },
   ): Promise<string> {
     const existing = await tx.position.findUnique({
-      where:
-        input.seasonParticipantId === null
-          ? {
-              tradingAccountId_assetId: {
-                tradingAccountId: input.tradingAccountId,
-                assetId: input.assetId,
-              },
-            }
-          : {
-              seasonParticipantId_assetId: {
-                seasonParticipantId: input.seasonParticipantId,
-                assetId: input.assetId,
-              },
-            },
+      where: {
+        tradingAccountId_assetId: {
+          tradingAccountId: input.tradingAccountId,
+          assetId: input.assetId,
+        },
+      },
       select: {
         id: true,
         seasonParticipantId: true,

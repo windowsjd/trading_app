@@ -18,7 +18,6 @@ import {
 import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
-  requireParticipantTradingAccountIdForSnapshot,
   requireSeasonSnapshotParticipantId,
   seasonSnapshotWhere,
 } from '../portfolio/season-snapshot-scope';
@@ -74,13 +73,12 @@ type SettlementParticipant = {
   seasonId: string;
   userId: string;
   totalFillCount: number;
-  /** Verified into a non-null scope by `buildRankingParticipantScopes`. */
-  tradingAccountId: string | null;
+  tradingAccountId: string;
   tradingAccount: {
     id: string;
     mode: TradingAccountMode;
     userId: string;
-  } | null;
+  };
 };
 
 type SettlementSeason = {
@@ -120,7 +118,7 @@ type ExistingFinalRankingRow = {
   id: string;
   seasonId: string;
   seasonParticipantId: string;
-  tradingAccountId: string | null;
+  tradingAccountId: string;
   rank: number;
   totalAssetKrw: Prisma.Decimal;
   returnRate: Prisma.Decimal;
@@ -131,7 +129,7 @@ type ExistingFinalRankingRow = {
     id: string;
     seasonId: string;
     userId: string;
-    tradingAccountId: string | null;
+    tradingAccountId: string;
     tradingAccount: {
       id: string;
       mode: TradingAccountMode;
@@ -168,7 +166,7 @@ type SettlementAccountParticipant = {
   id: string;
   userId: string;
   participantStatus: ParticipantStatus;
-  tradingAccountId: string | null;
+  tradingAccountId: string;
   tradingAccount: {
     id: string;
     mode: TradingAccountMode;
@@ -176,7 +174,7 @@ type SettlementAccountParticipant = {
     userId: string;
     closedAt: Date | null;
     seasonParticipant: { id: string } | null;
-  } | null;
+  };
 };
 
 @Injectable()
@@ -342,7 +340,7 @@ export class SeasonSettlementJobService {
     // Season-wide, not eligible-only: settlement closes excluded participants'
     // accounts too (작업 8 §14.2).
     result.seasonAccounts.linked = await this.prisma.seasonParticipant.count({
-      where: { seasonId, tradingAccountId: { not: null } },
+      where: { seasonId },
     });
     result.seasonAccounts.wouldClose = result.seasonAccounts.linked;
 
@@ -520,18 +518,18 @@ export class SeasonSettlementJobService {
           where: {
             status: OrderStatus.submitted,
             orderType: OrderType.limit,
-            seasonParticipant: { seasonId },
+            tradingAccount: { seasonParticipant: { seasonId } },
           },
         }),
         client.cashWallet.count({
           where: {
-            seasonParticipant: { seasonId },
+            tradingAccount: { seasonParticipant: { seasonId } },
             reservedAmount: { gt: 0 },
           },
         }),
         client.position.count({
           where: {
-            seasonParticipant: { seasonId },
+            tradingAccount: { seasonParticipant: { seasonId } },
             reservedQuantity: { gt: 0 },
           },
         }),
@@ -600,11 +598,16 @@ export class SeasonSettlementJobService {
 
     for (const participant of input.participants) {
       const valuation =
-        await this.portfolioValuationService.calculateSeasonParticipantValuation(
-          participant.id,
+        await this.portfolioValuationService.calculateTradingAccountValuation(
+          participant.tradingAccountId,
           input.settlementAt,
           'season_settlement',
         );
+      if (valuation.seasonParticipantId !== participant.id) {
+        throw new Error(
+          `Trading account ${participant.tradingAccountId} is not owned by settlement participant ${participant.id}.`,
+        );
+      }
       const history = await this.findEquityHistory(
         participant.id,
         input.participantScopes,
@@ -664,6 +667,9 @@ export class SeasonSettlementJobService {
         snapshotDate: input.settlementDate,
         // Season-only: general-mode daily rows must never reach settlement.
         ...seasonSnapshotWhere,
+        tradingAccountId: {
+          in: [...input.participantScopes.values()],
+        },
         seasonParticipant: {
           id: {
             in: input.participants.map((participant) => participant.id),
@@ -748,7 +754,7 @@ export class SeasonSettlementJobService {
   ): Promise<EquityHistoryPoint[]> {
     const rows = await this.prisma.equitySnapshot.findMany({
       where: {
-        seasonParticipantId,
+        tradingAccountId: participantScopes.get(seasonParticipantId)!,
       },
       orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
       select: {
@@ -934,7 +940,7 @@ export class SeasonSettlementJobService {
 
         const existingSnapshot = await tx.equitySnapshot.findFirst({
           where: {
-            seasonParticipantId: row.seasonParticipantId,
+            tradingAccountId,
             snapshotReason: SnapshotReason.settlement,
           },
           orderBy: [
@@ -985,12 +991,9 @@ export class SeasonSettlementJobService {
           const createdSnapshot = await tx.equitySnapshot.create({
             data: {
               seasonParticipantId: row.seasonParticipantId,
-              // 작업 7 dual-write.
-              tradingAccountId:
-                await requireParticipantTradingAccountIdForSnapshot(
-                  tx,
-                  row.seasonParticipantId,
-                ),
+              // Legacy participant identity remains dual-written; ownership
+              // is the same verified account used for the lookup above.
+              tradingAccountId,
               ...snapshotData,
               snapshotReason: SnapshotReason.settlement,
             },

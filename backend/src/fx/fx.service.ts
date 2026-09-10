@@ -473,6 +473,7 @@ export class FxService {
       },
       select: {
         id: true,
+        tradingAccountId: true,
         participantStatus: true,
         joinedAt: true,
       },
@@ -490,7 +491,7 @@ export class FxService {
     }
 
     const where = {
-      seasonParticipantId: participant.id,
+      tradingAccountId: participant.tradingAccountId,
     };
     const [total, exchanges] = await Promise.all([
       this.prisma.exchangeTransaction.count({ where }),
@@ -1554,19 +1555,12 @@ export class FxService {
     sourceAmount: Prisma.Decimal;
   }): Promise<void> {
     const wallet = await this.prisma.cashWallet.findUnique({
-      where: input.seasonParticipantId
-        ? {
-            seasonParticipantId_currencyCode: {
-              seasonParticipantId: input.seasonParticipantId,
-              currencyCode: input.fromCurrency,
-            },
-          }
-        : {
-            tradingAccountId_currencyCode: {
-              tradingAccountId: input.tradingAccountId,
-              currencyCode: input.fromCurrency,
-            },
-          },
+      where: {
+        tradingAccountId_currencyCode: {
+          tradingAccountId: input.tradingAccountId,
+          currencyCode: input.fromCurrency,
+        },
+      },
       select: {
         id: true,
         seasonParticipantId: true,
@@ -2348,13 +2342,25 @@ export class FxService {
     },
     client: PrismaService | Prisma.TransactionClient = this.prisma,
   ): Promise<FxExecuteCommandCandidate | null> {
-    const command = await client.fxExecuteRequest.findFirst({
-      where: {
-        userId: input.userId,
-        seasonParticipantId: input.seasonParticipantId,
-        idempotencyKey: input.idempotencyKey,
-        tradingAccountId: null,
-      },
+    // Compatibility only: the canonical Prisma field is required, so legacy
+    // NULL discovery is kept in explicit SQL and cannot become a normal scope.
+    const legacyRows = await client.$queryRaw<Array<{ id: string }>>`
+      SELECT "id"
+      FROM "fx_execute_requests"
+      WHERE "user_id" = ${input.userId}
+        AND "season_participant_id" = ${input.seasonParticipantId}
+        AND "idempotency_key" = ${input.idempotencyKey}
+        AND "trading_account_id" IS NULL
+      ORDER BY "created_at" DESC, "id" ASC
+      LIMIT 1
+    `;
+    const legacyId = legacyRows[0]?.id;
+    if (!legacyId) {
+      return null;
+    }
+
+    const command = await client.fxExecuteRequest.findUnique({
+      where: { id: legacyId },
       select: {
         id: true,
         idempotencyKey: true,
@@ -2635,22 +2641,15 @@ export class FxService {
     currencyCode: FxExecuteWalletCandidate['currencyCode'],
     client: PrismaService | Prisma.TransactionClient = this.prisma,
   ): Promise<
-    (FxExecuteWalletCandidate & { tradingAccountId: string | null }) | null
+    (FxExecuteWalletCandidate & { tradingAccountId: string }) | null
   > {
     return client.cashWallet.findUnique({
-      where: seasonParticipantId
-        ? {
-            seasonParticipantId_currencyCode: {
-              seasonParticipantId,
-              currencyCode,
-            },
-          }
-        : {
-            tradingAccountId_currencyCode: {
-              tradingAccountId,
-              currencyCode,
-            },
-          },
+      where: {
+        tradingAccountId_currencyCode: {
+          tradingAccountId,
+          currencyCode,
+        },
+      },
       select: {
         id: true,
         seasonParticipantId: true,
@@ -2797,22 +2796,37 @@ export class FxService {
     // only when its account scope is the verified one (NULL legacy quotes
     // were already pinned to the participant + request hash upstream). A
     // quote of another account can never be consumed here.
-    const quoteConsumeResult = await tx.quote.updateMany({
-      where: {
-        id: plan.quoteId,
-        status: QuoteStatus.active,
-        seasonParticipantId: plan.seasonParticipantId,
-        ...(input.mode === TradingAccountMode.general
-          ? { tradingAccountId }
-          : { OR: [{ tradingAccountId }, { tradingAccountId: null }] }),
-      },
-      data: {
-        status: QuoteStatus.consumed,
-        consumedAt: executeNow,
-      },
-    });
+    const quoteConsumeCount =
+      input.mode === TradingAccountMode.general
+        ? (
+            await tx.quote.updateMany({
+              where: {
+                id: plan.quoteId,
+                status: QuoteStatus.active,
+                seasonParticipantId: null,
+                tradingAccountId,
+              },
+              data: {
+                status: QuoteStatus.consumed,
+                consumedAt: executeNow,
+              },
+            })
+          ).count
+        : await tx.$executeRaw`
+            UPDATE "quotes"
+            SET "status" = 'consumed',
+                "consumed_at" = ${executeNow},
+                "updated_at" = clock_timestamp()
+            WHERE "id" = ${plan.quoteId}
+              AND "status" = 'active'
+              AND "season_participant_id" = ${plan.seasonParticipantId}
+              AND (
+                "trading_account_id" = ${tradingAccountId}
+                OR "trading_account_id" IS NULL
+              )
+          `;
 
-    if (quoteConsumeResult.count !== 1) {
+    if (quoteConsumeCount !== 1) {
       this.throwFxExecuteError(fxExecuteErrorCodes.QUOTE_NOT_ACTIVE);
     }
 
@@ -2946,12 +2960,12 @@ export class FxService {
       throw new Error('Season FX participant context is missing.');
     }
     const valuation =
-      await this.requirePortfolioValuationService().calculateSeasonParticipantValuation(
-      plan.seasonParticipantId,
-      capturedAt,
-      'live_portfolio_valuation',
-      tx,
-    );
+      await this.requirePortfolioValuationService().calculateTradingAccountValuation(
+        tradingAccountId,
+        capturedAt,
+        'live_portfolio_valuation',
+        tx,
+      );
 
     await tx.equitySnapshot.create({
       data: {
@@ -2977,7 +2991,7 @@ export class FxService {
     const maxDrawdown =
       await this.calculateParticipantMaxDrawdownFromEquitySnapshots(
         tx,
-        plan.seasonParticipantId,
+        tradingAccountId,
       );
 
     await tx.seasonParticipant.update({
@@ -2997,11 +3011,11 @@ export class FxService {
 
   private async calculateParticipantMaxDrawdownFromEquitySnapshots(
     tx: FxExecuteTransactionClient,
-    seasonParticipantId: string,
+    tradingAccountId: string,
   ) {
     const snapshots = await tx.equitySnapshot.findMany({
       where: {
-        seasonParticipantId,
+        tradingAccountId,
       },
       orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
       select: {

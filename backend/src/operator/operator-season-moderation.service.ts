@@ -167,6 +167,7 @@ export class OperatorSeasonModerationService {
               tx,
               {
                 seasonParticipantId: participant.id,
+                tradingAccountId: accountSync.tradingAccountId,
                 reason: LIMIT_ORDER_CANCEL_REASONS.participantExcluded,
                 canceledAt: now,
               },

@@ -341,8 +341,8 @@ export class TradingAccountPortfolioService {
 
     try {
       const valuation =
-        await this.valuationService.calculateSeasonParticipantValuation(
-          account.seasonParticipant.id,
+        await this.valuationService.calculateTradingAccountValuation(
+          account.id,
           new Date(),
           'home_live_valuation',
         );

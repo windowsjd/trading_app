@@ -268,6 +268,7 @@ export class LimitOrderCancelService {
     tx: CancelTransactionClient,
     input: {
       seasonParticipantId: string;
+      tradingAccountId: string;
       reason: LimitOrderCancelReason;
       canceledAt: Date;
     },
@@ -275,7 +276,8 @@ export class LimitOrderCancelService {
     const lockedRows = await tx.$queryRaw<Array<{ id: string }>>`
       SELECT "id"
       FROM "orders"
-      WHERE "season_participant_id" = ${input.seasonParticipantId}
+      WHERE "trading_account_id" = ${input.tradingAccountId}
+        AND "season_participant_id" = ${input.seasonParticipantId}
         AND "status" = 'submitted'
         AND "order_type" = 'limit'
       ORDER BY "id"
@@ -310,6 +312,8 @@ export class LimitOrderCancelService {
 
       if (
         !order ||
+        order.tradingAccountId !== input.tradingAccountId ||
+        order.seasonParticipantId !== input.seasonParticipantId ||
         order.status !== OrderStatus.submitted ||
         order.orderType !== OrderType.limit ||
         (order.side !== OrderSide.buy && order.side !== OrderSide.sell)
@@ -356,9 +360,12 @@ export class LimitOrderCancelService {
         where: {
           status: OrderStatus.submitted,
           orderType: OrderType.limit,
-          seasonParticipant: {
-            season: {
-              status: { in: [SeasonStatus.ended, SeasonStatus.settled] },
+          tradingAccount: {
+            mode: TradingAccountMode.season,
+            seasonParticipant: {
+              season: {
+                status: { in: [SeasonStatus.ended, SeasonStatus.settled] },
+              },
             },
           },
         },
@@ -527,20 +534,12 @@ export class LimitOrderCancelService {
     let releasedQuantityText: string | null = null;
     if (input.side === OrderSide.buy) {
       const wallet = await tx.cashWallet.findUnique({
-        where:
-          input.seasonParticipantId === null
-            ? {
-                tradingAccountId_currencyCode: {
-                  tradingAccountId: input.tradingAccountId,
-                  currencyCode: input.currencyCode,
-                },
-              }
-            : {
-                seasonParticipantId_currencyCode: {
-                  seasonParticipantId: input.seasonParticipantId,
-                  currencyCode: input.currencyCode,
-                },
-              },
+        where: {
+          tradingAccountId_currencyCode: {
+            tradingAccountId: input.tradingAccountId,
+            currencyCode: input.currencyCode,
+          },
+        },
         select: { id: true, seasonParticipantId: true, tradingAccountId: true },
       });
 
@@ -573,20 +572,12 @@ export class LimitOrderCancelService {
       });
     } else {
       const position = await tx.position.findUnique({
-        where:
-          input.seasonParticipantId === null
-            ? {
-                tradingAccountId_assetId: {
-                  tradingAccountId: input.tradingAccountId,
-                  assetId: input.assetId,
-                },
-              }
-            : {
-                seasonParticipantId_assetId: {
-                  seasonParticipantId: input.seasonParticipantId,
-                  assetId: input.assetId,
-                },
-              },
+        where: {
+          tradingAccountId_assetId: {
+            tradingAccountId: input.tradingAccountId,
+            assetId: input.assetId,
+          },
+        },
         select: {
           id: true,
           seasonParticipantId: true,

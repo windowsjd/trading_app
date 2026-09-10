@@ -253,7 +253,7 @@ export type SeasonRankingGroupByOutputType = {
   id: string
   seasonId: string
   seasonParticipantId: string
-  tradingAccountId: string | null
+  tradingAccountId: string
   rankType: $Enums.SeasonRankingType
   rank: number
   totalAssetKrw: runtime.Decimal
@@ -293,7 +293,7 @@ export type SeasonRankingWhereInput = {
   id?: Prisma.StringFilter<"SeasonRanking"> | string
   seasonId?: Prisma.StringFilter<"SeasonRanking"> | string
   seasonParticipantId?: Prisma.StringFilter<"SeasonRanking"> | string
-  tradingAccountId?: Prisma.StringNullableFilter<"SeasonRanking"> | string | null
+  tradingAccountId?: Prisma.StringFilter<"SeasonRanking"> | string
   rankType?: Prisma.EnumSeasonRankingTypeFilter<"SeasonRanking"> | $Enums.SeasonRankingType
   rank?: Prisma.IntFilter<"SeasonRanking"> | number
   totalAssetKrw?: Prisma.DecimalFilter<"SeasonRanking"> | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -306,14 +306,14 @@ export type SeasonRankingWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"SeasonRanking"> | Date | string
   season?: Prisma.XOR<Prisma.SeasonScalarRelationFilter, Prisma.SeasonWhereInput>
   seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantScalarRelationFilter, Prisma.SeasonParticipantWhereInput>
-  tradingAccount?: Prisma.XOR<Prisma.TradingAccountNullableScalarRelationFilter, Prisma.TradingAccountWhereInput> | null
+  tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
 }
 
 export type SeasonRankingOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   seasonId?: Prisma.SortOrder
   seasonParticipantId?: Prisma.SortOrder
-  tradingAccountId?: Prisma.SortOrderInput | Prisma.SortOrder
+  tradingAccountId?: Prisma.SortOrder
   rankType?: Prisma.SortOrder
   rank?: Prisma.SortOrder
   totalAssetKrw?: Prisma.SortOrder
@@ -339,7 +339,7 @@ export type SeasonRankingWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.SeasonRankingWhereInput | Prisma.SeasonRankingWhereInput[]
   seasonId?: Prisma.StringFilter<"SeasonRanking"> | string
   seasonParticipantId?: Prisma.StringFilter<"SeasonRanking"> | string
-  tradingAccountId?: Prisma.StringNullableFilter<"SeasonRanking"> | string | null
+  tradingAccountId?: Prisma.StringFilter<"SeasonRanking"> | string
   rankType?: Prisma.EnumSeasonRankingTypeFilter<"SeasonRanking"> | $Enums.SeasonRankingType
   rank?: Prisma.IntFilter<"SeasonRanking"> | number
   totalAssetKrw?: Prisma.DecimalFilter<"SeasonRanking"> | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -352,14 +352,14 @@ export type SeasonRankingWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"SeasonRanking"> | Date | string
   season?: Prisma.XOR<Prisma.SeasonScalarRelationFilter, Prisma.SeasonWhereInput>
   seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantScalarRelationFilter, Prisma.SeasonParticipantWhereInput>
-  tradingAccount?: Prisma.XOR<Prisma.TradingAccountNullableScalarRelationFilter, Prisma.TradingAccountWhereInput> | null
+  tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
 }, "id" | "seasonId_rankType_rankingDate_seasonParticipantId" | "seasonId_rankType_rankingDate_rank" | "seasonId_rankType_rankingDate_tradingAccountId">
 
 export type SeasonRankingOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   seasonId?: Prisma.SortOrder
   seasonParticipantId?: Prisma.SortOrder
-  tradingAccountId?: Prisma.SortOrderInput | Prisma.SortOrder
+  tradingAccountId?: Prisma.SortOrder
   rankType?: Prisma.SortOrder
   rank?: Prisma.SortOrder
   totalAssetKrw?: Prisma.SortOrder
@@ -384,7 +384,7 @@ export type SeasonRankingScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"SeasonRanking"> | string
   seasonId?: Prisma.StringWithAggregatesFilter<"SeasonRanking"> | string
   seasonParticipantId?: Prisma.StringWithAggregatesFilter<"SeasonRanking"> | string
-  tradingAccountId?: Prisma.StringNullableWithAggregatesFilter<"SeasonRanking"> | string | null
+  tradingAccountId?: Prisma.StringWithAggregatesFilter<"SeasonRanking"> | string
   rankType?: Prisma.EnumSeasonRankingTypeWithAggregatesFilter<"SeasonRanking"> | $Enums.SeasonRankingType
   rank?: Prisma.IntWithAggregatesFilter<"SeasonRanking"> | number
   totalAssetKrw?: Prisma.DecimalWithAggregatesFilter<"SeasonRanking"> | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -411,14 +411,14 @@ export type SeasonRankingCreateInput = {
   createdAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutSeasonRankingsInput
   seasonParticipant: Prisma.SeasonParticipantCreateNestedOneWithoutSeasonRankingsInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutSeasonRankingsInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutSeasonRankingsInput
 }
 
 export type SeasonRankingUncheckedCreateInput = {
   id?: string
   seasonId: string
   seasonParticipantId: string
-  tradingAccountId?: string | null
+  tradingAccountId: string
   rankType?: $Enums.SeasonRankingType
   rank: number
   totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -445,14 +445,14 @@ export type SeasonRankingUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutSeasonRankingsNestedInput
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneRequiredWithoutSeasonRankingsNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutSeasonRankingsNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutSeasonRankingsNestedInput
 }
 
 export type SeasonRankingUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonId?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   rankType?: Prisma.EnumSeasonRankingTypeFieldUpdateOperationsInput | $Enums.SeasonRankingType
   rank?: Prisma.IntFieldUpdateOperationsInput | number
   totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -469,7 +469,7 @@ export type SeasonRankingCreateManyInput = {
   id?: string
   seasonId: string
   seasonParticipantId: string
-  tradingAccountId?: string | null
+  tradingAccountId: string
   rankType?: $Enums.SeasonRankingType
   rank: number
   totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -500,7 +500,7 @@ export type SeasonRankingUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonId?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   rankType?: Prisma.EnumSeasonRankingTypeFieldUpdateOperationsInput | $Enums.SeasonRankingType
   rank?: Prisma.IntFieldUpdateOperationsInput | number
   totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -806,7 +806,7 @@ export type SeasonRankingScalarWhereInput = {
   id?: Prisma.StringFilter<"SeasonRanking"> | string
   seasonId?: Prisma.StringFilter<"SeasonRanking"> | string
   seasonParticipantId?: Prisma.StringFilter<"SeasonRanking"> | string
-  tradingAccountId?: Prisma.StringNullableFilter<"SeasonRanking"> | string | null
+  tradingAccountId?: Prisma.StringFilter<"SeasonRanking"> | string
   rankType?: Prisma.EnumSeasonRankingTypeFilter<"SeasonRanking"> | $Enums.SeasonRankingType
   rank?: Prisma.IntFilter<"SeasonRanking"> | number
   totalAssetKrw?: Prisma.DecimalFilter<"SeasonRanking"> | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -832,13 +832,13 @@ export type SeasonRankingCreateWithoutSeasonInput = {
   capturedAt: Date | string
   createdAt?: Date | string
   seasonParticipant: Prisma.SeasonParticipantCreateNestedOneWithoutSeasonRankingsInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutSeasonRankingsInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutSeasonRankingsInput
 }
 
 export type SeasonRankingUncheckedCreateWithoutSeasonInput = {
   id?: string
   seasonParticipantId: string
-  tradingAccountId?: string | null
+  tradingAccountId: string
   rankType?: $Enums.SeasonRankingType
   rank: number
   totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -890,13 +890,13 @@ export type SeasonRankingCreateWithoutSeasonParticipantInput = {
   capturedAt: Date | string
   createdAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutSeasonRankingsInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutSeasonRankingsInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutSeasonRankingsInput
 }
 
 export type SeasonRankingUncheckedCreateWithoutSeasonParticipantInput = {
   id?: string
   seasonId: string
-  tradingAccountId?: string | null
+  tradingAccountId: string
   rankType?: $Enums.SeasonRankingType
   rank: number
   totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -1002,7 +1002,7 @@ export type SeasonRankingUncheckedUpdateManyWithoutTradingAccountInput = {
 export type SeasonRankingCreateManySeasonInput = {
   id?: string
   seasonParticipantId: string
-  tradingAccountId?: string | null
+  tradingAccountId: string
   rankType?: $Enums.SeasonRankingType
   rank: number
   totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -1028,13 +1028,13 @@ export type SeasonRankingUpdateWithoutSeasonInput = {
   capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneRequiredWithoutSeasonRankingsNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutSeasonRankingsNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutSeasonRankingsNestedInput
 }
 
 export type SeasonRankingUncheckedUpdateWithoutSeasonInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   rankType?: Prisma.EnumSeasonRankingTypeFieldUpdateOperationsInput | $Enums.SeasonRankingType
   rank?: Prisma.IntFieldUpdateOperationsInput | number
   totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -1050,7 +1050,7 @@ export type SeasonRankingUncheckedUpdateWithoutSeasonInput = {
 export type SeasonRankingUncheckedUpdateManyWithoutSeasonInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   rankType?: Prisma.EnumSeasonRankingTypeFieldUpdateOperationsInput | $Enums.SeasonRankingType
   rank?: Prisma.IntFieldUpdateOperationsInput | number
   totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -1066,7 +1066,7 @@ export type SeasonRankingUncheckedUpdateManyWithoutSeasonInput = {
 export type SeasonRankingCreateManySeasonParticipantInput = {
   id?: string
   seasonId: string
-  tradingAccountId?: string | null
+  tradingAccountId: string
   rankType?: $Enums.SeasonRankingType
   rank: number
   totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -1092,13 +1092,13 @@ export type SeasonRankingUpdateWithoutSeasonParticipantInput = {
   capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutSeasonRankingsNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutSeasonRankingsNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutSeasonRankingsNestedInput
 }
 
 export type SeasonRankingUncheckedUpdateWithoutSeasonParticipantInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonId?: Prisma.StringFieldUpdateOperationsInput | string
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   rankType?: Prisma.EnumSeasonRankingTypeFieldUpdateOperationsInput | $Enums.SeasonRankingType
   rank?: Prisma.IntFieldUpdateOperationsInput | number
   totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -1114,7 +1114,7 @@ export type SeasonRankingUncheckedUpdateWithoutSeasonParticipantInput = {
 export type SeasonRankingUncheckedUpdateManyWithoutSeasonParticipantInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonId?: Prisma.StringFieldUpdateOperationsInput | string
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   rankType?: Prisma.EnumSeasonRankingTypeFieldUpdateOperationsInput | $Enums.SeasonRankingType
   rank?: Prisma.IntFieldUpdateOperationsInput | number
   totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -1146,7 +1146,7 @@ export type SeasonRankingSelect<ExtArgs extends runtime.Types.Extensions.Interna
   createdAt?: boolean
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
   seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
-  tradingAccount?: boolean | Prisma.SeasonRanking$tradingAccountArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["seasonRanking"]>
 
 export type SeasonRankingSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -1166,7 +1166,7 @@ export type SeasonRankingSelectCreateManyAndReturn<ExtArgs extends runtime.Types
   createdAt?: boolean
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
   seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
-  tradingAccount?: boolean | Prisma.SeasonRanking$tradingAccountArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["seasonRanking"]>
 
 export type SeasonRankingSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -1186,7 +1186,7 @@ export type SeasonRankingSelectUpdateManyAndReturn<ExtArgs extends runtime.Types
   createdAt?: boolean
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
   seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
-  tradingAccount?: boolean | Prisma.SeasonRanking$tradingAccountArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["seasonRanking"]>
 
 export type SeasonRankingSelectScalar = {
@@ -1210,17 +1210,17 @@ export type SeasonRankingOmit<ExtArgs extends runtime.Types.Extensions.InternalA
 export type SeasonRankingInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
   seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
-  tradingAccount?: boolean | Prisma.SeasonRanking$tradingAccountArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
 }
 export type SeasonRankingIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
   seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
-  tradingAccount?: boolean | Prisma.SeasonRanking$tradingAccountArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
 }
 export type SeasonRankingIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
   seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
-  tradingAccount?: boolean | Prisma.SeasonRanking$tradingAccountArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
 }
 
 export type $SeasonRankingPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1228,13 +1228,13 @@ export type $SeasonRankingPayload<ExtArgs extends runtime.Types.Extensions.Inter
   objects: {
     season: Prisma.$SeasonPayload<ExtArgs>
     seasonParticipant: Prisma.$SeasonParticipantPayload<ExtArgs>
-    tradingAccount: Prisma.$TradingAccountPayload<ExtArgs> | null
+    tradingAccount: Prisma.$TradingAccountPayload<ExtArgs>
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     seasonId: string
     seasonParticipantId: string
-    tradingAccountId: string | null
+    tradingAccountId: string
     rankType: $Enums.SeasonRankingType
     rank: number
     totalAssetKrw: runtime.Decimal
@@ -1641,7 +1641,7 @@ export interface Prisma__SeasonRankingClient<T, Null = never, ExtArgs extends ru
   readonly [Symbol.toStringTag]: "PrismaPromise"
   season<T extends Prisma.SeasonDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.SeasonDefaultArgs<ExtArgs>>): Prisma.Prisma__SeasonClient<runtime.Types.Result.GetResult<Prisma.$SeasonPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   seasonParticipant<T extends Prisma.SeasonParticipantDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.SeasonParticipantDefaultArgs<ExtArgs>>): Prisma.Prisma__SeasonParticipantClient<runtime.Types.Result.GetResult<Prisma.$SeasonParticipantPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
-  tradingAccount<T extends Prisma.SeasonRanking$tradingAccountArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.SeasonRanking$tradingAccountArgs<ExtArgs>>): Prisma.Prisma__TradingAccountClient<runtime.Types.Result.GetResult<Prisma.$TradingAccountPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  tradingAccount<T extends Prisma.TradingAccountDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccountDefaultArgs<ExtArgs>>): Prisma.Prisma__TradingAccountClient<runtime.Types.Result.GetResult<Prisma.$TradingAccountPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2083,25 +2083,6 @@ export type SeasonRankingDeleteManyArgs<ExtArgs extends runtime.Types.Extensions
    * Limit how many SeasonRankings to delete.
    */
   limit?: number
-}
-
-/**
- * SeasonRanking.tradingAccount
- */
-export type SeasonRanking$tradingAccountArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the TradingAccount
-   */
-  select?: Prisma.TradingAccountSelect<ExtArgs> | null
-  /**
-   * Omit specific fields from the TradingAccount
-   */
-  omit?: Prisma.TradingAccountOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.TradingAccountInclude<ExtArgs> | null
-  where?: Prisma.TradingAccountWhereInput
 }
 
 /**

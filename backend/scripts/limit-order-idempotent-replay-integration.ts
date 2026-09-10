@@ -470,6 +470,7 @@ type Scenario = {
   userId: string;
   seasonId: string;
   participantId: string;
+  tradingAccountId: string;
   walletId: string;
   assetId: string;
 };
@@ -570,6 +571,7 @@ async function createScenario(
     userId,
     seasonId: season.id,
     participantId: participant.id,
+    tradingAccountId: tradingAccount.id,
     walletId: wallet.id,
     assetId: asset.id,
   };
@@ -585,6 +587,7 @@ async function createLimitQuote(scenario: Scenario): Promise<string> {
     data: {
       userId: scenario.userId,
       seasonParticipantId: scenario.participantId,
+      tradingAccountId: scenario.tradingAccountId,
       quoteType: QuoteType.order,
       status: QuoteStatus.active,
       assetId: scenario.assetId,

@@ -38,6 +38,7 @@ type WalletsSeason = {
 
 type WalletsParticipant = {
   id: string;
+  tradingAccountId: string;
   participantStatus: ParticipantStatus;
   joinedAt: Date;
 };
@@ -431,6 +432,7 @@ export class WalletsService {
       },
       select: {
         id: true,
+        tradingAccountId: true,
         participantStatus: true,
         joinedAt: true,
       },
@@ -448,7 +450,7 @@ export class WalletsService {
     }
 
     const where = {
-      seasonParticipantId: participant.id,
+      tradingAccountId: participant.tradingAccountId,
       ...(parsedQuery.currency ? { currencyCode: parsedQuery.currency } : {}),
       ...(parsedQuery.direction ? { direction: parsedQuery.direction } : {}),
       ...this.walletTransactionTxTypeWhere(parsedQuery.txType),
@@ -526,6 +528,7 @@ export class WalletsService {
       },
       select: {
         id: true,
+        tradingAccountId: true,
         participantStatus: true,
         joinedAt: true,
       },
@@ -548,7 +551,7 @@ export class WalletsService {
 
     const wallets = await this.prisma.cashWallet.findMany({
       where: {
-        seasonParticipantId: participant.id,
+        tradingAccountId: participant.tradingAccountId,
       },
       orderBy: {
         currencyCode: 'asc',

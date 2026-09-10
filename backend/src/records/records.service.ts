@@ -112,6 +112,7 @@ type RecordsSeason = {
 
 type RecordsParticipant = {
   id: string;
+  tradingAccountId: string;
   participantStatus: ParticipantStatus;
   joinedAt: Date;
 };
@@ -662,13 +663,16 @@ export class RecordsService {
 
     const [exchanges, walletTransactions, orders] = await Promise.all([
       parsedQuery.type === 'all' || parsedQuery.type === 'exchanges'
-        ? this.buildExchangeSection(participant.id, parsedQuery)
+        ? this.buildExchangeSection(participant.tradingAccountId, parsedQuery)
         : Promise.resolve(undefined),
       parsedQuery.type === 'all' || parsedQuery.type === 'wallets'
-        ? this.buildWalletTransactionSection(participant.id, parsedQuery)
+        ? this.buildWalletTransactionSection(
+            participant.tradingAccountId,
+            parsedQuery,
+          )
         : Promise.resolve(undefined),
       parsedQuery.type === 'all' || parsedQuery.type === 'orders'
-        ? this.buildOrderSection(participant.id, parsedQuery)
+        ? this.buildOrderSection(participant.tradingAccountId, parsedQuery)
         : Promise.resolve(undefined),
     ]);
 
@@ -727,7 +731,34 @@ export class RecordsService {
         id: true,
         userId: true,
         tradingAccountId: true,
-        tradingAccount: { select: { id: true, mode: true, userId: true } },
+        tradingAccount: {
+          select: {
+            id: true,
+            mode: true,
+            userId: true,
+            dailyPortfolioSnapshots: {
+              orderBy: [
+                { snapshotDate: 'desc' },
+                { capturedAt: 'desc' },
+                { createdAt: 'desc' },
+              ],
+              take: 1,
+              select: {
+                totalAssetKrw: true,
+                returnRate: true,
+                snapshotDate: true,
+                capturedAt: true,
+              },
+            },
+            _count: {
+              select: {
+                orders: true,
+                exchangeTransactions: true,
+                walletTransactions: true,
+              },
+            },
+          },
+        },
         seasonId: true,
         joinedAt: true,
         participantStatus: true,
@@ -767,27 +798,6 @@ export class RecordsService {
             capturedAt: true,
           },
         },
-        dailyPortfolioSnapshots: {
-          orderBy: [
-            { snapshotDate: 'desc' },
-            { capturedAt: 'desc' },
-            { createdAt: 'desc' },
-          ],
-          take: 1,
-          select: {
-            totalAssetKrw: true,
-            returnRate: true,
-            snapshotDate: true,
-            capturedAt: true,
-          },
-        },
-        _count: {
-          select: {
-            orders: true,
-            exchangeTransactions: true,
-            walletTransactions: true,
-          },
-        },
       },
     });
 
@@ -808,7 +818,7 @@ export class RecordsService {
         seasons: participants.map((participant) => {
           const metric = this.selectBestMetric(
             participant.seasonRankings[0],
-            participant.dailyPortfolioSnapshots[0],
+            participant.tradingAccount.dailyPortfolioSnapshots[0],
           );
 
           return {
@@ -832,9 +842,11 @@ export class RecordsService {
             latestReturnRate: metric
               ? this.formatDecimal(metric.returnRate, 8)
               : null,
-            orderCount: participant._count.orders,
-            exchangeCount: participant._count.exchangeTransactions,
-            walletTransactionCount: participant._count.walletTransactions,
+            orderCount: participant.tradingAccount._count.orders,
+            exchangeCount:
+              participant.tradingAccount._count.exchangeTransactions,
+            walletTransactionCount:
+              participant.tradingAccount._count.walletTransactions,
           };
         }),
         pagination: this.listPagination(
@@ -888,20 +900,20 @@ export class RecordsService {
       snapshotHistory,
       profitAnalysis,
     ] = await Promise.all([
-      this.countOrders(participant.id, OrderStatus.submitted),
-      this.countOrders(participant.id, OrderStatus.executed),
-      this.countOrders(participant.id, OrderStatus.canceled),
-      this.countOrders(participant.id, OrderStatus.rejected),
+      this.countOrders(participant.tradingAccountId, OrderStatus.submitted),
+      this.countOrders(participant.tradingAccountId, OrderStatus.executed),
+      this.countOrders(participant.tradingAccountId, OrderStatus.canceled),
+      this.countOrders(participant.tradingAccountId, OrderStatus.rejected),
       this.prisma.position.count({
         where: {
-          seasonParticipantId: participant.id,
+          tradingAccountId: participant.tradingAccountId,
           quantity: {
             gt: 0,
           },
         },
       }),
-      this.findSnapshotHistory(participant.id),
-      this.buildProfitAnalysis(participant.id, new Date()),
+      this.findSnapshotHistory(participant.tradingAccountId),
+      this.buildProfitAnalysis(participant.tradingAccountId, new Date()),
     ]);
 
     return {
@@ -911,23 +923,23 @@ export class RecordsService {
         season: this.formatSeason(season),
         participant: this.formatDetailedParticipant(participant),
         performance: this.formatPerformance(
-          participant.dailyPortfolioSnapshots[0],
+          participant.tradingAccount.dailyPortfolioSnapshots[0],
           participant.seasonRankings[0],
           this.calculateMdd(participant.maxDrawdown, snapshotHistory),
         ),
         activitySummary: {
           orders: {
-            total: participant._count.orders,
+            total: participant.tradingAccount._count.orders,
             submitted: submittedOrders,
             executed: executedOrders,
             canceled: canceledOrders,
             rejected: rejectedOrders,
           },
           exchanges: {
-            total: participant._count.exchangeTransactions,
+            total: participant.tradingAccount._count.exchangeTransactions,
           },
           walletTransactions: {
-            total: participant._count.walletTransactions,
+            total: participant.tradingAccount._count.walletTransactions,
           },
           positions: {
             open: openPositions,
@@ -970,7 +982,7 @@ export class RecordsService {
     }
 
     const where = {
-      seasonParticipantId: participant.id,
+      tradingAccountId: participant.tradingAccountId,
     };
     const [total, snapshots] = await Promise.all([
       this.prisma.dailyPortfolioSnapshot.count({ where }),
@@ -1058,7 +1070,7 @@ export class RecordsService {
     }
 
     const where = {
-      seasonParticipantId: participant.id,
+      tradingAccountId: participant.tradingAccountId,
       ...(parsedQuery.status ? { status: parsedQuery.status } : {}),
       ...(parsedQuery.side ? { side: parsedQuery.side } : {}),
       ...(parsedQuery.assetId ? { assetId: parsedQuery.assetId } : {}),
@@ -1185,7 +1197,7 @@ export class RecordsService {
     }
 
     const where = {
-      seasonParticipantId: participant.id,
+      tradingAccountId: participant.tradingAccountId,
       ...(parsedQuery.fromCurrency
         ? { fromCurrency: parsedQuery.fromCurrency }
         : {}),
@@ -1330,12 +1342,12 @@ export class RecordsService {
     }
 
     const publicPortfolioSummary = await this.buildPublicPortfolioSummary(
-      participant.id,
+      participant.tradingAccountId,
       new Date(),
     );
     const metric = this.selectBestMetric(
       participant.seasonRankings[0],
-      participant.dailyPortfolioSnapshots[0],
+      participant.tradingAccount.dailyPortfolioSnapshots[0],
     );
 
     return {
@@ -1472,14 +1484,23 @@ export class RecordsService {
     }
 
     const [ranking, portfolio] = await Promise.all([
-      this.findLatestPublicRanking(season.id, participant.id, season.status),
-      this.buildPublicSeasonSummaryPortfolio(participant.id, new Date()),
+      this.findLatestPublicRanking(
+        season.id,
+        participant.id,
+        participant.tradingAccountId,
+        season.status,
+      ),
+      this.buildPublicSeasonSummaryPortfolio(
+        participant.id,
+        participant.tradingAccountId,
+        new Date(),
+      ),
     ]);
     const metric =
       ranking ??
       this.selectBestMetric(
         participant.seasonRankings[0],
-        participant.dailyPortfolioSnapshots[0],
+        participant.tradingAccount.dailyPortfolioSnapshots[0],
       );
     // 작업 8 보완 §A-4: this response publishes a tier and a percentile derived
     // from the whole snapshot, so the whole snapshot is verified — not only the
@@ -1546,10 +1567,10 @@ export class RecordsService {
   }
 
   private async buildProfitAnalysis(
-    seasonParticipantId: string,
+    tradingAccountId: string,
     valuationAt: Date,
   ): Promise<ProfitAnalysis> {
-    const positions = await this.findProfitPositions(seasonParticipantId);
+    const positions = await this.findProfitPositions(tradingAccountId);
 
     if (positions.length === 0) {
       return {
@@ -1732,14 +1753,14 @@ export class RecordsService {
   }
 
   private async buildPublicPortfolioSummary(
-    seasonParticipantId: string,
+    tradingAccountId: string,
     valuationAt: Date,
   ): Promise<PublicPortfolioSummary> {
     const [positions, cashWallets] = await Promise.all([
-      this.findProfitPositions(seasonParticipantId),
+      this.findProfitPositions(tradingAccountId),
       this.prisma.cashWallet.findMany({
         where: {
-          seasonParticipantId,
+          tradingAccountId,
         },
         select: {
           currencyCode: true,
@@ -1933,6 +1954,7 @@ export class RecordsService {
   private async findLatestPublicRanking(
     seasonId: string,
     seasonParticipantId: string,
+    tradingAccountId: string,
     seasonStatus: SeasonStatus,
   ) {
     const preferredRankType =
@@ -1942,6 +1964,7 @@ export class RecordsService {
     const preferredRanking = await this.findLatestRankingByType(
       seasonId,
       seasonParticipantId,
+      tradingAccountId,
       preferredRankType,
     );
 
@@ -1953,11 +1976,13 @@ export class RecordsService {
       ? this.findLatestRankingByType(
           seasonId,
           seasonParticipantId,
+          tradingAccountId,
           SeasonRankingType.daily,
         )
       : this.findLatestRankingByType(
           seasonId,
           seasonParticipantId,
+          tradingAccountId,
           SeasonRankingType.final,
         );
   }
@@ -1965,12 +1990,14 @@ export class RecordsService {
   private async findLatestRankingByType(
     seasonId: string,
     seasonParticipantId: string,
+    tradingAccountId: string,
     rankType: SeasonRankingType,
   ) {
     const ranking = await this.prisma.seasonRanking.findFirst({
       where: {
         seasonId,
         seasonParticipantId,
+        tradingAccountId,
         rankType,
         seasonParticipant: this.publicRankingParticipantWhere(),
       },
@@ -2003,6 +2030,7 @@ export class RecordsService {
 
   private async buildPublicSeasonSummaryPortfolio(
     seasonParticipantId: string,
+    tradingAccountId: string,
     valuationAt: Date,
   ): Promise<{
     allocation: UserCurrentSeasonSummaryResponse['data']['allocation'];
@@ -2017,16 +2045,22 @@ export class RecordsService {
 
     try {
       const valuation =
-        await this.portfolioValuationService.calculateSeasonParticipantValuation(
-          seasonParticipantId,
+        await this.portfolioValuationService.calculateTradingAccountValuation(
+          tradingAccountId,
           valuationAt,
           'home_live_valuation',
         );
+      if (valuation.seasonParticipantId !== seasonParticipantId) {
+        throw new PortfolioValuationError(
+          'TRADING_ACCOUNT_SCOPE_MISMATCH',
+          `Trading account ${tradingAccountId} is not owned by participant ${seasonParticipantId}.`,
+        );
+      }
 
       return {
         allocation: this.publicValueAllocationFromValuation(valuation),
         topPositions: await this.buildPublicTopPositions(
-          seasonParticipantId,
+          tradingAccountId,
           valuation.totalAssetKrw,
         ),
       };
@@ -2056,7 +2090,7 @@ export class RecordsService {
   }
 
   private async buildPublicTopPositions(
-    seasonParticipantId: string,
+    tradingAccountId: string,
     totalAssetKrw: string,
   ): Promise<UserCurrentSeasonSummaryResponse['data']['topPositions']> {
     const denominator = new Prisma.Decimal(totalAssetKrw);
@@ -2066,7 +2100,7 @@ export class RecordsService {
 
     const positions = await this.prisma.position.findMany({
       where: {
-        seasonParticipantId,
+        tradingAccountId,
         quantity: {
           gt: 0,
         },
@@ -2122,11 +2156,11 @@ export class RecordsService {
   }
 
   private async findProfitPositions(
-    seasonParticipantId: string,
+    tradingAccountId: string,
   ): Promise<ProfitPositionRecord[]> {
     return this.prisma.position.findMany({
       where: {
-        seasonParticipantId,
+        tradingAccountId,
       },
       select: {
         id: true,
@@ -2431,11 +2465,11 @@ export class RecordsService {
   }
 
   private async buildExchangeSection(
-    seasonParticipantId: string,
+    tradingAccountId: string,
     query: ParsedRecordsQuery,
   ): Promise<NonNullable<RecordsResponse['data']['exchanges']>> {
     const where = {
-      seasonParticipantId,
+      tradingAccountId,
       ...(query.currencyCode
         ? {
             OR: [
@@ -2492,11 +2526,11 @@ export class RecordsService {
   }
 
   private async buildWalletTransactionSection(
-    seasonParticipantId: string,
+    tradingAccountId: string,
     query: ParsedRecordsQuery,
   ): Promise<NonNullable<RecordsResponse['data']['walletTransactions']>> {
     const where = {
-      seasonParticipantId,
+      tradingAccountId,
       ...(query.currencyCode ? { currencyCode: query.currencyCode } : {}),
     };
     const [total, records] = await Promise.all([
@@ -2542,11 +2576,11 @@ export class RecordsService {
   }
 
   private async buildOrderSection(
-    seasonParticipantId: string,
+    tradingAccountId: string,
     query: ParsedRecordsQuery,
   ): Promise<NonNullable<RecordsResponse['data']['orders']>> {
     const where = {
-      seasonParticipantId,
+      tradingAccountId,
       ...(query.currencyCode ? { currencyCode: query.currencyCode } : {}),
     };
     const [total, records] = await Promise.all([
@@ -2969,6 +3003,7 @@ export class RecordsService {
       },
       select: {
         id: true,
+        tradingAccountId: true,
         participantStatus: true,
         joinedAt: true,
         rankingHiddenAt: true,
@@ -2990,7 +3025,34 @@ export class RecordsService {
         userId: true,
         seasonId: true,
         tradingAccountId: true,
-        tradingAccount: { select: { id: true, mode: true, userId: true } },
+        tradingAccount: {
+          select: {
+            id: true,
+            mode: true,
+            userId: true,
+            dailyPortfolioSnapshots: {
+              orderBy: [
+                { snapshotDate: 'desc' },
+                { capturedAt: 'desc' },
+                { createdAt: 'desc' },
+              ],
+              take: 1,
+              select: {
+                totalAssetKrw: true,
+                returnRate: true,
+                snapshotDate: true,
+                capturedAt: true,
+              },
+            },
+            _count: {
+              select: {
+                orders: true,
+                exchangeTransactions: true,
+                walletTransactions: true,
+              },
+            },
+          },
+        },
         participantStatus: true,
         joinedAt: true,
         rankingHiddenAt: true,
@@ -3023,27 +3085,6 @@ export class RecordsService {
             capturedAt: true,
           },
         },
-        dailyPortfolioSnapshots: {
-          orderBy: [
-            { snapshotDate: 'desc' },
-            { capturedAt: 'desc' },
-            { createdAt: 'desc' },
-          ],
-          take: 1,
-          select: {
-            totalAssetKrw: true,
-            returnRate: true,
-            snapshotDate: true,
-            capturedAt: true,
-          },
-        },
-        _count: {
-          select: {
-            orders: true,
-            exchangeTransactions: true,
-            walletTransactions: true,
-          },
-        },
       },
     });
 
@@ -3058,23 +3099,23 @@ export class RecordsService {
   }
 
   private countOrders(
-    seasonParticipantId: string,
+    tradingAccountId: string,
     status: OrderStatus,
   ): Promise<number> {
     return this.prisma.order.count({
       where: {
-        seasonParticipantId,
+        tradingAccountId,
         status,
       },
     });
   }
 
   private async findSnapshotHistory(
-    seasonParticipantId: string,
+    tradingAccountId: string,
   ): Promise<RankingHistoricalSnapshotInput[]> {
     const rows = await this.prisma.dailyPortfolioSnapshot.findMany({
       where: {
-        seasonParticipantId,
+        tradingAccountId,
       },
       orderBy: [
         { snapshotDate: 'asc' },

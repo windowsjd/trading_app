@@ -378,7 +378,7 @@ export type OrderGroupByArgs<ExtArgs extends runtime.Types.Extensions.InternalAr
 export type OrderGroupByOutputType = {
   id: string
   seasonParticipantId: string | null
-  tradingAccountId: string | null
+  tradingAccountId: string
   assetId: string
   quoteId: string | null
   side: $Enums.OrderSide
@@ -437,7 +437,7 @@ export type OrderWhereInput = {
   NOT?: Prisma.OrderWhereInput | Prisma.OrderWhereInput[]
   id?: Prisma.StringFilter<"Order"> | string
   seasonParticipantId?: Prisma.StringNullableFilter<"Order"> | string | null
-  tradingAccountId?: Prisma.StringNullableFilter<"Order"> | string | null
+  tradingAccountId?: Prisma.StringFilter<"Order"> | string
   assetId?: Prisma.StringFilter<"Order"> | string
   quoteId?: Prisma.StringNullableFilter<"Order"> | string | null
   side?: Prisma.EnumOrderSideFilter<"Order"> | $Enums.OrderSide
@@ -469,7 +469,7 @@ export type OrderWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantNullableScalarRelationFilter, Prisma.SeasonParticipantWhereInput> | null
-  tradingAccount?: Prisma.XOR<Prisma.TradingAccountNullableScalarRelationFilter, Prisma.TradingAccountWhereInput> | null
+  tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   asset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
   quote?: Prisma.XOR<Prisma.QuoteNullableScalarRelationFilter, Prisma.QuoteWhereInput> | null
   assetPriceSnapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotNullableScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput> | null
@@ -480,7 +480,7 @@ export type OrderWhereInput = {
 export type OrderOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   seasonParticipantId?: Prisma.SortOrderInput | Prisma.SortOrder
-  tradingAccountId?: Prisma.SortOrderInput | Prisma.SortOrder
+  tradingAccountId?: Prisma.SortOrder
   assetId?: Prisma.SortOrder
   quoteId?: Prisma.SortOrderInput | Prisma.SortOrder
   side?: Prisma.SortOrder
@@ -529,7 +529,7 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.OrderWhereInput[]
   NOT?: Prisma.OrderWhereInput | Prisma.OrderWhereInput[]
   seasonParticipantId?: Prisma.StringNullableFilter<"Order"> | string | null
-  tradingAccountId?: Prisma.StringNullableFilter<"Order"> | string | null
+  tradingAccountId?: Prisma.StringFilter<"Order"> | string
   assetId?: Prisma.StringFilter<"Order"> | string
   side?: Prisma.EnumOrderSideFilter<"Order"> | $Enums.OrderSide
   orderType?: Prisma.EnumOrderTypeFilter<"Order"> | $Enums.OrderType
@@ -560,7 +560,7 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantNullableScalarRelationFilter, Prisma.SeasonParticipantWhereInput> | null
-  tradingAccount?: Prisma.XOR<Prisma.TradingAccountNullableScalarRelationFilter, Prisma.TradingAccountWhereInput> | null
+  tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   asset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
   quote?: Prisma.XOR<Prisma.QuoteNullableScalarRelationFilter, Prisma.QuoteWhereInput> | null
   assetPriceSnapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotNullableScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput> | null
@@ -571,7 +571,7 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
 export type OrderOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   seasonParticipantId?: Prisma.SortOrderInput | Prisma.SortOrder
-  tradingAccountId?: Prisma.SortOrderInput | Prisma.SortOrder
+  tradingAccountId?: Prisma.SortOrder
   assetId?: Prisma.SortOrder
   quoteId?: Prisma.SortOrderInput | Prisma.SortOrder
   side?: Prisma.SortOrder
@@ -615,7 +615,7 @@ export type OrderScalarWhereWithAggregatesInput = {
   NOT?: Prisma.OrderScalarWhereWithAggregatesInput | Prisma.OrderScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"Order"> | string
   seasonParticipantId?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
-  tradingAccountId?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
+  tradingAccountId?: Prisma.StringWithAggregatesFilter<"Order"> | string
   assetId?: Prisma.StringWithAggregatesFilter<"Order"> | string
   quoteId?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
   side?: Prisma.EnumOrderSideWithAggregatesFilter<"Order"> | $Enums.OrderSide
@@ -676,7 +676,7 @@ export type OrderCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutOrdersInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
@@ -687,7 +687,7 @@ export type OrderCreateInput = {
 export type OrderUncheckedCreateInput = {
   id?: string
   seasonParticipantId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   assetId: string
   quoteId?: string | null
   side: $Enums.OrderSide
@@ -748,7 +748,7 @@ export type OrderUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutOrdersNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutOrdersNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
@@ -759,7 +759,7 @@ export type OrderUpdateInput = {
 export type OrderUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
@@ -795,7 +795,7 @@ export type OrderUncheckedUpdateInput = {
 export type OrderCreateManyInput = {
   id?: string
   seasonParticipantId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   assetId: string
   quoteId?: string | null
   side: $Enums.OrderSide
@@ -860,7 +860,7 @@ export type OrderUpdateManyMutationInput = {
 export type OrderUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
@@ -1451,7 +1451,7 @@ export type OrderScalarWhereInput = {
   NOT?: Prisma.OrderScalarWhereInput | Prisma.OrderScalarWhereInput[]
   id?: Prisma.StringFilter<"Order"> | string
   seasonParticipantId?: Prisma.StringNullableFilter<"Order"> | string | null
-  tradingAccountId?: Prisma.StringNullableFilter<"Order"> | string | null
+  tradingAccountId?: Prisma.StringFilter<"Order"> | string
   assetId?: Prisma.StringFilter<"Order"> | string
   quoteId?: Prisma.StringNullableFilter<"Order"> | string | null
   side?: Prisma.EnumOrderSideFilter<"Order"> | $Enums.OrderSide
@@ -1511,7 +1511,7 @@ export type OrderCreateWithoutSeasonParticipantInput = {
   rejectReason?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
@@ -1521,7 +1521,7 @@ export type OrderCreateWithoutSeasonParticipantInput = {
 
 export type OrderUncheckedCreateWithoutSeasonParticipantInput = {
   id?: string
-  tradingAccountId?: string | null
+  tradingAccountId: string
   assetId: string
   quoteId?: string | null
   side: $Enums.OrderSide
@@ -1608,7 +1608,7 @@ export type OrderCreateWithoutAssetInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutOrdersInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutOrdersInput
@@ -1618,7 +1618,7 @@ export type OrderCreateWithoutAssetInput = {
 export type OrderUncheckedCreateWithoutAssetInput = {
   id?: string
   seasonParticipantId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   quoteId?: string | null
   side: $Enums.OrderSide
   orderType: $Enums.OrderType
@@ -1704,7 +1704,7 @@ export type OrderCreateWithoutAssetPriceSnapshotInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutOrdersInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutOrdersInput
@@ -1714,7 +1714,7 @@ export type OrderCreateWithoutAssetPriceSnapshotInput = {
 export type OrderUncheckedCreateWithoutAssetPriceSnapshotInput = {
   id?: string
   seasonParticipantId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   assetId: string
   quoteId?: string | null
   side: $Enums.OrderSide
@@ -1800,7 +1800,7 @@ export type OrderCreateWithoutFxRateSnapshotInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutOrdersInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
@@ -1810,7 +1810,7 @@ export type OrderCreateWithoutFxRateSnapshotInput = {
 export type OrderUncheckedCreateWithoutFxRateSnapshotInput = {
   id?: string
   seasonParticipantId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   assetId: string
   quoteId?: string | null
   side: $Enums.OrderSide
@@ -1896,7 +1896,7 @@ export type OrderCreateWithoutQuoteInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutOrdersInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutOrdersInput
@@ -1906,7 +1906,7 @@ export type OrderCreateWithoutQuoteInput = {
 export type OrderUncheckedCreateWithoutQuoteInput = {
   id?: string
   seasonParticipantId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   assetId: string
   side: $Enums.OrderSide
   orderType: $Enums.OrderType
@@ -1992,7 +1992,7 @@ export type OrderCreateWithoutCandleEvidenceInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutOrdersInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
@@ -2002,7 +2002,7 @@ export type OrderCreateWithoutCandleEvidenceInput = {
 export type OrderUncheckedCreateWithoutCandleEvidenceInput = {
   id?: string
   seasonParticipantId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   assetId: string
   quoteId?: string | null
   side: $Enums.OrderSide
@@ -2202,7 +2202,7 @@ export type OrderUncheckedUpdateManyWithoutTradingAccountInput = {
 
 export type OrderCreateManySeasonParticipantInput = {
   id?: string
-  tradingAccountId?: string | null
+  tradingAccountId: string
   assetId: string
   quoteId?: string | null
   side: $Enums.OrderSide
@@ -2262,7 +2262,7 @@ export type OrderUpdateWithoutSeasonParticipantInput = {
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutOrdersNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
@@ -2272,7 +2272,7 @@ export type OrderUpdateWithoutSeasonParticipantInput = {
 
 export type OrderUncheckedUpdateWithoutSeasonParticipantInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
@@ -2307,7 +2307,7 @@ export type OrderUncheckedUpdateWithoutSeasonParticipantInput = {
 
 export type OrderUncheckedUpdateManyWithoutSeasonParticipantInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
@@ -2343,7 +2343,7 @@ export type OrderUncheckedUpdateManyWithoutSeasonParticipantInput = {
 export type OrderCreateManyAssetInput = {
   id?: string
   seasonParticipantId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   quoteId?: string | null
   side: $Enums.OrderSide
   orderType: $Enums.OrderType
@@ -2403,7 +2403,7 @@ export type OrderUpdateWithoutAssetInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutOrdersNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutOrdersNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutOrdersNestedInput
@@ -2413,7 +2413,7 @@ export type OrderUpdateWithoutAssetInput = {
 export type OrderUncheckedUpdateWithoutAssetInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
@@ -2448,7 +2448,7 @@ export type OrderUncheckedUpdateWithoutAssetInput = {
 export type OrderUncheckedUpdateManyWithoutAssetInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
@@ -2483,7 +2483,7 @@ export type OrderUncheckedUpdateManyWithoutAssetInput = {
 export type OrderCreateManyAssetPriceSnapshotInput = {
   id?: string
   seasonParticipantId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   assetId: string
   quoteId?: string | null
   side: $Enums.OrderSide
@@ -2543,7 +2543,7 @@ export type OrderUpdateWithoutAssetPriceSnapshotInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutOrdersNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutOrdersNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutOrdersNestedInput
@@ -2553,7 +2553,7 @@ export type OrderUpdateWithoutAssetPriceSnapshotInput = {
 export type OrderUncheckedUpdateWithoutAssetPriceSnapshotInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
@@ -2588,7 +2588,7 @@ export type OrderUncheckedUpdateWithoutAssetPriceSnapshotInput = {
 export type OrderUncheckedUpdateManyWithoutAssetPriceSnapshotInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
@@ -2623,7 +2623,7 @@ export type OrderUncheckedUpdateManyWithoutAssetPriceSnapshotInput = {
 export type OrderCreateManyFxRateSnapshotInput = {
   id?: string
   seasonParticipantId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   assetId: string
   quoteId?: string | null
   side: $Enums.OrderSide
@@ -2683,7 +2683,7 @@ export type OrderUpdateWithoutFxRateSnapshotInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutOrdersNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutOrdersNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
@@ -2693,7 +2693,7 @@ export type OrderUpdateWithoutFxRateSnapshotInput = {
 export type OrderUncheckedUpdateWithoutFxRateSnapshotInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
@@ -2728,7 +2728,7 @@ export type OrderUncheckedUpdateWithoutFxRateSnapshotInput = {
 export type OrderUncheckedUpdateManyWithoutFxRateSnapshotInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
@@ -2763,7 +2763,7 @@ export type OrderUncheckedUpdateManyWithoutFxRateSnapshotInput = {
 export type OrderCreateManyQuoteInput = {
   id?: string
   seasonParticipantId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   assetId: string
   side: $Enums.OrderSide
   orderType: $Enums.OrderType
@@ -2823,7 +2823,7 @@ export type OrderUpdateWithoutQuoteInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutOrdersNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutOrdersNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutOrdersNestedInput
@@ -2833,7 +2833,7 @@ export type OrderUpdateWithoutQuoteInput = {
 export type OrderUncheckedUpdateWithoutQuoteInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
@@ -2868,7 +2868,7 @@ export type OrderUncheckedUpdateWithoutQuoteInput = {
 export type OrderUncheckedUpdateManyWithoutQuoteInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
@@ -2903,7 +2903,7 @@ export type OrderUncheckedUpdateManyWithoutQuoteInput = {
 export type OrderCreateManyCandleEvidenceInput = {
   id?: string
   seasonParticipantId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   assetId: string
   quoteId?: string | null
   side: $Enums.OrderSide
@@ -2963,7 +2963,7 @@ export type OrderUpdateWithoutCandleEvidenceInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutOrdersNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutOrdersNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
@@ -2973,7 +2973,7 @@ export type OrderUpdateWithoutCandleEvidenceInput = {
 export type OrderUncheckedUpdateWithoutCandleEvidenceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
@@ -3008,7 +3008,7 @@ export type OrderUncheckedUpdateWithoutCandleEvidenceInput = {
 export type OrderUncheckedUpdateManyWithoutCandleEvidenceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
@@ -3077,7 +3077,7 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   createdAt?: boolean
   updatedAt?: boolean
   seasonParticipant?: boolean | Prisma.Order$seasonParticipantArgs<ExtArgs>
-  tradingAccount?: boolean | Prisma.Order$tradingAccountArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   quote?: boolean | Prisma.Order$quoteArgs<ExtArgs>
   assetPriceSnapshot?: boolean | Prisma.Order$assetPriceSnapshotArgs<ExtArgs>
@@ -3120,7 +3120,7 @@ export type OrderSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   createdAt?: boolean
   updatedAt?: boolean
   seasonParticipant?: boolean | Prisma.Order$seasonParticipantArgs<ExtArgs>
-  tradingAccount?: boolean | Prisma.Order$tradingAccountArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   quote?: boolean | Prisma.Order$quoteArgs<ExtArgs>
   assetPriceSnapshot?: boolean | Prisma.Order$assetPriceSnapshotArgs<ExtArgs>
@@ -3163,7 +3163,7 @@ export type OrderSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   createdAt?: boolean
   updatedAt?: boolean
   seasonParticipant?: boolean | Prisma.Order$seasonParticipantArgs<ExtArgs>
-  tradingAccount?: boolean | Prisma.Order$tradingAccountArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   quote?: boolean | Prisma.Order$quoteArgs<ExtArgs>
   assetPriceSnapshot?: boolean | Prisma.Order$assetPriceSnapshotArgs<ExtArgs>
@@ -3210,7 +3210,7 @@ export type OrderSelectScalar = {
 export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "seasonParticipantId" | "tradingAccountId" | "assetId" | "quoteId" | "side" | "orderType" | "status" | "quantity" | "limitPrice" | "executedPrice" | "currencyCode" | "grossAmount" | "feeAmount" | "netAmount" | "assetPriceSnapshotId" | "fxRateSnapshotId" | "idempotencyKey" | "requestHash" | "responsePayloadJson" | "reservedAmount" | "reservedQuantity" | "reservationFeeRate" | "reservationReleasedAt" | "cancelReason" | "limitOrderCandleEvidenceId" | "submittedAt" | "executedAt" | "canceledAt" | "rejectedAt" | "rejectReason" | "createdAt" | "updatedAt", ExtArgs["result"]["order"]>
 export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   seasonParticipant?: boolean | Prisma.Order$seasonParticipantArgs<ExtArgs>
-  tradingAccount?: boolean | Prisma.Order$tradingAccountArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   quote?: boolean | Prisma.Order$quoteArgs<ExtArgs>
   assetPriceSnapshot?: boolean | Prisma.Order$assetPriceSnapshotArgs<ExtArgs>
@@ -3219,7 +3219,7 @@ export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
 }
 export type OrderIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   seasonParticipant?: boolean | Prisma.Order$seasonParticipantArgs<ExtArgs>
-  tradingAccount?: boolean | Prisma.Order$tradingAccountArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   quote?: boolean | Prisma.Order$quoteArgs<ExtArgs>
   assetPriceSnapshot?: boolean | Prisma.Order$assetPriceSnapshotArgs<ExtArgs>
@@ -3228,7 +3228,7 @@ export type OrderIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extens
 }
 export type OrderIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   seasonParticipant?: boolean | Prisma.Order$seasonParticipantArgs<ExtArgs>
-  tradingAccount?: boolean | Prisma.Order$tradingAccountArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   quote?: boolean | Prisma.Order$quoteArgs<ExtArgs>
   assetPriceSnapshot?: boolean | Prisma.Order$assetPriceSnapshotArgs<ExtArgs>
@@ -3240,7 +3240,7 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   name: "Order"
   objects: {
     seasonParticipant: Prisma.$SeasonParticipantPayload<ExtArgs> | null
-    tradingAccount: Prisma.$TradingAccountPayload<ExtArgs> | null
+    tradingAccount: Prisma.$TradingAccountPayload<ExtArgs>
     asset: Prisma.$AssetPayload<ExtArgs>
     quote: Prisma.$QuotePayload<ExtArgs> | null
     assetPriceSnapshot: Prisma.$AssetPriceSnapshotPayload<ExtArgs> | null
@@ -3250,7 +3250,7 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     seasonParticipantId: string | null
-    tradingAccountId: string | null
+    tradingAccountId: string
     assetId: string
     quoteId: string | null
     side: $Enums.OrderSide
@@ -3676,7 +3676,7 @@ readonly fields: OrderFieldRefs;
 export interface Prisma__OrderClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   seasonParticipant<T extends Prisma.Order$seasonParticipantArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$seasonParticipantArgs<ExtArgs>>): Prisma.Prisma__SeasonParticipantClient<runtime.Types.Result.GetResult<Prisma.$SeasonParticipantPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
-  tradingAccount<T extends Prisma.Order$tradingAccountArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$tradingAccountArgs<ExtArgs>>): Prisma.Prisma__TradingAccountClient<runtime.Types.Result.GetResult<Prisma.$TradingAccountPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  tradingAccount<T extends Prisma.TradingAccountDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccountDefaultArgs<ExtArgs>>): Prisma.Prisma__TradingAccountClient<runtime.Types.Result.GetResult<Prisma.$TradingAccountPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   asset<T extends Prisma.AssetDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AssetDefaultArgs<ExtArgs>>): Prisma.Prisma__AssetClient<runtime.Types.Result.GetResult<Prisma.$AssetPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   quote<T extends Prisma.Order$quoteArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$quoteArgs<ExtArgs>>): Prisma.Prisma__QuoteClient<runtime.Types.Result.GetResult<Prisma.$QuotePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   assetPriceSnapshot<T extends Prisma.Order$assetPriceSnapshotArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$assetPriceSnapshotArgs<ExtArgs>>): Prisma.Prisma__AssetPriceSnapshotClient<runtime.Types.Result.GetResult<Prisma.$AssetPriceSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
@@ -4161,25 +4161,6 @@ export type Order$seasonParticipantArgs<ExtArgs extends runtime.Types.Extensions
    */
   include?: Prisma.SeasonParticipantInclude<ExtArgs> | null
   where?: Prisma.SeasonParticipantWhereInput
-}
-
-/**
- * Order.tradingAccount
- */
-export type Order$tradingAccountArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the TradingAccount
-   */
-  select?: Prisma.TradingAccountSelect<ExtArgs> | null
-  /**
-   * Omit specific fields from the TradingAccount
-   */
-  omit?: Prisma.TradingAccountOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.TradingAccountInclude<ExtArgs> | null
-  where?: Prisma.TradingAccountWhereInput
 }
 
 /**

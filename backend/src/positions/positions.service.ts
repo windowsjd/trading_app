@@ -60,6 +60,7 @@ type PositionsSeason = {
 
 type PositionsParticipant = {
   id: string;
+  tradingAccountId: string;
   participantStatus: ParticipantStatus;
   joinedAt: Date;
 };
@@ -397,7 +398,10 @@ export class PositionsService {
     }
 
     const valuationAt = new Date();
-    const positions = await this.findPositions(participant.id, parsedQuery);
+    const positions = await this.findPositionsByScope(
+      { tradingAccountId: participant.tradingAccountId },
+      parsedQuery,
+    );
     const usdKrwSelection = await this.findUsdKrwSelectionIfNeeded(
       positions,
       valuationAt,
@@ -987,15 +991,8 @@ export class PositionsService {
     };
   }
 
-  private async findPositions(
-    seasonParticipantId: string,
-    query: ParsedPositionsQuery,
-  ): Promise<PositionRecord[]> {
-    return this.findPositionsByScope({ seasonParticipantId }, query);
-  }
-
   private async findPositionsByScope(
-    scope: { seasonParticipantId: string } | { tradingAccountId: string },
+    scope: { tradingAccountId: string },
     query: ParsedPositionsQuery,
   ): Promise<PositionRecord[]> {
     const where: Prisma.PositionWhereInput = {
@@ -1253,6 +1250,7 @@ export class PositionsService {
       },
       select: {
         id: true,
+        tradingAccountId: true,
         participantStatus: true,
         joinedAt: true,
       },

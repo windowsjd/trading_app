@@ -55,8 +55,13 @@ export type DailyPortfolioSnapshotPersistenceData = {
 
 type DailyPortfolioSnapshotWriter = {
   dailyPortfolioSnapshot: {
+    findUnique?: (args: unknown) => Promise<{
+      seasonParticipantId: string | null;
+      tradingAccountId: string;
+    } | null>;
     upsert: (args: unknown) => Promise<{
       seasonParticipantId: string | null;
+      tradingAccountId: string;
       totalAssetKrw: Prisma.Decimal;
       returnRate: Prisma.Decimal;
       krwCash: Prisma.Decimal;
@@ -77,19 +82,57 @@ export async function writeDailyPortfolioSnapshot(
     return toWriteResult(input.valuation, input.capturedAt, true);
   }
 
-  const row = await prisma.dailyPortfolioSnapshot.upsert({
+  const seasonParticipantId = requireSeasonValuationParticipantId(
+    input.valuation,
+  );
+  const existing = await prisma.dailyPortfolioSnapshot.findUnique?.({
     where: {
-      seasonParticipantId_snapshotDate: {
-        seasonParticipantId: requireSeasonValuationParticipantId(
-          input.valuation,
-        ),
+      tradingAccountId_snapshotDate: {
+        tradingAccountId: input.tradingAccountId,
         snapshotDate: input.snapshotDate,
       },
     },
-    create: buildDailyPortfolioSnapshotData(input),
-    update: buildDailyPortfolioSnapshotData(input),
     select: {
       seasonParticipantId: true,
+      tradingAccountId: true,
+    },
+  });
+  if (
+    existing &&
+    (existing.tradingAccountId !== input.tradingAccountId ||
+      existing.seasonParticipantId !== seasonParticipantId)
+  ) {
+    throw new Error(
+      'Daily portfolio snapshot account scope disagrees with its season participant.',
+    );
+  }
+
+  const data = buildDailyPortfolioSnapshotData(input);
+  const canonicalUpdate = {
+    totalAssetKrw: data.totalAssetKrw,
+    returnRate: data.returnRate,
+    krwCash: data.krwCash,
+    usdCashKrw: data.usdCashKrw,
+    assetValueKrw: data.assetValueKrw,
+    realizedPnlKrw: data.realizedPnlKrw,
+    unrealizedPnlKrw: data.unrealizedPnlKrw,
+    capturedAt: data.capturedAt,
+  };
+  const row = await prisma.dailyPortfolioSnapshot.upsert({
+    where: {
+      tradingAccountId_snapshotDate: {
+        tradingAccountId: input.tradingAccountId,
+        snapshotDate: input.snapshotDate,
+      },
+    },
+    create: data,
+    // An ordinary rerun may refresh snapshot values, but it never rewrites a
+    // pre-existing legacy identity. Production Prisma performs the read
+    // above first and fails closed on any disagreement.
+    update: canonicalUpdate,
+    select: {
+      seasonParticipantId: true,
+      tradingAccountId: true,
       totalAssetKrw: true,
       returnRate: true,
       krwCash: true,
@@ -101,10 +144,17 @@ export async function writeDailyPortfolioSnapshot(
     },
   });
 
+  if (
+    row.tradingAccountId !== input.tradingAccountId ||
+    row.seasonParticipantId !== seasonParticipantId
+  ) {
+    throw new Error(
+      'Daily portfolio snapshot account scope disagrees with its season participant.',
+    );
+  }
+
   return {
-    seasonParticipantId: requireSeasonSnapshotParticipantId(
-      row.seasonParticipantId,
-    ),
+    seasonParticipantId,
     totalAssetKrw: row.totalAssetKrw.toFixed(8),
     returnRate: row.returnRate.toFixed(8),
     krwCash: row.krwCash.toFixed(8),

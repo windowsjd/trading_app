@@ -28,6 +28,7 @@ type PortfolioSeason = {
 
 type PortfolioParticipant = {
   id: string;
+  tradingAccountId: string;
   participantStatus: ParticipantStatus;
   joinedAt: Date;
 };
@@ -131,8 +132,8 @@ export class PortfolioService {
 
     try {
       const valuation =
-        await this.portfolioValuationService.calculateSeasonParticipantValuation(
-          participant.id,
+        await this.portfolioValuationService.calculateTradingAccountValuation(
+          participant.tradingAccountId,
           new Date(),
           'home_live_valuation',
         );
@@ -207,9 +208,12 @@ export class PortfolioService {
 
     const points =
       range === '1d'
-        ? await this.findEquitySnapshotPoints(participant.id, this.since1d())
+        ? await this.findEquitySnapshotPoints(
+            participant.tradingAccountId,
+            this.since1d(),
+          )
         : await this.findDailyOrEquityPoints(
-            participant.id,
+            participant.tradingAccountId,
             range === '7d' ? this.since7d() : season.startAt,
           );
 
@@ -316,26 +320,26 @@ export class PortfolioService {
   }
 
   private async findDailyOrEquityPoints(
-    seasonParticipantId: string,
+    tradingAccountId: string,
     since: Date,
   ): Promise<PortfolioEquityResponse['data']['points']> {
     const dailyPoints = await this.findDailySnapshotPoints(
-      seasonParticipantId,
+      tradingAccountId,
       since,
     );
 
     return dailyPoints.length > 0
       ? dailyPoints
-      : this.findEquitySnapshotPoints(seasonParticipantId, since);
+      : this.findEquitySnapshotPoints(tradingAccountId, since);
   }
 
   private async findEquitySnapshotPoints(
-    seasonParticipantId: string,
+    tradingAccountId: string,
     since: Date,
   ): Promise<PortfolioEquityResponse['data']['points']> {
     const snapshots = await this.prisma.equitySnapshot.findMany({
       where: {
-        seasonParticipantId,
+        tradingAccountId,
         capturedAt: {
           gte: since,
         },
@@ -356,12 +360,12 @@ export class PortfolioService {
   }
 
   private async findDailySnapshotPoints(
-    seasonParticipantId: string,
+    tradingAccountId: string,
     since: Date,
   ): Promise<PortfolioEquityResponse['data']['points']> {
     const snapshots = await this.prisma.dailyPortfolioSnapshot.findMany({
       where: {
-        seasonParticipantId,
+        tradingAccountId,
         capturedAt: {
           gte: since,
         },
@@ -436,6 +440,7 @@ export class PortfolioService {
       },
       select: {
         id: true,
+        tradingAccountId: true,
         participantStatus: true,
         joinedAt: true,
       },

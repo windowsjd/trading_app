@@ -43,12 +43,16 @@ type GeneralIntegrityClient = Pick<
 
 type GeneralTradingRowsClient = Pick<
   Prisma.TransactionClient,
-  'order' | 'position' | 'quote'
+  'order' | 'position' | 'quote' | '$queryRaw'
 >;
 
 type GeneralFxRowsClient = Pick<
   Prisma.TransactionClient,
-  'exchangeTransaction' | 'fxExecuteRequest' | 'quote' | 'walletTransaction'
+  | 'exchangeTransaction'
+  | 'fxExecuteRequest'
+  | 'quote'
+  | 'walletTransaction'
+  | '$queryRaw'
 >;
 
 export type GeneralAccountIntegrityTarget = {
@@ -323,6 +327,30 @@ export async function assertGeneralAccountTradingRowsIntegrity(
   prisma: GeneralTradingRowsClient,
   accountId: string,
 ): Promise<void> {
+  const legacyNullLinks = await prisma.$queryRaw<Array<{ found: number }>>`
+    SELECT 1 AS "found"
+    WHERE EXISTS (
+      SELECT 1
+      FROM "orders" o
+      JOIN "quotes" q ON q."id" = o."quote_id"
+      WHERE o."trading_account_id" = ${accountId}
+        AND q."trading_account_id" IS NULL
+    ) OR EXISTS (
+      SELECT 1
+      FROM "quotes" q
+      JOIN "orders" o ON o."quote_id" = q."id"
+      WHERE q."trading_account_id" = ${accountId}
+        AND o."trading_account_id" IS NULL
+    )
+    LIMIT 1
+  `;
+  if (legacyNullLinks.length > 0) {
+    throwGeneralAccountIntegrity(
+      accountId,
+      'a general order or quote is connected to a legacy null account scope',
+    );
+  }
+
   const [order, position, quote] = await Promise.all([
     prisma.order.findFirst({
       where: {
@@ -332,7 +360,6 @@ export async function assertGeneralAccountTradingRowsIntegrity(
           // Every general order is durable-quote backed. Missing or foreign
           // quote scope is corruption, not a row that may be shown normally.
           { quoteId: null },
-          { quote: { is: { tradingAccountId: null } } },
           {
             quote: {
               is: { tradingAccountId: { not: accountId } },
@@ -361,7 +388,6 @@ export async function assertGeneralAccountTradingRowsIntegrity(
             orders: {
               some: {
                 OR: [
-                  { tradingAccountId: null },
                   { tradingAccountId: { not: accountId } },
                   { seasonParticipantId: { not: null } },
                 ],
@@ -391,6 +417,32 @@ export async function assertGeneralAccountFxRowsIntegrity(
   accountId: string,
   expectedUserId?: string,
 ): Promise<void> {
+  const legacyNullLinks = await prisma.$queryRaw<Array<{ found: number }>>`
+    SELECT 1 AS "found"
+    WHERE EXISTS (
+      SELECT 1
+      FROM "exchange_transactions" e
+      JOIN "fx_execute_requests" r
+        ON r."exchange_transaction_id" = e."id"
+      WHERE e."trading_account_id" = ${accountId}
+        AND r."trading_account_id" IS NULL
+    ) OR EXISTS (
+      SELECT 1
+      FROM "fx_execute_requests" r
+      JOIN "exchange_transactions" e
+        ON e."id" = r."exchange_transaction_id"
+      WHERE r."trading_account_id" = ${accountId}
+        AND e."trading_account_id" IS NULL
+    )
+    LIMIT 1
+  `;
+  if (legacyNullLinks.length > 0) {
+    throwGeneralAccountIntegrity(
+      accountId,
+      'a general FX request or exchange is connected to a legacy null account scope',
+    );
+  }
+
   const [exchange, request, quote] = await Promise.all([
     prisma.exchangeTransaction.findFirst({
       where: {
@@ -401,7 +453,6 @@ export async function assertGeneralAccountFxRowsIntegrity(
             fxExecuteRequests: {
               some: {
                 OR: [
-                  { tradingAccountId: null },
                   { tradingAccountId: { not: accountId } },
                   { seasonParticipantId: { not: null } },
                   ...(expectedUserId
@@ -427,7 +478,6 @@ export async function assertGeneralAccountFxRowsIntegrity(
             exchangeTransaction: {
               is: {
                 OR: [
-                  { tradingAccountId: null },
                   { tradingAccountId: { not: accountId } },
                   { seasonParticipantId: { not: null } },
                 ],

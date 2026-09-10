@@ -533,11 +533,6 @@ export type TradingAccountSumOrderByAggregateInput = {
   initialCapitalKrw?: Prisma.SortOrder
 }
 
-export type TradingAccountNullableScalarRelationFilter = {
-  is?: Prisma.TradingAccountWhereInput | null
-  isNot?: Prisma.TradingAccountWhereInput | null
-}
-
 export type TradingAccountScalarRelationFilter = {
   is?: Prisma.TradingAccountWhereInput
   isNot?: Prisma.TradingAccountWhereInput
@@ -607,12 +602,10 @@ export type TradingAccountCreateNestedOneWithoutSeasonParticipantInput = {
   connect?: Prisma.TradingAccountWhereUniqueInput
 }
 
-export type TradingAccountUpdateOneWithoutSeasonParticipantNestedInput = {
+export type TradingAccountUpdateOneRequiredWithoutSeasonParticipantNestedInput = {
   create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutSeasonParticipantInput, Prisma.TradingAccountUncheckedCreateWithoutSeasonParticipantInput>
   connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutSeasonParticipantInput
   upsert?: Prisma.TradingAccountUpsertWithoutSeasonParticipantInput
-  disconnect?: Prisma.TradingAccountWhereInput | boolean
-  delete?: Prisma.TradingAccountWhereInput | boolean
   connect?: Prisma.TradingAccountWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutSeasonParticipantInput, Prisma.TradingAccountUpdateWithoutSeasonParticipantInput>, Prisma.TradingAccountUncheckedUpdateWithoutSeasonParticipantInput>
 }
@@ -623,12 +616,10 @@ export type TradingAccountCreateNestedOneWithoutPositionsInput = {
   connect?: Prisma.TradingAccountWhereUniqueInput
 }
 
-export type TradingAccountUpdateOneWithoutPositionsNestedInput = {
+export type TradingAccountUpdateOneRequiredWithoutPositionsNestedInput = {
   create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutPositionsInput, Prisma.TradingAccountUncheckedCreateWithoutPositionsInput>
   connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutPositionsInput
   upsert?: Prisma.TradingAccountUpsertWithoutPositionsInput
-  disconnect?: Prisma.TradingAccountWhereInput | boolean
-  delete?: Prisma.TradingAccountWhereInput | boolean
   connect?: Prisma.TradingAccountWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutPositionsInput, Prisma.TradingAccountUpdateWithoutPositionsInput>, Prisma.TradingAccountUncheckedUpdateWithoutPositionsInput>
 }
@@ -639,12 +630,10 @@ export type TradingAccountCreateNestedOneWithoutOrdersInput = {
   connect?: Prisma.TradingAccountWhereUniqueInput
 }
 
-export type TradingAccountUpdateOneWithoutOrdersNestedInput = {
+export type TradingAccountUpdateOneRequiredWithoutOrdersNestedInput = {
   create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutOrdersInput, Prisma.TradingAccountUncheckedCreateWithoutOrdersInput>
   connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutOrdersInput
   upsert?: Prisma.TradingAccountUpsertWithoutOrdersInput
-  disconnect?: Prisma.TradingAccountWhereInput | boolean
-  delete?: Prisma.TradingAccountWhereInput | boolean
   connect?: Prisma.TradingAccountWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutOrdersInput, Prisma.TradingAccountUpdateWithoutOrdersInput>, Prisma.TradingAccountUncheckedUpdateWithoutOrdersInput>
 }
@@ -655,12 +644,10 @@ export type TradingAccountCreateNestedOneWithoutCashWalletsInput = {
   connect?: Prisma.TradingAccountWhereUniqueInput
 }
 
-export type TradingAccountUpdateOneWithoutCashWalletsNestedInput = {
+export type TradingAccountUpdateOneRequiredWithoutCashWalletsNestedInput = {
   create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutCashWalletsInput, Prisma.TradingAccountUncheckedCreateWithoutCashWalletsInput>
   connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutCashWalletsInput
   upsert?: Prisma.TradingAccountUpsertWithoutCashWalletsInput
-  disconnect?: Prisma.TradingAccountWhereInput | boolean
-  delete?: Prisma.TradingAccountWhereInput | boolean
   connect?: Prisma.TradingAccountWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutCashWalletsInput, Prisma.TradingAccountUpdateWithoutCashWalletsInput>, Prisma.TradingAccountUncheckedUpdateWithoutCashWalletsInput>
 }
@@ -671,12 +658,10 @@ export type TradingAccountCreateNestedOneWithoutWalletTransactionsInput = {
   connect?: Prisma.TradingAccountWhereUniqueInput
 }
 
-export type TradingAccountUpdateOneWithoutWalletTransactionsNestedInput = {
+export type TradingAccountUpdateOneRequiredWithoutWalletTransactionsNestedInput = {
   create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutWalletTransactionsInput, Prisma.TradingAccountUncheckedCreateWithoutWalletTransactionsInput>
   connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutWalletTransactionsInput
   upsert?: Prisma.TradingAccountUpsertWithoutWalletTransactionsInput
-  disconnect?: Prisma.TradingAccountWhereInput | boolean
-  delete?: Prisma.TradingAccountWhereInput | boolean
   connect?: Prisma.TradingAccountWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutWalletTransactionsInput, Prisma.TradingAccountUpdateWithoutWalletTransactionsInput>, Prisma.TradingAccountUncheckedUpdateWithoutWalletTransactionsInput>
 }
@@ -701,12 +686,10 @@ export type TradingAccountCreateNestedOneWithoutExchangeTransactionsInput = {
   connect?: Prisma.TradingAccountWhereUniqueInput
 }
 
-export type TradingAccountUpdateOneWithoutExchangeTransactionsNestedInput = {
+export type TradingAccountUpdateOneRequiredWithoutExchangeTransactionsNestedInput = {
   create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutExchangeTransactionsInput, Prisma.TradingAccountUncheckedCreateWithoutExchangeTransactionsInput>
   connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutExchangeTransactionsInput
   upsert?: Prisma.TradingAccountUpsertWithoutExchangeTransactionsInput
-  disconnect?: Prisma.TradingAccountWhereInput | boolean
-  delete?: Prisma.TradingAccountWhereInput | boolean
   connect?: Prisma.TradingAccountWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutExchangeTransactionsInput, Prisma.TradingAccountUpdateWithoutExchangeTransactionsInput>, Prisma.TradingAccountUncheckedUpdateWithoutExchangeTransactionsInput>
 }
@@ -717,12 +700,10 @@ export type TradingAccountCreateNestedOneWithoutQuotesInput = {
   connect?: Prisma.TradingAccountWhereUniqueInput
 }
 
-export type TradingAccountUpdateOneWithoutQuotesNestedInput = {
+export type TradingAccountUpdateOneRequiredWithoutQuotesNestedInput = {
   create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutQuotesInput, Prisma.TradingAccountUncheckedCreateWithoutQuotesInput>
   connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutQuotesInput
   upsert?: Prisma.TradingAccountUpsertWithoutQuotesInput
-  disconnect?: Prisma.TradingAccountWhereInput | boolean
-  delete?: Prisma.TradingAccountWhereInput | boolean
   connect?: Prisma.TradingAccountWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutQuotesInput, Prisma.TradingAccountUpdateWithoutQuotesInput>, Prisma.TradingAccountUncheckedUpdateWithoutQuotesInput>
 }
@@ -733,12 +714,10 @@ export type TradingAccountCreateNestedOneWithoutFxExecuteRequestsInput = {
   connect?: Prisma.TradingAccountWhereUniqueInput
 }
 
-export type TradingAccountUpdateOneWithoutFxExecuteRequestsNestedInput = {
+export type TradingAccountUpdateOneRequiredWithoutFxExecuteRequestsNestedInput = {
   create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutFxExecuteRequestsInput, Prisma.TradingAccountUncheckedCreateWithoutFxExecuteRequestsInput>
   connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutFxExecuteRequestsInput
   upsert?: Prisma.TradingAccountUpsertWithoutFxExecuteRequestsInput
-  disconnect?: Prisma.TradingAccountWhereInput | boolean
-  delete?: Prisma.TradingAccountWhereInput | boolean
   connect?: Prisma.TradingAccountWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutFxExecuteRequestsInput, Prisma.TradingAccountUpdateWithoutFxExecuteRequestsInput>, Prisma.TradingAccountUncheckedUpdateWithoutFxExecuteRequestsInput>
 }
@@ -749,12 +728,10 @@ export type TradingAccountCreateNestedOneWithoutEquitySnapshotsInput = {
   connect?: Prisma.TradingAccountWhereUniqueInput
 }
 
-export type TradingAccountUpdateOneWithoutEquitySnapshotsNestedInput = {
+export type TradingAccountUpdateOneRequiredWithoutEquitySnapshotsNestedInput = {
   create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutEquitySnapshotsInput, Prisma.TradingAccountUncheckedCreateWithoutEquitySnapshotsInput>
   connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutEquitySnapshotsInput
   upsert?: Prisma.TradingAccountUpsertWithoutEquitySnapshotsInput
-  disconnect?: Prisma.TradingAccountWhereInput | boolean
-  delete?: Prisma.TradingAccountWhereInput | boolean
   connect?: Prisma.TradingAccountWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutEquitySnapshotsInput, Prisma.TradingAccountUpdateWithoutEquitySnapshotsInput>, Prisma.TradingAccountUncheckedUpdateWithoutEquitySnapshotsInput>
 }
@@ -765,12 +742,10 @@ export type TradingAccountCreateNestedOneWithoutDailyPortfolioSnapshotsInput = {
   connect?: Prisma.TradingAccountWhereUniqueInput
 }
 
-export type TradingAccountUpdateOneWithoutDailyPortfolioSnapshotsNestedInput = {
+export type TradingAccountUpdateOneRequiredWithoutDailyPortfolioSnapshotsNestedInput = {
   create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutDailyPortfolioSnapshotsInput, Prisma.TradingAccountUncheckedCreateWithoutDailyPortfolioSnapshotsInput>
   connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutDailyPortfolioSnapshotsInput
   upsert?: Prisma.TradingAccountUpsertWithoutDailyPortfolioSnapshotsInput
-  disconnect?: Prisma.TradingAccountWhereInput | boolean
-  delete?: Prisma.TradingAccountWhereInput | boolean
   connect?: Prisma.TradingAccountWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutDailyPortfolioSnapshotsInput, Prisma.TradingAccountUpdateWithoutDailyPortfolioSnapshotsInput>, Prisma.TradingAccountUncheckedUpdateWithoutDailyPortfolioSnapshotsInput>
 }
@@ -781,12 +756,10 @@ export type TradingAccountCreateNestedOneWithoutSeasonRankingsInput = {
   connect?: Prisma.TradingAccountWhereUniqueInput
 }
 
-export type TradingAccountUpdateOneWithoutSeasonRankingsNestedInput = {
+export type TradingAccountUpdateOneRequiredWithoutSeasonRankingsNestedInput = {
   create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutSeasonRankingsInput, Prisma.TradingAccountUncheckedCreateWithoutSeasonRankingsInput>
   connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutSeasonRankingsInput
   upsert?: Prisma.TradingAccountUpsertWithoutSeasonRankingsInput
-  disconnect?: Prisma.TradingAccountWhereInput | boolean
-  delete?: Prisma.TradingAccountWhereInput | boolean
   connect?: Prisma.TradingAccountWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutSeasonRankingsInput, Prisma.TradingAccountUpdateWithoutSeasonRankingsInput>, Prisma.TradingAccountUncheckedUpdateWithoutSeasonRankingsInput>
 }

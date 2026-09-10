@@ -44,20 +44,12 @@ export class OrderReservationService {
     },
   ): Promise<{ walletId: string }> {
     const wallet = await tx.cashWallet.findUnique({
-      where:
-        input.seasonParticipantId === null
-          ? {
-              tradingAccountId_currencyCode: {
-                tradingAccountId: input.tradingAccountId,
-                currencyCode: input.currencyCode,
-              },
-            }
-          : {
-              seasonParticipantId_currencyCode: {
-                seasonParticipantId: input.seasonParticipantId,
-                currencyCode: input.currencyCode,
-              },
-            },
+      where: {
+        tradingAccountId_currencyCode: {
+          tradingAccountId: input.tradingAccountId,
+          currencyCode: input.currencyCode,
+        },
+      },
       select: { id: true, seasonParticipantId: true, tradingAccountId: true },
     });
 

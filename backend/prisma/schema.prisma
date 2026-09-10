@@ -438,17 +438,16 @@ model SeasonParticipant {
   resultCorrectedAt       DateTime?         @map("result_corrected_at")
   resultCorrectedReason   String?           @map("result_corrected_reason")
   resultCorrectedByUserId String?           @map("result_corrected_by_user_id")
-  // Transitional nullable link to the common trading account. Backfilled for
-  // all pre-existing participants by the add_trading_account_foundation
-  // migration; every new join path must set it. Planned to be tightened to
-  // NOT NULL in a follow-up work unit once no writer can leave it null.
-  tradingAccountId        String?           @unique @map("trading_account_id")
+  // Canonical financial-account ownership link. Every season participant has
+  // exactly one season-mode TradingAccount; season state remains here while
+  // wallets/orders/positions/FX/snapshots are owned by that account.
+  tradingAccountId        String            @unique @map("trading_account_id")
   createdAt               DateTime          @default(now()) @map("created_at")
   updatedAt               DateTime          @updatedAt @map("updated_at")
 
   season                    Season                     @relation(fields: [seasonId], references: [id], onDelete: Cascade)
   user                      User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tradingAccount            TradingAccount?            @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  tradingAccount            TradingAccount             @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   cashWallets               CashWallet[]
   walletTransactions        WalletTransaction[]
   exchangeTransactions      ExchangeTransaction[]
@@ -776,11 +775,9 @@ model Position {
   // NULL for general-mode positions. Season positions keep their participant
   // link and every writer also records tradingAccountId.
   seasonParticipantId String?      @map("season_participant_id")
-  // Transitional dual identity (see CashWallet): nullable trading-account
-  // scope next to the legacy seasonParticipantId. Backfilled from the
-  // participant link by add_trading_scope_and_fx_legacy_partial_unique;
-  // every new writer sets BOTH. NOT NULL tightening is a later work unit.
-  tradingAccountId    String?      @map("trading_account_id")
+  // Canonical account ownership. The optional participant link is retained
+  // only for season-domain/legacy compatibility and is not the asset scope.
+  tradingAccountId    String       @map("trading_account_id")
   assetId             String       @map("asset_id")
   quantity            Decimal      @db.Decimal(24, 8)
   // Quantity locked by submitted limit-sell orders. It remains part of the
@@ -800,12 +797,11 @@ model Position {
   updatedAt           DateTime     @updatedAt @map("updated_at")
 
   seasonParticipant SeasonParticipant? @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
-  tradingAccount    TradingAccount?    @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  tradingAccount    TradingAccount     @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   asset             Asset              @relation(fields: [assetId], references: [id], onDelete: Restrict)
 
   @@unique([seasonParticipantId, assetId])
-  // One aggregate position per asset per trading account. NULL legacy rows
-  // stay allowed (PostgreSQL treats NULLs as distinct in unique indexes).
+  // One aggregate position per asset per canonical trading account.
   @@unique([tradingAccountId, assetId])
   @@index([seasonParticipantId])
   @@index([tradingAccountId])
@@ -817,10 +813,9 @@ model Order {
   id                         String       @id @default(uuid())
   // NULL for general-mode orders. Season orders keep their existing link.
   seasonParticipantId        String?      @map("season_participant_id")
-  // Transitional dual identity (see CashWallet). The trading account is the
-  // asset-isolation boundary for order data; the participant link stays for
-  // season state/ranking/settlement until the removal work unit.
-  tradingAccountId           String?      @map("trading_account_id")
+  // Canonical asset-isolation/ownership boundary. The participant link stays
+  // for season state/ranking/settlement and legacy compatibility only.
+  tradingAccountId           String       @map("trading_account_id")
   assetId                    String       @map("asset_id")
   quoteId                    String?      @unique @map("quote_id")
   side                       OrderSide
@@ -859,7 +854,7 @@ model Order {
   updatedAt                  DateTime     @updatedAt @map("updated_at")
 
   seasonParticipant  SeasonParticipant?        @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
-  tradingAccount     TradingAccount?           @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  tradingAccount     TradingAccount            @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   asset              Asset                     @relation(fields: [assetId], references: [id], onDelete: Restrict)
   quote              Quote?                    @relation(fields: [quoteId], references: [id], onDelete: Restrict)
   assetPriceSnapshot AssetPriceSnapshot?       @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
@@ -868,8 +863,8 @@ model Order {
 
   @@unique([seasonParticipantId, idempotencyKey])
   // Account-scoped create idempotency: the same key may be reused by the
-  // SAME user on a different trading account. NULL legacy rows stay allowed;
-  // idempotencyKey stays nullable with its existing meaning.
+  // SAME user on a different trading account. idempotencyKey stays nullable
+  // with its existing meaning; the participant-scoped twin is legacy.
   @@unique([tradingAccountId, idempotencyKey])
   @@index([seasonParticipantId, submittedAt])
   @@index([seasonParticipantId, status])
@@ -891,12 +886,9 @@ model CashWallet {
   // (작업 6). Season wallets keep their existing non-null link unchanged;
   // nothing in the general-account path ever fabricates a participant.
   seasonParticipantId String?      @map("season_participant_id")
-  // Transitional dual identity: nullable trading-account scope added next to
-  // the legacy seasonParticipantId. Backfilled from the participant link by
-  // the add_financial_trading_account_scope migration; every new writer sets
-  // BOTH. Tightened to NOT NULL only in a follow-up work unit. General
-  // wallets are ALWAYS created with a non-null tradingAccountId.
-  tradingAccountId    String?      @map("trading_account_id")
+  // Canonical account ownership. General wallets carry no participant;
+  // season wallets retain it only for legacy compatibility/season checks.
+  tradingAccountId    String       @map("trading_account_id")
   currencyCode        CurrencyCode @map("currency_code")
   balanceAmount       Decimal      @map("balance_amount") @db.Decimal(24, 8)
   // Cash locked by submitted limit-buy orders. Never subtracted from total
@@ -907,12 +899,11 @@ model CashWallet {
   updatedAt           DateTime     @updatedAt @map("updated_at")
 
   seasonParticipant  SeasonParticipant?  @relation(fields: [seasonParticipantId], references: [id], onDelete: Cascade)
-  tradingAccount     TradingAccount?     @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  tradingAccount     TradingAccount      @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   walletTransactions WalletTransaction[]
 
   @@unique([seasonParticipantId, currencyCode])
-  // One wallet per currency per account; NULL legacy rows stay allowed
-  // (PostgreSQL treats NULLs as distinct in unique indexes).
+  // One wallet per currency per canonical trading account.
   @@unique([tradingAccountId, currencyCode])
   @@index([seasonParticipantId])
   @@index([tradingAccountId])
@@ -924,10 +915,9 @@ model WalletTransaction {
   // NULL for general-mode ledger rows (작업 6): a general account has no
   // SeasonParticipant. Season ledger rows keep their existing link.
   seasonParticipantId String?                        @map("season_participant_id")
-  // Transitional dual identity (see CashWallet). Stored directly on the
-  // ledger row — account-level ledger reads/audits/aggregations must not
-  // depend on walking the wallet relation.
-  tradingAccountId    String?                        @map("trading_account_id")
+  // Canonical account ownership, stored directly so account-level ledger
+  // reads/audits never infer ownership through participant or wallet joins.
+  tradingAccountId    String                         @map("trading_account_id")
   walletId            String                         @map("wallet_id")
   currencyCode        CurrencyCode                   @map("currency_code")
   direction           WalletTransactionDirection
@@ -940,7 +930,7 @@ model WalletTransaction {
   createdAt           DateTime                       @default(now()) @map("created_at")
 
   seasonParticipant SeasonParticipant? @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
-  tradingAccount    TradingAccount?    @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  tradingAccount    TradingAccount     @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   wallet            CashWallet         @relation(fields: [walletId], references: [id], onDelete: Restrict)
   adRewardClaim     AdRewardClaim?
 
@@ -1029,8 +1019,8 @@ model AdRewardClaim {
 model ExchangeTransaction {
   id                  String       @id @default(uuid())
   seasonParticipantId String?      @map("season_participant_id")
-  // Transitional dual identity (see CashWallet).
-  tradingAccountId    String?      @map("trading_account_id")
+  // Canonical account ownership; participant is compatibility metadata only.
+  tradingAccountId    String       @map("trading_account_id")
   fxRateSnapshotId    String?      @map("fx_rate_snapshot_id")
   fromCurrency        CurrencyCode @map("from_currency")
   toCurrency          CurrencyCode @map("to_currency")
@@ -1045,7 +1035,7 @@ model ExchangeTransaction {
   createdAt           DateTime     @default(now()) @map("created_at")
 
   seasonParticipant SeasonParticipant? @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
-  tradingAccount    TradingAccount?    @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  tradingAccount    TradingAccount     @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   fxRateSnapshot    FxRateSnapshot?    @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
   fxExecuteRequests FxExecuteRequest[]
 
@@ -1085,11 +1075,9 @@ model Quote {
   id                   String        @id @default(uuid())
   userId               String        @map("user_id")
   seasonParticipantId  String?       @map("season_participant_id")
-  // Transitional dual identity (see CashWallet). A quote is not an asset
-  // mutation but grants later execution authority, so it carries the same
-  // account isolation: order/FX execution refuses quotes whose account
-  // differs, and only NULL legacy quotes pass the explicit legacy checks.
-  tradingAccountId     String?       @map("trading_account_id")
+  // Canonical execution-authority scope. A quote is not an asset mutation,
+  // but it can authorize one and therefore always belongs to an account.
+  tradingAccountId     String        @map("trading_account_id")
   quoteType            QuoteType     @map("quote_type")
   status               QuoteStatus   @default(active)
   assetId              String?       @map("asset_id")
@@ -1128,7 +1116,7 @@ model Quote {
 
   user               User                @relation(fields: [userId], references: [id], onDelete: Restrict)
   seasonParticipant  SeasonParticipant?  @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
-  tradingAccount     TradingAccount?     @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  tradingAccount     TradingAccount      @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   asset              Asset?              @relation(fields: [assetId], references: [id], onDelete: Restrict)
   assetPriceSnapshot AssetPriceSnapshot? @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
   fxRateSnapshot     FxRateSnapshot?     @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
@@ -1150,8 +1138,8 @@ model FxExecuteRequest {
   id                    String                 @id @default(uuid())
   userId                String                 @map("user_id")
   seasonParticipantId   String?                @map("season_participant_id")
-  // Transitional dual identity (see CashWallet).
-  tradingAccountId      String?                @map("trading_account_id")
+  // Canonical account ownership and idempotency scope.
+  tradingAccountId      String                 @map("trading_account_id")
   idempotencyKey        String                 @map("idempotency_key")
   requestHash           String                 @map("request_hash")
   fromCurrency          CurrencyCode           @map("from_currency")
@@ -1169,12 +1157,12 @@ model FxExecuteRequest {
 
   user                User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
   seasonParticipant   SeasonParticipant?   @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
-  tradingAccount      TradingAccount?      @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  tradingAccount      TradingAccount       @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   exchangeTransaction ExchangeTransaction? @relation(fields: [exchangeTransactionId], references: [id], onDelete: Restrict)
 
   // Account-scoped idempotency: the SAME user may reuse a key across two
   // different trading accounts (e.g. a season and a general account);
-  // within one account the key stays unique. NULL legacy rows stay allowed.
+  // within one account the key stays unique.
   //
   // The former global per-user unique on (userId, idempotencyKey) was
   // REPLACED by a PostgreSQL partial unique index protecting ONLY legacy
@@ -1207,9 +1195,8 @@ model EquitySnapshot {
   id                           String                          @id @default(uuid())
   /// NULL for general-mode snapshots (no participant exists).
   seasonParticipantId          String?                         @map("season_participant_id")
-  /// Transitional dual identity: backfilled for existing season rows, always
-  /// written by new writers, and the ONLY scope a general row has.
-  tradingAccountId             String?                         @map("trading_account_id")
+  /// Canonical account ownership. The participant is season metadata only.
+  tradingAccountId             String                          @map("trading_account_id")
   totalAssetKrw                Decimal                         @map("total_asset_krw") @db.Decimal(24, 8)
   returnRate                   Decimal                         @map("return_rate") @db.Decimal(12, 8)
   krwCash                      Decimal                         @map("krw_cash") @db.Decimal(24, 8)
@@ -1236,12 +1223,11 @@ model EquitySnapshot {
   createdAt                    DateTime                        @default(now()) @map("created_at")
 
   seasonParticipant SeasonParticipant? @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
-  tradingAccount    TradingAccount?    @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  tradingAccount    TradingAccount     @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
 
   // A boundary snapshot exists at most once per (account, reference, phase).
-  // Prisma CAN express this one as a plain composite unique because all four
-  // columns are nullable and PostgreSQL treats NULLs as distinct, so ordinary
-  // season/ordinary rows are unaffected.
+  // The three boundary columns remain nullable, so PostgreSQL leaves ordinary
+  // season/ordinary snapshots unaffected.
   @@unique([tradingAccountId, externalFundingReferenceType, externalFundingReferenceId, snapshotReason], name: "equity_snapshot_external_funding_boundary", map: "equity_snapshots_external_funding_boundary_key")
   @@index([seasonParticipantId, capturedAt])
   @@index([tradingAccountId, capturedAt])
@@ -1258,7 +1244,7 @@ model DailyPortfolioSnapshot {
   id                           String   @id @default(uuid())
   /// NULL for general-mode snapshots (no participant exists).
   seasonParticipantId          String?  @map("season_participant_id")
-  tradingAccountId             String?  @map("trading_account_id")
+  tradingAccountId             String   @map("trading_account_id")
   snapshotDate                 DateTime @map("snapshot_date") @db.Date
   totalAssetKrw                Decimal  @map("total_asset_krw") @db.Decimal(24, 8)
   returnRate                   Decimal  @map("return_rate") @db.Decimal(12, 8)
@@ -1275,10 +1261,10 @@ model DailyPortfolioSnapshot {
   createdAt                    DateTime @default(now()) @map("created_at")
 
   seasonParticipant SeasonParticipant? @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
-  tradingAccount    TradingAccount?    @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  tradingAccount    TradingAccount     @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
 
   @@unique([seasonParticipantId, snapshotDate])
-  /// One daily row per account per date; NULL legacy rows stay allowed.
+  /// One daily row per canonical account per date.
   @@unique([tradingAccountId, snapshotDate])
   @@index([snapshotDate])
   @@index([seasonParticipantId, capturedAt])
@@ -1291,12 +1277,9 @@ model SeasonRanking {
   id                  String            @id @default(uuid())
   seasonId            String            @map("season_id")
   seasonParticipantId String            @map("season_participant_id")
-  // Transitional SECOND identity (작업 8). SeasonRanking stays a season-only
-  // model — the participant relation is NOT relaxed — and this column exists
-  // to make the row's asset-isolation scope explicit and verifiable. Nullable
-  // only until every legacy row is repaired; NOT NULL is a later hardening
-  // unit. A general-mode account must NEVER appear here.
-  tradingAccountId    String?           @map("trading_account_id")
+  // Canonical account scope for the scored portfolio. SeasonRanking remains a
+  // season-domain model, so its participant relation is also retained.
+  tradingAccountId    String            @map("trading_account_id")
   rankType            SeasonRankingType @default(daily) @map("rank_type")
   rank                Int
   totalAssetKrw       Decimal           @map("total_asset_krw") @db.Decimal(24, 8)
@@ -1310,13 +1293,12 @@ model SeasonRanking {
 
   season            Season            @relation(fields: [seasonId], references: [id], onDelete: Restrict)
   seasonParticipant SeasonParticipant @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
-  tradingAccount    TradingAccount?   @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  tradingAccount    TradingAccount    @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
 
   @@unique([seasonId, rankType, rankingDate, seasonParticipantId])
   @@unique([seasonId, rankType, rankingDate, rank])
-  // One ranking row per ACCOUNT per (season, rankType, date), the account-scoped
-  // twin of the participant unique. NULLs are distinct in PostgreSQL, so legacy
-  // unrepaired rows are unaffected.
+  // One ranking row per ACCOUNT per (season, rankType, date), the canonical
+  // ownership twin of the retained participant unique.
   @@unique([seasonId, rankType, rankingDate, tradingAccountId])
   @@index([seasonId, rankType, rankingDate, rank])
   @@index([seasonParticipantId, rankingDate])

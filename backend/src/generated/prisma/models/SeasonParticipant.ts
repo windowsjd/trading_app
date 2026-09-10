@@ -353,7 +353,7 @@ export type SeasonParticipantGroupByOutputType = {
   resultCorrectedAt: Date | null
   resultCorrectedReason: string | null
   resultCorrectedByUserId: string | null
-  tradingAccountId: string | null
+  tradingAccountId: string
   createdAt: Date
   updatedAt: Date
   _count: SeasonParticipantCountAggregateOutputType | null
@@ -405,12 +405,12 @@ export type SeasonParticipantWhereInput = {
   resultCorrectedAt?: Prisma.DateTimeNullableFilter<"SeasonParticipant"> | Date | string | null
   resultCorrectedReason?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
   resultCorrectedByUserId?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
-  tradingAccountId?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
+  tradingAccountId?: Prisma.StringFilter<"SeasonParticipant"> | string
   createdAt?: Prisma.DateTimeFilter<"SeasonParticipant"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"SeasonParticipant"> | Date | string
   season?: Prisma.XOR<Prisma.SeasonScalarRelationFilter, Prisma.SeasonWhereInput>
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
-  tradingAccount?: Prisma.XOR<Prisma.TradingAccountNullableScalarRelationFilter, Prisma.TradingAccountWhereInput> | null
+  tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   cashWallets?: Prisma.CashWalletListRelationFilter
   walletTransactions?: Prisma.WalletTransactionListRelationFilter
   exchangeTransactions?: Prisma.ExchangeTransactionListRelationFilter
@@ -449,7 +449,7 @@ export type SeasonParticipantOrderByWithRelationInput = {
   resultCorrectedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   resultCorrectedReason?: Prisma.SortOrderInput | Prisma.SortOrder
   resultCorrectedByUserId?: Prisma.SortOrderInput | Prisma.SortOrder
-  tradingAccountId?: Prisma.SortOrderInput | Prisma.SortOrder
+  tradingAccountId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   season?: Prisma.SeasonOrderByWithRelationInput
@@ -502,7 +502,7 @@ export type SeasonParticipantWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"SeasonParticipant"> | Date | string
   season?: Prisma.XOR<Prisma.SeasonScalarRelationFilter, Prisma.SeasonWhereInput>
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
-  tradingAccount?: Prisma.XOR<Prisma.TradingAccountNullableScalarRelationFilter, Prisma.TradingAccountWhereInput> | null
+  tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   cashWallets?: Prisma.CashWalletListRelationFilter
   walletTransactions?: Prisma.WalletTransactionListRelationFilter
   exchangeTransactions?: Prisma.ExchangeTransactionListRelationFilter
@@ -541,7 +541,7 @@ export type SeasonParticipantOrderByWithAggregationInput = {
   resultCorrectedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   resultCorrectedReason?: Prisma.SortOrderInput | Prisma.SortOrder
   resultCorrectedByUserId?: Prisma.SortOrderInput | Prisma.SortOrder
-  tradingAccountId?: Prisma.SortOrderInput | Prisma.SortOrder
+  tradingAccountId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.SeasonParticipantCountOrderByAggregateInput
@@ -578,7 +578,7 @@ export type SeasonParticipantScalarWhereWithAggregatesInput = {
   resultCorrectedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"SeasonParticipant"> | Date | string | null
   resultCorrectedReason?: Prisma.StringNullableWithAggregatesFilter<"SeasonParticipant"> | string | null
   resultCorrectedByUserId?: Prisma.StringNullableWithAggregatesFilter<"SeasonParticipant"> | string | null
-  tradingAccountId?: Prisma.StringNullableWithAggregatesFilter<"SeasonParticipant"> | string | null
+  tradingAccountId?: Prisma.StringWithAggregatesFilter<"SeasonParticipant"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"SeasonParticipant"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"SeasonParticipant"> | Date | string
 }
@@ -609,7 +609,7 @@ export type SeasonParticipantCreateInput = {
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
   user: Prisma.UserCreateNestedOneWithoutSeasonParticipantsInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutSeasonParticipantInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutSeasonParticipantInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutSeasonParticipantInput
@@ -648,7 +648,7 @@ export type SeasonParticipantUncheckedCreateInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -691,7 +691,7 @@ export type SeasonParticipantUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutSeasonParticipantsNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutSeasonParticipantNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutSeasonParticipantNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutSeasonParticipantNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutSeasonParticipantNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutSeasonParticipantNestedInput
@@ -730,7 +730,7 @@ export type SeasonParticipantUncheckedUpdateInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -771,7 +771,7 @@ export type SeasonParticipantCreateManyInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -826,7 +826,7 @@ export type SeasonParticipantUncheckedUpdateManyInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1310,7 +1310,7 @@ export type SeasonParticipantCreateWithoutUserInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutSeasonParticipantInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutSeasonParticipantInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutSeasonParticipantInput
@@ -1348,7 +1348,7 @@ export type SeasonParticipantUncheckedCreateWithoutUserInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -1418,7 +1418,7 @@ export type SeasonParticipantScalarWhereInput = {
   resultCorrectedAt?: Prisma.DateTimeNullableFilter<"SeasonParticipant"> | Date | string | null
   resultCorrectedReason?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
   resultCorrectedByUserId?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
-  tradingAccountId?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
+  tradingAccountId?: Prisma.StringFilter<"SeasonParticipant"> | string
   createdAt?: Prisma.DateTimeFilter<"SeasonParticipant"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"SeasonParticipant"> | Date | string
 }
@@ -1624,7 +1624,7 @@ export type SeasonParticipantCreateWithoutSeasonInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutSeasonParticipantsInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutSeasonParticipantInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutSeasonParticipantInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutSeasonParticipantInput
@@ -1662,7 +1662,7 @@ export type SeasonParticipantUncheckedCreateWithoutSeasonInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -1731,7 +1731,7 @@ export type SeasonParticipantCreateWithoutSeasonRewardsInput = {
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
   user: Prisma.UserCreateNestedOneWithoutSeasonParticipantsInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutSeasonParticipantInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutSeasonParticipantInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutSeasonParticipantInput
@@ -1769,7 +1769,7 @@ export type SeasonParticipantUncheckedCreateWithoutSeasonRewardsInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -1827,7 +1827,7 @@ export type SeasonParticipantUpdateWithoutSeasonRewardsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutSeasonParticipantsNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutSeasonParticipantNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutSeasonParticipantNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutSeasonParticipantNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutSeasonParticipantNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutSeasonParticipantNestedInput
@@ -1865,7 +1865,7 @@ export type SeasonParticipantUncheckedUpdateWithoutSeasonRewardsInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -1907,7 +1907,7 @@ export type SeasonParticipantCreateWithoutRewardFulfillmentRequestsInput = {
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
   user: Prisma.UserCreateNestedOneWithoutSeasonParticipantsInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutSeasonParticipantInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutSeasonParticipantInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutSeasonParticipantInput
@@ -1945,7 +1945,7 @@ export type SeasonParticipantUncheckedCreateWithoutRewardFulfillmentRequestsInpu
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -2003,7 +2003,7 @@ export type SeasonParticipantUpdateWithoutRewardFulfillmentRequestsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutSeasonParticipantsNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutSeasonParticipantNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutSeasonParticipantNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutSeasonParticipantNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutSeasonParticipantNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutSeasonParticipantNestedInput
@@ -2041,7 +2041,7 @@ export type SeasonParticipantUncheckedUpdateWithoutRewardFulfillmentRequestsInpu
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -2083,7 +2083,7 @@ export type SeasonParticipantCreateWithoutPositionsInput = {
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
   user: Prisma.UserCreateNestedOneWithoutSeasonParticipantsInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutSeasonParticipantInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutSeasonParticipantInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutSeasonParticipantInput
@@ -2121,7 +2121,7 @@ export type SeasonParticipantUncheckedCreateWithoutPositionsInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -2179,7 +2179,7 @@ export type SeasonParticipantUpdateWithoutPositionsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutSeasonParticipantsNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutSeasonParticipantNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutSeasonParticipantNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutSeasonParticipantNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutSeasonParticipantNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutSeasonParticipantNestedInput
@@ -2217,7 +2217,7 @@ export type SeasonParticipantUncheckedUpdateWithoutPositionsInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -2259,7 +2259,7 @@ export type SeasonParticipantCreateWithoutOrdersInput = {
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
   user: Prisma.UserCreateNestedOneWithoutSeasonParticipantsInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutSeasonParticipantInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutSeasonParticipantInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutSeasonParticipantInput
@@ -2297,7 +2297,7 @@ export type SeasonParticipantUncheckedCreateWithoutOrdersInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -2355,7 +2355,7 @@ export type SeasonParticipantUpdateWithoutOrdersInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutSeasonParticipantsNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutSeasonParticipantNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutSeasonParticipantNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutSeasonParticipantNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutSeasonParticipantNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutSeasonParticipantNestedInput
@@ -2393,7 +2393,7 @@ export type SeasonParticipantUncheckedUpdateWithoutOrdersInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -2435,7 +2435,7 @@ export type SeasonParticipantCreateWithoutCashWalletsInput = {
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
   user: Prisma.UserCreateNestedOneWithoutSeasonParticipantsInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutSeasonParticipantInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutSeasonParticipantInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutSeasonParticipantInput
@@ -2473,7 +2473,7 @@ export type SeasonParticipantUncheckedCreateWithoutCashWalletsInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
   walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -2531,7 +2531,7 @@ export type SeasonParticipantUpdateWithoutCashWalletsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutSeasonParticipantsNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutSeasonParticipantNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutSeasonParticipantNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutSeasonParticipantNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutSeasonParticipantNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutSeasonParticipantNestedInput
@@ -2569,7 +2569,7 @@ export type SeasonParticipantUncheckedUpdateWithoutCashWalletsInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -2611,7 +2611,7 @@ export type SeasonParticipantCreateWithoutWalletTransactionsInput = {
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
   user: Prisma.UserCreateNestedOneWithoutSeasonParticipantsInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutSeasonParticipantInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutSeasonParticipantInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutSeasonParticipantInput
@@ -2649,7 +2649,7 @@ export type SeasonParticipantUncheckedCreateWithoutWalletTransactionsInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -2707,7 +2707,7 @@ export type SeasonParticipantUpdateWithoutWalletTransactionsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutSeasonParticipantsNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutSeasonParticipantNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutSeasonParticipantNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutSeasonParticipantNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutSeasonParticipantNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutSeasonParticipantNestedInput
@@ -2745,7 +2745,7 @@ export type SeasonParticipantUncheckedUpdateWithoutWalletTransactionsInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -2787,7 +2787,7 @@ export type SeasonParticipantCreateWithoutExchangeTransactionsInput = {
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
   user: Prisma.UserCreateNestedOneWithoutSeasonParticipantsInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutSeasonParticipantInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutSeasonParticipantInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutSeasonParticipantInput
@@ -2825,7 +2825,7 @@ export type SeasonParticipantUncheckedCreateWithoutExchangeTransactionsInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -2883,7 +2883,7 @@ export type SeasonParticipantUpdateWithoutExchangeTransactionsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutSeasonParticipantsNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutSeasonParticipantNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutSeasonParticipantNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutSeasonParticipantNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutSeasonParticipantNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutSeasonParticipantNestedInput
@@ -2921,7 +2921,7 @@ export type SeasonParticipantUncheckedUpdateWithoutExchangeTransactionsInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -2963,7 +2963,7 @@ export type SeasonParticipantCreateWithoutQuotesInput = {
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
   user: Prisma.UserCreateNestedOneWithoutSeasonParticipantsInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutSeasonParticipantInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutSeasonParticipantInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutSeasonParticipantInput
@@ -3001,7 +3001,7 @@ export type SeasonParticipantUncheckedCreateWithoutQuotesInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -3059,7 +3059,7 @@ export type SeasonParticipantUpdateWithoutQuotesInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutSeasonParticipantsNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutSeasonParticipantNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutSeasonParticipantNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutSeasonParticipantNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutSeasonParticipantNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutSeasonParticipantNestedInput
@@ -3097,7 +3097,7 @@ export type SeasonParticipantUncheckedUpdateWithoutQuotesInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -3139,7 +3139,7 @@ export type SeasonParticipantCreateWithoutFxExecuteRequestsInput = {
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
   user: Prisma.UserCreateNestedOneWithoutSeasonParticipantsInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutSeasonParticipantInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutSeasonParticipantInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutSeasonParticipantInput
@@ -3177,7 +3177,7 @@ export type SeasonParticipantUncheckedCreateWithoutFxExecuteRequestsInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -3235,7 +3235,7 @@ export type SeasonParticipantUpdateWithoutFxExecuteRequestsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutSeasonParticipantsNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutSeasonParticipantNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutSeasonParticipantNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutSeasonParticipantNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutSeasonParticipantNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutSeasonParticipantNestedInput
@@ -3273,7 +3273,7 @@ export type SeasonParticipantUncheckedUpdateWithoutFxExecuteRequestsInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -3315,7 +3315,7 @@ export type SeasonParticipantCreateWithoutEquitySnapshotsInput = {
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
   user: Prisma.UserCreateNestedOneWithoutSeasonParticipantsInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutSeasonParticipantInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutSeasonParticipantInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutSeasonParticipantInput
@@ -3353,7 +3353,7 @@ export type SeasonParticipantUncheckedCreateWithoutEquitySnapshotsInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -3411,7 +3411,7 @@ export type SeasonParticipantUpdateWithoutEquitySnapshotsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutSeasonParticipantsNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutSeasonParticipantNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutSeasonParticipantNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutSeasonParticipantNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutSeasonParticipantNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutSeasonParticipantNestedInput
@@ -3449,7 +3449,7 @@ export type SeasonParticipantUncheckedUpdateWithoutEquitySnapshotsInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -3491,7 +3491,7 @@ export type SeasonParticipantCreateWithoutDailyPortfolioSnapshotsInput = {
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
   user: Prisma.UserCreateNestedOneWithoutSeasonParticipantsInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutSeasonParticipantInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutSeasonParticipantInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutSeasonParticipantInput
@@ -3529,7 +3529,7 @@ export type SeasonParticipantUncheckedCreateWithoutDailyPortfolioSnapshotsInput 
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -3587,7 +3587,7 @@ export type SeasonParticipantUpdateWithoutDailyPortfolioSnapshotsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutSeasonParticipantsNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutSeasonParticipantNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutSeasonParticipantNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutSeasonParticipantNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutSeasonParticipantNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutSeasonParticipantNestedInput
@@ -3625,7 +3625,7 @@ export type SeasonParticipantUncheckedUpdateWithoutDailyPortfolioSnapshotsInput 
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -3667,7 +3667,7 @@ export type SeasonParticipantCreateWithoutSeasonRankingsInput = {
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
   user: Prisma.UserCreateNestedOneWithoutSeasonParticipantsInput
-  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutSeasonParticipantInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutSeasonParticipantInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutSeasonParticipantInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutSeasonParticipantInput
@@ -3705,7 +3705,7 @@ export type SeasonParticipantUncheckedCreateWithoutSeasonRankingsInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -3763,7 +3763,7 @@ export type SeasonParticipantUpdateWithoutSeasonRankingsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutSeasonParticipantsNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutSeasonParticipantNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutSeasonParticipantNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutSeasonParticipantNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutSeasonParticipantNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutSeasonParticipantNestedInput
@@ -3801,7 +3801,7 @@ export type SeasonParticipantUncheckedUpdateWithoutSeasonRankingsInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -3840,7 +3840,7 @@ export type SeasonParticipantCreateManyUserInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -3870,7 +3870,7 @@ export type SeasonParticipantUpdateWithoutUserInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutSeasonParticipantNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutSeasonParticipantNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutSeasonParticipantNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutSeasonParticipantNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutSeasonParticipantNestedInput
@@ -3908,7 +3908,7 @@ export type SeasonParticipantUncheckedUpdateWithoutUserInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -3948,7 +3948,7 @@ export type SeasonParticipantUncheckedUpdateManyWithoutUserInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -3976,7 +3976,7 @@ export type SeasonParticipantCreateManySeasonInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
-  tradingAccountId?: string | null
+  tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -4006,7 +4006,7 @@ export type SeasonParticipantUpdateWithoutSeasonInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutSeasonParticipantsNestedInput
-  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutSeasonParticipantNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutSeasonParticipantNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutSeasonParticipantNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutSeasonParticipantNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutSeasonParticipantNestedInput
@@ -4044,7 +4044,7 @@ export type SeasonParticipantUncheckedUpdateWithoutSeasonInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -4084,7 +4084,7 @@ export type SeasonParticipantUncheckedUpdateManyWithoutSeasonInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -4248,7 +4248,7 @@ export type SeasonParticipantSelect<ExtArgs extends runtime.Types.Extensions.Int
   updatedAt?: boolean
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  tradingAccount?: boolean | Prisma.SeasonParticipant$tradingAccountArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   cashWallets?: boolean | Prisma.SeasonParticipant$cashWalletsArgs<ExtArgs>
   walletTransactions?: boolean | Prisma.SeasonParticipant$walletTransactionsArgs<ExtArgs>
   exchangeTransactions?: boolean | Prisma.SeasonParticipant$exchangeTransactionsArgs<ExtArgs>
@@ -4293,7 +4293,7 @@ export type SeasonParticipantSelectCreateManyAndReturn<ExtArgs extends runtime.T
   updatedAt?: boolean
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  tradingAccount?: boolean | Prisma.SeasonParticipant$tradingAccountArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["seasonParticipant"]>
 
 export type SeasonParticipantSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -4325,7 +4325,7 @@ export type SeasonParticipantSelectUpdateManyAndReturn<ExtArgs extends runtime.T
   updatedAt?: boolean
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  tradingAccount?: boolean | Prisma.SeasonParticipant$tradingAccountArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["seasonParticipant"]>
 
 export type SeasonParticipantSelectScalar = {
@@ -4361,7 +4361,7 @@ export type SeasonParticipantOmit<ExtArgs extends runtime.Types.Extensions.Inter
 export type SeasonParticipantInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  tradingAccount?: boolean | Prisma.SeasonParticipant$tradingAccountArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   cashWallets?: boolean | Prisma.SeasonParticipant$cashWalletsArgs<ExtArgs>
   walletTransactions?: boolean | Prisma.SeasonParticipant$walletTransactionsArgs<ExtArgs>
   exchangeTransactions?: boolean | Prisma.SeasonParticipant$exchangeTransactionsArgs<ExtArgs>
@@ -4379,12 +4379,12 @@ export type SeasonParticipantInclude<ExtArgs extends runtime.Types.Extensions.In
 export type SeasonParticipantIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  tradingAccount?: boolean | Prisma.SeasonParticipant$tradingAccountArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
 }
 export type SeasonParticipantIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  tradingAccount?: boolean | Prisma.SeasonParticipant$tradingAccountArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
 }
 
 export type $SeasonParticipantPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -4392,7 +4392,7 @@ export type $SeasonParticipantPayload<ExtArgs extends runtime.Types.Extensions.I
   objects: {
     season: Prisma.$SeasonPayload<ExtArgs>
     user: Prisma.$UserPayload<ExtArgs>
-    tradingAccount: Prisma.$TradingAccountPayload<ExtArgs> | null
+    tradingAccount: Prisma.$TradingAccountPayload<ExtArgs>
     cashWallets: Prisma.$CashWalletPayload<ExtArgs>[]
     walletTransactions: Prisma.$WalletTransactionPayload<ExtArgs>[]
     exchangeTransactions: Prisma.$ExchangeTransactionPayload<ExtArgs>[]
@@ -4430,7 +4430,7 @@ export type $SeasonParticipantPayload<ExtArgs extends runtime.Types.Extensions.I
     resultCorrectedAt: Date | null
     resultCorrectedReason: string | null
     resultCorrectedByUserId: string | null
-    tradingAccountId: string | null
+    tradingAccountId: string
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["seasonParticipant"]>
@@ -4829,7 +4829,7 @@ export interface Prisma__SeasonParticipantClient<T, Null = never, ExtArgs extend
   readonly [Symbol.toStringTag]: "PrismaPromise"
   season<T extends Prisma.SeasonDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.SeasonDefaultArgs<ExtArgs>>): Prisma.Prisma__SeasonClient<runtime.Types.Result.GetResult<Prisma.$SeasonPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   user<T extends Prisma.UserDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.UserDefaultArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
-  tradingAccount<T extends Prisma.SeasonParticipant$tradingAccountArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.SeasonParticipant$tradingAccountArgs<ExtArgs>>): Prisma.Prisma__TradingAccountClient<runtime.Types.Result.GetResult<Prisma.$TradingAccountPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  tradingAccount<T extends Prisma.TradingAccountDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccountDefaultArgs<ExtArgs>>): Prisma.Prisma__TradingAccountClient<runtime.Types.Result.GetResult<Prisma.$TradingAccountPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   cashWallets<T extends Prisma.SeasonParticipant$cashWalletsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.SeasonParticipant$cashWalletsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CashWalletPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   walletTransactions<T extends Prisma.SeasonParticipant$walletTransactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.SeasonParticipant$walletTransactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WalletTransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   exchangeTransactions<T extends Prisma.SeasonParticipant$exchangeTransactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.SeasonParticipant$exchangeTransactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ExchangeTransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -5295,25 +5295,6 @@ export type SeasonParticipantDeleteManyArgs<ExtArgs extends runtime.Types.Extens
    * Limit how many SeasonParticipants to delete.
    */
   limit?: number
-}
-
-/**
- * SeasonParticipant.tradingAccount
- */
-export type SeasonParticipant$tradingAccountArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the TradingAccount
-   */
-  select?: Prisma.TradingAccountSelect<ExtArgs> | null
-  /**
-   * Omit specific fields from the TradingAccount
-   */
-  omit?: Prisma.TradingAccountOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.TradingAccountInclude<ExtArgs> | null
-  where?: Prisma.TradingAccountWhereInput
 }
 
 /**

@@ -237,14 +237,19 @@ export async function ensureSeasonTradingAccountLink(
     validateDeterministicAccount(stored, participant, initialCapitalKrw);
   }
 
-  let linked: { count: number };
+  let linkedCount: number;
   try {
     // Guarded link: only a still-null participant row is updated, so a
-    // concurrent repair that already linked cannot be overwritten.
-    linked = await tx.seasonParticipant.updateMany({
-      where: { id: participant.id, tradingAccountId: null },
-      data: { tradingAccountId: accountId },
-    });
+    // concurrent repair that already linked cannot be overwritten. This is
+    // explicit SQL because the canonical Prisma schema no longer exposes a
+    // nullable account link, while the pre-migration repair remains usable.
+    linkedCount = await tx.$executeRaw`
+      UPDATE "season_participants"
+      SET "trading_account_id" = ${accountId},
+          "updated_at" = clock_timestamp()
+      WHERE "id" = ${participant.id}
+        AND "trading_account_id" IS NULL
+    `;
   } catch (error) {
     if (isUniqueConstraintError(error)) {
       throw new SeasonTradingAccountLinkIntegrityError(
@@ -256,7 +261,7 @@ export async function ensureSeasonTradingAccountLink(
     throw error;
   }
 
-  if (linked.count === 0) {
+  if (linkedCount === 0) {
     const current = await tx.seasonParticipant.findUnique({
       where: { id: participant.id },
       select: { tradingAccountId: true },

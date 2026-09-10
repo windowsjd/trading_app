@@ -8,7 +8,6 @@ import {
 } from '../generated/prisma/client';
 import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { requireParticipantTradingAccountIdForSnapshot } from '../portfolio/season-snapshot-scope';
 import {
   assignSequentialRanks,
   compareRankingRows,
@@ -31,8 +30,7 @@ type RankableParticipant = {
   userId: string;
   initialCapitalKrw: Prisma.Decimal;
   totalFillCount: number;
-  /** Verified into a non-null scope by `buildRankingParticipantScopes`. */
-  tradingAccountId: string | null;
+  tradingAccountId: string;
 };
 
 type EquityPoint = {
@@ -152,12 +150,18 @@ export class RankingRefreshService {
 
       const valuations: CurrentRankingValuation[] = [];
       for (const participant of participants) {
+        const tradingAccountId = participantScopes.get(participant.id)!;
         const valuation =
-          await this.portfolioValuationService.calculateSeasonParticipantValuation(
-            participant.id,
+          await this.portfolioValuationService.calculateTradingAccountValuation(
+            tradingAccountId,
             capturedAt,
             'live_portfolio_valuation',
           );
+        if (valuation.seasonParticipantId !== participant.id) {
+          throw new Error(
+            `Trading account ${tradingAccountId} is not owned by ranking participant ${participant.id}.`,
+          );
+        }
         const history = await this.findEquityHistory(
           participant.id,
           participantScopes,
@@ -280,7 +284,7 @@ export class RankingRefreshService {
   ): Promise<EquityPoint[]> {
     const rows = await this.prisma.equitySnapshot.findMany({
       where: {
-        seasonParticipantId,
+        tradingAccountId: participantScopes.get(seasonParticipantId)!,
       },
       orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
       select: {
@@ -377,7 +381,7 @@ export class RankingRefreshService {
         for (const valuation of input.valuations) {
           const existing = await tx.equitySnapshot.findFirst({
             where: {
-              seasonParticipantId: valuation.participant.id,
+              tradingAccountId: valuation.participant.tradingAccountId,
               snapshotReason: SnapshotReason.scheduled,
               capturedAt: {
                 gte: bucketStart,
@@ -395,12 +399,9 @@ export class RankingRefreshService {
           await tx.equitySnapshot.create({
             data: {
               seasonParticipantId: valuation.participant.id,
-              // 작업 7 dual-write.
-              tradingAccountId:
-                await requireParticipantTradingAccountIdForSnapshot(
-                  tx,
-                  valuation.participant.id,
-                ),
+              // Legacy participant identity remains dual-written; ownership
+              // is the already-verified account used for valuation.
+              tradingAccountId: valuation.participant.tradingAccountId,
               totalAssetKrw: valuation.totalAssetKrw,
               returnRate: valuation.returnRate,
               krwCash: valuation.krwCash,

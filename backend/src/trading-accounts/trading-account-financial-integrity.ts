@@ -1,5 +1,5 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
-import type { Prisma } from '../generated/prisma/client';
+import { Prisma } from '../generated/prisma/client';
 
 /**
  * Account-scoped read integrity probes (작업 5 보완 2/작업 5).
@@ -33,6 +33,7 @@ type IntegrityClient = Pick<
   | 'order'
   | 'position'
   | 'quote'
+  | '$queryRaw'
 >;
 
 export type SeasonAccountScopeTarget = {
@@ -41,22 +42,24 @@ export type SeasonAccountScopeTarget = {
   seasonParticipantId: string | null;
 };
 
-function anomalyWhere(participantId: string, accountId: string) {
-  return {
-    nullScope: {
-      seasonParticipantId: participantId,
-      tradingAccountId: null,
-    },
-    // Two-step NOT: Prisma's `not` on a nullable column does not match NULL
-    // rows, so null and non-null-mismatch are probed separately.
-    mismatchedScope: {
-      seasonParticipantId: participantId,
-      AND: [
-        { tradingAccountId: { not: null } },
-        { tradingAccountId: { not: accountId } },
-      ],
-    },
-  };
+async function hasLegacyNullScope(
+  prisma: IntegrityClient,
+  tableName: string,
+  participantId: string,
+): Promise<boolean> {
+  // Compatibility probe only. The canonical Prisma schema is non-null, but
+  // this explicit SQL keeps deploy-boundary legacy rows detectable until the
+  // compatibility layer is removed in the follow-up task.
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>(
+    Prisma.sql`
+      SELECT "id"
+      FROM ${Prisma.raw(tableName)}
+      WHERE "season_participant_id" = ${participantId}
+        AND "trading_account_id" IS NULL
+      LIMIT 1
+    `,
+  );
+  return rows.length > 0;
 }
 
 function throwRepairRequired(model: string): never {
@@ -98,16 +101,11 @@ export async function assertSeasonAccountFinancialScopeIntegrity(
     return;
   }
 
-  const where = anomalyWhere(
-    target.seasonParticipantId,
-    target.tradingAccountId,
-  );
-
   const models = [
-    { name: 'cash wallet', delegate: prisma.cashWallet },
-    { name: 'wallet transaction', delegate: prisma.walletTransaction },
-    { name: 'exchange transaction', delegate: prisma.exchangeTransaction },
-    { name: 'FX execute request', delegate: prisma.fxExecuteRequest },
+    { name: 'cash wallet', tableName: 'cash_wallets', delegate: prisma.cashWallet },
+    { name: 'wallet transaction', tableName: 'wallet_transactions', delegate: prisma.walletTransaction },
+    { name: 'exchange transaction', tableName: 'exchange_transactions', delegate: prisma.exchangeTransaction },
+    { name: 'FX execute request', tableName: 'fx_execute_requests', delegate: prisma.fxExecuteRequest },
   ] as const;
 
   for (const model of models) {
@@ -115,14 +113,15 @@ export async function assertSeasonAccountFinancialScopeIntegrity(
       findFirst: (args: unknown) => Promise<{ id: string } | null>;
     };
 
-    if (
-      await delegate.findFirst({ where: where.nullScope, select: { id: true } })
-    ) {
+    if (await hasLegacyNullScope(prisma, model.tableName, target.seasonParticipantId)) {
       throwRepairRequired(model.name);
     }
     if (
       await delegate.findFirst({
-        where: where.mismatchedScope,
+        where: {
+          seasonParticipantId: target.seasonParticipantId,
+          tradingAccountId: { not: target.tradingAccountId },
+        },
         select: { id: true },
       })
     ) {
@@ -140,10 +139,7 @@ export async function assertSeasonAccountFinancialScopeIntegrity(
     where: {
       seasonParticipantId: target.seasonParticipantId,
       wallet: {
-        AND: [
-          { tradingAccountId: { not: null } },
-          { tradingAccountId: { not: target.tradingAccountId } },
-        ],
+        tradingAccountId: { not: target.tradingAccountId },
       },
     },
     select: { id: true },
@@ -168,22 +164,15 @@ export async function assertSeasonAccountOrderScopeIntegrity(
     return;
   }
 
-  const where = anomalyWhere(
-    target.seasonParticipantId,
-    target.tradingAccountId,
-  );
-
-  if (
-    await prisma.order.findFirst({
-      where: where.nullScope,
-      select: { id: true },
-    })
-  ) {
+  if (await hasLegacyNullScope(prisma, 'orders', target.seasonParticipantId)) {
     throwRepairRequired('order');
   }
   if (
     await prisma.order.findFirst({
-      where: where.mismatchedScope,
+      where: {
+        seasonParticipantId: target.seasonParticipantId,
+        tradingAccountId: { not: target.tradingAccountId },
+      },
       select: { id: true },
     })
   ) {
@@ -202,22 +191,15 @@ export async function assertSeasonAccountPositionScopeIntegrity(
     return;
   }
 
-  const where = anomalyWhere(
-    target.seasonParticipantId,
-    target.tradingAccountId,
-  );
-
-  if (
-    await prisma.position.findFirst({
-      where: where.nullScope,
-      select: { id: true },
-    })
-  ) {
+  if (await hasLegacyNullScope(prisma, 'positions', target.seasonParticipantId)) {
     throwRepairRequired('position');
   }
   if (
     await prisma.position.findFirst({
-      where: where.mismatchedScope,
+      where: {
+        seasonParticipantId: target.seasonParticipantId,
+        tradingAccountId: { not: target.tradingAccountId },
+      },
       select: { id: true },
     })
   ) {
