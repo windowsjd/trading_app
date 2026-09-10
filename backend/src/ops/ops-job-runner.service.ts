@@ -8,7 +8,10 @@ import {
   OpsJobName,
   OpsJobRun,
   OpsJobTrigger,
+  ParticipantStatus,
   SeasonStatus,
+  TradingAccountMode,
+  TradingAccountStatus,
 } from '../generated/prisma/client';
 import { DailyPortfolioSnapshotJobService } from '../batch/daily-portfolio-snapshot-job.service';
 import { GeneralDailySnapshotJobService } from '../batch/general-daily-snapshot-job.service';
@@ -889,19 +892,34 @@ export class OpsJobRunnerService {
     // Use dispatch time, not the tick time before potentially slow ingestion.
     const now = new Date();
     const snapshotDate = getSchedulerBusinessDate(now, timezone);
-    const attempt = randomUUID();
+    const snapshotDateValue = new Date(`${snapshotDate}T00:00:00.000Z`);
     const scheduledInput = {
       ...input,
       snapshotDate,
       snapshotTimezone: timezone,
     };
     // General history must not depend on the existence of a season.
-    const results = [
-      await this.runGeneralDailySnapshotJob({
-        ...scheduledInput,
-        idempotencyKey: `${GENERAL_DAILY_SNAPSHOT_JOB_NAME}:${snapshotDate}:${attempt}`,
-      }),
-    ];
+    const results: OpsJobRunnerResponse[] = [];
+    // Relation absence is evaluated by the DB; return at most one ID, never
+    // load all accounts/participants just to discover that today is complete.
+    const missingGeneral = await this.prisma.tradingAccount.findFirst({
+      where: {
+        mode: TradingAccountMode.general,
+        status: {
+          in: [TradingAccountStatus.active, TradingAccountStatus.suspended],
+        },
+        dailyPortfolioSnapshots: { none: { snapshotDate: snapshotDateValue } },
+      },
+      select: { id: true },
+    });
+    if (missingGeneral) {
+      results.push(
+        await this.runGeneralDailySnapshotJob({
+          ...scheduledInput,
+          idempotencyKey: `${GENERAL_DAILY_SNAPSHOT_JOB_NAME}:${snapshotDate}:${randomUUID()}`,
+        }),
+      );
+    }
     const seasonId = this.optionalString(input.seasonId);
     const seasons = await this.prisma.season.findMany({
       where: {
@@ -914,11 +932,22 @@ export class OpsJobRunnerService {
       select: { id: true },
     });
     for (const season of seasons) {
+      const missingParticipant = await this.prisma.seasonParticipant.findFirst({
+        where: {
+          seasonId: season.id,
+          participantStatus: ParticipantStatus.active,
+          dailyPortfolioSnapshots: {
+            none: { snapshotDate: snapshotDateValue },
+          },
+        },
+        select: { id: true },
+      });
+      if (!missingParticipant) continue;
       results.push(
         await this.runDailyPortfolioSnapshotJob({
           ...scheduledInput,
           seasonId: season.id,
-          idempotencyKey: `${DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME}:${season.id}:${snapshotDate}:${attempt}`,
+          idempotencyKey: `${DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME}:${season.id}:${snapshotDate}:${randomUUID()}`,
         }),
       );
     }

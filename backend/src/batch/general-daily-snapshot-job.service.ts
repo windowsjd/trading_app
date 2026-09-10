@@ -160,6 +160,18 @@ export class GeneralDailySnapshotJobService {
       }),
     ]);
 
+    const existingSnapshots = await this.prisma.dailyPortfolioSnapshot.findMany(
+      {
+        where: {
+          tradingAccountId: { in: accounts.map(({ id }) => id) },
+          snapshotDate,
+        },
+        select: { tradingAccountId: true },
+      },
+    );
+    const existingAccountIds = new Set(
+      existingSnapshots.map(({ tradingAccountId }) => tradingAccountId),
+    );
     const result: GeneralDailySnapshotJobResult = {
       snapshotDate: snapshotDateText,
       dryRun,
@@ -180,6 +192,10 @@ export class GeneralDailySnapshotJobService {
     };
 
     for (const account of accounts) {
+      if (existingAccountIds.has(account.id)) {
+        result.accounts.existing += 1;
+        continue;
+      }
       await this.processAccount({
         account,
         snapshotDate,
@@ -202,20 +218,6 @@ export class GeneralDailySnapshotJobService {
     result: GeneralDailySnapshotJobResult;
   }): Promise<void> {
     const { account, result } = input;
-
-    const existing = await this.prisma.dailyPortfolioSnapshot.findUnique({
-      where: {
-        tradingAccountId_snapshotDate: {
-          tradingAccountId: account.id,
-          snapshotDate: input.snapshotDate,
-        },
-      },
-      select: { id: true },
-    });
-    if (existing) {
-      result.accounts.existing += 1;
-      return;
-    }
 
     if (input.dryRun) {
       // Dry run still runs the FULL performance computation, because "how many

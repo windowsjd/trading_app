@@ -156,7 +156,10 @@ function createService() {
       findMany: jest.fn(() => Promise.resolve(listedAccounts)),
       count: jest.fn().mockResolvedValue(0),
     },
-    dailyPortfolioSnapshot: { findUnique: jest.fn().mockResolvedValue(null) },
+    dailyPortfolioSnapshot: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn(),
+    },
     $transaction: jest.fn((run: (client: typeof tx) => Promise<unknown>) =>
       run(tx),
     ),
@@ -207,6 +210,43 @@ function structuredError(code: string): HttpException {
  * account selection, per-account atomicity, and the dry-run report.
  */
 describe('GeneralDailySnapshotJobService', () => {
+  it('bulk checks 100 accounts once and opens a transaction only for the missing account', async () => {
+    const { service, prisma, tx, setAccounts, performanceService } =
+      createService();
+    const accounts = Array.from({ length: 100 }, (_, i) =>
+      account(`account-${i}`),
+    );
+    setAccounts(accounts);
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue(
+      accounts.slice(0, 99).map(({ id }) => ({ tradingAccountId: id })),
+    );
+    const result = await runAndGetResult(service, {
+      snapshotDate: SNAPSHOT_DATE,
+    });
+    expect(prisma.dailyPortfolioSnapshot.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.dailyPortfolioSnapshot.findMany).toHaveBeenCalledWith({
+      where: {
+        tradingAccountId: { in: accounts.map(({ id }) => id) },
+        snapshotDate: new Date(`${SNAPSHOT_DATE}T00:00:00.000Z`),
+      },
+      select: { tradingAccountId: true },
+    });
+    expect(prisma.dailyPortfolioSnapshot.findUnique).not.toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(
+      performanceService.buildOrdinarySnapshotValues,
+    ).toHaveBeenCalledTimes(1);
+    expect(tx.dailyPortfolioSnapshot.create).toHaveBeenCalledWith({
+      data: containing({ tradingAccountId: 'account-99' }),
+      select: { id: true },
+    });
+    expect(result.accounts).toMatchObject({
+      total: 100,
+      existing: 99,
+      created: 1,
+    });
+  });
+
   it('defers a scheduled capture if its account lock crosses the local midnight', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-08-04T14:59:59.000Z'));
     try {
@@ -231,6 +271,44 @@ describe('GeneralDailySnapshotJobService', () => {
     }
   });
 
+  it('retries only the failed account on the next same-day attempt', async () => {
+    const { service, prisma, tx, setAccounts, performanceService } =
+      createService();
+    setAccounts([account('account-A'), account('account-B')]);
+    performanceService.buildOrdinarySnapshotValues
+      .mockResolvedValueOnce({ values: WRITE_VALUES, valuation: VALUATION })
+      .mockRejectedValueOnce(
+        new PortfolioValuationError(
+          'ASSET_PRICE_UNAVAILABLE',
+          'temporary failure',
+        ),
+      );
+    const first = await runAndGetResult(service, {
+      snapshotDate: SNAPSHOT_DATE,
+      idempotencyKey: 'attempt-1',
+    });
+    expect(first.accounts).toMatchObject({ created: 1, failed: 1 });
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([
+      { tradingAccountId: 'account-A' },
+    ]);
+    const second = await runAndGetResult(service, {
+      snapshotDate: SNAPSHOT_DATE,
+      idempotencyKey: 'attempt-2',
+    });
+    expect(second.accounts).toMatchObject({
+      created: 1,
+      existing: 1,
+      failed: 0,
+    });
+    expect(
+      performanceService.buildOrdinarySnapshotValues.mock.calls.map(
+        ([input]) => input.account.id,
+      ),
+    ).toEqual(['account-A', 'account-B', 'account-B']);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(3);
+    expect(tx.dailyPortfolioSnapshot.create).toHaveBeenCalledTimes(2);
+  });
+
   it('captures a later account on a same-day rerun while preserving the first account row', async () => {
     const { service, prisma, tx, setAccounts } = createService();
     setAccounts([account('account-1')]);
@@ -239,9 +317,9 @@ describe('GeneralDailySnapshotJobService', () => {
       idempotencyKey: 'tick-1',
     });
     setAccounts([account('account-1'), account('account-2')]);
-    prisma.dailyPortfolioSnapshot.findUnique.mockResolvedValueOnce({
-      id: 'daily-1',
-    });
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([
+      { tradingAccountId: 'account-1' },
+    ]);
     const result = await runAndGetResult(service, {
       snapshotDate: SNAPSHOT_DATE,
       idempotencyKey: 'tick-2',
@@ -405,7 +483,7 @@ describe('GeneralDailySnapshotJobService', () => {
   });
 
   it('writes the daily row SECOND so a unique conflict rolls the equity row back', async () => {
-    const { service, tx, setAccounts } = createService();
+    const { service, prisma, tx, setAccounts } = createService();
     setAccounts([account('account-1')]);
     const order: string[] = [];
     tx.equitySnapshot.create.mockImplementation(() => {
@@ -426,6 +504,8 @@ describe('GeneralDailySnapshotJobService', () => {
     });
 
     expect(order).toEqual(['equity', 'daily']);
+    expect(prisma.dailyPortfolioSnapshot.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.dailyPortfolioSnapshot.findUnique).not.toHaveBeenCalled();
     // The loser reports the row as already existing and keeps nothing: the
     // rejection propagates out of the $transaction callback, so PostgreSQL
     // rolls the EquitySnapshot back with it.
@@ -436,9 +516,9 @@ describe('GeneralDailySnapshotJobService', () => {
   it('skips an account that already has a row for the date', async () => {
     const { service, prisma, setAccounts } = createService();
     setAccounts([account('account-1')]);
-    prisma.dailyPortfolioSnapshot.findUnique.mockResolvedValue({
-      id: 'existing',
-    });
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([
+      { tradingAccountId: 'account-1' },
+    ]);
 
     const result = await runAndGetResult(service, {
       snapshotDate: SNAPSHOT_DATE,

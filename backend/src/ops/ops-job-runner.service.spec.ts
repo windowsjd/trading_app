@@ -1,5 +1,9 @@
 jest.mock('../generated/prisma/client', () => ({
+  ...jest.requireActual('../generated/prisma/enums'),
   PrismaClient: class PrismaClient {},
+  Prisma: {
+    Decimal: jest.requireActual('@prisma/client/runtime/client').Decimal,
+  },
   OpsJobName: {
     provider_fx_ingest: 'provider_fx_ingest',
     provider_binance_ingest: 'provider_binance_ingest',
@@ -29,6 +33,9 @@ jest.mock('../generated/prisma/client', () => ({
     test: 'test',
   },
   SeasonStatus: { active: 'active' },
+  ParticipantStatus: { active: 'active' },
+  TradingAccountMode: { general: 'general' },
+  TradingAccountStatus: { active: 'active', suspended: 'suspended' },
   AssetType: {
     domestic_stock: 'domestic_stock',
     us_stock: 'us_stock',
@@ -176,6 +183,12 @@ describe('OpsJobRunnerService', () => {
       reconcile: jest.fn(),
     };
     const prisma = {
+      tradingAccount: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'account-1' }),
+      },
+      seasonParticipant: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'sp-1' }),
+      },
       season: {
         findMany: jest.fn(),
       },
@@ -346,6 +359,151 @@ describe('OpsJobRunnerService', () => {
       expect(f.dailyPortfolioSnapshotJobService.run).not.toHaveBeenCalled();
     });
 
+    it('only reads preflight for ten completed ticks, without writers, locks, or Ops/Batch audits', async () => {
+      const f = setup();
+      f.prisma.tradingAccount.findFirst.mockResolvedValue(null);
+      f.prisma.seasonParticipant.findFirst.mockResolvedValue(null);
+      const general = jest.spyOn(f.service, 'runGeneralDailySnapshotJob');
+      const season = jest.spyOn(f.service, 'runDailyPortfolioSnapshotJob');
+      // Real writer entrypoints ensure no BatchService entry is hidden by a
+      // mocked writer when a completed scope is dispatched accidentally.
+      const batchService = { runJob: jest.fn() };
+      const { GeneralDailySnapshotJobService } = jest.requireActual(
+        '../batch/general-daily-snapshot-job.service',
+      );
+      const { DailyPortfolioSnapshotJobService } = jest.requireActual(
+        '../batch/daily-portfolio-snapshot-job.service',
+      );
+      const generalWriter = new GeneralDailySnapshotJobService(
+        batchService,
+        f.prisma,
+        {},
+      );
+      const seasonWriter = new DailyPortfolioSnapshotJobService(
+        batchService,
+        f.prisma,
+        {},
+      );
+      f.generalDailySnapshotJobService.run.mockImplementation((input) =>
+        generalWriter.run(input),
+      );
+      f.dailyPortfolioSnapshotJobService.run.mockImplementation((input) =>
+        seasonWriter.run(input),
+      );
+
+      for (let tick = 0; tick < 10; tick += 1) {
+        expect(await f.service.runScheduledDailySnapshotJobs({})).toEqual([]);
+        jest.advanceTimersByTime(60_000);
+      }
+
+      expect(general).not.toHaveBeenCalled();
+      expect(season).not.toHaveBeenCalled();
+      expect(f.generalDailySnapshotJobService.run).not.toHaveBeenCalled();
+      expect(f.dailyPortfolioSnapshotJobService.run).not.toHaveBeenCalled();
+      expect(batchService.runJob).not.toHaveBeenCalled();
+      expect(f.lockService.acquireLock).not.toHaveBeenCalled();
+      for (const write of [
+        'createRunning',
+        'recordLocked',
+        'recordSkipped',
+        'recordFailed',
+        'recordSucceeded',
+      ] as const) {
+        expect(f.runService[write]).not.toHaveBeenCalled();
+      }
+      expect(f.prisma.tradingAccount.findFirst).toHaveBeenCalledTimes(10);
+      expect(f.prisma.season.findMany).toHaveBeenCalledTimes(10);
+      expect(f.prisma.seasonParticipant.findFirst).toHaveBeenCalledTimes(20);
+      expect(f.prisma.tradingAccount.findFirst).toHaveBeenCalledWith({
+        where: {
+          mode: 'general',
+          status: { in: ['active', 'suspended'] },
+          dailyPortfolioSnapshots: {
+            none: { snapshotDate: new Date('2026-06-08T00:00:00.000Z') },
+          },
+        },
+        select: { id: true },
+      });
+      for (const seasonId of ['season-1', 'season-2']) {
+        expect(f.prisma.seasonParticipant.findFirst).toHaveBeenCalledWith({
+          where: {
+            seasonId,
+            participantStatus: 'active',
+            dailyPortfolioSnapshots: {
+              none: { snapshotDate: new Date('2026-06-08T00:00:00.000Z') },
+            },
+          },
+          select: { id: true },
+        });
+      }
+    });
+
+    it('runs missing general exactly once while completed seasons create no jobs', async () => {
+      const f = setup();
+      f.prisma.seasonParticipant.findFirst.mockResolvedValue(null);
+      const general = jest.spyOn(f.service, 'runGeneralDailySnapshotJob');
+      const season = jest.spyOn(f.service, 'runDailyPortfolioSnapshotJob');
+      await f.service.runScheduledDailySnapshotJobs({});
+      expect(general).toHaveBeenCalledTimes(1);
+      expect(f.generalDailySnapshotJobService.run).toHaveBeenCalledTimes(1);
+      expect(season).not.toHaveBeenCalled();
+      expect(f.dailyPortfolioSnapshotJobService.run).not.toHaveBeenCalled();
+      expect(f.runService.createRunning).toHaveBeenCalledTimes(1);
+    });
+
+    it('runs only the season with a missing participant', async () => {
+      const f = setup();
+      f.prisma.tradingAccount.findFirst.mockResolvedValue(null);
+      f.prisma.seasonParticipant.findFirst.mockResolvedValueOnce(null);
+      await f.service.runScheduledDailySnapshotJobs({});
+      expect(f.generalDailySnapshotJobService.run).not.toHaveBeenCalled();
+      expect(f.dailyPortfolioSnapshotJobService.run).toHaveBeenCalledTimes(1);
+      expect(f.dailyPortfolioSnapshotJobService.run).toHaveBeenCalledWith(
+        expect.objectContaining({ seasonId: 'season-2' }),
+      );
+      expect(f.runService.createRunning).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(['general', 'season'])(
+      'detects a late %s target after a completed tick and starts a fresh attempt',
+      async (scope) => {
+        const f = setup();
+        f.prisma.tradingAccount.findFirst.mockResolvedValue(null);
+        f.prisma.seasonParticipant.findFirst.mockResolvedValue(null);
+        const addMissing = () => {
+          if (scope === 'general') {
+            f.prisma.tradingAccount.findFirst.mockResolvedValueOnce({
+              id: 'late-account',
+            });
+          } else {
+            f.prisma.seasonParticipant.findFirst.mockResolvedValueOnce({
+              id: 'late-participant',
+            });
+          }
+        };
+        addMissing();
+        await f.service.runScheduledDailySnapshotJobs({});
+        expect(await f.service.runScheduledDailySnapshotJobs({})).toEqual([]);
+        addMissing();
+        await f.service.runScheduledDailySnapshotJobs({});
+        const writer =
+          scope === 'general'
+            ? f.generalDailySnapshotJobService
+            : f.dailyPortfolioSnapshotJobService;
+        const other =
+          scope === 'general'
+            ? f.dailyPortfolioSnapshotJobService
+            : f.generalDailySnapshotJobService;
+        expect(writer.run).toHaveBeenCalledTimes(2);
+        expect(other.run).not.toHaveBeenCalled();
+        expect(
+          new Set(writer.run.mock.calls.map(([input]) => input.idempotencyKey))
+            .size,
+        ).toBe(2);
+        expect(f.runService.createRunning).toHaveBeenCalledTimes(2);
+      },
+    );
+
     it('retries missing rows after partial failures with new batch keys and keeps other scopes running', async () => {
       const f = setup();
       f.generalDailySnapshotJobService.run.mockResolvedValueOnce(
@@ -356,7 +514,12 @@ describe('OpsJobRunnerService', () => {
       );
       const first = await f.service.runScheduledDailySnapshotJobs({});
       expect(first.map((r) => r.success)).toEqual([false, false, true]);
+      // A succeeded, B is still missing in season-1; season-2 is complete.
+      f.prisma.seasonParticipant.findFirst
+        .mockResolvedValueOnce({ id: 'participant-B' })
+        .mockResolvedValueOnce(null);
       const second = await f.service.runScheduledDailySnapshotJobs({});
+      expect(second).toHaveLength(2);
       expect(second.every((r) => r.success)).toBe(true);
       const keys = f.generalDailySnapshotJobService.run.mock.calls.map(
         ([input]) => input.idempotencyKey,
@@ -365,7 +528,14 @@ describe('OpsJobRunnerService', () => {
       const seasonKeys = f.dailyPortfolioSnapshotJobService.run.mock.calls.map(
         ([input]) => input.idempotencyKey,
       );
-      expect(new Set(seasonKeys).size).toBe(4);
+      expect(new Set(seasonKeys).size).toBe(3);
+      expect(f.dailyPortfolioSnapshotJobService.run).toHaveBeenLastCalledWith(
+        expect.objectContaining({ seasonId: 'season-1' }),
+      );
+      f.prisma.tradingAccount.findFirst.mockResolvedValue(null);
+      f.prisma.seasonParticipant.findFirst.mockResolvedValue(null);
+      expect(await f.service.runScheduledDailySnapshotJobs({})).toEqual([]);
+      expect(f.runService.createRunning).toHaveBeenCalledTimes(5);
       expect(f.runService.recordFailed).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({

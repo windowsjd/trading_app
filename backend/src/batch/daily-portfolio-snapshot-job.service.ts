@@ -99,6 +99,18 @@ export class DailyPortfolioSnapshotJobService {
         tradingAccountId: true,
       },
     });
+    const existingSnapshots = await this.prisma.dailyPortfolioSnapshot.findMany(
+      {
+        where: {
+          seasonParticipantId: { in: participants.map(({ id }) => id) },
+          snapshotDate,
+        },
+        select: { seasonParticipantId: true },
+      },
+    );
+    const existingParticipantIds = new Set(
+      existingSnapshots.map(({ seasonParticipantId }) => seasonParticipantId),
+    );
     const result: DailyPortfolioSnapshotJobResult = {
       seasonId,
       snapshotDate: snapshotDateText,
@@ -132,19 +144,7 @@ export class DailyPortfolioSnapshotJobService {
           break;
         }
       }
-      const existing = await this.prisma.dailyPortfolioSnapshot.findUnique({
-        where: {
-          seasonParticipantId_snapshotDate: {
-            seasonParticipantId: participant.id,
-            snapshotDate,
-          },
-        },
-        select: {
-          id: true,
-        },
-      });
-
-      if (existing) {
+      if (existingParticipantIds.has(participant.id)) {
         result.participants.existing += 1;
         continue;
       }

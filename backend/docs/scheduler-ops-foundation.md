@@ -67,22 +67,41 @@ EVENT-based matching layer and nothing schedules them.
 ### Home daily history automation
 
 `SCHEDULER_DAILY_SNAPSHOT_ENABLED=true` enables the existing scheduler and
-dispatches both season and general daily batches on every shared tick (default
-60 seconds). No new scheduler or database enum is needed: both use the existing
-`daily_portfolio_snapshot` Ops name, with distinct season/general lock keys.
+checks for missing season and general daily snapshots on every shared tick
+(default 60 seconds). Each scope uses Prisma `findFirst` with a
+`dailyPortfolioSnapshots: { none: { snapshotDate } }` relation filter and selects
+only one ID. General targets are active/suspended general accounts; season
+targets are active participants in the selected season. No full target list is
+loaded by preflight. A completed scope creates no UUID, Ops run, or Batch run
+and never enters its writer. No new scheduler or database enum is needed: both
+use the existing `daily_portfolio_snapshot` Ops name, with distinct
+season/general lock keys.
 `SCHEDULER_DAILY_SNAPSHOT_SEASON_ID` is an optional season filter; without it,
 all active seasons within `startAt <= now < endAt` are selected, matching the
 current ranking season-selection policy. General accounts run even if there
 are no active seasons or the optional season filter matches nothing.
 
-Each scheduled attempt uses a fresh batch idempotency key, while the existing
+Only a scope with missing work starts an attempt with a fresh batch idempotency
+key. Writers load existing snapshot target IDs for their target list/date in one
+`findMany`, then skip existing targets using a Set before valuation (and before
+general account transactions). The existing
 account/date and participant/date unique constraints preserve the first daily
 row. This also picks up later joins/new accounts and retries valuation failures
 on the next tick. Manual batch date keys and dry-run semantics stay unchanged.
 Partial account failures are visible as failed Ops runs with batch results.
+Preflight is a read-only hint, not a lock: concurrent dispatch can still create
+an Ops attempt if another process finishes after the read. Existing Ops locks,
+snapshot unique constraints, and P2002 handling remain the race protection;
+a general conflict still rolls back its companion EquitySnapshot transaction.
 Scheduled writers check the actual capture date in `SCHEDULER_TIMEZONE`
 (default `Asia/Seoul`); work crossing midnight is deferred to the next tick,
 never stamped onto yesterday. Missing historical dates are never backfilled.
+
+With S selected active seasons and no missing snapshots, the daily dispatch
+per tick performs S + 2 read queries: general preflight, active season lookup,
+and S season preflights. There are no daily Ops/Batch rows, valuations, or full
+account/participant lists loaded. Database existence-check cost still depends
+on target cardinality and the query plan; this is not a constant-time cache.
 
 The flag defaults to false. After deploying this code, enable it in the service
 environment and restart/redeploy the backend. The first eligible tick records
