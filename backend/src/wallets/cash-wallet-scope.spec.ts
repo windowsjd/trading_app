@@ -5,7 +5,6 @@ import {
 } from './cash-wallet-scope';
 
 const expectedScope = {
-  seasonParticipantId: 'participant-1',
   tradingAccountId: 'account-1',
 };
 
@@ -31,10 +30,9 @@ function getError(fn: () => unknown): {
 }
 
 describe('assertCashWalletTradingAccountScope', () => {
-  it('returns the wallet when participant and account both match', () => {
+  it('returns the wallet when the canonical account matches', () => {
     const wallet = {
       id: 'wallet-1',
-      seasonParticipantId: 'participant-1',
       tradingAccountId: 'account-1',
       balanceAmount: '100',
     };
@@ -51,7 +49,6 @@ describe('assertCashWalletTradingAccountScope', () => {
       assertCashWalletTradingAccountScope(
         {
           id: 'wallet-1',
-          seasonParticipantId: 'participant-1',
           tradingAccountId: null,
         },
         expectedScope,
@@ -69,7 +66,6 @@ describe('assertCashWalletTradingAccountScope', () => {
       assertCashWalletTradingAccountScope(
         {
           id: 'wallet-1',
-          seasonParticipantId: 'participant-1',
           tradingAccountId: 'account-OTHER',
         },
         expectedScope,
@@ -77,44 +73,6 @@ describe('assertCashWalletTradingAccountScope', () => {
     );
 
     expect(status).toBe(500);
-    expect(code).toBe(
-      cashWalletScopeErrorCodes.FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH,
-    );
-  });
-
-  it('fails closed with a 500 mismatch error on a foreign participant', () => {
-    const { status, code } = getError(() =>
-      assertCashWalletTradingAccountScope(
-        {
-          id: 'wallet-1',
-          seasonParticipantId: 'participant-OTHER',
-          // Even a "correct" account cannot save a wrong participant link.
-          tradingAccountId: 'account-1',
-        },
-        expectedScope,
-      ),
-    );
-
-    expect(status).toBe(500);
-    expect(code).toBe(
-      cashWalletScopeErrorCodes.FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH,
-    );
-  });
-
-  it('checks the participant before the null-scope classification', () => {
-    // A foreign participant with a null scope is a MISMATCH, not a
-    // repair-required state: repairing would attach the wrong account.
-    const { code } = getError(() =>
-      assertCashWalletTradingAccountScope(
-        {
-          id: 'wallet-1',
-          seasonParticipantId: 'participant-OTHER',
-          tradingAccountId: null,
-        },
-        expectedScope,
-      ),
-    );
-
     expect(code).toBe(
       cashWalletScopeErrorCodes.FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH,
     );

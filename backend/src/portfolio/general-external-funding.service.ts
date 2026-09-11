@@ -71,7 +71,6 @@ export class GeneralExternalFundingService {
       select: {
         id: true,
         walletId: true,
-        seasonParticipantId: true,
         currencyCode: true,
         direction: true,
         txType: true,
@@ -93,7 +92,6 @@ export class GeneralExternalFundingService {
       // path, so no amount from it may be trusted.
       if (
         row.walletId !== krwWalletId ||
-        row.seasonParticipantId !== null ||
         row.currencyCode !== CurrencyCode.KRW ||
         row.direction !== WalletTransactionDirection.credit
       ) {

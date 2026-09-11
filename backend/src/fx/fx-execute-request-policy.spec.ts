@@ -23,6 +23,7 @@ describe('fx execute request policy', () => {
   const context: FxExecuteRequestContextLike = {
     userId: 'user-1',
     seasonParticipantId: 'participant-1',
+    tradingAccountId: 'account-1',
   };
 
   const validKrwUsdBody: FxExecuteRequestBodyLike = {
@@ -51,6 +52,7 @@ describe('fx execute request policy', () => {
       value: {
         userId: 'user-1',
         seasonParticipantId: 'participant-1',
+        tradingAccountId: 'account-1',
         quoteId: 'quote-fx-1',
         fromCurrency: 'KRW',
         toCurrency: 'USD',
@@ -327,6 +329,7 @@ describe('fx execute request policy', () => {
         'seasonParticipantId',
         'sourceAmount',
         'toCurrency',
+        'tradingAccountId',
         'userId',
       ]);
       expect(result.value).not.toHaveProperty('appliedRate');

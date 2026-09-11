@@ -26,11 +26,6 @@ type DecimalInput = string | Prisma.Decimal;
 
 export type FxExecuteWalletCandidate = {
   id: string;
-  /**
-   * General-mode wallets and FX executions have no SeasonParticipant; season
-   * executions retain their participant scope.
-   */
-  seasonParticipantId: string | null;
   currencyCode: FxExecuteCurrency;
   balanceAmount: DecimalInput;
   /**
@@ -86,26 +81,14 @@ export function buildFxExecutePlan(
 ): FxExecutePlanResult {
   const { request, sourceWallet, targetWallet, executeNow } = input;
 
-  if (
-    !isMatchingWallet(
-      sourceWallet,
-      request.seasonParticipantId,
-      request.fromCurrency,
-    )
-  ) {
+  if (!isMatchingWallet(sourceWallet, request.fromCurrency)) {
     return {
       ok: false,
       errorCode: fxExecuteErrorCodes.SOURCE_WALLET_NOT_FOUND,
     };
   }
 
-  if (
-    !isMatchingWallet(
-      targetWallet,
-      request.seasonParticipantId,
-      request.toCurrency,
-    )
-  ) {
+  if (!isMatchingWallet(targetWallet, request.toCurrency)) {
     return {
       ok: false,
       errorCode: fxExecuteErrorCodes.TARGET_WALLET_NOT_FOUND,
@@ -197,14 +180,9 @@ export function buildFxExecutePlan(
 
 function isMatchingWallet(
   wallet: FxExecuteWalletCandidate | null,
-  seasonParticipantId: string | null,
   currencyCode: FxExecuteCurrency,
 ): wallet is FxExecuteWalletCandidate {
-  return (
-    wallet !== null &&
-    wallet.seasonParticipantId === seasonParticipantId &&
-    wallet.currencyCode === currencyCode
-  );
+  return wallet !== null && wallet.currencyCode === currencyCode;
 }
 
 function parseFiniteDecimalInput(

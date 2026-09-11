@@ -443,54 +443,21 @@ touched), is idempotent across re-runs, and reports per-participant failures
 without stopping. `--apply` exits non-zero unless the post-apply verification
 confirms ZERO remaining null links and ZERO excluded-active mismatches.
 
-Backfill financial rows (wallets/ledger/exchanges/fx requests) left with
-`trading_account_id = null` by an old-version writer — run AFTER
-repair-links has converged:
+The former financial, trading, and snapshot scope repair commands were
+deployment-only tools for nullable `trading_account_id` and dual ownership.
+They were retired after canonical account scope became required. The
+`remove_legacy_financial_participant_scope` migration validates every legacy
+participant/account mapping and all required account indexes before it drops
+the redundant participant columns; it never repairs or changes financial
+values. `repair-links` remains because the SeasonParticipant↔TradingAccount
+season-domain link itself is still required.
+
+### General performance repair
 
 ```bash
-pnpm trading-accounts:repair-financial-scope           # dry-run (default)
-pnpm trading-accounts:repair-financial-scope --apply   # fill null scopes, then re-verify
-```
-
-Only the null `trading_account_id` column is filled from each row's
-participant link; amounts/balances/fees/ids/idempotency keys are never
-modified, mismatching stored scopes are reported
-(`FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`) and never overwritten, and
-`--apply` exits non-zero while any null or mismatch remains.
-
-Backfill trading rows (orders/positions/quotes) left with
-`trading_account_id = null` by an old-version writer — run AFTER
-repair-links has converged (typically after repair-financial-scope):
-
-```bash
-pnpm trading-accounts:repair-trading-scope           # dry-run (default)
-pnpm trading-accounts:repair-trading-scope --apply   # fill null scopes, then re-verify
-```
-
-Same safety contract: only the null `trading_account_id` column is filled
-from each row's participant link; order statuses/amounts/reservations,
-position quantities/average costs/PnL, and quote statuses/hashes are never
-modified. Mismatches (`TRADING_ACCOUNT_SCOPE_MISMATCH`), order↔quote scope
-disagreements (`ORDER_QUOTE_ACCOUNT_SCOPE_MISMATCH`), and participant-less
-quotes (`QUOTE_PARTICIPANT_SCOPE_MISSING`, never guessed) are reported and
-never auto-corrected; `--apply` exits non-zero while any null/mismatch
-remains. Deployment order and the NOT NULL preconditions:
-`docs/trading-modes-and-accounts.md` §3.5–§3.7.
-
-### Snapshot scope + general performance repair
-
-```bash
-pnpm trading-accounts:repair-snapshot-scope             # dry-run
-pnpm trading-accounts:repair-snapshot-scope --apply     # backfill season snapshots
 pnpm trading-accounts:backfill-general-performance          # dry-run
 pnpm trading-accounts:backfill-general-performance --apply  # create origins
 ```
-
-`repair-snapshot-scope` fills a SEASON snapshot's null `tradingAccountId`
-from its participant link and nothing else — amounts, return rates, captured
-times, snapshot dates, and reasons are never modified. Mismatches and
-general-account rows are reported and never guessed. Run it after
-`repair-links` has converged.
 
 `backfill-general-performance` creates the `performance_baseline` origin for
 general accounts opened before 작업 7, and ONLY where the baseline is
@@ -635,7 +602,7 @@ pnpm tsx scripts/admin-run-batch-job.ts --job reward-grant --season-id <SEASON_I
 pnpm tsx scripts/admin-run-batch-job.ts --job season-lifecycle-transition --now <ISO_TIMESTAMP> --dry-run --requested-by local-operator
 ```
 
-`daily-portfolio-snapshot` uses the idempotency key `daily-portfolio-snapshot:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run reports `wouldCreate`, `existing`, participant-level failures, and `sourceSummary` without inserting snapshots. Non-dry-run inserts only available participant snapshots, skips existing `(seasonParticipantId, snapshotDate)` rows without overwrite, and uses fresh eligible `provider_api` rows first with explicit `admin_manual` fallback. It does not call external providers, create provider/price/FX rows, schedule cron, generate rankings, settle seasons, or grant rewards.
+`daily-portfolio-snapshot` uses the idempotency key `daily-portfolio-snapshot:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run reports `wouldCreate`, `existing`, participant-level failures, and `sourceSummary` without inserting snapshots. Non-dry-run inserts only available participant snapshots, skips existing `(tradingAccountId, snapshotDate)` rows without overwrite, and uses fresh eligible `provider_api` rows first with explicit `admin_manual` fallback. It does not call external providers, create provider/price/FX rows, schedule cron, generate rankings, settle seasons, or grant rewards.
 
 `season-ranking` uses the idempotency key `season-ranking:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run reads existing `daily_portfolio_snapshots` and reports planned rankings without inserting rows. Non-dry-run creates `season_rankings` only when no rows already exist for the same season/date/type; existing rankings are skipped without overwrite. It does not call providers, create daily snapshots, mutate wallets/orders/positions, settle seasons, or grant rewards. Ranking is `totalAssetKrw desc` with stable user/participant ordering; the current schema requires unique persisted ranks, so true same-rank competition ties need a future schema gate.
 

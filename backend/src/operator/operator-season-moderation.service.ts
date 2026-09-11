@@ -163,7 +163,6 @@ export class OperatorSeasonModerationService {
           ? await this.limitOrderCancelService.cancelOpenLimitBuysForParticipantInTransaction(
               tx,
               {
-                seasonParticipantId: participant.id,
                 tradingAccountId: accountSync.tradingAccountId,
                 reason: LIMIT_ORDER_CANCEL_REASONS.participantExcluded,
                 canceledAt: now,
@@ -692,7 +691,8 @@ export class OperatorSeasonModerationService {
       data: {
         seasonId: input.participant.seasonId,
         seasonParticipantId: input.participant.id,
-        // 작업 8 dual-write.
+        // SeasonRanking intentionally records its participant target and the
+        // canonical account used for its financial measurements.
         tradingAccountId: scope.tradingAccountId,
         rankType: SeasonRankingType.final,
         rank: input.requestedRank,

@@ -90,7 +90,6 @@ const STORED_CLAIM_SELECT = {
     select: {
       id: true,
       tradingAccountId: true,
-      seasonParticipantId: true,
       walletId: true,
       currencyCode: true,
       direction: true,
@@ -103,7 +102,6 @@ const STORED_CLAIM_SELECT = {
         select: {
           id: true,
           tradingAccountId: true,
-          seasonParticipantId: true,
           currencyCode: true,
         },
       },
@@ -714,7 +712,6 @@ export class AdRewardService {
           where: {
             id: verified.krwWalletId,
             tradingAccountId: account.id,
-            seasonParticipantId: null,
             currencyCode: CurrencyCode.KRW,
           },
           data: {
@@ -742,7 +739,6 @@ export class AdRewardService {
 
         const ledger = await tx.walletTransaction.create({
           data: {
-            seasonParticipantId: null,
             tradingAccountId: account.id,
             walletId: verified.krwWalletId,
             currencyCode: CurrencyCode.KRW,

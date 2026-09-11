@@ -74,30 +74,23 @@ const enumBlock = (name: string): string => {
 };
 
 describe('General account + ad reward schema contract', () => {
-  describe('nullable legacy participant links', () => {
-    it('makes CashWallet.seasonParticipantId optional with an optional relation', () => {
-      const block = modelBlock('CashWallet');
-      expect(block).toMatch(
-        /seasonParticipantId\s+String\?\s+@map\("season_participant_id"\)/,
-      );
-      expect(block).toMatch(
-        /seasonParticipant\s+SeasonParticipant\?\s+@relation\(fields: \[seasonParticipantId\], references: \[id\], onDelete: Cascade\)/,
-      );
-    });
-
-    it('makes WalletTransaction.seasonParticipantId optional with an optional relation', () => {
-      const block = modelBlock('WalletTransaction');
-      expect(block).toMatch(
-        /seasonParticipantId\s+String\?\s+@map\("season_participant_id"\)/,
-      );
-      expect(block).toMatch(
-        /seasonParticipant\s+SeasonParticipant\?\s+@relation\(fields: \[seasonParticipantId\], references: \[id\], onDelete: Restrict\)/,
-      );
-    });
-
-    it('makes Order and Position participant links nullable for general trading', () => {
-      for (const model of ['Order', 'Position']) {
-        expect(modelBlock(model)).toMatch(/seasonParticipantId\s+String\?/);
+  describe('canonical account ownership', () => {
+    it('removes legacy participant ownership from account-owned rows', () => {
+      for (const model of [
+        'CashWallet',
+        'WalletTransaction',
+        'ExchangeTransaction',
+        'FxExecuteRequest',
+        'Quote',
+        'Order',
+        'Position',
+        'EquitySnapshot',
+        'DailyPortfolioSnapshot',
+      ]) {
+        const block = modelBlock(model);
+        expect(block).not.toContain('seasonParticipantId');
+        expect(block).not.toMatch(/\n\s+seasonParticipant\s/);
+        expect(block).toMatch(/tradingAccountId\s+String\s/);
       }
     });
 
@@ -117,12 +110,6 @@ describe('General account + ad reward schema contract', () => {
       expect(generalTradingMigration).not.toMatch(/DROP\s+COLUMN/i);
       expect(generalTradingMigration).not.toContain('exchange_transactions');
       expect(generalTradingMigration).not.toContain('fx_execute_requests');
-    });
-
-    it('makes ExchangeTransaction and FxExecuteRequest participant links nullable for general FX', () => {
-      for (const model of ['ExchangeTransaction', 'FxExecuteRequest']) {
-        expect(modelBlock(model)).toMatch(/seasonParticipantId\s+String\?\s/);
-      }
     });
 
     it('uses an additive DDL-only general-FX migration and rewrites no season row', () => {

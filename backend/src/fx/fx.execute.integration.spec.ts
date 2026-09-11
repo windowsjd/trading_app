@@ -214,7 +214,7 @@ async function testSuccessWritePath() {
     assert.equal(formatScale8(targetWallet.balanceAmount), '0.99900000');
 
     const exchangeRows = await prisma.exchangeTransaction.findMany({
-      where: { seasonParticipantId: scenario.participantId },
+      where: { tradingAccountId: scenario.tradingAccountId },
     });
     assert.equal(exchangeRows.length, 1);
     assert.equal(exchangeRows[0].id, response.data.exchangeId);
@@ -233,7 +233,7 @@ async function testSuccessWritePath() {
     assert.deepEqual(commandRows[0].responsePayloadJson, response);
 
     const ledgerRows = await prisma.walletTransaction.findMany({
-      where: { seasonParticipantId: scenario.participantId },
+      where: { tradingAccountId: scenario.tradingAccountId },
       orderBy: { createdAt: 'asc' },
     });
     assert.equal(ledgerRows.length, 2);
@@ -629,7 +629,6 @@ async function createScenario(label, options = {}) {
 
   const sourceWallet = await prisma.cashWallet.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: tradingAccount.id,
       currencyCode: sourceCurrency,
       balanceAmount: options.sourceBalance ?? '2000.00000000',
@@ -639,7 +638,6 @@ async function createScenario(label, options = {}) {
 
   const targetWallet = await prisma.cashWallet.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: tradingAccount.id,
       currencyCode: targetCurrency,
       balanceAmount: options.targetBalance ?? ZERO_AMOUNT,
@@ -690,16 +688,16 @@ async function cleanupScenario(scenario) {
     where: { userId: scenario.userId },
   });
   await prisma.walletTransaction.deleteMany({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   await prisma.exchangeTransaction.deleteMany({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   await prisma.equitySnapshot.deleteMany({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   await prisma.cashWallet.deleteMany({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   await prisma.seasonParticipant.deleteMany({
     where: { id: scenario.participantId },
@@ -761,6 +759,7 @@ async function createFxQuote(
   const requestHash = computeFxQuoteRequestHash({
     userId: scenario.userId,
     seasonParticipantId: scenario.participantId,
+    tradingAccountId: scenario.tradingAccountId,
     fromCurrency,
     toCurrency,
     sourceAmount,
@@ -768,7 +767,6 @@ async function createFxQuote(
   const quote = await prisma.quote.create({
     data: {
       userId: scenario.userId,
-      seasonParticipantId: scenario.participantId,
       tradingAccountId: scenario.tradingAccountId,
       quoteType: QuoteType.fx,
       status: QuoteStatus.active,
@@ -809,10 +807,10 @@ async function readMutationState(scenario) {
     where: { id: scenario.targetWalletId },
   });
   const exchangeCount = await prisma.exchangeTransaction.count({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   const ledgerCount = await prisma.walletTransaction.count({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
 
   return {
@@ -834,7 +832,7 @@ async function readRollbackProofState(scenario) {
     },
   });
   const equitySnapshotCount = await prisma.equitySnapshot.count({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   const quoteRows = await prisma.quote.findMany({
     where: { userId: scenario.userId },
@@ -876,7 +874,7 @@ async function countCommandsForUser(userId) {
 
 async function expectOneExchangeExecutedEquitySnapshot(scenario) {
   const snapshot = await prisma.equitySnapshot.findMany({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
     select: { snapshotReason: true },
   });
 

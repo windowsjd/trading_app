@@ -13,13 +13,11 @@ import { GENERAL_ACCOUNT_INITIAL_CAPITAL_KRW } from './general-account.policy';
 /**
  * Structural integrity of a GENERAL account's financial shape (작업 6).
  *
- * A general account has no SeasonParticipant, so the season scope probes in
- * trading-account-financial-integrity.ts do not apply. What must hold instead
- * is a fixed, small shape:
+ * A general account has no SeasonParticipant. Its financial data is owned by
+ * TradingAccount and must have a fixed, small shape:
  *
  *   mode = general, no participant attached, initialCapitalKrw = 10,000,000
- *   exactly one KRW wallet + exactly one USD wallet, both scoped to the
- *   account and both with seasonParticipantId = NULL
+ *   exactly one KRW wallet + exactly one USD wallet, both scoped to the account
  *   exactly one initial_grant / general_account_open ledger row for
  *   amount 10,000,000, on the KRW wallet, referencing the account
  *
@@ -43,16 +41,12 @@ type GeneralIntegrityClient = Pick<
 
 type GeneralTradingRowsClient = Pick<
   Prisma.TransactionClient,
-  'order' | 'position' | 'quote' | '$queryRaw'
+  'order' | 'quote'
 >;
 
 type GeneralFxRowsClient = Pick<
   Prisma.TransactionClient,
-  | 'exchangeTransaction'
-  | 'fxExecuteRequest'
-  | 'quote'
-  | 'walletTransaction'
-  | '$queryRaw'
+  'exchangeTransaction' | 'fxExecuteRequest' | 'quote' | 'walletTransaction'
 >;
 
 export type GeneralAccountIntegrityTarget = {
@@ -122,7 +116,6 @@ export async function assertGeneralAccountFoundationIntegrity(
     select: {
       id: true,
       currencyCode: true,
-      seasonParticipantId: true,
       tradingAccountId: true,
     },
     orderBy: [{ currencyCode: 'asc' }, { id: 'asc' }],
@@ -152,12 +145,6 @@ export async function assertGeneralAccountFoundationIntegrity(
         'wallet trading-account scope does not match the account',
       );
     }
-    if (wallet.seasonParticipantId !== null) {
-      throwGeneralAccountIntegrity(
-        account.id,
-        'general wallet carries a season participant link',
-      );
-    }
   }
 
   const krwWallet = krwWallets[0];
@@ -172,7 +159,6 @@ export async function assertGeneralAccountFoundationIntegrity(
       id: true,
       walletId: true,
       tradingAccountId: true,
-      seasonParticipantId: true,
       currencyCode: true,
       direction: true,
       txType: true,
@@ -212,7 +198,6 @@ export async function assertGeneralAccountFoundationIntegrity(
     );
   }
   if (
-    grant.seasonParticipantId !== null ||
     grant.currencyCode !== CurrencyCode.KRW ||
     grant.txType !== WalletTransactionType.initial_grant
   ) {
@@ -240,8 +225,8 @@ export async function assertGeneralAccountFoundationIntegrity(
 }
 
 /**
- * Row-scope half of the check: every wallet and ledger row that belongs to
- * this account must be purely account-scoped.
+ * Row-scope half of the check: every ledger row must point to a wallet owned
+ * by the same account.
  *
  * 작업 6 보완 2 renamed this from "…Unscoped" because it is only HALF the
  * story — on its own it happily passes an account whose USD wallet or initial
@@ -252,36 +237,6 @@ export async function assertGeneralAccountFinancialRowsIntegrity(
   prisma: GeneralIntegrityClient,
   accountId: string,
 ): Promise<void> {
-  const walletWithParticipant = await prisma.cashWallet.findFirst({
-    where: {
-      tradingAccountId: accountId,
-      seasonParticipantId: { not: null },
-    },
-    select: { id: true },
-  });
-  if (walletWithParticipant) {
-    throwGeneralAccountIntegrity(
-      accountId,
-      'a wallet of this general account carries a season participant link',
-    );
-  }
-
-  const ledgerWithParticipant = await prisma.walletTransaction.findFirst({
-    where: {
-      tradingAccountId: accountId,
-      seasonParticipantId: { not: null },
-    },
-    select: { id: true },
-  });
-  if (ledgerWithParticipant) {
-    throwGeneralAccountIntegrity(
-      accountId,
-      'a ledger row of this general account carries a season participant link',
-    );
-  }
-
-  // A ledger row whose WALLET belongs elsewhere is corruption the per-row
-  // check above cannot see.
   const ledgerWalletDisagreement = await prisma.walletTransaction.findFirst({
     where: {
       tradingAccountId: accountId,
@@ -322,41 +277,16 @@ export async function assertGeneralAccountFinancialIntegrity(
   return wallets;
 }
 
-/** General trading rows are account-only and must never carry a participant. */
+/** General trading rows and their durable quotes must share one account. */
 export async function assertGeneralAccountTradingRowsIntegrity(
   prisma: GeneralTradingRowsClient,
   accountId: string,
 ): Promise<void> {
-  const legacyNullLinks = await prisma.$queryRaw<Array<{ found: number }>>`
-    SELECT 1 AS "found"
-    WHERE EXISTS (
-      SELECT 1
-      FROM "orders" o
-      JOIN "quotes" q ON q."id" = o."quote_id"
-      WHERE o."trading_account_id" = ${accountId}
-        AND q."trading_account_id" IS NULL
-    ) OR EXISTS (
-      SELECT 1
-      FROM "quotes" q
-      JOIN "orders" o ON o."quote_id" = q."id"
-      WHERE q."trading_account_id" = ${accountId}
-        AND o."trading_account_id" IS NULL
-    )
-    LIMIT 1
-  `;
-  if (legacyNullLinks.length > 0) {
-    throwGeneralAccountIntegrity(
-      accountId,
-      'a general order or quote is connected to a legacy null account scope',
-    );
-  }
-
-  const [order, position, quote] = await Promise.all([
+  const [order, quote] = await Promise.all([
     prisma.order.findFirst({
       where: {
         tradingAccountId: accountId,
         OR: [
-          { seasonParticipantId: { not: null } },
           // Every general order is durable-quote backed. Missing or foreign
           // quote scope is corruption, not a row that may be shown normally.
           { quoteId: null },
@@ -365,104 +295,54 @@ export async function assertGeneralAccountTradingRowsIntegrity(
               is: { tradingAccountId: { not: accountId } },
             },
           },
-          { quote: { is: { seasonParticipantId: { not: null } } } },
         ],
-      },
-      select: { id: true },
-    }),
-    prisma.position.findFirst({
-      where: {
-        tradingAccountId: accountId,
-        seasonParticipantId: { not: null },
       },
       select: { id: true },
     }),
     prisma.quote.findFirst({
       where: {
         tradingAccountId: accountId,
-        OR: [
-          { seasonParticipantId: { not: null } },
-          // Also look from the quote side so moving an Order's accountId does
-          // not make the damaged row silently disappear from its origin.
-          {
-            orders: {
-              some: {
-                OR: [
-                  { tradingAccountId: { not: accountId } },
-                  { seasonParticipantId: { not: null } },
-                ],
-              },
-            },
+        // Also look from the quote side so moving an Order's accountId does
+        // not make the damaged row silently disappear from its origin.
+        orders: {
+          some: {
+            tradingAccountId: { not: accountId },
           },
-        ],
+        },
       },
       select: { id: true },
     }),
   ]);
-  if (order || position || quote) {
+  if (order || quote) {
     throwGeneralAccountIntegrity(
       accountId,
-      'a general order, position, or quote has participant pollution or mismatched durable-quote scope',
+      'a general order and its durable quote have mismatched account scope',
     );
   }
 }
 
 /**
  * Runtime invariants of account-scoped general FX. This is deliberately the
- * same small shape reported by audit-general: participant-free quotes,
- * commands, exchanges and their two ledger rows, all on one account.
+ * same small shape reported by audit-general: quotes, commands, exchanges and
+ * their two ledger rows all belong to one account.
  */
 export async function assertGeneralAccountFxRowsIntegrity(
   prisma: GeneralFxRowsClient,
   accountId: string,
   expectedUserId?: string,
 ): Promise<void> {
-  const legacyNullLinks = await prisma.$queryRaw<Array<{ found: number }>>`
-    SELECT 1 AS "found"
-    WHERE EXISTS (
-      SELECT 1
-      FROM "exchange_transactions" e
-      JOIN "fx_execute_requests" r
-        ON r."exchange_transaction_id" = e."id"
-      WHERE e."trading_account_id" = ${accountId}
-        AND r."trading_account_id" IS NULL
-    ) OR EXISTS (
-      SELECT 1
-      FROM "fx_execute_requests" r
-      JOIN "exchange_transactions" e
-        ON e."id" = r."exchange_transaction_id"
-      WHERE r."trading_account_id" = ${accountId}
-        AND e."trading_account_id" IS NULL
-    )
-    LIMIT 1
-  `;
-  if (legacyNullLinks.length > 0) {
-    throwGeneralAccountIntegrity(
-      accountId,
-      'a general FX request or exchange is connected to a legacy null account scope',
-    );
-  }
-
   const [exchange, request, quote] = await Promise.all([
     prisma.exchangeTransaction.findFirst({
       where: {
         tradingAccountId: accountId,
-        OR: [
-          { seasonParticipantId: { not: null } },
-          {
-            fxExecuteRequests: {
-              some: {
-                OR: [
-                  { tradingAccountId: { not: accountId } },
-                  { seasonParticipantId: { not: null } },
-                  ...(expectedUserId
-                    ? [{ userId: { not: expectedUserId } }]
-                    : []),
-                ],
-              },
-            },
+        fxExecuteRequests: {
+          some: {
+            OR: [
+              { tradingAccountId: { not: accountId } },
+              ...(expectedUserId ? [{ userId: { not: expectedUserId } }] : []),
+            ],
           },
-        ],
+        },
       },
       select: { id: true },
     }),
@@ -470,17 +350,13 @@ export async function assertGeneralAccountFxRowsIntegrity(
       where: {
         tradingAccountId: accountId,
         OR: [
-          { seasonParticipantId: { not: null } },
           { status: { not: FxExecuteRequestStatus.succeeded } },
           { exchangeTransactionId: null },
           ...(expectedUserId ? [{ userId: { not: expectedUserId } }] : []),
           {
             exchangeTransaction: {
               is: {
-                OR: [
-                  { tradingAccountId: { not: accountId } },
-                  { seasonParticipantId: { not: null } },
-                ],
+                tradingAccountId: { not: accountId },
               },
             },
           },
@@ -488,23 +364,22 @@ export async function assertGeneralAccountFxRowsIntegrity(
       },
       select: { id: true },
     }),
-    prisma.quote.findFirst({
-      where: {
-        tradingAccountId: accountId,
-        quoteType: QuoteType.fx,
-        OR: [
-          { seasonParticipantId: { not: null } },
-          ...(expectedUserId ? [{ userId: { not: expectedUserId } }] : []),
-        ],
-      },
-      select: { id: true },
-    }),
+    expectedUserId
+      ? prisma.quote.findFirst({
+          where: {
+            tradingAccountId: accountId,
+            quoteType: QuoteType.fx,
+            userId: { not: expectedUserId },
+          },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
   ]);
 
   if (exchange || request || quote) {
     throwGeneralAccountIntegrity(
       accountId,
-      'a general FX quote, command, or exchange has participant pollution or mismatched account scope',
+      'a general FX quote, command, or exchange has mismatched account scope',
     );
   }
 
@@ -519,7 +394,6 @@ export async function assertGeneralAccountFxRowsIntegrity(
           id: true,
           status: true,
           tradingAccountId: true,
-          seasonParticipantId: true,
         },
       },
     },
@@ -538,7 +412,6 @@ export async function assertGeneralAccountFxRowsIntegrity(
       id: true,
       referenceId: true,
       tradingAccountId: true,
-      seasonParticipantId: true,
       currencyCode: true,
       direction: true,
       txType: true,
@@ -551,8 +424,7 @@ export async function assertGeneralAccountFxRowsIntegrity(
       exchange.fxExecuteRequests.length !== 1 ||
       exchange.fxExecuteRequests[0]?.status !==
         FxExecuteRequestStatus.succeeded ||
-      exchange.fxExecuteRequests[0]?.tradingAccountId !== accountId ||
-      exchange.fxExecuteRequests[0]?.seasonParticipantId !== null
+      exchange.fxExecuteRequests[0]?.tradingAccountId !== accountId
     ) {
       throwGeneralAccountIntegrity(
         accountId,
@@ -587,13 +459,12 @@ export async function assertGeneralAccountFxRowsIntegrity(
       !row.referenceId ||
       !exchangeById.has(row.referenceId) ||
       row.tradingAccountId !== accountId ||
-      row.seasonParticipantId !== null ||
       row.wallet.tradingAccountId !== accountId,
   );
   if (pollutedLedger) {
     throwGeneralAccountIntegrity(
       accountId,
-      `general exchange ledger ${pollutedLedger.id} has participant or account-scope pollution`,
+      `general exchange ledger ${pollutedLedger.id} has account-scope pollution`,
     );
   }
 }

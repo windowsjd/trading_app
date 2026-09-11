@@ -8,19 +8,15 @@ import { HttpException, HttpStatus } from '@nestjs/common';
  * A wallet may only be debited/credited/reserved/released — or used as the
  * balance basis of a new quote — when ALL of the following hold:
  *
- *   wallet.seasonParticipantId === expected participant
- *   wallet.tradingAccountId    !== null
- *   wallet.tradingAccountId    === expected (verified) trading account
+ *   wallet.tradingAccountId !== null
+ *   wallet.tradingAccountId === expected (verified) trading account
  *
  * Violations are SERVER data-integrity states, never client errors, so both
  * throw structured 500s:
  *
- *  - null scope → FINANCIAL_SCOPE_REPAIR_REQUIRED: a deploy-boundary row an
- *    old writer left unscoped. The fix is running
- *    `pnpm trading-accounts:repair-financial-scope --apply` (after
- *    repair-links) — NEVER an in-request backfill: a trade must not be the
- *    thing that decides which account a wallet belongs to.
- *  - participant or account mismatch → FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH:
+ *  - null scope → FINANCIAL_SCOPE_REPAIR_REQUIRED: a canonical database
+ *    invariant violation. It is never repaired inside a financial request.
+ *  - account mismatch → FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH:
  *    corrupted linkage. Nothing is overwritten; the request fails closed and
  *    the mismatch is left for operators to investigate.
  *
@@ -41,18 +37,10 @@ export type CashWalletScopeErrorCode =
 
 export type CashWalletScopeCandidate = {
   id: string;
-  /**
-   * Nullable since 작업 6: general-mode wallets have no SeasonParticipant.
-   * Season callers expect their participant; general order/FX callers expect
-   * null. Either mode therefore rejects a wallet from the other mode.
-   */
-  seasonParticipantId: string | null;
   tradingAccountId: string | null;
 };
 
 export type ExpectedCashWalletScope = {
-  /** Null for a general account, which must never carry participant scope. */
-  seasonParticipantId: string | null;
   /** The VERIFIED trading account (participant link / owned account id). */
   tradingAccountId: string;
 };
@@ -68,17 +56,10 @@ export type ScopeVerifiedCashWallet<T extends CashWalletScopeCandidate> = T & {
 export function assertCashWalletTradingAccountScope<
   T extends CashWalletScopeCandidate,
 >(wallet: T, expected: ExpectedCashWalletScope): ScopeVerifiedCashWallet<T> {
-  if (wallet.seasonParticipantId !== expected.seasonParticipantId) {
-    throwScopeError(
-      cashWalletScopeErrorCodes.FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH,
-      'Cash wallet participant scope does not match the trading context.',
-    );
-  }
-
   if (wallet.tradingAccountId == null) {
     throwScopeError(
       cashWalletScopeErrorCodes.FINANCIAL_SCOPE_REPAIR_REQUIRED,
-      'Cash wallet has no trading account scope; run trading-accounts:repair-financial-scope before trading.',
+      'Cash wallet has no canonical trading account scope.',
     );
   }
 

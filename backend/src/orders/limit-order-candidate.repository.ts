@@ -22,7 +22,6 @@ import { PrismaService } from '../prisma/prisma.service';
 export type LimitMatchCandidate = {
   id: string;
   side?: OrderSide;
-  seasonParticipantId: string | null;
   tradingAccountId: string;
   assetId: string;
   quantity: Prisma.Decimal;
@@ -49,7 +48,6 @@ export type LimitMatchCandidate = {
 const CANDIDATE_SELECT = {
   id: true,
   side: true,
-  seasonParticipantId: true,
   tradingAccountId: true,
   assetId: true,
   quantity: true,
@@ -59,9 +57,11 @@ const CANDIDATE_SELECT = {
   reservedQuantity: true,
   reservationFeeRate: true,
   submittedAt: true,
-  seasonParticipant: {
+  tradingAccount: {
     select: {
-      season: { select: { id: true, endAt: true } },
+      seasonParticipant: {
+        select: { season: { select: { id: true, endAt: true } } },
+      },
     },
   },
   asset: {
@@ -106,24 +106,24 @@ export class LimitOrderCandidateRepository {
         {
           OR: [
             {
-              seasonParticipant: {
-                participantStatus: ParticipantStatus.active,
-                season: {
-                  status: SeasonStatus.active,
-                  startAt: { lte: now },
-                  endAt: { gt: now },
-                },
-              },
               tradingAccount: {
                 mode: TradingAccountMode.season,
                 status: TradingAccountStatus.active,
+                seasonParticipant: {
+                  participantStatus: ParticipantStatus.active,
+                  season: {
+                    status: SeasonStatus.active,
+                    startAt: { lte: now },
+                    endAt: { gt: now },
+                  },
+                },
               },
             },
             {
-              seasonParticipantId: null,
               tradingAccount: {
                 mode: TradingAccountMode.general,
                 status: TradingAccountStatus.active,
+                seasonParticipant: null,
               },
             },
           ],
@@ -178,12 +178,11 @@ export class LimitOrderCandidateRepository {
         return [];
       }
       if (!row.tradingAccountId) return [];
-      const season = row.seasonParticipant?.season ?? null;
+      const season = row.tradingAccount.seasonParticipant?.season ?? null;
       return [
         {
           id: row.id,
           side: row.side,
-          seasonParticipantId: row.seasonParticipantId,
           tradingAccountId: row.tradingAccountId,
           assetId: row.assetId,
           quantity: row.quantity,

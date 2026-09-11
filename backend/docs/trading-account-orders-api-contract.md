@@ -54,15 +54,11 @@ See `frontend/docs/trading-account-switching.md`.
   the stored rate even if another instance now has a different config. Provider
   price still follows execute-time repricing. A legacy general market quote
   with null `quotedFeeRate` fails 409 `QUOTE_MISMATCH` and must be requoted.
-- Season-account read integrity: if the linked participant still owns
-  orders (order routes) or positions (position routes) whose
-  `tradingAccountId` is NULL or points at a different account, the read
-  fails closed with 500 `FINANCIAL_SCOPE_REPAIR_REQUIRED` /
-  `TRADING_ACCOUNT_SCOPE_MISMATCH` instead of silently returning a
-  partial/empty result. Run `pnpm trading-accounts:repair-trading-scope`.
-  General reads validate the account foundation and reject participant-polluted
-  Order/Position/Quote rows with 500 `GENERAL_ACCOUNT_INTEGRITY`; a genuinely
-  empty general account remains a normal 200 empty list.
+- Order, position, and quote ownership is the required `tradingAccountId`.
+  Reads reject cross-account Order→Quote links with 500
+  `TRADING_ACCOUNT_SCOPE_MISMATCH`; no participant-derived ownership lookup or
+  repair fallback exists. General reads additionally validate the general
+  account foundation. A genuinely empty account remains a normal 200 list.
 
 ## Orders
 
@@ -93,51 +89,21 @@ See `frontend/docs/trading-account-switching.md`.
   exposes none either (market orders execute inside create; limit orders
   fill via the scheduler matcher).
 
-### Cancel scope classification (작업 5 보완 1)
+### Cancel scope classification
 
-The account-scoped cancel used to carry `order.tradingAccountId = :accountId`
-in the row-LOCKING statement. That collapsed three very different situations
-into one 404 — another user's order, another account's order, and the
-CALLER'S OWN order whose account scope was null or corrupted. Hiding the last
-one as "not found" is wrong: it is server-side data corruption, and the user
-is left unable to explain why their own order vanished.
+The ownership lock resolves `Order.tradingAccountId → TradingAccount.userId`.
+For the account-scoped route the requested account must equal the order's
+canonical account; an order belonging to another account (including another
+account of the same user) is the same 404 `ORDER_NOT_FOUND` as an unknown ID.
+A broken Order→TradingAccount relation is a 500
+`TRADING_ACCOUNT_SCOPE_MISMATCH`. Season status and participant status do not
+block cancel because releasing an existing reservation is protective.
 
-The lock now uses `orderId + user ownership` only, and account membership is
-classified afterwards against the loaded row (`req` = requested account,
-`part` = the order participant's link, `ord` = the order's own scope):
-
-| Case | Result |
-| --- | --- |
-| `part = req`, `ord = req` | proceed with the cancel |
-| `part = req`, `ord = null` | 500 `TRADING_SCOPE_REPAIR_REQUIRED` (run `pnpm trading-accounts:repair-trading-scope`) |
-| `part = req`, `ord ≠ req` | 500 `TRADING_ACCOUNT_SCOPE_MISMATCH` (never auto-overwritten) |
-| `part ≠ req`, `ord = req` | 500 `TRADING_ACCOUNT_SCOPE_MISMATCH` — the row names THIS account, so it is not concealed either |
-| `part ≠ req`, `ord ≠ req` | 404 `ORDER_NOT_FOUND` — a genuinely other-account order; its existence stays hidden |
-| unknown id / another user | 404 `ORDER_NOT_FOUND` (unchanged) |
-
-Classification runs BEFORE any cancel work — including before the market-order
-410 — so no error path can change order status, cash reservation, or quantity
-reservation; the whole transaction rolls back.
-
-For general orders there is no `part` identity to infer from. Ownership and
-membership are resolved directly through
-`order.tradingAccountId → TradingAccount.userId`; the row must point to a
-general account and must have `seasonParticipantId=null`. Suspended/closed does
-not block this release-only operation.
-
-BUY wallet checks are unchanged and still required before a release:
-`wallet.seasonParticipantId = order.seasonParticipantId`,
-`wallet.tradingAccountId = order.tradingAccountId`,
-`wallet.currencyCode = order.currencyCode`. A null wallet scope is 500
-`FINANCIAL_SCOPE_REPAIR_REQUIRED`, a mismatch is 500
-`FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`, and either rolls the whole
-transaction back. SELL cancel applies the equivalent account+asset scope guard
-to `Position.reservedQuantity` and releases it atomically with the order state.
-
-**Legacy cancel** keeps its route and response contract: another user's order
-is still a plain 404. It also still fails closed with a structured 500 —
-without changing the reservation — when the caller's OWN order has a null
-scope or one that disagrees with its participant link.
+BUY release requires the wallet's `tradingAccountId` and currency to match the
+order. SELL release applies the equivalent account+asset guard to the Position.
+Any mismatch fails before mutation and rolls the transaction back. The legacy
+cancel route keeps its route and response contract but uses the same canonical
+account checks.
 
 ### Committed replay first (작업 5 보완 2)
 
@@ -156,12 +122,10 @@ Account-scoped market create order of work:
    replay, so no other user's order is reachable through a borrowed id)
 4. idempotencyKey + requestHash
 5. lookup by `(tradingAccountId, idempotencyKey)`
-6. if absent, the pinned legacy fallback (`seasonParticipantId + key +
-   tradingAccountId IS NULL + user ownership`)
-7. if found: same requestHash → return the stored `responsePayloadJson`;
+6. if found: same requestHash → return the stored `responsePayloadJson`;
    different requestHash → 409 `ORDER_IDEMPOTENCY_CONFLICT`. Account status,
    season status, participant status, and market state are NOT re-checked.
-8. ONLY when no order exists: account active and mode-specific gates (season
+7. ONLY when no order exists: account active and mode-specific gates (season
    status/window/participant, or general foundation integrity), followed by
    market open, quote, wallet scope, balance, price freshness, and the create
    transaction.
@@ -181,7 +145,7 @@ The LEGACY market create is replay-first too, but only over a lookup whose
 scope equals a real DB uniqueness constraint: the UNIQUE `Order.quoteId`
 plus user ownership (a market create always carries a durable single-use
 quote). A broad `userId + idempotencyKey` lookup is deliberately NOT used —
-`idempotencyKey` is unique only within a season participation, so such a
+`idempotencyKey` is unique only within a trading account, so such a
 lookup could resolve a retry to a different season's order.
 
 Limit creates keep their existing quote-scoped committed-replay-first
@@ -189,24 +153,22 @@ behavior, reservation semantics, and `LIMIT_ORDER_ENABLED` policy unchanged.
 
 ### Order idempotency
 
-DB uniqueness is `(tradingAccountId, idempotencyKey)` (the legacy
-`(seasonParticipantId, idempotencyKey)` unique stays during the
-transition). Service lookups are account-first with a pinned legacy
-fallback (`seasonParticipantId + key + tradingAccountId IS NULL + user
-ownership`) — another account's or another season's order is never
-replayed. Same account + same key: same requestHash → stored-response
+DB uniqueness and service lookup are both
+`(tradingAccountId, idempotencyKey)` with no participant/null-scope fallback.
+Another account's or another season's order is never replayed. Same account +
+same key: same requestHash → stored-response
 replay, different requestHash → 409 `ORDER_IDEMPOTENCY_CONFLICT`. The SAME
 user may reuse one key on DIFFERENT accounts.
 
 ### Quote account binding
 
-Quote rows persist the verified `tradingAccountId`. General quotes always have
-`seasonParticipantId=null`; season quotes retain their participant. Create and
-execute reject a different account (409 `QUOTE_MISMATCH`). NULL-account legacy
-quotes remain consumable only on the season path and stay participant/hash
-pinned. General MARKET quotes additionally pin `quotedFeeRate`; only price is
-re-resolved at execution. General request hashes include `tradingAccountId`;
-legacy season hash material is unchanged.
+Quote rows persist only the verified `tradingAccountId` as ownership. Create
+and execute reject a different account (409 `QUOTE_MISMATCH`); no null-account
+or participant fallback is accepted. General MARKET quotes additionally pin
+`quotedFeeRate`; only price is re-resolved at execution. Durable request hashes
+use account identity for general mode. The released season v1 quote hash keeps
+its exact participant byte format so pre-migration open limit orders remain
+executable; quote ownership and all lookup/unique scopes are still account-only.
 
 ## Positions
 
@@ -226,10 +188,10 @@ Fills re-verify, inside the fill transaction against locked rows: the order's
 own account exists, is active, its quote and wallet/position have the same
 scope, and the reservation still exists. Season fills additionally require the
 participant/account link plus unchanged season gates. General fills require
-`seasonParticipantId=null` and never read a season. A suspended/closed account
-SKIPS the fill (`account_not_active`); owner cancel remains available so the
-reservation is not stranded. Scope corruption throws a structured 500 and
-rolls the fill back.
+account mode `general` with no linked SeasonParticipant and never read a
+season. A suspended/closed account SKIPS the fill (`account_not_active`);
+owner cancel remains available so the reservation is not stranded. Scope
+corruption throws a structured 500 and rolls the fill back.
 
 Both BUY and SELL limit orders use the same scheduler. BUY reserves cash in
 `CashWallet.reservedAmount`; SELL reserves owned quantity in
@@ -248,10 +210,10 @@ ranking refresh behavior remain unchanged.
 | Code | Status | Meaning |
 | --- | --- | --- |
 | `TRADING_ACCOUNT_NOT_ACTIVE` | 409 | account suspended/closed blocks new quotes/orders |
-| `TRADING_SCOPE_REPAIR_REQUIRED` | 500 | order/position row lacks account scope — run trading-accounts:repair-trading-scope |
-| `TRADING_ACCOUNT_SCOPE_MISMATCH` | 500 | order/position/quote scope disagrees with the participant link — investigate, never overwritten |
-| `FINANCIAL_SCOPE_REPAIR_REQUIRED` | 500 | wallet (or probed row) lacks account scope — run trading-accounts:repair-financial-scope / repair-trading-scope |
-| `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH` | 500 | wallet scope disagrees with the verified account |
+| `TRADING_SCOPE_REPAIR_REQUIRED` | 500 | defensive guard: an order/position lacks its required canonical account scope |
+| `TRADING_ACCOUNT_SCOPE_MISMATCH` | 500 | account-owned relations disagree (for example Order→Quote or Order→TradingAccount) |
+| `FINANCIAL_SCOPE_REPAIR_REQUIRED` | 500 | defensive guard: a wallet lacks its required canonical account scope |
+| `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH` | 500 | wallet/ledger/exchange relations disagree on the verified account |
 
 Legacy codes (`ORDER_NOT_FOUND`, `QUOTE_MISMATCH`,
 `ORDER_IDEMPOTENCY_CONFLICT`, `INSUFFICIENT_BALANCE`, market-hours codes,

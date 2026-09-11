@@ -55,17 +55,7 @@ async function main() {
     console.log(
       `  initial grant amount mismatch: ${summary.initialGrantsWithWrongAmount}`,
     );
-    console.log(
-      `general wallets with a season participant: ${summary.walletsWithSeasonParticipant}`,
-    );
-    console.log(
-      `general ledger rows with a season participant: ${summary.ledgerRowsWithSeasonParticipant}`,
-    );
-
     console.log('\ngeneral trading:');
-    console.log(
-      `  orders with a season participant: ${summary.generalOrdersWithSeasonParticipant}`,
-    );
     console.log(
       `  orders without a durable quote: ${summary.generalOrdersWithoutDurableQuote}`,
     );
@@ -73,16 +63,10 @@ async function main() {
       `  order/quote account mismatches: ${summary.generalOrderQuoteAccountMismatches}`,
     );
     console.log(
-      `  positions with a season participant: ${summary.generalPositionsWithSeasonParticipant}`,
-    );
-    console.log(
       `  positions with invalid reservation bounds: ${summary.generalPositionsWithInvalidReservation}`,
     );
     console.log(
       `  duplicate (account, asset) position groups: ${summary.duplicateGeneralPositionAccountAssetGroups}`,
-    );
-    console.log(
-      `  quotes with a season participant: ${summary.generalQuotesWithSeasonParticipant}`,
     );
     console.log(
       `  invalid limit-sell reservations: ${summary.invalidGeneralSellReservations}`,
@@ -92,18 +76,6 @@ async function main() {
     );
 
     console.log('\ngeneral FX:');
-    console.log(
-      `  exchanges with a season participant: ${summary.generalFxExchangesWithSeasonParticipant}`,
-    );
-    console.log(
-      `  execute requests with a season participant: ${summary.generalFxRequestsWithSeasonParticipant}`,
-    );
-    console.log(
-      `  quotes with a season participant: ${summary.generalFxQuotesWithSeasonParticipant}`,
-    );
-    console.log(
-      `  FX rows with invalid account scope: ${summary.generalFxRowsWithInvalidAccountScope}`,
-    );
     console.log(
       `  request/exchange account mismatches: ${summary.generalFxRequestExchangeAccountMismatches}`,
     );
@@ -139,12 +111,6 @@ async function main() {
       `  accounts with duplicate origins: ${summary.accountsWithDuplicatePerformanceOrigin}`,
     );
     console.log(
-      `  general snapshots with a season participant: ${summary.generalSnapshotsWithSeasonParticipant}`,
-    );
-    console.log(
-      `  snapshots with no scope at all: ${summary.generalSnapshotsWithoutAccountScope}`,
-    );
-    console.log(
       `  general snapshots missing performance values: ${summary.snapshotsMissingPerformanceValues}`,
     );
     console.log(
@@ -170,12 +136,6 @@ async function main() {
     );
     console.log(
       `  duplicate (account, date) daily snapshots: ${summary.duplicateAccountDateDailySnapshots}`,
-    );
-    console.log(
-      `  season snapshots without an account scope: ${summary.seasonSnapshotsWithoutAccountScope}`,
-    );
-    console.log(
-      `  season snapshots with a scope mismatch: ${summary.seasonSnapshotsWithScopeMismatch}`,
     );
 
     console.log('\nboundary order + funding continuity (작업 6·7 보완):');
@@ -205,9 +165,6 @@ async function main() {
     );
     console.log(
       `  boundary after-total mismatches: ${summary.boundaryPairsWithTotalAssetMismatch}`,
-    );
-    console.log(
-      `  general daily rows with a season participant: ${summary.generalDailySnapshotsWithSeasonParticipant}`,
     );
     console.log(
       `  general daily rows missing performance values: ${summary.generalDailySnapshotsMissingPerformanceValues}`,

@@ -24,10 +24,10 @@ export type FxExecuteRequestBodyLike = {
 
 export type FxExecuteRequestContextLike =
   | {
-      /** Omitted by existing callers to preserve the exact season v1 hash. */
       mode?: 'season';
       userId: string;
       seasonParticipantId: string;
+      tradingAccountId: string;
     }
   | {
       mode: 'general';
@@ -39,7 +39,7 @@ export type FxExecuteRequestContextLike =
 export type NormalizedFxExecuteRequest = {
   userId: string;
   seasonParticipantId: string | null;
-  tradingAccountId?: string | null;
+  tradingAccountId: string;
   quoteId: string;
   fromCurrency: FxExecuteCurrency;
   toCurrency: FxExecuteCurrency;
@@ -64,13 +64,10 @@ export function preflightFxExecuteRequest(
           context.seasonParticipantId,
           'seasonParticipantId',
         );
-  const tradingAccountId =
-    context.mode === 'general'
-      ? assertRequiredContextString(
-          context.tradingAccountId,
-          'tradingAccountId',
-        )
-      : null;
+  const tradingAccountId = assertRequiredContextString(
+    context.tradingAccountId,
+    'tradingAccountId',
+  );
 
   const idempotencyKey = parseIdempotencyKey(body.idempotencyKey);
 
@@ -123,7 +120,7 @@ export function preflightFxExecuteRequest(
     value: {
       userId,
       seasonParticipantId,
-      ...(tradingAccountId ? { tradingAccountId } : {}),
+      tradingAccountId,
       quoteId,
       fromCurrency: currencyPair.fromCurrency,
       toCurrency: currencyPair.toCurrency,

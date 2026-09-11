@@ -220,7 +220,7 @@ async function testConcurrentBuyOverspend() {
     assert.equal(
       await prisma.order.count({
         where: {
-          seasonParticipantId: scenario.participantId,
+          tradingAccountId: scenario.tradingAccountId,
           status: OrderStatus.executed,
         },
       }),
@@ -495,7 +495,6 @@ async function createScenario(label, options = {}) {
 
   await prisma.cashWallet.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: tradingAccount.id,
       currencyCode: CurrencyCode.KRW,
       balanceAmount: ZERO_AMOUNT,
@@ -505,7 +504,6 @@ async function createScenario(label, options = {}) {
 
   const usdWallet = await prisma.cashWallet.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: tradingAccount.id,
       currencyCode: CurrencyCode.USD,
       balanceAmount: options.walletBalance ?? '1000.00000000',
@@ -559,7 +557,6 @@ async function createScenario(label, options = {}) {
   if (options.positionQuantity) {
     await prisma.position.create({
       data: {
-        seasonParticipantId: participant.id,
         tradingAccountId: tradingAccount.id,
         assetId: asset.id,
         quantity: options.positionQuantity,
@@ -608,7 +605,6 @@ async function createSubmittedOrder(scenario, overrides = {}) {
   const quote = await prisma.quote.create({
     data: {
       userId: scenario.userId,
-      seasonParticipantId: scenario.participantId,
       tradingAccountId: scenario.tradingAccountId,
       quoteType: QuoteType.order,
       status: QuoteStatus.active,
@@ -627,6 +623,7 @@ async function createSubmittedOrder(scenario, overrides = {}) {
       requestHash: computeOrderQuoteRequestHash({
         userId: scenario.userId,
         seasonParticipantId: scenario.participantId,
+        tradingAccountId: scenario.tradingAccountId,
         assetId: scenario.assetId,
         side,
         orderType: OrderType.market,
@@ -639,7 +636,6 @@ async function createSubmittedOrder(scenario, overrides = {}) {
   });
   const order = await prisma.order.create({
     data: {
-      seasonParticipantId: scenario.participantId,
       tradingAccountId: scenario.tradingAccountId,
       assetId: scenario.assetId,
       quoteId: quote.id,
@@ -669,28 +665,28 @@ async function createSubmittedOrder(scenario, overrides = {}) {
 
 async function cleanupScenario(scenario) {
   await prisma.walletTransaction.deleteMany({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   await prisma.order.deleteMany({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   await prisma.quote.deleteMany({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   await prisma.position.deleteMany({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   await prisma.equitySnapshot.deleteMany({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   await prisma.dailyPortfolioSnapshot.deleteMany({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   await prisma.seasonRanking.deleteMany({
     where: { seasonParticipantId: scenario.participantId },
   });
   await prisma.cashWallet.deleteMany({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   await prisma.assetPriceSnapshot.deleteMany({
     where: { assetId: scenario.assetId },
@@ -716,8 +712,8 @@ async function readOrderMutationState(scenario) {
   });
   const position = await prisma.position.findUnique({
     where: {
-      seasonParticipantId_assetId: {
-        seasonParticipantId: scenario.participantId,
+      tradingAccountId_assetId: {
+        tradingAccountId: scenario.tradingAccountId,
         assetId: scenario.assetId,
       },
     },
@@ -731,10 +727,10 @@ async function readOrderMutationState(scenario) {
     orderStatus: order.status,
     ledgerCount: await countOrderLedgerRows(scenario),
     equitySnapshotCount: await prisma.equitySnapshot.count({
-      where: { seasonParticipantId: scenario.participantId },
+      where: { tradingAccountId: scenario.tradingAccountId },
     }),
     dailyPortfolioSnapshotCount: await prisma.dailyPortfolioSnapshot.count({
-      where: { seasonParticipantId: scenario.participantId },
+      where: { tradingAccountId: scenario.tradingAccountId },
     }),
     seasonRankingCount: await prisma.seasonRanking.count({
       where: { seasonParticipantId: scenario.participantId },
@@ -759,7 +755,7 @@ async function readRollbackProofState(scenario) {
 async function readOnlyOrderLedger(scenario) {
   const rows = await prisma.walletTransaction.findMany({
     where: {
-      seasonParticipantId: scenario.participantId,
+      tradingAccountId: scenario.tradingAccountId,
       referenceType: WalletTransactionReferenceType.order,
     },
   });
@@ -770,7 +766,7 @@ async function readOnlyOrderLedger(scenario) {
 async function countOrderLedgerRows(scenario) {
   return prisma.walletTransaction.count({
     where: {
-      seasonParticipantId: scenario.participantId,
+      tradingAccountId: scenario.tradingAccountId,
       referenceType: WalletTransactionReferenceType.order,
     },
   });
@@ -779,13 +775,13 @@ async function countOrderLedgerRows(scenario) {
 async function expectExecutionSnapshotCount(scenario, expected) {
   assert.equal(
     await prisma.equitySnapshot.count({
-      where: { seasonParticipantId: scenario.participantId },
+      where: { tradingAccountId: scenario.tradingAccountId },
     }),
     expected,
   );
   assert.equal(
     await prisma.dailyPortfolioSnapshot.count({
-      where: { seasonParticipantId: scenario.participantId },
+      where: { tradingAccountId: scenario.tradingAccountId },
     }),
     0,
   );

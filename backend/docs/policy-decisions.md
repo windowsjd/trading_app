@@ -2,6 +2,10 @@
 
 각 항목은 "결정 사항 + 한 줄 근거"만 기록한다. 조사/검토 과정, 후보 비교표, STOP/GO 이력 서술은 담지 않는다. 세부 구현(에러 코드, 필드명 등)은 코드와 `*-api-contract.md`를 기준으로 확인한다.
 
+> 2026-09-11 현재 account-owned 금융·거래·snapshot 행의 소유권은 required
+> `tradingAccountId` 하나다. 아래 작업 7·8의 nullable scope와 dual-write 설명은
+> 당시 rolling migration 결정 이력이며, 현행 계약으로 해석하지 않는다.
+
 ## Execute-Time Repricing (Durable Quote)
 
 - Quote TTL은 15초. 만료 시 `QUOTE_EXPIRED`.
@@ -178,8 +182,8 @@ OpsJobLockService + ops_job_locks다(Redis lock 아님). 실제 거래소 주문
 
 - 시즌모드와 일반모드는 하나의 사용자 계정을 공유하되 거래계정·지갑·주문·포지션·손익·스냅샷을 완전히 분리하고, 계정 간 자금·자산 이전은 지원하지 않는다.
   근거: 대회형 시즌 성과와 무기한 개인 투자 기록이 섞이면 랭킹·수익률 양쪽의 의미가 깨진다.
-- 공통 계정 계층은 `trading_accounts`(mode=season|general)이며 주문·포지션의 실질 격리 키는 `tradingAccountId`다. 시즌 행은 legacy participant를 함께 기록하고 일반 행은 participant가 null이다.
-  근거: 기존 시즌 관계를 보존하면서 일반계정 데이터를 participant 없이 완전히 분리해야 한다.
+- 공통 계정 계층은 `trading_accounts`(mode=season|general)이며 지갑·원장·환전·FX 요청·주문·포지션·견적·성과 스냅샷의 유일한 소유권/격리 키는 required `tradingAccountId`다. 시즌 정보가 필요하면 `TradingAccount → SeasonParticipant`로 조회하며 금융 행에 participant ID를 중복 저장하지 않는다.
+  근거: 계좌 소유권 source of truth를 하나로 유지하면서 SeasonParticipant는 시즌 참가·정책·결과 역할만 담당해야 한다.
 - 주문 코어는 검증된 `TradingContext`의 `feeRate`를 사용한다. 시즌은 `Season.tradeFeeRate`, 일반은 한 곳의 `GENERAL_TRADE_FEE_RATE`(미설정 기본 `0.001000`)를 사용하며 현재 시즌에서 일반 수수료를 가져오지 않는다.
   근거: 일반계정은 시즌 존재/상태와 독립적으로 거래해야 하고, 수수료 숫자가 주문 경로에 분산되면 quote/create/fill 사이에 불일치가 생긴다. 저장소에 별도 general canonical 값은 없었으므로, 기존 season/dev fixture가 일관되게 쓰는 가상거래 0.1%를 독립 기본값으로 채택했고 운영 override도 이 한 config만 사용한다.
 - general 시장가 durable quote는 quote 시점의 `GENERAL_TRADE_FEE_RATE`를 기존 `Quote.quotedFeeRate`에 고정하고 create/execute가 그 값을 사용한다. provider 가격은 기존처럼 execute-time repricing한다. 구버전의 null fee general market quote는 현재 config를 조용히 적용하지 않고 409 `QUOTE_MISMATCH`로 재견적한다. 시즌 시장가는 계속 `Season.tradeFeeRate`를 사용한다.
@@ -199,13 +203,9 @@ OpsJobLockService + ops_job_locks다(Redis lock 아님). 실제 거래소 주문
 
 ## TradingAccount Link Repair + Account Read API
 
-- `season_participants.trading_account_id`는 배포 경계(구버전 writer가 null 참가자를 생성) 동안 nullable을 유지하고, NOT NULL 강화는 "모든 writer 기록 + 복구 apply 완료 + null 0건 + 구버전 종료 + 배포 순서 확정"을 모두 확인한 별도 작업으로만 수행한다.
-  근거: 순단 없는 롤링 배포에서 스키마 강화를 먼저 하면 구버전 write가 통째로 실패한다.
-- null link 복구 계정의 ID는 migration backfill과 동일한 결정적 유도(`md5('trading-account:season-participant:'||id)::uuid`)를 애플리케이션에서도 재현해 사용하며, 랜덤 UUID 복구는 금지한다. 복구는 계정·링크만 만들고 지갑·원장·주문·포지션·스냅샷은 절대 수정하지 않으며, userId/mode/초기자금/openedAt 불일치는 덮어쓰지 않고 `TRADING_ACCOUNT_LINK_INTEGRITY`로 fail-closed 한다.
-  근거: 결정적 ID여야 동시 복구가 orphan 계정을 만들 수 없고, 불일치 자동 수정은 금융 데이터 손상을 은폐한다.
-- joinSeason은 기존 참가자의 null link를 같은 트랜잭션에서 복구한 뒤에도 기존 계약대로 409 `SEASON_ALREADY_JOINED`를 반환한다(복구는 commit, 409는 commit 후). 운영 일괄 복구는 `pnpm trading-accounts:repair-links`(기본 dry-run, `--apply` 명시 필수)로 수행한다.
-  근거: 복구를 위해 참가 API 응답 계약을 바꾸면 프런트 호환이 깨진다.
-- 운영자 참가자 제외는 같은 트랜잭션에서 연결 season 계정을 suspended로 동기화한다(null link면 먼저 복구, 이미 suspended면 idempotent, closed는 되돌리지 않음). finished/rewarded/settled 전환 시의 closed 동기화·suspended 재활성화는 시즌 lifecycle 격리 작업으로 미룬다.
+- `season_participants.trading_account_id`는 required+unique이며 participant와 season-mode account는 1:1이다. `repair-links`는 이 전환의 과거 배포 경계와 링크/status audit 절차를 위해 유지하지만, 현행 schema의 정상 writer는 null link를 만들 수 없다.
+  근거: SeasonParticipant의 시즌 도메인 정체성과 TradingAccount의 금융 소유권을 연결하되 두 역할을 합치지 않는다.
+- 운영자 참가자 제외는 같은 트랜잭션에서 연결 season 계정을 suspended로 동기화한다. 이미 suspended면 idempotent이고 closed 계정은 되돌리지 않는다.
   근거: 제외와 계정 정지가 다른 트랜잭션이면 부분 실패 시 상태가 갈라진다.
 - 거래계정 조회는 `GET /api/v1/trading-accounts`(목록)·`/:accountId`(상세)이며, 존재하지 않는 계정과 타인 소유 계정은 동일한 404 `TRADING_ACCOUNT_NOT_FOUND`로 응답한다(403 금지 — 존재 여부 노출 방지). status는 읽기 gate가 아니므로 소유자는 suspended/closed 계정도 조회할 수 있다.
   근거: 오류 코드가 존재 여부 oracle이 되면 계정 열거 공격이 가능해진다.
@@ -214,43 +214,35 @@ OpsJobLockService + ops_job_locks다(Redis lock 아님). 실제 거래소 주문
 
 ## Financial TradingAccount Scope (Wallet/Ledger/FX 전환)
 
-- 금융 4개 테이블(cash_wallets, wallet_transactions, exchange_transactions, fx_execute_requests)은 전환 기간 동안 nullable `seasonParticipantId`와 nullable `tradingAccountId`를 보유한다. 신규 season writer는 participant+account를 dual-write하고, general writer는 non-null account+null participant를 기록한다. season 참가자 링크가 null이면 새 금융 쓰기를 `TRADING_ACCOUNT_LINK_INTEGRITY`로 중단하며, general 행의 participant pollution은 `GENERAL_ACCOUNT_INTEGRITY`로 fail-closed한다.
-  근거: 기존 season 관계를 보존하면서 participant가 없는 general 자산을 같은 원장·환전 코어로 격리해야 한다. 손상 scope를 자동 추론하거나 복구하지 않는다.
-- WalletTransaction은 wallet 관계 유도 대신 자체 tradingAccountId 컬럼을 보유한다. TradingAccount에는 잔액·누적액·수익률류 캐시 컬럼을 두지 않는다(금융 값의 원천은 지갑·원장·거래 테이블).
-  근거: 계정별 원장 감사·집계는 조인 없이 조회 가능해야 하고, 캐시 컬럼은 원장과의 불일치 가능성만 만든다.
-- migration backfill은 참가자 링크 복사만 수행한다(IS NULL 가드, 멱등). 링크 없는 참가자의 금융 행은 null로 남기고 migration에서 계정을 만들거나 애플리케이션 복구를 재구현하지 않는다. 이후 정리는 `trading-accounts:repair-links --apply` → `trading-accounts:repair-financial-scope --apply` 순서로만 수행한다.
-  근거: SQL과 애플리케이션에 복구 규칙이 두 벌 있으면 반드시 어긋난다.
-- 복구 CLI(--apply)는 잔여 null·잔여 mismatch·행별 실패·검증 실패 중 하나라도 남으면 exit 1이다. 저장 scope가 참가자 링크와 다르면 `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`로 보고만 하고 절대 덮어쓰지 않는다. NOT NULL 강화는 두 CLI가 exit 0 + 잔여 0으로 끝난 후에만 검토한다.
-  근거: "오류 없이 끝남"과 "정합성 수렴"은 다르며, 자동 교정은 금융 데이터 손상을 은폐한다.
-- FX idempotency는 계정 기준 `(tradingAccountId, idempotencyKey)` unique가 기준이다. (2026-08-03 작업 5에서 개정) 전역 `(userId, idempotencyKey)` unique는 legacy null-scope 행만 보호하는 partial unique(`WHERE trading_account_id IS NULL`)로 교체되어, 같은 사용자가 서로 다른 계정에서 같은 키를 재사용할 수 있다. 신규 요청의 멱등성 기준은 legacy endpoint 포함 전부 계정이고, legacy null 행 replay는 같은 user+participant로 고정된 fallback으로만 허용한다.
-  근거: 계정이 자산 격리 경계인 이상 멱등성 경계도 계정이어야 하며, 교체는 partial 생성 → 전역 DROP 순서라 어느 시점에도 무보호 행이 없다.
+- `CashWallet`, `WalletTransaction`, `ExchangeTransaction`, `FxExecuteRequest`는 required `tradingAccountId`만 저장한다. child 관계(WalletTransaction→CashWallet, FxExecuteRequest→ExchangeTransaction)도 양쪽 account가 같아야 하며 request-time repair나 participant fallback은 없다.
+  근거: 금융 소유권을 participant에 중복 기록하면 두 식별자가 불일치할 수 있다.
+- TradingAccount에는 잔액·누적액·수익률 캐시 컬럼을 두지 않는다. 금융 값의 source of truth는 지갑·원장·거래·스냅샷 테이블이다.
+  근거: 캐시 ownership/value는 원장과의 불일치 가능성만 만든다.
+- FX idempotency는 `(tradingAccountId, idempotencyKey)` unique 하나로 보호한다. 과거 nullable-account 행을 위한 user partial unique와 participant replay fallback은 제거되었다.
+  근거: 계정이 자산 격리 경계인 이상 멱등성 경계도 계정이어야 한다.
 - account-scoped 환전 변경은 소유권(동일 404) + `TradingAccount.status=active` + mode별 context를 요구한다. season은 기존 Season.status·기간·participant status/excluded·`Season.tradeFeeRate`를 모두 유지하고, general은 season을 조회하지 않고 account foundation·KRW/USD wallet·general TWR 연속성을 검증한다. 조회는 mode/status와 무관하게 소유자에게 허용한다.
   근거: 계정 상태는 자산 변경 게이트일 뿐 시즌 거래 판정을 대체하지 않으며, general은 현재 시즌의 존재·상태와 독립적이어야 한다.
 - general FX 수수료는 `GENERAL_FX_FEE_RATE`에서만 결정하며 미설정 기본값은 `0.001000`이다(0~1, 소수 6자리 이하 startup validation). season의 `Season.fxFeeRate`나 general 주문의 `GENERAL_TRADE_FEE_RATE`와 섞지 않는다. general FX durable quote는 quote 시점 fee를 기존 `Quote.quotedFeeRate`에 pin하고 execute가 그 값만 쓴다. provider 환율은 체결 시 fresh snapshot으로 재가격하며 기존 30bps 한계를 유지한다. null/부적합 pinned fee는 현재 config로 fallback하지 않고 409 `QUOTE_MISMATCH`로 재견적한다.
   근거: rolling deploy·config 변경 중에도 표시된 수수료와 체결 원장이 같아야 하지만, 실행 시점 환율 freshness와 급변 보호는 약화하면 안 된다.
-- season FX quote/execute request hash v1은 byte-for-byte 유지한다. general FX는 participant 대신 user+`tradingAccountId`를 포함한 v2 hash를 사용하고, committed replay는 변경 가능한 status/integrity 게이트보다 먼저 재생한다. legacy null-scope fallback은 season user+participant에만 유지하고 general에서는 사용하지 않는다.
-  근거: 기존 season 멱등성 계약을 깨지 않으면서 같은 사용자의 여러 계정이 같은 key를 독립적으로 쓸 수 있어야 한다.
+- FX DB unique와 replay lookup은 account identity만 사용한다. general v2 hash도 account-bound다. 이미 발행된 season v1 quote/execute hash의 participant byte format은 active quote·committed replay 호환성을 위해 그대로 두되, 이를 row ownership 조회나 fallback에 사용하지 않는다.
+  근거: 해시 형식을 바꾸면 기존 미체결 지정가 주문과 완료된 FX 명령이 재배포 뒤 충돌하므로, 소유권 중복 제거와 불변 멱등 계약을 분리해야 한다.
 - general FX 체결은 account row `FOR UPDATE` 후 DB `clock_timestamp()`를 쓰고, 두 wallet·exchange·execute request·source/target ledger·`exchange_executed` ordinary TWR snapshot을 한 transaction에 기록한다. 환전은 external funding이 아니며 participant/ranking/season settlement를 변경하지 않는다.
   근거: 환전은 가치의 통화 구성만 바꾸므로 TWR 자금 유입 경계를 만들면 수익률이 왜곡된다. account lock은 주문·광고보상과의 snapshot 순서를 같은 fence로 직렬화한다.
-- legacy wallet/fx endpoint는 계약 그대로 유지하고 account-scoped endpoint와 같은 서비스 코드를 공유한다(수수료·환율·잔액 변경·원장·멱등·오류 코드·원자성 동일). 배포 순서는 migration → 신버전 → 구버전 종료 → repair-links → repair-financial-scope → 검증 0건 → (후속) NOT NULL.
+- legacy wallet/fx endpoint는 계약 그대로 유지하고 진입점에서 participant를 account로 resolve한 뒤 account-scoped endpoint와 같은 서비스 코드를 공유한다(수수료·환율·잔액 변경·원장·멱등·오류 코드·원자성 동일).
   근거: 환전 규칙이 두 벌 존재하는 순간부터 두 경로의 결과가 갈라진다.
 
 ## Trading TradingAccount Scope (Order/Position/Quote 전환)
 
-- Order·Position은 전환 기간 동안 nullable `seasonParticipantId`를 유지하고 `tradingAccountId`를 dual-write한다. 시즌 행은 두 scope를 모두 기록하며 일반 행은 participant가 null이다. Order는 `(tradingAccountId, idempotencyKey)` unique(+submittedAt/status 인덱스), Position은 `(tradingAccountId, assetId)` unique를 사용하고 기존 참가자 unique를 유지한다. Quote에는 신규 unique를 두지 않는다(status/consume가 단일 사용을 보장).
-  근거: 계정이 거래 데이터의 자산 격리 기준이 되려면 멱등성·집계 unique도 계정 축으로 존재해야 하고, 참가자 축 제거는 별도 작업이다.
-- 지갑을 변경하거나 지갑 잔액을 근거로 quote를 만드는 모든 경로는 wallet의 participant+account scope를 선검증하고, 원자적 잔액 UPDATE의 WHERE에도 `trading_account_id`를 포함한다. null scope는 500 `FINANCIAL_SCOPE_REPAIR_REQUIRED`(거래 중 자동 backfill 금지), 불일치는 500 `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`(덮어쓰기 금지)로 fail-closed 한다. 400류로 다루지 않는다.
+- Order·Position·Quote는 required `tradingAccountId`만 저장한다. Order는 `(tradingAccountId, idempotencyKey)`, Position은 `(tradingAccountId, assetId)` unique이며 Quote는 status/consume로 단일 사용을 보장한다.
+  근거: 거래 데이터의 소유권·멱등성·집계 unique를 같은 account 축으로 일치시킨다.
+- 지갑을 변경하거나 지갑 잔액을 근거로 quote를 만드는 모든 경로는 account scope를 검증하고 원자적 잔액 UPDATE의 WHERE에도 `trading_account_id`를 포함한다. 불일치는 500 integrity 오류로 fail-closed 한다.
   근거: 이는 클라이언트 입력 문제가 아니라 서버 정합성 손상이며, 어떤 계정의 지갑인지 거래가 결정하게 두면 손상이 확산된다.
-- account-scoped 조회(금융 4모델·주문·포지션)는 시즌 참가자의 null/불일치 scope 또는 일반 행의 participant 오염이 존재하면 빈·부분 결과 대신 구조화 500으로 실패한다. 정상 general 행은 participant 없이 account scope만 가진다.
-  근거: 복구 미완료 상태를 "정상적으로 빈 계정"으로 보여 주는 것이 가장 위험한 침묵 실패다.
-- Quote는 자산을 직접 바꾸지 않지만 실행 권한을 제공하므로 계정 격리 대상이다: 신규 quote는 검증된 accountId를 기록하고, 실행 시 non-null quote 계정이 다르면 `QUOTE_MISMATCH`, 소비는 `id+status+participant+(계정 일치 OR null)` 조건의 updateMany로만 한다. requestHash 계산식은 교체하지 않는다.
+- Quote는 자산을 직접 바꾸지 않지만 실행 권한을 제공하므로 계정 격리 대상이다. 신규 quote는 검증된 accountId를 기록하고 실행·소비 시 같은 account인지 검증한다.
   근거: 저장된 scope 검증만으로 계정 격리가 완성되며, hash 전면 교체는 미소비 legacy quote와 replay 계약을 깨뜨린다.
-- 지정가 자동 체결은 체결 트랜잭션 안에서 order/participant/quote/wallet/position의 계정 일치를 재검증한다. 계정 suspended/closed는 skip(주문 submitted 유지, 자동 취소 없음), scope 손상은 구조화된 500(다음 사이클 재시도가 운영 신호). 취소는 보호 동작이라 계정/참가자 status로 gate하지 않되 scope 손상 시 repair-required로 중단하고 상태·예약금이 함께 rollback 된다.
+- 지정가 자동 체결은 체결 트랜잭션 안에서 order/account/quote/wallet/position의 계정 일치를 재검증하고 시즌 정책은 account의 SeasonParticipant relation으로 확인한다. 계정 suspended/closed는 skip하며 취소는 보호 동작이라 상태로 gate하지 않는다.
   근거: 체결은 로그인 요청이 없어 relation이 유일한 권위이고, 취소 차단은 사용자를 처벌할 뿐 위험을 줄이지 않지만 잘못된 계정의 예약금 반환은 자산 이동이다.
-- 운영 복구는 3단 구성이다: repair-links(참가자↔계정) → repair-financial-scope(금융 4모델) → repair-trading-scope(Order·Position·Quote). 셋 다 기본 dry-run, `--apply` 명시, IS NULL 가드 backfill만, mismatch는 보고만, apply 후 잔여가 있으면 exit 1. participant 없는 quote는 계정을 추측하지 않고 `QUOTE_PARTICIPANT_SCOPE_MISSING`으로 보고한다.
-  근거: 복구 단계가 의존 순서를 갖고(계정 링크 없이는 어떤 backfill도 불가), 추측 backfill은 잘못된 계정 귀속이라는 최악의 손상을 만든다.
-- EquitySnapshot·DailyPortfolioSnapshot·SeasonRanking의 accountId 전환과 tradingAccountId NOT NULL 강화·seasonParticipantId 제거는 후속 작업으로 보류한다.
-  근거: 스냅샷은 랭킹·정산과 얽혀 있어 별도 검증 단위가 필요하고, NOT NULL은 구버전 writer 완전 종료 + 복구 수렴 증빙 없이는 롤링 배포를 깨뜨린다.
+- EquitySnapshot·DailyPortfolioSnapshot도 required account-only ownership이다. SeasonRanking은 시즌 랭킹 대상 자체를 식별하므로 `seasonParticipantId`를 유지하고 계산 portfolio의 `tradingAccountId`도 함께 검증한다.
+  근거: snapshot은 금융 이력이고 ranking은 시즌 결과 도메인이므로 같은 이름만 보고 participant relation을 일괄 제거하지 않는다.
 
 ## 작업 5 보완 (취소 scope 분류 / 시장가 replay / 지갑 실패 진단)
 

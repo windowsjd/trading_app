@@ -315,7 +315,6 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
     prisma.asset.findUnique.mockResolvedValueOnce(input.asset ?? krxAsset);
     prisma.cashWallet.findUnique.mockResolvedValueOnce({
       id: 'wallet-1',
-      seasonParticipantId: 'sp-1',
       tradingAccountId: 'trading-account-1',
       balanceAmount: new Prisma.Decimal(input.balance ?? '1000000.00000000'),
       reservedAmount: new Prisma.Decimal(input.reserved ?? '0'),
@@ -323,7 +322,6 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
     prisma.position.findUnique.mockResolvedValueOnce(
       input.positionQuantity
         ? {
-            seasonParticipantId: 'sp-1',
             tradingAccountId: 'trading-account-1',
             quantity: new Prisma.Decimal(input.positionQuantity),
           }
@@ -410,6 +408,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
             requestHash: computeOrderQuoteRequestHash({
               userId: 'user-1',
               seasonParticipantId: 'sp-1',
+              tradingAccountId: 'trading-account-1',
               assetId: 'asset-1',
               side: 'buy',
               orderType: 'limit',
@@ -426,6 +425,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       const base = {
         userId: 'user-1',
         seasonParticipantId: 'sp-1',
+        tradingAccountId: 'trading-account-1',
         assetId: 'asset-1',
         side: 'buy',
         quantity: '3.000000',
@@ -585,7 +585,6 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       });
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
         id: 'wallet-1',
-        seasonParticipantId: 'sp-1',
         tradingAccountId: 'trading-account-1',
         balanceAmount: new Prisma.Decimal('1000000.00000000'),
         reservedAmount: new Prisma.Decimal('0'),
@@ -633,7 +632,6 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       overrides: Partial<Record<string, unknown>> = {},
     ) => ({
       id: 'quote-limit-1',
-      seasonParticipantId: 'sp-1',
       tradingAccountId: 'trading-account-1',
       status: 'active',
       assetId: 'asset-1',
@@ -655,6 +653,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       requestHash: computeOrderQuoteRequestHash({
         userId: 'user-1',
         seasonParticipantId: 'sp-1',
+        tradingAccountId: 'trading-account-1',
         assetId: 'asset-1',
         side: 'buy',
         orderType: 'limit',
@@ -737,7 +736,6 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       prisma.asset.findUnique.mockResolvedValueOnce(krxAsset); // tradable check
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
         id: 'wallet-1',
-        seasonParticipantId: 'sp-1',
         tradingAccountId: 'trading-account-1',
       });
       prisma.$executeRaw
@@ -769,24 +767,15 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         duplicate: false,
       });
 
-      // Atomic reservation through the raw guard (values:
-      // [amount, walletId, participantId, tradingAccountId, currency, amount]).
-      expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
+      // Atomic reservation through the account-scoped raw guard.
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
       expect((prisma.$executeRaw.mock.calls[0] as unknown[]).slice(1)).toEqual([
         '150150.00000000',
         'wallet-1',
-        'sp-1',
         'trading-account-1',
         CurrencyCode.KRW,
         '150150.00000000',
       ]);
-      expect((prisma.$executeRaw.mock.calls[1] as unknown[]).slice(1)).toEqual([
-        krxOpenAt,
-        'quote-limit-1',
-        'sp-1',
-        'trading-account-1',
-      ]);
-
       // Order row stores the reservation bookkeeping.
       expect(prisma.order.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -802,9 +791,14 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         }),
       );
 
-      // Season quote consumption is the second account-conditioned raw call
-      // asserted above; the general-account Prisma branch is not used here.
-      expect(prisma.quote.updateMany).not.toHaveBeenCalled();
+      expect(prisma.quote.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'quote-limit-1',
+          status: 'active',
+          tradingAccountId: 'trading-account-1',
+        },
+        data: { status: 'consumed', consumedAt: krxOpenAt },
+      });
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
 
       // Phase 1 forbidden effects: no debit, no ledger, no position, no
@@ -1021,6 +1015,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
           requestHash: computeOrderQuoteRequestHash({
             userId: 'user-1',
             seasonParticipantId: 'sp-1',
+            tradingAccountId: 'trading-account-1',
             assetId: 'asset-1',
             side: 'buy',
             orderType: 'limit',
@@ -1033,7 +1028,6 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       prisma.asset.findUnique.mockResolvedValueOnce(krxAsset);
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
         id: 'wallet-1',
-        seasonParticipantId: 'sp-1',
         tradingAccountId: 'trading-account-1',
       });
       prisma.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(1);
@@ -1062,7 +1056,6 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       prisma.asset.findUnique.mockResolvedValueOnce(krxAsset);
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
         id: 'wallet-1',
-        seasonParticipantId: 'sp-1',
         tradingAccountId: 'trading-account-1',
       });
       prisma.$executeRaw.mockResolvedValueOnce(1);
@@ -1088,7 +1081,6 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       prisma.asset.findUnique.mockResolvedValueOnce(krxAsset);
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
         id: 'wallet-1',
-        seasonParticipantId: 'sp-1',
         tradingAccountId: 'trading-account-1',
       });
       prisma.$executeRaw.mockResolvedValueOnce(0);
@@ -1126,10 +1118,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             quoteId: 'quote-limit-1',
-            OR: [
-              { seasonParticipant: { userId: 'user-1' } },
-              { tradingAccount: { userId: 'user-1' } },
-            ],
+            tradingAccount: { userId: 'user-1' },
           }) as never,
         }),
       );
@@ -1156,9 +1145,8 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       },
     );
 
-    // A market request on the same key never reaches the limit path; it is
-    // resolved by the participant-scoped market lookup, which still needs the
-    // season and participant reads.
+    // A market request on the same key never reaches the limit path. The
+    // account-scoped lookup still reads the participant for season policy.
     it('conflicts when the same idempotency key is reused with a different orderType', async () => {
       const { prisma, service } = createService();
       prisma.season.findFirst.mockResolvedValueOnce(activeSeason);
@@ -1352,10 +1340,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             quoteId: 'quote-limit-1',
-            OR: [
-              { seasonParticipant: { userId: 'user-1' } },
-              { tradingAccount: { userId: 'user-1' } },
-            ],
+            tradingAccount: { userId: 'user-1' },
           }) as never,
         }),
       );

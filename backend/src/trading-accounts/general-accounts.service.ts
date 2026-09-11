@@ -150,7 +150,6 @@ export class GeneralAccountsService {
       // trading account.
       const krwWallet = await tx.cashWallet.create({
         data: {
-          seasonParticipantId: null,
           tradingAccountId: account.id,
           currencyCode: CurrencyCode.KRW,
           balanceAmount: GENERAL_ACCOUNT_INITIAL_CAPITAL_KRW,
@@ -161,7 +160,6 @@ export class GeneralAccountsService {
 
       await tx.cashWallet.create({
         data: {
-          seasonParticipantId: null,
           tradingAccountId: account.id,
           currencyCode: CurrencyCode.USD,
           balanceAmount: GENERAL_ACCOUNT_INITIAL_USD_BALANCE,
@@ -175,7 +173,6 @@ export class GeneralAccountsService {
       // pathological double-write cannot double-grant.
       await tx.walletTransaction.create({
         data: {
-          seasonParticipantId: null,
           tradingAccountId: account.id,
           walletId: krwWallet.id,
           currencyCode: CurrencyCode.KRW,

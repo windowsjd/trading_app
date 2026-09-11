@@ -305,9 +305,6 @@ jobs:
         run: |
           set -e
           pnpm run trading-accounts:repair-links
-          pnpm run trading-accounts:repair-financial-scope
-          pnpm run trading-accounts:repair-trading-scope
-          pnpm run trading-accounts:repair-snapshot-scope
           pnpm run trading-accounts:repair-ranking-scope
           pnpm run trading-accounts:audit-general
 

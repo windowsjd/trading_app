@@ -78,7 +78,6 @@ function boundary(overrides: {
   totalAssetKrw: string;
   cumulativeExternalFundingKrw: string;
   tradingAccountId?: string | null;
-  seasonParticipantId?: string | null;
   externalFundingAmountKrw?: string | null;
   externalFundingReferenceType?: string;
   timeWeightedReturnFactor?: string;
@@ -90,7 +89,6 @@ function boundary(overrides: {
 
   return {
     id: `snapshot-${overrides.reason}`,
-    seasonParticipantId: overrides.seasonParticipantId ?? null,
     tradingAccountId:
       overrides.tradingAccountId === undefined
         ? ACCOUNT_ID
@@ -254,23 +252,6 @@ describe('keyed granted claim boundary integrity', () => {
       totalAssetKrw: '10050000',
       cumulativeExternalFundingKrw: '10050000',
       tradingAccountId: 'other-account',
-    });
-    const { client: db } = client(rows);
-
-    expect(
-      await expectRejectionCode(
-        assertKeyedGrantedClaimBoundaryIntegrity(db, grantedClaim()),
-      ),
-    ).toBe('AD_REWARD_CLAIM_INTEGRITY');
-  });
-
-  it('refuses a boundary row that carries a season participant', async () => {
-    const rows = healthyPair();
-    rows[0] = boundary({
-      reason: 'external_funding_before',
-      totalAssetKrw: '10000000',
-      cumulativeExternalFundingKrw: '10000000',
-      seasonParticipantId: 'participant-1',
     });
     const { client: db } = client(rows);
 

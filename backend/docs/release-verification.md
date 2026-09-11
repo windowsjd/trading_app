@@ -153,19 +153,28 @@ quote succeeded.
 ```bash
 cd backend
 pnpm run trading-accounts:repair-links
-pnpm run trading-accounts:repair-financial-scope
-pnpm run trading-accounts:repair-trading-scope
-pnpm run trading-accounts:repair-snapshot-scope
 pnpm run trading-accounts:repair-ranking-scope
 pnpm run trading-accounts:audit-general
 ```
 
 Bare invocation is a dry-run; writes require `--apply`. Findings 0 with exit 0
-is the expected result on a healthy database. **A clean database proves only
-half of it** — that these tools say "0" when there is nothing wrong. The other
-half, that they say something when there IS, is covered by the damage-injection
-integration suites (`snapshot-scope-audit`, `trading-account-*-scope`,
-`general-account`), and that is the half worth trusting.
+is the expected result on a healthy database. The retired financial, trading,
+and snapshot scope repair tools targeted nullable account scope and redundant
+participant columns that no longer exist. Their replacement is the fail-closed
+preflight in the forward removal migration plus account-only integration
+coverage. Damage detection for the retained link, ranking, and general-account
+contracts remains covered by the corresponding integration suites.
+
+### Participant ownership removal rollout
+
+`20260911120000_remove_legacy_financial_participant_scope` is a destructive
+schema cleanup even though it changes no row values. The account-only runtime
+is backward-compatible with the immediately preceding schema because the old
+participant columns are nullable. Deploy that runtime first, drain every old
+web/worker process that can still read or write those columns, and only then
+apply the migration. Do not run the migration while an old binary remains
+live. Afterward, verify `prisma migrate status`, schema drift, the migration's
+identifier audit, and the account integration suites before reopening writes.
 
 ## CI mapping
 
@@ -182,8 +191,8 @@ integration suites (`snapshot-scope-audit`, `trading-account-*-scope`,
 
 1. `prisma migrate status` — no unapplied migrations.
 2. `prisma migrate diff --exit-code` — 0.
-3. Repair ×5 + `audit-general` dry-run — findings 0. If any are non-zero, stop:
-   apply is a decision, not a step.
+3. Retained repair tools ×2 + `audit-general` dry-run — findings 0. If any are
+   non-zero, stop: apply is a decision, not a step.
 4. Backend gates green; core account integration green; canonical e2e green.
 5. Frontend lint (scoped) + typecheck + tests + web export green.
 6. Deploy backend, then frontend.

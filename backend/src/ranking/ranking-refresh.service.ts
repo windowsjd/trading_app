@@ -289,7 +289,6 @@ export class RankingRefreshService {
       orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
       select: {
         id: true,
-        seasonParticipantId: true,
         tradingAccountId: true,
         cumulativeExternalFundingKrw: true,
         investmentPnlKrw: true,
@@ -398,9 +397,6 @@ export class RankingRefreshService {
 
           await tx.equitySnapshot.create({
             data: {
-              seasonParticipantId: valuation.participant.id,
-              // Legacy participant identity remains dual-written; ownership
-              // is the already-verified account used for valuation.
               tradingAccountId: valuation.participant.tradingAccountId,
               totalAssetKrw: valuation.totalAssetKrw,
               returnRate: valuation.returnRate,

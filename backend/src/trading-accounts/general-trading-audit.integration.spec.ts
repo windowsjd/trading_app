@@ -142,46 +142,6 @@ async function main() {
     const accountId = await openGeneral(ownerId);
     const otherAccountId = await openGeneral(otherUserId);
 
-    const season = await prisma.season.create({
-      data: {
-        name: 'general-trading-audit-' + randomUUID(),
-        status: 'active',
-        startAt: new Date(Date.now() - 60_000),
-        endAt: new Date(Date.now() + 86_400_000),
-        initialCapitalKrw: '10000000',
-        tradeFeeRate: '0.001',
-        fxFeeRate: '0.001',
-      },
-      select: { id: true },
-    });
-    created.seasonIds.push(season.id);
-    const seasonAccount = await prisma.tradingAccount.create({
-      data: {
-        userId: ownerId,
-        mode: 'season',
-        status: 'active',
-        initialCapitalKrw: '10000000',
-        openedAt: new Date(),
-      },
-      select: { id: true },
-    });
-    created.accountIds.push(seasonAccount.id);
-    const participant = await prisma.seasonParticipant.create({
-      data: {
-        seasonId: season.id,
-        userId: ownerId,
-        tradingAccountId: seasonAccount.id,
-        joinedAt: new Date(),
-        participantStatus: 'active',
-        initialCapitalKrw: '10000000',
-        totalAssetKrw: '10000000',
-        totalReturnRate: '0',
-        maxDrawdown: '0',
-      },
-      select: { id: true },
-    });
-    created.participantIds.push(participant.id);
-
     const asset = await prisma.asset.create({
       data: {
         symbol: 'GTA' + randomUUID().replace(/-/gu, '').slice(0, 16).toUpperCase(),
@@ -200,7 +160,6 @@ async function main() {
       data: {
         userId: ownerId,
         tradingAccountId: accountId,
-        seasonParticipantId: null,
         quoteType: 'order',
         status: 'consumed',
         assetId: asset.id,
@@ -226,7 +185,6 @@ async function main() {
     const position = await prisma.position.create({
       data: {
         tradingAccountId: accountId,
-        seasonParticipantId: null,
         assetId: asset.id,
         quantity: '10',
         reservedQuantity: '3',
@@ -240,7 +198,6 @@ async function main() {
     const order = await prisma.order.create({
       data: {
         tradingAccountId: accountId,
-        seasonParticipantId: null,
         quoteId: quote.id,
         assetId: asset.id,
         side: 'sell',
@@ -279,7 +236,7 @@ async function main() {
     created.fxRateSnapshotIds.push(fxSnapshot.id);
     const fxQuote = await prisma.quote.create({
       data: {
-        userId: ownerId, tradingAccountId: accountId, seasonParticipantId: null,
+        userId: ownerId, tradingAccountId: accountId,
         quoteType: 'fx', status: 'consumed', fromCurrency: 'KRW', toCurrency: 'USD',
         sourceAmount: '1350', targetAmount: '0.999', quotedRate: '1350',
         quotedFeeRate: '0.001', fxRateSnapshotId: fxSnapshot.id,
@@ -291,7 +248,7 @@ async function main() {
     created.quoteIds.push(fxQuote.id);
     const exchange = await prisma.exchangeTransaction.create({
       data: {
-        tradingAccountId: accountId, seasonParticipantId: null,
+        tradingAccountId: accountId,
         fxRateSnapshotId: fxSnapshot.id, fromCurrency: 'KRW', toCurrency: 'USD',
         sourceAmount: '1350', grossTargetAmount: '1', feeRate: '0.001',
         feeAmount: '0.001', feeCurrency: 'USD', appliedRate: '1350',
@@ -303,14 +260,14 @@ async function main() {
     await prisma.walletTransaction.createMany({
       data: [
         {
-          tradingAccountId: accountId, seasonParticipantId: null,
+          tradingAccountId: accountId,
           walletId: krwWallet.id, currencyCode: 'KRW', direction: 'debit',
           txType: 'exchange_source', referenceType: 'exchange_transaction',
           referenceId: exchange.id, amount: '1350',
           balanceAfter: krwWallet.balanceAmount.sub('1350'), occurredAt: new Date(),
         },
         {
-          tradingAccountId: accountId, seasonParticipantId: null,
+          tradingAccountId: accountId,
           walletId: usdWallet.id, currencyCode: 'USD', direction: 'credit',
           txType: 'exchange_target', referenceType: 'exchange_transaction',
           referenceId: exchange.id, amount: '0.999', balanceAfter: '0.999',
@@ -320,7 +277,7 @@ async function main() {
     });
     const fxRequest = await prisma.fxExecuteRequest.create({
       data: {
-        userId: ownerId, tradingAccountId: accountId, seasonParticipantId: null,
+        userId: ownerId, tradingAccountId: accountId,
         idempotencyKey: 'audit-fx-' + randomUUID(), requestHash: 'audit-fx-' + randomUUID(),
         fromCurrency: 'KRW', toCurrency: 'USD', sourceAmount: '1350',
         status: 'succeeded', exchangeTransactionId: exchange.id,
@@ -333,42 +290,10 @@ async function main() {
     const clean = await auditGeneralAccounts(prisma);
     assert.equal(clean.findings.length, 0, JSON.stringify(clean.findings));
     assert.equal(resolveGeneralAccountAuditExitCode(clean), 0);
-
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { seasonParticipantId: participant.id },
-    });
-    await assertFinding('GENERAL_ORDER_HAS_SEASON_PARTICIPANT', () =>
-      prisma.order.findUniqueOrThrow({ where: { id: order.id } }),
+    const participantColumns = await prisma.$queryRawUnsafe(
+      "SELECT table_name FROM information_schema.columns WHERE table_schema = 'public' AND column_name = 'season_participant_id' AND table_name IN ('orders', 'positions', 'quotes', 'exchange_transactions', 'fx_execute_requests')",
     );
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { seasonParticipantId: null },
-    });
-
-    await prisma.position.update({
-      where: { id: position.id },
-      data: { seasonParticipantId: participant.id },
-    });
-    await assertFinding('GENERAL_POSITION_HAS_SEASON_PARTICIPANT', () =>
-      prisma.position.findUniqueOrThrow({ where: { id: position.id } }),
-    );
-    await prisma.position.update({
-      where: { id: position.id },
-      data: { seasonParticipantId: null },
-    });
-
-    await prisma.quote.update({
-      where: { id: quote.id },
-      data: { seasonParticipantId: participant.id },
-    });
-    await assertFinding('GENERAL_QUOTE_HAS_SEASON_PARTICIPANT', () =>
-      prisma.quote.findUniqueOrThrow({ where: { id: quote.id } }),
-    );
-    await prisma.quote.update({
-      where: { id: quote.id },
-      data: { seasonParticipantId: null },
-    });
+    assert.deepEqual(participantColumns, []);
 
     await prisma.order.update({
       where: { id: order.id },
@@ -416,36 +341,6 @@ async function main() {
     await prisma.position.update({
       where: { id: position.id },
       data: { reservedQuantity: '3' },
-    });
-
-    await prisma.exchangeTransaction.update({
-      where: { id: exchange.id }, data: { seasonParticipantId: participant.id },
-    });
-    await assertFinding('GENERAL_FX_EXCHANGE_HAS_SEASON_PARTICIPANT', () =>
-      prisma.exchangeTransaction.findUniqueOrThrow({ where: { id: exchange.id } }),
-    );
-    await prisma.exchangeTransaction.update({
-      where: { id: exchange.id }, data: { seasonParticipantId: null },
-    });
-
-    await prisma.fxExecuteRequest.update({
-      where: { id: fxRequest.id }, data: { seasonParticipantId: participant.id },
-    });
-    await assertFinding('GENERAL_FX_REQUEST_HAS_SEASON_PARTICIPANT', () =>
-      prisma.fxExecuteRequest.findUniqueOrThrow({ where: { id: fxRequest.id } }),
-    );
-    await prisma.fxExecuteRequest.update({
-      where: { id: fxRequest.id }, data: { seasonParticipantId: null },
-    });
-
-    await prisma.quote.update({
-      where: { id: fxQuote.id }, data: { seasonParticipantId: participant.id },
-    });
-    await assertFinding('GENERAL_FX_QUOTE_HAS_SEASON_PARTICIPANT', () =>
-      prisma.quote.findUniqueOrThrow({ where: { id: fxQuote.id } }),
-    );
-    await prisma.quote.update({
-      where: { id: fxQuote.id }, data: { seasonParticipantId: null },
     });
 
     await prisma.fxExecuteRequest.update({

@@ -13,7 +13,7 @@
  *
  * 2. SCOPE. The lookup was `(seasonParticipant.userId, idempotencyKey)`
  *    ordered newest-first, while the only uniqueness the database enforces is
- *    `(seasonParticipantId, idempotencyKey)`. A key reused in a later season —
+ *    `(tradingAccountId, idempotencyKey)`. A key reused in a later season —
  *    which the schema permits — made the season-1 retry resolve to the
  *    season-2 order and answer ORDER_IDEMPOTENCY_CONFLICT, even though both
  *    requests were individually valid. The lookup is now keyed on the (unique)
@@ -413,7 +413,7 @@ async function assertNoExtraCommit(
   expectedOrders: number,
 ): Promise<void> {
   const count = await prisma.order.count({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   assert.equal(
     count,
@@ -543,7 +543,6 @@ async function createScenario(
 
   const wallet = await prisma.cashWallet.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: tradingAccount.id,
       currencyCode: CurrencyCode.KRW,
       balanceAmount: '1000000.00000000',
@@ -586,7 +585,6 @@ async function createLimitQuote(scenario: Scenario): Promise<string> {
   const quote = await prisma.quote.create({
     data: {
       userId: scenario.userId,
-      seasonParticipantId: scenario.participantId,
       tradingAccountId: scenario.tradingAccountId,
       quoteType: QuoteType.order,
       status: QuoteStatus.active,
@@ -606,6 +604,7 @@ async function createLimitQuote(scenario: Scenario): Promise<string> {
       requestHash: computeOrderQuoteRequestHash({
         userId: scenario.userId,
         seasonParticipantId: scenario.participantId,
+        tradingAccountId: scenario.tradingAccountId,
         assetId: scenario.assetId,
         side: 'buy',
         orderType: 'limit',
@@ -636,17 +635,23 @@ function createBody(
 }
 
 async function cleanup(): Promise<void> {
+  const tradingAccountIds = (
+    await prisma.tradingAccount.findMany({
+      where: { userId: { in: createdUserIds } },
+      select: { id: true },
+    })
+  ).map((row) => row.id);
   await prisma.order.deleteMany({
-    where: { seasonParticipantId: { in: createdParticipantIds } },
+    where: { tradingAccountId: { in: tradingAccountIds } },
   });
   await prisma.quote.deleteMany({
-    where: { seasonParticipantId: { in: createdParticipantIds } },
+    where: { tradingAccountId: { in: tradingAccountIds } },
   });
   await prisma.walletTransaction.deleteMany({
-    where: { seasonParticipantId: { in: createdParticipantIds } },
+    where: { tradingAccountId: { in: tradingAccountIds } },
   });
   await prisma.cashWallet.deleteMany({
-    where: { seasonParticipantId: { in: createdParticipantIds } },
+    where: { tradingAccountId: { in: tradingAccountIds } },
   });
   await prisma.seasonParticipant.deleteMany({
     where: { id: { in: createdParticipantIds } },

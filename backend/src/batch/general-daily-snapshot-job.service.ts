@@ -288,7 +288,6 @@ export class GeneralDailySnapshotJobService {
 
         const equity = await tx.equitySnapshot.create({
           data: {
-            seasonParticipantId: null,
             tradingAccountId: account.id,
             totalAssetKrw: values.totalAssetKrw,
             returnRate: values.returnRate,
@@ -392,9 +391,6 @@ export class GeneralDailySnapshotJobService {
     capturedAt: Date;
   }): Prisma.DailyPortfolioSnapshotUncheckedCreateInput {
     return {
-      // A general daily row has no participant, ever. The season job's rows
-      // are untouched by this writer.
-      seasonParticipantId: null,
       tradingAccountId: input.accountId,
       snapshotDate: input.snapshotDate,
       totalAssetKrw: input.values.totalAssetKrw,

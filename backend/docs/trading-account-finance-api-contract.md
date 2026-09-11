@@ -68,22 +68,17 @@ current server contract.
   exist yet returns an empty `wallets` array (`summary.totalWallets = 0`).
 - Rows are scoped by the financial rows' own `tradingAccountId` (never by a
   client-provided participant id); no other account's rows can appear.
-- Season-account read integrity (작업 5 보완): before returning, the service
-  probes the linked participant's CashWallet / WalletTransaction (including
-  the linked wallet's scope) / ExchangeTransaction / FxExecuteRequest rows
-  for NULL or mismatched `tradingAccountId` with indexed existence queries.
-  Any anomaly fails closed with 500 `FINANCIAL_SCOPE_REPAIR_REQUIRED`
-  (null — run `pnpm trading-accounts:repair-financial-scope`) or 500
-  `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH` (non-null mismatch) instead of
-  presenting a partial/empty result as a normally-empty account.
-- General-account read integrity (작업 6): a general account has no
-  participant, so the season probe does not apply. The read asserts the
-  INVERSE instead — no wallet and no ledger row of this account may carry a
-  `seasonParticipantId`, and no ledger row may point at another account's
-  wallet. A violation is 500 `GENERAL_ACCOUNT_INTEGRITY`. A genuinely empty
-  general account (none exists after the one-time grant, but a future state
-  could) still returns a normal empty response, and a GET never creates a
-  wallet, account, or grant.
+- Account-owned financial rows have one required ownership key:
+  `tradingAccountId`. Before returning, the service rejects a ledger row whose
+  wallet belongs to another account and an FX execute request whose exchange
+  transaction belongs to another account. A disagreement fails closed with
+  500 `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`; no request-time repair or
+  participant-derived fallback exists.
+- General-account reads additionally validate the fixed two-wallet and initial
+  grant foundation. A broken participant link on a general account, missing
+  wallet/grant, or cross-account child relation is 500
+  `GENERAL_ACCOUNT_INTEGRITY`. A GET never creates a wallet, account, grant,
+  or repairs ownership.
 
 `GET .../wallets` response data:
 
@@ -184,19 +179,15 @@ cannot consume cash reserved by a submitted limit buy. No wallet or account is
 created during quote or execute, and KRW→USD is never performed implicitly by
 an order.
 
-Quote and execute both verify the wallets used (quote: source; execute:
-source and target) carry the verified account scope. Season keeps
-`FINANCIAL_SCOPE_REPAIR_REQUIRED`,
-`FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`, and
-`TRADING_ACCOUNT_LINK_INTEGRITY` behavior. General requires non-null matching
-`tradingAccountId` and null participant on its financial/FX rows; pollution or
-cross-account relations fail closed as `GENERAL_ACCOUNT_INTEGRITY`. Every
-balance UPDATE includes wallet id, account, currency, mode-appropriate
-participant scope, and amount guard.
+Quote and execute both verify the wallets used (quote: source; execute: source
+and target) carry the verified account scope. Cross-account relations fail
+closed with the existing integrity codes. Every balance UPDATE includes wallet
+id, account, currency, and amount guard; participant scope is not stored or
+used as a fallback.
 
-General durable quotes store `tradingAccountId=<general account>`,
-`seasonParticipantId=null`, and the quote-time `GENERAL_FX_FEE_RATE` in
-`quotedFeeRate`. The default is `0.001000`; configuration is validated at
+General durable quotes store `tradingAccountId=<general account>` and the
+quote-time `GENERAL_FX_FEE_RATE` in `quotedFeeRate`. The default is `0.001000`;
+configuration is validated at
 startup and is independent of both `Season.fxFeeRate` and
 `GENERAL_TRADE_FEE_RATE`. Execute uses only the pinned fee. A legacy/null or
 invalid general pinned fee returns 409 `QUOTE_MISMATCH` for requote instead of
@@ -211,37 +202,29 @@ change.
   `(tradingAccountId, idempotencyKey)`: replaying the same key on the same
   account returns the stored result without further mutation; a different
   request under the same key is the idempotency conflict.
-- The SAME user may now reuse one key across two of their own accounts (and
-  different users always could): the former global
-  `UNIQUE(user_id, idempotency_key)` was REPLACED by a PostgreSQL partial
-  unique index that protects ONLY legacy rows —
-  `UNIQUE (user_id, idempotency_key) WHERE trading_account_id IS NULL`
-  (`fx_execute_requests_user_id_idempotency_key_legacy_null_key`). Prisma
-  cannot express partial uniques, so it lives in the
-  `add_trading_scope_and_fx_legacy_partial_unique` migration and is asserted
-  by the schema contract tests.
-- Season quote/execute request-hash v1 bytes are unchanged. General uses a v2
-  hash that binds user + account + direction/source (and quote for execute),
-  without inventing a participant.
+- The SAME user may reuse one key across two of their own accounts (and
+  different users always could). The only DB unique is the canonical
+  `(trading_account_id, idempotency_key)`; the transitional nullable-account
+  partial unique was removed with the legacy participant ownership columns.
+- General quote/execute hashes keep their account-bound v2 payload. Released
+  season v1 hashes keep their exact participant-based byte format so active
+  quotes and committed execute requests survive the schema cleanup. This is
+  immutable hash compatibility only: DB uniqueness, lookup, quote ownership,
+  and every financial row remain account-scoped.
 - Committed replay is checked before current account status and mutable
   integrity gates. A completed request therefore keeps returning its stored
   response after suspension/closure and never mutates twice.
-- Legacy NULL-scope rows stay replayable, but ONLY through a fallback pinned
-  to the same user AND the same participant
-  (`userId + seasonParticipantId + key + tradingAccountId IS NULL`) —
-  another participant's or another season's legacy row is never replayed,
-  and post-unique-violation requeries use the same scope rules (never a
-  bare per-user lookup). General never uses this legacy fallback.
+- Replay and post-unique-violation requery use the same account scope. No
+  nullable-account or participant lookup fallback remains.
 
 ## Scope and atomic write guarantee
 
-Season execute continues to record BOTH `seasonParticipantId` and the same
-verified `tradingAccountId`. General execute records the verified
-`tradingAccountId` with `seasonParticipantId=null` on FxExecuteRequest,
-ExchangeTransaction, and the source/target WalletTransaction rows. General
-also writes an `exchange_executed` ordinary TWR snapshot with null participant;
-FX is not external funding and never updates SeasonParticipant, ranking, or
-settlement state.
+Season and general execute both record only the verified `tradingAccountId` on
+FxExecuteRequest, ExchangeTransaction, source/target WalletTransaction, and
+the resulting EquitySnapshot. SeasonParticipant remains available through the
+season account relation for lifecycle/ranking policy. General FX is not
+external funding and never updates SeasonParticipant, ranking, or settlement
+state.
 
 General execution locks the TradingAccount row `FOR UPDATE`, obtains DB wall
 clock time after the lock, then performs both wallet changes, request,

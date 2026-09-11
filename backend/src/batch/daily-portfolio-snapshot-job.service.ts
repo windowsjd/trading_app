@@ -95,7 +95,7 @@ export class DailyPortfolioSnapshotJobService {
       select: {
         id: true,
         userId: true,
-        // 작업 7 dual-write: every new snapshot records the account too.
+        // The account is the snapshot's only persisted ownership key.
         tradingAccountId: true,
       },
     });

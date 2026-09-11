@@ -29,20 +29,13 @@ import {
 
 const CANCEL_ORDER_SELECT = {
   id: true,
-  seasonParticipantId: true,
   tradingAccountId: true,
-  seasonParticipant: {
-    select: {
-      id: true,
-      tradingAccountId: true,
-    },
-  },
   tradingAccount: {
     select: {
       id: true,
       userId: true,
       mode: true,
-      seasonParticipant: { select: { id: true } },
+      seasonParticipant: { select: { id: true, tradingAccountId: true } },
     },
   },
   quoteId: true,
@@ -151,10 +144,9 @@ export class LimitOrderCancelService {
       const lockedRows = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT o."id"
         FROM "orders" o
-        LEFT JOIN "trading_accounts" ta ON ta."id" = o."trading_account_id"
-        LEFT JOIN "season_participants" sp ON sp."id" = o."season_participant_id"
+        JOIN "trading_accounts" ta ON ta."id" = o."trading_account_id"
         WHERE o."id" = ${input.orderId}
-          AND (sp."user_id" = ${input.userId} OR ta."user_id" = ${input.userId})
+          AND ta."user_id" = ${input.userId}
         FOR UPDATE OF o
       `;
 
@@ -230,7 +222,6 @@ export class LimitOrderCancelService {
         orderId: order.id,
         side: order.side,
         assetId: order.assetId,
-        seasonParticipantId: order.seasonParticipantId,
         tradingAccountId: this.requireOrderTradingScopeForRelease(order),
         currencyCode: order.currencyCode,
         reservedAmount: order.reservedAmount,
@@ -267,7 +258,6 @@ export class LimitOrderCancelService {
   async cancelOpenLimitBuysForParticipantInTransaction(
     tx: CancelTransactionClient,
     input: {
-      seasonParticipantId: string;
       tradingAccountId: string;
       reason: LimitOrderCancelReason;
       canceledAt: Date;
@@ -277,7 +267,6 @@ export class LimitOrderCancelService {
       SELECT "id"
       FROM "orders"
       WHERE "trading_account_id" = ${input.tradingAccountId}
-        AND "season_participant_id" = ${input.seasonParticipantId}
         AND "status" = 'submitted'
         AND "order_type" = 'limit'
       ORDER BY "id"
@@ -291,14 +280,14 @@ export class LimitOrderCancelService {
         select: {
           id: true,
           assetId: true,
-          seasonParticipantId: true,
           tradingAccountId: true,
-          seasonParticipant: { select: { tradingAccountId: true } },
           tradingAccount: {
             select: {
               id: true,
               mode: true,
-              seasonParticipant: { select: { id: true } },
+              seasonParticipant: {
+                select: { id: true, tradingAccountId: true },
+              },
             },
           },
           currencyCode: true,
@@ -313,7 +302,6 @@ export class LimitOrderCancelService {
       if (
         !order ||
         order.tradingAccountId !== input.tradingAccountId ||
-        order.seasonParticipantId !== input.seasonParticipantId ||
         order.status !== OrderStatus.submitted ||
         order.orderType !== OrderType.limit ||
         (order.side !== OrderSide.buy && order.side !== OrderSide.sell)
@@ -325,7 +313,6 @@ export class LimitOrderCancelService {
         orderId: order.id,
         side: order.side,
         assetId: order.assetId,
-        seasonParticipantId: order.seasonParticipantId,
         tradingAccountId: this.requireOrderTradingScopeForRelease(order),
         currencyCode: order.currencyCode,
         reservedAmount: order.reservedAmount,
@@ -400,14 +387,14 @@ export class LimitOrderCancelService {
               id: true,
               assetId: true,
               side: true,
-              seasonParticipantId: true,
               tradingAccountId: true,
-              seasonParticipant: { select: { tradingAccountId: true } },
               tradingAccount: {
                 select: {
                   id: true,
                   mode: true,
-                  seasonParticipant: { select: { id: true } },
+                  seasonParticipant: {
+                    select: { id: true, tradingAccountId: true },
+                  },
                 },
               },
               currencyCode: true,
@@ -421,7 +408,6 @@ export class LimitOrderCancelService {
             orderId: order.id,
             side: order.side,
             assetId: order.assetId,
-            seasonParticipantId: order.seasonParticipantId,
             tradingAccountId: this.requireOrderTradingScopeForRelease(order),
             currencyCode: order.currencyCode,
             reservedAmount: order.reservedAmount,
@@ -470,12 +456,12 @@ export class LimitOrderCancelService {
           status: OrderStatus.submitted,
           orderType: OrderType.limit,
           side: OrderSide.buy,
-          seasonParticipant: { seasonId },
+          tradingAccount: { seasonParticipant: { seasonId } },
         },
       }),
       this.prisma.cashWallet.count({
         where: {
-          seasonParticipant: { seasonId },
+          tradingAccount: { seasonParticipant: { seasonId } },
           reservedAmount: { gt: 0 },
         },
       }),
@@ -497,9 +483,7 @@ export class LimitOrderCancelService {
       orderId: string;
       side: OrderSide;
       assetId: string;
-      seasonParticipantId: string | null;
-      /** VERIFIED account scope (order scope, checked against the
-       * participant link by requireOrderTradingScopeForRelease). */
+      /** VERIFIED canonical account scope. */
       tradingAccountId: string;
       currencyCode: CurrencyCode;
       reservedAmount: Prisma.Decimal | null;
@@ -540,7 +524,7 @@ export class LimitOrderCancelService {
             currencyCode: input.currencyCode,
           },
         },
-        select: { id: true, seasonParticipantId: true, tradingAccountId: true },
+        select: { id: true, tradingAccountId: true },
       });
 
       if (!wallet) {
@@ -554,7 +538,6 @@ export class LimitOrderCancelService {
       // any reservation is decreased: a null-scope wallet is repair-required,
       // a foreign wallet is never touched (both structured 500s).
       assertCashWalletTradingAccountScope(wallet, {
-        seasonParticipantId: input.seasonParticipantId,
         tradingAccountId: input.tradingAccountId,
       });
 
@@ -565,7 +548,6 @@ export class LimitOrderCancelService {
 
       await this.reservation.releaseLimitBuyReservation(tx, {
         walletId: wallet.id,
-        seasonParticipantId: input.seasonParticipantId,
         tradingAccountId: input.tradingAccountId,
         currencyCode: input.currencyCode,
         amount: releasedAmountText,
@@ -580,15 +562,10 @@ export class LimitOrderCancelService {
         },
         select: {
           id: true,
-          seasonParticipantId: true,
           tradingAccountId: true,
         },
       });
-      if (
-        !position ||
-        position.seasonParticipantId !== input.seasonParticipantId ||
-        position.tradingAccountId !== input.tradingAccountId
-      ) {
+      if (!position || position.tradingAccountId !== input.tradingAccountId) {
         this.throwLimitOrderError(
           limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
           'Position for the order reservation was not found or mis-scoped.',
@@ -600,7 +577,6 @@ export class LimitOrderCancelService {
       );
       const released = await releaseReservedPositionQuantity(tx, {
         positionId: position.id,
-        seasonParticipantId: input.seasonParticipantId,
         tradingAccountId: input.tradingAccountId,
         assetId: input.assetId,
         quantity: releasedQuantityText,
@@ -616,7 +592,6 @@ export class LimitOrderCancelService {
     const flipped = await tx.order.updateMany({
       where: {
         id: input.orderId,
-        seasonParticipantId: input.seasonParticipantId,
         tradingAccountId: input.tradingAccountId,
         status: OrderStatus.submitted,
       },
@@ -642,94 +617,37 @@ export class LimitOrderCancelService {
   }
 
   /**
-   * Account-scoped cancel: decide what the requested accountId means for an
-   * order the caller PROVABLY owns (ownership was part of the locking SQL).
-   * 작업 5 보완 1.
-   *
-   * The old shape put `o.trading_account_id = :accountId` in the locking
-   * WHERE, so three very different situations collapsed into one 404:
-   * another user's order, another account's order, and the caller's OWN
-   * order whose scope was null or corrupted. The last one is a server data
-   * problem and must not be hidden as "not found".
-   *
-   * With `req` = requested account, `part` = the order participant's account
-   * link, `ord` = the order's own scope:
-   *
-   *   part = req, ord = req   → normal; proceed to cancel
-   *   part = req, ord = null  → 500 TRADING_SCOPE_REPAIR_REQUIRED
-   *   part = req, ord ≠ req   → 500 TRADING_ACCOUNT_SCOPE_MISMATCH
-   *   part ≠ req, ord = req   → 500 TRADING_ACCOUNT_SCOPE_MISMATCH — the row
-   *                             names THIS account, so it is ours and must
-   *                             not be concealed either
-   *   part ≠ req, ord ≠ req   → 404 ORDER_NOT_FOUND (genuinely another
-   *                             account's order; its existence stays hidden)
-   *
-   * No branch writes anything: order status and reservedAmount are untouched
-   * and the transaction rolls back.
+   * Account-scoped cancel: the ownership lock already proved the caller owns
+   * the order. The requested account must be the order's canonical account;
+   * another account remains indistinguishable from an unknown order.
    */
   private assertRequestedAccountScope(
     order: {
       tradingAccountId: string | null;
-      seasonParticipantId?: string | null;
-      seasonParticipant: {
-        id?: string;
-        tradingAccountId: string | null;
-      } | null;
       tradingAccount: {
         id: string;
         mode: TradingAccountMode;
-        seasonParticipant: { id: string } | null;
+        seasonParticipant: {
+          id: string;
+          tradingAccountId: string | null;
+        } | null;
       } | null;
     },
     requestedTradingAccountId: string,
   ): void {
-    const participantAccountId = order.seasonParticipant?.tradingAccountId;
     const orderAccountId = order.tradingAccountId;
 
-    if (orderAccountId === requestedTradingAccountId) {
-      if (!order.tradingAccount || order.tradingAccount.id !== orderAccountId) {
-        this.throwScopeIntegrity(
-          'TRADING_ACCOUNT_SCOPE_MISMATCH',
-          'Order trading-account relation is inconsistent.',
-        );
-      }
-      if (order.tradingAccount.mode === TradingAccountMode.general) {
-        if (
-          order.seasonParticipantId !== null ||
-          order.seasonParticipant !== null ||
-          order.tradingAccount.seasonParticipant !== null
-        ) {
-          this.throwScopeIntegrity(
-            'TRADING_ACCOUNT_SCOPE_MISMATCH',
-            'General order carries a season participant link.',
-          );
-        }
-        return;
-      }
-    }
-
-    if (participantAccountId === requestedTradingAccountId) {
-      if (orderAccountId === null) {
-        this.throwScopeIntegrity(
-          'TRADING_SCOPE_REPAIR_REQUIRED',
-          'Order has no trading account scope; run trading-accounts:repair-trading-scope before canceling it.',
-        );
-      }
-      if (orderAccountId !== requestedTradingAccountId) {
-        this.throwScopeIntegrity(
-          'TRADING_ACCOUNT_SCOPE_MISMATCH',
-          'Order is scoped to a different trading account than its participant; investigate before canceling it.',
-        );
-      }
-      return;
-    }
-
-    if (orderAccountId === requestedTradingAccountId) {
+    if (
+      orderAccountId === requestedTradingAccountId &&
+      (!order.tradingAccount || order.tradingAccount.id !== orderAccountId)
+    ) {
       this.throwScopeIntegrity(
         'TRADING_ACCOUNT_SCOPE_MISMATCH',
-        'Order is scoped to this trading account but its participant is linked elsewhere; investigate before canceling it.',
+        'Order trading-account relation is inconsistent.',
       );
     }
+
+    if (orderAccountId === requestedTradingAccountId) return;
 
     // A normal order of another account of the same user: same 404 as an
     // unknown orderId, so no other account's contents are disclosed.
@@ -757,28 +675,21 @@ export class LimitOrderCancelService {
 
   /**
    * A release may only move the reservation of the ORDER's own account.
-   * The order's scope must exist (else run
-   * trading-accounts:repair-trading-scope first — a release is protective,
-   * but guessing the account is not) and must equal the participant link.
-   * Both violations are structured 500s and roll the whole cancel back.
+   * The order and its TradingAccount relation must agree. A season account
+   * must still have its normal SeasonParticipant domain link.
    */
   private requireOrderTradingScopeForRelease(order: {
     tradingAccountId: string | null;
-    seasonParticipantId?: string | null;
-    seasonParticipant: {
-      id?: string;
-      tradingAccountId: string | null;
-    } | null;
     tradingAccount: {
       id: string;
       mode: TradingAccountMode;
-      seasonParticipant: { id: string } | null;
+      seasonParticipant: { id: string; tradingAccountId: string | null } | null;
     } | null;
   }): string {
     if (!order.tradingAccountId) {
       this.throwScopeIntegrity(
         'TRADING_SCOPE_REPAIR_REQUIRED',
-        'Order has no trading account scope; run trading-accounts:repair-trading-scope before releasing its reservation.',
+        'Order has no canonical trading account scope.',
       );
     }
 
@@ -793,11 +704,7 @@ export class LimitOrderCancelService {
     }
 
     if (order.tradingAccount.mode === TradingAccountMode.general) {
-      if (
-        order.seasonParticipantId !== null ||
-        order.seasonParticipant !== null ||
-        order.tradingAccount.seasonParticipant !== null
-      ) {
+      if (order.tradingAccount.seasonParticipant !== null) {
         this.throwScopeIntegrity(
           'TRADING_ACCOUNT_SCOPE_MISMATCH',
           'General order carries a season participant link.',
@@ -807,11 +714,9 @@ export class LimitOrderCancelService {
     }
 
     if (
-      order.seasonParticipantId === null ||
-      !order.seasonParticipant ||
-      order.tradingAccount.seasonParticipant?.id !==
-        order.seasonParticipantId ||
-      order.tradingAccountId !== order.seasonParticipant.tradingAccountId
+      !order.tradingAccount.seasonParticipant ||
+      order.tradingAccountId !==
+        order.tradingAccount.seasonParticipant.tradingAccountId
     ) {
       this.throwScopeIntegrity(
         'TRADING_ACCOUNT_SCOPE_MISMATCH',

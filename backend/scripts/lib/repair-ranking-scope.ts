@@ -4,10 +4,11 @@ import type { PrismaClient } from '../../src/generated/prisma/client';
  * Non-destructive backfill of `season_rankings.trading_account_id` (작업 8 §12).
  *
  * Companion to — and deliberately separate from — repair-links (participant ↔
- * account), repair-financial-scope (wallets/ledger/exchange/fx),
- * repair-trading-scope (orders/positions/quotes), and repair-snapshot-scope
- * (equity/daily snapshots). Each owns one table family; none of them repairs
- * another's rows, so an operator always knows which one to blame.
+ * account). Financial, trading, and snapshot rows are now owned exclusively by
+ * TradingAccount, so their former participant-scope repair tools no longer
+ * exist. This tool remains because SeasonRanking intentionally keeps both its
+ * season-domain participant identity and its canonical account calculation
+ * scope.
  *
  * Safety contract, identical to the other four:
  *  - Bare invocation is a DRY-RUN; writes require an explicit `--apply`.
@@ -502,35 +503,35 @@ export async function auditRankingAndSettlement(
 
   await add(
     'SEASON_SNAPSHOT_SCOPE_DAMAGED',
-    'season snapshot(s) used as ranking input have a null or mismatched account scope.',
+    'snapshot account scope(s) used by ranking cannot resolve consistently to the season participant relation.',
     prisma.$queryRaw`
       SELECT (
         (SELECT count(*) FROM "daily_portfolio_snapshots" d
-          JOIN "season_participants" sp ON sp."id" = d."season_participant_id"
-          WHERE d."trading_account_id" IS NULL
-             OR (sp."trading_account_id" IS NOT NULL
-                 AND d."trading_account_id" <> sp."trading_account_id"))
+          JOIN "trading_accounts" ta ON ta."id" = d."trading_account_id"
+          LEFT JOIN "season_participants" sp ON sp."trading_account_id" = ta."id"
+          WHERE (ta."mode" = 'season' AND sp."id" IS NULL)
+             OR (ta."mode" = 'general' AND sp."id" IS NOT NULL))
         +
         (SELECT count(*) FROM "equity_snapshots" e
-          JOIN "season_participants" sp ON sp."id" = e."season_participant_id"
-          WHERE e."trading_account_id" IS NULL
-             OR (sp."trading_account_id" IS NOT NULL
-                 AND e."trading_account_id" <> sp."trading_account_id"))
+          JOIN "trading_accounts" ta ON ta."id" = e."trading_account_id"
+          LEFT JOIN "season_participants" sp ON sp."trading_account_id" = ta."id"
+          WHERE (ta."mode" = 'season' AND sp."id" IS NULL)
+             OR (ta."mode" = 'general' AND sp."id" IS NOT NULL))
       )::int AS n
     `,
   );
 
   await add(
     'RANKING_INPUT_ORDER_SCOPE_DAMAGED',
-    'executed order(s) feeding totalFillCount have a null or mismatched account scope.',
+    'executed order account scope(s) feeding totalFillCount cannot resolve consistently to the season participant relation.',
     prisma.$queryRaw`
       SELECT count(*)::int AS n
       FROM "orders" o
-      JOIN "season_participants" sp ON sp."id" = o."season_participant_id"
+      JOIN "trading_accounts" ta ON ta."id" = o."trading_account_id"
+      LEFT JOIN "season_participants" sp ON sp."trading_account_id" = ta."id"
       WHERE o."status" = 'executed'
-        AND (o."trading_account_id" IS NULL
-             OR (sp."trading_account_id" IS NOT NULL
-                 AND o."trading_account_id" <> sp."trading_account_id"))
+        AND ((ta."mode" = 'season' AND sp."id" IS NULL)
+          OR (ta."mode" = 'general' AND sp."id" IS NOT NULL))
     `,
   );
 

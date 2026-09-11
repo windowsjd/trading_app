@@ -40,7 +40,6 @@ export type StoredClaimForIntegrity = {
   walletTransaction: {
     id: string;
     tradingAccountId: string | null;
-    seasonParticipantId: string | null;
     walletId: string;
     currencyCode: CurrencyCode;
     direction: WalletTransactionDirection;
@@ -52,7 +51,6 @@ export type StoredClaimForIntegrity = {
     wallet: {
       id: string;
       tradingAccountId: string | null;
-      seasonParticipantId: string | null;
       currencyCode: CurrencyCode;
     };
   } | null;
@@ -102,12 +100,6 @@ export function assertGrantedClaimIntegrity(
       'ledger row belongs to a different trading account',
     );
   }
-  if (ledger.seasonParticipantId !== null) {
-    throwAdRewardClaimIntegrity(
-      claim.id,
-      'ledger row carries a season participant link',
-    );
-  }
   if (ledger.walletId !== expectedKrwWalletId) {
     throwAdRewardClaimIntegrity(
       claim.id,
@@ -140,7 +132,6 @@ export function assertGrantedClaimIntegrity(
   }
   if (
     ledger.wallet.tradingAccountId !== claim.tradingAccountId ||
-    ledger.wallet.seasonParticipantId !== null ||
     ledger.wallet.currencyCode !== CurrencyCode.KRW
   ) {
     throwAdRewardClaimIntegrity(
@@ -203,7 +194,6 @@ type BoundaryClient = Pick<Prisma.TransactionClient, 'equitySnapshot'>;
 
 const BOUNDARY_SELECT = {
   id: true,
-  seasonParticipantId: true,
   tradingAccountId: true,
   snapshotReason: true,
   totalAssetKrw: true,
@@ -325,12 +315,6 @@ function assertBoundaryRowShape(
     throwAdRewardClaimIntegrity(
       claim.id,
       `external-funding ${phase} snapshot belongs to a different trading account`,
-    );
-  }
-  if (row.seasonParticipantId !== null) {
-    throwAdRewardClaimIntegrity(
-      claim.id,
-      `external-funding ${phase} snapshot carries a season participant link`,
     );
   }
   if (

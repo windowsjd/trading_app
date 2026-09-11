@@ -207,6 +207,7 @@ function buildScenario() {
     refreshToken: null,
     seasonId: null,
     participantId: null,
+    tradingAccountId: null,
     krwWalletId: null,
     usdWalletId: null,
     fxRateSnapshotId: null,
@@ -447,10 +448,11 @@ async function assertJoinSideEffects() {
   });
   assert.equal(participant.id, scenario.participantId);
   assert.equal(participant.participantStatus, ParticipantStatus.active);
+  scenario.tradingAccountId = participant.tradingAccountId;
 
   const wallets = await prisma.cashWallet.findMany({
     where: {
-      seasonParticipantId: scenario.participantId,
+      tradingAccountId: scenario.tradingAccountId,
     },
     orderBy: {
       currencyCode: 'asc',
@@ -468,7 +470,7 @@ async function assertJoinSideEffects() {
 
   const initialGrant = await prisma.walletTransaction.findFirst({
     where: {
-      seasonParticipantId: scenario.participantId,
+      tradingAccountId: scenario.tradingAccountId,
       txType: WalletTransactionType.initial_grant,
     },
   });
@@ -599,18 +601,18 @@ async function assertFxSideEffects() {
       id: scenario.exchangeId,
     },
   });
-  assert.equal(exchange.seasonParticipantId, scenario.participantId);
+  assert.equal(exchange.tradingAccountId, scenario.tradingAccountId);
   assert.equal(exchange.fxRateSnapshotId, scenario.fxRateSnapshotId);
 
   const sourceLedger = await prisma.walletTransaction.findFirst({
     where: {
-      seasonParticipantId: scenario.participantId,
+      tradingAccountId: scenario.tradingAccountId,
       txType: WalletTransactionType.exchange_source,
     },
   });
   const targetLedger = await prisma.walletTransaction.findFirst({
     where: {
-      seasonParticipantId: scenario.participantId,
+      tradingAccountId: scenario.tradingAccountId,
       txType: WalletTransactionType.exchange_target,
     },
   });
@@ -683,8 +685,8 @@ async function assertOrderSideEffects() {
 
   const position = await prisma.position.findUniqueOrThrow({
     where: {
-      seasonParticipantId_assetId: {
-        seasonParticipantId: scenario.participantId,
+      tradingAccountId_assetId: {
+        tradingAccountId: scenario.tradingAccountId,
         assetId: scenario.usdAssetId,
       },
     },
@@ -694,7 +696,7 @@ async function assertOrderSideEffects() {
 
   const orderLedger = await prisma.walletTransaction.findFirst({
     where: {
-      seasonParticipantId: scenario.participantId,
+      tradingAccountId: scenario.tradingAccountId,
       txType: WalletTransactionType.order_buy,
       referenceId: scenario.orderId,
     },
@@ -831,19 +833,19 @@ async function readMutationCounts() {
   // these are read-only smoke assertions, so keep them deterministic and
   // sequential instead of manufacturing client-level concurrency.
   const exchangeTransactions = await prisma.exchangeTransaction.count({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   const walletTransactions = await prisma.walletTransaction.count({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   const orders = await prisma.order.count({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   const positions = await prisma.position.count({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   const dailyPortfolioSnapshots = await prisma.dailyPortfolioSnapshot.count({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   const seasonRankings = await prisma.seasonRanking.count({
     where: {
@@ -854,7 +856,7 @@ async function readMutationCounts() {
     },
   });
   const equitySnapshots = await prisma.equitySnapshot.count({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   const assetPriceSnapshots = await prisma.assetPriceSnapshot.count({
     where: { assetId: { in: [scenario.krwAssetId, scenario.usdAssetId] } },
@@ -928,10 +930,14 @@ async function cleanup() {
           },
           select: {
             id: true,
+            tradingAccountId: true,
           },
         })
       : [];
   const participantIds = participants.map((participant) => participant.id);
+  const accountIds = participants.map(
+    (participant) => participant.tradingAccountId,
+  );
 
   if (seasonIds.length > 0 || participantIds.length > 0) {
     await prisma.seasonRanking.deleteMany({
@@ -944,33 +950,33 @@ async function cleanup() {
     });
   }
 
-  if (participantIds.length > 0) {
+  if (accountIds.length > 0) {
     await prisma.dailyPortfolioSnapshot.deleteMany({
-      where: { seasonParticipantId: { in: participantIds } },
+      where: { tradingAccountId: { in: accountIds } },
     });
     await prisma.equitySnapshot.deleteMany({
-      where: { seasonParticipantId: { in: participantIds } },
+      where: { tradingAccountId: { in: accountIds } },
     });
     await prisma.order.deleteMany({
-      where: { seasonParticipantId: { in: participantIds } },
+      where: { tradingAccountId: { in: accountIds } },
     });
     await prisma.quote.deleteMany({
-      where: { seasonParticipantId: { in: participantIds } },
+      where: { tradingAccountId: { in: accountIds } },
     });
     await prisma.position.deleteMany({
-      where: { seasonParticipantId: { in: participantIds } },
+      where: { tradingAccountId: { in: accountIds } },
     });
     await prisma.fxExecuteRequest.deleteMany({
-      where: { seasonParticipantId: { in: participantIds } },
+      where: { tradingAccountId: { in: accountIds } },
     });
     await prisma.walletTransaction.deleteMany({
-      where: { seasonParticipantId: { in: participantIds } },
+      where: { tradingAccountId: { in: accountIds } },
     });
     await prisma.exchangeTransaction.deleteMany({
-      where: { seasonParticipantId: { in: participantIds } },
+      where: { tradingAccountId: { in: accountIds } },
     });
     await prisma.cashWallet.deleteMany({
-      where: { seasonParticipantId: { in: participantIds } },
+      where: { tradingAccountId: { in: accountIds } },
     });
   }
 

@@ -146,53 +146,21 @@ describe('TradingAccount schema contract', () => {
     expect(modelBlock('User')).toMatch(/tradingAccounts\s+TradingAccount\[\]/);
   });
 
-  it('keeps legacy participant links while requiring canonical account ownership', () => {
-    // The participant link remains optional for general-mode rows and for
-    // compatibility, while every financial row has a required account scope.
-    for (const model of ['CashWallet', 'WalletTransaction']) {
+  it('uses TradingAccount as the only ownership key on financial rows', () => {
+    for (const model of [
+      'CashWallet',
+      'WalletTransaction',
+      'ExchangeTransaction',
+      'FxExecuteRequest',
+      'Order',
+      'Position',
+      'Quote',
+      'EquitySnapshot',
+      'DailyPortfolioSnapshot',
+    ]) {
       const block = modelBlock(model);
-      expect(block).toMatch(/seasonParticipantId\s+String\?/);
-      expect(block).toMatch(
-        /seasonParticipant\s+SeasonParticipant\?\s+@relation\(/,
-      );
-      expect(block).toMatch(/tradingAccountId\s+String\s/);
-      expect(block).toMatch(
-        /tradingAccount\s+TradingAccount\s+@relation\([^)]*onDelete: Restrict/,
-      );
-    }
-
-    for (const model of ['ExchangeTransaction', 'FxExecuteRequest']) {
-      const block = modelBlock(model);
-      expect(block).toMatch(/seasonParticipantId\s+String\?\s/);
-      expect(block).toMatch(/tradingAccountId\s+String\s/);
-      expect(block).toMatch(
-        /tradingAccount\s+TradingAccount\s+@relation\([^)]*onDelete: Restrict/,
-      );
-    }
-
-    for (const model of ['Order', 'Position']) {
-      const block = modelBlock(model);
-      expect(block).toMatch(/seasonParticipantId\s+String\?/);
-      expect(block).toMatch(/tradingAccountId\s+String\s/);
-      expect(block).toMatch(
-        /tradingAccount\s+TradingAccount\s+@relation\([^)]*onDelete: Restrict/,
-      );
-    }
-
-    // Quote keeps its historical nullable participant id, but account scope
-    // is canonical and required.
-    const quoteBlock = modelBlock('Quote');
-    expect(quoteBlock).toMatch(/seasonParticipantId\s+String\?/);
-    expect(quoteBlock).toMatch(/tradingAccountId\s+String\s/);
-    expect(quoteBlock).toMatch(
-      /tradingAccount\s+TradingAccount\s+@relation\([^)]*onDelete: Restrict/,
-    );
-
-    // General accounts own snapshots without participants, but not without an
-    // account.
-    for (const model of ['EquitySnapshot', 'DailyPortfolioSnapshot']) {
-      const block = modelBlock(model);
-      expect(block).toMatch(/seasonParticipantId\s+String\?/);
+      expect(block).not.toContain('seasonParticipantId');
+      expect(block).not.toMatch(/\n\s+seasonParticipant\s/);
       expect(block).toMatch(/tradingAccountId\s+String\s/);
       expect(block).toMatch(
         /tradingAccount\s+TradingAccount\s+@relation\([^)]*onDelete: Restrict/,
@@ -214,15 +182,10 @@ describe('TradingAccount schema contract', () => {
 
   it('keeps the account-scoped financial uniques and back-relations', () => {
     expect(modelBlock('CashWallet')).toContain(
-      '@@unique([seasonParticipantId, currencyCode])',
-    );
-    expect(modelBlock('CashWallet')).toContain(
       '@@unique([tradingAccountId, currencyCode])',
     );
-    // The global per-user FX idempotency unique was REPLACED by a partial
-    // unique index (legacy null-scope rows only) that Prisma cannot express;
-    // it lives in the add_trading_scope_and_fx_legacy_partial_unique
-    // migration and is asserted in that migration's contract tests below.
+    // FX idempotency is now exclusively account-scoped. The transitional
+    // partial unique for nullable account rows is dropped by 작업 2.
     expect(modelBlock('FxExecuteRequest')).not.toContain(
       '@@unique([userId, idempotencyKey])',
     );
@@ -272,9 +235,6 @@ describe('TradingAccount schema contract', () => {
   it('keeps the account-scoped trading uniques and indexes', () => {
     const orderBlock = modelBlock('Order');
     expect(orderBlock).toContain(
-      '@@unique([seasonParticipantId, idempotencyKey])',
-    );
-    expect(orderBlock).toContain(
       '@@unique([tradingAccountId, idempotencyKey])',
     );
     expect(orderBlock).toContain('@@index([tradingAccountId, submittedAt])');
@@ -283,7 +243,6 @@ describe('TradingAccount schema contract', () => {
     expect(orderBlock).toMatch(/idempotencyKey\s+String\?/);
 
     const positionBlock = modelBlock('Position');
-    expect(positionBlock).toContain('@@unique([seasonParticipantId, assetId])');
     expect(positionBlock).toContain('@@unique([tradingAccountId, assetId])');
     expect(positionBlock).toContain('@@index([tradingAccountId])');
 
@@ -625,5 +584,97 @@ describe('add_trading_scope_and_fx_legacy_partial_unique migration contract', ()
     ]) {
       expect(sqlOnly).not.toContain(`SET "${column}"`);
     }
+  });
+});
+
+describe('remove_legacy_financial_participant_scope migration contract', () => {
+  const removalMigration = readFileSync(
+    join(
+      __dirname,
+      '..',
+      '..',
+      'prisma',
+      'migrations',
+      '20260911120000_remove_legacy_financial_participant_scope',
+      'migration.sql',
+    ),
+    'utf8',
+  );
+
+  const accountOwnedTables = [
+    'cash_wallets',
+    'wallet_transactions',
+    'exchange_transactions',
+    'fx_execute_requests',
+    'orders',
+    'positions',
+    'quotes',
+    'equity_snapshots',
+    'daily_portfolio_snapshots',
+  ];
+
+  it('fails closed unless every legacy participant agrees with its canonical account', () => {
+    for (const table of accountOwnedTables) {
+      expect(removalMigration).toContain(`'${table}'`);
+    }
+    expect(removalMigration).toContain(
+      'row.season_participant_id IS DISTINCT FROM sp.id',
+    );
+    expect(removalMigration).toContain(
+      `ta.mode = ''general''::"TradingAccountMode"`,
+    );
+    expect(removalMigration).toContain('RAISE EXCEPTION');
+  });
+
+  it('verifies child-account and user-account consistency before changing the schema', () => {
+    expect(removalMigration).toContain(
+      'wt."trading_account_id" <> w."trading_account_id"',
+    );
+    expect(removalMigration).toContain(
+      'o."trading_account_id" <> q."trading_account_id"',
+    );
+    expect(removalMigration).toContain(
+      'r."trading_account_id" <> e."trading_account_id"',
+    );
+    expect(removalMigration).toContain('q."user_id" <> ta."user_id"');
+    expect(removalMigration).toContain('r."user_id" <> ta."user_id"');
+    expect(removalMigration).toContain("to_regclass('public.' || index_name)");
+  });
+
+  it('drops the participant FK and column from every account-owned table only', () => {
+    for (const table of accountOwnedTables) {
+      expect(removalMigration).toContain(
+        `ALTER TABLE "${table}" DROP CONSTRAINT "${table}_season_participant_id_fkey";`,
+      );
+      expect(removalMigration).toContain(
+        `ALTER TABLE "${table}" DROP COLUMN "season_participant_id";`,
+      );
+    }
+    for (const seasonDomainTable of [
+      'season_participants',
+      'season_rankings',
+      'season_rewards',
+      'reward_fulfillment_requests',
+    ]) {
+      expect(removalMigration).not.toContain(
+        `ALTER TABLE "${seasonDomainTable}" DROP COLUMN "season_participant_id"`,
+      );
+    }
+  });
+
+  it('changes structure only and never mutates financial or season values', () => {
+    const sqlOnly = removalMigration
+      .split('\n')
+      .filter((line) => !line.trimStart().startsWith('--'))
+      .join('\n')
+      .toUpperCase();
+
+    expect(sqlOnly).toContain('BEGIN;');
+    expect(sqlOnly).toContain('COMMIT;');
+    expect(sqlOnly).not.toMatch(/\bUPDATE\b/);
+    expect(sqlOnly).not.toMatch(/\bINSERT\b/);
+    expect(sqlOnly).not.toMatch(/\bDELETE\b/);
+    expect(sqlOnly).not.toContain('TRUNCATE');
+    expect(sqlOnly).not.toContain('DROP TABLE');
   });
 });

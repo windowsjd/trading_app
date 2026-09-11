@@ -150,7 +150,6 @@ async function createScenario(label, options = {}) {
 
   const wallet = await prisma.cashWallet.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: tradingAccount.id,
       currencyCode: CurrencyCode.KRW,
       balanceAmount: options.balance ?? '1000.00000000',
@@ -187,10 +186,10 @@ async function createScenario(label, options = {}) {
 
 async function cleanupScenario(scenario) {
   await prisma.order.deleteMany({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   await prisma.cashWallet.deleteMany({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   await prisma.seasonParticipant.deleteMany({
     where: { id: scenario.participantId },
@@ -218,7 +217,6 @@ async function readWallet(scenario) {
 function reservationInput(scenario, amount) {
   return {
     walletId: scenario.walletId,
-    seasonParticipantId: scenario.participantId,
     tradingAccountId: scenario.tradingAccountId,
     currencyCode: CurrencyCode.KRW,
     amount,
@@ -357,7 +355,6 @@ async function testConcurrentCancelSingleRelease() {
   try {
     const order = await prisma.order.create({
       data: {
-        seasonParticipantId: scenario.participantId,
         tradingAccountId: scenario.tradingAccountId,
         assetId: scenario.assetId,
         side: OrderSide.buy,

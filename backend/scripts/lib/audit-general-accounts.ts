@@ -13,14 +13,13 @@ import type { PrismaClient } from '../../src/generated/prisma/client';
  * What it reports (all counts, never a repair):
  *  - general accounts, and those with a SeasonParticipant attached
  *  - missing/duplicate KRW or USD wallets
- *  - general wallets or ledger rows carrying a seasonParticipantId
  *  - missing / duplicate / wrong-amount initial grants
  *  - initialCapitalKrw values that are not the one-time 10,000,000 grant
  *  - granted claims without a wallet transaction
  *  - claim ↔ ledger amount mismatches, and ad_reward ledger rows with no claim
  *  - duplicate (provider, providerEventId) groups
- *  - (작업 7) performance origin presence/uniqueness, general snapshots with a
- *    participant link or no account scope, missing performance columns,
+ *  - (작업 7) performance origin presence/uniqueness, general snapshots with
+ *    missing performance columns,
  *    investment-PnL and factor/returnRate disagreement, negative factor or
  *    total, unpaired or inconsistent external-funding before/after pairs,
  *    keyed granted claims with no boundary pair, duplicate account/date daily
@@ -30,9 +29,8 @@ import type { PrismaClient } from '../../src/generated/prisma/client';
  *    after halves of a missing boundary reported SEPARATELY, each boundary
  *    invariant (amount, account scope, factor/returnRate, investment PnL,
  *    after-total) reported on its own, general daily rows polluted with a
- *    participant or missing performance columns, and daily rows written to a
- *    closed general account
- *  - general Order/Position/Quote participant and account-scope pollution,
+ *    missing performance columns, and daily rows written to a closed account
+ *  - general Order/Position/Quote account-scope consistency,
  *    missing durable quotes, invalid sell-side reservation evidence, invalid
  *    Position reservation bounds, and account+asset reservation mismatches
  */
@@ -51,8 +49,6 @@ export type GeneralAccountAuditSummary = {
   accountsMissingKrwWallet: number;
   accountsMissingUsdWallet: number;
   accountsWithDuplicateWallets: number;
-  walletsWithSeasonParticipant: number;
-  ledgerRowsWithSeasonParticipant: number;
   accountsMissingInitialGrant: number;
   accountsWithDuplicateInitialGrant: number;
   initialGrantsWithWrongAmount: number;
@@ -62,20 +58,13 @@ export type GeneralAccountAuditSummary = {
   adRewardLedgerRowsWithoutClaim: number;
   duplicateProviderEventGroups: number;
   // ---- general trading checks ----
-  generalOrdersWithSeasonParticipant: number;
   generalOrdersWithoutDurableQuote: number;
   generalOrderQuoteAccountMismatches: number;
-  generalPositionsWithSeasonParticipant: number;
   generalPositionsWithInvalidReservation: number;
   duplicateGeneralPositionAccountAssetGroups: number;
-  generalQuotesWithSeasonParticipant: number;
   invalidGeneralSellReservations: number;
   generalPositionReservationMismatches: number;
   // ---- general FX checks ----
-  generalFxExchangesWithSeasonParticipant: number;
-  generalFxRequestsWithSeasonParticipant: number;
-  generalFxQuotesWithSeasonParticipant: number;
-  generalFxRowsWithInvalidAccountScope: number;
   generalFxRequestExchangeAccountMismatches: number;
   generalFxQuoteAccountMismatches: number;
   generalFxQuotesWithInvalidPinnedFee: number;
@@ -83,8 +72,6 @@ export type GeneralAccountAuditSummary = {
   // ---- 작업 7 performance checks ----
   accountsWithoutPerformanceOrigin: number;
   accountsWithDuplicatePerformanceOrigin: number;
-  generalSnapshotsWithSeasonParticipant: number;
-  generalSnapshotsWithoutAccountScope: number;
   snapshotsMissingPerformanceValues: number;
   snapshotsWithInvestmentPnlMismatch: number;
   snapshotsWithReturnRateMismatch: number;
@@ -94,8 +81,6 @@ export type GeneralAccountAuditSummary = {
   externalFundingPairInconsistencies: number;
   keyedGrantedClaimsWithoutBoundaryPair: number;
   duplicateAccountDateDailySnapshots: number;
-  seasonSnapshotsWithoutAccountScope: number;
-  seasonSnapshotsWithScopeMismatch: number;
   // ---- 작업 6·7 보완 checks ----
   accountsWithLatestSnapshotBefore: number;
   accountsWithExternalFundingDiscontinuity: number;
@@ -106,7 +91,6 @@ export type GeneralAccountAuditSummary = {
   boundaryPairsWithFactorMismatch: number;
   boundaryPairsWithInvestmentPnlMismatch: number;
   boundaryPairsWithTotalAssetMismatch: number;
-  generalDailySnapshotsWithSeasonParticipant: number;
   generalDailySnapshotsMissingPerformanceValues: number;
   dailySnapshotsOnClosedAccounts: number;
   findings: GeneralAccountAuditFinding[];
@@ -171,7 +155,7 @@ export async function auditGeneralAccounts(
 
     const wallets = await prisma.cashWallet.findMany({
       where: { tradingAccountId: account.id },
-      select: { id: true, currencyCode: true, seasonParticipantId: true },
+      select: { id: true, currencyCode: true },
     });
     const krw = wallets.filter((w) => w.currencyCode === 'KRW');
     const usd = wallets.filter((w) => w.currencyCode === 'USD');
@@ -241,42 +225,6 @@ export async function auditGeneralAccounts(
         );
       }
     }
-  }
-
-  const generalAccountIds = generalAccounts.map((account) => account.id);
-
-  const walletsWithSeasonParticipant =
-    generalAccountIds.length === 0
-      ? 0
-      : await prisma.cashWallet.count({
-          where: {
-            tradingAccountId: { in: generalAccountIds },
-            seasonParticipantId: { not: null },
-          },
-        });
-  if (walletsWithSeasonParticipant > 0) {
-    add(
-      'GENERAL_WALLET_HAS_SEASON_PARTICIPANT',
-      null,
-      `${walletsWithSeasonParticipant} general wallet(s) carry a season participant link`,
-    );
-  }
-
-  const ledgerRowsWithSeasonParticipant =
-    generalAccountIds.length === 0
-      ? 0
-      : await prisma.walletTransaction.count({
-          where: {
-            tradingAccountId: { in: generalAccountIds },
-            seasonParticipantId: { not: null },
-          },
-        });
-  if (ledgerRowsWithSeasonParticipant > 0) {
-    add(
-      'GENERAL_LEDGER_HAS_SEASON_PARTICIPANT',
-      null,
-      `${ledgerRowsWithSeasonParticipant} general ledger row(s) carry a season participant link`,
-    );
   }
 
   const grantedClaimsWithoutWalletTransaction =
@@ -359,8 +307,6 @@ export async function auditGeneralAccounts(
     accountsMissingKrwWallet,
     accountsMissingUsdWallet,
     accountsWithDuplicateWallets,
-    walletsWithSeasonParticipant,
-    ledgerRowsWithSeasonParticipant,
     accountsMissingInitialGrant,
     accountsWithDuplicateInitialGrant,
     initialGrantsWithWrongAmount,
@@ -387,80 +333,6 @@ async function auditGeneralFx(
     }
     return rows.length;
   };
-
-  const generalFxExchangesWithSeasonParticipant = reportRows(
-    await prisma.$queryRaw<TradingAuditRow[]>`
-      SELECT e."id", e."trading_account_id" AS "tradingAccountId",
-        'seasonParticipantId=' || e."season_participant_id" AS "detail"
-      FROM "exchange_transactions" e
-      LEFT JOIN "trading_accounts" a ON a."id" = e."trading_account_id"
-      LEFT JOIN "fx_execute_requests" r ON r."exchange_transaction_id" = e."id"
-      LEFT JOIN "trading_accounts" ra ON ra."id" = r."trading_account_id"
-      WHERE e."season_participant_id" IS NOT NULL
-        AND (a."mode" = 'general' OR ra."mode" = 'general')
-      ORDER BY e."id"
-    `,
-    'GENERAL_FX_EXCHANGE_HAS_SEASON_PARTICIPANT',
-  );
-
-  const generalFxRequestsWithSeasonParticipant = reportRows(
-    await prisma.$queryRaw<TradingAuditRow[]>`
-      SELECT r."id", r."trading_account_id" AS "tradingAccountId",
-        'seasonParticipantId=' || r."season_participant_id" AS "detail"
-      FROM "fx_execute_requests" r
-      LEFT JOIN "trading_accounts" a ON a."id" = r."trading_account_id"
-      LEFT JOIN "exchange_transactions" e ON e."id" = r."exchange_transaction_id"
-      LEFT JOIN "trading_accounts" ea ON ea."id" = e."trading_account_id"
-      WHERE r."season_participant_id" IS NOT NULL
-        AND (a."mode" = 'general' OR ea."mode" = 'general')
-      ORDER BY r."id"
-    `,
-    'GENERAL_FX_REQUEST_HAS_SEASON_PARTICIPANT',
-  );
-
-  const generalFxQuotesWithSeasonParticipant = reportRows(
-    await prisma.$queryRaw<TradingAuditRow[]>`
-      SELECT q."id", q."trading_account_id" AS "tradingAccountId",
-        'seasonParticipantId=' || q."season_participant_id" AS "detail"
-      FROM "quotes" q
-      JOIN "trading_accounts" a ON a."id" = q."trading_account_id"
-      WHERE q."quote_type" = 'fx' AND a."mode" = 'general'
-        AND q."season_participant_id" IS NOT NULL
-      ORDER BY q."id"
-    `,
-    'GENERAL_FX_QUOTE_HAS_SEASON_PARTICIPANT',
-  );
-
-  const generalFxRowsWithInvalidAccountScope = reportRows(
-    await prisma.$queryRaw<TradingAuditRow[]>`
-      SELECT x."id", x."tradingAccountId", x."detail"
-      FROM (
-        SELECT e."id", e."trading_account_id" AS "tradingAccountId",
-          'participant-free exchange is not scoped to a general account' AS "detail"
-        FROM "exchange_transactions" e
-        LEFT JOIN "trading_accounts" a ON a."id" = e."trading_account_id"
-        WHERE e."season_participant_id" IS NULL
-          AND (a."id" IS NULL OR a."mode" <> 'general')
-        UNION ALL
-        SELECT r."id", r."trading_account_id",
-          'participant-free execute request is not scoped to a general account'
-        FROM "fx_execute_requests" r
-        LEFT JOIN "trading_accounts" a ON a."id" = r."trading_account_id"
-        WHERE r."season_participant_id" IS NULL
-          AND (a."id" IS NULL OR a."mode" <> 'general')
-        UNION ALL
-        SELECT q."id", q."trading_account_id",
-          'participant-free FX quote is not scoped to a general account'
-        FROM "quotes" q
-        LEFT JOIN "trading_accounts" a ON a."id" = q."trading_account_id"
-        WHERE q."quote_type" = 'fx'
-          AND q."season_participant_id" IS NULL
-          AND (a."id" IS NULL OR a."mode" <> 'general')
-      ) x
-      ORDER BY x."id"
-    `,
-    'GENERAL_FX_ACCOUNT_SCOPE_INVALID',
-  );
 
   const generalFxRequestExchangeAccountMismatches = reportRows(
     await prisma.$queryRaw<TradingAuditRow[]>`
@@ -533,22 +405,16 @@ async function auditGeneralFx(
         OR sum(CASE WHEN wt."tx_type" = 'exchange_target'
           AND wt."direction" = 'credit' AND wt."currency_code" = e."to_currency" THEN 1 ELSE 0 END) <> 1
         OR sum(CASE WHEN wt."trading_account_id" IS DISTINCT FROM e."trading_account_id"
-          OR wt."season_participant_id" IS NOT NULL
           OR w."trading_account_id" IS DISTINCT FROM e."trading_account_id" THEN 1 ELSE 0 END) > 0
         OR count(DISTINCT r."id") <> 1
         OR count(DISTINCT CASE WHEN r."status" = 'succeeded'
-          AND r."trading_account_id" = e."trading_account_id"
-          AND r."season_participant_id" IS NULL THEN r."id" END) <> 1
+          AND r."trading_account_id" = e."trading_account_id" THEN r."id" END) <> 1
       ORDER BY e."id"
     `,
     'GENERAL_FX_EXCHANGE_LEDGER_MISMATCH',
   );
 
   return {
-    generalFxExchangesWithSeasonParticipant,
-    generalFxRequestsWithSeasonParticipant,
-    generalFxQuotesWithSeasonParticipant,
-    generalFxRowsWithInvalidAccountScope,
     generalFxRequestExchangeAccountMismatches,
     generalFxQuoteAccountMismatches,
     generalFxQuotesWithInvalidPinnedFee,
@@ -577,23 +443,6 @@ async function auditGeneralTrading(
     }
     return rows.length;
   };
-
-  const generalOrdersWithSeasonParticipant = reportRows(
-    await prisma.$queryRaw<TradingAuditRow[]>`
-      SELECT
-        o."id",
-        coalesce(o."trading_account_id", q."trading_account_id") AS "tradingAccountId",
-        'seasonParticipantId=' || o."season_participant_id" AS "detail"
-      FROM "orders" o
-      LEFT JOIN "quotes" q ON q."id" = o."quote_id"
-      LEFT JOIN "trading_accounts" oa ON oa."id" = o."trading_account_id"
-      LEFT JOIN "trading_accounts" qa ON qa."id" = q."trading_account_id"
-      WHERE o."season_participant_id" IS NOT NULL
-        AND (oa."mode" = 'general' OR qa."mode" = 'general')
-      ORDER BY o."id"
-    `,
-    'GENERAL_ORDER_HAS_SEASON_PARTICIPANT',
-  );
 
   const generalOrdersWithoutDurableQuote = reportRows(
     await prisma.$queryRaw<TradingAuditRow[]>`
@@ -630,21 +479,6 @@ async function auditGeneralTrading(
     'GENERAL_ORDER_QUOTE_ACCOUNT_MISMATCH',
   );
 
-  const generalPositionsWithSeasonParticipant = reportRows(
-    await prisma.$queryRaw<TradingAuditRow[]>`
-      SELECT
-        p."id",
-        p."trading_account_id" AS "tradingAccountId",
-        'seasonParticipantId=' || p."season_participant_id" AS "detail"
-      FROM "positions" p
-      JOIN "trading_accounts" a ON a."id" = p."trading_account_id"
-      WHERE a."mode" = 'general'
-        AND p."season_participant_id" IS NOT NULL
-      ORDER BY p."id"
-    `,
-    'GENERAL_POSITION_HAS_SEASON_PARTICIPANT',
-  );
-
   const generalPositionsWithInvalidReservation = reportRows(
     await prisma.$queryRaw<TradingAuditRow[]>`
       SELECT
@@ -675,23 +509,6 @@ async function auditGeneralTrading(
       ORDER BY p."trading_account_id", p."asset_id"
     `,
     'GENERAL_POSITION_ACCOUNT_ASSET_DUPLICATE',
-  );
-
-  const generalQuotesWithSeasonParticipant = reportRows(
-    await prisma.$queryRaw<TradingAuditRow[]>`
-      SELECT
-        q."id",
-        coalesce(q."trading_account_id", o."trading_account_id") AS "tradingAccountId",
-        'seasonParticipantId=' || q."season_participant_id" AS "detail"
-      FROM "quotes" q
-      LEFT JOIN "orders" o ON o."quote_id" = q."id"
-      LEFT JOIN "trading_accounts" qa ON qa."id" = q."trading_account_id"
-      LEFT JOIN "trading_accounts" oa ON oa."id" = o."trading_account_id"
-      WHERE q."season_participant_id" IS NOT NULL
-        AND (qa."mode" = 'general' OR oa."mode" = 'general')
-      ORDER BY q."id"
-    `,
-    'GENERAL_QUOTE_HAS_SEASON_PARTICIPANT',
   );
 
   const invalidGeneralSellReservations = reportRows(
@@ -768,13 +585,10 @@ async function auditGeneralTrading(
   );
 
   return {
-    generalOrdersWithSeasonParticipant,
     generalOrdersWithoutDurableQuote,
     generalOrderQuoteAccountMismatches,
-    generalPositionsWithSeasonParticipant,
     generalPositionsWithInvalidReservation,
     duplicateGeneralPositionAccountAssetGroups,
-    generalQuotesWithSeasonParticipant,
     invalidGeneralSellReservations,
     generalPositionReservationMismatches,
   };
@@ -826,36 +640,16 @@ async function auditGeneralPerformance(
     'account(s) have more than one performance origin snapshot',
   );
 
-  const generalSnapshotsWithSeasonParticipant = report(
+  const snapshotsMissingPerformanceValues = report(
     await q(prisma.$queryRaw`
       SELECT count(*)::int AS n
       FROM "equity_snapshots" s
       JOIN "trading_accounts" a ON a."id" = s."trading_account_id"
-      WHERE a."mode" = 'general' AND s."season_participant_id" IS NOT NULL
-    `),
-    'GENERAL_SNAPSHOT_HAS_SEASON_PARTICIPANT',
-    'general equity snapshot(s) carry a season participant link',
-  );
-
-  const generalSnapshotsWithoutAccountScope = report(
-    await q(prisma.$queryRaw`
-      SELECT count(*)::int AS n
-      FROM "equity_snapshots"
-      WHERE "season_participant_id" IS NULL AND "trading_account_id" IS NULL
-    `),
-    'GENERAL_SNAPSHOT_SCOPE_MISSING',
-    'snapshot(s) have neither a participant nor an account scope',
-  );
-
-  const snapshotsMissingPerformanceValues = report(
-    await q(prisma.$queryRaw`
-      SELECT count(*)::int AS n
-      FROM "equity_snapshots"
-      WHERE "season_participant_id" IS NULL
+      WHERE a."mode" = 'general'
         AND (
-          "cumulative_external_funding_krw" IS NULL
-          OR "investment_pnl_krw" IS NULL
-          OR "time_weighted_return_factor" IS NULL
+          s."cumulative_external_funding_krw" IS NULL
+          OR s."investment_pnl_krw" IS NULL
+          OR s."time_weighted_return_factor" IS NULL
         )
     `),
     'GENERAL_SNAPSHOT_PERFORMANCE_VALUES_MISSING',
@@ -865,12 +659,13 @@ async function auditGeneralPerformance(
   const snapshotsWithInvestmentPnlMismatch = report(
     await q(prisma.$queryRaw`
       SELECT count(*)::int AS n
-      FROM "equity_snapshots"
-      WHERE "season_participant_id" IS NULL
-        AND "investment_pnl_krw" IS NOT NULL
-        AND "cumulative_external_funding_krw" IS NOT NULL
-        AND "investment_pnl_krw"
-            <> ("total_asset_krw" - "cumulative_external_funding_krw")
+      FROM "equity_snapshots" s
+      JOIN "trading_accounts" a ON a."id" = s."trading_account_id"
+      WHERE a."mode" = 'general'
+        AND s."investment_pnl_krw" IS NOT NULL
+        AND s."cumulative_external_funding_krw" IS NOT NULL
+        AND s."investment_pnl_krw"
+            <> (s."total_asset_krw" - s."cumulative_external_funding_krw")
     `),
     'GENERAL_SNAPSHOT_INVESTMENT_PNL_MISMATCH',
     'general snapshot(s) where investmentPnl != totalAsset - externalFunding',
@@ -879,10 +674,11 @@ async function auditGeneralPerformance(
   const snapshotsWithReturnRateMismatch = report(
     await q(prisma.$queryRaw`
       SELECT count(*)::int AS n
-      FROM "equity_snapshots"
-      WHERE "season_participant_id" IS NULL
-        AND "time_weighted_return_factor" IS NOT NULL
-        AND round(("time_weighted_return_factor" - 1) * 100, 8) <> "return_rate"
+      FROM "equity_snapshots" s
+      JOIN "trading_accounts" a ON a."id" = s."trading_account_id"
+      WHERE a."mode" = 'general'
+        AND s."time_weighted_return_factor" IS NOT NULL
+        AND round((s."time_weighted_return_factor" - 1) * 100, 8) <> s."return_rate"
     `),
     'GENERAL_SNAPSHOT_RETURN_RATE_MISMATCH',
     'general snapshot(s) whose returnRate disagrees with their TWR factor',
@@ -1118,9 +914,7 @@ async function auditGeneralPerformance(
       FROM "equity_snapshots" s
       WHERE s."snapshot_reason" IN ('external_funding_before', 'external_funding_after')
         AND (
-          s."trading_account_id" IS NULL
-          OR s."season_participant_id" IS NOT NULL
-          OR NOT EXISTS (
+          NOT EXISTS (
             SELECT 1 FROM "ad_reward_claims" c
             WHERE c."id" = s."external_funding_reference_id"
               AND c."trading_account_id" = s."trading_account_id"
@@ -1129,7 +923,7 @@ async function auditGeneralPerformance(
         AND s."external_funding_reference_type" = 'ad_reward_claim'
     `),
     'EXTERNAL_FUNDING_BOUNDARY_ACCOUNT_SCOPE_MISMATCH',
-    'ad-reward boundary snapshot(s) missing account scope, carrying a participant, or pointing at another account’s claim',
+    'ad-reward boundary snapshot(s) point at another account’s claim',
   );
 
   const boundaryPairsWithFactorMismatch = report(
@@ -1159,24 +953,12 @@ async function auditGeneralPerformance(
     'external-funding pair(s) where the after totals are not before plus the inflow',
   );
 
-  const generalDailySnapshotsWithSeasonParticipant = report(
-    await q(prisma.$queryRaw`
-      SELECT count(*)::int AS n
-      FROM "daily_portfolio_snapshots" d
-      JOIN "trading_accounts" a ON a."id" = d."trading_account_id"
-      WHERE a."mode" = 'general' AND d."season_participant_id" IS NOT NULL
-    `),
-    'GENERAL_DAILY_SNAPSHOT_HAS_SEASON_PARTICIPANT',
-    'general daily snapshot(s) carry a season participant link',
-  );
-
   const generalDailySnapshotsMissingPerformanceValues = report(
     await q(prisma.$queryRaw`
       SELECT count(*)::int AS n
       FROM "daily_portfolio_snapshots" d
       JOIN "trading_accounts" a ON a."id" = d."trading_account_id"
       WHERE a."mode" = 'general'
-        AND d."season_participant_id" IS NULL
         AND (
           d."cumulative_external_funding_krw" IS NULL
           OR d."investment_pnl_krw" IS NULL
@@ -1200,34 +982,9 @@ async function auditGeneralPerformance(
     'daily snapshot(s) were written to a closed general account after it closed',
   );
 
-  const seasonSnapshotsWithoutAccountScope = report(
-    await q(prisma.$queryRaw`
-      SELECT count(*)::int AS n
-      FROM "equity_snapshots"
-      WHERE "season_participant_id" IS NOT NULL AND "trading_account_id" IS NULL
-    `),
-    'SEASON_SNAPSHOT_SCOPE_MISSING',
-    'season snapshot(s) have no account scope; run trading-accounts:repair-snapshot-scope',
-  );
-
-  const seasonSnapshotsWithScopeMismatch = report(
-    await q(prisma.$queryRaw`
-      SELECT count(*)::int AS n
-      FROM "equity_snapshots" s
-      JOIN "season_participants" sp ON sp."id" = s."season_participant_id"
-      WHERE s."trading_account_id" IS NOT NULL
-        AND sp."trading_account_id" IS NOT NULL
-        AND s."trading_account_id" <> sp."trading_account_id"
-    `),
-    'SEASON_SNAPSHOT_SCOPE_MISMATCH',
-    "season snapshot(s) disagree with their participant's account link",
-  );
-
   return {
     accountsWithoutPerformanceOrigin,
     accountsWithDuplicatePerformanceOrigin,
-    generalSnapshotsWithSeasonParticipant,
-    generalSnapshotsWithoutAccountScope,
     snapshotsMissingPerformanceValues,
     snapshotsWithInvestmentPnlMismatch,
     snapshotsWithReturnRateMismatch,
@@ -1237,8 +994,6 @@ async function auditGeneralPerformance(
     externalFundingPairInconsistencies,
     keyedGrantedClaimsWithoutBoundaryPair,
     duplicateAccountDateDailySnapshots,
-    seasonSnapshotsWithoutAccountScope,
-    seasonSnapshotsWithScopeMismatch,
     accountsWithLatestSnapshotBefore,
     accountsWithExternalFundingDiscontinuity,
     keyedGrantedClaimsWithoutBoundaryBefore,
@@ -1248,7 +1003,6 @@ async function auditGeneralPerformance(
     boundaryPairsWithFactorMismatch,
     boundaryPairsWithInvestmentPnlMismatch,
     boundaryPairsWithTotalAssetMismatch,
-    generalDailySnapshotsWithSeasonParticipant,
     generalDailySnapshotsMissingPerformanceValues,
     dailySnapshotsOnClosedAccounts,
   };

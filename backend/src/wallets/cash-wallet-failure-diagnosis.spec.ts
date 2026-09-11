@@ -20,14 +20,12 @@ import { diagnoseCashWalletMutationFailure } from './cash-wallet-failure-diagnos
  */
 describe('diagnoseCashWalletMutationFailure', () => {
   const expected = {
-    seasonParticipantId: 'participant-1',
     tradingAccountId: 'account-1',
     currencyCode: 'KRW',
   };
 
   const wallet = (overrides: Record<string, unknown> = {}) => ({
     id: 'wallet-1',
-    seasonParticipantId: 'participant-1',
     tradingAccountId: 'account-1',
     currencyCode: 'KRW',
     balanceAmount: new Prisma.Decimal('1000.00000000'),
@@ -90,30 +88,6 @@ describe('diagnoseCashWalletMutationFailure', () => {
       errorCode(
         diagnoseCashWalletMutationFailure(
           createClient(wallet({ tradingAccountId: 'other-account' })) as never,
-          { walletId: 'wallet-1', expected },
-        ),
-      ),
-    ).resolves.toBe('FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH');
-  });
-
-  it('throws scope mismatch when the participant differs', async () => {
-    await expect(
-      errorCode(
-        diagnoseCashWalletMutationFailure(
-          createClient(
-            wallet({ seasonParticipantId: 'other-participant' }),
-          ) as never,
-          { walletId: 'wallet-1', expected },
-        ),
-      ),
-    ).resolves.toBe('FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH');
-  });
-
-  it('throws scope mismatch when a general (participant-less) wallet is reached', async () => {
-    await expect(
-      errorCode(
-        diagnoseCashWalletMutationFailure(
-          createClient(wallet({ seasonParticipantId: null })) as never,
           { walletId: 'wallet-1', expected },
         ),
       ),

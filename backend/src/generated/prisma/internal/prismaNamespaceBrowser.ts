@@ -419,7 +419,6 @@ export type MarketSessionOverrideScalarFieldEnum = (typeof MarketSessionOverride
 
 export const PositionScalarFieldEnum = {
   id: 'id',
-  seasonParticipantId: 'seasonParticipantId',
   tradingAccountId: 'tradingAccountId',
   assetId: 'assetId',
   quantity: 'quantity',
@@ -443,7 +442,6 @@ export type PositionScalarFieldEnum = (typeof PositionScalarFieldEnum)[keyof typ
 
 export const OrderScalarFieldEnum = {
   id: 'id',
-  seasonParticipantId: 'seasonParticipantId',
   tradingAccountId: 'tradingAccountId',
   assetId: 'assetId',
   quoteId: 'quoteId',
@@ -482,7 +480,6 @@ export type OrderScalarFieldEnum = (typeof OrderScalarFieldEnum)[keyof typeof Or
 
 export const CashWalletScalarFieldEnum = {
   id: 'id',
-  seasonParticipantId: 'seasonParticipantId',
   tradingAccountId: 'tradingAccountId',
   currencyCode: 'currencyCode',
   balanceAmount: 'balanceAmount',
@@ -496,7 +493,6 @@ export type CashWalletScalarFieldEnum = (typeof CashWalletScalarFieldEnum)[keyof
 
 export const WalletTransactionScalarFieldEnum = {
   id: 'id',
-  seasonParticipantId: 'seasonParticipantId',
   tradingAccountId: 'tradingAccountId',
   walletId: 'walletId',
   currencyCode: 'currencyCode',
@@ -543,7 +539,6 @@ export type AdRewardClaimScalarFieldEnum = (typeof AdRewardClaimScalarFieldEnum)
 
 export const ExchangeTransactionScalarFieldEnum = {
   id: 'id',
-  seasonParticipantId: 'seasonParticipantId',
   tradingAccountId: 'tradingAccountId',
   fxRateSnapshotId: 'fxRateSnapshotId',
   fromCurrency: 'fromCurrency',
@@ -584,7 +579,6 @@ export type FxRateSnapshotScalarFieldEnum = (typeof FxRateSnapshotScalarFieldEnu
 export const QuoteScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
-  seasonParticipantId: 'seasonParticipantId',
   tradingAccountId: 'tradingAccountId',
   quoteType: 'quoteType',
   status: 'status',
@@ -623,7 +617,6 @@ export type QuoteScalarFieldEnum = (typeof QuoteScalarFieldEnum)[keyof typeof Qu
 export const FxExecuteRequestScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
-  seasonParticipantId: 'seasonParticipantId',
   tradingAccountId: 'tradingAccountId',
   idempotencyKey: 'idempotencyKey',
   requestHash: 'requestHash',
@@ -646,7 +639,6 @@ export type FxExecuteRequestScalarFieldEnum = (typeof FxExecuteRequestScalarFiel
 
 export const EquitySnapshotScalarFieldEnum = {
   id: 'id',
-  seasonParticipantId: 'seasonParticipantId',
   tradingAccountId: 'tradingAccountId',
   totalAssetKrw: 'totalAssetKrw',
   returnRate: 'returnRate',
@@ -671,7 +663,6 @@ export type EquitySnapshotScalarFieldEnum = (typeof EquitySnapshotScalarFieldEnu
 
 export const DailyPortfolioSnapshotScalarFieldEnum = {
   id: 'id',
-  seasonParticipantId: 'seasonParticipantId',
   tradingAccountId: 'tradingAccountId',
   snapshotDate: 'snapshotDate',
   totalAssetKrw: 'totalAssetKrw',

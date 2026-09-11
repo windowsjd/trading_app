@@ -247,7 +247,7 @@ describe('SeasonSettlementJobService', () => {
       data: {
         seasonId: 'season-1',
         seasonParticipantId: 'sp-2',
-        // 작업 8 dual-write.
+        // A ranking retains its participant target and measured account.
         tradingAccountId: 'account-of-sp-2',
         rankType: SeasonRankingType.final,
         rank: 1,
@@ -373,11 +373,7 @@ describe('SeasonSettlementJobService', () => {
 
     expect(
       valuationService.calculateTradingAccountValuation,
-    ).toHaveBeenCalledWith(
-      'account-of-sp-1',
-      seasonEndAt,
-      'season_settlement',
-    );
+    ).toHaveBeenCalledWith('account-of-sp-1', seasonEndAt, 'season_settlement');
     expect(prisma.dailyPortfolioSnapshot.findMany).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       participants: {
@@ -711,7 +707,7 @@ describe('SeasonSettlementJobService', () => {
       ).rejects.toMatchObject({
         response: {
           error: {
-            code: 'SEASON_RANKING_SOURCE_SCOPE_REPAIR_REQUIRED',
+            code: 'SEASON_RANKING_SOURCE_SCOPE_MISMATCH',
           },
         },
       });
@@ -819,7 +815,7 @@ describe('SeasonSettlementJobService', () => {
           error: {
             // NOT collapsed into 503 FINAL_VALUATION_FAILED: retrying cannot
             // fix a scope fault, only the repair scripts can.
-            code: 'SEASON_RANKING_SOURCE_SCOPE_REPAIR_REQUIRED',
+            code: 'SEASON_RANKING_SOURCE_SCOPE_MISMATCH',
           },
         },
       });
@@ -1158,8 +1154,8 @@ function createPrismaMock() {
       count: jest.fn().mockResolvedValue(0),
     },
     seasonParticipant: {
-      // 작업 7 dual-write: the settlement snapshot writer resolves the
-      // participant's verified account inside the transaction.
+      // The settlement snapshot writer resolves the participant's verified
+      // account inside the transaction, then persists account ownership only.
       findUnique: jest.fn(async (args: { where: { id: string } }) => ({
         tradingAccountId: `account-of-${args.where.id}`,
       })),

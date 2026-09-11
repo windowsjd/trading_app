@@ -40,6 +40,7 @@ describe('fx execute pre-mutation orchestration policy', () => {
   const context = {
     userId: 'user-1',
     seasonParticipantId: 'participant-1',
+    tradingAccountId: 'account-1',
   };
   const validBody: FxExecuteRequestBodyLike = {
     quoteId: 'quote-fx-1',
@@ -63,10 +64,8 @@ describe('fx execute pre-mutation orchestration policy', () => {
     id: string,
     currencyCode: 'KRW' | 'USD',
     balanceAmount: string | Prisma.Decimal,
-    seasonParticipantId = 'participant-1',
   ): FxExecuteWalletCandidate => ({
     id,
-    seasonParticipantId,
     currencyCode,
     balanceAmount,
   });

@@ -61,7 +61,10 @@ export function computeFxQuoteRequestHash(
   });
 }
 
-/** Account-scoped v2. The season v1 payload above is deliberately unchanged. */
+/**
+ * Account-scoped v2 for general mode. The released season v1 payload above is
+ * immutable compatibility data, not a participant ownership lookup.
+ */
 export function computeGeneralFxQuoteRequestHash(
   input: GeneralFxQuoteRequestHashInput,
 ): string {
@@ -81,6 +84,9 @@ export function computeGeneralFxQuoteRequestHash(
 export function computeOrderQuoteRequestHash(
   input: OrderQuoteRequestHashInput,
 ): string {
+  // Preserve the released season v1 bytes so open limit orders remain
+  // executable. This participant value is hash compatibility metadata only;
+  // Quote ownership, lookup, and uniqueness are account-scoped.
   return sha256Json({
     apiVersion: ORDER_QUOTE_REQUEST_HASH_API_VERSION,
     userId: normalizeRequiredString(input.userId, 'userId'),

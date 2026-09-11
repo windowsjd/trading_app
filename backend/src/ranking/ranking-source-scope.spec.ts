@@ -117,7 +117,6 @@ describe('ranking source snapshot scopes', () => {
 
   const snapshotRow = (overrides: Record<string, unknown> = {}) => ({
     id: 'snapshot-1',
-    seasonParticipantId: 'sp-1',
     tradingAccountId: 'account-sp-1',
     cumulativeExternalFundingKrw: null,
     investmentPnlKrw: null,
@@ -143,7 +142,7 @@ describe('ranking source snapshot scopes', () => {
           rows: [snapshotRow({ tradingAccountId: null })],
           participantScopes: scopes,
         }),
-      rankingSourceScopeErrorCodes.SEASON_RANKING_SOURCE_SCOPE_REPAIR_REQUIRED,
+      rankingSourceScopeErrorCodes.SEASON_RANKING_SOURCE_SCOPE_MISMATCH,
     );
   });
 
@@ -153,30 +152,6 @@ describe('ranking source snapshot scopes', () => {
         assertRankingSourceSnapshotScopes({
           kind: 'equity snapshot',
           rows: [snapshotRow({ tradingAccountId: 'account-other' })],
-          participantScopes: scopes,
-        }),
-      rankingSourceScopeErrorCodes.SEASON_RANKING_SOURCE_SCOPE_MISMATCH,
-    );
-  });
-
-  it('fails the job on a snapshot with no participant at all', () => {
-    expectSourceFailure(
-      () =>
-        assertRankingSourceSnapshotScopes({
-          kind: 'daily portfolio snapshot',
-          rows: [snapshotRow({ seasonParticipantId: null })],
-          participantScopes: scopes,
-        }),
-      rankingSourceScopeErrorCodes.SEASON_RANKING_SOURCE_SCOPE_MISMATCH,
-    );
-  });
-
-  it('fails the job on a participant outside this ranking set', () => {
-    expectSourceFailure(
-      () =>
-        assertRankingSourceSnapshotScopes({
-          kind: 'daily portfolio snapshot',
-          rows: [snapshotRow({ seasonParticipantId: 'sp-unknown' })],
           participantScopes: scopes,
         }),
       rankingSourceScopeErrorCodes.SEASON_RANKING_SOURCE_SCOPE_MISMATCH,
@@ -215,7 +190,6 @@ describe('ranking source order scopes', () => {
         rows: [
           {
             id: 'order-1',
-            seasonParticipantId: 'sp-1',
             tradingAccountId: 'account-sp-1',
           },
         ],
@@ -231,13 +205,12 @@ describe('ranking source order scopes', () => {
           rows: [
             {
               id: 'order-1',
-              seasonParticipantId: 'sp-1',
               tradingAccountId: null,
             },
           ],
           participantScopes: scopes,
         }),
-      rankingSourceScopeErrorCodes.SEASON_RANKING_SOURCE_SCOPE_REPAIR_REQUIRED,
+      rankingSourceScopeErrorCodes.SEASON_RANKING_SOURCE_SCOPE_MISMATCH,
     );
   });
 
@@ -248,7 +221,6 @@ describe('ranking source order scopes', () => {
           rows: [
             {
               id: 'order-1',
-              seasonParticipantId: 'sp-1',
               tradingAccountId: 'account-other',
             },
           ],

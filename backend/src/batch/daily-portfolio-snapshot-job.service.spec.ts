@@ -375,7 +375,6 @@ describe('DailyPortfolioSnapshotJobService', () => {
     expect(prisma.dailyPortfolioSnapshot.create).toHaveBeenCalledTimes(2);
     expect(prisma.dailyPortfolioSnapshot.create).toHaveBeenLastCalledWith({
       data: expect.objectContaining({
-        seasonParticipantId: 'sp-2',
         tradingAccountId: 'account-of-sp-2',
       }),
       select: { id: true },
@@ -478,7 +477,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
     );
     expect(prisma.dailyPortfolioSnapshot.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'account-of-sp-1',
         snapshotDate: new Date('2026-05-20T00:00:00.000Z'),
         totalAssetKrw: '1200000.00000000',
         krwCash: '900000.00000000',
@@ -869,7 +868,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
 
     expect(prisma.dailyPortfolioSnapshot.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        seasonParticipantId: 'sp-provider',
+        tradingAccountId: 'account-of-sp-provider',
         totalAssetKrw: '1000100.00000000',
         assetValueKrw: '100.00000000',
       }),
@@ -1168,9 +1167,9 @@ function mockParticipants(
 ) {
   prisma.seasonParticipant.findMany.mockResolvedValue(
     participants.map((participant) => ({
-      // 작업 7 dual-write: every snapshot records the account too, so the
-      // default fixture has a link. Pass `tradingAccountId: null` explicitly
-      // to exercise the fail-closed path.
+      // Snapshot ownership is account-only, so the default participant fixture
+      // must expose its account link. Pass `tradingAccountId: null` explicitly
+      // to exercise the fail-closed resolution path.
       tradingAccountId: `account-of-${participant.id}`,
       ...participant,
     })),

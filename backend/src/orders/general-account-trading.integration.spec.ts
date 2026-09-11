@@ -69,11 +69,8 @@ import {
   AssetType,
   CurrencyCode,
   OrderStatus,
-  ParticipantStatus,
   Prisma,
-  SeasonStatus,
   SnapshotReason,
-  TradingAccountMode,
   TradingAccountStatus,
 } from './src/generated/prisma/client';
 import { PrismaService } from './src/prisma/prisma.service';
@@ -171,49 +168,6 @@ async function openGeneral(userId) {
   const opened = await generalAccounts.openGeneralAccount(userId);
   accountIds.push(opened.data.account.id);
   return opened.data.account.id;
-}
-
-async function createPollutionParticipant(userId) {
-  const now = new Date();
-  const season = await prisma.season.create({
-    data: {
-      name: 'general-trading-pollution-' + randomUUID().slice(0, 8),
-      status: SeasonStatus.active,
-      startAt: new Date(now.getTime() - 60_000),
-      endAt: new Date(now.getTime() + 86_400_000),
-      initialCapitalKrw: '10000000.00000000',
-      tradeFeeRate: '0.001000',
-      fxFeeRate: '0.001000',
-    },
-    select: { id: true },
-  });
-  seasonIds.push(season.id);
-  const account = await prisma.tradingAccount.create({
-    data: {
-      userId,
-      mode: TradingAccountMode.season,
-      status: TradingAccountStatus.active,
-      initialCapitalKrw: '10000000.00000000',
-      openedAt: now,
-    },
-    select: { id: true },
-  });
-  accountIds.push(account.id);
-  const participant = await prisma.seasonParticipant.create({
-    data: {
-      seasonId: season.id,
-      userId,
-      tradingAccountId: account.id,
-      joinedAt: now,
-      participantStatus: ParticipantStatus.active,
-      initialCapitalKrw: '10000000.00000000',
-      totalAssetKrw: '10000000.00000000',
-      totalReturnRate: '0.00000000',
-      maxDrawdown: '0.00000000',
-    },
-    select: { id: true },
-  });
-  return participant.id;
 }
 
 async function createAsset() {
@@ -523,7 +477,6 @@ async function main() {
   });
   assert.equal(domesticOrder.status, OrderStatus.executed);
   assert.equal(domesticOrder.tradingAccountId, accountId);
-  assert.equal(domesticOrder.seasonParticipantId, null);
   assert.equal(text(domesticOrder.feeAmount), '700.00000000');
   const domesticWallet = await prisma.cashWallet.findUniqueOrThrow({
     where: {
@@ -542,12 +495,10 @@ async function main() {
       },
     },
   });
-  assert.equal(domesticPosition.seasonParticipantId, null);
   assert.equal(text(domesticPosition.quantity), '10.00000000');
   const domesticLedger = await prisma.walletTransaction.findFirstOrThrow({
     where: { tradingAccountId: accountId, referenceId: domesticOrderId },
   });
-  assert.equal(domesticLedger.seasonParticipantId, null);
   assert.equal(text(domesticLedger.amount), '700700.00000000');
 
   // A quote minted by the previous version has no general market fee pin.
@@ -719,7 +670,6 @@ async function main() {
   const buyOrderId = buy.response.data.order.orderId;
   const buyOrder = await prisma.order.findUnique({ where: { id: buyOrderId } });
   assert.equal(buyOrder.tradingAccountId, accountId);
-  assert.equal(buyOrder.seasonParticipantId, null);
   assert.equal(text(buyOrder.grossAmount), '1000.00000000');
   assert.equal(text(buyOrder.feeAmount), '1.00000000');
   assert.equal(text(buyOrder.netAmount), '1001.00000000');
@@ -727,13 +677,11 @@ async function main() {
   const positionAfterBuy = await prisma.position.findUnique({
     where: { tradingAccountId_assetId: { tradingAccountId: accountId, assetId } },
   });
-  assert.equal(positionAfterBuy.seasonParticipantId, null);
   assert.equal(text(positionAfterBuy.quantity), '10.00000000');
   const buyLedger = await prisma.walletTransaction.findFirst({
     where: { referenceId: buyOrderId },
   });
   assert.equal(buyLedger.tradingAccountId, accountId);
-  assert.equal(buyLedger.seasonParticipantId, null);
 
   const beforeReplayWallet = await prisma.cashWallet.findUnique({
     where: {
@@ -1026,7 +974,6 @@ async function main() {
   );
   assert.equal(orderSnapshots.length, 5);
   for (const row of orderSnapshots) {
-    assert.equal(row.seasonParticipantId, null);
     assert.notEqual(row.cumulativeExternalFundingKrw, null);
     assert.notEqual(row.investmentPnlKrw, null);
     assert.notEqual(row.timeWeightedReturnFactor, null);
@@ -1042,10 +989,8 @@ async function main() {
     0,
   );
 
-  // General financial rows must remain account-only. The migration permits a
-  // nullable participant for compatibility, so directly injected participant
-  // pollution must fail closed on reads instead of being hidden or adopted.
-  const pollutionParticipantId = await createPollutionParticipant(userId);
+  // General financial rows are account-only. Cross-account child corruption
+  // still fails closed, and no participant ownership column remains to drift.
   await prisma.order.update({
     where: { id: sellOrderId },
     data: { tradingAccountId: strangerAccountId },
@@ -1063,74 +1008,10 @@ async function main() {
     data: { tradingAccountId: accountId },
   });
 
-  await prisma.order.update({
-    where: { id: buyOrderId },
-    data: { seasonParticipantId: pollutionParticipantId },
-  });
-  await expectCode(
-    orders.getOrdersForTradingAccount(userId, accountId),
-    'GENERAL_ACCOUNT_INTEGRITY',
+  const participantColumns = await prisma.$queryRawUnsafe(
+    "SELECT table_name FROM information_schema.columns WHERE table_schema = 'public' AND column_name = 'season_participant_id' AND table_name IN ('orders', 'positions', 'quotes', 'cash_wallets')",
   );
-  await prisma.order.update({
-    where: { id: buyOrderId },
-    data: { seasonParticipantId: null },
-  });
-
-  const generalPosition = await prisma.position.findFirstOrThrow({
-    where: { tradingAccountId: accountId, assetId },
-    select: { id: true },
-  });
-  await prisma.position.update({
-    where: { id: generalPosition.id },
-    data: { seasonParticipantId: pollutionParticipantId },
-  });
-  await expectCode(
-    positions.getPositionsForTradingAccount(userId, accountId),
-    'GENERAL_ACCOUNT_INTEGRITY',
-  );
-  await prisma.position.update({
-    where: { id: generalPosition.id },
-    data: { seasonParticipantId: null },
-  });
-
-  const generalQuote = await prisma.quote.findFirstOrThrow({
-    where: { tradingAccountId: accountId },
-    select: { id: true },
-  });
-  await prisma.quote.update({
-    where: { id: generalQuote.id },
-    data: { seasonParticipantId: pollutionParticipantId },
-  });
-  await expectCode(
-    orders.getOrderForTradingAccount(userId, accountId, buyOrderId),
-    'GENERAL_ACCOUNT_INTEGRITY',
-  );
-  await prisma.quote.update({
-    where: { id: generalQuote.id },
-    data: { seasonParticipantId: null },
-  });
-
-  const generalUsdWallet = await prisma.cashWallet.findUniqueOrThrow({
-    where: {
-      tradingAccountId_currencyCode: {
-        tradingAccountId: accountId,
-        currencyCode: CurrencyCode.USD,
-      },
-    },
-    select: { id: true },
-  });
-  await prisma.cashWallet.update({
-    where: { id: generalUsdWallet.id },
-    data: { seasonParticipantId: pollutionParticipantId },
-  });
-  await expectCode(
-    orders.getOrdersForTradingAccount(userId, accountId),
-    'GENERAL_ACCOUNT_INTEGRITY',
-  );
-  await prisma.cashWallet.update({
-    where: { id: generalUsdWallet.id },
-    data: { seasonParticipantId: null },
-  });
+  assert.deepEqual(participantColumns, []);
 
   console.log('general trading db integration ok');
  } finally {

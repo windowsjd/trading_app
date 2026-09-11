@@ -117,7 +117,7 @@ export async function runAdminGenerateDailyPortfolioSnapshot(argv: string[]) {
             seasonParticipantId,
             capturedAt,
           );
-        // 작업 7 dual-write: never write an unscoped snapshot from a script
+        // Never write a snapshot without its canonical account scope.
         // either — a missing link means repair-links has not converged yet.
         const participant = await prisma.seasonParticipant.findUnique({
           where: { id: seasonParticipantId },

@@ -4,6 +4,23 @@
 
 ## 0. 구현 상태 구분 (반드시 먼저 읽을 것)
 
+### 현재 canonical 상태 (2026-09-11, 작업 2)
+
+- `SeasonParticipant.tradingAccountId`와 모든 account-owned 금융/거래 row의
+  `tradingAccountId`는 required다.
+- CashWallet, WalletTransaction, ExchangeTransaction, FxExecuteRequest,
+  Quote, Order, Position, EquitySnapshot, DailyPortfolioSnapshot은
+  `tradingAccountId`만 소유권으로 저장한다. participant column/relation,
+  participant 기반 unique/index/FK, dual-write와 fallback은 제거됐다.
+- SeasonRanking, SeasonReward, RewardFulfillmentRequest의 participant relation은
+  참가·랭킹·보상이라는 시즌 도메인 식별자이므로 유지한다.
+- 아래의 nullable scope, dual-write, financial/trading/snapshot repair 단계는
+  이전 rolling migration의 역사와 당시 검증 근거다. 현행 명령은
+  `repair-links`, `repair-ranking-scope`, `backfill-general-performance`,
+  `audit-general`이며 account-owned scope repair 세 종류는 제거됐다.
+
+이 현재 상태가 아래 과거 전환 단계 설명보다 우선한다.
+
 **설계 확정(정책으로 고정, 코드 여부와 무관):**
 
 - 시즌모드와 일반모드 규칙, 모드별 자산 완전 분리 원칙

@@ -95,7 +95,7 @@ Daily snapshot policy:
 - If `--idempotency-key` is omitted, it is generated as `daily-portfolio-snapshot:<season-id>:<YYYY-MM-DD>`.
 - `--dry-run` evaluates active participants and reports `wouldCreate`, `existing`, `failed`, and aggregate `sourceSummary` counts without inserting `daily_portfolio_snapshots`.
 - Non-dry-run creates snapshots only for participants whose valuation is available.
-- Existing `(seasonParticipantId, snapshotDate)` rows are classified as `existing` and are not overwritten.
+- Existing `(tradingAccountId, snapshotDate)` rows are classified as `existing` and are not overwritten; participant identity is resolved separately for season policy/reporting.
 - Fresh eligible `provider_api` rows are selected first for USD/KRW and asset prices. Provider USD/KRW freshness uses capturedAt age <= 300 seconds; provider asset price freshness uses capturedAt age <= 60 seconds.
 - Missing, stale, future, non-positive, wrong-source, wrong-type, or ineligible provider rows fall back to existing safe `admin_manual` selection where available.
 - Provider missing/rejected plus missing/stale admin_manual evidence is participant-level failure with no fake fallback.

@@ -163,13 +163,13 @@ async function createSeason(label, options = {}) {
 
 async function cleanup(scope) {
   await prisma.walletTransaction.deleteMany({
-    where: { seasonParticipantId: { in: scope.participantIds } },
+    where: { tradingAccount: { userId: { in: scope.userIds } } },
   });
   await prisma.equitySnapshot.deleteMany({
-    where: { seasonParticipantId: { in: scope.participantIds } },
+    where: { tradingAccount: { userId: { in: scope.userIds } } },
   });
   await prisma.cashWallet.deleteMany({
-    where: { seasonParticipantId: { in: scope.participantIds } },
+    where: { tradingAccount: { userId: { in: scope.userIds } } },
   });
   await prisma.seasonParticipant.deleteMany({
     where: { id: { in: scope.participantIds } },
@@ -250,7 +250,6 @@ async function testBackfillMappingAndNonDestruction() {
 
     const wallet = await prisma.cashWallet.create({
       data: {
-        seasonParticipantId: participant.id,
         tradingAccountId: account.id,
         currencyCode: CurrencyCode.KRW,
         balanceAmount: '1234567.00000000',
@@ -259,7 +258,6 @@ async function testBackfillMappingAndNonDestruction() {
     });
     await prisma.walletTransaction.create({
       data: {
-        seasonParticipantId: participant.id,
         tradingAccountId: account.id,
         walletId: wallet.id,
         currencyCode: CurrencyCode.KRW,
@@ -460,12 +458,12 @@ async function testJoinCreatesAccountAtomically() {
 
     // Wallets + initial grant still created exactly as before.
     const wallets = await prisma.cashWallet.findMany({
-      where: { seasonParticipantId: participantId },
+      where: { tradingAccountId: participant.tradingAccountId },
     });
     assert.equal(wallets.length, 2);
     const grants = await prisma.walletTransaction.count({
       where: {
-        seasonParticipantId: participantId,
+        tradingAccountId: participant.tradingAccountId,
         txType: WalletTransactionType.initial_grant,
       },
     });
@@ -492,14 +490,14 @@ async function testJoinCreatesAccountAtomically() {
     );
     assert.equal(
       await prisma.cashWallet.count({
-        where: { seasonParticipantId: participantId },
+        where: { tradingAccountId: participant.tradingAccountId },
       }),
       2,
     );
     assert.equal(
       await prisma.walletTransaction.count({
         where: {
-          seasonParticipantId: participantId,
+          tradingAccountId: participant.tradingAccountId,
           txType: WalletTransactionType.initial_grant,
         },
       }),
@@ -563,7 +561,7 @@ async function testJoinRollbackOnLaterFailure(failingModel) {
     );
     assert.equal(
       await prisma.cashWallet.count({
-        where: { seasonParticipant: { userId: user.id } },
+        where: { tradingAccount: { userId: user.id } },
       }),
       0,
     );

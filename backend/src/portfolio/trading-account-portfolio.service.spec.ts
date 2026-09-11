@@ -180,9 +180,6 @@ describe('account equity daily read contract and legacy ranges', () => {
           h.rows[0].tradingAccountId = 'other';
         },
         (h) => {
-          h.rows[0].seasonParticipantId = 'other';
-        },
-        (h) => {
           h.rows[1].snapshotDate = h.rows[0].snapshotDate;
         },
       ]) {

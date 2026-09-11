@@ -4,8 +4,9 @@
 > under `GET /api/v1/trading-accounts/:accountId/positions` (same filters,
 > valuation, sorting, serialization; rows selected by the position's own
 > `tradingAccountId`). This legacy surface is UNCHANGED, and both return the
-> same positions for the same season account. New positions dual-write
-> `tradingAccountId`; execution paths verify position scope before mutating.
+> same positions for the same season account. Positions use required
+> `tradingAccountId` as their only ownership key; execution paths verify that
+> account scope before mutating.
 > See `docs/trading-account-orders-api-contract.md`.
 
 ## Status

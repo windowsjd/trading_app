@@ -6,10 +6,6 @@ import {
   SeasonRankingType,
 } from '../src/generated/prisma/client';
 import { writeSeasonRankings } from '../src/portfolio/season-ranking-generation';
-import {
-  requireSeasonSnapshotParticipantId,
-  seasonSnapshotWhere,
-} from '../src/portfolio/season-snapshot-scope';
 import { buildRankingRowsForSnapshots } from '../src/ranking/ranking-calculation.policy';
 import {
   assertRankingSourceOrderScopes,
@@ -100,19 +96,25 @@ export async function runAdminGenerateSeasonRanking(argv: string[]) {
       seasonId,
       participants,
     );
+    const participantByAccount = new Map(
+      participants.map((participant) => [
+        participant.tradingAccountId!,
+        participant,
+      ]),
+    );
 
     const snapshots = await prisma.dailyPortfolioSnapshot.findMany({
       where: {
         snapshotDate: rankingDate,
-        // Season-only: general-mode daily rows never enter a season ranking.
-        ...seasonSnapshotWhere,
-        seasonParticipant: {
-          seasonId,
+        tradingAccountId: {
+          in: [...participantScopes.values()],
+        },
+        tradingAccount: {
+          seasonParticipant: { seasonId },
         },
       },
       select: {
         id: true,
-        seasonParticipantId: true,
         tradingAccountId: true,
         cumulativeExternalFundingKrw: true,
         investmentPnlKrw: true,
@@ -122,11 +124,6 @@ export async function runAdminGenerateSeasonRanking(argv: string[]) {
         returnRate: true,
         capturedAt: true,
         createdAt: true,
-        seasonParticipant: {
-          select: {
-            userId: true,
-          },
-        },
       },
     });
     assertRankingSourceSnapshotScopes({
@@ -152,14 +149,15 @@ export async function runAdminGenerateSeasonRanking(argv: string[]) {
           snapshotDate: {
             lte: rankingDate,
           },
-          ...seasonSnapshotWhere,
-          seasonParticipant: {
-            seasonId,
+          tradingAccountId: {
+            in: [...participantScopes.values()],
+          },
+          tradingAccount: {
+            seasonParticipant: { seasonId },
           },
         },
         select: {
           id: true,
-          seasonParticipantId: true,
           tradingAccountId: true,
           cumulativeExternalFundingKrw: true,
           investmentPnlKrw: true,
@@ -178,13 +176,15 @@ export async function runAdminGenerateSeasonRanking(argv: string[]) {
             not: null,
             lte: latestCapturedAt ?? capturedAt,
           },
-          seasonParticipant: {
-            seasonId,
+          tradingAccountId: {
+            in: [...participantScopes.values()],
+          },
+          tradingAccount: {
+            seasonParticipant: { seasonId },
           },
         },
         select: {
           id: true,
-          seasonParticipantId: true,
           tradingAccountId: true,
           executedAt: true,
         },
@@ -199,12 +199,18 @@ export async function runAdminGenerateSeasonRanking(argv: string[]) {
       rows: executedOrders,
       participantScopes,
     });
+    const participantIdByAccount = new Map(
+      [...participantScopes].map(([participantId, accountId]) => [
+        accountId,
+        participantId,
+      ]),
+    );
     const rows = buildRankingRowsForSnapshots({
       rankingSnapshots: snapshots.map((snapshot) => ({
-        seasonParticipantId: requireSeasonSnapshotParticipantId(
-          snapshot.seasonParticipantId,
-        ),
-        userId: snapshot.seasonParticipant?.userId ?? '',
+        seasonParticipantId: participantByAccount.get(
+          snapshot.tradingAccountId,
+        )!.id,
+        userId: participantByAccount.get(snapshot.tradingAccountId)!.userId,
         snapshotDate: snapshot.snapshotDate,
         totalAssetKrw: snapshot.totalAssetKrw,
         returnRate: snapshot.returnRate,
@@ -213,15 +219,15 @@ export async function runAdminGenerateSeasonRanking(argv: string[]) {
       })),
       historicalSnapshots: historicalSnapshots.map((snapshot) => ({
         ...snapshot,
-        seasonParticipantId: requireSeasonSnapshotParticipantId(
-          snapshot.seasonParticipantId,
-        ),
+        seasonParticipantId: participantIdByAccount.get(
+          snapshot.tradingAccountId,
+        )!,
       })),
       executedOrders: executedOrders.map((order) => ({
         ...order,
-        seasonParticipantId: requireSeasonSnapshotParticipantId(
-          order.seasonParticipantId,
-        ),
+        seasonParticipantId: participantIdByAccount.get(
+          order.tradingAccountId,
+        )!,
       })),
     });
     const writeResult = await writeSeasonRankings(prisma, {

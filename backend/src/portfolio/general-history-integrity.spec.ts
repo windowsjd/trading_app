@@ -62,7 +62,6 @@ function equityRow(
 ): GeneralHistoryEquityRow {
   return {
     id: 'equity-1',
-    seasonParticipantId: null,
     tradingAccountId: ACCOUNT_ID,
     totalAssetKrw: d('10000000'),
     returnRate: d('0'),
@@ -132,14 +131,6 @@ describe('general equity history rows', () => {
           totalAssetKrw: d('-1'),
           investmentPnlKrw: d('-10000001'),
         }),
-      ]),
-    );
-  });
-
-  it('rejects a season participant link on a general row', () => {
-    expectIntegrityFailure(() =>
-      assertGeneralEquityHistoryRows(ACCOUNT_ID, [
-        equityRow({ seasonParticipantId: 'sp-1' }),
       ]),
     );
   });

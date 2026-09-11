@@ -189,7 +189,7 @@ async function createScenario(label) {
     data: {
       email: TEST_PREFIX + '-' + label + '-' + suffix + '@example.com',
       passwordHash: 'integration-test-only',
-      nickname: (TEST_PREFIX + '-' + label + '-' + suffix).slice(0, 40),
+      nickname: ('race-' + suffix + '-' + label).slice(0, 40),
     },
     select: { id: true },
   });
@@ -198,7 +198,7 @@ async function createScenario(label) {
     data: {
       email: TEST_PREFIX + '-op-' + label + '-' + suffix + '@example.com',
       passwordHash: 'integration-test-only',
-      nickname: (TEST_PREFIX + '-op-' + label + '-' + suffix).slice(0, 40),
+      nickname: ('race-op-' + suffix + '-' + label).slice(0, 40),
       role: UserRole.operator,
     },
     select: { id: true, role: true },
@@ -250,7 +250,6 @@ async function createScenario(label) {
 
   const wallet = await prisma.cashWallet.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: tradingAccount.id,
       currencyCode: CurrencyCode.KRW,
       balanceAmount: '1000000.00000000',
@@ -294,6 +293,7 @@ async function createLimitQuote(scenario, overrides = {}) {
   const requestHash = computeOrderQuoteRequestHash({
     userId: scenario.userId,
     seasonParticipantId: scenario.participantId,
+    tradingAccountId: scenario.tradingAccountId,
     assetId: scenario.assetId,
     side: 'buy',
     orderType: 'limit',
@@ -305,7 +305,6 @@ async function createLimitQuote(scenario, overrides = {}) {
   const quote = await prisma.quote.create({
     data: {
       userId: scenario.userId,
-      seasonParticipantId: scenario.participantId,
       tradingAccountId: scenario.tradingAccountId,
       quoteType: QuoteType.order,
       status: QuoteStatus.active,
@@ -347,13 +346,13 @@ async function cleanupScenario(scenario) {
     where: { actorUserId: scenario.operator.userId },
   });
   await prisma.order.deleteMany({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   await prisma.quote.deleteMany({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   await prisma.cashWallet.deleteMany({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
   });
   await prisma.seasonParticipant.deleteMany({
     where: { id: scenario.participantId },
@@ -382,7 +381,7 @@ async function readWallet(scenario) {
 
 async function readOrders(scenario) {
   return prisma.order.findMany({
-    where: { seasonParticipantId: scenario.participantId },
+    where: { tradingAccountId: scenario.tradingAccountId },
     select: {
       id: true,
       status: true,
@@ -747,10 +746,7 @@ async function testCreateRollback() {
               currencyCode: CurrencyCode.KRW,
             },
           },
-          participant: {
-            id: scenario.participantId,
-            tradingAccountId: scenario.tradingAccountId,
-          },
+          tradingAccountId: scenario.tradingAccountId,
           quantity: quote.quantity,
           idempotency: { idempotencyKey: 'race-rollback-1', requestHash: 'race-rollback-1' },
           submittedAt: new Date(),

@@ -179,8 +179,7 @@ export class LimitOrderCreateService {
    * when available position quantity cannot cover it. Never mutates anything.
    */
   async buildLimitBuyQuotePreview(input: {
-    participantId: string | null;
-    /** VERIFIED trading account id (participant link / owned account). */
+    /** VERIFIED trading account id. */
     tradingAccountId: string;
     assetId: string;
     currencyCode: CurrencyCode;
@@ -204,7 +203,6 @@ export class LimitOrderCreateService {
         },
         select: {
           id: true,
-          seasonParticipantId: true,
           tradingAccountId: true,
           balanceAmount: true,
           reservedAmount: true,
@@ -219,7 +217,6 @@ export class LimitOrderCreateService {
         },
         select: {
           id: true,
-          seasonParticipantId: true,
           tradingAccountId: true,
           quantity: true,
         },
@@ -230,7 +227,6 @@ export class LimitOrderCreateService {
     // scope must never back an available-balance preview.
     if (wallet) {
       assertCashWalletTradingAccountScope(wallet, {
-        seasonParticipantId: input.participantId,
         tradingAccountId: input.tradingAccountId,
       });
     }
@@ -251,11 +247,7 @@ export class LimitOrderCreateService {
     }
 
     const positionQuantityBefore = position?.quantity ?? new Prisma.Decimal(0);
-    if (
-      position &&
-      (position.seasonParticipantId !== input.participantId ||
-        position.tradingAccountId !== input.tradingAccountId)
-    ) {
+    if (position && position.tradingAccountId !== input.tradingAccountId) {
       this.throwApiError(
         HttpStatus.INTERNAL_SERVER_ERROR,
         'TRADING_ACCOUNT_SCOPE_MISMATCH',
@@ -281,7 +273,6 @@ export class LimitOrderCreateService {
   }
 
   async buildLimitSellQuotePreview(input: {
-    participantId: string | null;
     tradingAccountId: string;
     assetId: string;
     currencyCode: CurrencyCode;
@@ -304,7 +295,6 @@ export class LimitOrderCreateService {
         },
         select: {
           id: true,
-          seasonParticipantId: true,
           tradingAccountId: true,
           balanceAmount: true,
         },
@@ -317,7 +307,6 @@ export class LimitOrderCreateService {
           },
         },
         select: {
-          seasonParticipantId: true,
           tradingAccountId: true,
           quantity: true,
           reservedQuantity: true,
@@ -326,15 +315,10 @@ export class LimitOrderCreateService {
     ]);
     if (wallet) {
       assertCashWalletTradingAccountScope(wallet, {
-        seasonParticipantId: input.participantId,
         tradingAccountId: input.tradingAccountId,
       });
     }
-    if (
-      position &&
-      (position.seasonParticipantId !== input.participantId ||
-        position.tradingAccountId !== input.tradingAccountId)
-    ) {
+    if (position && position.tradingAccountId !== input.tradingAccountId) {
       this.throwApiError(
         HttpStatus.INTERNAL_SERVER_ERROR,
         'TRADING_ACCOUNT_SCOPE_MISMATCH',
@@ -565,12 +549,8 @@ export class LimitOrderCreateService {
           currencyCode: CurrencyCode;
         };
       };
-      participant: {
-        id: string | null;
-        /** VERIFIED trading account id (participant link, re-checked against
-         * the locked row by the caller). */
-        tradingAccountId: string;
-      };
+      /** VERIFIED trading account id. */
+      tradingAccountId: string;
       quantity: Prisma.Decimal;
       idempotency: { idempotencyKey: string; requestHash: string };
       submittedAt: Date;
@@ -598,8 +578,7 @@ export class LimitOrderCreateService {
     // the wallet's scope is verified and rides in the UPDATE's WHERE, so a
     // foreign/unscoped wallet can never be reserved against).
     await this.reservation.reserveForLimitBuy(tx, {
-      seasonParticipantId: input.participant.id,
-      tradingAccountId: input.participant.tradingAccountId,
+      tradingAccountId: input.tradingAccountId,
       currencyCode,
       amount: reservedAmountText,
     });
@@ -611,8 +590,7 @@ export class LimitOrderCreateService {
     // the quote's pinned quoted* amounts).
     const created = await tx.order.create({
       data: {
-        seasonParticipantId: input.participant.id,
-        tradingAccountId: input.participant.tradingAccountId,
+        tradingAccountId: input.tradingAccountId,
         assetId: input.quote.asset.id,
         quoteId: input.quote.id,
         side: OrderSide.buy,
@@ -641,35 +619,20 @@ export class LimitOrderCreateService {
       select: { id: true },
     });
 
-    // 3) Consume the quote inside the same transaction. Account-conditioned:
-    // only this participant's quote flips, and only when its scope is the
-    // verified canonical account.
-    const consumeCount =
-      input.participant.id === null
-        ? (
-            await tx.quote.updateMany({
-              where: {
-                id: input.quote.id,
-                status: QuoteStatus.active,
-                seasonParticipantId: null,
-                tradingAccountId: input.participant.tradingAccountId,
-              },
-              data: {
-                status: QuoteStatus.consumed,
-                consumedAt: input.submittedAt,
-              },
-            })
-          ).count
-        : await tx.$executeRaw`
-            UPDATE "quotes"
-            SET "status" = 'consumed',
-                "consumed_at" = ${input.submittedAt},
-                "updated_at" = clock_timestamp()
-            WHERE "id" = ${input.quote.id}
-              AND "status" = 'active'
-              AND "season_participant_id" = ${input.participant.id}
-              AND "trading_account_id" = ${input.participant.tradingAccountId}
-          `;
+    // 3) Consume the quote inside the same transaction and account scope.
+    const consumeCount = (
+      await tx.quote.updateMany({
+        where: {
+          id: input.quote.id,
+          status: QuoteStatus.active,
+          tradingAccountId: input.tradingAccountId,
+        },
+        data: {
+          status: QuoteStatus.consumed,
+          consumedAt: input.submittedAt,
+        },
+      })
+    ).count;
 
     if (consumeCount !== 1) {
       throw new HttpException(
@@ -744,7 +707,7 @@ export class LimitOrderCreateService {
           currencyCode: CurrencyCode;
         };
       };
-      participant: { id: string | null; tradingAccountId: string };
+      tradingAccountId: string;
       quantity: Prisma.Decimal;
       idempotency: { idempotencyKey: string; requestHash: string };
       submittedAt: Date;
@@ -785,13 +748,12 @@ export class LimitOrderCreateService {
     const position = await tx.position.findUnique({
       where: {
         tradingAccountId_assetId: {
-          tradingAccountId: input.participant.tradingAccountId,
+          tradingAccountId: input.tradingAccountId,
           assetId: input.quote.asset.id,
         },
       },
       select: {
         id: true,
-        seasonParticipantId: true,
         tradingAccountId: true,
         currencyCode: true,
       },
@@ -803,10 +765,7 @@ export class LimitOrderCreateService {
         'Position for the limit sell was not found.',
       );
     }
-    if (
-      position.seasonParticipantId !== input.participant.id ||
-      position.tradingAccountId !== input.participant.tradingAccountId
-    ) {
+    if (position.tradingAccountId !== input.tradingAccountId) {
       this.throwApiError(
         HttpStatus.INTERNAL_SERVER_ERROR,
         'TRADING_ACCOUNT_SCOPE_MISMATCH',
@@ -816,8 +775,7 @@ export class LimitOrderCreateService {
     const quantityText = formatDecimalScale(input.quantity, orderQuantityScale);
     const reserved = await reserveAvailablePositionQuantity(tx, {
       positionId: position.id,
-      seasonParticipantId: input.participant.id,
-      tradingAccountId: input.participant.tradingAccountId,
+      tradingAccountId: input.tradingAccountId,
       assetId: input.quote.asset.id,
       quantity: quantityText,
     });
@@ -835,8 +793,7 @@ export class LimitOrderCreateService {
     );
     const created = await tx.order.create({
       data: {
-        seasonParticipantId: input.participant.id,
-        tradingAccountId: input.participant.tradingAccountId,
+        tradingAccountId: input.tradingAccountId,
         assetId: input.quote.asset.id,
         quoteId: input.quote.id,
         side: OrderSide.sell,
@@ -863,32 +820,19 @@ export class LimitOrderCreateService {
       },
       select: { id: true },
     });
-    const consumedCount =
-      input.participant.id === null
-        ? (
-            await tx.quote.updateMany({
-              where: {
-                id: input.quote.id,
-                status: QuoteStatus.active,
-                seasonParticipantId: null,
-                tradingAccountId: input.participant.tradingAccountId,
-              },
-              data: {
-                status: QuoteStatus.consumed,
-                consumedAt: input.submittedAt,
-              },
-            })
-          ).count
-        : await tx.$executeRaw`
-            UPDATE "quotes"
-            SET "status" = 'consumed',
-                "consumed_at" = ${input.submittedAt},
-                "updated_at" = clock_timestamp()
-            WHERE "id" = ${input.quote.id}
-              AND "status" = 'active'
-              AND "season_participant_id" = ${input.participant.id}
-              AND "trading_account_id" = ${input.participant.tradingAccountId}
-          `;
+    const consumedCount = (
+      await tx.quote.updateMany({
+        where: {
+          id: input.quote.id,
+          status: QuoteStatus.active,
+          tradingAccountId: input.tradingAccountId,
+        },
+        data: {
+          status: QuoteStatus.consumed,
+          consumedAt: input.submittedAt,
+        },
+      })
+    ).count;
     if (consumedCount !== 1) {
       this.throwApiError(
         HttpStatus.CONFLICT,

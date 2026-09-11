@@ -3957,7 +3957,7 @@ describe('AppController (e2e)', () => {
         expect(prisma.walletTransaction.create).toHaveBeenCalledTimes(1);
         expect(prisma.equitySnapshot.create).toHaveBeenCalledWith({
           data: expect.objectContaining({
-            seasonParticipantId: participant.id,
+            tradingAccountId: 'trading-account-1',
             totalAssetKrw: '10000000.00000000',
             returnRate: '0.00000000',
             krwCash: '10000000.00000000',

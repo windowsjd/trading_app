@@ -163,7 +163,6 @@ const createServices = () => {
           where.tradingAccountId_currencyCode?.currencyCode ?? 'KRW';
         return Promise.resolve({
           id: `wallet-${currencyCode}`,
-          seasonParticipantId: null,
           tradingAccountId: 'ta-1',
           currencyCode,
           balanceAmount: new Prisma.Decimal(
@@ -302,7 +301,6 @@ describe('FxService account-scoped gating', () => {
     expect(prisma.quote.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          seasonParticipantId: null,
           tradingAccountId: 'ta-1',
           quotedFeeRate: '0.001000',
         }),

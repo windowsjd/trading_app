@@ -429,8 +429,10 @@ describe('OpsJobRunnerService', () => {
           where: {
             seasonId,
             participantStatus: 'active',
-            dailyPortfolioSnapshots: {
-              none: { snapshotDate: new Date('2026-06-08T00:00:00.000Z') },
+            tradingAccount: {
+              dailyPortfolioSnapshots: {
+                none: { snapshotDate: new Date('2026-06-08T00:00:00.000Z') },
+              },
             },
           },
           select: { id: true },

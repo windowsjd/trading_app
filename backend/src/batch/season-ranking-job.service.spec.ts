@@ -209,7 +209,7 @@ describe('SeasonRankingJobService', () => {
       data: {
         seasonId: 'season-1',
         seasonParticipantId: 'sp-2',
-        // 작업 8 dual-write: participant AND the account it traded on.
+        // A ranking retains its participant target and measured account.
         tradingAccountId: 'account-sp-2',
         rankType: SeasonRankingType.daily,
         rank: 1,
@@ -539,7 +539,7 @@ function createPrismaMock() {
         end_at: new Date('2026-06-01T00:00:00.000Z'),
       },
     ]),
-    // Account-scope resolution for the dual-write (작업 8 §8).
+    // Resolve the canonical account measured by each participant ranking.
     seasonParticipant: {
       findMany: jest.fn((args: { where: { id: { in: string[] } } }) =>
         Promise.resolve(args.where.id.in.map((id) => participantScope(id))),

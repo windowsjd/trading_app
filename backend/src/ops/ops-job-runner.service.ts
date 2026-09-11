@@ -936,8 +936,10 @@ export class OpsJobRunnerService {
         where: {
           seasonId: season.id,
           participantStatus: ParticipantStatus.active,
-          dailyPortfolioSnapshots: {
-            none: { snapshotDate: snapshotDateValue },
+          tradingAccount: {
+            dailyPortfolioSnapshots: {
+              none: { snapshotDate: snapshotDateValue },
+            },
           },
         },
         select: { id: true },

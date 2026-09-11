@@ -426,7 +426,6 @@ async function verifyUnkeyedLegacyClaimWithBaselineStaysHealthy() {
   });
   await prisma.equitySnapshot.create({
     data: {
-      seasonParticipantId: null,
       tradingAccountId: accountId,
       totalAssetKrw: '10050000',
       returnRate: '0',
@@ -787,7 +786,6 @@ async function verifyEligibilityChecksStructureBeforeConfig() {
   );
   await prisma.cashWallet.create({
     data: {
-      seasonParticipantId: null,
       tradingAccountId: damaged.accountId,
       currencyCode: 'USD',
       balanceAmount: '0',
@@ -812,18 +810,7 @@ async function verifyEligibilityChecksStructureBeforeConfig() {
     where: { id: suspended.accountId },
     data: { status: 'suspended' },
   });
-  const season = await prisma.season.create({
-    data: {
-      name: 'eligibility-' + randomUUID(),
-      status: 'active',
-      startAt: new Date(Date.now() - 86400000),
-      endAt: new Date(Date.now() + 86400000),
-      initialCapitalKrw: '10000000',
-      tradeFeeRate: '0.0015',
-      fxFeeRate: '0.001',
-    },
-  });
-  const seasonAccount = await prisma.tradingAccount.create({
+  const mismatchedAccount = await prisma.tradingAccount.create({
     data: {
       userId: suspended.userId,
       mode: 'season',
@@ -832,25 +819,12 @@ async function verifyEligibilityChecksStructureBeforeConfig() {
       openedAt: new Date(),
     },
   });
-  const participant = await prisma.seasonParticipant.create({
-    data: {
-      seasonId: season.id,
-      userId: suspended.userId,
-      joinedAt: new Date(),
-      participantStatus: 'active',
-      initialCapitalKrw: '10000000',
-      totalAssetKrw: '10000000',
-      totalReturnRate: '0',
-      maxDrawdown: '0',
-      tradingAccountId: seasonAccount.id,
-    },
-  });
   const krw = await prisma.cashWallet.findFirst({
     where: { tradingAccountId: suspended.accountId, currencyCode: 'KRW' },
   });
   await prisma.cashWallet.update({
     where: { id: krw.id },
-    data: { seasonParticipantId: participant.id },
+    data: { tradingAccountId: mismatchedAccount.id },
   });
   await expectCode(
     adRewardService().getEligibility(suspended.userId, suspended.accountId),
@@ -858,11 +832,9 @@ async function verifyEligibilityChecksStructureBeforeConfig() {
   );
   await prisma.cashWallet.update({
     where: { id: krw.id },
-    data: { seasonParticipantId: null },
+    data: { tradingAccountId: suspended.accountId },
   });
-  await prisma.seasonParticipant.delete({ where: { id: participant.id } });
-  await prisma.tradingAccount.delete({ where: { id: seasonAccount.id } });
-  await prisma.season.delete({ where: { id: season.id } });
+  await prisma.tradingAccount.delete({ where: { id: mismatchedAccount.id } });
 
   // closed + healthy → the existing status-based answer, unchanged.
   const closed = await openAccount();
@@ -949,7 +921,6 @@ async function verifyDailySnapshotJob() {
     },
   });
   assert.ok(daily, 'active general account must get a daily row');
-  assert.equal(daily.seasonParticipantId, null);
   assert.equal(daily.totalAssetKrw.toFixed(8), '10050000.00000000');
   assert.equal(daily.returnRate.toFixed(8), '0.00000000');
   assert.equal(daily.cumulativeExternalFundingKrw.toFixed(8), '10050000.00000000');
@@ -964,7 +935,6 @@ async function verifyDailySnapshotJob() {
     where: { tradingAccountId: activeAcc.accountId, snapshotReason: 'scheduled' },
   });
   assert.equal(scheduled.length, 1, 'exactly one scheduled equity snapshot');
-  assert.equal(scheduled[0].seasonParticipantId, null);
   assert.equal(scheduled[0].totalAssetKrw.toFixed(8), '10050000.00000000');
   assert.equal(scheduled[0].cumulativeExternalFundingKrw.toFixed(8), '10050000.00000000');
   assert.equal(scheduled[0].timeWeightedReturnFactor.toFixed(8), '1.00000000');
@@ -1157,8 +1127,8 @@ async function verifyDamagedAccountsAreReportedNotSnapshotted() {
 }
 
 async function verifySeasonDailyRowsAreUntouched() {
-  // A season daily row for the same date must survive the general job
-  // unchanged — the general writer never touches participant-scoped rows.
+  // A season-account daily row for the same date must survive the general job
+  // unchanged — the general writer never touches another account's rows.
   const userId = await createUser();
   const season = await prisma.season.create({
     data: {
@@ -1196,7 +1166,6 @@ async function verifySeasonDailyRowsAreUntouched() {
   const snapshotDate = new Date('2026-08-30T00:00:00.000Z');
   const seasonDaily = await prisma.dailyPortfolioSnapshot.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: seasonAccount.id,
       snapshotDate,
       totalAssetKrw: '11000000',
@@ -1217,7 +1186,7 @@ async function verifySeasonDailyRowsAreUntouched() {
   });
   assert.equal(reread.totalAssetKrw.toFixed(8), '11000000.00000000');
   assert.equal(reread.returnRate.toFixed(8), '10.00000000');
-  assert.equal(reread.seasonParticipantId, participant.id);
+  assert.equal(reread.tradingAccountId, seasonAccount.id);
   assert.equal(reread.cumulativeExternalFundingKrw, null);
   assert.equal(
     await prisma.dailyPortfolioSnapshot.count({

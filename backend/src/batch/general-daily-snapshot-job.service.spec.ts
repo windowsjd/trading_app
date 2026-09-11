@@ -329,7 +329,6 @@ describe('GeneralDailySnapshotJobService', () => {
     expect(tx.dailyPortfolioSnapshot.create).toHaveBeenLastCalledWith({
       data: containing({
         tradingAccountId: 'account-2',
-        seasonParticipantId: null,
       }),
       select: { id: true },
     });
@@ -393,7 +392,6 @@ describe('GeneralDailySnapshotJobService', () => {
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(tx.equitySnapshot.create).toHaveBeenCalledWith({
       data: containing({
-        seasonParticipantId: null,
         tradingAccountId: 'account-1',
         snapshotReason: 'scheduled',
         totalAssetKrw: WRITE_VALUES.totalAssetKrw,
@@ -407,7 +405,6 @@ describe('GeneralDailySnapshotJobService', () => {
     });
     expect(tx.dailyPortfolioSnapshot.create).toHaveBeenCalledWith({
       data: containing({
-        seasonParticipantId: null,
         tradingAccountId: 'account-1',
         snapshotDate: SNAPSHOT_DATE_UTC,
         totalAssetKrw: WRITE_VALUES.totalAssetKrw,

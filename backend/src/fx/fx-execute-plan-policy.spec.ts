@@ -38,6 +38,8 @@ describe('fx execute plan policy', () => {
   const krwUsdRequest: NormalizedFxExecuteRequest = {
     userId: 'user-1',
     seasonParticipantId: 'participant-1',
+    tradingAccountId: 'account-1',
+    quoteId: 'quote-fx-1',
     fromCurrency: 'KRW',
     toCurrency: 'USD',
     sourceAmount: '135000.00000000',
@@ -56,10 +58,8 @@ describe('fx execute plan policy', () => {
     id: string,
     currencyCode: 'KRW' | 'USD',
     balanceAmount: string | Prisma.Decimal,
-    seasonParticipantId = 'participant-1',
   ): FxExecuteWalletCandidate => ({
     id,
-    seasonParticipantId,
     currencyCode,
     balanceAmount,
   });
@@ -173,30 +173,6 @@ describe('fx execute plan policy', () => {
   it.each([
     ['source null', { sourceWallet: null }, 'SOURCE_WALLET_NOT_FOUND'],
     ['target null', { targetWallet: null }, 'TARGET_WALLET_NOT_FOUND'],
-    [
-      'source participant mismatch',
-      {
-        sourceWallet: wallet(
-          'krw-wallet-1',
-          'KRW',
-          '200000.00000000',
-          'other-participant',
-        ),
-      },
-      'SOURCE_WALLET_NOT_FOUND',
-    ],
-    [
-      'target participant mismatch',
-      {
-        targetWallet: wallet(
-          'usd-wallet-1',
-          'USD',
-          '10.00000000',
-          'other-participant',
-        ),
-      },
-      'TARGET_WALLET_NOT_FOUND',
-    ],
     [
       'source currency mismatch',
       { sourceWallet: wallet('usd-wallet-1', 'USD', '200000.00000000') },

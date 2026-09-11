@@ -1,6 +1,5 @@
 import { Prisma } from '../generated/prisma/client';
 import { PortfolioValuationResult } from './portfolio-valuation.policy';
-import { requireSeasonSnapshotParticipantId } from './season-snapshot-scope';
 
 /**
  * This writer is the SEASON daily-snapshot path. General-mode daily snapshots
@@ -10,7 +9,10 @@ import { requireSeasonSnapshotParticipantId } from './season-snapshot-scope';
 function requireSeasonValuationParticipantId(
   valuation: PortfolioValuationResult,
 ): string {
-  return requireSeasonSnapshotParticipantId(valuation.seasonParticipantId);
+  if (!valuation.seasonParticipantId) {
+    throw new Error('Season valuation has no participant context.');
+  }
+  return valuation.seasonParticipantId;
 }
 
 export type DailyPortfolioSnapshotWriteInput = {
@@ -19,9 +21,8 @@ export type DailyPortfolioSnapshotWriteInput = {
   capturedAt: Date;
   dryRun: boolean;
   /**
-   * The participant's verified trading account (작업 7 dual-write). Season
-   * writers MUST supply it; a null link is a caller-side integrity failure,
-   * never a reason to write an unscoped snapshot.
+   * The participant's verified trading account, which is the snapshot's only
+   * persisted ownership key. Season writers must supply it.
    */
   tradingAccountId: string;
 };
@@ -40,7 +41,6 @@ export type DailyPortfolioSnapshotWriteResult = {
 };
 
 export type DailyPortfolioSnapshotPersistenceData = {
-  seasonParticipantId: string;
   tradingAccountId: string;
   snapshotDate: Date;
   totalAssetKrw: string;
@@ -55,12 +55,7 @@ export type DailyPortfolioSnapshotPersistenceData = {
 
 type DailyPortfolioSnapshotWriter = {
   dailyPortfolioSnapshot: {
-    findUnique?: (args: unknown) => Promise<{
-      seasonParticipantId: string | null;
-      tradingAccountId: string;
-    } | null>;
     upsert: (args: unknown) => Promise<{
-      seasonParticipantId: string | null;
       tradingAccountId: string;
       totalAssetKrw: Prisma.Decimal;
       returnRate: Prisma.Decimal;
@@ -85,27 +80,6 @@ export async function writeDailyPortfolioSnapshot(
   const seasonParticipantId = requireSeasonValuationParticipantId(
     input.valuation,
   );
-  const existing = await prisma.dailyPortfolioSnapshot.findUnique?.({
-    where: {
-      tradingAccountId_snapshotDate: {
-        tradingAccountId: input.tradingAccountId,
-        snapshotDate: input.snapshotDate,
-      },
-    },
-    select: {
-      seasonParticipantId: true,
-      tradingAccountId: true,
-    },
-  });
-  if (
-    existing &&
-    (existing.tradingAccountId !== input.tradingAccountId ||
-      existing.seasonParticipantId !== seasonParticipantId)
-  ) {
-    throw new Error(
-      'Daily portfolio snapshot account scope disagrees with its season participant.',
-    );
-  }
 
   const data = buildDailyPortfolioSnapshotData(input);
   const canonicalUpdate = {
@@ -126,12 +100,9 @@ export async function writeDailyPortfolioSnapshot(
       },
     },
     create: data,
-    // An ordinary rerun may refresh snapshot values, but it never rewrites a
-    // pre-existing legacy identity. Production Prisma performs the read
-    // above first and fails closed on any disagreement.
+    // An ordinary rerun may refresh snapshot values for this account/date.
     update: canonicalUpdate,
     select: {
-      seasonParticipantId: true,
       tradingAccountId: true,
       totalAssetKrw: true,
       returnRate: true,
@@ -144,13 +115,8 @@ export async function writeDailyPortfolioSnapshot(
     },
   });
 
-  if (
-    row.tradingAccountId !== input.tradingAccountId ||
-    row.seasonParticipantId !== seasonParticipantId
-  ) {
-    throw new Error(
-      'Daily portfolio snapshot account scope disagrees with its season participant.',
-    );
+  if (row.tradingAccountId !== input.tradingAccountId) {
+    throw new Error('Daily portfolio snapshot account scope changed.');
   }
 
   return {
@@ -171,7 +137,6 @@ export function buildDailyPortfolioSnapshotData(
   input: DailyPortfolioSnapshotWriteInput,
 ): DailyPortfolioSnapshotPersistenceData {
   return {
-    seasonParticipantId: requireSeasonValuationParticipantId(input.valuation),
     tradingAccountId: input.tradingAccountId,
     snapshotDate: input.snapshotDate,
     totalAssetKrw: input.valuation.totalAssetKrw,

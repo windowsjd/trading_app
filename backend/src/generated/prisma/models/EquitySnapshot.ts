@@ -18,8 +18,7 @@ import type * as Prisma from "../internal/prismaNamespace.js"
  * 
  * SEASON rows keep their historical meaning: returnRate is the simple
  * initial-capital return and the general-performance columns stay NULL.
- * GENERAL rows (작업 7) have no SeasonParticipant at all and carry the
- * time-weighted performance state instead — returnRate is the TWR percent,
+ * GENERAL rows carry the time-weighted performance state instead — returnRate is the TWR percent,
  * i.e. (timeWeightedReturnFactor - 1) * 100. The two meanings are never
  * mixed; API responses always name which one applies via returnRateMethod.
  * 
@@ -67,7 +66,6 @@ export type EquitySnapshotSumAggregateOutputType = {
 
 export type EquitySnapshotMinAggregateOutputType = {
   id: string | null
-  seasonParticipantId: string | null
   tradingAccountId: string | null
   totalAssetKrw: runtime.Decimal | null
   returnRate: runtime.Decimal | null
@@ -89,7 +87,6 @@ export type EquitySnapshotMinAggregateOutputType = {
 
 export type EquitySnapshotMaxAggregateOutputType = {
   id: string | null
-  seasonParticipantId: string | null
   tradingAccountId: string | null
   totalAssetKrw: runtime.Decimal | null
   returnRate: runtime.Decimal | null
@@ -111,7 +108,6 @@ export type EquitySnapshotMaxAggregateOutputType = {
 
 export type EquitySnapshotCountAggregateOutputType = {
   id: number
-  seasonParticipantId: number
   tradingAccountId: number
   totalAssetKrw: number
   returnRate: number
@@ -163,7 +159,6 @@ export type EquitySnapshotSumAggregateInputType = {
 
 export type EquitySnapshotMinAggregateInputType = {
   id?: true
-  seasonParticipantId?: true
   tradingAccountId?: true
   totalAssetKrw?: true
   returnRate?: true
@@ -185,7 +180,6 @@ export type EquitySnapshotMinAggregateInputType = {
 
 export type EquitySnapshotMaxAggregateInputType = {
   id?: true
-  seasonParticipantId?: true
   tradingAccountId?: true
   totalAssetKrw?: true
   returnRate?: true
@@ -207,7 +201,6 @@ export type EquitySnapshotMaxAggregateInputType = {
 
 export type EquitySnapshotCountAggregateInputType = {
   id?: true
-  seasonParticipantId?: true
   tradingAccountId?: true
   totalAssetKrw?: true
   returnRate?: true
@@ -316,7 +309,6 @@ export type EquitySnapshotGroupByArgs<ExtArgs extends runtime.Types.Extensions.I
 
 export type EquitySnapshotGroupByOutputType = {
   id: string
-  seasonParticipantId: string | null
   tradingAccountId: string
   totalAssetKrw: runtime.Decimal
   returnRate: runtime.Decimal
@@ -361,7 +353,6 @@ export type EquitySnapshotWhereInput = {
   OR?: Prisma.EquitySnapshotWhereInput[]
   NOT?: Prisma.EquitySnapshotWhereInput | Prisma.EquitySnapshotWhereInput[]
   id?: Prisma.StringFilter<"EquitySnapshot"> | string
-  seasonParticipantId?: Prisma.StringNullableFilter<"EquitySnapshot"> | string | null
   tradingAccountId?: Prisma.StringFilter<"EquitySnapshot"> | string
   totalAssetKrw?: Prisma.DecimalFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate?: Prisma.DecimalFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -379,13 +370,11 @@ export type EquitySnapshotWhereInput = {
   externalFundingReferenceId?: Prisma.StringNullableFilter<"EquitySnapshot"> | string | null
   capturedAt?: Prisma.DateTimeFilter<"EquitySnapshot"> | Date | string
   createdAt?: Prisma.DateTimeFilter<"EquitySnapshot"> | Date | string
-  seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantNullableScalarRelationFilter, Prisma.SeasonParticipantWhereInput> | null
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
 }
 
 export type EquitySnapshotOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  seasonParticipantId?: Prisma.SortOrderInput | Prisma.SortOrder
   tradingAccountId?: Prisma.SortOrder
   totalAssetKrw?: Prisma.SortOrder
   returnRate?: Prisma.SortOrder
@@ -403,7 +392,6 @@ export type EquitySnapshotOrderByWithRelationInput = {
   externalFundingReferenceId?: Prisma.SortOrderInput | Prisma.SortOrder
   capturedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
-  seasonParticipant?: Prisma.SeasonParticipantOrderByWithRelationInput
   tradingAccount?: Prisma.TradingAccountOrderByWithRelationInput
 }
 
@@ -413,7 +401,6 @@ export type EquitySnapshotWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.EquitySnapshotWhereInput | Prisma.EquitySnapshotWhereInput[]
   OR?: Prisma.EquitySnapshotWhereInput[]
   NOT?: Prisma.EquitySnapshotWhereInput | Prisma.EquitySnapshotWhereInput[]
-  seasonParticipantId?: Prisma.StringNullableFilter<"EquitySnapshot"> | string | null
   tradingAccountId?: Prisma.StringFilter<"EquitySnapshot"> | string
   totalAssetKrw?: Prisma.DecimalFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate?: Prisma.DecimalFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -431,13 +418,11 @@ export type EquitySnapshotWhereUniqueInput = Prisma.AtLeast<{
   externalFundingReferenceId?: Prisma.StringNullableFilter<"EquitySnapshot"> | string | null
   capturedAt?: Prisma.DateTimeFilter<"EquitySnapshot"> | Date | string
   createdAt?: Prisma.DateTimeFilter<"EquitySnapshot"> | Date | string
-  seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantNullableScalarRelationFilter, Prisma.SeasonParticipantWhereInput> | null
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
 }, "id" | "equity_snapshot_external_funding_boundary">
 
 export type EquitySnapshotOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  seasonParticipantId?: Prisma.SortOrderInput | Prisma.SortOrder
   tradingAccountId?: Prisma.SortOrder
   totalAssetKrw?: Prisma.SortOrder
   returnRate?: Prisma.SortOrder
@@ -467,7 +452,6 @@ export type EquitySnapshotScalarWhereWithAggregatesInput = {
   OR?: Prisma.EquitySnapshotScalarWhereWithAggregatesInput[]
   NOT?: Prisma.EquitySnapshotScalarWhereWithAggregatesInput | Prisma.EquitySnapshotScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"EquitySnapshot"> | string
-  seasonParticipantId?: Prisma.StringNullableWithAggregatesFilter<"EquitySnapshot"> | string | null
   tradingAccountId?: Prisma.StringWithAggregatesFilter<"EquitySnapshot"> | string
   totalAssetKrw?: Prisma.DecimalWithAggregatesFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate?: Prisma.DecimalWithAggregatesFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -505,13 +489,11 @@ export type EquitySnapshotCreateInput = {
   externalFundingReferenceId?: string | null
   capturedAt: Date | string
   createdAt?: Date | string
-  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutEquitySnapshotsInput
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutEquitySnapshotsInput
 }
 
 export type EquitySnapshotUncheckedCreateInput = {
   id?: string
-  seasonParticipantId?: string | null
   tradingAccountId: string
   totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -549,13 +531,11 @@ export type EquitySnapshotUpdateInput = {
   externalFundingReferenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutEquitySnapshotsNestedInput
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutEquitySnapshotsNestedInput
 }
 
 export type EquitySnapshotUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -577,7 +557,6 @@ export type EquitySnapshotUncheckedUpdateInput = {
 
 export type EquitySnapshotCreateManyInput = {
   id?: string
-  seasonParticipantId?: string | null
   tradingAccountId: string
   totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -619,7 +598,6 @@ export type EquitySnapshotUpdateManyMutationInput = {
 
 export type EquitySnapshotUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -658,7 +636,6 @@ export type EquitySnapshotEquity_snapshot_external_funding_boundaryCompoundUniqu
 
 export type EquitySnapshotCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  seasonParticipantId?: Prisma.SortOrder
   tradingAccountId?: Prisma.SortOrder
   totalAssetKrw?: Prisma.SortOrder
   returnRate?: Prisma.SortOrder
@@ -694,7 +671,6 @@ export type EquitySnapshotAvgOrderByAggregateInput = {
 
 export type EquitySnapshotMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  seasonParticipantId?: Prisma.SortOrder
   tradingAccountId?: Prisma.SortOrder
   totalAssetKrw?: Prisma.SortOrder
   returnRate?: Prisma.SortOrder
@@ -716,7 +692,6 @@ export type EquitySnapshotMaxOrderByAggregateInput = {
 
 export type EquitySnapshotMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  seasonParticipantId?: Prisma.SortOrder
   tradingAccountId?: Prisma.SortOrder
   totalAssetKrw?: Prisma.SortOrder
   returnRate?: Prisma.SortOrder
@@ -792,48 +767,6 @@ export type EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput = 
   deleteMany?: Prisma.EquitySnapshotScalarWhereInput | Prisma.EquitySnapshotScalarWhereInput[]
 }
 
-export type EquitySnapshotCreateNestedManyWithoutSeasonParticipantInput = {
-  create?: Prisma.XOR<Prisma.EquitySnapshotCreateWithoutSeasonParticipantInput, Prisma.EquitySnapshotUncheckedCreateWithoutSeasonParticipantInput> | Prisma.EquitySnapshotCreateWithoutSeasonParticipantInput[] | Prisma.EquitySnapshotUncheckedCreateWithoutSeasonParticipantInput[]
-  connectOrCreate?: Prisma.EquitySnapshotCreateOrConnectWithoutSeasonParticipantInput | Prisma.EquitySnapshotCreateOrConnectWithoutSeasonParticipantInput[]
-  createMany?: Prisma.EquitySnapshotCreateManySeasonParticipantInputEnvelope
-  connect?: Prisma.EquitySnapshotWhereUniqueInput | Prisma.EquitySnapshotWhereUniqueInput[]
-}
-
-export type EquitySnapshotUncheckedCreateNestedManyWithoutSeasonParticipantInput = {
-  create?: Prisma.XOR<Prisma.EquitySnapshotCreateWithoutSeasonParticipantInput, Prisma.EquitySnapshotUncheckedCreateWithoutSeasonParticipantInput> | Prisma.EquitySnapshotCreateWithoutSeasonParticipantInput[] | Prisma.EquitySnapshotUncheckedCreateWithoutSeasonParticipantInput[]
-  connectOrCreate?: Prisma.EquitySnapshotCreateOrConnectWithoutSeasonParticipantInput | Prisma.EquitySnapshotCreateOrConnectWithoutSeasonParticipantInput[]
-  createMany?: Prisma.EquitySnapshotCreateManySeasonParticipantInputEnvelope
-  connect?: Prisma.EquitySnapshotWhereUniqueInput | Prisma.EquitySnapshotWhereUniqueInput[]
-}
-
-export type EquitySnapshotUpdateManyWithoutSeasonParticipantNestedInput = {
-  create?: Prisma.XOR<Prisma.EquitySnapshotCreateWithoutSeasonParticipantInput, Prisma.EquitySnapshotUncheckedCreateWithoutSeasonParticipantInput> | Prisma.EquitySnapshotCreateWithoutSeasonParticipantInput[] | Prisma.EquitySnapshotUncheckedCreateWithoutSeasonParticipantInput[]
-  connectOrCreate?: Prisma.EquitySnapshotCreateOrConnectWithoutSeasonParticipantInput | Prisma.EquitySnapshotCreateOrConnectWithoutSeasonParticipantInput[]
-  upsert?: Prisma.EquitySnapshotUpsertWithWhereUniqueWithoutSeasonParticipantInput | Prisma.EquitySnapshotUpsertWithWhereUniqueWithoutSeasonParticipantInput[]
-  createMany?: Prisma.EquitySnapshotCreateManySeasonParticipantInputEnvelope
-  set?: Prisma.EquitySnapshotWhereUniqueInput | Prisma.EquitySnapshotWhereUniqueInput[]
-  disconnect?: Prisma.EquitySnapshotWhereUniqueInput | Prisma.EquitySnapshotWhereUniqueInput[]
-  delete?: Prisma.EquitySnapshotWhereUniqueInput | Prisma.EquitySnapshotWhereUniqueInput[]
-  connect?: Prisma.EquitySnapshotWhereUniqueInput | Prisma.EquitySnapshotWhereUniqueInput[]
-  update?: Prisma.EquitySnapshotUpdateWithWhereUniqueWithoutSeasonParticipantInput | Prisma.EquitySnapshotUpdateWithWhereUniqueWithoutSeasonParticipantInput[]
-  updateMany?: Prisma.EquitySnapshotUpdateManyWithWhereWithoutSeasonParticipantInput | Prisma.EquitySnapshotUpdateManyWithWhereWithoutSeasonParticipantInput[]
-  deleteMany?: Prisma.EquitySnapshotScalarWhereInput | Prisma.EquitySnapshotScalarWhereInput[]
-}
-
-export type EquitySnapshotUncheckedUpdateManyWithoutSeasonParticipantNestedInput = {
-  create?: Prisma.XOR<Prisma.EquitySnapshotCreateWithoutSeasonParticipantInput, Prisma.EquitySnapshotUncheckedCreateWithoutSeasonParticipantInput> | Prisma.EquitySnapshotCreateWithoutSeasonParticipantInput[] | Prisma.EquitySnapshotUncheckedCreateWithoutSeasonParticipantInput[]
-  connectOrCreate?: Prisma.EquitySnapshotCreateOrConnectWithoutSeasonParticipantInput | Prisma.EquitySnapshotCreateOrConnectWithoutSeasonParticipantInput[]
-  upsert?: Prisma.EquitySnapshotUpsertWithWhereUniqueWithoutSeasonParticipantInput | Prisma.EquitySnapshotUpsertWithWhereUniqueWithoutSeasonParticipantInput[]
-  createMany?: Prisma.EquitySnapshotCreateManySeasonParticipantInputEnvelope
-  set?: Prisma.EquitySnapshotWhereUniqueInput | Prisma.EquitySnapshotWhereUniqueInput[]
-  disconnect?: Prisma.EquitySnapshotWhereUniqueInput | Prisma.EquitySnapshotWhereUniqueInput[]
-  delete?: Prisma.EquitySnapshotWhereUniqueInput | Prisma.EquitySnapshotWhereUniqueInput[]
-  connect?: Prisma.EquitySnapshotWhereUniqueInput | Prisma.EquitySnapshotWhereUniqueInput[]
-  update?: Prisma.EquitySnapshotUpdateWithWhereUniqueWithoutSeasonParticipantInput | Prisma.EquitySnapshotUpdateWithWhereUniqueWithoutSeasonParticipantInput[]
-  updateMany?: Prisma.EquitySnapshotUpdateManyWithWhereWithoutSeasonParticipantInput | Prisma.EquitySnapshotUpdateManyWithWhereWithoutSeasonParticipantInput[]
-  deleteMany?: Prisma.EquitySnapshotScalarWhereInput | Prisma.EquitySnapshotScalarWhereInput[]
-}
-
 export type EnumSnapshotReasonFieldUpdateOperationsInput = {
   set?: $Enums.SnapshotReason
 }
@@ -860,12 +793,10 @@ export type EquitySnapshotCreateWithoutTradingAccountInput = {
   externalFundingReferenceId?: string | null
   capturedAt: Date | string
   createdAt?: Date | string
-  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutEquitySnapshotsInput
 }
 
 export type EquitySnapshotUncheckedCreateWithoutTradingAccountInput = {
   id?: string
-  seasonParticipantId?: string | null
   totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   krwCash: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -915,7 +846,6 @@ export type EquitySnapshotScalarWhereInput = {
   OR?: Prisma.EquitySnapshotScalarWhereInput[]
   NOT?: Prisma.EquitySnapshotScalarWhereInput | Prisma.EquitySnapshotScalarWhereInput[]
   id?: Prisma.StringFilter<"EquitySnapshot"> | string
-  seasonParticipantId?: Prisma.StringNullableFilter<"EquitySnapshot"> | string | null
   tradingAccountId?: Prisma.StringFilter<"EquitySnapshot"> | string
   totalAssetKrw?: Prisma.DecimalFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate?: Prisma.DecimalFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -935,77 +865,8 @@ export type EquitySnapshotScalarWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"EquitySnapshot"> | Date | string
 }
 
-export type EquitySnapshotCreateWithoutSeasonParticipantInput = {
-  id?: string
-  totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
-  returnRate: runtime.Decimal | runtime.DecimalJsLike | number | string
-  krwCash: runtime.Decimal | runtime.DecimalJsLike | number | string
-  usdCashKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
-  domesticStockValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
-  usStockValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
-  cryptoValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
-  snapshotReason: $Enums.SnapshotReason
-  cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  timeWeightedReturnFactor?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  externalFundingAmountKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  externalFundingReferenceType?: $Enums.WalletTransactionReferenceType | null
-  externalFundingReferenceId?: string | null
-  capturedAt: Date | string
-  createdAt?: Date | string
-  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutEquitySnapshotsInput
-}
-
-export type EquitySnapshotUncheckedCreateWithoutSeasonParticipantInput = {
-  id?: string
-  tradingAccountId: string
-  totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
-  returnRate: runtime.Decimal | runtime.DecimalJsLike | number | string
-  krwCash: runtime.Decimal | runtime.DecimalJsLike | number | string
-  usdCashKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
-  domesticStockValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
-  usStockValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
-  cryptoValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
-  snapshotReason: $Enums.SnapshotReason
-  cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  timeWeightedReturnFactor?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  externalFundingAmountKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  externalFundingReferenceType?: $Enums.WalletTransactionReferenceType | null
-  externalFundingReferenceId?: string | null
-  capturedAt: Date | string
-  createdAt?: Date | string
-}
-
-export type EquitySnapshotCreateOrConnectWithoutSeasonParticipantInput = {
-  where: Prisma.EquitySnapshotWhereUniqueInput
-  create: Prisma.XOR<Prisma.EquitySnapshotCreateWithoutSeasonParticipantInput, Prisma.EquitySnapshotUncheckedCreateWithoutSeasonParticipantInput>
-}
-
-export type EquitySnapshotCreateManySeasonParticipantInputEnvelope = {
-  data: Prisma.EquitySnapshotCreateManySeasonParticipantInput | Prisma.EquitySnapshotCreateManySeasonParticipantInput[]
-  skipDuplicates?: boolean
-}
-
-export type EquitySnapshotUpsertWithWhereUniqueWithoutSeasonParticipantInput = {
-  where: Prisma.EquitySnapshotWhereUniqueInput
-  update: Prisma.XOR<Prisma.EquitySnapshotUpdateWithoutSeasonParticipantInput, Prisma.EquitySnapshotUncheckedUpdateWithoutSeasonParticipantInput>
-  create: Prisma.XOR<Prisma.EquitySnapshotCreateWithoutSeasonParticipantInput, Prisma.EquitySnapshotUncheckedCreateWithoutSeasonParticipantInput>
-}
-
-export type EquitySnapshotUpdateWithWhereUniqueWithoutSeasonParticipantInput = {
-  where: Prisma.EquitySnapshotWhereUniqueInput
-  data: Prisma.XOR<Prisma.EquitySnapshotUpdateWithoutSeasonParticipantInput, Prisma.EquitySnapshotUncheckedUpdateWithoutSeasonParticipantInput>
-}
-
-export type EquitySnapshotUpdateManyWithWhereWithoutSeasonParticipantInput = {
-  where: Prisma.EquitySnapshotScalarWhereInput
-  data: Prisma.XOR<Prisma.EquitySnapshotUpdateManyMutationInput, Prisma.EquitySnapshotUncheckedUpdateManyWithoutSeasonParticipantInput>
-}
-
 export type EquitySnapshotCreateManyTradingAccountInput = {
   id?: string
-  seasonParticipantId?: string | null
   totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   krwCash: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -1042,12 +903,10 @@ export type EquitySnapshotUpdateWithoutTradingAccountInput = {
   externalFundingReferenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutEquitySnapshotsNestedInput
 }
 
 export type EquitySnapshotUncheckedUpdateWithoutTradingAccountInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   krwCash?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -1068,91 +927,6 @@ export type EquitySnapshotUncheckedUpdateWithoutTradingAccountInput = {
 
 export type EquitySnapshotUncheckedUpdateManyWithoutTradingAccountInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  returnRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  krwCash?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  usdCashKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  domesticStockValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  usStockValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  cryptoValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  snapshotReason?: Prisma.EnumSnapshotReasonFieldUpdateOperationsInput | $Enums.SnapshotReason
-  cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  timeWeightedReturnFactor?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  externalFundingAmountKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  externalFundingReferenceType?: Prisma.NullableEnumWalletTransactionReferenceTypeFieldUpdateOperationsInput | $Enums.WalletTransactionReferenceType | null
-  externalFundingReferenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-}
-
-export type EquitySnapshotCreateManySeasonParticipantInput = {
-  id?: string
-  tradingAccountId: string
-  totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
-  returnRate: runtime.Decimal | runtime.DecimalJsLike | number | string
-  krwCash: runtime.Decimal | runtime.DecimalJsLike | number | string
-  usdCashKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
-  domesticStockValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
-  usStockValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
-  cryptoValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
-  snapshotReason: $Enums.SnapshotReason
-  cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  timeWeightedReturnFactor?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  externalFundingAmountKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  externalFundingReferenceType?: $Enums.WalletTransactionReferenceType | null
-  externalFundingReferenceId?: string | null
-  capturedAt: Date | string
-  createdAt?: Date | string
-}
-
-export type EquitySnapshotUpdateWithoutSeasonParticipantInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  returnRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  krwCash?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  usdCashKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  domesticStockValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  usStockValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  cryptoValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  snapshotReason?: Prisma.EnumSnapshotReasonFieldUpdateOperationsInput | $Enums.SnapshotReason
-  cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  timeWeightedReturnFactor?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  externalFundingAmountKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  externalFundingReferenceType?: Prisma.NullableEnumWalletTransactionReferenceTypeFieldUpdateOperationsInput | $Enums.WalletTransactionReferenceType | null
-  externalFundingReferenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutEquitySnapshotsNestedInput
-}
-
-export type EquitySnapshotUncheckedUpdateWithoutSeasonParticipantInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
-  totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  returnRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  krwCash?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  usdCashKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  domesticStockValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  usStockValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  cryptoValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  snapshotReason?: Prisma.EnumSnapshotReasonFieldUpdateOperationsInput | $Enums.SnapshotReason
-  cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  timeWeightedReturnFactor?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  externalFundingAmountKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  externalFundingReferenceType?: Prisma.NullableEnumWalletTransactionReferenceTypeFieldUpdateOperationsInput | $Enums.WalletTransactionReferenceType | null
-  externalFundingReferenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-}
-
-export type EquitySnapshotUncheckedUpdateManyWithoutSeasonParticipantInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   krwCash?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -1175,7 +949,6 @@ export type EquitySnapshotUncheckedUpdateManyWithoutSeasonParticipantInput = {
 
 export type EquitySnapshotSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  seasonParticipantId?: boolean
   tradingAccountId?: boolean
   totalAssetKrw?: boolean
   returnRate?: boolean
@@ -1193,13 +966,11 @@ export type EquitySnapshotSelect<ExtArgs extends runtime.Types.Extensions.Intern
   externalFundingReferenceId?: boolean
   capturedAt?: boolean
   createdAt?: boolean
-  seasonParticipant?: boolean | Prisma.EquitySnapshot$seasonParticipantArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["equitySnapshot"]>
 
 export type EquitySnapshotSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  seasonParticipantId?: boolean
   tradingAccountId?: boolean
   totalAssetKrw?: boolean
   returnRate?: boolean
@@ -1217,13 +988,11 @@ export type EquitySnapshotSelectCreateManyAndReturn<ExtArgs extends runtime.Type
   externalFundingReferenceId?: boolean
   capturedAt?: boolean
   createdAt?: boolean
-  seasonParticipant?: boolean | Prisma.EquitySnapshot$seasonParticipantArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["equitySnapshot"]>
 
 export type EquitySnapshotSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  seasonParticipantId?: boolean
   tradingAccountId?: boolean
   totalAssetKrw?: boolean
   returnRate?: boolean
@@ -1241,13 +1010,11 @@ export type EquitySnapshotSelectUpdateManyAndReturn<ExtArgs extends runtime.Type
   externalFundingReferenceId?: boolean
   capturedAt?: boolean
   createdAt?: boolean
-  seasonParticipant?: boolean | Prisma.EquitySnapshot$seasonParticipantArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["equitySnapshot"]>
 
 export type EquitySnapshotSelectScalar = {
   id?: boolean
-  seasonParticipantId?: boolean
   tradingAccountId?: boolean
   totalAssetKrw?: boolean
   returnRate?: boolean
@@ -1267,35 +1034,24 @@ export type EquitySnapshotSelectScalar = {
   createdAt?: boolean
 }
 
-export type EquitySnapshotOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "seasonParticipantId" | "tradingAccountId" | "totalAssetKrw" | "returnRate" | "krwCash" | "usdCashKrw" | "domesticStockValueKrw" | "usStockValueKrw" | "cryptoValueKrw" | "snapshotReason" | "cumulativeExternalFundingKrw" | "investmentPnlKrw" | "timeWeightedReturnFactor" | "externalFundingAmountKrw" | "externalFundingReferenceType" | "externalFundingReferenceId" | "capturedAt" | "createdAt", ExtArgs["result"]["equitySnapshot"]>
+export type EquitySnapshotOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "tradingAccountId" | "totalAssetKrw" | "returnRate" | "krwCash" | "usdCashKrw" | "domesticStockValueKrw" | "usStockValueKrw" | "cryptoValueKrw" | "snapshotReason" | "cumulativeExternalFundingKrw" | "investmentPnlKrw" | "timeWeightedReturnFactor" | "externalFundingAmountKrw" | "externalFundingReferenceType" | "externalFundingReferenceId" | "capturedAt" | "createdAt", ExtArgs["result"]["equitySnapshot"]>
 export type EquitySnapshotInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  seasonParticipant?: boolean | Prisma.EquitySnapshot$seasonParticipantArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
 }
 export type EquitySnapshotIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  seasonParticipant?: boolean | Prisma.EquitySnapshot$seasonParticipantArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
 }
 export type EquitySnapshotIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  seasonParticipant?: boolean | Prisma.EquitySnapshot$seasonParticipantArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
 }
 
 export type $EquitySnapshotPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "EquitySnapshot"
   objects: {
-    seasonParticipant: Prisma.$SeasonParticipantPayload<ExtArgs> | null
     tradingAccount: Prisma.$TradingAccountPayload<ExtArgs>
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    /**
-     * NULL for general-mode snapshots (no participant exists).
-     */
-    seasonParticipantId: string | null
-    /**
-     * Canonical account ownership. The participant is season metadata only.
-     */
     tradingAccountId: string
     totalAssetKrw: runtime.Decimal
     returnRate: runtime.Decimal
@@ -1718,7 +1474,6 @@ readonly fields: EquitySnapshotFieldRefs;
  */
 export interface Prisma__EquitySnapshotClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
-  seasonParticipant<T extends Prisma.EquitySnapshot$seasonParticipantArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.EquitySnapshot$seasonParticipantArgs<ExtArgs>>): Prisma.Prisma__SeasonParticipantClient<runtime.Types.Result.GetResult<Prisma.$SeasonParticipantPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   tradingAccount<T extends Prisma.TradingAccountDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccountDefaultArgs<ExtArgs>>): Prisma.Prisma__TradingAccountClient<runtime.Types.Result.GetResult<Prisma.$TradingAccountPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -1750,7 +1505,6 @@ export interface Prisma__EquitySnapshotClient<T, Null = never, ExtArgs extends r
  */
 export interface EquitySnapshotFieldRefs {
   readonly id: Prisma.FieldRef<"EquitySnapshot", 'String'>
-  readonly seasonParticipantId: Prisma.FieldRef<"EquitySnapshot", 'String'>
   readonly tradingAccountId: Prisma.FieldRef<"EquitySnapshot", 'String'>
   readonly totalAssetKrw: Prisma.FieldRef<"EquitySnapshot", 'Decimal'>
   readonly returnRate: Prisma.FieldRef<"EquitySnapshot", 'Decimal'>
@@ -2166,25 +1920,6 @@ export type EquitySnapshotDeleteManyArgs<ExtArgs extends runtime.Types.Extension
    * Limit how many EquitySnapshots to delete.
    */
   limit?: number
-}
-
-/**
- * EquitySnapshot.seasonParticipant
- */
-export type EquitySnapshot$seasonParticipantArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the SeasonParticipant
-   */
-  select?: Prisma.SeasonParticipantSelect<ExtArgs> | null
-  /**
-   * Omit specific fields from the SeasonParticipant
-   */
-  omit?: Prisma.SeasonParticipantOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.SeasonParticipantInclude<ExtArgs> | null
-  where?: Prisma.SeasonParticipantWhereInput
 }
 
 /**

@@ -328,11 +328,8 @@ export class SeasonsService {
           },
         });
 
-        // Transitional dual-write: every financial row records BOTH the
-        // legacy seasonParticipantId and the trading account created above.
         const krwWallet = await tx.cashWallet.create({
           data: {
-            seasonParticipantId: participant.id,
             tradingAccountId: tradingAccount.id,
             currencyCode: CurrencyCode.KRW,
             balanceAmount: initialCapitalKrw,
@@ -341,7 +338,6 @@ export class SeasonsService {
 
         await tx.cashWallet.create({
           data: {
-            seasonParticipantId: participant.id,
             tradingAccountId: tradingAccount.id,
             currencyCode: CurrencyCode.USD,
             balanceAmount: ZERO_AMOUNT,
@@ -350,7 +346,6 @@ export class SeasonsService {
 
         await tx.walletTransaction.create({
           data: {
-            seasonParticipantId: participant.id,
             tradingAccountId: tradingAccount.id,
             walletId: krwWallet.id,
             currencyCode: CurrencyCode.KRW,
@@ -366,9 +361,6 @@ export class SeasonsService {
 
         await tx.equitySnapshot.create({
           data: {
-            seasonParticipantId: participant.id,
-            // 작업 7 dual-write: the account created above in this same
-            // transaction.
             tradingAccountId: tradingAccount.id,
             totalAssetKrw: initialCapitalKrw,
             returnRate: ZERO_AMOUNT,

@@ -204,7 +204,6 @@ async function createScenario(label, options) {
   });
   const krwWallet = await prisma.cashWallet.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: account.id,
       currencyCode: CurrencyCode.KRW,
       balanceAmount: CAPITAL,
@@ -214,7 +213,6 @@ async function createScenario(label, options) {
   });
   const usdWallet = await prisma.cashWallet.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: account.id,
       currencyCode: CurrencyCode.USD,
       balanceAmount: '1000.00000000',
@@ -680,7 +678,8 @@ async function verifyCancelScopeClassification() {
     'rejected null-scope write must leave status and reservation untouched',
   );
 
-  // 6) The caller's OWN order scoped to a THIRD account → mismatch, not 404.
+  // 6) Reassigning the canonical owner makes it another account's order, so
+  // the original account gets the normal 404 with no existence oracle.
   await prisma.order.update({
     where: { id: nullScopeOrderId },
     data: { tradingAccountId: foilAccount.id },
@@ -688,14 +687,14 @@ async function verifyCancelScopeClassification() {
   const mismatchStateBefore = await orderAndWalletState(nullScopeOrderId, owner.usdWalletId);
   await expectHttpError(
     orders.cancelOrderForTradingAccount(owner.userId, owner.accountId, nullScopeOrderId),
-    500,
-    'TRADING_ACCOUNT_SCOPE_MISMATCH',
-    'own mis-scoped order',
+    404,
+    'ORDER_NOT_FOUND',
+    'order reassigned to another account',
   );
   assert.equal(
     await orderAndWalletState(nullScopeOrderId, owner.usdWalletId),
     mismatchStateBefore,
-    'mismatch error must leave status and reservedAmount untouched',
+    'cross-account 404 must leave status and reservedAmount untouched',
   );
   await prisma.order.update({
     where: { id: nullScopeOrderId },
@@ -746,11 +745,6 @@ async function verifyCancelScopeClassification() {
 }
 
 async function cleanup() {
-  const participants = await prisma.seasonParticipant.findMany({
-    where: { userId: { in: createdUserIds } },
-    select: { id: true },
-  });
-  const participantIds = participants.map((p) => p.id);
   const accounts = await prisma.tradingAccount.findMany({
     where: { userId: { in: createdUserIds } },
     select: { id: true },
@@ -758,14 +752,14 @@ async function cleanup() {
   const accountIds = accounts.map((a) => a.id);
 
   await prisma.walletTransaction.deleteMany({
-    where: { OR: [{ seasonParticipantId: { in: participantIds } }, { tradingAccountId: { in: accountIds } }] },
+    where: { tradingAccountId: { in: accountIds } },
   });
-  await prisma.order.deleteMany({ where: { seasonParticipantId: { in: participantIds } } });
-  await prisma.position.deleteMany({ where: { seasonParticipantId: { in: participantIds } } });
+  await prisma.order.deleteMany({ where: { tradingAccountId: { in: accountIds } } });
+  await prisma.position.deleteMany({ where: { tradingAccountId: { in: accountIds } } });
   await prisma.quote.deleteMany({ where: { userId: { in: createdUserIds } } });
-  await prisma.equitySnapshot.deleteMany({ where: { seasonParticipantId: { in: participantIds } } });
+  await prisma.equitySnapshot.deleteMany({ where: { tradingAccountId: { in: accountIds } } });
   await prisma.cashWallet.deleteMany({
-    where: { OR: [{ seasonParticipantId: { in: participantIds } }, { tradingAccountId: { in: accountIds } }] },
+    where: { tradingAccountId: { in: accountIds } },
   });
   await prisma.seasonParticipant.deleteMany({ where: { userId: { in: createdUserIds } } });
   await prisma.tradingAccount.deleteMany({ where: { userId: { in: createdUserIds } } });

@@ -138,13 +138,9 @@ describe('General performance schema contract', () => {
   describe('EquitySnapshot', () => {
     const block = () => modelBlock('EquitySnapshot');
 
-    it('keeps the season link optional and requires the account scope', () => {
-      expect(block()).toMatch(
-        /seasonParticipantId\s+String\?\s+@map\("season_participant_id"\)/,
-      );
-      expect(block()).toMatch(
-        /seasonParticipant\s+SeasonParticipant\?\s+@relation\(/,
-      );
+    it('uses only the required account ownership scope', () => {
+      expect(block()).not.toContain('seasonParticipantId');
+      expect(block()).not.toMatch(/\n\s+seasonParticipant\s/);
       expect(block()).toMatch(
         /tradingAccountId\s+String\s+@map\("trading_account_id"\)/,
       );
@@ -190,8 +186,6 @@ describe('General performance schema contract', () => {
       expect(block()).toContain(
         '@@index([externalFundingReferenceType, externalFundingReferenceId]',
       );
-      // The legacy season index is untouched.
-      expect(block()).toContain('@@index([seasonParticipantId, capturedAt])');
     });
 
     /**
@@ -221,8 +215,8 @@ describe('General performance schema contract', () => {
   describe('DailyPortfolioSnapshot', () => {
     const block = () => modelBlock('DailyPortfolioSnapshot');
 
-    it('keeps the season link optional and requires the account scope', () => {
-      expect(block()).toMatch(/seasonParticipantId\s+String\?/);
+    it('uses only the required account ownership scope', () => {
+      expect(block()).not.toContain('seasonParticipantId');
       expect(block()).toMatch(/tradingAccountId\s+String\s/);
       expect(block()).toMatch(
         /tradingAccount\s+TradingAccount\s+@relation\([^)]*onDelete: Restrict/,
@@ -235,10 +229,7 @@ describe('General performance schema contract', () => {
       expect(block()).toMatch(/timeWeightedReturnFactor\s+Decimal\?/);
     });
 
-    it('keeps the participant unique AND adds the account unique', () => {
-      expect(block()).toContain(
-        '@@unique([seasonParticipantId, snapshotDate])',
-      );
+    it('uses the account/date unique', () => {
       expect(block()).toContain('@@unique([tradingAccountId, snapshotDate])');
     });
   });
@@ -261,12 +252,14 @@ describe('General performance schema contract', () => {
       expect(foundationSql).not.toContain('season_rankings');
     });
 
-    it('allows account-scoped general Order/Position/FX rows', () => {
-      for (const model of ['Order', 'Position']) {
-        expect(modelBlock(model)).toMatch(/seasonParticipantId\s+String\?/);
-      }
-      for (const model of ['ExchangeTransaction', 'FxExecuteRequest']) {
-        expect(modelBlock(model)).toMatch(/seasonParticipantId\s+String\?\s/);
+    it('keeps account-owned trading rows participant-free', () => {
+      for (const model of [
+        'Order',
+        'Position',
+        'ExchangeTransaction',
+        'FxExecuteRequest',
+      ]) {
+        expect(modelBlock(model)).not.toContain('seasonParticipantId');
       }
     });
 

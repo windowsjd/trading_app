@@ -4,10 +4,9 @@ import { Prisma, TradingAccountMode } from '../generated/prisma/client';
 /**
  * Scope verification of the ROWS A RANKING IS COMPUTED FROM (작업 8 §9).
  *
- * Dual-writing `season_rankings.trading_account_id` is only half the job. If
- * the daily snapshots, equity history, and executed orders feeding the
- * calculation are themselves mis-scoped, the ranking rows come out perfectly
- * scoped and numerically wrong.
+ * Daily snapshots, equity history, and executed orders are account-owned.
+ * Every source account must belong to one of this season's verified
+ * participants before it can affect ranking.
  *
  * WHY THIS FAILS THE JOB INSTEAD OF SKIPPING ROWS
  * ----------------------------------------------
@@ -22,13 +21,12 @@ import { Prisma, TradingAccountMode } from '../generated/prisma/client';
  * subtly wrong in the direction that favours the damaged account. The job fails
  * closed instead, and the existing repair scripts fix the source rows.
  *
- * `seasonSnapshotWhere` is kept as the QUERY filter (general rows never enter a
- * season query in the first place); these checks are the separate assertion
- * that what did come back is what it claims to be.
+ * Queries filter through TradingAccount -> SeasonParticipant; these checks are
+ * the separate assertion that every returned account is in the verified map.
  */
 
 export const rankingSourceScopeErrorCodes = {
-  /** A source row has no account scope — repair-snapshot-scope / -trading-scope. */
+  /** A source row has no canonical account scope. */
   SEASON_RANKING_SOURCE_SCOPE_REPAIR_REQUIRED:
     'SEASON_RANKING_SOURCE_SCOPE_REPAIR_REQUIRED',
   /** A source row's account contradicts its participant, user, or mode. */
@@ -39,7 +37,7 @@ export type RankingSourceScopeErrorCode =
   (typeof rankingSourceScopeErrorCodes)[keyof typeof rankingSourceScopeErrorCodes];
 
 const REPAIR_HINT =
-  'Run "pnpm trading-accounts:repair-links --apply", "pnpm trading-accounts:repair-snapshot-scope --apply", and "pnpm trading-accounts:repair-trading-scope --apply"; ranking inputs are never silently excluded.';
+  'Inspect the canonical TradingAccount link; ranking inputs are never silently excluded or repaired during calculation.';
 
 export function throwRankingSourceScope(
   code: RankingSourceScopeErrorCode,
@@ -120,8 +118,7 @@ export function buildRankingParticipantScopes(
 /** Columns any season snapshot used as a ranking input must be selected with. */
 export type RankingSourceSnapshotScopeRow = {
   id?: string;
-  seasonParticipantId: string | null;
-  tradingAccountId: string | null;
+  tradingAccountId: string;
   cumulativeExternalFundingKrw: Prisma.Decimal | null;
   investmentPnlKrw: Prisma.Decimal | null;
   timeWeightedReturnFactor: Prisma.Decimal | null;
@@ -132,35 +129,13 @@ export function assertRankingSourceSnapshotScopes(input: {
   rows: readonly RankingSourceSnapshotScopeRow[];
   participantScopes: ReadonlyMap<string, string>;
 }): void {
+  const accountIds = new Set(input.participantScopes.values());
   for (const row of input.rows) {
     const label = `Season ${input.kind}${row.id ? ` ${row.id}` : ''}`;
-
-    if (!row.seasonParticipantId) {
+    if (!accountIds.has(row.tradingAccountId)) {
       throwRankingSourceScope(
         rankingSourceScopeErrorCodes.SEASON_RANKING_SOURCE_SCOPE_MISMATCH,
-        `${label} reached a season ranking calculation with no season participant.`,
-      );
-    }
-
-    const expectedAccountId = input.participantScopes.get(
-      row.seasonParticipantId,
-    );
-    if (!expectedAccountId) {
-      throwRankingSourceScope(
-        rankingSourceScopeErrorCodes.SEASON_RANKING_SOURCE_SCOPE_MISMATCH,
-        `${label} belongs to participant ${row.seasonParticipantId}, which is not among this season's verified ranking participants.`,
-      );
-    }
-    if (row.tradingAccountId === null) {
-      throwRankingSourceScope(
-        rankingSourceScopeErrorCodes.SEASON_RANKING_SOURCE_SCOPE_REPAIR_REQUIRED,
-        `${label} has no trading account scope.`,
-      );
-    }
-    if (row.tradingAccountId !== expectedAccountId) {
-      throwRankingSourceScope(
-        rankingSourceScopeErrorCodes.SEASON_RANKING_SOURCE_SCOPE_MISMATCH,
-        `${label} is scoped to account ${row.tradingAccountId} but its participant is linked to ${expectedAccountId}.`,
+        `${label} is scoped to account ${row.tradingAccountId}, which is not among this season's verified ranking accounts.`,
       );
     }
 
@@ -184,43 +159,20 @@ export function assertRankingSourceSnapshotScopes(input: {
 /** Columns any executed Order used for totalFillCount must be selected with. */
 export type RankingSourceOrderScopeRow = {
   id?: string;
-  seasonParticipantId: string | null;
-  tradingAccountId: string | null;
+  tradingAccountId: string;
 };
 
 export function assertRankingSourceOrderScopes(input: {
   rows: readonly RankingSourceOrderScopeRow[];
   participantScopes: ReadonlyMap<string, string>;
 }): void {
+  const accountIds = new Set(input.participantScopes.values());
   for (const row of input.rows) {
     const label = `Executed order${row.id ? ` ${row.id}` : ''}`;
-
-    if (!row.seasonParticipantId) {
+    if (!accountIds.has(row.tradingAccountId)) {
       throwRankingSourceScope(
         rankingSourceScopeErrorCodes.SEASON_RANKING_SOURCE_SCOPE_MISMATCH,
-        `${label} reached a season ranking calculation with no season participant.`,
-      );
-    }
-
-    const expectedAccountId = input.participantScopes.get(
-      row.seasonParticipantId,
-    );
-    if (!expectedAccountId) {
-      throwRankingSourceScope(
-        rankingSourceScopeErrorCodes.SEASON_RANKING_SOURCE_SCOPE_MISMATCH,
-        `${label} belongs to participant ${row.seasonParticipantId}, which is not among this season's verified ranking participants.`,
-      );
-    }
-    if (row.tradingAccountId === null) {
-      throwRankingSourceScope(
-        rankingSourceScopeErrorCodes.SEASON_RANKING_SOURCE_SCOPE_REPAIR_REQUIRED,
-        `${label} has no trading account scope, so this season's fill counts cannot be trusted.`,
-      );
-    }
-    if (row.tradingAccountId !== expectedAccountId) {
-      throwRankingSourceScope(
-        rankingSourceScopeErrorCodes.SEASON_RANKING_SOURCE_SCOPE_MISMATCH,
-        `${label} is scoped to account ${row.tradingAccountId} but its participant is linked to ${expectedAccountId}.`,
+        `${label} is scoped to account ${row.tradingAccountId}, which is not among this season's verified ranking accounts.`,
       );
     }
   }

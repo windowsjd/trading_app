@@ -71,7 +71,12 @@ export function computeFxExecuteRequestHash(
   return createHash('sha256').update(canonicalJson, 'utf8').digest('hex');
 }
 
-/** Account-scoped v2. The season v1 serializer and field order stay exact. */
+/**
+ * Account-scoped v2 for general mode. The released season v1 serializer and
+ * field order remain exact so committed commands keep replaying across this
+ * schema cleanup; the participant here is immutable request identity, not DB
+ * row ownership or lookup scope.
+ */
 export function computeGeneralFxExecuteRequestHash(
   input: BuildGeneralFxExecuteCanonicalPayloadInput,
 ): string {

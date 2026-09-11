@@ -64,18 +64,16 @@ describe('LimitOrderCancelService', () => {
 
   const orderRecord = (overrides: Partial<Record<string, unknown>> = {}) => ({
     id: 'order-1',
-    seasonParticipantId: 'sp-1',
     tradingAccountId: 'trading-account-1',
-    seasonParticipant: {
-      id: 'sp-1',
-      tradingAccountId: 'trading-account-1',
-    },
     tradingAccount: {
       id: 'trading-account-1',
       userId: 'user-1',
       mode: 'season',
       status: 'active',
-      seasonParticipant: { id: 'sp-1' },
+      seasonParticipant: {
+        id: 'sp-1',
+        tradingAccountId: 'trading-account-1',
+      },
     },
     quoteId: 'quote-1',
     side: 'buy',
@@ -167,7 +165,6 @@ describe('LimitOrderCancelService', () => {
         );
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
         id: 'wallet-1',
-        seasonParticipantId: 'sp-1',
         tradingAccountId: 'trading-account-1',
       });
       prisma.$executeRaw.mockResolvedValueOnce(1); // release applied
@@ -201,7 +198,6 @@ describe('LimitOrderCancelService', () => {
       expect((prisma.$executeRaw.mock.calls[0] as unknown[]).slice(1)).toEqual([
         '150150.00000000',
         'wallet-1',
-        'sp-1',
         'trading-account-1',
         CurrencyCode.KRW,
         '150150.00000000',
@@ -212,7 +208,6 @@ describe('LimitOrderCancelService', () => {
       expect(prisma.order.updateMany).toHaveBeenCalledWith({
         where: {
           id: 'order-1',
-          seasonParticipantId: 'sp-1',
           tradingAccountId: 'trading-account-1',
           status: OrderStatus.submitted,
         },
@@ -279,7 +274,6 @@ describe('LimitOrderCancelService', () => {
         );
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
         id: 'wallet-1',
-        seasonParticipantId: 'sp-1',
         tradingAccountId: 'trading-account-1',
       });
       prisma.$executeRaw.mockResolvedValueOnce(1);
@@ -362,7 +356,6 @@ describe('LimitOrderCancelService', () => {
       prisma.order.findUnique.mockResolvedValueOnce(orderRecord());
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
         id: 'wallet-1',
-        seasonParticipantId: 'sp-1',
         tradingAccountId: 'trading-account-1',
       });
       prisma.$executeRaw.mockResolvedValueOnce(0); // guard failed
@@ -404,7 +397,6 @@ describe('LimitOrderCancelService', () => {
       prisma.order.findUnique.mockResolvedValueOnce(orderRecord());
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
         id: 'wallet-1',
-        seasonParticipantId: 'sp-1',
         tradingAccountId: 'trading-account-1',
       });
       prisma.$executeRaw.mockResolvedValueOnce(1);
@@ -438,7 +430,6 @@ describe('LimitOrderCancelService', () => {
           );
         prisma.cashWallet.findUnique.mockResolvedValueOnce({
           id: 'wallet-1',
-          seasonParticipantId: 'sp-1',
           tradingAccountId: 'trading-account-1',
         });
         prisma.$executeRaw.mockResolvedValueOnce(1);
@@ -468,16 +459,14 @@ describe('LimitOrderCancelService', () => {
         .mockResolvedValueOnce({
           id: 'order-1',
           assetId: 'asset-1',
-          seasonParticipantId: 'sp-1',
           tradingAccountId: 'trading-account-1',
-          seasonParticipant: {
-            id: 'sp-1',
-            tradingAccountId: 'trading-account-1',
-          },
           tradingAccount: {
             id: 'trading-account-1',
             mode: 'season',
-            seasonParticipant: { id: 'sp-1' },
+            seasonParticipant: {
+              id: 'sp-1',
+              tradingAccountId: 'trading-account-1',
+            },
           },
           currencyCode: CurrencyCode.KRW,
           status: OrderStatus.submitted,
@@ -489,16 +478,14 @@ describe('LimitOrderCancelService', () => {
         .mockResolvedValueOnce({
           id: 'order-2',
           assetId: 'asset-1',
-          seasonParticipantId: 'sp-1',
           tradingAccountId: 'trading-account-1',
-          seasonParticipant: {
-            id: 'sp-1',
-            tradingAccountId: 'trading-account-1',
-          },
           tradingAccount: {
             id: 'trading-account-1',
             mode: 'season',
-            seasonParticipant: { id: 'sp-1' },
+            seasonParticipant: {
+              id: 'sp-1',
+              tradingAccountId: 'trading-account-1',
+            },
           },
           currencyCode: CurrencyCode.USD,
           status: OrderStatus.submitted,
@@ -510,12 +497,10 @@ describe('LimitOrderCancelService', () => {
       prisma.cashWallet.findUnique
         .mockResolvedValueOnce({
           id: 'wallet-krw',
-          seasonParticipantId: 'sp-1',
           tradingAccountId: 'trading-account-1',
         })
         .mockResolvedValueOnce({
           id: 'wallet-usd',
-          seasonParticipantId: 'sp-1',
           tradingAccountId: 'trading-account-1',
         });
       prisma.$executeRaw.mockResolvedValue(1);
@@ -525,7 +510,6 @@ describe('LimitOrderCancelService', () => {
         await service.cancelOpenLimitBuysForParticipantInTransaction(
           prisma as never,
           {
-            seasonParticipantId: 'sp-1',
             tradingAccountId: 'trading-account-1',
             reason: LIMIT_ORDER_CANCEL_REASONS.participantExcluded,
             canceledAt,
@@ -540,7 +524,6 @@ describe('LimitOrderCancelService', () => {
       expect(prisma.order.updateMany).toHaveBeenNthCalledWith(1, {
         where: {
           id: 'order-1',
-          seasonParticipantId: 'sp-1',
           tradingAccountId: 'trading-account-1',
           status: OrderStatus.submitted,
         },
@@ -560,7 +543,6 @@ describe('LimitOrderCancelService', () => {
         await service.cancelOpenLimitBuysForParticipantInTransaction(
           prisma as never,
           {
-            seasonParticipantId: 'sp-1',
             tradingAccountId: 'trading-account-1',
             reason: LIMIT_ORDER_CANCEL_REASONS.participantExcluded,
             canceledAt,
@@ -589,16 +571,14 @@ describe('LimitOrderCancelService', () => {
         .mockResolvedValueOnce({
           id: 'order-1',
           assetId: 'asset-1',
-          seasonParticipantId: 'sp-1',
           tradingAccountId: 'trading-account-1',
-          seasonParticipant: {
-            id: 'sp-1',
-            tradingAccountId: 'trading-account-1',
-          },
           tradingAccount: {
             id: 'trading-account-1',
             mode: 'season',
-            seasonParticipant: { id: 'sp-1' },
+            seasonParticipant: {
+              id: 'sp-1',
+              tradingAccountId: 'trading-account-1',
+            },
           },
           currencyCode: CurrencyCode.KRW,
           reservedAmount: new Prisma.Decimal('100.00000000'),
@@ -608,16 +588,14 @@ describe('LimitOrderCancelService', () => {
         .mockResolvedValueOnce({
           id: 'order-2',
           assetId: 'asset-1',
-          seasonParticipantId: 'sp-2',
           tradingAccountId: 'trading-account-2',
-          seasonParticipant: {
-            id: 'sp-2',
-            tradingAccountId: 'trading-account-2',
-          },
           tradingAccount: {
             id: 'trading-account-2',
             mode: 'season',
-            seasonParticipant: { id: 'sp-2' },
+            seasonParticipant: {
+              id: 'sp-2',
+              tradingAccountId: 'trading-account-2',
+            },
           },
           currencyCode: CurrencyCode.KRW,
           reservedAmount: new Prisma.Decimal('40.00000000'),
@@ -627,12 +605,10 @@ describe('LimitOrderCancelService', () => {
       prisma.cashWallet.findUnique
         .mockResolvedValueOnce({
           id: 'wallet-1',
-          seasonParticipantId: 'sp-1',
           tradingAccountId: 'trading-account-1',
         })
         .mockResolvedValueOnce({
           id: 'wallet-2',
-          seasonParticipantId: 'sp-2',
           tradingAccountId: 'trading-account-2',
         });
       prisma.$executeRaw.mockResolvedValue(1);
@@ -723,7 +699,9 @@ describe('LimitOrderCancelService', () => {
       expect(orderCount).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            seasonParticipant: { seasonId: 'season-1' },
+            tradingAccount: {
+              seasonParticipant: { seasonId: 'season-1' },
+            },
           }) as never,
         }),
       );
@@ -778,7 +756,6 @@ describe('LimitOrderCancelService', () => {
         );
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
         id: 'wallet-1',
-        seasonParticipantId: 'sp-1',
         tradingAccountId: 'trading-account-1',
       });
       prisma.$executeRaw.mockResolvedValueOnce(1);
@@ -787,7 +764,7 @@ describe('LimitOrderCancelService', () => {
       await scopedCancel(service);
 
       const lockValues = (prisma.$queryRaw.mock.calls[0] as unknown[]).slice(1);
-      expect(lockValues).toEqual(['order-1', 'user-1', 'user-1']);
+      expect(lockValues).toEqual(['order-1', 'user-1']);
       expect(lockValues).not.toContain('trading-account-1');
     });
 
@@ -806,7 +783,6 @@ describe('LimitOrderCancelService', () => {
         );
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
         id: 'wallet-1',
-        seasonParticipantId: 'sp-1',
         tradingAccountId: 'trading-account-1',
       });
       prisma.$executeRaw.mockResolvedValueOnce(1);
@@ -840,25 +816,11 @@ describe('LimitOrderCancelService', () => {
       expectNoReservationOrStatusChange(prisma);
     });
 
-    it("surfaces the caller's own NULL-scope order as TRADING_SCOPE_REPAIR_REQUIRED", async () => {
+    it("surfaces the caller's inconsistent account relation", async () => {
       const { prisma, service } = createService();
       prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-1' }]);
       prisma.order.findUnique.mockResolvedValueOnce(
-        orderRecord({ tradingAccountId: null }),
-      );
-
-      await expectErrorCode(
-        scopedCancel(service),
-        'TRADING_SCOPE_REPAIR_REQUIRED',
-      );
-      expectNoReservationOrStatusChange(prisma);
-    });
-
-    it('surfaces a mis-scoped order of the requested participant as TRADING_ACCOUNT_SCOPE_MISMATCH', async () => {
-      const { prisma, service } = createService();
-      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-1' }]);
-      prisma.order.findUnique.mockResolvedValueOnce(
-        orderRecord({ tradingAccountId: 'trading-account-9' }),
+        orderRecord({ tradingAccount: null }),
       );
 
       await expectErrorCode(
@@ -868,13 +830,29 @@ describe('LimitOrderCancelService', () => {
       expectNoReservationOrStatusChange(prisma);
     });
 
+    it('keeps an order on a different canonical account private', async () => {
+      const { prisma, service } = createService();
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-1' }]);
+      prisma.order.findUnique.mockResolvedValueOnce(
+        orderRecord({ tradingAccountId: 'trading-account-9' }),
+      );
+
+      await expectErrorCode(scopedCancel(service), 'ORDER_NOT_FOUND');
+      expectNoReservationOrStatusChange(prisma);
+    });
+
     it('does not hide an order scoped to THIS account whose participant link disagrees', async () => {
       const { prisma, service } = createService();
       prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-1' }]);
       prisma.order.findUnique.mockResolvedValueOnce(
         orderRecord({
-          tradingAccountId: 'trading-account-1',
-          seasonParticipant: { tradingAccountId: null },
+          tradingAccount: {
+            id: 'trading-account-1',
+            userId: 'user-1',
+            mode: 'season',
+            status: 'active',
+            seasonParticipant: null,
+          },
         }),
       );
 
@@ -889,12 +867,12 @@ describe('LimitOrderCancelService', () => {
       const { prisma, service } = createService();
       prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-1' }]);
       prisma.order.findUnique.mockResolvedValueOnce(
-        orderRecord({ orderType: OrderType.market, tradingAccountId: null }),
+        orderRecord({ orderType: OrderType.market, tradingAccount: null }),
       );
 
       await expectErrorCode(
         scopedCancel(service),
-        'TRADING_SCOPE_REPAIR_REQUIRED',
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
       );
       expectNoReservationOrStatusChange(prisma);
     });
@@ -938,7 +916,6 @@ describe('LimitOrderCancelService', () => {
       prisma.order.findUnique.mockResolvedValueOnce(orderRecord());
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
         id: 'wallet-1',
-        seasonParticipantId: 'sp-1',
         tradingAccountId: null,
       });
 
@@ -955,7 +932,6 @@ describe('LimitOrderCancelService', () => {
       prisma.order.findUnique.mockResolvedValueOnce(orderRecord());
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
         id: 'wallet-1',
-        seasonParticipantId: 'sp-1',
         tradingAccountId: 'trading-account-7',
       });
 

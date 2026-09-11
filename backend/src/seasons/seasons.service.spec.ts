@@ -415,32 +415,28 @@ describe('SeasonsService', () => {
         }),
       }),
     );
-    // Transitional dual-write: KRW+USD wallets and the initial grant all
-    // carry the created account id next to the participant id.
+    // Financial rows carry only the created canonical account id.
     expect(prisma.cashWallet.create).toHaveBeenNthCalledWith(1, {
       data: expect.objectContaining({
-        seasonParticipantId: 'sp-1',
         tradingAccountId: 'ta-1',
         currencyCode: 'KRW',
       }),
     });
     expect(prisma.cashWallet.create).toHaveBeenNthCalledWith(2, {
       data: expect.objectContaining({
-        seasonParticipantId: 'sp-1',
         tradingAccountId: 'ta-1',
         currencyCode: 'USD',
       }),
     });
     expect(prisma.walletTransaction.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        seasonParticipantId: 'sp-1',
         tradingAccountId: 'ta-1',
         txType: 'initial_grant',
       }),
     });
     expect(prisma.equitySnapshot.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'ta-1',
         totalAssetKrw: '1000000.00000000',
         returnRate: '0.00000000',
         krwCash: '1000000.00000000',

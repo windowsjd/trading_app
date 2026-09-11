@@ -2,8 +2,8 @@ import { spawnSync } from 'node:child_process';
 
 /**
  * Opt-in PostgreSQL integration tests for the trading trading-account scope
- * (작업 5): schema/index semantics (FX legacy partial unique, account-scoped
- * order/position uniques), the repair-trading-scope script, dual-write on
+ * (작업 5): schema/index semantics (account-scoped FX/order/position uniques),
+ * participant-column removal, account-only writes on
  * limit create / fill, wallet+order+position+quote scope fail-closed
  * behavior, account-scoped order/position APIs and their legacy
  * equivalence, same-user cross-account idempotency (orders and FX), and the
@@ -16,7 +16,7 @@ const itDbIntegration = RUN_DB_INTEGRATION ? it : it.skip;
 
 describe('Trading trading-account scope DB integration', () => {
   itDbIntegration(
-    'verifies trading-scope schema, repair script, dual-write, scope fail-closed, and account APIs against PostgreSQL',
+    'verifies account-only trading schema, scope fail-closed, and account APIs against PostgreSQL',
     () => {
       runDbIntegrationPrepare();
 
@@ -114,10 +114,6 @@ import { TradingAccountAccessService } from './src/trading-accounts/trading-acco
 import { PortfolioValuationService } from './src/portfolio/portfolio-valuation.service';
 import { GeneralExternalFundingService } from './src/portfolio/general-external-funding.service';
 import { GeneralAccountPerformanceService } from './src/portfolio/general-account-performance.service';
-import {
-  repairTradingScope,
-  resolveTradingScopeExitCode,
-} from './scripts/lib/repair-trading-scope';
 
 process.env.LIMIT_ORDER_ENABLED = 'true';
 
@@ -258,7 +254,6 @@ async function createScenario(label, options = {}) {
   });
   const krwWallet = await prisma.cashWallet.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: account.id,
       currencyCode: CurrencyCode.KRW,
       balanceAmount: CAPITAL,
@@ -270,7 +265,6 @@ async function createScenario(label, options = {}) {
   if (options.withUsdWallet) {
     const usdWallet = await prisma.cashWallet.create({
       data: {
-        seasonParticipantId: participant.id,
         tradingAccountId: account.id,
         currencyCode: CurrencyCode.USD,
         balanceAmount: ZERO,
@@ -313,23 +307,23 @@ async function cleanupAll() {
 
   await prisma.fxExecuteRequest.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.walletTransaction.deleteMany({
-    where: { seasonParticipantId: { in: participantIds } },
+    where: { tradingAccount: { userId: { in: userIds } } },
   });
   await prisma.exchangeTransaction.deleteMany({
-    where: { seasonParticipantId: { in: participantIds } },
+    where: { tradingAccount: { userId: { in: userIds } } },
   });
   await prisma.equitySnapshot.deleteMany({
-    where: { seasonParticipantId: { in: participantIds } },
+    where: { tradingAccount: { userId: { in: userIds } } },
   });
   await prisma.order.deleteMany({
-    where: { seasonParticipantId: { in: participantIds } },
+    where: { tradingAccount: { userId: { in: userIds } } },
   });
   await prisma.position.deleteMany({
-    where: { seasonParticipantId: { in: participantIds } },
+    where: { tradingAccount: { userId: { in: userIds } } },
   });
   await prisma.quote.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.cashWallet.deleteMany({
-    where: { seasonParticipantId: { in: participantIds } },
+    where: { tradingAccount: { userId: { in: userIds } } },
   });
   await prisma.seasonParticipant.deleteMany({
     where: { id: { in: participantIds } },
@@ -363,13 +357,9 @@ async function testIndexFingerprints() {
     !byName.has('fx_execute_requests_user_id_idempotency_key_key'),
     'global FX per-user unique must be dropped',
   );
-  const legacyPartial = byName.get(
-    'fx_execute_requests_user_id_idempotency_key_legacy_null_key',
-  );
-  assert.ok(legacyPartial, 'FX legacy partial unique must exist');
   assert.ok(
-    legacyPartial.includes('WHERE (trading_account_id IS NULL)'),
-    'FX legacy unique must be partial on trading_account_id IS NULL',
+    !byName.has('fx_execute_requests_user_id_idempotency_key_legacy_null_key'),
+    'obsolete NULL-account FX partial unique must be dropped',
   );
   assert.ok(
     byName.has('fx_execute_requests_trading_account_id_idempotency_key_key'),
@@ -408,9 +398,8 @@ async function testDbUniqueSemantics() {
   });
 
   const fxKey = 'fx-key-' + randomUUID().slice(0, 8);
-  const fxRow = (participantId, accountId, key) => ({
+  const fxRow = (accountId, key) => ({
     userId: user.id,
-    seasonParticipantId: participantId,
     tradingAccountId: accountId,
     idempotencyKey: key,
     requestHash: 'hash-' + randomUUID().slice(0, 8),
@@ -422,22 +411,20 @@ async function testDbUniqueSemantics() {
   });
 
   // Same user + same key on two DIFFERENT accounts: both insert fine.
-  await prisma.fxExecuteRequest.create({ data: fxRow(a.participantId, a.accountId, fxKey) });
-  await prisma.fxExecuteRequest.create({ data: fxRow(b.participantId, b.accountId, fxKey) });
+  await prisma.fxExecuteRequest.create({ data: fxRow(a.accountId, fxKey) });
+  await prisma.fxExecuteRequest.create({ data: fxRow(b.accountId, fxKey) });
 
   // Same account + same key: unique violation.
   await assert.rejects(
-    prisma.fxExecuteRequest.create({ data: fxRow(a.participantId, a.accountId, fxKey) }),
+    prisma.fxExecuteRequest.create({ data: fxRow(a.accountId, fxKey) }),
     (error) => error.code === 'P2002',
     'same-account FX key must conflict',
   );
 
-  // The retained legacy partial index remains available for pre-migration
-  // tooling, while the canonical client rejects new NULL-scoped requests.
-  const legacyKey = 'fx-legacy-' + randomUUID().slice(0, 8);
+  // The canonical client rejects NULL-scoped requests.
   await assert.rejects(
     prisma.fxExecuteRequest.create({
-      data: fxRow(a.participantId, null, legacyKey),
+      data: fxRow(null, 'fx-null-' + randomUUID().slice(0, 8)),
     }),
     (error) => error?.name === 'PrismaClientValidationError',
     'canonical FX requests require an account scope',
@@ -448,8 +435,7 @@ async function testDbUniqueSemantics() {
   const asset = await createKrwCryptoAsset('unique');
   trackScope({ assetIds: [asset.id] });
   const orderKey = 'order-key-' + randomUUID().slice(0, 8);
-  const orderRow = (participantId, accountId, key) => ({
-    seasonParticipantId: participantId,
+  const orderRow = (accountId, key) => ({
     tradingAccountId: accountId,
     assetId: asset.id,
     side: OrderSide.buy,
@@ -461,10 +447,10 @@ async function testDbUniqueSemantics() {
     requestHash: 'hash',
     submittedAt: new Date(),
   });
-  await prisma.order.create({ data: orderRow(a.participantId, a.accountId, orderKey) });
-  await prisma.order.create({ data: orderRow(b.participantId, b.accountId, orderKey) });
+  await prisma.order.create({ data: orderRow(a.accountId, orderKey) });
+  await prisma.order.create({ data: orderRow(b.accountId, orderKey) });
   await assert.rejects(
-    prisma.order.create({ data: orderRow(a.participantId, a.accountId, orderKey) }),
+    prisma.order.create({ data: orderRow(a.accountId, orderKey) }),
     (error) => error.code === 'P2002',
     'same-account order key must conflict',
   );
@@ -472,7 +458,6 @@ async function testDbUniqueSemantics() {
   // Positions: one aggregate position per (account, asset).
   await prisma.position.create({
     data: {
-      seasonParticipantId: a.participantId,
       tradingAccountId: a.accountId,
       assetId: asset.id,
       quantity: '1.00000000',
@@ -483,7 +468,6 @@ async function testDbUniqueSemantics() {
   await assert.rejects(
     prisma.position.create({
       data: {
-        seasonParticipantId: b.participantId,
         tradingAccountId: a.accountId,
         assetId: asset.id,
         quantity: '1.00000000',
@@ -498,9 +482,9 @@ async function testDbUniqueSemantics() {
 }
 
 // ---------------------------------------------------------------------------
-// T3: repair-trading-scope (dry-run/apply/idempotent/fail-closed)
+// T3: participant-column removal + canonical account integrity
 // ---------------------------------------------------------------------------
-async function testRepairTradingScope() {
+async function testCanonicalTradingScope() {
   const linked = await createScenario('repair-linked');
   const other = await createScenario('repair-other');
   const asset = await createKrwCryptoAsset('repair');
@@ -513,7 +497,6 @@ async function testRepairTradingScope() {
 
   const canonicalOrder = await prisma.order.create({
     data: {
-      seasonParticipantId: linked.participantId,
       tradingAccountId: linked.accountId,
       assetId: asset.id,
       side: OrderSide.buy,
@@ -530,7 +513,6 @@ async function testRepairTradingScope() {
   });
   const canonicalPosition = await prisma.position.create({
     data: {
-      seasonParticipantId: linked.participantId,
       tradingAccountId: linked.accountId,
       assetId: asset.id,
       quantity: '3.00000000',
@@ -544,7 +526,6 @@ async function testRepairTradingScope() {
   const canonicalQuote = await prisma.quote.create({
     data: {
       userId: linked.userId,
-      seasonParticipantId: linked.participantId,
       tradingAccountId: linked.accountId,
       quoteType: QuoteType.order,
       status: QuoteStatus.active,
@@ -583,21 +564,13 @@ async function testRepairTradingScope() {
     'the canonical Prisma client must reject a null order scope',
   );
 
-  // A clean post-migration database gives the pre-migration repair nothing to
-  // backfill, and apply/replay leave every financial value untouched.
-  const dryRun = await repairTradingScope(prisma, { apply: false });
-  assert.equal(dryRun.mode, 'dry-run');
-  assert.equal(dryRun.models.order.nullRowCount, 0);
-  assert.equal(dryRun.models.position.nullRowCount, 0);
-  assert.equal(dryRun.models.quote.nullRowCount, 0);
-  assert.equal(resolveTradingScopeExitCode(dryRun).exitCode, 0);
+  const removedColumns = await prisma.$queryRawUnsafe(
+    "SELECT table_name FROM information_schema.columns WHERE table_schema = 'public' AND column_name = 'season_participant_id' AND table_name IN ('orders', 'positions', 'quotes')",
+  );
+  assert.deepEqual(removedColumns, []);
 
-  const apply = await repairTradingScope(prisma, { apply: true });
-  assert.equal(apply.mode, 'apply');
-  assert.equal(resolveTradingScopeExitCode(apply).exitCode, 0);
-  assert.equal(apply.models.order.backfilledCount, 0);
-  assert.equal(apply.models.position.backfilledCount, 0);
-  assert.equal(apply.models.quote.backfilledCount, 0);
+  // Reading the canonical rows after the schema migration leaves every
+  // financial and lifecycle value untouched.
   const unchangedOrder = await prisma.order.findUniqueOrThrow({
     where: { id: canonicalOrder.id },
     select: {
@@ -639,17 +612,11 @@ async function testRepairTradingScope() {
   assert.equal(unchangedQuote.status, QuoteStatus.active);
   assert.equal(unchangedQuote.requestHash, 'repair-hash');
 
-  const replay = await repairTradingScope(prisma, { apply: true });
-  assert.equal(resolveTradingScopeExitCode(replay).exitCode, 0);
-  assert.equal(replay.models.position.backfilledCount, 0);
-  assert.equal(replay.models.quote.backfilledCount, 0);
-
-  // A non-null participant/account mismatch remains a fail-closed corruption;
-  // neither dry-run nor apply guesses a replacement account.
+  // Order and quote are independently account-owned, and their direct child
+  // relationship must still be checked before execution.
   const crossQuote = await prisma.quote.create({
     data: {
       userId: linked.userId,
-      seasonParticipantId: linked.participantId,
       tradingAccountId: other.accountId,
       quoteType: QuoteType.order,
       status: QuoteStatus.consumed,
@@ -667,7 +634,6 @@ async function testRepairTradingScope() {
   });
   const crossOrder = await prisma.order.create({
     data: {
-      seasonParticipantId: linked.participantId,
       tradingAccountId: linked.accountId,
       quoteId: crossQuote.id,
       assetId: asset.id,
@@ -680,31 +646,24 @@ async function testRepairTradingScope() {
     },
     select: { id: true },
   });
-  const crossReport = await repairTradingScope(prisma, { apply: false });
-  assert.ok(
-    crossReport.orderQuoteAccountMismatchCount >= 1,
-    'order-quote account mismatch detected',
+  const crossRows = await prisma.$queryRawUnsafe(
+    'SELECT count(*)::int AS n FROM "orders" o JOIN "quotes" q ON q."id" = o."quote_id" WHERE o."trading_account_id" <> q."trading_account_id"',
   );
-  assert.ok(
-    crossReport.failures.some(
-      (f) => f.code === 'ORDER_QUOTE_ACCOUNT_SCOPE_MISMATCH',
-    ),
-    'order-quote mismatch failure reported',
-  );
+  assert.ok(Number(crossRows[0].n) >= 1, 'order-quote mismatch detected');
   const mismatchAfter = await prisma.quote.findUniqueOrThrow({
     where: { id: crossQuote.id },
     select: { tradingAccountId: true },
   });
   assert.equal(mismatchAfter.tradingAccountId, other.accountId);
 
-  // Cleanup the deliberate anomaly so later repair/audit checks see a clean DB.
+  // Cleanup the deliberate anomaly so later audits see a clean DB.
   await prisma.order.delete({ where: { id: crossOrder.id } });
   await prisma.quote.deleteMany({ where: { id: crossQuote.id } });
-  console.log('[ok] repair-trading-scope');
+  console.log('[ok] canonical trading scope');
 }
 
 // ---------------------------------------------------------------------------
-// T4: limit lifecycle dual-write + scope fail-closed + fill gating
+// T4: limit lifecycle account ownership + scope fail-closed + fill gating
 // ---------------------------------------------------------------------------
 async function testLimitLifecycleAndFill() {
   const user = await createUser('limit');
@@ -739,7 +698,7 @@ async function testLimitLifecycleAndFill() {
     limitPrice: '100',
   };
 
-  // Account-scoped limit quote: durable quote rows dual-write the account.
+  // Account-scoped limit quote: durable quote rows store the canonical account.
   const quoteResponse = await ordersService.quoteOrderForTradingAccount(
     user.id,
     s.accountId,
@@ -748,12 +707,11 @@ async function testLimitLifecycleAndFill() {
   const quoteId = quoteResponse.data.quoteId;
   const quoteRow = await prisma.quote.findUnique({
     where: { id: quoteId },
-    select: { tradingAccountId: true, seasonParticipantId: true },
+    select: { tradingAccountId: true },
   });
-  assert.equal(quoteRow.tradingAccountId, s.accountId, 'quote dual-write');
-  assert.equal(quoteRow.seasonParticipantId, s.participantId);
+  assert.equal(quoteRow.tradingAccountId, s.accountId, 'quote ownership');
 
-  // Account-scoped limit create: order dual-writes; quote consumed with
+  // Account-scoped limit create: order stores its account; quote consumed with
   // account-conditioned updateMany; reservation applied.
   const createKey = 'limit-key-' + randomUUID().slice(0, 8);
   const createResponse = await ordersService.createOrderForTradingAccount(
@@ -767,7 +725,7 @@ async function testLimitLifecycleAndFill() {
     where: { id: orderId },
     select: { tradingAccountId: true, status: true, reservedAmount: true },
   });
-  assert.equal(orderRow.tradingAccountId, s.accountId, 'order dual-write');
+  assert.equal(orderRow.tradingAccountId, s.accountId, 'order ownership');
   const consumedQuote = await prisma.quote.findUnique({
     where: { id: quoteId },
     select: { status: true },
@@ -790,7 +748,7 @@ async function testLimitLifecycleAndFill() {
   assert.equal(replayResponse.data.order.orderId, orderId, 'replay same order');
   assert.equal(replayResponse.data.execution.state, 'submitted');
   const orderCountAfterReplay = await prisma.order.count({
-    where: { seasonParticipantId: s.participantId },
+    where: { tradingAccountId: s.accountId },
   });
   assert.equal(orderCountAfterReplay, 1, 'replay created no new order');
   const walletAfterReplay = await prisma.cashWallet.findUnique({
@@ -919,7 +877,7 @@ async function testLimitLifecycleAndFill() {
   assert.equal(decimalText(walletAfterCancel.reservedAmount), ZERO);
 
   // Fill gating: suspended account skips; scope mismatch rolls back; active
-  // account fills with full dual-write.
+  // account fills with canonical account ownership.
   const fillQuote = await ordersService.quoteOrderForTradingAccount(
     user.id,
     s.accountId,
@@ -1021,68 +979,25 @@ async function testLimitLifecycleAndFill() {
   assert.equal(decimalText(filledOrder.netAmount), '180.18000000');
   const filledPosition = await prisma.position.findUnique({
     where: {
-      seasonParticipantId_assetId: {
-        seasonParticipantId: s.participantId,
+      tradingAccountId_assetId: {
+        tradingAccountId: s.accountId,
         assetId: asset.id,
       },
     },
     select: { tradingAccountId: true, quantity: true },
   });
-  assert.equal(filledPosition.tradingAccountId, s.accountId, 'position dual-write');
+  assert.equal(filledPosition.tradingAccountId, s.accountId, 'position ownership');
   assert.equal(decimalText(filledPosition.quantity), '2.00000000');
   const fillLedger = await prisma.walletTransaction.findFirst({
     where: { referenceId: fillOrderId },
     select: { tradingAccountId: true },
   });
-  assert.equal(fillLedger.tradingAccountId, s.accountId, 'ledger dual-write');
+  assert.equal(fillLedger.tradingAccountId, s.accountId, 'ledger ownership');
   const walletAfterFill = await prisma.cashWallet.findUnique({
     where: { id: s.krwWalletId },
     select: { reservedAmount: true },
   });
   assert.equal(decimalText(walletAfterFill.reservedAmount), ZERO);
-
-  // A mis-scoped existing position blocks the next fill (rollback).
-  const blockQuote = await ordersService.quoteOrderForTradingAccount(
-    user.id,
-    s.accountId,
-    quoteBody,
-  );
-  const blockCreate = await ordersService.createOrderForTradingAccount(
-    user.id,
-    s.accountId,
-    {
-      ...quoteBody,
-      quoteId: blockQuote.data.quoteId,
-      idempotencyKey: 'fill-block-' + randomUUID().slice(0, 8),
-    },
-  );
-  await prisma.position.updateMany({
-    where: { seasonParticipantId: s.participantId, assetId: asset.id },
-    data: { tradingAccountId: foilAccount.id },
-  });
-  await assert.rejects(
-    executionService.fillLimitBuyOrder({
-      orderId: blockCreate.data.order.orderId,
-      now: new Date(),
-      plan: fillPlan,
-    }),
-    (error) => error?.code === 'P2002',
-    'the retained participant+asset unique must reject a duplicate canonical position',
-  );
-  const blockedFillOrder = await prisma.order.findUnique({
-    where: { id: blockCreate.data.order.orderId },
-    select: { status: true },
-  });
-  assert.equal(blockedFillOrder.status, OrderStatus.submitted);
-  await prisma.position.updateMany({
-    where: { seasonParticipantId: s.participantId, assetId: asset.id },
-    data: { tradingAccountId: s.accountId },
-  });
-  await ordersService.cancelOrderForTradingAccount(
-    user.id,
-    s.accountId,
-    blockCreate.data.order.orderId,
-  );
 
   // A raw general account without wallets/grant/origin is corrupt. Trading is
   // implemented, but must fail closed and must not auto-create its foundation.
@@ -1245,49 +1160,11 @@ async function testAccountReads(ctx) {
 
   await assert.rejects(
     prisma.position.updateMany({
-      where: { seasonParticipantId: s.participantId, assetId: asset.id },
+      where: { tradingAccountId: s.accountId, assetId: asset.id },
       data: { tradingAccountId: null },
     }),
     (error) => error?.name === 'PrismaClientValidationError',
   );
-  await prisma.position.updateMany({
-    where: { seasonParticipantId: s.participantId, assetId: asset.id },
-    data: { tradingAccountId: ctx.foilAccount.id },
-  });
-  await expectHttpError(
-    positionsService.getPositionsForTradingAccount(user.id, s.accountId),
-    500,
-    'TRADING_ACCOUNT_SCOPE_MISMATCH',
-    'mismatched position read',
-  );
-  await prisma.position.updateMany({
-    where: { seasonParticipantId: s.participantId, assetId: asset.id },
-    data: { tradingAccountId: s.accountId },
-  });
-
-  // A non-null but mismatched row must not silently vanish from account lists.
-  const hiddenOrder = await prisma.order.create({
-    data: {
-      seasonParticipantId: s.participantId,
-      tradingAccountId: ctx.foilAccount.id,
-      assetId: asset.id,
-      side: OrderSide.buy,
-      orderType: OrderType.market,
-      status: OrderStatus.executed,
-      quantity: '1.000000',
-      currencyCode: CurrencyCode.KRW,
-      submittedAt: new Date(),
-    },
-    select: { id: true },
-  });
-  await expectHttpError(
-    ordersService.getOrdersForTradingAccount(user.id, s.accountId),
-    500,
-    'TRADING_ACCOUNT_SCOPE_MISMATCH',
-    'mismatched order read',
-  );
-  await prisma.order.delete({ where: { id: hiddenOrder.id } });
-
   console.log('[ok] account-scoped reads');
 }
 
@@ -1322,6 +1199,7 @@ async function testFxCrossAccountIdempotency() {
     const requestHash = computeFxQuoteRequestHash({
       userId: user.id,
       seasonParticipantId: scenario.participantId,
+      tradingAccountId: scenario.accountId,
       fromCurrency: CurrencyCode.KRW,
       toCurrency: CurrencyCode.USD,
       sourceAmount,
@@ -1329,7 +1207,6 @@ async function testFxCrossAccountIdempotency() {
     const quote = await prisma.quote.create({
       data: {
         userId: user.id,
-        seasonParticipantId: scenario.participantId,
         tradingAccountId: scenario.accountId,
         quoteType: QuoteType.fx,
         status: QuoteStatus.active,
@@ -1406,6 +1283,7 @@ async function testFxCrossAccountIdempotency() {
   const preflight = preflightFxExecuteRequest(legacyBody, {
     userId: user.id,
     seasonParticipantId: a.participantId,
+    tradingAccountId: a.accountId,
   });
   assert.equal(preflight.ok, true);
   const legacyMarker = { success: true, data: { marker: 'legacy-replay' } };
@@ -1413,7 +1291,6 @@ async function testFxCrossAccountIdempotency() {
     prisma.fxExecuteRequest.create({
       data: {
       userId: user.id,
-      seasonParticipantId: a.participantId,
       tradingAccountId: null,
       idempotencyKey: legacyKey,
       requestHash: preflight.value.requestHash,
@@ -1464,7 +1341,7 @@ async function main() {
   try {
     await testIndexFingerprints();
     await testDbUniqueSemantics();
-    await testRepairTradingScope();
+    await testCanonicalTradingScope();
     const ctx = await testLimitLifecycleAndFill();
     await testAccountReads(ctx);
     await testFxCrossAccountIdempotency();

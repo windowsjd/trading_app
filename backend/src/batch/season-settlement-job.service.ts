@@ -18,10 +18,6 @@ import {
 import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
-  requireSeasonSnapshotParticipantId,
-  seasonSnapshotWhere,
-} from '../portfolio/season-snapshot-scope';
-import {
   assignSequentialRanks,
   compareRankingRows,
 } from '../ranking/ranking-calculation.policy';
@@ -34,6 +30,7 @@ import {
   buildRankingParticipantScopes,
   RANKING_PARTICIPANT_SCOPE_SELECT,
   rankingSourceScopeErrorCodes,
+  throwRankingSourceScope,
 } from '../ranking/ranking-source-scope';
 import {
   assertSeasonRankingScopes,
@@ -665,20 +662,19 @@ export class SeasonSettlementJobService {
     const snapshots = await this.prisma.dailyPortfolioSnapshot.findMany({
       where: {
         snapshotDate: input.settlementDate,
-        // Season-only: general-mode daily rows must never reach settlement.
-        ...seasonSnapshotWhere,
         tradingAccountId: {
           in: [...input.participantScopes.values()],
         },
-        seasonParticipant: {
-          id: {
-            in: input.participants.map((participant) => participant.id),
+        tradingAccount: {
+          seasonParticipant: {
+            id: {
+              in: input.participants.map((participant) => participant.id),
+            },
           },
         },
       },
       select: {
         id: true,
-        seasonParticipantId: true,
         tradingAccountId: true,
         cumulativeExternalFundingKrw: true,
         investmentPnlKrw: true,
@@ -690,11 +686,6 @@ export class SeasonSettlementJobService {
         assetValueKrw: true,
         capturedAt: true,
         createdAt: true,
-        seasonParticipant: {
-          select: {
-            userId: true,
-          },
-        },
       },
     });
 
@@ -703,11 +694,27 @@ export class SeasonSettlementJobService {
       rows: snapshots,
       participantScopes: input.participantScopes,
     });
+    const seenAccountIds = new Set<string>();
+    for (const snapshot of snapshots) {
+      if (seenAccountIds.has(snapshot.tradingAccountId)) {
+        throwRankingSourceScope(
+          rankingSourceScopeErrorCodes.SEASON_RANKING_SOURCE_SCOPE_MISMATCH,
+          `Settlement snapshot input contains more than one row for account ${snapshot.tradingAccountId} on the settlement date.`,
+        );
+      }
+      seenAccountIds.add(snapshot.tradingAccountId);
+    }
 
     const fillCountByParticipant = new Map(
       input.participants.map((participant) => [
         participant.id,
         participant.totalFillCount,
+      ]),
+    );
+    const participantByAccount = new Map(
+      input.participants.map((participant) => [
+        participant.tradingAccountId,
+        participant,
       ]),
     );
 
@@ -718,13 +725,12 @@ export class SeasonSettlementJobService {
         capturedAt: snapshot.capturedAt,
         createdAt: snapshot.createdAt,
       };
-      const seasonParticipantId = requireSeasonSnapshotParticipantId(
-        snapshot.seasonParticipantId,
-      );
+      const participant = participantByAccount.get(snapshot.tradingAccountId)!;
+      const seasonParticipantId = participant.id;
 
       return {
         seasonParticipantId,
-        userId: snapshot.seasonParticipant?.userId ?? '',
+        userId: participant.userId,
         totalAssetKrw: formatMoneyScale8(snapshot.totalAssetKrw),
         returnRate: formatDecimalScale(snapshot.returnRate, returnRateScale),
         krwCash: formatMoneyScale8(snapshot.krwCash ?? '0'),
@@ -759,7 +765,6 @@ export class SeasonSettlementJobService {
       orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
       select: {
         id: true,
-        seasonParticipantId: true,
         tradingAccountId: true,
         cumulativeExternalFundingKrw: true,
         investmentPnlKrw: true,
@@ -804,7 +809,8 @@ export class SeasonSettlementJobService {
    *
    *   season row FOR UPDATE → status re-check → reservation re-check →
    *   participant/account link verification → settlement EquitySnapshot →
-   *   final SeasonRanking (account dual-write) → participant final results →
+   *   final SeasonRanking (participant target + measured account) →
+   *   participant final results →
    *   participant status transitions → season account closure →
    *   Season.status = settled
    *
@@ -990,9 +996,6 @@ export class SeasonSettlementJobService {
         } else {
           const createdSnapshot = await tx.equitySnapshot.create({
             data: {
-              seasonParticipantId: row.seasonParticipantId,
-              // Legacy participant identity remains dual-written; ownership
-              // is the same verified account used for the lookup above.
               tradingAccountId,
               ...snapshotData,
               snapshotReason: SnapshotReason.settlement,
@@ -1026,7 +1029,8 @@ export class SeasonSettlementJobService {
           data: {
             seasonId: input.seasonId,
             seasonParticipantId: row.seasonParticipantId,
-            // 작업 8 dual-write.
+            // SeasonRanking intentionally records its participant target and
+            // the canonical account used for its financial measurements.
             tradingAccountId,
             rankType: FINAL_RANK_TYPE,
             rank: row.rank,
@@ -1275,7 +1279,7 @@ export class SeasonSettlementJobService {
       this.throwJobError(
         HttpStatus.INTERNAL_SERVER_ERROR,
         'SETTLEMENT_SNAPSHOT_SCOPE_REPAIR_REQUIRED',
-        `Settlement snapshot ${snapshot.id} has no trading account scope. Run "pnpm trading-accounts:repair-snapshot-scope --apply" first; settlement never fills it in as a side effect.`,
+        `Settlement snapshot ${snapshot.id} has no canonical trading account scope. Settlement never repairs ownership as a side effect.`,
       );
     }
     if (snapshot.tradingAccountId !== expectedTradingAccountId) {

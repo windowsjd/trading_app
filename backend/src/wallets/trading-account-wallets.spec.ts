@@ -371,7 +371,6 @@ describe('user cash ledger read contract', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           tradingAccountId: 'ta-1',
-          seasonParticipantId: null,
         }),
       }),
     );
@@ -444,7 +443,6 @@ describe('user cash ledger read contract', () => {
       expect.objectContaining({
         where: {
           tradingAccountId: 'ta-1',
-          seasonParticipantId: 'sp-1',
           id: { in: expect.arrayContaining(['order-buy-1', 'order-sell-1']) },
         },
       }),

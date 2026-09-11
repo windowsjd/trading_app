@@ -117,26 +117,6 @@ async function execute(userId, accountId, quoted, key) {
     idempotencyKey: key,
   });
 }
-async function pollutionParticipant(userId) {
-  const now = new Date();
-  const season = await prisma.season.create({ data: {
-    name: 'general-fx-pollution-' + randomUUID(), status: 'active',
-    startAt: new Date(now.getTime() - 60_000), endAt: new Date(now.getTime() + 86_400_000),
-    initialCapitalKrw: '10000000', tradeFeeRate: '0.001', fxFeeRate: '0.001',
-  }, select: { id: true }});
-  ids.seasons.push(season.id);
-  const account = await prisma.tradingAccount.create({ data: {
-    userId, mode: 'season', status: 'active', initialCapitalKrw: '10000000', openedAt: now,
-  }, select: { id: true }});
-  ids.accounts.push(account.id);
-  const participant = await prisma.seasonParticipant.create({ data: {
-    seasonId: season.id, userId, tradingAccountId: account.id, joinedAt: now,
-    participantStatus: 'active', initialCapitalKrw: '10000000',
-    totalAssetKrw: '10000000', totalReturnRate: '0', maxDrawdown: '0',
-  }, select: { id: true }});
-  ids.participants.push(participant.id); return participant.id;
-}
-
 async function main() {
  try {
   await prisma.onModuleInit();
@@ -152,7 +132,6 @@ async function main() {
   assert.equal(krwUsd.data.feeRate, '0.001000');
   const storedQuote = await prisma.quote.findUniqueOrThrow({ where: { id: krwUsd.data.quoteId } });
   assert.equal(storedQuote.tradingAccountId, account);
-  assert.equal(storedQuote.seasonParticipantId, null);
   assert.equal(storedQuote.quotedFeeRate?.toFixed(6), '0.001000');
 
   await rate('1401');
@@ -168,8 +147,6 @@ async function main() {
   const exchange = await prisma.exchangeTransaction.findUniqueOrThrow({
     where: { id: command.exchangeTransactionId },
   });
-  assert.equal(command.seasonParticipantId, null);
-  assert.equal(exchange.seasonParticipantId, null);
   assert.equal(exchange.feeRate.toFixed(6), '0.001000');
   assert.equal(
     (await prisma.quote.findUniqueOrThrow({ where: { id: krwUsd.data.quoteId } })).status,
@@ -183,7 +160,7 @@ async function main() {
     where: { referenceType: 'exchange_transaction', referenceId: exchange.id },
   });
   assert.equal(ledgers.length, 2);
-  assert.ok(ledgers.every((row) => row.tradingAccountId === account && row.seasonParticipantId === null));
+  assert.ok(ledgers.every((row) => row.tradingAccountId === account));
   assert.equal(ledgers.filter((row) => row.txType === 'exchange_source' && row.direction === 'debit').length, 1);
   assert.equal(ledgers.filter((row) => row.txType === 'exchange_target' && row.direction === 'credit').length, 1);
 
@@ -224,7 +201,6 @@ async function main() {
     orderBy: { capturedAt: 'asc' },
   });
   assert.equal(snapshots.length, 3);
-  assert.ok(snapshots.every((row) => row.seasonParticipantId === null));
   assert.ok(snapshots.every((row) => row.cumulativeExternalFundingKrw?.toFixed(8) === '10000000.00000000'));
   assert.ok(snapshots.every((row) => row.timeWeightedReturnFactor !== null));
   assert.equal(await prisma.seasonParticipant.count(), participantCountBeforeCore);
@@ -275,20 +251,10 @@ async function main() {
   await expectCode(quote(owner, account, 'KRW', 'USD', '1420'), 'GENERAL_ACCOUNT_INTEGRITY');
   await prisma.cashWallet.update({ where: { id: krwWallet.id }, data: { tradingAccountId: account } });
 
-  const participant = await pollutionParticipant(owner);
-  const participantCountBeforePollution = await prisma.seasonParticipant.count();
-  const rankingCountBeforePollution = await prisma.seasonRanking.count();
-  const usdWallet = await prisma.cashWallet.findUniqueOrThrow({ where: {
-    tradingAccountId_currencyCode: { tradingAccountId: account, currencyCode: 'USD' },
-  }});
-  await prisma.cashWallet.update({ where: { id: usdWallet.id }, data: { seasonParticipantId: participant } });
-  await expectCode(quote(owner, account, 'USD', 'KRW', '1'), 'GENERAL_ACCOUNT_INTEGRITY');
-  await prisma.cashWallet.update({ where: { id: usdWallet.id }, data: { seasonParticipantId: null } });
-
-  const pollutedQuote = await quote(owner, account, 'KRW', 'USD', '1420');
-  await prisma.quote.update({ where: { id: pollutedQuote.data.quoteId }, data: { seasonParticipantId: participant } });
-  await expectCode(execute(owner, account, pollutedQuote, 'general-fx-polluted-' + randomUUID()), 'GENERAL_ACCOUNT_INTEGRITY');
-  await prisma.quote.update({ where: { id: pollutedQuote.data.quoteId }, data: { seasonParticipantId: null } });
+  const removedParticipantColumns = await prisma.$queryRawUnsafe(
+    "SELECT table_name FROM information_schema.columns WHERE table_schema = 'public' AND column_name = 'season_participant_id' AND table_name IN ('cash_wallets', 'wallet_transactions', 'exchange_transactions', 'fx_execute_requests', 'quotes', 'equity_snapshots')",
+  );
+  assert.deepEqual(removedParticipantColumns, []);
 
   const foreignQuote = await quote(owner, account, 'KRW', 'USD', '1420');
   await prisma.quote.update({ where: { id: foreignQuote.data.quoteId }, data: { tradingAccountId: otherAccount } });
@@ -313,12 +279,8 @@ async function main() {
   assert.deepEqual(await execute(owner, account, krwUsd, key), first);
   await prisma.tradingAccount.update({ where: { id: account }, data: { status: 'active', closedAt: null } });
 
-  await prisma.exchangeTransaction.update({ where: { id: exchange.id }, data: { seasonParticipantId: participant } });
-  await expectCode(fx.getExchangesForTradingAccount(owner, account), 'GENERAL_ACCOUNT_INTEGRITY');
-  await prisma.exchangeTransaction.update({ where: { id: exchange.id }, data: { seasonParticipantId: null } });
-
-  assert.equal(await prisma.seasonParticipant.count(), participantCountBeforePollution);
-  assert.equal(await prisma.seasonRanking.count(), rankingCountBeforePollution);
+  assert.equal(await prisma.seasonParticipant.count(), participantCountBeforeCore);
+  assert.equal(await prisma.seasonRanking.count(), rankingCountBeforeCore);
   console.log('general fx db integration ok');
  } finally { await cleanup(); await prisma.$disconnect(); }
 }

@@ -55,7 +55,6 @@ export const GENERAL_PERFORMANCE_ORIGIN_REASONS = [
 
 const PERFORMANCE_SNAPSHOT_SELECT = {
   id: true,
-  seasonParticipantId: true,
   tradingAccountId: true,
   totalAssetKrw: true,
   returnRate: true,
@@ -126,7 +125,6 @@ export class GeneralAccountPerformanceService {
     const origin = buildGeneralPerformanceOrigin(input.initialFundingKrw);
 
     return {
-      seasonParticipantId: null,
       tradingAccountId: input.tradingAccountId,
       totalAssetKrw: origin.totalAssetKrw.toFixed(MONEY_SCALE),
       returnRate: origin.returnRate.toFixed(RETURN_RATE_SCALE),
@@ -239,13 +237,6 @@ export class GeneralAccountPerformanceService {
       this.throwPerformance(
         generalPerformanceErrorCodes.GENERAL_PERFORMANCE_INTEGRITY,
         'General account has more than one performance origin snapshot.',
-      );
-    }
-
-    if (latest.seasonParticipantId !== null) {
-      this.throwPerformance(
-        generalPerformanceErrorCodes.GENERAL_PERFORMANCE_INTEGRITY,
-        'General performance snapshot carries a season participant link.',
       );
     }
 
@@ -420,7 +411,6 @@ export class GeneralAccountPerformanceService {
     });
     const snapshot = await input.client.equitySnapshot.create({
       data: {
-        seasonParticipantId: null,
         ...values,
         snapshotReason: input.reason,
         capturedAt: input.capturedAt,
@@ -623,7 +613,6 @@ export class GeneralAccountPerformanceService {
     krwCashOverride?: string;
   }): Prisma.EquitySnapshotUncheckedCreateInput {
     return {
-      seasonParticipantId: null,
       tradingAccountId: input.accountId,
       totalAssetKrw: input.advance.totalAssetKrw.toFixed(MONEY_SCALE),
       returnRate: input.advance.returnRate.toFixed(RETURN_RATE_SCALE),

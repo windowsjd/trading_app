@@ -2,9 +2,8 @@ import { spawnSync } from 'node:child_process';
 
 /**
  * Opt-in PostgreSQL integration tests for the financial trading-account
- * scope (작업 4): migration backfill semantics, writer dual-write, the
- * financial-scope repair, account-scoped wallet/FX behavior and equivalence
- * with the legacy endpoints, account-scoped idempotency, the excluded-active
+ * scope: removal-migration semantics, account-only wallet/FX ownership,
+ * compatibility endpoints, account-scoped idempotency, the excluded-active
  * status repair, and the ON CONFLICT re-read race.
  * Runs only with TRADING_ACCOUNT_DB_INTEGRATION=1 against the migrated dev
  * DB (prepare = `prisma migrate deploy` only; never reset/drop/seed).
@@ -14,7 +13,7 @@ const itDbIntegration = RUN_DB_INTEGRATION ? it : it.skip;
 
 describe('Financial trading-account scope DB integration', () => {
   itDbIntegration(
-    'verifies backfill, dual-write, repair scripts, account-scoped APIs, and races against PostgreSQL',
+    'verifies participant-column removal, account-scoped APIs, and races against PostgreSQL',
     () => {
       runDbIntegrationPrepare();
 
@@ -80,7 +79,6 @@ function runDbIntegrationPrepare() {
 const FINANCIAL_SCOPE_DB_RUNNER = `
 import 'dotenv/config';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { HttpException } from '@nestjs/common';
 import {
@@ -109,10 +107,6 @@ import {
   repairMissingTradingAccountLinks,
   resolveRepairLinksExitCode,
 } from './scripts/lib/repair-trading-account-links';
-import {
-  repairFinancialTradingAccountScope,
-  resolveFinancialScopeExitCode,
-} from './scripts/lib/repair-financial-trading-account-scope';
 import { computeFxQuoteRequestHash } from './src/providers/durable-quote.policy';
 
 const TEST_PREFIX = 'financial-scope-db-integration';
@@ -136,22 +130,6 @@ const fxService = new FxService(
   valuationService,
 );
 const walletsService = new WalletsService(prisma, accessService);
-
-const MIGRATION_PATH =
-  'prisma/migrations/20260803120000_add_financial_trading_account_scope/migration.sql';
-
-function backfillStatements() {
-  const sql = readFileSync(MIGRATION_PATH, 'utf8');
-  const statements = sql
-    .split('\\n')
-    .filter((line) => !line.trimStart().startsWith('--'))
-    .join('\\n')
-    .split(';')
-    .map((chunk) => chunk.trim())
-    .filter((chunk) => chunk.startsWith('UPDATE '));
-  assert.equal(statements.length, 4, 'four backfill UPDATEs expected');
-  return statements.map((statement) => statement + ';');
-}
 
 async function createUser(label) {
   const suffix = randomUUID().slice(0, 8);
@@ -183,7 +161,7 @@ async function createSeason(label, options = {}) {
 }
 
 // Full FX-capable scenario: user + season + linked account + participant +
-// dual-write-correct wallets + provider fx snapshot.
+// account-owned wallets + provider fx snapshot.
 async function createFxScenario(label, options = {}) {
   const user = await createUser(label);
   const season = await createSeason(label);
@@ -214,7 +192,6 @@ async function createFxScenario(label, options = {}) {
   });
   const sourceWallet = await prisma.cashWallet.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: account.id,
       currencyCode: CurrencyCode.KRW,
       balanceAmount: '2000.00000000',
@@ -223,7 +200,6 @@ async function createFxScenario(label, options = {}) {
   });
   const targetWallet = await prisma.cashWallet.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: account.id,
       currencyCode: CurrencyCode.USD,
       balanceAmount: ZERO,
@@ -260,6 +236,7 @@ async function createFxQuote(scenario, sourceAmount = '1000.00000000') {
   const requestHash = computeFxQuoteRequestHash({
     userId: scenario.userId,
     seasonParticipantId: scenario.participantId,
+    tradingAccountId: scenario.accountId,
     fromCurrency: CurrencyCode.KRW,
     toCurrency: CurrencyCode.USD,
     sourceAmount,
@@ -267,7 +244,6 @@ async function createFxQuote(scenario, sourceAmount = '1000.00000000') {
   const quote = await prisma.quote.create({
     data: {
       userId: scenario.userId,
-      seasonParticipantId: scenario.participantId,
       tradingAccountId: scenario.accountId,
       quoteType: QuoteType.fx,
       status: QuoteStatus.active,
@@ -302,16 +278,16 @@ async function cleanupScenario(scope) {
   });
   await prisma.quote.deleteMany({ where: { userId: { in: scope.userIds } } });
   await prisma.walletTransaction.deleteMany({
-    where: { seasonParticipantId: { in: scope.participantIds } },
+    where: { tradingAccount: { userId: { in: scope.userIds } } },
   });
   await prisma.exchangeTransaction.deleteMany({
-    where: { seasonParticipantId: { in: scope.participantIds } },
+    where: { tradingAccount: { userId: { in: scope.userIds } } },
   });
   await prisma.equitySnapshot.deleteMany({
-    where: { seasonParticipantId: { in: scope.participantIds } },
+    where: { tradingAccount: { userId: { in: scope.userIds } } },
   });
   await prisma.cashWallet.deleteMany({
-    where: { seasonParticipantId: { in: scope.participantIds } },
+    where: { tradingAccount: { userId: { in: scope.userIds } } },
   });
   await prisma.seasonParticipant.deleteMany({
     where: { id: { in: scope.participantIds } },
@@ -339,7 +315,7 @@ function scopeOf(...scenarios) {
 
 // ---------------------------------------------------------------------------
 
-async function testMigrationBackfillOnLegacyRows() {
+async function testRemovalMigrationAndCanonicalRows() {
   const scenario = await createFxScenario('canonical-migration');
   const scope = scopeOf(scenario);
   try {
@@ -347,17 +323,10 @@ async function testMigrationBackfillOnLegacyRows() {
       where: { id: scenario.sourceWalletId },
     });
     const before = wallet.balanceAmount.toFixed(8);
-    await assert.rejects(
-      prisma.cashWallet.update({
-        where: { id: wallet.id },
-        data: { tradingAccountId: null },
-      }),
-      (error) => error?.name === 'PrismaClientValidationError',
+    const removedColumns = await prisma.$queryRawUnsafe(
+      "SELECT table_name FROM information_schema.columns WHERE table_schema = 'public' AND column_name = 'season_participant_id' AND table_name IN ('cash_wallets', 'wallet_transactions', 'exchange_transactions', 'fx_execute_requests', 'quotes')",
     );
-    const statements = backfillStatements();
-    for (const statement of statements) {
-      await prisma.$executeRawUnsafe(statement);
-    }
+    assert.deepEqual(removedColumns, []);
     const after = await prisma.cashWallet.findUniqueOrThrow({
       where: { id: wallet.id },
     });
@@ -368,34 +337,7 @@ async function testMigrationBackfillOnLegacyRows() {
   }
 }
 
-async function testFinancialScopeRepair() {
-  const scenario = await createFxScenario('scope-repair-clean');
-  const scope = scopeOf(scenario);
-  try {
-    const dryRun = await repairFinancialTradingAccountScope(prisma, {
-      apply: false,
-    });
-    assert.equal(dryRun.mode, 'dry-run');
-    assert.equal(dryRun.failures.length, 0);
-    const applied = await repairFinancialTradingAccountScope(prisma, {
-      apply: true,
-    });
-    assert.equal(resolveFinancialScopeExitCode(applied).exitCode, 0);
-    assert.ok(
-      Object.values(applied.models).every(
-        (model) => model.nullRowCount === 0 && model.backfilledCount === 0,
-      ),
-    );
-    const rerun = await repairFinancialTradingAccountScope(prisma, {
-      apply: true,
-    });
-    assert.equal(resolveFinancialScopeExitCode(rerun).exitCode, 0);
-  } finally {
-    await cleanupScenario(scope);
-  }
-}
-
-async function testJoinDualWriteAndWalletEquivalence() {
+async function testJoinAccountOwnershipAndWalletEquivalence() {
   const user = await createUser('join-dual');
   const season = await createSeason('join-dual');
   const scope = {
@@ -417,14 +359,14 @@ async function testJoinDualWriteAndWalletEquivalence() {
     assert.ok(participant.tradingAccountId);
 
     const wallets = await prisma.cashWallet.findMany({
-      where: { seasonParticipantId: participantId },
+      where: { tradingAccountId: participant.tradingAccountId },
     });
     assert.equal(wallets.length, 2);
     for (const wallet of wallets) {
       assert.equal(wallet.tradingAccountId, participant.tradingAccountId);
     }
     const grants = await prisma.walletTransaction.findMany({
-      where: { seasonParticipantId: participantId },
+      where: { tradingAccountId: participant.tradingAccountId },
     });
     assert.equal(grants.length, 1);
     assert.equal(grants[0].tradingAccountId, participant.tradingAccountId);
@@ -473,22 +415,21 @@ async function testJoinDualWriteAndWalletEquivalence() {
   }
 }
 
-async function testLegacyFxExecuteDualWrite() {
+async function testFxExecuteAccountOwnership() {
   const scenario = await createFxScenario('fx-legacy');
   const scope = scopeOf(scenario);
 
   try {
-    const body = await buildKrwToUsdBody(scenario, 'legacy-dual-write-key');
+    const body = await buildKrwToUsdBody(scenario, 'canonical-account-key');
     const response = await fxService.execute(scenario.userId, body);
     assert.equal(response.success, true);
 
     // The global (userId, idempotencyKey) unique is gone (replaced by the
-    // account unique + the legacy-null partial unique), so this lookup is a
-    // plain findFirst now.
+    // canonical account unique), so this lookup is a plain findFirst now.
     const request = await prisma.fxExecuteRequest.findFirstOrThrow({
       where: {
         userId: scenario.userId,
-        idempotencyKey: 'legacy-dual-write-key',
+        idempotencyKey: 'canonical-account-key',
       },
     });
     assert.equal(request.tradingAccountId, scenario.accountId);
@@ -500,7 +441,7 @@ async function testLegacyFxExecuteDualWrite() {
     assert.equal(exchange.tradingAccountId, scenario.accountId);
 
     const ledgers = await prisma.walletTransaction.findMany({
-      where: { seasonParticipantId: scenario.participantId },
+      where: { tradingAccountId: scenario.accountId },
     });
     assert.equal(ledgers.length, 2);
     for (const ledger of ledgers) {
@@ -515,7 +456,7 @@ async function testLegacyFxExecuteDualWrite() {
     assert.deepEqual(replay, response);
     assert.equal(
       await prisma.walletTransaction.count({
-        where: { seasonParticipantId: scenario.participantId },
+        where: { tradingAccountId: scenario.accountId },
       }),
       2,
     );
@@ -574,9 +515,9 @@ async function testAccountScopedFxExecuteEquivalenceAndIdempotency() {
     );
     assert.deepEqual(replay, responseA);
 
-    // Dual-write on the account-scoped path.
+    // The account-scoped path writes only the canonical account owner.
     const ledgersA = await prisma.walletTransaction.findMany({
-      where: { seasonParticipantId: scenarioA.participantId },
+      where: { tradingAccountId: scenarioA.accountId },
     });
     assert.equal(ledgersA.length, 2);
     for (const ledger of ledgersA) {
@@ -891,10 +832,12 @@ async function runCase(label, work) {
 async function main() {
   await prisma.$connect();
   try {
-    await runCase('canonical NOT NULL scope + migration replay non-mutation', testMigrationBackfillOnLegacyRows);
-    await runCase('financial-scope repair clean canonical DB + idempotent replay', testFinancialScopeRepair);
-    await runCase('join dual-write + legacy/scoped wallet equivalence + foreign 404', testJoinDualWriteAndWalletEquivalence);
-    await runCase('legacy fx execute dual-write + same-key replay', testLegacyFxExecuteDualWrite);
+    await runCase('legacy participant columns absent + canonical row unchanged', testRemovalMigrationAndCanonicalRows);
+    await runCase('join account ownership + compatibility/scoped wallet equivalence + foreign 404', testJoinAccountOwnershipAndWalletEquivalence);
+    await runCase(
+      'canonical FX execute account ownership + same-key replay',
+      testFxExecuteAccountOwnership,
+    );
     await runCase('account-scoped fx execute equivalence + cross-account idempotency', testAccountScopedFxExecuteEquivalenceAndIdempotency);
     await runCase('account-scoped fx gating (suspended/excluded/foreign/general)', testAccountScopedFxGating);
     await runCase('excluded-active status repair (suspend, closed untouched, converged exit 0)', testExcludedActiveStatusRepair);

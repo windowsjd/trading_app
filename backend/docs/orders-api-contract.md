@@ -5,11 +5,10 @@
 > service core (fees, quote consumption, wallet/ledger/position writes,
 > idempotency, rollback). This legacy surface is UNCHANGED — routes,
 > request/response contracts, error codes, pagination, and filters all stay.
-> New orders/quotes additionally dual-write the participant's
-> `tradingAccountId`, wallet mutations fail closed on null/mismatched wallet
-> scope (500 `FINANCIAL_SCOPE_REPAIR_REQUIRED` /
-> `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`), and order idempotency is
-> account-first with a pinned legacy fallback. See
+> Orders, quotes, positions, wallets, and ledgers use required
+> `tradingAccountId` as their only ownership key. Cross-account relationships
+> fail closed with the existing integrity codes, and order idempotency is
+> account-scoped with no participant fallback. See
 > `docs/trading-account-orders-api-contract.md`.
 
 ## Status
@@ -270,19 +269,17 @@ Same body as `POST /api/v1/orders/quote`.
   - `currencyCode`
 - `idempotencyKey` is excluded from the request hash.
 - `quoteId` is included in the create idempotency request hash.
-- Same `seasonParticipantId + idempotencyKey` and same request hash replays the stored create response without creating a second order.
-- Same `seasonParticipantId + idempotencyKey` and different request hash, including a different `quoteId`, returns `ORDER_IDEMPOTENCY_CONFLICT`.
-- This participant-scoped lookup is the MARKET create path. Limit creates
-  resolve the replay by `quoteId` instead — see *Idempotency lookup scope*
-  below — because a limit replay must work with no active season and must not
-  collide with the same key reused in another season.
-- DB unique constraint `(season_participant_id, idempotency_key)` prevents duplicate order rows under races.
+- Same `tradingAccountId + idempotencyKey` and same request hash replays the stored create response without creating a second order.
+- Same `tradingAccountId + idempotencyKey` and different request hash, including a different `quoteId`, returns `ORDER_IDEMPOTENCY_CONFLICT`.
+- Market and limit replay both resolve canonical ownership by account; the
+  legacy route first resolves its current SeasonParticipant to that account.
+- DB unique constraint `(trading_account_id, idempotency_key)` prevents duplicate order rows under races.
 - If create hits a unique race (`P2002`), the service rereads the existing order:
   - same request hash: replay.
   - different request hash: `ORDER_IDEMPOTENCY_CONFLICT`.
 - Replay prefers stored `orders.response_payload_json`.
 - If stored response is missing, replay falls back to formatting the existing order row.
-- New create validates the active durable quote by id, user, participant, asset, side, orderType, quantity, limitPrice, currencyCode, expiry, status, and quote requestHash.
+- New create validates the active durable quote by id, user, trading account, asset, side, orderType, quantity, limitPrice, currencyCode, expiry, status, and quote requestHash.
 - New create uses the durable quote persisted by `POST /api/v1/orders/quote`, then reprices at execution time from fresh provider_api rows.
 - Create response includes `order.quoteId` through the standard order item.
 - Execute-time provider repricing determines the actual fill values.

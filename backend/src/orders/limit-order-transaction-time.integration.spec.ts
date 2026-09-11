@@ -117,7 +117,7 @@ async function createScenario(label, options = {}) {
     data: {
       email: PREFIX + '-' + label + '-' + suffix + '@example.com',
       passwordHash: 'integration-test-only',
-      nickname: (PREFIX + '-' + label + '-' + suffix).slice(0, 40),
+      nickname: ('tx-time-' + suffix + '-' + label).slice(0, 40),
     },
     select: { id: true },
   });
@@ -159,7 +159,6 @@ async function createScenario(label, options = {}) {
   });
   const wallet = await prisma.cashWallet.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: tradingAccount.id,
       currencyCode: CurrencyCode.KRW,
       balanceAmount: '1000000.00000000',
@@ -194,6 +193,7 @@ async function createQuote(scenario, expiresAt) {
   const requestHash = computeOrderQuoteRequestHash({
     userId: scenario.userId,
     seasonParticipantId: scenario.participantId,
+    tradingAccountId: scenario.tradingAccountId,
     assetId: scenario.assetId,
     side: 'buy',
     orderType: 'limit',
@@ -204,7 +204,6 @@ async function createQuote(scenario, expiresAt) {
   const quote = await prisma.quote.create({
     data: {
       userId: scenario.userId,
-      seasonParticipantId: scenario.participantId,
       tradingAccountId: scenario.tradingAccountId,
       quoteType: QuoteType.order,
       status: QuoteStatus.active,
@@ -299,7 +298,7 @@ async function runBlockedCreate(scenario, quoteId, key, target, expectedCode, af
     });
     assert.equal(wallet.reservedAmount.toFixed(8), ZERO);
     assert.equal(
-      await prisma.order.count({ where: { seasonParticipantId: scenario.participantId } }),
+      await prisma.order.count({ where: { tradingAccountId: scenario.tradingAccountId } }),
       0,
     );
     const quote = await prisma.quote.findUnique({
@@ -315,9 +314,9 @@ async function runBlockedCreate(scenario, quoteId, key, target, expectedCode, af
 }
 
 async function cleanup(scenario) {
-  await prisma.order.deleteMany({ where: { seasonParticipantId: scenario.participantId } });
-  await prisma.quote.deleteMany({ where: { seasonParticipantId: scenario.participantId } });
-  await prisma.cashWallet.deleteMany({ where: { seasonParticipantId: scenario.participantId } });
+  await prisma.order.deleteMany({ where: { tradingAccountId: scenario.tradingAccountId } });
+  await prisma.quote.deleteMany({ where: { tradingAccountId: scenario.tradingAccountId } });
+  await prisma.cashWallet.deleteMany({ where: { tradingAccountId: scenario.tradingAccountId } });
   await prisma.seasonParticipant.deleteMany({ where: { id: scenario.participantId } });
   await prisma.assetPriceSnapshot.deleteMany({ where: { assetId: scenario.assetId } });
   await prisma.asset.deleteMany({ where: { id: scenario.assetId } });
@@ -356,7 +355,10 @@ function pad(value) {
 
 async function testMarketClose() {
   const now = await dbNow();
-  const closeAt = new Date(now.getTime() + 5000);
+  // Keep the row-lock wait comfortably below Prisma's default five-second
+  // interactive-transaction timeout while still crossing a real wall-clock
+  // market boundary.
+  const closeAt = new Date(now.getTime() + 2000);
   const parts = getZonedParts(closeAt, 'Asia/Seoul');
   const localDate = parts.year + '-' + pad(parts.month) + '-' + pad(parts.day);
   applyMarketSessionOverrideSnapshot(

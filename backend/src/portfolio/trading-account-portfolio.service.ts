@@ -427,25 +427,15 @@ export class TradingAccountPortfolioService {
       range === 'all'
         ? new Date(`${dateKey(account.openedAt)}T00:00:00.000Z`)
         : new Date(end.getTime() - (days - 1) * 86_400_000);
-    const participantId = account.seasonParticipant?.id ?? null;
     const rows = await client.dailyPortfolioSnapshot.findMany({
-      // Include conflicting participant links so corruption cannot look empty.
       where: {
-        ...(account.mode === TradingAccountMode.season
-          ? {
-              OR: [
-                { tradingAccountId: account.id },
-                { seasonParticipantId: participantId },
-              ],
-            }
-          : { tradingAccountId: account.id }),
+        tradingAccountId: account.id,
         snapshotDate: { gte: start, lte: end },
       },
       orderBy: { snapshotDate: 'asc' },
       select: {
         id: true,
         tradingAccountId: true,
-        seasonParticipantId: true,
         snapshotDate: true,
         capturedAt: true,
         totalAssetKrw: true,
@@ -461,11 +451,7 @@ export class TradingAccountPortfolioService {
     const dates = new Set<string>();
     for (const row of rows) {
       const date = row.snapshotDate.toISOString().slice(0, 10);
-      if (
-        row.tradingAccountId !== account.id ||
-        row.seasonParticipantId !== participantId ||
-        dates.has(date)
-      ) {
+      if (row.tradingAccountId !== account.id || dates.has(date)) {
         throw new HttpException(
           {
             success: false,
@@ -528,7 +514,6 @@ export class TradingAccountPortfolioService {
       orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
       select: {
         id: true,
-        seasonParticipantId: true,
         tradingAccountId: true,
         totalAssetKrw: true,
         returnRate: true,
@@ -584,7 +569,6 @@ export class TradingAccountPortfolioService {
       orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
       select: {
         id: true,
-        seasonParticipantId: true,
         tradingAccountId: true,
         totalAssetKrw: true,
         returnRate: true,
@@ -628,7 +612,7 @@ export class TradingAccountPortfolioService {
       orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
       select: {
         id: true,
-        seasonParticipantId: true,
+        tradingAccountId: true,
         totalAssetKrw: true,
         returnRate: true,
         snapshotReason: true,
@@ -646,10 +630,7 @@ export class TradingAccountPortfolioService {
       time: row.capturedAt.toISOString(),
       totalAssetKrw: row.totalAssetKrw.toFixed(MONEY_SCALE),
       returnRate: row.returnRate.toFixed(RETURN_RATE_SCALE),
-      returnRateMethod:
-        row.seasonParticipantId === null
-          ? ('time_weighted' as const)
-          : ('initial_capital' as const),
+      returnRateMethod: 'initial_capital' as const,
       cumulativeExternalFundingKrw:
         row.cumulativeExternalFundingKrw?.toFixed(MONEY_SCALE) ?? null,
       investmentPnlKrw: row.investmentPnlKrw?.toFixed(MONEY_SCALE) ?? null,

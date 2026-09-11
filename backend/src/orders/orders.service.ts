@@ -69,7 +69,7 @@ import {
   TradingAccountAccessService,
   type OwnedTradingAccount,
 } from '../trading-accounts/trading-account-access.service';
-import { assertSeasonAccountOrderScopeIntegrity } from '../trading-accounts/trading-account-financial-integrity';
+import { assertAccountOrderScopeIntegrity } from '../trading-accounts/trading-account-financial-integrity';
 import { debitAvailableCash } from '../wallets/cash-wallet-atomic';
 import { diagnoseCashWalletMutationFailure } from '../wallets/cash-wallet-failure-diagnosis';
 import { assertCashWalletTradingAccountScope } from '../wallets/cash-wallet-scope';
@@ -256,8 +256,7 @@ type OrderQuoteCalculation = {
 
 type DurableOrderQuoteForCreate = {
   id: string;
-  seasonParticipantId: string | null;
-  tradingAccountId: string | null;
+  tradingAccountId: string;
   status: QuoteStatus;
   assetId: string | null;
   side: OrderSide | null;
@@ -371,8 +370,7 @@ type ExecuteOrderResponse = {
 
 type OrderExecutionRecord = {
   id: string;
-  seasonParticipantId: string | null;
-  tradingAccountId: string | null;
+  tradingAccountId: string;
   assetId: string;
   quoteId: string | null;
   side: OrderSide;
@@ -407,8 +405,7 @@ type OrderExecutionRecord = {
   quote: {
     id: string;
     userId: string;
-    seasonParticipantId: string | null;
-    tradingAccountId: string | null;
+    tradingAccountId: string;
     status: QuoteStatus;
     assetId: string | null;
     side: OrderSide | null;
@@ -423,20 +420,19 @@ type OrderExecutionRecord = {
     expiresAt: Date;
     requestHash: string;
   } | null;
-  seasonParticipant: {
-    id: string;
-    participantStatus: ParticipantStatus;
-    joinedAt: Date;
-    tradingAccountId: string | null;
-    season: ActiveOrderSeason;
-  } | null;
   tradingAccount: {
     id: string;
     userId: string;
     mode: TradingAccountMode;
     status: TradingAccountStatus;
     initialCapitalKrw: Prisma.Decimal;
-    seasonParticipant: { id: string } | null;
+    seasonParticipant: {
+      id: string;
+      participantStatus: ParticipantStatus;
+      joinedAt: Date;
+      tradingAccountId: string;
+      season: ActiveOrderSeason;
+    } | null;
   } | null;
 };
 
@@ -484,7 +480,6 @@ const ZERO_MONEY = '0.00000000';
 const quantityScale = 6;
 const ORDER_EXECUTION_SELECT = {
   id: true,
-  seasonParticipantId: true,
   tradingAccountId: true,
   assetId: true,
   quoteId: true,
@@ -527,7 +522,6 @@ const ORDER_EXECUTION_SELECT = {
     select: {
       id: true,
       userId: true,
-      seasonParticipantId: true,
       tradingAccountId: true,
       status: true,
       assetId: true,
@@ -544,24 +538,6 @@ const ORDER_EXECUTION_SELECT = {
       requestHash: true,
     },
   },
-  seasonParticipant: {
-    select: {
-      id: true,
-      participantStatus: true,
-      joinedAt: true,
-      tradingAccountId: true,
-      season: {
-        select: {
-          id: true,
-          name: true,
-          status: true,
-          startAt: true,
-          endAt: true,
-          tradeFeeRate: true,
-        },
-      },
-    },
-  },
   tradingAccount: {
     select: {
       id: true,
@@ -569,7 +545,24 @@ const ORDER_EXECUTION_SELECT = {
       mode: true,
       status: true,
       initialCapitalKrw: true,
-      seasonParticipant: { select: { id: true } },
+      seasonParticipant: {
+        select: {
+          id: true,
+          participantStatus: true,
+          joinedAt: true,
+          tradingAccountId: true,
+          season: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+              startAt: true,
+              endAt: true,
+              tradeFeeRate: true,
+            },
+          },
+        },
+      },
     },
   },
 } as const;
@@ -578,7 +571,7 @@ const ORDER_EXECUTION_SELECT = {
  * Everything the idempotent-create replay needs to return the stored first
  * response (or rebuild a faithful payload for rows predating
  * responsePayloadJson). Shared by the user-scoped replay-first lookup and the
- * participant-scoped race-recovery lookup so the two can never drift.
+ * account-scoped race-recovery lookup so the two can never drift.
  */
 const IDEMPOTENT_CREATE_ORDER_SELECT = {
   id: true,
@@ -859,7 +852,6 @@ export class OrdersService {
 
     const settlementCurrency = this.getAssetSettlementCurrency(asset);
     const preview = await limitOrderCreate.buildLimitBuyQuotePreview({
-      participantId: participant?.id ?? null,
       tradingAccountId,
       assetId: asset.id,
       currencyCode: settlementCurrency,
@@ -1014,7 +1006,6 @@ export class OrdersService {
     this.assertOrderAssetTradable(asset, quoteAt);
     const preview =
       await this.requireLimitOrderCreateService().buildLimitSellQuotePreview({
-        participantId: context.participant?.id ?? null,
         tradingAccountId: context.tradingAccountId,
         assetId: asset.id,
         currencyCode: settlementCurrency,
@@ -1156,7 +1147,7 @@ export class OrdersService {
     // UNIQUE on Order — so the replay scope equals a real DB uniqueness
     // constraint, needs no active season, and can never resolve to another
     // season's or another user's order. A key reused with a DIFFERENT quote is
-    // not visible here; it is caught by the participant/account-scoped lookup
+    // not visible here; it is caught by the account-scoped lookup
     // and the request-hash comparison further down.
     const replayedOrder = await this.findIdempotentCreateOrderForQuote({
       userId,
@@ -1328,7 +1319,6 @@ export class OrdersService {
         await tx.order.create({
           data: {
             id: orderId,
-            seasonParticipantId: participant?.id ?? null,
             tradingAccountId,
             assetId: quote.asset.id,
             quoteId: quote.id,
@@ -1672,7 +1662,7 @@ export class OrdersService {
               currencyCode: quote.asset.currencyCode,
             },
           },
-          participant: { id: participant?.id ?? null, tradingAccountId },
+          tradingAccountId,
           quantity: request.quantity,
           idempotency,
           submittedAt: transactionNow,
@@ -1701,8 +1691,7 @@ export class OrdersService {
       // Two unique constraints can raise here and they mean different things.
       // `orders_quote_id_key` — the concurrent winner used the SAME quote, so
       // the quote-scoped lookup finds exactly the order this request wanted
-      // and replays it. `(seasonParticipantId, idempotencyKey)` /
-      // `(tradingAccountId, idempotencyKey)` — the key was reused with a
+      // and replays it. `(tradingAccountId, idempotencyKey)` — the key was reused with a
       // DIFFERENT quote inside one season/account, which the quote lookup
       // cannot see; the account-scoped fallback finds that order and the
       // request-hash comparison turns it into the conflict it is.
@@ -2082,9 +2071,8 @@ export class OrdersService {
         account,
       );
     } else {
-      await assertSeasonAccountOrderScopeIntegrity(this.prisma, {
+      await assertAccountOrderScopeIntegrity(this.prisma, {
         tradingAccountId: account.id,
-        seasonParticipantId: account.seasonParticipant?.id ?? null,
       });
     }
 
@@ -2181,9 +2169,8 @@ export class OrdersService {
         account,
       );
     } else {
-      await assertSeasonAccountOrderScopeIntegrity(this.prisma, {
+      await assertAccountOrderScopeIntegrity(this.prisma, {
         tradingAccountId: account.id,
-        seasonParticipantId: account.seasonParticipant?.id ?? null,
       });
     }
 
@@ -2404,9 +2391,7 @@ export class OrdersService {
     const order = await tx.order.findFirst({
       where: {
         id: orderId,
-        seasonParticipant: {
-          userId,
-        },
+        tradingAccount: { userId },
       },
       select: ORDER_EXECUTION_SELECT,
     });
@@ -2427,14 +2412,15 @@ export class OrdersService {
       );
     }
     if (order.tradingAccount?.mode === TradingAccountMode.season) {
-      if (!order.seasonParticipant) {
+      const participant = order.tradingAccount.seasonParticipant;
+      if (!participant) {
         this.throwTradingScopeIntegrityError(
           'TRADING_ACCOUNT_SCOPE_MISMATCH',
           'Season order has no season participant.',
         );
       }
-      this.assertSeasonTradable(order.seasonParticipant.season, executedAt);
-      this.assertParticipantTradable(order.seasonParticipant.participantStatus);
+      this.assertSeasonTradable(participant.season, executedAt);
+      this.assertParticipantTradable(participant.participantStatus);
     }
     this.assertOrderAssetTradable(order.asset, executedAt);
 
@@ -2483,7 +2469,7 @@ export class OrdersService {
       mode: order.tradingAccount?.mode,
       quotedFeeRate: quote.quotedFeeRate,
       currentFeeRate:
-        order.seasonParticipant?.season.tradeFeeRate ??
+        order.tradingAccount?.seasonParticipant?.season.tradeFeeRate ??
         (order.tradingAccount?.mode === TradingAccountMode.general
           ? null
           : this.throwTradingScopeIntegrityError(
@@ -2621,7 +2607,7 @@ export class OrdersService {
 
     const expectedHash = computeOrderQuoteRequestHash({
       userId: quote.userId,
-      seasonParticipantId: order.seasonParticipantId,
+      seasonParticipantId: order.tradingAccount?.seasonParticipant?.id ?? null,
       tradingAccountId: this.requireOrderTradingScope(order),
       assetId: order.assetId,
       side: order.side,
@@ -2642,7 +2628,6 @@ export class OrdersService {
     }
 
     if (
-      quote.seasonParticipantId !== order.seasonParticipantId ||
       quote.assetId !== order.assetId ||
       quote.side !== order.side ||
       quote.orderType !== order.orderType ||
@@ -2859,14 +2844,13 @@ export class OrdersService {
     order: OrderExecutionRecord,
     plan: OrderExecutionPlan,
   ): Promise<OrderExecutionTransactionResult> {
-    // Verified account scope FIRST: the order's own scope, the participant
-    // link, and (via the checks below) the wallet/position/quote must all
-    // name the same trading account before any money moves.
+    // Verified account scope FIRST: the order, wallet, position, and quote
+    // must all name the same trading account before any money moves.
     const tradingAccountId = this.requireOrderTradingScope(order);
+    const participant = order.tradingAccount?.seasonParticipant ?? null;
     await this.consumeOrderQuoteInTransaction(tx, order, plan.executedAt);
     const wallet = await this.findCashWalletForExecution(
       tx,
-      order.seasonParticipantId,
       order.currencyCode,
       tradingAccountId,
     );
@@ -2875,7 +2859,6 @@ export class OrdersService {
     // orders is never spendable by a market buy, even under concurrency.
     const debitCount = await debitAvailableCash(tx, {
       walletId: wallet.id,
-      seasonParticipantId: order.seasonParticipantId,
       tradingAccountId,
       currencyCode: order.currencyCode,
       amount: netAmount,
@@ -2884,7 +2867,6 @@ export class OrdersService {
     if (debitCount !== 1) {
       await this.throwCashDebitFailure(tx, {
         walletId: wallet.id,
-        seasonParticipantId: order.seasonParticipantId,
         tradingAccountId,
         currencyCode: order.currencyCode,
         amount: plan.netAmount,
@@ -2893,7 +2875,7 @@ export class OrdersService {
 
     const postWallet = await this.findCashWalletAfterUpdateOrThrow(tx, {
       walletId: wallet.id,
-      seasonParticipantId: order.seasonParticipantId,
+      tradingAccountId,
       currencyCode: order.currencyCode,
     });
     const positionId = await this.createOrUpdateBuyPosition(
@@ -2904,7 +2886,6 @@ export class OrdersService {
     );
     const walletTransaction = await tx.walletTransaction.create({
       data: {
-        seasonParticipantId: order.seasonParticipantId,
         tradingAccountId,
         walletId: wallet.id,
         currencyCode: order.currencyCode,
@@ -2926,14 +2907,14 @@ export class OrdersService {
     const finalizedOrder = await this.finalizeExecutedOrder(tx, order, plan);
     const equitySnapshotId = await this.recordOrderExecutedPortfolioSnapshot(
       tx,
-      order.seasonParticipantId,
+      participant?.id ?? null,
       plan.executedAt,
       tradingAccountId,
     );
 
     return {
-      seasonId: order.seasonParticipant?.season.id ?? null,
-      seasonParticipantId: order.seasonParticipantId,
+      seasonId: participant?.season.id ?? null,
+      seasonParticipantId: participant?.id ?? null,
       order: this.formatOrder(finalizedOrder),
       walletTransactionId: walletTransaction.id,
       walletBalanceAfter: this.formatDecimal(
@@ -2952,6 +2933,7 @@ export class OrdersService {
     plan: OrderExecutionPlan,
   ): Promise<OrderExecutionTransactionResult> {
     const tradingAccountId = this.requireOrderTradingScope(order);
+    const participant = order.tradingAccount?.seasonParticipant ?? null;
     await this.consumeOrderQuoteInTransaction(tx, order, plan.executedAt);
     const position = await tx.position.findUnique({
       where: {
@@ -2962,7 +2944,6 @@ export class OrdersService {
       },
       select: {
         id: true,
-        seasonParticipantId: true,
         tradingAccountId: true,
         quantity: true,
         reservedQuantity: true,
@@ -2982,7 +2963,6 @@ export class OrdersService {
     // Never decrement another account's position: the position must carry
     // the SAME verified account scope as the order (null → repair first).
     this.assertPositionTradingScope(position, {
-      seasonParticipantId: order.seasonParticipantId,
       tradingAccountId,
     });
 
@@ -3010,7 +2990,6 @@ export class OrdersService {
     const positionUpdateResult = await tx.position.updateMany({
       where: {
         id: position.id,
-        seasonParticipantId: order.seasonParticipantId,
         tradingAccountId,
         assetId: order.assetId,
         quantity: { gte: this.formatDecimal(order.quantity, monetaryScale) },
@@ -3033,7 +3012,6 @@ export class OrdersService {
     if (positionUpdateResult.count !== 1) {
       await this.throwPositionDecrementFailure(tx, {
         positionId: position.id,
-        seasonParticipantId: order.seasonParticipantId,
         tradingAccountId,
         assetId: order.assetId,
         quantity: order.quantity,
@@ -3042,7 +3020,6 @@ export class OrdersService {
 
     const wallet = await this.findCashWalletForExecution(
       tx,
-      order.seasonParticipantId,
       order.currencyCode,
       tradingAccountId,
     );
@@ -3050,7 +3027,6 @@ export class OrdersService {
     const creditResult = await tx.cashWallet.updateMany({
       where: {
         id: wallet.id,
-        seasonParticipantId: order.seasonParticipantId,
         tradingAccountId,
         currencyCode: order.currencyCode,
       },
@@ -3064,7 +3040,6 @@ export class OrdersService {
     if (creditResult.count !== 1) {
       await this.throwCashCreditFailure(tx, {
         walletId: wallet.id,
-        seasonParticipantId: order.seasonParticipantId,
         tradingAccountId,
         currencyCode: order.currencyCode,
       });
@@ -3072,12 +3047,11 @@ export class OrdersService {
 
     const postWallet = await this.findCashWalletAfterUpdateOrThrow(tx, {
       walletId: wallet.id,
-      seasonParticipantId: order.seasonParticipantId,
+      tradingAccountId,
       currencyCode: order.currencyCode,
     });
     const walletTransaction = await tx.walletTransaction.create({
       data: {
-        seasonParticipantId: order.seasonParticipantId,
         tradingAccountId,
         walletId: wallet.id,
         currencyCode: order.currencyCode,
@@ -3099,14 +3073,14 @@ export class OrdersService {
     const finalizedOrder = await this.finalizeExecutedOrder(tx, order, plan);
     const equitySnapshotId = await this.recordOrderExecutedPortfolioSnapshot(
       tx,
-      order.seasonParticipantId,
+      participant?.id ?? null,
       plan.executedAt,
       tradingAccountId,
     );
 
     return {
-      seasonId: order.seasonParticipant?.season.id ?? null,
-      seasonParticipantId: order.seasonParticipantId,
+      seasonId: participant?.season.id ?? null,
+      seasonParticipantId: participant?.id ?? null,
       order: this.formatOrder(finalizedOrder),
       walletTransactionId: walletTransaction.id,
       walletBalanceAfter: this.formatDecimal(
@@ -3132,35 +3106,21 @@ export class OrdersService {
       );
     }
 
-    // Account-conditioned consume: only this participant's quote flips, and
-    // only when its scope is the order's verified canonical account.
+    // Account-conditioned consume: only this account's active quote flips.
     const tradingAccountId = this.requireOrderTradingScope(order);
-    const consumedCount =
-      order.seasonParticipantId === null
-        ? (
-            await tx.quote.updateMany({
-              where: {
-                id: order.quoteId,
-                status: QuoteStatus.active,
-                seasonParticipantId: null,
-                tradingAccountId,
-              },
-              data: {
-                status: QuoteStatus.consumed,
-                consumedAt,
-              },
-            })
-          ).count
-        : await tx.$executeRaw`
-            UPDATE "quotes"
-            SET "status" = 'consumed',
-                "consumed_at" = ${consumedAt},
-                "updated_at" = clock_timestamp()
-            WHERE "id" = ${order.quoteId}
-              AND "status" = 'active'
-              AND "season_participant_id" = ${order.seasonParticipantId}
-              AND "trading_account_id" = ${tradingAccountId}
-          `;
+    const consumedCount = (
+      await tx.quote.updateMany({
+        where: {
+          id: order.quoteId,
+          status: QuoteStatus.active,
+          tradingAccountId,
+        },
+        data: {
+          status: QuoteStatus.consumed,
+          consumedAt,
+        },
+      })
+    ).count;
 
     if (consumedCount !== 1) {
       this.throwApiError(
@@ -3173,7 +3133,6 @@ export class OrdersService {
 
   private async findCashWalletForExecution(
     tx: OrderExecuteTransactionClient,
-    seasonParticipantId: string | null,
     currencyCode: CurrencyCode,
     tradingAccountId: string,
   ) {
@@ -3186,7 +3145,6 @@ export class OrdersService {
       },
       select: {
         id: true,
-        seasonParticipantId: true,
         tradingAccountId: true,
         currencyCode: true,
         balanceAmount: true,
@@ -3204,7 +3162,6 @@ export class OrdersService {
     // Null or mismatched wallet scope fails closed (500) BEFORE any debit
     // or credit — never auto-backfilled mid-trade.
     return assertCashWalletTradingAccountScope(wallet, {
-      seasonParticipantId,
       tradingAccountId,
     });
   }
@@ -3213,19 +3170,18 @@ export class OrdersService {
     tx: OrderExecuteTransactionClient,
     input: {
       walletId: string;
-      seasonParticipantId: string | null;
+      tradingAccountId: string;
       currencyCode: CurrencyCode;
     },
   ) {
     const wallet = await tx.cashWallet.findFirst({
       where: {
         id: input.walletId,
-        seasonParticipantId: input.seasonParticipantId,
+        tradingAccountId: input.tradingAccountId,
         currencyCode: input.currencyCode,
       },
       select: {
         id: true,
-        seasonParticipantId: true,
         currencyCode: true,
         balanceAmount: true,
       },
@@ -3251,7 +3207,6 @@ export class OrdersService {
     tx: OrderExecuteTransactionClient,
     input: {
       walletId: string;
-      seasonParticipantId: string | null;
       tradingAccountId: string;
       currencyCode: CurrencyCode;
       amount: Prisma.Decimal;
@@ -3260,7 +3215,6 @@ export class OrdersService {
     const reason = await diagnoseCashWalletMutationFailure(tx, {
       walletId: input.walletId,
       expected: {
-        seasonParticipantId: input.seasonParticipantId,
         tradingAccountId: input.tradingAccountId,
         currencyCode: input.currencyCode,
       },
@@ -3295,7 +3249,6 @@ export class OrdersService {
     tx: OrderExecuteTransactionClient,
     input: {
       walletId: string;
-      seasonParticipantId: string | null;
       tradingAccountId: string;
       currencyCode: CurrencyCode;
     },
@@ -3303,7 +3256,6 @@ export class OrdersService {
     const reason = await diagnoseCashWalletMutationFailure(tx, {
       walletId: input.walletId,
       expected: {
-        seasonParticipantId: input.seasonParticipantId,
         tradingAccountId: input.tradingAccountId,
         currencyCode: input.currencyCode,
       },
@@ -3340,7 +3292,6 @@ export class OrdersService {
       },
       select: {
         id: true,
-        seasonParticipantId: true,
         tradingAccountId: true,
         quantity: true,
         averageCost: true,
@@ -3355,7 +3306,6 @@ export class OrdersService {
       );
       const created = await tx.position.create({
         data: {
-          seasonParticipantId: order.seasonParticipantId,
           tradingAccountId,
           assetId: order.assetId,
           quantity: this.formatDecimal(order.quantity, monetaryScale),
@@ -3376,7 +3326,6 @@ export class OrdersService {
     // A null or foreign account scope on the existing position fails the
     // whole execution (repair first) — never auto-adopted mid-trade.
     this.assertPositionTradingScope(position, {
-      seasonParticipantId: order.seasonParticipantId,
       tradingAccountId,
     });
 
@@ -3400,7 +3349,6 @@ export class OrdersService {
     const updateResult = await tx.position.updateMany({
       where: {
         id: position.id,
-        seasonParticipantId: order.seasonParticipantId,
         tradingAccountId,
         assetId: order.assetId,
         quantity: this.formatDecimal(position.quantity, monetaryScale),
@@ -3427,7 +3375,7 @@ export class OrdersService {
     tx: OrderExecuteTransactionClient,
     seasonParticipantId: string | null,
     capturedAt: Date,
-    /** The order's ALREADY-VERIFIED account scope (작업 7 dual-write). */
+    /** The order's already-verified canonical account scope. */
     tradingAccountId: string,
   ): Promise<string | null> {
     if (seasonParticipantId === null) {
@@ -3479,10 +3427,6 @@ export class OrdersService {
 
     const snapshot = await tx.equitySnapshot.create({
       data: {
-        seasonParticipantId,
-        // 작업 7 dual-write. The account was already verified against the
-        // order and the participant link earlier in this transaction, so it
-        // is passed down rather than re-queried.
         tradingAccountId,
         totalAssetKrw: valuation.totalAssetKrw,
         returnRate: valuation.returnRate,
@@ -4062,7 +4006,6 @@ export class OrdersService {
     tx: OrderExecuteTransactionClient,
     input: {
       positionId: string;
-      seasonParticipantId: string | null;
       tradingAccountId: string;
       assetId: string;
       quantity: Prisma.Decimal;
@@ -4071,7 +4014,6 @@ export class OrdersService {
     const position = await tx.position.findFirst({
       where: {
         id: input.positionId,
-        seasonParticipantId: input.seasonParticipantId,
         tradingAccountId: input.tradingAccountId,
         assetId: input.assetId,
       },
@@ -4111,7 +4053,6 @@ export class OrdersService {
     const finalizationResult = await tx.order.updateMany({
       where: {
         id: order.id,
-        seasonParticipantId: order.seasonParticipantId,
         tradingAccountId: this.requireOrderTradingScope(order),
         status: OrderStatus.submitted,
       },
@@ -4359,7 +4300,6 @@ export class OrdersService {
     );
 
     const previewBalances = await this.assertOrderResourcesAvailable({
-      participantId: participant?.id ?? null,
       tradingAccountId,
       assetId: asset.id,
       side: request.side,
@@ -4444,10 +4384,6 @@ export class OrdersService {
     const durableQuote = await this.prisma.quote.create({
       data: {
         userId,
-        seasonParticipantId: quote.context.participant?.id ?? null,
-        // Dual-write: quote rows always carry the verified account. Every
-        // producer of OrderQuoteCalculation resolves the link fail-closed
-        // (requireParticipantTradingAccountId) before reaching here.
         tradingAccountId: quote.context.tradingAccountId,
         quoteType: QuoteType.order,
         status: QuoteStatus.active,
@@ -4591,7 +4527,6 @@ export class OrdersService {
       },
       select: {
         id: true,
-        seasonParticipantId: true,
         tradingAccountId: true,
         status: true,
         assetId: true,
@@ -4699,7 +4634,6 @@ export class OrdersService {
       : null;
 
     if (
-      quote.seasonParticipantId !== input.seasonParticipantId ||
       quote.assetId !== input.request.assetId ||
       quote.side !== input.request.side ||
       quote.orderType !== input.request.orderType ||
@@ -4888,8 +4822,8 @@ export class OrdersService {
    * WHY THE QUOTE AND NOT THE KEY ALONE
    * -----------------------------------
    * The durable uniqueness the database actually enforces on
-   * `idempotencyKey` is `(seasonParticipantId, idempotencyKey)` — a key is
-   * unique WITHIN a season participation, not across a user's lifetime. A
+   * `idempotencyKey` is `(tradingAccountId, idempotencyKey)` — a key is
+   * unique WITHIN an account, not across a user's lifetime. A
    * lookup scoped to `(userId, idempotencyKey)` was therefore strictly WIDER
    * than the constraint it was replaying, and had to break the tie itself
    * (newest first). A client that reuses one key across two seasons — which
@@ -4921,7 +4855,7 @@ export class OrdersService {
    *   - a market order on that quote
    *   - the same quote presented under a different idempotencyKey
    * The request-hash comparison then happens in replayIdempotentCreateOrder,
-   * exactly as on the participant-scoped path.
+   * exactly as on the account-scoped path.
    */
   private async findIdempotentCreateOrderForQuote(input: {
     userId: string;
@@ -4932,10 +4866,7 @@ export class OrdersService {
     const order = await this.prisma.order.findFirst({
       where: {
         quoteId: input.quoteId,
-        OR: [
-          { seasonParticipant: { userId: input.userId } },
-          { tradingAccount: { userId: input.userId } },
-        ],
+        tradingAccount: { userId: input.userId },
       },
       select: {
         ...IDEMPOTENT_CREATE_ORDER_SELECT,
@@ -5505,7 +5436,6 @@ export class OrdersService {
   }
 
   private async assertOrderResourcesAvailable(input: {
-    participantId: string | null;
     tradingAccountId: string;
     assetId: string;
     side: OrderSide;
@@ -5526,7 +5456,6 @@ export class OrdersService {
         },
         select: {
           id: true,
-          seasonParticipantId: true,
           tradingAccountId: true,
           balanceAmount: true,
           reservedAmount: true,
@@ -5537,7 +5466,6 @@ export class OrdersService {
       // the balance basis of a quote (500 repair-required/mismatch).
       if (wallet) {
         assertCashWalletTradingAccountScope(wallet, {
-          seasonParticipantId: input.participantId,
           tradingAccountId: input.tradingAccountId,
         });
       }
@@ -5567,7 +5495,6 @@ export class OrdersService {
           },
         },
         select: {
-          seasonParticipantId: true,
           tradingAccountId: true,
           quantity: true,
         },
@@ -5575,7 +5502,6 @@ export class OrdersService {
 
       if (position) {
         this.assertPositionTradingScope(position, {
-          seasonParticipantId: input.participantId,
           tradingAccountId: input.tradingAccountId,
         });
       }
@@ -5594,7 +5520,6 @@ export class OrdersService {
         },
       },
       select: {
-        seasonParticipantId: true,
         tradingAccountId: true,
         quantity: true,
         reservedQuantity: true,
@@ -5603,7 +5528,6 @@ export class OrdersService {
 
     if (position) {
       this.assertPositionTradingScope(position, {
-        seasonParticipantId: input.participantId,
         tradingAccountId: input.tradingAccountId,
       });
     }
@@ -5630,7 +5554,6 @@ export class OrdersService {
       },
       select: {
         id: true,
-        seasonParticipantId: true,
         tradingAccountId: true,
         balanceAmount: true,
       },
@@ -5638,7 +5561,6 @@ export class OrdersService {
 
     if (wallet) {
       assertCashWalletTradingAccountScope(wallet, {
-        seasonParticipantId: input.participantId,
         tradingAccountId: input.tradingAccountId,
       });
     }
@@ -6050,12 +5972,7 @@ export class OrdersService {
     };
   }
 
-  /**
-   * Transitional dual-write guard: every writer needs the participant's
-   * trading-account link. A null link is a deploy-boundary state that must
-   * be repaired (trading-accounts:repair-links) — never silently spread
-   * onto new orders/quotes/positions/ledger rows.
-   */
+  /** A season participant must resolve to its canonical trading account. */
   private requireParticipantTradingAccountId(participant: {
     tradingAccountId: string | null;
   }): string {
@@ -6071,25 +5988,24 @@ export class OrdersService {
   }
 
   /**
-   * Execution-time scope resolution for an existing order: the order's OWN
-   * tradingAccountId must exist (else the trading-scope repair has to run
-   * first) and must equal the participant's link. Only then may wallets,
-   * positions, quotes, and ledger rows be touched under that account.
+   * Execution-time scope resolution for an existing order. Season policy is
+   * reached through TradingAccount -> SeasonParticipant.
    */
   private requireOrderTradingScope(order: {
     tradingAccountId: string | null;
-    seasonParticipantId?: string | null;
-    seasonParticipant: { id?: string; tradingAccountId: string | null } | null;
     tradingAccount: {
       id: string;
       mode: TradingAccountMode;
-      seasonParticipant: { id: string } | null;
+      seasonParticipant: {
+        id?: string;
+        tradingAccountId: string | null;
+      } | null;
     } | null;
   }): string {
     if (!order.tradingAccountId) {
       this.throwTradingScopeIntegrityError(
         'TRADING_SCOPE_REPAIR_REQUIRED',
-        'Order has no trading account scope; run trading-accounts:repair-trading-scope.',
+        'Order has no canonical trading account scope.',
       );
     }
 
@@ -6104,11 +6020,7 @@ export class OrdersService {
     }
 
     if (order.tradingAccount.mode === TradingAccountMode.general) {
-      if (
-        order.seasonParticipantId !== null ||
-        order.seasonParticipant !== null ||
-        order.tradingAccount.seasonParticipant !== null
-      ) {
+      if (order.tradingAccount.seasonParticipant !== null) {
         this.throwTradingScopeIntegrityError(
           'TRADING_ACCOUNT_SCOPE_MISMATCH',
           'General order carries a season participant link.',
@@ -6117,7 +6029,8 @@ export class OrdersService {
       return order.tradingAccountId;
     }
 
-    const participantAccountId = order.seasonParticipant?.tradingAccountId;
+    const participantAccountId =
+      order.tradingAccount.seasonParticipant?.tradingAccountId;
     if (!participantAccountId) {
       this.throwApiError(
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -6126,16 +6039,10 @@ export class OrdersService {
       );
     }
 
-    if (
-      order.seasonParticipantId === null ||
-      order.seasonParticipant?.id !== order.seasonParticipantId ||
-      order.tradingAccount.seasonParticipant?.id !==
-        order.seasonParticipantId ||
-      order.tradingAccountId !== participantAccountId
-    ) {
+    if (order.tradingAccountId !== participantAccountId) {
       this.throwTradingScopeIntegrityError(
         'TRADING_ACCOUNT_SCOPE_MISMATCH',
-        'Season order participant and trading-account scope do not agree.',
+        'Season order account and participant link do not agree.',
       );
     }
 
@@ -6144,30 +6051,20 @@ export class OrdersService {
 
   /**
    * A position touched by an execution must carry the same verified account
-   * scope as the order. Null → repair first; mismatch → corruption. Never
-   * auto-adopted or overwritten mid-trade.
+   * scope as the order.
    */
   private assertPositionTradingScope(
     position: {
-      seasonParticipantId: string | null;
       tradingAccountId: string | null;
     },
     expected: {
-      seasonParticipantId: string | null;
       tradingAccountId: string;
     },
   ): void {
-    if (position.seasonParticipantId !== expected.seasonParticipantId) {
-      this.throwTradingScopeIntegrityError(
-        'TRADING_ACCOUNT_SCOPE_MISMATCH',
-        'Position belongs to a different season participant.',
-      );
-    }
-
     if (position.tradingAccountId == null) {
       this.throwTradingScopeIntegrityError(
         'TRADING_SCOPE_REPAIR_REQUIRED',
-        'Position has no trading account scope; run trading-accounts:repair-trading-scope.',
+        'Position has no canonical trading account scope.',
       );
     }
 
@@ -6237,7 +6134,7 @@ export class OrdersService {
     tx: Prisma.TransactionClient,
     seasonParticipantId: string | null,
     capturedAt: Date,
-    /** The fill's verified account scope (작업 7 dual-write). */
+    /** The fill's verified canonical account scope. */
     tradingAccountId: string,
   ): Promise<string | null> {
     return this.recordOrderExecutedPortfolioSnapshot(

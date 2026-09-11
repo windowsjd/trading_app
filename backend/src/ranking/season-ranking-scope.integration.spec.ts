@@ -19,7 +19,7 @@ const itDbIntegration = RUN_DB_INTEGRATION ? it : it.skip;
 
 describe('SeasonRanking trading-account scope DB integration', () => {
   itDbIntegration(
-    'verifies migration backfill, dual-write, source scope, season locks, settlement closure, and the repair script against PostgreSQL',
+    'verifies participant/account ranking identity, source scope, season locks, settlement closure, and the repair script against PostgreSQL',
     () => {
       runDbIntegrationPrepare();
 
@@ -213,7 +213,6 @@ async function createSeasonWithParticipants(options) {
     for (const currencyCode of ['KRW', 'USD']) {
       await prisma.cashWallet.create({
         data: {
-          seasonParticipantId: participant.id,
           tradingAccountId: account.id,
           currencyCode,
           balanceAmount: currencyCode === 'KRW' ? '10000000' : '0',
@@ -234,7 +233,6 @@ async function createSeasonWithParticipants(options) {
 async function createDailySnapshot(participant, snapshotDate, totalAssetKrw, returnRate) {
   return prisma.dailyPortfolioSnapshot.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: participant.accountId,
       snapshotDate,
       totalAssetKrw,
@@ -374,9 +372,10 @@ async function testMigrationBackfillAndUnique() {
 }
 
 // ===========================================================================
-// 2) Every writer dual-writes; a broken participant link blocks the write.
+// 2) Every ranking writer preserves both domain identities; a broken
+// participant-to-account link blocks the write.
 // ===========================================================================
-async function testWritersDualWrite() {
+async function testRankingIdentityWriters() {
   const now = new Date();
   const fixture = await createSeasonWithParticipants({
     participantCount: 2,
@@ -404,7 +403,7 @@ async function testWritersDualWrite() {
     assert.equal(
       row.tradingAccountId,
       participant.accountId,
-      'refresh writer must dual-write the account scope',
+      'refresh writer must retain the participant target and its account scope',
     );
   }
 
@@ -439,7 +438,7 @@ async function testWritersDualWrite() {
     assert.equal(
       row.tradingAccountId,
       participant.accountId,
-      'writeSeasonRankings must dual-write the account scope',
+      'writeSeasonRankings must retain the participant target and its account scope',
     );
   }
 
@@ -522,7 +521,7 @@ async function testWritersDualWrite() {
     data: { tradingAccountId: brokenFixture.participants[1].accountId },
   });
 
-  console.log('  [2] writer dual-write + fail-closed link/mode checks ok');
+  console.log('  [2] ranking identity writes + fail-closed link/mode checks ok');
   return fixture;
 }
 
@@ -562,8 +561,8 @@ async function testRankingInputScope() {
   assert.equal(created.length, 2);
   assert.ok(created.every((row) => row.tradingAccountId !== null));
 
-  // Now damage a source snapshot and confirm the job REFUSES rather than
-  // ranking one participant fewer.
+  // Account/date uniqueness prevents a source snapshot from being reassigned
+  // into another participant account's ranking slot.
   const damagedFixture = await createSeasonWithParticipants({
     participantCount: 3,
     status: 'active',
@@ -578,6 +577,12 @@ async function testRankingInputScope() {
     '10500000',
     '5',
   );
+  await createDailySnapshot(
+    damagedFixture.participants[2],
+    damagedDate,
+    '10200000',
+    '2',
+  );
   await assert.rejects(
     prisma.$executeRaw\`
       UPDATE "daily_portfolio_snapshots"
@@ -586,25 +591,13 @@ async function testRankingInputScope() {
     \`,
     (error) => error?.code === 'P2010',
   );
-  await prisma.$executeRaw\`
-    UPDATE "daily_portfolio_snapshots"
-    SET "trading_account_id" = \${damagedFixture.participants[2].accountId}
-    WHERE "id" = \${damaged.id}
-  \`;
-
-  let sourceFailureCode = null;
-  try {
-    await runJob(rankingJob, {
-      seasonId: damagedFixture.seasonId,
-      snapshotDate: '2026-08-04',
-    });
-  } catch (error) {
-    sourceFailureCode = errorCode(error);
-  }
-  assert.equal(
-    sourceFailureCode,
-    'SEASON_RANKING_SOURCE_SCOPE_MISMATCH',
-    'a mismatched source snapshot must fail the job',
+  await assert.rejects(
+    prisma.$executeRaw\`
+      UPDATE "daily_portfolio_snapshots"
+      SET "trading_account_id" = \${damagedFixture.participants[2].accountId}
+      WHERE "id" = \${damaged.id}
+    \`,
+    (error) => error?.code === 'P2010',
   );
   assert.equal(
     await prisma.seasonRanking.count({
@@ -1108,7 +1101,9 @@ async function testSettlementSourceScope() {
     }
     assert.equal(
       code,
-      'SEASON_RANKING_SOURCE_SCOPE_MISMATCH',
+      damage === 'mismatch'
+        ? 'MISSING_FINAL_SNAPSHOTS'
+        : 'SEASON_RANKING_SOURCE_SCOPE_MISMATCH',
       'settlement source damage (' + damage + ') must fail closed',
     );
 
@@ -1437,7 +1432,7 @@ async function testSettledWithoutFinalRanking() {
     where: { seasonId: fixture.seasonId, rankType: 'final' },
   });
   const equityBefore = await prisma.equitySnapshot.count({
-    where: { seasonParticipantId: fixture.participants[0].id },
+    where: { tradingAccountId: fixture.participants[0].accountId },
   });
   let emptyCode = null;
   try {
@@ -1458,7 +1453,7 @@ async function testSettledWithoutFinalRanking() {
   );
   assert.equal(
     await prisma.equitySnapshot.count({
-      where: { seasonParticipantId: fixture.participants[0].id },
+      where: { tradingAccountId: fixture.participants[0].accountId },
     }),
     equityBefore,
     'no new settlement snapshot may be created for a settled season',
@@ -1567,10 +1562,10 @@ async function cleanup() {
     where: { seasonId: { in: createdSeasonIds } },
   });
   await prisma.dailyPortfolioSnapshot.deleteMany({
-    where: { seasonParticipant: { seasonId: { in: createdSeasonIds } } },
+    where: { tradingAccount: { userId: { in: createdUserIds } } },
   });
   await prisma.equitySnapshot.deleteMany({
-    where: { seasonParticipant: { seasonId: { in: createdSeasonIds } } },
+    where: { tradingAccount: { userId: { in: createdUserIds } } },
   });
   await prisma.equitySnapshot.deleteMany({
     where: { tradingAccount: { userId: { in: createdUserIds } } },
@@ -1601,7 +1596,7 @@ async function main() {
   try {
     await ensureFxRate();
     await testMigrationBackfillAndUnique();
-    await testWritersDualWrite();
+    await testRankingIdentityWriters();
     await testRankingInputScope();
     await testSettlementClosesAccounts();
     await testSettlementRollback();

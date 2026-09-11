@@ -49,9 +49,7 @@ describe('Limit order registration without Redis DB integration', () => {
       ]) {
         expect(result.stdout).toContain(`ok ${name}`);
       }
-      expect(result.stdout).toContain(
-        'limit order no-redis db integration ok',
-      );
+      expect(result.stdout).toContain('limit order no-redis db integration ok');
     },
     190_000,
   );
@@ -223,7 +221,6 @@ async function createScenario() {
 
   const wallet = await prisma.cashWallet.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: tradingAccount.id,
       currencyCode: CurrencyCode.KRW,
       balanceAmount: '1000000.00000000',
@@ -257,13 +254,13 @@ async function createScenario() {
 
 async function cleanup() {
   await prisma.order.deleteMany({
-    where: { seasonParticipantId: { in: created.participants } },
+    where: { tradingAccount: { userId: { in: created.users } } },
   });
   await prisma.quote.deleteMany({
-    where: { seasonParticipantId: { in: created.participants } },
+    where: { tradingAccount: { userId: { in: created.users } } },
   });
   await prisma.cashWallet.deleteMany({
-    where: { seasonParticipantId: { in: created.participants } },
+    where: { tradingAccount: { userId: { in: created.users } } },
   });
   await prisma.seasonParticipant.deleteMany({
     where: { id: { in: created.participants } },

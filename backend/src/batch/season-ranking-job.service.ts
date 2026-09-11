@@ -13,10 +13,6 @@ import {
 } from '../fx/fx-decimal-policy';
 import { PrismaService } from '../prisma/prisma.service';
 import {
-  requireSeasonSnapshotParticipantId,
-  seasonSnapshotWhere,
-} from '../portfolio/season-snapshot-scope';
-import {
   buildRankingRowsForSnapshots,
   RankingCalculatedRow,
 } from '../ranking/ranking-calculation.policy';
@@ -130,24 +126,30 @@ export class SeasonRankingJobService {
       seasonId,
       participants,
     );
+    const participantByAccount = new Map(
+      participants.map((participant) => [
+        participant.tradingAccountId!,
+        participant,
+      ]),
+    );
 
     const snapshots = await this.prisma.dailyPortfolioSnapshot.findMany({
       where: {
         snapshotDate,
-        ...seasonSnapshotWhere,
         tradingAccountId: {
           in: [...participantScopes.values()],
         },
-        seasonParticipant: {
-          seasonId,
-          participantStatus: {
-            in: [...RANKABLE_PARTICIPANT_STATUSES],
+        tradingAccount: {
+          seasonParticipant: {
+            seasonId,
+            participantStatus: {
+              in: [...RANKABLE_PARTICIPANT_STATUSES],
+            },
           },
         },
       },
       select: {
         id: true,
-        seasonParticipantId: true,
         tradingAccountId: true,
         cumulativeExternalFundingKrw: true,
         investmentPnlKrw: true,
@@ -157,11 +159,6 @@ export class SeasonRankingJobService {
         returnRate: true,
         capturedAt: true,
         createdAt: true,
-        seasonParticipant: {
-          select: {
-            userId: true,
-          },
-        },
       },
     });
     assertRankingSourceSnapshotScopes({
@@ -212,11 +209,10 @@ export class SeasonRankingJobService {
     ]);
     const rows = buildRankingRowsForSnapshots({
       rankingSnapshots: snapshots.map((snapshot) => ({
-        // Season-only by query; narrowed here now that the column is nullable.
-        seasonParticipantId: requireSeasonSnapshotParticipantId(
-          snapshot.seasonParticipantId,
-        ),
-        userId: snapshot.seasonParticipant?.userId ?? '',
+        seasonParticipantId: participantByAccount.get(
+          snapshot.tradingAccountId,
+        )!.id,
+        userId: participantByAccount.get(snapshot.tradingAccountId)!.userId,
         snapshotDate: snapshot.snapshotDate,
         totalAssetKrw: snapshot.totalAssetKrw,
         returnRate: snapshot.returnRate,
@@ -392,20 +388,20 @@ export class SeasonRankingJobService {
         snapshotDate: {
           lte: rankingDate,
         },
-        ...seasonSnapshotWhere,
         tradingAccountId: {
           in: [...participantScopes.values()],
         },
-        seasonParticipant: {
-          seasonId,
-          participantStatus: {
-            in: [...RANKABLE_PARTICIPANT_STATUSES],
+        tradingAccount: {
+          seasonParticipant: {
+            seasonId,
+            participantStatus: {
+              in: [...RANKABLE_PARTICIPANT_STATUSES],
+            },
           },
         },
       },
       select: {
         id: true,
-        seasonParticipantId: true,
         tradingAccountId: true,
         cumulativeExternalFundingKrw: true,
         investmentPnlKrw: true,
@@ -424,13 +420,15 @@ export class SeasonRankingJobService {
       participantScopes,
     });
 
-    // Season-only by query (seasonSnapshotWhere); narrowed here because the
-    // column is nullable for general-mode rows.
+    const participantIdByAccount = new Map(
+      [...participantScopes].map(([participantId, accountId]) => [
+        accountId,
+        participantId,
+      ]),
+    );
     return rows.map((row) => ({
       ...row,
-      seasonParticipantId: requireSeasonSnapshotParticipantId(
-        row.seasonParticipantId,
-      ),
+      seasonParticipantId: participantIdByAccount.get(row.tradingAccountId)!,
     }));
   }
 
@@ -465,16 +463,17 @@ export class SeasonRankingJobService {
         tradingAccountId: {
           in: [...participantScopes.values()],
         },
-        seasonParticipant: {
-          seasonId,
-          participantStatus: {
-            in: [...RANKABLE_PARTICIPANT_STATUSES],
+        tradingAccount: {
+          seasonParticipant: {
+            seasonId,
+            participantStatus: {
+              in: [...RANKABLE_PARTICIPANT_STATUSES],
+            },
           },
         },
       },
       select: {
         id: true,
-        seasonParticipantId: true,
         tradingAccountId: true,
         executedAt: true,
       },
@@ -482,11 +481,15 @@ export class SeasonRankingJobService {
 
     assertRankingSourceOrderScopes({ rows, participantScopes });
 
+    const participantIdByAccount = new Map(
+      [...participantScopes].map(([participantId, accountId]) => [
+        accountId,
+        participantId,
+      ]),
+    );
     return rows.map((row) => ({
       ...row,
-      seasonParticipantId: requireSeasonSnapshotParticipantId(
-        row.seasonParticipantId,
-      ),
+      seasonParticipantId: participantIdByAccount.get(row.tradingAccountId)!,
     }));
   }
 

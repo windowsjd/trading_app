@@ -160,8 +160,7 @@ export type FxExecuteRequest = Prisma.FxExecuteRequestModel
  * 
  * SEASON rows keep their historical meaning: returnRate is the simple
  * initial-capital return and the general-performance columns stay NULL.
- * GENERAL rows (작업 7) have no SeasonParticipant at all and carry the
- * time-weighted performance state instead — returnRate is the TWR percent,
+ * GENERAL rows carry the time-weighted performance state instead — returnRate is the TWR percent,
  * i.e. (timeWeightedReturnFactor - 1) * 100. The two meanings are never
  * mixed; API responses always name which one applies via returnRateMethod.
  * 

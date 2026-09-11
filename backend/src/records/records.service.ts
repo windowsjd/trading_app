@@ -31,7 +31,6 @@ import {
   SEASON_RANKING_SCOPE_SELECT,
 } from '../ranking/season-ranking-scope';
 import { assertSeasonRankingSetScope } from '../ranking/season-ranking-set-scope';
-import { requireSeasonSnapshotParticipantId } from '../portfolio/season-snapshot-scope';
 import {
   calculateMaxDrawdownPercent,
   type RankingHistoricalSnapshotInput,
@@ -912,7 +911,7 @@ export class RecordsService {
           },
         },
       }),
-      this.findSnapshotHistory(participant.tradingAccountId),
+      this.findSnapshotHistory(participant.id, participant.tradingAccountId),
       this.buildProfitAnalysis(participant.tradingAccountId, new Date()),
     ]);
 
@@ -3111,6 +3110,7 @@ export class RecordsService {
   }
 
   private async findSnapshotHistory(
+    seasonParticipantId: string,
     tradingAccountId: string,
   ): Promise<RankingHistoricalSnapshotInput[]> {
     const rows = await this.prisma.dailyPortfolioSnapshot.findMany({
@@ -3123,7 +3123,6 @@ export class RecordsService {
         { createdAt: 'asc' },
       ],
       select: {
-        seasonParticipantId: true,
         snapshotDate: true,
         totalAssetKrw: true,
         returnRate: true,
@@ -3132,14 +3131,7 @@ export class RecordsService {
       },
     });
 
-    // Filtered by a concrete participant id, so the nullable column (general
-    // rows) cannot appear here; narrowed rather than asserted ad hoc.
-    return rows.map((row) => ({
-      ...row,
-      seasonParticipantId: requireSeasonSnapshotParticipantId(
-        row.seasonParticipantId,
-      ),
-    }));
+    return rows.map((row) => ({ ...row, seasonParticipantId }));
   }
 
   private calculateMdd(

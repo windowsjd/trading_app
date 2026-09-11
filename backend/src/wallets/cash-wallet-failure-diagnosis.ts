@@ -9,8 +9,8 @@ import {
  * (작업 5 보완 3).
  *
  * Every atomic cash mutation in cash-wallet-atomic.ts (and the equivalent
- * Prisma updateMany credits) carries the wallet id, the participant, the
- * VERIFIED trading account, the currency, AND an amount guard in one WHERE.
+ * Prisma updateMany credits) carries the wallet id, the VERIFIED trading
+ * account, the currency, AND an amount guard in one WHERE.
  * When it matches 0 rows, ANY of those could be the reason — and the old
  * per-caller diagnostics re-read the wallet with the scope columns still in
  * the WHERE, so a wallet whose scope had been corrupted simply "disappeared"
@@ -21,13 +21,12 @@ import {
  * the fixed order:
  *
  *   1. wallet row gone                       → 'wallet_not_found'
- *   2. participant differs from expected     → 500 scope mismatch (throws)
- *   3. tradingAccountId IS NULL              → 500 repair required (throws)
- *   4. tradingAccountId differs              → 500 scope mismatch (throws)
- *   5. currencyCode differs                  → 500 scope mismatch (throws)
- *   6. amount guard cannot hold              → 'insufficient_available' /
+ *   2. tradingAccountId IS NULL              → 500 repair required (throws)
+ *   3. tradingAccountId differs              → 500 scope mismatch (throws)
+ *   4. currencyCode differs                  → 500 scope mismatch (throws)
+ *   5. amount guard cannot hold              → 'insufficient_available' /
  *                                              'insufficient_reserved'
- *   7. scope AND amounts fine                → 'conflict' (real concurrency)
+ *   6. scope AND amounts fine                → 'conflict' (real concurrency)
  *
  * Steps 2–5 are structural server-side corruption and are thrown here as the
  * SAME structured 500s the pre-check guard uses
@@ -67,7 +66,6 @@ export async function diagnoseCashWalletMutationFailure(
   input: {
     walletId: string;
     expected: {
-      seasonParticipantId: string | null;
       /** The VERIFIED trading account the mutation was scoped to. */
       tradingAccountId: string;
       /** CurrencyCode enum value. */
@@ -83,7 +81,6 @@ export async function diagnoseCashWalletMutationFailure(
     where: { id: input.walletId },
     select: {
       id: true,
-      seasonParticipantId: true,
       tradingAccountId: true,
       currencyCode: true,
       balanceAmount: true,
@@ -96,9 +93,8 @@ export async function diagnoseCashWalletMutationFailure(
   }
 
   // Throws FINANCIAL_SCOPE_REPAIR_REQUIRED (null scope) or
-  // FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH (participant/account mismatch).
+  // FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH (account mismatch).
   assertCashWalletTradingAccountScope(wallet, {
-    seasonParticipantId: input.expected.seasonParticipantId,
     tradingAccountId: input.expected.tradingAccountId,
   });
 

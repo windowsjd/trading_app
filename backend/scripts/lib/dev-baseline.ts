@@ -311,11 +311,9 @@ export async function ensureDevBaselineParticipant(input: {
       select: { id: true },
     });
 
-    // Transitional dual-write: financial rows carry BOTH identifiers.
     const krwWallet = await tx.cashWallet.create({
       data: {
         id: DEV_KRW_WALLET_ID,
-        seasonParticipantId: participant.id,
         tradingAccountId: tradingAccount.id,
         currencyCode: CurrencyCode.KRW,
         balanceAmount: DEV_INITIAL_CAPITAL_KRW,
@@ -326,7 +324,6 @@ export async function ensureDevBaselineParticipant(input: {
     await tx.cashWallet.create({
       data: {
         id: DEV_USD_WALLET_ID,
-        seasonParticipantId: participant.id,
         tradingAccountId: tradingAccount.id,
         currencyCode: CurrencyCode.USD,
         balanceAmount: ZERO_AMOUNT,
@@ -337,7 +334,6 @@ export async function ensureDevBaselineParticipant(input: {
     await tx.walletTransaction.create({
       data: {
         id: DEV_INITIAL_GRANT_TX_ID,
-        seasonParticipantId: participant.id,
         tradingAccountId: tradingAccount.id,
         walletId: krwWallet.id,
         currencyCode: CurrencyCode.KRW,

@@ -152,19 +152,13 @@ export async function backfillGeneralPerformance(
       select: {
         id: true,
         currencyCode: true,
-        seasonParticipantId: true,
         balanceAmount: true,
         reservedAmount: true,
       },
     });
     const krw = wallets.filter((w) => w.currencyCode === 'KRW');
     const usd = wallets.filter((w) => w.currencyCode === 'USD');
-    if (
-      krw.length !== 1 ||
-      usd.length !== 1 ||
-      wallets.length !== 2 ||
-      wallets.some((w) => w.seasonParticipantId !== null)
-    ) {
+    if (krw.length !== 1 || usd.length !== 1 || wallets.length !== 2) {
       add(
         'GENERAL_PERFORMANCE_FINANCIAL_INTEGRITY',
         `unexpected wallets (KRW=${krw.length}, USD=${usd.length}, total=${wallets.length})`,
@@ -269,7 +263,6 @@ export async function backfillGeneralPerformance(
 
     await prisma.equitySnapshot.create({
       data: {
-        seasonParticipantId: null,
         tradingAccountId: account.id,
         totalAssetKrw: totalAsset.toFixed(8),
         returnRate: '0',

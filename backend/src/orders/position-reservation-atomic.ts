@@ -4,7 +4,6 @@ type PositionAtomicClient = Pick<Prisma.TransactionClient, '$executeRaw'>;
 
 export type PositionReservationInput = {
   positionId: string;
-  seasonParticipantId: string | null;
   tradingAccountId: string;
   assetId: string;
   quantity: string;
@@ -20,7 +19,6 @@ export async function reserveAvailablePositionQuantity(
     SET "reserved_quantity" = "reserved_quantity" + ${input.quantity}::numeric,
         "updated_at" = clock_timestamp()
     WHERE "id" = ${input.positionId}
-      AND "season_participant_id" IS NOT DISTINCT FROM ${input.seasonParticipantId}
       AND "trading_account_id" = ${input.tradingAccountId}
       AND "asset_id" = ${input.assetId}
       AND "quantity" - "reserved_quantity" >= ${input.quantity}::numeric
@@ -37,7 +35,6 @@ export async function releaseReservedPositionQuantity(
     SET "reserved_quantity" = "reserved_quantity" - ${input.quantity}::numeric,
         "updated_at" = clock_timestamp()
     WHERE "id" = ${input.positionId}
-      AND "season_participant_id" IS NOT DISTINCT FROM ${input.seasonParticipantId}
       AND "trading_account_id" = ${input.tradingAccountId}
       AND "asset_id" = ${input.assetId}
       AND "reserved_quantity" >= ${input.quantity}::numeric
@@ -60,7 +57,6 @@ export async function settleReservedPositionQuantity(
         "realized_pnl_krw" = "realized_pnl_krw" + ${input.realizedPnlKrwDelta}::numeric,
         "updated_at" = clock_timestamp()
     WHERE "id" = ${input.positionId}
-      AND "season_participant_id" IS NOT DISTINCT FROM ${input.seasonParticipantId}
       AND "trading_account_id" = ${input.tradingAccountId}
       AND "asset_id" = ${input.assetId}
       AND "quantity" >= ${input.quantity}::numeric

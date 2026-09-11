@@ -106,11 +106,11 @@ One DB transaction creates, in order:
 
 1. `TradingAccount` — `mode=general`, `status=active`,
    `initialCapitalKrw=10,000,000`, `openedAt=now`, `closedAt=null`
-2. KRW `CashWallet` — `seasonParticipantId=null`,
-   `tradingAccountId=<account>`, balance 10,000,000, reserved 0
+2. KRW `CashWallet` — `tradingAccountId=<account>`, balance 10,000,000,
+   reserved 0
 3. USD `CashWallet` — same scope, balance 0, reserved 0
-4. `WalletTransaction` — `seasonParticipantId=null`,
-   `tradingAccountId=<account>`, `walletId=<KRW wallet>`, `direction=credit`,
+4. `WalletTransaction` — `tradingAccountId=<account>`,
+   `walletId=<KRW wallet>`, `direction=credit`,
    `txType=initial_grant`, `referenceType=general_account_open`,
    `referenceId=<account id>`, `amount=balanceAfter=10,000,000`,
    `occurredAt=openedAt`
@@ -147,8 +147,7 @@ Enforced by the existing partial unique index
 
 Before replaying an existing account the server checks its structure:
 `mode=general`, no participant, `initialCapitalKrw=10,000,000`, exactly one
-KRW and one USD wallet both scoped to the account with
-`seasonParticipantId=null`, and exactly one 10,000,000 KRW
+KRW and one USD wallet both scoped to the account, and exactly one 10,000,000 KRW
 `initial_grant`/`general_account_open` ledger row on the KRW wallet.
 
 Any violation → **500 `GENERAL_ACCOUNT_INTEGRITY`**. The account is NOT
@@ -347,15 +346,14 @@ replay):
 
 #### Payout invariants
 
-- Target wallet must satisfy `tradingAccountId = <account>`,
-  `seasonParticipantId IS NULL`, `currencyCode = KRW` — all four conditions
-  are in the UPDATE's WHERE, so a season-linked or foreign wallet matches 0
+- Target wallet must satisfy `tradingAccountId = <account>` and
+  `currencyCode = KRW` — both conditions are in the UPDATE's WHERE, so a foreign wallet matches 0
   rows and the claim fails closed with 500 `GENERAL_ACCOUNT_INTEGRITY`.
 - `balanceAmount` is incremented by the configured reward;
   `reservedAmount` is untouched; USD is never credited.
 - The ledger row is `direction=credit`, `txType=ad_reward`,
   `referenceType=ad_reward_claim`, `referenceId=<claim id>`,
-  `seasonParticipantId=null`, `balanceAfter` = the post-update balance,
+  `tradingAccountId=<account>`, `balanceAfter` = the post-update balance,
   `occurredAt = grantedAt`.
 - Claim ↔ ledger is 1:1 (`AdRewardClaim.walletTransactionId` is UNIQUE, plus
   the partial unique `wallet_transactions_ad_reward_claim_reference_unique`).
@@ -478,14 +476,12 @@ Implemented:
 
 - `GET /api/v1/trading-accounts/:accountId/portfolio`
 - `GET /api/v1/trading-accounts/:accountId/portfolio/equity`
-- EquitySnapshot / DailyPortfolioSnapshot moved to the transitional
-  TradingAccount scope (season rows backfilled, every new season writer
-  dual-writes, general rows carry no participant at all)
+- EquitySnapshot / DailyPortfolioSnapshot use required TradingAccount-only
+  ownership for both season and general rows
 - the general-account performance origin, written in the SAME transaction as
   the account
 - external-funding before/after boundary snapshots, written in the SAME
   transaction as an ad payout
-- `pnpm trading-accounts:repair-snapshot-scope`
 - `pnpm trading-accounts:backfill-general-performance`
 - ad-reward COMMAND idempotency (`idempotencyKey` + `requestHash` +
   `responsePayloadJson`)
@@ -826,11 +822,6 @@ never an empty chart.
 
 ## Operations
 
-- `pnpm trading-accounts:repair-snapshot-scope [--apply]` — fills a season
-  snapshot's null `tradingAccountId` from its participant link. Amounts,
-  rates, times, dates, and reasons are never touched; mismatches and general
-  rows are reported and never guessed; `--apply` exits non-zero while anything
-  is unresolved.
 - `pnpm trading-accounts:backfill-general-performance [--apply]` — creates a
   `performance_baseline` origin for pre-작업 7 general accounts, ONLY where it
   is provable: no trading rows, wallets intact, claims consistent, no USD

@@ -184,7 +184,6 @@ async function createCanonicalParticipant(seasonId, userId, participantStatus) {
   });
   const krwWallet = await prisma.cashWallet.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: accountId,
       currencyCode: CurrencyCode.KRW,
       balanceAmount: CAPITAL,
@@ -193,7 +192,6 @@ async function createCanonicalParticipant(seasonId, userId, participantStatus) {
   });
   await prisma.cashWallet.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: accountId,
       currencyCode: CurrencyCode.USD,
       balanceAmount: ZERO,
@@ -202,7 +200,6 @@ async function createCanonicalParticipant(seasonId, userId, participantStatus) {
   });
   await prisma.walletTransaction.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: accountId,
       walletId: krwWallet.id,
       currencyCode: CurrencyCode.KRW,
@@ -217,7 +214,6 @@ async function createCanonicalParticipant(seasonId, userId, participantStatus) {
   });
   await prisma.equitySnapshot.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: accountId,
       totalAssetKrw: CAPITAL,
       returnRate: ZERO,
@@ -238,21 +234,21 @@ async function createCanonicalParticipant(seasonId, userId, participantStatus) {
   };
 }
 
-async function financialFingerprint(participantId) {
+async function financialFingerprint(tradingAccountId) {
   const [wallets, ledger, snapshots, orders, positions] = await Promise.all([
     prisma.cashWallet.findMany({
-      where: { seasonParticipantId: participantId },
+      where: { tradingAccountId },
       orderBy: { currencyCode: 'asc' },
       select: { id: true, currencyCode: true, balanceAmount: true, reservedAmount: true },
     }),
     prisma.walletTransaction.findMany({
-      where: { seasonParticipantId: participantId },
+      where: { tradingAccountId },
       orderBy: { id: 'asc' },
       select: { id: true, txType: true, amount: true, balanceAfter: true },
     }),
-    prisma.equitySnapshot.count({ where: { seasonParticipantId: participantId } }),
-    prisma.order.count({ where: { seasonParticipantId: participantId } }),
-    prisma.position.count({ where: { seasonParticipantId: participantId } }),
+    prisma.equitySnapshot.count({ where: { tradingAccountId } }),
+    prisma.order.count({ where: { tradingAccountId } }),
+    prisma.position.count({ where: { tradingAccountId } }),
   ]);
   return JSON.stringify({
     wallets: wallets.map((w) => ({
@@ -278,13 +274,13 @@ async function cleanup(scope) {
     where: { actorUserId: { in: scope.userIds } },
   });
   await prisma.walletTransaction.deleteMany({
-    where: { seasonParticipantId: { in: scope.participantIds } },
+    where: { tradingAccount: { userId: { in: scope.userIds } } },
   });
   await prisma.equitySnapshot.deleteMany({
-    where: { seasonParticipantId: { in: scope.participantIds } },
+    where: { tradingAccount: { userId: { in: scope.userIds } } },
   });
   await prisma.cashWallet.deleteMany({
-    where: { seasonParticipantId: { in: scope.participantIds } },
+    where: { tradingAccount: { userId: { in: scope.userIds } } },
   });
   await prisma.seasonParticipant.deleteMany({
     where: { id: { in: scope.participantIds } },
@@ -332,7 +328,7 @@ async function testRepairMappingAndNonMutation() {
         participantStatus,
       );
       scope.participantIds.push(legacy.id);
-      const before = await financialFingerprint(legacy.id);
+      const before = await financialFingerprint(legacy.tradingAccountId);
 
       const participantRow = await prisma.seasonParticipant.findUniqueOrThrow({
         where: { id: legacy.id },
@@ -367,7 +363,10 @@ async function testRepairMappingAndNonMutation() {
       assert.equal(linked.tradingAccount.closedAt, null);
 
       // Financial rows byte-identical, replay creates nothing new.
-      assert.equal(await financialFingerprint(legacy.id), before);
+      assert.equal(
+        await financialFingerprint(legacy.tradingAccountId),
+        before,
+      );
       const replay = await prisma.$transaction((tx) =>
         ensureSeasonTradingAccountLink(tx, {
           ...participantRow,
@@ -457,7 +456,7 @@ async function testJoinRepairsNullLinkAndKeeps409() {
       ParticipantStatus.active,
     );
     scope.participantIds.push(legacy.id);
-    const before = await financialFingerprint(legacy.id);
+    const before = await financialFingerprint(legacy.tradingAccountId);
 
     let joinError = null;
     try {
@@ -481,7 +480,7 @@ async function testJoinRepairsNullLinkAndKeeps409() {
     assert.equal(repaired.tradingAccount.status, TradingAccountStatus.active);
 
     // No duplicate wallets, grants, snapshots, participants, or accounts.
-    assert.equal(await financialFingerprint(legacy.id), before);
+    assert.equal(await financialFingerprint(legacy.tradingAccountId), before);
     assert.equal(
       await prisma.seasonParticipant.count({
         where: { seasonId: season.id, userId: user.id },
@@ -602,7 +601,7 @@ async function testExclusionRepairsNullLink() {
       ParticipantStatus.active,
     );
     scope.participantIds.push(legacy.id);
-    const before = await financialFingerprint(legacy.id);
+    const before = await financialFingerprint(legacy.tradingAccountId);
     const service = createModerationService(prisma);
 
     await service.excludeParticipant(
@@ -625,7 +624,7 @@ async function testExclusionRepairsNullLink() {
       participant.tradingAccount.status,
       TradingAccountStatus.suspended,
     );
-    assert.equal(await financialFingerprint(legacy.id), before);
+    assert.equal(await financialFingerprint(legacy.tradingAccountId), before);
   } finally {
     await cleanup(scope);
   }
@@ -923,8 +922,8 @@ async function testRepairScriptDryRunAndApply() {
       ParticipantStatus.excluded,
     );
     scope.participantIds.push(legacyA.id, legacyB.id);
-    const beforeA = await financialFingerprint(legacyA.id);
-    const beforeB = await financialFingerprint(legacyB.id);
+    const beforeA = await financialFingerprint(legacyA.tradingAccountId);
+    const beforeB = await financialFingerprint(legacyB.tradingAccountId);
 
     // A post-migration canonical database has no missing-link repair work.
     const dryRun = await repairMissingTradingAccountLinks(prisma, {
@@ -956,8 +955,14 @@ async function testRepairScriptDryRunAndApply() {
       repairedB.tradingAccount.status,
       TradingAccountStatus.suspended,
     );
-    assert.equal(await financialFingerprint(legacyA.id), beforeA);
-    assert.equal(await financialFingerprint(legacyB.id), beforeB);
+    assert.equal(
+      await financialFingerprint(legacyA.tradingAccountId),
+      beforeA,
+    );
+    assert.equal(
+      await financialFingerprint(legacyB.tradingAccountId),
+      beforeB,
+    );
 
     // Re-run: nothing left for these participants, no extra accounts.
     const rerun = await repairMissingTradingAccountLinks(prisma, {

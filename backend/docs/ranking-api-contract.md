@@ -216,8 +216,9 @@ Implemented error codes:
 ## Account scope integrity (작업 8)
 
 Every SeasonRanking row carries BOTH `seasonParticipantId` (required) and
-`tradingAccountId` (nullable until the repair converges). Every reader in this
-API selects the scope columns and verifies them before returning anything.
+`tradingAccountId` (required). The participant identifies the season ranking
+target; the account identifies the scored portfolio. Every reader selects and
+verifies both before returning anything.
 
 `tradingAccountId` is INTERNAL. It is never present in a ranking, myRanking, or
 near_me response — a public leaderboard does not expose another user's account
@@ -312,12 +313,13 @@ operator to repair. Only a clean set is replaced.
 No contract change. Re-verified against PostgreSQL as part of the release
 hardening pass:
 
-- `src/ranking/season-ranking-scope.integration.spec.ts` passes — ranking scope
-  dual-write/verification, the full-set preflight, `repair-ranking-scope`
+- `src/ranking/season-ranking-scope.integration.spec.ts` passes — retained
+  participant identity plus account-scope verification, the full-set preflight, `repair-ranking-scope`
   injected-damage detection, and the ranking-refresh ↔ settlement season-row
   serialisation.
-- `SeasonRanking.tradingAccountId` stays **nullable** by design; no migration
-  was added and no NOT NULL tightening was attempted.
+- `SeasonRanking.tradingAccountId` is required. Its `seasonParticipantId` also
+  remains required because the row is a season ranking result, not an
+  account-owned financial row.
 - Client-side: `accountId` is not exposed in any public ranking payload, and the
   frontend never derives an account from a ranking row.
 

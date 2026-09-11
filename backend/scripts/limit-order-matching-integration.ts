@@ -83,14 +83,35 @@ async function main(): Promise<void> {
   assert.ok(process.env.DATABASE_URL, 'DATABASE_URL must be configured.');
   await prisma.$connect();
   try {
-    await run('path A fills at the snapshot price with improvement', testPathAImprovement);
-    await run('path A does not fill above the limit', testPathANoFillAboveLimit);
-    await run('path B fills at the limit price off a candle touch', testPathBFillAtLimit);
-    await run('path B never uses the partial submit candle', testPathBPartialCandleExcluded);
-    await run('fill uses the pinned reservation fee rate, not the season rate', testReservationFeeRateUsed);
-    await run('a canceled order is skipped by the matcher', testCancelThenMatch);
+    await run(
+      'path A fills at the snapshot price with improvement',
+      testPathAImprovement,
+    );
+    await run(
+      'path A does not fill above the limit',
+      testPathANoFillAboveLimit,
+    );
+    await run(
+      'path B fills at the limit price off a candle touch',
+      testPathBFillAtLimit,
+    );
+    await run(
+      'path B never uses the partial submit candle',
+      testPathBPartialCandleExcluded,
+    );
+    await run(
+      'fill uses the pinned reservation fee rate, not the season rate',
+      testReservationFeeRateUsed,
+    );
+    await run(
+      'a canceled order is skipped by the matcher',
+      testCancelThenMatch,
+    );
     await run('an ended season is not filled', testEndedSeasonNotFilled);
-    await run('candle evidence never becomes a price snapshot', testEvidenceIsolation);
+    await run(
+      'candle evidence never becomes a price snapshot',
+      testEvidenceIsolation,
+    );
     console.log('limit order matching integration ok');
   } finally {
     await cleanup().catch((error: unknown) =>
@@ -420,7 +441,6 @@ async function createScenario(
 
   const wallet = await prisma.cashWallet.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: tradingAccount.id,
       currencyCode: CurrencyCode.USD,
       balanceAmount: START_BALANCE,
@@ -432,7 +452,6 @@ async function createScenario(
   // wallet is enough (this asset settles in USD).
   await prisma.cashWallet.create({
     data: {
-      seasonParticipantId: participant.id,
       tradingAccountId: tradingAccount.id,
       currencyCode: CurrencyCode.KRW,
       balanceAmount: ZERO,
@@ -478,7 +497,6 @@ async function createSubmittedLimitOrder(
   },
 ): Promise<{ id: string }> {
   const reserved = await reservation.reserveForLimitBuy(prisma, {
-    seasonParticipantId: s.participantId,
     tradingAccountId: s.tradingAccountId,
     currencyCode: CurrencyCode.USD,
     amount: input.reservedAmount,
@@ -486,7 +504,6 @@ async function createSubmittedLimitOrder(
   void reserved;
   return prisma.order.create({
     data: {
-      seasonParticipantId: s.participantId,
       tradingAccountId: s.tradingAccountId,
       assetId: s.assetId,
       side: OrderSide.buy,
@@ -612,8 +629,8 @@ function available(wallet: { balance: string; reserved: string }): string {
 async function readPosition(s: Scenario) {
   const position = await prisma.position.findUnique({
     where: {
-      seasonParticipantId_assetId: {
-        seasonParticipantId: s.participantId,
+      tradingAccountId_assetId: {
+        tradingAccountId: s.tradingAccountId,
         assetId: s.assetId,
       },
     },
@@ -628,6 +645,12 @@ async function readPosition(s: Scenario) {
 }
 
 async function cleanup(): Promise<void> {
+  const tradingAccountIds = (
+    await prisma.tradingAccount.findMany({
+      where: { userId: { in: createdUserIds } },
+      select: { id: true },
+    })
+  ).map((row) => row.id);
   const participantIds = (
     await prisma.seasonParticipant.findMany({
       where: { seasonId: { in: createdSeasonIds } },
@@ -636,7 +659,7 @@ async function cleanup(): Promise<void> {
   ).map((row) => row.id);
 
   await prisma.walletTransaction.deleteMany({
-    where: { seasonParticipantId: { in: participantIds } },
+    where: { tradingAccountId: { in: tradingAccountIds } },
   });
   // The post-commit ranking refresh may have written rankings referencing the
   // participant; remove them before the participant.
@@ -644,13 +667,13 @@ async function cleanup(): Promise<void> {
     where: { seasonId: { in: createdSeasonIds } },
   });
   await prisma.equitySnapshot.deleteMany({
-    where: { seasonParticipantId: { in: participantIds } },
+    where: { tradingAccountId: { in: tradingAccountIds } },
   });
   await prisma.position.deleteMany({
-    where: { seasonParticipantId: { in: participantIds } },
+    where: { tradingAccountId: { in: tradingAccountIds } },
   });
   await prisma.order.deleteMany({
-    where: { seasonParticipantId: { in: participantIds } },
+    where: { tradingAccountId: { in: tradingAccountIds } },
   });
   await prisma.limitOrderCandleEvidence.deleteMany({
     where: { assetId: { in: createdAssetIds } },
@@ -665,14 +688,16 @@ async function cleanup(): Promise<void> {
     where: { id: { in: createdFxSnapshotIds } },
   });
   await prisma.cashWallet.deleteMany({
-    where: { seasonParticipantId: { in: participantIds } },
+    where: { tradingAccountId: { in: tradingAccountIds } },
   });
   await prisma.seasonParticipant.deleteMany({
     where: { seasonId: { in: createdSeasonIds } },
   });
   await prisma.asset.deleteMany({ where: { id: { in: createdAssetIds } } });
   await prisma.season.deleteMany({ where: { id: { in: createdSeasonIds } } });
-  await prisma.tradingAccount.deleteMany({ where: { userId: { in: createdUserIds } } });
+  await prisma.tradingAccount.deleteMany({
+    where: { userId: { in: createdUserIds } },
+  });
   await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
 }
 

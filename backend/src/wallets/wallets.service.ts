@@ -16,7 +16,7 @@ import { buildPagination, type Pagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
 import { assertGeneralAccountFinancialIntegrity } from '../trading-accounts/general-account-integrity';
-import { assertSeasonAccountFinancialScopeIntegrity } from '../trading-accounts/trading-account-financial-integrity';
+import { assertAccountFinancialScopeIntegrity } from '../trading-accounts/trading-account-financial-integrity';
 
 export type WalletTransactionsQuery = {
   currency?: string;
@@ -137,10 +137,9 @@ export class WalletsService {
   ) {
     const account = await this.resolveOwnedAccount(userId, tradingAccountId);
 
-    // A season participant whose financial rows lost their account scope
-    // must NOT read as a normally-empty account — fail closed instead of
-    // silently omitting wallets. General accounts have no participant, so
-    // they get the general-shape probe instead.
+    // Verify account-local child relationships before presenting an empty or
+    // partial financial view. General accounts additionally get the fixed
+    // general-shape probe.
     await this.assertAccountFinancialReadIntegrity(account);
 
     const wallets = await this.prisma.cashWallet.findMany({
@@ -267,7 +266,6 @@ export class WalletsService {
           where: {
             id: { in: [...new Set(orderRows.map((row) => row.referenceId!))] },
             tradingAccountId: account.id,
-            seasonParticipantId: account.seasonParticipant?.id ?? null,
           },
           select: {
             id: true,
@@ -341,12 +339,11 @@ export class WalletsService {
   /**
    * Read-integrity gate for account-scoped financial views, split by mode:
    *
-   *  - season account → probe the linked participant's rows for null /
-   *    mismatched trading-account scope (작업 5 보완 2). Unchanged behavior.
-   *  - general account → there IS no participant, so instead assert the
-   *    inverse: none of this account's wallets/ledger rows may carry a
-   *    seasonParticipantId, and no ledger row may point at another account's
-   *    wallet. Any violation is 500 GENERAL_ACCOUNT_INTEGRITY.
+   *  - season account → verify the account's required participant link and
+   *    account-local wallet/ledger relationships.
+   *  - general account → there is no participant, so verify the same
+   *    account-local wallet/ledger relationships plus the general-account
+   *    funding/origin invariants. Any violation is fail-closed.
    *
    * Neither branch repairs anything; a GET never writes.
    */
@@ -364,9 +361,8 @@ export class WalletsService {
       return;
     }
 
-    await assertSeasonAccountFinancialScopeIntegrity(this.prisma, {
+    await assertAccountFinancialScopeIntegrity(this.prisma, {
       tradingAccountId: account.id,
-      seasonParticipantId: account.seasonParticipant?.id ?? null,
     });
   }
 

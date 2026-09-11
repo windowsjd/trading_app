@@ -95,7 +95,6 @@ type ExecTx = Prisma.TransactionClient;
 
 const EXEC_ORDER_SELECT = {
   id: true,
-  seasonParticipantId: true,
   tradingAccountId: true,
   assetId: true,
   side: true,
@@ -111,21 +110,7 @@ const EXEC_ORDER_SELECT = {
   quote: {
     select: {
       id: true,
-      seasonParticipantId: true,
       tradingAccountId: true,
-    },
-  },
-  seasonParticipant: {
-    select: {
-      id: true,
-      participantStatus: true,
-      tradingAccountId: true,
-      tradingAccount: {
-        select: { id: true, mode: true, status: true },
-      },
-      season: {
-        select: { id: true, status: true, startAt: true, endAt: true },
-      },
     },
   },
   tradingAccount: {
@@ -134,7 +119,16 @@ const EXEC_ORDER_SELECT = {
       mode: true,
       status: true,
       initialCapitalKrw: true,
-      seasonParticipant: { select: { id: true } },
+      seasonParticipant: {
+        select: {
+          id: true,
+          participantStatus: true,
+          tradingAccountId: true,
+          season: {
+            select: { id: true, status: true, startAt: true, endAt: true },
+          },
+        },
+      },
     },
   },
 } as const;
@@ -228,9 +222,10 @@ export class LimitOrderExecutionService {
           'Order has no valid trading account scope.',
         );
       }
-      const season = order.seasonParticipant?.season ?? null;
+      const participant = account.seasonParticipant;
+      const season = participant?.season ?? null;
       if (account.mode === TradingAccountMode.season) {
-        if (!order.seasonParticipant || !season) {
+        if (!participant || !season) {
           this.throwTradingScopeError(
             'TRADING_ACCOUNT_SCOPE_MISMATCH',
             'Season order has no season participant.',
@@ -243,20 +238,14 @@ export class LimitOrderExecutionService {
         ) {
           return { state: 'skipped', orderId, reason: 'season_not_active' };
         }
-        if (
-          order.seasonParticipant.participantStatus !== ParticipantStatus.active
-        ) {
+        if (participant.participantStatus !== ParticipantStatus.active) {
           return {
             state: 'skipped',
             orderId,
             reason: 'participant_not_active',
           };
         }
-      } else if (
-        order.seasonParticipantId !== null ||
-        order.seasonParticipant !== null ||
-        account.seasonParticipant !== null
-      ) {
+      } else if (account.seasonParticipant !== null) {
         this.throwTradingScopeError(
           'TRADING_ACCOUNT_SCOPE_MISMATCH',
           'General order carries a season participant link.',
@@ -272,7 +261,7 @@ export class LimitOrderExecutionService {
       // the operator signal. A suspended/closed account is a normal skip:
       // automatic fills stop, the submitted order and its reservation stay.
       if (account.mode === TradingAccountMode.season) {
-        const participantAccountId = order.seasonParticipant?.tradingAccountId;
+        const participantAccountId = participant?.tradingAccountId;
         if (!participantAccountId) {
           this.throwLimitOrderError(
             limitOrderErrorCodes.TRADING_ACCOUNT_LINK_INTEGRITY,
@@ -281,9 +270,7 @@ export class LimitOrderExecutionService {
         }
         if (
           order.tradingAccountId !== participantAccountId ||
-          order.seasonParticipant?.tradingAccount?.id !== account.id ||
-          order.seasonParticipant?.id !== order.seasonParticipantId ||
-          account.seasonParticipant?.id !== order.seasonParticipantId
+          participantAccountId !== account.id
         ) {
           this.throwTradingScopeError(
             'TRADING_ACCOUNT_SCOPE_MISMATCH',
@@ -309,8 +296,7 @@ export class LimitOrderExecutionService {
           : now;
       if (
         order.quote &&
-        (order.quote.tradingAccountId !== order.tradingAccountId ||
-          order.quote.seasonParticipantId !== order.seasonParticipantId)
+        order.quote.tradingAccountId !== order.tradingAccountId
       ) {
         this.throwTradingScopeError(
           'TRADING_ACCOUNT_SCOPE_MISMATCH',
@@ -396,7 +382,7 @@ export class LimitOrderExecutionService {
             currencyCode: order.currencyCode,
           },
         },
-        select: { id: true, seasonParticipantId: true, tradingAccountId: true },
+        select: { id: true, tradingAccountId: true },
       });
       if (!wallet) {
         this.throwLimitOrderError(
@@ -405,13 +391,11 @@ export class LimitOrderExecutionService {
         );
       }
       assertCashWalletTradingAccountScope(wallet, {
-        seasonParticipantId: order.seasonParticipantId,
         tradingAccountId,
       });
       if (order.side === OrderSide.buy) {
         const settled = await settleLimitBuyReservedCash(tx, {
           walletId: wallet.id,
-          seasonParticipantId: order.seasonParticipantId,
           tradingAccountId,
           currencyCode: order.currencyCode,
           actualDebit: netAmountText,
@@ -426,7 +410,6 @@ export class LimitOrderExecutionService {
           const reason = await diagnoseCashWalletMutationFailure(tx, {
             walletId: wallet.id,
             expected: {
-              seasonParticipantId: order.seasonParticipantId,
               tradingAccountId,
               currencyCode: order.currencyCode,
             },
@@ -465,7 +448,6 @@ export class LimitOrderExecutionService {
       // order's verified account.
       if (order.side === OrderSide.buy) {
         await this.upsertBuyPosition(tx, {
-          seasonParticipantId: order.seasonParticipantId,
           tradingAccountId,
           assetId: order.assetId,
           currencyCode: order.currencyCode,
@@ -474,7 +456,6 @@ export class LimitOrderExecutionService {
         });
       } else {
         await this.settleSellPosition(tx, {
-          seasonParticipantId: order.seasonParticipantId,
           tradingAccountId,
           assetId: order.assetId,
           currencyCode: order.currencyCode,
@@ -485,7 +466,6 @@ export class LimitOrderExecutionService {
         const credited = await tx.cashWallet.updateMany({
           where: {
             id: wallet.id,
-            seasonParticipantId: order.seasonParticipantId,
             tradingAccountId,
             currencyCode: order.currencyCode,
           },
@@ -507,7 +487,6 @@ export class LimitOrderExecutionService {
 
       await tx.walletTransaction.create({
         data: {
-          seasonParticipantId: order.seasonParticipantId,
           tradingAccountId,
           walletId: wallet.id,
           currencyCode: order.currencyCode,
@@ -538,7 +517,6 @@ export class LimitOrderExecutionService {
       const flipped = await tx.order.updateMany({
         where: {
           id: order.id,
-          seasonParticipantId: order.seasonParticipantId,
           tradingAccountId,
           status: OrderStatus.submitted,
         },
@@ -566,9 +544,9 @@ export class LimitOrderExecutionService {
       // limit fill and a market fill leave identical portfolio state.
       await this.ordersService.recordOrderExecutedPortfolioSnapshotInTransaction(
         tx,
-        order.seasonParticipantId,
+        participant?.id ?? null,
         effectiveNow,
-        // The fill's verified account scope (작업 7 dual-write).
+        // Persist the snapshot under the fill's verified account owner.
         tradingAccountId,
       );
 
@@ -576,7 +554,7 @@ export class LimitOrderExecutionService {
         state: 'filled',
         orderId: order.id,
         seasonId: season?.id ?? null,
-        seasonParticipantId: order.seasonParticipantId,
+        seasonParticipantId: participant?.id ?? null,
         path: plan.path,
         executedPrice: executedPriceText,
         netAmount: netAmountText,
@@ -610,7 +588,6 @@ export class LimitOrderExecutionService {
   private async settleSellPosition(
     tx: ExecTx,
     input: {
-      seasonParticipantId: string | null;
       tradingAccountId: string;
       assetId: string;
       currencyCode: CurrencyCode;
@@ -628,7 +605,6 @@ export class LimitOrderExecutionService {
       },
       select: {
         id: true,
-        seasonParticipantId: true,
         tradingAccountId: true,
         currencyCode: true,
         averageCost: true,
@@ -636,7 +612,6 @@ export class LimitOrderExecutionService {
     });
     if (
       !position ||
-      position.seasonParticipantId !== input.seasonParticipantId ||
       position.tradingAccountId !== input.tradingAccountId ||
       position.currencyCode !== input.currencyCode
     ) {
@@ -664,7 +639,6 @@ export class LimitOrderExecutionService {
           );
     const settled = await settleReservedPositionQuantity(tx, {
       positionId: position.id,
-      seasonParticipantId: input.seasonParticipantId,
       tradingAccountId: input.tradingAccountId,
       assetId: input.assetId,
       quantity: formatDecimalScale(input.quantity, monetaryScale),
@@ -682,7 +656,6 @@ export class LimitOrderExecutionService {
   private async upsertBuyPosition(
     tx: ExecTx,
     input: {
-      seasonParticipantId: string | null;
       /** VERIFIED account scope of the order being filled. */
       tradingAccountId: string;
       assetId: string;
@@ -700,7 +673,6 @@ export class LimitOrderExecutionService {
       },
       select: {
         id: true,
-        seasonParticipantId: true,
         tradingAccountId: true,
         quantity: true,
         averageCost: true,
@@ -712,14 +684,10 @@ export class LimitOrderExecutionService {
     if (existing && existing.tradingAccountId === null) {
       this.throwTradingScopeError(
         'TRADING_SCOPE_REPAIR_REQUIRED',
-        'Position has no trading account scope; run trading-accounts:repair-trading-scope.',
+        'Position has no canonical trading account scope.',
       );
     }
-    if (
-      existing &&
-      (existing.tradingAccountId !== input.tradingAccountId ||
-        existing.seasonParticipantId !== input.seasonParticipantId)
-    ) {
+    if (existing && existing.tradingAccountId !== input.tradingAccountId) {
       this.throwTradingScopeError(
         'TRADING_ACCOUNT_SCOPE_MISMATCH',
         'Position belongs to a different trading account.',
@@ -735,7 +703,6 @@ export class LimitOrderExecutionService {
     if (!existing) {
       const created = await tx.position.create({
         data: {
-          seasonParticipantId: input.seasonParticipantId,
           tradingAccountId: input.tradingAccountId,
           assetId: input.assetId,
           quantity: formatDecimalScale(newQuantity, monetaryScale),
@@ -755,7 +722,6 @@ export class LimitOrderExecutionService {
     const updated = await tx.position.updateMany({
       where: {
         id: existing.id,
-        seasonParticipantId: input.seasonParticipantId,
         tradingAccountId: input.tradingAccountId,
         quantity: existing.quantity,
         averageCost: existing.averageCost,

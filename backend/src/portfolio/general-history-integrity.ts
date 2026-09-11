@@ -47,8 +47,7 @@ const BOUNDARY_REASONS: readonly SnapshotReason[] = [
 
 export type GeneralHistoryEquityRow = {
   id: string;
-  seasonParticipantId: string | null;
-  tradingAccountId: string | null;
+  tradingAccountId: string;
   totalAssetKrw: Prisma.Decimal;
   returnRate: Prisma.Decimal;
   snapshotReason: SnapshotReason;
@@ -64,8 +63,7 @@ export type GeneralHistoryEquityRow = {
 
 export type GeneralHistoryDailyRow = {
   id: string;
-  seasonParticipantId: string | null;
-  tradingAccountId: string | null;
+  tradingAccountId: string;
   totalAssetKrw: Prisma.Decimal;
   returnRate: Prisma.Decimal;
   cumulativeExternalFundingKrw: Prisma.Decimal | null;
@@ -91,8 +89,7 @@ function assertRowScopeAndState(
   accountId: string,
   label: string,
   row: {
-    seasonParticipantId: string | null;
-    tradingAccountId: string | null;
+    tradingAccountId: string;
     totalAssetKrw: Prisma.Decimal;
     returnRate: Prisma.Decimal;
     cumulativeExternalFundingKrw: Prisma.Decimal | null;
@@ -103,11 +100,8 @@ function assertRowScopeAndState(
   if (row.tradingAccountId !== accountId) {
     fail(
       label,
-      `belongs to trading account ${row.tradingAccountId ?? 'none'} but was returned for ${accountId}.`,
+      `belongs to trading account ${row.tradingAccountId} but was returned for ${accountId}.`,
     );
-  }
-  if (row.seasonParticipantId !== null) {
-    fail(label, 'carries a season participant link on a general account.');
   }
 
   assertGeneralPerformanceStateConsistent(row, label);

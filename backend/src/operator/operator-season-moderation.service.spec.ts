@@ -438,7 +438,7 @@ describe('OperatorSeasonModerationService', () => {
     ).toHaveBeenCalledWith(
       prisma,
       expect.objectContaining({
-        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'ta-1',
         reason: 'participant_excluded',
       }),
     );

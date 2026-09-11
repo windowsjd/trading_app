@@ -17,7 +17,6 @@ import {
 import { isFxSnapshotStaleForPortfolioValuation } from '../portfolio/portfolio-valuation.policy';
 import { PrismaService } from '../prisma/prisma.service';
 import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
-import { assertSeasonAccountPositionScopeIntegrity } from '../trading-accounts/trading-account-financial-integrity';
 import {
   assertGeneralAccountFinancialIntegrity,
   assertGeneralAccountTradingRowsIntegrity,
@@ -306,11 +305,6 @@ export class PositionsService {
     if (account.mode === TradingAccountMode.general) {
       await assertGeneralAccountFinancialIntegrity(this.prisma, account);
       await assertGeneralAccountTradingRowsIntegrity(this.prisma, account.id);
-    } else {
-      await assertSeasonAccountPositionScopeIntegrity(this.prisma, {
-        tradingAccountId: account.id,
-        seasonParticipantId: account.seasonParticipant?.id ?? null,
-      });
     }
 
     const valuationAt = new Date();

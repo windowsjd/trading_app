@@ -242,14 +242,11 @@ async function verifyFirstOpenIsAtomicAndComplete() {
   assert.equal(krw.balanceAmount.toFixed(8), '10000000.00000000');
   assert.equal(krw.reservedAmount.toFixed(8), '0.00000000');
   assert.equal(usd.balanceAmount.toFixed(8), '0.00000000');
-  assert.equal(krw.seasonParticipantId, null);
-  assert.equal(usd.seasonParticipantId, null);
   assert.equal(krw.tradingAccountId, accountId);
   assert.equal(usd.tradingAccountId, accountId);
 
   assert.equal(shape.ledger.length, 1);
   const grant = shape.ledger[0];
-  assert.equal(grant.seasonParticipantId, null);
   assert.equal(grant.tradingAccountId, accountId);
   assert.equal(grant.walletId, krw.id);
   assert.equal(grant.txType, 'initial_grant');
@@ -421,7 +418,6 @@ async function verifyDamagedAccountFailsClosed() {
   // Restore so later scenarios can reuse nothing from this account.
   await prisma.cashWallet.create({
     data: {
-      seasonParticipantId: null,
       tradingAccountId: accountId,
       currencyCode: 'USD',
       balanceAmount: '0',
@@ -470,7 +466,6 @@ async function verifyPartialUniqueRejectsASecondGrantRow(accountId) {
     });
     await prisma.walletTransaction.create({
       data: {
-        seasonParticipantId: null,
         tradingAccountId: accountId,
         walletId: krw.id,
         currencyCode: 'KRW',
@@ -517,69 +512,21 @@ async function verifyAccountScopedReadsForGeneralAccount(userId, accountId) {
   assert.equal(grants[0].referenceId, accountId);
 }
 
-async function verifyGeneralReadFailsClosedOnSeasonLinkBleed() {
+async function verifyGeneralRowsHaveNoParticipantOwnershipColumn() {
   const userId = await createUser();
   const opened = await generalAccounts.openGeneralAccount(userId);
   const accountId = opened.data.account.id;
 
-  // Manufacture the corruption a general read must never present as normal.
-  const season = await prisma.season.create({
-    data: {
-      name: 'general-integrity-' + randomUUID(),
-      status: 'active',
-      startAt: new Date(Date.now() - 86400000),
-      endAt: new Date(Date.now() + 86400000),
-      initialCapitalKrw: '10000000',
-      tradeFeeRate: '0.0015',
-      fxFeeRate: '0.001',
-    },
-  });
-  const seasonAccount = await prisma.tradingAccount.create({
-    data: {
-      userId,
-      mode: 'season',
-      status: 'active',
-      initialCapitalKrw: '10000000',
-      openedAt: new Date(),
-    },
-  });
-  const participant = await prisma.seasonParticipant.create({
-    data: {
-      seasonId: season.id,
-      userId,
-      joinedAt: new Date(),
-      participantStatus: 'active',
-      initialCapitalKrw: '10000000',
-      totalAssetKrw: '10000000',
-      totalReturnRate: '0',
-      maxDrawdown: '0',
-      tradingAccountId: seasonAccount.id,
-    },
-  });
-  const krw = await prisma.cashWallet.findFirst({
-    where: { tradingAccountId: accountId, currencyCode: 'KRW' },
-  });
-  await prisma.cashWallet.update({
-    where: { id: krw.id },
-    data: { seasonParticipantId: participant.id },
-  });
-
-  await expectCode(
-    wallets.getWalletsForTradingAccount(userId, accountId),
-    'GENERAL_ACCOUNT_INTEGRITY',
+  const removedColumns = await prisma.$queryRawUnsafe(
+    "SELECT table_name FROM information_schema.columns WHERE table_schema = 'public' AND column_name = 'season_participant_id' AND table_name IN ('cash_wallets', 'wallet_transactions')",
   );
-  await expectCode(
-    wallets.getWalletTransactionsForTradingAccount(userId, accountId),
-    'GENERAL_ACCOUNT_INTEGRITY',
-  );
+  assert.deepEqual(removedColumns, []);
 
-  await prisma.cashWallet.update({
-    where: { id: krw.id },
-    data: { seasonParticipantId: null },
-  });
-  await prisma.seasonParticipant.delete({ where: { id: participant.id } });
-  await prisma.tradingAccount.delete({ where: { id: seasonAccount.id } });
-  await prisma.season.delete({ where: { id: season.id } });
+  const walletView = await wallets.getWalletsForTradingAccount(
+    userId,
+    accountId,
+  );
+  assert.equal(walletView.data.wallets.length, 2);
 }
 
 // ------------------------------------------------------------- ad rewards
@@ -655,7 +602,6 @@ async function verifyGrantIsAtomicAndLedgered(userId, accountId) {
   assert.equal(ledger.txType, 'ad_reward');
   assert.equal(ledger.referenceType, 'ad_reward_claim');
   assert.equal(ledger.referenceId, claim.id);
-  assert.equal(ledger.seasonParticipantId, null);
   assert.equal(ledger.tradingAccountId, accountId);
   assert.equal(ledger.currencyCode, 'KRW');
   assert.equal(ledger.direction, 'credit');
@@ -1073,7 +1019,7 @@ async function main() {
     await verifyMidTransactionFailureRollsEverythingBack('walletTransaction', 'create');
     await verifyDamagedAccountFailsClosed();
     await verifySuspendedAndClosedAreNotReopened();
-    await verifyGeneralReadFailsClosedOnSeasonLinkBleed();
+    await verifyGeneralRowsHaveNoParticipantOwnershipColumn();
 
     await verifyAdRewardDisabledAndProviderGates(first.userId, first.accountId);
     await verifyVerificationFailureWritesNothing(first.userId, first.accountId);
