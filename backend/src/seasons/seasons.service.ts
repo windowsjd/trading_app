@@ -21,10 +21,6 @@ import {
   type SeasonLifecycleMode,
   type SeasonLifecycleSeason,
 } from './season-lifecycle.policy';
-import {
-  ensureSeasonTradingAccountLink,
-  SeasonTradingAccountLinkIntegrityError,
-} from './season-trading-account-link';
 
 type CurrentSeasonResponse = {
   success: true;
@@ -289,14 +285,6 @@ export class SeasonsService {
         });
 
         if (existingParticipant) {
-          if (!existingParticipant.tradingAccountId) {
-            // Deploy-boundary legacy row: an old-version writer created this
-            // participant without a trading account. Repair ONLY the account
-            // link (never wallets/ledger/snapshots) before returning the
-            // unchanged 409 contract.
-            await ensureSeasonTradingAccountLink(tx, existingParticipant);
-          }
-
           return { kind: 'already-joined' } as const;
         }
 
@@ -411,16 +399,6 @@ export class SeasonsService {
         } as const;
       });
     } catch (error) {
-      if (error instanceof SeasonTradingAccountLinkIntegrityError) {
-        // A failed link repair is a server-side data problem; never disguise
-        // it as the ordinary SEASON_ALREADY_JOINED conflict.
-        this.throwApiError(
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          error.code,
-          error.message,
-        );
-      }
-
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'

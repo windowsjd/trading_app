@@ -25,6 +25,10 @@ jest.mock('../generated/prisma/client', () => {
       Decimal,
     },
     PrismaClient: class PrismaClient {},
+    TradingAccountMode: {
+      general: 'general',
+      season: 'season',
+    },
   };
 });
 
@@ -43,7 +47,8 @@ describe('PortfolioValuationService source eligibility', () => {
 
   it('uses the latest completed US session price after market close', async () => {
     const prisma = createPrismaMock();
-    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+      canonicalParticipant({
       id: 'sp-1',
       initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
       cashWallets: [
@@ -72,7 +77,8 @@ describe('PortfolioValuationService source eligibility', () => {
           },
         },
       ],
-    });
+    }),
+    );
     prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
       {
         id: 'provider-price-us',
@@ -154,7 +160,8 @@ describe('PortfolioValuationService source eligibility', () => {
 
   it('uses the latest completed US session price for a daily snapshot', async () => {
     const prisma = createPrismaMock();
-    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+      canonicalParticipant({
       id: 'sp-1',
       initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
       cashWallets: [
@@ -183,7 +190,8 @@ describe('PortfolioValuationService source eligibility', () => {
           },
         },
       ],
-    });
+    }),
+    );
     prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
       {
         id: 'provider-price-us',
@@ -250,7 +258,8 @@ describe('PortfolioValuationService source eligibility', () => {
 
   it('retains admin_manual fallback when the provider price is outside the required session', async () => {
     const prisma = createPrismaMock();
-    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+      canonicalParticipant({
       id: 'sp-1',
       initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
       cashWallets: [
@@ -279,7 +288,8 @@ describe('PortfolioValuationService source eligibility', () => {
           },
         },
       ],
-    });
+    }),
+    );
     prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
       {
         id: 'provider-price-stale',
@@ -355,7 +365,8 @@ describe('PortfolioValuationService source eligibility', () => {
 
   it('falls back to admin_manual when daily snapshot provider USD/KRW is stale', async () => {
     const prisma = createPrismaMock();
-    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+      canonicalParticipant({
       id: 'sp-1',
       initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
       cashWallets: [
@@ -369,7 +380,8 @@ describe('PortfolioValuationService source eligibility', () => {
         },
       ],
       positions: [],
-    });
+    }),
+    );
     prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
       {
         id: 'provider-fx-stale',
@@ -424,7 +436,8 @@ describe('PortfolioValuationService source eligibility', () => {
 
   it('fails daily snapshot valuation when provider and admin_manual sources are unavailable', async () => {
     const prisma = createPrismaMock();
-    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+      canonicalParticipant({
       id: 'sp-1',
       initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
       cashWallets: [
@@ -453,7 +466,8 @@ describe('PortfolioValuationService source eligibility', () => {
           },
         },
       ],
-    });
+    }),
+    );
     prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([]);
     prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(null);
     const service = new PortfolioValuationService(prisma as never);
@@ -472,7 +486,8 @@ describe('PortfolioValuationService source eligibility', () => {
   it('applies independent KRX, US, and crypto freshness in one portfolio', async () => {
     const prisma = createPrismaMock();
     const mixedAt = new Date('2026-07-17T15:00:00.000Z');
-    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+      canonicalParticipant({
       id: 'sp-mixed',
       initialCapitalKrw: new Prisma.Decimal('1000000'),
       cashWallets: [
@@ -495,7 +510,8 @@ describe('PortfolioValuationService source eligibility', () => {
         position('asset-us', AssetType.us_stock, 'NAS', CurrencyCode.USD),
         position('asset-crypto', AssetType.crypto, 'BINANCE', CurrencyCode.USD),
       ],
-    });
+    }),
+    );
     prisma.assetPriceSnapshot.findMany
       .mockResolvedValueOnce([
         providerPrice(
@@ -566,7 +582,8 @@ describe('PortfolioValuationService source eligibility', () => {
   it('uses latest provider_api rows at or before Season.endAt for settlement without capturedAt freshness', async () => {
     const prisma = createPrismaMock();
     const settlementAt = new Date('2026-06-07T14:59:00.000Z');
-    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+      canonicalParticipant({
       id: 'sp-1',
       initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
       cashWallets: [
@@ -595,7 +612,8 @@ describe('PortfolioValuationService source eligibility', () => {
           },
         },
       ],
-    });
+    }),
+    );
     prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
       {
         id: 'settlement-provider-price-us',
@@ -707,6 +725,31 @@ describe('PortfolioValuationService source eligibility', () => {
     expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
   });
 });
+
+function canonicalParticipant(input: {
+  id: string;
+  initialCapitalKrw: Prisma.Decimal;
+  cashWallets: unknown[];
+  positions: unknown[];
+}) {
+  const userId = `user-of-${input.id}`;
+  const tradingAccountId = `account-of-${input.id}`;
+
+  return {
+    id: input.id,
+    userId,
+    initialCapitalKrw: input.initialCapitalKrw,
+    tradingAccountId,
+    tradingAccount: {
+      id: tradingAccountId,
+      userId,
+      mode: 'season',
+      initialCapitalKrw: input.initialCapitalKrw,
+      cashWallets: input.cashWallets,
+      positions: input.positions,
+    },
+  };
+}
 
 function createPrismaMock() {
   return {

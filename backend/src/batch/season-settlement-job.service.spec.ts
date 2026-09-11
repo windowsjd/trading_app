@@ -346,7 +346,9 @@ describe('SeasonSettlementJobService', () => {
 
   it('uses Season.endAt and the season settlement valuation workflow when valuation service is available', async () => {
     const valuationService = {
-      calculateSeasonParticipantValuation: jest.fn().mockResolvedValue({
+      calculateTradingAccountValuation: jest.fn().mockResolvedValue({
+        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'account-of-sp-1',
         totalAssetKrw: '1000.00000000',
         returnRate: '0.00000000',
         krwCash: '1000.00000000',
@@ -370,8 +372,12 @@ describe('SeasonSettlementJobService', () => {
     });
 
     expect(
-      valuationService.calculateSeasonParticipantValuation,
-    ).toHaveBeenCalledWith('sp-1', seasonEndAt, 'season_settlement');
+      valuationService.calculateTradingAccountValuation,
+    ).toHaveBeenCalledWith(
+      'account-of-sp-1',
+      seasonEndAt,
+      'season_settlement',
+    );
     expect(prisma.dailyPortfolioSnapshot.findMany).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       participants: {
@@ -775,7 +781,9 @@ describe('SeasonSettlementJobService', () => {
 
     it('fails closed when a live-valuation equity snapshot has no trading account scope', async () => {
       const valuationService = {
-        calculateSeasonParticipantValuation: jest.fn().mockResolvedValue({
+        calculateTradingAccountValuation: jest.fn().mockResolvedValue({
+          seasonParticipantId: 'sp-1',
+          tradingAccountId: 'account-of-sp-1',
           totalAssetKrw: '1000.00000000',
           returnRate: '0.00000000',
           krwCash: '1000.00000000',
@@ -1107,7 +1115,7 @@ describe('SeasonSettlementJobService', () => {
 });
 
 function createService(portfolioValuationService?: {
-  calculateSeasonParticipantValuation: jest.Mock;
+  calculateTradingAccountValuation: jest.Mock;
 }) {
   const prisma = createPrismaMock();
   const batchService = createBatchServiceMock(BATCH_STARTED_AT);

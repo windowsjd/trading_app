@@ -643,8 +643,7 @@ export class LimitOrderCreateService {
 
     // 3) Consume the quote inside the same transaction. Account-conditioned:
     // only this participant's quote flips, and only when its scope is the
-    // verified account (NULL legacy quotes stay consumable — the caller
-    // already pinned them to the participant + request hash).
+    // verified canonical account.
     const consumeCount =
       input.participant.id === null
         ? (
@@ -669,10 +668,7 @@ export class LimitOrderCreateService {
             WHERE "id" = ${input.quote.id}
               AND "status" = 'active'
               AND "season_participant_id" = ${input.participant.id}
-              AND (
-                "trading_account_id" = ${input.participant.tradingAccountId}
-                OR "trading_account_id" IS NULL
-              )
+              AND "trading_account_id" = ${input.participant.tradingAccountId}
           `;
 
     if (consumeCount !== 1) {
@@ -891,10 +887,7 @@ export class LimitOrderCreateService {
             WHERE "id" = ${input.quote.id}
               AND "status" = 'active'
               AND "season_participant_id" = ${input.participant.id}
-              AND (
-                "trading_account_id" = ${input.participant.tradingAccountId}
-                OR "trading_account_id" IS NULL
-              )
+              AND "trading_account_id" = ${input.participant.tradingAccountId}
           `;
     if (consumedCount !== 1) {
       this.throwApiError(

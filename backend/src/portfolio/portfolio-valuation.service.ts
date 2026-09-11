@@ -152,7 +152,16 @@ export class PortfolioValuationService {
       where: { id: tradingAccountId },
       select: {
         id: true,
+        userId: true,
+        mode: true,
         initialCapitalKrw: true,
+        seasonParticipant: {
+          select: {
+            id: true,
+            userId: true,
+            initialCapitalKrw: true,
+          },
+        },
         cashWallets: {
           select: { currencyCode: true, balanceAmount: true },
         },
@@ -185,8 +194,25 @@ export class PortfolioValuationService {
       );
     }
 
+    const participant = account.seasonParticipant;
+    if (
+      (account.mode === TradingAccountMode.season &&
+        (!participant ||
+          participant.userId !== account.userId ||
+          !participant.initialCapitalKrw.eq(account.initialCapitalKrw))) ||
+      (account.mode === TradingAccountMode.general && participant)
+    ) {
+      throw new PortfolioValuationError(
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+        'Trading account does not have a valid owner scope for its mode.',
+      );
+    }
+
     return this.calculateValuationForHoldings({
-      subject: { seasonParticipantId: null, tradingAccountId: account.id },
+      subject: {
+        seasonParticipantId: participant?.id ?? null,
+        tradingAccountId: account.id,
+      },
       initialCapitalKrw: account.initialCapitalKrw,
       cashWallets: account.cashWallets,
       positions: account.positions,
@@ -448,9 +474,7 @@ export class PortfolioValuationService {
       ? await findUsdKrwProviderSnapshotCandidates(client, {
           sourceNames: providerEligibility.sourceNames,
           take: 10,
-          effectiveAtLte: useSettlementPricePolicy
-            ? valuationAt
-            : undefined,
+          effectiveAtLte: useSettlementPricePolicy ? valuationAt : undefined,
           positiveRateOnly: useSettlementPricePolicy,
         })
       : [];

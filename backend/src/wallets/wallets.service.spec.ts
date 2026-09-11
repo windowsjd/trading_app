@@ -62,6 +62,7 @@ describe('WalletsService', () => {
 
   const participant = {
     id: 'sp-1',
+    tradingAccountId: 'trading-account-1',
     participantStatus: ParticipantStatus.active,
     joinedAt,
   };
@@ -302,7 +303,7 @@ describe('WalletsService', () => {
     expect(prisma.walletTransaction.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
           currencyCode: CurrencyCode.KRW,
         },
         skip: 1,
@@ -350,7 +351,7 @@ describe('WalletsService', () => {
 
     expect(prisma.walletTransaction.count).toHaveBeenCalledWith({
       where: {
-        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'trading-account-1',
         currencyCode: CurrencyCode.USD,
       },
     });
@@ -373,7 +374,7 @@ describe('WalletsService', () => {
     expect(prisma.walletTransaction.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
           direction: 'credit',
         },
       }),
@@ -402,7 +403,7 @@ describe('WalletsService', () => {
     expect(prisma.walletTransaction.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
           direction: 'debit',
         },
       }),
@@ -426,7 +427,7 @@ describe('WalletsService', () => {
     expect(prisma.walletTransaction.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
           txType: WalletTransactionType.initial_grant,
         },
       }),
@@ -461,7 +462,7 @@ describe('WalletsService', () => {
     expect(prisma.walletTransaction.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
           currencyCode: CurrencyCode.KRW,
           direction: 'credit',
           txType: WalletTransactionType.initial_grant,

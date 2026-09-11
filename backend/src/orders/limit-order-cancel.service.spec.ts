@@ -526,6 +526,7 @@ describe('LimitOrderCancelService', () => {
           prisma as never,
           {
             seasonParticipantId: 'sp-1',
+            tradingAccountId: 'trading-account-1',
             reason: LIMIT_ORDER_CANCEL_REASONS.participantExcluded,
             canceledAt,
           },
@@ -560,6 +561,7 @@ describe('LimitOrderCancelService', () => {
           prisma as never,
           {
             seasonParticipantId: 'sp-1',
+            tradingAccountId: 'trading-account-1',
             reason: LIMIT_ORDER_CANCEL_REASONS.participantExcluded,
             canceledAt,
           },
@@ -650,9 +652,12 @@ describe('LimitOrderCancelService', () => {
           where: expect.objectContaining({
             status: OrderStatus.submitted,
             orderType: OrderType.limit,
-            seasonParticipant: {
-              season: {
-                status: { in: [SeasonStatus.ended, SeasonStatus.settled] },
+            tradingAccount: {
+              mode: 'season',
+              seasonParticipant: {
+                season: {
+                  status: { in: [SeasonStatus.ended, SeasonStatus.settled] },
+                },
               },
             },
           }) as never,

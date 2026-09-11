@@ -179,7 +179,7 @@ describe('HomeService', () => {
   };
 
   const createValuationService = () => ({
-    calculateSeasonParticipantValuation: jest.fn().mockResolvedValue({
+    calculateTradingAccountValuation: jest.fn().mockResolvedValue({
       seasonParticipantId: 'participant-1',
       totalAssetKrw: '1200000.00000000',
       returnRate: '20.00000000',
@@ -236,27 +236,30 @@ describe('HomeService', () => {
 
   const participant = {
     id: 'participant-1',
+    tradingAccountId: 'account-participant-1',
     participantStatus: ParticipantStatus.active,
     joinedAt,
     initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
-    cashWallets: [
-      {
-        currencyCode: CurrencyCode.KRW,
-        balanceAmount: new Prisma.Decimal('900000.00000000'),
-      },
-      {
-        currencyCode: CurrencyCode.USD,
-        balanceAmount: new Prisma.Decimal('100.00000000'),
-      },
-    ],
-    positions: [
-      {
-        quantity: new Prisma.Decimal('1.00000000'),
-      },
-      {
-        quantity: new Prisma.Decimal('0.00000000'),
-      },
-    ],
+    tradingAccount: {
+      cashWallets: [
+        {
+          currencyCode: CurrencyCode.KRW,
+          balanceAmount: new Prisma.Decimal('900000.00000000'),
+        },
+        {
+          currencyCode: CurrencyCode.USD,
+          balanceAmount: new Prisma.Decimal('100.00000000'),
+        },
+      ],
+      positions: [
+        {
+          quantity: new Prisma.Decimal('1.00000000'),
+        },
+        {
+          quantity: new Prisma.Decimal('0.00000000'),
+        },
+      ],
+    },
   };
 
   const mockActiveSeason = (prisma: ReturnType<typeof createPrisma>) => {
@@ -490,7 +493,7 @@ describe('HomeService', () => {
       ],
     });
     expect(
-      valuationService.calculateSeasonParticipantValuation,
+      valuationService.calculateTradingAccountValuation,
     ).toHaveBeenCalledTimes(1);
     expectNoHomeWrites(prisma);
   });
@@ -500,12 +503,15 @@ describe('HomeService', () => {
     mockActiveSeason(prisma);
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
       ...participant,
-      cashWallets: [
-        {
-          currencyCode: CurrencyCode.KRW,
-          balanceAmount: new Prisma.Decimal('2500000.00000000'),
-        },
-      ],
+      tradingAccount: {
+        ...participant.tradingAccount,
+        cashWallets: [
+          {
+            currencyCode: CurrencyCode.KRW,
+            balanceAmount: new Prisma.Decimal('2500000.00000000'),
+          },
+        ],
+      },
     });
     prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
 
@@ -531,7 +537,7 @@ describe('HomeService', () => {
     mockActiveSeason(prisma);
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
     prisma.dailyPortfolioSnapshot.findFirst.mockResolvedValueOnce(null);
-    valuationService.calculateSeasonParticipantValuation.mockResolvedValueOnce({
+    valuationService.calculateTradingAccountValuation.mockResolvedValueOnce({
       seasonParticipantId: 'participant-1',
       totalAssetKrw: '1200000.00000000',
       returnRate: '20.00000000',
@@ -619,14 +625,14 @@ describe('HomeService', () => {
       },
     });
     expect(
-      valuationService.calculateSeasonParticipantValuation,
+      valuationService.calculateTradingAccountValuation,
     ).toHaveBeenCalledWith(
-      'participant-1',
+      'account-participant-1',
       expect.any(Date),
       'home_live_valuation',
     );
     expect(
-      valuationService.calculateSeasonParticipantValuation,
+      valuationService.calculateTradingAccountValuation,
     ).toHaveBeenCalledTimes(1);
     expectNoHomeWrites(prisma);
   });
@@ -636,7 +642,7 @@ describe('HomeService', () => {
     mockActiveSeason(prisma);
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
     prisma.dailyPortfolioSnapshot.findFirst.mockResolvedValueOnce(null);
-    valuationService.calculateSeasonParticipantValuation.mockRejectedValueOnce(
+    valuationService.calculateTradingAccountValuation.mockRejectedValueOnce(
       new PortfolioValuationError(
         'ASSET_PRICE_UNAVAILABLE',
         'Asset price snapshot is unavailable.',
@@ -757,7 +763,7 @@ describe('HomeService', () => {
     expect(prisma.position.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          seasonParticipantId: 'participant-1',
+          tradingAccountId: 'account-participant-1',
           quantity: {
             gt: 0,
           },
@@ -883,7 +889,7 @@ describe('HomeService', () => {
     prisma.dailyPortfolioSnapshot.findFirst.mockResolvedValueOnce(
       latestSnapshot,
     );
-    valuationService.calculateSeasonParticipantValuation.mockRejectedValueOnce(
+    valuationService.calculateTradingAccountValuation.mockRejectedValueOnce(
       new PortfolioValuationError(
         'FX_RATE_STALE',
         'USD/KRW FX rate snapshot is stale.',
@@ -951,7 +957,7 @@ describe('HomeService', () => {
     prisma.dailyPortfolioSnapshot.findFirst.mockResolvedValueOnce(
       latestSnapshot,
     );
-    valuationService.calculateSeasonParticipantValuation.mockRejectedValueOnce(
+    valuationService.calculateTradingAccountValuation.mockRejectedValueOnce(
       new PortfolioValuationError(
         'FX_RATE_UNAVAILABLE',
         'USD/KRW FX rate snapshot is unavailable.',
@@ -1027,7 +1033,7 @@ describe('HomeService', () => {
     expect(prisma.dailyPortfolioSnapshot.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          seasonParticipantId: 'participant-1',
+          tradingAccountId: 'account-participant-1',
         },
         take: 30,
       }),
@@ -1245,6 +1251,7 @@ describe('HomeService', () => {
         initialCapitalKrw: true,
         finalTier: true,
         rewardGrantedAt: true,
+        tradingAccountId: true,
       },
     });
     expect(prisma.seasonRanking.findFirst).toHaveBeenCalledWith({
@@ -1433,7 +1440,7 @@ describe('HomeService', () => {
     expect(response.data.finalResult).not.toHaveProperty('totalAssetKrw');
     expect(prisma.seasonRanking.count).not.toHaveBeenCalled();
     expect(
-      valuationService.calculateSeasonParticipantValuation,
+      valuationService.calculateTradingAccountValuation,
     ).not.toHaveBeenCalled();
     expect(response.data.sectionErrors).toEqual(
       expect.arrayContaining([

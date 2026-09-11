@@ -46,6 +46,10 @@ jest.mock('../generated/prisma/client', () => {
       ended: 'ended',
       settled: 'settled',
     },
+    TradingAccountMode: {
+      general: 'general',
+      season: 'season',
+    },
   };
 });
 
@@ -87,7 +91,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
       const { service, prisma } = createServiceWithRealValuation();
       mockSeason(prisma, SeasonStatus.active);
       mockParticipants(prisma, [{ id: 'sp-usd', userId: 'user-usd' }]);
-      prisma.seasonParticipant.findUnique.mockResolvedValue(
+      prisma.tradingAccount.findUnique.mockResolvedValue(
         participantDetail({
           id: 'sp-usd',
           krwCash: '1000',
@@ -171,7 +175,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
     const { service, prisma } = createServiceWithRealValuation();
     mockSeason(prisma, SeasonStatus.active);
     mockParticipants(prisma, [{ id: 'sp-krw', userId: 'user-krw' }]);
-    prisma.seasonParticipant.findUnique.mockResolvedValue(
+    prisma.tradingAccount.findUnique.mockResolvedValue(
       participantDetail({ id: 'sp-krw', usdCash: '0', positions: [] }),
     );
     prisma.dailyPortfolioSnapshot.create.mockResolvedValue({ id: 'daily-krw' });
@@ -193,9 +197,11 @@ describe('DailyPortfolioSnapshotJobService', () => {
     }));
     mockParticipants(prisma, participants);
     prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue(
-      participants.slice(0, 99).map(({ id }) => ({ seasonParticipantId: id })),
+      participants.slice(0, 99).map(({ id }) => ({
+        tradingAccountId: `account-of-${id}`,
+      })),
     );
-    valuationService.calculateSeasonParticipantValuation.mockResolvedValue(
+    valuationService.calculateTradingAccountValuation.mockResolvedValue(
       valuation('sp-99'),
     );
     prisma.dailyPortfolioSnapshot.create.mockResolvedValue({ id: 'snap-99' });
@@ -208,18 +214,24 @@ describe('DailyPortfolioSnapshotJobService', () => {
     expect(prisma.dailyPortfolioSnapshot.findMany).toHaveBeenCalledTimes(1);
     expect(prisma.dailyPortfolioSnapshot.findMany).toHaveBeenCalledWith({
       where: {
-        seasonParticipantId: { in: participants.map(({ id }) => id) },
+        tradingAccountId: {
+          in: participants.map(({ id }) => `account-of-${id}`),
+        },
         snapshotDate: new Date(`${snapshotDate}T00:00:00.000Z`),
       },
-      select: { seasonParticipantId: true },
+      select: { tradingAccountId: true },
     });
     expect(prisma.dailyPortfolioSnapshot.findUnique).not.toHaveBeenCalled();
     expect(
-      valuationService.calculateSeasonParticipantValuation,
+      valuationService.calculateTradingAccountValuation,
     ).toHaveBeenCalledTimes(1);
     expect(
-      valuationService.calculateSeasonParticipantValuation,
-    ).toHaveBeenCalledWith('sp-99', startedAt, 'daily_portfolio_snapshot');
+      valuationService.calculateTradingAccountValuation,
+    ).toHaveBeenCalledWith(
+      'account-of-sp-99',
+      startedAt,
+      'daily_portfolio_snapshot',
+    );
     expect(result.participants).toMatchObject({
       total: 100,
       existing: 99,
@@ -231,7 +243,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
     const { service, prisma, valuationService } = createService();
     mockSeason(prisma, SeasonStatus.active);
     mockParticipants(prisma, [{ id: 'sp-1', userId: 'user-1' }]);
-    valuationService.calculateSeasonParticipantValuation.mockResolvedValue(
+    valuationService.calculateTradingAccountValuation.mockResolvedValue(
       valuation('sp-1'),
     );
     prisma.dailyPortfolioSnapshot.create.mockRejectedValue(
@@ -259,7 +271,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
       { id: 'sp-A', userId: 'user-A' },
       { id: 'sp-B', userId: 'user-B' },
     ]);
-    valuationService.calculateSeasonParticipantValuation
+    valuationService.calculateTradingAccountValuation
       .mockResolvedValueOnce(valuation('sp-A'))
       .mockRejectedValueOnce(
         new PortfolioValuationError(
@@ -276,7 +288,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
     });
     expect(first.participants).toMatchObject({ created: 1, failed: 1 });
     prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([
-      { seasonParticipantId: 'sp-A' },
+      { tradingAccountId: 'account-of-sp-A' },
     ]);
     const second = await runAndGetResult(service, {
       seasonId: 'season-1',
@@ -289,10 +301,10 @@ describe('DailyPortfolioSnapshotJobService', () => {
       failed: 0,
     });
     expect(
-      valuationService.calculateSeasonParticipantValuation.mock.calls.map(
+      valuationService.calculateTradingAccountValuation.mock.calls.map(
         ([id]) => id,
       ),
-    ).toEqual(['sp-A', 'sp-B', 'sp-B']);
+    ).toEqual(['account-of-sp-A', 'account-of-sp-B', 'account-of-sp-B']);
     expect(prisma.dailyPortfolioSnapshot.create).toHaveBeenCalledTimes(2);
   });
 
@@ -306,7 +318,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
         { id: 'sp-2', userId: 'user-2' },
       ]);
       prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([]);
-      valuationService.calculateSeasonParticipantValuation.mockResolvedValue(
+      valuationService.calculateTradingAccountValuation.mockResolvedValue(
         valuation('sp-1'),
       );
       prisma.dailyPortfolioSnapshot.create.mockImplementationOnce(() => {
@@ -321,9 +333,9 @@ describe('DailyPortfolioSnapshotJobService', () => {
       expect(result.participants).toMatchObject({ created: 1, skipped: 1 });
       expect(prisma.dailyPortfolioSnapshot.create).toHaveBeenCalledTimes(1);
       expect(
-        valuationService.calculateSeasonParticipantValuation,
+        valuationService.calculateTradingAccountValuation,
       ).toHaveBeenCalledWith(
-        'sp-1',
+        'account-of-sp-1',
         new Date('2026-05-20T14:59:59.000Z'),
         'daily_portfolio_snapshot',
       );
@@ -337,8 +349,9 @@ describe('DailyPortfolioSnapshotJobService', () => {
     mockSeason(prisma, SeasonStatus.active);
     mockParticipants(prisma, [{ id: 'sp-1', userId: 'user-1' }]);
     prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([]);
-    valuationService.calculateSeasonParticipantValuation.mockImplementation(
-      (id: string) => Promise.resolve(valuation(id)),
+    valuationService.calculateTradingAccountValuation.mockImplementation(
+      (id: string) =>
+        Promise.resolve(valuation(id.replace(/^account-of-/, ''))),
     );
     prisma.dailyPortfolioSnapshot.create.mockResolvedValue({ id: 'snap' });
     await runAndGetResult(service, {
@@ -351,7 +364,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
       { id: 'sp-2', userId: 'user-2' },
     ]);
     prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([
-      { seasonParticipantId: 'sp-1' },
+      { tradingAccountId: 'account-of-sp-1' },
     ]);
     const result = await runAndGetResult(service, {
       seasonId: 'season-1',
@@ -374,7 +387,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
     mockSeason(prisma, SeasonStatus.active);
     mockParticipants(prisma, [{ id: 'sp-1', userId: 'user-1' }]);
     prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([]);
-    valuationService.calculateSeasonParticipantValuation.mockResolvedValue(
+    valuationService.calculateTradingAccountValuation.mockResolvedValue(
       valuation('sp-1'),
     );
     prisma.dailyPortfolioSnapshot.create.mockResolvedValue({ id: 'snap-1' });
@@ -386,8 +399,12 @@ describe('DailyPortfolioSnapshotJobService', () => {
     });
 
     expect(
-      valuationService.calculateSeasonParticipantValuation,
-    ).toHaveBeenCalledWith('sp-1', startedAt, 'daily_portfolio_snapshot');
+      valuationService.calculateTradingAccountValuation,
+    ).toHaveBeenCalledWith(
+      'account-of-sp-1',
+      startedAt,
+      'daily_portfolio_snapshot',
+    );
     expect(batchService.runJob).toHaveBeenCalledWith(
       expect.objectContaining({
         jobName: DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME,
@@ -403,7 +420,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
     mockSeason(prisma, SeasonStatus.active);
     mockParticipants(prisma, [{ id: 'sp-1', userId: 'user-1' }]);
     prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([]);
-    valuationService.calculateSeasonParticipantValuation.mockResolvedValue(
+    valuationService.calculateTradingAccountValuation.mockResolvedValue(
       valuation('sp-1'),
     );
 
@@ -441,7 +458,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
     mockSeason(prisma, SeasonStatus.ended);
     mockParticipants(prisma, [{ id: 'sp-1', userId: 'user-1' }]);
     prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([]);
-    valuationService.calculateSeasonParticipantValuation.mockResolvedValue(
+    valuationService.calculateTradingAccountValuation.mockResolvedValue(
       valuation('sp-1'),
     );
     prisma.dailyPortfolioSnapshot.create.mockResolvedValue({ id: 'snap-1' });
@@ -477,8 +494,12 @@ describe('DailyPortfolioSnapshotJobService', () => {
     expect(result.participants.created).toBe(1);
     expect(result.createdSnapshotIds).toEqual(['snap-1']);
     expect(
-      valuationService.calculateSeasonParticipantValuation,
-    ).toHaveBeenCalledWith('sp-1', startedAt, 'daily_portfolio_snapshot');
+      valuationService.calculateTradingAccountValuation,
+    ).toHaveBeenCalledWith(
+      'account-of-sp-1',
+      startedAt,
+      'daily_portfolio_snapshot',
+    );
   });
 
   it('classifies an existing snapshot without overwriting it', async () => {
@@ -486,7 +507,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
     mockSeason(prisma, SeasonStatus.active);
     mockParticipants(prisma, [{ id: 'sp-1', userId: 'user-1' }]);
     prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([
-      { seasonParticipantId: 'sp-1' },
+      { tradingAccountId: 'account-of-sp-1' },
     ]);
 
     const result = await runAndGetResult(service, {
@@ -495,7 +516,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
     });
 
     expect(
-      valuationService.calculateSeasonParticipantValuation,
+      valuationService.calculateTradingAccountValuation,
     ).not.toHaveBeenCalled();
     expect(prisma.dailyPortfolioSnapshot.create).not.toHaveBeenCalled();
     expect(result.participants).toMatchObject({
@@ -514,7 +535,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
       { id: 'sp-ok', userId: 'user-ok' },
     ]);
     prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([]);
-    valuationService.calculateSeasonParticipantValuation
+    valuationService.calculateTradingAccountValuation
       .mockRejectedValueOnce(
         new PortfolioValuationError(
           'ASSET_PRICE_UNAVAILABLE',
@@ -552,7 +573,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
       { id: 'sp-2', userId: 'user-2' },
     ]);
     prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([]);
-    valuationService.calculateSeasonParticipantValuation.mockRejectedValue(
+    valuationService.calculateTradingAccountValuation.mockRejectedValue(
       new PortfolioValuationError(
         'FX_RATE_STALE',
         'USD/KRW FX rate snapshot is stale.',
@@ -654,7 +675,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
     mockSeason(prisma, SeasonStatus.active);
     mockParticipants(prisma, [{ id: 'sp-usd', userId: 'user-usd' }]);
     prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([]);
-    prisma.seasonParticipant.findUnique.mockResolvedValue(
+    prisma.tradingAccount.findUnique.mockResolvedValue(
       participantDetail({
         id: 'sp-usd',
         krwCash: '0.00000000',
@@ -692,7 +713,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
     mockSeason(prisma, SeasonStatus.active);
     mockParticipants(prisma, [{ id: 'sp-usd', userId: 'user-usd' }]);
     prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([]);
-    prisma.seasonParticipant.findUnique.mockResolvedValue(
+    prisma.tradingAccount.findUnique.mockResolvedValue(
       participantDetail({
         id: 'sp-usd',
         krwCash: '0.00000000',
@@ -729,7 +750,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
     mockSeason(prisma, SeasonStatus.active);
     mockParticipants(prisma, [{ id: 'sp-asset', userId: 'user-asset' }]);
     prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([]);
-    prisma.seasonParticipant.findUnique.mockResolvedValue(
+    prisma.tradingAccount.findUnique.mockResolvedValue(
       participantDetail({
         id: 'sp-asset',
         positions: [
@@ -760,7 +781,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
     mockSeason(prisma, SeasonStatus.active);
     mockParticipants(prisma, [{ id: 'sp-provider', userId: 'user-provider' }]);
     prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([]);
-    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+    prisma.tradingAccount.findUnique.mockResolvedValueOnce(
       participantDetail({
         id: 'sp-provider',
         positions: [
@@ -814,7 +835,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
     mockSeason(prisma, SeasonStatus.active);
     mockParticipants(prisma, [{ id: 'sp-provider', userId: 'user-provider' }]);
     prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([]);
-    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+    prisma.tradingAccount.findUnique.mockResolvedValueOnce(
       participantDetail({
         id: 'sp-provider',
         positions: [
@@ -875,7 +896,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
     mockSeason(prisma, SeasonStatus.active);
     mockParticipants(prisma, [{ id: 'sp-fallback', userId: 'user-fallback' }]);
     prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([]);
-    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+    prisma.tradingAccount.findUnique.mockResolvedValueOnce(
       participantDetail({
         id: 'sp-fallback',
         positions: [
@@ -941,7 +962,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
     mockSeason(prisma, SeasonStatus.active);
     mockParticipants(prisma, [{ id: 'sp-official', userId: 'user-official' }]);
     prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([]);
-    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+    prisma.tradingAccount.findUnique.mockResolvedValueOnce(
       participantDetail({
         id: 'sp-official',
         positions: [
@@ -981,7 +1002,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
     mockSeason(prisma, SeasonStatus.active);
     mockParticipants(prisma, [{ id: 'sp-1', userId: 'user-1' }]);
     prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([]);
-    valuationService.calculateSeasonParticipantValuation.mockResolvedValue(
+    valuationService.calculateTradingAccountValuation.mockResolvedValue(
       valuation('sp-1', {
         totalAssetKrw: '1234567.89000000',
         krwCash: '1000000.00000000',
@@ -1019,7 +1040,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
     const prisma = createPrismaMock();
     const batchService = createBatchServiceMock(startedAt);
     const valuationService = {
-      calculateSeasonParticipantValuation: jest.fn(),
+      calculateTradingAccountValuation: jest.fn(),
     };
     const service = new DailyPortfolioSnapshotJobService(
       batchService as never,
@@ -1061,6 +1082,9 @@ function createPrismaMock() {
     },
     seasonParticipant: {
       findMany: jest.fn(),
+      findUnique: jest.fn(),
+    },
+    tradingAccount: {
       findUnique: jest.fn(),
     },
     dailyPortfolioSnapshot: {
@@ -1199,8 +1223,15 @@ function participantDetail(input: {
   positions?: ReturnType<typeof positionDetail>[];
 }) {
   return {
-    id: input.id,
+    id: `account-of-${input.id}`,
+    userId: `user-of-${input.id}`,
+    mode: 'season',
     initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
+    seasonParticipant: {
+      id: input.id,
+      userId: `user-of-${input.id}`,
+      initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
+    },
     cashWallets: [
       {
         currencyCode: CurrencyCode.KRW,

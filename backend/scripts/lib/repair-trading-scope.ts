@@ -67,20 +67,16 @@ export type TradingScopeSummary = {
   remainingMismatchCounts: Record<TradingScopeModel, number> | null;
 };
 
-type RepairPrismaClient = Pick<PrismaClient, '$queryRawUnsafe'> &
-  Pick<Prisma.TransactionClient, 'order' | 'position' | 'quote'>;
+type RepairPrismaClient = Pick<
+  PrismaClient,
+  '$queryRawUnsafe' | '$executeRawUnsafe'
+>;
 
 type NullScopeRow = {
   id: string;
-  seasonParticipantId: string;
-  seasonParticipant: { tradingAccountId: string | null };
+  seasonParticipantId: string | null;
+  participantTradingAccountId: string | null;
 };
-
-const NULL_SCOPE_SELECT = {
-  id: true,
-  seasonParticipantId: true,
-  seasonParticipant: { select: { tradingAccountId: true } },
-} as const;
 
 export async function repairTradingScope(
   prisma: RepairPrismaClient,
@@ -216,34 +212,36 @@ async function repairModel(
   apply: boolean,
   failures: TradingScopeFailure[],
 ): Promise<TradingScopeModelSummary> {
-  const delegate = prisma[model] as unknown as {
-    findMany: (args: unknown) => Promise<NullScopeRow[]>;
-    updateMany: (args: unknown) => Promise<{ count: number }>;
-  };
+  const table = MODEL_TABLES[model];
 
   const missingParticipantLinkRows: TradingScopeModelSummary['missingParticipantLinkRows'] =
     [];
+  const participantRequiredClause =
+    model === 'quote' ? 'AND t."season_participant_id" IS NOT NULL' : '';
   let nullRowCount = 0;
   let backfilledCount = 0;
-  let cursorId: string | null = null;
-
-  // Quotes: only participant-linked rows are candidates; rows with a null
-  // participant are counted/reported separately and never touched here.
-  const nullScopeWhere =
-    model === 'quote'
-      ? { tradingAccountId: null, seasonParticipantId: { not: null } }
-      : { tradingAccountId: null };
+  let cursorId = '';
 
   // Cursor pagination (id asc) so unresolvable rows (missing participant
   // link) can never make the loop spin in place.
   for (;;) {
-    const rows: NullScopeRow[] = await delegate.findMany({
-      where: nullScopeWhere,
-      orderBy: { id: 'asc' },
-      take: BATCH_SIZE,
-      ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
-      select: NULL_SCOPE_SELECT,
-    });
+    // Compatibility SQL is deliberately confined to this pre-migration CLI;
+    // the canonical generated client models tradingAccountId as required.
+    const rows = await prisma.$queryRawUnsafe<NullScopeRow[]>(
+      `SELECT t."id",
+              t."season_participant_id" AS "seasonParticipantId",
+              sp."trading_account_id" AS "participantTradingAccountId"
+       FROM "${table}" t
+       LEFT JOIN "season_participants" sp
+         ON sp."id" = t."season_participant_id"
+       WHERE t."trading_account_id" IS NULL
+         ${participantRequiredClause}
+         AND t."id" > $1
+       ORDER BY t."id" ASC
+       LIMIT $2`,
+      cursorId,
+      BATCH_SIZE,
+    );
 
     if (rows.length === 0) {
       break;
@@ -255,11 +253,11 @@ async function repairModel(
     // a single guarded UPDATE per target account.
     const byAccount = new Map<string, string[]>();
     for (const row of rows) {
-      const accountId = row.seasonParticipant.tradingAccountId;
-      if (!accountId) {
+      const accountId = row.participantTradingAccountId;
+      if (!row.seasonParticipantId || !accountId) {
         missingParticipantLinkRows.push({
           rowId: row.id,
-          seasonParticipantId: row.seasonParticipantId,
+          seasonParticipantId: row.seasonParticipantId ?? '(missing)',
         });
         continue;
       }
@@ -280,11 +278,15 @@ async function repairModel(
         // Guarded fill: only still-null rows are touched; statuses,
         // amounts, quantities, hashes, and every other column stay
         // byte-identical.
-        const updated = await delegate.updateMany({
-          where: { id: { in: ids }, tradingAccountId: null },
-          data: { tradingAccountId: accountId },
-        });
-        backfilledCount += updated.count;
+        const updatedCount = await prisma.$executeRawUnsafe(
+          `UPDATE "${table}"
+           SET "trading_account_id" = $1
+           WHERE "id" = ANY($2::text[])
+             AND "trading_account_id" IS NULL`,
+          accountId,
+          ids,
+        );
+        backfilledCount += updatedCount;
       } catch (error) {
         failures.push({
           model,
@@ -312,15 +314,13 @@ async function countNullScope(
   prisma: RepairPrismaClient,
   model: TradingScopeModel,
 ): Promise<number> {
-  const delegate = prisma[model] as unknown as {
-    count: (args: unknown) => Promise<number>;
-  };
-  return delegate.count({
-    where:
-      model === 'quote'
-        ? { tradingAccountId: null, seasonParticipantId: { not: null } }
-        : { tradingAccountId: null },
-  });
+  const table = MODEL_TABLES[model];
+  const rows = await prisma.$queryRawUnsafe<Array<{ n: number }>>(
+    `SELECT count(*)::int AS n
+     FROM "${table}"
+     WHERE "trading_account_id" IS NULL`,
+  );
+  return rows[0]?.n ?? 0;
 }
 
 async function countParticipantMismatch(
@@ -365,5 +365,11 @@ async function countOrderQuoteParticipantMismatch(
 async function countQuotesWithoutParticipant(
   prisma: RepairPrismaClient,
 ): Promise<number> {
-  return prisma.quote.count({ where: { seasonParticipantId: null } });
+  const rows = await prisma.$queryRawUnsafe<Array<{ n: number }>>(
+    `SELECT count(*)::int AS n
+     FROM "quotes"
+     WHERE "season_participant_id" IS NULL
+       AND "trading_account_id" IS NULL`,
+  );
+  return rows[0]?.n ?? 0;
 }

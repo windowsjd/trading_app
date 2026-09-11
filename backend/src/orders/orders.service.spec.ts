@@ -226,6 +226,9 @@ describe('OrdersService', () => {
       upsert: jest.fn(),
       delete: jest.fn(),
     },
+    tradingAccount: {
+      findUnique: jest.fn(),
+    },
     fxExecuteRequest: {
       create: jest.fn(),
       update: jest.fn(),
@@ -255,7 +258,7 @@ describe('OrdersService', () => {
       delete: jest.fn(),
     },
     $transaction: jest.fn(),
-    $executeRaw: jest.fn(),
+    $executeRaw: jest.fn().mockResolvedValue(1),
     $queryRaw: jest.fn().mockResolvedValue([]),
   });
 
@@ -797,6 +800,14 @@ describe('OrdersService', () => {
         effectiveAt: providerNow,
         capturedAt: providerNow,
       },
+      {
+        id: `${snapshotId}-korea-exim`,
+        rate: new Prisma.Decimal(rate),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'korea_exim_exchange_rate',
+        effectiveAt: providerNow,
+        capturedAt: providerNow,
+      },
     ]);
   };
 
@@ -815,7 +826,7 @@ describe('OrdersService', () => {
     });
     // Buy debits go through the atomic raw-SQL available-balance guard;
     // sell credits still use cashWallet.updateMany. Mock both.
-    prisma.$executeRaw.mockResolvedValueOnce(1);
+    prisma.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(1);
     prisma.cashWallet.updateMany.mockResolvedValueOnce({ count: 1 });
     prisma.cashWallet.findFirst.mockResolvedValueOnce({
       id: 'wallet-1',
@@ -933,10 +944,12 @@ describe('OrdersService', () => {
           ? 'NASDAQ'
           : 'KRX');
 
-    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+    prisma.tradingAccount.findUnique.mockResolvedValueOnce({
+      mode: 'season',
       initialCapitalKrw: new Prisma.Decimal(
         input.initialCapitalKrw ?? '1000000.00000000',
       ),
+      seasonParticipant: { id: 'sp-1' },
       cashWallets: [
         {
           currencyCode: CurrencyCode.KRW,
@@ -1191,6 +1204,20 @@ describe('OrdersService', () => {
       );
     });
     expect(matched).toBe(true);
+  };
+
+  const expectQuoteConsumeCall = (
+    prisma: ReturnType<typeof createPrisma>,
+    input: { quoteId: string; consumedAt: Date },
+  ) => {
+    expect(
+      prisma.$executeRaw.mock.calls.map((args: unknown[]) => args.slice(1)),
+    ).toContainEqual([
+      input.consumedAt,
+      input.quoteId,
+      'sp-1',
+      'trading-account-1',
+    ]);
   };
 
   const expectNoOrderWrites = (
@@ -1624,8 +1651,8 @@ describe('OrdersService', () => {
     });
     expect(prisma.cashWallet.findUnique).toHaveBeenCalledWith({
       where: {
-        seasonParticipantId_currencyCode: {
-          seasonParticipantId: 'sp-1',
+        tradingAccountId_currencyCode: {
+          tradingAccountId: 'trading-account-1',
           currencyCode: CurrencyCode.USD,
         },
       },
@@ -1694,8 +1721,8 @@ describe('OrdersService', () => {
     });
     expect(prisma.position.findUnique).toHaveBeenCalledWith({
       where: {
-        seasonParticipantId_assetId: {
-          seasonParticipantId: 'sp-1',
+        tradingAccountId_assetId: {
+          tradingAccountId: 'trading-account-1',
           assetId: 'asset-btc',
         },
       },
@@ -1755,8 +1782,8 @@ describe('OrdersService', () => {
     });
     expect(prisma.position.findUnique).toHaveBeenCalledWith({
       where: {
-        seasonParticipantId_assetId: {
-          seasonParticipantId: 'sp-1',
+        tradingAccountId_assetId: {
+          tradingAccountId: 'trading-account-1',
           assetId: 'asset-1',
         },
       },
@@ -1993,20 +2020,9 @@ describe('OrdersService', () => {
         }),
       }),
     );
-    expect(prisma.quote.updateMany).toHaveBeenCalledWith({
-      where: {
-        id: 'quote-order-create-1',
-        status: 'active',
-        seasonParticipantId: 'sp-1',
-        OR: [
-          { tradingAccountId: 'trading-account-1' },
-          { tradingAccountId: null },
-        ],
-      },
-      data: {
-        status: 'consumed',
-        consumedAt: krxMarketOpenAt,
-      },
+    expectQuoteConsumeCall(prisma, {
+      quoteId: 'quote-order-create-1',
+      consumedAt: krxMarketOpenAt,
     });
     expect(prisma.order.update).toHaveBeenCalledWith({
       where: {
@@ -2173,7 +2189,7 @@ describe('OrdersService', () => {
         state: 'executed',
         quotedRate: '1400.00000000',
         executeRate: '1400.00000000',
-        fxRateSnapshotId: 'fx-exec-1',
+        fxRateSnapshotId: 'fx-exec-1-korea-exim',
         walletTransactionId: 'wallet-tx-btc-create-buy-1',
         positionId: 'position-btc-1',
       },
@@ -2372,10 +2388,8 @@ describe('OrdersService', () => {
       fxRateSnapshotId: null,
     });
     let racedRequestHash = '';
-    // Pre-transaction lookups: the quote-scoped committed replay first, then
-    // the account scope, then the legacy null scope — all three must miss to
-    // reach the create.
-    prisma.order.findFirst.mockResolvedValueOnce(null);
+    // Pre-transaction lookups: the quote-scoped committed replay and the
+    // canonical account scope must both miss to reach the create.
     prisma.order.findFirst.mockResolvedValueOnce(null);
     prisma.order.findFirst.mockResolvedValueOnce(null);
     prisma.order.create.mockImplementationOnce((args) => {
@@ -2416,10 +2430,8 @@ describe('OrdersService', () => {
       assetPriceSnapshotId: 'aps-1',
       fxRateSnapshotId: null,
     });
-    // Pre-transaction lookups: the quote-scoped committed replay first, then
-    // the account scope, then the legacy null scope — all three must miss to
-    // reach the create.
-    prisma.order.findFirst.mockResolvedValueOnce(null);
+    // Pre-transaction lookups: the quote-scoped committed replay and the
+    // canonical account scope must both miss to reach the create.
     prisma.order.findFirst.mockResolvedValueOnce(null);
     prisma.order.findFirst.mockResolvedValueOnce(null);
     prisma.order.create.mockRejectedValueOnce({ code: 'P2002' });
@@ -2492,7 +2504,7 @@ describe('OrdersService', () => {
     expect(prisma.order.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
           status: OrderStatus.executed,
           side: OrderSide.buy,
           assetId: 'asset-1',
@@ -2558,8 +2570,9 @@ describe('OrdersService', () => {
       expect.objectContaining({
         where: {
           id: 'order-1',
-          seasonParticipant: {
+          tradingAccount: {
             userId: 'user-1',
+            mode: 'season',
           },
         },
       }),
@@ -2595,8 +2608,9 @@ describe('OrdersService', () => {
       expect.objectContaining({
         where: {
           id: 'order-other-user',
-          seasonParticipant: {
+          tradingAccount: {
             userId: 'user-1',
+            mode: 'season',
           },
         },
       }),
@@ -2701,7 +2715,7 @@ describe('OrdersService', () => {
     expect(prisma.order.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
           status: OrderStatus.canceled,
         },
       }),
@@ -3059,20 +3073,9 @@ describe('OrdersService', () => {
           duplicate: false,
         },
       });
-      expect(prisma.quote.updateMany).toHaveBeenCalledWith({
-        where: {
-          id: 'quote-order-execute-1',
-          status: 'active',
-          seasonParticipantId: 'sp-1',
-          OR: [
-            { tradingAccountId: 'trading-account-1' },
-            { tradingAccountId: null },
-          ],
-        },
-        data: {
-          status: 'consumed',
-          consumedAt: executedAt,
-        },
+      expectQuoteConsumeCall(prisma, {
+        quoteId: 'quote-order-execute-1',
+        consumedAt: executedAt,
       });
       expectAvailableCashDebitCall(prisma, {
         walletId: 'wallet-1',
@@ -4158,7 +4161,7 @@ describe('OrdersService', () => {
         currencyCode: CurrencyCode.KRW,
         balanceAmount: new Prisma.Decimal('1000.00000000'),
       });
-      prisma.$executeRaw.mockResolvedValueOnce(0);
+      prisma.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
       prisma.cashWallet.findFirst.mockResolvedValueOnce({
         balanceAmount: new Prisma.Decimal('199.00000000'),
       });

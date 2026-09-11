@@ -309,9 +309,7 @@ export class LimitOrderExecutionService {
           : now;
       if (
         order.quote &&
-        (((account.mode === TradingAccountMode.general ||
-          order.quote.tradingAccountId !== null) &&
-          order.quote.tradingAccountId !== order.tradingAccountId) ||
+        (order.quote.tradingAccountId !== order.tradingAccountId ||
           order.quote.seasonParticipantId !== order.seasonParticipantId)
       ) {
         this.throwTradingScopeError(

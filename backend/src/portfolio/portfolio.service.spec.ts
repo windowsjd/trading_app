@@ -60,6 +60,7 @@ describe('PortfolioService', () => {
 
   const participant = {
     id: 'sp-1',
+    tradingAccountId: 'account-sp-1',
     participantStatus: ParticipantStatus.active,
     joinedAt,
   };
@@ -106,7 +107,7 @@ describe('PortfolioService', () => {
   const createService = () => {
     const prisma = createPrisma();
     const portfolioValuationService = {
-      calculateSeasonParticipantValuation: jest
+      calculateTradingAccountValuation: jest
         .fn()
         .mockResolvedValue(valuation),
     };
@@ -134,8 +135,12 @@ describe('PortfolioService', () => {
     const response = await service.getPortfolio('user-1');
 
     expect(
-      portfolioValuationService.calculateSeasonParticipantValuation,
-    ).toHaveBeenCalledWith('sp-1', expect.any(Date), 'home_live_valuation');
+      portfolioValuationService.calculateTradingAccountValuation,
+    ).toHaveBeenCalledWith(
+      'account-sp-1',
+      expect.any(Date),
+      'home_live_valuation',
+    );
     expect(response.data).toMatchObject({
       state: 'available',
       summary: {
@@ -170,7 +175,7 @@ describe('PortfolioService', () => {
       reason: 'SEASON_NOT_JOINED',
     });
     expect(
-      portfolioValuationService.calculateSeasonParticipantValuation,
+      portfolioValuationService.calculateTradingAccountValuation,
     ).not.toHaveBeenCalled();
   });
 

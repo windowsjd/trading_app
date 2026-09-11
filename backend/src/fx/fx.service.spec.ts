@@ -270,7 +270,9 @@ describe('FxService', () => {
       ingestUsdKrw: jest.Mock;
     },
     valuationService = {
-      calculateSeasonParticipantValuation: jest.fn().mockResolvedValue({
+      calculateTradingAccountValuation: jest.fn().mockResolvedValue({
+        seasonParticipantId: 'participant-1',
+        tradingAccountId: 'trading-account-1',
         totalAssetKrw: '999.00000000',
         returnRate: '-0.10000000',
         krwCash: '0.00000000',
@@ -946,7 +948,7 @@ describe('FxService', () => {
     expect(prisma.exchangeTransaction.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          seasonParticipantId: 'participant-1',
+          tradingAccountId: 'trading-account-1',
         },
         skip: 1,
         take: 1,
@@ -1616,8 +1618,8 @@ describe('FxService', () => {
     });
     expect(prisma.cashWallet.findUnique).toHaveBeenCalledWith({
       where: {
-        seasonParticipantId_currencyCode: {
-          seasonParticipantId: 'participant-1',
+        tradingAccountId_currencyCode: {
+          tradingAccountId: 'trading-account-1',
           currencyCode: CurrencyCode.KRW,
         },
       },
@@ -1662,8 +1664,8 @@ describe('FxService', () => {
     });
     expect(prisma.cashWallet.findUnique).toHaveBeenCalledWith({
       where: {
-        seasonParticipantId_currencyCode: {
-          seasonParticipantId: 'participant-1',
+        tradingAccountId_currencyCode: {
+          tradingAccountId: 'trading-account-1',
           currencyCode: CurrencyCode.USD,
         },
       },
@@ -1806,7 +1808,7 @@ describe('FxService', () => {
       prisma.quote.updateMany.mockResolvedValueOnce({ count: 1 });
       // Source debit uses the atomic raw-SQL available-balance guard; the
       // target credit still uses cashWallet.updateMany.
-      prisma.$executeRaw.mockResolvedValueOnce(1);
+      prisma.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(1);
       prisma.cashWallet.updateMany.mockResolvedValueOnce({ count: 1 });
       prisma.cashWallet.findFirst
         .mockResolvedValueOnce(sourceWalletAfterDebit)
@@ -1855,6 +1857,7 @@ describe('FxService', () => {
       prisma.$transaction.mockImplementationOnce(async (callback) => {
         const stagedWrites: string[] = [];
         let walletFindCallCount = 0;
+        let executeRawCallCount = 0;
         let ledgerCreateCallCount = 0;
 
         const stage = (writeName: string) => {
@@ -1870,6 +1873,12 @@ describe('FxService', () => {
         const tx = {
           ...prisma,
           $executeRaw: jest.fn(() => {
+            executeRawCallCount += 1;
+            if (executeRawCallCount === 1) {
+              stage('quote.consume');
+              return Promise.resolve(1);
+            }
+
             if (failAt === 'source-debit') {
               return Promise.resolve(0);
             }
@@ -1996,26 +2005,17 @@ describe('FxService', () => {
           id: true,
         },
       });
-      expect(prisma.quote.updateMany).toHaveBeenCalledWith({
-        where: {
-          id: 'quote-fx-1',
-          status: 'active',
-          seasonParticipantId: 'participant-1',
-          OR: [
-            { tradingAccountId: 'trading-account-1' },
-            { tradingAccountId: null },
-          ],
-        },
-        data: {
-          status: 'consumed',
-          consumedAt: now,
-        },
-      });
+      expect((prisma.$executeRaw.mock.calls[0] as unknown[]).slice(1)).toEqual([
+        now,
+        'quote-fx-1',
+        'participant-1',
+        'trading-account-1',
+      ]);
       // Atomic available-balance debit (raw SQL tagged template values:
       // [amount, walletId, seasonParticipantId, tradingAccountId,
       // currencyCode, amount]).
-      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
-      expect((prisma.$executeRaw.mock.calls[0] as unknown[]).slice(1)).toEqual([
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
+      expect((prisma.$executeRaw.mock.calls[1] as unknown[]).slice(1)).toEqual([
         '1000.00000000',
         'source-wallet-1',
         'participant-1',
@@ -2505,9 +2505,9 @@ describe('FxService', () => {
       expectExecutePlanReads(prisma);
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       expect(
-        valuationService.calculateSeasonParticipantValuation,
+        valuationService.calculateTradingAccountValuation,
       ).toHaveBeenCalledWith(
-        'participant-1',
+        'trading-account-1',
         now,
         'live_portfolio_valuation',
         prisma,
@@ -2644,7 +2644,7 @@ describe('FxService', () => {
       mockJoinedParticipant(prisma);
       mockExecuteReadCandidates(prisma);
       prisma.fxExecuteRequest.create.mockResolvedValueOnce({ id: 'command-1' });
-      prisma.$executeRaw.mockResolvedValueOnce(0);
+      prisma.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
       // The shared diagnosis re-reads the wallet BY ID (findUnique), so a
       // vanished row is a third findUnique call returning null.
       prisma.cashWallet.findUnique.mockResolvedValueOnce(null);
@@ -2655,7 +2655,7 @@ describe('FxService', () => {
       );
       expect(prisma.cashWallet.findUnique).toHaveBeenCalledTimes(3);
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
       expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
       expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
       expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
@@ -2668,7 +2668,7 @@ describe('FxService', () => {
       mockJoinedParticipant(prisma);
       mockExecuteReadCandidates(prisma);
       prisma.fxExecuteRequest.create.mockResolvedValueOnce({ id: 'command-1' });
-      prisma.$executeRaw.mockResolvedValueOnce(0);
+      prisma.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
         ...sourceWallet,
         reservedAmount: new Prisma.Decimal('0.00000000'),
@@ -2679,7 +2679,7 @@ describe('FxService', () => {
         service.execute('user-1', validExecuteBody),
         'INSUFFICIENT_BALANCE',
       );
-      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
       expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
       expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
       expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
@@ -2692,7 +2692,7 @@ describe('FxService', () => {
       mockJoinedParticipant(prisma);
       mockExecuteReadCandidates(prisma);
       prisma.fxExecuteRequest.create.mockResolvedValueOnce({ id: 'command-1' });
-      prisma.$executeRaw.mockResolvedValueOnce(0);
+      prisma.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
         ...sourceWallet,
         reservedAmount: new Prisma.Decimal('0.00000000'),
@@ -2703,7 +2703,7 @@ describe('FxService', () => {
         service.execute('user-1', validExecuteBody),
         'CONFLICT',
       );
-      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
       expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
       expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
       expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
@@ -2716,7 +2716,7 @@ describe('FxService', () => {
       mockJoinedParticipant(prisma);
       mockExecuteReadCandidates(prisma);
       prisma.fxExecuteRequest.create.mockResolvedValueOnce({ id: 'command-1' });
-      prisma.$executeRaw.mockResolvedValueOnce(1);
+      prisma.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(1);
       prisma.cashWallet.updateMany.mockRejectedValueOnce(
         new Error('target credit failed'),
       );
@@ -2737,7 +2737,7 @@ describe('FxService', () => {
       mockJoinedParticipant(prisma);
       mockExecuteReadCandidates(prisma);
       prisma.fxExecuteRequest.create.mockResolvedValueOnce({ id: 'command-1' });
-      prisma.$executeRaw.mockResolvedValueOnce(1);
+      prisma.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(1);
       prisma.cashWallet.updateMany.mockResolvedValueOnce({ count: 1 });
       prisma.cashWallet.findFirst
         .mockResolvedValueOnce(sourceWalletAfterDebit)
@@ -2760,7 +2760,7 @@ describe('FxService', () => {
       mockJoinedParticipant(prisma);
       mockExecuteReadCandidates(prisma);
       prisma.fxExecuteRequest.create.mockResolvedValueOnce({ id: 'command-1' });
-      prisma.$executeRaw.mockResolvedValueOnce(1);
+      prisma.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(1);
       prisma.cashWallet.updateMany.mockResolvedValueOnce({ count: 1 });
       prisma.cashWallet.findFirst
         .mockResolvedValueOnce(sourceWalletAfterDebit)
@@ -2786,7 +2786,7 @@ describe('FxService', () => {
       mockJoinedParticipant(prisma);
       mockExecuteReadCandidates(prisma);
       prisma.fxExecuteRequest.create.mockResolvedValueOnce({ id: 'command-1' });
-      prisma.$executeRaw.mockResolvedValueOnce(1);
+      prisma.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(1);
       prisma.cashWallet.updateMany.mockResolvedValueOnce({ count: 1 });
       prisma.cashWallet.findFirst
         .mockResolvedValueOnce(sourceWalletAfterDebit)
@@ -2830,7 +2830,7 @@ describe('FxService', () => {
         'source debit classification fails',
         'source-debit',
         'INSUFFICIENT_BALANCE',
-        ['fxExecuteRequest.create:pending', 'quote.updateMany:consume'],
+        ['fxExecuteRequest.create:pending', 'quote.consume'],
       ],
       [
         'target credit fails after source debit',
@@ -2838,7 +2838,7 @@ describe('FxService', () => {
         'EXECUTE_TRANSACTION_FAILED',
         [
           'fxExecuteRequest.create:pending',
-          'quote.updateMany:consume',
+          'quote.consume',
           'cashWallet.updateMany:source-debit',
         ],
       ],
@@ -2848,7 +2848,7 @@ describe('FxService', () => {
         'EXECUTE_TRANSACTION_FAILED',
         [
           'fxExecuteRequest.create:pending',
-          'quote.updateMany:consume',
+          'quote.consume',
           'cashWallet.updateMany:source-debit',
           'cashWallet.updateMany:target-credit',
         ],
@@ -2859,7 +2859,7 @@ describe('FxService', () => {
         'EXECUTE_TRANSACTION_FAILED',
         [
           'fxExecuteRequest.create:pending',
-          'quote.updateMany:consume',
+          'quote.consume',
           'cashWallet.updateMany:source-debit',
           'cashWallet.updateMany:target-credit',
           'exchangeTransaction.create',
@@ -2871,7 +2871,7 @@ describe('FxService', () => {
         'EXECUTE_TRANSACTION_FAILED',
         [
           'fxExecuteRequest.create:pending',
-          'quote.updateMany:consume',
+          'quote.consume',
           'cashWallet.updateMany:source-debit',
           'cashWallet.updateMany:target-credit',
           'exchangeTransaction.create',
@@ -2884,7 +2884,7 @@ describe('FxService', () => {
         'EXECUTE_TRANSACTION_FAILED',
         [
           'fxExecuteRequest.create:pending',
-          'quote.updateMany:consume',
+          'quote.consume',
           'cashWallet.updateMany:source-debit',
           'cashWallet.updateMany:target-credit',
           'exchangeTransaction.create',
@@ -2956,32 +2956,11 @@ describe('FxService', () => {
           exchangeTransactionId: true,
         },
       });
-      // Account row missing → the legacy null-scope fallback is pinned to
-      // the same user AND participant (never a bare per-user lookup).
-      expect(prisma.fxExecuteRequest.findFirst).toHaveBeenCalledWith({
-        where: {
-          userId: 'user-1',
-          seasonParticipantId: 'participant-1',
-          idempotencyKey: 'idempotency-key-1',
-          tradingAccountId: null,
-        },
-        select: {
-          id: true,
-          idempotencyKey: true,
-          requestHash: true,
-          status: true,
-          requestedAt: true,
-          completedAt: true,
-          responsePayloadJson: true,
-          errorCode: true,
-          errorMessage: true,
-          exchangeTransactionId: true,
-        },
-      });
+      expect(prisma.fxExecuteRequest.findFirst).not.toHaveBeenCalled();
       expect(prisma.cashWallet.findUnique).toHaveBeenNthCalledWith(1, {
         where: {
-          seasonParticipantId_currencyCode: {
-            seasonParticipantId: 'participant-1',
+          tradingAccountId_currencyCode: {
+            tradingAccountId: 'trading-account-1',
             currencyCode: CurrencyCode.KRW,
           },
         },
@@ -2996,8 +2975,8 @@ describe('FxService', () => {
       });
       expect(prisma.cashWallet.findUnique).toHaveBeenNthCalledWith(2, {
         where: {
-          seasonParticipantId_currencyCode: {
-            seasonParticipantId: 'participant-1',
+          tradingAccountId_currencyCode: {
+            tradingAccountId: 'trading-account-1',
             currencyCode: CurrencyCode.USD,
           },
         },

@@ -1248,8 +1248,6 @@ export class OrdersService {
     // turns a key reused with a different request into a 409.
     const existingOrder = await this.findIdempotentCreateOrder({
       tradingAccountId: account.id,
-      seasonParticipantId: account.seasonParticipant?.id ?? null,
-      userId,
       idempotencyKey: idempotency.idempotencyKey,
     });
     if (existingOrder) {
@@ -1283,8 +1281,6 @@ export class OrdersService {
     const { season, participant, tradingAccountId } = input.context;
     const existingOrder = await this.findIdempotentCreateOrder({
       tradingAccountId,
-      seasonParticipantId: participant?.id ?? null,
-      userId,
       idempotencyKey: idempotency.idempotencyKey,
     });
 
@@ -1432,8 +1428,6 @@ export class OrdersService {
 
       const racedOrder = await this.findIdempotentCreateOrder({
         tradingAccountId,
-        seasonParticipantId: participant?.id ?? null,
-        userId,
         idempotencyKey: idempotency.idempotencyKey,
       });
 
@@ -1721,8 +1715,6 @@ export class OrdersService {
         })) ??
         (await this.findIdempotentCreateOrder({
           tradingAccountId,
-          seasonParticipantId: participant?.id ?? null,
-          userId,
           idempotencyKey: idempotency.idempotencyKey,
         }));
 
@@ -2639,13 +2631,9 @@ export class OrdersService {
       currencyCode: order.currencyCode,
     });
 
-    // Account isolation: a quote minted under a different trading account is
-    // never executable, even for the same user. NULL legacy quotes pass and
-    // stay pinned to the participant + request hash below.
-    if (
-      quote.tradingAccountId !== this.requireOrderTradingScope(order) &&
-      !(order.seasonParticipantId !== null && quote.tradingAccountId === null)
-    ) {
+    // Account isolation: a quote minted under a different canonical account
+    // is never executable, even for the same user.
+    if (quote.tradingAccountId !== this.requireOrderTradingScope(order)) {
       this.throwApiError(
         HttpStatus.CONFLICT,
         'QUOTE_MISMATCH',
@@ -3145,9 +3133,7 @@ export class OrdersService {
     }
 
     // Account-conditioned consume: only this participant's quote flips, and
-    // only when its scope is the order's verified account (NULL legacy
-    // quotes stay consumable — they were already pinned to the participant
-    // and request hash by the execution-time validation).
+    // only when its scope is the order's verified canonical account.
     const tradingAccountId = this.requireOrderTradingScope(order);
     const consumedCount =
       order.seasonParticipantId === null
@@ -3173,10 +3159,7 @@ export class OrdersService {
             WHERE "id" = ${order.quoteId}
               AND "status" = 'active'
               AND "season_participant_id" = ${order.seasonParticipantId}
-              AND (
-                "trading_account_id" = ${tradingAccountId}
-                OR "trading_account_id" IS NULL
-              )
+              AND "trading_account_id" = ${tradingAccountId}
           `;
 
     if (consumedCount !== 1) {
@@ -4651,13 +4634,9 @@ export class OrdersService {
       );
     }
 
-    // Account isolation: a quote minted under a different trading account
-    // cannot back an order create on this account. NULL legacy quotes pass
-    // and stay pinned to the participant + request hash below.
-    if (
-      quote.tradingAccountId !== input.tradingAccountId &&
-      !(input.seasonParticipantId !== null && quote.tradingAccountId === null)
-    ) {
+    // Account isolation: a quote minted under a different canonical account
+    // cannot back an order create on this account.
+    if (quote.tradingAccountId !== input.tradingAccountId) {
       this.throwApiError(
         HttpStatus.CONFLICT,
         'QUOTE_MISMATCH',
@@ -4981,21 +4960,12 @@ export class OrdersService {
   }
 
   /**
-   * Account-first idempotent-create lookup. The DB uniqueness this replays
-   * is (tradingAccountId, idempotencyKey); the same user may reuse a key on
-   * a DIFFERENT account without colliding. When the account has no row, a
-   * LEGACY null-scope order (written before the trading-scope transition) is
-   * still replayable — but only one pinned to the same participant AND the
-   * same user, so no other season's or user's order is ever selected.
+   * Account-scoped idempotent-create lookup. The canonical migration
+   * backfills historical orders before enforcing NOT NULL, so this key
+   * covers both historical and newly-created rows.
    */
   private async findIdempotentCreateOrder(input: {
     tradingAccountId: string;
-    /**
-     * Null for a general account (no participant exists), which simply skips
-     * the legacy null-scope fallback — a general account has no legacy rows.
-     */
-    seasonParticipantId: string | null;
-    userId: string;
     idempotencyKey: string;
   }) {
     const accountOrder = await this.prisma.order.findFirst({
@@ -5006,38 +4976,7 @@ export class OrdersService {
       select: IDEMPOTENT_CREATE_ORDER_SELECT,
     });
 
-    if (accountOrder) {
-      return accountOrder;
-    }
-
-    if (!input.seasonParticipantId) {
-      return null;
-    }
-
-    // Compatibility only: Prisma's canonical schema now models the account
-    // column as required, so the pre-hardening NULL predicate lives in
-    // explicit SQL. The normal lookup above remains account-scoped.
-    const legacyRows = await this.prisma.$queryRaw<Array<{ id: string }>>`
-      SELECT o."id"
-      FROM "orders" o
-      JOIN "season_participants" sp
-        ON sp."id" = o."season_participant_id"
-      WHERE o."season_participant_id" = ${input.seasonParticipantId}
-        AND o."idempotency_key" = ${input.idempotencyKey}
-        AND o."trading_account_id" IS NULL
-        AND sp."user_id" = ${input.userId}
-      ORDER BY o."created_at" DESC, o."id" ASC
-      LIMIT 1
-    `;
-    const legacyId = legacyRows[0]?.id;
-    if (!legacyId) {
-      return null;
-    }
-
-    return this.prisma.order.findUnique({
-      where: { id: legacyId },
-      select: IDEMPOTENT_CREATE_ORDER_SELECT,
-    });
+    return accountOrder;
   }
 
   private replayIdempotentCreateOrder(

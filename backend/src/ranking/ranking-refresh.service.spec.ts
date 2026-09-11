@@ -191,7 +191,9 @@ describe('RankingRefreshService', () => {
     const setup = (existingRows: unknown[]) => {
       const prisma = createPrisma();
       const valuation = {
-        calculateSeasonParticipantValuation: jest.fn().mockResolvedValue({
+        calculateTradingAccountValuation: jest.fn().mockResolvedValue({
+          seasonParticipantId: 'sp-1',
+          tradingAccountId: 'account-of-sp-1',
           totalAssetKrw: '1000000.00000000',
           returnRate: '0.00000000',
           krwCash: '1000000.00000000',

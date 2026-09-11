@@ -355,7 +355,10 @@ export function mapFxExecuteOrchestrationDecisionToSkeletonResponse(
 
 @Injectable()
 export class FxService {
-  private readonly providerRefreshInFlight = new Map<number, Promise<boolean>>();
+  private readonly providerRefreshInFlight = new Map<
+    number,
+    Promise<boolean>
+  >();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -1008,10 +1011,7 @@ export class FxService {
     // Committed replay is resolved before mutable account-status checks.
     const committed = await this.findFxExecuteCommandForIdempotency({
       tradingAccountId: context.account.id,
-      userId,
-      seasonParticipantId: null,
       idempotencyKey: normalizedRequest.idempotencyKey,
-      allowLegacyFallback: false,
     });
     if (committed) {
       return this.returnExistingFxCommandOrThrow({
@@ -1057,10 +1057,7 @@ export class FxService {
         const racedCommand = await this.findFxExecuteCommandForIdempotency(
           {
             tradingAccountId: context.account.id,
-            userId,
-            seasonParticipantId: null,
             idempotencyKey: normalizedRequest.idempotencyKey,
-            allowLegacyFallback: false,
           },
           tx,
         );
@@ -1226,14 +1223,11 @@ export class FxService {
 
     const normalizedRequest = preflightResult.value;
     // Idempotency is ACCOUNT-scoped for every new request (legacy and
-    // account endpoints both resolve a verified account first). Legacy
-    // null-scope rows written before the transition are still replayable,
-    // but ONLY for the same user + same participant — never another
-    // participant's (or another season's) row.
+    // account endpoints both resolve a verified account first). The canonical
+    // migration backfills historical rows before enforcing NOT NULL, so the
+    // account key covers both historical and newly-created commands.
     const existingCommand = await this.findFxExecuteCommandForIdempotency({
       tradingAccountId,
-      userId,
-      seasonParticipantId: participantId,
       idempotencyKey: normalizedRequest.idempotencyKey,
     });
 
@@ -1488,13 +1482,7 @@ export class FxService {
     // never executable here, even for the same user. Only NULL legacy quotes
     // (pre-transition rows) pass through, and those are still pinned to the
     // same participant + request hash below.
-    if (
-      (input.mode === TradingAccountMode.general &&
-        quote.tradingAccountId !== input.tradingAccountId) ||
-      (input.mode === TradingAccountMode.season &&
-        quote.tradingAccountId !== null &&
-        quote.tradingAccountId !== input.tradingAccountId)
-    ) {
+    if (quote.tradingAccountId !== input.tradingAccountId) {
       this.throwFxExecuteError(fxExecuteErrorCodes.QUOTE_MISMATCH);
     }
 
@@ -2286,103 +2274,19 @@ export class FxService {
     }
   }
 
-  /**
-   * Unified idempotency lookup for NEW execute requests: the account row
-   * wins; only when the account has none is a LEGACY null-scope row
-   * considered — and that fallback is pinned to the same user AND the same
-   * participant, so another participant's (or another season's) legacy row
-   * can never be replayed. The former global (userId, idempotencyKey)
-   * lookup is gone together with its unique index.
-   */
+  /** Account-scoped idempotency lookup for both backfilled history and new requests. */
   private async findFxExecuteCommandForIdempotency(
     input: {
       tradingAccountId: string;
-      userId: string;
-      seasonParticipantId: string | null;
       idempotencyKey: string;
-      allowLegacyFallback?: boolean;
     },
     client: PrismaService | Prisma.TransactionClient = this.prisma,
   ): Promise<FxExecuteCommandCandidate | null> {
-    const accountCommand = await this.findFxExecuteCommandCandidateByAccount(
+    return this.findFxExecuteCommandCandidateByAccount(
       input.tradingAccountId,
       input.idempotencyKey,
       client,
     );
-
-    if (accountCommand) {
-      return accountCommand;
-    }
-
-    if (input.allowLegacyFallback === false || !input.seasonParticipantId) {
-      return null;
-    }
-
-    return this.findLegacyFxExecuteCommandCandidate(
-      {
-        userId: input.userId,
-        seasonParticipantId: input.seasonParticipantId,
-        idempotencyKey: input.idempotencyKey,
-      },
-      client,
-    );
-  }
-
-  /**
-   * Legacy replay path: pre-transition rows carry tradingAccountId = null
-   * and stay unique per (userId, idempotencyKey) via the partial unique
-   * index. The participant condition keeps the fallback from ever selecting
-   * a different season's row for the same user.
-   */
-  private async findLegacyFxExecuteCommandCandidate(
-    input: {
-      userId: string;
-      seasonParticipantId: string;
-      idempotencyKey: string;
-    },
-    client: PrismaService | Prisma.TransactionClient = this.prisma,
-  ): Promise<FxExecuteCommandCandidate | null> {
-    // Compatibility only: the canonical Prisma field is required, so legacy
-    // NULL discovery is kept in explicit SQL and cannot become a normal scope.
-    const legacyRows = await client.$queryRaw<Array<{ id: string }>>`
-      SELECT "id"
-      FROM "fx_execute_requests"
-      WHERE "user_id" = ${input.userId}
-        AND "season_participant_id" = ${input.seasonParticipantId}
-        AND "idempotency_key" = ${input.idempotencyKey}
-        AND "trading_account_id" IS NULL
-      ORDER BY "created_at" DESC, "id" ASC
-      LIMIT 1
-    `;
-    const legacyId = legacyRows[0]?.id;
-    if (!legacyId) {
-      return null;
-    }
-
-    const command = await client.fxExecuteRequest.findUnique({
-      where: { id: legacyId },
-      select: {
-        id: true,
-        idempotencyKey: true,
-        requestHash: true,
-        status: true,
-        requestedAt: true,
-        completedAt: true,
-        responsePayloadJson: true,
-        errorCode: true,
-        errorMessage: true,
-        exchangeTransactionId: true,
-      },
-    });
-
-    if (!command) {
-      return null;
-    }
-
-    return {
-      ...command,
-      status: this.toFxExecuteCommandStatus(command.status),
-    };
   }
 
   private toFxExecuteCommandStatus(
@@ -2640,9 +2544,7 @@ export class FxService {
     tradingAccountId: string,
     currencyCode: FxExecuteWalletCandidate['currencyCode'],
     client: PrismaService | Prisma.TransactionClient = this.prisma,
-  ): Promise<
-    (FxExecuteWalletCandidate & { tradingAccountId: string }) | null
-  > {
+  ): Promise<(FxExecuteWalletCandidate & { tradingAccountId: string }) | null> {
     return client.cashWallet.findUnique({
       where: {
         tradingAccountId_currencyCode: {
@@ -2720,14 +2622,10 @@ export class FxService {
       }
 
       if (this.isUniqueConstraintError(error)) {
-        // Post-conflict requery uses the SAME scope rules as the original
-        // lookup: the account row first, then the user+participant-pinned
-        // legacy null row. Never a bare per-user query — that could replay
-        // another account's command.
+        // Post-conflict requery uses the same canonical account scope as the
+        // original lookup; never a bare per-user or participant query.
         const existingCommand = await this.findFxExecuteCommandForIdempotency({
           tradingAccountId: input.tradingAccountId,
-          userId: input.normalizedRequest.userId,
-          seasonParticipantId: input.normalizedRequest.seasonParticipantId,
           idempotencyKey: input.normalizedRequest.idempotencyKey,
         });
 
@@ -2793,9 +2691,8 @@ export class FxService {
     });
 
     // Account-conditioned consume: only THIS participant's quote flips, and
-    // only when its account scope is the verified one (NULL legacy quotes
-    // were already pinned to the participant + request hash upstream). A
-    // quote of another account can never be consumed here.
+    // only when its account scope is the verified canonical one. A quote of
+    // another account can never be consumed here.
     const quoteConsumeCount =
       input.mode === TradingAccountMode.general
         ? (
@@ -2820,10 +2717,7 @@ export class FxService {
             WHERE "id" = ${plan.quoteId}
               AND "status" = 'active'
               AND "season_participant_id" = ${plan.seasonParticipantId}
-              AND (
-                "trading_account_id" = ${tradingAccountId}
-                OR "trading_account_id" IS NULL
-              )
+              AND "trading_account_id" = ${tradingAccountId}
           `;
 
     if (quoteConsumeCount !== 1) {

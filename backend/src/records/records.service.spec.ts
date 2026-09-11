@@ -143,6 +143,22 @@ describe('RecordsService', () => {
 
   const detailedParticipant = {
     ...participant,
+    tradingAccount: {
+      ...participantAccount,
+      dailyPortfolioSnapshots: [
+        {
+          totalAssetKrw: new Prisma.Decimal('11900000.00000000'),
+          returnRate: new Prisma.Decimal('19.00000000'),
+          snapshotDate,
+          capturedAt,
+        },
+      ],
+      _count: {
+        orders: 10,
+        exchangeTransactions: 2,
+        walletTransactions: 13,
+      },
+    },
     participantStatus: ParticipantStatus.finished,
     initialCapitalKrw: new Prisma.Decimal('10000000.00000000'),
     maxDrawdown: new Prisma.Decimal('3.00000000'),
@@ -162,19 +178,6 @@ describe('RecordsService', () => {
         capturedAt,
       },
     ],
-    dailyPortfolioSnapshots: [
-      {
-        totalAssetKrw: new Prisma.Decimal('11900000.00000000'),
-        returnRate: new Prisma.Decimal('19.00000000'),
-        snapshotDate,
-        capturedAt,
-      },
-    ],
-    _count: {
-      orders: 10,
-      exchangeTransactions: 2,
-      walletTransactions: 13,
-    },
   };
 
   const createPrisma = () => ({
@@ -284,7 +287,7 @@ describe('RecordsService', () => {
   });
 
   const createService = (portfolioValuationService?: {
-    calculateSeasonParticipantValuation: jest.Mock;
+    calculateTradingAccountValuation: jest.Mock;
   }) => {
     const prisma = createPrisma();
     const service = new RecordsService(
@@ -671,7 +674,7 @@ describe('RecordsService', () => {
     expect(prisma.exchangeTransaction.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          seasonParticipantId: 'sp-1',
+          tradingAccountId: participantAccount.id,
           OR: [
             { fromCurrency: CurrencyCode.KRW },
             { toCurrency: CurrencyCode.KRW },
@@ -820,7 +823,7 @@ describe('RecordsService', () => {
     expect(prisma.order.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          seasonParticipantId: 'sp-1',
+          tradingAccountId: participantAccount.id,
           currencyCode: CurrencyCode.USD,
         },
       }),
@@ -1244,11 +1247,14 @@ describe('RecordsService', () => {
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
       ...detailedParticipant,
       seasonRankings: [],
-      dailyPortfolioSnapshots: [],
-      _count: {
-        orders: 0,
-        exchangeTransactions: 0,
-        walletTransactions: 0,
+      tradingAccount: {
+        ...detailedParticipant.tradingAccount,
+        dailyPortfolioSnapshots: [],
+        _count: {
+          orders: 0,
+          exchangeTransactions: 0,
+          walletTransactions: 0,
+        },
       },
     });
     prisma.order.count
@@ -1312,7 +1318,7 @@ describe('RecordsService', () => {
     });
     expect(prisma.dailyPortfolioSnapshot.findMany).toHaveBeenCalledWith({
       where: {
-        seasonParticipantId: 'sp-1',
+        tradingAccountId: participantAccount.id,
       },
       orderBy: [
         { snapshotDate: 'asc' },
@@ -1476,7 +1482,7 @@ describe('RecordsService', () => {
     expect(prisma.order.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          seasonParticipantId: 'sp-1',
+          tradingAccountId: participantAccount.id,
           status: OrderStatus.executed,
           side: OrderSide.buy,
           assetId: 'asset-1',
@@ -1528,7 +1534,7 @@ describe('RecordsService', () => {
     expect(prisma.exchangeTransaction.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          seasonParticipantId: 'sp-1',
+          tradingAccountId: participantAccount.id,
           fromCurrency: CurrencyCode.KRW,
           toCurrency: CurrencyCode.USD,
         },
@@ -1555,7 +1561,7 @@ describe('RecordsService', () => {
 
   it('returns current public user season summary without private activity data', async () => {
     const portfolioValuationService = {
-      calculateSeasonParticipantValuation: jest.fn().mockResolvedValue({
+      calculateTradingAccountValuation: jest.fn().mockResolvedValue({
         totalAssetKrw: '13812590.00000000',
         returnRate: '38.12590000',
         krwCash: '1000000.00000000',
@@ -1629,8 +1635,12 @@ describe('RecordsService', () => {
     );
 
     expect(
-      portfolioValuationService.calculateSeasonParticipantValuation,
-    ).toHaveBeenCalledWith('sp-1', expect.any(Date), 'home_live_valuation');
+      portfolioValuationService.calculateTradingAccountValuation,
+    ).toHaveBeenCalledWith(
+      participantAccount.id,
+      expect.any(Date),
+      'home_live_valuation',
+    );
     expect(response.data).toMatchObject({
       state: 'available',
       user: {
@@ -1675,7 +1685,7 @@ describe('RecordsService', () => {
 
   it('hides current public user season summary for ranking-hidden participants', async () => {
     const portfolioValuationService = {
-      calculateSeasonParticipantValuation: jest.fn(),
+      calculateTradingAccountValuation: jest.fn(),
     };
     const { prisma, service } = createService(portfolioValuationService);
     prisma.user.findUnique.mockResolvedValueOnce({
@@ -1710,14 +1720,14 @@ describe('RecordsService', () => {
     });
     expect(prisma.seasonRanking.findFirst).not.toHaveBeenCalled();
     expect(
-      portfolioValuationService.calculateSeasonParticipantValuation,
+      portfolioValuationService.calculateTradingAccountValuation,
     ).not.toHaveBeenCalled();
     expectNoRecordWrites(prisma);
   });
 
   it('returns not_joined for current public user season summary', async () => {
     const portfolioValuationService = {
-      calculateSeasonParticipantValuation: jest.fn(),
+      calculateTradingAccountValuation: jest.fn(),
     };
     const { prisma, service } = createService(portfolioValuationService);
     prisma.user.findUnique.mockResolvedValueOnce({
@@ -1745,7 +1755,7 @@ describe('RecordsService', () => {
       reason: 'SEASON_NOT_JOINED',
     });
     expect(
-      portfolioValuationService.calculateSeasonParticipantValuation,
+      portfolioValuationService.calculateTradingAccountValuation,
     ).not.toHaveBeenCalled();
     expectNoRecordWrites(prisma);
   });

@@ -22,10 +22,7 @@ import {
   assertExistingRankingRowScopeWritable,
   requireSeasonRankingAccountScope,
 } from '../ranking/season-ranking-scope';
-import {
-  ensureSeasonTradingAccountLink,
-  SeasonTradingAccountLinkIntegrityError,
-} from '../seasons/season-trading-account-link';
+import { SeasonTradingAccountLinkIntegrityError } from '../seasons/season-trading-account-link';
 import { OperatorAuditService } from './operator-audit.service';
 import type { OperatorRequestContext } from './operator-account-management.service';
 import { hasOperatorRole } from './operator.guard';
@@ -136,8 +133,8 @@ export class OperatorSeasonModerationService {
         this.assertExcludeAllowed(participant);
 
         // Same transaction as the exclusion: the linked season trading
-        // account is moved to suspended (repairing a legacy null link
-        // first), so a failure in either update rolls both back.
+        // account is moved to suspended, so a failure in either update rolls
+        // both back.
         const accountSync = await this.syncExcludedParticipantTradingAccount(
           tx,
           participant,
@@ -479,29 +476,15 @@ export class OperatorSeasonModerationService {
   /**
    * Keep the linked season TradingAccount in sync with an exclusion:
    * active → suspended, suspended stays suspended (idempotent), and a closed
-   * account is never reverted. A legacy null link (deploy-boundary
-   * participant) is repaired first inside the same transaction. Any
-   * account/participant mismatch fails closed instead of being overwritten.
+   * account is never reverted. Any account/participant mismatch fails closed
+   * instead of being overwritten. Pre-migration null links are handled only
+   * by the explicit repair-links CLI.
    */
   private async syncExcludedParticipantTradingAccount(
     tx: ModerationTransactionClient,
     participant: ModeratedParticipant,
   ): Promise<ExcludedAccountSync> {
-    let tradingAccountId = participant.tradingAccountId;
-    let tradingAccountLinkRepaired = false;
-
-    if (!tradingAccountId) {
-      const link = await ensureSeasonTradingAccountLink(tx, {
-        id: participant.id,
-        userId: participant.userId,
-        joinedAt: participant.joinedAt,
-        participantStatus: participant.participantStatus,
-        initialCapitalKrw: participant.initialCapitalKrw,
-        tradingAccountId: null,
-      });
-      tradingAccountId = link.tradingAccountId;
-      tradingAccountLinkRepaired = link.action !== 'already-linked';
-    }
+    const tradingAccountId = participant.tradingAccountId;
 
     const account = await tx.tradingAccount.findUnique({
       where: { id: tradingAccountId },
@@ -548,7 +531,7 @@ export class OperatorSeasonModerationService {
       tradingAccountId: account.id,
       beforeTradingAccountStatus: account.status,
       afterTradingAccountStatus,
-      tradingAccountLinkRepaired,
+      tradingAccountLinkRepaired: false,
     };
   }
 

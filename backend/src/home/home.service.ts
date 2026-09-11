@@ -418,10 +418,7 @@ export class HomeService {
     const sectionErrors: SectionError[] = [];
     const [finalResult, equityChart] = await Promise.all([
       this.buildFinalResult(season.id, participant, sectionErrors),
-      this.buildSettledEquityChart(
-        participant.tradingAccountId,
-        sectionErrors,
-      ),
+      this.buildSettledEquityChart(participant.tradingAccountId, sectionErrors),
     ]);
 
     return {

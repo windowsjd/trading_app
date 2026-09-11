@@ -740,7 +740,9 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         seasonParticipantId: 'sp-1',
         tradingAccountId: 'trading-account-1',
       });
-      prisma.$executeRaw.mockResolvedValueOnce(1); // reservation applied
+      prisma.$executeRaw
+        .mockResolvedValueOnce(1) // reservation applied
+        .mockResolvedValueOnce(1); // quote consumed
       prisma.order.create.mockResolvedValueOnce({ id: 'order-limit-1' });
       prisma.order.findUnique.mockResolvedValueOnce(createdOrderRecord());
       prisma.order.update.mockResolvedValueOnce({ id: 'order-limit-1' });
@@ -769,7 +771,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
 
       // Atomic reservation through the raw guard (values:
       // [amount, walletId, participantId, tradingAccountId, currency, amount]).
-      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
       expect((prisma.$executeRaw.mock.calls[0] as unknown[]).slice(1)).toEqual([
         '150150.00000000',
         'wallet-1',
@@ -777,6 +779,12 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         'trading-account-1',
         CurrencyCode.KRW,
         '150150.00000000',
+      ]);
+      expect((prisma.$executeRaw.mock.calls[1] as unknown[]).slice(1)).toEqual([
+        krxOpenAt,
+        'quote-limit-1',
+        'sp-1',
+        'trading-account-1',
       ]);
 
       // Order row stores the reservation bookkeeping.
@@ -794,21 +802,9 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         }),
       );
 
-      // Quote consumed inside the same transaction, conditioned on the
-      // participant and the verified account (NULL legacy scope stays
-      // consumable).
-      expect(prisma.quote.updateMany).toHaveBeenCalledWith({
-        where: {
-          id: 'quote-limit-1',
-          status: 'active',
-          seasonParticipantId: 'sp-1',
-          OR: [
-            { tradingAccountId: 'trading-account-1' },
-            { tradingAccountId: null },
-          ],
-        },
-        data: expect.objectContaining({ status: 'consumed' }) as never,
-      });
+      // Season quote consumption is the second account-conditioned raw call
+      // asserted above; the general-account Prisma branch is not used here.
+      expect(prisma.quote.updateMany).not.toHaveBeenCalled();
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
 
       // Phase 1 forbidden effects: no debit, no ledger, no position, no
@@ -1040,7 +1036,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         seasonParticipantId: 'sp-1',
         tradingAccountId: 'trading-account-1',
       });
-      prisma.$executeRaw.mockResolvedValueOnce(1);
+      prisma.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(1);
       prisma.order.create.mockResolvedValueOnce({ id: 'order-limit-1' });
       prisma.order.findUnique.mockResolvedValueOnce(createdOrderRecord());
       prisma.order.update.mockResolvedValueOnce({ id: 'order-limit-1' });

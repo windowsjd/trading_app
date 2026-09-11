@@ -69,6 +69,7 @@ describe('PositionsService', () => {
 
   const participant = {
     id: 'sp-1',
+    tradingAccountId: 'trading-account-1',
     participantStatus: ParticipantStatus.active,
     joinedAt,
   };
@@ -380,7 +381,7 @@ describe('PositionsService', () => {
     expect(prisma.position.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
           quantity: {
             gt: 0,
           },
@@ -416,7 +417,7 @@ describe('PositionsService', () => {
     expect(prisma.position.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
         },
       }),
     );
@@ -499,7 +500,7 @@ describe('PositionsService', () => {
     expect(prisma.position.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
           assetId: 'asset-filtered',
         }),
       }),
@@ -525,7 +526,7 @@ describe('PositionsService', () => {
     expect(prisma.position.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
           assetId: 'asset-unowned',
         }),
       }),
