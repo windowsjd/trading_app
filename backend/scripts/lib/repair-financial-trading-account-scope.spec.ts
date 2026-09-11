@@ -20,22 +20,25 @@ import {
 const nullRow = (id: string, accountId: string | null) => ({
   id,
   seasonParticipantId: `sp-${id}`,
-  seasonParticipant: { tradingAccountId: accountId },
+  participantTradingAccountId: accountId,
 });
 
 const createPrisma = () => {
-  const delegate = () => ({
-    findMany: jest.fn().mockResolvedValue([]),
-    updateMany: jest.fn().mockResolvedValue({ count: 0 }),
-    count: jest.fn().mockResolvedValue(0),
-  });
+  const nullRowsByTable: Record<string, ReturnType<typeof nullRow>[]> = {};
   const prisma = {
-    cashWallet: delegate(),
-    walletTransaction: delegate(),
-    exchangeTransaction: delegate(),
-    fxExecuteRequest: delegate(),
-    // Mismatch counters (raw SQL) default to zero.
-    $queryRawUnsafe: jest.fn().mockResolvedValue([{ n: 0 }]),
+    nullRowsByTable,
+    $queryRawUnsafe: jest.fn(
+      (sql: string, cursorId = ''): Promise<unknown[]> => {
+        if (sql.includes('ORDER BY t."id" ASC')) {
+          const table = /FROM "([^"]+)" t/.exec(sql)?.[1] ?? '';
+          return Promise.resolve(
+            (nullRowsByTable[table] ?? []).filter((row) => row.id > cursorId),
+          );
+        }
+        return Promise.resolve([{ n: 0 }]);
+      },
+    ),
+    $executeRawUnsafe: jest.fn().mockResolvedValue(0),
     $transaction: jest.fn(),
   };
   prisma.$transaction.mockImplementation((callback: (tx: unknown) => unknown) =>
@@ -48,13 +51,11 @@ const createPrisma = () => {
 describe('repairFinancialTradingAccountScope', () => {
   it('dry-run scans all four models and never writes', async () => {
     const prisma = createPrisma();
-    prisma.cashWallet.findMany.mockResolvedValueOnce([
+    prisma.nullRowsByTable.cash_wallets = [
       nullRow('w1', 'ta-1'),
       nullRow('w2', 'ta-1'),
-    ]);
-    prisma.walletTransaction.findMany.mockResolvedValueOnce([
-      nullRow('t1', 'ta-1'),
-    ]);
+    ];
+    prisma.nullRowsByTable.wallet_transactions = [nullRow('t1', 'ta-1')];
 
     const summary = await repairFinancialTradingAccountScope(prisma as never, {
       apply: false,
@@ -67,36 +68,31 @@ describe('repairFinancialTradingAccountScope', () => {
     expect(summary.models.exchangeTransaction.nullRowCount).toBe(0);
     expect(summary.failures).toEqual([]);
     expect(summary.remainingNullCounts).toBeNull();
-    for (const model of [
-      prisma.cashWallet,
-      prisma.walletTransaction,
-      prisma.exchangeTransaction,
-      prisma.fxExecuteRequest,
-    ]) {
-      expect(model.updateMany).not.toHaveBeenCalled();
-    }
+    expect(prisma.$executeRawUnsafe).not.toHaveBeenCalled();
   });
 
   it('apply backfills null rows via guarded grouped updates and re-verifies', async () => {
     const prisma = createPrisma();
-    prisma.cashWallet.findMany.mockResolvedValueOnce([
+    prisma.nullRowsByTable.cash_wallets = [
       nullRow('w1', 'ta-1'),
       nullRow('w2', 'ta-2'),
-    ]);
-    prisma.cashWallet.updateMany.mockResolvedValue({ count: 1 });
+    ];
+    prisma.$executeRawUnsafe.mockResolvedValue(1);
 
     const summary = await repairFinancialTradingAccountScope(prisma as never, {
       apply: true,
     });
 
-    expect(prisma.cashWallet.updateMany).toHaveBeenCalledWith({
-      where: { id: { in: ['w1'] }, tradingAccountId: null },
-      data: { tradingAccountId: 'ta-1' },
-    });
-    expect(prisma.cashWallet.updateMany).toHaveBeenCalledWith({
-      where: { id: { in: ['w2'] }, tradingAccountId: null },
-      data: { tradingAccountId: 'ta-2' },
-    });
+    expect(prisma.$executeRawUnsafe).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE "cash_wallets"'),
+      'ta-1',
+      ['w1'],
+    );
+    expect(prisma.$executeRawUnsafe).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE "cash_wallets"'),
+      'ta-2',
+      ['w2'],
+    );
     expect(summary.models.cashWallet.backfilledCount).toBe(2);
     expect(summary.remainingNullCounts).toEqual({
       cashWallet: 0,
@@ -114,9 +110,7 @@ describe('repairFinancialTradingAccountScope', () => {
 
   it('reports rows blocked by a missing participant link and never touches them', async () => {
     const prisma = createPrisma();
-    prisma.walletTransaction.findMany.mockResolvedValueOnce([
-      nullRow('t1', null),
-    ]);
+    prisma.nullRowsByTable.wallet_transactions = [nullRow('t1', null)];
 
     const summary = await repairFinancialTradingAccountScope(prisma as never, {
       apply: true,
@@ -125,7 +119,7 @@ describe('repairFinancialTradingAccountScope', () => {
     expect(summary.models.walletTransaction.missingParticipantLinkRows).toEqual(
       [{ rowId: 't1', seasonParticipantId: 'sp-t1' }],
     );
-    expect(prisma.walletTransaction.updateMany).not.toHaveBeenCalled();
+    expect(prisma.$executeRawUnsafe).not.toHaveBeenCalled();
   });
 
   it('reports scope mismatches as failures without overwriting anything', async () => {
@@ -133,7 +127,11 @@ describe('repairFinancialTradingAccountScope', () => {
     // Participant mismatch counter for cashWallet returns 3.
     prisma.$queryRawUnsafe.mockImplementation((sql: string) =>
       Promise.resolve(
-        sql.includes('"cash_wallets" t') ? [{ n: 3 }] : [{ n: 0 }],
+        sql.includes('ORDER BY t."id" ASC')
+          ? []
+          : sql.includes('"cash_wallets" t')
+            ? [{ n: 3 }]
+            : [{ n: 0 }],
       ),
     );
 
@@ -148,14 +146,18 @@ describe('repairFinancialTradingAccountScope', () => {
         code: 'FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH',
       }),
     ]);
-    expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+    expect(prisma.$executeRawUnsafe).not.toHaveBeenCalled();
   });
 
   it('reports wallet-vs-transaction scope disagreements', async () => {
     const prisma = createPrisma();
     prisma.$queryRawUnsafe.mockImplementation((sql: string) =>
       Promise.resolve(
-        sql.includes('JOIN "cash_wallets" w') ? [{ n: 2 }] : [{ n: 0 }],
+        sql.includes('ORDER BY t."id" ASC')
+          ? []
+          : sql.includes('JOIN "cash_wallets" w')
+            ? [{ n: 2 }]
+            : [{ n: 0 }],
       ),
     );
 

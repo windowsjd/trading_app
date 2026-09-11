@@ -36,11 +36,9 @@ function modelBlock(name: string): string {
 describe('SeasonRanking trading-account scope — schema', () => {
   const block = modelBlock('SeasonRanking');
 
-  it('adds a NULLABLE tradingAccountId', () => {
-    // Nullable on purpose: NOT NULL is a later hardening unit, after the repair
-    // script has converged on every environment.
+  it('requires tradingAccountId as the canonical ownership scope', () => {
     expect(block).toMatch(
-      /tradingAccountId\s+String\?\s+@map\("trading_account_id"\)/,
+      /tradingAccountId\s+String\s+@map\("trading_account_id"\)/,
     );
   });
 
@@ -51,7 +49,7 @@ describe('SeasonRanking trading-account scope — schema', () => {
 
   it('relates to TradingAccount with onDelete: Restrict', () => {
     expect(block).toMatch(
-      /tradingAccount\s+TradingAccount\?\s+@relation\(fields: \[tradingAccountId\], references: \[id\], onDelete: Restrict\)/,
+      /tradingAccount\s+TradingAccount\s+@relation\(fields: \[tradingAccountId\], references: \[id\], onDelete: Restrict\)/,
     );
   });
 

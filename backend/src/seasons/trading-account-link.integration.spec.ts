@@ -143,13 +143,33 @@ async function createSeason(label, status) {
   });
 }
 
-// Pre-account legacy participant shape: tradingAccountId deliberately null,
-// exactly like a row written by an old-version writer during the deploy
-// boundary, including its wallets and initial-grant ledger row.
-async function createLegacyParticipant(seasonId, userId, participantStatus) {
+// Canonical post-migration participant shape. Pre-migration NULL-link behavior
+// is covered by the repair helper's unit tests and migration SQL checks; a
+// migrated runtime database must only be populated through this required link.
+async function createCanonicalParticipant(seasonId, userId, participantStatus) {
   const joinedAt = new Date('2026-06-15T01:02:03.000Z');
+  const participantId = randomUUID();
+  const accountId = deriveSeasonTradingAccountId(participantId);
+  const accountStatus =
+    participantStatus === ParticipantStatus.excluded
+      ? TradingAccountStatus.suspended
+      : participantStatus === ParticipantStatus.finished ||
+          participantStatus === ParticipantStatus.rewarded
+        ? TradingAccountStatus.closed
+        : TradingAccountStatus.active;
+  await prisma.tradingAccount.create({
+    data: {
+      id: accountId,
+      userId,
+      mode: TradingAccountMode.season,
+      status: accountStatus,
+      initialCapitalKrw: CAPITAL,
+      openedAt: joinedAt,
+    },
+  });
   const participant = await prisma.seasonParticipant.create({
     data: {
+      id: participantId,
       seasonId,
       userId,
       joinedAt,
@@ -158,12 +178,14 @@ async function createLegacyParticipant(seasonId, userId, participantStatus) {
       totalAssetKrw: CAPITAL,
       totalReturnRate: ZERO,
       maxDrawdown: ZERO,
+      tradingAccountId: accountId,
     },
     select: { id: true, joinedAt: true },
   });
   const krwWallet = await prisma.cashWallet.create({
     data: {
       seasonParticipantId: participant.id,
+      tradingAccountId: accountId,
       currencyCode: CurrencyCode.KRW,
       balanceAmount: CAPITAL,
     },
@@ -172,6 +194,7 @@ async function createLegacyParticipant(seasonId, userId, participantStatus) {
   await prisma.cashWallet.create({
     data: {
       seasonParticipantId: participant.id,
+      tradingAccountId: accountId,
       currencyCode: CurrencyCode.USD,
       balanceAmount: ZERO,
     },
@@ -180,6 +203,7 @@ async function createLegacyParticipant(seasonId, userId, participantStatus) {
   await prisma.walletTransaction.create({
     data: {
       seasonParticipantId: participant.id,
+      tradingAccountId: accountId,
       walletId: krwWallet.id,
       currencyCode: CurrencyCode.KRW,
       direction: WalletTransactionDirection.credit,
@@ -194,6 +218,7 @@ async function createLegacyParticipant(seasonId, userId, participantStatus) {
   await prisma.equitySnapshot.create({
     data: {
       seasonParticipantId: participant.id,
+      tradingAccountId: accountId,
       totalAssetKrw: CAPITAL,
       returnRate: ZERO,
       krwCash: CAPITAL,
@@ -205,7 +230,12 @@ async function createLegacyParticipant(seasonId, userId, participantStatus) {
       capturedAt: joinedAt,
     },
   });
-  return { id: participant.id, joinedAt, krwWalletId: krwWallet.id };
+  return {
+    id: participant.id,
+    joinedAt,
+    krwWalletId: krwWallet.id,
+    tradingAccountId: accountId,
+  };
 }
 
 async function financialFingerprint(participantId) {
@@ -296,7 +326,7 @@ async function testRepairMappingAndNonMutation() {
     for (const [participantStatus, expectedStatus] of cases) {
       const user = await createUser('repair-' + participantStatus);
       scope.userIds.push(user.id);
-      const legacy = await createLegacyParticipant(
+      const legacy = await createCanonicalParticipant(
         season.id,
         user.id,
         participantStatus,
@@ -318,7 +348,7 @@ async function testRepairMappingAndNonMutation() {
       const result = await prisma.$transaction((tx) =>
         ensureSeasonTradingAccountLink(tx, participantRow),
       );
-      assert.equal(result.action, 'created-and-linked');
+      assert.equal(result.action, 'already-linked');
       assert.equal(result.tradingAccountId, deriveSeasonTradingAccountId(legacy.id));
 
       const linked = await prisma.seasonParticipant.findUniqueOrThrow({
@@ -368,7 +398,7 @@ async function testConcurrentRepairRace() {
   const scope = { userIds: [user.id], seasonIds: [season.id], participantIds: [] };
 
   try {
-    const legacy = await createLegacyParticipant(
+    const legacy = await createCanonicalParticipant(
       season.id,
       user.id,
       ParticipantStatus.active,
@@ -421,7 +451,7 @@ async function testJoinRepairsNullLinkAndKeeps409() {
   const scope = { userIds: [user.id], seasonIds: [season.id], participantIds: [] };
 
   try {
-    const legacy = await createLegacyParticipant(
+    const legacy = await createCanonicalParticipant(
       season.id,
       user.id,
       ParticipantStatus.active,
@@ -439,7 +469,7 @@ async function testJoinRepairsNullLinkAndKeeps409() {
     assert.equal(joinError.getStatus(), 409);
     assert.equal(joinError.getResponse().error.code, 'SEASON_ALREADY_JOINED');
 
-    // The repair must have committed despite the 409 response.
+    // A normal duplicate join must preserve the existing canonical link.
     const repaired = await prisma.seasonParticipant.findUniqueOrThrow({
       where: { id: legacy.id },
       include: { tradingAccount: true },
@@ -566,7 +596,7 @@ async function testExclusionRepairsNullLink() {
   };
 
   try {
-    const legacy = await createLegacyParticipant(
+    const legacy = await createCanonicalParticipant(
       season.id,
       user.id,
       ParticipantStatus.active,
@@ -762,13 +792,13 @@ async function testClosedAccountNotReverted() {
   };
 
   try {
-    const legacy = await createLegacyParticipant(
+    const legacy = await createCanonicalParticipant(
       season.id,
       user.id,
       ParticipantStatus.finished,
     );
     scope.participantIds.push(legacy.id);
-    // Repair first: finished → closed account, like the migration mapping.
+    // The canonical fixture starts with the same finished → closed mapping.
     const participantRow = await prisma.seasonParticipant.findUniqueOrThrow({
       where: { id: legacy.id },
       select: {
@@ -882,12 +912,12 @@ async function testRepairScriptDryRunAndApply() {
   };
 
   try {
-    const legacyA = await createLegacyParticipant(
+    const legacyA = await createCanonicalParticipant(
       season.id,
       userA.id,
       ParticipantStatus.active,
     );
-    const legacyB = await createLegacyParticipant(
+    const legacyB = await createCanonicalParticipant(
       season.id,
       userB.id,
       ParticipantStatus.excluded,
@@ -896,28 +926,28 @@ async function testRepairScriptDryRunAndApply() {
     const beforeA = await financialFingerprint(legacyA.id);
     const beforeB = await financialFingerprint(legacyB.id);
 
-    // Dry-run: plans both repairs, writes nothing.
+    // A post-migration canonical database has no missing-link repair work.
     const dryRun = await repairMissingTradingAccountLinks(prisma, {
       apply: false,
     });
     const dryRunIds = dryRun.outcomes.map((o) => o.seasonParticipantId);
-    assert.ok(dryRunIds.includes(legacyA.id));
-    assert.ok(dryRunIds.includes(legacyB.id));
+    assert.equal(dryRunIds.includes(legacyA.id), false);
+    assert.equal(dryRunIds.includes(legacyB.id), false);
     assert.equal(
       await prisma.tradingAccount.count({
         where: { userId: { in: [userA.id, userB.id] } },
       }),
-      0,
-      'dry-run must not create accounts',
+      2,
+      'dry-run must leave the canonical accounts untouched',
     );
 
-    // Apply: repairs the scoped participants; financial rows untouched.
+    // Apply is also a no-op; financial rows remain untouched.
     const applied = await repairMissingTradingAccountLinks(prisma, {
       apply: true,
     });
     const appliedIds = applied.outcomes.map((o) => o.seasonParticipantId);
-    assert.ok(appliedIds.includes(legacyA.id));
-    assert.ok(appliedIds.includes(legacyB.id));
+    assert.equal(appliedIds.includes(legacyA.id), false);
+    assert.equal(appliedIds.includes(legacyB.id), false);
     const repairedB = await prisma.seasonParticipant.findUniqueOrThrow({
       where: { id: legacyB.id },
       include: { tradingAccount: true },
@@ -962,11 +992,11 @@ async function main() {
   await prisma.$connect();
   try {
     await runCase('deterministic id matches postgres md5 cast', testDeterministicIdMatchesPostgres);
-    await runCase('null-link repair mapping + non-mutation + replay', testRepairMappingAndNonMutation);
-    await runCase('concurrent repair race: one account, no orphan', testConcurrentRepairRace);
-    await runCase('join repairs null link and keeps 409', testJoinRepairsNullLinkAndKeeps409);
+    await runCase('canonical link validation + non-mutation + replay', testRepairMappingAndNonMutation);
+    await runCase('concurrent canonical link validation: one account, no orphan', testConcurrentRepairRace);
+    await runCase('duplicate join preserves canonical link and keeps 409', testJoinRepairsNullLinkAndKeeps409);
     await runCase('exclusion suspends linked account + audit', testExclusionSuspendsAccount);
-    await runCase('exclusion repairs null link before suspending', testExclusionRepairsNullLink);
+    await runCase('exclusion preserves canonical link while suspending', testExclusionRepairsNullLink);
     await runCase('exclusion rollback on account update failure', () =>
       testExclusionRollsBackTogether('tradingAccount', 'update'));
     await runCase('exclusion rollback on participant update failure', () =>
@@ -974,7 +1004,7 @@ async function main() {
     await runCase('exclusion rollback on limit-order cancel failure', testExclusionRollsBackOnLimitCancelFailure);
     await runCase('closed account never reverted to suspended', testClosedAccountNotReverted);
     await runCase('ownership access: own list, foreign 404, suspended/closed readable', testOwnershipAccess);
-    await runCase('repair script dry-run/apply/idempotent re-run', testRepairScriptDryRunAndApply);
+    await runCase('repair script is a no-op on canonical rows', testRepairScriptDryRunAndApply);
     console.log('trading account link db integration ok');
   } finally {
     await prisma.$disconnect();

@@ -5,8 +5,8 @@ import { join } from 'node:path';
  * Contract tests for the TradingAccount DB foundation. These parse the actual
  * schema.prisma and the add_trading_account_foundation migration SQL, so they
  * fail if someone reintroduces monthly-grant fields, drops the partial unique
- * index, flips the backfill status mapping, or prematurely migrates the
- * trading tables off SeasonParticipant. DB-level behavior (index/CHECK
+ * index, flips the backfill status mapping, or weakens canonical account
+ * ownership back to a nullable scope. DB-level behavior (index/CHECK
  * enforcement, backfill execution) is covered by the opt-in PostgreSQL spec
  * trading-account.integration.spec.ts — text assertions here never replace it.
  */
@@ -126,13 +126,13 @@ describe('TradingAccount schema contract', () => {
     expect(fieldLines.join('\n').toLowerCase()).not.toContain('ad_reward');
   });
 
-  it('links SeasonParticipant 1:1 via nullable unique tradingAccountId', () => {
+  it('links SeasonParticipant 1:1 via required unique tradingAccountId', () => {
     const block = modelBlock('SeasonParticipant');
     expect(block).toMatch(
-      /tradingAccountId\s+String\?\s+@unique @map\("trading_account_id"\)/,
+      /tradingAccountId\s+String\s+@unique @map\("trading_account_id"\)/,
     );
     expect(block).toMatch(
-      /tradingAccount\s+TradingAccount\?\s+@relation\(fields: \[tradingAccountId\], references: \[id\], onDelete: Restrict\)/,
+      /tradingAccount\s+TradingAccount\s+@relation\(fields: \[tradingAccountId\], references: \[id\], onDelete: Restrict\)/,
     );
   });
 
@@ -146,60 +146,56 @@ describe('TradingAccount schema contract', () => {
     expect(modelBlock('User')).toMatch(/tradingAccounts\s+TradingAccount\[\]/);
   });
 
-  it('keeps the transitional dual identity on the financial AND trading tables', () => {
-    // Financial + trading tables carry BOTH identifiers during the
-    // transition. CashWallet/WalletTransaction became OPTIONAL on the
-    // participant in 작업 6 (general-mode rows have no participant at all);
-    // Order/Position are optional for participant-less general trading;
-    // ExchangeTransaction/FxExecuteRequest remain required because general FX
-    // is still disabled. Account scope stays nullable during the transition.
+  it('keeps legacy participant links while requiring canonical account ownership', () => {
+    // The participant link remains optional for general-mode rows and for
+    // compatibility, while every financial row has a required account scope.
     for (const model of ['CashWallet', 'WalletTransaction']) {
       const block = modelBlock(model);
       expect(block).toMatch(/seasonParticipantId\s+String\?/);
       expect(block).toMatch(
         /seasonParticipant\s+SeasonParticipant\?\s+@relation\(/,
       );
-      expect(block).toMatch(/tradingAccountId\s+String\?/);
+      expect(block).toMatch(/tradingAccountId\s+String\s/);
       expect(block).toMatch(
-        /tradingAccount\s+TradingAccount\?\s+@relation\([^)]*onDelete: Restrict/,
+        /tradingAccount\s+TradingAccount\s+@relation\([^)]*onDelete: Restrict/,
       );
     }
 
     for (const model of ['ExchangeTransaction', 'FxExecuteRequest']) {
       const block = modelBlock(model);
       expect(block).toMatch(/seasonParticipantId\s+String\?\s/);
-      expect(block).toMatch(/tradingAccountId\s+String\?/);
+      expect(block).toMatch(/tradingAccountId\s+String\s/);
       expect(block).toMatch(
-        /tradingAccount\s+TradingAccount\?\s+@relation\([^)]*onDelete: Restrict/,
+        /tradingAccount\s+TradingAccount\s+@relation\([^)]*onDelete: Restrict/,
       );
     }
 
     for (const model of ['Order', 'Position']) {
       const block = modelBlock(model);
       expect(block).toMatch(/seasonParticipantId\s+String\?/);
-      expect(block).toMatch(/tradingAccountId\s+String\?/);
+      expect(block).toMatch(/tradingAccountId\s+String\s/);
       expect(block).toMatch(
-        /tradingAccount\s+TradingAccount\?\s+@relation\([^)]*onDelete: Restrict/,
+        /tradingAccount\s+TradingAccount\s+@relation\([^)]*onDelete: Restrict/,
       );
     }
 
-    // Quote keeps its historical NULLABLE participant id and gains the same
-    // nullable account scope.
+    // Quote keeps its historical nullable participant id, but account scope
+    // is canonical and required.
     const quoteBlock = modelBlock('Quote');
     expect(quoteBlock).toMatch(/seasonParticipantId\s+String\?/);
-    expect(quoteBlock).toMatch(/tradingAccountId\s+String\?/);
+    expect(quoteBlock).toMatch(/tradingAccountId\s+String\s/);
     expect(quoteBlock).toMatch(
-      /tradingAccount\s+TradingAccount\?\s+@relation\([^)]*onDelete: Restrict/,
+      /tradingAccount\s+TradingAccount\s+@relation\([^)]*onDelete: Restrict/,
     );
 
-    // EquitySnapshot / DailyPortfolioSnapshot moved to the transitional dual
-    // identity in 작업 7 (general accounts own snapshots with no participant).
+    // General accounts own snapshots without participants, but not without an
+    // account.
     for (const model of ['EquitySnapshot', 'DailyPortfolioSnapshot']) {
       const block = modelBlock(model);
       expect(block).toMatch(/seasonParticipantId\s+String\?/);
-      expect(block).toMatch(/tradingAccountId\s+String\?/);
+      expect(block).toMatch(/tradingAccountId\s+String\s/);
       expect(block).toMatch(
-        /tradingAccount\s+TradingAccount\?\s+@relation\([^)]*onDelete: Restrict/,
+        /tradingAccount\s+TradingAccount\s+@relation\([^)]*onDelete: Restrict/,
       );
     }
 
@@ -207,7 +203,7 @@ describe('TradingAccount schema contract', () => {
     // link stays REQUIRED: it is still a season-only model.
     const rankingBlock = modelBlock('SeasonRanking');
     expect(rankingBlock).toMatch(/seasonParticipantId\s+String\s/);
-    expect(rankingBlock).toMatch(/tradingAccountId\s+String\?/);
+    expect(rankingBlock).toMatch(/tradingAccountId\s+String\s/);
 
     // LimitOrderCandleEvidence is reached through the Order relation and
     // must not gain a duplicated account FK.

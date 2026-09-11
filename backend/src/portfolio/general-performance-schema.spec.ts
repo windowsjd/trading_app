@@ -4,7 +4,7 @@ import { join } from 'node:path';
 /**
  * Contract tests for the 작업 7 snapshot foundation + the 작업 6 보완
  * ad-reward command idempotency. They parse the real schema and migrations,
- * so they fail if someone re-tightens the nullable snapshot links, drops a
+ * so they fail if someone re-tightens the participant links, drops a
  * CHECK or boundary unique, merges the two ad-reward uniques, lets the
  * migration fabricate a general account or a baseline, or prematurely moves
  * SeasonRanking / the trading tables.
@@ -138,7 +138,7 @@ describe('General performance schema contract', () => {
   describe('EquitySnapshot', () => {
     const block = () => modelBlock('EquitySnapshot');
 
-    it('makes the season link optional and adds the account scope', () => {
+    it('keeps the season link optional and requires the account scope', () => {
       expect(block()).toMatch(
         /seasonParticipantId\s+String\?\s+@map\("season_participant_id"\)/,
       );
@@ -146,10 +146,10 @@ describe('General performance schema contract', () => {
         /seasonParticipant\s+SeasonParticipant\?\s+@relation\(/,
       );
       expect(block()).toMatch(
-        /tradingAccountId\s+String\?\s+@map\("trading_account_id"\)/,
+        /tradingAccountId\s+String\s+@map\("trading_account_id"\)/,
       );
       expect(block()).toMatch(
-        /tradingAccount\s+TradingAccount\?\s+@relation\([^)]*onDelete: Restrict/,
+        /tradingAccount\s+TradingAccount\s+@relation\([^)]*onDelete: Restrict/,
       );
     });
 
@@ -221,11 +221,11 @@ describe('General performance schema contract', () => {
   describe('DailyPortfolioSnapshot', () => {
     const block = () => modelBlock('DailyPortfolioSnapshot');
 
-    it('makes the season link optional and adds the account scope', () => {
+    it('keeps the season link optional and requires the account scope', () => {
       expect(block()).toMatch(/seasonParticipantId\s+String\?/);
-      expect(block()).toMatch(/tradingAccountId\s+String\?/);
+      expect(block()).toMatch(/tradingAccountId\s+String\s/);
       expect(block()).toMatch(
-        /tradingAccount\s+TradingAccount\?\s+@relation\([^)]*onDelete: Restrict/,
+        /tradingAccount\s+TradingAccount\s+@relation\([^)]*onDelete: Restrict/,
       );
     });
 

@@ -70,7 +70,6 @@ const createPrisma = () => {
     seasonParticipant: {
       findMany: jest.fn().mockResolvedValue([]),
       findUnique: jest.fn(),
-      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       count: jest.fn().mockResolvedValue(0),
     },
     tradingAccount: {
@@ -78,6 +77,7 @@ const createPrisma = () => {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     $executeRaw: jest.fn().mockResolvedValue(1),
+    $queryRaw: jest.fn().mockResolvedValue([]),
     $transaction: jest.fn(),
   };
   prisma.$transaction.mockImplementation((callback: (tx: unknown) => unknown) =>
@@ -95,11 +95,7 @@ describe('repairMissingTradingAccountLinks', () => {
       apply: false,
     });
 
-    expect(prisma.seasonParticipant.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { tradingAccountId: null },
-      }),
-    );
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
     expect(prisma.seasonParticipant.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         // `expect.objectContaining` is typed as `any` by jest; nesting two of
@@ -130,9 +126,10 @@ describe('repairMissingTradingAccountLinks', () => {
 
   it('dry-run plans both repair kinds without any write', async () => {
     const prisma = createPrisma();
-    prisma.seasonParticipant.findMany
-      .mockResolvedValueOnce([nullParticipant('sp-a', 'user-a')])
-      .mockResolvedValueOnce([excludedActiveRow('sp-x', 'user-x')]);
+    prisma.$queryRaw.mockResolvedValueOnce([nullParticipant('sp-a', 'user-a')]);
+    prisma.seasonParticipant.findMany.mockResolvedValueOnce([
+      excludedActiveRow('sp-x', 'user-x'),
+    ]);
 
     const summary = await repairMissingTradingAccountLinks(prisma as never, {
       apply: false,
@@ -155,15 +152,15 @@ describe('repairMissingTradingAccountLinks', () => {
     ]);
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.$executeRaw).not.toHaveBeenCalled();
-    expect(prisma.seasonParticipant.updateMany).not.toHaveBeenCalled();
     expect(prisma.tradingAccount.updateMany).not.toHaveBeenCalled();
   });
 
   it('apply repairs null links and re-verifies both remaining counts', async () => {
     const prisma = createPrisma();
-    prisma.seasonParticipant.findMany
+    prisma.$queryRaw
       .mockResolvedValueOnce([nullParticipant('sp-a', 'user-a')])
-      .mockResolvedValueOnce([]);
+      .mockResolvedValueOnce([{ count: 0n }]);
+    prisma.seasonParticipant.findMany.mockResolvedValueOnce([]);
     // Post-insert re-read validation fetches the stored deterministic row.
     prisma.tradingAccount.findUnique
       .mockResolvedValueOnce(null)
@@ -190,14 +187,15 @@ describe('repairMissingTradingAccountLinks', () => {
     expect(summary.failures).toEqual([]);
     expect(summary.remainingNullLinkCount).toBe(0);
     expect(summary.remainingExcludedActiveMismatchCount).toBe(0);
-    expect(prisma.seasonParticipant.count).toHaveBeenCalledTimes(2);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(prisma.seasonParticipant.count).toHaveBeenCalledTimes(1);
   });
 
   it('apply suspends the active account of an already-excluded participant (guarded)', async () => {
     const prisma = createPrisma();
-    prisma.seasonParticipant.findMany
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([excludedActiveRow('sp-x', 'user-x')]);
+    prisma.seasonParticipant.findMany.mockResolvedValueOnce([
+      excludedActiveRow('sp-x', 'user-x'),
+    ]);
 
     const summary = await repairMissingTradingAccountLinks(prisma as never, {
       apply: true,
@@ -217,9 +215,9 @@ describe('repairMissingTradingAccountLinks', () => {
 
   it('reports a concurrent status change as already-consistent instead of forcing it', async () => {
     const prisma = createPrisma();
-    prisma.seasonParticipant.findMany
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([excludedActiveRow('sp-x', 'user-x')]);
+    prisma.seasonParticipant.findMany.mockResolvedValueOnce([
+      excludedActiveRow('sp-x', 'user-x'),
+    ]);
     prisma.tradingAccount.updateMany.mockResolvedValueOnce({ count: 0 });
 
     const summary = await repairMissingTradingAccountLinks(prisma as never, {
@@ -233,11 +231,9 @@ describe('repairMissingTradingAccountLinks', () => {
 
   it('fails closed on a foreign-user account instead of suspending it', async () => {
     const prisma = createPrisma();
-    prisma.seasonParticipant.findMany
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        excludedActiveRow('sp-x', 'user-x', { userId: 'user-other' }),
-      ]);
+    prisma.seasonParticipant.findMany.mockResolvedValueOnce([
+      excludedActiveRow('sp-x', 'user-x', { userId: 'user-other' }),
+    ]);
 
     const summary = await repairMissingTradingAccountLinks(prisma as never, {
       apply: true,
@@ -254,12 +250,13 @@ describe('repairMissingTradingAccountLinks', () => {
 
   it('reports per-participant failures without stopping the remaining repairs', async () => {
     const prisma = createPrisma();
-    prisma.seasonParticipant.findMany
+    prisma.$queryRaw
       .mockResolvedValueOnce([
         nullParticipant('sp-bad', 'user-bad'),
         nullParticipant('sp-good', 'user-good'),
       ])
-      .mockResolvedValueOnce([]);
+      .mockResolvedValueOnce([{ count: 1n }]);
+    prisma.seasonParticipant.findMany.mockResolvedValueOnce([]);
     // sp-bad's deterministic account exists but belongs to someone else.
     prisma.tradingAccount.findUnique
       .mockResolvedValueOnce({
@@ -283,9 +280,7 @@ describe('repairMissingTradingAccountLinks', () => {
         openedAt: new Date('2026-06-01T00:00:00.000Z'),
         seasonParticipant: null,
       });
-    prisma.seasonParticipant.count
-      .mockResolvedValueOnce(1)
-      .mockResolvedValueOnce(0);
+    prisma.seasonParticipant.count.mockResolvedValueOnce(0);
 
     const summary = await repairMissingTradingAccountLinks(prisma as never, {
       apply: true,

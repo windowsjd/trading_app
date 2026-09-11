@@ -71,7 +71,6 @@ const createPrisma = () => {
     seasonParticipant: {
       findUnique: jest.fn(),
       create: jest.fn(),
-      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     tradingAccount: {
       create: jest.fn(),
@@ -145,7 +144,6 @@ describe('ensureDevBaselineParticipant trading-account link repair', () => {
     ).toBe(true);
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.$executeRaw).not.toHaveBeenCalled();
-    expect(prisma.seasonParticipant.updateMany).not.toHaveBeenCalled();
   });
 
   it('apply repairs only the trading account link, never wallets or the grant', async () => {
@@ -181,7 +179,7 @@ describe('ensureDevBaselineParticipant trading-account link repair', () => {
     expect(result.notes.some((note) => note.includes(deterministicId))).toBe(
       true,
     );
-    expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
     // The jest mock's `.mock` surface is untyped by construction; asserting on
     // the recorded arguments is the point of this test.
     /* eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
@@ -193,10 +191,11 @@ describe('ensureDevBaselineParticipant trading-account link repair', () => {
       CAPITAL,
       new Date('2026-03-30T00:00:00.000Z'),
     ]);
-    expect(prisma.seasonParticipant.updateMany).toHaveBeenCalledWith({
-      where: { id: DEV_SEASON_PARTICIPANT_ID, tradingAccountId: null },
-      data: { tradingAccountId: deterministicId },
-    });
+    /* eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+    expect(prisma.$executeRaw.mock.calls[1].slice(1)).toEqual([
+      deterministicId,
+      DEV_SEASON_PARTICIPANT_ID,
+    ]);
     // Financial rows are never touched by the repair.
     expect(prisma.cashWallet.create).not.toHaveBeenCalled();
     expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
@@ -217,6 +216,5 @@ describe('ensureDevBaselineParticipant trading-account link repair', () => {
 
     expect(result.accountLinkRepaired).toBe(false);
     expect(prisma.$executeRaw).not.toHaveBeenCalled();
-    expect(prisma.seasonParticipant.updateMany).not.toHaveBeenCalled();
   });
 });

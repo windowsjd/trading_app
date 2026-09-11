@@ -116,11 +116,19 @@ const authService = new AuthService(prisma, new JwtService(), configService);
 const seasonsService = new SeasonsService(prisma);
 const walletsService = new WalletsService(prisma);
 const assetsService = new AssetsService(prisma);
-const fxService = new FxService(prisma);
 const ordersService = new OrdersService(prisma);
 const positionsService = new PositionsService(prisma);
 const recordsService = new RecordsService(prisma);
 const portfolioValuationService = new PortfolioValuationService(prisma);
+const fxService = new FxService(
+  prisma,
+  undefined,
+  undefined,
+  undefined,
+  undefined,
+  undefined,
+  portfolioValuationService,
+);
 const homeService = new HomeService(prisma, portfolioValuationService);
 const rankingService = new RankingService(prisma);
 

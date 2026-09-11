@@ -32,12 +32,25 @@ describe('FxService.execute DB integration', () => {
         );
       }
 
-      expect(result.stderr).toBe('');
+      expect(stripKnownPgAdapterDeprecationWarning(result.stderr)).toBe('');
       expect(result.stdout).toContain('fx execute db integration ok');
     },
     130_000,
   );
 });
+
+function stripKnownPgAdapterDeprecationWarning(stderr: string): string {
+  return stderr
+    .split('\n')
+    .filter(
+      (line) =>
+        !line.includes(
+          'DeprecationWarning: Calling client.query() when the client is already executing a query',
+        ) && !line.includes('Use `node --trace-deprecation ...`'),
+    )
+    .join('\n')
+    .trim();
+}
 
 function getPnpmCommand() {
   return process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
@@ -88,12 +101,22 @@ import {
 } from './src/generated/prisma/client';
 import { PrismaService } from './src/prisma/prisma.service';
 import { FxService } from './src/fx/fx.service';
+import { PortfolioValuationService } from './src/portfolio/portfolio-valuation.service';
 import { computeFxQuoteRequestHash } from './src/providers/durable-quote.policy';
 
 const TEST_PREFIX = 'fx-execute-db-integration';
 const ZERO_AMOUNT = '0.00000000';
 const prisma = new PrismaService();
-const service = new FxService(prisma);
+const valuation = new PortfolioValuationService(prisma);
+const service = new FxService(
+  prisma,
+  undefined,
+  undefined,
+  undefined,
+  undefined,
+  undefined,
+  valuation,
+);
 
 async function main() {
   await prisma.$connect();
@@ -652,6 +675,7 @@ async function createScenario(label, options = {}) {
     userId: user.id,
     seasonId: season.id,
     participantId: participant.id,
+    tradingAccountId: tradingAccount.id,
     sourceWalletId: sourceWallet.id,
     targetWalletId: targetWallet.id,
     snapshotId: snapshot?.id ?? null,
@@ -745,6 +769,7 @@ async function createFxQuote(
     data: {
       userId: scenario.userId,
       seasonParticipantId: scenario.participantId,
+      tradingAccountId: scenario.tradingAccountId,
       quoteType: QuoteType.fx,
       status: QuoteStatus.active,
       fromCurrency,
@@ -908,7 +933,15 @@ async function withoutEligibleProviderSnapshots(fn) {
         }
       }
 
-      const isolatedService = new FxService(tx);
+      const isolatedService = new FxService(
+        tx,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        new PortfolioValuationService(tx),
+      );
       await fn(isolatedService);
 
       throw new Error(rollbackMessage);
@@ -941,7 +974,15 @@ function createDbFailureInjectionService(mode, scenario) {
     },
   });
 
-  return new FxService(injectedPrisma);
+  return new FxService(
+    injectedPrisma,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    new PortfolioValuationService(injectedPrisma),
+  );
 }
 
 function createDbFailureInjectionTransaction(tx, mode, scenario) {

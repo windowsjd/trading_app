@@ -232,6 +232,22 @@ describe('AssetsService', () => {
     approvedByUserId: 'operator-1',
   });
 
+  const freshUsdKrwProviderSnapshots = () =>
+    ['korea_exim_exchange_rate', 'exchange_rate_api'].map(
+      (sourceName, index) => ({
+        id: `fx-provider-${index + 1}`,
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+        rate: new Prisma.Decimal('1400.00000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName,
+        effectiveAt: new Date(Date.now() - 1_000),
+        capturedAt: new Date(Date.now() - 1_000),
+        createdAt: new Date(Date.now() - 1_000),
+        approvedByUserId: null,
+      }),
+    );
+
   const staleUsdKrwSnapshot = () => ({
     ...freshUsdKrwSnapshot(),
     effectiveAt: new Date(Date.now() - 61_000),
@@ -333,8 +349,9 @@ describe('AssetsService', () => {
 
   it('caches the realtime USD/KRW selection for a short TTL (one FX read per burst)', async () => {
     const { prisma, service } = createService();
-    prisma.fxRateSnapshot.findMany.mockResolvedValue([]);
-    prisma.fxRateSnapshot.findFirst.mockResolvedValue(freshUsdKrwSnapshot());
+    prisma.fxRateSnapshot.findMany.mockResolvedValue(
+      freshUsdKrwProviderSnapshots(),
+    );
 
     const first = await service.convertRealtimePriceToKrw({
       priceLocal: '2.00000000',
@@ -355,7 +372,7 @@ describe('AssetsService', () => {
       priceKrw: '4200.00000000',
     });
     expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalledTimes(1);
-    expect(prisma.fxRateSnapshot.findFirst).toHaveBeenCalledTimes(1);
+    expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
 
     // TTL expiry → exactly one more read.
     jest.setSystemTime(new Date(testNow.getTime() + 2_500));
@@ -382,7 +399,9 @@ describe('AssetsService', () => {
 
     expect(first.state).toBe('unavailable');
     expect(second.state).toBe('unavailable');
-    expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalledTimes(1);
+    // One selection cycle performs the bounded first page plus one query for
+    // each missing configured provider. The cached second call performs none.
+    expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalledTimes(3);
   });
 
   it('converts KRW-priced realtime prices without touching FX at all', async () => {

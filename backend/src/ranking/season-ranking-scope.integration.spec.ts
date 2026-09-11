@@ -272,23 +272,34 @@ async function testMigrationBackfillAndUnique() {
   });
   const rankingDate = dateOnly('2026-08-01');
 
-  // A row written the OLD way: participant only, no account scope. Raw SQL,
-  // because the Prisma writers can no longer produce one.
-  const legacyId = randomUUID();
-  await prisma.$executeRaw\`
-    INSERT INTO "season_rankings"
-      ("id", "season_id", "season_participant_id", "rank_type", "rank",
-       "total_asset_krw", "return_rate", "max_drawdown", "total_fill_count",
-       "ranking_date", "captured_at")
-    VALUES (\${legacyId}, \${fixture.seasonId}, \${fixture.participants[0].id},
-            'daily'::"SeasonRankingType", 1, 12345.5, 1.25, 0.5, 3,
-            \${rankingDate}::date, now())
-  \`;
-
-  const beforeRow = await prisma.seasonRanking.findUniqueOrThrow({
-    where: { id: legacyId },
+  const canonical = await prisma.seasonRanking.create({
+    data: {
+      seasonId: fixture.seasonId,
+      seasonParticipantId: fixture.participants[0].id,
+      tradingAccountId: fixture.participants[0].accountId,
+      rankType: 'daily',
+      rank: 1,
+      totalAssetKrw: '12345.5',
+      returnRate: '1.25',
+      maxDrawdown: '0.5',
+      totalFillCount: 3,
+      rankingDate,
+      capturedAt: new Date(),
+    },
   });
-  assert.equal(beforeRow.tradingAccountId, null, 'legacy row must start unscoped');
+  const beforeRow = await prisma.seasonRanking.findUniqueOrThrow({
+    where: { id: canonical.id },
+  });
+
+  await assert.rejects(
+    prisma.$executeRaw\`
+      UPDATE "season_rankings"
+      SET "trading_account_id" = NULL
+      WHERE "id" = \${canonical.id}
+    \`,
+    (error) => error?.code === 'P2010',
+    'the database must reject a null ranking account scope',
+  );
 
   // The migration's backfill statement, replayed exactly.
   await prisma.$executeRaw\`
@@ -301,12 +312,12 @@ async function testMigrationBackfillAndUnique() {
   \`;
 
   const afterRow = await prisma.seasonRanking.findUniqueOrThrow({
-    where: { id: legacyId },
+    where: { id: canonical.id },
   });
   assert.equal(
     afterRow.tradingAccountId,
     fixture.participants[0].accountId,
-    'backfill must copy the participant account link',
+    'migration replay must preserve the canonical account link',
   );
 
   // FINGERPRINT: everything except trading_account_id is byte-identical.
@@ -338,48 +349,6 @@ async function testMigrationBackfillAndUnique() {
   }
   assert.equal(afterRow.reachedReturnAt, beforeRow.reachedReturnAt);
 
-  // A participant with NO account link stays NULL — never guessed.
-  const orphanUserId = await createUser('orphan');
-  const orphan = await prisma.seasonParticipant.create({
-    data: {
-      seasonId: fixture.seasonId,
-      userId: orphanUserId,
-      joinedAt: fixture.startAt,
-      participantStatus: 'active',
-      initialCapitalKrw: '10000000',
-      totalAssetKrw: '10000000',
-      totalReturnRate: '0',
-      maxDrawdown: '0',
-      tradingAccountId: null,
-    },
-    select: { id: true },
-  });
-  const orphanRankingId = randomUUID();
-  await prisma.$executeRaw\`
-    INSERT INTO "season_rankings"
-      ("id", "season_id", "season_participant_id", "rank_type", "rank",
-       "total_asset_krw", "return_rate", "max_drawdown", "total_fill_count",
-       "ranking_date", "captured_at")
-    VALUES (\${orphanRankingId}, \${fixture.seasonId}, \${orphan.id},
-            'daily'::"SeasonRankingType", 2, 1, 0, 0, 0, \${rankingDate}::date, now())
-  \`;
-  await prisma.$executeRaw\`
-    UPDATE "season_rankings" sr
-    SET "trading_account_id" = sp."trading_account_id"
-    FROM "season_participants" sp
-    WHERE sr."season_participant_id" = sp."id"
-      AND sr."trading_account_id" IS NULL
-      AND sp."trading_account_id" IS NOT NULL
-  \`;
-  const orphanRow = await prisma.seasonRanking.findUniqueOrThrow({
-    where: { id: orphanRankingId },
-  });
-  assert.equal(
-    orphanRow.tradingAccountId,
-    null,
-    'a participant with no link must leave the ranking unscoped',
-  );
-
   // The new account-scoped UNIQUE is real.
   let uniqueViolated = false;
   try {
@@ -400,13 +369,7 @@ async function testMigrationBackfillAndUnique() {
     'one account must not hold two rows in the same ranking set',
   );
 
-  // The orphan pair has served its purpose. Removing it here keeps the shared
-  // DB free of a permanently unrepairable row, which the repair-script test
-  // later asserts a CLEAN converged state against.
-  await prisma.$executeRaw\`DELETE FROM "season_rankings" WHERE "id" = \${orphanRankingId}\`;
-  await prisma.seasonParticipant.delete({ where: { id: orphan.id } });
-
-  console.log('  [1] migration backfill + fingerprint + account unique ok');
+  console.log('  [1] canonical NOT NULL + migration replay + account unique ok');
   return fixture;
 }
 
@@ -480,49 +443,19 @@ async function testWritersDualWrite() {
     );
   }
 
-  // ---- a participant whose link is broken blocks the ENTIRE write ----
+  // ---- the canonical client rejects a participant with no account link ----
   const brokenFixture = await createSeasonWithParticipants({
     participantCount: 2,
     status: 'active',
     startAt: new Date(now.getTime() - 3_600_000),
     endAt: new Date(now.getTime() + 3_600_000),
   });
-  await prisma.seasonParticipant.update({
-    where: { id: brokenFixture.participants[1].id },
-    data: { tradingAccountId: null },
-  });
-
-  // The refresh resolves participant scopes BEFORE it opens its write
-  // transaction, so a broken link is caught by the source-scope guard first.
-  await expectCode(
-    refresh.refreshCurrentRankingForSeason(brokenFixture.seasonId, {
-      capturedAt: now,
-      createEquitySnapshots: false,
+  await assert.rejects(
+    prisma.seasonParticipant.update({
+      where: { id: brokenFixture.participants[1].id },
+      data: { tradingAccountId: null },
     }),
-    'SEASON_RANKING_SOURCE_SCOPE_REPAIR_REQUIRED',
-  );
-
-  // The admin/script writer has no participant pre-pass, so it is the path
-  // that surfaces the ranking-scope link error directly.
-  await expectCode(
-    writeSeasonRankings(prisma, {
-      seasonId: brokenFixture.seasonId,
-      rankType: 'final',
-      rankingDate: dateOnly('2026-08-09'),
-      capturedAt: now,
-      dryRun: false,
-      rows: brokenFixture.participants.map((participant, index) => ({
-        seasonParticipantId: participant.id,
-        userId: participant.userId,
-        rank: index + 1,
-        totalAssetKrw: '10000000.00000000',
-        returnRate: '0.00000000',
-        maxDrawdown: '0.00000000',
-        totalFillCount: 0,
-        reachedReturnAt: now,
-      })),
-    }),
-    'TRADING_ACCOUNT_LINK_INTEGRITY',
+    (error) => error?.name === 'PrismaClientValidationError',
   );
   assert.equal(
     await prisma.seasonRanking.count({
@@ -632,7 +565,7 @@ async function testRankingInputScope() {
   // Now damage a source snapshot and confirm the job REFUSES rather than
   // ranking one participant fewer.
   const damagedFixture = await createSeasonWithParticipants({
-    participantCount: 2,
+    participantCount: 3,
     status: 'active',
     startAt: new Date(now.getTime() - 86_400_000),
     endAt: new Date(now.getTime() + 86_400_000),
@@ -645,8 +578,18 @@ async function testRankingInputScope() {
     '10500000',
     '5',
   );
+  await assert.rejects(
+    prisma.$executeRaw\`
+      UPDATE "daily_portfolio_snapshots"
+      SET "trading_account_id" = NULL
+      WHERE "id" = \${damaged.id}
+    \`,
+    (error) => error?.code === 'P2010',
+  );
   await prisma.$executeRaw\`
-    UPDATE "daily_portfolio_snapshots" SET "trading_account_id" = NULL WHERE "id" = \${damaged.id}
+    UPDATE "daily_portfolio_snapshots"
+    SET "trading_account_id" = \${damagedFixture.participants[2].accountId}
+    WHERE "id" = \${damaged.id}
   \`;
 
   let sourceFailureCode = null;
@@ -660,8 +603,8 @@ async function testRankingInputScope() {
   }
   assert.equal(
     sourceFailureCode,
-    'SEASON_RANKING_SOURCE_SCOPE_REPAIR_REQUIRED',
-    'a null-scoped source snapshot must fail the job',
+    'SEASON_RANKING_SOURCE_SCOPE_MISMATCH',
+    'a mismatched source snapshot must fail the job',
   );
   assert.equal(
     await prisma.seasonRanking.count({
@@ -852,18 +795,37 @@ async function testSettlementRollback() {
   await createDailySnapshot(fixture.participants[0], settlementDate, '12000000', '20');
   await createDailySnapshot(fixture.participants[1], settlementDate, '11000000', '10');
 
-  // Break the link of an EXCLUDED participant, AFTER the snapshots exist.
+  // Corrupt the link of an EXCLUDED participant with a foreign non-null
+  // account, AFTER the snapshots exist.
   //
   // Excluded participants are not settlement-ELIGIBLE, so 작업 8 보완 §A-1's
   // pre-transaction participant scope map never sees this one — the failure
   // therefore happens where it is meant to, inside the settlement transaction,
   // at the season-wide account link check that runs before any write.
+  const foreignUserId = await createUser('settlement-foreign');
+  const foreignAccount = await prisma.tradingAccount.create({
+    data: {
+      userId: foreignUserId,
+      mode: 'season',
+      status: 'active',
+      initialCapitalKrw: '10000000',
+      openedAt: fixture.startAt,
+    },
+    select: { id: true },
+  });
+  await assert.rejects(
+    prisma.seasonParticipant.update({
+      where: { id: fixture.participants[1].id },
+      data: { tradingAccountId: null },
+    }),
+    (error) => error?.name === 'PrismaClientValidationError',
+  );
   await prisma.seasonParticipant.update({
     where: { id: fixture.participants[1].id },
     data: {
       participantStatus: 'excluded',
       excludedAt: new Date(),
-      tradingAccountId: null,
+      tradingAccountId: foreignAccount.id,
     },
   });
 
@@ -998,35 +960,36 @@ async function testRepairScript() {
   });
   const rankingDate = dateOnly('2026-08-08');
 
-  const nullScopedId = randomUUID();
-  await prisma.$executeRaw\`
-    INSERT INTO "season_rankings"
-      ("id", "season_id", "season_participant_id", "rank_type", "rank",
-       "total_asset_krw", "return_rate", "max_drawdown", "total_fill_count",
-       "ranking_date", "captured_at")
-    VALUES (\${nullScopedId}, \${fixture.seasonId}, \${fixture.participants[0].id},
-            'daily'::"SeasonRankingType", 1, 777.25, 3.5, 1.5, 9,
-            \${rankingDate}::date, now())
-  \`;
+  const row = await prisma.seasonRanking.create({
+    data: {
+      seasonId: fixture.seasonId,
+      seasonParticipantId: fixture.participants[0].id,
+      tradingAccountId: fixture.participants[0].accountId,
+      rankType: 'daily',
+      rank: 1,
+      totalAssetKrw: '777.25',
+      returnRate: '3.5',
+      maxDrawdown: '1.5',
+      totalFillCount: 9,
+      rankingDate,
+      capturedAt: now,
+    },
+  });
   const before = await prisma.seasonRanking.findUniqueOrThrow({
-    where: { id: nullScopedId },
+    where: { id: row.id },
   });
 
-  // ---- DRY RUN writes nothing ----
+  // ---- canonical rows require no pre-migration repair ----
   const dry = await repairRankingScope(prisma, { apply: false });
-  assert.ok(dry.nullScopeRowCount >= 1);
-  assert.ok(dry.backfilledCount >= 1, 'dry-run must report what it would fix');
-  const stillNull = await prisma.seasonRanking.findUniqueOrThrow({
-    where: { id: nullScopedId },
-  });
-  assert.equal(stillNull.tradingAccountId, null, 'dry-run must not write');
+  assert.equal(dry.nullScopeRowCount, 0);
+  assert.equal(dry.backfilledCount, 0);
   assert.equal(resolveRankingScopeExitCode(dry), 0);
 
-  // ---- APPLY fills ONLY the scope column ----
+  // ---- APPLY is a no-op and preserves every ranking value ----
   const applied = await repairRankingScope(prisma, { apply: true });
-  assert.ok(applied.backfilledCount >= 1);
+  assert.equal(applied.backfilledCount, 0);
   const repaired = await prisma.seasonRanking.findUniqueOrThrow({
-    where: { id: nullScopedId },
+    where: { id: row.id },
   });
   assert.equal(repaired.tradingAccountId, fixture.participants[0].accountId);
   assert.equal(repaired.rank, before.rank);
@@ -1047,7 +1010,7 @@ async function testRepairScript() {
   // ---- a NON-NULL mismatch is reported and NEVER overwritten ----
   await prisma.$executeRaw\`
     UPDATE "season_rankings" SET "trading_account_id" = \${fixture.participants[1].accountId}
-    WHERE "id" = \${nullScopedId}
+    WHERE "id" = \${row.id}
   \`;
   const mismatched = await repairRankingScope(prisma, { apply: true });
   assert.ok(mismatched.mismatchCount >= 1, 'mismatch must be reported');
@@ -1057,7 +1020,7 @@ async function testRepairScript() {
     'unresolved mismatch must exit non-zero',
   );
   const untouched = await prisma.seasonRanking.findUniqueOrThrow({
-    where: { id: nullScopedId },
+    where: { id: row.id },
   });
   assert.equal(
     untouched.tradingAccountId,
@@ -1075,7 +1038,7 @@ async function testRepairScript() {
   // Clean it up so the shared DB is left healthy.
   await prisma.$executeRaw\`
     UPDATE "season_rankings" SET "trading_account_id" = \${fixture.participants[0].accountId}
-    WHERE "id" = \${nullScopedId}
+    WHERE "id" = \${row.id}
   \`;
 
   console.log('  [7] repair-ranking-scope dry-run/apply/idempotency ok');
@@ -1091,7 +1054,7 @@ async function testRepairScript() {
 async function testSettlementSourceScope() {
   const endAt = new Date(Date.now() - 3_600_000);
 
-  for (const damage of ['null', 'mismatch', 'general-columns']) {
+  for (const damage of ['mismatch', 'general-columns']) {
     // Three participants, two snapshots: the third account exists but owns no
     // row on this date, so the "mismatch" case can point at a REAL other
     // account without colliding with the (account, date) unique.
@@ -1110,11 +1073,15 @@ async function testSettlementSourceScope() {
       '10',
     );
 
-    if (damage === 'null') {
-      await prisma.$executeRaw\`
-        UPDATE "daily_portfolio_snapshots" SET "trading_account_id" = NULL WHERE "id" = \${target.id}
-      \`;
-    } else if (damage === 'mismatch') {
+    await assert.rejects(
+      prisma.$executeRaw\`
+        UPDATE "daily_portfolio_snapshots"
+        SET "trading_account_id" = NULL
+        WHERE "id" = \${target.id}
+      \`,
+      (error) => error?.code === 'P2010',
+    );
+    if (damage === 'mismatch') {
       await prisma.$executeRaw\`
         UPDATE "daily_portfolio_snapshots"
         SET "trading_account_id" = \${fixture.participants[2].accountId}
@@ -1141,9 +1108,7 @@ async function testSettlementSourceScope() {
     }
     assert.equal(
       code,
-      damage === 'null'
-        ? 'SEASON_RANKING_SOURCE_SCOPE_REPAIR_REQUIRED'
-        : 'SEASON_RANKING_SOURCE_SCOPE_MISMATCH',
+      'SEASON_RANKING_SOURCE_SCOPE_MISMATCH',
       'settlement source damage (' + damage + ') must fail closed',
     );
 
@@ -1311,18 +1276,20 @@ async function testRefreshDoesNotDeleteDamagedRankings() {
     select: { id: true },
   });
 
-  for (const damage of ['null', 'mismatch']) {
-    if (damage === 'null') {
-      await prisma.$executeRaw\`
-        UPDATE "season_rankings" SET "trading_account_id" = NULL WHERE "id" = \${before[0].id}
-      \`;
-    } else {
-      await prisma.$executeRaw\`
-        UPDATE "season_rankings"
-        SET "trading_account_id" = \${bystanderAccount.id}
-        WHERE "id" = \${before[0].id}
-      \`;
-    }
+  await assert.rejects(
+    prisma.$executeRaw\`
+      UPDATE "season_rankings"
+      SET "trading_account_id" = NULL
+      WHERE "id" = \${before[0].id}
+    \`,
+    (error) => error?.code === 'P2010',
+  );
+  for (const damage of ['mismatch']) {
+    await prisma.$executeRaw\`
+      UPDATE "season_rankings"
+      SET "trading_account_id" = \${bystanderAccount.id}
+      WHERE "id" = \${before[0].id}
+    \`;
 
     const ranksBefore = await prisma.seasonParticipant.findMany({
       where: { seasonId: fixture.seasonId },
@@ -1340,9 +1307,7 @@ async function testRefreshDoesNotDeleteDamagedRankings() {
     }
     assert.equal(
       code,
-      damage === 'null'
-        ? 'SEASON_RANKING_SCOPE_REPAIR_REQUIRED'
-        : 'SEASON_RANKING_SCOPE_MISMATCH',
+      'SEASON_RANKING_SCOPE_MISMATCH',
       'refresh must refuse to delete a damaged set (' + damage + ')',
     );
 

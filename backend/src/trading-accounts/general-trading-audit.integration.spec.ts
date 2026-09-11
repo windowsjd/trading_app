@@ -458,15 +458,16 @@ async function main() {
       where: { id: fxRequest.id }, data: { tradingAccountId: accountId },
     });
 
-    await prisma.fxExecuteRequest.update({
-      where: { id: fxRequest.id }, data: { tradingAccountId: null },
-    });
-    await assertFinding('GENERAL_FX_ACCOUNT_SCOPE_INVALID', () =>
-      prisma.fxExecuteRequest.findUniqueOrThrow({ where: { id: fxRequest.id } }),
+    await assert.rejects(
+      prisma.fxExecuteRequest.update({
+        where: { id: fxRequest.id }, data: { tradingAccountId: null },
+      }),
+      (error) => error?.name === 'PrismaClientValidationError',
     );
-    await prisma.fxExecuteRequest.update({
-      where: { id: fxRequest.id }, data: { tradingAccountId: accountId },
-    });
+    assert.equal(
+      (await prisma.fxExecuteRequest.findUniqueOrThrow({ where: { id: fxRequest.id } })).tradingAccountId,
+      accountId,
+    );
 
     await prisma.quote.update({
       where: { id: fxQuote.id }, data: { tradingAccountId: otherAccountId },

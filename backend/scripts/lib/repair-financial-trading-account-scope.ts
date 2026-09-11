@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from '../../src/generated/prisma/client';
+import type { PrismaClient } from '../../src/generated/prisma/client';
 
 /**
  * Non-destructive backfill + consistency check for the transitional

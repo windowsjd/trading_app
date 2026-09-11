@@ -165,43 +165,13 @@ async function main() {
   });
   created.participantIds.push(participant.id);
 
-  await prisma.tradingAccount.update({
-    where: { id: seasonAccount.id },
-    data: { seasonParticipant: { connect: { id: participant.id } } },
-  }).catch(() => undefined);
-
-  // A participant with NO account link at all: its snapshot cannot be repaired
-  // by inference, and the tool must say so rather than guess.
-  const orphanParticipant = await prisma.seasonParticipant.create({
-    data: {
-      seasonId: season.id,
-      userId: (
-        await prisma.user.create({
-          data: {
-            email: 'snapshot-orphan-' + suffix + '@example.com',
-            passwordHash: 'x',
-            nickname: 'snapshot-orphan-' + suffix,
-          },
-          select: { id: true },
-        })
-      ).id,
-      joinedAt: new Date(),
-      participantStatus: 'active',
-      initialCapitalKrw: '10000000',
-      totalAssetKrw: '10000000',
-      totalReturnRate: '0',
-      maxDrawdown: '0',
-    },
-    select: { id: true, userId: true },
-  });
-  created.participantIds.push(orphanParticipant.id);
-  created.userIds.push(orphanParticipant.userId);
-
-  // ---------- inject: repairable null scope ----------
-  const repairableEquity = await prisma.equitySnapshot.create({
+  // Canonical post-migration snapshots always carry the required account.
+  // Pre-migration NULL rows are covered by the repair helper unit tests and
+  // migration SQL checks, not created through today's Prisma client.
+  const canonicalEquity = await prisma.equitySnapshot.create({
     data: {
       seasonParticipantId: participant.id,
-      tradingAccountId: null,
+      tradingAccountId: seasonAccount.id,
       totalAssetKrw: '10000000',
       returnRate: '0',
       krwCash: '10000000',
@@ -214,12 +184,12 @@ async function main() {
     },
     select: { id: true },
   });
-  created.equityIds.push(repairableEquity.id);
+  created.equityIds.push(canonicalEquity.id);
 
-  const repairableDaily = await prisma.dailyPortfolioSnapshot.create({
+  const canonicalDaily = await prisma.dailyPortfolioSnapshot.create({
     data: {
       seasonParticipantId: participant.id,
-      tradingAccountId: null,
+      tradingAccountId: seasonAccount.id,
       snapshotDate: new Date('2026-01-02T00:00:00.000Z'),
       totalAssetKrw: '10000000',
       returnRate: '0',
@@ -232,90 +202,64 @@ async function main() {
     },
     select: { id: true },
   });
-  created.dailyIds.push(repairableDaily.id);
+  created.dailyIds.push(canonicalDaily.id);
 
-  // ---------- inject: BLOCKED null scope (no participant link to infer from) ----------
-  const blockedEquity = await prisma.equitySnapshot.create({
-    data: {
-      seasonParticipantId: orphanParticipant.id,
-      tradingAccountId: null,
-      totalAssetKrw: '999',
-      returnRate: '0',
-      krwCash: '999',
-      usdCashKrw: '0',
-      domesticStockValueKrw: '0',
-      usStockValueKrw: '0',
-      cryptoValueKrw: '0',
-      snapshotReason: 'scheduled',
-      capturedAt: new Date(),
-    },
-    select: { id: true },
-  });
-  created.equityIds.push(blockedEquity.id);
+  await assert.rejects(
+    prisma.equitySnapshot.update({
+      where: { id: canonicalEquity.id },
+      data: { tradingAccountId: null },
+    }),
+    (error) => error?.name === 'PrismaClientValidationError',
+  );
+  await assert.rejects(
+    prisma.dailyPortfolioSnapshot.update({
+      where: { id: canonicalDaily.id },
+      data: { tradingAccountId: null },
+    }),
+    (error) => error?.name === 'PrismaClientValidationError',
+  );
 
-  // ---------- 1. detection ----------
+  // ---------- 1. clean canonical DB is a no-op ----------
   const dryRun = await repairSnapshotScope(prisma, { apply: false });
   assert.equal(dryRun.apply, false);
-  assert.ok(
-    dryRun.models.equitySnapshot.nullRowCount >= 2,
-    'both injected null equity snapshots must be detected'
-  );
-  assert.ok(
-    dryRun.models.dailyPortfolioSnapshot.nullRowCount >= 1,
-    'the injected null daily snapshot must be detected'
-  );
-  assert.ok(
-    dryRun.models.equitySnapshot.missingParticipantLinkRows.some(
-      (row) => row.rowId === blockedEquity.id
-    ),
-    'the unrepairable row must be reported, not silently skipped'
-  );
+  assert.equal(dryRun.models.equitySnapshot.nullRowCount, 0);
+  assert.equal(dryRun.models.dailyPortfolioSnapshot.nullRowCount, 0);
+  assert.equal(resolveSnapshotScopeExitCode(dryRun), 0);
 
-  // ---------- 2. a dry-run writes NOTHING ----------
+  // ---------- 2. dry-run/apply preserve account and financial values ----------
   assert.equal(
     (await prisma.equitySnapshot.findUniqueOrThrow({
-      where: { id: repairableEquity.id },
+      where: { id: canonicalEquity.id },
     })).tradingAccountId,
-    null,
+    seasonAccount.id,
     'dry-run must not write'
   );
   assert.equal(
     (await prisma.dailyPortfolioSnapshot.findUniqueOrThrow({
-      where: { id: repairableDaily.id },
+      where: { id: canonicalDaily.id },
     })).tradingAccountId,
-    null,
+    seasonAccount.id,
     'dry-run must not write'
   );
 
-  // ---------- 3. apply repairs only what is inferable ----------
   const applied = await repairSnapshotScope(prisma, { apply: true });
+  assert.equal(applied.models.equitySnapshot.backfilledCount, 0);
+  assert.equal(applied.models.dailyPortfolioSnapshot.backfilledCount, 0);
+  assert.equal(resolveSnapshotScopeExitCode(applied), 0);
   assert.equal(
     (await prisma.equitySnapshot.findUniqueOrThrow({
-      where: { id: repairableEquity.id },
+      where: { id: canonicalEquity.id },
     })).tradingAccountId,
     seasonAccount.id
   );
   assert.equal(
     (await prisma.dailyPortfolioSnapshot.findUniqueOrThrow({
-      where: { id: repairableDaily.id },
+      where: { id: canonicalDaily.id },
     })).tradingAccountId,
     seasonAccount.id
   );
-  assert.equal(
-    (await prisma.equitySnapshot.findUniqueOrThrow({
-      where: { id: blockedEquity.id },
-    })).tradingAccountId,
-    null,
-    'a row with nothing to infer from is never guessed at'
-  );
-  assert.ok(
-    applied.models.equitySnapshot.backfilledCount >= 1,
-    'apply must report what it wrote'
-  );
-  // Remaining unrepairable nulls force a non-zero exit so an operator notices.
-  assert.equal(resolveSnapshotScopeExitCode(applied), 1);
 
-  // ---------- 4. re-running is idempotent ----------
+  // ---------- 3. re-running is idempotent ----------
   const rerun = await repairSnapshotScope(prisma, { apply: true });
   assert.equal(
     rerun.models.equitySnapshot.backfilledCount,
@@ -329,13 +273,13 @@ async function main() {
   );
   assert.equal(
     (await prisma.equitySnapshot.findUniqueOrThrow({
-      where: { id: repairableEquity.id },
+      where: { id: canonicalEquity.id },
     })).tradingAccountId,
     seasonAccount.id,
     'a repaired row keeps its value across re-runs'
   );
 
-  // ---------- 5. a MISMATCH is reported and NEVER overwritten ----------
+  // ---------- 4. a MISMATCH is reported and NEVER overwritten ----------
   const otherAccount = await prisma.tradingAccount.create({
     data: {
       userId: user.id,
@@ -349,7 +293,7 @@ async function main() {
   created.accountIds.push(otherAccount.id);
 
   await prisma.equitySnapshot.update({
-    where: { id: repairableEquity.id },
+    where: { id: canonicalEquity.id },
     data: { tradingAccountId: otherAccount.id },
   });
 
@@ -360,7 +304,7 @@ async function main() {
   );
   assert.equal(
     (await prisma.equitySnapshot.findUniqueOrThrow({
-      where: { id: repairableEquity.id },
+      where: { id: canonicalEquity.id },
     })).tradingAccountId,
     otherAccount.id,
     'a non-null mismatch is investigated by a person, never auto-overwritten'
@@ -369,11 +313,11 @@ async function main() {
 
   // restore so the general-account audit below sees only ITS injected damage
   await prisma.equitySnapshot.update({
-    where: { id: repairableEquity.id },
+    where: { id: canonicalEquity.id },
     data: { tradingAccountId: seasonAccount.id },
   });
 
-  // ---------- 6. audit-general detects a general account carrying a participant ----------
+  // ---------- 5. audit-general detects a general account carrying a participant ----------
   // Compare the SPECIFIC counter, not the total finding count: this test's
   // fixture general account also legitimately trips unrelated checks (no
   // grant, no USD wallet), and adding a KRW wallet clears one of those while
@@ -417,7 +361,7 @@ async function main() {
     'findings must exit non-zero'
   );
 
-  // ---------- 7. the audit is READ-ONLY ----------
+  // ---------- 6. the audit is READ-ONLY ----------
   assert.equal(
     (await prisma.cashWallet.findUniqueOrThrow({
       where: { id: generalWallet.id },
@@ -438,10 +382,6 @@ async function cleanup() {
   });
   await prisma.cashWallet.deleteMany({
     where: { id: { in: created.walletIds } },
-  });
-  await prisma.seasonParticipant.updateMany({
-    where: { id: { in: created.participantIds } },
-    data: { tradingAccountId: null },
   });
   await prisma.seasonParticipant.deleteMany({
     where: { id: { in: created.participantIds } },

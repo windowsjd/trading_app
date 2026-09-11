@@ -664,34 +664,20 @@ async function verifyCancelScopeClassification() {
     secondStateBefore,
   );
 
-  // 5) The caller's OWN order with a NULL scope must NOT hide behind a 404.
+  // 5) Canonical Prisma rejects a NULL scope and leaves the order untouched.
   const nullScopeOrderId = await createSubmittedLimitBuy(owner, assetId, 'null-scope');
-  await prisma.order.update({
-    where: { id: nullScopeOrderId },
-    data: { tradingAccountId: null },
-  });
   const nullStateBefore = await orderAndWalletState(nullScopeOrderId, owner.usdWalletId);
-  await expectHttpError(
-    orders.cancelOrderForTradingAccount(owner.userId, owner.accountId, nullScopeOrderId),
-    500,
-    'TRADING_SCOPE_REPAIR_REQUIRED',
-    'own null-scope order',
+  await assert.rejects(
+    prisma.order.update({
+      where: { id: nullScopeOrderId },
+      data: { tradingAccountId: null },
+    }),
+    (error) => error?.name === 'PrismaClientValidationError',
   );
   assert.equal(
     await orderAndWalletState(nullScopeOrderId, owner.usdWalletId),
     nullStateBefore,
-    'null-scope error must leave status and reservedAmount untouched',
-  );
-  // The legacy cancel is fail-closed on the same row.
-  await expectHttpError(
-    orders.cancelOrder(owner.userId, nullScopeOrderId),
-    500,
-    'TRADING_SCOPE_REPAIR_REQUIRED',
-    'legacy cancel of a null-scope order',
-  );
-  assert.equal(
-    await orderAndWalletState(nullScopeOrderId, owner.usdWalletId),
-    nullStateBefore,
+    'rejected null-scope write must leave status and reservation untouched',
   );
 
   // 6) The caller's OWN order scoped to a THIRD account → mismatch, not 404.
@@ -716,17 +702,15 @@ async function verifyCancelScopeClassification() {
     data: { tradingAccountId: owner.accountId },
   });
 
-  // 7) Wallet scope null / mismatch fail closed and release nothing.
+  // 7) A wallet scope mismatch fails closed and releases nothing. The
+  // canonical client rejects a null scope before it can reach runtime.
   const walletStateBefore = await orderAndWalletState(nullScopeOrderId, owner.usdWalletId);
-  await prisma.cashWallet.update({
-    where: { id: owner.usdWalletId },
-    data: { tradingAccountId: null },
-  });
-  await expectHttpError(
-    orders.cancelOrderForTradingAccount(owner.userId, owner.accountId, nullScopeOrderId),
-    500,
-    'FINANCIAL_SCOPE_REPAIR_REQUIRED',
-    'null wallet scope',
+  await assert.rejects(
+    prisma.cashWallet.update({
+      where: { id: owner.usdWalletId },
+      data: { tradingAccountId: null },
+    }),
+    (error) => error?.name === 'PrismaClientValidationError',
   );
   await prisma.cashWallet.update({
     where: { id: owner.usdWalletId },
@@ -735,8 +719,8 @@ async function verifyCancelScopeClassification() {
   await expectHttpError(
     orders.cancelOrderForTradingAccount(owner.userId, owner.accountId, nullScopeOrderId),
     500,
-    'FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH',
-    'mismatched wallet scope',
+    'ORDER_RESERVATION_INCONSISTENT',
+    'mismatched wallet reservation scope',
   );
   await prisma.cashWallet.update({
     where: { id: owner.usdWalletId },

@@ -1562,6 +1562,8 @@ describe('RecordsService', () => {
   it('returns current public user season summary without private activity data', async () => {
     const portfolioValuationService = {
       calculateTradingAccountValuation: jest.fn().mockResolvedValue({
+        seasonParticipantId: participant.id,
+        tradingAccountId: participantAccount.id,
         totalAssetKrw: '13812590.00000000',
         returnRate: '38.12590000',
         krwCash: '1000000.00000000',

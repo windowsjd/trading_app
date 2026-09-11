@@ -255,7 +255,23 @@ async function main() {
   await expectCode(execute(owner, account, nullFeeQuote, 'general-fx-null-fee-' + randomUUID()), 'QUOTE_MISMATCH');
   await prisma.quote.update({ where: { id: nullFeeQuote.data.quoteId }, data: { quotedFeeRate: '0.001000' } });
 
-  await prisma.cashWallet.update({ where: { id: krwWallet.id }, data: { tradingAccountId: null } });
+  await assert.rejects(
+    prisma.cashWallet.update({ where: { id: krwWallet.id }, data: { tradingAccountId: null } }),
+    (error) => error?.name === 'PrismaClientValidationError',
+  );
+  assert.equal(
+    (await prisma.cashWallet.findUniqueOrThrow({ where: { id: krwWallet.id } })).tradingAccountId,
+    account,
+  );
+  const mismatchedAccount = await prisma.tradingAccount.create({ data: {
+    userId: other, mode: 'season', status: 'active',
+    initialCapitalKrw: '10000000', openedAt: new Date(),
+  }, select: { id: true } });
+  ids.accounts.push(mismatchedAccount.id);
+  await prisma.cashWallet.update({
+    where: { id: krwWallet.id },
+    data: { tradingAccountId: mismatchedAccount.id },
+  });
   await expectCode(quote(owner, account, 'KRW', 'USD', '1420'), 'GENERAL_ACCOUNT_INTEGRITY');
   await prisma.cashWallet.update({ where: { id: krwWallet.id }, data: { tradingAccountId: account } });
 

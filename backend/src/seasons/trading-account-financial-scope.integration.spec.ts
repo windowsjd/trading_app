@@ -127,7 +127,13 @@ const performanceService = new GeneralAccountPerformanceService(
   prisma, valuationService, externalFundingService,
 );
 const fxService = new FxService(
-  prisma, undefined, undefined, accessService, performanceService,
+  prisma,
+  undefined,
+  undefined,
+  accessService,
+  performanceService,
+  undefined,
+  valuationService,
 );
 const walletsService = new WalletsService(prisma, accessService);
 
@@ -262,6 +268,7 @@ async function createFxQuote(scenario, sourceAmount = '1000.00000000') {
     data: {
       userId: scenario.userId,
       seasonParticipantId: scenario.participantId,
+      tradingAccountId: scenario.accountId,
       quoteType: QuoteType.fx,
       status: QuoteStatus.active,
       fromCurrency: CurrencyCode.KRW,
@@ -333,303 +340,56 @@ function scopeOf(...scenarios) {
 // ---------------------------------------------------------------------------
 
 async function testMigrationBackfillOnLegacyRows() {
-  const user = await createUser('backfill');
-  const season = await createSeason('backfill');
-  const userNull = await createUser('backfill-null');
-  const scope = {
-    userIds: [user.id, userNull.id],
-    seasonIds: [season.id],
-    participantIds: [],
-    snapshotIds: [],
-  };
-
+  const scenario = await createFxScenario('canonical-migration');
+  const scope = scopeOf(scenario);
   try {
-    const now = new Date('2026-07-01T00:00:00.000Z');
-    const account = await prisma.tradingAccount.create({
-      data: {
-        userId: user.id,
-        mode: TradingAccountMode.season,
-        initialCapitalKrw: CAPITAL,
-        openedAt: now,
-      },
-      select: { id: true },
+    const wallet = await prisma.cashWallet.findUniqueOrThrow({
+      where: { id: scenario.sourceWalletId },
     });
-    // Linked participant whose financial rows are legacy (NULL scope).
-    const participant = await prisma.seasonParticipant.create({
-      data: {
-        seasonId: season.id,
-        userId: user.id,
-        joinedAt: now,
-        participantStatus: ParticipantStatus.active,
-        initialCapitalKrw: CAPITAL,
-        totalAssetKrw: CAPITAL,
-        totalReturnRate: ZERO,
-        maxDrawdown: ZERO,
-        tradingAccountId: account.id,
-      },
-      select: { id: true },
-    });
-    scope.participantIds.push(participant.id);
-    // Null-link participant: its financial rows must STAY null.
-    const orphanParticipant = await prisma.seasonParticipant.create({
-      data: {
-        seasonId: season.id,
-        userId: userNull.id,
-        joinedAt: now,
-        participantStatus: ParticipantStatus.active,
-        initialCapitalKrw: CAPITAL,
-        totalAssetKrw: CAPITAL,
-        totalReturnRate: ZERO,
-        maxDrawdown: ZERO,
-      },
-      select: { id: true },
-    });
-    scope.participantIds.push(orphanParticipant.id);
-
-    const mkLegacyRows = async (participantId) => {
-      const wallet = await prisma.cashWallet.create({
-        data: {
-          seasonParticipantId: participantId,
-          currencyCode: CurrencyCode.KRW,
-          balanceAmount: '1234567.00000000',
-        },
-        select: { id: true },
-      });
-      await prisma.walletTransaction.create({
-        data: {
-          seasonParticipantId: participantId,
-          walletId: wallet.id,
-          currencyCode: CurrencyCode.KRW,
-          direction: 'credit',
-          txType: 'initial_grant',
-          referenceType: 'season_join',
-          referenceId: participantId,
-          amount: '1234567.00000000',
-          balanceAfter: '1234567.00000000',
-          occurredAt: now,
-        },
-        select: { id: true },
-      });
-      const exchange = await prisma.exchangeTransaction.create({
-        data: {
-          seasonParticipantId: participantId,
-          fromCurrency: CurrencyCode.KRW,
-          toCurrency: CurrencyCode.USD,
-          sourceAmount: '1000.00000000',
-          grossTargetAmount: '1.00000000',
-          feeRate: '0.001000',
-          feeAmount: '0.00100000',
-          feeCurrency: CurrencyCode.USD,
-          appliedRate: '1000.00000000',
-          netTargetAmount: '0.99900000',
-          executedAt: now,
-        },
-        select: { id: true },
-      });
-      await prisma.fxExecuteRequest.create({
-        data: {
-          userId: participantId === participant.id ? user.id : userNull.id,
-          seasonParticipantId: participantId,
-          idempotencyKey: 'legacy-' + participantId,
-          requestHash: 'legacy-hash',
-          fromCurrency: CurrencyCode.KRW,
-          toCurrency: CurrencyCode.USD,
-          sourceAmount: '1000.00000000',
-          status: 'succeeded',
-          exchangeTransactionId: exchange.id,
-          requestedAt: now,
-          completedAt: now,
-        },
-        select: { id: true },
-      });
-      return wallet.id;
-    };
-    const walletId = await mkLegacyRows(participant.id);
-    await mkLegacyRows(orphanParticipant.id);
-
+    const before = wallet.balanceAmount.toFixed(8);
+    await assert.rejects(
+      prisma.cashWallet.update({
+        where: { id: wallet.id },
+        data: { tradingAccountId: null },
+      }),
+      (error) => error?.name === 'PrismaClientValidationError',
+    );
     const statements = backfillStatements();
     for (const statement of statements) {
       await prisma.$executeRawUnsafe(statement);
     }
-
-    // Linked participant rows got the account id copied; amounts unchanged.
-    const wallet = await prisma.cashWallet.findUniqueOrThrow({
-      where: { id: walletId },
+    const after = await prisma.cashWallet.findUniqueOrThrow({
+      where: { id: wallet.id },
     });
-    assert.equal(wallet.tradingAccountId, account.id);
-    assert.equal(wallet.balanceAmount.toFixed(8), '1234567.00000000');
-    for (const [model, where] of [
-      ['walletTransaction', { seasonParticipantId: participant.id }],
-      ['exchangeTransaction', { seasonParticipantId: participant.id }],
-      ['fxExecuteRequest', { seasonParticipantId: participant.id }],
-    ]) {
-      const rows = await prisma[model].findMany({ where });
-      assert.ok(rows.length > 0);
-      for (const row of rows) {
-        assert.equal(row.tradingAccountId, account.id, model + ' backfilled');
-      }
-    }
-
-    // Null-link participant rows stayed NULL (never guessed) and no account
-    // was fabricated.
-    for (const model of [
-      'cashWallet',
-      'walletTransaction',
-      'exchangeTransaction',
-      'fxExecuteRequest',
-    ]) {
-      const rows = await prisma[model].findMany({
-        where: { seasonParticipantId: orphanParticipant.id },
-      });
-      assert.ok(rows.length > 0);
-      for (const row of rows) {
-        assert.equal(row.tradingAccountId, null);
-      }
-    }
-    assert.equal(
-      await prisma.tradingAccount.count({ where: { userId: userNull.id } }),
-      0,
-    );
-    assert.equal(
-      await prisma.tradingAccount.count({
-        where: { mode: TradingAccountMode.general },
-      }),
-      0,
-      'backfill must never create general accounts',
-    );
-
-    // Idempotent replay changes nothing further.
-    const before = await prisma.walletTransaction.findMany({
-      where: { seasonParticipantId: { in: scope.participantIds } },
-      orderBy: { id: 'asc' },
-    });
-    for (const statement of statements) {
-      await prisma.$executeRawUnsafe(statement);
-    }
-    const after = await prisma.walletTransaction.findMany({
-      where: { seasonParticipantId: { in: scope.participantIds } },
-      orderBy: { id: 'asc' },
-    });
-    assert.deepEqual(
-      after.map((r) => [r.id, r.tradingAccountId, r.amount.toFixed(8)]),
-      before.map((r) => [r.id, r.tradingAccountId, r.amount.toFixed(8)]),
-    );
+    assert.equal(after.tradingAccountId, scenario.accountId);
+    assert.equal(after.balanceAmount.toFixed(8), before);
   } finally {
     await cleanupScenario(scope);
   }
 }
 
 async function testFinancialScopeRepair() {
-  const user = await createUser('scope-repair');
-  const userNull = await createUser('scope-repair-null');
-  const season = await createSeason('scope-repair');
-  const scope = {
-    userIds: [user.id, userNull.id],
-    seasonIds: [season.id],
-    participantIds: [],
-    snapshotIds: [],
-  };
-
+  const scenario = await createFxScenario('scope-repair-clean');
+  const scope = scopeOf(scenario);
   try {
-    const now = new Date();
-    const account = await prisma.tradingAccount.create({
-      data: {
-        userId: user.id,
-        mode: TradingAccountMode.season,
-        initialCapitalKrw: CAPITAL,
-        openedAt: now,
-      },
-      select: { id: true },
-    });
-    const participant = await prisma.seasonParticipant.create({
-      data: {
-        seasonId: season.id,
-        userId: user.id,
-        joinedAt: now,
-        participantStatus: ParticipantStatus.active,
-        initialCapitalKrw: CAPITAL,
-        totalAssetKrw: CAPITAL,
-        totalReturnRate: ZERO,
-        maxDrawdown: ZERO,
-        tradingAccountId: account.id,
-      },
-      select: { id: true },
-    });
-    scope.participantIds.push(participant.id);
-    const orphanParticipant = await prisma.seasonParticipant.create({
-      data: {
-        seasonId: season.id,
-        userId: userNull.id,
-        joinedAt: now,
-        participantStatus: ParticipantStatus.active,
-        initialCapitalKrw: CAPITAL,
-        totalAssetKrw: CAPITAL,
-        totalReturnRate: ZERO,
-        maxDrawdown: ZERO,
-      },
-      select: { id: true },
-    });
-    scope.participantIds.push(orphanParticipant.id);
-
-    const wallet = await prisma.cashWallet.create({
-      data: {
-        seasonParticipantId: participant.id,
-        currencyCode: CurrencyCode.KRW,
-        balanceAmount: '777.00000000',
-      },
-      select: { id: true },
-    });
-    const orphanWallet = await prisma.cashWallet.create({
-      data: {
-        seasonParticipantId: orphanParticipant.id,
-        currencyCode: CurrencyCode.KRW,
-        balanceAmount: '888.00000000',
-      },
-      select: { id: true },
-    });
-
-    // Dry-run: nothing written.
     const dryRun = await repairFinancialTradingAccountScope(prisma, {
       apply: false,
     });
     assert.equal(dryRun.mode, 'dry-run');
-    const walletAfterDryRun = await prisma.cashWallet.findUniqueOrThrow({
-      where: { id: wallet.id },
-    });
-    assert.equal(walletAfterDryRun.tradingAccountId, null);
-
-    // Apply: repairable row filled, blocked row reported + untouched.
+    assert.equal(dryRun.failures.length, 0);
     const applied = await repairFinancialTradingAccountScope(prisma, {
       apply: true,
     });
-    const walletAfter = await prisma.cashWallet.findUniqueOrThrow({
-      where: { id: wallet.id },
-    });
-    assert.equal(walletAfter.tradingAccountId, account.id);
-    assert.equal(walletAfter.balanceAmount.toFixed(8), '777.00000000');
-    const orphanAfter = await prisma.cashWallet.findUniqueOrThrow({
-      where: { id: orphanWallet.id },
-    });
-    assert.equal(orphanAfter.tradingAccountId, null);
+    assert.equal(resolveFinancialScopeExitCode(applied).exitCode, 0);
     assert.ok(
-      applied.models.cashWallet.missingParticipantLinkRows.some(
-        (row) => row.rowId === orphanWallet.id,
+      Object.values(applied.models).every(
+        (model) => model.nullRowCount === 0 && model.backfilledCount === 0,
       ),
-      'blocked row must be reported with MISSING_PARTICIPANT_TRADING_ACCOUNT_LINK',
     );
-    // Remaining nulls (the blocked row) force a non-zero exit code.
-    const exit = resolveFinancialScopeExitCode(applied);
-    assert.equal(exit.exitCode, 1);
-
-    // Re-run: idempotent (no further updates for the repaired row).
     const rerun = await repairFinancialTradingAccountScope(prisma, {
       apply: true,
     });
-    assert.equal(
-      rerun.models.cashWallet.backfilledCount <=
-        applied.models.cashWallet.backfilledCount,
-      true,
-    );
+    assert.equal(resolveFinancialScopeExitCode(rerun).exitCode, 0);
   } finally {
     await cleanupScenario(scope);
   }
@@ -1061,6 +821,15 @@ async function testOnConflictReReadRace() {
 
   try {
     const now = new Date();
+    const foreignAccount = await prisma.tradingAccount.create({
+      data: {
+        userId: attacker.id,
+        mode: TradingAccountMode.season,
+        initialCapitalKrw: CAPITAL,
+        openedAt: now,
+      },
+      select: { id: true },
+    });
     const participant = await prisma.seasonParticipant.create({
       data: {
         seasonId: season.id,
@@ -1071,6 +840,7 @@ async function testOnConflictReReadRace() {
         totalAssetKrw: CAPITAL,
         totalReturnRate: ZERO,
         maxDrawdown: ZERO,
+        tradingAccountId: foreignAccount.id,
       },
       select: {
         id: true,
@@ -1083,55 +853,16 @@ async function testOnConflictReReadRace() {
     });
     scope.participantIds.push(participant.id);
 
-    // The interleaving: our transaction's FIRST lookup sees null, another
-    // transaction inserts a MISMATCHED account under the same deterministic
-    // id, our INSERT is silently ignored — the post-insert re-read must
-    // catch the mismatch and refuse to link.
-    const deterministicId = deriveSeasonTradingAccountId(participant.id);
-    await prisma.tradingAccount.create({
-      data: {
-        id: deterministicId,
-        userId: attacker.id, // wrong owner
-        mode: TradingAccountMode.season,
-        initialCapitalKrw: CAPITAL,
-        openedAt: now,
-      },
-      select: { id: true },
-    });
-
     let failure = null;
     try {
-      await prisma.$transaction(async (tx) => {
-        let firstAccountLookup = true;
-        const spoofedTx = new Proxy(tx, {
-          get(target, prop, receiver) {
-            if (prop === 'tradingAccount') {
-              const delegate = Reflect.get(target, prop, receiver);
-              return new Proxy(delegate, {
-                get(dTarget, dProp, dReceiver) {
-                  if (dProp === 'findUnique') {
-                    return async (args) => {
-                      if (firstAccountLookup) {
-                        firstAccountLookup = false;
-                        return null; // simulate pre-insert lookup racing
-                      }
-                      return delegate.findUnique(args);
-                    };
-                  }
-                  return Reflect.get(dTarget, dProp, dReceiver);
-                },
-              });
-            }
-            return Reflect.get(target, prop, receiver);
-          },
-        });
-        await ensureSeasonTradingAccountLink(spoofedTx, participant);
-      });
+      await prisma.$transaction((tx) =>
+        ensureSeasonTradingAccountLink(tx, participant),
+      );
     } catch (error) {
       failure = error;
     }
 
-    assert.ok(failure, 'mismatched conflicting account must fail closed');
+    assert.ok(failure, 'foreign-owner account link must fail closed');
     assert.equal(failure.code, 'TRADING_ACCOUNT_LINK_INTEGRITY');
     const after = await prisma.seasonParticipant.findUniqueOrThrow({
       where: { id: participant.id },
@@ -1139,8 +870,8 @@ async function testOnConflictReReadRace() {
     });
     assert.equal(
       after.tradingAccountId,
-      null,
-      'participant must never be linked to the unverified account',
+      foreignAccount.id,
+      'repair must never overwrite a corrupt non-null account link',
     );
   } finally {
     await cleanupScenario(scope);
@@ -1160,14 +891,14 @@ async function runCase(label, work) {
 async function main() {
   await prisma.$connect();
   try {
-    await runCase('migration backfill on legacy rows (copy, null-kept, idempotent, non-mutating)', testMigrationBackfillOnLegacyRows);
-    await runCase('financial-scope repair dry-run/apply/blocked/exit', testFinancialScopeRepair);
+    await runCase('canonical NOT NULL scope + migration replay non-mutation', testMigrationBackfillOnLegacyRows);
+    await runCase('financial-scope repair clean canonical DB + idempotent replay', testFinancialScopeRepair);
     await runCase('join dual-write + legacy/scoped wallet equivalence + foreign 404', testJoinDualWriteAndWalletEquivalence);
     await runCase('legacy fx execute dual-write + same-key replay', testLegacyFxExecuteDualWrite);
     await runCase('account-scoped fx execute equivalence + cross-account idempotency', testAccountScopedFxExecuteEquivalenceAndIdempotency);
     await runCase('account-scoped fx gating (suspended/excluded/foreign/general)', testAccountScopedFxGating);
     await runCase('excluded-active status repair (suspend, closed untouched, converged exit 0)', testExcludedActiveStatusRepair);
-    await runCase('on-conflict re-read race refuses mismatched account', testOnConflictReReadRace);
+    await runCase('repair refuses a foreign-owner non-null account link', testOnConflictReReadRace);
     console.log('financial scope db integration ok');
   } finally {
     await prisma.$disconnect();

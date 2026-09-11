@@ -217,43 +217,41 @@ async function expectCheckViolation(work, constraintName) {
 async function testBackfillMappingAndNonDestruction() {
   const season = await createSeason('backfill');
   const scope = { userIds: [], seasonIds: [season.id], participantIds: [] };
-  const statuses = [
-    [ParticipantStatus.registered, TradingAccountStatus.active],
-    [ParticipantStatus.active, TradingAccountStatus.active],
-    [ParticipantStatus.excluded, TradingAccountStatus.suspended],
-    [ParticipantStatus.finished, TradingAccountStatus.closed],
-    [ParticipantStatus.rewarded, TradingAccountStatus.closed],
-  ];
 
   try {
     const joinedAt = new Date('2026-05-01T01:02:03.000Z');
-    const rows = [];
-    for (const [participantStatus, expectedAccountStatus] of statuses) {
-      const user = await createUser('backfill-' + participantStatus);
-      scope.userIds.push(user.id);
-      // Pre-account participant shape: tradingAccountId deliberately null,
-      // exactly like rows that existed before the migration.
-      const participant = await prisma.seasonParticipant.create({
-        data: {
-          seasonId: season.id,
-          userId: user.id,
-          joinedAt,
-          participantStatus,
-          initialCapitalKrw: CAPITAL,
-          totalAssetKrw: CAPITAL,
-          totalReturnRate: ZERO,
-          maxDrawdown: ZERO,
-        },
-        select: { id: true },
-      });
-      scope.participantIds.push(participant.id);
-      rows.push({ participant, user, participantStatus, expectedAccountStatus });
-    }
+    const user = await createUser('canonical-scope');
+    scope.userIds.push(user.id);
+    const account = await prisma.tradingAccount.create({
+      data: {
+        userId: user.id,
+        mode: TradingAccountMode.season,
+        status: TradingAccountStatus.active,
+        initialCapitalKrw: CAPITAL,
+        openedAt: joinedAt,
+      },
+      select: { id: true },
+    });
+    const participant = await prisma.seasonParticipant.create({
+      data: {
+        seasonId: season.id,
+        userId: user.id,
+        joinedAt,
+        participantStatus: ParticipantStatus.active,
+        initialCapitalKrw: CAPITAL,
+        totalAssetKrw: CAPITAL,
+        totalReturnRate: ZERO,
+        maxDrawdown: ZERO,
+        tradingAccountId: account.id,
+      },
+      select: { id: true },
+    });
+    scope.participantIds.push(participant.id);
 
-    // Financial rows that the backfill must not touch.
     const wallet = await prisma.cashWallet.create({
       data: {
-        seasonParticipantId: rows[0].participant.id,
+        seasonParticipantId: participant.id,
+        tradingAccountId: account.id,
         currencyCode: CurrencyCode.KRW,
         balanceAmount: '1234567.00000000',
       },
@@ -261,65 +259,49 @@ async function testBackfillMappingAndNonDestruction() {
     });
     await prisma.walletTransaction.create({
       data: {
-        seasonParticipantId: rows[0].participant.id,
+        seasonParticipantId: participant.id,
+        tradingAccountId: account.id,
         walletId: wallet.id,
         currencyCode: CurrencyCode.KRW,
         direction: WalletTransactionDirection.credit,
         txType: WalletTransactionType.initial_grant,
         referenceType: WalletTransactionReferenceType.season_join,
-        referenceId: rows[0].participant.id,
+        referenceId: participant.id,
         amount: '1234567.00000000',
         balanceAfter: '1234567.00000000',
         occurredAt: joinedAt,
       },
     });
 
-    const [insertSql, updateSql] = backfillStatements();
-    await prisma.$executeRawUnsafe(insertSql);
-    await prisma.$executeRawUnsafe(updateSql);
-
-    for (const row of rows) {
-      const participant = await prisma.seasonParticipant.findUniqueOrThrow({
-        where: { id: row.participant.id },
-        include: { tradingAccount: true },
-      });
-      assert.ok(participant.tradingAccountId, 'tradingAccountId backfilled');
-      const account = participant.tradingAccount;
-      assert.equal(account.userId, row.user.id);
-      assert.equal(account.mode, TradingAccountMode.season);
-      assert.equal(account.status, row.expectedAccountStatus);
-      assert.equal(account.initialCapitalKrw.toFixed(8), CAPITAL);
-      assert.equal(account.openedAt.getTime(), participant.joinedAt.getTime());
-      assert.equal(account.closedAt, null);
-    }
-
-    // Exactly one account per participant, no orphans, no general accounts.
-    const accounts = await prisma.tradingAccount.findMany({
-      where: { userId: { in: scope.userIds } },
+    const financialBefore = await prisma.walletTransaction.findMany({
+      where: { tradingAccountId: account.id },
     });
-    assert.equal(accounts.length, statuses.length);
-    assert.equal(
-      accounts.filter((a) => a.mode === TradingAccountMode.general).length,
-      0,
+    await assert.rejects(
+      prisma.seasonParticipant.update({
+        where: { id: participant.id },
+        data: { tradingAccountId: null },
+      }),
+      (error) => error?.name === 'PrismaClientValidationError',
     );
-
-    // Idempotent replay of the same statements creates nothing new.
-    await prisma.$executeRawUnsafe(insertSql);
-    await prisma.$executeRawUnsafe(updateSql);
-    const accountsAfterReplay = await prisma.tradingAccount.count({
-      where: { userId: { in: scope.userIds } },
+    const linked = await prisma.seasonParticipant.findUniqueOrThrow({
+      where: { id: participant.id },
+      include: { tradingAccount: true },
     });
-    assert.equal(accountsAfterReplay, statuses.length);
+    assert.equal(linked.tradingAccountId, account.id);
+    assert.equal(linked.tradingAccount.userId, user.id);
+    assert.equal(linked.tradingAccount.mode, TradingAccountMode.season);
+    assert.equal(linked.tradingAccount.openedAt.getTime(), joinedAt.getTime());
 
-    // Financial rows untouched.
     const walletAfter = await prisma.cashWallet.findUniqueOrThrow({
       where: { id: wallet.id },
     });
     assert.equal(walletAfter.balanceAmount.toFixed(8), '1234567.00000000');
-    const ledgerCount = await prisma.walletTransaction.count({
-      where: { seasonParticipantId: rows[0].participant.id },
-    });
-    assert.equal(ledgerCount, 1);
+    assert.deepEqual(
+      await prisma.walletTransaction.findMany({
+        where: { tradingAccountId: account.id },
+      }),
+      financialBefore,
+    );
   } finally {
     await cleanup(scope);
   }
@@ -637,7 +619,7 @@ async function runCase(label, work) {
 async function main() {
   await prisma.$connect();
   try {
-    await runCase('backfill mapping + non-destruction', testBackfillMappingAndNonDestruction);
+    await runCase('canonical participant scope + non-destruction', testBackfillMappingAndNonDestruction);
     await runCase('general partial unique + account sharing', testGeneralPartialUniqueAndSharing);
     await runCase('table CHECK constraints', testCheckConstraints);
     await runCase('join creates linked account atomically + replay', testJoinCreatesAccountAtomically);

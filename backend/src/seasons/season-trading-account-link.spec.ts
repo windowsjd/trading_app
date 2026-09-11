@@ -82,7 +82,6 @@ const createTx = () => ({
   },
   seasonParticipant: {
     findUnique: jest.fn(),
-    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
   },
   // Tagged-template raw INSERT ... ON CONFLICT DO NOTHING used by the repair.
   $executeRaw: jest.fn().mockResolvedValue(1),
@@ -92,6 +91,9 @@ const createTx = () => ({
 // strings array): id, userId, mode, status, initialCapitalKrw, openedAt.
 const rawInsertParams = (tx: ReturnType<typeof createTx>) =>
   tx.$executeRaw.mock.calls[0].slice(1);
+
+const rawLinkParams = (tx: ReturnType<typeof createTx>, callIndex = 0) =>
+  tx.$executeRaw.mock.calls[callIndex].slice(1);
 
 describe('deriveSeasonTradingAccountId', () => {
   it('matches the migration md5→uuid formula for known vectors', () => {
@@ -151,7 +153,6 @@ describe('ensureSeasonTradingAccountLink', () => {
       action: 'already-linked',
     });
     expect(tx.$executeRaw).not.toHaveBeenCalled();
-    expect(tx.seasonParticipant.updateMany).not.toHaveBeenCalled();
   });
 
   it('fails closed when the linked account belongs to another user', async () => {
@@ -167,7 +168,6 @@ describe('ensureSeasonTradingAccountLink', () => {
       ),
     ).rejects.toBeInstanceOf(SeasonTradingAccountLinkIntegrityError);
     expect(tx.$executeRaw).not.toHaveBeenCalled();
-    expect(tx.seasonParticipant.updateMany).not.toHaveBeenCalled();
   });
 
   it('creates the deterministic season account and links a null participant', async () => {
@@ -188,7 +188,7 @@ describe('ensureSeasonTradingAccountLink', () => {
     });
     // The stored account is ALWAYS re-read and validated after the insert.
     expect(tx.tradingAccount.findUnique).toHaveBeenCalledTimes(2);
-    expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(2);
     expect(rawInsertParams(tx)).toEqual([
       DETERMINISTIC_ID,
       'user-1',
@@ -197,10 +197,7 @@ describe('ensureSeasonTradingAccountLink', () => {
       CAPITAL,
       JOINED_AT,
     ]);
-    expect(tx.seasonParticipant.updateMany).toHaveBeenCalledWith({
-      where: { id: 'sp-legacy-1', tradingAccountId: null },
-      data: { tradingAccountId: DETERMINISTIC_ID },
-    });
+    expect(rawLinkParams(tx, 1)).toEqual([DETERMINISTIC_ID, 'sp-legacy-1']);
   });
 
   it('links an existing deterministic account without recreating it', async () => {
@@ -216,7 +213,8 @@ describe('ensureSeasonTradingAccountLink', () => {
       tradingAccountId: DETERMINISTIC_ID,
       action: 'linked-existing-account',
     });
-    expect(tx.$executeRaw).not.toHaveBeenCalled();
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(rawLinkParams(tx)).toEqual([DETERMINISTIC_ID, 'sp-legacy-1']);
   });
 
   it('treats a concurrent identical link as already linked', async () => {
@@ -224,7 +222,7 @@ describe('ensureSeasonTradingAccountLink', () => {
     tx.tradingAccount.findUnique
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(matchingAccount());
-    tx.seasonParticipant.updateMany.mockResolvedValueOnce({ count: 0 });
+    tx.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
     tx.seasonParticipant.findUnique.mockResolvedValueOnce({
       tradingAccountId: DETERMINISTIC_ID,
     });
@@ -243,7 +241,7 @@ describe('ensureSeasonTradingAccountLink', () => {
   it('fails closed when the participant was linked to a different account concurrently', async () => {
     const tx = createTx();
     tx.tradingAccount.findUnique.mockResolvedValueOnce(null);
-    tx.seasonParticipant.updateMany.mockResolvedValueOnce({ count: 0 });
+    tx.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
     tx.seasonParticipant.findUnique.mockResolvedValueOnce({
       tradingAccountId: 'ta-unexpected',
     });
@@ -277,14 +275,13 @@ describe('ensureSeasonTradingAccountLink', () => {
         ensureSeasonTradingAccountLink(tx as never, participant()),
       ).rejects.toBeInstanceOf(SeasonTradingAccountLinkIntegrityError);
       expect(tx.$executeRaw).not.toHaveBeenCalled();
-      expect(tx.seasonParticipant.updateMany).not.toHaveBeenCalled();
     },
   );
 
   it('translates a unique violation on linking into an integrity error', async () => {
     const tx = createTx();
-    tx.tradingAccount.findUnique.mockResolvedValueOnce(null);
-    tx.seasonParticipant.updateMany.mockRejectedValueOnce(
+    tx.tradingAccount.findUnique.mockResolvedValueOnce(matchingAccount());
+    tx.$executeRaw.mockRejectedValueOnce(
       Object.assign(new Error('unique violation'), { code: 'P2002' }),
     );
 
@@ -320,7 +317,8 @@ describe('ensureSeasonTradingAccountLink post-insert conflict validation', () =>
       tradingAccountId: DETERMINISTIC_ID,
       action: 'linked-existing-account',
     });
-    expect(tx.seasonParticipant.updateMany).toHaveBeenCalledTimes(1);
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(2);
+    expect(rawLinkParams(tx, 1)).toEqual([DETERMINISTIC_ID, 'sp-legacy-1']);
   });
 
   it.each([
@@ -349,7 +347,7 @@ describe('ensureSeasonTradingAccountLink post-insert conflict validation', () =>
       await expect(
         ensureSeasonTradingAccountLink(tx as never, participant()),
       ).rejects.toBeInstanceOf(SeasonTradingAccountLinkIntegrityError);
-      expect(tx.seasonParticipant.updateMany).not.toHaveBeenCalled();
+      expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
     },
   );
 
@@ -359,7 +357,7 @@ describe('ensureSeasonTradingAccountLink post-insert conflict validation', () =>
     await expect(
       ensureSeasonTradingAccountLink(tx as never, participant()),
     ).rejects.toBeInstanceOf(SeasonTradingAccountLinkIntegrityError);
-    expect(tx.seasonParticipant.updateMany).not.toHaveBeenCalled();
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -378,7 +376,6 @@ describe('previewSeasonTradingAccountLink', () => {
       action: 'would-create-and-link',
     });
     expect(tx.$executeRaw).not.toHaveBeenCalled();
-    expect(tx.seasonParticipant.updateMany).not.toHaveBeenCalled();
   });
 
   it('reports would-link when the deterministic account already exists and matches', async () => {

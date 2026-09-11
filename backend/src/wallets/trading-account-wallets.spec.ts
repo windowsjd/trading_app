@@ -67,8 +67,7 @@ const createServices = (accountStatus = 'active') => {
     order: { findMany: jest.fn().mockResolvedValue([]) },
     cashWallet: {
       findMany: jest.fn().mockResolvedValue([]),
-      // Scope-integrity probe (assertSeasonAccountFinancialScopeIntegrity):
-      // null = no anomalous rows, so the healthy account reads proceed.
+      // Retained participant metadata agrees with the canonical account.
       findFirst: jest.fn().mockResolvedValue(null),
     },
     walletTransaction: {
@@ -491,7 +490,7 @@ describe('user cash ledger read contract', () => {
     }
   });
 
-  it('runs the existing integrity gate before filtering even hidden audit rows', async () => {
+  it('rejects participant metadata scoped to a different account before listing rows', async () => {
     const h = ledgerServices();
     h.prisma.walletTransaction.findFirst.mockResolvedValueOnce({
       id: 'damaged-opening',
@@ -499,7 +498,7 @@ describe('user cash ledger read contract', () => {
     await expectStatusAndCode(
       h.service.getWalletTransactionsForTradingAccount('user-1', 'ta-1'),
       500,
-      'FINANCIAL_SCOPE_REPAIR_REQUIRED',
+      'FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH',
     );
     expect(h.prisma.walletTransaction.count).not.toHaveBeenCalled();
     expect(h.prisma.walletTransaction.findMany).not.toHaveBeenCalled();
@@ -527,26 +526,65 @@ describe('user cash ledger read contract', () => {
 });
 
 describe('executed trade quantity metadata', () => {
-  it.each(['market', 'limit'])('%s full fills serialize the referenced quantity, independent of wallet amount', async (orderType) => {
-    const h = ledgerServices();
-    h.prisma.order.findMany.mockResolvedValueOnce([
-      { id: 'order-buy-1', orderType, status: 'executed', side: 'buy', currencyCode: 'KRW',
-        quantity: new Prisma.Decimal('0.00001000'),
-        asset: { id: 'btc', name: 'Bitcoin', symbol: 'BTC', assetType: 'crypto' } },
-    ]);
-    const result = await h.service.getWalletTransactionsForTradingAccount('user-1', 'ta-1', { txType: 'order_buy' });
-    expect(result.data.transactions[0]).toMatchObject({
-      amount: '1000000.00000000', balanceAfter: '9000000.00000000',
-      trade: { quantity: '0.00001000' }, asset: { assetType: 'crypto' },
-    });
-    expect(h.prisma.order.findMany).toHaveBeenCalledTimes(1);
-    expect(h.prisma.order.findMany).toHaveBeenCalledWith(expect.objectContaining({ select: expect.objectContaining({ quantity: true }) }));
-  });
-  it.each([null, '0', '-1', 'NaN'])('rejects invalid executed quantity %s', async (quantity) => {
-    const h = ledgerServices();
-    h.prisma.order.findMany.mockResolvedValueOnce([
-      { id: 'order-buy-1', status: 'executed', side: 'buy', currencyCode: 'KRW', quantity: quantity === null ? null : new Prisma.Decimal(quantity) },
-    ]);
-    await expectStatusAndCode(h.service.getWalletTransactionsForTradingAccount('user-1', 'ta-1', { txType: 'order_buy' }), 500, 'TRADING_ACCOUNT_INTEGRITY');
-  });
+  it.each(['market', 'limit'])(
+    '%s full fills serialize the referenced quantity, independent of wallet amount',
+    async (orderType) => {
+      const h = ledgerServices();
+      h.prisma.order.findMany.mockResolvedValueOnce([
+        {
+          id: 'order-buy-1',
+          orderType,
+          status: 'executed',
+          side: 'buy',
+          currencyCode: 'KRW',
+          quantity: new Prisma.Decimal('0.00001000'),
+          asset: {
+            id: 'btc',
+            name: 'Bitcoin',
+            symbol: 'BTC',
+            assetType: 'crypto',
+          },
+        },
+      ]);
+      const result = await h.service.getWalletTransactionsForTradingAccount(
+        'user-1',
+        'ta-1',
+        { txType: 'order_buy' },
+      );
+      expect(result.data.transactions[0]).toMatchObject({
+        amount: '1000000.00000000',
+        balanceAfter: '9000000.00000000',
+        trade: { quantity: '0.00001000' },
+        asset: { assetType: 'crypto' },
+      });
+      expect(h.prisma.order.findMany).toHaveBeenCalledTimes(1);
+      expect(h.prisma.order.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: expect.objectContaining({ quantity: true }),
+        }),
+      );
+    },
+  );
+  it.each([null, '0', '-1', 'NaN'])(
+    'rejects invalid executed quantity %s',
+    async (quantity) => {
+      const h = ledgerServices();
+      h.prisma.order.findMany.mockResolvedValueOnce([
+        {
+          id: 'order-buy-1',
+          status: 'executed',
+          side: 'buy',
+          currencyCode: 'KRW',
+          quantity: quantity === null ? null : new Prisma.Decimal(quantity),
+        },
+      ]);
+      await expectStatusAndCode(
+        h.service.getWalletTransactionsForTradingAccount('user-1', 'ta-1', {
+          txType: 'order_buy',
+        }),
+        500,
+        'TRADING_ACCOUNT_INTEGRITY',
+      );
+    },
+  );
 });

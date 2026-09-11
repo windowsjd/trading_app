@@ -306,6 +306,7 @@ async function createLimitQuote(scenario, overrides = {}) {
     data: {
       userId: scenario.userId,
       seasonParticipantId: scenario.participantId,
+      tradingAccountId: scenario.tradingAccountId,
       quoteType: QuoteType.order,
       status: QuoteStatus.active,
       assetId: scenario.assetId,

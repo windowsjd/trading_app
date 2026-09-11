@@ -60,7 +60,6 @@ jest.mock('../generated/prisma/client', () => {
 
 import { HttpException } from '@nestjs/common';
 import { Prisma, SeasonStatus } from '../generated/prisma/client';
-import { deriveSeasonTradingAccountId } from './season-trading-account-link';
 import { SeasonsService } from './seasons.service';
 
 describe('SeasonsService', () => {
@@ -310,7 +309,7 @@ describe('SeasonsService', () => {
     expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
   });
 
-  it('repairs a legacy null trading-account link and still returns 409', async () => {
+  it('does not repair a legacy null account link from the runtime join path', async () => {
     const { prisma, service } = createService();
     prisma.$transaction.mockImplementation(async (callback) =>
       callback(prisma),
@@ -320,50 +319,24 @@ describe('SeasonsService', () => {
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
       existingParticipant(null),
     );
-    prisma.tradingAccount.findUnique
-      .mockResolvedValueOnce(null)
-      // Post-insert re-read validation of the stored deterministic row.
-      .mockResolvedValueOnce({
-        id: deriveSeasonTradingAccountId('sp-existing'),
-        userId: 'user-1',
-        mode: 'season',
-        status: 'active',
-        initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
-        openedAt: new Date('2026-05-02T00:00:00.000Z'),
-        seasonParticipant: null,
-      });
-    prisma.seasonParticipant.updateMany.mockResolvedValueOnce({ count: 1 });
-
     const error = await expectStatus(
       service.joinSeason('season-1', 'user-1'),
       409,
     );
 
-    const deterministicId = deriveSeasonTradingAccountId('sp-existing');
     expect(
       (error.getResponse() as { error: { code: string } }).error.code,
     ).toBe('SEASON_ALREADY_JOINED');
-    expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
-    expect(prisma.$executeRaw.mock.calls[0].slice(1)).toEqual([
-      deterministicId,
-      'user-1',
-      'season',
-      'active',
-      '1000000.00000000',
-      new Date('2026-05-02T00:00:00.000Z'),
-    ]);
-    expect(prisma.seasonParticipant.updateMany).toHaveBeenCalledWith({
-      where: { id: 'sp-existing', tradingAccountId: null },
-      data: { tradingAccountId: deterministicId },
-    });
-    // Repair never re-creates wallets, grants, or snapshots.
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    expect(prisma.tradingAccount.findUnique).not.toHaveBeenCalled();
+    expect(prisma.seasonParticipant.updateMany).not.toHaveBeenCalled();
     expect(prisma.cashWallet.create).not.toHaveBeenCalled();
     expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
     expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
     expect(prisma.seasonParticipant.create).not.toHaveBeenCalled();
   });
 
-  it('surfaces a failed link repair as a 500 integrity error, not SEASON_ALREADY_JOINED', async () => {
+  it('does not inspect or overwrite a conflicting legacy account from the runtime join path', async () => {
     const { prisma, service } = createService();
     prisma.$transaction.mockImplementation(async (callback) =>
       callback(prisma),
@@ -373,25 +346,16 @@ describe('SeasonsService', () => {
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
       existingParticipant(null),
     );
-    // Deterministic id already taken by another user's account: fail closed.
-    prisma.tradingAccount.findUnique.mockResolvedValueOnce({
-      id: deriveSeasonTradingAccountId('sp-existing'),
-      userId: 'user-other',
-      mode: 'season',
-      status: 'active',
-      initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
-      openedAt: new Date('2026-05-02T00:00:00.000Z'),
-      seasonParticipant: null,
-    });
-
     const error = await expectStatus(
       service.joinSeason('season-1', 'user-1'),
-      500,
+      409,
     );
 
     expect(
       (error.getResponse() as { error: { code: string } }).error.code,
-    ).toBe('TRADING_ACCOUNT_LINK_INTEGRITY');
+    ).toBe('SEASON_ALREADY_JOINED');
+    expect(prisma.tradingAccount.findUnique).not.toHaveBeenCalled();
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
     expect(prisma.seasonParticipant.updateMany).not.toHaveBeenCalled();
   });
 

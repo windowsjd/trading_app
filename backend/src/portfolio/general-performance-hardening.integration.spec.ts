@@ -823,6 +823,15 @@ async function verifyEligibilityChecksStructureBeforeConfig() {
       fxFeeRate: '0.001',
     },
   });
+  const seasonAccount = await prisma.tradingAccount.create({
+    data: {
+      userId: suspended.userId,
+      mode: 'season',
+      status: 'active',
+      initialCapitalKrw: '10000000',
+      openedAt: new Date(),
+    },
+  });
   const participant = await prisma.seasonParticipant.create({
     data: {
       seasonId: season.id,
@@ -833,6 +842,7 @@ async function verifyEligibilityChecksStructureBeforeConfig() {
       totalAssetKrw: '10000000',
       totalReturnRate: '0',
       maxDrawdown: '0',
+      tradingAccountId: seasonAccount.id,
     },
   });
   const krw = await prisma.cashWallet.findFirst({
@@ -851,6 +861,7 @@ async function verifyEligibilityChecksStructureBeforeConfig() {
     data: { seasonParticipantId: null },
   });
   await prisma.seasonParticipant.delete({ where: { id: participant.id } });
+  await prisma.tradingAccount.delete({ where: { id: seasonAccount.id } });
   await prisma.season.delete({ where: { id: season.id } });
 
   // closed + healthy → the existing status-based answer, unchanged.

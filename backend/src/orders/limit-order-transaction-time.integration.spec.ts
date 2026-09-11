@@ -184,6 +184,7 @@ async function createScenario(label, options = {}) {
     userId: user.id,
     seasonId: season.id,
     participantId: participant.id,
+    tradingAccountId: tradingAccount.id,
     walletId: wallet.id,
     assetId: asset.id,
   };
@@ -204,6 +205,7 @@ async function createQuote(scenario, expiresAt) {
     data: {
       userId: scenario.userId,
       seasonParticipantId: scenario.participantId,
+      tradingAccountId: scenario.tradingAccountId,
       quoteType: QuoteType.order,
       status: QuoteStatus.active,
       assetId: scenario.assetId,

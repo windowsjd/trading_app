@@ -733,8 +733,11 @@ describe('AppController (e2e)', () => {
   const mockJoinedParticipant = () => {
     prisma.seasonParticipant.findUnique.mockResolvedValue({
       ...participant,
-      cashWallets: [krwWallet, usdWallet],
-      positions: [],
+      tradingAccountId: 'trading-account-1',
+      tradingAccount: {
+        cashWallets: [krwWallet, usdWallet],
+        positions: [],
+      },
     });
   };
 

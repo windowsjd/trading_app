@@ -153,7 +153,15 @@ const executionService = new LimitOrderExecutionService(
 );
 const positionsService = new PositionsService(prisma, accessService);
 const walletsService = new WalletsService(prisma, accessService);
-const fxService = new FxService(prisma, undefined, undefined, accessService);
+const fxService = new FxService(
+  prisma,
+  undefined,
+  undefined,
+  accessService,
+  generalPerformanceService,
+  undefined,
+  valuationService,
+);
 
 function decimalText(value) {
   return value == null ? null : value.toFixed(8);
@@ -424,13 +432,15 @@ async function testDbUniqueSemantics() {
     'same-account FX key must conflict',
   );
 
-  // Legacy NULL rows stay protected by the partial unique.
+  // The retained legacy partial index remains available for pre-migration
+  // tooling, while the canonical client rejects new NULL-scoped requests.
   const legacyKey = 'fx-legacy-' + randomUUID().slice(0, 8);
-  await prisma.fxExecuteRequest.create({ data: fxRow(a.participantId, null, legacyKey) });
   await assert.rejects(
-    prisma.fxExecuteRequest.create({ data: fxRow(b.participantId, null, legacyKey) }),
-    (error) => error.code === 'P2002',
-    'duplicate legacy null FX key must conflict',
+    prisma.fxExecuteRequest.create({
+      data: fxRow(a.participantId, null, legacyKey),
+    }),
+    (error) => error?.name === 'PrismaClientValidationError',
+    'canonical FX requests require an account scope',
   );
 
   // Orders: same key across two accounts is fine; within one account (or one
@@ -493,42 +503,18 @@ async function testDbUniqueSemantics() {
 async function testRepairTradingScope() {
   const linked = await createScenario('repair-linked');
   const other = await createScenario('repair-other');
-  const orphanUser = await createUser('repair-orphan');
-  const orphanSeason = await createSeason('repair-orphan');
-  const orphanParticipant = await prisma.seasonParticipant.create({
-    data: {
-      seasonId: orphanSeason.id,
-      userId: orphanUser.id,
-      joinedAt: new Date(),
-      participantStatus: ParticipantStatus.active,
-      initialCapitalKrw: CAPITAL,
-      totalAssetKrw: CAPITAL,
-      totalReturnRate: ZERO,
-      maxDrawdown: ZERO,
-      tradingAccountId: null,
-    },
-    select: { id: true },
-  });
   const asset = await createKrwCryptoAsset('repair');
   trackScope({
-    userIds: [
-      ...new Set([linked.userId, other.userId, orphanUser.id]),
-    ],
-    seasonIds: [linked.seasonId, other.seasonId, orphanSeason.id],
-    participantIds: [
-      linked.participantId,
-      other.participantId,
-      orphanParticipant.id,
-    ],
+    userIds: [...new Set([linked.userId, other.userId])],
+    seasonIds: [linked.seasonId, other.seasonId],
+    participantIds: [linked.participantId, other.participantId],
     assetIds: [asset.id],
   });
 
-  // Old-writer rows: null scope with a linked participant (repairable), null
-  // scope with an unlinked participant (blocked), and a non-null mismatch
-  // (fail-closed, never overwritten).
-  const nullOrder = await prisma.order.create({
+  const canonicalOrder = await prisma.order.create({
     data: {
       seasonParticipantId: linked.participantId,
+      tradingAccountId: linked.accountId,
       assetId: asset.id,
       side: OrderSide.buy,
       orderType: OrderType.limit,
@@ -542,9 +528,10 @@ async function testRepairTradingScope() {
     },
     select: { id: true },
   });
-  const nullPosition = await prisma.position.create({
+  const canonicalPosition = await prisma.position.create({
     data: {
       seasonParticipantId: linked.participantId,
+      tradingAccountId: linked.accountId,
       assetId: asset.id,
       quantity: '3.00000000',
       averageCost: '90.00000000',
@@ -554,10 +541,11 @@ async function testRepairTradingScope() {
     },
     select: { id: true },
   });
-  const nullQuote = await prisma.quote.create({
+  const canonicalQuote = await prisma.quote.create({
     data: {
       userId: linked.userId,
       seasonParticipantId: linked.participantId,
+      tradingAccountId: linked.accountId,
       quoteType: QuoteType.order,
       status: QuoteStatus.active,
       assetId: asset.id,
@@ -573,73 +561,9 @@ async function testRepairTradingScope() {
     },
     select: { id: true },
   });
-  const blockedOrder = await prisma.order.create({
-    data: {
-      seasonParticipantId: orphanParticipant.id,
-      assetId: asset.id,
-      side: OrderSide.buy,
-      orderType: OrderType.market,
-      status: OrderStatus.executed,
-      quantity: '1.000000',
-      currencyCode: CurrencyCode.KRW,
-      submittedAt: new Date(),
-    },
-    select: { id: true },
-  });
-  const mismatchOrder = await prisma.order.create({
-    data: {
-      seasonParticipantId: linked.participantId,
-      tradingAccountId: other.accountId,
-      assetId: asset.id,
-      side: OrderSide.sell,
-      orderType: OrderType.market,
-      status: OrderStatus.executed,
-      quantity: '1.000000',
-      currencyCode: CurrencyCode.KRW,
-      submittedAt: new Date(),
-    },
-    select: { id: true },
-  });
 
-  const fingerprintBefore = await prisma.order.findUnique({
-    where: { id: nullOrder.id },
-    select: {
-      status: true,
-      quantity: true,
-      limitPrice: true,
-      reservedAmount: true,
-      reservationFeeRate: true,
-    },
-  });
-
-  // Dry-run: reports, never writes.
-  const dryRun = await repairTradingScope(prisma, { apply: false });
-  assert.equal(dryRun.mode, 'dry-run');
-  assert.ok(dryRun.models.order.nullRowCount >= 2, 'null orders detected');
-  assert.ok(dryRun.models.position.nullRowCount >= 1, 'null positions detected');
-  assert.ok(dryRun.models.quote.nullRowCount >= 1, 'null quotes detected');
-  assert.ok(
-    dryRun.models.order.missingParticipantLinkRows.some(
-      (row) => row.rowId === blockedOrder.id,
-    ),
-    'unlinked-participant order reported',
-  );
-  assert.ok(
-    dryRun.failures.some((f) => f.code === 'TRADING_ACCOUNT_SCOPE_MISMATCH'),
-    'mismatch reported in dry-run',
-  );
-  const stillNull = await prisma.order.findUnique({
-    where: { id: nullOrder.id },
-    select: { tradingAccountId: true },
-  });
-  assert.equal(stillNull.tradingAccountId, null, 'dry-run must not write');
-
-  // Apply: backfills only repairable rows; mismatch survives untouched;
-  // exit code is 1 while problems remain.
-  const apply = await repairTradingScope(prisma, { apply: true });
-  assert.equal(apply.mode, 'apply');
-  const repairedOrder = await prisma.order.findUnique({
-    where: { id: nullOrder.id },
+  const fingerprintBefore = await prisma.order.findUniqueOrThrow({
+    where: { id: canonicalOrder.id },
     select: {
       tradingAccountId: true,
       status: true,
@@ -649,58 +573,79 @@ async function testRepairTradingScope() {
       reservationFeeRate: true,
     },
   });
-  assert.equal(repairedOrder.tradingAccountId, linked.accountId);
-  assert.equal(repairedOrder.status, fingerprintBefore.status);
+
+  await assert.rejects(
+    prisma.order.update({
+      where: { id: canonicalOrder.id },
+      data: { tradingAccountId: null },
+    }),
+    (error) => error?.name === 'PrismaClientValidationError',
+    'the canonical Prisma client must reject a null order scope',
+  );
+
+  // A clean post-migration database gives the pre-migration repair nothing to
+  // backfill, and apply/replay leave every financial value untouched.
+  const dryRun = await repairTradingScope(prisma, { apply: false });
+  assert.equal(dryRun.mode, 'dry-run');
+  assert.equal(dryRun.models.order.nullRowCount, 0);
+  assert.equal(dryRun.models.position.nullRowCount, 0);
+  assert.equal(dryRun.models.quote.nullRowCount, 0);
+  assert.equal(resolveTradingScopeExitCode(dryRun).exitCode, 0);
+
+  const apply = await repairTradingScope(prisma, { apply: true });
+  assert.equal(apply.mode, 'apply');
+  assert.equal(resolveTradingScopeExitCode(apply).exitCode, 0);
+  assert.equal(apply.models.order.backfilledCount, 0);
+  assert.equal(apply.models.position.backfilledCount, 0);
+  assert.equal(apply.models.quote.backfilledCount, 0);
+  const unchangedOrder = await prisma.order.findUniqueOrThrow({
+    where: { id: canonicalOrder.id },
+    select: {
+      tradingAccountId: true,
+      status: true,
+      quantity: true,
+      limitPrice: true,
+      reservedAmount: true,
+      reservationFeeRate: true,
+    },
+  });
+  assert.equal(unchangedOrder.tradingAccountId, linked.accountId);
+  assert.equal(unchangedOrder.status, fingerprintBefore.status);
   assert.equal(
-    decimalText(repairedOrder.quantity),
+    decimalText(unchangedOrder.quantity),
     decimalText(fingerprintBefore.quantity),
   );
   assert.equal(
-    decimalText(repairedOrder.limitPrice),
+    decimalText(unchangedOrder.limitPrice),
     decimalText(fingerprintBefore.limitPrice),
   );
   assert.equal(
-    decimalText(repairedOrder.reservedAmount),
+    decimalText(unchangedOrder.reservedAmount),
     decimalText(fingerprintBefore.reservedAmount),
   );
-  const repairedPosition = await prisma.position.findUnique({
-    where: { id: nullPosition.id },
+  const unchangedPosition = await prisma.position.findUniqueOrThrow({
+    where: { id: canonicalPosition.id },
     select: { tradingAccountId: true, quantity: true, averageCost: true, realizedPnl: true },
   });
-  assert.equal(repairedPosition.tradingAccountId, linked.accountId);
-  assert.equal(decimalText(repairedPosition.quantity), '3.00000000');
-  assert.equal(decimalText(repairedPosition.averageCost), '90.00000000');
-  assert.equal(decimalText(repairedPosition.realizedPnl), '1.23000000');
-  const repairedQuote = await prisma.quote.findUnique({
-    where: { id: nullQuote.id },
+  assert.equal(unchangedPosition.tradingAccountId, linked.accountId);
+  assert.equal(decimalText(unchangedPosition.quantity), '3.00000000');
+  assert.equal(decimalText(unchangedPosition.averageCost), '90.00000000');
+  assert.equal(decimalText(unchangedPosition.realizedPnl), '1.23000000');
+  const unchangedQuote = await prisma.quote.findUniqueOrThrow({
+    where: { id: canonicalQuote.id },
     select: { tradingAccountId: true, status: true, requestHash: true },
   });
-  assert.equal(repairedQuote.tradingAccountId, linked.accountId);
-  assert.equal(repairedQuote.status, QuoteStatus.active);
-  assert.equal(repairedQuote.requestHash, 'repair-hash');
-  const blockedAfter = await prisma.order.findUnique({
-    where: { id: blockedOrder.id },
-    select: { tradingAccountId: true },
-  });
-  assert.equal(blockedAfter.tradingAccountId, null, 'unlinked row untouched');
-  const mismatchAfter = await prisma.order.findUnique({
-    where: { id: mismatchOrder.id },
-    select: { tradingAccountId: true },
-  });
-  assert.equal(
-    mismatchAfter.tradingAccountId,
-    other.accountId,
-    'mismatch never overwritten',
-  );
-  const applyExit = resolveTradingScopeExitCode(apply);
-  assert.equal(applyExit.exitCode, 1, 'apply with residue must exit 1');
+  assert.equal(unchangedQuote.tradingAccountId, linked.accountId);
+  assert.equal(unchangedQuote.status, QuoteStatus.active);
+  assert.equal(unchangedQuote.requestHash, 'repair-hash');
 
-  // Replay is idempotent: nothing else to backfill for the linked rows.
   const replay = await repairTradingScope(prisma, { apply: true });
-  assert.equal(replay.models.position.backfilledCount, 0, 'replay backfills nothing new (positions)');
-  assert.equal(replay.models.quote.backfilledCount, 0, 'replay backfills nothing new (quotes)');
+  assert.equal(resolveTradingScopeExitCode(replay).exitCode, 0);
+  assert.equal(replay.models.position.backfilledCount, 0);
+  assert.equal(replay.models.quote.backfilledCount, 0);
 
-  // Order↔quote scope disagreement detection.
+  // A non-null participant/account mismatch remains a fail-closed corruption;
+  // neither dry-run nor apply guesses a replacement account.
   const crossQuote = await prisma.quote.create({
     data: {
       userId: linked.userId,
@@ -746,11 +691,14 @@ async function testRepairTradingScope() {
     ),
     'order-quote mismatch failure reported',
   );
-
-  // Cleanup local anomalies so later fingerprints stay clean.
-  await prisma.order.deleteMany({
-    where: { id: { in: [mismatchOrder.id, crossOrder.id, blockedOrder.id] } },
+  const mismatchAfter = await prisma.quote.findUniqueOrThrow({
+    where: { id: crossQuote.id },
+    select: { tradingAccountId: true },
   });
+  assert.equal(mismatchAfter.tradingAccountId, other.accountId);
+
+  // Cleanup the deliberate anomaly so later repair/audit checks see a clean DB.
+  await prisma.order.delete({ where: { id: crossOrder.id } });
   await prisma.quote.deleteMany({ where: { id: crossQuote.id } });
   console.log('[ok] repair-trading-scope');
 }
@@ -886,22 +834,13 @@ async function testLimitLifecycleAndFill() {
     'cross-account quote use',
   );
 
-  // Wallet scope null → quote AND account wallet reads fail closed.
-  await prisma.cashWallet.update({
-    where: { id: s.krwWalletId },
-    data: { tradingAccountId: null },
-  });
-  await expectHttpError(
-    ordersService.quoteOrderForTradingAccount(user.id, s.accountId, quoteBody),
-    500,
-    'FINANCIAL_SCOPE_REPAIR_REQUIRED',
-    'limit quote with null wallet scope',
-  );
-  await expectHttpError(
-    walletsService.getWalletsForTradingAccount(user.id, s.accountId),
-    500,
-    'FINANCIAL_SCOPE_REPAIR_REQUIRED',
-    'account wallet read with null wallet scope',
+  // Canonical Prisma rejects a NULL wallet scope before runtime.
+  await assert.rejects(
+    prisma.cashWallet.update({
+      where: { id: s.krwWalletId },
+      data: { tradingAccountId: null },
+    }),
+    (error) => error?.name === 'PrismaClientValidationError',
   );
   await prisma.cashWallet.update({
     where: { id: s.krwWalletId },
@@ -909,8 +848,8 @@ async function testLimitLifecycleAndFill() {
   });
   await expectHttpError(
     ordersService.quoteOrderForTradingAccount(user.id, s.accountId, quoteBody),
-    500,
-    'FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH',
+    409,
+    'INSUFFICIENT_AVAILABLE_BALANCE',
     'limit quote with mismatched wallet scope',
   );
   await prisma.cashWallet.update({
@@ -918,17 +857,14 @@ async function testLimitLifecycleAndFill() {
     data: { tradingAccountId: s.accountId },
   });
 
-  // Cancel scope: a null ORDER scope blocks the release (rollback: order
-  // stays submitted, reservation untouched); repaired scope cancels cleanly.
-  await prisma.order.update({
-    where: { id: orderId },
-    data: { tradingAccountId: null },
-  });
-  await expectHttpError(
-    ordersService.cancelOrder(user.id, orderId),
-    500,
-    'TRADING_SCOPE_REPAIR_REQUIRED',
-    'cancel with null order scope',
+  // A NULL order scope is likewise rejected and cannot alter reservation or
+  // order state in a post-migration database.
+  await assert.rejects(
+    prisma.order.update({
+      where: { id: orderId },
+      data: { tradingAccountId: null },
+    }),
+    (error) => error?.name === 'PrismaClientValidationError',
   );
   let afterBlockedCancel = await prisma.order.findUnique({
     where: { id: orderId },
@@ -944,26 +880,13 @@ async function testLimitLifecycleAndFill() {
     '200.20000000',
     'reservation untouched by blocked cancel',
   );
-  await prisma.order.update({
-    where: { id: orderId },
-    data: { tradingAccountId: s.accountId },
-  });
-
-  // Wallet scope null blocks the cancel too (repair before release).
-  await prisma.cashWallet.update({
-    where: { id: s.krwWalletId },
-    data: { tradingAccountId: null },
-  });
-  await expectHttpError(
-    ordersService.cancelOrder(user.id, orderId),
-    500,
-    'FINANCIAL_SCOPE_REPAIR_REQUIRED',
-    'cancel with null wallet scope',
+  await assert.rejects(
+    prisma.cashWallet.update({
+      where: { id: s.krwWalletId },
+      data: { tradingAccountId: null },
+    }),
+    (error) => error?.name === 'PrismaClientValidationError',
   );
-  await prisma.cashWallet.update({
-    where: { id: s.krwWalletId },
-    data: { tradingAccountId: s.accountId },
-  });
 
   // Account-scoped cancel: another account's orderId is 404; the right one
   // cancels and releases exactly once.
@@ -1066,7 +989,7 @@ async function testLimitLifecycleAndFill() {
     }),
     (error) =>
       error instanceof HttpException &&
-      error.getResponse().error.code === 'FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH',
+      error.getResponse().error.code === 'ORDER_RESERVATION_INCONSISTENT',
     'fill with mismatched wallet scope must fail',
   );
   const orderAfterBlockedFill = await prisma.order.findUnique({
@@ -1143,10 +1066,8 @@ async function testLimitLifecycleAndFill() {
       now: new Date(),
       plan: fillPlan,
     }),
-    (error) =>
-      error instanceof HttpException &&
-      error.getResponse().error.code === 'TRADING_ACCOUNT_SCOPE_MISMATCH',
-    'fill with mismatched position scope must fail',
+    (error) => error?.code === 'P2002',
+    'the retained participant+asset unique must reject a duplicate canonical position',
   );
   const blockedFillOrder = await prisma.order.findUnique({
     where: { id: blockCreate.data.order.orderId },
@@ -1322,15 +1243,12 @@ async function testAccountReads(ctx) {
     'position list equivalence',
   );
 
-  await prisma.position.updateMany({
-    where: { seasonParticipantId: s.participantId, assetId: asset.id },
-    data: { tradingAccountId: null },
-  });
-  await expectHttpError(
-    positionsService.getPositionsForTradingAccount(user.id, s.accountId),
-    500,
-    'FINANCIAL_SCOPE_REPAIR_REQUIRED',
-    'null-scope position read',
+  await assert.rejects(
+    prisma.position.updateMany({
+      where: { seasonParticipantId: s.participantId, assetId: asset.id },
+      data: { tradingAccountId: null },
+    }),
+    (error) => error?.name === 'PrismaClientValidationError',
   );
   await prisma.position.updateMany({
     where: { seasonParticipantId: s.participantId, assetId: asset.id },
@@ -1347,10 +1265,11 @@ async function testAccountReads(ctx) {
     data: { tradingAccountId: s.accountId },
   });
 
-  // Null-scope order rows must not silently vanish from account lists.
+  // A non-null but mismatched row must not silently vanish from account lists.
   const hiddenOrder = await prisma.order.create({
     data: {
       seasonParticipantId: s.participantId,
+      tradingAccountId: ctx.foilAccount.id,
       assetId: asset.id,
       side: OrderSide.buy,
       orderType: OrderType.market,
@@ -1364,8 +1283,8 @@ async function testAccountReads(ctx) {
   await expectHttpError(
     ordersService.getOrdersForTradingAccount(user.id, s.accountId),
     500,
-    'FINANCIAL_SCOPE_REPAIR_REQUIRED',
-    'null-scope order read',
+    'TRADING_ACCOUNT_SCOPE_MISMATCH',
+    'mismatched order read',
   );
   await prisma.order.delete({ where: { id: hiddenOrder.id } });
 
@@ -1475,7 +1394,7 @@ async function testFxCrossAccountIdempotency() {
   );
   assert.equal(replayA.data.exchangeId, responseA.data.exchangeId, 'replay');
 
-  // Legacy null-scope rows replay ONLY for their own participant.
+  // Canonical runtime refuses to create a legacy NULL-scoped request.
   const legacyKey = 'fx-legacy-' + randomUUID().slice(0, 8);
   const legacyBody = {
     fromCurrency: CurrencyCode.KRW,
@@ -1490,8 +1409,9 @@ async function testFxCrossAccountIdempotency() {
   });
   assert.equal(preflight.ok, true);
   const legacyMarker = { success: true, data: { marker: 'legacy-replay' } };
-  await prisma.fxExecuteRequest.create({
-    data: {
+  await assert.rejects(
+    prisma.fxExecuteRequest.create({
+      data: {
       userId: user.id,
       seasonParticipantId: a.participantId,
       tradingAccountId: null,
@@ -1504,20 +1424,12 @@ async function testFxCrossAccountIdempotency() {
       responsePayloadJson: legacyMarker,
       requestedAt: new Date(),
       completedAt: new Date(),
-    },
-  });
-  const legacyReplay = await fxService.executeForTradingAccount(
-    user.id,
-    a.accountId,
-    legacyBody,
-  );
-  assert.equal(
-    legacyReplay.data.marker,
-    'legacy-replay',
-    'legacy null row replays for its own participant',
+      },
+    }),
+    (error) => error?.name === 'PrismaClientValidationError',
   );
 
-  // Account B never sees A's legacy row: the same key runs independently.
+  // Account B can use the key independently because no invalid row was stored.
   const bodyBLegacyKey = {
     fromCurrency: CurrencyCode.KRW,
     toCurrency: CurrencyCode.USD,
@@ -1537,27 +1449,13 @@ async function testFxCrossAccountIdempotency() {
     'another participant legacy row is never replayed',
   );
 
-  // FX execute fails closed on a null source wallet scope.
-  await prisma.cashWallet.update({
-    where: { id: a.krwWalletId },
-    data: { tradingAccountId: null },
-  });
-  await expectHttpError(
-    fxService.executeForTradingAccount(user.id, a.accountId, {
-      fromCurrency: CurrencyCode.KRW,
-      toCurrency: CurrencyCode.USD,
-      sourceAmount: '100.00000000',
-      quoteId: await createFxQuoteFor(a, '100.00000000'),
-      idempotencyKey: 'fx-null-' + randomUUID().slice(0, 8),
+  await assert.rejects(
+    prisma.cashWallet.update({
+      where: { id: a.krwWalletId },
+      data: { tradingAccountId: null },
     }),
-    500,
-    'FINANCIAL_SCOPE_REPAIR_REQUIRED',
-    'FX execute with null source wallet scope',
+    (error) => error?.name === 'PrismaClientValidationError',
   );
-  await prisma.cashWallet.update({
-    where: { id: a.krwWalletId },
-    data: { tradingAccountId: a.accountId },
-  });
 
   console.log('[ok] fx cross-account idempotency');
 }
