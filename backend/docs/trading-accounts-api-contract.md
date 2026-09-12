@@ -48,6 +48,13 @@
 
 ## Routes
 
+The owned account **detail** response also includes read-only `feePolicy`:
+`{ "tradeFeeRate": "0.001000", "fxFeeRate": "0.001000" }`. General rates use
+the existing independent `GENERAL_TRADE_FEE_RATE` / `GENERAL_FX_FEE_RATE`
+configuration; season rates come from that account's linked season. These
+fields support frontend indicative previews and grant no execution authority.
+Order/FX quote and execute requests and validations are unchanged.
+
 `GET /api/v1/trading-accounts`
 
 `GET /api/v1/trading-accounts/:accountId`

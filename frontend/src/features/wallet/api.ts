@@ -72,6 +72,8 @@ export interface FxRateDto {
   effectiveAt?: IsoDateTimeString;
   capturedAt?: IsoDateTimeString;
   freshnessAgeSeconds?: number;
+  /** Server's display validity; absent on older servers means no preview. */
+  validUntil?: IsoDateTimeString;
   providerPriority?: number;
   fallbackUsed?: boolean;
 }

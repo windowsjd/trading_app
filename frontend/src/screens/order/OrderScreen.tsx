@@ -7,6 +7,8 @@ import {
   TextInput,
   ScrollView,
   Pressable,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -26,6 +28,7 @@ import {
   getAccountPositionQuantity,
   getTradingAccountPositions,
   getTradingAccountWallets,
+  getTradingAccount,
   quoteTradingAccountOrder,
 } from '../../features/tradingAccount/api';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
@@ -61,7 +64,13 @@ import {
   isOrderRequoteRequiredCode,
   isOrderSuccess,
 } from '../../features/order/mapper';
-import { LIMIT_ORDER_ENABLED } from '../../constants/env';
+import { buildWsUrl, LIMIT_ORDER_ENABLED } from '../../constants/env';
+import { useAssetTicker } from '../../features/asset/useAssetTicker';
+import { selectDisplayPrice } from '../../features/asset/displayPricePolicy';
+import { useStaleRecheck } from '../../features/asset/useStaleRecheck';
+import { formatPreviewMoney, isPreviewPriceAvailable, orderPreview } from '../../features/tradingAccount/indicativePreview';
+import { runQuotedAction, type QuotedAction } from '../../features/tradingAccount/quotedAction';
+import PreviewAmounts from '../../components/tradingAccount/PreviewAmounts';
 import { ERROR_CODE } from '../../models/enums/errorCode';
 import type { OrderFlowState } from '../../models/enums/viewState';
 import {
@@ -229,6 +238,26 @@ export default function OrderScreen({ route, navigation }: Props) {
   const successData = successState.data;
   const successQuoteData = successState.quote;
   const [quoteNow, setQuoteNow] = useState(() => Date.now());
+  type BuyRequest = {
+    accountId: string;
+    epoch: number;
+    seasonUi: boolean;
+    payload: Parameters<typeof quoteTradingAccountOrder>[1];
+  };
+  const buyActionRef = useRef<QuotedAction<BuyRequest, OrderQuoteDto> | null>(null);
+  const buySubmitLockRef = useRef(false);
+  const buyScopeRef = useRef({ key: '', epoch: 0, mounted: true });
+  const scopeKey = `${accountId}:${selectedAccountId ?? ''}:${accountKnown}:${assetId}:${side}`;
+  if (buyScopeRef.current.key !== scopeKey) {
+    buyActionRef.current = null;
+    buyScopeRef.current = { key: scopeKey, epoch: buyScopeRef.current.epoch + 1, mounted: true };
+  }
+  useEffect(() => {
+    buyScopeRef.current.mounted = true;
+    return () => { buyScopeRef.current.mounted = false; };
+  }, []);
+  const isBuyCurrent = (request: BuyRequest) =>
+    buyScopeRef.current.mounted && request.epoch === buyScopeRef.current.epoch;
   const latestQuoteInputRef = useRef<{
     assetId: string;
     side: typeof side;
@@ -247,6 +276,65 @@ export default function OrderScreen({ route, navigation }: Props) {
     queryKey: QUERY_KEYS.asset.detail(assetId),
     queryFn: () => getAssetDetail(assetId),
   });
+  const feeQuery = useQuery({
+    queryKey: QUERY_KEYS.tradingAccount.detail(accountId),
+    queryFn: () => getTradingAccount(accountId),
+    enabled: accountKnown && side === 'buy',
+  });
+  const tickerUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
+  const { latestTicker } = useAssetTicker({
+    assetId, wsUrl: tickerUrl ?? '', enabled: side === 'buy' && !!tickerUrl,
+  });
+  useStaleRecheck(side === 'buy', () => setQuoteNow(Date.now()));
+
+  const buyMutation = useMutation({
+    mutationFn: (action: QuotedAction<BuyRequest, OrderQuoteDto>) => runQuotedAction(action, {
+      quote: (request) => quoteTradingAccountOrder(request.accountId, request.payload),
+      execute: (request, quote, key) => createTradingAccountOrder(request.accountId, {
+        assetId: request.payload.assetId,
+        side: request.payload.side,
+        quantity: quote.quantity,
+        quoteId: quote.quoteId,
+        idempotencyKey: key,
+        ...(request.payload.orderType === 'limit'
+          ? { orderType: 'limit' as const, limitPrice: quote.limitPrice } : {}),
+      }),
+      isCurrent: () => isBuyCurrent(action.request),
+    }),
+    retry: false,
+    onSettled: () => { buySubmitLockRef.current = false; },
+    onSuccess: async (data, action) => {
+      if (!data) return;
+      if (isBuyCurrent(action.request)) {
+        if (isOrderSuccess(data.result)) {
+          setSuccessState(captureOrderSuccess(data.result, data.quote));
+          setQuantity('');
+          setFieldError(null);
+          setDomainError(null);
+        } else {
+          setDomainError('주문 결과를 확인할 수 없습니다. 주문 내역을 확인해주세요.');
+        }
+      }
+      await invalidateAfterOrderCreate(queryClient, action.request.accountId, {
+        seasonUi: action.request.seasonUi,
+      });
+    },
+    onError: (error, action) => {
+      if (!isBuyCurrent(action.request)) return;
+      const code = getApiErrorCode(error);
+      if (isOrderRequoteRequiredCode(code) || isOrderIdempotencyConflictCode(code)) {
+        buyActionRef.current = null;
+        setDomainError(code === ERROR_CODE.QUOTE_EXPIRED
+          ? '주문 견적이 만료되었습니다. 매수하기를 다시 눌러주세요.'
+          : isOrderIdempotencyConflictCode(code)
+            ? '이미 처리 중인 요청입니다. 주문 내역을 확인해주세요.'
+            : '가격 또는 환율이 변경되어 주문하지 못했습니다. 매수하기를 다시 눌러주세요.');
+      } else {
+        setDomainError(getOrderDomainErrorMessage(code, !action.request.seasonUi));
+      }
+    },
+  });
+  const buyPending = buyMutation.isPending;
 
   const positionQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.positions(accountId, {
@@ -396,6 +484,8 @@ export default function OrderScreen({ route, navigation }: Props) {
   });
 
   const resetOrderActionState = () => {
+    if (buySubmitLockRef.current) return;
+    buyActionRef.current = null;
     setFieldError(null);
     setDomainError(null);
     setQuoteData(null);
@@ -420,6 +510,7 @@ export default function OrderScreen({ route, navigation }: Props) {
    */
   useEffect(() => {
     if (!accountChangedAway) return;
+    buyActionRef.current = null;
 
     setQuantity('');
     setLimitPrice('');
@@ -458,6 +549,24 @@ export default function OrderScreen({ route, navigation }: Props) {
 
   const asset = assetQuery.data?.asset;
   const price = asset?.price;
+  const displayPrice = selectDisplayPrice({
+    latestTicker: latestTicker?.assetId === assetId ? latestTicker : null,
+    restPrice: price,
+    assetPriceCurrency: asset?.priceCurrency,
+    assetDisplayPriceDecimals: asset?.displayPriceDecimals,
+  });
+  const previewPriceAvailable = isPreviewPriceAvailable(displayPrice, Date.now());
+  const preview = side === 'buy' && !inputInvalidReason
+    ? orderPreview({
+        quantity: quantity.trim(),
+        price: orderType === 'limit' ? limitPrice.trim()
+          : previewPriceAvailable ? displayPrice.priceLocal : null,
+        feeRate: !feeQuery.isError ? feeQuery.data?.feePolicy?.tradeFeeRate : null,
+      }) : null;
+  const previewNotice = orderType === 'market' && !previewPriceAvailable
+    ? '현재 시세가 없거나 오래되어 예상 금액을 표시할 수 없습니다.'
+    : feeQuery.isPending ? '수수료 정보를 확인하는 중입니다.'
+      : '수수료 정보를 불러오지 못해 예상 금액을 표시할 수 없습니다.';
   const positionQuantity = getAccountPositionQuantity(
     positionQuery.data,
     assetId,
@@ -506,7 +615,7 @@ export default function OrderScreen({ route, navigation }: Props) {
         '거래 제한 가능성이 있습니다. 서버 견적에서 최종 확인됩니다.')
       : asset && !isTradableMarketStatus(asset.marketStatus)
         ? '장 상태는 서버 견적에서 최종 확인됩니다.'
-        : asset && !isPriceAvailable(price)
+        : asset && (side === 'buy' ? !previewPriceAvailable : !isPriceAvailable(price))
           ? '현재 화면 시세가 없어 비율 수량 계산은 제한됩니다. 견적은 서버가 최종 판정합니다.'
           : asset && price?.priceKrwState && price.priceKrwState !== 'available'
             ? 'KRW 환산 시세를 사용할 수 없습니다. 견적은 서버가 최종 판정합니다.'
@@ -542,7 +651,9 @@ export default function OrderScreen({ route, navigation }: Props) {
       ? getWalletAvailableAmount(walletsQuery.data, settlementCurrency)
       : null;
   const buyAvailableValue = parsePositiveDecimal(buyAvailable);
-  const priceValue = parsePositiveDecimal(price?.currentPrice);
+  const priceValue = parsePositiveDecimal(side === 'buy'
+    ? previewPriceAvailable ? displayPrice.priceLocal : null
+    : price?.currentPrice);
   const limitPriceValue = parsePositiveDecimal(limitPrice);
   const ratioPriceValue = orderType === 'limit' ? limitPriceValue : priceValue;
   const positionQuantityValue = parsePositiveDecimal(positionQuantity);
@@ -621,6 +732,9 @@ export default function OrderScreen({ route, navigation }: Props) {
     orderDomainState !== 'order_requote_required' &&
     orderDomainState !== 'order_idempotency_conflict';
 
+  const canBuyExecute = !preOrderBlockedReason && !inputInvalidReason &&
+    !!preview && !successData && !buyActionRef.current?.completed;
+
   const inputErrorMessage =
     fieldError ??
     (viewState === 'order_input_invalid' ? inputInvalidReason : null);
@@ -655,6 +769,7 @@ export default function OrderScreen({ route, navigation }: Props) {
   };
 
   const applyQuantityRatio = (ratio: (typeof RATIO_BUTTONS)[number]) => {
+    if (buySubmitLockRef.current) return;
     if (ratioDisabledReason) {
       setFieldError(ratioDisabledReason);
       return;
@@ -724,6 +839,23 @@ export default function OrderScreen({ route, navigation }: Props) {
     });
   };
 
+  const submitBuy = () => {
+    if (buySubmitLockRef.current || buyPending || !canBuyExecute) return;
+    setFieldError(null);
+    setDomainError(null);
+    buyActionRef.current ??= {
+      request: {
+        accountId, epoch: buyScopeRef.current.epoch,
+        seasonUi: capabilities?.isSeason ?? false,
+        payload: { assetId, side: 'buy', quantity: quantity.trim(),
+          ...(orderType === 'limit' ? { orderType: 'limit', limitPrice: limitPrice.trim() } : {}) },
+      },
+      idempotencyKey: createIdempotencyKey('order'),
+    };
+    buySubmitLockRef.current = true;
+    buyMutation.mutate(buyActionRef.current);
+  };
+
   if (assetQuery.isLoading || accountsLoading) {
     return <FullPageLoading message="주문 화면을 준비하는 중입니다." />;
   }
@@ -779,7 +911,9 @@ export default function OrderScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView
+        keyboardShouldPersistTaps="handled"
         testID={TEST_IDS.order.screen}
         contentContainerStyle={styles.content}
       >
@@ -814,9 +948,9 @@ export default function OrderScreen({ route, navigation }: Props) {
           <Text style={styles.helper}>
             현재가{' '}
             {formatAssetPrice(
-              price?.currentPrice,
+              side === 'buy' ? (previewPriceAvailable ? displayPrice.priceLocal : null) : price?.currentPrice,
               asset.priceCurrency,
-              asset.displayPriceDecimals,
+              displayPrice.displayPriceDecimals,
             )}
           </Text>
           <Text style={styles.helper}>
@@ -880,12 +1014,13 @@ export default function OrderScreen({ route, navigation }: Props) {
             <View style={styles.ratioRow}>
               <Pressable
                 testID={TEST_IDS.order.typeToggleMarket}
+                disabled={buyPending}
                 style={[
                   styles.ratioButton,
                   orderType === 'market' && styles.typeButtonActive,
                 ]}
                 onPress={() => {
-                  if (orderType === 'market') return;
+                  if (buySubmitLockRef.current || orderType === 'market') return;
                   setOrderTypeState('market');
                   resetOrderActionState();
                 }}
@@ -901,12 +1036,13 @@ export default function OrderScreen({ route, navigation }: Props) {
               </Pressable>
               <Pressable
                 testID={TEST_IDS.order.typeToggleLimit}
+                disabled={buyPending}
                 style={[
                   styles.ratioButton,
                   orderType === 'limit' && styles.typeButtonActive,
                 ]}
                 onPress={() => {
-                  if (orderType === 'limit') return;
+                  if (buySubmitLockRef.current || orderType === 'limit') return;
                   setOrderTypeState('limit');
                   resetOrderActionState();
                 }}
@@ -926,9 +1062,11 @@ export default function OrderScreen({ route, navigation }: Props) {
                 <Text style={styles.label}>지정가 가격</Text>
                 <TextInput
                   testID={TEST_IDS.order.limitPriceInput}
+                  editable={!buyPending}
                   style={styles.input}
                   value={limitPrice}
                   onChangeText={(value) => {
+                    if (buySubmitLockRef.current) return;
                     setLimitPrice(value);
                     resetOrderActionState();
                   }}
@@ -950,9 +1088,11 @@ export default function OrderScreen({ route, navigation }: Props) {
 
           <TextInput
             testID={TEST_IDS.order.quantityInput}
+            editable={!buyPending}
             style={styles.input}
             value={quantity}
             onChangeText={(value) => {
+              if (buySubmitLockRef.current) return;
               setQuantity(value);
               resetOrderActionState();
             }}
@@ -962,7 +1102,7 @@ export default function OrderScreen({ route, navigation }: Props) {
 
           <View style={styles.ratioRow}>
             {RATIO_BUTTONS.map((ratio) => {
-              const disabled = !!ratioDisabledReason;
+              const disabled = buyPending || !!ratioDisabledReason;
 
               return (
                 <Pressable
@@ -1019,6 +1159,35 @@ export default function OrderScreen({ route, navigation }: Props) {
           ) : null}
         </View>
 
+        {side === 'buy' ? <>
+          {!inputInvalidReason ? (
+            <View style={styles.card} testID="order-indicative-preview">
+              <Text style={styles.label}>예상 매수 견적</Text>
+              {preview ? <>
+                <PreviewAmounts rows={[
+                  { label: orderType === 'limit' ? '지정가' : '현재가', value: formatAssetPrice(preview.price, asset.settlementCurrency, displayPrice.displayPriceDecimals) },
+                  { label: '예상 주문금액', value: formatPreviewMoney(preview.grossAmount, asset.settlementCurrency) },
+                  { label: '예상 수수료', value: formatPreviewMoney(preview.feeAmount, asset.settlementCurrency) },
+                  { label: orderType === 'limit' ? '예상 예약금액' : '예상 결제금액', value: formatPreviewMoney(preview.totalAmount, asset.settlementCurrency) },
+                ]} />
+                <Text style={styles.helper}>{orderType === 'limit' ? '입력한 지정가 기준' : displayPrice.isRealtime ? '현재 시세 기준' : '최근 조회 시세 기준'}</Text>
+                <Text style={styles.helper}>예상 금액이며 실제 주문 시 가격과 수수료를 확인합니다.</Text>
+              </> : <>
+                <Text style={styles.warningText}>{previewNotice}</Text>
+                {orderType === 'market' && !previewPriceAvailable && !displayPrice.isRealtime ? (
+                  <CTAButton label="시세 다시 불러오기"
+                    state={assetQuery.isFetching ? 'loading' : 'enabled'}
+                    onPress={() => void assetQuery.refetch()} />
+                ) : null}
+                {feeQuery.isError ? <CTAButton label="수수료 다시 불러오기" onPress={() => void feeQuery.refetch()} /> : null}
+              </>}
+            </View>
+          ) : null}
+          <CTAButton testID={TEST_IDS.order.executeSubmit}
+            label={quantity.trim() ? `${formatDisplayDecimal(quantity.trim())}${asset.assetType === 'crypto' ? '개' : '주'} 매수하기` : '매수하기'}
+            state={buyPending ? 'loading' : canBuyExecute ? 'enabled' : 'disabled'}
+            onPress={submitBuy} />
+        </> : <>
         <View style={styles.card}>
           <Text style={styles.label}>주문 견적</Text>
 
@@ -1053,39 +1222,6 @@ export default function OrderScreen({ route, navigation }: Props) {
                       quoteData.currencyCode,
                     )}
                   </Text>
-                  {side === 'buy' ? (
-                    <>
-                      <Text style={styles.helper}>
-                        예약 예정 금액{' '}
-                        {formatCurrency(
-                          quoteData.quotedReservedAmount ??
-                            quoteData.reservedAmount,
-                          quoteData.currencyCode,
-                        )}
-                      </Text>
-                      <Text style={styles.helper}>
-                        기존 예약금{' '}
-                        {formatCurrency(
-                          quoteData.walletReservedBefore,
-                          quoteData.currencyCode,
-                        )}
-                      </Text>
-                      <Text style={styles.helper}>
-                        사용 가능 현금{' '}
-                        {formatCurrency(
-                          quoteData.walletAvailableBefore,
-                          quoteData.currencyCode,
-                        )}
-                      </Text>
-                      <Text style={styles.helper}>
-                        주문 후 예상 사용 가능 현금{' '}
-                        {formatCurrency(
-                          quoteData.estimatedAvailableAfter,
-                          quoteData.currencyCode,
-                        )}
-                      </Text>
-                    </>
-                  ) : (
                     <>
                       <Text style={styles.helper}>
                         예상 순수령액{' '}
@@ -1099,7 +1235,6 @@ export default function OrderScreen({ route, navigation }: Props) {
                         {formatDisplayDecimal(quoteData.reservedQuantity)}
                       </Text>
                     </>
-                  )}
                   <Text style={styles.helper}>
                     {getLimitOrderSuccessMessage(
                       quoteData.executionPolicy,
@@ -1196,7 +1331,9 @@ export default function OrderScreen({ route, navigation }: Props) {
             style={styles.flex}
           />
         </View>
+        </>}
       </ScrollView>
+      </KeyboardAvoidingView>
 
       <OrderSuccessBottomSheet
         visible={!!successData}

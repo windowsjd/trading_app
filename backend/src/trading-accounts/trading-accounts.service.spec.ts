@@ -56,6 +56,8 @@ const seasonAccountRow = (overrides: Record<string, unknown> = {}) => ({
     season: {
       id: 'season-1',
       name: 'Season 1',
+      tradeFeeRate: new Prisma.Decimal('0.002000'),
+      fxFeeRate: new Prisma.Decimal('0.003000'),
       status: 'active',
       startAt: new Date('2026-06-01T00:00:00.000Z'),
       endAt: new Date('2026-09-01T00:00:00.000Z'),
@@ -195,6 +197,32 @@ describe('TradingAccountsService.listTradingAccounts', () => {
 });
 
 describe('TradingAccountsService.getTradingAccount', () => {
+  it('publishes independent canonical general fee overrides without borrowing season fees', async () => {
+    const previousTrade = process.env.GENERAL_TRADE_FEE_RATE;
+    const previousFx = process.env.GENERAL_FX_FEE_RATE;
+    try {
+      process.env.GENERAL_TRADE_FEE_RATE = '0.004';
+      process.env.GENERAL_FX_FEE_RATE = '0.005';
+      const { prisma, service } = createServices();
+      prisma.tradingAccount.findFirst.mockResolvedValueOnce(
+        generalAccountRow(),
+      );
+      const result = await service.getTradingAccount('user-1', 'ta-general-1');
+      expect(result.data.feePolicy).toEqual({
+        tradeFeeRate: '0.004000',
+        fxFeeRate: '0.005000',
+      });
+      expect(result.data.season).toBeNull();
+      expect(prisma.tradingAccount.findFirst).toHaveBeenCalledTimes(1);
+    } finally {
+      if (previousTrade === undefined)
+        delete process.env.GENERAL_TRADE_FEE_RATE;
+      else process.env.GENERAL_TRADE_FEE_RATE = previousTrade;
+      if (previousFx === undefined) delete process.env.GENERAL_FX_FEE_RATE;
+      else process.env.GENERAL_FX_FEE_RATE = previousFx;
+    }
+  });
+
   it('rejects a missing user id with 401', async () => {
     const { prisma, service } = createServices();
 
@@ -220,6 +248,7 @@ describe('TradingAccountsService.getTradingAccount', () => {
     expect(response.data).toMatchObject({
       id: 'ta-season-1',
       mode: 'season',
+      feePolicy: { tradeFeeRate: '0.002000', fxFeeRate: '0.003000' },
       season: expect.objectContaining({ seasonParticipantId: 'sp-1' }),
     });
   });

@@ -8,6 +8,10 @@
 
 ## Execute-Time Repricing (Durable Quote)
 
+- 주문 매수/환전 입력 화면의 indicative preview는 기존 표시 시세/환율과 계좌별 수수료율로 계산하며 Quote를 저장하지 않는다. 최종 버튼에서만 기존 quote → execute를 호출한다. 매도 흐름은 유지한다.
+- `GET /api/v1/trading-accounts/:accountId`의 additive `feePolicy`는 일반 계좌의 canonical config 또는 해당 계좌 시즌의 trade/FX fee를 문자열로 제공한다. 실행 권한이나 가격 보장이 아니며 기존 Quote/재가격/예약 정책은 그대로다.
+- `GET /api/v1/fx/rates/current`의 additive `validUntil`은 provider의 기존 display freshness(capturedAt 기준), admin fallback의 기존 Quote freshness(effectiveAt + 60초)로 계산한다. source 선택/갱신 정책을 변경하지 않으며 클라이언트는 만료된 값을 정상 preview로 표시하지 않는다.
+
 - Quote TTL은 15초. 만료 시 `QUOTE_EXPIRED`.
   근거: quote는 체결가가 아니라 참고 견적이며, 오래된 quote로 체결하면 시장가 괴리가 커진다.
 - Execute는 quote 가격이 아니라 execute 시점 fresh provider price/rate로 재산정한다.

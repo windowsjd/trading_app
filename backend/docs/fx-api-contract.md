@@ -15,6 +15,12 @@
 
 ## Source Rules
 
+- Current-rate responses add `validUntil` (UTC ISO): provider `capturedAt` plus
+  the existing configured display freshness (default 7200 seconds), or admin
+  fallback `effectiveAt` plus its existing 60-second quote freshness. Clients
+  stop showing normal indicative previews after this time. This does not change
+  source selection, provider refresh, quote TTL, or the stricter execute checks.
+
 - Amount values are strings at the API boundary.
 - Timestamps are UTC ISO strings.
 - Exchange follows quote -> execute.

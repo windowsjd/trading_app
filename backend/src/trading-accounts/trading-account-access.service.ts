@@ -40,6 +40,8 @@ const OWNED_ACCOUNT_SELECT = {
           status: true,
           startAt: true,
           endAt: true,
+          tradeFeeRate: true,
+          fxFeeRate: true,
         },
       },
     },

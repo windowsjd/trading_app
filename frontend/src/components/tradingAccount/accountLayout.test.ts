@@ -357,12 +357,14 @@ describe('an account switch cannot leave the previous account on screen', () => 
 
     // Success/error handlers compare the RESPONSE's scope, not a render
     // closure, before touching quote/success/error state.
-    assert.match(source, /isFxQuoteResponseCurrent\(variables\.scope/);
-    assert.match(source, /isFxResponseInScope\(variables\.scope/);
+    assert.match(source, /isCurrent: \(\) => isCurrent\(action\.request\)/);
+    assert.match(source, /isFxResponseInScope\(request\.scope, readScope\(\)\)/);
+    assert.match(source, /if \(isCurrent\(request\)\)/);
+    assert.match(source, /if \(!isCurrent\(action\.request\)\) return/);
     // Cache invalidation is keyed by the account that actually moved.
     assert.match(
       source,
-      /invalidateAfterFx\(\s*queryClient,\s*variables\.scope\.accountId/s,
+      /invalidateAfterFx\(\s*queryClient,\s*request\.scope\.accountId/s,
     );
     assert.ok(
       !/invalidateAfterFx\(queryClient, accountId/.test(source),

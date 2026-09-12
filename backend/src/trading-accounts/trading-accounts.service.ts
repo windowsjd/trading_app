@@ -1,4 +1,6 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { readGeneralTradeFeeRate } from '../orders/general-trading.config';
+import { readGeneralFxFeeRate } from '../fx/general-fx.config';
 import {
   ParticipantStatus,
   SeasonStatus,
@@ -49,7 +51,9 @@ type TradingAccountsListResponse = {
 
 type TradingAccountDetailResponse = {
   success: true;
-  data: TradingAccountView;
+  data: TradingAccountView & {
+    feePolicy: { tradeFeeRate: string; fxFeeRate: string };
+  };
 };
 
 @Injectable()
@@ -82,7 +86,21 @@ export class TradingAccountsService {
 
     return {
       success: true,
-      data: this.toView(account),
+      data: {
+        ...this.toView(account),
+        feePolicy:
+          account.mode === TradingAccountMode.general
+            ? {
+                tradeFeeRate: readGeneralTradeFeeRate().toFixed(6),
+                fxFeeRate: readGeneralFxFeeRate().toFixed(6),
+              }
+            : {
+                tradeFeeRate:
+                  account.seasonParticipant!.season.tradeFeeRate.toFixed(6),
+                fxFeeRate:
+                  account.seasonParticipant!.season.fxFeeRate.toFixed(6),
+              },
+      },
     };
   }
 

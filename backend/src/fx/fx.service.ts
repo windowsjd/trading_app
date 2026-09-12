@@ -189,6 +189,7 @@ type FxCurrentRateResponse = {
     effectiveAt: string;
     capturedAt: string;
     freshnessAgeSeconds: number;
+    validUntil: string;
     providerPriority: number | null;
     fallbackUsed: boolean;
   };
@@ -429,6 +430,12 @@ export class FxService {
         sourceName: snapshot.sourceName,
         effectiveAt: snapshot.effectiveAt.toISOString(),
         capturedAt: snapshot.capturedAt.toISOString(),
+        validUntil: new Date(
+          snapshot.sourceType === FxRateSourceType.provider_api
+            ? snapshot.capturedAt.getTime() +
+                getProviderFreshnessThresholdsSeconds().fxUsdKrwDisplay * 1000
+            : snapshot.effectiveAt.getTime() + FX_RATE_STALE_THRESHOLD_MS,
+        ).toISOString(),
         freshnessAgeSeconds: Math.max(
           0,
           Math.floor((now.getTime() - snapshot.capturedAt.getTime()) / 1000),

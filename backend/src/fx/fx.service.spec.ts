@@ -396,6 +396,7 @@ describe('FxService', () => {
         effectiveAt: freshEffectiveAt.toISOString(),
         capturedAt: capturedAt.toISOString(),
         freshnessAgeSeconds: 30,
+        validUntil: new Date(capturedAt.getTime() + 7200 * 1000).toISOString(),
         providerPriority: 1,
         fallbackUsed: false,
       },
@@ -434,7 +435,13 @@ describe('FxService', () => {
         prisma.fxRateSnapshot.findFirst.mockResolvedValue(null);
         if (available) {
           await expect(service.currentRate()).resolves.toMatchObject({
-            data: { state: 'available', freshnessAgeSeconds: age },
+            data: {
+              state: 'available',
+              freshnessAgeSeconds: age,
+              validUntil: new Date(
+                observedAt.getTime() + (override === '900' ? 900 : 7200) * 1000,
+              ).toISOString(),
+            },
           });
         } else {
           await expectErrorCode(service.currentRate(), 'FX_RATE_UNAVAILABLE');
@@ -579,6 +586,7 @@ describe('FxService', () => {
         sourceName: 'manual-approved',
         providerPriority: null,
         fallbackUsed: true,
+        validUntil: new Date(freshEffectiveAt.getTime() + 60_000).toISOString(),
       },
     });
     expect(prisma.fxRateSnapshot.findFirst).toHaveBeenCalledWith(

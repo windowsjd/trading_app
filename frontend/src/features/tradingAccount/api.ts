@@ -74,6 +74,8 @@ export interface TradingAccountDto {
   createdAt: string;
   updatedAt: string;
   season: TradingAccountSeasonDto | null;
+  /** Detail-only, read from the same server policy as executable quotes. */
+  feePolicy?: { tradeFeeRate: string; fxFeeRate: string };
 }
 
 export interface TradingAccountsDto {

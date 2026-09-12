@@ -7,6 +7,8 @@ import {
   ScrollView,
   TextInput,
   Pressable,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -22,6 +24,7 @@ import {
 import {
   executeTradingAccountFx,
   getTradingAccountWallets,
+  getTradingAccount,
   quoteTradingAccountFx,
 } from '../../features/tradingAccount/api';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
@@ -36,20 +39,15 @@ import {
 } from '../../features/tradingAccount/accountIntegrityGate';
 import { invalidateAfterFx } from '../../features/tradingAccount/invalidation';
 import {
-  isFxQuoteResponseCurrent,
   isFxResponseInScope,
-  type FxQuoteRequestScope,
   type FxRequestScope,
 } from '../../features/wallet/fxAccountScope';
 import AccountSwitcher from '../../components/tradingAccount/AccountSwitcher';
 import {
   calculateUsdBalanceKrw,
-  getFxQuoteDisplay,
-  getFxQuoteExpiresInSeconds,
   getWalletBalanceAmount,
   getWalletViewState,
   isFxIdempotencyConflictCode,
-  isFxQuoteExpired,
   isFxRequoteRequiredCode,
 } from '../../features/wallet/mapper';
 import { ERROR_CODE } from '../../models/enums/errorCode';
@@ -71,7 +69,10 @@ import {
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import BlockedState from '../../components/states/BlockedState';
-import SectionSkeleton from '../../components/states/SectionSkeleton';
+import { formatPreviewMoney, fxPreview, isPositiveInput, isPreviewFxAvailable } from '../../features/tradingAccount/indicativePreview';
+import { runQuotedAction, type QuotedAction } from '../../features/tradingAccount/quotedAction';
+import { useStaleRecheck } from '../../features/asset/useStaleRecheck';
+import PreviewAmounts from '../../components/tradingAccount/PreviewAmounts';
 import CTAButton from '../../components/common/CTAButton';
 import FxSuccessBottomSheet from './FxSuccessBottomSheet';
 
@@ -92,10 +93,10 @@ const FX_RATE_PARAMS = {
 };
 
 const QUOTE_EXPIRED_MESSAGE =
-  '견적 유효 시간이 지났습니다. 다시 견적을 받아주세요.';
-const REQUOTE_REQUIRED_MESSAGE = '환율이 변경되어 다시 견적이 필요합니다.';
+  '환전 견적이 만료되었습니다. 환전하기를 다시 눌러주세요.';
+const REQUOTE_REQUIRED_MESSAGE = '환율이 변경되어 환전하지 못했습니다. 환전하기를 다시 눌러주세요.';
 const IDEMPOTENCY_CONFLICT_MESSAGE =
-  '이미 다른 요청으로 처리 중입니다. 새 견적을 받아 다시 시도해주세요.';
+  '이미 처리 중인 요청입니다. 환전 내역을 확인해주세요.';
 
 function displayValue(value?: string | number | boolean | null) {
   if (value === null || value === undefined || value === '') return '-';
@@ -161,10 +162,6 @@ export default function WalletFxScreen({ navigation }: Props) {
   if (scopeRef.current.accountId !== accountId) {
     scopeRef.current = { accountId, epoch: scopeRef.current.epoch + 1 };
   }
-  const currentScope: FxRequestScope = {
-    accountId: scopeRef.current.accountId,
-    scopeEpoch: scopeRef.current.epoch,
-  };
   // Read through the ref (never through a render closure) so a late callback
   // compares against the scope the screen is in NOW.
   const readScope = (): FxRequestScope => ({
@@ -176,23 +173,29 @@ export default function WalletFxScreen({ navigation }: Props) {
   const [amount, setAmount] = useState('');
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [domainError, setDomainError] = useState<string | null>(null);
-  const [quoteData, setQuoteData] = useState<FxQuoteDto | null>(null);
-  const [executeIdempotencyKey, setExecuteIdempotencyKey] = useState<
-    string | null
-  >(null);
-  const [fxDomainState, setFxDomainState] = useState<FxDomainState | null>(
-    null,
-  );
+  const [fxDomainState, setFxDomainState] = useState<FxDomainState | null>(null);
   const [successData, setSuccessData] = useState<FxExecuteDto | null>(null);
-  const [quoteNow, setQuoteNow] = useState(() => Date.now());
-  const latestQuoteInputRef = useRef<{
-    fromCurrency: Currency;
-    toCurrency: Currency;
-    sourceAmount: string;
-  }>({
-    fromCurrency: 'KRW',
-    toCurrency: 'USD',
-    sourceAmount: '',
+  const [, setPreviewClock] = useState(0);
+  useStaleRecheck(true, () => setPreviewClock((value) => value + 1));
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+  type FxRequest = {
+    scope: FxRequestScope;
+    seasonUi: boolean;
+    isGeneral: boolean;
+    payload: Parameters<typeof quoteTradingAccountFx>[1];
+  };
+  const actionRef = useRef<QuotedAction<FxRequest, FxQuoteDto> | null>(null);
+  const submitLockRef = useRef(false);
+  const isCurrent = (request: FxRequest) => mountedRef.current &&
+    isFxResponseInScope(request.scope, readScope());
+  const feeQuery = useQuery({
+    queryKey: QUERY_KEYS.tradingAccount.detail(accountId),
+    queryFn: () => getTradingAccount(accountId),
+    enabled: hasAccount,
   });
 
   const walletsQuery = useQuery({
@@ -203,6 +206,7 @@ export default function WalletFxScreen({ navigation }: Props) {
 
   const rateQuery = useQuery({
     queryKey: QUERY_KEYS.wallet.fxRate(FX_RATE_PARAMS),
+    refetchInterval: 60_000,
     queryFn: () =>
       getCurrentFxRate(
         FX_RATE_PARAMS.baseCurrency,
@@ -210,156 +214,63 @@ export default function WalletFxScreen({ navigation }: Props) {
         FX_RATE_PARAMS.refresh,
       ),
   });
-  const availableRate =
-    !rateQuery.isError &&
-    rateQuery.data?.state === 'available' &&
-    rateQuery.data.rate
-      ? rateQuery.data
-      : null;
-
-  /** The quote inputs the screen is currently asking about. */
-  const readQuoteScope = (): FxQuoteRequestScope => ({
-    ...readScope(),
-    ...latestQuoteInputRef.current,
-  });
-
-  const quoteMutation = useMutation({
-    // The account is a REQUEST variable, not a closure read. `mutationFn` runs
-    // at mutate() time so a closure would still have been right here — but the
-    // callbacks below run at RESPONSE time, and there the closure is whatever
-    // account the screen has drifted to. Carrying it in the variables means
-    // both halves are talking about the same account by construction.
-    mutationFn: (variables: {
-      scope: FxQuoteRequestScope;
-      payload: Parameters<typeof quoteTradingAccountFx>[1];
-    }) => quoteTradingAccountFx(variables.scope.accountId, variables.payload),
-    retry: false,
-    onSuccess: (result, variables) => {
-      // Wrong account, or right account after a switch away and back: this
-      // quote describes something the user is no longer looking at.
-      if (!isFxQuoteResponseCurrent(variables.scope, readQuoteScope())) {
-        return;
-      }
-
-      setQuoteData(result);
-      setExecuteIdempotencyKey(createIdempotencyKey('fx'));
-      setFxDomainState(null);
-      setFieldError(null);
-      setDomainError(null);
-      setSuccessData(null);
-    },
-    onError: (error, variables) => {
-      if (!isFxQuoteResponseCurrent(variables.scope, readQuoteScope())) {
-        return;
-      }
-
-      const code = getApiErrorCode(error);
-
-      setQuoteData(null);
-      setExecuteIdempotencyKey(null);
-      setFxDomainState('fx_quote_rejected');
-      setDomainError(
-        isFxRequoteRequiredCode(code)
-          ? REQUOTE_REQUIRED_MESSAGE
-          : getFxDomainErrorMessage(
-              code,
-              capabilities?.isGeneral === true,
-            ),
-      );
-    },
-  });
+  const availableRate = !rateQuery.isError && isPreviewFxAvailable(rateQuery.data, Date.now())
+    ? rateQuery.data : null;
 
   const executeMutation = useMutation({
-    mutationFn: (variables: {
-      scope: FxRequestScope;
-      seasonUi: boolean;
-      payload: Parameters<typeof executeTradingAccountFx>[1];
-    }) => executeTradingAccountFx(variables.scope.accountId, variables.payload),
+    mutationFn: (action: QuotedAction<FxRequest, FxQuoteDto>) => runQuotedAction(action, {
+      quote: (request) => quoteTradingAccountFx(request.scope.accountId, request.payload),
+      execute: (request, quote, key) => executeTradingAccountFx(request.scope.accountId, {
+        quoteId: quote.quoteId,
+        fromCurrency: quote.fromCurrency,
+        toCurrency: quote.toCurrency,
+        sourceAmount: quote.sourceAmount,
+        idempotencyKey: key,
+      }),
+      isCurrent: () => isCurrent(action.request),
+    }),
     retry: false,
-    onSuccess: async (result, variables) => {
-      const inScope = isFxResponseInScope(variables.scope, readScope());
-
-      // SCREEN state only when the answer belongs to this screen. A success
-      // sheet for account A over account B's screen would invite the user to
-      // act on a movement in money they are not looking at.
-      if (inScope) {
-        setSuccessData(result);
-        setQuoteData(null);
-        setExecuteIdempotencyKey(null);
+    onSettled: () => { submitLockRef.current = false; },
+    onSuccess: async (data, action) => {
+      if (!data) return;
+      const request = action.request;
+      if (isCurrent(request)) {
+        setSuccessData(data.result);
+        setAmount('');
         setFxDomainState(null);
         setFieldError(null);
         setDomainError(null);
       }
-
-      // CACHE regardless of scope, and keyed by the account that actually
-      // moved (작업 12 §2). The server executed this exchange; A's wallets are
-      // stale whether or not the user is still on A's screen. Using the current
-      // selection here would have invalidated the WRONG account — refetching B
-      // for nothing while leaving A's stale balances cached for the moment the
-      // user switches back.
-      //
-      // `seasonUi` is likewise the acting account's, captured at issue time:
-      // the current selection's capabilities describe a different account.
+      // Invalidate the acting account even after a switch/unmount.
       await Promise.all([
-        invalidateAfterFx(queryClient, variables.scope.accountId, {
-          seasonUi: variables.seasonUi,
-        }),
-        // The executed rate is new public market information, not account data.
-        queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.wallet.fxRate(FX_RATE_PARAMS),
-        }),
+        invalidateAfterFx(queryClient, request.scope.accountId, { seasonUi: request.seasonUi }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.wallet.fxRate(FX_RATE_PARAMS) }),
       ]);
     },
-    onError: (error, variables) => {
-      if (!isFxResponseInScope(variables.scope, readScope())) {
-        return;
-      }
-
+    onError: (error, action) => {
+      if (!isCurrent(action.request)) return;
       const code = getApiErrorCode(error);
-
       if (isFxRequoteRequiredCode(code)) {
-        setQuoteData(null);
-        setExecuteIdempotencyKey(null);
+        actionRef.current = null;
         setFxDomainState('fx_execute_requote_required');
-        setDomainError(
-          code === ERROR_CODE.QUOTE_EXPIRED
-            ? QUOTE_EXPIRED_MESSAGE
-            : REQUOTE_REQUIRED_MESSAGE,
-        );
-        return;
-      }
-
-      if (isFxIdempotencyConflictCode(code)) {
-        setQuoteData(null);
-        setExecuteIdempotencyKey(null);
+        setDomainError(code === ERROR_CODE.QUOTE_EXPIRED ? QUOTE_EXPIRED_MESSAGE : REQUOTE_REQUIRED_MESSAGE);
+      } else if (isFxIdempotencyConflictCode(code)) {
+        actionRef.current = null;
         setFxDomainState('fx_idempotency_conflict');
         setDomainError(IDEMPOTENCY_CONFLICT_MESSAGE);
-        return;
+      } else {
+        setFxDomainState('fx_execute_rejected');
+        setDomainError(getFxDomainErrorMessage(code, action.request.isGeneral));
       }
-
-      setFxDomainState('fx_execute_rejected');
-      setDomainError(
-        getFxDomainErrorMessage(code, capabilities?.isGeneral === true),
-      );
     },
   });
 
   const toCurrency: Currency = fromCurrency === 'KRW' ? 'USD' : 'KRW';
 
-  useEffect(() => {
-    latestQuoteInputRef.current = {
-      fromCurrency,
-      toCurrency,
-      sourceAmount: amount.trim(),
-    };
-  }, [fromCurrency, toCurrency, amount]);
-
-  const inputInvalidReason = useMemo(() => {
-    if (!amount.trim()) return '금액을 입력해주세요.';
-    if (Number.isNaN(Number(amount))) return '숫자 형식을 확인해주세요.';
-    if (Number(amount) <= 0) return '0보다 큰 금액을 입력해주세요.';
-    return null;
-  }, [amount]);
+  const inputInvalidReason = !amount.trim() ? '금액을 입력해주세요.'
+    : !isPositiveInput(amount, 8) ? '0보다 큰 금액을 소수점 이하 8자리까지 입력해주세요.' : null;
+  const preview = fxPreview({ amount: amount.trim(), fromCurrency, rate: availableRate,
+    feeRate: !feeQuery.isError ? feeQuery.data?.feePolicy?.fxFeeRate : null, now: Date.now() });
 
   const walletLookupState = useMemo(
     () =>
@@ -384,211 +295,49 @@ export default function WalletFxScreen({ navigation }: Props) {
   );
 
   useEffect(() => {
-    if (!quoteData) return undefined;
-
-    setQuoteNow(Date.now());
-    const intervalId = setInterval(() => {
-      setQuoteNow(Date.now());
-    }, 1000);
-
-    return () => clearInterval(intervalId);
-  }, [quoteData]);
-
-  /**
-   * The account changed: every piece of in-flight FX state describes the old
-   * one (작업 10 §A-4).
-   *
-   * The quote is pinned server-side to the account that issued it, the
-   * idempotency key identifies a request against THAT account, and the amount
-   * was chosen against that account's balances. Carrying any of it over would
-   * at best produce a QUOTE_MISMATCH and at worst let a user press 환전 on
-   * numbers from a different account.
-   */
-  useEffect(() => {
     setAmount('');
     setFieldError(null);
     setDomainError(null);
-    setQuoteData(null);
-    setExecuteIdempotencyKey(null);
     setFxDomainState(null);
     setSuccessData(null);
+    actionRef.current = null;
   }, [accountId]);
 
-  const quoteExpired = useMemo(
-    () => (quoteData ? isFxQuoteExpired(quoteData, quoteNow) : false),
-    [quoteData, quoteNow],
-  );
-
-  const quoteExpiresInSeconds = useMemo(
-    () =>
-      quoteData ? getFxQuoteExpiresInSeconds(quoteData, quoteNow) : 0,
-    [quoteData, quoteNow],
-  );
-
-  const quoteDisplay = useMemo(
-    () => (quoteData ? getFxQuoteDisplay(quoteData) : null),
-    [quoteData],
-  );
-
-  /**
-   * A request still in flight for the PREVIOUS account must not put this
-   * account's screen into a loading state — the "환전 실행 중" spinner belongs to
-   * the account that pressed the button. The mutation is deliberately not
-   * `reset()` here: it is still going to succeed or fail on the server, and its
-   * callback still has to invalidate the acting account's cache.
-   */
-  const quoteVariables = quoteMutation.variables;
-  const quotePendingInScope =
-    quoteMutation.isPending &&
-    !!quoteVariables &&
-    isFxResponseInScope(quoteVariables.scope, currentScope);
-  const executeVariables = executeMutation.variables;
-  const executePendingInScope =
-    executeMutation.isPending &&
-    !!executeVariables &&
-    isFxResponseInScope(executeVariables.scope, currentScope);
-
-  const viewState = useMemo<WalletFxViewState>(() => {
-    if (
-      walletLookupState !== 'wallet_ready' &&
-      walletLookupState !== 'fx_rate_unavailable'
-    ) {
-      return walletLookupState;
-    }
-    if (walletLookupState === 'fx_rate_unavailable') {
-      return walletLookupState;
-    }
-    if (executePendingInScope) return 'fx_execute_submitting';
-    if (quotePendingInScope) return 'fx_quote_loading';
-    if (successData) return 'fx_execute_success';
-    if (
-      fxDomainState === 'fx_execute_requote_required' ||
-      fxDomainState === 'fx_idempotency_conflict' ||
-      fxDomainState === 'fx_quote_rejected'
-    ) {
-      return fxDomainState;
-    }
-    if (quoteData && quoteExpired) return 'fx_quote_expired';
-    if (fxDomainState === 'fx_execute_rejected') return fxDomainState;
-    if (quoteData) return 'fx_quote_ready';
-    if (inputInvalidReason) {
-      return amount.trim() || fieldError ? 'fx_input_invalid' : 'fx_input_idle';
-    }
-    return 'fx_input_idle';
-  }, [
-    walletLookupState,
-    executePendingInScope,
-    quotePendingInScope,
-    successData,
-    fxDomainState,
-    quoteData,
-    quoteExpired,
-    inputInvalidReason,
-    amount,
-    fieldError,
-  ]);
-
-  const canExecute =
-    walletLookupState === 'wallet_ready' &&
-    !!availableRate &&
-    !inputInvalidReason &&
-    !!quoteData &&
-    !quoteExpired &&
-    !!executeIdempotencyKey &&
-    fxDomainState !== 'fx_execute_requote_required' &&
-    fxDomainState !== 'fx_idempotency_conflict';
-
-  const inputErrorMessage =
-    fieldError ??
-    (viewState === 'fx_input_invalid' ? inputInvalidReason : null);
+  const pending = executeMutation.isPending;
+  const viewState: WalletFxViewState = walletLookupState !== 'wallet_ready'
+    ? walletLookupState : pending ? 'fx_execute_submitting'
+      : fxDomainState ?? (amount.trim() && inputInvalidReason ? 'fx_input_invalid' : 'fx_input_idle');
+  const canExecute = walletLookupState === 'wallet_ready' && !!availableRate &&
+    !!preview && !inputInvalidReason && capabilities?.canExchange && !pending && !successData && !actionRef.current?.completed;
+  const inputErrorMessage = fieldError ?? (amount.trim() ? inputInvalidReason : null);
 
   const resetFxActionState = () => {
+    if (submitLockRef.current) return;
+    actionRef.current = null;
     setFieldError(null);
     setDomainError(null);
-    setQuoteData(null);
-    setExecuteIdempotencyKey(null);
     setFxDomainState(null);
     setSuccessData(null);
-    quoteMutation.reset();
-    executeMutation.reset();
   };
-
   const retryWalletLookup = () => {
     void walletsQuery.refetch();
     void rateQuery.refetch();
   };
-
-  const requestQuote = () => {
-    if (!availableRate) {
-      setDomainError(
-        '현재 환율을 사용할 수 없습니다. 환율을 다시 불러온 뒤 시도해주세요.',
-      );
-      return;
-    }
-
-    if (inputInvalidReason) {
-      setFieldError(inputInvalidReason);
-      return;
-    }
-
-    setFieldError(null);
-    setDomainError(null);
-    setQuoteData(null);
-    setExecuteIdempotencyKey(null);
-    setFxDomainState(null);
-    setSuccessData(null);
-    executeMutation.reset();
-
-    const payload = {
-      fromCurrency,
-      toCurrency,
-      sourceAmount: amount.trim(),
-    };
-    quoteMutation.mutate({
-      scope: { ...readScope(), ...payload },
-      payload,
-    });
-  };
-
   const executeQuote = () => {
-    if (inputInvalidReason) {
-      setFieldError(inputInvalidReason);
-      return;
-    }
-
-    if (!quoteData) {
-      setDomainError('먼저 환전 미리보기를 확인해주세요.');
-      return;
-    }
-
-    if (quoteExpired) {
-      setDomainError(QUOTE_EXPIRED_MESSAGE);
-      return;
-    }
-
-    if (!executeIdempotencyKey) {
-      setFxDomainState('fx_execute_rejected');
-      setDomainError(getErrorMessageFromCode(ERROR_CODE.IDEMPOTENCY_REQUIRED));
-      return;
-    }
-
+    if (submitLockRef.current || !canExecute) return;
     setFieldError(null);
     setDomainError(null);
     setFxDomainState(null);
-
-    executeMutation.mutate({
-      scope: readScope(),
-      // The ACTING account's UI mode, captured now: by the time the response
-      // lands, `capabilities` may describe a different account entirely.
-      seasonUi: capabilities?.isSeason ?? false,
-      payload: {
-        quoteId: quoteData.quoteId,
-        fromCurrency: quoteData.fromCurrency,
-        toCurrency: quoteData.toCurrency,
-        sourceAmount: quoteData.sourceAmount,
-        idempotencyKey: executeIdempotencyKey,
+    actionRef.current ??= {
+      request: {
+        scope: readScope(), seasonUi: capabilities?.isSeason ?? false,
+        isGeneral: capabilities?.isGeneral === true,
+        payload: { fromCurrency, toCurrency, sourceAmount: amount.trim() },
       },
-    });
+      idempotencyKey: createIdempotencyKey('fx'),
+    };
+    submitLockRef.current = true;
+    executeMutation.mutate(actionRef.current);
   };
 
   if (accountsLoading || (hasAccount && viewState === 'wallet_loading')) {
@@ -708,7 +457,9 @@ export default function WalletFxScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView
+        keyboardShouldPersistTaps="handled"
         testID={TEST_IDS.walletFx.screen}
         contentContainerStyle={styles.content}
       >
@@ -771,11 +522,13 @@ export default function WalletFxScreen({ navigation }: Props) {
           <View style={styles.row}>
             <Pressable
               testID={TEST_IDS.walletFx.directionKrwUsd}
+              disabled={pending}
               style={[
                 styles.directionChip,
                 fromCurrency === 'KRW' && styles.directionChipActive,
               ]}
               onPress={() => {
+                if (submitLockRef.current) return;
                 setFromCurrency('KRW');
                 resetFxActionState();
               }}
@@ -793,11 +546,13 @@ export default function WalletFxScreen({ navigation }: Props) {
 
             <Pressable
               testID={TEST_IDS.walletFx.directionUsdKrw}
+              disabled={pending}
               style={[
                 styles.directionChip,
                 fromCurrency === 'USD' && styles.directionChipActive,
               ]}
               onPress={() => {
+                if (submitLockRef.current) return;
                 setFromCurrency('USD');
                 resetFxActionState();
               }}
@@ -816,9 +571,11 @@ export default function WalletFxScreen({ navigation }: Props) {
 
           <TextInput
             testID={TEST_IDS.walletFx.amountInput}
+            editable={!pending}
             style={styles.input}
             value={amount}
             onChangeText={(value) => {
+              if (submitLockRef.current) return;
               setAmount(value);
               resetFxActionState();
             }}
@@ -832,84 +589,28 @@ export default function WalletFxScreen({ navigation }: Props) {
           {domainError ? <Text style={styles.errorText}>{domainError}</Text> : null}
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.label}>환전 견적</Text>
-
-          {viewState === 'fx_quote_loading' ? (
-            <SectionSkeleton lines={5} />
-          ) : quoteDisplay ? (
-            <>
-              <Text style={styles.helper}>견적 ID {quoteDisplay.quoteId}</Text>
-              <Text style={styles.helper}>환전 방향 {quoteDisplay.direction}</Text>
-              <Text style={styles.helper}>
-                환전 금액 {quoteDisplay.sourceAmount}
-              </Text>
-              <Text style={styles.helper}>
-                적용 환율 {quoteDisplay.appliedRate}
-              </Text>
-              <Text style={styles.helper}>
-                총 수령액 {quoteDisplay.grossTargetAmount}
-              </Text>
-              <Text style={styles.helper}>수수료율 {quoteDisplay.feeRate}</Text>
-              <Text style={styles.helper}>수수료 {quoteDisplay.feeAmount}</Text>
-              <Text style={styles.helper}>
-                수령 예정 {quoteDisplay.netTargetAmount}
-              </Text>
-              <Text style={styles.helper}>만료 시각 {quoteDisplay.expiresAt}</Text>
-              <Text style={styles.helper}>
-                허용 변동 {quoteDisplay.maxChangeBps}bps
-              </Text>
-              <Text style={styles.helper}>
-                남은 시간 {quoteExpiresInSeconds}초
-              </Text>
-              {quoteExpired ? (
-                <Text style={styles.errorText}>{QUOTE_EXPIRED_MESSAGE}</Text>
-              ) : null}
-            </>
-          ) : (
-            <Text style={styles.helper}>
-              환전 미리보기를 눌러 예상 수령 금액을 확인하세요.
-            </Text>
-          )}
-
-          {viewState === 'fx_execute_requote_required' ? (
-            <Text style={styles.errorText}>{REQUOTE_REQUIRED_MESSAGE}</Text>
-          ) : null}
-          {viewState === 'fx_idempotency_conflict' ? (
-            <Text style={styles.errorText}>{IDEMPOTENCY_CONFLICT_MESSAGE}</Text>
-          ) : null}
-        </View>
-
-        <View style={styles.row}>
-          <CTAButton
-            label="환전 미리보기"
-            state={
-              viewState === 'fx_quote_loading'
-                ? 'loading'
-                : !availableRate ||
-                    inputInvalidReason ||
-                    viewState === 'fx_execute_submitting'
-                ? 'disabled'
-                : 'enabled'
-            }
-            onPress={requestQuote}
-            style={styles.flex}
-          />
-
-          <CTAButton
-            label="환전 실행"
-            state={
-              viewState === 'fx_execute_submitting'
-                ? 'loading'
-                : canExecute
-                ? 'enabled'
-                : 'disabled'
-            }
-            onPress={executeQuote}
-            style={styles.flex}
-          />
-        </View>
+        {!inputInvalidReason ? (
+          <View style={styles.card} testID="fx-indicative-preview">
+            <Text style={styles.label}>예상 환전 견적</Text>
+            {preview && availableRate ? <>
+              <PreviewAmounts rows={[
+                { label: '적용 환율 (USD/KRW)', value: formatDisplayDecimal(availableRate.rate) },
+                { label: '예상 수수료', value: formatPreviewMoney(preview.feeAmount, preview.feeCurrency) },
+                { label: '예상 수령액', value: formatPreviewMoney(preview.netTargetAmount, toCurrency) },
+              ]} />
+              <Text style={styles.helper}>최신 환율 기준 · {formatKstDateTime(availableRate.effectiveAt)}</Text>
+              <Text style={styles.helper}>받는 통화에서 수수료가 차감됩니다. 실제 환전 금액은 실행 시 확정됩니다.</Text>
+            </> : <>
+              <Text style={styles.errorText}>{!availableRate ? '현재 환율이 없거나 오래되어 예상 수령액을 표시할 수 없습니다.' : feeQuery.isPending ? '수수료 정보를 확인하는 중입니다.' : '수수료 정보를 불러오지 못해 예상 수령액을 표시할 수 없습니다.'}</Text>
+              {feeQuery.isError ? <CTAButton label="수수료 다시 불러오기" onPress={() => void feeQuery.refetch()} /> : null}
+            </>}
+          </View>
+        ) : null}
+        <CTAButton testID={TEST_IDS.walletFx.executeSubmit} label="환전하기"
+          state={pending ? 'loading' : canExecute ? 'enabled' : 'disabled'}
+          onPress={executeQuote} />
       </ScrollView>
+      </KeyboardAvoidingView>
 
       <FxSuccessBottomSheet
         visible={!!successData}
