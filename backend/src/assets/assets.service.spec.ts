@@ -275,6 +275,8 @@ describe('AssetsService', () => {
   };
 
   const expectNoAssetWrites = (prisma: ReturnType<typeof createPrisma>) => {
+    expect(prisma.season.findFirst).not.toHaveBeenCalled();
+    expect(prisma.seasonParticipant.findUnique).not.toHaveBeenCalled();
     for (const model of [
       prisma.asset,
       prisma.season,
@@ -736,13 +738,13 @@ describe('AssetsService', () => {
   it.each([
     // Season boundaries are half-open [startAt, endAt) around the pinned
     // testNow; none of these depend on the real run date or host timezone.
-    ['starts exactly now', 0, 86_400_000, true],
-    ['starts one second from now', 1_000, 86_400_000, false],
-    ['ended one second ago', -86_400_000, -1_000, false],
-    ['ends exactly now', -86_400_000, 0, false],
+    ['starts exactly now', 0, 86_400_000],
+    ['starts one second from now', 1_000, 86_400_000],
+    ['ended one second ago', -86_400_000, -1_000],
+    ['ends exactly now', -86_400_000, 0],
   ] as const)(
-    'season activity boundary: %s',
-    async (_label, startOffsetMs, endOffsetMs, expectTradable) => {
+    'asset tradability is independent of season boundary: %s',
+    async (_label, startOffsetMs, endOffsetMs) => {
       const { prisma, service } = createService();
       prisma.asset.count.mockResolvedValueOnce(1);
       prisma.asset.findMany.mockResolvedValueOnce([
@@ -768,16 +770,17 @@ describe('AssetsService', () => {
 
       const response = await service.getAssets('user-1');
 
-      expect(response.data.assets[0]).toMatchObject(
-        expectTradable
-          ? { tradable: true, tradeBlockedReason: null }
-          : { tradable: false, tradeBlockedReason: 'SEASON_NOT_ACTIVE' },
-      );
+      expect(response.data.assets[0]).toMatchObject({
+        tradable: true,
+        tradeBlockedReason: null,
+      });
+      expect(prisma.season.findFirst).not.toHaveBeenCalled();
+      expect(prisma.seasonParticipant.findUnique).not.toHaveBeenCalled();
     },
   );
 
   it('keeps trading UX stable when the host timezone differs from Seoul', async () => {
-    // The service must derive market/season decisions from the pinned
+    // The service must derive market decisions from the pinned
     // instant, not the host timezone. TZ changes only affect local
     // formatting; this guards against accidental local-time arithmetic.
     const originalTz = process.env.TZ;
@@ -1461,8 +1464,8 @@ describe('AssetsService', () => {
       assetId: 'asset-btc',
       id: 'asset-btc',
       marketStatus: 'always_open',
-      tradable: false,
-      tradeBlockedReason: 'SEASON_NOT_JOINED',
+      tradable: true,
+      tradeBlockedReason: null,
       price: {
         state: 'available',
       },

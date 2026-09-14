@@ -1,13 +1,20 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+
+beforeEach(() =>
+  mock.timers.enable({ apis: ['Date'], now: new Date('2026-05-15T00:00:00Z') }),
+);
+afterEach(() => mock.timers.reset());
 
 import {
-  getAssetTradeBlockedReasonDisplay,
   getCapabilityBlockMessage,
   getTradingAccountCapabilities,
-  isSeasonNotActiveReason,
+  nextCapabilityBoundary,
 } from './capabilities.ts';
-import { getAccountDisplay, getReturnRateMethodLabel } from './accountDisplay.ts';
+import {
+  getAccountDisplay,
+  getReturnRateMethodLabel,
+} from './accountDisplay.ts';
 import type { TradingAccountDto } from './api.ts';
 
 function account(
@@ -70,38 +77,6 @@ describe('mode capabilities', () => {
     assert.equal(caps.returnRateMethod, 'time_weighted');
   });
 
-  it('never exposes a season-not-active reason for a general account', () => {
-    const caps = getTradingAccountCapabilities(generalAccount())!;
-
-    assert.equal(getCapabilityBlockMessage(caps, 'season_not_active'), null);
-    assert.equal(
-      getAssetTradeBlockedReasonDisplay('season_not_active', caps.mode),
-      null,
-    );
-    assert.equal(
-      getAssetTradeBlockedReasonDisplay(' SEASON_NOT_ACTIVE ', caps.mode),
-      null,
-    );
-  });
-
-  it('keeps season-account copy and unrelated asset reasons', () => {
-    const caps = getTradingAccountCapabilities(account())!;
-
-    assert.equal(
-      getCapabilityBlockMessage(caps, 'season_not_active'),
-      '현재 거래 가능한 시즌이 아닙니다.',
-    );
-    assert.equal(
-      getAssetTradeBlockedReasonDisplay('season_not_active', caps.mode),
-      '현재 거래 가능한 시즌이 아닙니다.',
-    );
-    assert.equal(
-      getAssetTradeBlockedReasonDisplay('market_closed', 'general'),
-      'market_closed',
-    );
-    assert.equal(isSeasonNotActiveReason('SEASON_NOT_ACTIVE'), true);
-  });
-
   it('allows an ad-reward claim only on an ACTIVE general account', () => {
     assert.equal(
       getTradingAccountCapabilities(generalAccount())!.canClaimAdReward,
@@ -140,7 +115,9 @@ describe('status capabilities', () => {
   });
 
   it('suspended: readable, but no new order or exchange', () => {
-    const caps = getTradingAccountCapabilities(account({ status: 'suspended' }))!;
+    const caps = getTradingAccountCapabilities(
+      account({ status: 'suspended' }),
+    )!;
 
     assert.equal(caps.canRead, true);
     assert.equal(caps.canTrade, false);
@@ -173,6 +150,97 @@ describe('status capabilities', () => {
 
   it('returns null when no account is selected', () => {
     assert.equal(getTradingAccountCapabilities(null), null);
+  });
+});
+
+describe('season lifecycle and participant authority', () => {
+  for (const participantStatus of [
+    'registered',
+    'excluded',
+    'finished',
+    'rewarded',
+  ] as const) {
+    it(`blocks new market/limit/FX for ${participantStatus} without blocking read/cancel`, () => {
+      const caps = getTradingAccountCapabilities(
+        account({ season: { ...account().season!, participantStatus } }),
+      )!;
+      assert.equal(caps.canTrade, false);
+      assert.equal(caps.canQuote, false);
+      assert.equal(caps.canExchange, false);
+      assert.equal(caps.canRead, true);
+      assert.equal(caps.canCancelOrder, true);
+      assert.equal(
+        caps.tradeBlockReason,
+        participantStatus === 'excluded'
+          ? 'participant_excluded'
+          : 'participant_not_active',
+      );
+      assert.match(
+        getCapabilityBlockMessage(caps, caps.tradeBlockReason)!,
+        /시즌계좌/,
+      );
+    });
+  }
+  for (const seasonStatus of ['upcoming', 'ended', 'settled'] as const) {
+    it(`keeps ${seasonStatus} history/cancel available`, () => {
+      const caps = getTradingAccountCapabilities(
+        account({ season: { ...account().season!, seasonStatus } }),
+      )!;
+      assert.equal(caps.canTrade, false);
+      assert.equal(caps.canQuote, false);
+      assert.equal(caps.canExchange, false);
+      assert.equal(caps.canRead, true);
+      assert.equal(caps.canCancelOrder, true);
+    });
+  }
+  it('uses the half-open season window even while status is still active', () => {
+    const a = account();
+    const start = Date.parse(a.season!.startAt),
+      end = Date.parse(a.season!.endAt);
+    for (const [now, canTrade] of [
+      [start - 1, false],
+      [start, true],
+      [end - 1, true],
+      [end, false],
+    ] as const) {
+      const caps = getTradingAccountCapabilities(a, now)!;
+      assert.equal(caps.canTrade, canTrade);
+      assert.equal(caps.canQuote, canTrade);
+      assert.equal(caps.canExchange, canTrade);
+      assert.equal(caps.canCancelOrder, true);
+    }
+    assert.equal(nextCapabilityBoundary(a, start - 1), start);
+    assert.equal(nextCapabilityBoundary(a, start), end);
+    assert.equal(nextCapabilityBoundary(a, end), null);
+  });
+  it('does not authorize a missing or invalid season window', () => {
+    assert.equal(
+      getTradingAccountCapabilities(account({ season: null }))!.canTrade,
+      false,
+    );
+    assert.equal(
+      getTradingAccountCapabilities(
+        account({ season: { ...account().season!, endAt: 'invalid' } }),
+      )!.canTrade,
+      false,
+    );
+  });
+  it('never consults season lifecycle or participant permission for a general account', () => {
+    for (const season of [
+      null,
+      {
+        ...account().season!,
+        participantStatus: 'excluded' as const,
+        seasonStatus: 'ended' as const,
+      },
+    ]) {
+      const a = generalAccount({ season });
+      const caps = getTradingAccountCapabilities(a, Date.parse('2027-01-01'))!;
+      assert.equal(caps.canTrade, true);
+      assert.equal(caps.canQuote, true);
+      assert.equal(caps.canExchange, true);
+      assert.equal(nextCapabilityBoundary(a), null);
+    }
   });
 });
 

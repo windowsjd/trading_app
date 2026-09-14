@@ -285,6 +285,7 @@ jobs:
       - name: Core account integration tests
         run: >-
           pnpm exec jest --runInBand
+          src/assets/assets-tradability.integration.spec.ts
           src/seasons/trading-account.integration.spec.ts
           src/seasons/trading-account-link.integration.spec.ts
           src/seasons/trading-account-financial-scope.integration.spec.ts

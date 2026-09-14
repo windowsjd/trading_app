@@ -1,3 +1,4 @@
+import { getAssetTradingWarning } from '../../features/asset/tradingUx';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
@@ -33,7 +34,6 @@ import {
 } from '../../features/tradingAccount/api';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import {
-  getAssetTradeBlockedReasonDisplay,
   getCapabilityBlockMessage,
   isSeasonNotActiveReason,
 } from '../../features/tradingAccount/capabilities';
@@ -121,6 +121,8 @@ function getOrderDomainErrorMessage(
   isGeneralAccount = false,
 ) {
   if (isGeneralAccount && isSeasonNotActiveReason(code)) {
+    // Compatibility for an older backend's error copy; this grants no
+    // permission and does not participate in asset/capability decisions.
     return '주문을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.';
   }
   const blockedReason = mapOrderErrorCodeToBlockedReason(code);
@@ -617,19 +619,15 @@ export default function OrderScreen({ route, navigation }: Props) {
     asset && !asset.isActive ? '비활성 자산입니다.' : null;
 
   const assetWarningReason =
-    asset && !asset.tradable
-      ? (getAssetTradeBlockedReasonDisplay(
-          asset.tradeBlockedReason,
-          capabilities?.mode,
-        ) ??
-        '거래 제한 가능성이 있습니다. 서버 견적에서 최종 확인됩니다.')
-      : asset && !isTradableMarketStatus(asset.marketStatus)
-        ? '장 상태는 서버 견적에서 최종 확인됩니다.'
-        : asset && (side === 'buy' ? !previewPriceAvailable : !isPriceAvailable(price))
-          ? '현재 화면 시세가 없어 비율 수량 계산은 제한됩니다. 견적은 서버가 최종 판정합니다.'
-          : asset && price?.priceKrwState && price.priceKrwState !== 'available'
-            ? 'KRW 환산 시세를 사용할 수 없습니다. 견적은 서버가 최종 판정합니다.'
-            : null;
+    (asset ? getAssetTradingWarning(asset) : null) ??
+    (asset && !isTradableMarketStatus(asset.marketStatus)
+      ? '장 상태는 서버 견적에서 최종 확인됩니다.'
+      : asset &&
+          (side === 'buy' ? !previewPriceAvailable : !isPriceAvailable(price))
+        ? '현재 화면 시세가 없어 비율 수량 계산은 제한됩니다. 견적은 서버가 최종 판정합니다.'
+        : asset && price?.priceKrwState && price.priceKrwState !== 'available'
+          ? 'KRW 환산 시세를 사용할 수 없습니다. 견적은 서버가 최종 판정합니다.'
+          : null);
 
   const sellBlockedReason =
     side === 'sell' && positionQuery.isLoading

@@ -34,6 +34,30 @@
 - Positions API: full list of positions the user already holds.
 - Assets API: list/detail of assets the user can search and select before placing an order.
 
+## Tradability responsibilities
+
+Assets list/detail `tradable` describes only the asset, market session and
+selected price data. It does not query the current season, participation,
+participant status, or a selected trading account. Authentication remains
+required, but no accountId is required for market data.
+
+The blocking order is inactive asset → closed/unknown market → unavailable or
+stale price/FX conversion evidence under the existing source policies. The
+existing `withPrice=false` metadata-only contract skips price reads/validation;
+its tradable flag is not a guarantee that an executable price exists.
+Market and Order discovery use priced responses. Legacy season reason names
+may remain in the type for compatibility, but new Assets responses never emit
+`SEASON_NOT_ACTIVE` or `SEASON_NOT_JOINED`.
+
+Selected-account capability owns permission for new orders and FX. General
+accounts are independent of season participation; season accounts additionally
+require an active season in `[startAt, endAt)` and an active participant.
+An excluded participant can therefore see a healthy BTC asset with
+`tradable=true` while their account has `canTrade=false`. Reads and permitted
+reservation cancellation remain available. Backend quote/create/execute keeps
+final authority, including transaction-time locks and revalidation. Fee pinning
+and matching policies are unchanged.
+
 ## GET /api/v1/assets
 
 ### Query Parameters

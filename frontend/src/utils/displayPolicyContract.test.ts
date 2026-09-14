@@ -32,7 +32,10 @@ describe('numeric asset symbol display contract', () => {
   it('keeps numeric-symbol search wired to the API query', () => {
     assert.match(marketSearch, /search:\s*trimmedSearchText \|\| undefined/u);
     assert.match(marketSearch, /placeholder="종목명 또는 심볼 검색"/u);
-    assert.match(marketSearch, /message="종목명 또는 심볼로 검색할 수 있습니다\."/u);
+    assert.match(
+      marketSearch,
+      /message="종목명 또는 심볼로 검색할 수 있습니다\."/u,
+    );
   });
 
   it('does not render raw market-row symbols or dangling separators', () => {
@@ -41,16 +44,18 @@ describe('numeric asset symbol display contract', () => {
   });
 });
 
-describe('general-account season reason display contract', () => {
-  it('passes the selected account mode through market list and search rows', () => {
-    assert.match(marketScreen, /accountMode=\{selectedAccount\?\.mode\}/u);
-    assert.match(marketRow, /getAssetTradeBlockedReasonDisplay\(/u);
-    assert.match(marketSearch, /getAssetTradeBlockedReasonDisplay\(/u);
+describe('separate asset and account availability display contract', () => {
+  it('keeps market list and search independent of account mode', () => {
+    assert.doesNotMatch(marketScreen, /accountMode|useTradingAccount/u);
+    assert.doesNotMatch(marketRow, /accountMode/u);
+    assert.doesNotMatch(marketSearch, /accountMode|useTradingAccount/u);
+    assert.match(marketRow, /getAssetTradingWarning\(/u);
+    assert.match(marketSearch, /getAssetTradingWarning\(/u);
   });
 
   it('sanitizes asset reasons on detail and order surfaces', () => {
-    assert.match(assetDetail, /getAssetTradeBlockedReasonDisplay\(/u);
-    assert.match(orderScreen, /getAssetTradeBlockedReasonDisplay\(/u);
+    assert.match(assetDetail, /getAssetTradingWarning\(/u);
+    assert.match(orderScreen, /getAssetTradingWarning\(/u);
     assert.doesNotMatch(assetDetail, /asset\.tradeBlockedReason\s*\?\?/u);
     assert.doesNotMatch(orderScreen, /asset\.tradeBlockedReason\s*\?\?/u);
   });

@@ -21,7 +21,6 @@ import {
 } from '../../features/market/api';
 import { MarketAssetRow } from '../../features/market/MarketAssetRow';
 import { useMarketTickers } from '../../features/market/useMarketTickers';
-import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -38,7 +37,6 @@ const TABS: Array<{ key: AssetType; label: string }> = [
 const CRYPTO_PRICE_BASIS_TEXT = '가격 기준: Binance Spot 최근 체결가';
 
 export default function MarketScreen({ navigation }: Props) {
-  const { selectedAccount } = useTradingAccount();
   const [selectedTab, setSelectedTab] = useState<AssetType>('domestic_stock');
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
 
@@ -196,7 +194,6 @@ export default function MarketScreen({ navigation }: Props) {
             item={item}
             ticker={tickersByAssetId.get(item.id) ?? null}
             isStale={staleAssetIds.has(item.id)}
-            accountMode={selectedAccount?.mode}
             onPress={openAsset}
           />
         )}

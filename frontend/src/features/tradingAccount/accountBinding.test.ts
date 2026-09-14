@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+
+beforeEach(() =>
+  mock.timers.enable({ apis: ['Date'], now: new Date('2026-05-15T00:00:00Z') }),
+);
+afterEach(() => mock.timers.reset());
 
 import {
   resolveAccountBinding,
@@ -60,6 +65,26 @@ const GENERAL = generalAccount('acc-general');
 const ACCOUNTS = [SEASON, GENERAL];
 
 describe('order/FX flow account binding', () => {
+  it('blocks an excluded route account while keeping asset discovery/read/cancel separate', () => {
+    const excluded = {
+      ...SEASON,
+      season: { ...SEASON.season!, participantStatus: 'excluded' as const },
+    };
+    const binding = resolveAccountBinding({
+      boundAccountId: excluded.id,
+      accounts: [excluded],
+      selectedAccountId: excluded.id,
+      accountsLoading: false,
+    });
+    assert.equal(binding.state, 'bound');
+    if (binding.state !== 'bound')
+      throw new Error('expected owned account binding');
+    assert.equal(binding.capabilities.canTrade, false);
+    assert.equal(binding.capabilities.canQuote, false);
+    assert.equal(binding.capabilities.canExchange, false);
+    assert.equal(binding.capabilities.canRead, true);
+    assert.equal(binding.capabilities.canCancelOrder, true);
+  });
   it('waits while the owned-account list is still loading', () => {
     const binding = resolveAccountBinding({
       boundAccountId: SEASON.id,

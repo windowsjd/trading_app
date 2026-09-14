@@ -33,7 +33,7 @@ plus one AsyncStorage entry.
 | ---------------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | `features/tradingAccount/api.ts`                                             | account-scoped API calls (existing backend routes only)            |
 | `features/tradingAccount/accountSelection.ts`                                | pure selection policy + display ordering                           |
-| `features/tradingAccount/capabilities.ts`                                    | mode/status → what the UI may offer                                |
+| `features/tradingAccount/capabilities.ts`                                    | account status + own season lifecycle/participant → what the UI may offer |
 | `features/tradingAccount/accountDisplay.ts`                                  | human-readable names, status labels, return-rate meaning           |
 | `features/tradingAccount/selectionStorage.ts`                                | per-user AsyncStorage persistence                                  |
 | `features/tradingAccount/integrityErrors.ts`                                 | structural-error classification                                    |
@@ -357,16 +357,25 @@ about it.
 
 ## Capabilities
 
-`getTradingAccountCapabilities(account)` derives from `mode` and `status` only.
-Status is checked **before** mode, so a closed general account reads as closed
-rather than "not implemented yet" — different situations, and one of them will
-never change.
+`getTradingAccountCapabilities(account, now)` derives permission for new market,
+limit and FX requests from the selected account. Account status is checked first.
+General accounts require active status and never consult a current season or
+season participation. Their financial foundation remains server-validated;
+the account DTO does not let the client independently verify wallet/ledger/TWR
+integrity.
+
+Season accounts require active account status, active season status, the
+half-open window `startAt <= now < endAt`, and `participantStatus=active`.
+`registered`, `excluded`, `finished` and `rewarded` participants cannot open new
+orders or FX. The selected-account provider recomputes capability at season
+time boundaries, and refreshed account data applies participant/status changes.
+Order routing uses the same helper for its bound account.
 
 |                    | active           | suspended | closed |
 | ------------------ | ---------------- | --------- | ------ |
 | reads              | ✓                | ✓         | ✓      |
-| new order / quote  | season + general | ✗         | ✗      |
-| FX quote / execute | season + general | ✗         | ✗      |
+| new order / quote  | general; season only with lifecycle + active participant | ✗ | ✗ |
+| FX quote / execute | general; season only with lifecycle + active participant | ✗ | ✗ |
 | cancel order       | ✓                | ✓         | ✓      |
 | ad-reward claim    | general only     | ✗         | ✗      |
 
@@ -376,6 +385,22 @@ KRW↔USD FX through the existing account-scoped FX endpoints. Suspended/closed
 accounts remain readable and may cancel submitted limit orders, but cannot
 create new order or FX quotes and cannot execute FX. The server remains
 authoritative for every capability.
+
+Upcoming, ended and settled season accounts, and excluded participants, retain
+reads and cancellation of their existing submitted orders. `canRead` and
+`canCancelOrder` remain true; `canTrade`, `canQuote` and `canExchange` are false.
+Cancellation releases reservations under the existing backend policy.
+
+Assets `tradable` is independent of account permission. Market list/search rows
+no longer receive account mode. Asset detail and Order show market/price warnings
+separately from the selected/bound account warning and mutation CTA gate. FX
+uses the same capability for its new-transaction control while preserving history.
+`features/asset/tradingUx.ts` ignores account-related reasons in old cached Assets
+responses in every mode; this is transition compatibility only. New Assets
+responses never use those reasons. Real asset/market/price restrictions remain
+visible. Backend quote/create/execute remains authoritative after locks at DB
+transactionNow; neither this UX gate nor the compatibility filter grants a
+financial permission. Fee pinning, TWR, limit matching and reservation are unchanged.
 
 `WalletFxScreen` stays shared. It pins the accountId that opened the flow and
 uses the existing scope epoch/request-sequence guards: switching accounts clears

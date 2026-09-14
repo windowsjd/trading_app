@@ -10,7 +10,6 @@ import {
   CurrencyCode,
   FxRateSourceType,
   Prisma,
-  SeasonStatus,
 } from '../generated/prisma/client';
 import { isFxSnapshotStaleForPortfolioValuation } from '../portfolio/portfolio-valuation.policy';
 import { PrismaService } from '../prisma/prisma.service';
@@ -29,7 +28,6 @@ import {
 } from '../providers/source-metadata.presenter';
 import { BinanceSymbolMetadataService } from '../providers/binance/binance-symbol-metadata.service';
 import { buildPagination, type Pagination } from '../common/pagination';
-import { isSeasonCurrentlyActive } from '../seasons/season-lifecycle.policy';
 import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
 import {
@@ -73,13 +71,6 @@ type AssetRecord = {
   isActive: boolean;
 };
 
-type AssetSeason = {
-  id: string;
-  status: SeasonStatus;
-  startAt: Date;
-  endAt: Date;
-};
-
 type AssetPriceSnapshotRecord = {
   id: string;
   price: Prisma.Decimal;
@@ -106,6 +97,7 @@ type TradeBlockedReason =
   | 'MARKET_CLOSED'
   | 'PRICE_UNAVAILABLE'
   | 'PRICE_STALE'
+  // Legacy response compatibility only; new asset UX never emits these.
   | 'SEASON_NOT_ACTIVE'
   | 'SEASON_NOT_JOINED'
   | 'UNKNOWN';
@@ -116,12 +108,6 @@ type AssetTradingUx = {
   marketStatus: MarketStatus;
   tradable: boolean;
   tradeBlockedReason: TradeBlockedReason | null;
-};
-
-type AssetTradingContext = {
-  now: Date;
-  season: AssetSeason | null;
-  joined: boolean;
 };
 
 type UsdKrwSelection =
@@ -288,13 +274,6 @@ const MAX_LIMIT = 100;
  * ticker bursts stop re-reading fx_rate_snapshots per event.
  */
 const REALTIME_FX_CACHE_TTL_MS = 2_000;
-const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
-  SeasonStatus.active,
-  SeasonStatus.upcoming,
-  SeasonStatus.ended,
-  SeasonStatus.settled,
-];
-
 @Injectable()
 export class AssetsService {
   private realtimeUsdKrwCache: {
@@ -336,17 +315,14 @@ export class AssetsService {
         select: this.assetSelect(),
       }),
     ]);
-    const tradingContext =
-      assets.length > 0
-        ? await this.buildAssetTradingContext(userId, new Date())
-        : null;
+    const now = new Date();
     const pricedAssets = parsedQuery.withPrice
-      ? await this.buildAssetsWithPrices(assets, tradingContext)
+      ? await this.buildAssetsWithPrices(assets, now)
       : {
           assets: assets.map((asset) =>
             this.formatAssetMetadata(
               asset,
-              this.buildTradingUx(asset, undefined, tradingContext),
+              this.buildTradingUx(asset, undefined, now),
             ),
           ),
           priceErrors: [],
@@ -392,14 +368,7 @@ export class AssetsService {
       );
     }
 
-    const tradingContext = await this.buildAssetTradingContext(
-      userId,
-      new Date(),
-    );
-    const pricedAssets = await this.buildAssetsWithPrices(
-      [asset],
-      tradingContext,
-    );
+    const pricedAssets = await this.buildAssetsWithPrices([asset]);
     const pricedAsset = pricedAssets.assets[0];
 
     if (!pricedAsset?.price) {
@@ -452,7 +421,7 @@ export class AssetsService {
       );
     }
 
-    const pricedAssets = await this.buildAssetsWithPrices([asset], null);
+    const pricedAssets = await this.buildAssetsWithPrices([asset]);
     const price = pricedAssets.assets[0]?.price;
     if (!price || price.state === 'unavailable') {
       const priceError = pricedAssets.priceErrors[0];
@@ -639,7 +608,7 @@ export class AssetsService {
 
   private async buildAssetsWithPrices(
     assets: readonly AssetRecord[],
-    tradingContext: AssetTradingContext | null,
+    valuationAt = new Date(),
   ): Promise<{
     assets: AssetListItem[];
     priceErrors: AssetPriceError[];
@@ -651,7 +620,6 @@ export class AssetsService {
       };
     }
 
-    const valuationAt = new Date();
     const usdKrwSelection = assets.some(
       (asset) => this.getAssetPriceCurrency(asset) === CurrencyCode.USD,
     )
@@ -669,7 +637,7 @@ export class AssetsService {
           asset: {
             ...this.formatAssetMetadata(
               asset,
-              this.buildTradingUx(asset, price.payload, tradingContext),
+              this.buildTradingUx(asset, price.payload, valuationAt),
             ),
             price: price.payload,
           },
@@ -684,70 +652,6 @@ export class AssetsService {
         .map((result) => result.error)
         .filter((error): error is AssetPriceError => Boolean(error)),
     };
-  }
-
-  private async buildAssetTradingContext(
-    userId: string,
-    now: Date,
-  ): Promise<AssetTradingContext> {
-    const season = await this.findCurrentSeason();
-    const participant = season
-      ? await this.prisma.seasonParticipant.findUnique({
-          where: {
-            seasonId_userId: {
-              seasonId: season.id,
-              userId,
-            },
-          },
-          select: {
-            id: true,
-          },
-        })
-      : null;
-
-    return {
-      now,
-      season,
-      joined: Boolean(participant),
-    };
-  }
-
-  private async findCurrentSeason(): Promise<AssetSeason | null> {
-    for (const status of CURRENT_SEASON_STATUS_PRIORITY) {
-      const season = await this.prisma.season.findFirst({
-        where: {
-          status,
-        },
-        select: {
-          id: true,
-          status: true,
-          startAt: true,
-          endAt: true,
-        },
-        orderBy: this.getSeasonOrderBy(status),
-      });
-
-      if (season) {
-        return season;
-      }
-    }
-
-    return null;
-  }
-
-  private getSeasonOrderBy(
-    status: SeasonStatus,
-  ): Prisma.SeasonFindFirstArgs['orderBy'] {
-    switch (status) {
-      case SeasonStatus.upcoming:
-        return [{ startAt: 'asc' }, { createdAt: 'asc' }];
-      case SeasonStatus.ended:
-      case SeasonStatus.settled:
-        return [{ endAt: 'desc' }, { createdAt: 'desc' }];
-      case SeasonStatus.active:
-      default:
-        return [{ startAt: 'desc' }, { createdAt: 'desc' }];
-    }
   }
 
   private async buildAssetPrice(
@@ -1449,14 +1353,13 @@ export class AssetsService {
   private buildTradingUx(
     asset: AssetRecord,
     price: AssetPricePayload | undefined,
-    context: AssetTradingContext | null,
+    now: Date,
   ): AssetTradingUx {
-    const marketStatus = this.resolveMarketStatus(asset, context?.now);
+    const marketStatus = this.resolveMarketStatus(asset, now);
     const blockedReason = this.resolveTradeBlockedReason(
       asset,
       price,
       marketStatus,
-      context,
     );
 
     return {
@@ -1472,21 +1375,9 @@ export class AssetsService {
     asset: AssetRecord,
     price: AssetPricePayload | undefined,
     marketStatus: MarketStatus,
-    context: AssetTradingContext | null,
   ): TradeBlockedReason | null {
     if (!asset.isActive) {
       return 'ASSET_INACTIVE';
-    }
-
-    if (
-      !context?.season ||
-      !isSeasonCurrentlyActive(context.season, context.now)
-    ) {
-      return 'SEASON_NOT_ACTIVE';
-    }
-
-    if (!context.joined) {
-      return 'SEASON_NOT_JOINED';
     }
 
     if (marketStatus === 'closed') {

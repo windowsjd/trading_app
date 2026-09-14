@@ -20,8 +20,7 @@ import {
   type AssetType,
   type MarketAssetItemDto,
 } from '../../features/market/api';
-import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
-import { getAssetTradeBlockedReasonDisplay } from '../../features/tradingAccount/capabilities';
+import { getAssetTradingWarning } from '../../features/asset/tradingUx';
 import {
   formatPercent,
   getAssetNameDisplay,
@@ -43,22 +42,17 @@ const SEARCH_SCOPE: Array<{ key: SearchScope; label: string }> = [
   { key: 'crypto', label: '암호화폐' },
 ];
 
-function getChangeRateText(
-  item: MarketAssetItemDto,
-  accountMode: 'general' | 'season' | null,
-) {
+function getChangeRateText(item: MarketAssetItemDto) {
+  const warning = getAssetTradingWarning(item);
+  if (warning) return warning;
   if (item.price?.state !== 'available' || !item.price.changeRate) {
-    return (
-      getAssetTradeBlockedReasonDisplay(item.tradeBlockedReason, accountMode) ??
-      item.marketStatus
-    );
+    return item.marketStatus;
   }
 
   return `${formatPercent(item.price.changeRate)}%`;
 }
 
 export default function MarketSearchScreen({ navigation }: Props) {
-  const { selectedAccount } = useTradingAccount();
   const [assetType, setAssetType] = useState<SearchScope>('all');
   const [searchText, setSearchText] = useState('');
   const trimmedSearchText = searchText.trim();
@@ -98,8 +92,9 @@ export default function MarketSearchScreen({ navigation }: Props) {
 
   const hasPriceErrors = useMemo(
     () =>
-      searchQuery.data?.pages.some((page) => (page.priceErrors?.length ?? 0) > 0) ??
-      false,
+      searchQuery.data?.pages.some(
+        (page) => (page.priceErrors?.length ?? 0) > 0,
+      ) ?? false,
     [searchQuery.data],
   );
 
@@ -163,7 +158,11 @@ export default function MarketSearchScreen({ navigation }: Props) {
                     onPress={() => setAssetType(scope.key)}
                   >
                     <Text
-                      style={active ? styles.scopeChipTextActive : styles.scopeChipText}
+                      style={
+                        active
+                          ? styles.scopeChipTextActive
+                          : styles.scopeChipText
+                      }
                     >
                       {scope.label}
                     </Text>
@@ -215,9 +214,7 @@ export default function MarketSearchScreen({ navigation }: Props) {
 
               <View style={styles.alignEnd}>
                 <Text style={styles.itemPrice}>{getAssetPriceText(item)}</Text>
-                <Text style={styles.helper}>
-                  {getChangeRateText(item, selectedAccount?.mode ?? null)}
-                </Text>
+                <Text style={styles.helper}>{getChangeRateText(item)}</Text>
                 <Text style={styles.helper}>
                   {item.marketStatus} ·{' '}
                   {item.tradable ? '거래 가능' : '거래 제한'}

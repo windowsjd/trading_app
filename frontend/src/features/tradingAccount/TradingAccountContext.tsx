@@ -23,6 +23,7 @@ import {
 } from './accountSelection';
 import {
   getTradingAccountCapabilities,
+  nextCapabilityBoundary,
   type TradingAccountCapabilities,
 } from './capabilities';
 import {
@@ -85,6 +86,7 @@ const TradingAccountContext = createContext<TradingAccountContextValue | null>(
 );
 
 export function TradingAccountProvider({ children }: PropsWithChildren) {
+  const [capabilityRevision, setCapabilityRevision] = useState(0);
   const queryClient = useQueryClient();
   const [storedAccountId, setStoredAccountId] = useState<string | null>(null);
   const [storedLoadedForUserId, setStoredLoadedForUserId] = useState<
@@ -147,12 +149,14 @@ export function TradingAccountProvider({ children }: PropsWithChildren) {
   }, [userId, storedLoadedForUserId]);
 
   const selection = useMemo(
-    () => selectTradingAccountId(accounts, explicitAccountId ?? storedAccountId),
+    () =>
+      selectTradingAccountId(accounts, explicitAccountId ?? storedAccountId),
     [accounts, explicitAccountId, storedAccountId],
   );
 
   const selectedAccount = useMemo(
-    () => accounts.find((account) => account.id === selection.accountId) ?? null,
+    () =>
+      accounts.find((account) => account.id === selection.accountId) ?? null,
     [accounts, selection.accountId],
   );
 
@@ -186,12 +190,27 @@ export function TradingAccountProvider({ children }: PropsWithChildren) {
     await accountsQuery.refetch();
   }, [accountsQuery, userId]);
 
+  useEffect(() => {
+    const now = Date.now();
+    const boundary = nextCapabilityBoundary(selectedAccount, now);
+    if (boundary === null) return;
+    const timer = setTimeout(
+      () => setCapabilityRevision((revision) => revision + 1),
+      Math.min(boundary - now, 2_147_483_647),
+    );
+    return () => clearTimeout(timer);
+  }, [selectedAccount, capabilityRevision]);
+
+  const capabilityNow = Date.now();
   const value = useMemo<TradingAccountContextValue>(
     () => ({
       accounts,
       selectedAccountId: selection.accountId,
       selectedAccount,
-      capabilities: getTradingAccountCapabilities(selectedAccount),
+      capabilities: getTradingAccountCapabilities(
+        selectedAccount,
+        capabilityNow,
+      ),
       selectionReason: selection.reason,
       isLoading: meQuery.isLoading || accountsQuery.isLoading,
       isError: accountsQuery.isError,
@@ -203,6 +222,7 @@ export function TradingAccountProvider({ children }: PropsWithChildren) {
     }),
     [
       accounts,
+      capabilityNow,
       selection.accountId,
       selection.reason,
       selectedAccount,

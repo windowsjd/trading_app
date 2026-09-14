@@ -1,3 +1,4 @@
+import { getAssetTradingWarning } from "../../features/asset/tradingUx";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
@@ -26,7 +27,6 @@ import {
 import { getPositionDisplay } from "../../features/position/display";
 import { useTradingAccount } from "../../features/tradingAccount/TradingAccountContext";
 import {
-  getAssetTradeBlockedReasonDisplay,
   getCapabilityBlockMessage,
   isSeasonNotActiveReason,
 } from "../../features/tradingAccount/capabilities";
@@ -237,13 +237,9 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
 
   const assetHardBlockedReason = !asset.isActive ? "비활성 자산입니다." : null;
 
-  const assetWarningReason = !asset.tradable
-    ? (getAssetTradeBlockedReasonDisplay(
-        asset.tradeBlockedReason,
-        capabilities?.mode,
-      ) ??
-      "거래 제한 가능성이 있습니다. 서버 견적에서 최종 확인됩니다.")
-    : !isTradableMarketStatus(asset.marketStatus)
+  const assetWarningReason =
+    getAssetTradingWarning(asset) ??
+    (!isTradableMarketStatus(asset.marketStatus)
       ? "장 상태는 주문 견적에서 최종 확인됩니다."
       : isTickerStale
         ? "실시간 시세 최신성이 낮습니다. 서버 견적에서 최종 확인됩니다."
@@ -252,7 +248,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
           : displayPriceKrwState && displayPriceKrwState !== "available"
             ? (displayPriceKrwMessage ??
               "KRW 환산 시세를 사용할 수 없습니다. 서버 견적에서 최종 확인됩니다.")
-            : null;
+            : null);
 
   const buyBlockedReason = accountBlockedReason ?? assetHardBlockedReason;
   const sellBlockedReason =
