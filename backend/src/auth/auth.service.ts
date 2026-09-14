@@ -49,6 +49,7 @@ type PublicUserRecord = {
   email: string;
   nickname: string;
   profileImageUrl: string | null;
+  role: UserRole;
   status: UserStatus;
   createdAt: Date;
 };
@@ -124,6 +125,7 @@ export class AuthService implements OnModuleInit {
             id: true,
             email: true,
             nickname: true,
+            role: true,
             status: true,
           },
         });
@@ -163,6 +165,7 @@ export class AuthService implements OnModuleInit {
         email: true,
         passwordHash: true,
         nickname: true,
+        role: true,
         status: true,
       },
     });
@@ -188,6 +191,7 @@ export class AuthService implements OnModuleInit {
         id: user.id,
         email: user.email,
         nickname: user.nickname,
+        role: user.role,
         status: user.status,
       },
       metadata,
@@ -219,6 +223,7 @@ export class AuthService implements OnModuleInit {
               id: true,
               email: true,
               nickname: true,
+              role: true,
               status: true,
             },
           },
@@ -267,6 +272,7 @@ export class AuthService implements OnModuleInit {
         id: session.user.id,
         email: session.user.email,
         nickname: session.user.nickname,
+        role: session.user.role,
         status: session.user.status,
       };
     });
@@ -335,6 +341,7 @@ export class AuthService implements OnModuleInit {
         email: true,
         nickname: true,
         profileImageUrl: true,
+        role: true,
         status: true,
         createdAt: true,
       },
@@ -368,6 +375,7 @@ export class AuthService implements OnModuleInit {
         email: true,
         nickname: true,
         profileImageUrl: true,
+        role: true,
         status: true,
         createdAt: true,
       },
@@ -424,6 +432,7 @@ export class AuthService implements OnModuleInit {
           email: true,
           nickname: true,
           profileImageUrl: true,
+          role: true,
           status: true,
           createdAt: true,
         },
@@ -455,6 +464,7 @@ export class AuthService implements OnModuleInit {
         email: user.email,
         nickname: user.nickname,
         profileImageUrl: user.profileImageUrl,
+        role: user.role,
         status: user.status,
         createdAt: user.createdAt.toISOString(),
       },

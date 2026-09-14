@@ -26,6 +26,10 @@ import {
   type ProviderWorkflow,
 } from '../providers/source-eligibility.policy';
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
+import {
+  recordAdminDiagnosticEvent,
+  setAdminDiagnosticContext,
+} from '../common/admin-diagnostics';
 
 type PortfolioSourceWorkflow = ProviderWorkflow;
 
@@ -442,6 +446,47 @@ export class PortfolioValuationService {
     });
 
     if (!fallbackSnapshot) {
+      const latestCandidate = providerCandidates[0];
+      setAdminDiagnosticContext({
+        failureStage: 'asset_price_selection',
+        entities: {
+          assetId: asset.id,
+          snapshotId: latestCandidate?.id,
+        },
+        evidence: {
+          workflow: sourceEligibilityWorkflow,
+          market: asset.market,
+          valuationAt,
+          freshnessThresholdSeconds: providerEligibility.eligible
+            ? providerEligibility.freshnessThresholdSeconds
+            : null,
+          expectedSourceNames: providerEligibility.eligible
+            ? providerEligibility.sourceNames
+            : [],
+          providerDecision: providerSelection.decision,
+          latestRejectedCandidate: latestCandidate
+            ? {
+                id: latestCandidate.id,
+                sourceType: latestCandidate.sourceType,
+                sourceName: latestCandidate.sourceName,
+                effectiveAt: latestCandidate.effectiveAt,
+                capturedAt: latestCandidate.capturedAt,
+              }
+            : null,
+          fallbackSnapshotFound: false,
+          selectionResult: 'REJECTED',
+        },
+        nextInvestigation: [
+          'backend/src/providers/source-eligibility.policy.ts',
+          'backend/src/portfolio/portfolio-valuation.service.ts',
+        ],
+      });
+      recordAdminDiagnosticEvent(
+        'warn',
+        'PORTFOLIO_ASSET_PRICE_REJECTED',
+        `No eligible price snapshot was selected for asset ${asset.id}.`,
+        { rejectedReason: providerSelection.decision.rejectedProviderReason },
+      );
       return null;
     }
 
@@ -565,6 +610,47 @@ export class PortfolioValuationService {
           providerDecision: providerSelection.decision,
         }),
       };
+    }
+
+    if (!fallbackSnapshot) {
+      const latestCandidate = providerCandidates[0];
+      setAdminDiagnosticContext({
+        failureStage: 'fx_rate_selection',
+        entities: { snapshotId: latestCandidate?.id },
+        evidence: {
+          pair: 'USD/KRW',
+          workflow: sourceEligibilityWorkflow,
+          valuationAt,
+          freshnessThresholdSeconds: providerEligibility.eligible
+            ? providerEligibility.freshnessThresholdSeconds
+            : null,
+          expectedSourceNames: providerEligibility.eligible
+            ? providerEligibility.sourceNames
+            : [],
+          providerDecision: providerSelection.decision,
+          latestRejectedCandidate: latestCandidate
+            ? {
+                id: latestCandidate.id,
+                sourceType: latestCandidate.sourceType,
+                sourceName: latestCandidate.sourceName,
+                effectiveAt: latestCandidate.effectiveAt,
+                capturedAt: latestCandidate.capturedAt,
+              }
+            : null,
+          fallbackSnapshotFound: false,
+          selectionResult: 'REJECTED',
+        },
+        nextInvestigation: [
+          'backend/src/providers/source-eligibility.policy.ts',
+          'backend/src/portfolio/portfolio-valuation.service.ts',
+        ],
+      });
+      recordAdminDiagnosticEvent(
+        'warn',
+        'PORTFOLIO_FX_RATE_REJECTED',
+        'No eligible USD/KRW snapshot was selected for portfolio valuation.',
+        { rejectedReason: providerSelection.decision.rejectedProviderReason },
+      );
     }
 
     return fallbackSnapshot;

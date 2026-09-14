@@ -22,7 +22,43 @@ export interface ApiErrorResponse {
     code: string;
     message: string;
     details?: Record<string, unknown>;
+    diagnostic?: AdminDiagnosticDto;
   };
+}
+
+export interface AdminDiagnosticLogEventDto {
+  timestamp: IsoDateTimeString;
+  level: 'debug' | 'info' | 'warn' | 'error';
+  event: string;
+  message: string;
+  context?: Record<string, unknown>;
+}
+
+export interface AdminDiagnosticDto {
+  version: 1;
+  code: string;
+  httpStatus: number;
+  timestamp: IsoDateTimeString;
+  requestId: string;
+  domain: string;
+  operation: string;
+  failureStage: string;
+  entities?: Record<string, unknown>;
+  evidence?: Record<string, unknown>;
+  exception: {
+    type: string;
+    message: string;
+    cause?: string;
+    applicationStack: string[];
+    stack: string[];
+    truncated: boolean;
+  };
+  serverLogs: {
+    events: AdminDiagnosticLogEventDto[];
+    truncated: boolean;
+  };
+  nextInvestigation?: string[];
+  truncated: boolean;
 }
 
 export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;

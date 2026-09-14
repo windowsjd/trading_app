@@ -6,12 +6,14 @@ import {
   Pressable,
   StyleSheet,
 } from 'react-native';
+import AdminDiagnosticPanel from './AdminDiagnosticPanel';
 
 interface ErrorStateProps {
   title?: string;
   message?: string;
   actionLabel?: string;
   onRetry?: () => void;
+  diagnosticError?: unknown;
 }
 
 export default function ErrorState({
@@ -19,12 +21,14 @@ export default function ErrorState({
   message = '잠시 후 다시 시도해주세요.',
   actionLabel = '다시 시도',
   onRetry,
+  diagnosticError,
 }: ErrorStateProps) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.center}>
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.message}>{message}</Text>
+        <AdminDiagnosticPanel error={diagnosticError} />
 
         {onRetry ? (
           <Pressable style={styles.button} onPress={onRetry}>

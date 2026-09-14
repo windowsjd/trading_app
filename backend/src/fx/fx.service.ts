@@ -91,6 +91,10 @@ import {
 import { readGeneralFxFeeRate } from './general-fx.config';
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
 import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
+import {
+  recordAdminDiagnosticEvent,
+  setAdminDiagnosticContext,
+} from '../common/admin-diagnostics';
 
 export type FxQuoteRequestBody = {
   fromCurrency?: unknown;
@@ -409,6 +413,21 @@ export class FxService {
       refreshedProviderSnapshot ??
       (await this.findCurrentUsdKrwRateSnapshot(now));
     if (!snapshot) {
+      setAdminDiagnosticContext({
+        failureStage: 'display_rate_selection',
+        evidence: {
+          pair: 'USD/KRW',
+          requestTime: now,
+          freshnessThresholdSeconds:
+            getProviderFreshnessThresholdsSeconds().fxUsdKrwDisplay,
+          providerPriority: FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
+          refreshRequested: request.refresh,
+          refreshProducedSnapshot: Boolean(refreshedProviderSnapshot),
+          selectionResult: 'REJECTED',
+          normalCriteria:
+            'A positive eligible provider rate within the display freshness threshold, or an approved manual fallback, is required.',
+        },
+      });
       this.throwApiError(
         HttpStatus.SERVICE_UNAVAILABLE,
         'FX_RATE_UNAVAILABLE',
@@ -815,6 +834,18 @@ export class FxService {
       const rateSnapshot = await this.findFxQuoteRateSnapshot(now);
 
       if (!rateSnapshot) {
+        setAdminDiagnosticContext({
+          failureStage: 'quote_rate_selection',
+          entities: { tradingAccountId },
+          evidence: {
+            pair: 'USD/KRW',
+            quoteTime: now,
+            providerPriority: FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
+            freshnessThresholdSeconds:
+              getProviderFreshnessThresholdsSeconds().fxUsdKrwQuote,
+            selectionResult: 'REJECTED',
+          },
+        });
         this.throwApiError(
           HttpStatus.SERVICE_UNAVAILABLE,
           'FX_RATE_UNAVAILABLE',
@@ -827,6 +858,31 @@ export class FxService {
         now.getTime() - rateSnapshot.effectiveAt.getTime() >
           FX_RATE_STALE_THRESHOLD_MS
       ) {
+        setAdminDiagnosticContext({
+          failureStage: 'quote_rate_freshness_validation',
+          entities: {
+            tradingAccountId,
+            snapshotId: rateSnapshot.id,
+          },
+          evidence: {
+            pair: 'USD/KRW',
+            sourceType: rateSnapshot.sourceType,
+            sourceName: rateSnapshot.sourceName,
+            effectiveAt: rateSnapshot.effectiveAt,
+            capturedAt: rateSnapshot.capturedAt,
+            quoteTime: now,
+            freshnessAgeSeconds: Math.max(
+              0,
+              Math.floor(
+                (now.getTime() - rateSnapshot.effectiveAt.getTime()) / 1000,
+              ),
+            ),
+            allowedFreshnessSeconds: FX_RATE_STALE_THRESHOLD_MS / 1000,
+            fallbackUsed: rateSnapshot.sourceDecision.fallbackUsed,
+            selectionResult: 'REJECTED',
+            rejectedReason: 'manual_fallback_effective_at_stale',
+          },
+        });
         this.throwApiError(
           HttpStatus.SERVICE_UNAVAILABLE,
           'FX_RATE_STALE',
@@ -1408,6 +1464,26 @@ export class FxService {
     });
 
     if (!fallbackSnapshot) {
+      setAdminDiagnosticContext({
+        failureStage: 'quote_rate_selection',
+        evidence: {
+          pair: 'USD/KRW',
+          quoteTime: quoteAt,
+          freshnessThresholdSeconds: providerEligibility.eligible
+            ? providerEligibility.freshnessThresholdSeconds
+            : null,
+          providerPriority: providerEligibility.eligible
+            ? providerEligibility.sourceNames
+            : [],
+          providerDecision: providerSelection.decision,
+          fallbackSnapshotFound: false,
+          selectionResult: 'REJECTED',
+        },
+        nextInvestigation: [
+          'backend/src/fx/fx.service.ts',
+          'backend/src/providers/source-eligibility.policy.ts',
+        ],
+      });
       this.throwApiError(
         HttpStatus.SERVICE_UNAVAILABLE,
         'FX_RATE_UNAVAILABLE',
@@ -1483,6 +1559,29 @@ export class FxService {
           status: QuoteStatus.expired,
         },
       });
+      setAdminDiagnosticContext({
+        failureStage: 'quote_expiry_validation',
+        entities: {
+          tradingAccountId: input.tradingAccountId,
+          quoteId: quote.id,
+        },
+        evidence: {
+          quoteStatus: quote.status,
+          quoteExpiresAt: quote.expiresAt,
+          executionTime: input.executeNow,
+          quotedRate: quote.quotedRate?.toFixed(8),
+          maxChangeBps: quote.maxChangeBps.toFixed(4),
+          selectionResult: 'REJECTED',
+          rejectedReason: 'execution_after_quote_expiry',
+          normalCriteria: 'executionTime must be on or before quoteExpiresAt.',
+        },
+      });
+      recordAdminDiagnosticEvent(
+        'warn',
+        'FX_QUOTE_EXPIRED',
+        `FX quote ${quote.id} expired before execution.`,
+        { quoteExpiresAt: quote.expiresAt, executionTime: input.executeNow },
+      );
       this.throwFxExecuteError(fxExecuteErrorCodes.QUOTE_EXPIRED);
     }
 
@@ -1588,6 +1687,29 @@ export class FxService {
         sourceDecision: selection.decision,
       };
     }
+
+    setAdminDiagnosticContext({
+      failureStage: 'execution_rate_selection',
+      evidence: {
+        pair: 'USD/KRW',
+        executionTime: executeNow,
+        providerPriority: providerEligibility.sourceNames,
+        freshnessThresholdSeconds:
+          providerEligibility.freshnessThresholdSeconds,
+        selectionDecision: selection.decision,
+        selectionResult: 'REJECTED',
+      },
+      nextInvestigation: [
+        'backend/src/fx/fx.service.ts',
+        'backend/src/providers/source-eligibility.policy.ts',
+      ],
+    });
+    recordAdminDiagnosticEvent(
+      'warn',
+      'FX_EXECUTION_RATE_REJECTED',
+      'No eligible provider rate was selected for FX execution.',
+      { rejectedReason: selection.decision.rejectedProviderReason },
+    );
 
     if (selection.decision.rejectedProviderReason === 'captured_at_stale') {
       this.throwFxExecuteError(fxExecuteErrorCodes.PROVIDER_RATE_STALE);
@@ -1826,6 +1948,23 @@ export class FxService {
     const executeRate = providerSnapshot.rate;
     const rateChangeBps = calculateChangeBps(quotedRate, executeRate);
     if (rateChangeBps.gt(quote.maxChangeBps)) {
+      setAdminDiagnosticContext({
+        failureStage: 'execute_rate_change_validation',
+        entities: {
+          quoteId: quote.id,
+          snapshotId: providerSnapshot.id,
+        },
+        evidence: {
+          quotedRate: quotedRate.toFixed(8),
+          executeRate: executeRate.toFixed(8),
+          actualChangeBps: rateChangeBps.toFixed(4),
+          allowedMaxChangeBps: quote.maxChangeBps.toFixed(4),
+          executionTime: input.executeNow,
+          source: providerSnapshot.sourceDecision,
+          selectionResult: 'REJECTED',
+          rejectedReason: 'max_change_exceeded',
+        },
+      });
       this.throwFxExecuteError(
         fxExecuteErrorCodes.RATE_CHANGED_REQUOTE_REQUIRED,
       );
@@ -3127,11 +3266,24 @@ export class FxService {
     code: string,
     message: string,
   ): never {
+    recordAdminDiagnosticEvent(
+      status >= HttpStatus.INTERNAL_SERVER_ERROR ? 'error' : 'warn',
+      'FX_ERROR_THROWN',
+      `${code}: ${message}`,
+      { httpStatus: status },
+    );
     throw new HttpException(this.createErrorBody(code, message), status);
   }
 
   private throwFxExecuteError(code: FxExecuteErrorCode): never {
     const metadata = fxExecuteErrorMetadata[code];
+
+    recordAdminDiagnosticEvent(
+      Number(metadata.httpStatus) >= 500 ? 'error' : 'warn',
+      'FX_EXECUTE_ERROR_THROWN',
+      `${code}: ${metadata.defaultMessage}`,
+      { httpStatus: metadata.httpStatus },
+    );
 
     throw new HttpException(
       buildFxExecuteErrorEnvelope(code),

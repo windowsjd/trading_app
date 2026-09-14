@@ -7,6 +7,11 @@ import {
 } from '@nestjs/common';
 import { STATUS_CODES } from 'node:http';
 import { Response } from 'express';
+import type { AuthenticatedRequest } from '../auth/auth.types';
+import {
+  type AdminDiagnostic,
+  buildAdminDiagnostic,
+} from './admin-diagnostics';
 
 type ErrorEnvelope = {
   success: false;
@@ -14,6 +19,7 @@ type ErrorEnvelope = {
     code: string;
     message: string;
     details?: Record<string, unknown>;
+    diagnostic?: AdminDiagnostic;
   };
 };
 
@@ -27,7 +33,29 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
-    response.status(status).json(this.toErrorEnvelope(exception, status));
+    const envelope = this.toErrorEnvelope(exception, status);
+    const diagnostic = buildAdminDiagnostic(
+      exception,
+      envelope.error.code,
+      status,
+      {
+        entities: {
+          userId: context.getRequest?.<AuthenticatedRequest>()?.user?.userId,
+        },
+      },
+    );
+
+    response.status(status).json(
+      diagnostic
+        ? {
+            ...envelope,
+            error: {
+              ...envelope.error,
+              diagnostic,
+            },
+          }
+        : envelope,
+    );
   }
 
   private toErrorEnvelope(exception: unknown, status: number): ErrorEnvelope {

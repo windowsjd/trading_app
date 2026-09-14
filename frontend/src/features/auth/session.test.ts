@@ -75,6 +75,7 @@ const USER_B = {
   id: 'user-b',
   email: 'b@example.com',
   nickname: '사용자 B',
+  role: 'user' as const,
   status: 'active' as const,
 };
 

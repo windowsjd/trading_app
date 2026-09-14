@@ -25,6 +25,7 @@ import {
 } from './general-performance.policy';
 import { PortfolioValuationError } from './portfolio-valuation.policy';
 import { PortfolioValuationService } from './portfolio-valuation.service';
+import { buildAdminPartialFailureDiagnostic } from '../common/admin-diagnostics';
 
 /**
  * Account-scoped portfolio + equity history (작업 7).
@@ -291,6 +292,14 @@ export class TradingAccountPortfolioService {
       if (!sectionError) {
         throw this.rethrowStructuralError(error);
       }
+      const diagnostic = this.buildValuationDiagnostic(
+        error,
+        sectionError.code,
+        account,
+      );
+      const diagnosticSectionError = diagnostic
+        ? { ...sectionError, diagnostic }
+        : sectionError;
 
       return {
         success: true as const,
@@ -306,12 +315,12 @@ export class TradingAccountPortfolioService {
             domesticStockValueKrw: ZERO_MONEY,
             usStockValueKrw: ZERO_MONEY,
             cryptoValueKrw: ZERO_MONEY,
-            reason: sectionError.code,
-            message: sectionError.message,
+            reason: diagnosticSectionError.code,
+            message: diagnosticSectionError.message,
           },
-          sectionErrors: [sectionError],
-          reason: sectionError.code,
-          message: sectionError.message,
+          sectionErrors: [diagnosticSectionError],
+          reason: diagnosticSectionError.code,
+          message: diagnosticSectionError.message,
         },
       };
     }
@@ -378,6 +387,14 @@ export class TradingAccountPortfolioService {
       if (!sectionError) {
         throw this.rethrowStructuralError(error);
       }
+      const diagnostic = this.buildValuationDiagnostic(
+        error,
+        sectionError.code,
+        account,
+      );
+      const diagnosticSectionError = diagnostic
+        ? { ...sectionError, diagnostic }
+        : sectionError;
 
       return {
         success: true as const,
@@ -393,12 +410,12 @@ export class TradingAccountPortfolioService {
             domesticStockValueKrw: ZERO_MONEY,
             usStockValueKrw: ZERO_MONEY,
             cryptoValueKrw: ZERO_MONEY,
-            reason: sectionError.code,
-            message: sectionError.message,
+            reason: diagnosticSectionError.code,
+            message: diagnosticSectionError.message,
           },
-          sectionErrors: [sectionError],
-          reason: sectionError.code,
-          message: sectionError.message,
+          sectionErrors: [diagnosticSectionError],
+          reason: diagnosticSectionError.code,
+          message: diagnosticSectionError.message,
         },
       };
     }
@@ -692,6 +709,38 @@ export class TradingAccountPortfolioService {
     }
 
     return null;
+  }
+
+  private buildValuationDiagnostic(
+    error: unknown,
+    code: string,
+    account: OwnedTradingAccount,
+  ) {
+    return buildAdminPartialFailureDiagnostic(error, code, {
+      domain: 'PORTFOLIO',
+      operation: 'PORTFOLIO_VALUATION',
+      failureStage:
+        error instanceof PortfolioValuationError
+          ? (error.diagnosticContext?.failureStage ?? 'portfolio_valuation')
+          : 'portfolio_valuation',
+      entities: {
+        userId: account.userId,
+        tradingAccountId: account.id,
+        seasonId: account.seasonParticipant?.season.id,
+        seasonParticipantId: account.seasonParticipant?.id,
+        ...(error instanceof PortfolioValuationError
+          ? error.diagnosticContext?.entities
+          : {}),
+      },
+      evidence:
+        error instanceof PortfolioValuationError
+          ? error.diagnosticContext?.evidence
+          : undefined,
+      nextInvestigation: [
+        'backend/src/portfolio/portfolio-valuation.service.ts',
+        'backend/src/portfolio/portfolio-valuation.policy.ts',
+      ],
+    });
   }
 
   /**

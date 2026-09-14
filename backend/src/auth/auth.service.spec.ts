@@ -173,6 +173,7 @@ describe('AuthService', () => {
       id: activeUser.id,
       email: activeUser.email,
       nickname: activeUser.nickname,
+      role: activeUser.role,
       status: activeUser.status,
     });
 
@@ -205,6 +206,7 @@ describe('AuthService', () => {
           id: activeUser.id,
           email: activeUser.email,
           nickname: activeUser.nickname,
+          role: activeUser.role,
           status: activeUser.status,
         },
         tokens: {
@@ -300,6 +302,7 @@ describe('AuthService', () => {
         email: activeUser.email,
         nickname: 'newNickname',
         profileImageUrl: null,
+        role: UserRole.user,
         status: UserStatus.active,
       },
     });
@@ -754,6 +757,7 @@ describe('AuthService', () => {
         email: activeUser.email,
         nickname: activeUser.nickname,
         profileImageUrl: null,
+        role: UserRole.user,
         status: UserStatus.active,
         createdAt: createdAt.toISOString(),
       },

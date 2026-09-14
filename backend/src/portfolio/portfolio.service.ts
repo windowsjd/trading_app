@@ -10,6 +10,10 @@ import {
   type PortfolioValuationResult,
 } from './portfolio-valuation.policy';
 import { PortfolioValuationService } from './portfolio-valuation.service';
+import {
+  type AdminDiagnostic,
+  buildAdminPartialFailureDiagnostic,
+} from '../common/admin-diagnostics';
 
 export type PortfolioEquityQuery = {
   range?: string;
@@ -37,6 +41,7 @@ type SectionError = {
   section: string;
   code: string;
   message: string;
+  diagnostic?: AdminDiagnostic;
 };
 
 type PortfolioResponse = {
@@ -150,7 +155,12 @@ export class PortfolioService {
         },
       };
     } catch (error) {
-      const sectionError = this.sectionErrorFromValuation(error);
+      const sectionError = this.sectionErrorFromValuation(error, {
+        userId,
+        tradingAccountId: participant.tradingAccountId,
+        seasonId: season.id,
+        seasonParticipantId: participant.id,
+      });
 
       return {
         success: true,
@@ -462,15 +472,43 @@ export class PortfolioService {
     }
   }
 
-  private sectionErrorFromValuation(error: unknown): SectionError {
+  private sectionErrorFromValuation(
+    error: unknown,
+    entities: Record<string, unknown>,
+  ): SectionError {
+    const code =
+      error instanceof PortfolioValuationError
+        ? error.code
+        : 'VALUATION_UNAVAILABLE';
+    const diagnostic = buildAdminPartialFailureDiagnostic(error, code, {
+      domain: 'PORTFOLIO',
+      operation: 'PORTFOLIO_VALUATION',
+      failureStage:
+        error instanceof PortfolioValuationError
+          ? (error.diagnosticContext?.failureStage ?? 'portfolio_valuation')
+          : 'portfolio_valuation',
+      entities: {
+        ...entities,
+        ...(error instanceof PortfolioValuationError
+          ? error.diagnosticContext?.entities
+          : {}),
+      },
+      evidence:
+        error instanceof PortfolioValuationError
+          ? error.diagnosticContext?.evidence
+          : undefined,
+      nextInvestigation: [
+        'backend/src/portfolio/portfolio-valuation.service.ts',
+        'backend/src/portfolio/portfolio-valuation.policy.ts',
+      ],
+    });
+
     return {
       section: 'portfolio',
-      code:
-        error instanceof PortfolioValuationError
-          ? error.code
-          : 'VALUATION_UNAVAILABLE',
+      code,
       message:
         error instanceof Error ? error.message : 'Portfolio is unavailable.',
+      ...(diagnostic ? { diagnostic } : {}),
     };
   }
 

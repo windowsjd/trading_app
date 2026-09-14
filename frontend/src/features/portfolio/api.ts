@@ -1,5 +1,6 @@
 import type {
   MoneyString,
+  AdminDiagnosticDto,
   OffsetPagination,
   PercentString,
   SectionState,
@@ -48,6 +49,7 @@ export interface PortfolioSectionErrorDto {
   section: string;
   code: string;
   message: string;
+  diagnostic?: AdminDiagnosticDto;
 }
 
 export interface PortfolioOverviewDto {

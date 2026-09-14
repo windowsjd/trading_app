@@ -32,6 +32,12 @@ import { buildPagination, type Pagination } from '../common/pagination';
 import { isSeasonCurrentlyActive } from '../seasons/season-lifecycle.policy';
 import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
+import {
+  type AdminDiagnostic,
+  buildAdminPartialFailureDiagnostic,
+  recordAdminDiagnosticEvent,
+  setAdminDiagnosticContext,
+} from '../common/admin-diagnostics';
 
 export type AssetsQuery = {
   assetType?: string;
@@ -90,6 +96,7 @@ type AssetPriceError = {
   assetId: string;
   code: 'ASSET_PRICE_UNAVAILABLE' | 'FX_RATE_UNAVAILABLE' | 'FX_RATE_STALE';
   message: string;
+  diagnostic?: AdminDiagnostic;
 };
 
 type MarketStatus = 'open' | 'closed' | 'always_open' | 'unknown';
@@ -269,6 +276,7 @@ type AssetPriceResponse = {
         priceSource: null;
         reason: 'ASSET_PRICE_UNAVAILABLE';
         message: string;
+        diagnostic?: AdminDiagnostic;
       };
 };
 
@@ -447,6 +455,7 @@ export class AssetsService {
     const pricedAssets = await this.buildAssetsWithPrices([asset], null);
     const price = pricedAssets.assets[0]?.price;
     if (!price || price.state === 'unavailable') {
+      const priceError = pricedAssets.priceErrors[0];
       return {
         success: true,
         data: {
@@ -471,6 +480,9 @@ export class AssetsService {
           message:
             price?.message ??
             `Asset price snapshot is unavailable for asset ${asset.id}.`,
+          ...(priceError?.diagnostic
+            ? { diagnostic: priceError.diagnostic }
+            : {}),
         },
       };
     }
@@ -753,6 +765,20 @@ export class AssetsService {
 
     if (!snapshot) {
       const message = `Asset price snapshot is unavailable for asset ${asset.id}.`;
+      const diagnostic = buildAdminPartialFailureDiagnostic(
+        new Error(message),
+        'ASSET_PRICE_UNAVAILABLE',
+        {
+          domain: 'MARKET_DATA',
+          operation: 'ASSET_PRICE_READ',
+          failureStage: 'asset_price_selection',
+          entities: { assetId: asset.id, symbol: asset.symbol },
+          nextInvestigation: [
+            'backend/src/assets/assets.service.ts',
+            'backend/src/providers/source-eligibility.policy.ts',
+          ],
+        },
+      );
 
       return {
         payload: {
@@ -764,6 +790,7 @@ export class AssetsService {
           assetId: asset.id,
           code: 'ASSET_PRICE_UNAVAILABLE',
           message,
+          ...(diagnostic ? { diagnostic } : {}),
         },
       };
     }
@@ -822,6 +849,32 @@ export class AssetsService {
       'sourceDecision' in error
         ? presentSourceDecision(error.sourceDecision)
         : null;
+    const diagnostic = buildAdminPartialFailureDiagnostic(
+      new Error(error.message),
+      error.code,
+      {
+        domain: 'MARKET_DATA',
+        operation: 'ASSET_PRICE_KRW_CONVERSION',
+        failureStage: 'fx_rate_selection',
+        entities: {
+          assetId: asset.id,
+          symbol: asset.symbol,
+          snapshotId: snapshot.id,
+        },
+        evidence: {
+          priceCurrency: snapshot.currencyCode,
+          price: snapshot.price.toFixed(8),
+          priceSnapshotCapturedAt: snapshot.capturedAt,
+          valuationAt,
+          fxSelection: error,
+          selectionResult: 'REJECTED',
+        },
+        nextInvestigation: [
+          'backend/src/assets/assets.service.ts',
+          'backend/src/providers/source-eligibility.policy.ts',
+        ],
+      },
+    );
 
     return {
       payload: {
@@ -835,6 +888,7 @@ export class AssetsService {
         assetId: asset.id,
         code: error.code,
         message: error.message,
+        ...(diagnostic ? { diagnostic } : {}),
       },
     };
   }
@@ -949,6 +1003,44 @@ export class AssetsService {
     });
 
     if (!fallbackSnapshot) {
+      const latestCandidate = providerCandidates[0];
+      setAdminDiagnosticContext({
+        failureStage: 'asset_price_selection',
+        entities: {
+          assetId: asset.id,
+          symbol: asset.symbol,
+          snapshotId: latestCandidate?.id,
+        },
+        evidence: {
+          workflow: 'assets_with_price',
+          market: asset.market,
+          valuationAt,
+          freshnessThresholdSeconds: providerEligibility.eligible
+            ? providerEligibility.freshnessThresholdSeconds
+            : null,
+          expectedSourceNames: providerEligibility.eligible
+            ? providerEligibility.sourceNames
+            : [],
+          providerDecision: providerSelection.decision,
+          latestRejectedCandidate: latestCandidate
+            ? {
+                id: latestCandidate.id,
+                sourceName: latestCandidate.sourceName,
+                effectiveAt: latestCandidate.effectiveAt,
+                capturedAt: latestCandidate.capturedAt,
+                price: latestCandidate.price.toFixed(8),
+              }
+            : null,
+          fallbackSnapshotFound: false,
+          selectionResult: 'REJECTED',
+        },
+      });
+      recordAdminDiagnosticEvent(
+        'warn',
+        'ASSET_PRICE_SELECTION_REJECTED',
+        `No eligible price snapshot was selected for asset ${asset.id}.`,
+        { rejectedReason: providerSelection.decision.rejectedProviderReason },
+      );
       return null;
     }
 
@@ -1526,6 +1618,12 @@ export class AssetsService {
     code: string,
     message: string,
   ): never {
+    recordAdminDiagnosticEvent(
+      status >= HttpStatus.INTERNAL_SERVER_ERROR ? 'error' : 'warn',
+      'MARKET_DATA_ERROR_THROWN',
+      `${code}: ${message}`,
+      { httpStatus: status },
+    );
     throw new HttpException(this.createErrorBody(code, message), status);
   }
 }

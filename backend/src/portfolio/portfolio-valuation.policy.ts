@@ -120,8 +120,14 @@ export class PortfolioValuationError extends Error {
   constructor(
     readonly code: string,
     message: string,
+    readonly diagnosticContext?: {
+      failureStage?: string;
+      entities?: Record<string, unknown>;
+      evidence?: Record<string, unknown>;
+    },
   ) {
     super(message);
+    this.name = 'PortfolioValuationError';
   }
 }
 
@@ -195,6 +201,16 @@ export function calculatePortfolioValuation(
       throw new PortfolioValuationError(
         'ASSET_PRICE_UNAVAILABLE',
         `Asset price snapshot is unavailable for asset ${position.assetId}.`,
+        {
+          failureStage: 'asset_price_selection',
+          entities: { assetId: position.assetId },
+          evidence: {
+            valuationAt: input.valuationAt,
+            selectionResult: 'REJECTED',
+            rejectedReason: 'snapshot_unavailable',
+            normalCriteria: 'An eligible positive price snapshot is required.',
+          },
+        },
       );
     }
 
@@ -349,6 +365,16 @@ function selectUsableUsdKrwRate(
     throw new PortfolioValuationError(
       'FX_RATE_UNAVAILABLE',
       'USD/KRW FX rate snapshot is unavailable.',
+      {
+        failureStage: 'fx_rate_selection',
+        evidence: {
+          pair: 'USD/KRW',
+          valuationAt,
+          selectionResult: 'REJECTED',
+          rejectedReason: 'snapshot_unavailable',
+          normalCriteria: 'An eligible positive USD/KRW snapshot is required.',
+        },
+      },
     );
   }
 
@@ -377,6 +403,28 @@ function selectUsableUsdKrwRate(
       throw new PortfolioValuationError(
         'FX_RATE_STALE',
         'USD/KRW FX rate snapshot is stale.',
+        {
+          failureStage: 'fx_rate_freshness_validation',
+          entities: { snapshotId: snapshot.id },
+          evidence: {
+            pair: 'USD/KRW',
+            sourceType: snapshot.sourceType,
+            sourceName: snapshot.sourceName,
+            effectiveAt: snapshot.effectiveAt,
+            capturedAt: snapshot.capturedAt,
+            valuationAt,
+            freshnessAgeSeconds: Math.max(
+              0,
+              Math.floor(
+                (valuationAt.getTime() - snapshot.effectiveAt.getTime()) / 1000,
+              ),
+            ),
+            allowedFreshnessSeconds:
+              fxExecuteSnapshotFreshnessThresholdMs / 1000,
+            selectionResult: 'REJECTED',
+            rejectedReason: 'effective_at_stale',
+          },
+        },
       );
     }
   } else if (

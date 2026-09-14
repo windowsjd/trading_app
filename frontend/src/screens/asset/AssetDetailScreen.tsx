@@ -54,6 +54,7 @@ import ErrorState from "../../components/states/ErrorState";
 import InlineEmptyState from "../../components/states/InlineEmptyState";
 import SectionSkeleton from "../../components/states/SectionSkeleton";
 import CTAButton from "../../components/common/CTAButton";
+import AdminDiagnosticPanel from "../../components/states/AdminDiagnosticPanel";
 import { CandlestickChart } from "../../components/charts";
 
 type Props = AssetDetailScreenProps;
@@ -152,6 +153,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
         title="종목 정보를 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
         onRetry={() => void detailQuery.refetch()}
+        diagnosticError={detailQuery.error}
       />
     );
   }
@@ -340,6 +342,9 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
           {assetWarningReason ? (
             <View style={styles.inlineWarning}>
               <Text style={styles.inlineWarningText}>{assetWarningReason}</Text>
+              <AdminDiagnosticPanel
+                diagnostic={detailQuery.data.priceErrors?.[0]?.diagnostic}
+              />
             </View>
           ) : null}
 
@@ -387,6 +392,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
               >
                 <Text style={styles.retryText}>포지션 다시 시도</Text>
               </Pressable>
+              <AdminDiagnosticPanel error={positionQuery.error} />
             </>
           ) : positionQuery.isError ? (
             <>
@@ -400,6 +406,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
               >
                 <Text style={styles.retryText}>포지션 다시 시도</Text>
               </Pressable>
+              <AdminDiagnosticPanel error={positionQuery.error} />
             </>
           ) : hasPosition && position ? (
             <>
@@ -467,6 +474,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
                 title={describeCandleError(candlesQuery.error).title}
                 message={describeCandleError(candlesQuery.error).message}
               />
+              <AdminDiagnosticPanel error={candlesQuery.error} />
               <Pressable
                 testID={TEST_IDS.assetDetail.chartRetry}
                 style={styles.retryButton}

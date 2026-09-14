@@ -1,6 +1,7 @@
 import { apiClient } from '../../services/api/client';
 import type {
   ApiSuccessResponse,
+  AdminDiagnosticDto,
   IsoDateTimeString,
   MoneyString,
   OffsetPagination,
@@ -51,6 +52,7 @@ export interface AssetPriceErrorDto {
   assetId: string;
   code?: string;
   message?: string;
+  diagnostic?: AdminDiagnosticDto;
 }
 
 export interface AssetsResponseDto {

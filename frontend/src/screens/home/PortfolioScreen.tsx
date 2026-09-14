@@ -43,6 +43,7 @@ import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
+import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import {
   DonutChart,
   LineChart,
@@ -314,6 +315,7 @@ export default function PortfolioScreen({ navigation }: Props) {
             title="포트폴리오를 불러오지 못했습니다."
             message="잠시 후 다시 시도해주세요."
             onRetry={() => void overviewQuery.refetch()}
+            diagnosticError={overviewQuery.error}
           />
         </View>
       </SafeAreaView>
@@ -372,6 +374,9 @@ export default function PortfolioScreen({ navigation }: Props) {
                   {portfolioNotice.title}
                 </Text>
                 <Text style={styles.helper}>{portfolioNotice.message}</Text>
+                <AdminDiagnosticPanel
+                  diagnostic={overview.sectionErrors[0]?.diagnostic}
+                />
               </View>
             ) : null}
 
@@ -389,6 +394,9 @@ export default function PortfolioScreen({ navigation }: Props) {
                 <Text style={styles.inlineWarningText}>
                   일부 포트폴리오 정보를 불러오지 못했습니다.
                 </Text>
+                <AdminDiagnosticPanel
+                  error={positionsQuery.error ?? equityQuery.error}
+                />
               </View>
             ) : null}
 
@@ -426,6 +434,7 @@ export default function PortfolioScreen({ navigation }: Props) {
                       title="자산 추이를 불러오지 못했습니다."
                       message="잠시 후 다시 시도해주세요."
                     />
+                    <AdminDiagnosticPanel error={equityQuery.error} />
                     <CTAButton
                       label="자산 추이 다시 불러오기"
                       onPress={() => void equityQuery.refetch()}
@@ -477,6 +486,7 @@ export default function PortfolioScreen({ navigation }: Props) {
                 title="보유 포지션을 불러오지 못했습니다."
                 message="잠시 후 다시 시도해주세요."
               />
+              <AdminDiagnosticPanel error={positionsQuery.error} />
               <CTAButton
                 label="포지션 다시 불러오기"
                 onPress={() => void positionsQuery.refetch()}

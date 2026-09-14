@@ -43,6 +43,7 @@ export type AuthUser = {
   id: string;
   email: string;
   nickname: string;
+  role: UserRole;
   status: UserStatus;
 };
 
@@ -73,6 +74,7 @@ export type CurrentUserResponse = {
     email: string;
     nickname: string;
     profileImageUrl: string | null;
+    role: UserRole;
     status: UserStatus;
     createdAt: string;
   };

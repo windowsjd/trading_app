@@ -75,6 +75,7 @@ import { useStaleRecheck } from '../../features/asset/useStaleRecheck';
 import PreviewAmounts from '../../components/tradingAccount/PreviewAmounts';
 import CTAButton from '../../components/common/CTAButton';
 import FxSuccessBottomSheet from './FxSuccessBottomSheet';
+import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 
 type Props = WalletFxScreenProps;
 type Currency = 'KRW' | 'USD';
@@ -173,6 +174,7 @@ export default function WalletFxScreen({ navigation }: Props) {
   const [amount, setAmount] = useState('');
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [domainError, setDomainError] = useState<string | null>(null);
+  const [diagnosticError, setDiagnosticError] = useState<unknown>(null);
   const [fxDomainState, setFxDomainState] = useState<FxDomainState | null>(null);
   const [successData, setSuccessData] = useState<FxExecuteDto | null>(null);
   const [, setPreviewClock] = useState(0);
@@ -240,6 +242,7 @@ export default function WalletFxScreen({ navigation }: Props) {
         setFxDomainState(null);
         setFieldError(null);
         setDomainError(null);
+        setDiagnosticError(null);
       }
       // Invalidate the acting account even after a switch/unmount.
       await Promise.all([
@@ -249,6 +252,7 @@ export default function WalletFxScreen({ navigation }: Props) {
     },
     onError: (error, action) => {
       if (!isCurrent(action.request)) return;
+      setDiagnosticError(error);
       const code = getApiErrorCode(error);
       if (isFxRequoteRequiredCode(code)) {
         actionRef.current = null;
@@ -298,6 +302,7 @@ export default function WalletFxScreen({ navigation }: Props) {
     setAmount('');
     setFieldError(null);
     setDomainError(null);
+    setDiagnosticError(null);
     setFxDomainState(null);
     setSuccessData(null);
     actionRef.current = null;
@@ -316,6 +321,7 @@ export default function WalletFxScreen({ navigation }: Props) {
     actionRef.current = null;
     setFieldError(null);
     setDomainError(null);
+    setDiagnosticError(null);
     setFxDomainState(null);
     setSuccessData(null);
   };
@@ -327,6 +333,7 @@ export default function WalletFxScreen({ navigation }: Props) {
     if (submitLockRef.current || !canExecute) return;
     setFieldError(null);
     setDomainError(null);
+    setDiagnosticError(null);
     setFxDomainState(null);
     actionRef.current ??= {
       request: {
@@ -435,6 +442,7 @@ export default function WalletFxScreen({ navigation }: Props) {
         title="지갑 정보를 사용할 수 없습니다."
         message="지갑 정보가 아직 준비되지 않았습니다."
         onRetry={retryWalletLookup}
+        diagnosticError={walletsQuery.error ?? rateQuery.error}
       />
     );
   }
@@ -445,6 +453,7 @@ export default function WalletFxScreen({ navigation }: Props) {
         title="지갑 정보를 불러오지 못했습니다."
         message="지갑 조회에 실패했습니다."
         onRetry={retryWalletLookup}
+        diagnosticError={walletsQuery.error ?? rateQuery.error}
       />
     );
   }
@@ -504,6 +513,7 @@ export default function WalletFxScreen({ navigation }: Props) {
                 state={rateQuery.isLoading ? 'loading' : 'enabled'}
                 onPress={() => void rateQuery.refetch()}
               />
+              <AdminDiagnosticPanel error={rateQuery.error} />
             </>
           )}
           <CTAButton
@@ -587,6 +597,9 @@ export default function WalletFxScreen({ navigation }: Props) {
             <Text style={styles.errorText}>{inputErrorMessage}</Text>
           ) : null}
           {domainError ? <Text style={styles.errorText}>{domainError}</Text> : null}
+          {domainError ? (
+            <AdminDiagnosticPanel error={diagnosticError} />
+          ) : null}
         </View>
 
         {!inputInvalidReason ? (

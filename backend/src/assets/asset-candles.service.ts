@@ -25,6 +25,10 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CandleServingService } from './candle-serving.service';
 import { CandleResponseBuilder } from './candle-response.builder';
+import {
+  recordAdminDiagnosticEvent,
+  setAdminDiagnosticContext,
+} from '../common/admin-diagnostics';
 
 export type AssetCandlesQuery = {
   range?: string;
@@ -382,6 +386,42 @@ export class AssetCandlesService {
 
     const clock = new Date();
     const parsedQuery = await this.parseQuery(query, asset, clock);
+    setAdminDiagnosticContext({
+      domain: 'CANDLE',
+      operation: 'CANDLE_READ',
+      failureStage: 'candle_serving',
+      entities: {
+        assetId: asset.id,
+        symbol: asset.symbol,
+      },
+      evidence: {
+        assetType: asset.assetType,
+        market: asset.market,
+        requestedRange: parsedQuery.range,
+        requestedInterval: parsedQuery.interval,
+        requestedLimit: parsedQuery.limit,
+        requestedDate: parsedQuery.requestedDate,
+        requestedAt: clock,
+        expectedStoredFeed:
+          parsedQuery.interval === '1m' || parsedQuery.interval === '5m'
+            ? parsedQuery.interval
+            : '5m_aggregated',
+      },
+      nextInvestigation: [
+        'backend/src/assets/candle-serving.service.ts',
+        'backend/src/assets/asset-candles.service.ts',
+      ],
+    });
+    recordAdminDiagnosticEvent(
+      'info',
+      'CANDLE_READ_STARTED',
+      `Candle read started for ${asset.symbol}.`,
+      {
+        range: parsedQuery.range,
+        interval: parsedQuery.interval,
+        limit: parsedQuery.limit,
+      },
+    );
 
     try {
       return await this.serving.serve(asset, parsedQuery, () =>
@@ -396,6 +436,21 @@ export class AssetCandlesService {
         error instanceof ProviderConfigError ||
         error instanceof ProviderHttpError
       ) {
+        setAdminDiagnosticContext({
+          failureStage: 'provider_candle_fetch',
+          evidence: {
+            provider: error.provider,
+            providerErrorCode: error.code,
+            providerErrorType: error.name,
+            fallbackResult: 'UNAVAILABLE',
+          },
+        });
+        recordAdminDiagnosticEvent(
+          'error',
+          'CANDLE_PROVIDER_FAILED',
+          `${error.provider} candle provider request failed.`,
+          { providerErrorCode: error.code },
+        );
         if (error.provider === 'binance') {
           this.throwApiError(
             HttpStatus.BAD_GATEWAY,
@@ -2134,6 +2189,12 @@ export class AssetCandlesService {
     code: string,
     message: string,
   ): never {
+    recordAdminDiagnosticEvent(
+      status >= HttpStatus.INTERNAL_SERVER_ERROR ? 'error' : 'warn',
+      'CANDLE_ERROR_THROWN',
+      `${code}: ${message}`,
+      { httpStatus: status },
+    );
     throw new HttpException(this.createErrorBody(code, message), status);
   }
 }

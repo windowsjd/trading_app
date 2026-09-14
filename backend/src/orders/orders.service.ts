@@ -94,6 +94,15 @@ import {
   type OrderResponsePayload,
 } from './order-response.presenter';
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
+import {
+  recordAdminDiagnosticEvent,
+  setAdminDiagnosticContext,
+} from '../common/admin-diagnostics';
+import {
+  resolveCalendarMarket,
+  resolveStockMarketSessionState,
+} from './market-calendar.policy';
+import { getMarketSessionOverrideRuntimeStatus } from './market-calendar/market-session-override.store';
 
 export type OrdersQuery = {
   seasonId?: string;
@@ -2598,6 +2607,31 @@ export class OrdersService {
           status: QuoteStatus.expired,
         },
       });
+      setAdminDiagnosticContext({
+        failureStage: 'quote_expiry_validation',
+        entities: {
+          tradingAccountId: this.requireOrderTradingScope(order),
+          assetId: order.assetId,
+          orderId: order.id,
+          quoteId: quote.id,
+        },
+        evidence: {
+          quoteStatus: quote.status,
+          quoteExpiresAt: quote.expiresAt,
+          executionTime: executedAt,
+          quotedPrice: quote.quotedPrice?.toFixed(monetaryScale),
+          maxChangeBps: quote.maxChangeBps.toFixed(4),
+          selectionResult: 'REJECTED',
+          rejectedReason: 'execution_after_quote_expiry',
+          normalCriteria: 'executionTime must be on or before quoteExpiresAt.',
+        },
+      });
+      recordAdminDiagnosticEvent(
+        'warn',
+        'ORDER_QUOTE_EXPIRED',
+        `Quote ${quote.id} expired before order execution.`,
+        { quoteExpiresAt: quote.expiresAt, executionTime: executedAt },
+      );
       this.throwApiError(
         HttpStatus.CONFLICT,
         'QUOTE_EXPIRED',
@@ -2716,6 +2750,46 @@ export class OrdersService {
     });
 
     if (selection.state !== 'selected') {
+      const latestCandidate = candidates[0];
+      setAdminDiagnosticContext({
+        failureStage: 'execution_price_selection',
+        entities: {
+          tradingAccountId: this.requireOrderTradingScope(order),
+          assetId: order.assetId,
+          orderId: order.id,
+          quoteId: quote.id,
+          snapshotId: latestCandidate?.id,
+        },
+        evidence: {
+          workflow: 'orders_execute',
+          requestTime: executedAt,
+          providerPriority: providerEligibility.sourceNames,
+          freshnessThresholdSeconds:
+            providerEligibility.freshnessThresholdSeconds,
+          selectionResult: 'REJECTED',
+          selectionDecision: selection.decision,
+          latestRejectedCandidate: latestCandidate
+            ? {
+                id: latestCandidate.id,
+                sourceType: latestCandidate.sourceType,
+                sourceName: latestCandidate.sourceName,
+                effectiveAt: latestCandidate.effectiveAt,
+                capturedAt: latestCandidate.capturedAt,
+                price: latestCandidate.price.toFixed(monetaryScale),
+              }
+            : null,
+        },
+        nextInvestigation: [
+          'backend/src/providers/source-eligibility.policy.ts',
+          'backend/src/orders/orders.service.ts',
+        ],
+      });
+      recordAdminDiagnosticEvent(
+        'warn',
+        'ORDER_EXECUTION_PRICE_REJECTED',
+        `Execution price selection rejected for asset ${order.assetId}.`,
+        { rejectedReason: selection.decision.rejectedProviderReason },
+      );
       if (
         selection.decision.rejectedProviderReason === 'captured_at_stale' ||
         selection.decision.rejectedProviderReason ===
@@ -5939,13 +6013,38 @@ export class OrdersService {
   }
 
   private assertOrderAssetTradable(
-    asset: Pick<OrderAsset, 'assetType' | 'market'>,
+    asset: Pick<OrderAsset, 'assetType' | 'market'> & { id?: string },
     now: Date,
   ) {
     try {
       assertAssetTradable(asset, now);
     } catch (error) {
       if (error instanceof MarketHoursError) {
+        const market = resolveCalendarMarket(asset);
+        const sessionState = resolveStockMarketSessionState(asset, now);
+        setAdminDiagnosticContext({
+          failureStage: 'market_session_validation',
+          entities: { assetId: asset.id },
+          evidence: {
+            market,
+            evaluatedAt: now,
+            marketState: sessionState,
+            calendarOverrideRuntime: getMarketSessionOverrideRuntimeStatus(),
+            selectionResult: 'REJECTED',
+            rejectedReason: error.code,
+            normalCriteria: 'The asset market session must be open.',
+          },
+          nextInvestigation: [
+            'backend/src/orders/market-hours.policy.ts',
+            'backend/src/orders/market-calendar.policy.ts',
+          ],
+        });
+        recordAdminDiagnosticEvent(
+          'warn',
+          'ORDER_MARKET_SESSION_REJECTED',
+          `Order market-session validation failed with ${error.code}.`,
+          { market, evaluatedAt: now },
+        );
         // MARKET_CLOSED (confirmed closure) and MARKET_CALENDAR_UNAVAILABLE
         // (session undecidable, fail-closed) both block with 409 but keep
         // distinct codes; ASSET_NOT_TRADABLE stays a 400 input problem.
@@ -6088,6 +6187,12 @@ export class OrdersService {
     code: string,
     message: string,
   ): never {
+    recordAdminDiagnosticEvent(
+      status >= HttpStatus.INTERNAL_SERVER_ERROR ? 'error' : 'warn',
+      'ORDER_ERROR_THROWN',
+      `${code}: ${message}`,
+      { httpStatus: status },
+    );
     throw new HttpException(this.createErrorBody(code, message), status);
   }
 

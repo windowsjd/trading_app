@@ -1,4 +1,5 @@
 import { ERROR_CODE, type ErrorCode } from '../../models/enums/errorCode.ts';
+import type { AdminDiagnosticDto } from '../../models/dto/common.ts';
 
 type ApiErrorLike = {
   response?: {
@@ -7,6 +8,7 @@ type ApiErrorLike = {
       error?: {
         code?: unknown;
         message?: unknown;
+        diagnostic?: unknown;
       };
     };
   };
@@ -157,6 +159,52 @@ export function getApiErrorServerMessage(error: unknown) {
 
 export function getApiErrorStatus(error: unknown) {
   return getApiErrorInfo(error).status;
+}
+
+export function getApiErrorDiagnostic(
+  error: unknown,
+): AdminDiagnosticDto | null {
+  const errorLike = isRecord(error) ? (error as ApiErrorLike) : undefined;
+  const diagnostic = errorLike?.response?.data?.error?.diagnostic;
+  if (!isRecord(diagnostic)) return null;
+  if (
+    diagnostic.version !== 1 ||
+    typeof diagnostic.code !== 'string' ||
+    typeof diagnostic.httpStatus !== 'number' ||
+    typeof diagnostic.timestamp !== 'string' ||
+    typeof diagnostic.requestId !== 'string' ||
+    typeof diagnostic.domain !== 'string' ||
+    typeof diagnostic.operation !== 'string' ||
+    typeof diagnostic.failureStage !== 'string' ||
+    !isRecord(diagnostic.exception) ||
+    typeof diagnostic.exception.type !== 'string' ||
+    typeof diagnostic.exception.message !== 'string' ||
+    !isStringArray(diagnostic.exception.applicationStack) ||
+    !isStringArray(diagnostic.exception.stack) ||
+    typeof diagnostic.exception.truncated !== 'boolean' ||
+    !isRecord(diagnostic.serverLogs) ||
+    !Array.isArray(diagnostic.serverLogs.events) ||
+    !diagnostic.serverLogs.events.every(isDiagnosticLogEvent) ||
+    typeof diagnostic.serverLogs.truncated !== 'boolean' ||
+    typeof diagnostic.truncated !== 'boolean'
+  ) {
+    return null;
+  }
+  return diagnostic as unknown as AdminDiagnosticDto;
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+function isDiagnosticLogEvent(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.timestamp === 'string' &&
+    typeof value.level === 'string' &&
+    typeof value.event === 'string' &&
+    typeof value.message === 'string'
+  );
 }
 
 export type BlockedReason =

@@ -92,6 +92,7 @@ import ErrorState from '../../components/states/ErrorState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
 import OrderSuccessBottomSheet from './OrderSuccessBottomSheet';
+import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 
 type Props = OrderScreenProps;
 type OrderDomainState = Extract<
@@ -226,6 +227,7 @@ export default function OrderScreen({ route, navigation }: Props) {
   const [limitPrice, setLimitPrice] = useState('');
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [domainError, setDomainError] = useState<string | null>(null);
+  const [diagnosticError, setDiagnosticError] = useState<unknown>(null);
   const [quoteData, setQuoteData] = useState<OrderQuoteDto | null>(null);
   const [executeIdempotencyKey, setExecuteIdempotencyKey] = useState<
     string | null
@@ -311,6 +313,7 @@ export default function OrderScreen({ route, navigation }: Props) {
           setQuantity('');
           setFieldError(null);
           setDomainError(null);
+          setDiagnosticError(null);
         } else {
           setDomainError('주문 결과를 확인할 수 없습니다. 주문 내역을 확인해주세요.');
         }
@@ -321,6 +324,7 @@ export default function OrderScreen({ route, navigation }: Props) {
     },
     onError: (error, action) => {
       if (!isBuyCurrent(action.request)) return;
+      setDiagnosticError(error);
       const code = getApiErrorCode(error);
       if (isOrderRequoteRequiredCode(code) || isOrderIdempotencyConflictCode(code)) {
         buyActionRef.current = null;
@@ -396,6 +400,7 @@ export default function OrderScreen({ route, navigation }: Props) {
       setOrderDomainState(null);
       setFieldError(null);
       setDomainError(null);
+      setDiagnosticError(null);
       setSuccessState(clearOrderSuccess());
     },
     onError: (error, variables) => {
@@ -411,6 +416,7 @@ export default function OrderScreen({ route, navigation }: Props) {
       }
 
       const code = getApiErrorCode(error);
+      setDiagnosticError(error);
 
       setQuoteData(null);
       setExecuteIdempotencyKey(null);
@@ -445,6 +451,7 @@ export default function OrderScreen({ route, navigation }: Props) {
       setOrderDomainState(null);
       setFieldError(null);
       setDomainError(null);
+      setDiagnosticError(null);
 
       // ONLY this account's entries (작업 10 §A-11). Another account's cache is
       // still correct — the order could not have touched it — and market data
@@ -455,6 +462,7 @@ export default function OrderScreen({ route, navigation }: Props) {
     },
     onError: (error) => {
       const code = getApiErrorCode(error);
+      setDiagnosticError(error);
 
       if (isOrderRequoteRequiredCode(code)) {
         setQuoteData(null);
@@ -488,6 +496,7 @@ export default function OrderScreen({ route, navigation }: Props) {
     buyActionRef.current = null;
     setFieldError(null);
     setDomainError(null);
+    setDiagnosticError(null);
     setQuoteData(null);
     setExecuteIdempotencyKey(null);
     setOrderDomainState(null);
@@ -516,6 +525,7 @@ export default function OrderScreen({ route, navigation }: Props) {
     setLimitPrice('');
     setFieldError(null);
     setDomainError(null);
+    setDiagnosticError(null);
     setQuoteData(null);
     setExecuteIdempotencyKey(null);
     setOrderDomainState(null);
@@ -752,6 +762,7 @@ export default function OrderScreen({ route, navigation }: Props) {
 
     setFieldError(null);
     setDomainError(null);
+    setDiagnosticError(null);
     setQuoteData(null);
     setExecuteIdempotencyKey(null);
     setOrderDomainState(null);
@@ -821,6 +832,7 @@ export default function OrderScreen({ route, navigation }: Props) {
 
     setFieldError(null);
     setDomainError(null);
+    setDiagnosticError(null);
     setOrderDomainState(null);
 
     createMutation.mutate({
@@ -843,6 +855,7 @@ export default function OrderScreen({ route, navigation }: Props) {
     if (buySubmitLockRef.current || buyPending || !canBuyExecute) return;
     setFieldError(null);
     setDomainError(null);
+    setDiagnosticError(null);
     buyActionRef.current ??= {
       request: {
         accountId, epoch: buyScopeRef.current.epoch,
@@ -896,6 +909,7 @@ export default function OrderScreen({ route, navigation }: Props) {
         title="주문에 필요한 자산 정보를 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
         onRetry={() => void assetQuery.refetch()}
+        diagnosticError={assetQuery.error}
       />
     );
   }
@@ -1139,6 +1153,9 @@ export default function OrderScreen({ route, navigation }: Props) {
 
           {domainError ? (
             <Text style={styles.errorText}>{domainError}</Text>
+          ) : null}
+          {domainError ? (
+            <AdminDiagnosticPanel error={diagnosticError} />
           ) : null}
 
           {isUsdSettlement &&

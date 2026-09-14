@@ -2,6 +2,7 @@ import { assertDailyEquity } from './dailyEquity.ts';
 import { apiClient } from '../../services/api/client';
 import type {
   ApiSuccessResponse,
+  AdminDiagnosticDto,
   MoneyString,
   OffsetPagination,
   PercentString,
@@ -119,6 +120,7 @@ export interface TradingAccountSectionErrorDto {
   section: string;
   code: string;
   message: string;
+  diagnostic?: AdminDiagnosticDto;
 }
 
 export interface TradingAccountPortfolioDto {

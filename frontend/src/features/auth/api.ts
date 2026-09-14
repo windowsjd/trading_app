@@ -1,11 +1,12 @@
 import { apiClient } from '../../services/api/client';
 import type { ApiSuccessResponse } from '../../models/dto/common';
-import type { UserStatus } from '../../models/dto/user';
+import type { UserRole, UserStatus } from '../../models/dto/user';
 
 export interface AuthUserDto {
   id: string;
   email: string;
   nickname: string;
+  role: UserRole;
   status: UserStatus;
 }
 
