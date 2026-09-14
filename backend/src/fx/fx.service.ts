@@ -936,10 +936,7 @@ export class FxService {
           sourceAmount: this.formatDecimal(request.sourceAmount, 8),
           targetAmount: this.formatDecimal(netTargetAmount, 8),
           quotedRate: this.formatDecimal(appliedRate, 8),
-          quotedFeeRate:
-            mode === TradingAccountMode.general
-              ? this.formatDecimal(feeRate, 6)
-              : null,
+          quotedFeeRate: this.formatDecimal(feeRate, 6),
           fxRateSnapshotId: rateSnapshot.id,
           fxRateSourceJson: rateSource as unknown as Prisma.InputJsonValue,
           maxChangeBps: maxChangeBps.toFixed(4),
@@ -1201,10 +1198,7 @@ export class FxService {
           quote,
           sourceWallet,
           targetWallet,
-          fxFeeRate:
-            context.mode === TradingAccountMode.general
-              ? this.resolveGeneralQuotedFeeRate(quote)
-              : this.formatDecimal(context.feeRate, 6),
+          fxFeeRate: this.resolveQuotedFeeRate(quote, context),
           providerSnapshot,
           executeNow: transactionNow,
         });
@@ -2454,7 +2448,18 @@ export class FxService {
     return this.returnFxExecuteSkeletonResponseOrThrow(response);
   }
 
-  private resolveGeneralQuotedFeeRate(quote: FxExecuteQuoteRecord): string {
+  private resolveQuotedFeeRate(
+    quote: FxExecuteQuoteRecord,
+    context: { mode: TradingAccountMode; feeRate: Prisma.Decimal },
+  ): string {
+    // Only old season quotes lack a pinned fee. Preserve their historical
+    // source without allowing new quotes or invalid pinned rates to fall back.
+    if (
+      quote.quotedFeeRate == null &&
+      context.mode === TradingAccountMode.season
+    ) {
+      return this.formatDecimal(context.feeRate, 6);
+    }
     const feeRate = quote.quotedFeeRate;
     if (
       !feeRate ||
@@ -2463,8 +2468,7 @@ export class FxService {
       feeRate.gt(1) ||
       feeRate.decimalPlaces() > 6
     ) {
-      // Rolling-deploy quotes created before fee pinning must be requoted;
-      // silently reading today's env would violate quote determinism.
+      // General null quotes keep their existing fail-closed requote contract.
       this.throwFxExecuteError(fxExecuteErrorCodes.QUOTE_MISMATCH);
     }
     return this.formatDecimal(feeRate, 6);

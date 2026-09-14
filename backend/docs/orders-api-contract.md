@@ -212,6 +212,24 @@ use the lifecycle locks described below, without a general-account TWR fence.
 - Sell quote validates position quantity read-only.
 - Creates one active `Quote` row with public-safe source metadata and no raw provider payloads or secrets.
 
+### Market fee pinning (both account modes)
+
+Every new market quote, through the account-scoped or legacy season endpoint,
+stores a non-null `Quote.quotedFeeRate`. Season quotes source it from
+`Season.tradeFeeRate`; general quotes source it from `GENERAL_TRADE_FEE_RATE`.
+Changing that source after quote issuance does not change the quote's fee rate.
+Immediate create/execute and existing submitted-market execution use the pin.
+Gross, fee and net amounts are recalculated with the actual execute price and
+quantity using existing decimal rounding; quote-time amounts are estimates.
+
+Only legacy season market quotes whose `quotedFeeRate` is null retain their
+historical season fee fallback. General null quotes and invalid pinned rates
+require requote (`QUOTE_MISMATCH`). Committed create replay preserves the stored
+response and financial effect; legacy submitted-order execute retains its
+`already_executed` response contract with persisted amounts and execution time.
+No replay recalculates fees from current configuration. Limit reservation fee
+pinning, transaction-time gates and idempotency scope/hash remain unchanged.
+
 ### Response
 
 ```json

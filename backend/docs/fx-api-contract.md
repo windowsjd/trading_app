@@ -194,11 +194,17 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
 - Selected provider snapshot older than 300 seconds by `capturedAt`, or selected manual snapshot older than 60 seconds by `effectiveAt`, returns `FX_RATE_STALE` only when no safe fallback is available.
 - Quote metadata stores only public-safe source decision fields; raw provider payloads and secrets are not stored in quote metadata.
 - Execute after durable quote expiry returns `QUOTE_EXPIRED`.
-- A general durable quote records `tradingAccountId`, null participant, and
-  quote-time `GENERAL_FX_FEE_RATE` (default `0.001000`) in `quotedFeeRate`.
-  Execute uses that pinned fee while still repricing the FX rate. Null/invalid
-  general pinned fees return `QUOTE_MISMATCH`; there is no current-env fallback.
-  Season fee behavior remains `Season.fxFeeRate`.
+- Every new FX quote, through either the account-scoped or legacy endpoint,
+  records a non-null `quotedFeeRate`. Its quote-time source is `Season.fxFeeRate`
+  for season accounts and `GENERAL_FX_FEE_RATE` (default `0.001000`) for general
+  accounts. Subsequent source changes cannot change that quote's fee rate.
+- Execute recalculates gross/fee/net target amounts with the execute-time
+  provider rate, source amount and pinned fee rate, using existing rounding.
+  Neither the FX rate nor the quote-time fee amount is pinned.
+- Only legacy season quotes with null `quotedFeeRate` keep their historical
+  season fee fallback. General null quotes and invalid pinned rates return
+  `QUOTE_MISMATCH`; there is no current-env fallback. Committed and concurrent
+  duplicate replay preserve the stored response, amounts and execution time.
 
 ### Quote Balance Error
 

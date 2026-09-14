@@ -578,7 +578,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       });
     });
 
-    it('leaves the reservation basis null on a market quote', async () => {
+    it('pins the season market fee without pinning reservation amounts', async () => {
       const { prisma, service } = createService();
       prisma.season.findFirst.mockResolvedValueOnce(activeSeason);
       prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
@@ -608,13 +608,12 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         currencyCode: CurrencyCode.KRW,
       });
 
-      // Market quotes keep repricing at execute; they must not carry a pinned
-      // reservation basis.
+      // Market quotes pin only the rate; amounts still reprice at execute.
       expect(prisma.quote.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             orderType: OrderType.market,
-            quotedFeeRate: null,
+            quotedFeeRate: '0.001000',
             quotedGrossAmount: null,
             quotedFeeAmount: null,
             quotedReservedAmount: null,

@@ -49,11 +49,15 @@ See `frontend/docs/trading-account-switching.md`.
 - The common calculation core receives `feeRate` from the validated context:
   season uses `Season.tradeFeeRate`; general uses the independent
   `GENERAL_TRADE_FEE_RATE` config (default `0.001000`). General never reads the
-  current season to obtain a fee. A general MARKET durable quote stores that
-  resolved rate in `Quote.quotedFeeRate`; create and immediate execution reuse
-  the stored rate even if another instance now has a different config. Provider
-  price still follows execute-time repricing. A legacy general market quote
-  with null `quotedFeeRate` fails 409 `QUOTE_MISMATCH` and must be requoted.
+  current season to obtain a fee. Every new MARKET durable quote in either mode
+  stores that resolved rate in `Quote.quotedFeeRate`. Both immediate create and
+  existing submitted-market execution use the pin even after the source changes.
+  Provider price still follows execute-time repricing; gross, fee and net amounts
+  are recalculated with that price and the pinned rate using existing rounding.
+  Only legacy season quotes with null `quotedFeeRate` retain the historical
+  season fee fallback. Legacy general null quotes and invalid pinned rates fail
+  409 `QUOTE_MISMATCH` and require requote. Committed replay preserves stored
+  amounts, timestamps and response without applying the current fee source.
 - Order, position, and quote ownership is the required `tradingAccountId`.
   Reads reject cross-account Order→Quote links with 500
   `TRADING_ACCOUNT_SCOPE_MISMATCH`; no participant-derived ownership lookup or
@@ -164,7 +168,7 @@ user may reuse one key on DIFFERENT accounts.
 
 Quote rows persist only the verified `tradingAccountId` as ownership. Create
 and execute reject a different account (409 `QUOTE_MISMATCH`); no null-account
-or participant fallback is accepted. General MARKET quotes additionally pin
+or participant fallback is accepted. All new MARKET quotes pin
 `quotedFeeRate`; only price is re-resolved at execution. Durable request hashes
 use account identity for general mode. The released season v1 quote hash keeps
 its exact participant byte format so pre-migration open limit orders remain

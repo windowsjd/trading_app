@@ -168,7 +168,8 @@ Common gating, in order:
    `TRADING_ACCOUNT_NOT_ACTIVE` for new quote/execute requests.
 3. Mode-specific context:
    - season keeps every existing season status/window, participant
-     status/excluded, `Season.fxFeeRate`, and financial-scope gate;
+     status/excluded and financial-scope gates; the quote fee source remains
+     `Season.fxFeeRate`;
    - general requires the participant-free general foundation, KRW/USD
      wallets, ledger/snapshot continuity, and never looks up a current season.
 4. Common durable-quote, provider freshness/repricing, available-balance,
@@ -185,15 +186,18 @@ closed with the existing integrity codes. Every balance UPDATE includes wallet
 id, account, currency, and amount guard; participant scope is not stored or
 used as a fallback.
 
-General durable quotes store `tradingAccountId=<general account>` and the
-quote-time `GENERAL_FX_FEE_RATE` in `quotedFeeRate`. The default is `0.001000`;
-configuration is validated at
-startup and is independent of both `Season.fxFeeRate` and
-`GENERAL_TRADE_FEE_RATE`. Execute uses only the pinned fee. A legacy/null or
-invalid general pinned fee returns 409 `QUOTE_MISMATCH` for requote instead of
-silently applying the current environment value. The provider rate is still
-freshly resolved at execute and protected by the existing 30bps maximum
-change.
+All new FX durable quotes store the canonical `tradingAccountId` and a non-null
+`quotedFeeRate`. Season quotes pin `Season.fxFeeRate`; general quotes pin
+`GENERAL_FX_FEE_RATE` (default `0.001000`, validated at startup and independent
+of `Season.fxFeeRate` and `GENERAL_TRADE_FEE_RATE`). Account-scoped and legacy
+endpoints share the quote/execute core. Source changes after quote do not change
+the pinned rate. Only legacy season null quotes use their historical season
+fee fallback; general null quotes and invalid pins return 409 `QUOTE_MISMATCH`.
+
+The provider rate is still freshly resolved at execute and protected by the
+existing 30bps maximum change. Gross/fee/net target amounts are recalculated
+from that rate, source amount and the quote's fee rate with unchanged rounding.
+Committed and concurrent replay preserve the stored result and execution time.
 
 ## Idempotency (작업 5 보완: account-scoped for every new request)
 

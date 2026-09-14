@@ -193,6 +193,7 @@ jobs:
           src/orders/limit-order-create-race.integration.spec.ts
           src/orders/limit-order-transaction-time.integration.spec.ts
           src/orders/trading-transaction-time.integration.spec.ts
+          src/orders/trading-fee-pinning.integration.spec.ts
           src/orders/limit-order-create-no-redis.integration.spec.ts
           src/orders/limit-order-idempotent-replay.integration.spec.ts
           src/orders/limit-order-matching.integration.spec.ts
