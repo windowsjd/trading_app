@@ -167,8 +167,9 @@ function waitForAnyBlockedCashWalletUpdate(observer) {
   return waitForBlockedSql(observer, 'cash_wallets');
 }
 
-function waitForAnyBlockedParticipantUpdate(observer) {
-  return waitForBlockedSql(observer, 'season_participants');
+function waitForAnyBlockedAccountUpdate(observer) {
+  // Exclusion writes Account before Participant; authorization now fences it there.
+  return waitForBlockedSql(observer, 'trading_accounts');
 }
 
 async function runCase(name, fn) {
@@ -576,7 +577,7 @@ async function testConcurrentCreateVsExclusion() {
     );
     await waitForAnyBlockedCashWalletUpdate(observer);
     const exclusionPromise = excludeParticipant(scenario);
-    await waitForAnyBlockedParticipantUpdate(observer);
+    await waitForAnyBlockedAccountUpdate(observer);
 
     await walletBlocker.query('COMMIT');
     const created = await createPromise;

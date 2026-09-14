@@ -14,6 +14,7 @@ import {
   formatDecimalScale,
   monetaryScale,
 } from '../fx/fx-decimal-policy';
+import { lockSeasonTradingContext } from '../seasons/season-trading-lock';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertCashWalletTradingAccountScope } from '../wallets/cash-wallet-scope';
 import {
@@ -367,112 +368,23 @@ export class LimitOrderCreateService {
     `;
   }
 
-  /**
-   * Re-reads and locks the season/participant state that authorizes a limit
-   * create, INSIDE the create transaction. The identical checks run before
-   * the transaction too, but only as a fast-fail courtesy: financial
-   * correctness rests here, on these locked rows.
-   *
-   * Lock order is Quote → SeasonParticipant → Season → CashWallet, and every
-   * concurrent writer is compatible with it:
-   *   - participant exclusion (operator-season-moderation) takes
-   *     SeasonParticipant → Order → CashWallet, so it can never hold the
-   *     wallet while waiting for the participant;
-   *   - settlement takes SeasonParticipant → … → Season, which is why the
-   *     participant is locked BEFORE the season here (the reverse order would
-   *     deadlock against a settling season);
-   *   - season lifecycle ending updates Season alone in its transaction and
-   *     cleans up orders afterwards in separate ones;
-   *   - user cancel and both cleanup paths take Order → CashWallet and never
-   *     touch Season/SeasonParticipant locks.
-   *
-   * Both rows are taken FOR SHARE, not FOR UPDATE: concurrent creates do not
-   * serialize against each other, while a plain UPDATE of either row (the
-   * exclusion write and the season-ending write both acquire FOR NO KEY
-   * UPDATE) still conflicts and must wait. Create never upgrades either lock,
-   * so no lock-upgrade deadlock is introduced. Rows are locked BY ID so the
-   * post-wait re-read always returns the newest committed version and the
-   * status check happens in application code with a precise error.
-   */
+  /** Shared lifecycle authorization; see season-trading-lock for writer order. */
   async lockTradableContextInTransaction(
     tx: LimitCreateTransactionClient,
-    input: {
-      userId: string;
-      seasonParticipantId: string;
-      /** Compatibility for direct callers; OrdersService deliberately omits
-       * this and validates with a post-lock clock_timestamp(). */
-      now?: Date;
-    },
-  ): Promise<{
-    seasonId: string;
-    participantStatus: ParticipantStatus;
-    seasonStatus: SeasonStatus;
-    seasonStartAt: Date;
-    seasonEndAt: Date;
-    /** Trading-account link read from the LOCKED participant row. */
-    tradingAccountId: string | null;
-  }> {
-    const participantRows = await tx.$queryRaw<
-      Array<{
-        id: string;
-        season_id: string;
-        user_id: string;
-        participant_status: ParticipantStatus;
-        trading_account_id: string | null;
-      }>
-    >`
-      SELECT "id", "season_id", "user_id", "participant_status",
-             "trading_account_id"
-      FROM "season_participants"
-      WHERE "id" = ${input.seasonParticipantId}
-      FOR SHARE
-    `;
-
-    const participant = participantRows[0];
-    if (!participant || participant.user_id !== input.userId) {
-      this.throwApiError(
-        HttpStatus.NOT_FOUND,
-        'PARTICIPANT_NOT_FOUND',
-        'Season participant was not found.',
-      );
-    }
-
-    // seasonId comes from the LOCKED participant row, not from the caller's
-    // pre-transaction read, so the participant-to-season link is verified
-    // against committed state as well.
-    // trade_fee_rate is deliberately NOT selected: the reservation basis comes
-    // from the quote, and not having the live rate in scope makes it
-    // impossible to reintroduce a re-price at create time by accident.
-    const seasonRows = await tx.$queryRaw<
-      Array<{
-        id: string;
-        status: SeasonStatus;
-        start_at: Date;
-        end_at: Date;
-      }>
-    >`
-      SELECT "id", "status", "start_at", "end_at"
-      FROM "seasons"
-      WHERE "id" = ${participant.season_id}
-      FOR SHARE
-    `;
-
-    const season = seasonRows[0];
-    if (!season) {
-      this.throwApiError(
-        HttpStatus.CONFLICT,
-        'SEASON_NOT_ACTIVE',
-        'Season is not active.',
-      );
-    }
-
+    input: { userId: string; seasonParticipantId: string; now?: Date },
+  ) {
+    const { season, participant, account } = await lockSeasonTradingContext(
+      tx,
+      { ...input, participantWrite: false },
+    );
     const context = {
       seasonId: season.id,
-      participantStatus: participant.participant_status,
+      participantStatus: participant.participantStatus,
       seasonStatus: season.status,
-      seasonStartAt: season.start_at,
-      seasonEndAt: season.end_at,
-      tradingAccountId: participant.trading_account_id,
+      seasonStartAt: season.startAt,
+      seasonEndAt: season.endAt,
+      tradingAccountId: account.id,
+      accountStatus: account.status,
     };
     if (input.now) this.assertLockedTradableContext(context, input.now);
     return context;
@@ -484,6 +396,7 @@ export class LimitOrderCreateService {
       seasonStatus: SeasonStatus;
       seasonStartAt: Date;
       seasonEndAt: Date;
+      accountStatus?: string;
     },
     transactionNow: Date,
   ): void {
@@ -506,6 +419,16 @@ export class LimitOrderCreateService {
         HttpStatus.CONFLICT,
         'SEASON_NOT_ACTIVE',
         'Season is not active.',
+      );
+    }
+    if (
+      context.accountStatus !== undefined &&
+      context.accountStatus !== 'active'
+    ) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'TRADING_ACCOUNT_NOT_ACTIVE',
+        'Trading account is not active',
       );
     }
     if (transactionNow < context.seasonStartAt) {

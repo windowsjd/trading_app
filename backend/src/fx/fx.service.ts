@@ -21,6 +21,7 @@ import {
   WalletTransactionType,
 } from '../generated/prisma/client';
 import { buildPagination, type Pagination } from '../common/pagination';
+import { lockSeasonTradingContext } from '../seasons/season-trading-lock';
 import { PrismaService } from '../prisma/prisma.service';
 import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
 import type { OwnedTradingAccount } from '../trading-accounts/trading-account-access.service';
@@ -993,8 +994,6 @@ export class FxService {
       }
 
       const season = await this.findCurrentSeason();
-      const executeNow = new Date();
-      this.assertSeasonExchangeableForExecute(season, executeNow);
 
       const participant = await this.prisma.seasonParticipant.findUnique({
         where: {
@@ -1011,16 +1010,14 @@ export class FxService {
       });
 
       if (!participant) {
+        this.assertSeasonExchangeableForExecute(season, new Date());
         this.throwFxExecuteError(fxExecuteErrorCodes.SEASON_NOT_JOINED);
       }
-      this.assertParticipantExchangeableForExecute(participant);
-
       return await this.executeFxForContext({
         userId,
         body,
         season,
-        executeNow,
-        participantId: participant.id,
+        participant,
         // Dual-write guard: a missing account link must never spread onto
         // new financial rows (fail-closed inside executeFxForContext).
         tradingAccountId: participant.tradingAccountId,
@@ -1035,23 +1032,33 @@ export class FxService {
   }
 
   /**
-   * General execution keeps the season engine's quote, repricing, wallet,
-   * ledger and response machinery. Its only distinct concern is the
-   * account-level authorization/TWR fence: lock the account first, then use a
-   * PostgreSQL wall clock and revalidate every row inside that transaction.
+   * Both modes share post-lock time, quote/repricing, wallet and ledger work.
+   * Only authorization differs: season lifecycle locks or the general TWR
+   * account fence. Provider refresh always precedes the transaction.
    */
-  private async executeGeneralFxForContext(input: {
+  private async executeFxTradingContext(input: {
     userId: string;
     body: FxExecuteRequestBody;
-    context: GeneralFxTradingContext;
+    context:
+      | GeneralFxTradingContext
+      | (Omit<SeasonFxTradingContext, 'account'> & { account: { id: string } });
   }): Promise<FxExecuteSkeletonResponse> {
     const { userId, body, context } = input;
-    const preflightResult = preflightFxExecuteRequest(body, {
-      mode: 'general',
-      userId,
-      tradingAccountId: context.account.id,
-      seasonParticipantId: null,
-    });
+    const preflightResult = preflightFxExecuteRequest(
+      body,
+      context.mode === TradingAccountMode.general
+        ? {
+            mode: 'general',
+            userId,
+            tradingAccountId: context.account.id,
+            seasonParticipantId: null,
+          }
+        : {
+            userId,
+            tradingAccountId: context.account.id,
+            seasonParticipantId: context.participant.id,
+          },
+    );
     if (!preflightResult.ok) {
       this.throwFxExecuteError(preflightResult.errorCode);
     }
@@ -1072,10 +1079,16 @@ export class FxService {
       });
     }
 
-    this.assertTradingAccountExchangeable(context.account);
-    await this.requireGeneralPerformanceService().assertGeneralAccountReady(
-      context.account,
-    );
+    if (context.mode === TradingAccountMode.general) {
+      this.assertTradingAccountExchangeable(context.account);
+      await this.requireGeneralPerformanceService().assertGeneralAccountReady(
+        context.account,
+      );
+    }
+    if (context.mode === TradingAccountMode.season) {
+      this.assertSeasonExchangeableForExecute(context.season, new Date());
+      this.assertParticipantExchangeableForExecute(context.participant);
+    }
 
     // Provider ingestion/network work stays outside the financial transaction.
     // The selected row is re-read for freshness after the account lock.
@@ -1095,14 +1108,10 @@ export class FxService {
     }
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
-        const lockedAccount = await this.lockGeneralFxAccountInTransaction(
-          tx,
-          userId,
-          context.account.id,
-        );
-        const executeNow = await this.readTransactionWallClock(tx);
-
+      let didExecute = false;
+      const response = await this.prisma.$transaction(async (tx) => {
+        const quoteId = this.parseQuoteId(body.quoteId);
+        await tx.$queryRaw`SELECT "id" FROM "quotes" WHERE "id" = ${quoteId} FOR UPDATE`;
         const racedCommand = await this.findFxExecuteCommandForIdempotency(
           {
             tradingAccountId: context.account.id,
@@ -1116,19 +1125,51 @@ export class FxService {
             normalizedRequest,
             command: racedCommand,
             feeRate: context.feeRate,
-            executeNow,
+            executeNow: new Date(),
           }) as FxExecuteSuccessResponse;
         }
 
-        const quoteId = this.parseQuoteId(body.quoteId);
+        const lockedSeason =
+          context.mode === TradingAccountMode.season
+            ? await lockSeasonTradingContext(tx, {
+                userId,
+                seasonParticipantId: context.participant.id,
+              })
+            : null;
+        const lockedAccount =
+          context.mode === TradingAccountMode.general
+            ? await this.lockGeneralFxAccountInTransaction(
+                tx,
+                userId,
+                context.account.id,
+              )
+            : undefined;
+        const transactionNow = await this.readTransactionWallClock(tx);
+        if (lockedSeason) {
+          if (lockedSeason.account.id !== context.account.id) {
+            this.throwApiError(
+              HttpStatus.INTERNAL_SERVER_ERROR,
+              'TRADING_ACCOUNT_SCOPE_MISMATCH',
+              'Participant account changed during FX execution.',
+            );
+          }
+          this.assertParticipantExchangeableForExecute(
+            lockedSeason.participant,
+          );
+          this.assertTradingAccountExchangeable(lockedSeason.account);
+          this.assertSeasonExchangeableForExecute(
+            lockedSeason.season,
+            transactionNow,
+          );
+        }
         const quote = await this.findActiveFxQuoteOrThrow(
           {
-            mode: TradingAccountMode.general,
+            mode: context.mode,
             quoteId,
             userId,
             tradingAccountId: context.account.id,
             normalizedRequest,
-            executeNow,
+            executeNow: transactionNow,
           },
           tx,
         );
@@ -1144,7 +1185,7 @@ export class FxService {
               normalizedRequest.toCurrency,
               tx,
             ),
-            this.findProviderFxExecuteSnapshot(executeNow, tx, false),
+            this.findProviderFxExecuteSnapshot(transactionNow, tx, false),
           ]);
 
         for (const wallet of [sourceWallet, targetWallet]) {
@@ -1160,22 +1201,48 @@ export class FxService {
           quote,
           sourceWallet,
           targetWallet,
-          fxFeeRate: this.resolveGeneralQuotedFeeRate(quote),
+          fxFeeRate:
+            context.mode === TradingAccountMode.general
+              ? this.resolveGeneralQuotedFeeRate(quote)
+              : this.formatDecimal(context.feeRate, 6),
           providerSnapshot,
-          executeNow,
+          executeNow: transactionNow,
         });
 
-        return this.executeFxWritePathInTransaction(tx, {
+        const result = await this.executeFxWritePathInTransaction(tx, {
           normalizedRequest,
           plan,
-          executeNow,
+          executeNow: transactionNow,
           tradingAccountId: context.account.id,
-          mode: TradingAccountMode.general,
+          mode: context.mode,
           generalAccount: lockedAccount,
         });
+        didExecute = true;
+        return result;
       });
+      if (didExecute && context.season && context.participant) {
+        this.refreshRankingAfterParticipantChange(
+          context.season.id,
+          context.participant.id,
+        );
+      }
+      return response;
     } catch (error) {
       if (error instanceof HttpException) throw error;
+      if (this.isUniqueConstraintError(error)) {
+        const command = await this.findFxExecuteCommandForIdempotency({
+          tradingAccountId: context.account.id,
+          idempotencyKey: normalizedRequest.idempotencyKey,
+        });
+        if (command)
+          return this.returnExistingFxCommandOrThrow({
+            body,
+            normalizedRequest,
+            command,
+            feeRate: context.feeRate,
+            executeNow: new Date(),
+          });
+      }
       this.throwFxExecuteError(fxExecuteErrorCodes.EXECUTE_TRANSACTION_FAILED);
     }
   }
@@ -1210,26 +1277,7 @@ export class FxService {
         userId,
         tradingAccountId,
       );
-      if (context.mode === TradingAccountMode.general) {
-        return await this.executeGeneralFxForContext({
-          userId,
-          body,
-          context,
-        });
-      }
-      this.assertTradingAccountExchangeable(context.account);
-      const executeNow = new Date();
-      this.assertSeasonExchangeableForExecute(context.season, executeNow);
-      this.assertParticipantExchangeableForExecute(context.participant);
-
-      return await this.executeFxForContext({
-        userId,
-        body,
-        season: context.season,
-        executeNow,
-        participantId: context.participant.id,
-        tradingAccountId: context.account.id,
-      });
+      return await this.executeFxTradingContext({ userId, body, context });
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -1243,12 +1291,9 @@ export class FxService {
     userId: string;
     body: FxExecuteRequestBody;
     season: ActiveSeasonRecord;
-    executeNow: Date;
-    participantId: string;
+    participant: Pick<FxParticipantRecord, 'id' | 'participantStatus'>;
     tradingAccountId: string | null;
   }): Promise<FxExecuteSkeletonResponse> {
-    const { userId, body, season, executeNow, participantId } = input;
-
     if (!input.tradingAccountId) {
       this.throwApiError(
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -1256,99 +1301,20 @@ export class FxService {
         'Participant has no trading account link; run trading-accounts:repair-links.',
       );
     }
-    const tradingAccountId = input.tradingAccountId;
-
-    const preflightResult = preflightFxExecuteRequest(body, {
-      userId,
-      seasonParticipantId: participantId,
-      tradingAccountId,
-    });
-
-    if (!preflightResult.ok) {
-      this.throwFxExecuteError(preflightResult.errorCode);
-    }
-
-    const normalizedRequest = preflightResult.value;
-    // Idempotency is ACCOUNT-scoped for every new request (legacy and
-    // account endpoints both resolve a verified account first). The canonical
-    // migration backfills historical rows before enforcing NOT NULL, so the
-    // account key covers both historical and newly-created commands.
-    const existingCommand = await this.findFxExecuteCommandForIdempotency({
-      tradingAccountId,
-      idempotencyKey: normalizedRequest.idempotencyKey,
-    });
-
-    if (existingCommand) {
-      const response = mapFxExecuteOrchestrationDecisionToSkeletonResponse(
-        orchestrateFxExecutePreMutation({
-          body,
-          context: {
-            userId,
-            seasonParticipantId: participantId,
-            tradingAccountId,
-          },
-          existingCommand,
-          sourceWallet: null,
-          targetWallet: null,
-          snapshots: [],
-          fxFeeRate: this.formatDecimal(season.fxFeeRate, 6),
-          executeNow,
-        }),
-      );
-
-      return this.returnFxExecuteSkeletonResponseOrThrow(response);
-    }
-
-    const quoteId = this.parseQuoteId(body.quoteId);
-    const quote = await this.findActiveFxQuoteOrThrow({
-      mode: TradingAccountMode.season,
-      quoteId,
-      userId,
-      tradingAccountId,
-      normalizedRequest,
-      executeNow,
-    });
-
-    const [sourceWallet, targetWallet, providerSnapshot] = await Promise.all([
-      this.findFxExecuteWalletCandidate(
-        tradingAccountId,
-        normalizedRequest.fromCurrency,
-      ),
-      this.findFxExecuteWalletCandidate(
-        tradingAccountId,
-        normalizedRequest.toCurrency,
-      ),
-      this.findProviderFxExecuteSnapshot(executeNow),
-    ]);
-
-    // Both wallets must belong to the same verified trading account. A
-    // mismatch fails closed before any balance math; requests never repair
-    // ownership.
-    for (const wallet of [sourceWallet, targetWallet]) {
-      if (wallet) {
-        assertCashWalletTradingAccountScope(wallet, {
-          tradingAccountId,
-        });
-      }
-    }
-
-    const plan = this.buildProviderFxExecutePlan({
-      normalizedRequest,
-      quote,
-      sourceWallet,
-      targetWallet,
-      fxFeeRate: this.formatDecimal(season.fxFeeRate, 6),
-      providerSnapshot,
-      executeNow,
-    });
-
-    return await this.executeFxWritePath({
-      body,
-      normalizedRequest,
-      plan,
-      executeNow,
-      seasonId: season.id,
-      tradingAccountId,
+    return this.executeFxTradingContext({
+      userId: input.userId,
+      body: input.body,
+      context: {
+        mode: TradingAccountMode.season,
+        account: { id: input.tradingAccountId },
+        season: input.season,
+        participant: {
+          id: input.participant.id,
+          tradingAccountId: input.tradingAccountId,
+          participantStatus: input.participant.participantStatus,
+        },
+        feeRate: input.season.fxFeeRate,
+      },
     });
   }
 
@@ -2342,7 +2308,7 @@ export class FxService {
   }
 
   private assertSeasonExchangeableForExecute(
-    season: ActiveSeasonRecord,
+    season: Pick<ActiveSeasonRecord, 'status' | 'startAt' | 'endAt'>,
     now: Date,
   ) {
     try {
@@ -2705,70 +2671,6 @@ export class FxService {
         createdAt: true,
       },
     });
-  }
-
-  private async executeFxWritePath(input: {
-    body: FxExecuteRequestBody;
-    normalizedRequest: NormalizedFxExecuteRequest;
-    plan: ProviderFxExecutePlan;
-    executeNow: Date;
-    seasonId: string;
-    tradingAccountId: string;
-  }): Promise<FxExecuteSuccessResponse> {
-    try {
-      const response = await this.prisma.$transaction(async (tx) => {
-        return this.executeFxWritePathInTransaction(tx, {
-          ...input,
-          mode: TradingAccountMode.season,
-        });
-      });
-
-      this.refreshRankingAfterParticipantChange(
-        input.seasonId,
-        input.normalizedRequest.seasonParticipantId!,
-      );
-
-      return response;
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-
-      if (this.isUniqueConstraintError(error)) {
-        // Post-conflict requery uses the same canonical account scope as the
-        // original lookup; never a bare per-user or participant query.
-        const existingCommand = await this.findFxExecuteCommandForIdempotency({
-          tradingAccountId: input.tradingAccountId,
-          idempotencyKey: input.normalizedRequest.idempotencyKey,
-        });
-
-        if (existingCommand) {
-          const response = mapFxExecuteOrchestrationDecisionToSkeletonResponse(
-            orchestrateFxExecutePreMutation({
-              body: input.body,
-              context: {
-                userId: input.normalizedRequest.userId,
-                seasonParticipantId:
-                  input.normalizedRequest.seasonParticipantId!,
-                tradingAccountId: input.normalizedRequest.tradingAccountId,
-              },
-              existingCommand,
-              sourceWallet: null,
-              targetWallet: null,
-              snapshots: [],
-              fxFeeRate: input.plan.feeRate,
-              executeNow: input.executeNow,
-            }),
-          );
-
-          return this.returnFxExecuteSkeletonResponseOrThrow(
-            response,
-          ) as FxExecuteSuccessResponse;
-        }
-      }
-
-      this.throwFxExecuteError(fxExecuteErrorCodes.EXECUTE_TRANSACTION_FAILED);
-    }
   }
 
   private async executeFxWritePathInTransaction(

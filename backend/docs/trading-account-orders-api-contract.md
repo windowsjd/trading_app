@@ -202,8 +202,21 @@ settles it atomically before writing the ledger, position, and
 General market execution and limit fill take an exclusive per-account row
 fence before financial writes. This serializes KRW/USD trades with each other
 and with ad-reward external-funding boundaries; the post-lock database wall
-clock becomes the execution/ledger/TWR snapshot time. Season lock order and
-ranking refresh behavior remain unchanged.
+clock becomes the execution/ledger/TWR snapshot time. Season execution uses
+Season SHARE → Account SHARE → Participant NO KEY UPDATE → Order, matching the
+current lifecycle writers and avoiding participant lock upgrades. Season limit
+registration needs only Participant SHARE. Ranking calculations/refresh remain
+unchanged.
+
+Both modes use post-lock PostgreSQL `clock_timestamp()` (`transactionNow`) for
+final quote/freshness/market checks and execution/ledger/equity timestamps.
+Season status, start/end and participant gates are additional authorization.
+Matcher `cycleNow` is only a scan/scheduling clock. Path A revalidates its exact
+snapshot at transaction time and skips stale/future or closed-session evidence;
+Path B retains historical closed-candle touch evidence without current price
+freshness. Both paths require current execution authorization and fresh USD FX.
+Committed replay keeps stored results and timestamps. See the financial-time
+section of `orders-api-contract.md` for the full common policy.
 
 ## Error codes (new in this surface)
 

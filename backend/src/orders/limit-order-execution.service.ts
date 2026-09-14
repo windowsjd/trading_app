@@ -5,6 +5,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import {
+  AssetType,
   CurrencyCode,
   FxRateSourceType,
   OrderSide,
@@ -19,6 +20,7 @@ import {
   WalletTransactionReferenceType,
   WalletTransactionType,
 } from '../generated/prisma/client';
+import { lockSeasonTradingContext } from '../seasons/season-trading-lock';
 import { PrismaService } from '../prisma/prisma.service';
 import { GeneralAccountPerformanceService } from '../portfolio/general-account-performance.service';
 import {
@@ -30,6 +32,9 @@ import { settleLimitBuyReservedCash } from '../wallets/cash-wallet-atomic';
 import { diagnoseCashWalletMutationFailure } from '../wallets/cash-wallet-failure-diagnosis';
 import { assertCashWalletTradingAccountScope } from '../wallets/cash-wallet-scope';
 import {
+  isPositiveDecimal,
+  resolveAssetProviderEligibility,
+  selectMarketAwareAssetPriceSnapshotBySourcePriority,
   resolveFxProviderEligibility,
   selectFreshProviderSnapshotBySourcePriority,
 } from '../providers/source-eligibility.policy';
@@ -51,6 +56,9 @@ import {
 } from './limit-order-candle-evidence.service';
 import { OrdersService } from './orders.service';
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
+
+import { resolveRegularSessionForEvent } from './market-calendar.policy';
+import { getAssetTradingStatus } from './market-hours.policy';
 
 const ZERO_MONEY = '0.00000000';
 
@@ -106,7 +114,17 @@ const EXEC_ORDER_SELECT = {
   reservedAmount: true,
   reservedQuantity: true,
   reservationFeeRate: true,
-  asset: { select: { id: true, isActive: true } },
+  submittedAt: true,
+  asset: {
+    select: {
+      id: true,
+      isActive: true,
+      assetType: true,
+      market: true,
+      currencyCode: true,
+      priceCurrency: true,
+    },
+  },
   quote: {
     select: {
       id: true,
@@ -135,9 +153,9 @@ const EXEC_ORDER_SELECT = {
 
 /**
  * Executes ONE limit-order fill in its own transaction. Season fills lock the
- * Order first. General fills take the account's exclusive performance fence,
- * then Order → CashWallet/Position → WalletTransaction. Cancel does not take
- * the account fence and still races on the Order row, so exactly one wins.
+ * lifecycle authorization before Order. General fills take the account's
+ * exclusive performance fence, then Order → CashWallet/Position → ledger.
+ * Cancel does not take the account fence and still races on the Order row, so exactly one wins.
  * Every authorization fact is re-verified against locked rows; matcher
  * pre-checks only avoid transactions that would no-op.
  */
@@ -153,16 +171,19 @@ export class LimitOrderExecutionService {
 
   async fillLimitOrder(input: {
     orderId: string;
-    now: Date;
+    /** Legacy caller cycle time; never used for execution. */
+    now?: Date;
     plan: LimitFillPlan;
   }): Promise<LimitFillOutcome> {
-    const { orderId, now, plan } = input;
+    const { orderId, plan } = input;
     return this.prisma.$transaction(async (tx) => {
       const prelock = await tx.order.findUnique({
         where: { id: orderId },
         select: {
           tradingAccountId: true,
-          tradingAccount: { select: { mode: true } },
+          tradingAccount: {
+            select: { mode: true, seasonParticipant: { select: { id: true } } },
+          },
         },
       });
       if (
@@ -175,7 +196,23 @@ export class LimitOrderExecutionService {
           FOR UPDATE
         `;
       }
-      // 1) Lock the order row first (Order → CashWallet → Position order).
+      if (prelock?.tradingAccount?.mode === TradingAccountMode.season) {
+        const participantId = prelock.tradingAccount.seasonParticipant?.id;
+        if (!participantId)
+          this.throwTradingScopeError(
+            'TRADING_ACCOUNT_SCOPE_MISMATCH',
+            'Season order has no participant.',
+          );
+        const context = await lockSeasonTradingContext(tx, {
+          seasonParticipantId: participantId,
+        });
+        if (context.account.id !== prelock.tradingAccountId)
+          this.throwTradingScopeError(
+            'TRADING_ACCOUNT_SCOPE_MISMATCH',
+            'Order participant scope changed.',
+          );
+      }
+      // 1) Authorization → Order → CashWallet/Position. Cancel locks only Order.
       const locked = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT "id" FROM "orders" WHERE "id" = ${orderId} FOR UPDATE
       `;
@@ -214,6 +251,8 @@ export class LimitOrderExecutionService {
         );
       }
 
+      const transactionNow = await this.readTransactionWallClock(tx);
+
       // 3) Re-validate season / participant / asset (§17: no fill at/after endAt).
       const account = order.tradingAccount;
       if (!order.tradingAccountId || !account) {
@@ -233,8 +272,8 @@ export class LimitOrderExecutionService {
         }
         if (
           season.status !== SeasonStatus.active ||
-          now < season.startAt ||
-          now >= season.endAt
+          transactionNow < season.startAt ||
+          transactionNow >= season.endAt
         ) {
           return { state: 'skipped', orderId, reason: 'season_not_active' };
         }
@@ -290,10 +329,6 @@ export class LimitOrderExecutionService {
         }
         await this.generalPerformance.assertGeneralAccountReady(account, tx);
       }
-      const effectiveNow =
-        account.mode === TradingAccountMode.general
-          ? await this.readTransactionWallClock(tx)
-          : now;
       if (
         order.quote &&
         order.quote.tradingAccountId !== order.tradingAccountId
@@ -304,6 +339,77 @@ export class LimitOrderExecutionService {
         );
       }
       const tradingAccountId = order.tradingAccountId;
+
+      // Path A is an execution-time price; the cycle's exact evidence must
+      // still be fresh and in the current stock session. Never refresh over
+      // the network or silently substitute a different price in this fill.
+      if (plan.path === 'snapshot') {
+        const market = getAssetTradingStatus(order.asset, transactionNow);
+        if (!market.tradable)
+          return { state: 'skipped', orderId, reason: 'market_not_open' };
+        const eligibility = resolveAssetProviderEligibility({
+          workflow: 'orders_execute',
+          asset: order.asset,
+        });
+        const evidence = await tx.assetPriceSnapshot.findUnique({
+          where: { id: plan.assetPriceSnapshotId },
+        });
+        if (
+          !eligibility.eligible ||
+          !evidence ||
+          evidence.assetId !== order.assetId ||
+          evidence.currencyCode !==
+            (order.asset.priceCurrency ?? order.asset.currencyCode) ||
+          !evidence.price.eq(plan.executedPrice)
+        ) {
+          return {
+            state: 'skipped',
+            orderId,
+            reason: 'price_evidence_unavailable',
+          };
+        }
+        const selection = selectMarketAwareAssetPriceSnapshotBySourcePriority({
+          asset: order.asset,
+          workflow: 'orders_execute',
+          candidates: [evidence],
+          expectedSourceNames: eligibility.sourceNames,
+          now: transactionNow,
+          freshnessThresholdSeconds: eligibility.freshnessThresholdSeconds,
+          isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
+        });
+        if (selection.state !== 'selected')
+          return {
+            state: 'skipped',
+            orderId,
+            reason: 'price_evidence_unavailable',
+          };
+      } else {
+        // Path B is historical touch evidence. Its close is evidenceAt, not
+        // the execution time: no current 10-second price freshness/session gate.
+        const evidenceAt = plan.candle.closeTime;
+        const session =
+          order.asset.assetType === AssetType.crypto
+            ? null
+            : resolveRegularSessionForEvent(order.asset, plan.candle.openTime);
+        if (
+          evidenceAt > transactionNow ||
+          (order.asset.assetType !== AssetType.crypto &&
+            (!session || evidenceAt > session.closeTime)) ||
+          !plan.executedPrice.eq(order.limitPrice) ||
+          !this.candleEvidence.selectTriggerCandleForOrder([plan.candle], {
+            submittedAt: order.submittedAt,
+            limitPrice: order.limitPrice,
+            side: order.side,
+            seasonEndAt: season?.endAt ?? null,
+          })
+        ) {
+          return {
+            state: 'skipped',
+            orderId,
+            reason: 'candle_evidence_invalid',
+          };
+        }
+      }
 
       // 4) Re-verify the price basis reaches the limit (§19 step 12).
       if (
@@ -351,7 +457,10 @@ export class LimitOrderExecutionService {
       let fxRateSnapshotId: string | null = null;
       let fxRate: Prisma.Decimal | null = null;
       if (order.currencyCode === CurrencyCode.USD) {
-        const evidence = await this.resolveFxEvidenceSnapshot(tx, effectiveNow);
+        const evidence = await this.resolveFxEvidenceSnapshot(
+          tx,
+          transactionNow,
+        );
         if (!evidence) {
           return {
             state: 'skipped',
@@ -505,7 +614,7 @@ export class LimitOrderExecutionService {
             walletAfter.balanceAmount,
             monetaryScale,
           ),
-          occurredAt: effectiveNow,
+          occurredAt: transactionNow,
         },
         select: { id: true },
       });
@@ -529,8 +638,8 @@ export class LimitOrderExecutionService {
           assetPriceSnapshotId,
           fxRateSnapshotId,
           limitOrderCandleEvidenceId,
-          executedAt: effectiveNow,
-          reservationReleasedAt: effectiveNow,
+          executedAt: transactionNow,
+          reservationReleasedAt: transactionNow,
         },
       });
       if (flipped.count !== 1) {
@@ -545,7 +654,7 @@ export class LimitOrderExecutionService {
       await this.ordersService.recordOrderExecutedPortfolioSnapshotInTransaction(
         tx,
         participant?.id ?? null,
-        effectiveNow,
+        transactionNow,
         // Persist the snapshot under the fill's verified account owner.
         tradingAccountId,
       );
@@ -565,7 +674,8 @@ export class LimitOrderExecutionService {
   /** Backward-compatible name retained for existing callers/tests. */
   async fillLimitBuyOrder(input: {
     orderId: string;
-    now: Date;
+    /** Legacy caller cycle time; never used for execution. */
+    now?: Date;
     plan: LimitFillPlan;
   }): Promise<LimitFillOutcome> {
     return this.fillLimitOrder(input);

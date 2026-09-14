@@ -352,15 +352,42 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - `EXECUTE_TRANSACTION_FAILED`
 - `INTERNAL_ERROR`
 
+## Execute transaction time (season and general)
+
+New executions share one core: quote consumption lock → account-specific
+required authorization locks → PostgreSQL `clock_timestamp()` → final
+quote/provider/repricing/wallet validation → atomic financial writes.
+`transactionNow` includes row-lock wait time. Request-time `new Date()`,
+PostgreSQL `now()` and `CURRENT_TIMESTAMP` are not final execution clocks.
+
+General accounts retain Account `FOR UPDATE` for TWR/external-funding ordering.
+Season accounts use Season SHARE → Account SHARE → Participant NO KEY UPDATE,
+aligned with current settlement/ranking and exclusion writers. The participant
+lock is taken before writes because the execution updates participant valuation;
+there is no later shared-to-exclusive upgrade or general TWR fence on seasons.
+Locked scope/status, season status/start/end and participant state are rechecked.
+
+Quote expiry, execute provider freshness (including future-data rejection),
+maximum rate-change calculation, wallet scope and balance guards all run inside
+the transaction with the same `transactionNow`. Provider refresh stays outside;
+inside the transaction selection is DB-only with refresh disabled.
+Exchange `executedAt`, command `requestedAt`/`completedAt`, quote `consumedAt`,
+both ledger `occurredAt` values and equity `capturedAt` share this value.
+Prisma-managed creation/update metadata keeps its existing meaning.
+
+Committed command replay precedes mutable execution gates for the resolved
+account and returns the stored response unchanged, without new financial writes
+or recalculating its execution timestamps. Idempotency scope/hash, fee source,
+source priority, wallet atomic guards and general TWR formulas are unchanged.
+
 ## Execute Idempotency
 
 - `fx_execute_requests` is the durable command table;
   `exchange_transactions` intentionally has no idempotency key.
-- New requests are unique by `(tradingAccountId, idempotencyKey)`. The partial
-  legacy `(userId, idempotencyKey) WHERE tradingAccountId IS NULL` index only
-  preserves pre-transition season rows.
-- Legacy null-account replay is pinned to the same season user+participant and
-  is never available to general requests.
+- Requests are unique by `(tradingAccountId, idempotencyKey)` for both modes.
+  Historical nullable/dual-scope replay rules predate the canonical account
+  migration; current rows and lookups require `tradingAccountId` and do not
+  use a null-account fallback.
 - Request, quote consumption, both wallet mutations, exchange, two ledger
   rows, stored response, and snapshot commit or roll back together.
 

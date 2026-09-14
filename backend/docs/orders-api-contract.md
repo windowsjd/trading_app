@@ -11,6 +11,46 @@
 > account-scoped with no participant fallback. See
 > `docs/trading-account-orders-api-contract.md`.
 
+## Financial execution time (current contract)
+
+Season and general market orders, including the existing execute endpoint, use
+one PostgreSQL `clock_timestamp()` value, `transactionNow`, after required
+quote/authorization/order locks. PostgreSQL `now()` / `CURRENT_TIMESTAMP` and
+request arrival time are not final execution clocks. Quote TTL, provider asset
+freshness, stock session, USD/KRW freshness and price/rate movement, account
+status, and season/participant lifecycle gates are checked against that clock
+and transaction-time rows. Crypto remains continuous; stock session policy is
+unchanged. No provider network call is introduced inside the transaction.
+
+A newly created market order uses that value for `submittedAt`, `executedAt`,
+explicit create timestamps, ledger `occurredAt` and execution equity snapshot
+`capturedAt`. A previously submitted order keeps its original submission time.
+Prisma-managed metadata timestamps retain their normal meaning. Committed
+idempotent replay returns the stored response and does not retime or repeat
+financial effects; the existing execute endpoint retains its `already_executed`
+response with the stored execution time, before mutable trading gates.
+
+For automatic limits, `cycleNow` is only the scheduler/candidate/evidence scan
+clock and bounded-work reference. Each individual fill reads `transactionNow`
+after its own locks; only this value becomes `executedAt`, ledger `occurredAt`,
+reservation release time and execution snapshot `capturedAt`.
+
+- Path A: the exact snapshot selected during the cycle is read again in the
+  fill transaction. Its price/scope/source, non-future `effectiveAt` and
+  `capturedAt`, execute freshness and the current stock session must still be
+  valid at `transactionNow`. Otherwise skip the fill and retry next cycle.
+- Path B: candle `closeTime` is historical `evidenceAt`, not execution time.
+  Preserve closed 5-minute candle, first-eligible submit boundary, candle's
+  own stock session, season-end containment and BUY/SELL touch rules. Do not
+  impose current price freshness or a current open-session requirement on a
+  historical candle. Account/participant status, season status/window and USD
+  FX freshness still gate execution at `transactionNow`, so no fill crosses
+  season end merely because the cycle/evidence preceded it.
+
+There is no new timestamp column or matching table. General accounts keep their
+exclusive account fence for TWR/external-funding ordering. Season executions
+use the lifecycle locks described below, without a general-account TWR fence.
+
 ## Status
 
 - `GET /api/v1/orders` read-only MVP is implemented.
@@ -450,31 +490,31 @@ operator can exclude the participant or end the season in the gap between
 them and the commit. Financial correctness therefore rests on re-reading
 both against LOCKED rows inside the create transaction, in this order:
 
-1. `Quote` — `SELECT ... FOR UPDATE` (serializes two creates on one quote).
-2. `SeasonParticipant` — `SELECT ... FOR SHARE` by id; must exist, belong to
-   the caller, and be `active` (`PARTICIPANT_EXCLUDED` / `PARTICIPANT_NOT_ACTIVE`
-   / `PARTICIPANT_NOT_FOUND`). `seasonId` is read from this locked row.
-3. `Season` — `SELECT ... FOR SHARE` by that id; must be `active` with
-   `startAt <= now < endAt` (`SEASON_NOT_ACTIVE` / `SEASON_NOT_STARTED` /
-   `SEASON_ENDED`).
-4. `CashWallet` — the guarded reservation UPDATE.
-5. `Order` insert, then the quote consume.
+1. `Quote` — `SELECT ... FOR UPDATE` (serializes creates/executes on one quote).
+2. Read participant ids to locate lock targets only.
+3. `Season` — `FOR SHARE`.
+4. Season `TradingAccount` — `FOR SHARE` (authorization only).
+5. `SeasonParticipant` — `FOR SHARE` for limit registration. Financial
+   execution instead takes `FOR NO KEY UPDATE` up front because it writes
+   participant valuation/fill count; it never upgrades a shared lock later.
+6. Verify owner/account/season links against the locked rows. After remaining
+   order locks, read `clock_timestamp()` and validate status/window/TTL/session.
+7. Guarded wallet/position reservation, order insert and quote consumption.
 
-`FOR SHARE` (not `FOR UPDATE`) means concurrent creates do not serialize
-against each other, while the exclusion write and the season-ending write —
-both plain UPDATEs, which take `FOR NO KEY UPDATE` — do conflict and must
-wait. Exactly two outcomes are therefore possible for a race, and both are
-safe: either the create commits first and the cleanup then cancels the order
-and releases its reservation, or the exclusion/ending commits first and the
-create fails. An `excluded` participant or an `ended` season can never end
-up holding a new reservation.
+This follows the current writers: ranking/settlement lock Season first;
+operator exclusion updates Account then Participant before order cleanup.
+Limit registration does not serialize other registrations on authorization
+rows. Execution serializes participant writes without a lock-upgrade race.
+General transactions retain Account `FOR UPDATE` before Order/wallet/position
+work for their TWR fence and never acquire season locks. Cancel and cleanup
+continue to use Order → reservation owner, without acquiring lifecycle locks.
 
-The participant is locked BEFORE the season deliberately: settlement locks
-`SeasonParticipant` rows and only then updates `Season`, so locking the
-season first here would invert that order and could deadlock. The
-lifecycle-ending transaction touches `Season` alone, and cancel plus both
-cleanup paths take `Order → CashWallet` without locking Season/participant,
-so no cycle exists with any of them.
+The earlier Participant → Season description reflected older settlement code.
+It is superseded by the current Season-first writer ordering above. Either
+registration commits first and cleanup releases its reservation, or lifecycle
+mutation commits first and registration fails; no new reservation escapes the
+authorization check. Full-fill-only, BUY/SELL reservations and cleanup policy
+are unchanged.
 
 Reservation basis: create reads `quotedFeeRate` / `quotedGrossAmount` /
 `quotedFeeAmount` / `quotedReservedAmount` off the quote and re-validates
@@ -597,7 +637,7 @@ at all today; automatic matching is planned as separate work.
   - finalizes order to `executed` with actual execution fields.
 - Wallet mutation, position mutation, wallet transaction creation, and order finalization run in one Prisma transaction.
 - Quote consume runs in the same Prisma transaction before wallet/position/order mutation; if consume fails, the transaction rolls back and returns `QUOTE_NOT_ACTIVE`.
-- Guarded order finalization uses `id + seasonParticipantId + status = submitted`.
+- Guarded order finalization uses `id + tradingAccountId + status = submitted`.
 - If finalization affects zero rows after prior writes inside the transaction, execute returns `ORDER_EXECUTION_CONFLICT` and rolls back all prior writes.
 - Execute creates one `SnapshotReason.order_executed` `equity_snapshots` row in
   the financial transaction. It creates no `daily_portfolio_snapshots`, no

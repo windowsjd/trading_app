@@ -1,5 +1,7 @@
 jest.mock('../generated/prisma/client', () => {
-  const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
+  const { Decimal, sqltag } = jest.requireActual(
+    '@prisma/client/runtime/client',
+  );
 
   return {
     AssetPriceSourceType: {
@@ -77,6 +79,7 @@ jest.mock('../generated/prisma/client', () => {
     },
     Prisma: {
       Decimal,
+      sql: sqltag,
     },
     PrismaClient: class PrismaClient {},
     SeasonStatus: {
@@ -136,6 +139,7 @@ describe('FxService', () => {
   const createPrisma = () => {
     const prisma = {
       $transaction: jest.fn(),
+      $queryRaw: jest.fn(),
       $executeRaw: jest.fn(),
       season: {
         findFirst: jest.fn(),
@@ -179,6 +183,39 @@ describe('FxService', () => {
       },
     };
 
+    prisma.$queryRaw.mockImplementation(async (template) => {
+      const sql = template.join(' ? ');
+      if (sql.includes('clock_timestamp')) return [{ now: new Date() }];
+      if (sql.includes('"season_participants"')) {
+        const participant =
+          await prisma.seasonParticipant.findUnique.mock.results[0]?.value;
+        return [
+          {
+            id: 'participant-1',
+            seasonId: 'season-1',
+            userId: 'user-1',
+            tradingAccountId: 'trading-account-1',
+            participantStatus: participant?.participantStatus ?? 'active',
+          },
+        ];
+      }
+      if (sql.includes('"seasons"')) {
+        const results = await Promise.all(
+          prisma.season.findFirst.mock.results.map((r) => r.value),
+        );
+        return results.filter(Boolean).slice(-1);
+      }
+      if (sql.includes('"trading_accounts"'))
+        return [
+          {
+            id: 'trading-account-1',
+            userId: 'user-1',
+            mode: 'season',
+            status: 'active',
+          },
+        ];
+      return [];
+    });
     prisma.$transaction.mockImplementation(async (callback) =>
       callback(prisma),
     );
@@ -236,7 +273,7 @@ describe('FxService', () => {
   };
 
   const expectNoExecuteWrites = (prisma: ReturnType<typeof createPrisma>) => {
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
     expect(prisma.cashWallet.update).not.toHaveBeenCalled();
     expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
     expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
@@ -256,7 +293,7 @@ describe('FxService', () => {
   };
 
   const expectExecutePlanReads = (prisma: ReturnType<typeof createPrisma>) => {
-    expect(prisma.fxExecuteRequest.findUnique).toHaveBeenCalledTimes(1);
+    expect(prisma.fxExecuteRequest.findUnique).toHaveBeenCalledTimes(2);
     expect(prisma.quote.findFirst).toHaveBeenCalledTimes(1);
     expect(prisma.cashWallet.findUnique).toHaveBeenCalledTimes(2);
     expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalled();
@@ -1783,7 +1820,7 @@ describe('FxService', () => {
         .mockResolvedValueOnce(
           hasOverride('targetWallet') ? overrides.targetWallet : targetWallet,
         );
-      prisma.fxRateSnapshot.findMany.mockResolvedValueOnce(
+      prisma.fxRateSnapshot.findMany.mockResolvedValue(
         hasOverride('snapshots') ? overrides.snapshots : [executeSnapshot],
       );
     };
@@ -2162,7 +2199,7 @@ describe('FxService', () => {
         'SEASON_NOT_ACTIVE',
       );
       expectNoExecuteWrites(prisma);
-      expect(prisma.seasonParticipant.findUnique).not.toHaveBeenCalled();
+      expect(prisma.seasonParticipant.findUnique).toHaveBeenCalledTimes(1);
       expect(prisma.fxExecuteRequest.findUnique).not.toHaveBeenCalled();
       expect(prisma.cashWallet.findUnique).not.toHaveBeenCalled();
       expect(prisma.fxRateSnapshot.findMany).not.toHaveBeenCalled();

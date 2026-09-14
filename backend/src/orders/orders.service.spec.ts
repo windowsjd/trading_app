@@ -1,5 +1,7 @@
 jest.mock('../generated/prisma/client', () => {
-  const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
+  const { Decimal, sqltag } = jest.requireActual(
+    '@prisma/client/runtime/client',
+  );
 
   return {
     AssetPriceSourceType: {
@@ -65,6 +67,7 @@ jest.mock('../generated/prisma/client', () => {
     },
     Prisma: {
       Decimal,
+      sql: sqltag,
     },
     PrismaClient: class PrismaClient {},
     SeasonStatus: {
@@ -267,6 +270,31 @@ describe('OrdersService', () => {
     prisma.$transaction.mockImplementation(async (callback) =>
       callback(prisma),
     );
+    prisma.$queryRaw.mockImplementation(async (template) => {
+      const sql = template.join(' ? ');
+      if (sql.includes('clock_timestamp')) return [{ now: new Date() }];
+      if (sql.includes('"season_participants"'))
+        return [
+          {
+            id: 'sp-1',
+            seasonId: 'season-1',
+            userId: 'user-1',
+            tradingAccountId: 'trading-account-1',
+            participantStatus: 'active',
+          },
+        ];
+      if (sql.includes('"seasons"')) return [activeSeason];
+      if (sql.includes('"trading_accounts"'))
+        return [
+          {
+            id: 'trading-account-1',
+            userId: 'user-1',
+            mode: 'season',
+            status: 'active',
+          },
+        ];
+      return [];
+    });
     const reservationService = new OrderReservationService();
     const limitOrderCreateService = new LimitOrderCreateService(
       prisma as never,
@@ -723,6 +751,7 @@ describe('OrdersService', () => {
       updatedAt,
       asset: {
         ...asset,
+        isActive: true,
         assetType:
           asset.assetType ??
           (currencyCode === CurrencyCode.USD
@@ -2376,6 +2405,7 @@ describe('OrdersService', () => {
     // canonical account scope must both miss to reach the create.
     prisma.order.findFirst.mockResolvedValueOnce(null);
     prisma.order.findFirst.mockResolvedValueOnce(null);
+    prisma.order.findFirst.mockResolvedValueOnce(null); // post-quote-lock replay lookup
     prisma.order.create.mockImplementationOnce((args) => {
       racedRequestHash = args.data.requestHash;
 
@@ -2418,6 +2448,7 @@ describe('OrdersService', () => {
     // canonical account scope must both miss to reach the create.
     prisma.order.findFirst.mockResolvedValueOnce(null);
     prisma.order.findFirst.mockResolvedValueOnce(null);
+    prisma.order.findFirst.mockResolvedValueOnce(null); // post-quote-lock replay lookup
     prisma.order.create.mockRejectedValueOnce({ code: 'P2002' });
     prisma.order.findFirst.mockResolvedValueOnce(
       idempotentOrderRecord('different-request-hash'),
@@ -3017,7 +3048,7 @@ describe('OrdersService', () => {
 
     it('executes buy orders and creates a new position', async () => {
       const { prisma, service } = createService();
-      prisma.order.findFirst.mockResolvedValueOnce(orderExecutionRecord());
+      prisma.order.findFirst.mockResolvedValue(orderExecutionRecord());
       mockExecutionPrice(prisma);
       mockExecutionWallet(prisma, '1000.00000000', '799.80000000');
       prisma.position.findUnique.mockResolvedValueOnce(null);
@@ -3120,9 +3151,7 @@ describe('OrdersService', () => {
 
     it('executes Binance crypto USD buys with USD wallet debit, USD position, and FX snapshot audit', async () => {
       const { prisma, service } = createService();
-      prisma.order.findFirst.mockResolvedValueOnce(
-        cryptoUsdOrderExecutionRecord(),
-      );
+      prisma.order.findFirst.mockResolvedValue(cryptoUsdOrderExecutionRecord());
       mockExecutionPrice(
         prisma,
         '50000.00000000',
@@ -3246,9 +3275,7 @@ describe('OrdersService', () => {
 
     it('records buy equity snapshots with fresh provider asset and FX valuation snapshots', async () => {
       const { prisma, service } = createService();
-      prisma.order.findFirst.mockResolvedValueOnce(
-        cryptoUsdOrderExecutionRecord(),
-      );
+      prisma.order.findFirst.mockResolvedValue(cryptoUsdOrderExecutionRecord());
       mockExecutionPrice(
         prisma,
         '50000.00000000',
@@ -3358,7 +3385,7 @@ describe('OrdersService', () => {
 
     it('records sell equity snapshots after position and realizedPnl updates', async () => {
       const { prisma, service } = createService();
-      prisma.order.findFirst.mockResolvedValueOnce(
+      prisma.order.findFirst.mockResolvedValue(
         orderExecutionRecord({
           side: OrderSide.sell,
           orderType: OrderType.market,
@@ -3459,7 +3486,7 @@ describe('OrdersService', () => {
       'rejects execute when post-execute valuation has $name',
       async ({ assetProviderCandidates, expectedCode }) => {
         const { prisma, service } = createService();
-        prisma.order.findFirst.mockResolvedValueOnce(orderExecutionRecord());
+        prisma.order.findFirst.mockResolvedValue(orderExecutionRecord());
         mockExecutionPrice(prisma);
         mockExecutionWallet(prisma, '1000.00000000', '799.80000000');
         prisma.position.findUnique.mockResolvedValueOnce(null);
@@ -3515,7 +3542,7 @@ describe('OrdersService', () => {
       'rejects execute when post-execute valuation has $name',
       async ({ fxProviderCandidates, fxAdminSnapshot, expectedCode }) => {
         const { prisma, service } = createService();
-        prisma.order.findFirst.mockResolvedValueOnce(
+        prisma.order.findFirst.mockResolvedValue(
           cryptoUsdOrderExecutionRecord(),
         );
         mockExecutionPrice(
@@ -3562,7 +3589,7 @@ describe('OrdersService', () => {
     it('rejects US stock executes when provider price changes by more than 30 bps', async () => {
       jest.setSystemTime(usMarketOpenAt);
       const { prisma, service } = createService();
-      prisma.order.findFirst.mockResolvedValueOnce(
+      prisma.order.findFirst.mockResolvedValue(
         orderExecutionRecord({
           currencyCode: CurrencyCode.USD,
           asset: {
@@ -3596,9 +3623,7 @@ describe('OrdersService', () => {
 
     it('rejects crypto executes when provider price changes by more than 30 bps', async () => {
       const { prisma, service } = createService();
-      prisma.order.findFirst.mockResolvedValueOnce(
-        cryptoUsdOrderExecutionRecord(),
-      );
+      prisma.order.findFirst.mockResolvedValue(cryptoUsdOrderExecutionRecord());
       mockExecutionPrice(
         prisma,
         '50155.00000000',
@@ -3618,7 +3643,7 @@ describe('OrdersService', () => {
 
     it('executes buy orders and updates weighted average for an existing position', async () => {
       const { prisma, service } = createService();
-      prisma.order.findFirst.mockResolvedValueOnce(orderExecutionRecord());
+      prisma.order.findFirst.mockResolvedValue(orderExecutionRecord());
       mockExecutionPrice(prisma);
       mockExecutionWallet(prisma, '1000.00000000', '799.80000000');
       prisma.position.findUnique.mockResolvedValueOnce({
@@ -3655,7 +3680,7 @@ describe('OrdersService', () => {
 
     it('executes sell orders with position decrement and realizedPnl update', async () => {
       const { prisma, service } = createService();
-      prisma.order.findFirst.mockResolvedValueOnce(
+      prisma.order.findFirst.mockResolvedValue(
         orderExecutionRecord({
           side: OrderSide.sell,
           orderType: OrderType.market,
@@ -3738,7 +3763,7 @@ describe('OrdersService', () => {
 
     it('records negative realizedPnlKrw for loss sells', async () => {
       const { prisma, service } = createService();
-      prisma.order.findFirst.mockResolvedValueOnce(
+      prisma.order.findFirst.mockResolvedValue(
         orderExecutionRecord({
           side: OrderSide.sell,
           orderType: OrderType.market,
@@ -3789,7 +3814,7 @@ describe('OrdersService', () => {
 
     it('executes Binance crypto USD sells with USD wallet credit and USD ledger currency', async () => {
       const { prisma, service } = createService();
-      prisma.order.findFirst.mockResolvedValueOnce(
+      prisma.order.findFirst.mockResolvedValue(
         cryptoUsdOrderExecutionRecord({
           side: OrderSide.sell,
         }),
@@ -3919,7 +3944,7 @@ describe('OrdersService', () => {
 
     it('returns not found for missing or unowned execute orders', async () => {
       const { prisma, service } = createService();
-      prisma.order.findFirst.mockResolvedValueOnce(null);
+      prisma.order.findFirst.mockResolvedValue(null);
 
       await expectErrorCode(
         service.executeOrder('user-1', 'order-other-user'),
@@ -3933,7 +3958,7 @@ describe('OrdersService', () => {
       'rejects execute for %s orders',
       async (status) => {
         const { prisma, service } = createService();
-        prisma.order.findFirst.mockResolvedValueOnce(
+        prisma.order.findFirst.mockResolvedValue(
           orderExecutionRecord({ status }),
         );
 
@@ -3948,9 +3973,7 @@ describe('OrdersService', () => {
 
     it('returns already executed current-state response without mutation', async () => {
       const { prisma, service } = createService();
-      prisma.order.findFirst.mockResolvedValueOnce(
-        executedOrderExecutionRecord(),
-      );
+      prisma.order.findFirst.mockResolvedValue(executedOrderExecutionRecord());
 
       const response = await service.executeOrder('user-1', 'order-execute-1');
 
@@ -3979,7 +4002,7 @@ describe('OrdersService', () => {
 
     it('rejects execute when market price is unavailable', async () => {
       const { prisma, service } = createService();
-      prisma.order.findFirst.mockResolvedValueOnce(orderExecutionRecord());
+      prisma.order.findFirst.mockResolvedValue(orderExecutionRecord());
       prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([]);
 
       await expectErrorCode(
@@ -3992,7 +4015,7 @@ describe('OrdersService', () => {
 
     it('rejects execute after season end even when status is still active', async () => {
       const { prisma, service } = createService();
-      prisma.order.findFirst.mockResolvedValueOnce(
+      prisma.order.findFirst.mockResolvedValue(
         orderExecutionRecord({
           tradingAccount: {
             id: 'trading-account-1',
@@ -4023,7 +4046,7 @@ describe('OrdersService', () => {
     it('rejects execute when the market closed after quote/create', async () => {
       jest.setSystemTime(new Date('2026-05-07T06:30:00.000Z'));
       const { prisma, service } = createService();
-      prisma.order.findFirst.mockResolvedValueOnce(orderExecutionRecord());
+      prisma.order.findFirst.mockResolvedValue(orderExecutionRecord());
 
       await expectErrorCode(
         service.executeOrder('user-1', 'order-execute-1'),
@@ -4036,7 +4059,7 @@ describe('OrdersService', () => {
 
     it('rejects limit execute orders as unsupported', async () => {
       const buy = createService();
-      buy.prisma.order.findFirst.mockResolvedValueOnce(
+      buy.prisma.order.findFirst.mockResolvedValue(
         orderExecutionRecord({
           orderType: OrderType.limit,
           limitPrice: new Prisma.Decimal('99.00000000'),
@@ -4050,7 +4073,7 @@ describe('OrdersService', () => {
       );
 
       const sell = createService();
-      sell.prisma.order.findFirst.mockResolvedValueOnce(
+      sell.prisma.order.findFirst.mockResolvedValue(
         orderExecutionRecord({
           side: OrderSide.sell,
           orderType: OrderType.limit,
@@ -4074,6 +4097,7 @@ describe('OrdersService', () => {
         asset: {
           id: 'asset-1',
           symbol: 'AAPL',
+          isActive: true,
           name: 'Apple Inc.',
           market: 'NASDAQ',
           assetType: AssetType.us_stock,
@@ -4081,7 +4105,7 @@ describe('OrdersService', () => {
         },
       });
       const unavailable = createService();
-      unavailable.prisma.order.findFirst.mockResolvedValueOnce(usdOrder);
+      unavailable.prisma.order.findFirst.mockResolvedValue(usdOrder);
       mockExecutionPrice(
         unavailable.prisma,
         '100.00000000',
@@ -4096,7 +4120,7 @@ describe('OrdersService', () => {
       );
 
       const stale = createService();
-      stale.prisma.order.findFirst.mockResolvedValueOnce(usdOrder);
+      stale.prisma.order.findFirst.mockResolvedValue(usdOrder);
       mockExecutionPrice(
         stale.prisma,
         '100.00000000',
@@ -4124,7 +4148,7 @@ describe('OrdersService', () => {
 
     it('rejects buy when cash balance is insufficient after guarded debit', async () => {
       const { prisma, service } = createService();
-      prisma.order.findFirst.mockResolvedValueOnce(orderExecutionRecord());
+      prisma.order.findFirst.mockResolvedValue(orderExecutionRecord());
       mockExecutionPrice(prisma);
       prisma.cashWallet.findUnique
         .mockResolvedValueOnce({
@@ -4154,7 +4178,7 @@ describe('OrdersService', () => {
 
     it('rejects sell when position is missing or quantity is insufficient', async () => {
       const missing = createService();
-      missing.prisma.order.findFirst.mockResolvedValueOnce(
+      missing.prisma.order.findFirst.mockResolvedValue(
         orderExecutionRecord({ side: OrderSide.sell }),
       );
       mockExecutionPrice(missing.prisma);
@@ -4166,7 +4190,7 @@ describe('OrdersService', () => {
       );
 
       const insufficient = createService();
-      insufficient.prisma.order.findFirst.mockResolvedValueOnce(
+      insufficient.prisma.order.findFirst.mockResolvedValue(
         orderExecutionRecord({ side: OrderSide.sell }),
       );
       mockExecutionPrice(insufficient.prisma);
@@ -4194,7 +4218,7 @@ describe('OrdersService', () => {
 
     it('uses actual post-update wallet balance for walletTransaction balanceAfter', async () => {
       const { prisma, service } = createService();
-      prisma.order.findFirst.mockResolvedValueOnce(orderExecutionRecord());
+      prisma.order.findFirst.mockResolvedValue(orderExecutionRecord());
       mockExecutionPrice(prisma);
       mockExecutionWallet(prisma, '1000.00000000', '777.77777777');
       prisma.position.findUnique.mockResolvedValueOnce(null);
@@ -4217,7 +4241,7 @@ describe('OrdersService', () => {
 
     it('uses guarded finalization for cancel/execute conflicts', async () => {
       const { prisma, service } = createService();
-      prisma.order.findFirst.mockResolvedValueOnce(orderExecutionRecord());
+      prisma.order.findFirst.mockResolvedValue(orderExecutionRecord());
       mockExecutionPrice(prisma);
       mockExecutionWallet(prisma, '1000.00000000', '799.80000000');
       prisma.position.findUnique.mockResolvedValueOnce(null);
@@ -4237,7 +4261,7 @@ describe('OrdersService', () => {
 
     it('uses guarded finalization for order double execution conflicts', async () => {
       const { prisma, service } = createService();
-      prisma.order.findFirst.mockResolvedValueOnce(
+      prisma.order.findFirst.mockResolvedValue(
         orderExecutionRecord({
           side: OrderSide.sell,
         }),

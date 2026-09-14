@@ -85,7 +85,8 @@ export class LimitOrderMatchingService {
     const config = this.readConfig();
     const batchSize = input.batchSize ?? config.batchSize;
     const candleLookbackMs = input.candleLookbackMs ?? config.candleLookbackMs;
-    const now = input.now;
+    // Scheduler/evidence scan time only; each fill reads its own DB clock.
+    const cycleNow = input.now;
 
     const summary: LimitMatchingSummary = {
       assetsScanned: 0,
@@ -105,7 +106,7 @@ export class LimitOrderMatchingService {
 
     let budget = batchSize;
     const assetIds = await this.candidates.findAssetIdsWithFillableLimitBuys(
-      now,
+      cycleNow,
       MAX_ASSET_SCAN,
     );
 
@@ -118,17 +119,17 @@ export class LimitOrderMatchingService {
 
       const candidates = await this.candidates.findFillableLimitBuysForAsset(
         assetId,
-        now,
+        cycleNow,
         budget,
       );
       if (candidates.length === 0) continue;
 
       const asset = candidates[0].asset;
-      const pathASnapshot = await this.resolvePathASnapshot(asset, now);
+      const pathASnapshot = await this.resolvePathASnapshot(asset, cycleNow);
       const eligibleCandles =
         await this.candleEvidence.findEligibleClosedCandlesForAsset(
           { assetType: asset.assetType, market: asset.market, id: asset.id },
-          now,
+          cycleNow,
           candleLookbackMs,
         );
 
@@ -149,7 +150,6 @@ export class LimitOrderMatchingService {
         try {
           const outcome = await this.execution.fillLimitOrder({
             orderId: candidate.id,
-            now,
             plan,
           });
           if (outcome.state === 'filled') {

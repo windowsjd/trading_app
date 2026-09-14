@@ -1,5 +1,5 @@
 jest.mock('../generated/prisma/client', () => {
-  const { Decimal } = jest.requireActual<
+  const { Decimal, sqltag } = jest.requireActual<
     typeof import('@prisma/client/runtime/client')
   >('@prisma/client/runtime/client');
 
@@ -44,7 +44,7 @@ jest.mock('../generated/prisma/client', () => {
       rewarded: 'rewarded',
       excluded: 'excluded',
     },
-    Prisma: { Decimal },
+    Prisma: { Decimal, sql: sqltag },
     PrismaClient: class PrismaClient {},
     QuoteStatus: {
       active: 'active',
@@ -250,11 +250,11 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         return Promise.resolve([
           {
             id: 'sp-1',
-            season_id: 'season-1',
-            user_id: overrides.participantUserId ?? 'user-1',
-            participant_status:
+            seasonId: 'season-1',
+            userId: overrides.participantUserId ?? 'user-1',
+            participantStatus:
               overrides.participantStatus ?? ParticipantStatus.active,
-            trading_account_id: 'trading-account-1',
+            tradingAccountId: 'trading-account-1',
           },
         ]);
       }
@@ -264,8 +264,8 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
           {
             id: 'season-1',
             status: overrides.seasonStatus ?? SeasonStatus.active,
-            start_at: overrides.seasonStartAt ?? startAt,
-            end_at: overrides.seasonEndAt ?? endAt,
+            startAt: overrides.seasonStartAt ?? startAt,
+            endAt: overrides.seasonEndAt ?? endAt,
             trade_fee_rate: new Prisma.Decimal(
               overrides.tradeFeeRate ?? '0.001000',
             ),
@@ -273,6 +273,15 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         ]);
       }
 
+      if (sql.includes('"trading_accounts"'))
+        return Promise.resolve([
+          {
+            id: 'trading-account-1',
+            userId: 'user-1',
+            mode: 'season',
+            status: 'active',
+          },
+        ]);
       if (sql.includes('"quotes"')) {
         return Promise.resolve([{ id: 'quote-limit-1' }]);
       }
@@ -927,15 +936,16 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       const lockSql = (
         prisma.$queryRaw.mock.calls as unknown as string[][][]
       ).map((call) => call[0].join(' ? ').replace(/\s+/g, ' '));
-      // Order matters: Quote -> SeasonParticipant -> Season, then the wallet
-      // guard. Participant before season is what keeps this compatible with
-      // settlement, which locks participant rows before the season row.
+      // Target discovery is unlocked. Actual row locks follow current writers.
       expect(lockSql[0]).toContain('FROM "quotes"');
       expect(lockSql[0]).toContain('FOR UPDATE');
       expect(lockSql[1]).toContain('FROM "season_participants"');
-      expect(lockSql[1]).toContain('FOR SHARE');
       expect(lockSql[2]).toContain('FROM "seasons"');
       expect(lockSql[2]).toContain('FOR SHARE');
+      expect(lockSql[3]).toContain('FROM "trading_accounts"');
+      expect(lockSql[3]).toContain('FOR SHARE');
+      expect(lockSql[4]).toContain('FROM "season_participants"');
+      expect(lockSql[5]).toContain('clock_timestamp()');
     });
 
     it('fails inside the transaction when the participant was excluded after the pre-check', async () => {

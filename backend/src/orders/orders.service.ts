@@ -35,6 +35,7 @@ import {
 import { isFxSnapshotStale } from '../fx/fx-execute-snapshot-policy';
 import { isFxSnapshotStaleForPortfolioValuation } from '../portfolio/portfolio-valuation.policy';
 import { GeneralAccountPerformanceService } from '../portfolio/general-account-performance.service';
+import { lockSeasonTradingContext } from '../seasons/season-trading-lock';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   buildAdminManualFallbackDecision,
@@ -407,6 +408,7 @@ type OrderExecutionRecord = {
     name: string;
     market: string;
     assetType: AssetType;
+    isActive: boolean;
     currencyCode: CurrencyCode;
     priceCurrency: CurrencyCode;
     settlementCurrency: CurrencyCode;
@@ -522,6 +524,7 @@ const ORDER_EXECUTION_SELECT = {
       name: true,
       market: true,
       assetType: true,
+      isActive: true,
       currencyCode: true,
       priceCurrency: true,
       settlementCurrency: true,
@@ -1180,7 +1183,6 @@ export class OrdersService {
       request,
       quoteId,
       idempotency,
-      submittedAt,
       context: {
         mode: TradingAccountMode.season,
         season,
@@ -1264,7 +1266,6 @@ export class OrdersService {
       request,
       quoteId,
       idempotency,
-      submittedAt,
       context,
     });
   }
@@ -1274,10 +1275,9 @@ export class OrdersService {
     request: ParsedOrderRequest;
     quoteId: string;
     idempotency: OrderCreateIdempotency;
-    submittedAt: Date;
     context: TradingContext;
   }): Promise<CreateOrderResponse | LimitOrderCreateResponse> {
-    const { userId, request, quoteId, idempotency, submittedAt } = input;
+    const { userId, request, quoteId, idempotency } = input;
     const { season, participant, tradingAccountId } = input.context;
     const existingOrder = await this.findIdempotentCreateOrder({
       tradingAccountId,
@@ -1289,21 +1289,31 @@ export class OrdersService {
     }
 
     try {
+      let didExecute = false;
       const response = await this.prisma.$transaction(async (tx) => {
-        await this.lockGeneralTradingAccountInTransaction(tx, input.context);
-        const effectiveSubmittedAt =
-          input.context.mode === TradingAccountMode.general
-            ? await this.readTransactionWallClock(tx)
-            : submittedAt;
+        // Quote serializes consumption and lets a waiter replay a committed
+        // winner before any mutable authorization/time gate.
+        await tx.$queryRaw`SELECT "id" FROM "quotes" WHERE "id" = ${quoteId} FOR UPDATE`;
+        const racedOrder = await this.findIdempotentCreateOrder(
+          {
+            tradingAccountId,
+            idempotencyKey: idempotency.idempotencyKey,
+          },
+          tx,
+        );
+        if (racedOrder)
+          return this.replayIdempotentCreateOrder(racedOrder, idempotency);
+        await this.lockTradingContextInTransaction(tx, input.context, userId);
+        const transactionNow = await this.readTransactionWallClock(tx);
         const quote = await this.findActiveOrderQuoteForCreateOrThrow(tx, {
           quoteId,
           userId,
           seasonParticipantId: participant?.id ?? null,
           tradingAccountId,
           request,
-          now: effectiveSubmittedAt,
+          now: transactionNow,
         });
-        this.assertOrderAssetTradable(quote.asset, effectiveSubmittedAt);
+        this.assertOrderAssetTradable(quote.asset, transactionNow);
 
         const tradeFeeRate = this.resolveMarketOrderFeeRate({
           mode: input.context.mode,
@@ -1345,13 +1355,13 @@ export class OrdersService {
             fxRateSnapshotId: quote.fxRateSnapshotId,
             idempotencyKey: idempotency.idempotencyKey,
             requestHash: idempotency.requestHash,
-            submittedAt: effectiveSubmittedAt,
+            submittedAt: transactionNow,
             executedAt: null,
             canceledAt: null,
             rejectedAt: null,
             rejectReason: null,
-            createdAt: effectiveSubmittedAt,
-            updatedAt: effectiveSubmittedAt,
+            createdAt: transactionNow,
+            updatedAt: transactionNow,
           },
           select: {
             id: true,
@@ -1374,14 +1384,11 @@ export class OrdersService {
         }
 
         const executionOrder = order as OrderExecutionRecord;
-        this.assertExecutableSeasonAndAsset(
-          executionOrder,
-          effectiveSubmittedAt,
-        );
+        this.assertExecutableSeasonAndAsset(executionOrder, transactionNow);
         const plan = await this.buildOrderExecutionPlan(
           tx,
           executionOrder,
-          effectiveSubmittedAt,
+          transactionNow,
         );
         const result =
           executionOrder.side === OrderSide.buy
@@ -1412,10 +1419,11 @@ export class OrdersService {
           },
         });
 
+        didExecute = true;
         return responsePayloadJson;
       });
 
-      if (season && participant) {
+      if (didExecute && season && participant) {
         this.refreshRankingAfterParticipantChange(season.id, participant.id);
       }
 
@@ -1585,12 +1593,8 @@ export class OrdersService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // Lock order: Quote → SeasonParticipant → Season → CashWallet →
-        // Order. Registration is complete against PostgreSQL alone: no Redis
-        // or provider-connection state participates in this transaction.
-        //
-        // See LimitOrderCreateService.lockTradableContextInTransaction for why
-        // the participant precedes the season and why both are FOR SHARE.
+        // Quote → lifecycle authorization (Season → Account → Participant)
+        // → reservation. See season-trading-lock for the current writer order.
         await limitOrderCreate.lockQuoteForCreateInTransaction(tx, quoteId);
         // Re-validate season + participant against LOCKED rows. A concurrent
         // exclusion or season-ending either commits first (and this create
@@ -1621,17 +1625,7 @@ export class OrdersService {
         // The wall clock is read only after every authorization row lock, so
         // lock wait time is never omitted from final quote/season/market
         // checks.
-        const transactionClock = await tx.$queryRaw<Array<{ now: Date }>>`
-          SELECT clock_timestamp() AS "now"
-        `;
-        const transactionNow = transactionClock[0]?.now;
-        if (!transactionNow) {
-          this.throwApiError(
-            HttpStatus.INTERNAL_SERVER_ERROR,
-            'ORDER_EXECUTION_TRANSACTION_FAILED',
-            'Database transaction clock is unavailable.',
-          );
-        }
+        const transactionNow = await this.readTransactionWallClock(tx);
         if (lockedContext) {
           limitOrderCreate.assertLockedTradableContext(
             lockedContext,
@@ -1802,11 +1796,9 @@ export class OrdersService {
     }
 
     const parsedOrderId = this.parseOrderId(orderId);
-    const executedAt = new Date();
-
     try {
       const result = await this.prisma.$transaction(async (tx) => {
-        const order = await this.findOwnedOrderForExecution(
+        let order = await this.findOwnedOrderForExecution(
           tx,
           parsedOrderId,
           userId,
@@ -1820,11 +1812,56 @@ export class OrdersService {
           );
         }
 
-        this.assertExecutableSeasonAndAsset(order, executedAt);
-
+        if (order.orderType !== OrderType.market) {
+          this.throwApiError(
+            HttpStatus.BAD_REQUEST,
+            'LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED',
+            'Limit orders cannot be executed through the order execute path.',
+          );
+        }
         if (order.status === OrderStatus.executed) {
           return this.buildAlreadyExecutedOrderResponse(order);
         }
+        if (order.quoteId) {
+          await tx.$queryRaw`SELECT "id" FROM "quotes" WHERE "id" = ${order.quoteId} FOR UPDATE`;
+        }
+        const committedAfterQuoteWait = await this.findOwnedOrderForExecution(
+          tx,
+          parsedOrderId,
+          userId,
+        );
+        if (committedAfterQuoteWait?.status === OrderStatus.executed) {
+          return this.buildAlreadyExecutedOrderResponse(
+            committedAfterQuoteWait,
+          );
+        }
+        const account = order.tradingAccount;
+        this.requireOrderTradingScope(order);
+        await this.lockTradingContextInTransaction(
+          tx,
+          {
+            mode: account!.mode,
+            tradingAccountId: order.tradingAccountId,
+          },
+          userId,
+          account!.seasonParticipant?.id,
+        );
+        await tx.$queryRaw`SELECT "id" FROM "orders" WHERE "id" = ${parsedOrderId} FOR UPDATE`;
+        order = await this.findOwnedOrderForExecution(
+          tx,
+          parsedOrderId,
+          userId,
+        );
+        if (!order)
+          this.throwApiError(
+            HttpStatus.NOT_FOUND,
+            'ORDER_NOT_FOUND',
+            'Order not found.',
+          );
+        if (order.status === OrderStatus.executed)
+          return this.buildAlreadyExecutedOrderResponse(order);
+        const transactionNow = await this.readTransactionWallClock(tx);
+        this.assertExecutableSeasonAndAsset(order, transactionNow);
 
         if (order.status !== OrderStatus.submitted) {
           this.throwApiError(
@@ -1834,7 +1871,11 @@ export class OrdersService {
           );
         }
 
-        const plan = await this.buildOrderExecutionPlan(tx, order, executedAt);
+        const plan = await this.buildOrderExecutionPlan(
+          tx,
+          order,
+          transactionNow,
+        );
 
         return order.side === OrderSide.buy
           ? this.executeBuyOrderInTransaction(tx, order, plan)
@@ -2316,6 +2357,36 @@ export class OrdersService {
     };
   }
 
+  private async lockTradingContextInTransaction(
+    tx: Prisma.TransactionClient,
+    context: Pick<TradingContext, 'mode' | 'tradingAccountId'> & {
+      participant?: TradingContext['participant'];
+    },
+    userId: string,
+    participantId = context.participant?.id,
+  ): Promise<void> {
+    if (context.mode === TradingAccountMode.general) {
+      await this.lockGeneralTradingAccountInTransaction(tx, context);
+      return;
+    }
+    if (!participantId)
+      this.throwTradingScopeIntegrityError(
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+        'Season account has no participant.',
+      );
+    const locked = await lockSeasonTradingContext(tx, {
+      userId,
+      seasonParticipantId: participantId,
+    });
+    if (locked.account.id !== context.tradingAccountId) {
+      this.throwTradingScopeIntegrityError(
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+        'Participant trading account changed during execution.',
+      );
+    }
+    // Final status/window checks use freshly read relations after these locks.
+  }
+
   /**
    * Serializes every general-account financial mutation, across both wallet
    * currencies, with external-funding boundaries and account status changes.
@@ -2325,7 +2396,7 @@ export class OrdersService {
    */
   private async lockGeneralTradingAccountInTransaction(
     tx: Prisma.TransactionClient,
-    context: TradingContext,
+    context: Pick<TradingContext, 'mode' | 'tradingAccountId'>,
   ): Promise<void> {
     if (context.mode !== TradingAccountMode.general) return;
 
@@ -2431,6 +2502,12 @@ export class OrdersService {
       this.assertSeasonTradable(participant.season, executedAt);
       this.assertParticipantTradable(participant.participantStatus);
     }
+    if (!order.asset.isActive)
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'ASSET_NOT_TRADABLE',
+        'Asset is not active.',
+      );
     this.assertOrderAssetTradable(order.asset, executedAt);
 
     if (order.orderType !== OrderType.market) {
@@ -4969,11 +5046,14 @@ export class OrdersService {
    * backfills historical orders before enforcing NOT NULL, so this key
    * covers both historical and newly-created rows.
    */
-  private async findIdempotentCreateOrder(input: {
-    tradingAccountId: string;
-    idempotencyKey: string;
-  }) {
-    const accountOrder = await this.prisma.order.findFirst({
+  private async findIdempotentCreateOrder(
+    input: {
+      tradingAccountId: string;
+      idempotencyKey: string;
+    },
+    client: PrismaService | Prisma.TransactionClient = this.prisma,
+  ) {
+    const accountOrder = await client.order.findFirst({
       where: {
         tradingAccountId: input.tradingAccountId,
         idempotencyKey: input.idempotencyKey,
