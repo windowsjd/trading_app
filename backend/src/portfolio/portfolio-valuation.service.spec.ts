@@ -483,6 +483,96 @@ describe('PortfolioValuationService source eligibility', () => {
     } satisfies Partial<PortfolioValuationError>);
   });
 
+  it('keeps parallel asset failure evidence local to the position that becomes the final error', async () => {
+    const prisma = createPrismaMock();
+    const assetA = deferred<unknown[]>();
+    const assetB = deferred<unknown[]>();
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+      canonicalParticipant({
+        id: 'sp-parallel-failure',
+        initialCapitalKrw: new Prisma.Decimal('1000000'),
+        cashWallets: [
+          {
+            currencyCode: CurrencyCode.KRW,
+            balanceAmount: new Prisma.Decimal('0'),
+          },
+          {
+            currencyCode: CurrencyCode.USD,
+            balanceAmount: new Prisma.Decimal('0'),
+          },
+        ],
+        positions: [
+          position(
+            'asset-a',
+            AssetType.domestic_stock,
+            'KRX',
+            CurrencyCode.KRW,
+          ),
+          position(
+            'asset-b',
+            AssetType.domestic_stock,
+            'KRX',
+            CurrencyCode.KRW,
+          ),
+        ],
+      }),
+    );
+    prisma.assetPriceSnapshot.findMany.mockImplementation(
+      (query: { where: { assetId: string } }) =>
+        query.where.assetId === 'asset-a' ? assetA.promise : assetB.promise,
+    );
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValue(null);
+    const valuation = new PortfolioValuationService(
+      prisma as never,
+    ).calculateSeasonParticipantValuation(
+      'sp-parallel-failure',
+      valuationAt,
+      'live_portfolio_valuation',
+    );
+
+    // Complete B first to reproduce the old last-writer-wins context race.
+    assetB.resolve([
+      providerPrice(
+        'snapshot-b',
+        'asset-b',
+        'kis_krx_realtime_trade',
+        '2026-06-01T00:00:00.000Z',
+        CurrencyCode.KRW,
+      ),
+    ]);
+    await Promise.resolve();
+    assetA.resolve([
+      providerPrice(
+        'snapshot-a',
+        'asset-a',
+        'kis_krx_realtime_trade',
+        '2026-06-01T00:00:00.000Z',
+        CurrencyCode.KRW,
+      ),
+    ]);
+
+    const error = await valuation.catch((reason: unknown) => reason);
+    expect(error).toBeInstanceOf(PortfolioValuationError);
+    expect(error).toMatchObject({
+      code: 'ASSET_PRICE_UNAVAILABLE',
+      diagnosticContext: {
+        entities: {
+          assetId: 'asset-a',
+          snapshotId: 'snapshot-a',
+        },
+        evidence: {
+          latestRejectedCandidate: {
+            id: 'snapshot-a',
+            sourceName: 'kis_krx_realtime_trade',
+          },
+          selectionResult: 'REJECTED',
+        },
+      },
+    });
+    expect(JSON.stringify(error)).not.toContain('asset-b');
+    expect(JSON.stringify(error)).not.toContain('snapshot-b');
+  });
+
   it('applies independent KRX, US, and crypto freshness in one portfolio', async () => {
     const prisma = createPrismaMock();
     const mixedAt = new Date('2026-07-17T15:00:00.000Z');
@@ -805,4 +895,12 @@ function providerPrice(
     capturedAt: time,
     createdAt: time,
   };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
 }

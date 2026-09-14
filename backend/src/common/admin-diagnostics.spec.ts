@@ -5,8 +5,15 @@ import {
   recordAdminDiagnosticEvent,
   setAdminDiagnosticContext,
 } from './admin-diagnostics';
+import { AdminDiagnosticLogger } from './admin-diagnostic.logger';
 
 type Role = 'user' | 'operator' | 'admin';
+
+class SilentAdminDiagnosticLogger extends AdminDiagnosticLogger {
+  protected override printMessages(): void {}
+}
+
+const applicationLogger = new SilentAdminDiagnosticLogger();
 
 function inRequest<T>(
   role: Role,
@@ -89,14 +96,17 @@ describe('admin request diagnostics', () => {
       },
     });
     expect(diagnostic?.exception.applicationStack.length).toBeGreaterThan(0);
-    expect(diagnostic?.serverLogs.events.map((event) => event.event)).toEqual([
+    expect(
+      diagnostic?.diagnosticEvents.events.map((event) => event.event),
+    ).toEqual([
       'HTTP_REQUEST_RECEIVED',
       'ORDER_EXECUTION_PRICE_REJECTED',
       'REQUEST_FAILED',
     ]);
+    expect(diagnostic?.serverLogs.entries).toEqual([]);
   });
 
-  it('redacts secrets in evidence, messages, causes, stack, and log metadata', () => {
+  it('separates actual application logs from diagnostic events and redacts both', () => {
     const diagnostic = inRequest('admin', 'req-redaction', () => {
       setAdminDiagnosticContext({
         evidence: {
@@ -111,6 +121,11 @@ describe('admin request diagnostics', () => {
         'authorization=Bearer raw-token-123',
         { refreshToken: 'refresh-token-123' },
       );
+      applicationLogger.warn(
+        'provider failed authorization=Bearer logger-token-123',
+        { password: 'logger-password-123' },
+        'ProviderService',
+      );
       const error = new Error('secret=raw-secret-123');
       error.cause = new Error('password=raw-password-123');
       return buildAdminDiagnostic(error, 'INTERNAL_SERVER_ERROR', 500);
@@ -122,9 +137,22 @@ describe('admin request diagnostics', () => {
     expect(serialized).not.toContain('provider-key-123');
     expect(serialized).not.toContain('db-pass');
     expect(serialized).not.toContain('raw-token-123');
+    expect(serialized).not.toContain('logger-token-123');
+    expect(serialized).not.toContain('logger-password-123');
     expect(serialized).not.toContain('refresh-token-123');
     expect(serialized).not.toContain('raw-secret-123');
     expect(serialized).not.toContain('raw-password-123');
+    expect(diagnostic?.diagnosticEvents.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ event: 'PROVIDER_FAILED' }),
+      ]),
+    );
+    expect(diagnostic?.serverLogs.entries).toEqual([
+      expect.objectContaining({
+        level: 'warn',
+        context: 'ProviderService',
+      }),
+    ]);
   });
 
   it('bounds logs and total payload and reports truncation', () => {
@@ -134,11 +162,17 @@ describe('admin request diagnostics', () => {
       });
       for (let index = 0; index < 30; index += 1) {
         recordAdminDiagnosticEvent('info', `EVENT_${index}`, 'y'.repeat(2_000));
+        applicationLogger.warn(
+          `application log ${index} ${'q'.repeat(2_000)}`,
+          'BoundedLogger',
+        );
       }
       return buildAdminDiagnostic(new Error('bounded'), 'PRICE_STALE', 503);
     });
 
-    expect(diagnostic?.serverLogs.events.length).toBeLessThanOrEqual(20);
+    expect(diagnostic?.diagnosticEvents.events.length).toBeLessThanOrEqual(20);
+    expect(diagnostic?.diagnosticEvents.truncated).toBe(true);
+    expect(diagnostic?.serverLogs.entries.length).toBeLessThanOrEqual(20);
     expect(diagnostic?.serverLogs.truncated).toBe(true);
     expect(diagnostic?.truncated).toBe(true);
     expect(
@@ -171,16 +205,20 @@ describe('admin request diagnostics', () => {
   it('isolates related logs by request context', () => {
     inRequest('admin', 'req-first', () => {
       recordAdminDiagnosticEvent('warn', 'FIRST_ONLY', 'first request');
+      applicationLogger.error('FIRST_APPLICATION_LOG', 'FirstService');
       return buildAdminDiagnostic(new Error('first'), 'FIRST', 500);
     });
     const second = inRequest('admin', 'req-second', () => {
       recordAdminDiagnosticEvent('warn', 'SECOND_ONLY', 'second request');
+      applicationLogger.error('SECOND_APPLICATION_LOG', 'SecondService');
       return buildAdminDiagnostic(new Error('second'), 'SECOND', 500);
     });
     const serialized = JSON.stringify(second);
 
     expect(serialized).toContain('SECOND_ONLY');
     expect(serialized).not.toContain('FIRST_ONLY');
+    expect(serialized).not.toContain('FIRST_APPLICATION_LOG');
+    expect(serialized).toContain('SECOND_APPLICATION_LOG');
     expect(second?.requestId).toBe('req-second');
   });
 
@@ -214,6 +252,17 @@ describe('admin request diagnostics', () => {
         ),
       '/api/v1/trading-accounts/account-1/portfolio',
     );
+    const operatorDiagnostic = inRequest(
+      'operator',
+      'req-partial-operator',
+      () =>
+        buildAdminPartialFailureDiagnostic(
+          new Error('No eligible valuation snapshot.'),
+          'ASSET_PRICE_UNAVAILABLE',
+          { failureStage: 'asset_valuation' },
+        ),
+      '/api/v1/trading-accounts/account-1/portfolio',
+    );
 
     expect(adminDiagnostic).toMatchObject({
       code: 'ASSET_PRICE_UNAVAILABLE',
@@ -222,6 +271,79 @@ describe('admin request diagnostics', () => {
       failureStage: 'asset_valuation',
       entities: { assetId: 'asset-2' },
     });
+    expect(
+      adminDiagnostic?.diagnosticEvents.events.map((event) => event.event),
+    ).toEqual(['HTTP_REQUEST_RECEIVED', 'PARTIAL_FAILURE_RECORDED']);
     expect(userDiagnostic).toBeUndefined();
+    expect(operatorDiagnostic).toBeUndefined();
+  });
+
+  it('builds a partial failure only from its failure-local snapshot', () => {
+    const diagnostic = inRequest(
+      'admin',
+      'req-isolated-partial',
+      () => {
+        setAdminDiagnosticContext({
+          failureStage: 'asset_price_selection',
+          entities: {
+            assetId: 'asset-a-shadow',
+            snapshotId: 'snapshot-a-shadow',
+          },
+          evidence: { provider: 'provider-shadow', rejectedReason: 'b-reason' },
+        });
+        recordAdminDiagnosticEvent(
+          'warn',
+          'ASSET_B_REJECTED',
+          'parallel asset B failed',
+        );
+        applicationLogger.warn(
+          JSON.stringify({
+            assetId: 'asset-a-shadow',
+            snapshotId: 'snapshot-a-shadow',
+          }),
+          'PortfolioValuationService',
+        );
+        applicationLogger.warn(
+          JSON.stringify({ assetId: 'asset-a', snapshotId: 'snapshot-a' }),
+          'PortfolioService',
+        );
+        return buildAdminPartialFailureDiagnostic(
+          new Error('asset A failed'),
+          'ASSET_PRICE_UNAVAILABLE',
+          {
+            failureStage: 'asset_price_selection',
+            entities: { assetId: 'asset-a', snapshotId: 'snapshot-a' },
+            evidence: {
+              provider: 'provider-a',
+              rejectedReason: 'a-reason',
+            },
+          },
+        );
+      },
+      '/api/v1/trading-accounts/account-1/portfolio',
+    );
+    const serialized = JSON.stringify(diagnostic);
+
+    expect(diagnostic).toMatchObject({
+      entities: {
+        tradingAccountId: 'account-1',
+        assetId: 'asset-a',
+        snapshotId: 'snapshot-a',
+      },
+      evidence: {
+        provider: 'provider-a',
+        rejectedReason: 'a-reason',
+      },
+    });
+    expect(serialized).not.toContain('asset-a-shadow');
+    expect(serialized).not.toContain('snapshot-a-shadow');
+    expect(serialized).not.toContain('provider-shadow');
+    expect(serialized).not.toContain('ASSET_B_REJECTED');
+    expect(diagnostic?.serverLogs.entries).toEqual([
+      expect.objectContaining({
+        context: 'PortfolioService',
+        message: expect.stringContaining('asset-a'),
+      }),
+    ]);
   });
 });

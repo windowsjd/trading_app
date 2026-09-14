@@ -182,9 +182,13 @@ export function getApiErrorDiagnostic(
     !isStringArray(diagnostic.exception.applicationStack) ||
     !isStringArray(diagnostic.exception.stack) ||
     typeof diagnostic.exception.truncated !== 'boolean' ||
+    !isRecord(diagnostic.diagnosticEvents) ||
+    !Array.isArray(diagnostic.diagnosticEvents.events) ||
+    !diagnostic.diagnosticEvents.events.every(isDiagnosticLogEvent) ||
+    typeof diagnostic.diagnosticEvents.truncated !== 'boolean' ||
     !isRecord(diagnostic.serverLogs) ||
-    !Array.isArray(diagnostic.serverLogs.events) ||
-    !diagnostic.serverLogs.events.every(isDiagnosticLogEvent) ||
+    !Array.isArray(diagnostic.serverLogs.entries) ||
+    !diagnostic.serverLogs.entries.every(isServerLogEntry) ||
     typeof diagnostic.serverLogs.truncated !== 'boolean' ||
     typeof diagnostic.truncated !== 'boolean'
   ) {
@@ -204,6 +208,17 @@ function isDiagnosticLogEvent(value: unknown): boolean {
     typeof value.level === 'string' &&
     typeof value.event === 'string' &&
     typeof value.message === 'string'
+  );
+}
+
+function isServerLogEntry(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.timestamp === 'string' &&
+    typeof value.level === 'string' &&
+    typeof value.message === 'string' &&
+    (value.context === undefined || typeof value.context === 'string') &&
+    (value.details === undefined || Array.isArray(value.details))
   );
 }
 

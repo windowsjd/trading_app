@@ -10,7 +10,9 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import {
   calculatePortfolioValuation,
-  PortfolioAssetPriceSnapshotInput,
+  type PortfolioAssetPriceSnapshotInput,
+  type PortfolioFxRateSnapshotInput,
+  type PortfolioValuationDiagnosticContext,
   PortfolioValuationError,
   PortfolioValuationResult,
 } from './portfolio-valuation.policy';
@@ -26,12 +28,13 @@ import {
   type ProviderWorkflow,
 } from '../providers/source-eligibility.policy';
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
-import {
-  recordAdminDiagnosticEvent,
-  setAdminDiagnosticContext,
-} from '../common/admin-diagnostics';
 
 type PortfolioSourceWorkflow = ProviderWorkflow;
+
+type PortfolioSnapshotSelection<T> = {
+  snapshot: T | null;
+  diagnosticContext?: PortfolioValuationDiagnosticContext;
+};
 
 type PositionAssetForSourceSelection = {
   id: string;
@@ -258,22 +261,26 @@ export class PortfolioValuationService {
     client: Prisma.TransactionClient | PrismaService;
   }): Promise<PortfolioValuationResult> {
     const positions = await Promise.all(
-      input.positions.map(async (position) => ({
-        assetId: position.assetId,
-        assetType: position.asset.assetType,
-        quantity: position.quantity,
-        averageCost: position.averageCost,
-        currencyCode: position.currencyCode,
-        realizedPnl: position.realizedPnl,
-        realizedPnlKrw: position.realizedPnlKrw,
-        latestPriceSnapshot: await this.findLatestEligibleAssetPriceSnapshot(
+      input.positions.map(async (position) => {
+        const priceSelection = await this.findLatestEligibleAssetPriceSnapshot(
           position.asset,
           input.valuationAt,
           input.sourceEligibilityWorkflow,
           input.useSettlementPricePolicy,
           input.client,
-        ),
-      })),
+        );
+        return {
+          assetId: position.assetId,
+          assetType: position.asset.assetType,
+          quantity: position.quantity,
+          averageCost: position.averageCost,
+          currencyCode: position.currencyCode,
+          realizedPnl: position.realizedPnl,
+          realizedPnlKrw: position.realizedPnlKrw,
+          latestPriceSnapshot: priceSelection.snapshot,
+          priceSelectionDiagnosticContext: priceSelection.diagnosticContext,
+        };
+      }),
     );
 
     // No USD cash and no USD position → no FX snapshot is needed at all, so a
@@ -290,14 +297,14 @@ export class PortfolioValuationService {
           !position.quantity.eq(0),
       );
 
-    const usdKrwSnapshot = needsUsdConversion
+    const usdKrwSelection = needsUsdConversion
       ? await this.findLatestEligibleUsdKrwSnapshot(
           input.valuationAt,
           input.sourceEligibilityWorkflow,
           input.useSettlementPricePolicy,
           input.client,
         )
-      : null;
+      : { snapshot: null };
 
     return calculatePortfolioValuation({
       seasonParticipantId: input.subject.seasonParticipantId,
@@ -305,7 +312,8 @@ export class PortfolioValuationService {
       initialCapitalKrw: input.initialCapitalKrw,
       cashWallets: input.cashWallets,
       positions,
-      usdKrwSnapshot,
+      usdKrwSnapshot: usdKrwSelection.snapshot,
+      usdKrwSelectionDiagnosticContext: usdKrwSelection.diagnosticContext,
       valuationAt: input.valuationAt,
       sourceEligibilityWorkflow: isProviderWorkflowAllowed(
         input.sourceEligibilityWorkflow,
@@ -322,7 +330,7 @@ export class PortfolioValuationService {
     sourceEligibilityWorkflow: PortfolioSourceWorkflow,
     useSettlementPricePolicy: boolean,
     client: Prisma.TransactionClient | PrismaService,
-  ): Promise<PortfolioAssetPriceSnapshotInput | null> {
+  ): Promise<PortfolioSnapshotSelection<PortfolioAssetPriceSnapshotInput>> {
     const providerEligibility = resolveAssetProviderEligibility({
       workflow: sourceEligibilityWorkflow,
       asset: {
@@ -409,8 +417,10 @@ export class PortfolioValuationService {
 
     if (providerSelection.state === 'selected') {
       return {
-        ...providerSelection.snapshot,
-        sourceDecision: providerSelection.decision,
+        snapshot: {
+          ...providerSelection.snapshot,
+          sourceDecision: providerSelection.decision,
+        },
       };
     }
 
@@ -447,47 +457,39 @@ export class PortfolioValuationService {
 
     if (!fallbackSnapshot) {
       const latestCandidate = providerCandidates[0];
-      setAdminDiagnosticContext({
-        failureStage: 'asset_price_selection',
-        entities: {
-          assetId: asset.id,
-          snapshotId: latestCandidate?.id,
+      return {
+        snapshot: null,
+        diagnosticContext: {
+          failureStage: 'asset_price_selection',
+          entities: {
+            assetId: asset.id,
+            snapshotId: latestCandidate?.id,
+          },
+          evidence: {
+            workflow: sourceEligibilityWorkflow,
+            market: asset.market,
+            valuationAt,
+            freshnessThresholdSeconds: providerEligibility.eligible
+              ? providerEligibility.freshnessThresholdSeconds
+              : null,
+            expectedSourceNames: providerEligibility.eligible
+              ? providerEligibility.sourceNames
+              : [],
+            providerDecision: providerSelection.decision,
+            latestRejectedCandidate: latestCandidate
+              ? {
+                  id: latestCandidate.id,
+                  sourceType: latestCandidate.sourceType,
+                  sourceName: latestCandidate.sourceName,
+                  effectiveAt: latestCandidate.effectiveAt,
+                  capturedAt: latestCandidate.capturedAt,
+                }
+              : null,
+            fallbackSnapshotFound: false,
+            selectionResult: 'REJECTED',
+          },
         },
-        evidence: {
-          workflow: sourceEligibilityWorkflow,
-          market: asset.market,
-          valuationAt,
-          freshnessThresholdSeconds: providerEligibility.eligible
-            ? providerEligibility.freshnessThresholdSeconds
-            : null,
-          expectedSourceNames: providerEligibility.eligible
-            ? providerEligibility.sourceNames
-            : [],
-          providerDecision: providerSelection.decision,
-          latestRejectedCandidate: latestCandidate
-            ? {
-                id: latestCandidate.id,
-                sourceType: latestCandidate.sourceType,
-                sourceName: latestCandidate.sourceName,
-                effectiveAt: latestCandidate.effectiveAt,
-                capturedAt: latestCandidate.capturedAt,
-              }
-            : null,
-          fallbackSnapshotFound: false,
-          selectionResult: 'REJECTED',
-        },
-        nextInvestigation: [
-          'backend/src/providers/source-eligibility.policy.ts',
-          'backend/src/portfolio/portfolio-valuation.service.ts',
-        ],
-      });
-      recordAdminDiagnosticEvent(
-        'warn',
-        'PORTFOLIO_ASSET_PRICE_REJECTED',
-        `No eligible price snapshot was selected for asset ${asset.id}.`,
-        { rejectedReason: providerSelection.decision.rejectedProviderReason },
-      );
-      return null;
+      };
     }
 
     const sourceDecision = buildAdminManualFallbackDecision({
@@ -499,8 +501,10 @@ export class PortfolioValuationService {
     });
 
     return {
-      ...fallbackSnapshot,
-      sourceDecision,
+      snapshot: {
+        ...fallbackSnapshot,
+        sourceDecision,
+      },
     };
   }
 
@@ -509,7 +513,7 @@ export class PortfolioValuationService {
     sourceEligibilityWorkflow: PortfolioSourceWorkflow,
     useSettlementPricePolicy: boolean,
     client: Prisma.TransactionClient | PrismaService,
-  ) {
+  ): Promise<PortfolioSnapshotSelection<PortfolioFxRateSnapshotInput>> {
     const providerEligibility = resolveFxProviderEligibility({
       workflow: sourceEligibilityWorkflow,
       baseCurrency: CurrencyCode.USD,
@@ -556,8 +560,10 @@ export class PortfolioValuationService {
 
     if (providerSelection.state === 'selected') {
       return {
-        ...providerSelection.snapshot,
-        sourceDecision: providerSelection.decision,
+        snapshot: {
+          ...providerSelection.snapshot,
+          sourceDecision: providerSelection.decision,
+        },
       };
     }
 
@@ -601,20 +607,23 @@ export class PortfolioValuationService {
 
     if (fallbackSnapshot) {
       return {
-        ...fallbackSnapshot,
-        sourceDecision: buildAdminManualFallbackDecision({
-          selectedSnapshotId: fallbackSnapshot.id,
-          selectedSourceName: fallbackSnapshot.sourceName,
-          selectedEffectiveAt: fallbackSnapshot.effectiveAt,
-          selectedCapturedAt: fallbackSnapshot.capturedAt,
-          providerDecision: providerSelection.decision,
-        }),
+        snapshot: {
+          ...fallbackSnapshot,
+          sourceDecision: buildAdminManualFallbackDecision({
+            selectedSnapshotId: fallbackSnapshot.id,
+            selectedSourceName: fallbackSnapshot.sourceName,
+            selectedEffectiveAt: fallbackSnapshot.effectiveAt,
+            selectedCapturedAt: fallbackSnapshot.capturedAt,
+            providerDecision: providerSelection.decision,
+          }),
+        },
       };
     }
 
-    if (!fallbackSnapshot) {
-      const latestCandidate = providerCandidates[0];
-      setAdminDiagnosticContext({
+    const latestCandidate = providerCandidates[0];
+    return {
+      snapshot: null,
+      diagnosticContext: {
         failureStage: 'fx_rate_selection',
         entities: { snapshotId: latestCandidate?.id },
         evidence: {
@@ -640,20 +649,8 @@ export class PortfolioValuationService {
           fallbackSnapshotFound: false,
           selectionResult: 'REJECTED',
         },
-        nextInvestigation: [
-          'backend/src/providers/source-eligibility.policy.ts',
-          'backend/src/portfolio/portfolio-valuation.service.ts',
-        ],
-      });
-      recordAdminDiagnosticEvent(
-        'warn',
-        'PORTFOLIO_FX_RATE_REJECTED',
-        'No eligible USD/KRW snapshot was selected for portfolio valuation.',
-        { rejectedReason: providerSelection.decision.rejectedProviderReason },
-      );
-    }
-
-    return fallbackSnapshot;
+      },
+    };
   }
 
   private getAssetPriceCurrency(

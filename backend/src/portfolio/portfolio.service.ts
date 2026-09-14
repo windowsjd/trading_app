@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import {
   ParticipantStatus,
   Prisma,
@@ -13,6 +13,8 @@ import { PortfolioValuationService } from './portfolio-valuation.service';
 import {
   type AdminDiagnostic,
   buildAdminPartialFailureDiagnostic,
+  getAdminDiagnosticRequestId,
+  isAdminDiagnosticRequest,
 } from '../common/admin-diagnostics';
 
 export type PortfolioEquityQuery = {
@@ -99,6 +101,8 @@ const ZERO_MONEY = '0.00000000';
 
 @Injectable()
 export class PortfolioService {
+  private readonly logger = new Logger(PortfolioService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly portfolioValuationService: PortfolioValuationService,
@@ -480,6 +484,25 @@ export class PortfolioService {
       error instanceof PortfolioValuationError
         ? error.code
         : 'VALUATION_UNAVAILABLE';
+    if (isAdminDiagnosticRequest()) {
+      this.logger.warn(
+        JSON.stringify({
+          event: 'portfolio_partial_valuation_failed',
+          requestId: getAdminDiagnosticRequestId(),
+          code,
+          failureStage:
+            error instanceof PortfolioValuationError
+              ? error.diagnosticContext?.failureStage
+              : undefined,
+          entities: {
+            ...entities,
+            ...(error instanceof PortfolioValuationError
+              ? error.diagnosticContext?.entities
+              : {}),
+          },
+        }),
+      );
+    }
     const diagnostic = buildAdminPartialFailureDiagnostic(error, code, {
       domain: 'PORTFOLIO',
       operation: 'PORTFOLIO_VALUATION',

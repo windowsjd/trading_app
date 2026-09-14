@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import {
   Prisma,
   SnapshotReason,
@@ -25,7 +25,11 @@ import {
 } from './general-performance.policy';
 import { PortfolioValuationError } from './portfolio-valuation.policy';
 import { PortfolioValuationService } from './portfolio-valuation.service';
-import { buildAdminPartialFailureDiagnostic } from '../common/admin-diagnostics';
+import {
+  buildAdminPartialFailureDiagnostic,
+  getAdminDiagnosticRequestId,
+  isAdminDiagnosticRequest,
+} from '../common/admin-diagnostics';
 
 /**
  * Account-scoped portfolio + equity history (작업 7).
@@ -80,6 +84,8 @@ const VALUATION_SECTION_ERROR_CODES = new Set([
 
 @Injectable()
 export class TradingAccountPortfolioService {
+  private readonly logger = new Logger(TradingAccountPortfolioService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly accessService: TradingAccountAccessService,
@@ -716,6 +722,28 @@ export class TradingAccountPortfolioService {
     code: string,
     account: OwnedTradingAccount,
   ) {
+    if (isAdminDiagnosticRequest()) {
+      this.logger.warn(
+        JSON.stringify({
+          event: 'portfolio_partial_valuation_failed',
+          requestId: getAdminDiagnosticRequestId(),
+          code,
+          failureStage:
+            error instanceof PortfolioValuationError
+              ? error.diagnosticContext?.failureStage
+              : undefined,
+          entities: {
+            userId: account.userId,
+            tradingAccountId: account.id,
+            seasonId: account.seasonParticipant?.season.id,
+            seasonParticipantId: account.seasonParticipant?.id,
+            ...(error instanceof PortfolioValuationError
+              ? error.diagnosticContext?.entities
+              : {}),
+          },
+        }),
+      );
+    }
     return buildAdminPartialFailureDiagnostic(error, code, {
       domain: 'PORTFOLIO',
       operation: 'PORTFOLIO_VALUATION',

@@ -19,6 +19,12 @@ import {
 
 type DecimalInput = string | Prisma.Decimal;
 
+export type PortfolioValuationDiagnosticContext = {
+  failureStage?: string;
+  entities?: Record<string, unknown>;
+  evidence?: Record<string, unknown>;
+};
+
 export type PortfolioCashWalletInput = {
   currencyCode: CurrencyCode;
   balanceAmount: DecimalInput;
@@ -33,6 +39,7 @@ export type PortfolioPositionInput = {
   realizedPnl: DecimalInput;
   realizedPnlKrw?: DecimalInput;
   latestPriceSnapshot?: PortfolioAssetPriceSnapshotInput | null;
+  priceSelectionDiagnosticContext?: PortfolioValuationDiagnosticContext;
 };
 
 export type PortfolioAssetPriceSnapshotInput = {
@@ -89,6 +96,7 @@ export type PortfolioValuationInput = {
   cashWallets: readonly PortfolioCashWalletInput[];
   positions: readonly PortfolioPositionInput[];
   usdKrwSnapshot?: PortfolioFxRateSnapshotInput | null;
+  usdKrwSelectionDiagnosticContext?: PortfolioValuationDiagnosticContext;
   valuationAt: Date;
   sourceEligibilityWorkflow?: ProviderEligibleWorkflow;
   enforceAdminManualFxFreshness?: boolean;
@@ -120,11 +128,7 @@ export class PortfolioValuationError extends Error {
   constructor(
     readonly code: string,
     message: string,
-    readonly diagnosticContext?: {
-      failureStage?: string;
-      entities?: Record<string, unknown>;
-      evidence?: Record<string, unknown>;
-    },
+    readonly diagnosticContext?: PortfolioValuationDiagnosticContext,
   ) {
     super(message);
     this.name = 'PortfolioValuationError';
@@ -158,6 +162,7 @@ export function calculatePortfolioValuation(
         input.valuationAt,
         input.sourceEligibilityWorkflow,
         input.enforceAdminManualFxFreshness,
+        input.usdKrwSelectionDiagnosticContext,
       )
     : null;
 
@@ -202,12 +207,20 @@ export function calculatePortfolioValuation(
         'ASSET_PRICE_UNAVAILABLE',
         `Asset price snapshot is unavailable for asset ${position.assetId}.`,
         {
-          failureStage: 'asset_price_selection',
-          entities: { assetId: position.assetId },
+          failureStage:
+            position.priceSelectionDiagnosticContext?.failureStage ??
+            'asset_price_selection',
+          entities: {
+            ...position.priceSelectionDiagnosticContext?.entities,
+            assetId: position.assetId,
+          },
           evidence: {
+            ...position.priceSelectionDiagnosticContext?.evidence,
             valuationAt: input.valuationAt,
             selectionResult: 'REJECTED',
-            rejectedReason: 'snapshot_unavailable',
+            rejectedReason:
+              position.priceSelectionDiagnosticContext?.evidence
+                ?.rejectedReason ?? 'snapshot_unavailable',
             normalCriteria: 'An eligible positive price snapshot is required.',
           },
         },
@@ -360,18 +373,24 @@ function selectUsableUsdKrwRate(
   valuationAt: Date,
   sourceEligibilityWorkflow?: ProviderEligibleWorkflow,
   enforceAdminManualFxFreshness = true,
+  selectionDiagnosticContext?: PortfolioValuationDiagnosticContext,
 ): Prisma.Decimal {
   if (!snapshot) {
     throw new PortfolioValuationError(
       'FX_RATE_UNAVAILABLE',
       'USD/KRW FX rate snapshot is unavailable.',
       {
-        failureStage: 'fx_rate_selection',
+        failureStage:
+          selectionDiagnosticContext?.failureStage ?? 'fx_rate_selection',
+        entities: selectionDiagnosticContext?.entities,
         evidence: {
+          ...selectionDiagnosticContext?.evidence,
           pair: 'USD/KRW',
           valuationAt,
           selectionResult: 'REJECTED',
-          rejectedReason: 'snapshot_unavailable',
+          rejectedReason:
+            selectionDiagnosticContext?.evidence?.rejectedReason ??
+            'snapshot_unavailable',
           normalCriteria: 'An eligible positive USD/KRW snapshot is required.',
         },
       },

@@ -90,14 +90,25 @@ export default function AdminDiagnosticPanel({ diagnostic, error }: Props) {
             </CodeText>
           </Section>
 
-          <Section title="관련 Server Logs">
+          <Section title="진단 이벤트">
             <CodeText>
-              {resolved.serverLogs.events
+              {resolved.diagnosticEvents.events
                 .map(
                   (entry) =>
                     `${entry.timestamp} ${entry.level.toUpperCase()} ${entry.event}\n${entry.message}${entry.context ? `\n${formatJson(entry.context)}` : ''}`,
                 )
-                .join('\n\n') || '(related logs unavailable)'}
+                .join('\n\n') || '(diagnostic events unavailable)'}
+            </CodeText>
+          </Section>
+
+          <Section title="관련 Server Logs">
+            <CodeText>
+              {resolved.serverLogs.entries
+                .map(
+                  (entry) =>
+                    `${entry.timestamp} ${entry.level.toUpperCase()}${entry.context ? ` [${entry.context}]` : ''}\n${entry.message}${entry.details?.length ? `\n${formatJson(entry.details)}` : ''}`,
+                )
+                .join('\n\n') || '(related application logs unavailable)'}
             </CodeText>
           </Section>
 
@@ -110,6 +121,7 @@ export default function AdminDiagnosticPanel({ diagnostic, error }: Props) {
           ) : null}
 
           {resolved.truncated ||
+          resolved.diagnosticEvents.truncated ||
           resolved.serverLogs.truncated ||
           resolved.exception.truncated ? (
             <Text style={styles.truncated}>

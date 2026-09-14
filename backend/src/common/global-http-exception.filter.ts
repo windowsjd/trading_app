@@ -4,6 +4,7 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { STATUS_CODES } from 'node:http';
 import { Response } from 'express';
@@ -11,6 +12,7 @@ import type { AuthenticatedRequest } from '../auth/auth.types';
 import {
   type AdminDiagnostic,
   buildAdminDiagnostic,
+  getAdminDiagnosticRequestId,
 } from './admin-diagnostics';
 
 type ErrorEnvelope = {
@@ -25,6 +27,8 @@ type ErrorEnvelope = {
 
 @Catch()
 export class GlobalHttpExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(GlobalHttpExceptionFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const context = host.switchToHttp();
     const response = context.getResponse<Response>();
@@ -34,13 +38,30 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
     const envelope = this.toErrorEnvelope(exception, status);
+    const request = context.getRequest?.<AuthenticatedRequest>();
+    if (request?.user?.role === 'admin') {
+      const logMessage = JSON.stringify({
+        event: 'admin_http_request_failed',
+        requestId: getAdminDiagnosticRequestId(),
+        code: envelope.error.code,
+        httpStatus: status,
+        exceptionType:
+          exception instanceof Error ? exception.name : typeof exception,
+      });
+      if (status >= 500) {
+        this.logger.error(logMessage);
+      } else {
+        this.logger.warn(logMessage);
+      }
+    }
+
     const diagnostic = buildAdminDiagnostic(
       exception,
       envelope.error.code,
       status,
       {
         entities: {
-          userId: context.getRequest?.<AuthenticatedRequest>()?.user?.userId,
+          userId: request?.user?.userId,
         },
       },
     );

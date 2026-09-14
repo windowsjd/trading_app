@@ -34,6 +34,14 @@ export interface AdminDiagnosticLogEventDto {
   context?: Record<string, unknown>;
 }
 
+export interface AdminDiagnosticServerLogEntryDto {
+  timestamp: IsoDateTimeString;
+  level: 'debug' | 'info' | 'warn' | 'error';
+  context?: string;
+  message: string;
+  details?: unknown[];
+}
+
 export interface AdminDiagnosticDto {
   version: 1;
   code: string;
@@ -53,8 +61,12 @@ export interface AdminDiagnosticDto {
     stack: string[];
     truncated: boolean;
   };
-  serverLogs: {
+  diagnosticEvents: {
     events: AdminDiagnosticLogEventDto[];
+    truncated: boolean;
+  };
+  serverLogs: {
+    entries: AdminDiagnosticServerLogEntryDto[];
     truncated: boolean;
   };
   nextInvestigation?: string[];

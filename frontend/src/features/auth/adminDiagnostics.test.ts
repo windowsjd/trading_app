@@ -23,7 +23,8 @@ const diagnostic: AdminDiagnosticDto = {
     stack: [],
     truncated: false,
   },
-  serverLogs: { events: [], truncated: false },
+  diagnosticEvents: { events: [], truncated: false },
+  serverLogs: { entries: [], truncated: false },
   truncated: false,
 };
 
@@ -65,6 +66,9 @@ describe('admin inline diagnostics visibility', () => {
     assert.match(panel, /flexShrink:\s*1/u);
     assert.match(panel, /minWidth:\s*0/u);
     assert.doesNotMatch(panel, /horizontal/u);
+    assert.match(panel, /title="진단 이벤트"/u);
+    assert.match(panel, /title="관련 Server Logs"/u);
+    assert.match(panel, /serverLogs\.entries/u);
 
     for (const sourcePath of [
       'screens/home/PortfolioScreen.tsx',

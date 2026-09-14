@@ -1212,6 +1212,7 @@ describe('AppController (e2e)', () => {
       id: user.id,
       email: user.email,
       nickname: user.nickname,
+      role: user.role,
       status: user.status,
     });
 
@@ -1229,6 +1230,7 @@ describe('AppController (e2e)', () => {
           id: user.id,
           email: user.email,
           nickname: user.nickname,
+          role: user.role,
           status: user.status,
         });
         expect(response.body.data.tokens.accessToken).toEqual(
@@ -1290,6 +1292,7 @@ describe('AppController (e2e)', () => {
           id: user.id,
           email: user.email,
           nickname: user.nickname,
+          role: user.role,
           status: user.status,
         });
         expect(response.body.data.tokens.accessToken).toEqual(
@@ -1566,6 +1569,7 @@ describe('AppController (e2e)', () => {
             email: user.email,
             nickname: user.nickname,
             profileImageUrl: null,
+            role: user.role,
             status: user.status,
             createdAt: now.toISOString(),
           },
@@ -1591,6 +1595,7 @@ describe('AppController (e2e)', () => {
           data: {
             id: user.id,
             email: user.email,
+            role: 'operator',
           },
         });
         expect(prisma.user.findUnique).toHaveBeenCalledTimes(2);

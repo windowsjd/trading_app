@@ -3,7 +3,8 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import type { NextFunction, Response } from 'express';
 import type { AuthenticatedRequest } from '../auth/auth.types';
 
-const MAX_LOG_EVENTS = 20;
+const MAX_DIAGNOSTIC_EVENTS = 20;
+const MAX_SERVER_LOG_ENTRIES = 20;
 const MAX_STACK_FRAMES = 24;
 const MAX_APPLICATION_STACK_FRAMES = 12;
 const MAX_STRING_LENGTH = 1_000;
@@ -25,6 +26,14 @@ export type AdminDiagnosticLogEvent = {
   context?: Record<string, DiagnosticValue>;
 };
 
+export type AdminDiagnosticServerLogEntry = {
+  timestamp: string;
+  level: 'debug' | 'info' | 'warn' | 'error';
+  context?: string;
+  message: string;
+  details?: DiagnosticValue[];
+};
+
 export type AdminDiagnostic = {
   version: 1;
   code: string;
@@ -44,8 +53,12 @@ export type AdminDiagnostic = {
     stack: string[];
     truncated: boolean;
   };
-  serverLogs: {
+  diagnosticEvents: {
     events: AdminDiagnosticLogEvent[];
+    truncated: boolean;
+  };
+  serverLogs: {
+    entries: AdminDiagnosticServerLogEntry[];
     truncated: boolean;
   };
   nextInvestigation?: string[];
@@ -55,6 +68,8 @@ export type AdminDiagnostic = {
 type RequestDiagnosticContext = {
   request: AuthenticatedRequest;
   requestId: string;
+  requestEntities: Record<string, unknown>;
+  requestNextInvestigation: string[];
   domain: string;
   operation: string;
   failureStage: string;
@@ -68,7 +83,15 @@ type RequestDiagnosticContext = {
     message: string;
     context?: Record<string, unknown>;
   }>;
-  logsTruncated: boolean;
+  diagnosticEventsTruncated: boolean;
+  serverLogs: Array<{
+    timestamp: string;
+    level: AdminDiagnosticServerLogEntry['level'];
+    context?: string;
+    message: string;
+    details?: DiagnosticValue[];
+  }>;
+  serverLogsTruncated: boolean;
 };
 
 export type DiagnosticContextUpdate = {
@@ -92,6 +115,8 @@ export function adminDiagnosticRequestMiddleware(
   const context: RequestDiagnosticContext = {
     request,
     requestId,
+    requestEntities: { ...route.entities },
+    requestNextInvestigation: [...route.nextInvestigation],
     domain: route.domain,
     operation: route.operation,
     failureStage: 'request_processing',
@@ -99,7 +124,9 @@ export function adminDiagnosticRequestMiddleware(
     evidence: {},
     nextInvestigation: route.nextInvestigation,
     events: [],
-    logsTruncated: false,
+    diagnosticEventsTruncated: false,
+    serverLogs: [],
+    serverLogsTruncated: false,
   };
 
   response.setHeader('x-request-id', requestId);
@@ -139,9 +166,9 @@ export function recordAdminDiagnosticEvent(
 ): void {
   const context = requestDiagnostics.getStore();
   if (!context) return;
-  if (context.events.length >= MAX_LOG_EVENTS) {
+  if (context.events.length >= MAX_DIAGNOSTIC_EVENTS) {
     context.events.shift();
-    context.logsTruncated = true;
+    context.diagnosticEventsTruncated = true;
   }
   context.events.push({
     timestamp: new Date().toISOString(),
@@ -152,38 +179,141 @@ export function recordAdminDiagnosticEvent(
   });
 }
 
+export function recordAdminApplicationLog(
+  level: AdminDiagnosticServerLogEntry['level'],
+  message: unknown,
+  optionalParams: unknown[] = [],
+): void {
+  const context = requestDiagnostics.getStore();
+  if (!context || context.request.user?.role !== 'admin') return;
+  if (context.serverLogs.length >= MAX_SERVER_LOG_ENTRIES) {
+    context.serverLogs.shift();
+    context.serverLogsTruncated = true;
+  }
+  const loggerContext =
+    typeof optionalParams.at(-1) === 'string'
+      ? (optionalParams.at(-1) as string)
+      : undefined;
+  const details = loggerContext ? optionalParams.slice(0, -1) : optionalParams;
+  if (
+    hasSanitizationLoss(message) ||
+    hasSanitizationLoss(details) ||
+    (loggerContext?.length ?? 0) > MAX_STRING_LENGTH
+  ) {
+    context.serverLogsTruncated = true;
+  }
+  context.serverLogs.push({
+    timestamp: new Date().toISOString(),
+    level,
+    ...(loggerContext ? { context: sanitizeString(loggerContext) } : {}),
+    message: sanitizeLogMessage(message),
+    ...(details.length
+      ? { details: sanitizeValue(details, 0) as DiagnosticValue[] }
+      : {}),
+  });
+}
+
+export function getAdminDiagnosticRequestId(): string | undefined {
+  return requestDiagnostics.getStore()?.requestId;
+}
+
+export function isAdminDiagnosticRequest(): boolean {
+  return requestDiagnostics.getStore()?.request.user?.role === 'admin';
+}
+
 export function buildAdminDiagnostic(
   exception: unknown,
   code: string,
   httpStatus: number,
   update?: DiagnosticContextUpdate,
 ): AdminDiagnostic | undefined {
+  return buildAdminDiagnosticInternal(
+    exception,
+    code,
+    httpStatus,
+    update,
+    false,
+  );
+}
+
+function buildAdminDiagnosticInternal(
+  exception: unknown,
+  code: string,
+  httpStatus: number,
+  update: DiagnosticContextUpdate | undefined,
+  isolateFailure: boolean,
+): AdminDiagnostic | undefined {
   const context = requestDiagnostics.getStore();
   if (!context || context.request.user?.role !== 'admin') {
     return undefined;
   }
-  if (update) setAdminDiagnosticContext(update);
-  if (context.failureStage === 'request_processing') {
+  if (update && !isolateFailure) setAdminDiagnosticContext(update);
+  if (!isolateFailure && context.failureStage === 'request_processing') {
     context.failureStage = inferFailureStage(code);
   }
 
-  recordAdminDiagnosticEvent(
-    'error',
-    'REQUEST_FAILED',
-    `${code} (${httpStatus})`,
-    {
-      failureStage: context.failureStage,
+  const domain = isolateFailure
+    ? (update?.domain ?? context.domain)
+    : context.domain;
+  const operation = isolateFailure
+    ? (update?.operation ?? context.operation)
+    : context.operation;
+  const failureStage = isolateFailure
+    ? (update?.failureStage ?? inferFailureStage(code))
+    : context.failureStage;
+  const entities = isolateFailure
+    ? { ...context.requestEntities, ...update?.entities }
+    : context.entities;
+  const evidence = isolateFailure ? (update?.evidence ?? {}) : context.evidence;
+  const nextInvestigation = isolateFailure
+    ? unique([
+        ...context.requestNextInvestigation,
+        ...(update?.nextInvestigation ?? []),
+      ]).slice(0, 8)
+    : context.nextInvestigation;
+  const serverLogSource = isolateFailure
+    ? selectFailureRelatedServerLogs(context.serverLogs, update, code)
+    : context.serverLogs;
+
+  const failureEvent = {
+    timestamp: new Date().toISOString(),
+    level: 'error' as const,
+    event: isolateFailure ? 'PARTIAL_FAILURE_RECORDED' : 'REQUEST_FAILED',
+    message: `${code} (${httpStatus})`,
+    context: {
+      failureStage,
     },
-  );
+  };
+  let diagnosticEventSource = context.events;
+  if (isolateFailure) {
+    diagnosticEventSource = [
+      ...context.events.filter(
+        (event) => event.event === 'HTTP_REQUEST_RECEIVED',
+      ),
+      failureEvent,
+    ];
+  } else {
+    recordAdminDiagnosticEvent(
+      failureEvent.level,
+      failureEvent.event,
+      failureEvent.message,
+      failureEvent.context,
+    );
+  }
 
   const exceptionDetails = describeException(exception);
   const contentTruncated =
-    hasSanitizationLoss(context.entities) ||
-    hasSanitizationLoss(context.evidence) ||
-    context.events.some(
+    hasSanitizationLoss(entities) ||
+    hasSanitizationLoss(evidence) ||
+    diagnosticEventSource.some(
       (entry) =>
         entry.message.length > MAX_STRING_LENGTH ||
         hasSanitizationLoss(entry.context),
+    ) ||
+    serverLogSource.some(
+      (entry) =>
+        entry.message.length > MAX_STRING_LENGTH ||
+        hasSanitizationLoss(entry.details),
     );
 
   const diagnostic: AdminDiagnostic = {
@@ -192,33 +322,42 @@ export function buildAdminDiagnostic(
     httpStatus,
     timestamp: new Date().toISOString(),
     requestId: context.requestId,
-    domain: sanitizeString(context.domain),
-    operation: sanitizeString(context.operation),
-    failureStage: sanitizeString(context.failureStage),
-    ...(nonEmptyRecord(context.entities)
-      ? { entities: sanitizeRecord(context.entities) }
-      : {}),
-    ...(nonEmptyRecord(context.evidence)
-      ? { evidence: sanitizeRecord(context.evidence) }
-      : {}),
+    domain: sanitizeString(domain),
+    operation: sanitizeString(operation),
+    failureStage: sanitizeString(failureStage),
+    ...(nonEmptyRecord(entities) ? { entities: sanitizeRecord(entities) } : {}),
+    ...(nonEmptyRecord(evidence) ? { evidence: sanitizeRecord(evidence) } : {}),
     exception: exceptionDetails,
-    serverLogs: {
-      events: context.events.map((entry) => ({
+    diagnosticEvents: {
+      events: diagnosticEventSource.map((entry) => ({
         timestamp: entry.timestamp,
         level: entry.level,
         event: sanitizeString(entry.event),
         message: sanitizeString(entry.message),
         ...(entry.context ? { context: sanitizeRecord(entry.context) } : {}),
       })),
-      truncated: context.logsTruncated,
+      truncated: isolateFailure ? false : context.diagnosticEventsTruncated,
     },
-    ...(context.nextInvestigation.length
+    serverLogs: {
+      entries: serverLogSource.map((entry) => ({
+        timestamp: entry.timestamp,
+        level: entry.level,
+        ...(entry.context ? { context: entry.context } : {}),
+        message: entry.message,
+        ...(entry.details?.length ? { details: entry.details } : {}),
+      })),
+      truncated: context.serverLogsTruncated,
+    },
+    ...(nextInvestigation.length
       ? {
-          nextInvestigation: context.nextInvestigation.map(sanitizeString),
+          nextInvestigation: nextInvestigation.map(sanitizeString),
         }
       : {}),
     truncated:
-      context.logsTruncated || contentTruncated || exceptionDetails.truncated,
+      context.diagnosticEventsTruncated ||
+      context.serverLogsTruncated ||
+      contentTruncated ||
+      exceptionDetails.truncated,
   };
 
   return enforceTotalBound(diagnostic);
@@ -229,7 +368,7 @@ export function buildAdminPartialFailureDiagnostic(
   code: string,
   update: DiagnosticContextUpdate,
 ): AdminDiagnostic | undefined {
-  return buildAdminDiagnostic(exception, code, 200, update);
+  return buildAdminDiagnosticInternal(exception, code, 200, update, true);
 }
 
 function resolveRequestId(value: string | string[] | undefined): string {
@@ -419,6 +558,54 @@ function sanitizeString(value: string): string {
     : `${redacted.slice(0, MAX_STRING_LENGTH - 3)}...`;
 }
 
+function sanitizeLogMessage(value: unknown): string {
+  if (value instanceof Error) {
+    return sanitizeString(`${value.name}: ${value.message}`);
+  }
+  if (typeof value === 'string') return sanitizeString(value);
+  const sanitized = sanitizeValue(value, 0);
+  try {
+    return sanitizeString(JSON.stringify(sanitized));
+  } catch {
+    return '[UNSERIALIZABLE_LOG_MESSAGE]';
+  }
+}
+
+function selectFailureRelatedServerLogs(
+  entries: RequestDiagnosticContext['serverLogs'],
+  update: DiagnosticContextUpdate | undefined,
+  code: string,
+): RequestDiagnosticContext['serverLogs'] {
+  const failureEntityKeys = new Set([
+    'assetId',
+    'snapshotId',
+    'quoteId',
+    'orderId',
+    'exchangeTransactionId',
+    'fxExecuteRequestId',
+  ]);
+  const entityEntries = Object.entries(update?.entities ?? {})
+    .filter(([key]) => failureEntityKeys.has(key))
+    .filter((entry): entry is [string, string | number] => {
+      const value = entry[1];
+      return (
+        (typeof value === 'string' && value.length > 0) ||
+        typeof value === 'number'
+      );
+    });
+
+  return entries.filter((entry) => {
+    const searchable = [
+      entry.message,
+      ...(entry.details ?? []).map(sanitizeLogMessage),
+    ].join(' ');
+    if (!entityEntries.length) return searchable.includes(code);
+    return entityEntries.some(([key, value]) =>
+      searchable.includes(`${JSON.stringify(key)}:${JSON.stringify(value)}`),
+    );
+  });
+}
+
 function hasSanitizationLoss(
   value: unknown,
   depth = 0,
@@ -461,7 +648,10 @@ function enforceTotalBound(diagnostic: AdminDiagnostic): AdminDiagnostic {
   diagnostic.exception.truncated = true;
   diagnostic.exception.stack = diagnostic.exception.applicationStack;
   if (byteLength(diagnostic) <= MAX_DIAGNOSTIC_BYTES) return diagnostic;
-  diagnostic.serverLogs.events = diagnostic.serverLogs.events.slice(-8);
+  diagnostic.diagnosticEvents.events =
+    diagnostic.diagnosticEvents.events.slice(-8);
+  diagnostic.diagnosticEvents.truncated = true;
+  diagnostic.serverLogs.entries = diagnostic.serverLogs.entries.slice(-8);
   diagnostic.serverLogs.truncated = true;
   if (byteLength(diagnostic) <= MAX_DIAGNOSTIC_BYTES) return diagnostic;
   diagnostic.evidence = { truncated: true };
@@ -470,7 +660,9 @@ function enforceTotalBound(diagnostic: AdminDiagnostic): AdminDiagnostic {
   if (byteLength(diagnostic) <= MAX_DIAGNOSTIC_BYTES) return diagnostic;
   delete diagnostic.nextInvestigation;
   if (byteLength(diagnostic) <= MAX_DIAGNOSTIC_BYTES) return diagnostic;
-  diagnostic.serverLogs.events = [];
+  diagnostic.diagnosticEvents.events = [];
+  diagnostic.diagnosticEvents.truncated = true;
+  diagnostic.serverLogs.entries = [];
   diagnostic.serverLogs.truncated = true;
   if (byteLength(diagnostic) <= MAX_DIAGNOSTIC_BYTES) return diagnostic;
   diagnostic.exception.stack = [];
