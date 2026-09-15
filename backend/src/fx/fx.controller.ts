@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Query, Req } from '@nestjs/common';
+import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import { Request } from 'express';
 import { FxService } from './fx.service';
 import type {
@@ -19,13 +20,28 @@ export class FxController {
   constructor(private readonly fxService: FxService) {}
 
   @Get('rates/current')
-  currentRate(@Query() query: FxCurrentRateQuery) {
+  currentRate(
+    @Query(
+      new ScalarQueryPipe({
+        baseCurrency: 'UNSUPPORTED_FX_PAIR',
+        quoteCurrency: 'UNSUPPORTED_FX_PAIR',
+        refresh: 'INVALID_REFRESH',
+      } satisfies Record<keyof FxCurrentRateQuery, string>),
+    )
+    query: FxCurrentRateQuery,
+  ) {
     return this.fxService.currentRate(query);
   }
 
   @Get('exchanges')
   exchanges(
-    @Query() query: FxExchangesQuery,
+    @Query(
+      new ScalarQueryPipe({
+        limit: 'INVALID_LIMIT',
+        offset: 'INVALID_OFFSET',
+      } satisfies Record<keyof FxExchangesQuery, string>),
+    )
+    query: FxExchangesQuery,
     @Req() request: AuthenticatedRequest,
   ) {
     return this.fxService.getExchanges(this.extractUserId(request), query);

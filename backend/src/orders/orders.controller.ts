@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import { Request } from 'express';
 import { OrdersService } from './orders.service';
 import type { OrderRequestBody, OrdersQuery } from './orders.service';
@@ -14,7 +15,20 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Get()
-  getOrders(@Req() request: AuthenticatedRequest, @Query() query: OrdersQuery) {
+  getOrders(
+    @Req() request: AuthenticatedRequest,
+    @Query(
+      new ScalarQueryPipe({
+        seasonId: 'VALIDATION_ERROR',
+        status: 'INVALID_ORDER_STATUS',
+        side: 'INVALID_ORDER_SIDE',
+        assetId: 'VALIDATION_ERROR',
+        limit: 'INVALID_LIMIT',
+        offset: 'INVALID_OFFSET',
+      } satisfies Record<keyof OrdersQuery, string>),
+    )
+    query: OrdersQuery,
+  ) {
     return this.ordersService.getOrders(this.extractUserId(request), query);
   }
 

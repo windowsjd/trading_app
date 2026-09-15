@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import { Request } from 'express';
 import { FxService } from './fx.service';
 import type {
@@ -52,7 +53,13 @@ export class TradingAccountFxController {
   @Get('transactions')
   transactions(
     @Param('accountId') accountId: string,
-    @Query() query: FxExchangesQuery,
+    @Query(
+      new ScalarQueryPipe({
+        limit: 'INVALID_LIMIT',
+        offset: 'INVALID_OFFSET',
+      } satisfies Record<keyof FxExchangesQuery, string>),
+    )
+    query: FxExchangesQuery,
     @Req() request: AuthenticatedRequest,
   ) {
     return this.fxService.getExchangesForTradingAccount(

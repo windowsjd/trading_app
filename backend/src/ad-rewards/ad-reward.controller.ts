@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import { Request } from 'express';
 import {
   AdRewardService,
@@ -58,7 +59,13 @@ export class AdRewardController {
   listClaims(
     @Req() request: AuthenticatedRequest,
     @Param('accountId') accountId: string,
-    @Query() query: AdRewardClaimsQuery,
+    @Query(
+      new ScalarQueryPipe({
+        limit: 'AD_REWARD_INVALID_REQUEST',
+        offset: 'AD_REWARD_INVALID_REQUEST',
+      } satisfies Record<keyof AdRewardClaimsQuery, string>),
+    )
+    query: AdRewardClaimsQuery,
   ) {
     return this.adRewardService.listClaims(
       this.extractUserId(request),

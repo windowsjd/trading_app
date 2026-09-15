@@ -4165,4 +4165,328 @@ describe('AppController (e2e)', () => {
       });
     },
   );
+
+  describe('HTTP query runtime boundary', () => {
+    // Independent API expectations: every query route is exercised through
+    // the real AppModule, auth guards, Nest pipes, services and error filter.
+    const surfaces: Array<[string, string, string]> = [
+      ['/assets', 'limit', 'INVALID_LIMIT'],
+      ['/assets', 'offset', 'INVALID_OFFSET'],
+      ['/assets', 'assetType', 'INVALID_ASSET_TYPE'],
+      ['/assets', 'currencyCode', 'INVALID_CURRENCY_CODE'],
+      ['/assets', 'market', 'VALIDATION_ERROR'],
+      ['/assets', 'search', 'VALIDATION_ERROR'],
+      ['/assets', 'includeInactive', 'INVALID_INCLUDE_INACTIVE'],
+      ['/assets', 'withPrice', 'INVALID_WITH_PRICE'],
+      ['/assets/asset-1/candles', 'limit', 'INVALID_CANDLE_LIMIT'],
+      ['/assets/asset-1/candles', 'interval', 'ASSET_CANDLES_INVALID_INTERVAL'],
+      ['/assets/asset-1/candles', 'range', 'ASSET_CANDLES_INVALID_RANGE'],
+      ['/assets/asset-1/candles', 'date', 'INVALID_CANDLE_DATE'],
+      ['/assets/asset-1/candles', 'to', 'INVALID_CANDLE_TO'],
+      [
+        '/assets/asset-1/candles',
+        'includePrevious',
+        'INVALID_CANDLE_INCLUDE_PREVIOUS',
+      ],
+      ['/orders', 'limit', 'INVALID_LIMIT'],
+      ['/orders', 'status', 'INVALID_ORDER_STATUS'],
+      ['/orders', 'side', 'INVALID_ORDER_SIDE'],
+      ['/orders', 'seasonId', 'VALIDATION_ERROR'],
+      ['/trading-accounts/account-1/orders', 'assetId', 'VALIDATION_ERROR'],
+      ['/wallets/transactions', 'offset', 'INVALID_OFFSET'],
+      ['/wallets/transactions', 'currency', 'INVALID_CURRENCY'],
+      ['/wallets/transactions', 'direction', 'INVALID_DIRECTION'],
+      [
+        '/trading-accounts/account-1/wallet-transactions',
+        'txType',
+        'INVALID_TX_TYPE',
+      ],
+      ['/positions', 'includeClosed', 'INVALID_INCLUDE_CLOSED'],
+      ['/positions', 'assetType', 'INVALID_ASSET_TYPE'],
+      [
+        '/trading-accounts/account-1/positions',
+        'currencyCode',
+        'INVALID_CURRENCY_CODE',
+      ],
+      ['/fx/exchanges', 'limit', 'INVALID_LIMIT'],
+      [
+        '/trading-accounts/account-1/fx/transactions',
+        'offset',
+        'INVALID_OFFSET',
+      ],
+      ['/fx/rates/current', 'baseCurrency', 'UNSUPPORTED_FX_PAIR'],
+      ['/fx/rates/current', 'quoteCurrency', 'UNSUPPORTED_FX_PAIR'],
+      ['/fx/rates/current', 'refresh', 'INVALID_REFRESH'],
+      ['/portfolio/equity', 'range', 'INVALID_RANGE'],
+      [
+        '/trading-accounts/account-1/portfolio/equity',
+        'range',
+        'INVALID_RANGE',
+      ],
+      [
+        '/trading-accounts/account-1/portfolio/equity',
+        'granularity',
+        'INVALID_GRANULARITY',
+      ],
+      ['/seasons', 'status', 'INVALID_SEASON_STATUS'],
+      ['/ranking', 'rankType', 'INVALID_RANK_TYPE'],
+      ['/ranking', 'rankingDate', 'INVALID_RANKING_DATE'],
+      ['/ranking', 'capturedAt', 'INVALID_RANKING_CAPTURED_AT'],
+      ['/ranking', 'scope', 'INVALID_RANKING_SCOPE'],
+      ['/records', 'type', 'INVALID_RECORD_TYPE'],
+      ['/records', 'currencyCode', 'INVALID_CURRENCY_CODE'],
+      ['/records/me/seasons', 'seasonStatus', 'INVALID_SEASON_STATUS'],
+      ['/records/me/seasons/season-1/equity', 'limit', 'INVALID_LIMIT'],
+      ['/records/me/seasons/season-1/orders', 'side', 'INVALID_ORDER_SIDE'],
+      [
+        '/records/me/seasons/season-1/exchanges',
+        'fromCurrency',
+        'INVALID_FROM_CURRENCY',
+      ],
+      [
+        '/records/me/seasons/season-1/exchanges',
+        'toCurrency',
+        'INVALID_TO_CURRENCY',
+      ],
+      ['/rewards/me', 'limit', 'INVALID_LIMIT'],
+      ['/badges/me', 'offset', 'INVALID_OFFSET'],
+      [
+        '/operator/reward-fulfillments',
+        'status',
+        'REWARD_FULFILLMENT_INVALID_STATUS',
+      ],
+      ['/operator/reward-fulfillments', 'rewardCode', 'VALIDATION_ERROR'],
+      ['/operator/users', 'role', 'INVALID_USER_ROLE'],
+      ['/operator/users', 'status', 'INVALID_USER_STATUS'],
+      ['/operator/users', 'search', 'VALIDATION_ERROR'],
+      ['/operator/market-session-overrides', 'market', 'INVALID_MARKET'],
+      ['/operator/market-session-overrides', 'from', 'INVALID_OVERRIDE_QUERY'],
+      ['/operator/market-session-overrides', 'to', 'INVALID_OVERRIDE_QUERY'],
+      [
+        '/operator/market-session-overrides',
+        'includeInactive',
+        'INVALID_OVERRIDE_QUERY',
+      ],
+      [
+        '/trading-accounts/account-1/ad-rewards/claims',
+        'limit',
+        'AD_REWARD_INVALID_REQUEST',
+      ],
+      [
+        '/trading-accounts/account-1/ad-rewards/claims',
+        'offset',
+        'AD_REWARD_INVALID_REQUEST',
+      ],
+    ];
+    const malformedQueries = surfaces.flatMap(([path, field, code]) => [
+      [path, `${field}=20&${field}=30`, code],
+      [path, `${field}%5B%5D=20`, code],
+      [path, `${field}%5Bx%5D=20`, code],
+    ]);
+
+    it.each(malformedQueries)(
+      'rejects scalar shape %s?%s with %s',
+      async (path, query, code) => {
+        mockActiveUser(
+          user.id,
+          path.startsWith('/operator/') ? 'admin' : 'user',
+        );
+        await request(app.getHttpServer())
+          .get(`/api/v1${path}?${query}`)
+          .set('Authorization', `Bearer ${await createValidAccessToken()}`)
+          .expect(400)
+          .expect(({ body }) => {
+            expect(body).toMatchObject({ success: false, error: { code } });
+          });
+        expect(prisma.asset.count).not.toHaveBeenCalled();
+        expect(prisma.order.findMany).not.toHaveBeenCalled();
+        expect(prisma.walletTransaction.findMany).not.toHaveBeenCalled();
+        expectNoWriteMutationCalls();
+      },
+    );
+
+    it('documents the actual Express simple-parser shape', () => {
+      const instance = app.getHttpAdapter().getInstance() as {
+        get(name: string): unknown;
+      };
+      expect(instance.get('query parser')).toBe('simple');
+      const parse = instance.get('query parser fn') as (
+        text: string,
+      ) => unknown;
+      expect(parse('limit=20&limit=30')).toEqual({ limit: ['20', '30'] });
+      expect(parse('limit[]=20')).toEqual({ 'limit[]': '20' });
+      expect(parse('limit[x]=20')).toEqual({ 'limit[x]': '20' });
+    });
+
+    it.each(['limit%5B%5D=20', 'limit%5Bx%5D=20'])(
+      'also rejects array/object values from the extended parser: %s',
+      async (query) => {
+        const instance = app.getHttpAdapter().getInstance() as {
+          set(name: string, value: string): void;
+          get(name: string): unknown;
+        };
+        instance.set('query parser', 'extended');
+        const parse = instance.get('query parser fn') as (
+          text: string,
+        ) => unknown;
+        expect(parse(query)).toEqual({
+          limit: query.includes('%5Bx%5D') ? { x: '20' } : ['20'],
+        });
+        mockActiveUser();
+        await request(app.getHttpServer())
+          .get(`/api/v1/assets?${query}`)
+          .set('Authorization', `Bearer ${await createValidAccessToken()}`)
+          .expect(400)
+          .expect(({ body }) => expect(body.error.code).toBe('INVALID_LIMIT'));
+        expect(prisma.asset.count).not.toHaveBeenCalled();
+      },
+    );
+
+    const invalidIntegers = [
+      '-1',
+      '1.5',
+      '1e2',
+      'NaN',
+      'Infinity',
+      'abc',
+      '',
+      '9007199254740992',
+      '999999999999999999999999999999999',
+    ];
+    it.each(
+      invalidIntegers.flatMap((value) =>
+        ['limit', 'offset'].map((field) => [field, value]),
+      ),
+    )('rejects Assets integer %s=%s', async (field, value) => {
+      mockActiveUser();
+      await request(app.getHttpServer())
+        .get(`/api/v1/assets?${field}=${value}`)
+        .set('Authorization', `Bearer ${await createValidAccessToken()}`)
+        .expect(400)
+        .expect(({ body }) =>
+          expect(body.error.code).toBe(
+            field === 'limit' ? 'INVALID_LIMIT' : 'INVALID_OFFSET',
+          ),
+        );
+      expect(prisma.asset.count).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['limit=0', 'INVALID_LIMIT'],
+      ['withPrice=yes', 'INVALID_WITH_PRICE'],
+      ['includeInactive=1', 'INVALID_INCLUDE_INACTIVE'],
+      ['assetType=CRYPTO', 'INVALID_ASSET_TYPE'],
+      ['currencyCode=EUR', 'INVALID_CURRENCY_CODE'],
+    ])('preserves scalar value errors for Assets ?%s', async (query, code) => {
+      mockActiveUser();
+      await request(app.getHttpServer())
+        .get(`/api/v1/assets?${query}`)
+        .set('Authorization', `Bearer ${await createValidAccessToken()}`)
+        .expect(400)
+        .expect(({ body }) => expect(body.error.code).toBe(code));
+    });
+
+    it.each([
+      ['', 50, 0],
+      ['limit=20', 20, 0],
+      ['offset=0', 50, 0],
+      ['limit=%20020%20&offset=%202%20', 20, 2],
+      ['limit=101', 100, 0],
+      ['limit=9007199254740991', 100, 0],
+      ['withPrice=&includeInactive=&search=%20&market=%20', 50, 0],
+      ['unrecognized=x&unrecognized=y', 50, 0],
+    ])(
+      'preserves Assets defaults, trim and clamps: ?%s',
+      async (query, limit, offset) => {
+        mockActiveUser();
+        prisma.asset.count.mockResolvedValue(0);
+        prisma.asset.findMany.mockResolvedValue([]);
+        const { body } = await request(app.getHttpServer())
+          .get(`/api/v1/assets?${query}`)
+          .set('Authorization', `Bearer ${await createValidAccessToken()}`)
+          .expect(200);
+        expect(body.data.pagination).toMatchObject({ limit, offset });
+        expect(body.data.filters).toEqual({
+          assetType: null,
+          currencyCode: null,
+          market: null,
+          search: null,
+          includeInactive: false,
+          withPrice: true,
+        });
+        expect(prisma.asset.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ take: limit, skip: offset }),
+        );
+        expect(prisma.season.findFirst).not.toHaveBeenCalled();
+        expect(prisma.seasonParticipant.findUnique).not.toHaveBeenCalled();
+        expectNoWriteMutationCalls();
+      },
+    );
+
+    it('preserves supported Assets filter/search/withPrice combinations', async () => {
+      mockActiveUser();
+      prisma.asset.count.mockResolvedValue(0);
+      prisma.asset.findMany.mockResolvedValue([]);
+      const { body } = await request(app.getHttpServer())
+        .get(
+          '/api/v1/assets?assetType=%20crypto%20&currencyCode=USD&market=%20BINANCE%20&search=%20BTC%20&withPrice=false&includeInactive=true&limit=20&offset=2',
+        )
+        .set('Authorization', `Bearer ${await createValidAccessToken()}`)
+        .expect(200);
+      expect(body.data.filters).toEqual({
+        assetType: 'crypto',
+        currencyCode: 'USD',
+        market: 'BINANCE',
+        search: 'BTC',
+        withPrice: false,
+        includeInactive: true,
+      });
+      expect(prisma.asset.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            assetType: 'crypto',
+            currencyCode: 'USD',
+            market: 'BINANCE',
+            OR: [
+              { symbol: { contains: 'BTC', mode: 'insensitive' } },
+              { name: { contains: 'BTC', mode: 'insensitive' } },
+            ],
+          },
+          take: 20,
+          skip: 2,
+        }),
+      );
+      expect(prisma.assetPriceSnapshot.findMany).not.toHaveBeenCalled();
+      expect(prisma.fxRateSnapshot.findMany).not.toHaveBeenCalled();
+    });
+
+    it.each([new TypeError('internal bug'), new Error('database unavailable')])(
+      'keeps genuine internal errors at 500: %p',
+      async (error) => {
+        mockActiveUser();
+        prisma.asset.count.mockRejectedValue(error);
+        prisma.asset.findMany.mockResolvedValue([]);
+        await request(app.getHttpServer())
+          .get('/api/v1/assets?limit=20')
+          .set('Authorization', `Bearer ${await createValidAccessToken()}`)
+          .expect(500)
+          .expect(({ body }) =>
+            expect(body).toEqual({
+              success: false,
+              error: {
+                code: 'INTERNAL_SERVER_ERROR',
+                message: 'Internal server error.',
+              },
+            }),
+          );
+      },
+    );
+
+    it('keeps authentication ahead of malformed-query validation', async () => {
+      await request(app.getHttpServer())
+        .get('/api/v1/assets?limit=20&limit=30')
+        .expect(401)
+        .expect(({ body }) => expect(body.error.code).toBe('UNAUTHORIZED'));
+    });
+  });
 });

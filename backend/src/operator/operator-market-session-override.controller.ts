@@ -11,10 +11,12 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import type { AuthenticatedRequest } from '../auth/auth.types';
 import { OperatorGuard } from './operator.guard';
 import {
   OperatorMarketSessionOverrideService,
+  type MarketSessionOverrideListQuery,
   type MarketSessionOverrideStatusBody,
   type MarketSessionOverrideUpdateBody,
   type MarketSessionOverrideUpsertBody,
@@ -30,17 +32,17 @@ export class OperatorMarketSessionOverrideController {
   @Get('market-session-overrides')
   listOverrides(
     @Req() request: AuthenticatedRequest,
-    @Query('market') market?: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-    @Query('includeInactive') includeInactive?: string,
+    @Query(
+      new ScalarQueryPipe({
+        market: 'INVALID_MARKET',
+        from: 'INVALID_OVERRIDE_QUERY',
+        to: 'INVALID_OVERRIDE_QUERY',
+        includeInactive: 'INVALID_OVERRIDE_QUERY',
+      } satisfies Record<keyof MarketSessionOverrideListQuery, string>),
+    )
+    query: MarketSessionOverrideListQuery,
   ) {
-    return this.overrideService.listOverrides(request.user, {
-      market,
-      from,
-      to,
-      includeInactive,
-    });
+    return this.overrideService.listOverrides(request.user, query);
   }
 
   @Get('market-session-overrides/:overrideId')

@@ -1,4 +1,5 @@
 import { Controller, Get, Param, Query, Req } from '@nestjs/common';
+import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import { Request } from 'express';
 import { AssetCandlesService } from './asset-candles.service';
 import type { AssetCandlesQuery } from './asset-candles.service';
@@ -19,7 +20,22 @@ export class AssetsController {
   ) {}
 
   @Get()
-  getAssets(@Req() request: AuthenticatedRequest, @Query() query: AssetsQuery) {
+  getAssets(
+    @Req() request: AuthenticatedRequest,
+    @Query(
+      new ScalarQueryPipe({
+        assetType: 'INVALID_ASSET_TYPE',
+        currencyCode: 'INVALID_CURRENCY_CODE',
+        market: 'VALIDATION_ERROR',
+        search: 'VALIDATION_ERROR',
+        includeInactive: 'INVALID_INCLUDE_INACTIVE',
+        withPrice: 'INVALID_WITH_PRICE',
+        limit: 'INVALID_LIMIT',
+        offset: 'INVALID_OFFSET',
+      } satisfies Record<keyof AssetsQuery, string>),
+    )
+    query: AssetsQuery,
+  ) {
     return this.assetsService.getAssets(this.extractUserId(request), query);
   }
 
@@ -27,7 +43,17 @@ export class AssetsController {
   getAssetCandles(
     @Req() request: AuthenticatedRequest,
     @Param('assetId') assetId: string,
-    @Query() query: AssetCandlesQuery,
+    @Query(
+      new ScalarQueryPipe({
+        interval: 'ASSET_CANDLES_INVALID_INTERVAL',
+        range: 'ASSET_CANDLES_INVALID_RANGE',
+        limit: 'INVALID_CANDLE_LIMIT',
+        date: 'INVALID_CANDLE_DATE',
+        to: 'INVALID_CANDLE_TO',
+        includePrevious: 'INVALID_CANDLE_INCLUDE_PREVIOUS',
+      } satisfies Record<keyof AssetCandlesQuery, string>),
+    )
+    query: AssetCandlesQuery,
   ) {
     return this.assetCandlesService.getAssetCandles(
       this.extractUserId(request),

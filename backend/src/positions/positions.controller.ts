@@ -1,4 +1,5 @@
 import { Controller, Get, Query, Req } from '@nestjs/common';
+import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import { Request } from 'express';
 import { PositionsService } from './positions.service';
 import type { PositionsQuery } from './positions.service';
@@ -16,7 +17,18 @@ export class PositionsController {
   @Get()
   getPositions(
     @Req() request: AuthenticatedRequest,
-    @Query() query: PositionsQuery,
+    @Query(
+      new ScalarQueryPipe({
+        seasonId: 'VALIDATION_ERROR',
+        includeClosed: 'INVALID_INCLUDE_CLOSED',
+        assetType: 'INVALID_ASSET_TYPE',
+        currencyCode: 'INVALID_CURRENCY_CODE',
+        assetId: 'VALIDATION_ERROR',
+        limit: 'INVALID_LIMIT',
+        offset: 'INVALID_OFFSET',
+      } satisfies Record<keyof PositionsQuery, string>),
+    )
+    query: PositionsQuery,
   ) {
     return this.positionsService.getPositions(
       this.extractUserId(request),

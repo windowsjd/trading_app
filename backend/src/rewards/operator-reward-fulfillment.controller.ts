@@ -9,6 +9,7 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
+import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import type { AuthenticatedRequest } from '../auth/auth.types';
 import {
   RewardFulfillmentService,
@@ -26,7 +27,18 @@ export class OperatorRewardFulfillmentController {
   @Get()
   list(
     @Req() request: AuthenticatedRequest,
-    @Query() query: RewardFulfillmentQuery,
+    @Query(
+      new ScalarQueryPipe({
+        status: 'REWARD_FULFILLMENT_INVALID_STATUS',
+        seasonId: 'VALIDATION_ERROR',
+        userId: 'VALIDATION_ERROR',
+        seasonParticipantId: 'VALIDATION_ERROR',
+        rewardCode: 'VALIDATION_ERROR',
+        limit: 'INVALID_LIMIT',
+        offset: 'INVALID_OFFSET',
+      } satisfies Record<keyof RewardFulfillmentQuery, string>),
+    )
+    query: RewardFulfillmentQuery,
   ) {
     return this.rewardFulfillmentService.listFulfillments(
       request.user,

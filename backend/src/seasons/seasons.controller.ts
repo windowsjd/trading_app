@@ -1,4 +1,5 @@
 import { Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import { Request } from 'express';
 import { OptionalAuth } from '../auth/auth.decorators';
 import { SeasonsService } from './seasons.service';
@@ -16,7 +17,16 @@ export class SeasonsController {
 
   @OptionalAuth()
   @Get()
-  getSeasons(@Query() query: SeasonsListQuery) {
+  getSeasons(
+    @Query(
+      new ScalarQueryPipe({
+        status: 'INVALID_SEASON_STATUS',
+        limit: 'INVALID_LIMIT',
+        offset: 'INVALID_OFFSET',
+      } satisfies Record<keyof SeasonsListQuery, string>),
+    )
+    query: SeasonsListQuery,
+  ) {
     return this.seasonsService.getSeasons(query);
   }
 

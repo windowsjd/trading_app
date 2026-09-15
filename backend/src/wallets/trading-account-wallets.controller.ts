@@ -1,4 +1,5 @@
 import { Controller, Get, Param, Query, Req } from '@nestjs/common';
+import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import { Request } from 'express';
 import { WalletsService } from './wallets.service';
 import type { WalletTransactionsQuery } from './wallets.service';
@@ -33,7 +34,16 @@ export class TradingAccountWalletsController {
   getWalletTransactions(
     @Req() request: AuthenticatedRequest,
     @Param('accountId') accountId: string,
-    @Query() query: WalletTransactionsQuery,
+    @Query(
+      new ScalarQueryPipe({
+        currency: 'INVALID_CURRENCY',
+        direction: 'INVALID_DIRECTION',
+        txType: 'INVALID_TX_TYPE',
+        limit: 'INVALID_LIMIT',
+        offset: 'INVALID_OFFSET',
+      } satisfies Record<keyof WalletTransactionsQuery, string>),
+    )
+    query: WalletTransactionsQuery,
   ) {
     return this.walletsService.getWalletTransactionsForTradingAccount(
       this.extractUserId(request),

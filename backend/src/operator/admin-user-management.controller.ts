@@ -7,6 +7,7 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
+import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import type { AuthenticatedRequest } from '../auth/auth.types';
 import { OperatorAccountManagementService } from './operator-account-management.service';
 import type {
@@ -23,7 +24,16 @@ export class AdminUserManagementController {
   @Get('users')
   listUsers(
     @Req() request: AuthenticatedRequest,
-    @Query() query: UserManagementQuery,
+    @Query(
+      new ScalarQueryPipe({
+        role: 'INVALID_USER_ROLE',
+        status: 'INVALID_USER_STATUS',
+        search: 'VALIDATION_ERROR',
+        limit: 'INVALID_LIMIT',
+        offset: 'INVALID_OFFSET',
+      } satisfies Record<keyof UserManagementQuery, string>),
+    )
+    query: UserManagementQuery,
   ) {
     return this.accountManagementService.listUsers(
       request.user,

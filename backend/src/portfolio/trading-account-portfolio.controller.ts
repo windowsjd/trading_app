@@ -1,4 +1,5 @@
 import { Controller, Get, Param, Query, Req } from '@nestjs/common';
+import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import { Request } from 'express';
 import {
   TradingAccountPortfolioService,
@@ -41,7 +42,13 @@ export class TradingAccountPortfolioController {
   getEquity(
     @Req() request: AuthenticatedRequest,
     @Param('accountId') accountId: string,
-    @Query() query: TradingAccountEquityQuery,
+    @Query(
+      new ScalarQueryPipe({
+        range: 'INVALID_RANGE',
+        granularity: 'INVALID_GRANULARITY',
+      } satisfies Record<keyof TradingAccountEquityQuery, string>),
+    )
+    query: TradingAccountEquityQuery,
   ) {
     return this.portfolioService.getEquity(
       this.extractUserId(request),

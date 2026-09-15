@@ -1,4 +1,5 @@
 import { Controller, Get, Query, Req } from '@nestjs/common';
+import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import { Request } from 'express';
 import { RewardsService } from './rewards.service';
 import type { RewardsQuery } from './rewards.service';
@@ -16,7 +17,13 @@ export class RewardsController {
   @Get('rewards/me')
   getMyRewards(
     @Req() request: AuthenticatedRequest,
-    @Query() query: RewardsQuery,
+    @Query(
+      new ScalarQueryPipe({
+        limit: 'INVALID_LIMIT',
+        offset: 'INVALID_OFFSET',
+      } satisfies Record<keyof RewardsQuery, string>),
+    )
+    query: RewardsQuery,
   ) {
     return this.rewardsService.getMyRewards(this.extractUserId(request), query);
   }
@@ -24,7 +31,13 @@ export class RewardsController {
   @Get('badges/me')
   getMyBadges(
     @Req() request: AuthenticatedRequest,
-    @Query() query: RewardsQuery,
+    @Query(
+      new ScalarQueryPipe({
+        limit: 'INVALID_LIMIT',
+        offset: 'INVALID_OFFSET',
+      } satisfies Record<keyof RewardsQuery, string>),
+    )
+    query: RewardsQuery,
   ) {
     return this.rewardsService.getMyBadges(this.extractUserId(request), query);
   }

@@ -60,6 +60,12 @@ and matching policies are unchanged.
 
 ## GET /api/v1/assets
 
+HTTP query scalar fields are runtime-validated before service parsing. Duplicate
+values and bracket array/object forms return the existing field error code with
+HTTP 400; free-text shape errors use `VALIDATION_ERROR`. See the shared
+[HTTP query contract](http-query-validation.md) for defaults, compatibility and
+the full endpoint audit. Existing limit clamping and blank optional values remain unchanged.
+
 ### Query Parameters
 
 - `assetType` optional.

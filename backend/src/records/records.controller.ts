@@ -1,4 +1,5 @@
 import { Controller, Get, Param, Query, Req } from '@nestjs/common';
+import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import { Request } from 'express';
 import { RecordsService } from './records.service';
 import type {
@@ -22,7 +23,16 @@ export class RecordsController {
   @Get('records')
   getRecords(
     @Req() request: AuthenticatedRequest,
-    @Query() query: RecordsQuery,
+    @Query(
+      new ScalarQueryPipe({
+        seasonId: 'VALIDATION_ERROR',
+        type: 'INVALID_RECORD_TYPE',
+        currencyCode: 'INVALID_CURRENCY_CODE',
+        limit: 'INVALID_LIMIT',
+        offset: 'INVALID_OFFSET',
+      } satisfies Record<keyof RecordsQuery, string>),
+    )
+    query: RecordsQuery,
   ) {
     return this.recordsService.getRecords(this.extractUserId(request), query);
   }
@@ -30,7 +40,14 @@ export class RecordsController {
   @Get('records/me/seasons')
   getMySeasonRecords(
     @Req() request: AuthenticatedRequest,
-    @Query() query: MySeasonRecordsQuery,
+    @Query(
+      new ScalarQueryPipe({
+        seasonStatus: 'INVALID_SEASON_STATUS',
+        limit: 'INVALID_LIMIT',
+        offset: 'INVALID_OFFSET',
+      } satisfies Record<keyof MySeasonRecordsQuery, string>),
+    )
+    query: MySeasonRecordsQuery,
   ) {
     return this.recordsService.getMySeasonRecords(
       this.extractUserId(request),
@@ -53,7 +70,13 @@ export class RecordsController {
   getMySeasonEquity(
     @Req() request: AuthenticatedRequest,
     @Param('seasonId') seasonId: string,
-    @Query() query: MySeasonEquityQuery,
+    @Query(
+      new ScalarQueryPipe({
+        limit: 'INVALID_LIMIT',
+        offset: 'INVALID_OFFSET',
+      } satisfies Record<keyof MySeasonEquityQuery, string>),
+    )
+    query: MySeasonEquityQuery,
   ) {
     return this.recordsService.getMySeasonEquity(
       this.extractUserId(request),
@@ -66,7 +89,16 @@ export class RecordsController {
   getMySeasonOrders(
     @Req() request: AuthenticatedRequest,
     @Param('seasonId') seasonId: string,
-    @Query() query: MySeasonOrdersQuery,
+    @Query(
+      new ScalarQueryPipe({
+        status: 'INVALID_ORDER_STATUS',
+        side: 'INVALID_ORDER_SIDE',
+        assetId: 'VALIDATION_ERROR',
+        limit: 'INVALID_LIMIT',
+        offset: 'INVALID_OFFSET',
+      } satisfies Record<keyof MySeasonOrdersQuery, string>),
+    )
+    query: MySeasonOrdersQuery,
   ) {
     return this.recordsService.getMySeasonOrders(
       this.extractUserId(request),
@@ -79,7 +111,15 @@ export class RecordsController {
   getMySeasonExchanges(
     @Req() request: AuthenticatedRequest,
     @Param('seasonId') seasonId: string,
-    @Query() query: MySeasonExchangesQuery,
+    @Query(
+      new ScalarQueryPipe({
+        fromCurrency: 'INVALID_FROM_CURRENCY',
+        toCurrency: 'INVALID_TO_CURRENCY',
+        limit: 'INVALID_LIMIT',
+        offset: 'INVALID_OFFSET',
+      } satisfies Record<keyof MySeasonExchangesQuery, string>),
+    )
+    query: MySeasonExchangesQuery,
   ) {
     return this.recordsService.getMySeasonExchanges(
       this.extractUserId(request),
