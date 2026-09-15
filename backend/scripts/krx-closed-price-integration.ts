@@ -267,9 +267,12 @@ async function main() {
         );
       }
       const result = await home.getHome(user.id);
-      assert.equal(result.data.summary?.state, 'available');
-      if (result.data.summary?.state === 'available')
-        assert.equal(result.data.summary.totalAssetKrw, '10863600.00000000');
+      const summary = result.data.summary;
+      assert.ok(summary && typeof summary === 'object');
+      assert.ok('state' in summary);
+      assert.equal(summary.state, 'available');
+      assert.ok('totalAssetKrw' in summary);
+      assert.equal(summary.totalAssetKrw, '10863600.00000000');
       console.log(`PASS Market/Position/Portfolio/Home GENERAL/SEASON ${at}`);
     }
     await prisma.assetPriceSnapshot.deleteMany({

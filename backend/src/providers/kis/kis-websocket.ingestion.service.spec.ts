@@ -132,6 +132,111 @@ describe('KIS WebSocket ingestion service', () => {
     expect(prisma.assetPriceSnapshot.create).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    {
+      name: 'late intraday trade',
+      sourceTimestamp: new Date('2026-05-27T06:29:59.000Z'),
+    },
+    {
+      name: 'post-close trade',
+      sourceTimestamp: new Date('2026-05-27T06:30:01.000Z'),
+    },
+    { name: 'missing provider timestamp', sourceTimestamp: null },
+  ])(
+    'keeps the throttle for a $name received after close',
+    async ({ sourceTimestamp }) => {
+      const prisma = createPrismaMock({
+        assets: [{ id: 'asset-samsung', market: 'KRX', symbol: '005930' }],
+      });
+      prisma.assetPriceSnapshot.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: '15:29:59' });
+      const trade: KisWebSocketTradeTick = {
+        ...parseOneTrade(
+          domesticFrame([
+            domesticRecord({
+              symbol: '005930',
+              time: '153000',
+              price: '248500',
+              businessDate: '20260527',
+            }),
+          ]),
+        ),
+        sourceTimestamp,
+        receivedAt: new Date('2026-05-27T06:30:02.000Z'),
+      };
+
+      const result = await createService(prisma).ingestTrade(trade);
+
+      expect(result).toMatchObject({
+        state: 'skipped',
+        reason: 'THROTTLED_PROVIDER_SNAPSHOT',
+      });
+      expect(prisma.assetPriceSnapshot.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('still rejects a duplicate closing trade before the throttle exception', async () => {
+    const prisma = createPrismaMock({
+      assets: [{ id: 'asset-samsung', market: 'KRX', symbol: '005930' }],
+    });
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce({ id: 'close' });
+    const trade: KisWebSocketTradeTick = {
+      ...parseOneTrade(
+        domesticFrame([
+          domesticRecord({
+            symbol: '005930',
+            time: '153000',
+            price: '248500',
+            businessDate: '20260527',
+          }),
+        ]),
+      ),
+      receivedAt: new Date('2026-05-27T06:30:02.000Z'),
+    };
+
+    const result = await createService(prisma).ingestTrade(trade);
+
+    expect(result).toMatchObject({
+      state: 'skipped',
+      reason: 'DUPLICATE_PROVIDER_SNAPSHOT',
+    });
+    expect(prisma.assetPriceSnapshot.create).not.toHaveBeenCalled();
+  });
+
+  it('does not extend the KRX closing throttle exception to US trades', async () => {
+    const prisma = createPrismaMock({
+      assets: [{ id: 'asset-aapl', market: 'NASDAQ', symbol: 'AAPL' }],
+    });
+    prisma.assetPriceSnapshot.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'recent-us' });
+    const trade: KisWebSocketTradeTick = {
+      ...parseOneTrade(
+        overseasFrame([
+          overseasRecord({
+            rsym: 'DNASAAPL',
+            symbol: 'AAPL',
+            zdiv: '2',
+            koreanDate: '20260527',
+            koreanTime: '153000',
+            last: '19012',
+            marketType: 'NAS',
+          }),
+        ]),
+      ),
+      receivedAt: new Date('2026-05-27T06:30:02.000Z'),
+    };
+
+    const result = await createService(prisma).ingestTrade(trade);
+
+    expect(result).toMatchObject({
+      state: 'skipped',
+      reason: 'THROTTLED_PROVIDER_SNAPSHOT',
+    });
+    expect(prisma.assetPriceSnapshot.create).not.toHaveBeenCalled();
+  });
+
   it('skips unmapped domestic assets without creating fake assets', async () => {
     const prisma = createPrismaMock({ assets: [] });
     const service = createService(prisma);
