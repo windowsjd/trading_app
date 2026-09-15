@@ -44,7 +44,7 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
   });
 
   const recordsQuery = useInfiniteQuery({
-    queryKey: QUERY_KEYS.record.seasons({ limit: 20, offset: 0 }),
+    queryKey: QUERY_KEYS.record.infiniteSeasons({ limit: 20, offset: 0 }),
     queryFn: ({ pageParam }) =>
       getMySeasonRecords({ limit: 20, offset: pageParam }),
     getNextPageParam: (lastPage) => lastPage.pagination.nextOffset ?? undefined,

@@ -66,7 +66,7 @@ export default function RankingScreen({ navigation }: Props) {
   const rankingLimit = selectedTab === 'top10' ? 10 : 50;
   const rankingQueryKey = useMemo(
     () =>
-      QUERY_KEYS.ranking.list({
+      QUERY_KEYS.ranking.infiniteList({
         scope: selectedTab,
         limit: rankingLimit,
         offset: 0,

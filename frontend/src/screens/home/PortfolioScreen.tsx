@@ -155,7 +155,7 @@ export default function PortfolioScreen({ navigation }: Props) {
     overviewQuery.data?.state === 'available' && !!overviewQuery.data.summary;
 
   const positionsQuery = useInfiniteQuery({
-    queryKey: QUERY_KEYS.tradingAccount.positions(accountId, {
+    queryKey: QUERY_KEYS.tradingAccount.infinitePositions(accountId, {
       assetType,
       limit: POSITIONS_PAGE_SIZE,
     }),

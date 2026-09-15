@@ -9,6 +9,7 @@ import MainTabs from './MainTabs';
 import SplashScreen from '../../screens/auth/SplashScreen';
 import ModeSelectionScreen from '../../screens/entry/ModeSelectionScreen';
 import SeasonJoinScreen from '../../screens/season/SeasonJoinScreen';
+import ScreenErrorBoundary from '../../components/states/ScreenErrorBoundary';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -19,6 +20,11 @@ export default function RootNavigator() {
         id="RootStack"
         initialRouteName="Splash"
         screenOptions={{ headerShown: false }}
+        // Keep navigation and session/account providers alive during a render
+        // failure. Retrying remounts only this root screen (MainTabs opens Home).
+        screenLayout={({ children }) => (
+          <ScreenErrorBoundary>{children}</ScreenErrorBoundary>
+        )}
       >
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="AuthStack" component={AuthStack} />

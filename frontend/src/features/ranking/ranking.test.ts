@@ -352,7 +352,10 @@ function prepareAccountScreens(h: ReturnType<typeof createHarness>) {
   h.mockLocal('features/auth/useLogout', { useLogout: () => () => Promise.resolve() });
   h.mockLocal('components/charts', { DonutChart: () => null, LineChart: () => null });
   h.queries.set('me', h.ready({ nickname: 'trader-2', email: 'trader-2@example.com' }));
-  h.queries.set('record', h.ready({ items: [] }));
+  h.queries.set('record', h.ready({
+    items: [],
+    pagination: { limit: 20, offset: 0, total: 0, returned: 0, nextOffset: null },
+  }));
   h.queries.set('ranking', h.ready(h.page));
   h.queries.set('tradingAccount', h.ready({ state: 'available', sectionErrors: [], summary: null, allocation: {}, wallets: [], positions: [], points: [] }));
   return account;

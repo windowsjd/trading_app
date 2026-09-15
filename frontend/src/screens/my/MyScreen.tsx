@@ -172,7 +172,7 @@ export default function MyScreen({ navigation }: Props) {
         tier: getRankingTier(myRanking, rankType),
       }
     : null;
-  const seasonCount = recordsQuery.data.items.length;
+  const seasonCount = recordsQuery.data.pagination.total;
 
   return (
     <SafeAreaView style={styles.container}>

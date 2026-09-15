@@ -1,3 +1,6 @@
+// A key identifies the cached shape, not just the endpoint. Resources used by
+// both query hooks have explicit infinite factories; their resource/account
+// prefixes stay intact for existing mutation invalidation and session teardown.
 export const QUERY_KEYS = {
   me: ['me'] as const,
 
@@ -170,6 +173,9 @@ export const QUERY_KEYS = {
         params.limit ?? null,
         params.offset ?? 0,
       ] as const,
+    // Single responses and InfiniteData must never occupy the same entry.
+    infiniteList: (params: Parameters<typeof QUERY_KEYS.ranking.list>[0]) =>
+      [...QUERY_KEYS.ranking.list(params), 'infinite'] as const,
     userSeasonSummary: (userId: string) =>
       ['ranking', 'user-season-summary', userId] as const,
   },
@@ -183,6 +189,8 @@ export const QUERY_KEYS = {
         params?.limit ?? null,
         params?.offset ?? 0,
       ] as const,
+    infiniteSeasons: (params?: { limit?: number; offset?: number }) =>
+      [...QUERY_KEYS.record.seasons(params), 'infinite'] as const,
     seasonDetail: (seasonId: string) =>
       ['record', 'season-detail', seasonId] as const,
     seasonEquity: (params: {
@@ -315,6 +323,8 @@ export const QUERY_KEYS = {
         'list',
         normalizeFilterKey(filters),
       ] as const,
+    infinitePositions: (accountId: string, filters?: Record<string, unknown>) =>
+      [...QUERY_KEYS.tradingAccount.positions(accountId, filters), 'infinite'] as const,
 
     ordersAll: (accountId: string) =>
       ['tradingAccount', 'orders', accountId] as const,
