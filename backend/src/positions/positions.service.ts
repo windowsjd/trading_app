@@ -1,3 +1,4 @@
+import { closedMarketPriceScope, findMarketAwareAssetPriceCandidates } from '../providers/asset-price-snapshot-query';
 import {
   HttpException,
   HttpStatus,
@@ -635,30 +636,10 @@ export class PositionsService {
         currencyCode: this.getAssetPriceCurrency(asset),
       },
     });
+    const priceRead = { asset: { ...asset, currencyCode: currencyCode }, workflow: 'positions_live_valuation' as const, now: valuationAt };
+    const closedScope = closedMarketPriceScope(priceRead);
     const providerCandidates = providerEligibility.eligible
-      ? ((await this.prisma.assetPriceSnapshot.findMany({
-          where: {
-            assetId: asset.id,
-            currencyCode,
-            sourceType: AssetPriceSourceType.provider_api,
-          },
-          orderBy: [
-            { effectiveAt: 'desc' },
-            { capturedAt: 'desc' },
-            { createdAt: 'desc' },
-          ],
-          take: 10,
-          select: {
-            id: true,
-            price: true,
-            priceKrw: true,
-            currencyCode: true,
-            sourceType: true,
-            sourceName: true,
-            effectiveAt: true,
-            capturedAt: true,
-          },
-        })) ?? [])
+      ? await findMarketAwareAssetPriceCandidates(this.prisma, { ...priceRead, sourceNames: providerEligibility.sourceNames })
       : [];
     const providerSelection = providerEligibility.eligible
       ? selectMarketAwareAssetPriceSnapshotBySourcePriority({
@@ -704,6 +685,7 @@ export class PositionsService {
         price: {
           gt: 0,
         },
+        ...closedScope?.where,
       },
       orderBy: [
         { effectiveAt: 'desc' },

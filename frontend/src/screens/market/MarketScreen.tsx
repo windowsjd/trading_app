@@ -56,6 +56,7 @@ export default function MarketScreen({ navigation }: Props) {
       }),
     getNextPageParam: (lastPage) => lastPage.pagination.nextOffset ?? undefined,
     initialPageParam: 0,
+    refetchInterval: selectedTab === 'crypto' ? false : 15_000,
   });
 
   // REST is the baseline and stays untouched: rows receive their ticker as a

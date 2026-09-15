@@ -1,3 +1,4 @@
+import { applyTickerMarketState, canOverlayAssetTicker } from "../../features/asset/assetTickerPolicy";
 import { getAssetTradingWarning } from "../../features/asset/tradingUx";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -87,6 +88,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
   const detailQuery = useQuery({
     queryKey: QUERY_KEYS.asset.detail(assetId),
     queryFn: () => getAssetDetail(assetId),
+    refetchInterval: (query) => query.state.data?.asset.assetType === "crypto" ? false : 15_000,
   });
 
   const positionQuery = useQuery({
@@ -158,7 +160,8 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
     );
   }
 
-  const { asset } = detailQuery.data;
+  const asset = applyTickerMarketState(detailQuery.data.asset, latestTicker);
+  const displayTicker = canOverlayAssetTicker(asset, latestTicker) ? latestTicker : null;
   const price = asset.price;
   // The quantity shown, and the quantity 매도 is gated on, both come from the
   // SELECTED account's position read. Because the query key carries the
@@ -171,14 +174,16 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
     ? getAccountDisplay(selectedAccount)
     : null;
   const priceAvailable = isPriceAvailable(price);
-  const livePriceAvailable = !!latestTicker?.priceLocal;
+  const livePriceAvailable = !!displayTicker?.priceLocal;
   const orderPriceAvailable = priceAvailable || livePriceAvailable;
 
   // ONE basis for the whole price block: while a realtime ticker is shown,
   // its local price and KRW state/reason are taken from that ticker — REST and
   // realtime values are never mixed (see displayPricePolicy).
   const displayPrice = selectDisplayPrice({
-    latestTicker,
+    latestTicker: displayTicker,
+    assetType: asset.assetType,
+    marketStatus: asset.marketStatus,
     restPrice: price,
     assetPriceCurrency: asset.priceCurrency,
     assetDisplayPriceDecimals: asset.displayPriceDecimals,
@@ -484,7 +489,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
               candles={chartCandles}
               currencyCode={displayPriceCurrency}
               displayPriceDecimals={displayPriceDecimals}
-              currentPrice={latestTicker?.priceLocal ?? null}
+              currentPrice={displayPrice.isRealtime ? displayPrice.priceLocal : null}
               emptyMessage="가격 추이를 표시하려면 데이터가 더 필요합니다."
               viewportResetKey={`${assetId}:${selectedTimeframe.interval}`}
             />

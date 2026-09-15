@@ -3,6 +3,7 @@ jest.mock('../generated/prisma/client', () => ({
     KRW: 'KRW',
     USD: 'USD',
   },
+  Prisma: { Decimal: jest.requireActual('@prisma/client/runtime/client').Decimal },
   PrismaClient: class PrismaClient {},
   UserStatus: {
     active: 'active',
@@ -164,6 +165,7 @@ describe('AssetTickerGateway', () => {
 
     expect(assetsService.getAssetPriceForTicker).toHaveBeenCalledWith(
       'asset-aapl',
+      new Date('2026-06-19T03:00:30.000Z'),
     );
     expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
     expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
@@ -290,6 +292,32 @@ describe('AssetTickerGateway', () => {
     });
   });
 
+  it.each(['2026-06-18T06:30:02.000Z', '2026-06-20T03:00:00.000Z'])('does not fan out a late closing KRX trade at %s', async now => {
+    jest.setSystemTime(new Date(now));
+    const {gateway, assetsService} = createGateway(null, DEFAULT_KRW_CONVERSION, {
+      assetId: 'asset-samsung', symbol: '005930', name: 'Samsung',
+      assetType: 'domestic_stock', market: 'KRX', priceCurrency: CurrencyCode.KRW, displayPriceDecimals: null,
+    });
+    expect(await buildRealtimeTickerMessage(gateway, {
+      type: 'kis_realtime_price', assetId: 'asset-samsung', snapshotState: 'created',
+      price: {price: '248500', currencyCode: CurrencyCode.KRW, sourceName: 'kis_krx_realtime_trade',
+        effectiveAt: '2026-06-18T06:30:00.000Z', capturedAt: now},
+    })).toBeNull();
+    expect(assetsService.getAssetPriceForTicker).not.toHaveBeenCalled();
+    expect(assetsService.convertRealtimePriceToKrw).not.toHaveBeenCalled();
+  });
+
+  it('rejects a previous-session event even when KRX is currently open', async () => {
+    const {gateway} = createGateway(null, DEFAULT_KRW_CONVERSION, {
+      assetId: 'asset-samsung', symbol: '005930', name: 'Samsung', assetType: 'domestic_stock', market: 'KRX', priceCurrency: CurrencyCode.KRW,
+    });
+    expect(await buildRealtimeTickerMessage(gateway, {
+      type: 'kis_realtime_price', assetId: 'asset-samsung', snapshotState: 'skipped',
+      price: {price: '248500', currencyCode: CurrencyCode.KRW, sourceName: 'kis_krx_realtime_trade',
+        effectiveAt: '2026-06-18T06:30:00.000Z', capturedAt: '2026-06-19T03:00:29.000Z'},
+    })).toBeNull();
+  });
+
   it('builds Binance realtime tickers from the event fields (price/changeRate/source)', async () => {
     const { gateway, prisma } = createGateway(null, DEFAULT_KRW_CONVERSION, {
       assetId: 'asset-btc',
@@ -373,6 +401,7 @@ describe('AssetTickerGateway', () => {
   });
 
   it('never labels the KIS US delayed event feed as realtime', async () => {
+    jest.setSystemTime(new Date('2026-06-18T15:00:30.000Z'));
     const { gateway } = createGateway(null, DEFAULT_KRW_CONVERSION, {
       assetId: 'asset-aapl',
       symbol: 'AAPL',
@@ -392,8 +421,8 @@ describe('AssetTickerGateway', () => {
         price: '190.12500000',
         currencyCode: CurrencyCode.USD,
         sourceName: 'kis_us_delayed_trade',
-        capturedAt: '2026-06-19T03:00:29.000Z',
-        effectiveAt: '2026-06-19T02:45:29.000Z',
+        capturedAt: '2026-06-18T15:00:29.000Z',
+        effectiveAt: '2026-06-18T14:45:29.000Z',
       },
     });
 

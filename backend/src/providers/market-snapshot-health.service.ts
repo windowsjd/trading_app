@@ -1,3 +1,4 @@
+import { closedMarketPriceScope, findMarketAwareAssetPriceCandidates } from './asset-price-snapshot-query';
 import { Injectable } from '@nestjs/common';
 import {
   AssetPriceSourceType,
@@ -240,30 +241,10 @@ export class MarketSnapshotHealthService {
         currencyCode: priceCurrency,
       },
     });
+    const priceRead = { asset: { ...asset, currencyCode: priceCurrency }, workflow: 'assets_with_price' as const, now: now };
+    const closedScope = closedMarketPriceScope(priceRead);
     const providerCandidates = providerEligibility.eligible
-      ? await this.prisma.assetPriceSnapshot.findMany({
-          where: {
-            assetId: asset.id,
-            currencyCode: priceCurrency,
-            sourceType: AssetPriceSourceType.provider_api,
-          },
-          orderBy: [
-            { effectiveAt: 'desc' },
-            { capturedAt: 'desc' },
-            { createdAt: 'desc' },
-          ],
-          take: 10,
-          select: {
-            id: true,
-            price: true,
-            priceKrw: true,
-            currencyCode: true,
-            sourceType: true,
-            sourceName: true,
-            effectiveAt: true,
-            capturedAt: true,
-          },
-        })
+      ? await findMarketAwareAssetPriceCandidates(this.prisma, { ...priceRead, sourceNames: providerEligibility.sourceNames })
       : [];
     const providerSelection = providerEligibility.eligible
       ? selectMarketAwareAssetPriceSnapshotBySourcePriority({
@@ -305,6 +286,7 @@ export class MarketSnapshotHealthService {
         price: {
           gt: 0,
         },
+        ...closedScope?.where,
       },
       orderBy: [
         { effectiveAt: 'desc' },

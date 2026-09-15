@@ -72,6 +72,22 @@ describe('KIS WebSocket ingestion service', () => {
     );
   });
 
+  it('stores a parsed 15:30 closing trade received at 15:30:02 as session evidence', async () => {
+    const prisma = createPrismaMock({assets: [{id: 'asset-samsung', market: 'KRX', symbol: '005930'}]});
+    const service = createService(prisma);
+    const parsed = parseKisWebSocketMessage({
+      frame: domesticFrame([domesticRecord({symbol: '005930', time: '153000', price: '248500', businessDate: '20260527'})]),
+      receivedAt: new Date('2026-05-27T06:30:02.000Z'),
+    });
+    expect(parsed.state).toBe('trades');
+    if (parsed.state !== 'trades') throw new Error('trade expected');
+    expect(parsed.trades[0].sourceTimestamp).toEqual(new Date('2026-05-27T06:30:00.000Z'));
+    await service.ingestTrade(parsed.trades[0]);
+    expect(prisma.assetPriceSnapshot.create).toHaveBeenCalledWith(expect.objectContaining({data: expect.objectContaining({
+      price: '248500.00000000', effectiveAt: new Date('2026-05-27T06:30:00.000Z'), capturedAt: new Date('2026-05-27T06:30:02.000Z'),
+    })}));
+  });
+
   it('skips unmapped domestic assets without creating fake assets', async () => {
     const prisma = createPrismaMock({ assets: [] });
     const service = createService(prisma);

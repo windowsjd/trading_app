@@ -402,7 +402,7 @@ export function selectFreshProviderSnapshotBySourcePriority<
   };
 }
 
-const CLOSED_MARKET_CARRY_FORWARD_WORKFLOWS: ReadonlySet<ProviderWorkflow> =
+export const CLOSED_MARKET_CARRY_FORWARD_WORKFLOWS: ReadonlySet<ProviderWorkflow> =
   new Set([
     'assets_with_price',
     'live_portfolio_valuation',

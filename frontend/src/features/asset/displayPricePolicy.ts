@@ -1,4 +1,4 @@
-import type { AssetTickerMessage } from './assetTickerPolicy';
+import { canOverlayAssetTicker, type AssetTickerMessage } from './assetTickerPolicy.ts';
 
 /**
  * ONE basis for every price value and metadata selected for the detail screen.
@@ -31,7 +31,7 @@ export type RestDisplayPrice = {
   fxRateSource?: unknown;
 };
 
-export type DisplayPriceBasis = 'realtime' | 'rest' | 'none';
+export type DisplayPriceBasis = 'realtime' | 'snapshot' | 'rest' | 'none';
 
 export type DisplayPrice = {
   /** Which side of the data the whole set came from. */
@@ -62,14 +62,17 @@ export function selectDisplayPrice(input: {
   restPrice?: RestDisplayPrice | null;
   assetPriceCurrency?: 'KRW' | 'USD' | null;
   assetDisplayPriceDecimals?: number | null;
+  assetType?: string;
+  marketStatus?: string;
 }): DisplayPrice {
-  const { latestTicker, restPrice } = input;
+  const { restPrice } = input;
+  const latestTicker = canOverlayAssetTicker(input, input.latestTicker) ? input.latestTicker : null;
   const decimalsFallback = input.assetDisplayPriceDecimals ?? null;
 
   if (latestTicker) {
     const krwAvailable = latestTicker.priceKrwState === 'available';
     return {
-      basis: 'realtime',
+      basis: latestTicker.realtime === false && !latestTicker.delayed ? 'snapshot' : 'realtime',
       priceLocal: latestTicker.priceLocal ?? null,
       priceCurrency: latestTicker.priceCurrency ?? input.assetPriceCurrency ?? null,
       priceKrw: krwAvailable ? (latestTicker.priceKrw ?? null) : null,
@@ -91,7 +94,7 @@ export function selectDisplayPrice(input: {
         typeof latestTicker.displayPriceDecimals === 'number'
           ? latestTicker.displayPriceDecimals
           : decimalsFallback,
-      isRealtime: true,
+      isRealtime: latestTicker.realtime !== false && !latestTicker.delayed,
     };
   }
 

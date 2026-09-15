@@ -310,9 +310,9 @@ describe('PortfolioValuationService source eligibility', () => {
       currencyCode: CurrencyCode.KRW,
       sourceType: AssetPriceSourceType.admin_manual,
       sourceName: 'manual-price',
-      effectiveAt: new Date('2026-06-02T23:59:30.000Z'),
-      capturedAt: new Date('2026-06-02T23:59:40.000Z'),
-      createdAt: new Date('2026-06-02T23:59:41.000Z'),
+      effectiveAt: new Date('2026-06-02T06:30:00.000Z'),
+      capturedAt: new Date('2026-06-02T06:30:02.000Z'),
+      createdAt: new Date('2026-06-02T06:30:03.000Z'),
     });
     const service = new PortfolioValuationService(prisma as never);
 
@@ -353,7 +353,8 @@ describe('PortfolioValuationService source eligibility', () => {
           currencyCode: CurrencyCode.KRW,
           sourceType: AssetPriceSourceType.admin_manual,
           effectiveAt: {
-            lte: valuationAt,
+            gte: new Date('2026-06-02T00:00:00.000Z'),
+            lte: new Date('2026-06-02T06:30:00.000Z'),
           },
           price: {
             gt: 0,

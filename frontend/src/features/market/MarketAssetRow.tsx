@@ -63,7 +63,7 @@ function MarketAssetRowComponent({ item, ticker, isStale, onPress }: Props) {
       </View>
 
       <View style={styles.alignEnd}>
-        <Text style={[styles.itemPrice, isStale && styles.itemPriceStale]}>
+        <Text style={[styles.itemPrice, isStale && displayItem.marketStatus !== 'closed' && styles.itemPriceStale]}>
           {getAssetPriceText(displayItem)}
         </Text>
         <Text style={styles.helper}>{getChangeRateText(displayItem)}</Text>

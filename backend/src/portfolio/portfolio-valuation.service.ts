@@ -1,3 +1,4 @@
+import { closedMarketPriceScope, findMarketAwareAssetPriceCandidates } from '../providers/asset-price-snapshot-query';
 import { Injectable } from '@nestjs/common';
 import {
   AssetPriceSourceType,
@@ -340,8 +341,11 @@ export class PortfolioValuationService {
         currencyCode: this.getAssetPriceCurrency(asset),
       },
     });
+    const priceRead = { asset: { ...asset, currencyCode: this.getAssetPriceCurrency(asset) }, workflow: sourceEligibilityWorkflow, now: valuationAt };
+    const closedScope = useSettlementPricePolicy ? null : closedMarketPriceScope(priceRead);
     const providerCandidates = providerEligibility.eligible
-      ? ((await client.assetPriceSnapshot.findMany({
+      ? useSettlementPricePolicy
+        ? ((await client.assetPriceSnapshot.findMany({
           where: {
             assetId: asset.id,
             currencyCode: this.getAssetPriceCurrency(asset),
@@ -381,6 +385,7 @@ export class PortfolioValuationService {
             createdAt: true,
           },
         })) ?? [])
+        : await findMarketAwareAssetPriceCandidates(client, { ...priceRead, sourceNames: providerEligibility.sourceNames })
       : [];
     const providerSelection = providerEligibility.eligible
       ? useSettlementPricePolicy
@@ -435,6 +440,7 @@ export class PortfolioValuationService {
         price: {
           gt: 0,
         },
+        ...closedScope?.where,
       },
       orderBy: [
         { effectiveAt: 'desc' },
@@ -466,6 +472,7 @@ export class PortfolioValuationService {
             snapshotId: latestCandidate?.id,
           },
           evidence: {
+            marketSession: closedScope?.marketState ?? null,
             workflow: sourceEligibilityWorkflow,
             market: asset.market,
             valuationAt,

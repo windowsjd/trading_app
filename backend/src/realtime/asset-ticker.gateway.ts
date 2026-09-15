@@ -1,3 +1,5 @@
+import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
+import { resolveAssetProviderEligibility, selectMarketAwareAssetPriceSnapshotBySourcePriority, isPositiveDecimal } from '../providers/source-eligibility.policy';
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -16,7 +18,7 @@ import {
 import { IncomingMessage } from 'node:http';
 import { URL } from 'node:url';
 import { WebSocket, WebSocketServer as WsServer } from 'ws';
-import { CurrencyCode, UserStatus } from '../generated/prisma/client';
+import { CurrencyCode, UserStatus, Prisma } from '../generated/prisma/client';
 import {
   AssetsService,
   type RealtimePriceKrwConversion,
@@ -254,7 +256,7 @@ export class AssetTickerGateway
         return;
       }
 
-      state.subscriptions.set(assetId, ticker.assetPriceSnapshotId);
+      state.subscriptions.set(assetId, snapshotTickerKey(ticker));
       this.sendJson(client, {
         type: 'subscribed',
         channel: 'asset_ticker',
@@ -411,11 +413,11 @@ export class AssetTickerGateway
           continue;
         }
 
-        if (lastSnapshotId === ticker.assetPriceSnapshotId) {
+        if (lastSnapshotId === snapshotTickerKey(ticker)) {
           continue;
         }
 
-        state.subscriptions.set(assetId, ticker.assetPriceSnapshotId);
+        state.subscriptions.set(assetId, snapshotTickerKey(ticker));
         this.sendTickerMessage(client, state, assetId, ticker);
       }
     }
@@ -458,6 +460,11 @@ export class AssetTickerGateway
     assetId: string,
     ticker: Record<string, unknown>,
   ): void {
+    if (!canSendLiveStockTicker(ticker)) {
+      state.pendingTickers.delete(assetId);
+      this.tickerDroppedCount += 1;
+      return;
+    }
     const maxBuffered =
       this.liveCandleConfig?.websocketBackpressureBytes ??
       DEFAULT_CANDLE_BACKPRESSURE_BYTES;
@@ -536,6 +543,11 @@ export class AssetTickerGateway
         // A row that unsubscribed while queued must not be delivered late.
         if (!state.subscriptions.has(assetId)) {
           state.pendingTickers.delete(assetId);
+          continue;
+        }
+        if (!canSendLiveStockTicker(ticker)) {
+          state.pendingTickers.delete(assetId);
+          this.tickerDroppedCount += 1;
           continue;
         }
         if (this.sendJson(client, ticker)) {
@@ -649,15 +661,23 @@ export class AssetTickerGateway
    * would otherwise re-run these DB reads once per provider tick.
    */
   private async buildSnapshotTickerMessage(assetId: string) {
-    const selection = await this.assetsService.getAssetPriceForTicker(assetId);
+    const now = new Date();
+    const selection = await this.assetsService.getAssetPriceForTicker(assetId, now);
     if (!selection) {
       return null;
     }
 
     const { asset, price } = selection;
+    const session = asset.assetType === 'crypto' ? null : resolveStockMarketSessionState(asset, now);
+    const marketMetadata = asset.assetType === 'crypto' ? {} : {
+      marketStatus: session?.state === 'open' ? 'open' : session?.state === 'closed' ? 'closed' : 'unknown',
+      marketEvaluatedAt: now.toISOString(),
+      realtime: false,
+    };
     if (price.state === 'unavailable') {
       return {
         type: 'asset_ticker',
+      ...marketMetadata,
         assetId: asset.id,
         symbol: asset.symbol,
         name: asset.name,
@@ -681,6 +701,7 @@ export class AssetTickerGateway
 
     return {
       type: 'asset_ticker',
+      ...marketMetadata,
       assetId: asset.id,
       symbol: asset.symbol,
       name: asset.name,
@@ -731,6 +752,30 @@ export class AssetTickerGateway
       return null;
     }
 
+    const now = new Date();
+    const marketState = metadata.assetType === 'crypto' ? null : resolveStockMarketSessionState(metadata, now);
+    if (metadata.assetType !== 'crypto') {
+      // Transport and snapshot ingestion continue; only live price use is gated.
+      if (marketState?.state !== 'open') return null;
+      const eligibility = resolveAssetProviderEligibility({
+        asset: { ...metadata, currencyCode: metadata.priceCurrency },
+        workflow: 'assets_with_price',
+      });
+      if (!eligibility.eligible) return null;
+      const candidate = {
+        id: '', sourceType: 'provider_api', sourceName: event.price.sourceName,
+        effectiveAt: new Date(event.price.effectiveAt), capturedAt: new Date(event.price.capturedAt),
+      };
+      if (!Number.isFinite(candidate.effectiveAt.getTime()) || !Number.isFinite(candidate.capturedAt.getTime())) return null;
+      const selection = selectMarketAwareAssetPriceSnapshotBySourcePriority({
+        asset: metadata, workflow: 'assets_with_price', candidates: [candidate],
+        expectedSourceNames: eligibility.sourceNames, now,
+        freshnessThresholdSeconds: eligibility.freshnessThresholdSeconds,
+        isPositiveValue: () => isPositiveDecimal(new Prisma.Decimal(event.price.price)),
+      });
+      if (selection.state !== 'selected') return null;
+    }
+
     const delayed =
       event.type === 'kis_realtime_price' &&
       event.price.sourceName === 'kis_us_delayed_trade';
@@ -741,6 +786,7 @@ export class AssetTickerGateway
 
     return {
       type: 'asset_ticker',
+      ...(marketState ? { marketStatus: 'open', marketEvaluatedAt: now.toISOString() } : {}),
       assetId: metadata.assetId,
       symbol: metadata.symbol,
       name: metadata.name,
@@ -919,4 +965,20 @@ function candleSubscriptionKey(
 function parseCandleSubscriptionKey(key: string): [string, string] {
   const [assetId, interval] = key.split('\u0000');
   return [assetId, interval];
+}
+
+function snapshotTickerKey(ticker: { assetPriceSnapshotId: string | null; marketStatus?: string }): string | null {
+  return ticker.marketStatus ? `${ticker.marketStatus}:${ticker.assetPriceSnapshotId ?? 'unavailable'}` : ticker.assetPriceSnapshotId;
+}
+
+/** A buffered/async live tick must also be eligible at actual delivery time. */
+function canSendLiveStockTicker(ticker: Record<string, unknown>): boolean {
+  if (ticker.realtime !== true && ticker.delayed !== true) return true;
+  const source = ticker.priceSource as { sourceName?: string } | undefined;
+  const asset = source?.sourceName === 'kis_krx_realtime_trade'
+    ? { assetType: 'domestic_stock' as const, market: 'KRX' }
+    : source?.sourceName === 'kis_us_delayed_trade'
+      ? { assetType: 'us_stock' as const, market: 'NAS' }
+      : null;
+  return !asset || resolveStockMarketSessionState(asset, new Date())?.state === 'open';
 }

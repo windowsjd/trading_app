@@ -1,5 +1,8 @@
 import {
   getTickerTimestamp,
+  canOverlayAssetTicker,
+  isClosedMarketSnapshot,
+  applyTickerMarketState,
   parseTickerTimestamp,
   type AssetTickerMessage,
 } from '../asset/assetTickerPolicy.ts';
@@ -23,13 +26,16 @@ export function mergeMarketAssetTicker(
   ticker: AssetTickerMessage | undefined,
 ): MarketAssetItemDto {
   if (!ticker || ticker.assetId !== item.id) return item;
-  if (!ticker.priceLocal) return item;
+  if (!canOverlayAssetTicker(item, ticker)) return item;
+  const closedSnapshot = isClosedMarketSnapshot(ticker);
+  if (!ticker.priceLocal && !closedSnapshot) return item;
 
   const tickerTimestamp = getTickerTimestamp(ticker);
   const restTimestamp =
     parseTickerTimestamp(item.price?.priceCapturedAt) ??
     parseTickerTimestamp(item.price?.priceEffectiveAt);
   if (
+    !closedSnapshot &&
     tickerTimestamp !== null &&
     restTimestamp !== null &&
     tickerTimestamp < restTimestamp
@@ -41,7 +47,7 @@ export function mergeMarketAssetTicker(
     ticker.priceKrwState === 'available' && !!ticker.priceKrw;
 
   return {
-    ...item,
+    ...applyTickerMarketState(item, ticker),
     // Provider-declared unit-price precision travels with the ticker, so a
     // backend precision refresh reaches already-rendered rows. A ticker with
     // no declared value never wipes the REST one.
@@ -53,7 +59,7 @@ export function mergeMarketAssetTicker(
       typeof ticker.changeRate === 'string' ? ticker.changeRate : item.changeRate,
     price: {
       ...item.price,
-      state: 'available',
+      state: ticker.priceLocal ? 'available' : 'unavailable',
       currentPrice: ticker.priceLocal,
       priceCurrency: ticker.priceCurrency ?? item.priceCurrency,
       // Never pair this new local price with the previous snapshot's KRW.

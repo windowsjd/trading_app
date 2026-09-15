@@ -76,6 +76,7 @@ export default function MarketSearchScreen({ navigation }: Props) {
     getNextPageParam: (lastPage) => lastPage.pagination.nextOffset ?? undefined,
     initialPageParam: 0,
     enabled: trimmedSearchText.length > 0,
+    refetchInterval: 15_000,
   });
 
   const items = useMemo(() => {
