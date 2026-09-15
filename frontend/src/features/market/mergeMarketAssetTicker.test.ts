@@ -33,7 +33,10 @@ function restItem(
       assetPriceSnapshotId: 'snap-rest',
       priceCapturedAt: '2026-07-25T03:00:00.000Z',
       priceEffectiveAt: '2026-07-25T03:00:00.000Z',
-      priceSource: { sourceType: 'provider_api', sourceName: 'binance_spot_ws_ticker' },
+      priceSource: {
+        sourceType: 'provider_api',
+        sourceName: 'binance_spot_ws_ticker',
+      },
     },
     ...overrides,
   };
@@ -54,7 +57,10 @@ function liveTicker(
     priceCapturedAt: '2026-07-25T03:00:29.000Z',
     priceEffectiveAt: '2026-07-25T03:00:29.000Z',
     freshnessAgeSeconds: 1,
-    priceSource: { sourceType: 'provider_api', sourceName: 'binance_spot_ws_ticker' },
+    priceSource: {
+      sourceType: 'provider_api',
+      sourceName: 'binance_spot_ws_ticker',
+    },
     ...overrides,
   };
 }
@@ -175,7 +181,7 @@ describe('market row inputs (props passed to MarketAssetRow)', () => {
       ticker: tickers.get(item.id) ?? null,
     }));
 
-  it('changes only the ticking asset\'s ticker prop identity', () => {
+  it("changes only the ticking asset's ticker prop identity", () => {
     const rows = [restItem(), restItem({ id: 'asset-btc', symbol: 'BTCUSDT' })];
     const dogeTicker = liveTicker();
     const btcTicker = liveTicker({
@@ -222,10 +228,7 @@ describe('market row inputs (props passed to MarketAssetRow)', () => {
 
 describe('mergeMarketAssetTickers', () => {
   it('returns identical row objects for assets without a ticker', () => {
-    const rows = [
-      restItem(),
-      restItem({ id: 'asset-btc', symbol: 'BTCUSDT' }),
-    ];
+    const rows = [restItem(), restItem({ id: 'asset-btc', symbol: 'BTCUSDT' })];
     const merged = mergeMarketAssetTickers(
       rows,
       new Map([['asset-doge', liveTicker()]]),
@@ -240,5 +243,57 @@ describe('mergeMarketAssetTickers', () => {
     const rows = [restItem()];
 
     assert.equal(mergeMarketAssetTickers(rows, new Map()), rows);
+  });
+});
+
+describe('closed stock display', () => {
+  const stock = restItem({
+    assetType: 'domestic_stock',
+    market: 'KRX',
+    marketStatus: 'open',
+    price: { state: 'available', currentPrice: '248000', priceCurrency: 'KRW' },
+  });
+  const live = liveTicker({
+    priceLocal: '248500',
+    priceKrw: '248500',
+    priceCurrency: 'KRW',
+    realtime: true,
+    marketStatus: 'open',
+    marketEvaluatedAt: '2026-07-10T06:29:59Z',
+  });
+  const closed = {
+    ...live,
+    realtime: false,
+    marketStatus: 'closed' as const,
+    marketEvaluatedAt: '2026-07-10T06:30:02Z',
+  };
+  it('shows live in open, then the same close price separately from the trade restriction', () => {
+    assert.equal(
+      mergeMarketAssetTicker(stock, live).price?.currentPrice,
+      '248500',
+    );
+    const result = mergeMarketAssetTicker(stock, closed);
+    assert.equal(result.price?.currentPrice, '248500');
+    assert.equal(result.marketStatus, 'closed');
+    assert.equal(result.tradable, false);
+    assert.equal(result.tradeBlockedReason, 'MARKET_CLOSED');
+  });
+  it('clears the price for a server-confirmed closed unavailable snapshot', () => {
+    const result = mergeMarketAssetTicker(stock, {
+      ...closed,
+      priceLocal: null,
+      priceKrw: null,
+      priceKrwState: 'unavailable',
+    });
+    assert.equal(result.price?.state, 'unavailable');
+    assert.equal(result.price?.currentPrice, null);
+    assert.equal(result.marketStatus, 'closed');
+  });
+  it('does not overlay an unqualified ticker onto a closed REST baseline', () => {
+    const baseline = { ...stock, marketStatus: 'closed' };
+    assert.equal(
+      mergeMarketAssetTicker(baseline, liveTicker({ priceLocal: '999999' })),
+      baseline,
+    );
   });
 });

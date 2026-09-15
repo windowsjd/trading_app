@@ -87,6 +87,7 @@ import { LimitOrderCandleEvidenceService } from './src/orders/limit-order-candle
 import { LimitOrderExecutionService } from './src/orders/limit-order-execution.service';
 import { PositionsService } from './src/positions/positions.service';
 import { getAssetTradingStatus } from './src/orders/market-hours.policy';
+import { resolveStockMarketSessionState } from './src/orders/market-calendar.policy';
 import {
   applyMarketSessionOverrideSnapshot,
   resetMarketSessionOverrideStoreForTest,
@@ -407,22 +408,6 @@ async function main() {
     CurrencyCode.KRW,
     'kis_krx_realtime_trade',
   );
-  // The runner is compiled from an eval module, so its test-only in-memory
-  // market-session override is not shared with every tsx dependency module.
-  // Keep valuation deterministic outside real KRX hours with the same-price
-  // admin fallback; order quote/execute still prove provider_api selection.
-  const domesticFallbackAt = new Date(Date.now() - 1_000);
-  await prisma.assetPriceSnapshot.create({
-    data: {
-      assetId: domesticAssetId,
-      price: '70000.00000000',
-      currencyCode: CurrencyCode.KRW,
-      sourceType: AssetPriceSourceType.admin_manual,
-      sourceName: 'general-trading-integration-fallback',
-      effectiveAt: domesticFallbackAt,
-      capturedAt: domesticFallbackAt,
-    },
-  });
   const domesticRequest = {
     assetId: domesticAssetId,
     side: 'buy',
@@ -522,6 +507,20 @@ async function main() {
     'QUOTE_MISMATCH',
   );
   resetMarketSessionOverrideStoreForTest();
+  // The account still owns ten domestic shares during the crypto scenarios.
+  // After removing the all-day test session, give those holdings valid evidence
+  // for the real calendar, rather than an out-of-session manual price.
+  const domesticState = resolveStockMarketSessionState(
+    { assetType: AssetType.domestic_stock, market: 'KRX' }, new Date(),
+  );
+  if (domesticState?.state === 'closed') {
+    assert.ok(domesticState.latestCompletedSession);
+    await prisma.assetPriceSnapshot.create({data: {
+      assetId: domesticAssetId, price: '70000.00000000', currencyCode: CurrencyCode.KRW,
+      sourceType: AssetPriceSourceType.provider_api, sourceName: 'kis_krx_realtime_trade',
+      effectiveAt: domesticState.latestCompletedSession.closeTime, capturedAt: new Date(),
+    }});
+  }
 
   const closedMarket = naturallyClosedMarket;
   const closedAsset = await prisma.asset.create({

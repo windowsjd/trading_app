@@ -88,7 +88,6 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
   const detailQuery = useQuery({
     queryKey: QUERY_KEYS.asset.detail(assetId),
     queryFn: () => getAssetDetail(assetId),
-    refetchInterval: (query) => query.state.data?.asset.assetType === "crypto" ? false : 15_000,
   });
 
   const positionQuery = useQuery({

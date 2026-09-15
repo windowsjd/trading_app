@@ -54,3 +54,14 @@ describe('MarketScreen partial-price warning policy', () => {
     );
   });
 });
+
+it('uses the shared socket for market and search session transitions without per-client REST polling', () => {
+  assert.match(marketScreen, /useMarketTickers/u);
+  assert.match(marketSearch, /useMarketTickers/u);
+  assert.doesNotMatch(marketScreen, /refetchInterval/u);
+  assert.doesNotMatch(marketSearch, /refetchInterval/u);
+  const detail = read('screens/asset/AssetDetailScreen.tsx');
+  assert.match(detail, /applyTickerMarketState/u);
+  assert.match(detail, /latestTicker: displayTicker/u);
+  assert.doesNotMatch(detail, /refetchInterval/u);
+});

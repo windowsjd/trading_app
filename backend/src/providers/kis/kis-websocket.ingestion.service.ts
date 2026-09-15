@@ -7,6 +7,7 @@ import {
   Prisma,
 } from '../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { resolveStockMarketSessionState } from '../../orders/market-calendar.policy';
 import {
   ProviderConfigService,
   type ProviderConfig,
@@ -331,7 +332,23 @@ export class KisWebSocketIngestionService {
       receivedAt: input.trade.receivedAt,
       throttleMs: input.config.kis.wsSnapshotThrottleMs,
     });
-    if (throttled) {
+    // Do not permanently lose the closing auction behind a 15:29:59 write.
+    // Only an explicit provider timestamp at the calendar's exact close gets
+    // this exception; ordinary intraday throttling and duplicate checks stay.
+    const closingMarketState =
+      throttled &&
+      input.trade.kind === 'domestic_krx_realtime_trade' &&
+      input.trade.sourceTimestamp
+        ? resolveStockMarketSessionState(
+            { assetType: AssetType.domestic_stock, market: 'KRX' },
+            input.trade.receivedAt,
+          )
+        : null;
+    const isClosingTrade =
+      closingMarketState?.state === 'closed' &&
+      closingMarketState.latestCompletedSession?.closeTime.getTime() ===
+        input.trade.sourceTimestamp?.getTime();
+    if (throttled && !isClosingTrade) {
       return {
         symbol: input.trade.symbol,
         sourceName,

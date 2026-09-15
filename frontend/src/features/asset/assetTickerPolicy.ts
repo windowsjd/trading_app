@@ -16,6 +16,8 @@ export interface AssetTickerMessage {
   /** Backend calendar assessment, independent of the snapshot's age. */
   marketStatus?: 'open' | 'closed' | 'unknown';
   marketEvaluatedAt?: string;
+  tradable?: boolean;
+  tradeBlockedReason?: string | null;
   /** Provider-declared unit-price decimals (Binance PRICE_FILTER.tickSize). */
   displayPriceDecimals?: number | null;
   priceLocal: string | null;
@@ -54,9 +56,7 @@ export function parseTickerTimestamp(value?: string | null): number | null {
 }
 
 /** Event time of a ticker: captured-at first, effective-at as a fallback. */
-export function getTickerTimestamp(
-  payload: AssetTickerMessage,
-): number | null {
+export function getTickerTimestamp(payload: AssetTickerMessage): number | null {
   return (
     parseTickerTimestamp(payload.priceCapturedAt ?? payload.capturedAt) ??
     parseTickerTimestamp(payload.priceEffectiveAt)
@@ -126,13 +126,28 @@ export function shouldAcceptTicker(
   next: AssetTickerMessage,
 ): boolean {
   const nextAssessment = parseTickerTimestamp(next.marketEvaluatedAt);
-  const currentAssessment = parseTickerTimestamp(current?.ticker.marketEvaluatedAt);
-  if (nextAssessment !== null && currentAssessment !== null && nextAssessment < currentAssessment) return false;
+  const currentAssessment = parseTickerTimestamp(
+    current?.ticker.marketEvaluatedAt,
+  );
+  if (
+    nextAssessment !== null &&
+    currentAssessment !== null &&
+    nextAssessment < currentAssessment
+  )
+    return false;
   // A server session transition replaces even a newer cached live price.
-  if (nextAssessment !== null && next.marketStatus !== current?.ticker.marketStatus) return true;
-  if (isClosedMarketSnapshot(current?.ticker) && !next.marketStatus) return false;
+  if (
+    nextAssessment !== null &&
+    next.marketStatus !== current?.ticker.marketStatus
+  )
+    return true;
+  if (isClosedMarketSnapshot(current?.ticker) && !next.marketStatus)
+    return false;
   if (isClosedMarketSnapshot(next)) {
-    return next.assetPriceSnapshotId !== current?.snapshotId || next.priceLocal !== current?.ticker.priceLocal;
+    return (
+      next.assetPriceSnapshotId !== current?.snapshotId ||
+      next.priceLocal !== current?.ticker.priceLocal
+    );
   }
   const snapshotId = next.assetPriceSnapshotId ?? null;
   if (snapshotId && current && snapshotId === current.snapshotId) return false;
@@ -150,10 +165,15 @@ export function shouldAcceptTicker(
   return true;
 }
 
-export function isClosedMarketSnapshot(ticker?: AssetTickerMessage | null): boolean {
-  return !!ticker && ticker.realtime === false &&
+export function isClosedMarketSnapshot(
+  ticker?: AssetTickerMessage | null,
+): boolean {
+  return (
+    !!ticker &&
+    ticker.realtime === false &&
     (ticker.marketStatus === 'closed' || ticker.marketStatus === 'unknown') &&
-    parseTickerTimestamp(ticker.marketEvaluatedAt) !== null;
+    parseTickerTimestamp(ticker.marketEvaluatedAt) !== null
+  );
 }
 
 /** Use backend market state only; no client session clock or holiday rules. */
@@ -164,16 +184,45 @@ export function canOverlayAssetTicker(
   if (!ticker) return false;
   if (asset.assetType === 'crypto') return true;
   if (isClosedMarketSnapshot(ticker)) return true;
+  if (
+    ticker.marketStatus === 'open' &&
+    parseTickerTimestamp(ticker.marketEvaluatedAt) !== null
+  )
+    return true;
   return asset.marketStatus !== 'closed' && asset.marketStatus !== 'unknown';
 }
 
-export function applyTickerMarketState<T extends { assetType?: string; marketStatus?: string; isActive?: boolean }>(asset: T, ticker?: AssetTickerMessage | null): T {
-  if (asset.assetType === 'crypto' || !isClosedMarketSnapshot(ticker)) return asset;
+export function applyTickerMarketState<
+  T extends { assetType?: string; marketStatus?: string; isActive?: boolean },
+>(asset: T, ticker?: AssetTickerMessage | null): T {
+  if (
+    asset.assetType === 'crypto' ||
+    !ticker?.marketStatus ||
+    parseTickerTimestamp(ticker.marketEvaluatedAt) === null
+  )
+    return asset;
+  if (ticker.marketStatus === 'open')
+    return {
+      ...asset,
+      marketStatus: 'open',
+      ...(typeof ticker.tradable === 'boolean'
+        ? {
+            tradable: ticker.tradable,
+            tradeBlockedReason: ticker.tradeBlockedReason ?? null,
+          }
+        : {}),
+    };
+  if (!isClosedMarketSnapshot(ticker)) return asset;
   return {
     ...asset,
-    marketStatus: ticker!.marketStatus,
+    marketStatus: ticker.marketStatus,
     tradable: false,
-    tradeBlockedReason: asset.isActive === false ? 'ASSET_INACTIVE' : ticker!.marketStatus === 'closed' ? 'MARKET_CLOSED' : 'UNKNOWN',
+    tradeBlockedReason:
+      asset.isActive === false
+        ? 'ASSET_INACTIVE'
+        : ticker.marketStatus === 'closed'
+          ? 'MARKET_CLOSED'
+          : 'UNKNOWN',
   };
 }
 

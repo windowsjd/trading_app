@@ -295,6 +295,7 @@ jobs:
           src/fx/general-account-fx.integration.spec.ts
           src/orders/order-replay-and-cancel-scope.integration.spec.ts
           src/portfolio/general-performance-hardening.integration.spec.ts
+          src/portfolio/krx-closed-price.integration.spec.ts
           src/portfolio/snapshot-scope-audit.integration.spec.ts
           src/trading-accounts/general-trading-audit.integration.spec.ts
           src/ranking/season-ranking-scope.integration.spec.ts

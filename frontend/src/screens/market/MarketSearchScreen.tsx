@@ -1,3 +1,6 @@
+import { buildWsUrl } from '../../constants/env';
+import { useMarketTickers } from '../../features/market/useMarketTickers';
+import { mergeMarketAssetTicker } from '../../features/market/mergeMarketAssetTicker';
 import React, { useMemo, useState } from 'react';
 import {
   View,
@@ -53,6 +56,7 @@ function getChangeRateText(item: MarketAssetItemDto) {
 }
 
 export default function MarketSearchScreen({ navigation }: Props) {
+  const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
   const [assetType, setAssetType] = useState<SearchScope>('all');
   const [searchText, setSearchText] = useState('');
   const trimmedSearchText = searchText.trim();
@@ -76,7 +80,6 @@ export default function MarketSearchScreen({ navigation }: Props) {
     getNextPageParam: (lastPage) => lastPage.pagination.nextOffset ?? undefined,
     initialPageParam: 0,
     enabled: trimmedSearchText.length > 0,
-    refetchInterval: 15_000,
   });
 
   const items = useMemo(() => {
@@ -90,6 +93,12 @@ export default function MarketSearchScreen({ navigation }: Props) {
 
     return Array.from(byId.values());
   }, [searchQuery.data]);
+  const assetIds = useMemo(() => items.map((item) => item.id), [items]);
+  const { tickersByAssetId } = useMarketTickers({
+    assetIds,
+    wsUrl: wsUrl ?? '',
+    enabled: !!wsUrl,
+  });
 
   const hasPriceErrors = useMemo(
     () =>
@@ -194,7 +203,11 @@ export default function MarketSearchScreen({ navigation }: Props) {
             />
           )
         }
-        renderItem={({ item }) => {
+        renderItem={({ item: baseline }) => {
+          const item = mergeMarketAssetTicker(
+            baseline,
+            tickersByAssetId.get(baseline.id),
+          );
           const nameDisplay = getAssetNameDisplay(item);
           const symbolMarketDisplay = getAssetSymbolMarketDisplay(item);
 

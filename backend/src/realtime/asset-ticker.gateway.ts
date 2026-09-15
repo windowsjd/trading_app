@@ -1,5 +1,9 @@
 import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
-import { resolveAssetProviderEligibility, selectMarketAwareAssetPriceSnapshotBySourcePriority, isPositiveDecimal } from '../providers/source-eligibility.policy';
+import {
+  resolveAssetProviderEligibility,
+  selectMarketAwareAssetPriceSnapshotBySourcePriority,
+  isPositiveDecimal,
+} from '../providers/source-eligibility.policy';
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -23,7 +27,10 @@ import {
   AssetsService,
   type RealtimePriceKrwConversion,
 } from '../assets/assets.service';
-import { RealtimeAssetMetadataCacheService } from './realtime-asset-metadata-cache.service';
+import {
+  RealtimeAssetMetadataCacheService,
+  type RealtimeAssetMetadata,
+} from './realtime-asset-metadata-cache.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   BinanceRealtimePriceEvent,
@@ -115,6 +122,10 @@ export class AssetTickerGateway
   @WebSocketServer()
   private readonly server!: WsServer;
 
+  private readonly liveTickerAssets = new WeakMap<
+    object,
+    RealtimeAssetMetadata
+  >();
   private readonly clients = new Map<WebSocket, ClientState>();
   private pollTimer: NodeJS.Timeout | null = null;
   private unsubscribeKisRealtimePrices: (() => void) | null = null;
@@ -460,7 +471,7 @@ export class AssetTickerGateway
     assetId: string,
     ticker: Record<string, unknown>,
   ): void {
-    if (!canSendLiveStockTicker(ticker)) {
+    if (!this.canSendLiveStockTicker(ticker)) {
       state.pendingTickers.delete(assetId);
       this.tickerDroppedCount += 1;
       return;
@@ -545,7 +556,7 @@ export class AssetTickerGateway
           state.pendingTickers.delete(assetId);
           continue;
         }
-        if (!canSendLiveStockTicker(ticker)) {
+        if (!this.canSendLiveStockTicker(ticker)) {
           state.pendingTickers.delete(assetId);
           this.tickerDroppedCount += 1;
           continue;
@@ -662,22 +673,38 @@ export class AssetTickerGateway
    */
   private async buildSnapshotTickerMessage(assetId: string) {
     const now = new Date();
-    const selection = await this.assetsService.getAssetPriceForTicker(assetId, now);
+    const selection = await this.assetsService.getAssetPriceForTicker(
+      assetId,
+      now,
+    );
     if (!selection) {
       return null;
     }
 
     const { asset, price } = selection;
-    const session = asset.assetType === 'crypto' ? null : resolveStockMarketSessionState(asset, now);
-    const marketMetadata = asset.assetType === 'crypto' ? {} : {
-      marketStatus: session?.state === 'open' ? 'open' : session?.state === 'closed' ? 'closed' : 'unknown',
-      marketEvaluatedAt: now.toISOString(),
-      realtime: false,
-    };
+    const session =
+      asset.assetType === 'crypto'
+        ? null
+        : resolveStockMarketSessionState(asset, now);
+    const marketMetadata =
+      asset.assetType === 'crypto'
+        ? {}
+        : {
+            marketStatus:
+              session?.state === 'open'
+                ? 'open'
+                : session?.state === 'closed'
+                  ? 'closed'
+                  : 'unknown',
+            marketEvaluatedAt: now.toISOString(),
+            tradable: asset.tradable,
+            tradeBlockedReason: asset.tradeBlockedReason,
+            realtime: false,
+          };
     if (price.state === 'unavailable') {
       return {
         type: 'asset_ticker',
-      ...marketMetadata,
+        ...marketMetadata,
         assetId: asset.id,
         symbol: asset.symbol,
         name: asset.name,
@@ -753,7 +780,10 @@ export class AssetTickerGateway
     }
 
     const now = new Date();
-    const marketState = metadata.assetType === 'crypto' ? null : resolveStockMarketSessionState(metadata, now);
+    const marketState =
+      metadata.assetType === 'crypto'
+        ? null
+        : resolveStockMarketSessionState(metadata, now);
     if (metadata.assetType !== 'crypto') {
       // Transport and snapshot ingestion continue; only live price use is gated.
       if (marketState?.state !== 'open') return null;
@@ -763,15 +793,26 @@ export class AssetTickerGateway
       });
       if (!eligibility.eligible) return null;
       const candidate = {
-        id: '', sourceType: 'provider_api', sourceName: event.price.sourceName,
-        effectiveAt: new Date(event.price.effectiveAt), capturedAt: new Date(event.price.capturedAt),
+        id: '',
+        sourceType: 'provider_api',
+        sourceName: event.price.sourceName,
+        effectiveAt: new Date(event.price.effectiveAt),
+        capturedAt: new Date(event.price.capturedAt),
       };
-      if (!Number.isFinite(candidate.effectiveAt.getTime()) || !Number.isFinite(candidate.capturedAt.getTime())) return null;
+      if (
+        !Number.isFinite(candidate.effectiveAt.getTime()) ||
+        !Number.isFinite(candidate.capturedAt.getTime())
+      )
+        return null;
       const selection = selectMarketAwareAssetPriceSnapshotBySourcePriority({
-        asset: metadata, workflow: 'assets_with_price', candidates: [candidate],
-        expectedSourceNames: eligibility.sourceNames, now,
+        asset: metadata,
+        workflow: 'assets_with_price',
+        candidates: [candidate],
+        expectedSourceNames: eligibility.sourceNames,
+        now,
         freshnessThresholdSeconds: eligibility.freshnessThresholdSeconds,
-        isPositiveValue: () => isPositiveDecimal(new Prisma.Decimal(event.price.price)),
+        isPositiveValue: () =>
+          isPositiveDecimal(new Prisma.Decimal(event.price.price)),
       });
       if (selection.state !== 'selected') return null;
     }
@@ -784,9 +825,11 @@ export class AssetTickerGateway
     // selection (short-TTL cached) and reported unavailable when there is none.
     const krw = await this.buildRealtimePriceKrw(event);
 
-    return {
+    const ticker = {
       type: 'asset_ticker',
-      ...(marketState ? { marketStatus: 'open', marketEvaluatedAt: now.toISOString() } : {}),
+      ...(marketState
+        ? { marketStatus: 'open', marketEvaluatedAt: now.toISOString() }
+        : {}),
       assetId: metadata.assetId,
       symbol: metadata.symbol,
       name: metadata.name,
@@ -823,6 +866,22 @@ export class AssetTickerGateway
             ...(krw.fxRateSource ? { fxRateSource: krw.fxRateSource } : {}),
           }),
     };
+    this.liveTickerAssets.set(ticker, metadata);
+    return ticker;
+  }
+
+  /** Recheck the actual asset at delivery, including after buffered waits. */
+  private canSendLiveStockTicker(ticker: Record<string, unknown>): boolean {
+    const asset = this.liveTickerAssets.get(ticker);
+    if (!asset || asset.assetType === 'crypto') return true;
+    const now = new Date();
+    const state = resolveStockMarketSessionState(asset, now);
+    const effectiveAt = Date.parse(String(ticker.priceEffectiveAt));
+    return (
+      state?.state === 'open' &&
+      effectiveAt >= state.currentSession.openTime.getTime() &&
+      effectiveAt <= now.getTime()
+    );
   }
 
   private async buildRealtimePriceKrw(
@@ -967,18 +1026,11 @@ function parseCandleSubscriptionKey(key: string): [string, string] {
   return [assetId, interval];
 }
 
-function snapshotTickerKey(ticker: { assetPriceSnapshotId: string | null; marketStatus?: string }): string | null {
-  return ticker.marketStatus ? `${ticker.marketStatus}:${ticker.assetPriceSnapshotId ?? 'unavailable'}` : ticker.assetPriceSnapshotId;
-}
-
-/** A buffered/async live tick must also be eligible at actual delivery time. */
-function canSendLiveStockTicker(ticker: Record<string, unknown>): boolean {
-  if (ticker.realtime !== true && ticker.delayed !== true) return true;
-  const source = ticker.priceSource as { sourceName?: string } | undefined;
-  const asset = source?.sourceName === 'kis_krx_realtime_trade'
-    ? { assetType: 'domestic_stock' as const, market: 'KRX' }
-    : source?.sourceName === 'kis_us_delayed_trade'
-      ? { assetType: 'us_stock' as const, market: 'NAS' }
-      : null;
-  return !asset || resolveStockMarketSessionState(asset, new Date())?.state === 'open';
+function snapshotTickerKey(ticker: {
+  assetPriceSnapshotId: string | null;
+  marketStatus?: string;
+}): string | null {
+  return ticker.marketStatus
+    ? `${ticker.marketStatus}:${ticker.assetPriceSnapshotId ?? 'unavailable'}`
+    : ticker.assetPriceSnapshotId;
 }

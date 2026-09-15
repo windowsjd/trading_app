@@ -56,7 +56,6 @@ export default function MarketScreen({ navigation }: Props) {
       }),
     getNextPageParam: (lastPage) => lastPage.pagination.nextOffset ?? undefined,
     initialPageParam: 0,
-    refetchInterval: selectedTab === 'crypto' ? false : 15_000,
   });
 
   // REST is the baseline and stays untouched: rows receive their ticker as a
@@ -79,15 +78,12 @@ export default function MarketScreen({ navigation }: Props) {
   // Live overlay: the currently loaded rows subscribe on the app's shared
   // socket. Changing tab releases the previous tab's rows; loading another page
   // only adds the new ids.
-  const {
-    tickersByAssetId,
-    showReconnectBanner,
-    staleAssetIds,
-  } = useMarketTickers({
-    assetIds,
-    wsUrl: wsUrl ?? '',
-    enabled: !!wsUrl,
-  });
+  const { tickersByAssetId, showReconnectBanner, staleAssetIds } =
+    useMarketTickers({
+      assetIds,
+      wsUrl: wsUrl ?? '',
+      enabled: !!wsUrl,
+    });
 
   const openAsset = useCallback(
     (assetId: string) => navigation.navigate('AssetDetail', { assetId }),
@@ -139,8 +135,8 @@ export default function MarketScreen({ navigation }: Props) {
                   tab.key === 'domestic_stock'
                     ? TEST_IDS.market.tabDomestic
                     : tab.key === 'us_stock'
-                    ? TEST_IDS.market.tabUs
-                    : TEST_IDS.market.tabCrypto;
+                      ? TEST_IDS.market.tabUs
+                      : TEST_IDS.market.tabCrypto;
 
                 return (
                   <Pressable
@@ -149,7 +145,9 @@ export default function MarketScreen({ navigation }: Props) {
                     style={[styles.tabButton, active && styles.tabButtonActive]}
                     onPress={() => setSelectedTab(tab.key)}
                   >
-                    <Text style={active ? styles.tabTextActive : styles.tabText}>
+                    <Text
+                      style={active ? styles.tabTextActive : styles.tabText}
+                    >
                       {tab.label}
                     </Text>
                   </Pressable>

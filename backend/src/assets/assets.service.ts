@@ -1,4 +1,7 @@
-import { closedMarketPriceScope, findMarketAwareAssetPriceCandidates } from '../providers/asset-price-snapshot-query';
+import {
+  closedMarketPriceScope,
+  findMarketAwareAssetPriceCandidates,
+} from '../providers/asset-price-snapshot-query';
 import {
   HttpException,
   HttpStatus,
@@ -160,6 +163,8 @@ export type AssetPricePayload =
 
 export type AssetTickerPriceSelection = {
   asset: {
+    tradable: boolean;
+    tradeBlockedReason: string | null;
     id: string;
     symbol: string;
     name: string;
@@ -521,6 +526,7 @@ export class AssetsService {
 
     return {
       asset: {
+        ...this.buildTradingUx(asset, price.payload, valuationAt),
         id: asset.id,
         symbol: asset.symbol,
         name: asset.name,
@@ -820,10 +826,17 @@ export class AssetsService {
         currencyCode: this.getAssetPriceCurrency(asset),
       },
     });
-    const priceRead = { asset: { ...asset, currencyCode: this.getAssetPriceCurrency(asset) }, workflow: 'assets_with_price' as const, now: valuationAt };
+    const priceRead = {
+      asset: { ...asset, currencyCode: this.getAssetPriceCurrency(asset) },
+      workflow: 'assets_with_price' as const,
+      now: valuationAt,
+    };
     const closedScope = closedMarketPriceScope(priceRead);
     const providerCandidates = providerEligibility.eligible
-      ? await findMarketAwareAssetPriceCandidates(this.prisma, { ...priceRead, sourceNames: providerEligibility.sourceNames })
+      ? await findMarketAwareAssetPriceCandidates(this.prisma, {
+          ...priceRead,
+          sourceNames: providerEligibility.sourceNames,
+        })
       : [];
     const providerSelection = providerEligibility.eligible
       ? selectMarketAwareAssetPriceSnapshotBySourcePriority({

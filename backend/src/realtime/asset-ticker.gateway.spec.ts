@@ -3,7 +3,9 @@ jest.mock('../generated/prisma/client', () => ({
     KRW: 'KRW',
     USD: 'USD',
   },
-  Prisma: { Decimal: jest.requireActual('@prisma/client/runtime/client').Decimal },
+  Prisma: {
+    Decimal: jest.requireActual('@prisma/client/runtime/client').Decimal,
+  },
   PrismaClient: class PrismaClient {},
   UserStatus: {
     active: 'active',
@@ -292,30 +294,65 @@ describe('AssetTickerGateway', () => {
     });
   });
 
-  it.each(['2026-06-18T06:30:02.000Z', '2026-06-20T03:00:00.000Z'])('does not fan out a late closing KRX trade at %s', async now => {
-    jest.setSystemTime(new Date(now));
-    const {gateway, assetsService} = createGateway(null, DEFAULT_KRW_CONVERSION, {
-      assetId: 'asset-samsung', symbol: '005930', name: 'Samsung',
-      assetType: 'domestic_stock', market: 'KRX', priceCurrency: CurrencyCode.KRW, displayPriceDecimals: null,
-    });
-    expect(await buildRealtimeTickerMessage(gateway, {
-      type: 'kis_realtime_price', assetId: 'asset-samsung', snapshotState: 'created',
-      price: {price: '248500', currencyCode: CurrencyCode.KRW, sourceName: 'kis_krx_realtime_trade',
-        effectiveAt: '2026-06-18T06:30:00.000Z', capturedAt: now},
-    })).toBeNull();
-    expect(assetsService.getAssetPriceForTicker).not.toHaveBeenCalled();
-    expect(assetsService.convertRealtimePriceToKrw).not.toHaveBeenCalled();
-  });
+  it.each(['2026-06-18T06:30:02.000Z', '2026-06-20T03:00:00.000Z'])(
+    'does not fan out a late closing KRX trade at %s',
+    async (now) => {
+      jest.setSystemTime(new Date(now));
+      const { gateway, assetsService } = createGateway(
+        null,
+        DEFAULT_KRW_CONVERSION,
+        {
+          assetId: 'asset-samsung',
+          symbol: '005930',
+          name: 'Samsung',
+          assetType: 'domestic_stock',
+          market: 'KRX',
+          priceCurrency: CurrencyCode.KRW,
+          displayPriceDecimals: null,
+        },
+      );
+      expect(
+        await buildRealtimeTickerMessage(gateway, {
+          type: 'kis_realtime_price',
+          assetId: 'asset-samsung',
+          snapshotState: 'created',
+          price: {
+            price: '248500',
+            currencyCode: CurrencyCode.KRW,
+            sourceName: 'kis_krx_realtime_trade',
+            effectiveAt: '2026-06-18T06:30:00.000Z',
+            capturedAt: now,
+          },
+        }),
+      ).toBeNull();
+      expect(assetsService.getAssetPriceForTicker).not.toHaveBeenCalled();
+      expect(assetsService.convertRealtimePriceToKrw).not.toHaveBeenCalled();
+    },
+  );
 
   it('rejects a previous-session event even when KRX is currently open', async () => {
-    const {gateway} = createGateway(null, DEFAULT_KRW_CONVERSION, {
-      assetId: 'asset-samsung', symbol: '005930', name: 'Samsung', assetType: 'domestic_stock', market: 'KRX', priceCurrency: CurrencyCode.KRW,
+    const { gateway } = createGateway(null, DEFAULT_KRW_CONVERSION, {
+      assetId: 'asset-samsung',
+      symbol: '005930',
+      name: 'Samsung',
+      assetType: 'domestic_stock',
+      market: 'KRX',
+      priceCurrency: CurrencyCode.KRW,
     });
-    expect(await buildRealtimeTickerMessage(gateway, {
-      type: 'kis_realtime_price', assetId: 'asset-samsung', snapshotState: 'skipped',
-      price: {price: '248500', currencyCode: CurrencyCode.KRW, sourceName: 'kis_krx_realtime_trade',
-        effectiveAt: '2026-06-18T06:30:00.000Z', capturedAt: '2026-06-19T03:00:29.000Z'},
-    })).toBeNull();
+    expect(
+      await buildRealtimeTickerMessage(gateway, {
+        type: 'kis_realtime_price',
+        assetId: 'asset-samsung',
+        snapshotState: 'skipped',
+        price: {
+          price: '248500',
+          currencyCode: CurrencyCode.KRW,
+          sourceName: 'kis_krx_realtime_trade',
+          effectiveAt: '2026-06-18T06:30:00.000Z',
+          capturedAt: '2026-06-19T03:00:29.000Z',
+        },
+      }),
+    ).toBeNull();
   });
 
   it('builds Binance realtime tickers from the event fields (price/changeRate/source)', async () => {
@@ -626,6 +663,124 @@ describe('AssetTickerGateway', () => {
     (
       gateway as unknown as { flushPendingTickers(): void }
     ).flushPendingTickers();
+
+  it('publishes an open-to-closed transition even with the same snapshot id', async () => {
+    const { gateway } = createGateway({
+      asset: {
+        id: 'samsung',
+        symbol: '005930',
+        name: 'Samsung',
+        assetType: 'domestic_stock',
+        market: 'KRX',
+        priceCurrency: CurrencyCode.KRW,
+        tradable: false,
+        tradeBlockedReason: 'MARKET_CLOSED',
+      },
+      price: {
+        state: 'available',
+        currentPrice: '248500',
+        priceCurrency: CurrencyCode.KRW,
+        priceKrwState: 'available',
+        priceKrw: '248500',
+        assetPriceSnapshotId: 'closing-snapshot',
+        priceCapturedAt: '2026-06-18T06:29:59Z',
+        priceEffectiveAt: '2026-06-18T06:29:59Z',
+        priceSource: null,
+      },
+    });
+    const { client, state } = attachClient(gateway, 'samsung');
+    const poll = () =>
+      (
+        gateway as unknown as { pushChangedTickers(): Promise<void> }
+      ).pushChangedTickers();
+    jest.setSystemTime(new Date('2026-06-18T06:29:59Z'));
+    await poll();
+    jest.setSystemTime(new Date('2026-06-18T06:30:02Z'));
+    await poll();
+    expect(client.send).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(client.send.mock.calls[1][0])).toMatchObject({
+      marketStatus: 'closed',
+      realtime: false,
+      priceLocal: '248500',
+      assetPriceSnapshotId: 'closing-snapshot',
+    });
+    expect(state.subscriptions.has('samsung')).toBe(true);
+  });
+
+  it.each(['NAS', 'NYS'])(
+    'uses actual %s metadata at buffered delivery, independently of KRX',
+    async (market) => {
+      jest.setSystemTime(new Date('2026-06-18T15:00:30Z'));
+      const { gateway, realtimeAssetMetadata } = createGateway(
+        null,
+        DEFAULT_KRW_CONVERSION,
+        {
+          assetId: 'us-stock',
+          symbol: 'US',
+          name: 'US stock',
+          assetType: 'us_stock',
+          market,
+          priceCurrency: CurrencyCode.USD,
+        },
+      );
+      const { client, state } = attachClient(gateway, 'us-stock', 2_000_000);
+      await pushRealtimePriceEvent(gateway, {
+        type: 'kis_realtime_price',
+        assetId: 'us-stock',
+        snapshotState: 'skipped',
+        price: {
+          price: '100',
+          currencyCode: CurrencyCode.USD,
+          sourceName: 'kis_us_delayed_trade',
+          effectiveAt: '2026-06-18T14:45:29Z',
+          capturedAt: '2026-06-18T15:00:29Z',
+        },
+      });
+      expect(state.pendingTickers.size).toBe(1);
+      client.bufferedAmount = 0;
+      flushPendingTickers(gateway);
+      expect(client.send).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(client.send.mock.calls[0][0])).toMatchObject({
+        marketStatus: 'open',
+        delayed: true,
+        realtime: false,
+      });
+      expect(realtimeAssetMetadata.getMetadata).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('discards an open KRX tick buffered until after close without closing the shared socket', async () => {
+    jest.setSystemTime(new Date('2026-06-18T06:29:59Z'));
+    const { gateway } = createGateway(null, DEFAULT_KRW_CONVERSION, {
+      assetId: 'samsung',
+      symbol: '005930',
+      name: 'Samsung',
+      assetType: 'domestic_stock',
+      market: 'KRX',
+      priceCurrency: CurrencyCode.KRW,
+    });
+    const { client, state } = attachClient(gateway, 'samsung', 2_000_000);
+    await pushRealtimePriceEvent(gateway, {
+      type: 'kis_realtime_price',
+      assetId: 'samsung',
+      snapshotState: 'skipped',
+      price: {
+        price: '248500',
+        currencyCode: CurrencyCode.KRW,
+        sourceName: 'kis_krx_realtime_trade',
+        effectiveAt: '2026-06-18T06:29:59Z',
+        capturedAt: '2026-06-18T06:29:59Z',
+      },
+    });
+    expect(state.pendingTickers.size).toBe(1);
+    jest.setSystemTime(new Date('2026-06-18T06:30:02Z'));
+    client.bufferedAmount = 0;
+    flushPendingTickers(gateway);
+    expect(client.send).not.toHaveBeenCalled();
+    expect(client.readyState).toBe(1);
+    expect(state.subscriptions.has('samsung')).toBe(true);
+    expect(state.pendingTickers.size).toBe(0);
+  });
 
   it('sends realtime tickers straight through when the socket can drain', async () => {
     const { gateway } = createGateway(

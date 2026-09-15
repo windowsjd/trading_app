@@ -223,3 +223,45 @@ describe('selectDisplayPrice — REST basis', () => {
     assert.equal(display.displayPriceDecimals, 2);
   });
 });
+
+describe('detail completed-session display', () => {
+  it('uses the completed snapshot as one basis without labeling it realtime', () => {
+    const display = selectDisplayPrice({
+      ...assetInput,
+      assetType: 'domestic_stock',
+      marketStatus: 'closed',
+      restPrice,
+      latestTicker: ticker({
+        realtime: false,
+        marketStatus: 'closed',
+        marketEvaluatedAt: '2026-07-10T06:30:02Z',
+        priceLocal: '248500',
+        priceKrw: '248500',
+        priceCurrency: 'KRW',
+      }),
+    });
+    assert.equal(display.basis, 'snapshot');
+    assert.equal(display.isRealtime, false);
+    assert.equal(display.priceLocal, '248500');
+    assert.equal(display.priceKrw, '248500');
+  });
+  it('keeps a closed unavailable snapshot empty instead of reviving REST', () => {
+    const display = selectDisplayPrice({
+      ...assetInput,
+      assetType: 'domestic_stock',
+      marketStatus: 'closed',
+      restPrice,
+      latestTicker: ticker({
+        realtime: false,
+        marketStatus: 'closed',
+        marketEvaluatedAt: '2026-07-10T06:30:02Z',
+        priceLocal: null,
+        priceKrw: null,
+        priceKrwState: 'unavailable',
+      }),
+    });
+    assert.equal(display.priceLocal, null);
+    assert.equal(display.priceKrw, null);
+    assert.equal(display.isRealtime, false);
+  });
+});

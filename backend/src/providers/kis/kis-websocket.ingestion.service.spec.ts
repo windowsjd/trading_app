@@ -72,20 +72,64 @@ describe('KIS WebSocket ingestion service', () => {
     );
   });
 
-  it('stores a parsed 15:30 closing trade received at 15:30:02 as session evidence', async () => {
-    const prisma = createPrismaMock({assets: [{id: 'asset-samsung', market: 'KRX', symbol: '005930'}]});
-    const service = createService(prisma);
+  it.each(['005930', '000270'])(
+    'stores %s 15:30 closing trade received at 15:30:02 as session evidence',
+    async (symbol) => {
+      const prisma = createPrismaMock({
+        assets: [{ id: 'asset-samsung', market: 'KRX', symbol }],
+      });
+      const service = createService(prisma);
+      const parsed = parseKisWebSocketMessage({
+        frame: domesticFrame([
+          domesticRecord({
+            symbol,
+            time: '153000',
+            price: '248500',
+            businessDate: '20260527',
+          }),
+        ]),
+        receivedAt: new Date('2026-05-27T06:30:02.000Z'),
+      });
+      expect(parsed.state).toBe('trades');
+      if (parsed.state !== 'trades') throw new Error('trade expected');
+      expect(parsed.trades[0].sourceTimestamp).toEqual(
+        new Date('2026-05-27T06:30:00.000Z'),
+      );
+      await service.ingestTrade(parsed.trades[0]);
+      expect(prisma.assetPriceSnapshot.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            price: '248500.00000000',
+            effectiveAt: new Date('2026-05-27T06:30:00.000Z'),
+            capturedAt: new Date('2026-05-27T06:30:02.000Z'),
+          }),
+        }),
+      );
+    },
+  );
+
+  it('does not lose the closing trade to the normal snapshot throttle', async () => {
+    const prisma = createPrismaMock({
+      assets: [{ id: 'asset-samsung', market: 'KRX', symbol: '005930' }],
+    });
+    prisma.assetPriceSnapshot.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: '15:29:59' });
     const parsed = parseKisWebSocketMessage({
-      frame: domesticFrame([domesticRecord({symbol: '005930', time: '153000', price: '248500', businessDate: '20260527'})]),
+      frame: domesticFrame([
+        domesticRecord({
+          symbol: '005930',
+          time: '153000',
+          price: '248500',
+          businessDate: '20260527',
+        }),
+      ]),
       receivedAt: new Date('2026-05-27T06:30:02.000Z'),
     });
-    expect(parsed.state).toBe('trades');
     if (parsed.state !== 'trades') throw new Error('trade expected');
-    expect(parsed.trades[0].sourceTimestamp).toEqual(new Date('2026-05-27T06:30:00.000Z'));
-    await service.ingestTrade(parsed.trades[0]);
-    expect(prisma.assetPriceSnapshot.create).toHaveBeenCalledWith(expect.objectContaining({data: expect.objectContaining({
-      price: '248500.00000000', effectiveAt: new Date('2026-05-27T06:30:00.000Z'), capturedAt: new Date('2026-05-27T06:30:02.000Z'),
-    })}));
+    const result = await createService(prisma).ingestTrade(parsed.trades[0]);
+    expect(result.state).toBe('created');
+    expect(prisma.assetPriceSnapshot.create).toHaveBeenCalledTimes(1);
   });
 
   it('skips unmapped domestic assets without creating fake assets', async () => {
