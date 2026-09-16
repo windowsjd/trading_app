@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { URL } from 'node:url';
 import { describe, it } from 'node:test';
 import { createHomeHarness, elements } from '../../../test/homeTestHarness.cjs';
+import { getCapabilityBlockMessage } from '../../features/tradingAccount/capabilities.ts';
 import {
   assertDailyEquity,
   DailyEquityContractError,
@@ -20,6 +21,174 @@ const texts = (node) =>
   elements(node, 'Text')
     .flatMap((node) => node.props.children)
     .join(' ');
+
+describe('home exchange shortcut', () => {
+  for (const mode of ['general', 'season']) {
+    it(`${mode} offers only exchange and opens WalletFx for the selected account`, async (t) => {
+      const h = createHomeHarness(mode);
+      t.after(h.close);
+      h.seed(h.account, fixture[mode].data);
+      const { tree } = h.render();
+      const actions = elements(tree, 'CTAButton');
+      assert.deepEqual(actions.map((node) => node.props.label), ['환전하기']);
+      const button = h.renderCta(actions[0]);
+      assert.equal(button.props.disabled, false);
+      button.props.onPress();
+      assert.deepEqual(h.navigation, [['WalletFx']]);
+
+      h.renderFx();
+      const queries = h.fxQueries.filter(
+        (query) => query.queryKey[0] === 'tradingAccount',
+      );
+      assert.equal(queries.length, 2);
+      for (const query of queries) {
+        assert.equal(query.enabled, true);
+        assert.ok(query.queryKey.includes(h.account.id));
+        h.response = {
+          success: true,
+          data: { tradingAccountId: h.account.id, wallets: [] },
+        };
+        await query.queryFn();
+      }
+      assert.deepEqual(h.requests.map((request) => request.path), [
+        `/trading-accounts/${h.account.id}`,
+        `/trading-accounts/${h.account.id}/wallets`,
+      ]);
+    });
+
+    it(`${mode} keeps exchange full width in scroll content with unrestricted label growth`, (t) => {
+      const h = createHomeHarness(mode);
+      t.after(h.close);
+      h.seed(h.account, fixture[mode].data);
+      const { tree } = h.render();
+      const action = elements(tree, 'CTAButton')[0];
+      assert.equal(tree.type, 'ScrollView');
+      assert.ok(tree.props.children.includes(action));
+      const button = h.renderCta(action);
+      const style = Object.assign({}, ...button.props.style.filter(Boolean));
+      const label = elements(button, 'Text')[0];
+      assert.equal(texts(button), '환전하기');
+      for (const key of ['width', 'height', 'maxWidth', 'maxHeight', 'flex']) {
+        assert.equal(style[key], undefined, key);
+      }
+      assert.notEqual(tree.props.contentContainerStyle.alignItems, 'center');
+      assert.ok(tree.props.contentContainerStyle.paddingBottom > 0);
+      assert.equal(label.props.numberOfLines, undefined);
+      assert.notEqual(label.props.allowFontScaling, false);
+      assert.equal(label.props.style.textAlign, 'center');
+    });
+
+    for (const status of ['suspended', 'closed']) {
+      it(`${mode} ${status} keeps the exchange gate, notice and read actions`, (t) => {
+        const h = createHomeHarness(mode);
+        t.after(h.close);
+        h.account = { ...h.account, status };
+        h.seed(h.account, fixture[mode].data);
+        const { tree } = h.render();
+        assert.deepEqual(elements(tree, 'CTAButton'), []);
+        const caps = h.getCapabilities();
+        assert.ok(texts(tree).includes(
+          getCapabilityBlockMessage(caps, caps.exchangeBlockReason),
+        ));
+        for (const label of ['원장 보기', '주문 내역 보기']) {
+          const button = elements(tree, 'Pressable').find(
+            (node) => texts(node) === label,
+          );
+          assert.ok(button);
+          button.props.onPress();
+        }
+        assert.equal(h.navigation[0][0], 'WalletTransactions');
+        assert.equal(h.navigation[1][1].params.params.accountId, h.account.id);
+      });
+    }
+
+    it(`${mode} does not offer exchange before capabilities are available`, (t) => {
+      const h = createHomeHarness(mode);
+      t.after(h.close);
+      h.seed(h.account, fixture[mode].data);
+      h.capabilities = null;
+      assert.deepEqual(elements(h.render().tree, 'CTAButton'), []);
+    });
+
+    it(`${mode} gates the shortcut on canExchange independently of canTrade`, (t) => {
+      const h = createHomeHarness(mode);
+      t.after(h.close);
+      h.seed(h.account, fixture[mode].data);
+      h.capabilities = { ...h.getCapabilities(), canExchange: false, canTrade: true };
+      assert.deepEqual(elements(h.render().tree, 'CTAButton'), []);
+      h.capabilities = { ...h.getCapabilities(), canExchange: true, canTrade: false };
+      assert.deepEqual(
+        elements(h.render().tree, 'CTAButton').map((node) => node.props.label),
+        ['환전하기'],
+      );
+    });
+  }
+
+  for (const change of [
+    { seasonStatus: 'ended' },
+    { seasonStatus: 'settled' },
+    { participantStatus: 'excluded' },
+    { participantStatus: 'finished' },
+    { endAt: '2026-09-09T00:00:00Z' },
+  ]) {
+    it(`season restrictions still gate exchange: ${JSON.stringify(change)}`, (t) => {
+      const h = createHomeHarness('season');
+      t.after(h.close);
+      h.account.season = { ...h.account.season, ...change };
+      h.seed(h.account, fixture.season.data);
+      const { tree } = h.render();
+      const actions = elements(tree, 'CTAButton');
+      assert.deepEqual(
+        actions.map((node) => node.props.label),
+        change.seasonStatus === 'settled' ? ['보상 확인'] : [],
+      );
+      const caps = h.getCapabilities();
+      assert.ok(texts(tree).includes(
+        getCapabilityBlockMessage(caps, caps.exchangeBlockReason),
+      ));
+      if (change.seasonStatus === 'settled') {
+        h.renderCta(actions[0]).props.onPress();
+        assert.deepEqual(h.navigation, [
+          ['MainTabs', { screen: 'MyTab', params: { screen: 'Reward' } }],
+        ]);
+      }
+    });
+  }
+
+  it('general ↔ season switches immediately render the current capability and FX account', async (t) => {
+    const h = createHomeHarness('season');
+    t.after(h.close);
+    const season = h.account;
+    const general = { ...season, id: 'general-1', mode: 'general', season: null };
+    for (const account of [
+      general, season, general, { ...season, status: 'suspended' }, general,
+    ]) {
+      h.account = account;
+      h.seed(account, fixture[account.mode].data);
+      const { tree, branch } = h.render();
+      assert.equal(branch.key, account.id);
+      const actions = elements(tree, 'CTAButton');
+      assert.deepEqual(
+        actions.map((node) => node.props.label),
+        account.status === 'active' ? ['환전하기'] : [],
+      );
+      if (actions.length) {
+        h.renderCta(actions[0]).props.onPress();
+        assert.deepEqual(h.navigation.at(-1), ['WalletFx']);
+        h.renderFx();
+        const wallets = h.fxQueries.find(
+          (query) => query.queryKey.includes('wallets'),
+        );
+        h.response = {
+          success: true,
+          data: { tradingAccountId: account.id, wallets: [] },
+        };
+        await wallets.queryFn();
+        assert.equal(h.requests.at(-1).path, `/trading-accounts/${account.id}/wallets`);
+      }
+    }
+  });
+});
 
 describe('general/season home API, queries, rendering and navigation integration', () => {
   for (const mode of ['general', 'season']) {

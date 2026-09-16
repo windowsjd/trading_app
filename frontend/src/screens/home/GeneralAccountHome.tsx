@@ -31,6 +31,7 @@ import {
 import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
+import CTAButton from '../../components/common/CTAButton';
 import HomePortfolioCharts from './HomePortfolioCharts';
 
 /**
@@ -57,6 +58,7 @@ type Props = {
   capabilities: TradingAccountCapabilities | null;
   onOpenLedger: () => void;
   onOpenOrders: () => void;
+  onOpenFx: () => void;
 };
 
 const POSITIONS_PREVIEW_LIMIT = 5;
@@ -73,6 +75,7 @@ export default function GeneralAccountHome({
   capabilities,
   onOpenLedger,
   onOpenOrders,
+  onOpenFx,
 }: Props) {
   const accountId = account.id;
 
@@ -334,6 +337,10 @@ export default function GeneralAccountHome({
           })
         )}
       </View>
+
+      {capabilities?.canExchange ? (
+        <CTAButton label="환전하기" onPress={onOpenFx} />
+      ) : null}
 
       {capabilityNotice ? (
         <View

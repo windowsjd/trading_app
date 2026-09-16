@@ -4,6 +4,7 @@ const { resolve } = require('node:path');
 const React = require('react');
 const { QueryClient, QueryObserver } = require('@tanstack/react-query');
 const { load, elements } = require('./ledgerTestHarness.cjs');
+const { getTradingAccountCapabilities } = require('../src/features/tradingAccount/capabilities.ts');
 function createHomeHarness(mode = 'general') {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -13,6 +14,7 @@ function createHomeHarness(mode = 'general') {
     queries: [],
     requests: [],
     navigation: [],
+    now: Date.parse('2026-09-09T00:00:00Z'),
     account: {
       id: mode + '-1',
       mode,
@@ -24,10 +26,13 @@ function createHomeHarness(mode = 'general') {
               seasonName: '9월 시즌',
               seasonStatus: 'active',
               participantStatus: 'active',
+              startAt: '2026-09-01T00:00:00Z',
+              endAt: '2026-10-01T00:00:00Z',
             }
           : null,
     },
   };
+  h.getCapabilities = () => getTradingAccountCapabilities(h.account, h.now);
   const api = load(
     resolve(__dirname, '../src/features/tradingAccount/api.ts'),
     {
@@ -68,8 +73,11 @@ function createHomeHarness(mode = 'general') {
     '../../features/tradingAccount/api': api,
     '../../features/tradingAccount/TradingAccountContext': {
       useTradingAccount: () => ({
+        selectedAccountId: h.account.id,
         selectedAccount: h.account,
-        capabilities: { canTrade: true, canExchange: true },
+        capabilities: h.capabilities === undefined
+          ? h.getCapabilities()
+          : h.capabilities,
       }),
     },
     '../../app/navigation/navigationHooks': { useRootNavigation: () => root },
@@ -124,6 +132,39 @@ function createHomeHarness(mode = 'general') {
     resolve(__dirname, '../src/screens/home/SeasonAccountHome.tsx'),
     mocks,
   ).default;
+  const cta = load(
+    resolve(__dirname, '../src/components/common/CTAButton.tsx'),
+    mocks,
+  ).default;
+  h.renderCta = (node) => cta(node.props);
+  h.renderFx = () => {
+    h.fxQueries = [];
+    const screen = load(resolve(__dirname, '../src/screens/wallet/WalletFxScreen.tsx'), {
+      ...mocks,
+      react: {
+        ...React,
+        useMemo: (fn) => fn(),
+        useEffect: () => {},
+        useRef: (value) => ({ current: value }),
+        useState: (value) => [value, () => {}],
+      },
+      '@tanstack/react-query': {
+        useQueryClient: () => client,
+        useMutation: () => ({}),
+        useQuery: (options) => {
+          h.fxQueries.push(options);
+          return { isLoading: true };
+        },
+      },
+      '../../features/wallet/api': { getCurrentFxRate: () => {} },
+      '../../features/asset/useStaleRecheck': { useStaleRecheck: () => {} },
+      '../../components/states/BlockedState': { default: 'BlockedState', __esModule: true },
+      '../../components/states/AdminDiagnosticPanel': { default: 'AdminDiagnosticPanel', __esModule: true },
+      '../../components/tradingAccount/PreviewAmounts': { default: 'PreviewAmounts', __esModule: true },
+      './FxSuccessBottomSheet': { default: 'FxSuccessBottomSheet', __esModule: true },
+    }).default;
+    return screen({ navigation: root });
+  };
   h.home = () => home({ navigation: root });
   h.render = () => {
     h.queries = [];

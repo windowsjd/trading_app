@@ -103,6 +103,7 @@ export default function HomeScreen({ navigation }: Props) {
           capabilities={capabilities}
           onOpenLedger={() => navigation.navigate('WalletTransactions')}
           onOpenOrders={openOrders}
+          onOpenFx={() => navigation.navigate('WalletFx')}
         />
       ) : (
         <SeasonAccountHome
@@ -112,19 +113,6 @@ export default function HomeScreen({ navigation }: Props) {
           capabilities={capabilities}
           onOpenLedger={() => navigation.navigate('WalletTransactions')}
           onOpenFx={() => navigation.navigate('WalletFx')}
-          onOpenPortfolio={() => navigation.navigate('Portfolio')}
-          onOpenMarket={() =>
-            rootNavigation.navigate('MainTabs', {
-              screen: 'MarketTab',
-              params: { screen: 'Market' },
-            })
-          }
-          onOpenRanking={() =>
-            rootNavigation.navigate('MainTabs', {
-              screen: 'RankingTab',
-              params: { screen: 'Ranking' },
-            })
-          }
           onOpenReward={() =>
             rootNavigation.navigate('MainTabs', {
               screen: 'MyTab',

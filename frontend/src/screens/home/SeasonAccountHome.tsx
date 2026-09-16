@@ -68,9 +68,6 @@ type Props = {
   onOpenLedger: () => void;
   onOpenOrders: () => void;
   onOpenFx: () => void;
-  onOpenPortfolio: () => void;
-  onOpenMarket: () => void;
-  onOpenRanking: () => void;
   onOpenReward: () => void;
   onOpenAsset: (assetId: string) => void;
 };
@@ -84,9 +81,6 @@ export default function SeasonAccountHome({
   onOpenLedger,
   onOpenOrders,
   onOpenFx,
-  onOpenPortfolio,
-  onOpenMarket,
-  onOpenRanking,
   onOpenReward,
   onOpenAsset,
 }: Props) {
@@ -409,37 +403,9 @@ export default function SeasonAccountHome({
         )}
       </View>
 
-      {/*
-        CTAs follow the account's capabilities, not the app's mood (작업 11
-        §10.3). A closed or settled season account keeps every READ route — its
-        holdings, its ledger, its leaderboard row, its rewards — and is offered
-        no route whose only outcome would be a refused mutation.
-      */}
-      <View style={styles.row}>
-        {capabilities?.canExchange ? (
-          <CTAButton label="환전하기" onPress={onOpenFx} style={styles.flex} />
-        ) : null}
-        <CTAButton
-          label="포트폴리오"
-          onPress={onOpenPortfolio}
-          style={styles.flex}
-        />
-      </View>
-
-      <View style={styles.row}>
-        {capabilities?.canTrade ? (
-          <CTAButton
-            label="마켓으로 이동"
-            onPress={onOpenMarket}
-            style={styles.flex}
-          />
-        ) : null}
-        <CTAButton
-          label="랭킹 보기"
-          onPress={onOpenRanking}
-          style={styles.flex}
-        />
-      </View>
+      {capabilities?.canExchange ? (
+        <CTAButton label="환전하기" onPress={onOpenFx} />
+      ) : null}
 
       {isSettled ? (
         <CTAButton label="보상 확인" onPress={onOpenReward} />
