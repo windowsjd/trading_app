@@ -1,5 +1,7 @@
 jest.mock('../../generated/prisma/client', () => {
-  const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
+  const { Decimal } = jest.requireActual<
+    typeof import('@prisma/client/runtime/client')
+  >('@prisma/client/runtime/client');
 
   return {
     AssetPriceSourceType: {
@@ -27,7 +29,7 @@ import { Logger } from '@nestjs/common';
 import type { MarketSnapshotHealthService } from '../market-snapshot-health.service';
 import type { ProviderConfigService } from '../provider-config.service';
 import { KIS_FIXED_DOMESTIC_SYMBOLS } from './kis-fixed-asset-universe';
-import type { KisRestCurrentPriceIngestionService } from './kis-rest-current-price.ingestion.service';
+import type { KisKrxSessionCloseIngestionService } from './kis-krx-session-close.ingestion.service';
 import { KisKrxStartupCatchUpService } from './kis-krx-startup-catch-up.service';
 
 const POST_CLOSE = new Date('2026-08-24T07:30:00.000Z'); // 16:30 KST
@@ -42,8 +44,8 @@ describe('KIS KRX startup catch-up', () => {
     jest.restoreAllMocks();
   });
 
-  it('runs existing REST current-price ingestion for missing latest completed-session coverage', async () => {
-    const { service, restIngestionService } = createService({
+  it('recovers a dated close then verifies consumer coverage', async () => {
+    const { service, closeIngestionService } = createService({
       assets: [missingKrxAsset('000270')],
     });
 
@@ -53,12 +55,10 @@ describe('KIS KRX startup catch-up', () => {
       created: 1,
       skipped: 0,
     });
-    expect(restIngestionService.ingestCurrentPrices).toHaveBeenCalledWith({
-      dryRun: false,
-      requestedBy: 'kis-krx-startup-catch-up',
-      domesticSymbols: ['000270'],
-      usSymbols: [],
-      maxSnapshots: 1,
+    expect(closeIngestionService.recoverSessionPrice).toHaveBeenCalledWith({
+      assetId: 'asset-000270',
+      symbol: '000270',
+      now: POST_CLOSE,
     });
   });
 
@@ -67,7 +67,7 @@ describe('KIS KRX startup catch-up', () => {
       missingKrxAsset,
     );
     expect(healthAssets).toHaveLength(15);
-    const { service, restIngestionService } = createService({
+    const { service, closeIngestionService } = createService({
       domesticSymbols: [' 005930 ', '000270'],
       assets: healthAssets,
     });
@@ -76,19 +76,22 @@ describe('KIS KRX startup catch-up', () => {
       state: 'completed',
       requestedSymbols: ['005930', '000270'],
     });
-    expect(restIngestionService.ingestCurrentPrices).toHaveBeenCalledWith(
+    expect(closeIngestionService.recoverSessionPrice).toHaveBeenCalledWith(
       expect.objectContaining({
-        domesticSymbols: ['005930', '000270'],
-        maxSnapshots: 2,
+        assetId: 'asset-005930',
+        symbol: '005930',
+        now: POST_CLOSE,
       }),
     );
     expect(
-      restIngestionService.ingestCurrentPrices.mock.calls[0][0].domesticSymbols,
-    ).not.toContain('000660');
+      closeIngestionService.recoverSessionPrice.mock.calls.map(
+        (call: [{ symbol: string }]) => call[0].symbol,
+      ),
+    ).toEqual(['005930', '000270']);
   });
 
   it('still excludes configured symbols that do not meet the health conditions', async () => {
-    const { service, restIngestionService } = createService({
+    const { service, closeIngestionService } = createService({
       domesticSymbols: ['005930', '000270'],
       assets: [missingKrxAsset('005930'), availableKrxAsset('000270')],
     });
@@ -97,16 +100,75 @@ describe('KIS KRX startup catch-up', () => {
       state: 'completed',
       requestedSymbols: ['005930'],
     });
-    expect(restIngestionService.ingestCurrentPrices).toHaveBeenCalledWith(
+    expect(closeIngestionService.recoverSessionPrice).toHaveBeenCalledTimes(1);
+    expect(closeIngestionService.recoverSessionPrice).toHaveBeenCalledWith(
       expect.objectContaining({
-        domesticSymbols: ['005930'],
-        maxSnapshots: 1,
+        assetId: 'asset-005930',
+        symbol: '005930',
+        now: POST_CLOSE,
       }),
     );
   });
 
+  it('does not report success when a row was created but coverage remains unavailable', async () => {
+    const { service, healthService } = createService({
+      assets: [missingKrxAsset('000270')],
+    });
+    healthService.checkActiveAssetCoverage
+      .mockReset()
+      .mockResolvedValue({ assets: [missingKrxAsset('000270')] });
+    await expect(service.runStartupCatchUp(POST_CLOSE)).resolves.toEqual({
+      state: 'failed',
+      reason: 'COMPLETED_SESSION_PRICE_UNAVAILABLE',
+      failures: [
+        {
+          assetId: 'asset-000270',
+          symbol: '000270',
+          reason: 'LAST_COMPLETED_SESSION_PRICE_MISSING',
+        },
+      ],
+    });
+    expect(healthService.checkActiveAssetCoverage).toHaveBeenCalledTimes(2);
+    expect(jest.spyOn(Logger.prototype, 'warn')).toHaveBeenCalledWith(
+      'KIS KRX startup catch-up failed.',
+      expect.objectContaining({
+        completedSessionDate: '2026-08-24',
+        failures: [
+          {
+            assetId: 'asset-000270',
+            symbol: '000270',
+            reason: 'LAST_COMPLETED_SESSION_PRICE_MISSING',
+          },
+        ],
+      }),
+    );
+  });
+
+  it('preserves the evidence failure reason when the second health read still fails', async () => {
+    const { service, healthService, closeIngestionService } = createService({
+      assets: [missingKrxAsset('000270')],
+    });
+    closeIngestionService.recoverSessionPrice.mockResolvedValue({
+      state: 'failed',
+      reason: 'KIS_SESSION_CLOSE_DATE_MISSING_OR_AMBIGUOUS',
+    });
+    healthService.checkActiveAssetCoverage
+      .mockReset()
+      .mockResolvedValue({ assets: [missingKrxAsset('000270')] });
+    const result = await service.runStartupCatchUp(POST_CLOSE);
+    expect(result).toMatchObject({
+      state: 'failed',
+      failures: [
+        {
+          symbol: '000270',
+          reason: 'KIS_SESSION_CLOSE_DATE_MISSING_OR_AMBIGUOUS',
+        },
+      ],
+    });
+  });
+
   it('does not call KIS when the latest completed session is already covered', async () => {
-    const { service, restIngestionService } = createService({
+    const { service, closeIngestionService } = createService({
       assets: [availableKrxAsset('000270')],
     });
 
@@ -114,11 +176,11 @@ describe('KIS KRX startup catch-up', () => {
       state: 'not_needed',
       reason: 'LATEST_COMPLETED_SESSION_COVERED',
     });
-    expect(restIngestionService.ingestCurrentPrices).not.toHaveBeenCalled();
+    expect(closeIngestionService.recoverSessionPrice).not.toHaveBeenCalled();
   });
 
   it('does not call KIS on a KRX holiday', async () => {
-    const { service, healthService, restIngestionService } = createService({
+    const { service, healthService, closeIngestionService } = createService({
       assets: [missingKrxAsset('000270')],
     });
 
@@ -129,14 +191,14 @@ describe('KIS KRX startup catch-up', () => {
       reason: 'NO_COMPLETED_KRX_SESSION_TODAY',
     });
     expect(healthService.checkActiveAssetCoverage).not.toHaveBeenCalled();
-    expect(restIngestionService.ingestCurrentPrices).not.toHaveBeenCalled();
+    expect(closeIngestionService.recoverSessionPrice).not.toHaveBeenCalled();
   });
 
   it.each([
     ['pre-open', new Date('2026-08-23T23:00:00.000Z')], // 08:00 KST
     ['live session', new Date('2026-08-24T01:00:00.000Z')], // 10:00 KST
   ])('does not call KIS during %s startup', async (_label, now) => {
-    const { service, restIngestionService } = createService({
+    const { service, closeIngestionService } = createService({
       assets: [missingKrxAsset('000270')],
     });
 
@@ -144,11 +206,11 @@ describe('KIS KRX startup catch-up', () => {
       state: 'skipped',
       reason: 'NO_COMPLETED_KRX_SESSION_TODAY',
     });
-    expect(restIngestionService.ingestCurrentPrices).not.toHaveBeenCalled();
+    expect(closeIngestionService.recoverSessionPrice).not.toHaveBeenCalled();
   });
 
   it('keeps missing calendar coverage distinct from a holiday', async () => {
-    const { service, healthService, restIngestionService } = createService({
+    const { service, healthService, closeIngestionService } = createService({
       assets: [missingKrxAsset('000270')],
     });
 
@@ -159,11 +221,11 @@ describe('KIS KRX startup catch-up', () => {
       reason: 'MARKET_CALENDAR_COVERAGE_MISSING',
     });
     expect(healthService.checkActiveAssetCoverage).not.toHaveBeenCalled();
-    expect(restIngestionService.ingestCurrentPrices).not.toHaveBeenCalled();
+    expect(closeIngestionService.recoverSessionPrice).not.toHaveBeenCalled();
   });
 
   it('skips safely when the KIS provider is disabled', async () => {
-    const { service, healthService, restIngestionService } = createService({
+    const { service, healthService, closeIngestionService } = createService({
       providerEnabled: false,
       assets: [missingKrxAsset('000270')],
     });
@@ -173,14 +235,14 @@ describe('KIS KRX startup catch-up', () => {
       reason: 'PROVIDER_DISABLED',
     });
     expect(healthService.checkActiveAssetCoverage).not.toHaveBeenCalled();
-    expect(restIngestionService.ingestCurrentPrices).not.toHaveBeenCalled();
+    expect(closeIngestionService.recoverSessionPrice).not.toHaveBeenCalled();
   });
 
   it('absorbs a REST failure so application bootstrap can continue', async () => {
-    const { service, restIngestionService } = createService({
+    const { service, closeIngestionService } = createService({
       assets: [missingKrxAsset('000270')],
     });
-    restIngestionService.ingestCurrentPrices.mockRejectedValueOnce(
+    closeIngestionService.recoverSessionPrice.mockRejectedValueOnce(
       new Error('temporary KIS timeout'),
     );
 
@@ -230,33 +292,31 @@ function createService(input: {
     }),
   };
   const healthService = {
-    checkActiveAssetCoverage: jest.fn().mockResolvedValue({
-      assets: input.assets,
-    }),
+    checkActiveAssetCoverage: jest
+      .fn()
+      .mockResolvedValue({
+        assets: input.assets.map((asset) => ({
+          ...asset,
+          state: 'available',
+          reason: null,
+        })),
+      })
+      .mockResolvedValueOnce({ assets: input.assets }),
   };
-  const restIngestionService = {
-    ingestCurrentPrices: jest.fn().mockResolvedValue({
-      success: true,
-      provider: 'kis',
-      ingestion: 'rest_current_price',
-      dryRun: false,
-      received: 1,
-      created: 1,
-      skipped: 0,
-      wouldCreate: 0,
-      failed: 0,
-      snapshots: [],
+  const closeIngestionService = {
+    recoverSessionPrice: jest.fn().mockResolvedValue({
+      state: 'created',
     }),
   };
 
   return {
     configService,
     healthService,
-    restIngestionService,
+    closeIngestionService,
     service: new KisKrxStartupCatchUpService(
       configService as unknown as ProviderConfigService,
       healthService as unknown as MarketSnapshotHealthService,
-      restIngestionService as unknown as KisRestCurrentPriceIngestionService,
+      closeIngestionService as unknown as KisKrxSessionCloseIngestionService,
     ),
   };
 }

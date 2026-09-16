@@ -6,7 +6,10 @@ import {
   type MarketSnapshotHealthReason,
 } from '../market-snapshot-health.service';
 import { ProviderConfigService } from '../provider-config.service';
-import { KisRestCurrentPriceIngestionService } from './kis-rest-current-price.ingestion.service';
+import {
+  KisKrxSessionCloseIngestionService,
+  type KisKrxSessionCloseResult,
+} from './kis-krx-session-close.ingestion.service';
 
 const MISSING_COMPLETED_SESSION_REASONS: ReadonlySet<MarketSnapshotHealthReason> =
   new Set(['PROVIDER_MISSING', 'LAST_COMPLETED_SESSION_PRICE_MISSING']);
@@ -29,7 +32,11 @@ export type KisKrxStartupCatchUpResult =
       created: number;
       skipped: number;
     }
-  | { state: 'failed'; reason: string };
+  | {
+      state: 'failed';
+      reason: string;
+      failures?: Array<{ assetId: string; symbol: string; reason: string }>;
+    };
 
 /**
  * One best-effort KRX recovery pass per backend process start.
@@ -47,7 +54,7 @@ export class KisKrxStartupCatchUpService implements OnApplicationBootstrap {
   constructor(
     private readonly configService: ProviderConfigService,
     private readonly healthService: MarketSnapshotHealthService,
-    private readonly restIngestionService: KisRestCurrentPriceIngestionService,
+    private readonly closeIngestionService: KisKrxSessionCloseIngestionService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -109,22 +116,17 @@ export class KisKrxStartupCatchUpService implements OnApplicationBootstrap {
       const configuredDomesticSymbols = new Set(
         config.kis.domesticSymbols.map((symbol) => symbol.trim().toUpperCase()),
       );
+      const requestedAssets = health.assets.filter(
+        (asset) =>
+          asset.state === 'unavailable' &&
+          asset.assetType === ('domestic_stock' as AssetType) &&
+          KRX_MARKETS.has(asset.market.trim().toUpperCase()) &&
+          configuredDomesticSymbols.has(asset.symbol.trim().toUpperCase()) &&
+          asset.reason !== null &&
+          MISSING_COMPLETED_SESSION_REASONS.has(asset.reason),
+      );
       const requestedSymbols = [
-        ...new Set(
-          health.assets
-            .filter(
-              (asset) =>
-                asset.state === 'unavailable' &&
-                asset.assetType === ('domestic_stock' as AssetType) &&
-                KRX_MARKETS.has(asset.market.trim().toUpperCase()) &&
-                configuredDomesticSymbols.has(
-                  asset.symbol.trim().toUpperCase(),
-                ) &&
-                asset.reason !== null &&
-                MISSING_COMPLETED_SESSION_REASONS.has(asset.reason),
-            )
-            .map((asset) => asset.symbol),
-        ),
+        ...new Set(requestedAssets.map((asset) => asset.symbol)),
       ];
 
       if (requestedSymbols.length === 0) {
@@ -134,36 +136,57 @@ export class KisKrxStartupCatchUpService implements OnApplicationBootstrap {
         };
       }
 
-      const result = await this.restIngestionService.ingestCurrentPrices({
-        dryRun: false,
-        requestedBy: 'kis-krx-startup-catch-up',
-        domesticSymbols: requestedSymbols,
-        usSymbols: [],
-        maxSnapshots: requestedSymbols.length,
+      const results = new Map<string, KisKrxSessionCloseResult>();
+      // Bounded sequential requests use the existing shared KIS rate limiter.
+      for (const asset of requestedAssets) {
+        results.set(
+          asset.assetId,
+          await this.closeIngestionService.recoverSessionPrice({
+            assetId: asset.assetId,
+            symbol: asset.symbol,
+            now,
+          }),
+        );
+      }
+      // A created row is not proof of recovery: read it with consumer policy.
+      const after = await this.healthService.checkActiveAssetCoverage({ now });
+      const failures = requestedAssets.flatMap((asset) => {
+        const checked = after.assets.find(
+          (row) => row.assetId === asset.assetId,
+        );
+        if (checked?.state === 'available') return [];
+        const result = results.get(asset.assetId);
+        return [
+          {
+            assetId: asset.assetId,
+            symbol: asset.symbol,
+            reason:
+              result?.state === 'failed'
+                ? result.reason
+                : (checked?.reason ?? 'COMPLETED_SESSION_PRICE_UNAVAILABLE'),
+          },
+        ];
       });
-
-      if (!result.success || result.failed > 0) {
-        const reason = result.errorCode ?? 'KIS_REST_CURRENT_PRICE_FAILED';
+      if (failures.length > 0) {
+        const reason = 'COMPLETED_SESSION_PRICE_UNAVAILABLE';
         this.logger.warn('KIS KRX startup catch-up failed.', {
           reason,
-          requestedSymbolCount: requestedSymbols.length,
-          failed: result.failed,
+          completedSessionDate: completedSession.localDate,
+          failures,
         });
-        return { state: 'failed', reason };
+        return { state: 'failed', reason, failures };
       }
-
+      const created = [...results.values()].filter(
+        (result) => result.state === 'created',
+      ).length;
+      const skipped = requestedAssets.length - created;
       this.logger.log('KIS KRX startup catch-up completed.', {
         requestedSymbolCount: requestedSymbols.length,
-        created: result.created,
-        skipped: result.skipped,
+        created,
+        skipped,
         completedSessionDate: completedSession.localDate,
       });
-      return {
-        state: 'completed',
-        requestedSymbols,
-        created: result.created,
-        skipped: result.skipped,
-      };
+      return { state: 'completed', requestedSymbols, created, skipped };
     } catch (error) {
       const reason = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn('KIS KRX startup catch-up failed safely.', { reason });

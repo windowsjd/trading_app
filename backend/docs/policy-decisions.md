@@ -25,6 +25,9 @@
 
 ## Market-State-Aware Price Freshness
 
+- KRX startup recovery requests the missing completed date from KIS FHKST03010100 (J, D, original prices FID_ORG_ADJ_PRC=1). Only an exact-date output2.stck_bsop_date with valid stck_clpr/OHLCV and matching output1.stck_shrn_iscd, received after session close, is closing-price evidence. The existing KIS KRW provider source is retained; raw endpoint, request and business-date evidence distinguish it from a WebSocket trade. sourceTimestamp remains null (no trade clock), capturedAt remains actual receipt time, and effectiveAt is the calendar close of the provider-reported closing-price date. A timestamp-less current quote cannot supply this evidence.
+- Recovery remains one bounded pass per process, only after today's KRX session and only for configured domestic symbols with missing coverage. Success requires a second health read through the shared selector for every requested asset; created rows alone are insufficient. Missing/invalid evidence retains unavailable/stale-cache behaviour. No selector, order, US/crypto or schema policy changes.
+
 - 휴장 조회는 최근 완료 세션의 `openTime <= effectiveAt <= closeTime`, 양수 가격, 적격 source를 DB 조건에 먼저 넣고 source별 최신 1개를 선택한다. 최신 N개를 먼저 읽어 세션 가격을 찾지 않는다. 수동 fallback도 휴장 중에는 같은 세션 범위만 허용하며 캘린더 미확인 시 fail-closed한다.
 - KIS transport와 frontend `/api/v1/ws`는 유지한다. Gateway는 주식별 캘린더가 open일 때만 현재 세션의 provider event를 live ticker로 전달한다. 휴장 ticker는 기존 3초 snapshot poll에서 완료 세션 가격을 전달한다. 세션 상태 전환은 가격 snapshot ID가 같아도 전송하며 frontend는 서버의 시장 상태를 사용한다.
 - KRX `H0STCNT0`의 `BSOP_DATE` + `STCK_CNTG_HOUR`가 체결 `effectiveAt`, 서버 수신 시간이 `capturedAt`이다. 정상 종가가 늦게 수신되어도 snapshot evidence로 저장할 수 있으며 휴장 live fanout은 금지한다. 유효한 provider 시각이 없는 휴장 이벤트에 임의 grace period를 적용하지 않는다.

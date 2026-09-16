@@ -1,5 +1,7 @@
 jest.mock('../../generated/prisma/client', () => {
-  const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
+  const { Decimal } = jest.requireActual<
+    typeof import('@prisma/client/runtime/client')
+  >('@prisma/client/runtime/client');
 
   return {
     AssetPriceSourceType: {
@@ -36,12 +38,13 @@ import {
   parseKisDomesticCurrentPriceResponse,
   parseKisUsCurrentPriceResponse,
 } from './kis-rest-current-price.parser';
+import type { Prisma } from '../../generated/prisma/client';
 import { KisRestCurrentPriceIngestionService } from './kis-rest-current-price.ingestion.service';
 
 const receivedAt = new Date('2026-06-21T01:00:00.000Z');
 
 describe('KIS REST current-price ingestion', () => {
-  it('parses domestic current-price fixture', () => {
+  it('parses actual timestamp-less domestic current-price contract', () => {
     expect(
       parseKisDomesticCurrentPriceResponse(
         domesticPriceResponse({ price: '70123' }),
@@ -53,7 +56,7 @@ describe('KIS REST current-price ingestion', () => {
       symbol: '005930',
       price: '70123.00000000',
       currencyCode: 'KRW',
-      effectiveAt: new Date('2026-06-21T00:30:15.000Z'),
+      effectiveAt: receivedAt,
     });
   });
 
@@ -115,22 +118,21 @@ describe('KIS REST current-price ingestion', () => {
     });
 
     expect(result.created).toBe(1);
-    expect(prisma.assetPriceSnapshot.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          assetId: 'asset-samsung',
-          price: '70123.00000000',
-          priceKrw: '70123.00000000',
-          currencyCode: 'KRW',
-          sourceType: 'provider_api',
-          sourceName: 'kis_krx_realtime_trade',
-          sourceTimestamp: new Date('2026-06-21T00:30:15.000Z'),
-          effectiveAt: new Date('2026-06-21T00:30:15.000Z'),
-          capturedAt: receivedAt,
-          note: 'provider_api KIS REST current-price ingestion requested by operator-1',
-        }),
-      }),
-    );
+    expect(prisma.assetPriceSnapshot.create).toHaveBeenCalledTimes(1);
+    expect(
+      prisma.assetPriceSnapshot.create.mock.calls[0][0].data,
+    ).toMatchObject({
+      assetId: 'asset-samsung',
+      price: '70123.00000000',
+      priceKrw: '70123.00000000',
+      currencyCode: 'KRW',
+      sourceType: 'provider_api',
+      sourceName: 'kis_krx_realtime_trade',
+      sourceTimestamp: null,
+      effectiveAt: receivedAt,
+      capturedAt: receivedAt,
+      note: 'provider_api KIS REST current-price ingestion requested by operator-1',
+    });
   });
 
   it('skips zero or missing prices without DB writes', async () => {
@@ -368,7 +370,9 @@ function createPrismaMock(input: {
     },
     assetPriceSnapshot: {
       findFirst: jest.fn().mockResolvedValue(null),
-      create: jest.fn().mockResolvedValue({ id: 'snapshot-1' }),
+      create: jest
+        .fn<Promise<{ id: string }>, [Prisma.AssetPriceSnapshotCreateArgs]>()
+        .mockResolvedValue({ id: 'snapshot-1' }),
     },
     fxRateSnapshot: {
       findFirst: jest.fn().mockResolvedValue(null),
@@ -408,8 +412,6 @@ function domesticPriceResponse(input: { price?: string; extra?: string } = {}) {
     output: {
       stck_shrn_iscd: '005930',
       stck_prpr: input.price ?? '70123',
-      stck_bsop_date: '20260621',
-      stck_cntg_hour: '093015',
       note: input.extra,
     },
   };
