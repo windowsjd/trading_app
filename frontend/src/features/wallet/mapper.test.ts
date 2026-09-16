@@ -114,36 +114,52 @@ describe('FX decimal display', () => {
     assert.equal(display.maxChangeBps, '30');
   });
 
-  it('trims execution rates and balances after currency rounding', () => {
-    const result = {
-      exchangeId: 'exchange-1000',
-      executedAt: '2026-08-25T03:44:48.000Z',
-      fromCurrency: 'USD',
-      toCurrency: 'KRW',
-      sourceAmount: '10.50000000',
-      grossTargetAmount: '14043.75000000',
-      feeRate: '0.001000',
-      feeAmount: '14.04375000',
-      feeCurrency: 'KRW',
-      appliedRate: '1337.50000000',
-      quoteId: 'quote-1000',
-      quotedRate: '1337.50000000',
-      executeRate: '1337.60000000',
-      rateChangeBps: '30.5000',
-      idempotencyKey: 'idem-1000',
-      netTargetAmount: '14029.70625000',
-      sourceWalletBalanceAfter: '1000.00000000',
-      targetWalletBalanceAfter: '14029.70625000',
-      rateSource: {},
-    } as FxExecuteDto;
+  for (const fromCurrency of ['KRW', 'USD'] as const) {
+    it(`formats ${fromCurrency} completion amounts with units and canonical balances`, () => {
+      const toCurrency = fromCurrency === 'KRW' ? 'USD' : 'KRW';
+      const result = {
+        exchangeId: 'exchange-1000',
+        executedAt: '2026-08-25T03:44:48.000Z',
+        fromCurrency, toCurrency,
+        sourceAmount: fromCurrency === 'KRW' ? '100000.00000000' : '10.50000000',
+        netTargetAmount: toCurrency === 'USD' ? '73.82000000' : '14029.70625000',
+        appliedRate: '1337.50000000', quotedRate: '1337.40000000', executeRate: '1337.60000000',
+        rateChangeBps: '30.5000', feeAmount: '0.50000000', feeCurrency: toCurrency,
+        sourceWalletBalanceAfter: '999999', targetWalletBalanceAfter: '888888',
+        wallets: { KRW: '1000.00000000', USD: '50.25000000' }, rateSource: {},
+      } as FxExecuteDto;
+      const display = getFxExecuteSuccessDisplay(result);
+      assert.deepEqual(display, {
+        direction: `${fromCurrency} → ${toCurrency}`,
+        executedAt: '2026-08-25 12:44',
+        sourceAmount: fromCurrency === 'KRW' ? 'KRW 100,000' : 'USD 10.5',
+        netTargetAmount: toCurrency === 'USD' ? 'USD 73.82' : 'KRW 14,030',
+        appliedRate: '1337.5', fee: toCurrency === 'USD' ? '$0.5' : '1원',
+        krwWalletBalance: '1,000', usdWalletBalance: '50.25',
+      });
+      assert.equal(result.exchangeId, 'exchange-1000');
+      assert.equal(result.sourceWalletBalanceAfter, '999999');
+    });
+  }
 
-    const display = getFxExecuteSuccessDisplay(result);
-    assert.equal(display.exchangeId, 'exchange-1000');
-    assert.equal(display.executedAt, '2026-08-25 12:44');
-    assert.equal(display.sourceAmount, '10.5');
-    assert.equal(display.quotedRate, '1337.5');
-    assert.equal(display.executeRate, '1337.6');
-    assert.equal(display.rateChangeBps, '30.5');
-    assert.equal(display.sourceWalletBalanceAfter, '1,000');
+  it('supports typed array wallet responses by currency rather than array order', () => {
+    const display = getFxExecuteSuccessDisplay({
+      wallets: [
+        { currencyCode: 'USD', balanceAmount: '3.25000000' },
+        { currencyCode: 'KRW', balanceAmount: '0.00000000' },
+      ],
+    } as FxExecuteDto);
+    assert.equal(display.krwWalletBalance, '0');
+    assert.equal(display.usdWalletBalance, '3.25');
+  });
+
+  it('keeps absent canonical balances unknown without guessing from compatibility fields', () => {
+    for (const wallets of [undefined, null, {}, [], { KRW: '0' }]) {
+      const display = getFxExecuteSuccessDisplay({
+        wallets, sourceWalletBalanceAfter: '999999', targetWalletBalanceAfter: '888888',
+      } as FxExecuteDto);
+      assert.equal(display.krwWalletBalance, wallets && !Array.isArray(wallets) && 'KRW' in wallets ? '0' : '-');
+      assert.equal(display.usdWalletBalance, '-');
+    }
   });
 });

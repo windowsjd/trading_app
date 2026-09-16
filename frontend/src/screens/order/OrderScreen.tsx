@@ -641,6 +641,11 @@ export default function OrderScreen({ route, navigation }: Props) {
 
   const preOrderBlockedReason =
     accountBlockedReason ?? assetHardBlockedReason ?? sellBlockedReason;
+  const sellHasNoPosition =
+    side === 'sell' &&
+    !positionQuery.isLoading &&
+    !positionQuery.isError &&
+    Number(positionQuantity) <= 0;
 
   const settlementCurrency = isWalletCurrency(asset?.settlementCurrency)
     ? asset.settlementCurrency
@@ -992,7 +997,8 @@ export default function OrderScreen({ route, navigation }: Props) {
               {positionIntegrityMessage ?? walletIntegrityMessage}
             </Text>
           ) : null}
-          {preOrderBlockedReason ? (
+          {preOrderBlockedReason &&
+          !(sellHasNoPosition && preOrderBlockedReason === sellBlockedReason) ? (
             <Text
               testID={TEST_IDS.tradingAccount.capabilityNotice}
               style={styles.errorText}
@@ -1141,7 +1147,8 @@ export default function OrderScreen({ route, navigation }: Props) {
           </View>
 
           <Text style={styles.helper}>
-            {ratioDisabledReason
+            {ratioDisabledReason &&
+            !(sellHasNoPosition && ratioDisabledReason === sellBlockedReason)
               ? `비율 입력 제한: ${ratioDisabledReason}`
               : '비율 버튼은 수량 입력 보조이며 서버 견적이 최종 판정합니다.'}
           </Text>

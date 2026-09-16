@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 
 import BottomSheetBackdrop from '../../components/common/BottomSheetBackdrop';
 import CTAButton from '../../components/common/CTAButton';
@@ -21,40 +21,39 @@ export default function FxSuccessBottomSheet({
   onGoHome,
   payload,
 }: FxSuccessBottomSheetProps) {
+  const { height } = useWindowDimensions();
   const display = payload ? getFxExecuteSuccessDisplay(payload) : null;
 
   return (
     <BottomSheetBackdrop visible={visible} onClose={onClose}>
-      <View style={styles.iconCircle}>
-        <Text style={styles.iconText}>✓</Text>
-      </View>
-
-      <Text style={styles.title}>환전이 완료되었습니다</Text>
-
-      {display ? (
-        <View style={styles.card}>
-          <Row label="거래 ID" value={display.exchangeId} />
-          <Row label="환전 방향" value={display.direction} />
-          <Row label="환전 금액" value={display.sourceAmount} />
-          <Row label="수령 금액" value={display.netTargetAmount} />
-          <Row label="적용 환율" value={display.appliedRate} />
-          <Row label="실행 환율" value={display.executeRate} />
-          <Row label="견적 환율" value={display.quotedRate} />
-          <Row label="환율 변동" value={display.rateChangeBps} />
-          <Row label="수수료" value={display.fee} />
-          <Row label="실행 시각" value={display.executedAt} />
-          <Row label="출금 지갑 잔액" value={display.sourceWalletBalanceAfter} />
-          <Row label="입금 지갑 잔액" value={display.targetWalletBalanceAfter} />
-          {display.walletRows.map((item) => (
-            <Row key={item} label="지갑 잔액" value={item} />
-          ))}
+      <ScrollView
+        style={{ maxHeight: height * 0.8 }}
+        contentContainerStyle={styles.content}
+      >
+        <View style={styles.iconCircle}>
+          <Text style={styles.iconText}>✓</Text>
         </View>
-      ) : null}
 
-      <View style={styles.buttonRow}>
-        <CTAButton label="지갑으로 돌아가기" onPress={onGoWallet} style={styles.flex} />
-        <CTAButton label="홈으로 가기" onPress={onGoHome} style={styles.flex} />
-      </View>
+        <Text style={styles.title}>환전이 완료되었습니다</Text>
+
+        {display ? (
+          <View style={styles.card}>
+            <Row label="환전 방향" value={display.direction} />
+            <Row label="환전 금액" value={display.sourceAmount} />
+            <Row label="수령 금액" value={display.netTargetAmount} />
+            <Row label="적용 환율" value={display.appliedRate} />
+            <Row label="수수료" value={display.fee} />
+            <Row label="실행 시각" value={display.executedAt} />
+            <Row label="KRW 지갑 잔액" value={display.krwWalletBalance} />
+            <Row label="USD 지갑 잔액" value={display.usdWalletBalance} />
+          </View>
+        ) : null}
+
+        <View style={styles.buttonRow}>
+          <CTAButton label="지갑으로 돌아가기" onPress={onGoWallet} style={styles.flex} />
+          <CTAButton label="홈으로 가기" onPress={onGoHome} style={styles.flex} />
+        </View>
+      </ScrollView>
     </BottomSheetBackdrop>
   );
 }
@@ -69,6 +68,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+  content: { gap: 12 },
   iconCircle: {
     width: 52,
     height: 52,
@@ -105,7 +105,8 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     color: '#666',
-    flexShrink: 0,
+    flexShrink: 1,
+    maxWidth: '45%',
   },
   value: {
     fontSize: 14,

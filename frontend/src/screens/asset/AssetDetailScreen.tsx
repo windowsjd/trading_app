@@ -242,9 +242,14 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
 
   const assetHardBlockedReason = !asset.isActive ? "비활성 자산입니다." : null;
 
+  const isDomesticMarketClosed =
+    asset.assetType === "domestic_stock" && asset.marketStatus === "closed";
+  const marketClosedNoticeIsRedundant =
+    isDomesticMarketClosed &&
+    asset.tradeBlockedReason?.trim().toUpperCase() === "MARKET_CLOSED";
   const assetWarningReason =
-    getAssetTradingWarning(asset) ??
-    (!isTradableMarketStatus(asset.marketStatus)
+    (marketClosedNoticeIsRedundant ? null : getAssetTradingWarning(asset)) ??
+    (!isDomesticMarketClosed && !isTradableMarketStatus(asset.marketStatus)
       ? "장 상태는 주문 견적에서 최종 확인됩니다."
       : isTickerStale
         ? "실시간 시세 최신성이 낮습니다. 서버 견적에서 최종 확인됩니다."
@@ -300,16 +305,18 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
                 )
               : getUnavailablePriceText(asset)}
           </Text>
-          <Text style={styles.helper}>
-            KRW 환산{" "}
-            {displayPriceKrwState === "available"
-              ? formatKrw(displayPriceKrw)
-              : `사용 불가${
-                  displayPrice.priceKrwReason
-                    ? ` (${displayPrice.priceKrwReason})`
-                    : ""
-                }`}
-          </Text>
+          {asset.priceCurrency !== "KRW" ? (
+            <Text style={styles.helper}>
+              KRW 환산{" "}
+              {displayPriceKrwState === "available"
+                ? formatKrw(displayPriceKrw)
+                : `사용 불가${
+                    displayPrice.priceKrwReason
+                      ? ` (${displayPrice.priceKrwReason})`
+                      : ""
+                  }`}
+            </Text>
+          ) : null}
           <Text style={styles.helper}>
             등락률 {formatPercent(displayChangeRate)}%
           </Text>
@@ -532,7 +539,9 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
           />
         </View>
 
-        {sellBlockedReason && !buyBlockedReason ? (
+        {sellBlockedReason &&
+        !buyBlockedReason &&
+        (hasPosition || positionQuery.isError || positionQuery.isLoading) ? (
           <Text style={styles.errorText}>{sellBlockedReason}</Text>
         ) : null}
       </ScrollView>

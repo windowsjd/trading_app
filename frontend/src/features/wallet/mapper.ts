@@ -187,76 +187,23 @@ export function getFxQuoteDisplay(quote: FxQuoteDto) {
   };
 }
 
-function getWalletRows(wallets: unknown) {
-  if (Array.isArray(wallets)) {
-    return wallets
-      .map((wallet) => {
-        if (!wallet || typeof wallet !== 'object') return null;
-
-        const item = wallet as {
-          currencyCode?: string;
-          currency?: string;
-          balanceAmount?: string;
-          balance?: string;
-        };
-        const currency = item.currencyCode ?? item.currency;
-        const balance = item.balanceAmount ?? item.balance;
-
-        if (!currency || !balance) return null;
-        return formatMoney(balance, currency);
-      })
-      .filter((item): item is string => !!item);
-  }
-
-  if (wallets && typeof wallets === 'object') {
-    return Object.entries(wallets)
-      .map(([currency, value]) => {
-        if (typeof value === 'string' || typeof value === 'number') {
-          return formatMoney(value, currency);
-        }
-
-        if (!value || typeof value !== 'object') return null;
-
-        const item = value as {
-          balanceAmount?: string;
-          balance?: string;
-        };
-        const balance = item.balanceAmount ?? item.balance;
-
-        return balance ? formatMoney(balance, currency) : null;
-      })
-      .filter((item): item is string => !!item);
-  }
-
-  return [];
-}
-
 export function getFxExecuteSuccessDisplay(result: FxExecuteDto) {
+  const krwBalance = Array.isArray(result.wallets)
+    ? getKnownWalletBalanceAmount({ wallets: result.wallets }, 'KRW')
+    : result.wallets?.KRW;
+  const usdBalance = Array.isArray(result.wallets)
+    ? getKnownWalletBalanceAmount({ wallets: result.wallets }, 'USD')
+    : result.wallets?.USD;
+
   return {
-    exchangeId: displayValue(result.exchangeId),
     executedAt: formatKstDateTime(result.executedAt),
     direction: `${result.fromCurrency} → ${result.toCurrency}`,
-    sourceAmount: formatCurrency(result.sourceAmount, result.fromCurrency),
-    grossTargetAmount: formatCurrency(
-      result.grossTargetAmount,
-      result.toCurrency,
-    ),
-    netTargetAmount: formatCurrency(result.netTargetAmount, result.toCurrency),
+    sourceAmount: `${result.fromCurrency} ${formatCurrency(result.sourceAmount, result.fromCurrency)}`,
+    netTargetAmount: `${result.toCurrency} ${formatCurrency(result.netTargetAmount, result.toCurrency)}`,
     appliedRate: formatDisplayDecimal(result.appliedRate),
-    quotedRate: formatDisplayDecimal(result.quotedRate),
-    executeRate: formatDisplayDecimal(result.executeRate),
-    rateChangeBps: formatDisplayDecimal(result.rateChangeBps),
     fee: formatMoney(result.feeAmount, result.feeCurrency),
-    sourceWalletBalanceAfter: formatCurrency(
-      result.sourceWalletBalanceAfter,
-      result.fromCurrency,
-    ),
-    targetWalletBalanceAfter: formatCurrency(
-      result.targetWalletBalanceAfter,
-      result.toCurrency,
-    ),
-    walletRows: getWalletRows(result.wallets),
-    rateSource: formatSourceMetadata(result.rateSource),
+    krwWalletBalance: formatCurrency(krwBalance, 'KRW'),
+    usdWalletBalance: formatCurrency(usdBalance, 'USD'),
   };
 }
 

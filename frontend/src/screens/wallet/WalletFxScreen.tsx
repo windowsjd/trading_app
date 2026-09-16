@@ -100,11 +100,6 @@ const REQUOTE_REQUIRED_MESSAGE = '환율이 변경되어 환전하지 못했습�
 const IDEMPOTENCY_CONFLICT_MESSAGE =
   '이미 처리 중인 요청입니다. 환전 내역을 확인해주세요.';
 
-function displayValue(value?: string | number | boolean | null) {
-  if (value === null || value === undefined || value === '') return '-';
-  return String(value);
-}
-
 function getFxDomainErrorMessage(
   code?: string | null,
   isGeneralAccount = false,
@@ -385,14 +380,6 @@ export default function WalletFxScreen({ navigation }: Props) {
             <Text style={styles.label}>환전</Text>
             <Text style={styles.blockedTitle}>환전이 제한된 계정입니다.</Text>
             <Text style={styles.blockedMessage}>{exchangeBlockMessage}</Text>
-            <CTAButton
-              label="원장 보기"
-              onPress={() =>
-                navigation.navigate('WalletTransactions', {
-                  currencyCode: fromCurrency,
-                })
-              }
-            />
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -490,13 +477,7 @@ export default function WalletFxScreen({ navigation }: Props) {
                 환율 {formatDisplayDecimal(availableRate.rate)}
               </Text>
               <Text style={styles.helper}>
-                기준 시각 {formatKstDateTime(availableRate.effectiveAt)}
-              </Text>
-              <Text style={styles.helper}>
                 수집 시각 {formatKstDateTime(availableRate.capturedAt)}
-              </Text>
-              <Text style={styles.helper}>
-                최신성 {displayValue(availableRate.freshnessAgeSeconds)}초
               </Text>
               {availableRate.fallbackUsed ? (
                 <Text style={styles.helper}>
@@ -517,14 +498,6 @@ export default function WalletFxScreen({ navigation }: Props) {
               <AdminDiagnosticPanel error={rateQuery.error} />
             </>
           )}
-          <CTAButton
-            label="원장 보기"
-            onPress={() =>
-              navigation.navigate('WalletTransactions', {
-                currencyCode: fromCurrency,
-              })
-            }
-          />
         </View>
 
         <View style={styles.card}>
@@ -612,7 +585,6 @@ export default function WalletFxScreen({ navigation }: Props) {
                 { label: '예상 수수료', value: formatPreviewMoney(preview.feeAmount, preview.feeCurrency) },
                 { label: '예상 수령액', value: formatPreviewMoney(preview.netTargetAmount, toCurrency) },
               ]} />
-              <Text style={styles.helper}>최신 환율 기준 · {formatKstDateTime(availableRate.effectiveAt)}</Text>
               <Text style={styles.helper}>받는 통화에서 수수료가 차감됩니다. 실제 환전 금액은 실행 시 확정됩니다.</Text>
             </> : <>
               <Text style={styles.errorText}>{!availableRate ? '현재 환율이 없거나 오래되어 예상 수령액을 표시할 수 없습니다.' : feeQuery.isPending ? '수수료 정보를 확인하는 중입니다.' : '수수료 정보를 불러오지 못해 예상 수령액을 표시할 수 없습니다.'}</Text>
