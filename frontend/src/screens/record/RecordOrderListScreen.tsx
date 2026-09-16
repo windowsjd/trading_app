@@ -11,6 +11,7 @@ import {
   AppState,
   type AppStateStatus,
 } from 'react-native';
+import { withPressedFeedback } from '../../components/common/pressFeedback';
 import {
   useInfiniteQuery,
   useMutation,
@@ -446,10 +447,10 @@ export default function RecordOrderListScreen({ route }: Props) {
               {display.isOpenLimitBuy && display.orderId ? (
                 <Pressable
                   testID={TEST_IDS.record.orderCancel(display.key)}
-                  style={[
+                  style={withPressedFeedback([
                     styles.cancelButton,
                     isCanceling && styles.cancelButtonDisabled,
-                  ]}
+                  ], isCanceling)}
                   disabled={isCanceling}
                   onPress={() => confirmCancel(display.orderId, display.name)}
                 >
@@ -487,7 +488,7 @@ function FilterChip({
   return (
     <Pressable
       testID={testID}
-      style={[styles.chip, active && styles.chipActive]}
+      style={withPressedFeedback([styles.chip, active && styles.chipActive])}
       onPress={onPress}
     >
       <Text style={active ? styles.chipTextActive : styles.chipText}>

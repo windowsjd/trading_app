@@ -8,6 +8,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { withPressedFeedback } from '../common/pressFeedback';
 
 import {
   getCandlestickChartHeight,
@@ -476,7 +477,7 @@ export default function CandlestickChart({
           `accessible` chart box so screen readers can still reach it. */}
       {canResetViewport ? (
         <Pressable
-          style={styles.resetButton}
+          style={withPressedFeedback(styles.resetButton)}
           onPress={resetToLatest}
           accessibilityRole="button"
           accessibilityLabel="차트를 최신 구간으로 초기화"

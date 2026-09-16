@@ -6,6 +6,7 @@ import {
   SafeAreaView,
   Pressable,
 } from 'react-native';
+import { withPressedFeedback } from '../../components/common/pressFeedback';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { SeasonJoinScreenProps } from '../../app/navigation/types';
@@ -369,7 +370,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
             joining is not the only way to have an account (작업 11 §3.3). */}
         {!hasUsableAccount ? (
           <Pressable
-            style={styles.secondaryButton}
+            style={withPressedFeedback(styles.secondaryButton)}
             onPress={() => setShowGeneralSetup(true)}
           >
             <Text style={styles.secondaryButtonText}>

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { withPressedFeedback } from '../../components/common/pressFeedback';
 
 import { TEST_IDS } from '../../constants/testIds';
 import {
@@ -52,7 +53,7 @@ function MarketAssetRowComponent({ item, ticker, isStale, onPress }: Props) {
   return (
     <Pressable
       testID={TEST_IDS.market.item(item.id)}
-      style={styles.itemRow}
+      style={withPressedFeedback(styles.itemRow)}
       onPress={() => onPress(item.id)}
     >
       <View>

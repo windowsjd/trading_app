@@ -8,6 +8,7 @@ import {
   FlatList,
   ActivityIndicator,
 } from 'react-native';
+import { withPressedFeedback } from '../../components/common/pressFeedback';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { RankingScreenProps } from '../../app/navigation/types';
@@ -297,7 +298,7 @@ export default function RankingScreen({ navigation }: Props) {
                   {top3.map((item) => (
                     <Pressable
                       key={getRankingItemKey(item)}
-                      style={styles.topCard}
+                      style={withPressedFeedback(styles.topCard)}
                       onPress={() =>
                         navigation.navigate('UserSeasonSummary', {
                           userId: item.userId,
@@ -327,7 +328,7 @@ export default function RankingScreen({ navigation }: Props) {
                   <Pressable
                     key={tab.key}
                     testID={testID}
-                    style={[styles.tabButton, active && styles.tabButtonActive]}
+                    style={withPressedFeedback([styles.tabButton, active && styles.tabButtonActive])}
                     onPress={() => setSelectedTab(tab.key)}
                   >
                     <Text style={active ? styles.tabTextActive : styles.tabText}>
@@ -426,7 +427,7 @@ function RankingRow({
   return (
     <Pressable
       testID={TEST_IDS.ranking.item(item.userId)}
-      style={styles.rankRow}
+      style={withPressedFeedback(styles.rankRow)}
       onPress={onPress}
     >
       <View style={styles.rankLeft}>

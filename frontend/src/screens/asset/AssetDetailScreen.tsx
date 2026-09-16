@@ -9,6 +9,7 @@ import {
   ScrollView,
   Pressable,
 } from "react-native";
+import { withPressedFeedback } from '../../components/common/pressFeedback';
 import { useQuery } from "@tanstack/react-query";
 
 import type { AssetDetailScreenProps } from "../../app/navigation/types";
@@ -331,7 +332,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
               {capabilities?.isSeason &&
                 isSeasonNotActiveReason(capabilities.tradeBlockReason) ? (
                 <Pressable
-                  style={styles.retryButton}
+                  style={withPressedFeedback(styles.retryButton)}
                   onPress={() => rootNavigation.navigate("SeasonJoin")}
                 >
                   <Text style={styles.retryText}>시즌 안내 보기</Text>
@@ -387,7 +388,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
                 message={positionIntegrityMessage}
               />
               <Pressable
-                style={styles.retryButton}
+                style={withPressedFeedback(styles.retryButton)}
                 onPress={() => void positionQuery.refetch()}
               >
                 <Text style={styles.retryText}>포지션 다시 시도</Text>
@@ -401,7 +402,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
                 message="자산 정보는 계속 볼 수 있습니다."
               />
               <Pressable
-                style={styles.retryButton}
+                style={withPressedFeedback(styles.retryButton)}
                 onPress={() => void positionQuery.refetch()}
               >
                 <Text style={styles.retryText}>포지션 다시 시도</Text>
@@ -450,7 +451,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
               return (
                 <Pressable
                   key={tab.interval}
-                  style={[styles.chip, active && styles.chipActive]}
+                  style={withPressedFeedback([styles.chip, active && styles.chipActive])}
                   onPress={() => setSelectedTimeframe(tab)}
                 >
                   <Text
@@ -477,7 +478,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
               <AdminDiagnosticPanel error={candlesQuery.error} />
               <Pressable
                 testID={TEST_IDS.assetDetail.chartRetry}
-                style={styles.retryButton}
+                style={withPressedFeedback(styles.retryButton)}
                 onPress={() => void candlesQuery.refetch()}
               >
                 <Text style={styles.retryText}>차트 다시 시도</Text>

@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { withPressedFeedback } from '../../components/common/pressFeedback';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { OrderScreenProps } from '../../app/navigation/types';
@@ -1027,10 +1028,10 @@ export default function OrderScreen({ route, navigation }: Props) {
               <Pressable
                 testID={TEST_IDS.order.typeToggleMarket}
                 disabled={buyPending}
-                style={[
+                style={withPressedFeedback([
                   styles.ratioButton,
                   orderType === 'market' && styles.typeButtonActive,
-                ]}
+                ], buyPending)}
                 onPress={() => {
                   if (buySubmitLockRef.current || orderType === 'market') return;
                   setOrderTypeState('market');
@@ -1049,10 +1050,10 @@ export default function OrderScreen({ route, navigation }: Props) {
               <Pressable
                 testID={TEST_IDS.order.typeToggleLimit}
                 disabled={buyPending}
-                style={[
+                style={withPressedFeedback([
                   styles.ratioButton,
                   orderType === 'limit' && styles.typeButtonActive,
-                ]}
+                ], buyPending)}
                 onPress={() => {
                   if (buySubmitLockRef.current || orderType === 'limit') return;
                   setOrderTypeState('limit');
@@ -1119,10 +1120,10 @@ export default function OrderScreen({ route, navigation }: Props) {
               return (
                 <Pressable
                   key={ratio}
-                  style={[
+                  style={withPressedFeedback([
                     styles.ratioButton,
                     disabled && styles.ratioButtonDisabled,
-                  ]}
+                  ], disabled)}
                   disabled={disabled}
                   onPress={() => applyQuantityRatio(ratio)}
                 >
@@ -1161,7 +1162,7 @@ export default function OrderScreen({ route, navigation }: Props) {
           domainError ===
             getOrderDomainErrorMessage(ERROR_CODE.INSUFFICIENT_BALANCE) ? (
             <Pressable
-              style={styles.retryButton}
+              style={withPressedFeedback(styles.retryButton)}
               onPress={() =>
                 rootNavigation.navigate('MainTabs', {
                   screen: 'HomeTab',

@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { withPressedFeedback } from '../../components/common/pressFeedback';
 import { useQuery } from '@tanstack/react-query';
 
 import type { ModeSelectionScreenProps } from '../../app/navigation/types';
@@ -237,7 +238,7 @@ export default function ModeSelectionScreen({
               return (
                 <Pressable
                   key={account.id}
-                  style={styles.pastRow}
+                  style={withPressedFeedback(styles.pastRow)}
                   onPress={() => startWithAccount(account)}
                   accessibilityRole="button"
                   accessibilityLabel={`${display.title}, ${display.statusLabel}. 이 계정으로 시작`}

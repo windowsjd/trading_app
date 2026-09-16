@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { withPressedFeedback } from '../../components/common/pressFeedback';
 import { useQuery } from '@tanstack/react-query';
 
 import { QUERY_KEYS } from '../../constants/queryKeys';
@@ -334,10 +335,10 @@ export default function SeasonAccountHome({
             <Text style={styles.helper}>
               USD {usdBalance === null ? '-' : formatUsd(usdBalance)}
             </Text>
-            <Pressable style={styles.secondaryButton} onPress={onOpenLedger}>
+            <Pressable style={withPressedFeedback(styles.secondaryButton)} onPress={onOpenLedger}>
               <Text style={styles.secondaryText}>원장 보기</Text>
             </Pressable>
-            <Pressable style={styles.secondaryButton} onPress={onOpenOrders}>
+            <Pressable style={withPressedFeedback(styles.secondaryButton)} onPress={onOpenOrders}>
               <Text style={styles.secondaryText}>주문 내역 보기</Text>
             </Pressable>
           </>
@@ -376,7 +377,7 @@ export default function SeasonAccountHome({
               <Pressable
                 key={position.positionId}
                 testID={TEST_IDS.home.positionItem(position.assetId)}
-                style={styles.positionCard}
+                style={withPressedFeedback(styles.positionCard)}
                 onPress={() => onOpenAsset(position.assetId)}
               >
                 <View style={styles.positionRow}>

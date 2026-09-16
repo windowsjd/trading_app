@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
 } from 'react-native';
+import { withPressedFeedback } from '../common/pressFeedback';
 import AdminDiagnosticPanel from './AdminDiagnosticPanel';
 
 interface ErrorStateProps {
@@ -31,7 +32,7 @@ export default function ErrorState({
         <AdminDiagnosticPanel error={diagnosticError} />
 
         {onRetry ? (
-          <Pressable style={styles.button} onPress={onRetry}>
+          <Pressable style={withPressedFeedback(styles.button)} onPress={onRetry}>
             <Text style={styles.buttonText}>{actionLabel}</Text>
           </Pressable>
         ) : null}

@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import TabBarIcon from '../../components/navigation/TabBarIcon';
+import TabBarButton from '../../components/navigation/TabBarButton';
 import type { MainTabParamList } from './types';
 import HomeStack from './HomeStack';
 import MarketStack from './MarketStack';
@@ -22,6 +23,7 @@ export default function MainTabs() {
       id="MainTabs"
       screenOptions={{
         headerShown: false,
+        tabBarButton: (props) => <TabBarButton {...props} />,
         tabBarLabelPosition: 'below-icon',
         // Keep the default 49pt bar at normal font sizes. Extra label space
         // grows with accessibility text; Navigation still pads the safe area.

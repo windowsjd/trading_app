@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ViewStyle,
 } from 'react-native';
+import { withPressedFeedback } from './pressFeedback';
 
 type CTAState = 'enabled' | 'disabled' | 'loading' | 'blocked';
 
@@ -29,12 +30,12 @@ export default function CTAButton({
   return (
     <Pressable
       testID={testID}
-      style={[
+      style={withPressedFeedback([
         styles.button,
         state === 'blocked' && styles.blocked,
         state === 'disabled' && styles.disabled,
         style,
-      ]}
+      ], disabled || !onPress)}
       onPress={onPress}
       disabled={disabled}
     >

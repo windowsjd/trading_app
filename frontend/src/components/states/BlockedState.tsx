@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
 } from 'react-native';
+import { withPressedFeedback } from '../common/pressFeedback';
 
 interface BlockedStateProps {
   title?: string;
@@ -27,7 +28,7 @@ export default function BlockedState({
         <Text style={styles.message}>{message}</Text>
 
         {actionLabel && onAction ? (
-          <Pressable style={styles.button} onPress={onAction}>
+          <Pressable style={withPressedFeedback(styles.button)} onPress={onAction}>
             <Text style={styles.buttonText}>{actionLabel}</Text>
           </Pressable>
         ) : null}

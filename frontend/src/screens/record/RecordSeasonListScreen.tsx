@@ -7,6 +7,7 @@ import {
   FlatList,
   Pressable,
 } from 'react-native';
+import { withPressedFeedback } from '../../components/common/pressFeedback';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import type { RecordSeasonListScreenProps } from '../../app/navigation/types';
@@ -164,7 +165,7 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
         renderItem={({ item }) => (
           <Pressable
             testID={TEST_IDS.record.seasonItem(item.seasonId)}
-            style={styles.rowCard}
+            style={withPressedFeedback(styles.rowCard)}
             onPress={() =>
               navigation.navigate('RecordSeasonDetail', {
                 seasonId: item.seasonId,

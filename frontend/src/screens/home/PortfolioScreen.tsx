@@ -8,6 +8,7 @@ import {
   FlatList,
   ActivityIndicator,
 } from 'react-native';
+import { withPressedFeedback } from '../../components/common/pressFeedback';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import type { PortfolioScreenProps } from '../../app/navigation/types';
@@ -411,7 +412,7 @@ export default function PortfolioScreen({ navigation }: Props) {
                       <Pressable
                         key={tab.key}
                         testID={TEST_IDS.portfolio.equityRange(tab.key)}
-                        style={[styles.chip, active && styles.chipActive]}
+                        style={withPressedFeedback([styles.chip, active && styles.chipActive])}
                         onPress={() => setRange(tab.key)}
                       >
                         <Text
@@ -462,7 +463,7 @@ export default function PortfolioScreen({ navigation }: Props) {
                     <Pressable
                       key={tab.key}
                       testID={TEST_IDS.portfolio.assetTab(tab.key)}
-                      style={[styles.chip, active && styles.chipActive]}
+                      style={withPressedFeedback([styles.chip, active && styles.chipActive])}
                       onPress={() => setAssetType(tab.key)}
                     >
                       <Text
@@ -504,7 +505,7 @@ export default function PortfolioScreen({ navigation }: Props) {
           return (
             <Pressable
               testID={TEST_IDS.portfolio.positionItem(item.assetId)}
-              style={styles.positionRow}
+              style={withPressedFeedback(styles.positionRow)}
               onPress={() =>
                 rootNavigation.navigate('MainTabs', {
                   screen: 'MarketTab',

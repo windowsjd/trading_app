@@ -14,6 +14,7 @@
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-navigation/bottom-tabs": "^7.15.10",
+    "@react-navigation/elements": "2.9.15",
     "@react-navigation/native": "^7.2.2",
     "@react-navigation/native-stack": "^7.14.12",
     "@tanstack/react-query": "^5.100.5",
@@ -33,7 +34,7 @@
   "name": "LeagueOfTrading",
   "version": "1.0.0",
   "scripts": {
-    "lint:accounts:check": "eslint --no-fix --max-warnings=0 --no-warn-ignored --ignore-pattern \"**/*.test.ts\" src/features/auth src/features/tradingAccount src/features/record src/features/wallet src/app/AppProviders.tsx src/app/navigation/RootNavigator.tsx src/components/states/ScreenErrorBoundary.tsx src/services/api/sessionExpiry.ts src/screens/auth src/screens/entry src/screens/home src/screens/my src/screens/wallet/WalletFxScreen.tsx src/screens/order/OrderScreen.tsx src/screens/asset/AssetDetailScreen.tsx src/screens/record/RecordOrderListScreen.tsx src/components/tradingAccount src/components/common/CTAButton.tsx",
+    "lint:accounts:check": "eslint --no-fix --max-warnings=0 --no-warn-ignored --ignore-pattern \"**/*.test.ts\" src/features/auth src/features/tradingAccount src/features/record src/features/wallet src/app/AppProviders.tsx src/app/navigation/RootNavigator.tsx src/components/states/ScreenErrorBoundary.tsx src/services/api/sessionExpiry.ts src/screens/auth src/screens/entry src/screens/home src/screens/my src/screens/wallet/WalletFxScreen.tsx src/screens/order/OrderScreen.tsx src/screens/asset/AssetDetailScreen.tsx src/screens/record/RecordOrderListScreen.tsx src/components/tradingAccount src/components/common/CTAButton.tsx src/components/common/pressFeedback.ts src/components/navigation/TabBarButton.tsx",
     "typecheck": "tsc --noEmit",
     "test": "node --test 'src/**/*.test.ts'",
     "check": "npm run lint:accounts:check && npm run typecheck && npm run test",

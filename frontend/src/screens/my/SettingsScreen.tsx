@@ -8,6 +8,7 @@ import {
   Pressable,
   Alert,
 } from 'react-native';
+import { withPressedFeedback } from '../../components/common/pressFeedback';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -97,7 +98,7 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
 
           <Pressable
             testID={TEST_IDS.settings.saveNickname}
-            style={styles.primaryButton}
+            style={withPressedFeedback(styles.primaryButton, updateMutation.isPending)}
             onPress={onSaveNickname}
             disabled={updateMutation.isPending}
           >
@@ -111,7 +112,7 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
           <Text style={styles.sectionTitle}>알림 설정</Text>
 
           <Pressable
-            style={styles.menuRow}
+            style={withPressedFeedback(styles.menuRow)}
             onPress={() => setNotificationEnabled((prev) => !prev)}
           >
             <Text style={styles.menuText}>
@@ -131,7 +132,7 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
 
         <Pressable
           testID={TEST_IDS.settings.logout}
-          style={styles.logoutButton}
+          style={withPressedFeedback(styles.logoutButton)}
           onPress={() => void onLogout()}
         >
           <Text style={styles.logoutText}>로그아웃</Text>

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { withPressedFeedback } from '../common/pressFeedback';
 import { useQuery } from '@tanstack/react-query';
 
 import { QUERY_KEYS } from '../../constants/queryKeys';
@@ -41,7 +42,7 @@ export default function AdminDiagnosticPanel({ diagnostic, error }: Props) {
         accessibilityRole="button"
         accessibilityState={{ expanded }}
         onPress={() => setExpanded((value) => !value)}
-        style={styles.toggle}
+        style={withPressedFeedback(styles.toggle)}
         testID="admin-diagnostic-toggle"
       >
         <Text style={styles.toggleText}>

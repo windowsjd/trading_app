@@ -12,6 +12,7 @@ import {
   Pressable,
   ActivityIndicator,
 } from 'react-native';
+import { withPressedFeedback } from '../../components/common/pressFeedback';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -164,7 +165,7 @@ export default function MarketSearchScreen({ navigation }: Props) {
                 return (
                   <Pressable
                     key={scope.key}
-                    style={[styles.scopeChip, active && styles.scopeChipActive]}
+                    style={withPressedFeedback([styles.scopeChip, active && styles.scopeChipActive])}
                     onPress={() => setAssetType(scope.key)}
                   >
                     <Text
@@ -214,7 +215,7 @@ export default function MarketSearchScreen({ navigation }: Props) {
           return (
             <Pressable
               testID={TEST_IDS.market.item(item.id)}
-              style={styles.itemRow}
+              style={withPressedFeedback(styles.itemRow)}
               onPress={() =>
                 navigation.navigate('AssetDetail', { assetId: item.id })
               }

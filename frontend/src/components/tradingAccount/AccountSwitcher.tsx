@@ -8,6 +8,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { withPressedFeedback } from '../common/pressFeedback';
 import { useQuery } from '@tanstack/react-query';
 
 import BottomSheetBackdrop from '../common/BottomSheetBackdrop';
@@ -111,7 +112,7 @@ export default function AccountSwitcher({ compact = false }: Props) {
           시도해주세요.
         </Text>
         <Pressable
-          style={styles.retryButton}
+          style={withPressedFeedback(styles.retryButton)}
           onPress={() => void refetchAccounts()}
           testID={TEST_IDS.tradingAccount.switcherRetry}
         >
@@ -140,7 +141,7 @@ export default function AccountSwitcher({ compact = false }: Props) {
   return (
     <>
       <Pressable
-        style={styles.trigger}
+        style={withPressedFeedback(styles.trigger)}
         onPress={() => setOpen(true)}
         accessibilityRole="button"
         accessibilityLabel={`계정 선택. 현재 ${display.title}, ${display.statusLabel}`}
@@ -209,7 +210,7 @@ export default function AccountSwitcher({ compact = false }: Props) {
           {!hasGeneralAccount(accounts) ? (
             <View style={styles.startBox}>
               <Pressable
-                style={styles.startRow}
+                style={withPressedFeedback(styles.startRow, startGeneral.isPending)}
                 onPress={startGeneral.start}
                 disabled={startGeneral.isPending}
                 accessibilityRole="button"
@@ -266,7 +267,7 @@ function AccountRow({
 
   return (
     <Pressable
-      style={[styles.row, selected && styles.rowSelected]}
+      style={withPressedFeedback([styles.row, selected && styles.rowSelected])}
       onPress={onSelect}
       accessibilityRole="button"
       accessibilityState={{ selected }}

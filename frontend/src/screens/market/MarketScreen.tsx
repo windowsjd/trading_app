@@ -8,6 +8,7 @@ import {
   FlatList,
   ActivityIndicator,
 } from 'react-native';
+import { withPressedFeedback } from '../../components/common/pressFeedback';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
 import type { MarketScreenProps } from '../../app/navigation/types';
@@ -142,7 +143,7 @@ export default function MarketScreen({ navigation }: Props) {
                   <Pressable
                     key={tab.key}
                     testID={testID}
-                    style={[styles.tabButton, active && styles.tabButtonActive]}
+                    style={withPressedFeedback([styles.tabButton, active && styles.tabButtonActive])}
                     onPress={() => setSelectedTab(tab.key)}
                   >
                     <Text
@@ -156,7 +157,7 @@ export default function MarketScreen({ navigation }: Props) {
             </View>
 
             <Pressable
-              style={styles.searchEntry}
+              style={withPressedFeedback(styles.searchEntry)}
               onPress={() => navigation.navigate('MarketSearch')}
             >
               <Text style={styles.searchEntryText}>종목명 또는 심볼 검색</Text>

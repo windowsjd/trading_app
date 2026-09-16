@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { withPressedFeedback } from '../../components/common/pressFeedback';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { WalletFxScreenProps } from '../../app/navigation/types';
@@ -533,10 +534,10 @@ export default function WalletFxScreen({ navigation }: Props) {
             <Pressable
               testID={TEST_IDS.walletFx.directionKrwUsd}
               disabled={pending}
-              style={[
+              style={withPressedFeedback([
                 styles.directionChip,
                 fromCurrency === 'KRW' && styles.directionChipActive,
-              ]}
+              ], pending)}
               onPress={() => {
                 if (submitLockRef.current) return;
                 setFromCurrency('KRW');
@@ -557,10 +558,10 @@ export default function WalletFxScreen({ navigation }: Props) {
             <Pressable
               testID={TEST_IDS.walletFx.directionUsdKrw}
               disabled={pending}
-              style={[
+              style={withPressedFeedback([
                 styles.directionChip,
                 fromCurrency === 'USD' && styles.directionChipActive,
-              ]}
+              ], pending)}
               onPress={() => {
                 if (submitLockRef.current) return;
                 setFromCurrency('USD');

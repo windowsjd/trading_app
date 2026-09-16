@@ -8,6 +8,7 @@ import {
   Pressable,
   ActivityIndicator,
 } from 'react-native';
+import { withPressedFeedback } from '../../components/common/pressFeedback';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
 import type { WalletTransactionsScreenProps } from '../../app/navigation/types';
@@ -287,7 +288,7 @@ function FilterChip({
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
-      style={[styles.chip, active && styles.chipActive]}
+      style={withPressedFeedback([styles.chip, active && styles.chipActive])}
       onPress={onPress}
     >
       <Text style={active ? styles.chipTextActive : styles.chipText}>
