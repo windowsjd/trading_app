@@ -38,6 +38,29 @@ describe('ExchangeRate ingestion', () => {
     },
   };
 
+  it('publishes only after commit, skips dry-run/failure, and tolerates Redis loss', async () => {
+    const prisma = createPrismaMock();
+    let commit: (value: unknown) => void = () => {};
+    prisma.fxRateSnapshot.create.mockImplementationOnce(() => new Promise(resolve => { commit = resolve; }));
+    const redis = { publish: jest.fn().mockResolvedValue(1) };
+    const client = { fetchLatestUsd: jest.fn().mockResolvedValue({ response, receivedAt }) };
+    const service = new ExchangeRateIngestionService(prisma as never, configServiceFor('test-key'), client as never, redis as never);
+    const ingestion = service.ingestUsdKrw();
+    await new Promise(resolve => setImmediate(resolve));
+    expect(prisma.fxRateSnapshot.create).toHaveBeenCalledTimes(1);
+    expect(redis.publish).not.toHaveBeenCalled();
+    commit({ id: 'committed' });
+    await expect(ingestion).resolves.toMatchObject({ success: true });
+    expect(redis.publish).toHaveBeenLastCalledWith('candles:live:v1:provider-price-fanout', JSON.stringify({ type: 'fx_rate_updated', pair: 'USD/KRW' }));
+    await service.ingestUsdKrw({ dryRun: true });
+    expect(redis.publish).toHaveBeenCalledTimes(1);
+    prisma.fxRateSnapshot.create.mockRejectedValueOnce(new Error('write failed'));
+    await expect(service.ingestUsdKrw()).rejects.toThrow('write failed');
+    expect(redis.publish).toHaveBeenCalledTimes(1);
+    redis.publish.mockRejectedValueOnce(new Error('offline'));
+    await expect(service.ingestUsdKrw()).resolves.toMatchObject({ success: true, created: 1 });
+  });
+
   it('stores two successful same-rate/effectiveAt fetches as distinct observations', async () => {
     const prisma = createPrismaMock();
     prisma.fxRateSnapshot.findFirst.mockResolvedValue({

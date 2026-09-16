@@ -76,10 +76,15 @@ describe('KoreaEximExchangeIngestionService', () => {
               rows: [{ RESULT: 1, CUR_UNIT: 'USD', DEAL_BAS_R: '1390' }],
             }),
         };
+        const redis = { publish: jest.fn().mockImplementation(async () => {
+          expect(stored).toHaveLength(2);
+          return 1;
+        }) };
         const service = new KoreaEximExchangeIngestionService(
           prisma as never,
           createConfigService(),
           client as never,
+          redis as never,
         );
         if (path === 'scheduled') {
           await expect(service.ingestUsdKrw()).resolves.toMatchObject({
@@ -112,6 +117,8 @@ describe('KoreaEximExchangeIngestionService', () => {
             }),
           );
         }
+        expect(redis.publish).toHaveBeenCalledTimes(1);
+        expect(redis.publish).toHaveBeenCalledWith('candles:live:v1:provider-price-fanout', JSON.stringify({ type: 'fx_rate_updated', pair: 'USD/KRW' }));
         expect(client.fetchDailyExchangeRates).toHaveBeenCalledTimes(1);
         expect(prisma.fxRateSnapshot.create).toHaveBeenCalledTimes(1);
         expect(stored).toHaveLength(2);

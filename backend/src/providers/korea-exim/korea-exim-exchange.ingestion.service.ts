@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { RedisService } from '../../redis/redis.service';
+import { publishFxRateUpdate } from '../fx-rate-update-event';
 import {
   CurrencyCode,
   FxRateSourceType,
@@ -61,6 +63,7 @@ export class KoreaEximExchangeIngestionService {
     private readonly prisma: PrismaService,
     private readonly configService: ProviderConfigService,
     private readonly client: KoreaEximExchangeClient,
+    @Optional() private readonly redis?: RedisService,
   ) {}
 
   async ingestUsdKrw(
@@ -131,6 +134,8 @@ export class KoreaEximExchangeIngestionService {
             id: true,
           },
         });
+
+        await publishFxRateUpdate(this.redis);
 
         return this.ingestionResult({
           parsed,
@@ -249,6 +254,8 @@ export class KoreaEximExchangeIngestionService {
           capturedAt: true,
         },
       });
+
+      await publishFxRateUpdate(this.redis);
 
       return {
         snapshotId: created.id,

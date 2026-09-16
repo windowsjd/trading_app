@@ -34,6 +34,7 @@ import { BinanceSymbolMetadataService } from '../providers/binance/binance-symbo
 import { buildPagination, type Pagination } from '../common/pagination';
 import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
+import { DailyChangeRateService } from './daily-change-rate.service';
 import {
   type AdminDiagnostic,
   buildAdminPartialFailureDiagnostic,
@@ -295,6 +296,8 @@ export class AssetsService {
     // `displayPriceDecimals: null`, which keeps the previous display policy.
     @Optional()
     private readonly binanceSymbolMetadata?: BinanceSymbolMetadataService,
+    @Optional()
+    private readonly dailyChangeRate?: DailyChangeRateService,
   ) {}
 
   async getAssets(
@@ -709,7 +712,7 @@ export class AssetsService {
     const basePayload = {
       state: 'available' as const,
       currentPrice: this.formatDecimal(snapshot.price, 8),
-      changeRate: await this.calculateChangeRate(asset, snapshot),
+      changeRate: await this.calculateChangeRate(asset, snapshot, valuationAt),
       priceCurrency: snapshot.currencyCode,
       assetPriceSnapshotId: snapshot.id,
       priceEffectiveAt: snapshot.effectiveAt.toISOString(),
@@ -804,13 +807,12 @@ export class AssetsService {
     };
   }
 
-  private async calculateChangeRate(
-    asset: AssetRecord,
-    snapshot: AssetPriceSnapshotRecord,
+  async calculateChangeRate(
+    asset: Pick<AssetRecord, 'id' | 'assetType' | 'market'>,
+    snapshot: { price: Prisma.Decimal | string; effectiveAt: Date },
+    now = new Date(),
   ): Promise<string | null> {
-    void asset;
-    void snapshot;
-    return null;
+    return this.dailyChangeRate?.calculate({ asset, ...snapshot, now }) ?? null;
   }
 
   private async findLatestEligibleAssetPriceSnapshot(

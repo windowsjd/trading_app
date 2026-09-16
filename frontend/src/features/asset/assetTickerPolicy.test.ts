@@ -33,6 +33,14 @@ function ticker(
 }
 
 describe('assetTickerPolicy', () => {
+  it('accepts recovered or invalidated daily returns for the same price snapshot', () => {
+    const current = toAssetTickerAcceptState(ticker({ changeRate: null }));
+    const recovered = applyTicker(current, ticker({ changeRate: '2.00000000' }));
+    assert.equal(recovered?.ticker.changeRate, '2.00000000');
+    assert.equal(applyTicker(recovered, ticker({ changeRate: null }))?.ticker.changeRate, null);
+    assert.equal(shouldAcceptTicker(recovered, ticker({ changeRate: '3', priceCapturedAt: '2026-07-25T02:00:00Z' })), false);
+  });
+
   it('reads the event time from capturedAt, then effectiveAt', () => {
     assert.equal(
       getTickerTimestamp(

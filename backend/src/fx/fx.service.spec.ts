@@ -441,6 +441,21 @@ describe('FxService', () => {
     expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
   });
 
+  it('keeps canonical EXIM priority when a newer raw fallback observation triggers a resync', async () => {
+    const { prisma, service } = createService();
+    const exim = { id: 'exim', rate: new Prisma.Decimal('1390'), sourceType: FxRateSourceType.provider_api,
+      sourceName: 'korea_exim_exchange_rate', capturedAt, effectiveAt: freshEffectiveAt };
+    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([exim]);
+    const before = await service.currentRate({ refresh: false });
+    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+      { ...exim, id: 'fallback', sourceName: 'exchange_rate_api', rate: new Prisma.Decimal('9999'),
+        capturedAt: new Date(capturedAt.getTime() + 1000) }, exim,
+    ]);
+    const after = await service.currentRate({ refresh: false });
+    expect(after).toEqual(before);
+    expect(after.data).toMatchObject({ rate: '1390.00000000', sourceName: 'korea_exim_exchange_rate' });
+  });
+
   it.each([
     [undefined, 600, true],
     [undefined, 7200, true],

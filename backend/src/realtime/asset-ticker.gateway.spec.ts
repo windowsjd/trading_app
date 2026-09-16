@@ -70,6 +70,7 @@ describe('AssetTickerGateway', () => {
     };
     const assetsService = {
       getAssetPriceForTicker: jest.fn().mockResolvedValue(selection),
+      calculateChangeRate: jest.fn().mockResolvedValue(null),
       convertRealtimePriceToKrw: jest.fn().mockResolvedValue(krwConversion),
     };
     const realtimeAssetMetadata = {
@@ -355,8 +356,8 @@ describe('AssetTickerGateway', () => {
     ).toBeNull();
   });
 
-  it('builds Binance realtime tickers from the event fields (price/changeRate/source)', async () => {
-    const { gateway, prisma } = createGateway(null, DEFAULT_KRW_CONVERSION, {
+  it('builds Binance prices from events but ignores rolling 24h changeRate', async () => {
+    const { gateway, prisma, assetsService } = createGateway(null, DEFAULT_KRW_CONVERSION, {
       assetId: 'asset-btc',
       symbol: 'BTCUSDT',
       name: 'Bitcoin',
@@ -366,6 +367,7 @@ describe('AssetTickerGateway', () => {
       displayPriceDecimals: 2,
     });
 
+    assetsService.calculateChangeRate.mockResolvedValue('2.00000000');
     const ticker = await buildRealtimeTickerMessage(gateway, {
       type: 'binance_realtime_price',
       assetId: 'asset-btc',
@@ -387,6 +389,11 @@ describe('AssetTickerGateway', () => {
       },
     });
 
+    expect(assetsService.calculateChangeRate).toHaveBeenCalledWith(
+      { id: 'asset-btc', assetType: 'crypto', market: 'BINANCE' },
+      { price: '100123.00000000', effectiveAt: new Date('2026-06-19T03:00:28.000Z') },
+      new Date('2026-06-19T03:00:30.000Z'),
+    );
     expect(prisma.asset.findFirst).not.toHaveBeenCalled();
     expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
     expect(ticker).toMatchObject({
@@ -402,7 +409,7 @@ describe('AssetTickerGateway', () => {
       priceCapturedAt: '2026-06-19T03:00:29.000Z',
       priceEffectiveAt: '2026-06-19T03:00:28.000Z',
       freshnessAgeSeconds: 1,
-      changeRate: '1.75000000',
+      changeRate: '2.00000000',
       displayPriceDecimals: 2,
       priceSource: {
         sourceType: 'provider_api',
@@ -663,6 +670,33 @@ describe('AssetTickerGateway', () => {
     (
       gateway as unknown as { flushPendingTickers(): void }
     ).flushPendingTickers();
+
+  it('routes value-free FX invalidations only to subscribed clients and coalesces backpressure', async () => {
+    const { gateway } = createGateway(null);
+    const { client } = attachClient(gateway, 'a1');
+    const { client: priceOnly } = attachClient(gateway, 'a1');
+    const internal = gateway as unknown as {
+      handleMessage(client: unknown, message: string): Promise<void>;
+      pushFxRateUpdate(): void;
+      flushPendingFxRateUpdates(): void;
+    };
+    await internal.handleMessage(client, JSON.stringify({ type: 'subscribe', channel: 'fx_rate', pair: 'EUR/KRW' }));
+    expect(JSON.parse(client.send.mock.calls[0][0]).type).toBe('error');
+    client.send.mockClear();
+    await internal.handleMessage(client, JSON.stringify({ type: 'subscribe', channel: 'fx_rate', pair: 'USD/KRW' }));
+    expect(JSON.parse(client.send.mock.calls[0][0])).toEqual({ type: 'subscribed', channel: 'fx_rate', pair: 'USD/KRW' });
+    client.bufferedAmount = 10_000_000;
+    internal.pushFxRateUpdate(); internal.pushFxRateUpdate();
+    expect(client.send).toHaveBeenCalledTimes(1);
+    expect(priceOnly.send).not.toHaveBeenCalled();
+    client.bufferedAmount = 0;
+    internal.flushPendingFxRateUpdates();
+    expect(client.send).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(client.send.mock.calls[1][0])).toEqual({ type: 'fx_rate_updated', channel: 'fx_rate', pair: 'USD/KRW' });
+    await internal.handleMessage(client, JSON.stringify({ type: 'unsubscribe', channel: 'fx_rate', pair: 'USD/KRW' }));
+    internal.pushFxRateUpdate();
+    expect(client.send).toHaveBeenCalledTimes(3);
+  });
 
   it('publishes an open-to-closed transition even with the same snapshot id', async () => {
     const { gateway } = createGateway({

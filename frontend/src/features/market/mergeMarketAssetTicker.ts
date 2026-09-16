@@ -55,8 +55,7 @@ export function mergeMarketAssetTicker(
       typeof ticker.displayPriceDecimals === 'number'
         ? ticker.displayPriceDecimals
         : item.displayPriceDecimals,
-    changeRate:
-      typeof ticker.changeRate === 'string' ? ticker.changeRate : item.changeRate,
+    changeRate: ticker.changeRate ?? null,
     price: {
       ...item.price,
       state: ticker.priceLocal ? 'available' : 'unavailable',
@@ -65,10 +64,7 @@ export function mergeMarketAssetTicker(
       // Never pair this new local price with the previous snapshot's KRW.
       priceKrw: krwAvailable ? ticker.priceKrw : null,
       priceKrwState: krwAvailable ? 'available' : 'unavailable',
-      changeRate:
-        typeof ticker.changeRate === 'string'
-          ? ticker.changeRate
-          : (item.price?.changeRate ?? null),
+      changeRate: ticker.changeRate ?? null,
       assetPriceSnapshotId: ticker.assetPriceSnapshotId ?? null,
       priceCapturedAt: ticker.priceCapturedAt ?? ticker.capturedAt ?? null,
       priceEffectiveAt: ticker.priceEffectiveAt ?? null,

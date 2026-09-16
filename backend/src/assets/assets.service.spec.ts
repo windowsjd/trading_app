@@ -51,6 +51,9 @@ import {
   resetMarketSessionOverrideStoreForTest,
 } from '../orders/market-calendar/market-session-override.store';
 import { AssetsService } from './assets.service';
+import { AssetTickerGateway } from '../realtime/asset-ticker.gateway';
+import { DailyChangeRateService } from './daily-change-rate.service';
+import { MarketCandlesRepository } from './market-candles.repository';
 
 describe('AssetsService', () => {
   const priceAt = new Date('2026-05-07T00:00:00.000Z');
@@ -76,6 +79,7 @@ describe('AssetsService', () => {
   });
 
   const createPrisma = () => ({
+    marketCandle: { findMany: jest.fn().mockResolvedValue([]) },
     asset: {
       count: jest.fn(),
       findFirst: jest.fn(),
@@ -140,6 +144,7 @@ describe('AssetsService', () => {
     const service = new AssetsService(
       prisma as never,
       binanceSymbolMetadata as never,
+      new DailyChangeRateService(new MarketCandlesRepository(prisma as never)),
     );
 
     return { prisma, service, binanceSymbolMetadata };
@@ -1515,6 +1520,53 @@ describe('AssetsService', () => {
     expect(JSON.stringify(response.data)).not.toContain('rawPayloadJson');
     expectNoAssetWrites(prisma);
   });
+
+  it.each([AssetType.domestic_stock, AssetType.crypto])(
+    'shares the %s daily baseline across REST, live ticks and reconnect snapshots',
+    async (assetType) => {
+      const { prisma, service } = createService();
+      const isCrypto = assetType === AssetType.crypto;
+      const currency = isCrypto ? CurrencyCode.USD : CurrencyCode.KRW;
+      const sourceName = isCrypto ? 'binance_spot_ws_ticker' : 'kis_krx_realtime_trade';
+      const fixture = asset({ id: 'asset-daily', symbol: isCrypto ? 'BTCUSDT' : '005930', assetType, currencyCode: currency });
+      const current = providerPriceSnapshot('current', sourceName, '110', currency);
+      prisma.asset.findUnique.mockResolvedValue(fixture);
+      prisma.asset.findFirst.mockResolvedValue(fixture);
+      prisma.asset.findMany.mockResolvedValue([fixture]);
+      prisma.asset.count.mockResolvedValue(1);
+      prisma.assetPriceSnapshot.findMany.mockResolvedValue([current]);
+      prisma.fxRateSnapshot.findMany.mockResolvedValue(freshUsdKrwProviderSnapshots());
+      prisma.marketCandle.findMany.mockResolvedValue([{
+        assetId: fixture.id, interval: '1d', sourceProvider: isCrypto ? 'binance' : 'kis', isClosed: true,
+        openTime: new Date(isCrypto ? '2026-07-19T00:00:00Z' : '2026-07-15T15:00:00Z'),
+        closeTime: new Date(isCrypto ? '2026-07-20T00:00:00Z' : '2026-07-16T15:00:00Z'),
+        sourceUpdatedAt: new Date(isCrypto ? '2026-07-20T00:00:00Z' : '2026-07-16T15:00:00Z'),
+        open: new Prisma.Decimal(100), high: new Prisma.Decimal(101),
+        low: new Prisma.Decimal(99), close: new Prisma.Decimal(100),
+      }]);
+      expect((await service.getAssetPrice('user-1', fixture.id)).data.changeRate).toBe('10.00000000');
+      expect((await service.getAsset('user-1', fixture.id)).data.asset.price).toMatchObject({ changeRate: '10.00000000' });
+      expect((await service.getAssets('user-1', { withPrice: 'true' })).data.assets[0].price).toMatchObject({ changeRate: '10.00000000' });
+      const gateway = new AssetTickerGateway(prisma as never, {} as never, {} as never, service,
+        { getMetadata: async () => ({ ...fixture, assetId: fixture.id }) } as never, {} as never, {} as never);
+      const internal = gateway as unknown as {
+        buildSnapshotTickerMessage(id: string): Promise<Record<string, unknown>>;
+        buildRealtimeTickerMessageFromEvent(event: unknown): Promise<Record<string, unknown>>;
+      };
+      expect(await internal.buildSnapshotTickerMessage(fixture.id)).toMatchObject({ changeRate: '10.00000000' });
+      const event = { type: isCrypto ? 'binance_realtime_price' : 'kis_realtime_price', assetId: fixture.id,
+        price: { price: '120', currencyCode: currency, sourceName, changeRate: '-99.9',
+          effectiveAt: testNow.toISOString(), capturedAt: testNow.toISOString() } };
+      expect(await internal.buildRealtimeTickerMessageFromEvent(event)).toMatchObject({ priceLocal: '120', changeRate: '20.00000000' });
+      event.price.price = '130'; event.price.changeRate = '999';
+      expect(await internal.buildRealtimeTickerMessageFromEvent(event)).toMatchObject({ priceLocal: '130', changeRate: '30.00000000' });
+      // Reconnection reloads REST current state with the same daily definition.
+      prisma.assetPriceSnapshot.findMany.mockResolvedValue([providerPriceSnapshot('recovered', sourceName, '130', currency)]);
+      expect(await internal.buildSnapshotTickerMessage(fixture.id)).toMatchObject({ priceLocal: '130.00000000', changeRate: '30.00000000' });
+      expect(prisma.marketCandle.findMany).toHaveBeenCalledTimes(1);
+      expectNoAssetWrites(prisma);
+    },
+  );
 
   it('builds ticker price selection with the same asset price policy as REST price', async () => {
     const { prisma, service } = createService();

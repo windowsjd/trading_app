@@ -115,7 +115,7 @@ export function isTickerStaleAt(
 
 /**
  * Whether `next` may replace `current`:
- *  - the same snapshot id is never applied twice,
+ *  - the same snapshot id is skipped unless its derived daily return changed,
  *  - an older event time never overwrites a newer one,
  *  - a priced event with NO timestamp never overwrites an existing ticker
  *    (it cannot be ordered), while an unavailable event still gets through so
@@ -146,11 +146,15 @@ export function shouldAcceptTicker(
   if (isClosedMarketSnapshot(next)) {
     return (
       next.assetPriceSnapshotId !== current?.snapshotId ||
-      next.priceLocal !== current?.ticker.priceLocal
+      next.priceLocal !== current?.ticker.priceLocal ||
+      next.changeRate !== current?.ticker.changeRate
     );
   }
   const snapshotId = next.assetPriceSnapshotId ?? null;
-  if (snapshotId && current && snapshotId === current.snapshotId) return false;
+  if (
+    snapshotId && current && snapshotId === current.snapshotId &&
+    next.changeRate === current.ticker.changeRate
+  ) return false;
 
   const nextTimestamp = getTickerTimestamp(next);
   if (nextTimestamp === null) {

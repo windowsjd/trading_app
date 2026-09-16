@@ -9,6 +9,7 @@ import { AssetCandlesCacheService } from './asset-candles-cache.service';
 import { AssetCandlesService } from './asset-candles.service';
 import { AssetsController } from './assets.controller';
 import { AssetsService } from './assets.service';
+import { DailyChangeRateService } from './daily-change-rate.service';
 import { MarketCandlesRepository } from './market-candles.repository';
 import { AssetCandlesSingleFlightService } from './asset-candles-single-flight.service';
 import { readCandleSingleFlightConfig } from './asset-candles-single-flight.config';
@@ -58,6 +59,7 @@ import { MarketCandleReconciliationService } from './market-candle-reconciliatio
   controllers: [AssetsController],
   providers: [
     AssetsService,
+    DailyChangeRateService,
     MarketSessionOverrideCacheInvalidatorService,
     AssetCandlesService,
     MarketCandlesRepository,

@@ -67,6 +67,36 @@ function sentFrames(socket: FakeSocket): Array<Record<string, unknown>> {
 }
 
 describe("RealtimeSocketManager", () => {
+  it("shares FX with price channels, isolates pairs and restores the FX subscription", async () => {
+    const manager = createManager();
+    const fx = collect();
+    const ticker = collect();
+    const offPrice = manager.subscribe({ channel: 'asset_ticker', assetId: 'a1' }, ticker.listener);
+    const offFx = manager.subscribe({ channel: 'fx_rate', pair: 'USD/KRW' }, fx.listener);
+    await delay(5);
+    assert.equal(FakeSocket.instances.length, 1);
+    const first = FakeSocket.instances[0];
+    first.open();
+    first.receive({ type: 'subscribed', channel: 'fx_rate', pair: 'USD/KRW' });
+    first.receive({ type: 'fx_rate_updated', channel: 'fx_rate', pair: 'EUR/KRW' });
+    first.receive({ type: 'fx_rate_updated', channel: 'fx_rate', pair: 'USD/KRW' });
+    assert.equal(fx.events.filter(e => e.kind === 'message').length, 2);
+    assert.equal(ticker.events.filter(e => e.kind === 'message').length, 0);
+    const late = collect();
+    const offLate = manager.subscribe({ channel: 'fx_rate', pair: 'USD/KRW' }, late.listener);
+    assert.ok(late.events.some(e => e.kind === 'message' && e.payload.type === 'subscribed'));
+    assert.equal(sentFrames(first).filter(f => f.channel === 'fx_rate').length, 1);
+    first.drop();
+    await delay(10);
+    const second = FakeSocket.instances[1];
+    second.open();
+    assert.ok(sentFrames(second).some(f => f.channel === 'fx_rate' && f.pair === 'USD/KRW' && !('assetId' in f)));
+    assert.ok(fx.events.some(e => e.kind === 'restored'));
+    offFx(); offLate(); offPrice();
+    assert.ok(sentFrames(second).some(f => f.channel === 'fx_rate' && f.type === 'unsubscribe'));
+    assert.equal(second.closed.length, 1);
+  });
+
   it("shares ONE socket between ticker and candle subscriptions", async () => {
     const manager = createManager();
     const ticker = collect();

@@ -99,6 +99,7 @@ function createTradingUiHarness(screenName) {
     '../../features/asset/useAssetTicker': { useAssetTicker: () => ({ latestTicker: h.ticker, isStale: h.tickerStale }) },
     '../../features/asset/useAssetCandle': { useAssetCandle: () => ({}) },
     '../../features/asset/useStaleRecheck': { useStaleRecheck: () => {} },
+    '../../features/wallet/useFxRateUpdates': { useFxRateUpdates: () => {} },
     '../../components/charts': { CandlestickChart: 'CandlestickChart' },
     ...Object.fromEntries(['FullPageLoading', 'ErrorState', 'InlineEmptyState', 'SectionSkeleton',
       'BlockedState', 'AdminDiagnosticPanel'].map(name => ['../../components/states/' + name, { default: name, __esModule: true }])),

@@ -13,15 +13,19 @@ import type { BinanceRealtimePriceEvent } from '../providers/binance/binance-rea
 import type { KisRealtimePriceEvent } from '../providers/kis/kis-realtime-price-event-bus.service';
 import { readRedisConfig } from '../redis/redis.config';
 import { RedisService } from '../redis/redis.service';
+import {
+  PROVIDER_PRICE_PUBSUB_CHANNEL,
+  FX_RATE_UPDATE_EVENT,
+  type FxRateUpdateEvent,
+} from '../providers/fx-rate-update-event';
 
-export const PROVIDER_PRICE_PUBSUB_CHANNEL =
-  'candles:live:v1:provider-price-fanout';
+export { PROVIDER_PRICE_PUBSUB_CHANNEL } from '../providers/fx-rate-update-event';
 
 export type ProviderRealtimePriceEvent =
   | BinanceRealtimePriceEvent
   | KisRealtimePriceEvent;
 
-type Listener = (event: ProviderRealtimePriceEvent) => void;
+type Listener = (event: ProviderRealtimePriceEvent | FxRateUpdateEvent) => void;
 
 /**
  * Keeps the legacy asset_ticker channel multi-instance while the candle
@@ -41,7 +45,7 @@ export class ProviderPricePubSubService
   ) {}
 
   onModuleInit(): void {
-    if (!this.config.enabled) return;
+    // FX notifications remain active even when live candle streaming is off.
     const redis = readRedisConfig();
     if (!redis.url) return;
     const client = new IORedis(redis.url, {
@@ -58,11 +62,17 @@ export class ProviderPricePubSubService
     });
     this.client = client;
     client.on('ready', () => {
-      void client.subscribe(PROVIDER_PRICE_PUBSUB_CHANNEL).catch(() => {});
+      void client
+        .subscribe(PROVIDER_PRICE_PUBSUB_CHANNEL)
+        .then(() => {
+          // A connected app socket may have missed events during a Redis outage.
+          for (const listener of this.listeners) listener(FX_RATE_UPDATE_EVENT);
+        })
+        .catch(() => {});
     });
     client.on('message', (channel, message) => {
       if (channel !== PROVIDER_PRICE_PUBSUB_CHANNEL) return;
-      const event = parseEvent(message);
+      const event = parseProviderEvent(message);
       if (!event) return;
       for (const listener of this.listeners) listener(event);
     });
@@ -102,9 +112,16 @@ export class ProviderPricePubSubService
   }
 }
 
-function parseEvent(message: string): ProviderRealtimePriceEvent | null {
+export function parseProviderEvent(
+  message: string,
+): ProviderRealtimePriceEvent | FxRateUpdateEvent | null {
   try {
-    const event = JSON.parse(message) as Partial<ProviderRealtimePriceEvent>;
+    const control = JSON.parse(message) as Record<string, unknown> | null;
+    if (control?.type === 'fx_rate_updated') {
+      return control.pair === 'USD/KRW' ? FX_RATE_UPDATE_EVENT : null;
+    }
+    if (!control) return null;
+    const event = control as Partial<ProviderRealtimePriceEvent>;
     if (
       (event.type !== 'binance_realtime_price' &&
         event.type !== 'kis_realtime_price') ||

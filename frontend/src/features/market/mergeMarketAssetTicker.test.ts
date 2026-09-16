@@ -66,6 +66,13 @@ function liveTicker(
 }
 
 describe('mergeMarketAssetTicker', () => {
+  it('clears the old daily return when the new daily baseline is unavailable', () => {
+    const merged = mergeMarketAssetTicker(restItem(), liveTicker({ changeRate: null }));
+    assert.equal(merged.price?.currentPrice, '0.24560000');
+    assert.equal(merged.price?.changeRate, null);
+    assert.equal(merged.changeRate, null);
+  });
+
   it('uses the ticker price when the ticker is newer than REST', () => {
     const merged = mergeMarketAssetTicker(restItem(), liveTicker());
 

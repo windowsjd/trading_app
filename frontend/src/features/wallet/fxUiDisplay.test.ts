@@ -37,7 +37,7 @@ describe('FX screen information display', () => {
     const rows = elements(tree, 'PreviewAmounts')[0].props.rows;
     assert.deepEqual(rows.map((row: any) => row.label), ['적용 환율 (USD/KRW)', '예상 수수료', '예상 수령액']);
     assert.equal(h.renderCta(h.control(tree, TEST_IDS.walletFx.executeSubmit)).props.disabled, false);
-    assert.equal(h.queries.find((query: any) => query.queryKey[1] === 'fx-rate').refetchInterval, 60000);
+    assert.equal(h.queries.find((query: any) => query.queryKey[1] === 'fx-rate').refetchInterval, 300000);
   });
 
   for (const status of ['suspended', 'closed']) {

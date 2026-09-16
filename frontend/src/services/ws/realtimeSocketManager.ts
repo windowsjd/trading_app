@@ -10,13 +10,21 @@
  * reconnectWithFreshToken() call.
  */
 
-export type RealtimeChannel = 'asset_ticker' | 'asset_candle';
+export type RealtimeChannel = 'asset_ticker' | 'asset_candle' | 'fx_rate';
 
-export interface RealtimeSubscriptionSpec {
-  channel: RealtimeChannel;
-  assetId: string;
-  interval?: string;
-}
+export type RealtimeSubscriptionSpec =
+  | {
+      channel: 'asset_ticker' | 'asset_candle';
+      assetId: string;
+      interval?: string;
+      pair?: never;
+    }
+  | {
+      channel: 'fx_rate';
+      pair: 'USD/KRW';
+      assetId?: never;
+      interval?: never;
+    };
 
 export type RealtimeSocketStatus =
   | 'idle'
@@ -42,6 +50,7 @@ type RoutedPayload = {
   channel?: string;
   assetId?: string;
   interval?: string;
+  pair?: string;
   code?: string;
   [key: string]: unknown;
 };
@@ -71,7 +80,7 @@ type SubscriptionEntry = {
 };
 
 function subscriptionKey(spec: RealtimeSubscriptionSpec): string {
-  return `${spec.channel}|${spec.assetId}|${spec.interval ?? ''}`;
+  return `${spec.channel}|${spec.assetId ?? spec.pair}|${spec.interval ?? ''}`;
 }
 
 function appendToken(wsUrl: string, token: string | null): string {
@@ -132,7 +141,9 @@ export class RealtimeSocketManager {
           payload: {
             type: 'subscribed',
             channel: entry.spec.channel,
-            assetId: entry.spec.assetId,
+            ...(entry.spec.channel === 'fx_rate'
+              ? { pair: entry.spec.pair }
+              : { assetId: entry.spec.assetId }),
             ...(entry.spec.interval ? { interval: entry.spec.interval } : {}),
           },
         });
@@ -292,7 +303,15 @@ export class RealtimeSocketManager {
       this.emitToMatches('asset_candle', payload, true);
       return;
     }
-    if (payload.channel === 'asset_ticker' || payload.channel === 'asset_candle') {
+    if (payload.type === 'fx_rate_updated') {
+      this.emitToMatches('fx_rate', payload, true);
+      return;
+    }
+    if (
+      payload.channel === 'asset_ticker' ||
+      payload.channel === 'asset_candle' ||
+      payload.channel === 'fx_rate'
+    ) {
       this.emitToMatches(payload.channel, payload, false);
       return;
     }
@@ -307,7 +326,7 @@ export class RealtimeSocketManager {
   private findEntry(payload: RoutedPayload): SubscriptionEntry | undefined {
     if (typeof payload.channel !== 'string') return undefined;
     return this.subscriptions.get(
-      `${payload.channel}|${payload.assetId ?? ''}|${payload.interval ?? ''}`,
+      `${payload.channel}|${payload.assetId ?? payload.pair ?? ''}|${payload.interval ?? ''}`,
     );
   }
 
@@ -318,6 +337,7 @@ export class RealtimeSocketManager {
   ): void {
     for (const entry of this.subscriptions.values()) {
       if (entry.spec.channel !== channel) continue;
+      if (channel === 'fx_rate' && payload.pair !== entry.spec.pair) continue;
       if (payload.assetId && entry.spec.assetId !== payload.assetId) continue;
       if (
         dataMessage &&
@@ -362,7 +382,9 @@ export class RealtimeSocketManager {
         JSON.stringify({
           type,
           channel: entry.spec.channel,
-          assetId: entry.spec.assetId,
+          ...(entry.spec.channel === 'fx_rate'
+            ? { pair: entry.spec.pair }
+            : { assetId: entry.spec.assetId }),
           ...(entry.spec.interval ? { interval: entry.spec.interval } : {}),
         }),
       );

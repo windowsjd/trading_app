@@ -77,6 +77,8 @@ import PreviewAmounts from '../../components/tradingAccount/PreviewAmounts';
 import CTAButton from '../../components/common/CTAButton';
 import FxSuccessBottomSheet from './FxSuccessBottomSheet';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
+import { useFxRateUpdates } from '../../features/wallet/useFxRateUpdates';
+import { FX_RATE_FALLBACK_INTERVAL_MS } from '../../features/wallet/fxRateUpdates';
 
 type Props = WalletFxScreenProps;
 type Currency = 'KRW' | 'USD';
@@ -91,8 +93,9 @@ type FxDomainState = Extract<
 const FX_RATE_PARAMS = {
   baseCurrency: 'USD' as const,
   quoteCurrency: 'KRW' as const,
-  refresh: true,
+  refresh: false,
 };
+const FX_RATE_QUERY_KEY = QUERY_KEYS.wallet.fxRate(FX_RATE_PARAMS);
 
 const QUOTE_EXPIRED_MESSAGE =
   '환전 견적이 만료되었습니다. 환전하기를 다시 눌러주세요.';
@@ -203,8 +206,8 @@ export default function WalletFxScreen({ navigation }: Props) {
   });
 
   const rateQuery = useQuery({
-    queryKey: QUERY_KEYS.wallet.fxRate(FX_RATE_PARAMS),
-    refetchInterval: 60_000,
+    queryKey: FX_RATE_QUERY_KEY,
+    refetchInterval: FX_RATE_FALLBACK_INTERVAL_MS,
     queryFn: () =>
       getCurrentFxRate(
         FX_RATE_PARAMS.baseCurrency,
@@ -212,6 +215,7 @@ export default function WalletFxScreen({ navigation }: Props) {
         FX_RATE_PARAMS.refresh,
       ),
   });
+  useFxRateUpdates(FX_RATE_QUERY_KEY, rateQuery.data?.validUntil);
   const availableRate = !rateQuery.isError && isPreviewFxAvailable(rateQuery.data, Date.now())
     ? rateQuery.data : null;
 

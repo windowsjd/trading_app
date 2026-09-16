@@ -69,6 +69,8 @@ type AccessTokenPayload = {
 
 type ClientState = {
   userId: string;
+  fxRateSubscribed?: boolean;
+  pendingFxRateUpdate?: boolean;
   subscriptions: Map<string, string | null>;
   candleSubscriptions: Map<
     string,
@@ -88,6 +90,7 @@ type SubscriptionMessage = {
   channel?: unknown;
   assetId?: unknown;
   interval?: unknown;
+  pair?: unknown;
 };
 
 type RealtimePriceEvent =
@@ -178,12 +181,14 @@ export class AssetTickerGateway
         this.handleLiveCandlePubSubStatus(status),
       ) ?? null;
     this.unsubscribeProviderPrices =
-      this.providerPricePubSub?.subscribe((event) =>
-        this.pushRealtimePriceEvent(event),
-      ) ?? null;
+      this.providerPricePubSub?.subscribe((event) => {
+        if (event.type === 'fx_rate_updated') this.pushFxRateUpdate();
+        else void this.pushRealtimePriceEvent(event);
+      }) ?? null;
     this.backpressureTimer = setInterval(() => {
       this.flushPendingCandles();
       this.flushPendingTickers();
+      this.flushPendingFxRateUpdates();
     }, CANDLE_BACKPRESSURE_FLUSH_MS);
     this.backpressureTimer.unref?.();
   }
@@ -246,6 +251,24 @@ export class AssetTickerGateway
       return;
     }
 
+    if (message.channel === 'fx_rate') {
+      if (
+        message.pair !== 'USD/KRW' ||
+        (message.type !== 'subscribe' && message.type !== 'unsubscribe')
+      ) {
+        this.sendInvalidSubscription(client);
+        return;
+      }
+      state.fxRateSubscribed = message.type === 'subscribe';
+      state.pendingFxRateUpdate = false;
+      this.sendJson(client, {
+        type: state.fxRateSubscribed ? 'subscribed' : 'unsubscribed',
+        channel: 'fx_rate',
+        pair: 'USD/KRW',
+      });
+      return;
+    }
+
     if (typeof message.assetId !== 'string' || message.assetId.trim() === '') {
       this.sendInvalidSubscription(client);
       return;
@@ -289,6 +312,38 @@ export class AssetTickerGateway
     }
 
     this.sendInvalidSubscription(client);
+  }
+
+  private pushFxRateUpdate(): void {
+    for (const state of this.clients.values()) {
+      if (state.fxRateSubscribed) state.pendingFxRateUpdate = true;
+    }
+    this.flushPendingFxRateUpdates();
+  }
+
+  private flushPendingFxRateUpdates(): void {
+    for (const [client, state] of this.clients) {
+      if (!state.fxRateSubscribed || !state.pendingFxRateUpdate) continue;
+      if (client.readyState !== WebSocket.OPEN) {
+        this.clients.delete(client);
+        continue;
+      }
+      if (
+        client.bufferedAmount >
+        (this.liveCandleConfig?.websocketBackpressureBytes ??
+          DEFAULT_CANDLE_BACKPRESSURE_BYTES)
+      )
+        continue;
+      if (
+        this.sendJson(client, {
+          type: 'fx_rate_updated',
+          channel: 'fx_rate',
+          pair: 'USD/KRW',
+        })
+      ) {
+        state.pendingFxRateUpdate = false;
+      }
+    }
   }
 
   private async handleCandleSubscription(
@@ -850,8 +905,18 @@ export class AssetTickerGateway
         sourceType: 'provider_api',
         sourceName: event.price.sourceName,
       },
-      changeRate:
-        'changeRate' in event.price ? (event.price.changeRate ?? null) : null,
+      changeRate: await this.assetsService.calculateChangeRate(
+        {
+          id: metadata.assetId,
+          assetType: metadata.assetType,
+          market: metadata.market,
+        },
+        {
+          price: event.price.price,
+          effectiveAt: new Date(event.price.effectiveAt),
+        },
+        now,
+      ),
       ...(krw.state === 'available'
         ? {
             priceKrw: krw.priceKrw,
@@ -1029,8 +1094,7 @@ function parseCandleSubscriptionKey(key: string): [string, string] {
 function snapshotTickerKey(ticker: {
   assetPriceSnapshotId: string | null;
   marketStatus?: string;
+  changeRate?: string | null;
 }): string | null {
-  return ticker.marketStatus
-    ? `${ticker.marketStatus}:${ticker.assetPriceSnapshotId ?? 'unavailable'}`
-    : ticker.assetPriceSnapshotId;
+  return `${ticker.marketStatus ?? ''}:${ticker.assetPriceSnapshotId ?? 'unavailable'}:${ticker.changeRate ?? 'unavailable'}`;
 }

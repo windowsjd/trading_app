@@ -158,6 +158,7 @@ function createHomeHarness(mode = 'general') {
       },
       '../../features/wallet/api': { getCurrentFxRate: () => {} },
       '../../features/asset/useStaleRecheck': { useStaleRecheck: () => {} },
+      '../../features/wallet/useFxRateUpdates': { useFxRateUpdates: () => {} },
       '../../components/states/BlockedState': { default: 'BlockedState', __esModule: true },
       '../../components/states/AdminDiagnosticPanel': { default: 'AdminDiagnosticPanel', __esModule: true },
       '../../components/tradingAccount/PreviewAmounts': { default: 'PreviewAmounts', __esModule: true },
