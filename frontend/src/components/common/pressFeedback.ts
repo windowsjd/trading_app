@@ -1,3 +1,10 @@
+export const RIPPLE_EXPAND_DURATION_MS = 330;
+export const RIPPLE_FADE_DURATION_MS = 180;
+export const PRESS_IN_SCALE = 0.99;
+export const PRESS_IN_DURATION_MS = 90;
+export const PRESS_OUT_DURATION_MS = 150;
+export const WASH_FADE_DURATION_MS = 140;
+
 /** Page coordinates avoid a nested Text/View becoming the ripple origin. */
 export function getRippleGeometry(
   pageX: number | undefined,

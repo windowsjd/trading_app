@@ -4,7 +4,15 @@ import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import ts from 'typescript';
-import { getFeedbackPalette, getRippleGeometry } from './pressFeedback.ts';
+import {
+  getFeedbackPalette,
+  getRippleGeometry,
+  PRESS_IN_DURATION_MS,
+  PRESS_IN_SCALE,
+  PRESS_OUT_DURATION_MS,
+  RIPPLE_EXPAND_DURATION_MS,
+  RIPPLE_FADE_DURATION_MS,
+} from './pressFeedback.ts';
 
 const require = createRequire(import.meta.url);
 const { load, elements } = require('../../../test/ledgerTestHarness.cjs');
@@ -23,14 +31,23 @@ describe('general ripple interaction', () => {
       const h = interactionHarness(platform);
       const calls: string[] = [];
       const onPress = () => calls.push('press');
-      const style = { backgroundColor: '#111', borderRadius: 12, padding: 14, shadowOpacity: 0.2, elevation: 4 };
+      const style = {
+        backgroundColor: '#111', borderRadius: 12, padding: 14,
+        shadowOpacity: 0.2, elevation: 4, transform: [{ translateX: 2 }],
+      };
       const renderer = h.render(React.createElement(h.ActionPressable, {
         style, onPress, onPressIn: () => calls.push('in'), onPressOut: () => calls.push('out'),
         testID: 'action', accessibilityRole: 'button', accessibilityLabel: '실행',
       }, React.createElement('Text', null, '실행')));
       t.after(() => act(() => renderer.unmount()));
       const button = renderer.root.findByType('Pressable');
-      assert.strictEqual(button.props.style, style, 'root layout, shadow and opacity are untouched');
+      const rootStyle = flatten(button.props.style);
+      const pressScale = rootStyle.transform.at(-1).scale;
+      assert.equal(rootStyle.padding, 14, 'root layout is untouched');
+      assert.equal(rootStyle.shadowOpacity, 0.2, 'root shadow is untouched');
+      assert.equal(rootStyle.elevation, 4);
+      assert.deepEqual(rootStyle.transform[0], { translateX: 2 });
+      assert.equal(pressScale.value, 1);
       assert.strictEqual(button.props.onPress, onPress);
       assert.equal(button.props.testID, 'action');
       assert.equal(button.props.accessibilityLabel, '실행');
@@ -50,18 +67,52 @@ describe('general ripple interaction', () => {
       assert.equal((style as any).opacity, undefined);
       assert.equal((style as any).overflow, undefined);
       assert.equal(clip.props.accessibilityElementsHidden, true);
-      assert.equal(h.animations[0].options.toValue, 1);
-      assert.equal(h.animations[0].options.useNativeDriver, platform !== 'web');
-      assert.equal(h.animations[0].options.isInteraction, false);
+      const pressInAnimation = h.animations.find(
+        (animation: any) => animation.value === pressScale,
+      );
+      const expansion = h.animations.find(
+        (animation: any) => animation.value === ripple.transform[0].scale,
+      );
+      assert.equal(pressInAnimation.options.toValue, PRESS_IN_SCALE);
+      assert.equal(pressInAnimation.options.duration, PRESS_IN_DURATION_MS);
+      assert.equal(expansion.options.toValue, 1);
+      assert.equal(expansion.options.duration, RIPPLE_EXPAND_DURATION_MS);
+      assert.ok(expansion.options.duration > 240);
+      assert.equal(expansion.options.useNativeDriver, platform !== 'web');
+      assert.equal(expansion.options.isInteraction, false);
+      act(() => pressInAnimation.finish());
+      assert.equal(pressScale.value, PRESS_IN_SCALE);
       assert.deepEqual(calls, ['in']);
       button.props.onPress();
       assert.deepEqual(calls, ['in', 'press'], 'onPress runs once before animation completion');
       act(() => button.props.onPressOut(event));
       assert.deepEqual(calls, ['in', 'press', 'out']);
+      const release = h.animations.find(
+        (animation: any) =>
+          animation.value === pressScale && animation.options.toValue === 1,
+      );
+      assert.equal(release.options.duration, PRESS_OUT_DURATION_MS);
+      assert.equal(
+        h.animations.some(
+          (animation: any) =>
+            animation.value === ripple.opacity && animation.options.toValue === 0,
+        ),
+        false,
+        'quick release does not fade before expansion completes',
+      );
+      act(() => expansion.finish());
+      const fade = h.animations.find(
+        (animation: any) =>
+          animation.value === ripple.opacity && animation.options.toValue === 0,
+      );
+      assert.equal(fade.options.duration, RIPPLE_FADE_DURATION_MS);
+      assert.ok(circle(renderer), 'completed expansion remains visible while fading');
+      act(() => release.finish());
+      assert.equal(pressScale.value, 1);
       h.finish();
       assert.equal(circle(renderer), undefined);
       assert.equal(wash(renderer).opacity.value.value, 0);
-      assert.strictEqual(button.props.style, style);
+      assert.equal(flatten(button.props.style).padding, 14);
     });
   }
 
@@ -122,11 +173,24 @@ describe('general ripple interaction', () => {
     act(() => h.measures.shift()(...h.bounds));
     h.finish();
     assert.equal(circle(renderer), undefined);
+    assert.equal(
+      flatten(button().props.style).transform.at(-1).scale.value,
+      1,
+      'cancel restores the root scale',
+    );
     assert.equal(calls, 0, 'cancel is not an action');
     h.delayedMeasure = false;
     act(() => button().props.onPressIn(event));
     act(() => button().props.onPressOut(event));
-    const oldFade = h.animations.at(-1);
+    const oldRipple = circle(renderer).props.style;
+    const oldExpansion = h.animations.findLast(
+      (animation: any) => animation.value === oldRipple.transform[0].scale,
+    );
+    act(() => oldExpansion.finish());
+    const oldFade = h.animations.findLast(
+      (animation: any) =>
+        animation.value === oldRipple.opacity && animation.options.toValue === 0,
+    );
     act(() => button().props.onPressIn({ nativeEvent: { pageX: 180, pageY: 220 } }));
     act(() => oldFade.callback({ finished: true }));
     assert.ok(circle(renderer), 'old release cannot remove a new ripple');
@@ -136,6 +200,23 @@ describe('general ripple interaction', () => {
     act(() => renderer.update(React.createElement(h.ActionPressable, { ...props, disabled: true })));
     act(() => h.measures.shift()(...h.bounds));
     assert.equal(renderer.root.findAllByType('AnimatedView').length, 0);
+    assert.equal(flatten(button().props.style).transform.at(-1).scale.value, 1);
+  });
+
+  it('invalidates measurement and animation callbacks when navigation unmounts the action', () => {
+    const h = interactionHarness();
+    h.delayedMeasure = true;
+    const renderer = h.render(
+      React.createElement(h.ActionPressable, { onPress: () => {} }),
+    );
+    const button = renderer.root.findByType('Pressable');
+    act(() => button.props.onPressIn(event));
+    const lateMeasure = h.measures.shift();
+
+    act(() => renderer.unmount());
+
+    assert.doesNotThrow(() => act(() => lateMeasure(...h.bounds)));
+    assert.doesNotThrow(() => h.finish());
   });
 
   it('never makes a quick tap wait for measurement, and never revives a finished ripple', (t) => {
@@ -150,7 +231,21 @@ describe('general ripple interaction', () => {
     button.props.onPress();
     assert.equal(calls, 1);
     act(() => h.measures.shift()(...h.bounds));
-    assert.ok(circle(renderer), 'a fast tap still gets the remaining ripple fade');
+    const ripple = circle(renderer).props.style;
+    const expansion = h.animations.find(
+      (animation: any) => animation.value === ripple.transform[0].scale,
+    );
+    assert.ok(circle(renderer), 'a fast tap still gets its ripple expansion');
+    assert.equal(
+      h.animations.some(
+        (animation: any) =>
+          animation.value === ripple.opacity && animation.options.toValue === 0,
+      ),
+      false,
+      'pressOut does not immediately remove a quick-tap ripple',
+    );
+    act(() => expansion.finish());
+    assert.ok(circle(renderer), 'ripple fades only after expansion');
     h.finish();
     assert.equal(circle(renderer), undefined);
     act(() => button.props.onPressIn(event));

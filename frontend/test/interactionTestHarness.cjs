@@ -34,7 +34,7 @@ function interactionHarness(platform = 'android') {
       return (0xff000000 | parseInt(hex.length === 3 ? [...hex].map((c) => c + c).join('') : hex, 16)) >>> 0;
     },
     useWindowDimensions: () => h.dimensions,
-    Animated: { Value, View: 'AnimatedView', timing: (value, options) => {
+    Animated: { Value, View: 'AnimatedView', createAnimatedComponent: (Component) => Component, timing: (value, options) => {
       const animation = {
         value, options,
         start: (callback) => { value.stopAnimation(); value.animation = animation; animation.callback = callback; h.animations.push(animation); },
@@ -55,7 +55,11 @@ function interactionHarness(platform = 'android') {
     } : null }); });
     return renderer;
   };
-  h.finish = () => act(() => h.animations.slice().forEach((a) => a.finish()));
+  h.finish = () => act(() => {
+    for (let index = 0; index < h.animations.length; index++) {
+      h.animations[index].finish();
+    }
+  });
   return h;
 }
 
