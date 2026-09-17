@@ -1,12 +1,11 @@
 import React from 'react';
 import {
-  Pressable,
   Text,
   ActivityIndicator,
   StyleSheet,
   ViewStyle,
 } from 'react-native';
-import { withPressedFeedback } from './pressFeedback';
+import ActionPressable from './ActionPressable';
 
 type CTAState = 'enabled' | 'disabled' | 'loading' | 'blocked';
 
@@ -28,14 +27,14 @@ export default function CTAButton({
   const disabled = state === 'disabled' || state === 'loading' || state === 'blocked';
 
   return (
-    <Pressable
+    <ActionPressable
       testID={testID}
-      style={withPressedFeedback([
+      style={[
         styles.button,
         state === 'blocked' && styles.blocked,
         state === 'disabled' && styles.disabled,
         style,
-      ], disabled || !onPress)}
+      ]}
       onPress={onPress}
       disabled={disabled}
     >
@@ -44,7 +43,7 @@ export default function CTAButton({
       ) : (
         <Text style={styles.text}>{label}</Text>
       )}
-    </Pressable>
+    </ActionPressable>
   );
 }
 

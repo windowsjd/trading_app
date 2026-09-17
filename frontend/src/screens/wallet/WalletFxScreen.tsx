@@ -6,11 +6,10 @@ import {
   SafeAreaView,
   ScrollView,
   TextInput,
-  Pressable,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { withPressedFeedback } from '../../components/common/pressFeedback';
+import ActionPressable from '../../components/common/ActionPressable';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { WalletFxScreenProps } from '../../app/navigation/types';
@@ -508,13 +507,13 @@ export default function WalletFxScreen({ navigation }: Props) {
           <Text style={styles.label}>환전 방향</Text>
 
           <View style={styles.row}>
-            <Pressable
+            <ActionPressable
               testID={TEST_IDS.walletFx.directionKrwUsd}
               disabled={pending}
-              style={withPressedFeedback([
+              style={[
                 styles.directionChip,
                 fromCurrency === 'KRW' && styles.directionChipActive,
-              ], pending)}
+              ]}
               onPress={() => {
                 if (submitLockRef.current) return;
                 setFromCurrency('KRW');
@@ -530,15 +529,15 @@ export default function WalletFxScreen({ navigation }: Props) {
               >
                 KRW → USD
               </Text>
-            </Pressable>
+            </ActionPressable>
 
-            <Pressable
+            <ActionPressable
               testID={TEST_IDS.walletFx.directionUsdKrw}
               disabled={pending}
-              style={withPressedFeedback([
+              style={[
                 styles.directionChip,
                 fromCurrency === 'USD' && styles.directionChipActive,
-              ], pending)}
+              ]}
               onPress={() => {
                 if (submitLockRef.current) return;
                 setFromCurrency('USD');
@@ -554,7 +553,7 @@ export default function WalletFxScreen({ navigation }: Props) {
               >
                 USD → KRW
               </Text>
-            </Pressable>
+            </ActionPressable>
           </View>
 
           <TextInput

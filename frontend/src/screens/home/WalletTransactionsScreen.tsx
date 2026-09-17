@@ -5,10 +5,9 @@ import {
   StyleSheet,
   SafeAreaView,
   FlatList,
-  Pressable,
   ActivityIndicator,
 } from 'react-native';
-import { withPressedFeedback } from '../../components/common/pressFeedback';
+import ActionPressable from '../../components/common/ActionPressable';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
 import type { WalletTransactionsScreenProps } from '../../app/navigation/types';
@@ -285,16 +284,16 @@ function FilterChip({
   onPress: () => void;
 }) {
   return (
-    <Pressable
+    <ActionPressable
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
-      style={withPressedFeedback([styles.chip, active && styles.chipActive])}
+      style={[styles.chip, active && styles.chipActive]}
       onPress={onPress}
     >
       <Text style={active ? styles.chipTextActive : styles.chipText}>
         {label}
       </Text>
-    </Pressable>
+    </ActionPressable>
   );
 }
 

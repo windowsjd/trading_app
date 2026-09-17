@@ -121,8 +121,9 @@ describe('asset detail screen wiring', () => {
     );
   });
 
-  it('keeps the timeframe tabs driving the request windows', () => {
-    assert.ok(screenSource.includes('ASSET_CHART_TIMEFRAMES.map'));
+  it('keeps the timeframe selector driving the request windows', () => {
+    assert.ok(screenSource.includes('<ChartTimeframeSelector'));
+    assert.ok(screenSource.includes('onSelect={setSelectedTimeframe}'));
     assert.ok(screenSource.includes('range: selectedTimeframe.range'));
     assert.ok(screenSource.includes('limit: selectedTimeframe.limit'));
   });

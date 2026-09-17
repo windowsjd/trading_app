@@ -4,11 +4,10 @@ import {
   Text,
   StyleSheet,
   SafeAreaView,
-  Pressable,
   FlatList,
   ActivityIndicator,
 } from 'react-native';
-import { withPressedFeedback } from '../../components/common/pressFeedback';
+import ActionPressable from '../../components/common/ActionPressable';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import type { PortfolioScreenProps } from '../../app/navigation/types';
@@ -409,10 +408,10 @@ export default function PortfolioScreen({ navigation }: Props) {
                   {RANGE_TABS.map((tab) => {
                     const active = tab.key === range;
                     return (
-                      <Pressable
+                      <ActionPressable
                         key={tab.key}
                         testID={TEST_IDS.portfolio.equityRange(tab.key)}
-                        style={withPressedFeedback([styles.chip, active && styles.chipActive])}
+                        style={[styles.chip, active && styles.chipActive]}
                         onPress={() => setRange(tab.key)}
                       >
                         <Text
@@ -422,7 +421,7 @@ export default function PortfolioScreen({ navigation }: Props) {
                         >
                           {tab.label}
                         </Text>
-                      </Pressable>
+                      </ActionPressable>
                     );
                   })}
                 </View>
@@ -460,10 +459,10 @@ export default function PortfolioScreen({ navigation }: Props) {
                 {POSITION_TABS.map((tab) => {
                   const active = tab.key === assetType;
                   return (
-                    <Pressable
+                    <ActionPressable
                       key={tab.key}
                       testID={TEST_IDS.portfolio.assetTab(tab.key)}
-                      style={withPressedFeedback([styles.chip, active && styles.chipActive])}
+                      style={[styles.chip, active && styles.chipActive]}
                       onPress={() => setAssetType(tab.key)}
                     >
                       <Text
@@ -471,7 +470,7 @@ export default function PortfolioScreen({ navigation }: Props) {
                       >
                         {tab.label}
                       </Text>
-                    </Pressable>
+                    </ActionPressable>
                   );
                 })}
               </View>
@@ -503,9 +502,9 @@ export default function PortfolioScreen({ navigation }: Props) {
         renderItem={({ item }) => {
           const nameDisplay = getAssetNameDisplay(item);
           return (
-            <Pressable
+            <ActionPressable
               testID={TEST_IDS.portfolio.positionItem(item.assetId)}
-              style={withPressedFeedback(styles.positionRow)}
+              style={styles.positionRow}
               onPress={() =>
                 rootNavigation.navigate('MainTabs', {
                   screen: 'MarketTab',
@@ -542,7 +541,7 @@ export default function PortfolioScreen({ navigation }: Props) {
                   </Text>
                 ) : null}
               </View>
-            </Pressable>
+            </ActionPressable>
           );
         }}
         ListFooterComponent={

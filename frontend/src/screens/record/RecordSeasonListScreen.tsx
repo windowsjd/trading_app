@@ -5,9 +5,8 @@ import {
   StyleSheet,
   SafeAreaView,
   FlatList,
-  Pressable,
 } from 'react-native';
-import { withPressedFeedback } from '../../components/common/pressFeedback';
+import ActionPressable from '../../components/common/ActionPressable';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import type { RecordSeasonListScreenProps } from '../../app/navigation/types';
@@ -163,9 +162,9 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
           </View>
         }
         renderItem={({ item }) => (
-          <Pressable
+          <ActionPressable
             testID={TEST_IDS.record.seasonItem(item.seasonId)}
-            style={withPressedFeedback(styles.rowCard)}
+            style={styles.rowCard}
             onPress={() =>
               navigation.navigate('RecordSeasonDetail', {
                 seasonId: item.seasonId,
@@ -186,7 +185,7 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
               <Text style={styles.helper}>{displayValue(item.finalTier ?? item.tier)}</Text>
               <Text style={styles.itemTitle}>{formatPercent(getReturnRate(item))}%</Text>
             </View>
-          </Pressable>
+          </ActionPressable>
         )}
         ListFooterComponent={
           recordsQuery.isFetchingNextPage ? (

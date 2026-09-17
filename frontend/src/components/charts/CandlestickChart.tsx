@@ -2,13 +2,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   LayoutChangeEvent,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from 'react-native';
-import { withPressedFeedback } from '../common/pressFeedback';
+import ActionPressable from '../common/ActionPressable';
 
 import {
   getCandlestickChartHeight,
@@ -476,14 +475,14 @@ export default function CandlestickChart({
           default density. Hidden while already there, and a SIBLING of the
           `accessible` chart box so screen readers can still reach it. */}
       {canResetViewport ? (
-        <Pressable
-          style={withPressedFeedback(styles.resetButton)}
+        <ActionPressable
+          style={styles.resetButton}
           onPress={resetToLatest}
           accessibilityRole="button"
           accessibilityLabel="차트를 최신 구간으로 초기화"
         >
           <Text style={styles.resetText}>최신</Text>
-        </Pressable>
+        </ActionPressable>
       ) : null}
     </View>
   );

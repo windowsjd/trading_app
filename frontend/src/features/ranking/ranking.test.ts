@@ -39,7 +39,8 @@ function createHarness() {
   mocks.set('react-native', {
     ...native,
     Pressable: (props: any) => {
-      presses.push(props);
+      // Label lookups inspect the resting content, including render-prop layers.
+      presses.push({ ...props, children: typeof props.children === 'function' ? props.children({ pressed: false }) : props.children });
       return React.createElement(native.Pressable, props);
     },
     FlatList: (props: any) => {

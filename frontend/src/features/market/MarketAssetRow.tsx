@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { withPressedFeedback } from '../../components/common/pressFeedback';
+import { View, Text, StyleSheet } from 'react-native';
+import ActionPressable from '../../components/common/ActionPressable';
 
 import { TEST_IDS } from '../../constants/testIds';
 import {
@@ -51,9 +51,9 @@ function MarketAssetRowComponent({ item, ticker, isStale, onPress }: Props) {
   const symbolMarketDisplay = getAssetSymbolMarketDisplay(displayItem);
 
   return (
-    <Pressable
+    <ActionPressable
       testID={TEST_IDS.market.item(item.id)}
-      style={withPressedFeedback(styles.itemRow)}
+      style={styles.itemRow}
       onPress={() => onPress(item.id)}
     >
       <View>
@@ -73,7 +73,7 @@ function MarketAssetRowComponent({ item, ticker, isStale, onPress }: Props) {
           {displayItem.tradable ? '거래 가능' : '거래 제한'}
         </Text>
       </View>
-    </Pressable>
+    </ActionPressable>
   );
 }
 

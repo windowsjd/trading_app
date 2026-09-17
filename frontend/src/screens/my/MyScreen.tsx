@@ -4,9 +4,8 @@ import {
   Text,
   StyleSheet,
   SafeAreaView,
-  Pressable,
 } from 'react-native';
-import { withPressedFeedback } from '../../components/common/pressFeedback';
+import ActionPressable from '../../components/common/ActionPressable';
 import { useQuery } from '@tanstack/react-query';
 
 import type { MyScreenProps } from '../../app/navigation/types';
@@ -197,29 +196,29 @@ export default function MyScreen({ navigation }: Props) {
         </View>
 
         <View style={styles.card}>
-          <Pressable
+          <ActionPressable
             testID={TEST_IDS.my.rewardMenu}
-            style={withPressedFeedback(styles.menuRow)}
+            style={styles.menuRow}
             onPress={() => navigation.navigate('Reward')}
           >
             <Text style={styles.menuText}>내 보상 / 뱃지</Text>
-          </Pressable>
+          </ActionPressable>
 
-          <Pressable
+          <ActionPressable
             testID={TEST_IDS.my.settingsMenu}
-            style={withPressedFeedback(styles.menuRow)}
+            style={styles.menuRow}
             onPress={() => navigation.navigate('Settings')}
           >
             <Text style={styles.menuText}>설정</Text>
-          </Pressable>
+          </ActionPressable>
 
-          <Pressable
+          <ActionPressable
             testID={TEST_IDS.my.logoutMenu}
-            style={withPressedFeedback(styles.menuRow)}
+            style={styles.menuRow}
             onPress={() => void onLogout()}
           >
             <Text style={styles.logoutText}>로그아웃</Text>
-          </Pressable>
+          </ActionPressable>
         </View>
       </View>
     </SafeAreaView>

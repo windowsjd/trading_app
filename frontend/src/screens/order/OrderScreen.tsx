@@ -7,11 +7,10 @@ import {
   SafeAreaView,
   TextInput,
   ScrollView,
-  Pressable,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { withPressedFeedback } from '../../components/common/pressFeedback';
+import ActionPressable from '../../components/common/ActionPressable';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { OrderScreenProps } from '../../app/navigation/types';
@@ -1031,13 +1030,13 @@ export default function OrderScreen({ route, navigation }: Props) {
           <View style={styles.card}>
             <Text style={styles.label}>주문 방식</Text>
             <View style={styles.ratioRow}>
-              <Pressable
+              <ActionPressable
                 testID={TEST_IDS.order.typeToggleMarket}
                 disabled={buyPending}
-                style={withPressedFeedback([
+                style={[
                   styles.ratioButton,
                   orderType === 'market' && styles.typeButtonActive,
-                ], buyPending)}
+                ]}
                 onPress={() => {
                   if (buySubmitLockRef.current || orderType === 'market') return;
                   setOrderTypeState('market');
@@ -1052,14 +1051,14 @@ export default function OrderScreen({ route, navigation }: Props) {
                 >
                   시장가
                 </Text>
-              </Pressable>
-              <Pressable
+              </ActionPressable>
+              <ActionPressable
                 testID={TEST_IDS.order.typeToggleLimit}
                 disabled={buyPending}
-                style={withPressedFeedback([
+                style={[
                   styles.ratioButton,
                   orderType === 'limit' && styles.typeButtonActive,
-                ], buyPending)}
+                ]}
                 onPress={() => {
                   if (buySubmitLockRef.current || orderType === 'limit') return;
                   setOrderTypeState('limit');
@@ -1074,7 +1073,7 @@ export default function OrderScreen({ route, navigation }: Props) {
                 >
                   지정가
                 </Text>
-              </Pressable>
+              </ActionPressable>
             </View>
             {orderType === 'limit' ? (
               <>
@@ -1124,12 +1123,12 @@ export default function OrderScreen({ route, navigation }: Props) {
               const disabled = buyPending || !!ratioDisabledReason;
 
               return (
-                <Pressable
+                <ActionPressable
                   key={ratio}
-                  style={withPressedFeedback([
+                  style={[
                     styles.ratioButton,
                     disabled && styles.ratioButtonDisabled,
-                  ], disabled)}
+                  ]}
                   disabled={disabled}
                   onPress={() => applyQuantityRatio(ratio)}
                 >
@@ -1141,7 +1140,7 @@ export default function OrderScreen({ route, navigation }: Props) {
                   >
                     {getRatioLabel(ratio)}
                   </Text>
-                </Pressable>
+                </ActionPressable>
               );
             })}
           </View>
@@ -1168,8 +1167,8 @@ export default function OrderScreen({ route, navigation }: Props) {
           domainError &&
           domainError ===
             getOrderDomainErrorMessage(ERROR_CODE.INSUFFICIENT_BALANCE) ? (
-            <Pressable
-              style={withPressedFeedback(styles.retryButton)}
+            <ActionPressable
+              style={styles.retryButton}
               onPress={() =>
                 rootNavigation.navigate('MainTabs', {
                   screen: 'HomeTab',
@@ -1178,7 +1177,7 @@ export default function OrderScreen({ route, navigation }: Props) {
               }
             >
               <Text style={styles.retryText}>USD 환전하러 가기</Text>
-            </Pressable>
+            </ActionPressable>
           ) : null}
         </View>
 

@@ -4,9 +4,8 @@ import {
   Text,
   StyleSheet,
   SafeAreaView,
-  Pressable,
 } from 'react-native';
-import { withPressedFeedback } from '../../components/common/pressFeedback';
+import ActionPressable from '../../components/common/ActionPressable';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { SeasonJoinScreenProps } from '../../app/navigation/types';
@@ -369,14 +368,14 @@ export default function SeasonJoinScreen({ navigation }: Props) {
         {/* A user who owns nothing needs the other entrance visible here too:
             joining is not the only way to have an account (작업 11 §3.3). */}
         {!hasUsableAccount ? (
-          <Pressable
-            style={withPressedFeedback(styles.secondaryButton)}
+          <ActionPressable
+            style={styles.secondaryButton}
             onPress={() => setShowGeneralSetup(true)}
           >
             <Text style={styles.secondaryButtonText}>
               일반 투자 계정으로 시작하기
             </Text>
-          </Pressable>
+          </ActionPressable>
         ) : null}
       </View>
     </SafeAreaView>

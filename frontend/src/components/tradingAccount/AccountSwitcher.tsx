@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from 'react-native';
-import { withPressedFeedback } from '../common/pressFeedback';
+import ActionPressable from '../common/ActionPressable';
 import { useQuery } from '@tanstack/react-query';
 
 import BottomSheetBackdrop from '../common/BottomSheetBackdrop';
@@ -111,13 +110,13 @@ export default function AccountSwitcher({ compact = false }: Props) {
           계정 목록을 불러오지 못했습니다. 네트워크 상태를 확인한 뒤 다시
           시도해주세요.
         </Text>
-        <Pressable
-          style={withPressedFeedback(styles.retryButton)}
+        <ActionPressable
+          style={styles.retryButton}
           onPress={() => void refetchAccounts()}
           testID={TEST_IDS.tradingAccount.switcherRetry}
         >
           <Text style={styles.retryText}>다시 시도</Text>
-        </Pressable>
+        </ActionPressable>
       </View>
     );
   }
@@ -140,8 +139,8 @@ export default function AccountSwitcher({ compact = false }: Props) {
 
   return (
     <>
-      <Pressable
-        style={withPressedFeedback(styles.trigger)}
+      <ActionPressable
+        style={styles.trigger}
         onPress={() => setOpen(true)}
         accessibilityRole="button"
         accessibilityLabel={`계정 선택. 현재 ${display.title}, ${display.statusLabel}`}
@@ -168,7 +167,7 @@ export default function AccountSwitcher({ compact = false }: Props) {
           />
           <Text style={styles.chevron}>변경</Text>
         </View>
-      </Pressable>
+      </ActionPressable>
 
       <BottomSheetBackdrop visible={open} onClose={() => setOpen(false)}>
         <ScrollView
@@ -209,8 +208,8 @@ export default function AccountSwitcher({ compact = false }: Props) {
 
           {!hasGeneralAccount(accounts) ? (
             <View style={styles.startBox}>
-              <Pressable
-                style={withPressedFeedback(styles.startRow, startGeneral.isPending)}
+              <ActionPressable
+                style={styles.startRow}
                 onPress={startGeneral.start}
                 disabled={startGeneral.isPending}
                 accessibilityRole="button"
@@ -235,7 +234,7 @@ export default function AccountSwitcher({ compact = false }: Props) {
                     <Text style={styles.startAction}>시작</Text>
                   )}
                 </View>
-              </Pressable>
+              </ActionPressable>
               {startGeneral.errorMessage ? (
                 <Text
                   style={styles.startError}
@@ -266,8 +265,8 @@ function AccountRow({
   const display = getAccountDisplay(account);
 
   return (
-    <Pressable
-      style={withPressedFeedback([styles.row, selected && styles.rowSelected])}
+    <ActionPressable
+      style={[styles.row, selected && styles.rowSelected]}
       onPress={onSelect}
       accessibilityRole="button"
       accessibilityState={{ selected }}
@@ -286,7 +285,7 @@ function AccountRow({
         <StatusBadge label={display.statusLabel} tone={display.statusTone} />
         {selected ? <Text style={styles.selectedMark}>선택됨</Text> : null}
       </View>
-    </Pressable>
+    </ActionPressable>
   );
 }
 

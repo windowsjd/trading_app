@@ -9,10 +9,9 @@ import {
   SafeAreaView,
   TextInput,
   FlatList,
-  Pressable,
   ActivityIndicator,
 } from 'react-native';
-import { withPressedFeedback } from '../../components/common/pressFeedback';
+import ActionPressable from '../../components/common/ActionPressable';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -163,9 +162,9 @@ export default function MarketSearchScreen({ navigation }: Props) {
               {SEARCH_SCOPE.map((scope) => {
                 const active = scope.key === assetType;
                 return (
-                  <Pressable
+                  <ActionPressable
                     key={scope.key}
-                    style={withPressedFeedback([styles.scopeChip, active && styles.scopeChipActive])}
+                    style={[styles.scopeChip, active && styles.scopeChipActive]}
                     onPress={() => setAssetType(scope.key)}
                   >
                     <Text
@@ -177,7 +176,7 @@ export default function MarketSearchScreen({ navigation }: Props) {
                     >
                       {scope.label}
                     </Text>
-                  </Pressable>
+                  </ActionPressable>
                 );
               })}
             </View>
@@ -213,9 +212,9 @@ export default function MarketSearchScreen({ navigation }: Props) {
           const symbolMarketDisplay = getAssetSymbolMarketDisplay(item);
 
           return (
-            <Pressable
+            <ActionPressable
               testID={TEST_IDS.market.item(item.id)}
-              style={withPressedFeedback(styles.itemRow)}
+              style={styles.itemRow}
               onPress={() =>
                 navigation.navigate('AssetDetail', { assetId: item.id })
               }
@@ -235,7 +234,7 @@ export default function MarketSearchScreen({ navigation }: Props) {
                   {item.tradable ? '거래 가능' : '거래 제한'}
                 </Text>
               </View>
-            </Pressable>
+            </ActionPressable>
           );
         }}
         ListFooterComponent={

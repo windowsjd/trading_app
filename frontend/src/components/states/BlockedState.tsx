@@ -3,10 +3,9 @@ import {
   SafeAreaView,
   ScrollView,
   Text,
-  Pressable,
   StyleSheet,
 } from 'react-native';
-import { withPressedFeedback } from '../common/pressFeedback';
+import ActionPressable from '../common/ActionPressable';
 
 interface BlockedStateProps {
   title?: string;
@@ -28,9 +27,9 @@ export default function BlockedState({
         <Text style={styles.message}>{message}</Text>
 
         {actionLabel && onAction ? (
-          <Pressable style={withPressedFeedback(styles.button)} onPress={onAction}>
+          <ActionPressable style={styles.button} onPress={onAction}>
             <Text style={styles.buttonText}>{actionLabel}</Text>
-          </Pressable>
+          </ActionPressable>
         ) : null}
       </ScrollView>
     </SafeAreaView>

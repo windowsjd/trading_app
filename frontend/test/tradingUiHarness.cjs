@@ -70,7 +70,7 @@ function createTradingUiHarness(screenName) {
         h.queries.push(options);
         const [scope, resource] = options.queryKey;
         const base = { refetch: () => {}, isLoading: false, isError: false };
-        if (scope === 'asset') return { ...base, data: resource === 'detail' ? { asset: h.asset } : { candles: [] } };
+        if (scope === 'asset') return { ...base, data: resource === 'detail' ? { asset: h.asset } : { candles: h.candles ?? [] } };
         if (resource === 'positions') return { ...base, ...h.positionQuery };
         if (resource === 'fx-rate') return { ...base, ...h.rateQuery };
         if (resource === 'detail') return { ...base, data: { feePolicy: { fxFeeRate: '0.001', tradeFeeRate: '0.001' } } };
@@ -97,10 +97,11 @@ function createTradingUiHarness(screenName) {
     '../../features/asset/api': { ...timeframes },
     '../../features/wallet/api': {},
     '../../features/asset/useAssetTicker': { useAssetTicker: () => ({ latestTicker: h.ticker, isStale: h.tickerStale }) },
-    '../../features/asset/useAssetCandle': { useAssetCandle: () => ({}) },
+    '../../features/asset/useAssetCandle': { useAssetCandle: (options) => { h.liveCandleOptions = options; return {}; } },
     '../../features/asset/useStaleRecheck': { useStaleRecheck: () => {} },
     '../../features/wallet/useFxRateUpdates': { useFxRateUpdates: () => {} },
     '../../components/charts': { CandlestickChart: 'CandlestickChart' },
+    '../../components/charts/ChartTimeframeSelector': { default: 'ChartTimeframeSelector', __esModule: true },
     ...Object.fromEntries(['FullPageLoading', 'ErrorState', 'InlineEmptyState', 'SectionSkeleton',
       'BlockedState', 'AdminDiagnosticPanel'].map(name => ['../../components/states/' + name, { default: name, __esModule: true }])),
     ...Object.fromEntries(['AccountSwitcher', 'PreviewAmounts'].map(name => ['../../components/tradingAccount/' + name, { default: name, __esModule: true }])),

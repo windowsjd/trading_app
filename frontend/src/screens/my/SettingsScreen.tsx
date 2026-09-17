@@ -5,10 +5,9 @@ import {
   StyleSheet,
   SafeAreaView,
   TextInput,
-  Pressable,
   Alert,
 } from 'react-native';
-import { withPressedFeedback } from '../../components/common/pressFeedback';
+import ActionPressable from '../../components/common/ActionPressable';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -96,29 +95,29 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
             placeholder="닉네임 입력"
           />
 
-          <Pressable
+          <ActionPressable
             testID={TEST_IDS.settings.saveNickname}
-            style={withPressedFeedback(styles.primaryButton, updateMutation.isPending)}
+            style={styles.primaryButton}
             onPress={onSaveNickname}
             disabled={updateMutation.isPending}
           >
             <Text style={styles.primaryButtonText}>
               {updateMutation.isPending ? '저장 중...' : '저장'}
             </Text>
-          </Pressable>
+          </ActionPressable>
         </View>
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>알림 설정</Text>
 
-          <Pressable
-            style={withPressedFeedback(styles.menuRow)}
+          <ActionPressable
+            style={styles.menuRow}
             onPress={() => setNotificationEnabled((prev) => !prev)}
           >
             <Text style={styles.menuText}>
               {notificationEnabled ? '알림 켜짐' : '알림 꺼짐'}
             </Text>
-          </Pressable>
+          </ActionPressable>
 
           <Text style={styles.helper}>
             현재 문서 기준으로 서버 연동 알림 설정 API는 아직 명시되지 않았습니다.
@@ -130,13 +129,13 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
           <Text style={styles.helper}>앱 버전 0.1.0</Text>
         </View>
 
-        <Pressable
+        <ActionPressable
           testID={TEST_IDS.settings.logout}
-          style={withPressedFeedback(styles.logoutButton)}
+          style={styles.logoutButton}
           onPress={() => void onLogout()}
         >
           <Text style={styles.logoutText}>로그아웃</Text>
-        </Pressable>
+        </ActionPressable>
       </View>
     </SafeAreaView>
   );

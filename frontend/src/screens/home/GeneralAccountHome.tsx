@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { withPressedFeedback } from '../../components/common/pressFeedback';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import ActionPressable from '../../components/common/ActionPressable';
 import { useQuery } from '@tanstack/react-query';
 
 import { QUERY_KEYS } from '../../constants/queryKeys';
@@ -266,12 +266,12 @@ export default function GeneralAccountHome({
             <Text style={styles.helper}>
               USD {usdBalance === null ? '-' : formatUsd(usdBalance)}
             </Text>
-            <Pressable style={withPressedFeedback(styles.retryButton)} onPress={onOpenLedger}>
+            <ActionPressable style={styles.retryButton} onPress={onOpenLedger}>
               <Text style={styles.retryText}>원장 보기</Text>
-            </Pressable>
-            <Pressable style={withPressedFeedback(styles.retryButton)} onPress={onOpenOrders}>
+            </ActionPressable>
+            <ActionPressable style={styles.retryButton} onPress={onOpenOrders}>
               <Text style={styles.retryText}>주문 내역 보기</Text>
-            </Pressable>
+            </ActionPressable>
           </>
         )}
       </View>

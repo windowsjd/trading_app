@@ -4,11 +4,10 @@ import {
   Text,
   StyleSheet,
   SafeAreaView,
-  Pressable,
   FlatList,
   ActivityIndicator,
 } from 'react-native';
-import { withPressedFeedback } from '../../components/common/pressFeedback';
+import ActionPressable from '../../components/common/ActionPressable';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { RankingScreenProps } from '../../app/navigation/types';
@@ -296,9 +295,9 @@ export default function RankingScreen({ navigation }: Props) {
                 <Text style={styles.label}>상위 랭커</Text>
                 <View style={styles.topRow}>
                   {top3.map((item) => (
-                    <Pressable
+                    <ActionPressable
                       key={getRankingItemKey(item)}
-                      style={withPressedFeedback(styles.topCard)}
+                      style={styles.topCard}
                       onPress={() =>
                         navigation.navigate('UserSeasonSummary', {
                           userId: item.userId,
@@ -308,7 +307,7 @@ export default function RankingScreen({ navigation }: Props) {
                       <Text style={styles.topRank}>#{item.rank}</Text>
                       <Text style={styles.topName}>{item.nickname}</Text>
                       <Text style={styles.helper}>{formatPercent(item.returnRate)}%</Text>
-                    </Pressable>
+                    </ActionPressable>
                   ))}
                 </View>
               </View>
@@ -325,16 +324,16 @@ export default function RankingScreen({ navigation }: Props) {
                     : TEST_IDS.ranking.tabTop10;
 
                 return (
-                  <Pressable
+                  <ActionPressable
                     key={tab.key}
                     testID={testID}
-                    style={withPressedFeedback([styles.tabButton, active && styles.tabButtonActive])}
+                    style={[styles.tabButton, active && styles.tabButtonActive]}
                     onPress={() => setSelectedTab(tab.key)}
                   >
                     <Text style={active ? styles.tabTextActive : styles.tabText}>
                       {tab.label}
                     </Text>
-                  </Pressable>
+                  </ActionPressable>
                 );
               })}
             </View>
@@ -425,9 +424,9 @@ function RankingRow({
   onPress: () => void;
 }) {
   return (
-    <Pressable
+    <ActionPressable
       testID={TEST_IDS.ranking.item(item.userId)}
-      style={withPressedFeedback(styles.rankRow)}
+      style={styles.rankRow}
       onPress={onPress}
     >
       <View style={styles.rankLeft}>
@@ -443,7 +442,7 @@ function RankingRow({
         <Text style={styles.value}>{formatPercent(item.returnRate)}%</Text>
         <Text style={styles.helper}>{formatKrw(item.totalAssetKrw)}원</Text>
       </View>
-    </Pressable>
+    </ActionPressable>
   );
 }
 

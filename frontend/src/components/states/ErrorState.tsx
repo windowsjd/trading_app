@@ -3,10 +3,9 @@ import {
   SafeAreaView,
   ScrollView,
   Text,
-  Pressable,
   StyleSheet,
 } from 'react-native';
-import { withPressedFeedback } from '../common/pressFeedback';
+import ActionPressable from '../common/ActionPressable';
 import AdminDiagnosticPanel from './AdminDiagnosticPanel';
 
 interface ErrorStateProps {
@@ -32,9 +31,9 @@ export default function ErrorState({
         <AdminDiagnosticPanel error={diagnosticError} />
 
         {onRetry ? (
-          <Pressable style={withPressedFeedback(styles.button)} onPress={onRetry}>
+          <ActionPressable style={styles.button} onPress={onRetry}>
             <Text style={styles.buttonText}>{actionLabel}</Text>
-          </Pressable>
+          </ActionPressable>
         ) : null}
       </ScrollView>
     </SafeAreaView>

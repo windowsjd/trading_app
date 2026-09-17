@@ -65,9 +65,9 @@ describe('home exchange shortcut', () => {
       assert.equal(tree.type, 'ScrollView');
       assert.ok(tree.props.children.includes(action));
       const button = h.renderCta(action);
-      const style = Object.assign({}, ...button.props.style({ pressed: false }).filter(Boolean));
-      const pressedStyle = Object.assign({}, ...button.props.style({ pressed: true }).flat().filter(Boolean));
-      assert.deepEqual(pressedStyle, { ...style, opacity: 0.76 });
+      const style = Object.assign({}, ...button.props.style.filter(Boolean));
+      // ActionPressable animates only its internal layers (tested separately).
+      assert.equal(style.opacity, undefined);
       const label = elements(button, 'Text')[0];
       assert.equal(texts(button), '환전하기');
       for (const key of ['width', 'height', 'maxWidth', 'maxHeight', 'flex']) {

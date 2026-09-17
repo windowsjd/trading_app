@@ -86,7 +86,7 @@ describe('chart controls: zoom UI is gone', () => {
       ),
       'reset also clears the crosshair',
     );
-    const pressableCount = (chartSource.match(/<Pressable/g) ?? []).length;
+    const pressableCount = (chartSource.match(/<ActionPressable/g) ?? []).length;
     assert.equal(pressableCount, 1, 'the reset button is the only chart button');
   });
 
@@ -131,8 +131,10 @@ describe('existing behaviour that must not regress', () => {
     assert.ok(!detailScreenSource.includes('horizontal'), 'no horizontal scroll view');
   });
 
-  it('keeps the timeframe tabs and their viewport reset key', () => {
-    assert.ok(detailScreenSource.includes('ASSET_CHART_TIMEFRAMES.map'));
+  it('keeps the timeframe selector and its viewport reset key', () => {
+    assert.ok(detailScreenSource.includes('<ChartTimeframeSelector'));
+    assert.ok(detailScreenSource.includes('onSelect={setSelectedTimeframe}'));
+    assert.ok(!detailScreenSource.includes('ASSET_CHART_TIMEFRAMES.map'));
     assert.ok(
       detailScreenSource.includes(
         'viewportResetKey={`${assetId}:${selectedTimeframe.interval}`}',

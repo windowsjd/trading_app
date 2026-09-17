@@ -3,11 +3,10 @@ import {
   View,
   Text,
   TextInput,
-  Pressable,
   StyleSheet,
   SafeAreaView,
 } from 'react-native';
-import { withPressedFeedback } from '../../components/common/pressFeedback';
+import ActionPressable from '../../components/common/ActionPressable';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import type { LoginScreenProps } from '../../app/navigation/types';
@@ -182,23 +181,23 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           <Text style={styles.errorText}>{submitError}</Text>
         ) : null}
 
-        <Pressable
+        <ActionPressable
           testID={TEST_IDS.auth.loginSubmit}
-          style={withPressedFeedback(styles.primaryButton, loginMutation.isPending)}
+          style={styles.primaryButton}
           onPress={onSubmit}
           disabled={loginMutation.isPending}
         >
           <Text style={styles.primaryButtonText}>
             {loginMutation.isPending ? '로그인 중...' : '로그인'}
           </Text>
-        </Pressable>
+        </ActionPressable>
 
-        <Pressable
-          style={withPressedFeedback(styles.secondaryButton)}
+        <ActionPressable
+          style={styles.secondaryButton}
           onPress={() => navigation.navigate('Signup')}
         >
           <Text style={styles.secondaryButtonText}>회원가입</Text>
-        </Pressable>
+        </ActionPressable>
       </View>
     </SafeAreaView>
   );

@@ -7,15 +7,13 @@ import {
   StyleSheet,
   SafeAreaView,
   ScrollView,
-  Pressable,
 } from "react-native";
-import { withPressedFeedback } from '../../components/common/pressFeedback';
+import ActionPressable from '../../components/common/ActionPressable';
 import { useQuery } from "@tanstack/react-query";
 
 import type { AssetDetailScreenProps } from "../../app/navigation/types";
 import { useRootNavigation } from "../../app/navigation/navigationHooks";
 import {
-  ASSET_CHART_TIMEFRAMES,
   DEFAULT_ASSET_CHART_TIMEFRAME,
   getAssetCandles,
   getAssetDetail,
@@ -58,6 +56,7 @@ import SectionSkeleton from "../../components/states/SectionSkeleton";
 import CTAButton from "../../components/common/CTAButton";
 import AdminDiagnosticPanel from "../../components/states/AdminDiagnosticPanel";
 import { CandlestickChart } from "../../components/charts";
+import ChartTimeframeSelector from "../../components/charts/ChartTimeframeSelector";
 
 type Props = AssetDetailScreenProps;
 
@@ -338,12 +337,12 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
               <Text style={styles.inlineWarningText}>{buyBlockedReason}</Text>
               {capabilities?.isSeason &&
                 isSeasonNotActiveReason(capabilities.tradeBlockReason) ? (
-                <Pressable
-                  style={withPressedFeedback(styles.retryButton)}
+                <ActionPressable
+                  style={styles.retryButton}
                   onPress={() => rootNavigation.navigate("SeasonJoin")}
                 >
                   <Text style={styles.retryText}>시즌 안내 보기</Text>
-                </Pressable>
+                </ActionPressable>
               ) : null}
             </View>
           ) : null}
@@ -394,12 +393,12 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
                 title="보유 내역을 안전하게 표시할 수 없습니다."
                 message={positionIntegrityMessage}
               />
-              <Pressable
-                style={withPressedFeedback(styles.retryButton)}
+              <ActionPressable
+                style={styles.retryButton}
                 onPress={() => void positionQuery.refetch()}
               >
                 <Text style={styles.retryText}>포지션 다시 시도</Text>
-              </Pressable>
+              </ActionPressable>
               <AdminDiagnosticPanel error={positionQuery.error} />
             </>
           ) : positionQuery.isError ? (
@@ -408,12 +407,12 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
                 title="포지션을 불러오지 못했습니다."
                 message="자산 정보는 계속 볼 수 있습니다."
               />
-              <Pressable
-                style={withPressedFeedback(styles.retryButton)}
+              <ActionPressable
+                style={styles.retryButton}
                 onPress={() => void positionQuery.refetch()}
               >
                 <Text style={styles.retryText}>포지션 다시 시도</Text>
-              </Pressable>
+              </ActionPressable>
               <AdminDiagnosticPanel error={positionQuery.error} />
             </>
           ) : hasPosition && position ? (
@@ -452,24 +451,10 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
 
         <View style={styles.card}>
           <Text style={styles.label}>차트</Text>
-          <View style={styles.row}>
-            {ASSET_CHART_TIMEFRAMES.map((tab) => {
-              const active = tab.interval === selectedTimeframe.interval;
-              return (
-                <Pressable
-                  key={tab.interval}
-                  style={withPressedFeedback([styles.chip, active && styles.chipActive])}
-                  onPress={() => setSelectedTimeframe(tab)}
-                >
-                  <Text
-                    style={active ? styles.chipTextActive : styles.chipText}
-                  >
-                    {tab.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <ChartTimeframeSelector
+            selectedTimeframe={selectedTimeframe}
+            onSelect={setSelectedTimeframe}
+          />
 
           {candlesQuery.isLoading ? (
             <SectionSkeleton lines={5} />
@@ -483,13 +468,13 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
                 message={describeCandleError(candlesQuery.error).message}
               />
               <AdminDiagnosticPanel error={candlesQuery.error} />
-              <Pressable
+              <ActionPressable
                 testID={TEST_IDS.assetDetail.chartRetry}
-                style={withPressedFeedback(styles.retryButton)}
+                style={styles.retryButton}
                 onPress={() => void candlesQuery.refetch()}
               >
                 <Text style={styles.retryText}>차트 다시 시도</Text>
-              </Pressable>
+              </ActionPressable>
             </>
           ) : chartCandles.length ? (
             <CandlestickChart
@@ -582,20 +567,7 @@ const styles = StyleSheet.create({
   },
   debug: { fontSize: 11, color: "#9aa0a6", marginTop: 6 },
   errorText: { fontSize: 14, color: "#c62828" },
-  chip: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "#fff",
-  },
-  chipActive: {
-    backgroundColor: "#111",
-    borderColor: "#111",
-  },
-  chipText: { color: "#111", fontWeight: "600" },
-  chipTextActive: { color: "#fff", fontWeight: "600" },
+
   retryButton: {
     marginTop: 8,
     alignSelf: "flex-start",

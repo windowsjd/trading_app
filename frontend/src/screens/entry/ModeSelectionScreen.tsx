@@ -1,13 +1,12 @@
 import React, { useMemo } from 'react';
 import {
-  Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { withPressedFeedback } from '../../components/common/pressFeedback';
+import ActionPressable from '../../components/common/ActionPressable';
 import { useQuery } from '@tanstack/react-query';
 
 import type { ModeSelectionScreenProps } from '../../app/navigation/types';
@@ -236,9 +235,9 @@ export default function ModeSelectionScreen({
               const display = getAccountDisplay(account);
 
               return (
-                <Pressable
+                <ActionPressable
                   key={account.id}
-                  style={withPressedFeedback(styles.pastRow)}
+                  style={styles.pastRow}
                   onPress={() => startWithAccount(account)}
                   accessibilityRole="button"
                   accessibilityLabel={`${display.title}, ${display.statusLabel}. 이 계정으로 시작`}
@@ -253,7 +252,7 @@ export default function ModeSelectionScreen({
                     ) : null}
                   </View>
                   <Text style={styles.pastRowAction}>기록 보기</Text>
-                </Pressable>
+                </ActionPressable>
               );
             })}
           </>

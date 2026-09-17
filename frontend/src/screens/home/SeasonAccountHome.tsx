@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { withPressedFeedback } from '../../components/common/pressFeedback';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import ActionPressable from '../../components/common/ActionPressable';
 import { useQuery } from '@tanstack/react-query';
 
 import { QUERY_KEYS } from '../../constants/queryKeys';
@@ -335,12 +335,12 @@ export default function SeasonAccountHome({
             <Text style={styles.helper}>
               USD {usdBalance === null ? '-' : formatUsd(usdBalance)}
             </Text>
-            <Pressable style={withPressedFeedback(styles.secondaryButton)} onPress={onOpenLedger}>
+            <ActionPressable style={styles.secondaryButton} onPress={onOpenLedger}>
               <Text style={styles.secondaryText}>원장 보기</Text>
-            </Pressable>
-            <Pressable style={withPressedFeedback(styles.secondaryButton)} onPress={onOpenOrders}>
+            </ActionPressable>
+            <ActionPressable style={styles.secondaryButton} onPress={onOpenOrders}>
               <Text style={styles.secondaryText}>주문 내역 보기</Text>
-            </Pressable>
+            </ActionPressable>
           </>
         )}
       </View>
@@ -374,10 +374,10 @@ export default function SeasonAccountHome({
             });
             const positionDisplay = getPositionDisplay(position);
             return (
-              <Pressable
+              <ActionPressable
                 key={position.positionId}
                 testID={TEST_IDS.home.positionItem(position.assetId)}
-                style={withPressedFeedback(styles.positionCard)}
+                style={styles.positionCard}
                 onPress={() => onOpenAsset(position.assetId)}
               >
                 <View style={styles.positionRow}>
@@ -398,7 +398,7 @@ export default function SeasonAccountHome({
                     {positionDisplay.priceNotice}
                   </Text>
                 ) : null}
-              </Pressable>
+              </ActionPressable>
             );
           })
         )}

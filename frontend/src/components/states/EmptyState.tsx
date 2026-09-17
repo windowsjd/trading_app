@@ -1,6 +1,6 @@
 import React from 'react';
-import { SafeAreaView, View, Text, Pressable, StyleSheet } from 'react-native';
-import { withPressedFeedback } from '../common/pressFeedback';
+import { SafeAreaView, View, Text, StyleSheet } from 'react-native';
+import ActionPressable from '../common/ActionPressable';
 
 interface EmptyStateProps {
   title?: string;
@@ -22,9 +22,9 @@ export default function EmptyState({
         <Text style={styles.message}>{message}</Text>
 
         {actionLabel && onAction ? (
-          <Pressable style={withPressedFeedback(styles.button)} onPress={onAction}>
+          <ActionPressable style={styles.button} onPress={onAction}>
             <Text style={styles.buttonText}>{actionLabel}</Text>
-          </Pressable>
+          </ActionPressable>
         ) : null}
       </View>
     </SafeAreaView>

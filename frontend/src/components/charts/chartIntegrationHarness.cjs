@@ -63,6 +63,7 @@ function createChartHarness(platform = 'android') {
     const module = { exports: {} };
     cache.set(file, module);
     const localRequire = (name) => {
+      if (name.endsWith('/ActionPressable')) return { default: 'Pressable', __esModule: true };
       if (name === 'react') return react;
       if (name === 'react-native') return native;
       if (name === 'react-native-svg') return {

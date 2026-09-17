@@ -4,11 +4,10 @@ import {
   Text,
   StyleSheet,
   SafeAreaView,
-  Pressable,
   FlatList,
   ActivityIndicator,
 } from 'react-native';
-import { withPressedFeedback } from '../../components/common/pressFeedback';
+import ActionPressable from '../../components/common/ActionPressable';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
 import type { MarketScreenProps } from '../../app/navigation/types';
@@ -140,10 +139,10 @@ export default function MarketScreen({ navigation }: Props) {
                       : TEST_IDS.market.tabCrypto;
 
                 return (
-                  <Pressable
+                  <ActionPressable
                     key={tab.key}
                     testID={testID}
-                    style={withPressedFeedback([styles.tabButton, active && styles.tabButtonActive])}
+                    style={[styles.tabButton, active && styles.tabButtonActive]}
                     onPress={() => setSelectedTab(tab.key)}
                   >
                     <Text
@@ -151,17 +150,17 @@ export default function MarketScreen({ navigation }: Props) {
                     >
                       {tab.label}
                     </Text>
-                  </Pressable>
+                  </ActionPressable>
                 );
               })}
             </View>
 
-            <Pressable
-              style={withPressedFeedback(styles.searchEntry)}
+            <ActionPressable
+              style={styles.searchEntry}
               onPress={() => navigation.navigate('MarketSearch')}
             >
               <Text style={styles.searchEntryText}>종목명 또는 심볼 검색</Text>
-            </Pressable>
+            </ActionPressable>
 
             {selectedTab === 'crypto' ? (
               <Text style={styles.priceBasisText}>

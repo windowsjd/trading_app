@@ -13,6 +13,9 @@ function load(file, mocks) {
   }).outputText;
   const localRequire = (name) => {
     if (Object.hasOwn(mocks, name)) return mocks[name];
+    // Interaction animation is a native boundary here; its real component has
+    // separate render tests. Keep screen/query/gesture tests focused on actions.
+    if (name.endsWith('/ActionPressable')) return { default: 'Pressable', __esModule: true };
     if (name.startsWith('.')) return require(resolve(dirname(file), name.endsWith('.ts') ? name : name + '.ts'));
     return require(name);
   };

@@ -4,71 +4,187 @@ import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import ts from 'typescript';
-import { withPressedFeedback } from './pressFeedback.ts';
+import { getFeedbackPalette, getRippleGeometry } from './pressFeedback.ts';
 
 const require = createRequire(import.meta.url);
 const { load, elements } = require('../../../test/ledgerTestHarness.cjs');
+const { interactionHarness, flatten, React, act } = require('../../../test/interactionTestHarness.cjs');
 const native = {
   Pressable: 'Pressable', Text: 'Text', ActivityIndicator: 'ActivityIndicator',
   Modal: 'Modal', View: 'View', StyleSheet: { create: (styles: unknown) => styles },
 };
-const CTAButton = load(resolve('src/components/common/CTAButton.tsx'), {
-  'react-native': native,
-}).default;
-const flatten = (style: any): any => Array.isArray(style)
-  ? Object.assign({}, ...style.map(flatten))
-  : style || {};
+const event = { nativeEvent: { pageX: 130, pageY: 215, locationX: 3, locationY: 4 } };
+const circle = (renderer: any) => renderer.root.findAllByType('AnimatedView').find((n: any) => n.props.style.width !== undefined);
+const wash = (renderer: any) => flatten(renderer.root.findAllByType('AnimatedView')[0].props.style);
 
-describe('general pressed feedback', () => {
-  it('dims immediately, restores the exact base style, and changes no layout', () => {
-    const base = [{ padding: 14, backgroundColor: '#111' }, { borderRadius: 12 }];
-    const style = withPressedFeedback(base);
-    assert.strictEqual(style({ pressed: false }), base);
-    assert.deepEqual(flatten(style({ pressed: true })), { ...flatten(base), opacity: 0.76 });
-    assert.strictEqual(style({ pressed: false }), base);
-  });
-
-  it('preserves style callbacks and never adds active feedback when disabled', () => {
-    const base = { opacity: 0.45, padding: 12 };
-    const states: boolean[] = [];
-    const style = withPressedFeedback(({ pressed }) => {
-      states.push(pressed);
-      return base;
-    }, true);
-    assert.strictEqual(style({ pressed: true }), base);
-    assert.strictEqual(style({ pressed: false }), base);
-    assert.deepEqual(states, [true, false]);
-  });
-
-  it('connects the actual CTA without wrapping or delaying its action', () => {
-    let calls = 0;
-    const onPress = () => { calls++; };
-    const node = CTAButton({ label: '주문하기', testID: 'cta', onPress, style: { flex: 1 } });
-    assert.equal(node.type, 'Pressable');
-    assert.equal(node.props.testID, 'cta');
-    assert.equal(node.props.disabled, false);
-    assert.strictEqual(node.props.onPress, onPress);
-    const idle = flatten(node.props.style({ pressed: false }));
-    assert.deepEqual(flatten(node.props.style({ pressed: true })), { ...idle, opacity: 0.76 });
-    assert.equal(calls, 0, 'feedback alone does not execute the action');
-    node.props.onPress();
-    assert.equal(calls, 1, 'the original action runs synchronously once');
-    assert.deepEqual(flatten(node.props.style({ pressed: false })), idle);
-    assert.equal(elements(node, 'Text')[0].props.numberOfLines, undefined);
-  });
-
-  for (const state of ['disabled', 'loading', 'blocked']) {
-    it(`keeps ${state} CTA inert even if a pressed style is evaluated`, () => {
-      const node = CTAButton({ label: '실행', state, onPress: () => {} });
-      assert.equal(node.props.disabled, true);
-      assert.deepEqual(node.props.style({ pressed: true }), node.props.style({ pressed: false }));
-      assert.equal(elements(node, 'ActivityIndicator').length, state === 'loading' ? 1 : 0);
+describe('general ripple interaction', () => {
+  for (const platform of ['android', 'ios', 'web']) {
+    it(`${platform}: touch origin, expansion, neutral lightening and restoration without delaying the action`, (t) => {
+      const h = interactionHarness(platform);
+      const calls: string[] = [];
+      const onPress = () => calls.push('press');
+      const style = { backgroundColor: '#111', borderRadius: 12, padding: 14, shadowOpacity: 0.2, elevation: 4 };
+      const renderer = h.render(React.createElement(h.ActionPressable, {
+        style, onPress, onPressIn: () => calls.push('in'), onPressOut: () => calls.push('out'),
+        testID: 'action', accessibilityRole: 'button', accessibilityLabel: '실행',
+      }, React.createElement('Text', null, '실행')));
+      t.after(() => act(() => renderer.unmount()));
+      const button = renderer.root.findByType('Pressable');
+      assert.strictEqual(button.props.style, style, 'root layout, shadow and opacity are untouched');
+      assert.strictEqual(button.props.onPress, onPress);
+      assert.equal(button.props.testID, 'action');
+      assert.equal(button.props.accessibilityLabel, '실행');
+      act(() => button.props.onPressIn(event));
+      const ripple = circle(renderer).props.style;
+      assert.equal(ripple.left + ripple.width / 2, 30, 'pageX minus rootX, not child locationX');
+      assert.equal(ripple.top + ripple.height / 2, 15);
+      assert.ok(ripple.width / 2 >= Math.hypot(170, 45), 'covers the farthest corner');
+      assert.equal(ripple.transform[0].scale.value, 0.02);
+      assert.equal(wash(renderer).backgroundColor, '#fff');
+      assert.deepEqual(wash(renderer).opacity.outputRange, [0, 0.045]);
+      assert.equal(wash(renderer).opacity.value.value, 1, 'lightening starts on touch');
+      assert.equal(ripple.backgroundColor, 'rgba(255,255,255,0.16)');
+      const clip = renderer.root.findAllByType('View').find((n: any) => n.props.pointerEvents === 'none');
+      assert.equal(flatten(clip.props.style).overflow, 'hidden');
+      assert.equal(flatten(clip.props.style).borderRadius, 12);
+      assert.equal((style as any).opacity, undefined);
+      assert.equal((style as any).overflow, undefined);
+      assert.equal(clip.props.accessibilityElementsHidden, true);
+      assert.equal(h.animations[0].options.toValue, 1);
+      assert.equal(h.animations[0].options.useNativeDriver, platform !== 'web');
+      assert.equal(h.animations[0].options.isInteraction, false);
+      assert.deepEqual(calls, ['in']);
+      button.props.onPress();
+      assert.deepEqual(calls, ['in', 'press'], 'onPress runs once before animation completion');
+      act(() => button.props.onPressOut(event));
+      assert.deepEqual(calls, ['in', 'press', 'out']);
+      h.finish();
+      assert.equal(circle(renderer), undefined);
+      assert.equal(wash(renderer).opacity.value.value, 0);
+      assert.strictEqual(button.props.style, style);
     });
   }
 
-  it('does not advertise an action on a CTA with no handler', () => {
-    const node = CTAButton({ label: '준비 중' });
-    assert.deepEqual(node.props.style({ pressed: true }), node.props.style({ pressed: false }));
+  it('uses current root bounds after scrolling, clamps edges and centers keyboard presses', () => {
+    assert.deepEqual(getRippleGeometry(130, 215, { pageX: 100, pageY: 200, width: 200, height: 60 }), { x: 30, y: 15, radius: Math.hypot(170, 45) });
+    assert.equal(getRippleGeometry(130, 215, { pageX: 100, pageY: 180, width: 200, height: 60 }).y, 35);
+    assert.equal(getRippleGeometry(0, 0, { pageX: 100, pageY: 200, width: 200, height: 60 }).x, 0);
+    assert.deepEqual(getRippleGeometry(undefined, undefined, { pageX: 100, pageY: 200, width: 200, height: 60 }), { x: 100, y: 30, radius: Math.hypot(100, 30) });
+  });
+
+  it('lightens dark/blue/gray surfaces with a weaker neutral wash and leaves white alone', () => {
+    for (const color of [0xff111111, 0xff0066cc, 0xffcccccc]) {
+      assert.deepEqual(getFeedbackPalette(color), { washOpacity: 0.045, rippleColor: 'rgba(255,255,255,0.16)' });
+    }
+    for (const color of [0xfffafafa, 0xffffffff, null]) {
+      assert.deepEqual(getFeedbackPalette(color), { washOpacity: 0, rippleColor: 'rgba(0,0,0,0.10)' });
+    }
+  });
+
+  it('CTA and direct buttons use the same component, preserving pending states and wrapping', (t) => {
+    const h = interactionHarness();
+    const CTA = h.load('src/components/common/CTAButton.tsx', { './ActionPressable': { default: h.ActionPressable, __esModule: true } }).default;
+    const onPress = () => {};
+    const cta = CTA({ label: '환전하기', onPress, testID: 'cta' });
+    assert.strictEqual(cta.type, h.ActionPressable);
+    const renderer = h.render(cta);
+    t.after(() => act(() => renderer.unmount()));
+    act(() => renderer.root.findByType('Pressable').props.onPressIn(event));
+    assert.ok(circle(renderer));
+    assert.equal(wash(renderer).opacity.value.value, 1);
+    assert.equal(renderer.root.findByType('Text').props.numberOfLines, undefined);
+    for (const state of ['disabled', 'loading', 'blocked']) {
+      act(() => renderer.update(React.createElement(CTA, { label: '환전하기', state, onPress })));
+      const button = renderer.root.findByType('Pressable');
+      assert.equal(button.props.disabled, true);
+      assert.equal(button.props.onPress, undefined);
+      const count = h.animations.length;
+      act(() => { button.props.onPressIn(event); button.props.onPressOut(event); });
+      assert.equal(h.animations.length, count);
+      assert.equal(renderer.root.findAllByType('AnimatedView').length, 0);
+      assert.equal(renderer.root.findAllByType('ActivityIndicator').length, state === 'loading' ? 1 : 0);
+    }
+    act(() => renderer.update(React.createElement(h.ActionPressable, { style: { backgroundColor: '#111' } }, '준비 중')));
+    act(() => renderer.root.findByType('Pressable').props.onPressIn(event));
+    assert.equal(renderer.root.findAllByType('AnimatedView').length, 0, 'no handler, no feedback');
+  });
+
+  it('cancels release/scroll feedback and ignores stale measurements and old animation completion', (t) => {
+    const h = interactionHarness();
+    h.delayedMeasure = true;
+    let calls = 0;
+    const props = { onPress: () => calls++, style: { backgroundColor: '#eee' } };
+    const renderer = h.render(React.createElement(h.ActionPressable, props));
+    t.after(() => act(() => renderer.unmount()));
+    const button = () => renderer.root.findByType('Pressable');
+    act(() => button().props.onPressIn(event));
+    act(() => button().props.onPressOut(event));
+    act(() => h.measures.shift()(...h.bounds));
+    h.finish();
+    assert.equal(circle(renderer), undefined);
+    assert.equal(calls, 0, 'cancel is not an action');
+    h.delayedMeasure = false;
+    act(() => button().props.onPressIn(event));
+    act(() => button().props.onPressOut(event));
+    const oldFade = h.animations.at(-1);
+    act(() => button().props.onPressIn({ nativeEvent: { pageX: 180, pageY: 220 } }));
+    act(() => oldFade.callback({ finished: true }));
+    assert.ok(circle(renderer), 'old release cannot remove a new ripple');
+    assert.equal(circle(renderer).props.style.left + circle(renderer).props.style.width / 2, 80);
+    h.delayedMeasure = true;
+    act(() => button().props.onPressIn(event));
+    act(() => renderer.update(React.createElement(h.ActionPressable, { ...props, disabled: true })));
+    act(() => h.measures.shift()(...h.bounds));
+    assert.equal(renderer.root.findAllByType('AnimatedView').length, 0);
+  });
+
+  it('never makes a quick tap wait for measurement, and never revives a finished ripple', (t) => {
+    const h = interactionHarness();
+    h.delayedMeasure = true;
+    let calls = 0;
+    const renderer = h.render(React.createElement(h.ActionPressable, { onPress: () => calls++ }));
+    t.after(() => act(() => renderer.unmount()));
+    const button = renderer.root.findByType('Pressable');
+    act(() => button.props.onPressIn(event));
+    act(() => button.props.onPressOut(event));
+    button.props.onPress();
+    assert.equal(calls, 1);
+    act(() => h.measures.shift()(...h.bounds));
+    assert.ok(circle(renderer), 'a fast tap still gets the remaining ripple fade');
+    h.finish();
+    assert.equal(circle(renderer), undefined);
+    act(() => button.props.onPressIn(event));
+    act(() => button.props.onPressOut(event));
+    h.finish();
+    act(() => h.measures.shift()(...h.bounds));
+    assert.equal(circle(renderer), undefined, 'late native callbacks cannot restart a finished effect');
+  });
+
+  it('pressing a market row never rerenders its parent or sibling price content', (t) => {
+    const h = interactionHarness();
+    let parentRenders = 0;
+    let prices = 0;
+    const { MarketAssetRow } = h.load('src/features/market/MarketAssetRow.tsx', {
+      '../../components/common/ActionPressable': { default: h.ActionPressable, __esModule: true },
+      '../../utils/format': {
+        getAssetNameDisplay: (item: any) => ({ primary: item.id }), getAssetSymbolMarketDisplay: () => '',
+        getAssetPriceText: () => { prices++; return '100'; }, formatPercent: () => '0',
+      },
+    });
+    function List() {
+      parentRenders++;
+      return ['btc', 'eth'].map((id) => React.createElement(MarketAssetRow, { key: id, item: { id, tradable: true, marketStatus: 'open' }, onPress: () => {} }));
+    }
+    const renderer = h.render(React.createElement(List));
+    t.after(() => act(() => renderer.unmount()));
+    assert.equal(prices, 2);
+    const button = renderer.root.findAllByType('Pressable')[0];
+    act(() => button.props.onPressIn(event));
+    assert.ok(circle(renderer));
+    act(() => button.props.onPressOut(event));
+    h.finish();
+    assert.equal(parentRenders, 1);
+    assert.equal(prices, 2);
   });
 });
 
@@ -80,7 +196,7 @@ describe('touch coverage and exclusions', () => {
       if (!file.endsWith('.tsx')) continue;
       const source = ts.createSourceFile(file, readFileSync(resolve('src', file), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
       const visit = (node: ts.Node) => {
-        if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && node.tagName.getText(source) === 'Pressable') {
+        if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && ['Pressable', 'ActionPressable'].includes(node.tagName.getText(source))) {
           const attrs = node.attributes.properties.filter(ts.isJsxAttribute);
           const attr = (name: string) => attrs.find((a) => a.name.getText(source) === name);
           const expression = (name: string) => {
@@ -88,17 +204,14 @@ describe('touch coverage and exclusions', () => {
             return init && ts.isJsxExpression(init) ? init.expression : undefined;
           };
           const style = expression('style');
+          if (file === 'components/common/ActionPressable.tsx') return;
           if (file === 'components/common/BottomSheetBackdrop.tsx' || !attr('onPress')) {
             excluded.push(file);
             assert.ok(style && !ts.isCallExpression(style), `${file}: non-action keeps its static style`);
           } else {
-            assert.ok(style && ts.isCallExpression(style), `${file}: missing feedback`);
-            assert.equal(style.expression.getText(source), 'withPressedFeedback', file);
-            if (attr('disabled')) {
-              const guard = style.arguments[1]?.getText(source);
-              const disabled = expression('disabled')?.getText(source);
-              assert.equal(guard, file.endsWith('/CTAButton.tsx') ? 'disabled || !onPress' : disabled, file);
-            }
+            assert.equal(node.tagName.getText(source), 'ActionPressable', `${file}: missing common interaction`);
+            assert.match(readFileSync(resolve('src', file), 'utf8'), /import ActionPressable from ['"].*\/ActionPressable['"]/);
+            assert.ok(style && !ts.isCallExpression(style), `${file}: base style stays static`);
             covered.add(file);
           }
         }
@@ -112,6 +225,7 @@ describe('touch coverage and exclusions', () => {
     ]);
     for (const file of [
       'components/common/CTAButton.tsx', 'components/tradingAccount/AccountSwitcher.tsx',
+      'components/charts/ChartTimeframeSelector.tsx',
       'components/states/ErrorState.tsx', 'features/market/MarketAssetRow.tsx',
       'screens/auth/LoginScreen.tsx', 'screens/auth/SignupScreen.tsx',
       'screens/home/GeneralAccountHome.tsx', 'screens/home/SeasonAccountHome.tsx',
@@ -138,15 +252,15 @@ describe('touch coverage and exclusions', () => {
   it('keeps feedback outside the chart gesture subtree', () => {
     const read = (file: string) => readFileSync(resolve('src/components/charts', file), 'utf8');
     for (const file of ['CandlestickGestures.native.tsx', 'CandlestickGestures.web.tsx', 'CandlestickChartRenderer.tsx']) {
-      assert.doesNotMatch(read(file), /withPressedFeedback|<Pressable|android_ripple/);
+      assert.doesNotMatch(read(file), /ActionPressable|<Pressable|android_ripple/);
     }
     const source = read('CandlestickChart.tsx');
     const gestureStart = source.indexOf('<CandlestickGestures');
     const gestureEnd = source.indexOf('</CandlestickGestures>');
     assert.ok(gestureStart > 0 && gestureEnd > gestureStart);
-    assert.doesNotMatch(source.slice(gestureStart, gestureEnd), /withPressedFeedback|<Pressable/);
-    assert.match(source.slice(gestureEnd), /style=\{withPressedFeedback\(styles.resetButton\)\}/);
-    assert.equal((source.match(/withPressedFeedback\(/g) ?? []).length, 1);
+    assert.doesNotMatch(source.slice(gestureStart, gestureEnd), /ActionPressable|<Pressable/);
+    assert.match(source.slice(gestureEnd), /<ActionPressable\s+style=\{styles.resetButton\}/);
+    assert.equal((source.match(/<ActionPressable/g) ?? []).length, 1);
   });
 
   it('preserves market row memoization across unrelated ticker updates', () => {
