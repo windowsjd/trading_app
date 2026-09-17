@@ -159,6 +159,11 @@ export function TradingAccountProvider({ children }: PropsWithChildren) {
       accounts.find((account) => account.id === selection.accountId) ?? null,
     [accounts, selection.accountId],
   );
+  // The account list can be warm before AsyncStorage resolves on session
+  // restore. Treat that preference read as loading so consumers never render
+  // the policy fallback account for a frame before the user's choice arrives.
+  const selectionIsLoading =
+    !!userId && storedLoadedForUserId !== userId;
 
   const selectAccount = useCallback(
     (accountId: string) => {
@@ -212,10 +217,14 @@ export function TradingAccountProvider({ children }: PropsWithChildren) {
         capabilityNow,
       ),
       selectionReason: selection.reason,
-      isLoading: meQuery.isLoading || accountsQuery.isLoading,
+      isLoading:
+        meQuery.isLoading || accountsQuery.isLoading || selectionIsLoading,
       isError: accountsQuery.isError,
       error: accountsQuery.error,
-      isEmpty: !accountsQuery.isLoading && accounts.length === 0,
+      isEmpty:
+        !accountsQuery.isLoading &&
+        !selectionIsLoading &&
+        accounts.length === 0,
       selectAccount,
       refetchAccounts: accountsQuery.refetch,
       handleSelectedAccountMissing,
@@ -228,6 +237,7 @@ export function TradingAccountProvider({ children }: PropsWithChildren) {
       selectedAccount,
       meQuery.isLoading,
       accountsQuery.isLoading,
+      selectionIsLoading,
       accountsQuery.isError,
       accountsQuery.error,
       accountsQuery.refetch,

@@ -2,7 +2,13 @@ import React from 'react';
 import { View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
-type TabIconName = 'home' | 'market' | 'ranking' | 'record' | 'profile';
+type TabIconName =
+  | 'home'
+  | 'market'
+  | 'guide'
+  | 'ranking'
+  | 'record'
+  | 'profile';
 
 type Props = {
   name: TabIconName;
@@ -20,6 +26,11 @@ export default function TabBarIcon({ name, color, size }: Props) {
     case 'market':
       drawing = (
         <Path d="M3 7h4v7H3z M5 3v4m0 7v7 M10 10h4v7h-4z M12 3v7m0 7v4 M17 5h4v6h-4z M19 3v2m0 6v10" />
+      );
+      break;
+    case 'guide':
+      drawing = (
+        <Path d="M4 4h5a3 3 0 0 1 3 3v14a3 3 0 0 0-3-3H4V4Z M20 4h-5a3 3 0 0 0-3 3v14a3 3 0 0 1 3-3h5V4Z" />
       );
       break;
     case 'ranking':

@@ -110,6 +110,20 @@ const account: TradingAccountDto = {
   },
 };
 
+it('stays loading until the stored account choice has resolved', async (t) => {
+  const h = harness(account);
+  t.after(h.dispose);
+
+  const beforeStorage = h.render();
+  assert.equal(beforeStorage.selectedAccountId, account.id);
+  assert.equal(beforeStorage.isLoading, true);
+
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.equal(h.render().isLoading, false);
+});
+
 it('updates selected-account CTA capability at start and end without a network response', (t) => {
   t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: start - 1 });
   const h = harness(account);

@@ -94,6 +94,10 @@ export const TEST_IDS = {
     positionItem: (assetId: string) => `portfolio-position-item-${assetId}`,
   },
 
+  guide: {
+    screen: 'guide-screen',
+  },
+
   ranking: {
     screen: 'ranking-screen',
     retry: 'ranking-retry',

@@ -44,6 +44,10 @@ export type RankingStackParamList = {
   UserSeasonSummary: { userId: string };
 };
 
+export type GuideStackParamList = {
+  Guide: undefined;
+};
+
 export type RecordStackParamList = {
   RecordSeasonList: undefined;
   RecordSeasonDetail: { seasonId: string };
@@ -63,6 +67,7 @@ export type MyStackParamList = {
 export type MainTabParamList = {
   HomeTab: NavigatorScreenParams<HomeStackParamList> | undefined;
   MarketTab: NavigatorScreenParams<MarketStackParamList> | undefined;
+  GuideTab: NavigatorScreenParams<GuideStackParamList> | undefined;
   RankingTab: NavigatorScreenParams<RankingStackParamList> | undefined;
   RecordTab: NavigatorScreenParams<RecordStackParamList> | undefined;
   MyTab: NavigatorScreenParams<MyStackParamList> | undefined;
@@ -144,6 +149,11 @@ export type AssetDetailScreenProps = CompositeScreenProps<
 export type OrderScreenProps = CompositeScreenProps<
   StackScreenProps<MarketStackParamList, 'Order'>,
   CompositeScreenProps<TabScreenProps<'MarketTab'>, RootScreenProps<'MainTabs'>>
+>;
+
+export type GuideScreenProps = CompositeScreenProps<
+  StackScreenProps<GuideStackParamList, 'Guide'>,
+  CompositeScreenProps<TabScreenProps<'GuideTab'>, RootScreenProps<'MainTabs'>>
 >;
 
 export type RankingScreenProps = CompositeScreenProps<
