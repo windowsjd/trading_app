@@ -31,9 +31,6 @@ import {
 type Props = Omit<PressableProps, 'android_ripple'> & { ref?: React.Ref<View> };
 type Ripple = ReturnType<typeof getRippleGeometry> & { id: number };
 
-const AnimatedPressable = Animated.createAnimatedComponent(
-  Pressable,
-) as typeof Pressable;
 const animationOptions = {
   useNativeDriver: Platform.OS !== 'web',
   isInteraction: false,
@@ -54,6 +51,7 @@ export default function ActionPressable({
   const host = useRef<View>(null);
   const session = useRef({ id: 0, active: false, expanded: false });
   const [ripple, setRipple] = useState<Ripple | null>(null);
+  const [pressScale, setPressScale] = useState(1);
   const [motion] = useState(() => ({
     rippleScale: new Animated.Value(0.02),
     opacity: new Animated.Value(0),
@@ -65,6 +63,14 @@ export default function ActionPressable({
     !props['aria-disabled'] &&
     !props.accessibilityState?.disabled &&
     !!onPress;
+
+  useEffect(() => {
+    // Keep the root a regular Pressable: Animated's web wrapper turns a style
+    // callback into an array, so Pressable never evaluates its visual styles.
+    // Only this pressed button renders scale frames; parents/sibling rows don't.
+    const listener = motion.pressScale.addListener(({ value }) => setPressScale(value));
+    return () => motion.pressScale.removeListener(listener);
+  }, [motion]);
 
   const finishRipple = useCallback(
     (id: number) => {
@@ -112,10 +118,11 @@ export default function ActionPressable({
   const animatedStyle = (state: PressableStateCallbackType) => {
     const resolved = typeof style === 'function' ? style(state) : style;
     const base = StyleSheet.flatten(resolved) ?? {};
-    const composedTransform: ViewStyle['transform'] = [
-      ...(Array.isArray(base.transform) ? base.transform : []),
-      { scale: motion.pressScale },
-    ];
+    const scale = enabled ? pressScale : 1;
+    const composedTransform: ViewStyle['transform'] =
+      typeof base.transform === 'string'
+        ? `${base.transform} scale(${scale})`
+        : [...(base.transform ?? []), { scale }];
 
     return [
       resolved,
@@ -133,13 +140,16 @@ export default function ActionPressable({
       session.current.active = true;
       session.current.expanded = false;
       const { pageX, pageY } = event.nativeEvent;
-      setRipple(null);
+      // Keep an existing circle mounted until measure supplies the new origin.
+      // Detaching its Animated.View can stop the shared values just started by
+      // a rapid second tap, leaving that new ripple stuck at its initial size.
       motion.rippleScale.stopAnimation();
       motion.rippleScale.setValue(0.02);
       motion.opacity.setValue(1);
       motion.wash.setValue(1);
       Animated.timing(motion.pressScale, {
         ...animationOptions,
+        useNativeDriver: false,
         toValue: PRESS_IN_SCALE,
         duration: PRESS_IN_DURATION_MS,
       }).start();
@@ -181,6 +191,7 @@ export default function ActionPressable({
     if (enabled) {
       Animated.timing(motion.pressScale, {
         ...animationOptions,
+        useNativeDriver: false,
         toValue: 1,
         duration: PRESS_OUT_DURATION_MS,
       }).start();
@@ -195,7 +206,7 @@ export default function ActionPressable({
   };
 
   return (
-    <AnimatedPressable
+    <Pressable
       {...props}
       ref={(node) => {
         host.current = node;
@@ -273,7 +284,7 @@ export default function ActionPressable({
           </>
         );
       }}
-    </AnimatedPressable>
+    </Pressable>
   );
 }
 

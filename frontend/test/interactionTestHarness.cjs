@@ -10,8 +10,13 @@ const flatten = (style) => Array.isArray(style) ? Object.assign({}, ...style.map
 function interactionHarness(platform = 'android') {
   const h = { animations: [], measures: [], delayedMeasure: false, bounds: [0, 0, 200, 60, 100, 200] };
   class Value {
-    constructor(value) { this.value = value; }
-    setValue(value) { this.stopAnimation(); this.value = value; }
+    constructor(value) { this.value = value; this.listeners = new Map(); this.listenerId = 0; }
+    setValue(value) {
+      this.stopAnimation(); this.value = value;
+      this.listeners.forEach((callback) => callback({ value }));
+    }
+    addListener(callback) { const id = String(++this.listenerId); this.listeners.set(id, callback); return id; }
+    removeListener(id) { this.listeners.delete(id); }
     stopAnimation() { this.animation?.stop(); }
     interpolate(config) { return { value: this, ...config }; }
   }
@@ -34,12 +39,12 @@ function interactionHarness(platform = 'android') {
       return (0xff000000 | parseInt(hex.length === 3 ? [...hex].map((c) => c + c).join('') : hex, 16)) >>> 0;
     },
     useWindowDimensions: () => h.dimensions,
-    Animated: { Value, View: 'AnimatedView', createAnimatedComponent: (Component) => Component, timing: (value, options) => {
+    Animated: { Value, View: 'AnimatedView', timing: (value, options) => {
       const animation = {
         value, options,
         start: (callback) => { value.stopAnimation(); value.animation = animation; animation.callback = callback; h.animations.push(animation); },
         stop: () => { value.animation = null; animation.callback?.({ finished: false }); },
-        finish: () => { if (value.animation !== animation) return; value.animation = null; value.value = options.toValue; animation.callback?.({ finished: true }); },
+        finish: () => { if (value.animation !== animation) return; value.animation = null; value.setValue(options.toValue); animation.callback?.({ finished: true }); },
       };
       return animation;
     } },

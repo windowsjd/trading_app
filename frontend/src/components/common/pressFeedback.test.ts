@@ -31,24 +31,32 @@ describe('general ripple interaction', () => {
       const h = interactionHarness(platform);
       const calls: string[] = [];
       const onPress = () => calls.push('press');
+      const onLongPress = () => calls.push('long');
+      const hitSlop = { top: 8, bottom: 8, left: 4, right: 4 };
+      const pressRetentionOffset = { top: 20, bottom: 20, left: 20, right: 20 };
       const style = {
         backgroundColor: '#111', borderRadius: 12, padding: 14,
         shadowOpacity: 0.2, elevation: 4, transform: [{ translateX: 2 }],
       };
       const renderer = h.render(React.createElement(h.ActionPressable, {
-        style, onPress, onPressIn: () => calls.push('in'), onPressOut: () => calls.push('out'),
+        style, onPress, onLongPress, hitSlop, pressRetentionOffset, href: '/market',
+        onPressIn: () => calls.push('in'), onPressOut: () => calls.push('out'),
         testID: 'action', accessibilityRole: 'button', accessibilityLabel: '실행',
       }, React.createElement('Text', null, '실행')));
       t.after(() => act(() => renderer.unmount()));
       const button = renderer.root.findByType('Pressable');
       const rootStyle = flatten(button.props.style);
-      const pressScale = rootStyle.transform.at(-1).scale;
+      const rootScale = () => flatten(button.props.style).transform.at(-1).scale;
       assert.equal(rootStyle.padding, 14, 'root layout is untouched');
       assert.equal(rootStyle.shadowOpacity, 0.2, 'root shadow is untouched');
       assert.equal(rootStyle.elevation, 4);
       assert.deepEqual(rootStyle.transform[0], { translateX: 2 });
-      assert.equal(pressScale.value, 1);
+      assert.equal(rootScale(), 1);
       assert.strictEqual(button.props.onPress, onPress);
+      assert.strictEqual(button.props.onLongPress, onLongPress);
+      assert.strictEqual(button.props.hitSlop, hitSlop);
+      assert.strictEqual(button.props.pressRetentionOffset, pressRetentionOffset);
+      assert.equal(button.props.href, '/market');
       assert.equal(button.props.testID, 'action');
       assert.equal(button.props.accessibilityLabel, '실행');
       act(() => button.props.onPressIn(event));
@@ -68,7 +76,7 @@ describe('general ripple interaction', () => {
       assert.equal((style as any).overflow, undefined);
       assert.equal(clip.props.accessibilityElementsHidden, true);
       const pressInAnimation = h.animations.find(
-        (animation: any) => animation.value === pressScale,
+        (animation: any) => animation.options.toValue === PRESS_IN_SCALE,
       );
       const expansion = h.animations.find(
         (animation: any) => animation.value === ripple.transform[0].scale,
@@ -81,7 +89,7 @@ describe('general ripple interaction', () => {
       assert.equal(expansion.options.useNativeDriver, platform !== 'web');
       assert.equal(expansion.options.isInteraction, false);
       act(() => pressInAnimation.finish());
-      assert.equal(pressScale.value, PRESS_IN_SCALE);
+      assert.equal(rootScale(), PRESS_IN_SCALE);
       assert.deepEqual(calls, ['in']);
       button.props.onPress();
       assert.deepEqual(calls, ['in', 'press'], 'onPress runs once before animation completion');
@@ -89,7 +97,7 @@ describe('general ripple interaction', () => {
       assert.deepEqual(calls, ['in', 'press', 'out']);
       const release = h.animations.find(
         (animation: any) =>
-          animation.value === pressScale && animation.options.toValue === 1,
+          animation.value === pressInAnimation.value && animation.options.toValue === 1,
       );
       assert.equal(release.options.duration, PRESS_OUT_DURATION_MS);
       assert.equal(
@@ -108,7 +116,7 @@ describe('general ripple interaction', () => {
       assert.equal(fade.options.duration, RIPPLE_FADE_DURATION_MS);
       assert.ok(circle(renderer), 'completed expansion remains visible while fading');
       act(() => release.finish());
-      assert.equal(pressScale.value, 1);
+      assert.equal(rootScale(), 1);
       h.finish();
       assert.equal(circle(renderer), undefined);
       assert.equal(wash(renderer).opacity.value.value, 0);
@@ -174,7 +182,7 @@ describe('general ripple interaction', () => {
     h.finish();
     assert.equal(circle(renderer), undefined);
     assert.equal(
-      flatten(button().props.style).transform.at(-1).scale.value,
+      flatten(button().props.style).transform.at(-1).scale,
       1,
       'cancel restores the root scale',
     );
@@ -200,7 +208,7 @@ describe('general ripple interaction', () => {
     act(() => renderer.update(React.createElement(h.ActionPressable, { ...props, disabled: true })));
     act(() => h.measures.shift()(...h.bounds));
     assert.equal(renderer.root.findAllByType('AnimatedView').length, 0);
-    assert.equal(flatten(button().props.style).transform.at(-1).scale.value, 1);
+    assert.equal(flatten(button().props.style).transform.at(-1).scale, 1);
   });
 
   it('invalidates measurement and animation callbacks when navigation unmounts the action', () => {
@@ -255,6 +263,30 @@ describe('general ripple interaction', () => {
     assert.equal(circle(renderer), undefined, 'late native callbacks cannot restart a finished effect');
   });
 
+  it('keeps the animated circle attached across rapid taps until the new origin is measured', (t) => {
+    const h = interactionHarness('web');
+    const renderer = h.render(React.createElement(h.ActionPressable, { onPress: () => {} }));
+    t.after(() => act(() => renderer.unmount()));
+    const button = () => renderer.root.findByType('Pressable');
+    act(() => button().props.onPressIn(event));
+    const firstCircle = circle(renderer);
+    act(() => button().props.onPressOut(event));
+    h.delayedMeasure = true;
+    act(() => button().props.onPressIn({ nativeEvent: { pageX: 180, pageY: 220 } }));
+    // Real Animated.Value.__detach stops its animation when its view disappears.
+    // Keeping that view mounted avoids cancelling the new tap's expansion.
+    assert.strictEqual(circle(renderer), firstCircle);
+    act(() => h.measures.shift()(...h.bounds));
+    assert.strictEqual(circle(renderer), firstCircle);
+    const style = circle(renderer).props.style;
+    assert.equal(style.left + style.width / 2, 80, 'the retained circle moves to the new touch');
+    act(() => button().props.onPressOut(event));
+    h.finish();
+    assert.equal(circle(renderer), undefined);
+    assert.equal(flatten(button().props.style).transform.at(-1).scale, 1);
+    assert.equal(wash(renderer).opacity.value.value, 0);
+  });
+
   it('pressing a market row never rerenders its parent or sibling price content', (t) => {
     const h = interactionHarness();
     let parentRenders = 0;
@@ -276,6 +308,12 @@ describe('general ripple interaction', () => {
     const button = renderer.root.findAllByType('Pressable')[0];
     act(() => button.props.onPressIn(event));
     assert.ok(circle(renderer));
+    act(() => h.animations.find((a: any) => a.options.toValue === PRESS_IN_SCALE).finish());
+    const buttons = renderer.root.findAllByType('Pressable');
+    assert.equal(flatten(buttons[0].props.style).transform.at(-1).scale, PRESS_IN_SCALE);
+    assert.equal(flatten(buttons[1].props.style).transform.at(-1).scale, 1);
+    assert.equal(parentRenders, 1, 'scale updates stay inside the touched ActionPressable');
+    assert.equal(prices, 2, 'scale does not rerender either row’s price content');
     act(() => button.props.onPressOut(event));
     h.finish();
     assert.equal(parentRenders, 1);
