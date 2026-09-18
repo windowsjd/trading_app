@@ -4,6 +4,10 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { GuideStackParamList } from './types';
 import GuideScreen from '../../screens/guide/GuideScreen';
 import MarketBasicsScreen from '../../screens/guide/MarketBasicsScreen';
+import MarketBasicsChaptersScreen from '../../screens/guide/MarketBasicsChaptersScreen';
+import LiquidityScreen from '../../screens/guide/LiquidityScreen';
+import CandlesScreen from '../../screens/guide/CandlesScreen';
+import OrderTypesScreen from '../../screens/guide/OrderTypesScreen';
 
 const Stack = createNativeStackNavigator<GuideStackParamList>();
 
@@ -17,9 +21,13 @@ export default function GuideStack() {
       />
       <Stack.Screen
         name="MarketBasics"
-        component={MarketBasicsScreen}
+        component={MarketBasicsChaptersScreen}
         options={{ title: '시장기초' }}
       />
+      <Stack.Screen name="OrderBookLesson" component={MarketBasicsScreen} options={{ title: '호가창과 체결' }} />
+      <Stack.Screen name="Liquidity" component={LiquidityScreen} options={{ title: '유동성과 가격 충격' }} />
+      <Stack.Screen name="Candles" component={CandlesScreen} options={{ title: '캔들' }} />
+      <Stack.Screen name="OrderTypes" component={OrderTypesScreen} options={{ title: '주문방식' }} />
     </Stack.Navigator>
   );
 }

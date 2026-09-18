@@ -110,6 +110,9 @@ export const TEST_IDS = {
     buyThree: 'guide-buy-three',
     buyEight: 'guide-buy-eight',
     restart: 'guide-restart',
+    exercise: (step: 1 | 2) => `guide-exercise-${step}`,
+    result: (step: 1 | 2) => `guide-result-${step}`,
+    firstSnapshot: (id: string) => `${id}-first-snapshot`,
   },
 
   ranking: {

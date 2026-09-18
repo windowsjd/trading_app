@@ -5,9 +5,21 @@ import type { GuideScreenProps } from '../../app/navigation/types';
 import ActionPressable from '../../components/common/ActionPressable';
 import { TEST_IDS } from '../../constants/testIds';
 
+const availableGuides = [
+  {
+    number: '01', title: '시장기초', route: 'MarketBasics', id: TEST_IDS.guide.marketBasicsCard,
+    description: '호가·체결·유동성을 통해 시장 가격이 형성되고 움직이는 과정을 이해합니다.',
+  },
+  {
+    number: '02', title: '캔들', route: 'Candles', id: 'guide-candles-card',
+    description: '시가·고가·저가·종가와 시간 단위에 따라 가격 움직임이 캔들로 표현되는 방식을 이해합니다.',
+  },
+  {
+    number: '03', title: '주문방식', route: 'OrderTypes', id: 'guide-order-types-card',
+    description: '시장가와 지정가 주문이 실제 호가에서 어떻게 체결되는지 비교합니다.',
+  },
+] as const;
 const upcomingGuides = [
-  { number: '02', title: '캔들', description: '캔들에 담긴 가격 정보를 읽는 기초를 살펴봅니다.' },
-  { number: '03', title: '주문방식', description: '주문 방식에 따른 체결 과정의 차이를 살펴봅니다.' },
   { number: '04', title: '주식특성', description: '주식의 기본적인 성격과 투자 시 고려할 특성을 살펴봅니다.' },
 ];
 
@@ -20,21 +32,22 @@ export default function GuideScreen({ navigation }: GuideScreenProps) {
         </Text>
         <Text accessibilityRole="header" style={styles.sectionTitle}>기초 가이드</Text>
 
-        <ActionPressable
-          testID={TEST_IDS.guide.marketBasicsCard}
-          style={styles.card}
-          accessibilityRole="button"
-          accessibilityLabel="01 시장기초. 이용 가능. 호가와 체결을 통해 시장 가격이 형성되는 과정을 이해합니다."
-          accessibilityHint="시장기초 체험형 강의를 엽니다."
-          onPress={() => navigation.navigate('MarketBasics')}
-        >
-          <Text style={styles.number}>01</Text>
-          <Text style={styles.title}>시장기초</Text>
-          <Text style={styles.description}>
-            호가와 체결을 통해 시장 가격이 형성되는 과정을 이해합니다.
-          </Text>
-          <Text style={styles.available}>이용 가능 · 학습 시작 →</Text>
-        </ActionPressable>
+        {availableGuides.map((guide) => (
+          <ActionPressable
+            key={guide.route}
+            testID={guide.id}
+            style={styles.card}
+            accessibilityRole="button"
+            accessibilityLabel={`${guide.number} ${guide.title}. 이용 가능. ${guide.description}`}
+            accessibilityHint={`${guide.title} 가이드를 엽니다.`}
+            onPress={() => navigation.navigate(guide.route)}
+          >
+            <Text style={styles.number}>{guide.number}</Text>
+            <Text style={styles.title}>{guide.title}</Text>
+            <Text style={styles.description}>{guide.description}</Text>
+            <Text style={styles.available}>이용 가능 · 학습 시작 →</Text>
+          </ActionPressable>
+        ))}
 
         {upcomingGuides.map((guide) => (
           <View key={guide.number} style={[styles.card, styles.upcoming]}>

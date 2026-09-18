@@ -126,11 +126,15 @@ describe('mode-aware bottom tabs', () => {
   });
 
   it('extends the existing Guide stack with MarketBasics and leaves Ranking intact', () => {
-    assert.equal([...guideStack.matchAll(/<Stack\.Screen\b/g)].length, 2);
+    assert.equal([...guideStack.matchAll(/<Stack\.Screen\b/g)].length, 6);
     assert.match(guideStack, /name="Guide"/);
     assert.match(guideStack, /component=\{GuideScreen\}/);
     assert.match(guideStack, /name="MarketBasics"/);
     assert.match(guideStack, /component=\{MarketBasicsScreen\}/);
+    assert.match(guideStack, /component=\{MarketBasicsChaptersScreen\}/);
+    for (const route of ['OrderBookLesson', 'Liquidity', 'Candles', 'OrderTypes']) {
+      assert.ok(guideStack.includes(`name="${route}"`));
+    }
     assert.match(guideStack, /title: '시장기초'/);
     assert.equal([...rankingStack.matchAll(/<Stack\.Screen\b/g)].length, 2);
     assert.match(rankingStack, /name="Ranking"/);

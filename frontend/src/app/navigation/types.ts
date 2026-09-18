@@ -47,6 +47,10 @@ export type RankingStackParamList = {
 export type GuideStackParamList = {
   Guide: undefined;
   MarketBasics: undefined;
+  OrderBookLesson: undefined;
+  Liquidity: undefined;
+  Candles: undefined;
+  OrderTypes: undefined;
 };
 
 export type RecordStackParamList = {

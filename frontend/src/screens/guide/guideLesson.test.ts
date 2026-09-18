@@ -33,6 +33,14 @@ function setup(t: TestContext, home = false) {
   h.press = (id: string) => act(() => h.find(id).props.onPress());
   h.text = () => JSON.stringify(h.renderer.toJSON());
   h.update = () => act(() => h.renderer.update(React.createElement(h.Screen, h.props)));
+  h.layout = (id: string, layout: { y?: number; height?: number }) => act(() =>
+    h.find(id).props.onLayout({ nativeEvent: { layout } }),
+  );
+  h.viewport = (y: number, height = 568) => act(() =>
+    h.renderer.root.findByType('ScrollView').props.onScroll({
+      nativeEvent: { contentOffset: { y }, layoutMeasurement: { height } },
+    }),
+  );
   t.after(() => act(() => h.renderer.unmount()));
   return h;
 }
@@ -125,17 +133,35 @@ const allPurchases = {
   holdingQuantity: 11, holdingAmount: 110220, holdingAverage: 10020,
 };
 
+function assertRenderOrder(h: any, nodes: any[]) {
+  const tree = h.renderer.root.findAll((node: any) => typeof node.type === 'string');
+  const positions = nodes.map((node) => tree.indexOf(node));
+  assert.ok(positions.every((position, index) => position >= 0 && (index === 0 || position > positions[index - 1])), `render positions: ${positions.join(', ')}`);
+}
+
+function header(h: any, title: string) {
+  return h.renderer.root.findAllByType('Text').find((node: any) => node.props.accessibilityRole === 'header' && node.props.children === title);
+}
+
+function assertUniqueTestIds(h: any) {
+  const testIds = h.renderer.root.findAll((node: any) => typeof node.type === 'string' && node.props.testID).map((node: any) => node.props.testID);
+  assert.equal(testIds.length, new Set(testIds).size);
+}
+
 describe('guide home and market basics lesson', () => {
-  it('opens only MarketBasics; upcoming guides have no touch surface', (t) => {
+  it('opens three available guides; stock characteristics has no touch surface', (t) => {
     const h = setup(t, true);
     const buttons = h.renderer.root.findAllByType('Pressable');
-    assert.equal(buttons.length, 1);
+    assert.equal(buttons.length, 3);
     assert.equal(buttons[0].props.testID, ids.marketBasicsCard);
     assert.equal(buttons[0].props.accessibilityRole, 'button');
     h.press(ids.marketBasicsCard);
     assert.deepEqual(h.routes, ['MarketBasics']);
+    h.press('guide-candles-card');
+    h.press('guide-order-types-card');
+    assert.deepEqual(h.routes, ['MarketBasics', 'Candles', 'OrderTypes']);
     for (const title of ['시장기초', '캔들', '주문방식', '주식특성']) assert.ok(h.text().includes(title));
-    assert.equal(h.renderer.root.findAllByType('Text').filter((node: any) => node.props.children === '준비 중').length, 3);
+    assert.equal(h.renderer.root.findAllByType('Text').filter((node: any) => node.props.children === '준비 중').length, 1);
     assert.equal(h.renderer.root.findAllByType('Text').filter((node: any) => node.props.children === '가이드').length, 0);
     act(() => buttons[0].props.onPressIn({ nativeEvent: { pageX: 120, pageY: 210 } }));
     assert.ok(h.renderer.root.findAllByType('AnimatedView').length > 0, 'available card keeps the shared ripple');
@@ -157,11 +183,14 @@ describe('guide home and market basics lesson', () => {
     assert.equal(h.find(ids.restart), undefined);
     assertLessonContent(h);
     assertPurchaseSummary(h, noPurchases);
-    act(() => h.find(ids.orderBook).props.onLayout({ nativeEvent: { layout: { y: 280 } } }));
+    h.layout(ids.exercise(1), { y: 200 });
+    h.layout(ids.orderBook, { y: 80 });
+    h.layout(ids.ask(10010), { y: 120, height: 50 });
+    h.viewport(700);
 
     const firstPress = h.find(ids.buyThree).props.onPress;
     act(() => { firstPress(); firstPress(); });
-    assert.deepEqual(h.scrolls[0], { y: 280, animated: false });
+    assert.deepEqual(h.scrolls[0], { y: 400, animated: false }, 'only reveal the execution row');
     assert.match(row(10010).props.accessibilityLabel, /잔량 3주.*체결 대상/);
     assert.equal(h.find(ids.buyThree).props.disabled, true);
     assert.notEqual(flatten(row(10010).props.style).borderColor, 'transparent');
@@ -275,11 +304,13 @@ describe('guide home and market basics lesson', () => {
       assert.match(quote.props.accessibilityLabel, /매도, 가격 10,010원, 잔량 3주/);
       assert.match(h.find(ids.bid(9990)).props.accessibilityLabel, /매수, 가격 9,990원, 잔량 4주/);
       assert.ok(quote.findAllByType('View').some((view: any) => flatten(view.props.style).flexDirection === (width / fontScale < 240 ? 'column' : 'row')));
+      const price = h.find(ids.lastPrice).findAllByType('Text').find((node: any) => textContent(node) === '10,000원');
+      assert.equal(flatten(price.props.style).maxWidth, '100%', 'large centered prices wrap within the book');
     }
-    act(() => {
-      h.find(ids.orderBook).props.onLayout({ nativeEvent: { layout: { y: 280 } } });
-      h.find(ids.ask(10010)).props.onLayout({ nativeEvent: { layout: { y: 650 } } });
-    });
+    h.layout(ids.exercise(1), { y: 200 });
+    h.layout(ids.orderBook, { y: 80 });
+    h.layout(ids.ask(10010), { y: 650, height: 200 });
+    h.viewport(1200);
     h.press(ids.buyThree);
     assert.deepEqual(h.scrolls.at(-1), { y: 930, animated: false }, 'the active quote stays visible with enlarged text');
     h.tick(1000);
@@ -295,6 +326,118 @@ describe('guide home and market basics lesson', () => {
       const minimum = label === '시장 가격은 어떻게 형성될까요?' ? 24 : label === '처음부터 다시 보기' ? 16 : 19;
       assert.ok(flatten(text.props.style).fontSize >= minimum);
     }
+  });
+
+  it('keeps each result and its purchase values before the next exercise, preserving the first snapshot', (t) => {
+    const h = setup(t);
+    assert.equal(h.find(ids.exercise(2)), undefined);
+    assertRenderOrder(h, [header(h, '실습 1 · 3주 매수'), h.find(ids.orderBook), h.find(ids.buyThree)]);
+    h.press(ids.buyThree);
+    h.tick(1000);
+    h.tick(1300);
+    assertRenderOrder(h, [
+      h.find(ids.firstSnapshot(ids.orderBook)),
+      header(h, '실습 1 · 체결 결과'),
+      h.find(ids.purchaseSummary), h.find(ids.orderAverage), h.find(ids.holdingAverage),
+      header(h, '실습 2 · 여러 가격대 체결'), h.find(ids.orderBook), h.find(ids.buyEight),
+    ]);
+    assertPurchaseSummary(h, firstPurchase);
+    assert.equal(h.find(ids.buyThree), undefined);
+    const second = h.find(ids.exercise(2));
+    assert.ok(second.findAll((node: any) => node === h.find(ids.orderBook)).length > 0);
+    assert.match(h.find(ids.lastPrice).props.accessibilityLabel, /현재가 10,010원/);
+    assert.equal(h.find(ids.ask(10010)), undefined);
+    assert.match(h.find(ids.ask(10020)).props.accessibilityLabel, /잔량 5주/);
+    assert.match(h.find(ids.ask(10030)).props.accessibilityLabel, /잔량 8주/);
+    assertUniqueTestIds(h);
+
+    h.press(ids.buyEight);
+    const frozen = { ...h, find: (id: string) => h.find(ids.firstSnapshot(id)) };
+    assertPurchaseSummary(frozen, firstPurchase);
+    h.tick(1000);
+    assert.match(h.find(ids.ask(10020)).props.accessibilityLabel, /잔량 0주.*5주 체결/);
+    assertPurchaseSummary(h, partialSecondPurchase);
+    assertPurchaseSummary(frozen, firstPurchase);
+    assert.match(frozen.find(ids.ask(10020)).props.accessibilityLabel, /잔량 5주/);
+    h.tick(1300);
+    assert.equal(h.find(ids.ask(10020)), undefined);
+    h.tick(1200);
+    assert.match(h.find(ids.ask(10030)).props.accessibilityLabel, /잔량 5주.*3주 체결/);
+    assert.ok(second.findAll((node: any) => node === h.find(ids.ask(10030))).length > 0);
+    assert.match(frozen.find(ids.ask(10030)).props.accessibilityLabel, /잔량 8주/);
+    assert.match(frozen.find(ids.lastPrice).props.accessibilityLabel, /현재가 10,010원/);
+    h.tick(1300);
+    assertRenderOrder(h, [
+      h.find(ids.result(1)), frozen.find(ids.purchaseSummary),
+      h.find(ids.exercise(2)), h.find(ids.orderBook),
+      header(h, '실습 2 · 체결 결과'), h.find(ids.purchaseSummary),
+      header(h, '호가창 용어'), header(h, '핵심 정리'),
+    ]);
+    assertPurchaseSummary(h, allPurchases);
+    assertPurchaseSummary(frozen, firstPurchase);
+    assertUniqueTestIds(h);
+
+    h.press(ids.restart);
+    assert.equal(h.find(ids.exercise(2)), undefined);
+    assert.equal(frozen.find(ids.orderBook), undefined);
+    assert.equal(frozen.find(ids.purchaseSummary), undefined);
+    assertPurchaseSummary(h, noPurchases);
+    assert.deepEqual(h.scrolls.at(-1), { y: 0, animated: false });
+  });
+
+  for (const fontScale of [1, 3]) {
+    it(`reveals only exercise 2's active row on a narrow screen at font scale ${fontScale}`, (t) => {
+      const h = setup(t);
+      h.dimensions = { width: 280, height: 568, fontScale };
+      h.update();
+      h.layout(ids.exercise(1), { y: 200 });
+      h.layout(ids.orderBook, { y: 80 });
+      h.layout(ids.ask(10010), { y: 120, height: 60 });
+      h.viewport(350);
+      h.press(ids.buyThree);
+      assert.equal(h.scrolls.length, 0, 'an already visible row causes no scroll');
+      h.tick(1000);
+      h.tick(1300);
+
+      const exerciseY = 5000;
+      h.layout(ids.exercise(2), { y: exerciseY });
+      h.layout(ids.orderBook, { y: 240 });
+      h.layout(ids.ask(10020), { y: 260, height: 160 });
+      h.layout(ids.ask(10030), { y: 100, height: 160 });
+      h.viewport(6200);
+      h.press(ids.buyEight);
+      assert.deepEqual(h.scrolls, [{ y: 5500, animated: false }]);
+      h.tick(1000);
+      assertPurchaseSummary(h, partialSecondPurchase);
+      h.tick(1300);
+      assert.deepEqual(h.scrolls.at(-1), { y: 5340, animated: false });
+      assert.ok(h.scrolls.every((scroll: any) => scroll.y >= exerciseY), 'never returns to exercise 1 or its results');
+      h.tick(1200);
+      h.tick(1300);
+      assertPurchaseSummary(h, allPurchases);
+      assertReadableText(h);
+    });
+  }
+
+  it('waits for exercise 2 measurements and leaves visible rows in place', (t) => {
+    const h = setup(t);
+    h.layout(ids.exercise(1), { y: 200 });
+    h.layout(ids.orderBook, { y: 80 });
+    h.layout(ids.ask(10010), { y: 120, height: 60 });
+    h.viewport(350);
+    h.press(ids.buyThree);
+    h.tick(1000);
+    h.tick(1300);
+    h.viewport(5400);
+    h.press(ids.buyEight);
+    assert.equal(h.scrolls.length, 0, 'missing second-exercise measurements never reuse the first book');
+    h.layout(ids.exercise(2), { y: 5000 });
+    h.layout(ids.ask(10020), { y: 260, height: 160 });
+    h.layout(ids.orderBook, { y: 240 });
+    assert.equal(h.scrolls.length, 0, 'the measured target already fits in the viewport');
+    h.tick(1000);
+    assertPurchaseSummary(h, partialSecondPurchase);
+    assert.equal(h.scrolls.length, 0, 'a fill alone does not force a scroll');
   });
 
   it('enlarges home typography without restricting card text or button labels', (t) => {
