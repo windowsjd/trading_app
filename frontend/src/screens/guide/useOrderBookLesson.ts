@@ -35,7 +35,7 @@ const frames: LessonFrame[] = [
   {
     asks: [...afterFirst, { price: 10010, quantity: 0 }],
     lastPrice: 10010, previousPrice: 10000, targetPrice: 10010, filledQuantity: 3,
-    status: '10,010원에서 3주 체결. 잔량이 3주에서 0주가 되고, 최근 체결가는 10,010원으로 변경됩니다.', delay: 1300,
+    status: '10,010원에서 3주 체결. 매도잔량이 3주에서 0주가 되고, 현재가는 10,010원으로 변경됩니다.', delay: 1300,
   },
   {
     asks: afterFirst, lastPrice: 10010, previousPrice: 10000,
@@ -45,7 +45,7 @@ const frames: LessonFrame[] = [
   {
     asks: [initialAsks[0], { price: 10020, quantity: 0 }],
     lastPrice: 10020, previousPrice: 10010, targetPrice: 10020, filledQuantity: 5,
-    status: '10,020원에서 5주 체결. 해당 잔량은 0주입니다. 최근 체결가는 10,020원이며, 매수 요청 중 3주가 남았습니다.', delay: 1300,
+    status: '10,020원에서 5주 체결. 해당 매도잔량은 0주입니다. 현재가는 10,020원이며, 매수 요청 중 3주가 남았습니다.', delay: 1300,
   },
   {
     asks: [initialAsks[0]], lastPrice: 10020, targetPrice: 10030,
@@ -53,18 +53,34 @@ const frames: LessonFrame[] = [
   },
   {
     asks: afterSecond, lastPrice: 10030, previousPrice: 10020, targetPrice: 10030, filledQuantity: 3,
-    status: '10,030원에서 나머지 3주 체결. 해당 잔량은 8주에서 5주가 되고, 최근 체결가는 10,030원으로 변경됩니다.', delay: 1300,
+    status: '10,030원에서 나머지 3주 체결. 해당 매도잔량은 8주에서 5주가 되고, 현재가는 10,030원으로 변경됩니다.', delay: 1300,
   },
   {
     asks: afterSecond, lastPrice: 10030, previousPrice: 10010,
-    status: '8주 매수 완료. 10,020원에서 5주, 10,030원에서 3주가 순서대로 체결되었습니다. 최근 체결가는 10,030원입니다.',
+    status: '8주 매수 완료. 10,020원에서 5주, 10,030원에서 3주가 순서대로 체결되었습니다. 현재가는 10,030원입니다.',
   },
 ];
+
+function summarizeFills(completedFrames: LessonFrame[]) {
+  const fills = completedFrames.flatMap((frame) =>
+    frame.filledQuantity === undefined
+      ? []
+      : [{ price: frame.lastPrice, quantity: frame.filledQuantity }],
+  );
+  const quantity = fills.reduce((sum, fill) => sum + fill.quantity, 0);
+  const amount = fills.reduce((sum, fill) => sum + fill.price * fill.quantity, 0);
+  return { fills, quantity, amount, averagePrice: quantity === 0 ? null : amount / quantity };
+}
 
 export function useOrderBookLesson() {
   const [frameIndex, setFrameIndex] = useState(0);
   const currentIndex = useRef(0);
   const frame = frames[frameIndex];
+  const secondOrderStarted = frameIndex >= 4;
+  // Derive purchases only from executed frames. Highlights and removed rows
+  // add no fills; re-renders, focus changes and reset cannot double-count them.
+  const order = summarizeFills(frames.slice(secondOrderStarted ? 4 : 0, frameIndex + 1));
+  const holding = summarizeFills(frames.slice(0, frameIndex + 1));
 
   const moveTo = useCallback((index: number) => {
     currentIndex.current = index;
@@ -80,6 +96,8 @@ export function useOrderBookLesson() {
 
   return {
     frame,
+    order: { ...order, number: secondOrderStarted ? 2 : 1, requestedQuantity: secondOrderStarted ? 8 : 3 },
+    holding,
     running: frame.delay !== undefined,
     firstComplete: frameIndex >= 3,
     complete: frameIndex === 8,

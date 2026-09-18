@@ -52,8 +52,8 @@ export default function GuideScreen({ navigation }: GuideScreenProps) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   content: { padding: 16, paddingBottom: 32, gap: 12 },
-  introduction: { fontSize: 15, lineHeight: 24, color: '#546e7a', marginBottom: 12 },
-  sectionTitle: { fontSize: 18, lineHeight: 26, fontWeight: '700', color: '#111' },
+  introduction: { fontSize: 16, lineHeight: 26, color: '#546e7a', marginBottom: 12 },
+  sectionTitle: { fontSize: 20, lineHeight: 28, fontWeight: '700', color: '#111' },
   card: {
     borderWidth: 1,
     borderColor: '#e0e0e0',
@@ -63,9 +63,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   upcoming: { backgroundColor: '#fafafa', borderColor: '#eee' },
-  number: { fontSize: 13, lineHeight: 20, fontWeight: '600', color: '#666' },
-  title: { fontSize: 18, lineHeight: 26, fontWeight: '700', color: '#111' },
-  description: { fontSize: 14, lineHeight: 22, color: '#546e7a' },
-  available: { fontSize: 13, lineHeight: 21, color: '#245b76', fontWeight: '700', marginTop: 4 },
-  unavailable: { fontSize: 13, lineHeight: 21, color: '#666', marginTop: 4 },
+  number: { fontSize: 14, lineHeight: 22, fontWeight: '600', color: '#666' },
+  title: { fontSize: 20, lineHeight: 28, fontWeight: '700', color: '#111' },
+  description: { fontSize: 16, lineHeight: 26, color: '#546e7a' },
+  available: { fontSize: 14, lineHeight: 23, color: '#245b76', fontWeight: '700', marginTop: 4 },
+  unavailable: { fontSize: 14, lineHeight: 23, color: '#666', marginTop: 4 },
 });

@@ -13,23 +13,23 @@ import { TEST_IDS } from '../../constants/testIds';
 import { LESSON_BIDS, useOrderBookLesson, type Quote } from './useOrderBookLesson';
 
 const terms = [
-  ['매도호가(Ask)', '현재 시장에 대기 중인 매도 주문의 가격입니다.'],
-  ['매수호가(Bid)', '현재 시장에 대기 중인 매수 주문의 가격입니다.'],
-  ['잔량', '해당 가격에 아직 체결되지 않고 대기 중인 주문 수량입니다.'],
-  ['최우선 매도호가', '현재 대기 중인 매도 주문 가운데 가장 낮은 가격입니다.'],
-  ['최우선 매수호가', '현재 대기 중인 매수 주문 가운데 가장 높은 가격입니다.'],
-  ['체결(Execution)', '매수 주문과 매도 주문이 실제 거래로 성사되는 것을 의미합니다.'],
-  ['최근 체결가', '가장 최근에 거래가 체결된 가격입니다.'],
+  ['호가창 (Order Book)', '아직 체결되지 않고 대기 중인 매수·매도 주문을 가격대별로 확인하는 화면입니다.'],
+  ['현재가 (Last Price)', '가장 최근에 거래가 체결된 가격입니다. 이 가이드에서는 현재가를 최근 체결가격 기준으로 표시합니다. 매수·매도호가가 변하더라도 실제 체결이 발생하지 않으면 현재가는 변하지 않을 수 있습니다.'],
+  ['매도호가 (Ask)', '시장에 대기 중인 매도 주문의 가격입니다.'],
+  ['매수호가 (Bid)', '시장에 대기 중인 매수 주문의 가격입니다.'],
+  ['매도잔량 / 매수잔량', '각 가격에 아직 체결되지 않고 대기 중인 매도·매수 주문의 수량입니다.'],
+  ['체결 / 체결량 (Trade / Trade Size)', '매수 주문과 매도 주문이 실제 거래로 성사되는 것을 체결이라 하며, 이때 실제로 거래된 수량을 체결량이라고 합니다.'],
 ];
 
 const takeaways = [
-  '호가창은 가격대별로 대기 중인 매수·매도 주문과 잔량을 보여줍니다.',
-  '거래는 매수와 매도 주문이 실제로 체결될 때 발생합니다.',
-  '최근 체결가는 가장 최근에 거래가 성사된 가격입니다.',
-  '주문이 여러 가격대의 호가를 순차적으로 체결하면 최근 체결가격도 이동할 수 있습니다.',
+  '호가창에는 가격대별로 대기 중인 매수·매도 주문과 잔량이 표시됩니다.',
+  '거래는 매수 주문과 매도 주문이 실제로 체결될 때 발생합니다.',
+  '현재가는 가장 최근에 거래가 체결된 가격을 기준으로 표시됩니다.',
+  '매수 주문이 더 높은 가격대의 매도호가까지 순차적으로 체결되면 현재가가 상승할 수 있습니다.',
+  '평균 매입단가는 체결가격과 수량을 함께 반영합니다. 이번 주문의 평균 체결가와 전체 보유 평단가는 계산에 포함하는 범위가 다릅니다.',
 ];
 
-const won = (price: number) => `${price.toLocaleString('ko-KR')}원`;
+const won = (price: number) => `${price.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}원`;
 
 function QuoteRow({
   quote, side, best, active = false, filledQuantity, stacked, onLayout,
@@ -75,7 +75,7 @@ function QuoteRow({
 
 export default function MarketBasicsScreen() {
   const lesson = useOrderBookLesson();
-  const { frame, running, firstComplete, complete } = lesson;
+  const { frame, running, firstComplete, complete, order, holding } = lesson;
   const scroll = useRef<ScrollView>(null);
   const bookY = useRef(0);
   const quoteY = useRef<Record<number, number>>({});
@@ -149,14 +149,15 @@ export default function MarketBasicsScreen() {
           <View
             testID={TEST_IDS.guide.lastPrice}
             accessible
-            accessibilityLabel={`최근 체결가 ${won(frame.lastPrice)}`}
+            accessibilityLabel={`현재가 ${won(frame.lastPrice)}. 최근 체결가 기준`}
             style={[styles.lastPrice, frame.filledQuantity !== undefined && styles.priceChanged]}
           >
-            <Text style={styles.helper}>최근 체결가</Text>
+            <Text style={styles.helper}>현재가</Text>
             {frame.previousPrice !== undefined ? (
               <Text style={styles.previousPrice}>{won(frame.previousPrice)} →</Text>
             ) : null}
             <Text style={styles.lastPriceValue}>{won(frame.lastPrice)}</Text>
+            <Text style={styles.helper}>최근 체결가 기준</Text>
           </View>
 
           <Text accessibilityRole="header" style={[styles.sideTitle, styles.bidText]}>매수</Text>
@@ -211,15 +212,72 @@ export default function MarketBasicsScreen() {
           </View>
         ) : null}
 
+        <View style={styles.explanation} testID={TEST_IDS.guide.purchaseSummary}>
+          <Text accessibilityRole="header" style={styles.sectionTitle}>체결가격과 평균 매입단가</Text>
+          <Text style={styles.body}>
+            평균 매입단가(평단가)는 매입금액을 매입수량으로 나눈 값입니다.
+            각 가격에서 실제로 체결된 수량을 반영하므로, 체결 수량이 많은 가격이 평균에 더 큰 영향을 줍니다.
+          </Text>
+          <View style={styles.term} testID={TEST_IDS.guide.orderFills}>
+            <Text style={[styles.body, styles.bold]}>
+              실습 {order.number} · {order.requestedQuantity}주 매수
+            </Text>
+            <Text style={styles.helper}>이번 주문 체결 수량: {order.quantity}주 / {order.requestedQuantity}주</Text>
+            {order.fills.length === 0 ? (
+              <Text style={styles.helper}>아직 체결된 수량이 없습니다.</Text>
+            ) : order.fills.map((fill) => (
+              <Text key={fill.price} style={styles.body}>
+                {won(fill.price)} × {fill.quantity}주 = {won(fill.price * fill.quantity)}
+              </Text>
+            ))}
+          </View>
+          <View style={styles.term}>
+            <Text style={[styles.body, styles.bold]}>현재가</Text>
+            <Text style={styles.summaryValue}>{won(frame.lastPrice)}</Text>
+            <Text style={styles.helper}>시장에서 가장 최근에 체결된 가격입니다.</Text>
+          </View>
+          <View
+            testID={TEST_IDS.guide.orderAverage}
+            style={styles.term}
+            accessible
+            accessibilityLabel={`이번 주문 평균 체결가 ${order.averagePrice === null ? '체결 전' : won(order.averagePrice)}. 이번 주문 체결 ${order.quantity}주, 체결금액 ${won(order.amount)}. 이번 주문에서 지금까지 체결된 금액을 체결 수량으로 나눈 값입니다.`}
+          >
+            <Text style={[styles.body, styles.bold]}>이번 주문 평균 체결가</Text>
+            <Text style={styles.summaryValue}>{order.averagePrice === null ? '체결 전' : won(order.averagePrice)}</Text>
+            <Text style={styles.helper}>이번 주문에서 지금까지 체결된 금액을 체결 수량으로 나눈 값입니다.</Text>
+            {order.averagePrice !== null ? (
+              <Text style={styles.body}>{won(order.amount)} ÷ {order.quantity}주 = {won(order.averagePrice)}</Text>
+            ) : null}
+          </View>
+          <View
+            testID={TEST_IDS.guide.holdingAverage}
+            style={styles.section}
+            accessible
+            accessibilityLabel={`전체 보유 평단가 ${holding.averagePrice === null ? '보유 없음' : won(holding.averagePrice)}. 보유 수량 ${holding.quantity}주, 총 매입금액 ${won(holding.amount)}. 이전 주문과 이번 주문으로 보유한 주식 전체의 매입금액을 보유 수량으로 나눈 값입니다.`}
+          >
+            <Text style={[styles.body, styles.bold]}>전체 보유 평단가</Text>
+            <Text style={styles.summaryValue}>{holding.averagePrice === null ? '보유 없음' : won(holding.averagePrice)}</Text>
+            <Text style={styles.helper}>이전 주문과 이번 주문으로 보유한 주식 전체의 매입금액을 보유 수량으로 나눈 값입니다.</Text>
+            <Text style={styles.body}>보유 수량 {holding.quantity}주 · 총 매입금액 {won(holding.amount)}</Text>
+            {holding.averagePrice !== null ? (
+              <Text style={styles.body}>{won(holding.amount)} ÷ {holding.quantity}주 = {won(holding.averagePrice)}</Text>
+            ) : null}
+          </View>
+        </View>
+
         {firstComplete ? (
           <View style={styles.explanation}>
             <Text accessibilityRole="header" style={styles.sectionTitle}>실습 1 · 체결 결과</Text>
             <Text style={styles.body}>
-              3주의 매수 요청은 최우선 매도호가인 10,010원에 대기 중이던 3주와 전량 체결되었습니다.
-              이에 따라 10,010원의 매도 잔량이 소진되었고, 최근 체결가는 10,010원으로 변경되었습니다.
+              3주의 매수 요청은 10,010원에 대기 중이던 매도 3주와 전량 체결되었습니다.
+              해당 가격의 매도잔량이 소진되었고, 가장 최근 체결가격이 10,010원이 되면서 현재가도 10,010원으로 변경됩니다.
+            </Text>
+            <Text style={styles.body}>
+              3주 모두 같은 가격에서 체결되어 매입금액은 30,030원입니다.
+              첫 주문의 평균 체결가와 전체 보유 3주의 평단가는 모두 10,010원입니다.
             </Text>
             <Text style={[styles.body, styles.bold]}>
-              대기 중인 매도호가가 실제 매수 주문에 의해 체결되면서 새로운 거래 가격이 형성됩니다.
+              대기 중인 매도호가가 실제 매수 주문에 의해 순차적으로 체결되면서 거래 가격이 형성됩니다.
             </Text>
           </View>
         ) : null}
@@ -232,20 +290,23 @@ export default function MarketBasicsScreen() {
               남은 수량은 다음 매도호가와 순차적으로 체결됩니다.
             </Text>
             <Text style={styles.body}>
-              이번 실습에서는 10,020원의 5주가 먼저 체결된 뒤 남은 3주가 10,030원에서 체결되었습니다.
-              마지막 체결가격이 10,030원이므로 최근 체결가 역시 10,030원으로 변경됩니다.
+              8주의 매수 요청 중 5주는 10,020원에서 먼저 체결되고, 남은 3주는 다음 매도호가인 10,030원에서 체결됩니다.
+              마지막 체결가격이 10,030원이므로 현재가 역시 10,030원으로 변경됩니다.
+            </Text>
+            <Text style={styles.body}>
+              이번 주문은 10,020원 × 5주와 10,030원 × 3주를 합한 {won(order.amount)}을
+              8주로 나누어 평균 체결가 {won(order.averagePrice)}이 됩니다.
+              현재가 {won(frame.lastPrice)}과 달리 8주 모두의 체결가격과 수량을 반영한 결과입니다.
+            </Text>
+            <Text style={styles.body}>
+              첫 주문의 30,030원과 이번 주문의 {won(order.amount)}을 합하면 총 매입금액은 {won(holding.amount)}입니다.
+              이를 전체 {holding.quantity}주로 나눈 보유 평단가는 {won(holding.averagePrice)}입니다.
             </Text>
             <Text style={[styles.body, styles.bold]}>
-              충분한 매수 주문이 더 높은 가격대의 매도호가까지 체결시키면 시장의 최근 체결가격은 위쪽으로 이동할 수 있습니다.
+              매수 주문이 더 높은 가격대의 매도호가까지 순차적으로 체결되면 현재가가 상승할 수 있습니다.
             </Text>
           </View>
         ) : null}
-
-        <Text style={styles.helper}>
-          이 실습에서는 매수 요청이 가장 낮은 매도호가부터 즉시 체결되는 것으로 단순화합니다.
-          주문 방식의 차이는 별도 가이드에서 다룹니다.
-          {'\n'}실제 계정이나 시장 데이터와 연결되지 않으며, 학습 진행도는 저장하지 않습니다.
-        </Text>
 
         <View style={styles.section}>
           <Text accessibilityRole="header" style={styles.sectionTitle}>호가창 용어</Text>
@@ -283,38 +344,39 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   content: { padding: 16, paddingBottom: 32, gap: 24 },
   section: { gap: 12 },
-  title: { fontSize: 22, lineHeight: 32, fontWeight: '700', color: '#111' },
-  sectionTitle: { fontSize: 17, lineHeight: 26, fontWeight: '700', color: '#111' },
-  body: { fontSize: 15, lineHeight: 25, color: '#37474f' },
-  helper: { fontSize: 13, lineHeight: 21, color: '#546e7a' },
+  title: { fontSize: 24, lineHeight: 34, fontWeight: '700', color: '#111' },
+  sectionTitle: { fontSize: 19, lineHeight: 28, fontWeight: '700', color: '#111' },
+  summaryValue: { fontSize: 19, lineHeight: 28, fontWeight: '700', color: '#111', fontVariant: ['tabular-nums'] },
+  body: { fontSize: 16, lineHeight: 27, color: '#37474f' },
+  helper: { fontSize: 14, lineHeight: 23, color: '#546e7a' },
   bold: { fontWeight: '700' },
   book: { borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 14, padding: 12, gap: 4 },
   bookHeading: { gap: 4, marginBottom: 8 },
-  sideTitle: { fontSize: 14, lineHeight: 22, fontWeight: '700', marginVertical: 4 },
+  sideTitle: { fontSize: 16, lineHeight: 24, fontWeight: '700', marginVertical: 4 },
   columnHeadings: { flexDirection: 'row', paddingHorizontal: 12, paddingBottom: 4, gap: 12 },
   quoteRow: { padding: 10, borderWidth: 2, borderColor: 'transparent', borderRadius: 8, gap: 4 },
   columns: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   stackedColumns: { flexDirection: 'column', alignItems: 'stretch', gap: 4 },
-  priceCell: { flex: 3, textAlign: 'right', fontSize: 15, lineHeight: 23, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  priceCell: { flex: 3, textAlign: 'right', fontSize: 16, lineHeight: 25, fontWeight: '600', fontVariant: ['tabular-nums'] },
   quantityCell: { flex: 2, alignItems: 'flex-end' },
   quantityHeading: { flex: 2, textAlign: 'right' },
   stackedCell: { flex: 0, textAlign: 'left', alignItems: 'flex-start' },
-  quantity: { fontSize: 15, lineHeight: 23, color: '#263238', fontVariant: ['tabular-nums'] },
-  previousQuantity: { fontSize: 12, lineHeight: 19, color: '#546e7a', fontVariant: ['tabular-nums'] },
+  quantity: { fontSize: 16, lineHeight: 25, color: '#263238', fontVariant: ['tabular-nums'] },
+  previousQuantity: { fontSize: 14, lineHeight: 22, color: '#546e7a', fontVariant: ['tabular-nums'] },
   askRow: { backgroundColor: '#f1f5fc' },
   bidRow: { backgroundColor: '#fcf3f2' },
   askText: { color: '#315f9b' },
   bidText: { color: '#a13e3b' },
   activeRow: { borderColor: '#527b91', backgroundColor: '#e7f0f4' },
-  rowNote: { fontSize: 12, lineHeight: 19, color: '#37474f' },
+  rowNote: { fontSize: 14, lineHeight: 22, color: '#37474f' },
   lastPrice: { alignItems: 'center', padding: 12, gap: 4, marginVertical: 8, borderRadius: 8, backgroundColor: '#fafafa' },
   priceChanged: { backgroundColor: '#e7f0f4' },
-  previousPrice: { fontSize: 14, lineHeight: 22, color: '#546e7a', fontVariant: ['tabular-nums'] },
-  lastPriceValue: { fontSize: 24, lineHeight: 34, fontWeight: '700', color: '#111', fontVariant: ['tabular-nums'] },
-  executionStatus: { fontSize: 14, lineHeight: 23, color: '#37474f', marginTop: 12 },
+  previousPrice: { fontSize: 15, lineHeight: 24, color: '#546e7a', fontVariant: ['tabular-nums'] },
+  lastPriceValue: { fontSize: 26, lineHeight: 38, fontWeight: '700', color: '#111', fontVariant: ['tabular-nums'] },
+  executionStatus: { fontSize: 15, lineHeight: 25, color: '#37474f', marginTop: 12 },
   button: { backgroundColor: '#111', borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
   disabledButton: { backgroundColor: '#626262' },
-  buttonText: { color: '#fff', fontSize: 15, lineHeight: 23, fontWeight: '700', textAlign: 'center' },
+  buttonText: { color: '#fff', fontSize: 16, lineHeight: 25, fontWeight: '700', textAlign: 'center' },
   explanation: { borderWidth: 1, borderColor: '#e8e8e8', borderRadius: 14, padding: 16, backgroundColor: '#fafafa', gap: 12 },
   term: { gap: 4, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
 });
