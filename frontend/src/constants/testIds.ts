@@ -96,6 +96,16 @@ export const TEST_IDS = {
 
   guide: {
     screen: 'guide-screen',
+    marketBasicsCard: 'guide-market-basics-card',
+    marketBasicsScreen: 'guide-market-basics-screen',
+    orderBook: 'guide-order-book',
+    ask: (price: number) => `guide-ask-${price}`,
+    bid: (price: number) => `guide-bid-${price}`,
+    lastPrice: 'guide-last-price',
+    executionStatus: 'guide-execution-status',
+    buyThree: 'guide-buy-three',
+    buyEight: 'guide-buy-eight',
+    restart: 'guide-restart',
   },
 
   ranking: {

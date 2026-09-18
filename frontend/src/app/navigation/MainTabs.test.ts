@@ -17,10 +17,6 @@ const rankingStack = readFileSync(
   new URL('./RankingStack.tsx', import.meta.url),
   'utf8',
 );
-const guideScreen = readFileSync(
-  new URL('../../screens/guide/GuideScreen.tsx', import.meta.url),
-  'utf8',
-);
 const icons = readFileSync(
   new URL('../../components/navigation/TabBarIcon.tsx', import.meta.url),
   'utf8',
@@ -129,22 +125,16 @@ describe('mode-aware bottom tabs', () => {
     }
   });
 
-  it('keeps Guide minimal and leaves the existing Ranking stack intact', () => {
-    assert.equal([...guideStack.matchAll(/<Stack\.Screen\b/g)].length, 1);
+  it('extends the existing Guide stack with MarketBasics and leaves Ranking intact', () => {
+    assert.equal([...guideStack.matchAll(/<Stack\.Screen\b/g)].length, 2);
     assert.match(guideStack, /name="Guide"/);
     assert.match(guideStack, /component=\{GuideScreen\}/);
+    assert.match(guideStack, /name="MarketBasics"/);
+    assert.match(guideStack, /component=\{MarketBasicsScreen\}/);
+    assert.match(guideStack, /title: '시장기초'/);
     assert.equal([...rankingStack.matchAll(/<Stack\.Screen\b/g)].length, 2);
     assert.match(rankingStack, /name="Ranking"/);
     assert.match(rankingStack, /name="UserSeasonSummary"/);
-    assert.match(guideScreen, />\s*가이드\s*</);
-    assert.match(
-      guideScreen,
-      /투자 기초와 차트 활용 가이드를 준비하고 있습니다\./,
-    );
-    assert.match(
-      guideScreen,
-      /<ScrollView contentContainerStyle=\{styles\.content\}>/,
-    );
   });
 });
 

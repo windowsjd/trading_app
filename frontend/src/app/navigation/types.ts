@@ -46,6 +46,7 @@ export type RankingStackParamList = {
 
 export type GuideStackParamList = {
   Guide: undefined;
+  MarketBasics: undefined;
 };
 
 export type RecordStackParamList = {
