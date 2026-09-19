@@ -149,10 +149,10 @@ function assertUniqueTestIds(h: any) {
 }
 
 describe('guide home and market basics lesson', () => {
-  it('opens three available guides; stock characteristics has no touch surface', (t) => {
+  it('opens all six available guides with the existing touch surface', (t) => {
     const h = setup(t, true);
     const buttons = h.renderer.root.findAllByType('Pressable');
-    assert.equal(buttons.length, 3);
+    assert.equal(buttons.length, 6);
     assert.equal(buttons[0].props.testID, ids.marketBasicsCard);
     assert.equal(buttons[0].props.accessibilityRole, 'button');
     h.press(ids.marketBasicsCard);
@@ -160,8 +160,10 @@ describe('guide home and market basics lesson', () => {
     h.press('guide-candles-card');
     h.press('guide-order-types-card');
     assert.deepEqual(h.routes, ['MarketBasics', 'Candles', 'OrderTypes']);
-    for (const title of ['시장기초', '캔들', '주문방식', '주식특성']) assert.ok(h.text().includes(title));
-    assert.equal(h.renderer.root.findAllByType('Text').filter((node: any) => node.props.children === '준비 중').length, 1);
+    for (const route of ['StockCharacteristics', 'CorporateActions', 'EtfIndex']) h.press(`guide-topic-card-${route}`);
+    assert.deepEqual(h.routes, ['MarketBasics', 'Candles', 'OrderTypes', 'StockCharacteristics', 'CorporateActions', 'EtfIndex']);
+    for (const title of ['시장기초', '캔들', '주문방식', '주식특성', '기업행동과 조정주가', 'ETF와 지수']) assert.ok(h.text().includes(title));
+    assert.equal(h.renderer.root.findAllByType('Text').filter((node: any) => node.props.children === '준비 중').length, 0);
     assert.equal(h.renderer.root.findAllByType('Text').filter((node: any) => node.props.children === '가이드').length, 0);
     act(() => buttons[0].props.onPressIn({ nativeEvent: { pageX: 120, pageY: 210 } }));
     assert.ok(h.renderer.root.findAllByType('AnimatedView').length > 0, 'available card keeps the shared ripple');

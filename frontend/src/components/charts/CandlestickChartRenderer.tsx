@@ -1,5 +1,6 @@
 import React, { useId, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { UP_COLOR, DOWN_COLOR } from './candleColors';
 import Svg, {
   ClipPath,
   Defs,
@@ -83,8 +84,6 @@ export type CandlestickChartRendererProps = {
 };
 
 const GRID_LINES = 4;
-const UP_COLOR = '#16a34a';
-const DOWN_COLOR = '#dc2626';
 const GRID_COLOR = '#eef1f4';
 const AXIS_TEXT_COLOR = '#98a2b3';
 const CROSSHAIR_COLOR = '#64748b';

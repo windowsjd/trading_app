@@ -1,3 +1,4 @@
+import type { GuideChapter } from '../../screens/guide/guideTopics';
 import type {
   CompositeScreenProps,
   NavigatorScreenParams,
@@ -51,6 +52,10 @@ export type GuideStackParamList = {
   Liquidity: undefined;
   Candles: undefined;
   OrderTypes: undefined;
+  StockCharacteristics: undefined;
+  CorporateActions: undefined;
+  EtfIndex: undefined;
+  GuideChapter: { chapter: GuideChapter };
 };
 
 export type RecordStackParamList = {

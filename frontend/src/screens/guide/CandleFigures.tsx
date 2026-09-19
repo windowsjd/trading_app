@@ -3,6 +3,7 @@ import { Text, View } from 'react-native';
 import Svg, { Line, Polyline, Rect } from 'react-native-svg';
 import { candleParts, won, type Ohlc } from './lessonCalculations';
 import { lessonStyles as s } from './LessonUi';
+import { UP_COLOR, DOWN_COLOR } from '../../components/charts/candleColors';
 
 // All teaching candles share a price scale so their shapes are comparable.
 const y = (price: number) => 190 - ((price - 9400) / 1600) * 170;
@@ -18,7 +19,7 @@ export function CandleFigure({
   details?: boolean;
 }) {
   const parts = candleParts(candle);
-  const color = candle.close >= candle.open ? '#a44b4b' : '#3c6799';
+  const color = candle.close >= candle.open ? UP_COLOR : DOWN_COLOR;
   const label = `${title}. ${parts.direction}. 시가 ${won(candle.open)}, 고가 ${won(candle.high)}, 저가 ${won(candle.low)}, 종가 ${won(candle.close)}.`;
   return (
     <View testID={id} style={s.card}>
