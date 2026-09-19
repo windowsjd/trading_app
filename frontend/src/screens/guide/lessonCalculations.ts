@@ -28,12 +28,6 @@ export const THIN_ASKS: Quote[] = [
   { price: 10020, quantity: 8 },
   { price: 10010, quantity: 5 },
 ];
-export const SIZE_ASKS: Quote[] = [
-  { price: 10040, quantity: 20 },
-  { price: 10030, quantity: 12 },
-  { price: 10020, quantity: 8 },
-  { price: 10010, quantity: 5 },
-];
 export const CANCEL_ASKS: Quote[] = [
   { price: 10020, quantity: 5 },
   { price: 10010, quantity: 3 },

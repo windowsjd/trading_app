@@ -63,28 +63,6 @@ export function callAuction(buys: Quote[], sells: Quote[]) {
   // These fixtures have one clear result. Do not invent exchange tie-breaking rules.
   return { candidates, result: best.length === 1 ? best[0] : null };
 }
-export function limitBuy(asks: Quote[], requested: number, limit: number) {
-  let remaining = requested;
-  const fills: Quote[] = [];
-  for (const row of [...asks].sort((a, b) => a.price - b.price)) {
-    if (row.price > limit || remaining === 0) break;
-    const quantity = Math.min(row.quantity, remaining);
-    fills.push({ price: row.price, quantity });
-    remaining -= quantity;
-  }
-  const quantity = requested - remaining;
-  const amount = fills.reduce(
-    (sum, fill) => sum + fill.price * fill.quantity,
-    0,
-  );
-  return {
-    fills,
-    quantity,
-    remaining,
-    amount,
-    average: quantity ? amount / quantity : null,
-  };
-}
 export function sessionOhlc(trades: SessionTrade[], extended: boolean) {
   const records = trades.filter(
     (trade) =>
@@ -97,6 +75,31 @@ export function sessionOhlc(trades: SessionTrade[], extended: boolean) {
       : null,
   };
 }
+// Fixed display buckets from these samples. Missing/excluded sessions remain visible gaps.
+export function sessionTimeline(trades: SessionTrade[], extended: boolean) {
+  const groups = new Map<string, SessionTrade[]>();
+  for (const trade of trades) {
+    const key =
+      trade.day === '전 거래일'
+        ? trade.day
+        : `${trade.session}-${trade.time.slice(0, 2)}`;
+    groups.set(key, [...(groups.get(key) ?? []), trade]);
+  }
+  return [...groups.values()].flatMap((records) => {
+    const first = records[0];
+    const label = `${first.day} ${first.time} · ${first.session === 'regular' ? '정규장' : first.session === 'pre' ? '장전' : '장후'}`;
+    const included = extended || first.session === 'regular';
+    const item = {
+      label,
+      candle: included ? ohlcFromPrices(records.map((r) => r.price)) : null,
+    };
+    return first.day === '전 거래일'
+      ? [item, { label: '밤사이 거래 공백 · 예제 기록 없음', candle: null }]
+      : [item];
+  });
+}
+export const payoutRatio = (dividends: number, netIncome: number) =>
+  netIncome > 0 ? (dividends / netIncome) * 100 : null;
 export function adjustOhlc(candle: Ohlc, factor: number): Ohlc {
   return {
     open: candle.open * factor,

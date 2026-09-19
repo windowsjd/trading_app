@@ -294,7 +294,7 @@ export default function OrderTypesScreen() {
       <OrderTypesLesson />
       <LessonAction
         id="orders-reset"
-        label="처음부터 다시 보기"
+        label="처음부터"
         secondary
         onPress={() => setVersion((v) => v + 1)}
       />

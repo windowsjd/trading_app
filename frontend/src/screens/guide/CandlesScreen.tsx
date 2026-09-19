@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Text, View } from 'react-native';
-import { CandleFigure, PricePath } from './CandleFigures';
+import { CandleAnatomy, CandleFigure, PricePath } from './CandleFigures';
 import {
   Body,
   Comparison,
@@ -58,6 +58,7 @@ function CandlesLesson() {
           하나의 도형으로 압축해 보여줍니다.
         </Body>
       </Section>
+      <CandleAnatomy />
       <Section title="실습 1 · 가격으로 캔들 만들기" id="candle-builder">
         <Body>
           시가는 10,000원으로 고정합니다. 고가·저가·종가를 바꾸고 몸통과 꼬리의 변화를 확인하세요.
@@ -83,8 +84,7 @@ function CandlesLesson() {
         ))}
         <CandleFigure candle={candle} id="candle-builder-figure" title="선택한 가격의 캔들" />
         <Body>
-          종가가 시가보다 높으면 양봉, 낮으면 음봉입니다. 몸통은 시가와 종가 사이이며, 윗꼬리는 몸통
-          위부터 고가까지, 아랫꼬리는 저가부터 몸통 아래까지의 가격 범위입니다.
+          선택한 가격을 그림의 몸통과 꼬리에 연결해보세요. 결과 확인을 누르면 이 캔들이 기록됩니다.
         </Body>
         <LessonAction
           id="candle-builder-confirm"
@@ -95,13 +95,12 @@ function CandlesLesson() {
         {built ? (
           <Result title="실습 1 · 결과 해석" id="candle-builder-result">
             <Body>
-              시가는 구간의 첫 체결가격, 종가는 마지막 체결가격입니다. 고가와 저가는 구간에서 체결된
-              가격의 최댓값과 최솟값입니다.
+              시가 {won(candle.open)}에서 시작해 종가 {won(candle.close)}로 끝난 캔들입니다.
+              {candle.close > candle.open ? ' 종가가 시가보다 높아 양봉입니다.' : candle.close < candle.open ? ' 종가가 시가보다 낮아 음봉입니다.' : ' 시가와 종가가 같아 몸통은 수평선으로 표시됩니다.'}
             </Body>
             <Body>
-              몸통(Body)은 시가와 종가 사이를 나타냅니다. 윗꼬리(Upper Wick)와 아랫꼬리(Lower
-              Wick)는 몸통 바깥에서 관찰된 고가·저가 범위를 나타냅니다. 해당 범위가 없으면 그 꼬리도
-              없습니다.
+              이 구간의 최고 체결가는 {won(candle.high)}, 최저 체결가는 {won(candle.low)}입니다.
+              몸통 바깥의 가격 범위가 꼬리로 나타나며, 해당 범위가 없으면 그 꼬리도 없습니다.
             </Body>
           </Result>
         ) : null}
@@ -230,7 +229,7 @@ export default function CandlesScreen() {
       <CandlesLesson />
       <LessonAction
         id="candles-reset"
-        label="처음부터 다시 보기"
+        label="처음부터"
         secondary
         onPress={() => setVersion((v) => v + 1)}
       />

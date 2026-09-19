@@ -1,6 +1,12 @@
 import React from 'react';
 import { Text, View } from 'react-native';
-import Svg, { Circle, Line, Polyline, Rect } from 'react-native-svg';
+import Svg, {
+  Circle,
+  Line,
+  Polyline,
+  Rect,
+  Text as SvgText,
+} from 'react-native-svg';
 import { UP_COLOR, DOWN_COLOR } from '../../components/charts/candleColors';
 import { LessonAction, lessonStyles as s } from './LessonUi';
 import { won, type Ohlc } from './lessonCalculations';
@@ -164,10 +170,14 @@ export function CandleSeries({
   id,
   items,
   domain,
+  formatPrice = won,
+  timeline = false,
 }: {
   id: string;
   items: { label: string; candle: Ohlc | null }[];
   domain: [number, number];
+  formatPrice?: (value: number) => string;
+  timeline?: boolean;
 }) {
   return (
     <View style={s.card} testID={id}>
@@ -221,10 +231,32 @@ export function CandleSeries({
             </React.Fragment>
           );
         })}
+        {timeline
+          ? items.map((_, i) => (
+              <SvgText
+                key={i}
+                x={((i + 0.5) / items.length) * 300}
+                y={204}
+                fontSize={15}
+                textAnchor="middle"
+                fill="#425966"
+              >
+                {i + 1}
+              </SvgText>
+            ))
+          : null}
       </Svg>
       <Basis>
-        공통 가격축: {won(domain[0])}~{won(domain[1])} · 양봉 녹색 / 음봉 빨간색
+        공통 가격축: {formatPrice(domain[0])}~{formatPrice(domain[1])} · 양봉
+        녹색 / 음봉 빨간색
       </Basis>
+      {timeline ? (
+        <Basis>
+          시간축: 왼쪽 → 오른쪽 번호 순서. 회색 칸은 기록 없음 또는 선택 범위
+          밖입니다. 아래에 각 시각과 값을 표시합니다. 예제 구간 간 간격은 시간에
+          비례하지 않습니다.
+        </Basis>
+      ) : null}
       {items.map(({ label, candle }, i) => (
         <View
           key={i}
@@ -232,15 +264,18 @@ export function CandleSeries({
           accessible
           accessibilityLabel={
             candle
-              ? `${label}, ${candle.close < candle.open ? '음봉' : candle.close > candle.open ? '양봉' : '시가와 종가 동일'}, 시가 ${won(candle.open)}, 고가 ${won(candle.high)}, 저가 ${won(candle.low)}, 종가 ${won(candle.close)}`
+              ? `${label}, ${candle.close < candle.open ? '음봉' : candle.close > candle.open ? '양봉' : '시가와 종가 동일'}, 시가 ${formatPrice(candle.open)}, 고가 ${formatPrice(candle.high)}, 저가 ${formatPrice(candle.low)}, 종가 ${formatPrice(candle.close)}`
               : `${label}, 거래 기록 없음`
           }
         >
-          <Text style={[s.body, s.bold]}>{label}</Text>
+          <Text style={[s.body, s.bold]}>
+            {timeline ? `${i + 1}. ` : ''}
+            {label}
+          </Text>
           <Text style={s.body}>
             {candle
-              ? `${candle.close < candle.open ? '음봉' : candle.close > candle.open ? '양봉' : '시가와 종가 동일'}\n시가 ${won(candle.open)}\n고가 ${won(candle.high)}\n저가 ${won(candle.low)}\n종가 ${won(candle.close)}`
-              : '거래 기록 없음 · 공백'}
+              ? `${candle.close < candle.open ? '음봉' : candle.close > candle.open ? '양봉' : '시가와 종가 동일'}\n시가 ${formatPrice(candle.open)}\n고가 ${formatPrice(candle.high)}\n저가 ${formatPrice(candle.low)}\n종가 ${formatPrice(candle.close)}`
+              : '포함된 거래 기록 없음 · 공백'}
           </Text>
         </View>
       ))}

@@ -323,9 +323,9 @@ describe('guide home and market basics lesson', () => {
       h.tick(delay);
       assertReadableText(h);
     }
-    for (const label of ['시장 가격은 어떻게 형성될까요?', '실습 2 · 체결 결과', '처음부터 다시 보기']) {
+    for (const label of ['시장 가격은 어떻게 형성될까요?', '실습 2 · 체결 결과', '처음부터']) {
       const text = h.renderer.root.findAllByType('Text').find((node: any) => node.props.children === label);
-      const minimum = label === '시장 가격은 어떻게 형성될까요?' ? 24 : label === '처음부터 다시 보기' ? 16 : 19;
+      const minimum = label === '시장 가격은 어떻게 형성될까요?' ? 24 : label === '처음부터' ? 16 : 19;
       assert.ok(flatten(text.props.style).fontSize >= minimum);
     }
   });

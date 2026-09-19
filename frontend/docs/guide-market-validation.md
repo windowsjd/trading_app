@@ -1,67 +1,114 @@
-# 가이드 04–06 구현 및 검증 기록
+# 가이드 수정 및 완료 전 검토 기록
 
-검증일: 2026-09-19. [출처·적용 시장·시행일·예제 가정](./guide-market-sources.md).
+검증일: 2026-09-19. 조사 기준 HEAD: `554c2c18` (작업 시작 시 working tree clean).
+공식 근거와 계산 가정은 [guide-market-sources.md](./guide-market-sources.md)에 정리했다.
 
-## 최종 정보 구조와 조작
+## 유지한 교육 구조와 수정 결과
 
-기존 01 시장기초(호가창과 체결 / 유동성과 가격 충격), 02 캔들, 03 주문방식을 유지한다. 04–06은 주제 선택 화면에서 각각 아래 챕터로 진입한다. 각 챕터는 하나의 세로 페이지다.
-
-| 주제/챕터 | 실제 사용자 조작 → 결과 |
+| 주제 | 최종 강의·실습 |
 | --- | --- |
-| 04 거래시간과 휴장 | KRX/NXT 구간 선택 → 접수·체결·가격 기준 변경. 미국 겨울/여름 날짜 선택 → ET/KST와 익일 날짜 계산. 정상일/휴장/조기 폐장 선택 → 해당 날짜 일정 우선 적용 |
-| 04 개장·마감과 시간대별 거래 | 세 묶음 주문 수집 → 후보별 수량 계산 → 10,200원 80주 체결. 종가 확정 후 장후 체결 → 정규장 종가 유지. 정규장 매수 결과 아래 시간외 매수 → 15주 체결·5주 미체결 |
-| 04 주식 차트의 갭과 표시 기준 | 다음 개장 적용 → 10,000원/10,700원 갭. 종가 확인 → 10,600원 음봉과 전일 대비 +6%. 거래 구간 전환 → 동일 원본에서 OHLC 재집계 |
-| 04 거래정지와 가격제한 | 거래정지/재개 적용 → 공백과 재개 첫 거래 표시. VI 단계 실행 → 접수 가능·단일가 체결·연속매매 복귀. 주문가격 검사 → 7,000–13,000원 안팎 허용/거절, 반대 주문 없는 상하한가 미체결 |
-| 05 주식분할과 병합 | 1주→2주 분할 / 별도 2주→1주 병합 → 수량·단가 동시 변경, 가치 1,000,000원 유지 |
-| 05 배당과 배당락 | 매수일 선택 → 미국 일반 현금배당 권리 확인. 원화 이론 예제에서 배당락/지급 적용 → 미수 배당 5,000원이 지급일에 현금으로 이동, 총액 100,000원 유지 |
-| 05 조정주가 읽기 | 원본/분할 조정 전환 → 과거 OHLC 전체 0.5배. 선택 기록 후 배당 반영 전환 → 과거 OHLC 전체 0.95배. 공통 축·원본 불변 |
-| 06 지수와 ETF의 구조 | A/C 수익률 선택·적용 → 비중과 기여도 계산. 기본값 +4%, 지수 1,040. 아래 ETF 계산 → 순자산 1,040,000원, NAV 10,400원 |
-| 06 시장가격과 순자산가치 | 부채 선택 → 전체 순자산/주당 NAV 계산. 독립 NAV 10,000원 예제에서 가격 선택 → 괴리율 +2/0/−2%. 기준시각 선택 → 동일시점 가정/이전 NAV 구분 |
-| 06 지수 추종과 상품정보 | 수익률 정규화 → +10%/+9.8%, 추적차이 −0.2%p. 안정형 결과 아래 변동형 실행 → 평균은 같아도 편차가 다름. 6개 상품 항목을 열어 의미 확인 |
+| 시장기초 | 호가창과 체결 유지. 유동성과 가격 충격은 ‘같은 주문, 다른 유동성’과 ‘호가 변화와 실제 체결은 다르다’ 두 실습 |
+| 캔들 | 단일 예시 캔들에 시가·고가·저가·종가·몸통·윗꼬리·아랫꼬리의 위치와 정의 연결. 그 아래 기존 캔들 만들기, 같은 OHLC/다른 경로, 5분→15분 집계 유지 |
+| 주문방식 | 기존 실습·계산 유지. 초기화 표시만 ‘처음부터’로 통일 |
+| 주식특성 1 | 한국시장과 미국시장의 거래시간: 같은 화면 구조의 시간표와 캔들 시간축, 정규장/시간외 전환, 서머타임, 휴장/조기 폐장 |
+| 주식특성 2 | 개장·마감과 시간대별 거래: 주문 수집→시가→첫 캔들, 장중 마지막 가격→종가 단일가→종가, 장후 가격, 미국 개장·마감 경매와 캔들 비교 |
+| 주식특성 3 | 한국주식과 미국주식 차트의 특징: 두 시장의 갭, 음봉이면서 전일 대비 상승, 같은 원본에서 정규장/시간외 OHLC 재계산 |
+| 기업행동과 조정주가 | 주식분할과 병합 / 배당과 배당락 / 조정주가 읽기 유지. 배당은 용어 설명→배당락 전→배당락 후(권리와 이후 지급)→배당성향 계산 |
+| ETF와 지수 | 지수란 무엇인가 / ETF란 무엇인가 / ETF는 지수를 어떻게 따라가는가 / ETF 시장가격과 NAV / ETF를 볼 때 확인해야 할 정보 |
 
-모든 신규 실습은 `조작 → 도표/수치 → 결과 해석 → 다음 실습`으로 진행한다. 이후 결과에 의존하는 입력은 기록 후 잠근다. 분할/지급 등은 boolean 상태를 적용하므로 중복 합산하지 않는다. 단계 수집/VI의 동일 이벤트 콜백 중복 호출도 두 단계로 건너뛰지 않는다.
+삭제한 내용:
 
-신규 실습에는 자동 스크롤이나 재생 타이머를 추가하지 않았다. 따라서 완료한 이전 단계로 자동 복귀하지 않고, 현재 실행 버튼 아래에서 결과를 읽을 수 있다. 전체 초기화만 페이지 재마운트로 처음 위치로 돌아간다. 이전 시장기초의 프레임·평단 계산·현재 실습 호가 보조 스크롤은 그대로 유지한다.
+- 유동성 실습 3, 3/10/20/30주 수량 선택·비교, SizeTrial 및 전용 상태/결과/테스트, `SIZE_ASKS`.
+- 주식특성의 거래정지·VI·상한가/하한가·가격제한 강의와 라우팅 항목, 상태 및 전용 테스트.
+- 독립적인 한국 제도 암기형 선택 목록과 NXT 혼합 fixture를 두 시장 비교 구조로 교체.
+- 개장·마감 강의의 중복 잔량 비교를 미국 경매 비교로 교체하고 사용처가 사라진 `limitBuy` 제거. 기존 주문방식의 지정가 실습은 유지.
+- ETF 초반 부채 선택·고급 용어 중심 흐름을 기본 개념 중심으로 교체. 추적오차의 통계 공식 표시 대신 선의 변화를 비교.
 
-## 변경 부분
+## 계산과 상태 검증
 
-- `guideTopics`, `GuideTopicScreen`, `GuideChapterScreen`: 주제/챕터 목록과 기존 Stack 연결, 초기화.
-- `StockLessons`, `CorporateLessons`, `EtfLessons`: 해당 주제에 한정된 직접 조작 화면.
-- `marketLessonData`, `marketLessonCalculations`: 고정 교육 기록과 순수 계산. 실제 계정·시세 서비스 import 없음.
-- `MarketLessonUi`: 기존 LessonUi/ActionPressable 위의 선택지·수치·공통 축 그림. 새로운 라이브러리 없음.
-- `candleColors`: 실제 차트가 이미 쓰던 상승 초록/하락 빨강 상수 공유. 교육용 그림만 의미를 일치시킴. 실제 차트 동작 변경 없음.
-- 테스트: 기존 홈/Stack의 예상 활성 카드/route 수만 갱신, 기존 체결 검증 유지. `marketGuides.test.ts` 29개 계산·상태·순서·초기화·색상 검증 추가.
-- `package.json`: `lint:guides:check`를 `check`에 포함. 모든 가이드 런타임 TS/TSX, GuideStack/types, 공유 색/실제 렌더러를 lint. 기존 정책대로 `*.test.ts`는 lint에서 제외하며 typecheck와 전체 테스트에서 검사.
+가이드 상세 테스트 **61개**: `guideLesson` 9개, `guideContent` 19개, `marketGuides` 33개 통과.
 
-## 실행 결과
+| 대상 | 확인한 결과 |
+| --- | --- |
+| 유동성 | A 20주 평균 10,010원/마지막 10,010원. B 평균 10,021원/마지막 10,030원. 참여자의 주문 취소만으로 10,000원 유지, 실제 체결 후 10,020원. 이전 비교/취소 결과 고정 |
+| 캔들 | 7개 용어가 위치에 연결되고 실습 1 이전에 표시. 기존 geometry 변경·가격 경로·집계 계산, 선택값 고정 유지 |
+| 거래시간 | KRX 09:00–15:30, 미국 09:30–16:00 ET. 2026-01-07 23:30→익일 06:00 KST, 2026-07-08 22:30→익일 05:00. 두 시장의 원본 필터링과 시간축 생성, 선택 결과 고정 |
+| 갭/방향 | 한국 10,000→10,700원, 미국 100→107달러 갭. 한국 종가 10,600원은 음봉이면서 전일 대비 +6%. 실제 차트와 동일한 색상 상수 사용 |
+| 세션 OHLC | 각 시장에서 원본 기록 하나로 정규장/확장 범위를 계산. 원본 가격을 바꾸는 테스트에서 OHLC도 변함. 원본 불변, 빈 구간은 null |
+| 배당 | 주요 단계 2개만 표시. 배당락 후 9,500원×10주=95,000원, 받을 배당 5,000원, 현금 0. 지급 후 받을 배당 0, 현금 5,000원. 총액 100,000원 유지, 연속 클릭에도 중복 지급 없음 |
+| 배당성향 | 20/30/50억원 ÷ 순이익 100억원 → 20/30/50%. 0/음수 분모는 null |
+| 지수/ETF | 기본 입력의 기여도 +5/0/−1%포인트, 지수 1,000→1,040. ETF 순자산 1,000,000→1,040,000원, 100주당 한 주 가치 10,000→10,400원. B 수익률을 바꾸면 결과도 재계산 |
+| NAV/추종 | 괴리율 −2/0/+2%, 추적차이 −0.2%포인트. 추적오차는 시간에 따른 차이의 변동으로 구분. 지수/ETF 정의가 NAV/추적 강의보다 먼저 나옴 |
+| 초기화/타이머 | 모든 초기화 이름 ‘처음부터’. 11개 챕터는 전체 완료 후 초기 텍스트·선택·결과로 복귀. 기존 재생은 중복 시작·blur·reset·unmount 회귀 검사 통과. 새 타이머 없음 |
+| 공통 | 결과→다음 실습의 DOM 순서, 앞선 결과 freeze, 중복 testID 없음, NaN/Infinity 없음, 가이드의 서비스/API import 및 외부 요청 없음 |
 
-`frontend/`에서 실행:
+## 실제 프로젝트 품질 게이트
 
-- `npm run check` 통과: 기존 account lint, 신규 guide lint(경고 0), `tsc --noEmit`, 전체 테스트. 테스트 러너 보고 기준 **73개 테스트 파일 모두 통과**.
-- `node src/screens/guide/marketGuides.test.ts`: 최종 내용은 전체 테스트에서도 실행. 신규 상세 케이스 29개.
-- 기존 guideLesson/guideContent의 3주·8주 체결·평단·snapshot·reset·blur/unmount 정리 검증과 차트 관련 테스트도 전체 테스트에 포함되어 통과.
-- `npm run export:web` 통과 (`frontend/dist`, 추적 제외).
-- `npx expo export --platform android --output-dir /tmp/trading-guides-android-final` 통과 (Hermes 번들 생성).
-- `git diff --check` 통과.
+`frontend/`에서 실행했다. npm 스크립트나 lint 범위는 변경하지 않았다.
 
-## 브라우저 시각·상호작용 검증
+- `npm run check` 통과: `lint:accounts:check`, `lint:guides:check` 모두 경고 0, `npm run typecheck`, 전체 테스트 **81개 파일 성공 / 실패 0**.
+- `node src/screens/guide/guideLesson.test.ts`, `node src/screens/guide/guideContent.test.ts`, `node src/screens/guide/marketGuides.test.ts`: 위 61개 상세 사례 확인.
+- `npm run export:web` 통과. 결과 `frontend/dist`는 추적 제외.
+- `npx expo export --platform android --output-dir /tmp/trading-guides-revised-android` 통과. Hermes 번들 생성.
+- `git diff --check` 통과. 모든 변경은 `frontend/src/screens/guide`와 `frontend/docs`에 한정.
 
-Chromium + Playwright, 실제 `GuideStack`과 화면·ActionPressable을 React Native Web로 실행했다. 앱의 로그인/실거래 서비스와 분리된 임시 진입점으로 검사했다. Noto CJK 폰트를 사용했다.
+## 좁은 화면·큰 글꼴과 실제 화면 조작
+
+기존 임시 브라우저 하네스를 재사용했다. 실제 `GuideStack`, 각 화면, `ActionPressable`, React Native Web을 Chromium/Playwright에서 실행한다. 앱 로그인 및 계정 provider와 분리된 임시 진입점이며 제품 진입점/의존성은 변경하지 않았다.
 
 - 320×800, 기본 글꼴.
-- 280×800, Text의 fontSize/lineHeight를 3배로 하고 useWindowDimensions fontScale=3을 반환하는 검증용 어댑터. 실제 OS 접근성 글꼴 확대의 근사 환경이다.
-- 두 환경 모두 prefers-reduced-motion=reduce.
-- 신규 10개 챕터 × 2환경, **20개 전체 흐름 통과**. 주제/챕터 진입, 각 조작, 완료 결과, 초기화 후 상단 복귀, 실제 Stack 뒤로가기, 재진입 확인.
-- 렌더된 문장의 화면 가로 경계 초과와 hidden overflow를 검사했다. 시간대 날짜, 긴 제목, 단일가 후보/결과, 배당 상태, ETF 공식/금액, 공통 축·범례의 스크린샷을 직접 검토했다. 3배에서는 문장과 숫자가 여러 줄로 늘어나며 세로 스크롤로 읽을 수 있었다.
-- 기존 시장기초 3주/8주, 유동성, 캔들, 주문방식도 280px/3배 환경에서 끝까지 실행. 진행 중 실습의 호가 행 표시와 결과 읽기 통과.
-- 가이드 흐름 중 외부 네트워크 요청 0, 브라우저 실행 오류 0.
+- 280×800, `Text` fontSize/lineHeight 3배 및 `useWindowDimensions().fontScale=3`인 어댑터. OS 접근성 확대를 근사한 브라우저 환경.
+- 수정된 11개 챕터×2환경: **22개 전체 흐름** 성공. 조작/결과/초기화/Stack 뒤로가기/재진입 확인.
+- 기존 호가창·유동성·캔들·주문방식×2환경: **8개 전체 흐름** 성공. 호가창 3주/8주 체결, 유동성 2개 실습, 캔들 3개 실습, 주문방식 전체 진행.
+- 마지막 문구 정리 후 거래시간·배당·ETF 기본 3개 챕터×2환경 **6개 추가 확인**.
+- 표시 중인 Text의 화면 가로 경계 초과와 hidden overflow, 중복 testID 검사 통과. 큰 글꼴에서 문장·금액이 줄바꿈되고 세로로 읽을 수 있었다.
+- 캔들 용어 그림, 시간축의 회색 공백/세션 캔들, 음봉과 +6%, 배당락 직후의 평가액/권리/현금, 지급 및 배당성향, ETF 펀드→1주 구조, 지수→ETF 가치 흐름의 스크린샷을 직접 열어 확인했다.
+- 외부 네트워크 요청 0, 브라우저 실행 오류 0. 수정된 챕터에는 자동 스크롤이 없으며 기존 호가 실습의 보조 스크롤은 현재 실습 안에서만 동작했다.
 
-임시 브라우저 하네스·이미지·번들은 `/tmp/trading-guide-browser`에서 관리했으며 저장소 의존성/제품 진입점에 추가하지 않았다.
+실행 로그와 임시 이미지: `/tmp/guide-final-check.log`, `/tmp/revised-browser.log`, `/tmp/revised-old-browser.log`, `/tmp/revised-detail.log`, `/tmp/trading-guide-browser/revised-*.png`, `/tmp/trading-guide-browser/detail-*.png`. 브라우저 하네스와 도구 설치물은 저장소에 추가하지 않았다.
 
-## 완료 전 자체 검토와 남은 한계
+물리 iOS/Android 기기·네이티브 OS 글꼴 확대·TalkBack/VoiceOver의 실제 음성 탐색은 검증하지 못했다. Android export는 실제 기기 실행 검증과 구분한다.
 
-각 신규 챕터를 처음부터 끝까지 다시 실행해 결과가 다음 실습보다 먼저 나오고 이전 기록이 유지되는 것을 확인했다. 제도와 앱 지원 범위, 가상 이론가와 실제 가격, 날짜·상품별 적용 범위를 재검토했다. 최종 diff는 frontend의 교육 화면·navigation·색 상수·검증·문서에 한정된다. backend, DB, 계정, 주문/환전 API, 실제 시장시간 정책, 실제 캔들 원본/보유 원가를 변경하지 않는다.
+## 요청한 완료 전 자체 검토
 
-물리 Android/iOS 기기, 네이티브 에뮬레이터, TalkBack/VoiceOver의 실제 음성 탐색은 확인하지 못했다. Android export 성공은 기기 실행 검증과 다르다. 브라우저 어댑터와 네이티브 글꼴 측정의 차이는 실제 기기 확인이 남아 있다. 공식 일정·제도는 이후 바뀔 수 있어 출처 문서와 고정 사례를 함께 갱신해야 한다.
+| 요청 순서 | 검토 |
+| --- | --- |
+| 1–6 유동성 | 실습 1→평균/최종 체결·소진 결과→실습 2 주문 취소→실제 체결 결과→핵심 정리. 실습 3 없음 |
+| 7–10 캔들 | 조작 전에 7개 용어와 연결선을 확인할 수 있음. 기존 만들기/경로/집계 완료, 결과 유지 |
+| 11–16 주식특성 | 한국/미국 시간표·세션 캔들 전환, 서머타임, 개장/마감, 갭, 음봉+6%, 세션 OHLC 확인. 삭제한 강의는 챕터 목록·런타임 콘텐츠에 없음 |
+| 17–22 기업행동 | 배당 정의→전 상태→후 권리 상태→그 아래 이후 지급일→배당성향. 지급과 배당락을 분리하고 관련 총액 중복 증가 없음 |
+| 23–28 ETF | 지수 정의/가중 기여→펀드/1주→같은 구성자산의 변화→NAV/시장가격→추적 개념/상품정보 7개. 마지막 핵심 정리는 요청한 기본 6개 문장 |
 
-기존 유동성 첫 비교는 HEAD에서 두 호가창이 동시에 재생되며 좁은 화면에서 얇은 호가창을 따라가는 구조였다. 기존 강의를 재설계하지 않는 범위에 따라 그대로 보존했고, 신규 비교는 모두 순차 실행하도록 했다.
+다음 실습 버튼은 이전 결과 아래에 있고, 앞선 입력을 다시 변경할 필요가 없다. 비교 범위를 바꾸는 조작은 해당 실습 내부에 한정된다. 용어를 먼저 설명하고 가격·캔들·자산구성·화살표 도식으로 결과와 원인을 연결했다. 추가된 순수 helper는 시간축 생성과 배당성향 계산뿐이며 새로운 상태관리/차트/애니메이션 라이브러리나 범용 엔진은 없다.
+
+실제 TradingAccount/Wallet/Position/Ledger/주문·quote·캔들 API/실시간 시세/기업행동 처리는 사용하지 않는다. 실제 거래시간 정책·휴장 정책·자산평가·주문 가능 여부·backend·DB·migration은 변경하지 않았다. 관련 없는 diff 없음.
+
+## 변경 파일 목록 (19개)
+
+화면·교육 그림:
+
+- `frontend/src/screens/guide/LiquidityScreen.tsx`
+- `frontend/src/screens/guide/CandleFigures.tsx`
+- `frontend/src/screens/guide/CandlesScreen.tsx`
+- `frontend/src/screens/guide/StockLessons.tsx`
+- `frontend/src/screens/guide/CorporateLessons.tsx`
+- `frontend/src/screens/guide/EtfLessons.tsx`
+- `frontend/src/screens/guide/MarketBasicsScreen.tsx`
+- `frontend/src/screens/guide/OrderTypesScreen.tsx`
+- `frontend/src/screens/guide/MarketLessonUi.tsx`
+
+챕터 연결·데이터·계산:
+
+- `frontend/src/screens/guide/GuideChapterScreen.tsx`
+- `frontend/src/screens/guide/guideTopics.ts`
+- `frontend/src/screens/guide/lessonCalculations.ts`
+- `frontend/src/screens/guide/marketLessonData.ts`
+- `frontend/src/screens/guide/marketLessonCalculations.ts`
+
+검증·문서:
+
+- `frontend/src/screens/guide/guideLesson.test.ts`
+- `frontend/src/screens/guide/guideContent.test.ts`
+- `frontend/src/screens/guide/marketGuides.test.ts`
+- `frontend/docs/guide-market-sources.md`
+- `frontend/docs/guide-market-validation.md`

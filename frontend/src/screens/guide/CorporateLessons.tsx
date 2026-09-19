@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { View } from 'react-native';
 import { Body, LessonAction, Result, Section, Takeaways } from './LessonUi';
 import { Basis, CandleSeries, Choices, Values } from './MarketLessonUi';
 import {
@@ -11,6 +12,7 @@ import {
   dividendAssets,
   eligibleDividend,
   priceDomain,
+  payoutRatio,
   shareConversion,
 } from './marketLessonCalculations';
 import { won, type Ohlc } from './lessonCalculations';
@@ -102,132 +104,233 @@ export function SplitsLesson() {
 function DividendBalance({ stage }: { stage: 'before' | 'ex' | 'paid' }) {
   const values = dividendAssets(stage);
   return (
-    <Values
-      rows={[
-        [
-          '주식 평가액',
-          `${won(values.price)} × ${values.quantity}주 = ${won(values.stock)}`,
-        ],
-        ['받을 배당금', won(values.receivable)],
-        ['받은 현금', won(values.cash)],
-        ['합계', won(values.total)],
-      ]}
-    />
+    <>
+      <View
+        style={{ flexDirection: 'row', height: 24 }}
+        accessible
+        accessibilityLabel={`관련 총 가치 ${won(values.total)}. 주식 ${won(values.stock)}, 받을 배당금 ${won(values.receivable)}, 지급 현금 ${won(values.cash)}`}
+      >
+        <View style={{ flex: values.stock, backgroundColor: '#245b76' }} />
+        {values.receivable > 0 ? (
+          <View
+            style={{ flex: values.receivable, backgroundColor: '#995b16' }}
+          />
+        ) : null}
+        {values.cash > 0 ? (
+          <View style={{ flex: values.cash, backgroundColor: '#16a34a' }} />
+        ) : null}
+      </View>
+      <Basis>
+        막대의 전체 길이는 100,000원입니다. 아래 금액으로 각 구성요소를
+        확인하세요.
+      </Basis>
+      <Values
+        rows={[
+          ['주가', won(values.price)],
+          ['보유수량', `${values.quantity}주`],
+          ['주식 평가액', won(values.stock)],
+          [
+            stage === 'before' ? '예정 배당금 · 아직 지급 전' : '받을 배당금',
+            won(stage === 'before' ? 500 * values.quantity : values.receivable),
+          ],
+          [
+            stage === 'before'
+              ? '배당 지급 전 현재 보유 현금'
+              : '현재 지급된 배당 현금',
+            won(values.cash),
+          ],
+          [
+            '관련 총 가치',
+            stage === 'before'
+              ? `${won(values.total)} + 배당 권리 정보 (예정액 별도 합산 안 함)`
+              : won(values.total),
+          ],
+        ]}
+      />
+    </>
   );
 }
 export function DividendsLesson() {
-  const [purchase, setPurchase] = useState<string | null>(null);
-  const [recorded, setRecorded] = useState(false);
+  const [held, setHeld] = useState(false);
   const [ex, setEx] = useState(false);
   const [paid, setPaid] = useState(false);
+  const [dividends, setDividends] = useState<number | null>(null);
+  const netIncome = 100;
   return (
     <>
-      <Section title="실습 A · 배당 권리와 날짜" id="dividend-a">
-        <Basis>{dividendNotice.market} · 미국 T+1 일반 현금배당 예제</Basis>
-        <Values
-          rows={[
-            ['주당 배당금', `${dividendNotice.amount}달러`],
-            ['배당락일', dividendNotice.exDate],
-            ['배당 기준일', dividendNotice.recordDate],
-            ['지급일', dividendNotice.paymentDate],
-          ]}
-        />
+      <Section title="배당을 이해하는 세 가지 용어" id="dividend-terms">
         <Body>
-          배당락일은 이번 배당 권리가 없이 거래되기 시작하는 날, 기준일은
-          권리자를 확인하는 기준일, 지급일은 배당금을 지급하는 날입니다.
+          배당(Dividend)은 기업이 벌어들인 이익이나 보유 자금의 일부를 주주에게
+          분배하는 것입니다. 현금배당과 주식배당 등이 있으며 이번 실습은
+          현금배당만 다룹니다.
         </Body>
-        <Choices<string>
-          id="dividend-buy"
-          options={[
-            { value: '2026-03-13', label: '3월 13일 · 배당락 전 매수' },
-            { value: '2026-03-16', label: '3월 16일 · 배당락일 매수' },
-            { value: '2026-03-17', label: '3월 17일 · 배당락 후 매수' },
-          ]}
-          value={purchase}
-          onChange={setPurchase}
-          disabled={recorded}
+        <Body>
+          배당락(Ex-Dividend)은 해당 배당을 받을 권리가 분리되는 시점입니다.
+          일반적인 현금배당에서는 배당락일에 새로 매수한 투자자는 이번 배당
+          권리를 갖지 못합니다. 정확한 기준은 해당 시장의 규정과 공시를
+          따릅니다.
+        </Body>
+        <Body>
+          배당성향(Payout Ratio)은 기업의 이익 중 배당으로 지급한 비율입니다. 총
+          배당금 ÷ 당기순이익 × 100으로 계산합니다. 당기순이익 100억원 중
+          30억원을 배당하면 30%입니다.
+        </Body>
+        <Body>
+          배당성향은 주가에 대한 주당 배당금의 비율인 배당수익률과 다릅니다.
+          이익·배당정책·성장투자·재무상황을 함께 보는 지표입니다.
+        </Body>
+      </Section>
+      <Section title="1. 배당락 전" id="dividend-before">
+        <Basis>별도의 원화 이론 예제 · 세금·비용·다른 시장 요인 제외</Basis>
+        <Body>
+          가상 기업의 주가 10,000원, 보유 10주, 결정된 현금배당은 주당
+          500원입니다. 배당 발표만으로 현금이 지급되지는 않습니다. 배당락일
+          전부터 보유한 상태를 확인하세요.
+        </Body>
+        <DividendBalance stage="before" />
+        <LessonAction
+          id="dividend-hold"
+          label="배당락일 전 보유 확인"
+          disabled={held}
+          onPress={() => setHeld(true)}
         />
-        {purchase ? (
+        {held ? (
           <Result title="배당 권리 확인" id="dividend-eligibility">
             <Body>
-              {purchase} 매수:{' '}
-              {eligibleDividend(purchase, dividendNotice.exDate)
+              {eligibleDividend('2026-03-13', dividendNotice.exDate)
                 ? '이번 배당을 받을 권리가 있습니다.'
-                : '이번 배당을 받을 권리가 없습니다.'}
+                : '이번 배당을 받을 권리가 없습니다.'}{' '}
+              예정 배당금 5,000원은 아직 현금 0원에 더하지 않습니다.
             </Body>
+            <Basis>
+              날짜 기준을 이해하는 별도의 미국 일반 현금배당 예시 · SEC 자료
+            </Basis>
+            <Values
+              rows={[
+                ['배당락 전 매수 예', '2026-03-13 (금) · 권리 있음'],
+                [
+                  '배당락일 / 기준일',
+                  `${dividendNotice.exDate} / ${dividendNotice.recordDate}`,
+                ],
+                ['이후 지급일', dividendNotice.paymentDate],
+              ]}
+            />
             <Body>
-              이 일반 현금배당 예제에서는 배당락일 전 매수 여부로 판단합니다.
-              국가별 결제주기와 거래소 규칙이 다르므로 ‘기준일 하루 전 매수’라는
-              공통 규칙으로 바꾸면 안 됩니다. 특별배당 등은 별도 규칙이 적용될
-              수 있습니다.
+              이 미국 T+1 예시에서는 3월 16일 배당락일 전 매수에 권리가 있고,
+              당일 새로 매수하면 없습니다. 한국은 일반적으로 T+2 결제이므로
+              공시된 기준일과 거래소 영업일에 맞춰 결제가 완료되어야 합니다.
+              ‘기준일 하루 전 매수’를 모든 시장에 적용하지 않습니다. 특별배당
+              등은 별도 기준을 확인합니다.
             </Body>
           </Result>
         ) : null}
-        <LessonAction
-          id="dividend-record"
-          label="선택한 매수일의 권리 결과 기록"
-          disabled={!purchase || recorded}
-          onPress={() => setRecorded(true)}
-        />
       </Section>
-      {recorded ? (
-        <Section title="실습 B · 배당락과 자산 구성" id="dividend-b">
-          <Basis>
-            별도의 원화 이론 예제 · 배당 권리를 보유한 10주 · 세금·수수료·다른
-            가격 영향 제외
-          </Basis>
+      {held ? (
+        <Section title="2. 배당락 후" id="dividend-after">
           <Body>
-            주가 10,000원, 주당 배당 500원입니다. 권리가 분리될 때와 현금이
-            지급될 때를 나누어 확인합니다.
+            배당락 이후로 진행해 주식 평가액과 배당 권리의 변화를 비교하세요.
+            여기서는 배당 이외의 가격 요인을 제외합니다.
           </Body>
-          <DividendBalance stage="before" />
           <LessonAction
             id="dividend-ex"
-            label="배당락 · 이론적 가격 조정 적용"
+            label="배당락 이후로 진행"
             disabled={ex}
             onPress={() => setEx(true)}
           />
           {ex ? (
             <>
-              <Result title="배당락일 상태" id="dividend-ex-result">
+              <Result
+                title="배당락 후 · 아직 현금 지급 전"
+                id="dividend-ex-result"
+              >
                 <DividendBalance stage="ex" />
                 <Body>
-                  이론적으로 주가가 배당액만큼 조정된 사례입니다. 주식 평가액에
-                  받을 배당금을 더한 합계는 유지되며, 아직 현금이 입금된 것은
-                  아닙니다.
+                  주당 500원 배당에 따라 이론적 주가는 10,000원 → 9,500원입니다.
+                  주식 95,000원과 받을 배당금 5,000원을 합하면 100,000원입니다.
+                  기업 가치 일부가 주주에게 이전되는 과정이므로 자산이 즉시
+                  5,000원 늘어난 것은 아닙니다.
+                </Body>
+                <Body>
+                  실제 배당락일 가격에는 시장 수급·새로운 정보·전체 시장
+                  움직임도 반영됩니다. 정확히 배당금만큼 하락한다고 보장되지
+                  않습니다. 이론적 조정은 KRX의 실제 현금배당 기준가격 처리와
+                  구분합니다.
                 </Body>
               </Result>
-              <LessonAction
-                id="dividend-pay"
-                label="지급일 · 받을 배당금을 현금으로 지급"
-                disabled={paid}
-                onPress={() => setPaid(true)}
-              />
+              <Section
+                title="이어서 · 이후 지급일의 현금 이동"
+                id="dividend-payment"
+              >
+                <Body>
+                  배당락일은 현금 지급일이 아닙니다. 아래에서 이후 지급일을
+                  확인하면 받을 배당금이 현금으로 이동합니다.
+                </Body>
+                <LessonAction
+                  id="dividend-pay"
+                  label="배당 지급일 확인"
+                  disabled={paid}
+                  onPress={() => setPaid(true)}
+                />
+                {paid ? (
+                  <Result title="지급일 확인 결과" id="dividend-paid-result">
+                    <DividendBalance stage="paid" />
+                    <Body>
+                      받을 배당금 5,000원 → 0원, 지급 현금 0원 → 5,000원. 주식
+                      평가액 95,000원은 그대로이고 관련 총 가치도
+                      100,000원입니다. 같은 배당을 권리와 현금으로 중복 합산하지
+                      않습니다.
+                    </Body>
+                  </Result>
+                ) : null}
+              </Section>
             </>
           ) : null}
           {paid ? (
-            <>
-              <Result title="지급일 상태" id="dividend-paid-result">
-                <DividendBalance stage="paid" />
-                <Body>
-                  받을 배당금이 0원이 되고 받은 현금으로 이동합니다. 같은 배당을
-                  두 번 합산하지 않습니다. 배당은 회사 자산 일부의 분배이므로
-                  자동으로 추가 수익을 보장하지 않습니다.
-                </Body>
-                <Body>
-                  실제 배당락일 가격은 다른 시장 요인도 반영해 배당금과 정확히
-                  같은 폭으로 하락하지 않을 수 있습니다. 이 이론적 가격은 KRX의
-                  실제 현금배당 기준가격 처리 규칙을 재현한 값이 아닙니다.
-                </Body>
-              </Result>
-              <Takeaways
-                items={[
-                  '배당락일·기준일·지급일은 다른 의미입니다.',
-                  '배당 권리와 실제 현금 지급을 구분합니다.',
-                  '주식 평가액, 받을 배당금, 받은 현금의 합계를 확인합니다.',
-                ]}
+            <Section title="결과 아래에서 · 배당성향 계산" id="dividend-payout">
+              <Body>
+                기업 전체의 당기순이익은 100억원입니다. 총 배당금을 선택하고
+                이익 중 배당한 비율을 확인하세요. 앞선 개인의 5,000원 배당금과는
+                계산 대상이 다릅니다.
+              </Body>
+              <Choices<number>
+                id="payout"
+                options={[20, 30, 50].map((value) => ({
+                  value,
+                  label: `총 배당금 ${value}억원`,
+                }))}
+                value={dividends}
+                onChange={setDividends}
               />
-            </>
+              {dividends !== null ? (
+                <>
+                  <Result title="배당성향 결과" id="payout-result">
+                    <Values
+                      rows={[
+                        ['당기순이익', `${netIncome}억원`],
+                        ['총 배당금', `${dividends}억원`],
+                        [
+                          '배당성향',
+                          `${dividends} ÷ ${netIncome} × 100 = ${payoutRatio(dividends, netIncome)}%`,
+                        ],
+                      ]}
+                    />
+                    <Body>
+                      이익 중 얼마나 배당했는지 나타내는 비율입니다. 높고
+                      낮음만으로 좋은 기업인지 판단할 수 없으며
+                      이익·배당정책·성장투자·재무상황을 함께 봅니다.
+                    </Body>
+                  </Result>
+                  <Takeaways
+                    items={[
+                      '배당은 기업의 이익이나 보유 자금 일부의 분배입니다.',
+                      '배당락 후 권리 보유와 이후 지급일의 현금 지급을 구분합니다.',
+                      '주식 평가액·받을 배당금·지급 현금을 중복 합산하지 않습니다.',
+                      '배당성향은 총 배당금 ÷ 당기순이익 × 100이며 배당수익률과 다릅니다.',
+                    ]}
+                  />
+                </>
+              ) : null}
+            </Section>
           ) : null}
         </Section>
       ) : null}

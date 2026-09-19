@@ -11,12 +11,13 @@ import {
   dividendAssets,
   eligibleDividend,
   indexImpact,
-  limitBuy,
   nav,
   normalize,
   premium,
   priceDomain,
   sessionOhlc,
+  sessionTimeline,
+  payoutRatio,
   shareConversion,
   usTradingSession,
 } from './marketLessonCalculations.ts';
@@ -25,6 +26,7 @@ import {
   auctionSells,
   fundAssets,
   sessionTrades,
+  usSessionTrades,
   splitCandles,
   stableDifferences,
   variableDifferences,
@@ -74,6 +76,7 @@ function setup(
       Rect: 'Rect',
       Circle: 'Circle',
       Polyline: 'Polyline',
+      Text: 'SvgText',
     },
   });
   const mocks: any = { './LessonUi': ui, './MarketLessonUi': figures };
@@ -143,11 +146,6 @@ function setup(
   t.after(() => act(() => h.renderer.unmount()));
   return h;
 }
-function untilLimits(h: any) {
-  h.press('halt-apply');
-  h.press('halt-resume');
-  for (let i = 0; i < 4; i++) h.press('vi-step');
-}
 const near = (actual: number, expected: number) =>
   assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);
 
@@ -168,7 +166,7 @@ describe('market guide calculations from local inputs', () => {
       '2026-11-28 03:00',
     );
   });
-  it('derives eligible auction quantities and limit executions without mutating orders', () => {
+  it('derives eligible auction quantities without mutating orders', () => {
     const original = JSON.stringify([auctionBuys, auctionSells]);
     const result = callAuction(auctionBuys, auctionSells);
     assert.deepEqual(
@@ -184,22 +182,6 @@ describe('market guide calculations from local inputs', () => {
     assert.equal(callAuction([], []).result, null);
     const changed = callAuction(auctionBuys, [{ price: 10100, quantity: 5 }]);
     assert.equal(changed.candidates[0].quantity, 5, 'uses input quantities');
-    const fill = limitBuy(
-      [
-        { price: 10100, quantity: 20 },
-        { price: 10050, quantity: 10 },
-        { price: 10010, quantity: 5 },
-      ],
-      20,
-      10050,
-    );
-    assert.deepEqual(fill.fills, [
-      { price: 10010, quantity: 5 },
-      { price: 10050, quantity: 10 },
-    ]);
-    assert.equal(fill.remaining, 5);
-    assert.equal(fill.quantity, 15);
-    assert.equal(limitBuy([], 20, 10050).average, null);
     assert.equal(JSON.stringify([auctionBuys, auctionSells]), original);
   });
   it('filters the same trades into OHLC, keeps raw candles, and sizes shared axes', () => {
@@ -211,10 +193,10 @@ describe('market guide calculations from local inputs', () => {
       close: 10600,
     });
     assert.deepEqual(sessionOhlc(sessionTrades, true).candle, {
-      open: 10200,
+      open: 10000,
       high: 10850,
-      low: 10200,
-      close: 10850,
+      low: 10000,
+      close: 10800,
     });
     assert.equal(sessionOhlc([], true).candle, null);
     assert.equal(changeRate(10000, 10600), 6);
@@ -227,6 +209,51 @@ describe('market guide calculations from local inputs', () => {
     const domain = priceDomain([7000, 13000, 50000, 100000]);
     assert.ok(domain[0] < 7000 && domain[1] > 100000);
     assert.equal(JSON.stringify([sessionTrades, splitCandles]), original);
+  });
+  it('builds both market timelines from the same immutable session records', () => {
+    for (const trades of [sessionTrades, usSessionTrades]) {
+      const original = JSON.stringify(trades);
+      const regular = sessionTimeline(trades, false);
+      const all = sessionTimeline(trades, true);
+      assert.equal(
+        regular.filter((item) => item.candle).length,
+        trades === sessionTrades ? 5 : 6,
+      ); // prior + hourly samples
+      assert.equal(
+        all.filter((item) => item.candle).length,
+        trades === sessionTrades ? 7 : 8,
+      );
+      assert.equal(
+        all[1].candle,
+        null,
+        'overnight gap is not a zero-price candle',
+      );
+      assert.equal(sessionOhlc(trades, false).records.length, 8);
+      const changed = trades.map((trade, i) =>
+        i === trades.length - 1 ? { ...trade, price: 20000 } : trade,
+      );
+      assert.equal(sessionOhlc(changed, true).candle?.high, 20000);
+      assert.equal(sessionOhlc(changed, true).candle?.close, 20000);
+      assert.equal(JSON.stringify(trades), original);
+    }
+    assert.deepEqual(sessionOhlc(usSessionTrades, false).candle, {
+      open: 107,
+      high: 107.5,
+      low: 105.5,
+      close: 106,
+    });
+    assert.deepEqual(sessionOhlc(usSessionTrades, true).candle, {
+      open: 102,
+      high: 108.5,
+      low: 102,
+      close: 108,
+    });
+    assert.deepEqual(
+      [20, 30, 50].map((value) => payoutRatio(value, 100)),
+      [20, 30, 50],
+    );
+    assert.equal(payoutRatio(20, 0), null);
+    assert.equal(payoutRatio(20, -10), null);
   });
   it('conserves conversion value and keeps dividends receivable separate from cash', () => {
     assert.deepEqual(shareConversion(100000, 10, 2), {
@@ -308,24 +335,35 @@ describe('new guide chapters preserve downward learning flow', () => {
       }
       h.readable();
     });
-  it('distinguishes simultaneous KRX sessions, NXT, dated ET/KST and holiday precedence', (t) => {
+  it('compares Korea and the US on the same session timeline, then freezes before dates', (t) => {
     const h = setup(t, 'sessions');
-    h.press('session-krx-open');
-    assert.match(h.text('session-result'), /08:35.*지금은 체결하지/s);
-    h.press('session-krx-pre');
-    assert.match(h.text('session-result'), /08:35.*전 거래일 정규장 종가/s);
-    h.press('session-krx-after-receive');
-    assert.match(h.text('session-result'), /15:30.*15:40.*지금은 체결하지/s);
-    h.press('session-nxt-day');
-    assert.match(h.text('session-result'), /NXT.*09:00:30~15:20/s);
+    assert.match(h.text(), /Regular Session.*Pre-Market.*After-Hours/s);
+    assert.match(h.text('session-kr'), /09:00~15:30.*15:20~15:30/s);
+    assert.match(
+      h.text('session-us'),
+      /04:00~09:30.*09:30~16:00.*16:00~20:00/s,
+    );
+    assert.equal(h.find('session-record').props.disabled, true);
+    h.press('session-scope-regular');
+    assert.match(h.text('session-kr-summary'), /4개.*10,750원.*10,550원/s);
+    h.press('session-scope-extended');
+    assert.match(h.text('session-kr-summary'), /6개.*10,850원.*10,000원/s);
+    assert.match(h.text('session-us-summary'), /7개.*108.5달러.*102달러/s);
     h.press('session-record');
-    const before = h.text('session-result');
+    const before = h.text('sessions-a');
     h.press('us-date-2026-01-07');
-    assert.match(h.text('us-date-result'), /2026-01-08 06:00/);
+    assert.match(
+      h.text('us-date-result'),
+      /2026-01-07 23:30.*2026-01-08 06:00/s,
+    );
     h.press('us-date-2026-07-08');
-    assert.match(h.text('us-date-result'), /2026-07-09 05:00/);
+    assert.match(
+      h.text('us-date-result'),
+      /2026-07-08 22:30.*2026-07-09 05:00/s,
+    );
     h.press('us-date-record');
     const us = h.text('us-date-result');
+    assert.match(h.text('sessions-c'), /Market Holiday.*Early Close/s);
     for (const id of ['weekend', 'krx-holiday', 'us-holiday']) {
       h.press(`calendar-${id}`);
       assert.match(h.text('calendar-result'), /운영하지 않음/);
@@ -334,7 +372,7 @@ describe('new guide chapters preserve downward learning flow', () => {
     assert.doesNotMatch(h.text('calendar-result'), /운영하지 않음/);
     h.press('calendar-early');
     assert.match(h.text('calendar-result'), /13:00.*2026-11-28 03:00/s);
-    assert.equal(h.text('session-result'), before);
+    assert.equal(h.text('sessions-a'), before);
     assert.equal(h.text('us-date-result'), us);
     h.order(
       'session-result',
@@ -345,7 +383,7 @@ describe('new guide chapters preserve downward learning flow', () => {
     );
     h.readable();
   });
-  it('collects without execution, preserves close, then runs regular and thin comparisons sequentially', (t) => {
+  it('collects without execution, creates first/last candles and compares US auctions sequentially', (t) => {
     const h = setup(t, 'auctions');
     for (let i = 0; i < 3; i++) {
       h.press('auction-collect');
@@ -360,28 +398,23 @@ describe('new guide chapters preserve downward learning flow', () => {
     const close = h.text('close-result');
     h.press('close-after');
     assert.match(h.text('after-close-result'), /10,200원.*10,250원/s);
-    assert.equal(h.find('session-extended-buy'), undefined);
-    h.press('session-regular-buy');
-    assert.match(h.text('session-regular-result'), /체결 수량20주/);
-    const regular = h.text('session-regular-result');
-    h.press('session-extended-buy');
-    assert.match(
-      h.text('session-extended-result'),
-      /10,010원 × 5주.*10,050원 × 10주.*미체결 수량5주/s,
-    );
-    assert.doesNotMatch(h.text('session-extended-result'), /10,100원/);
+    h.press('auction-us-open');
+    const us = h.text('auction-us-open-result');
+    h.press('auction-us-close');
+    assert.match(h.text('auction-us-open-result'), /시가 102달러/);
+    assert.match(h.text('auction-us-close-result'), /종가 102.2달러/);
     assert.equal(h.text('auction-result'), opening);
     assert.equal(h.text('close-result'), close);
-    assert.equal(h.text('session-regular-result'), regular);
+    assert.equal(h.text('auction-us-open-result'), us);
     h.order(
       'auction-result',
       'auction-b',
       'close-result',
       'after-close-result',
       'auction-c',
-      'session-regular-result',
-      'session-extended-buy',
-      'session-extended-result',
+      'auction-us-open-result',
+      'auction-us-close',
+      'auction-us-close-result',
     );
     h.readable();
   });
@@ -394,52 +427,28 @@ describe('new guide chapters preserve downward learning flow', () => {
     assert.match(h.text('gap-close-result'), /음봉.*\+6%/s);
     const result = h.text('gap-close-result');
     h.press('gap-scope-extended');
-    assert.match(h.text('gap-scope-candle'), /10,200원.*10,850원/s);
+    assert.match(h.text('gap-scope-candle'), /10,000원.*10,850원/s);
     assert.equal(h.text('gap-result'), gap);
     assert.equal(h.text('gap-close-result'), result);
     h.order('gap-result', 'gap-close', 'gap-close-result', 'gaps-c');
     h.readable();
   });
-  it('separates halt, VI collection and limits without zero-price candles', (t) => {
-    const h = setup(t, 'safeguards');
-    h.press('halt-apply');
-    assert.match(h.text('halt-plot'), /거래 기록 없음/);
-    h.press('halt-resume');
-    const halt = h.text('halt-result');
-    const startVi = h.find('vi-step').props.onPress;
-    act(() => {
-      startVi();
-      startVi();
-    });
-    assert.match(h.text('vi-state'), /VI 발동/);
-    h.press('vi-step');
-    assert.match(h.text('vi-state'), /단일가 주문 접수 가능.*10,000원.*0주/s);
-    h.press('vi-step');
-    assert.match(h.text('vi-state'), /10,200원.*80주/s);
-    h.press('vi-step');
-    h.press('limit-price-13200');
-    h.press('limit-submit');
-    assert.match(h.text('limit-price-result'), /거절/);
-    h.press('limit-upper');
-    h.press('limit-lower');
-    assert.match(h.text('limit-upper-result'), /13,000원.*0주/);
-    assert.match(h.text('limit-lower-result'), /7,000원.*0주/);
-    assert.equal(h.text('halt-result'), halt);
-    h.order(
-      'halt-resume-result',
-      'vi-b',
-      'vi-result',
-      'limits-c',
-      'limit-price-result',
-      'limit-upper-result',
-      'limit-lower-result',
+  it('keeps three stock chapters without removed safeguards content', () => {
+    assert.deepEqual(
+      guideTopics.StockCharacteristics.chapters.map((c) => c.id),
+      ['sessions', 'auctions', 'gaps'],
     );
-    h.readable();
-    h.press('reset-safeguards');
-    untilLimits(h);
-    h.press('limit-price-7000');
-    h.press('limit-submit');
-    assert.match(h.text('limit-price-result'), /가격 조건 허용/);
+    for (const name of [
+      'StockLessons.tsx',
+      'guideTopics.ts',
+      'marketLessonData.ts',
+      'GuideChapterScreen.tsx',
+    ]) {
+      assert.doesNotMatch(
+        readFileSync(new URL(name, import.meta.url), 'utf8'),
+        /거래정지|가격제한|상한가|하한가|\bVI\b|safeguards/,
+      );
+    }
   });
   it('applies split/reverse once and preserves independent results', (t) => {
     const h = setup(t, 'splits');
@@ -456,28 +465,60 @@ describe('new guide chapters preserve downward learning flow', () => {
     h.order('split-result', 'split-b', 'reverse-result');
     h.readable();
   });
-  it('uses ex-date eligibility and moves receivable to cash only on payment', (t) => {
+  it('teaches dividends before two major phases and transfers receivable only on payment', (t) => {
     const h = setup(t, 'dividends');
-    h.press('dividend-buy-2026-03-13');
-    assert.match(h.text('dividend-eligibility'), /받을 권리/);
-    h.press('dividend-buy-2026-03-16');
-    assert.match(h.text('dividend-eligibility'), /받을 권리가 없습니다/);
-    h.press('dividend-record');
+    assert.match(
+      h.text('dividend-terms'),
+      /배당\(Dividend\).*배당락\(Ex-Dividend\).*배당성향\(Payout Ratio\)/s,
+    );
+    assert.match(h.text('dividend-before'), /100,000원.*5,000원.*현금0원/s);
+    h.press('dividend-hold');
+    const before = h.text('dividend-before');
+    assert.match(
+      h.text('dividend-eligibility'),
+      /이번 배당을 받을 권리가 있습니다/,
+    );
+    assert.match(h.text('dividend-eligibility'), /2026-03-16.*2026-03-17/s);
     h.press('dividend-ex');
     const ex = h.text('dividend-ex-result');
-    assert.match(ex, /95,000원.*받을 배당금5,000원.*받은 현금0원.*100,000원/s);
-    h.press('dividend-pay');
     assert.match(
-      h.text('dividend-paid-result'),
-      /받을 배당금0원.*받은 현금5,000원.*100,000원/s,
+      ex,
+      /9,500원.*95,000원.*받을 배당금5,000원.*배당 현금0원.*100,000원/s,
     );
+    const pay = h.find('dividend-pay').props.onPress;
+    act(() => {
+      pay();
+      pay();
+    });
+    const paid = h.text('dividend-paid-result');
+    assert.match(paid, /받을 배당금0원.*배당 현금5,000원.*100,000원/s);
+    for (const amount of [20, 30, 50]) {
+      h.press(`payout-${amount}`);
+      assert.ok(
+        h.text('payout-result').includes(`${amount} ÷ 100 × 100 = ${amount}%`),
+      );
+    }
+    assert.equal(h.text('dividend-before'), before);
     assert.equal(h.text('dividend-ex-result'), ex);
+    assert.equal(h.text('dividend-paid-result'), paid);
+    const headings = h.renderer.root
+      .findAllByType('Text')
+      .filter((node: any) => node.props.accessibilityRole === 'header')
+      .map((node: any) => textContent(node));
+    assert.deepEqual(
+      headings.filter((text: string) => /^\d\. 배당락/.test(text)),
+      ['1. 배당락 전', '2. 배당락 후'],
+    );
     h.order(
+      'dividend-terms',
+      'dividend-before',
       'dividend-eligibility',
-      'dividend-record',
+      'dividend-after',
       'dividend-ex-result',
       'dividend-pay',
       'dividend-paid-result',
+      'dividend-payout',
+      'payout-result',
     );
     h.readable();
   });
@@ -502,15 +543,55 @@ describe('new guide chapters preserve downward learning flow', () => {
     assert.equal(h.text('adjust-split-chart'), split);
     h.readable();
   });
-  it('derives +4% index and NAV from the same quantities and freezes selected inputs', (t) => {
+  it('teaches index then ETF before following, NAV and tracking', (t) => {
+    assert.deepEqual(
+      guideTopics.EtfIndex.chapters.map((c) => c.id),
+      ['index', 'etf', 'following', 'nav', 'tracking'],
+    );
     const h = setup(t, 'index');
+    assert.match(
+      h.text('index-definition'),
+      /여러 자산의 가격 움직임.*기준.*직접 사는 종목이 아닙니다/s,
+    );
+    assert.doesNotMatch(h.text(), /NAV|추적오차/);
     h.press('index-apply');
-    const result = h.text('index-result');
-    assert.match(result, /\+4%.*1,040포인트/s);
-    h.press('index-fund');
-    assert.match(h.text('index-fund-result'), /1,040,000원.*100주.*10,400원/s);
-    assert.equal(h.text('index-result'), result);
-    h.order('index-result', 'index-b', 'index-fund-result');
+    assert.match(h.text('index-result'), /\+4%.*1,040포인트/s);
+    h.order('index-definition', 'index-apply', 'index-flow', 'index-result');
+    h.press('reset-index');
+    h.press('index-b-return-10');
+    h.press('index-apply');
+    assert.match(h.text('index-result'), /\+7%.*1,070포인트/s);
+    h.readable();
+  });
+  it('shows assets → fund → one ETF share without direct constituent ownership', (t) => {
+    const h = setup(t, 'etf');
+    assert.match(
+      h.text('etf-definition'),
+      /Exchange-Traded Fund.*펀드의 지분.*지수.*기준 숫자.*ETF.*펀드 상품/s,
+    );
+    h.press('etf-unit');
+    assert.match(
+      h.text('etf-structure'),
+      /A 주식 50%.*B 주식 30%.*C 주식 20%.*1,000,000원.*100주.*10,000원/s,
+    );
+    assert.match(
+      h.text('etf-unit-result'),
+      /각각 한 주씩 직접 소유하는 것은 아닙니다.*펀드의 지분/s,
+    );
+    h.order('etf-definition', 'etf-unit', 'etf-structure', 'etf-unit-result');
+    h.readable();
+  });
+  it('applies one asset change to index, fund assets and per-share value together', (t) => {
+    const h = setup(t, 'following');
+    h.press('following-apply');
+    assert.match(
+      h.text('following-flow'),
+      /1,000 → 1,040포인트.*1,000,000원 → 1,040,000원.*10,000원 → 10,400원/s,
+    );
+    assert.match(
+      h.text('following-result'),
+      /\+4%.*100주 = 10,400원.*액티브 ETF/s,
+    );
     h.readable();
   });
   it('separates net assets, unit NAV, premium and mismatched timestamps', (t) => {
@@ -550,14 +631,15 @@ describe('new guide chapters preserve downward learning flow', () => {
     h.press('tracking-stable');
     const stable = h.text('tracking-stable-result');
     h.press('tracking-variable');
-    assert.match(h.text('tracking-variable-result'), /0.60%포인트/);
+    assert.match(h.text('tracking-variable-result'), /위아래로 크게 변함/);
     for (const id of [
       'assets',
       'benchmark',
       'weights',
       'costs',
       'distribution',
-      'asof',
+      'nav',
+      'price',
     ])
       h.press(`product-${id}`);
     assert.equal(h.text('tracking-result'), result);
@@ -573,20 +655,63 @@ describe('new guide chapters preserve downward learning flow', () => {
     );
     h.readable();
   });
+  const completionActions: Record<GuideChapter, string[]> = {
+    sessions: [
+      'session-scope-regular',
+      'session-scope-extended',
+      'session-record',
+      'us-date-2026-07-08',
+      'us-date-record',
+      'calendar-early',
+    ],
+    auctions: [
+      'auction-collect',
+      'auction-collect',
+      'auction-collect',
+      'auction-match',
+      'close-collect',
+      'close-match',
+      'close-after',
+      'auction-us-open',
+      'auction-us-close',
+    ],
+    gaps: ['gap-open', 'gap-close', 'gap-scope-extended'],
+    splits: ['split-apply', 'reverse-apply'],
+    dividends: ['dividend-hold', 'dividend-ex', 'dividend-pay', 'payout-50'],
+    adjusted: [
+      'adjust-split-adjusted',
+      'adjust-split-record',
+      'adjust-dividend-dividend',
+    ],
+    index: ['index-apply'],
+    etf: ['etf-unit'],
+    following: ['following-apply'],
+    nav: ['nav-calculate', 'nav-price-10200', 'nav-record', 'nav-timing-stale'],
+    tracking: [
+      'tracking-compare',
+      'tracking-stable',
+      'tracking-variable',
+      'product-assets',
+      'product-benchmark',
+      'product-weights',
+      'product-costs',
+      'product-distribution',
+      'product-nav',
+      'product-price',
+    ],
+  };
   for (const chapter of Object.values(guideTopics).flatMap((topic) => [
     ...topic.chapters,
   ]))
     it(`${chapter.id} resets locally, has no background playback and uses readable text`, (t) => {
       const h = setup(t, chapter.id);
       const original = h.text();
-      const button = h.renderer.root
-        .findAllByType('Pressable')
-        .find(
-          (button: any) =>
-            !button.props.disabled &&
-            button.props.testID !== `reset-${chapter.id}`,
-        );
-      act(() => button.props.onPress());
+      assert.equal(
+        h.find(`reset-${chapter.id}`).props.accessibilityLabel,
+        '처음부터',
+      );
+      for (const action of completionActions[chapter.id]) h.press(action);
+      assert.notEqual(h.text(), original);
       for (const fontScale of [1, 2, 3]) {
         h.dimensions = { width: 280, height: 568, fontScale };
         h.update();

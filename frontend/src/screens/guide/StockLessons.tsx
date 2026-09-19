@@ -8,38 +8,32 @@ import {
   Takeaways,
   lessonStyles as s,
 } from './LessonUi';
-import {
-  Basis,
-  CandleSeries,
-  Choices,
-  LessonPlot,
-  Values,
-} from './MarketLessonUi';
+import { Basis, CandleSeries, Choices, Values } from './MarketLessonUi';
 import {
   auctionBuys,
   auctionSells,
   calendarCases,
-  sessionCases,
+  marketExamples,
   sessionTrades,
 } from './marketLessonData';
 import {
   callAuction,
   changeRate,
-  limitBuy,
   percent,
   priceDomain,
   sessionOhlc,
+  sessionTimeline,
   usTradingSession,
 } from './marketLessonCalculations';
-import { won, type Quote } from './lessonCalculations';
+import { won, ohlcFromPrices, type Quote } from './lessonCalculations';
 
 export function SessionsLesson() {
-  const [selected, setSelected] = useState<string | null>(null);
+  const [extended, setExtended] = useState(false);
+  const [scopes, setScopes] = useState<string[]>([]);
   const [recorded, setRecorded] = useState(false);
   const [date, setDate] = useState<string | null>(null);
   const [dateRecorded, setDateRecorded] = useState(false);
   const [calendar, setCalendar] = useState<string | null>(null);
-  const session = sessionCases.find((item) => item.id === selected);
   const us = date ? usTradingSession(date) : null;
   const day = calendarCases.find((item) => item.id === calendar);
   const dayUs =
@@ -49,120 +43,151 @@ export function SessionsLesson() {
   return (
     <>
       <Body>
-        시장이 열려 있다는 말만으로 체결 방식을 알 수는 없습니다. 거래소, 거래
-        구간과 거래일을 함께 확인합니다.
+        정규장(Regular Session)은 시장이 정한 기본 거래 구간입니다. 장전
+        거래(Pre-Market)는 정규장 이전, 장후 거래(After-Hours)는 이후에
+        이루어지는 거래입니다. 한국과 미국의 하루를 같은 순서로 비교합니다.
       </Body>
-      <Section title="실습 A · 한국시장의 하루" id="sessions-a">
-        <Basis>
-          KRX 일반주식 / NXT 대상 종목 · 한국시간(KST). KRX 정규장은
-          09:00~15:30입니다.
-        </Basis>
+      <Section title="실습 A · 거래시간과 캔들이 생기는 구간" id="sessions-a">
         <Body>
-          특히 같은 08:35의 개장 주문 수집과 장전 종가거래를 각각 선택해
+          정규장만 보기와 시간외 포함을 차례로 눌러보세요. 각 시장의 같은 원본
+          기록에서 포함 구간만 바꿉니다. 캔들 수와 고가·저가, 회색 공백을
           비교하세요.
         </Body>
-        <Choices<string>
-          id="session"
-          options={sessionCases.map((item) => ({
-            value: item.id,
-            label: item.label,
-          }))}
-          value={selected}
-          onChange={setSelected}
+        <Choices
+          id="session-scope"
+          options={[
+            { value: 'regular', label: '정규장만 보기' },
+            { value: 'extended', label: '시간외 포함' },
+          ]}
+          value={extended ? 'extended' : 'regular'}
           disabled={recorded}
+          onChange={(value) => {
+            setExtended(value === 'extended');
+            setScopes((values) =>
+              values.includes(value) ? values : [...values, value],
+            );
+          }}
         />
-        {session ? (
-          <Result id="session-result" title="선택한 거래 구간">
-            <Values
-              rows={[
-                ['시장', session.market],
-                ['선택 시각', session.time],
-                ['거래 구간', session.session],
-                ['운영 시간', session.hours],
-                [
-                  '주문 접수',
-                  session.receive
-                    ? '가능 · 대상 종목과 허용 주문유형 범위 내'
-                    : '불가',
-                ],
-                [
-                  '실제 체결',
-                  session.execute
-                    ? '체결 상대와 가격 조건이 맞으면 체결 가능'
-                    : '지금은 체결하지 않고 주문을 수집',
-                ],
-                ['체결가격 기준', session.price],
-              ]}
-            />
+        {marketExamples.map((market) => {
+          const result = sessionOhlc(market.trades, extended);
+          const items = sessionTimeline(market.trades, extended);
+          const format = (price: number) =>
+            `${price.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}${market.currency}`;
+          return (
+            <Section
+              key={market.id}
+              title={market.name}
+              id={`session-${market.id}`}
+            >
+              <Basis>
+                모든 시각은 {market.zone} · 정상 거래일 가상 가격 기록
+              </Basis>
+              <Values rows={market.hours} />
+              <CandleSeries
+                id={`session-${market.id}-candles`}
+                timeline
+                items={items}
+                formatPrice={format}
+                domain={priceDomain(market.trades.map((r) => r.price))}
+              />
+              <Values
+                id={`session-${market.id}-summary`}
+                rows={[
+                  [
+                    '당일 예제 캔들 수',
+                    `${items.filter((item) => item.candle).length - 1}개 · 실제 하루 전체 캔들 수가 아님`,
+                  ],
+                  ['당일 포함 기록의 고가', format(result.candle.high)],
+                  ['당일 포함 기록의 저가', format(result.candle.low)],
+                  [
+                    '차트의 거래 공백',
+                    extended
+                      ? '밤사이 공백은 남고, 장전·장후 기록이 나타남'
+                      : '전 거래일 종료 → 밤사이 공백 → 다음 정규장 개장 · 시간외 기록 제외',
+                  ],
+                ]}
+              />
+            </Section>
+          );
+        })}
+        {scopes.length ? (
+          <Result title="세션을 바꿔 본 결과" id="session-result">
             <Body>
-              같은 시각에도 선택한 구간에 따라 주문을 모으거나 정해진 종가로
-              거래할 수 있습니다. NXT는 KRX와 별도 시장이며, 모든 종목과
-              증권사가 모든 구간을 지원하는 것은 아닙니다.
+              정규장만 선택하면 장전·장후 칸이 비어 있습니다. 시간외를 포함하면
+              그 구간의 캔들이 생기고 당일 고가·저가도 달라질 수 있습니다. 한국
+              예제의 장전 종가거래는 전일 종가로 체결되며 개장 단일가 주문
+              수집과 구분됩니다.
             </Body>
             <Body>
-              KRX 애프터마켓은 연속매매이며 대상 종목과 허용 주문유형에 제한이
-              있습니다. 거래 구간의 시장 제도와 이 앱의 주문 지원 범위는
-              구분합니다.
+              미국 장전·장후 이용 가능 시간은 시장과 증권사에 따라 달라집니다.
+              여기서는 NYSE Arca 시간대를 사용합니다. 시간외의 유동성·주문유형도
+              정규장과 다를 수 있습니다.
             </Body>
           </Result>
-        ) : (
-          <Body>거래 구간을 선택하면 접수·체결 상태가 표시됩니다.</Body>
-        )}
+        ) : null}
         <LessonAction
           id="session-record"
-          label="선택한 거래 구간 기록"
+          label="두 표시 범위 비교 완료"
+          disabled={scopes.length < 2 || recorded}
           onPress={() => setRecorded(true)}
-          disabled={!session || recorded}
         />
       </Section>
       {recorded ? (
-        <Section title="실습 B · 미국 거래일을 한국시간으로" id="sessions-b">
-          <Basis>NYSE 정규장 · 미국 동부시간(ET) 09:30~16:00</Basis>
+        <Section
+          title="실습 B · 미국 정규장을 한국시간으로 비교"
+          id="sessions-b"
+        >
+          <Body>
+            ET는 미국 동부시간입니다. 정규장 09:30~16:00 ET는 같지만 서머타임에
+            따라 한국에서 보는 시간이 한 시간 달라집니다. 겨울·여름 날짜를
+            선택하세요.
+          </Body>
           <Choices<string>
             id="us-date"
             options={[
-              { value: '2026-01-07', label: '2026-01-07 · 겨울 거래일' },
-              { value: '2026-07-08', label: '2026-07-08 · 여름 거래일' },
+              { value: '2026-01-07', label: '2026-01-07 · 서머타임 미적용' },
+              { value: '2026-07-08', label: '2026-07-08 · 서머타임 적용' },
             ]}
             value={date}
             onChange={setDate}
             disabled={dateRecorded}
           />
           {us ? (
-            <Result title="날짜에 따른 시간 변환" id="us-date-result">
+            <Result title="한국·미국 정규장 시각" id="us-date-result">
               <Values
                 rows={[
+                  ['한국 정규장 · KST', '09:00~15:30'],
+                  ['미국 정규장 · ET', `${us.openEt} ~ ${us.closeEt}`],
                   [
                     '서머타임',
                     us.daylightSaving ? '적용 (EDT)' : '미적용 (EST)',
                   ],
-                  ['개장 · ET', us.openEt],
-                  ['마감 · ET', us.closeEt],
-                  ['개장 · 한국시간', us.openKst],
-                  ['마감 · 한국시간', `${us.closeKst} · 다음 날`],
+                  ['미국 개장 · 한국시간', us.openKst],
+                  ['미국 마감 · 한국시간', `${us.closeKst} · 다음 날`],
                 ]}
               />
               <Body>
-                날짜의 실제 시간대 규칙을 적용했습니다. 미국 동부의 서머타임
-                전환에 따라 한국에서 보는 시각이 한 시간 달라집니다.
-              </Body>
-              <Body>
-                NYSE Arca의 대표 확장 구간은 장전 04:00~09:30 ET, 장후
-                16:00~20:00 ET입니다. 모든 미국 계좌의 공통 이용시간이 아니며,
-                야간거래 서비스도 정규장과 구분해야 합니다.
+                미적용일은 23:30~다음 날 06:00, 적용일은 22:30~다음 날
+                05:00입니다. 날짜와 다음 날 여부까지 함께 읽습니다.
               </Body>
             </Result>
           ) : null}
           <LessonAction
             id="us-date-record"
-            label="선택한 거래일 시간 기록"
-            onPress={() => setDateRecorded(true)}
+            label="시간 비교 결과 기록"
             disabled={!us || dateRecorded}
+            onPress={() => setDateRecorded(true)}
           />
         </Section>
       ) : null}
       {dateRecorded ? (
-        <Section title="실습 C · 거래일과 휴장일" id="sessions-c">
+        <Section title="실습 C · 휴장과 조기 폐장" id="sessions-c">
+          <Body>
+            휴장(Market Holiday)은 해당 시장이 쉬는 날입니다. 조기 폐장(Early
+            Close)은 평소보다 일찍 거래를 마치는 날입니다. 같은 날짜에도 한국과
+            미국의 일정이 다를 수 있습니다.
+          </Body>
+          <Body>날짜를 눌러 일반 시간표가 어떻게 바뀌는지 확인하세요.</Body>
           <Choices<string>
             id="calendar"
             options={calendarCases.map((item) => ({
@@ -173,57 +198,44 @@ export function SessionsLesson() {
             onChange={setCalendar}
           />
           {day ? (
-            <Result title="선택한 날짜의 시간표" id="calendar-result">
-              <Values
-                rows={[
-                  ['시장·날짜', `${day.market} · ${day.date}`],
-                  ['상태', day.reason],
-                  [
-                    '주문·체결',
-                    day.closed
-                      ? '휴장 · 해당 시장의 거래소 주문 접수와 체결 없음'
-                      : '선택 시장의 해당 거래 구간에서 접수·체결 가능',
-                  ],
-                  [
-                    '정규장',
-                    day.closed
-                      ? '운영하지 않음'
-                      : dayUs
-                        ? `${dayUs.openEt} ~ ${dayUs.closeEt} ET`
-                        : '09:00~15:30 KST',
-                  ],
-                  [
-                    '한국시간',
-                    day.closed
-                      ? '해당 거래일 휴장'
-                      : dayUs
-                        ? `${dayUs.openKst} ~ ${dayUs.closeKst}`
-                        : `${day.date} 09:00~15:30`,
-                  ],
+            <>
+              <Result title="선택한 날짜의 거래시간" id="calendar-result">
+                <Values
+                  rows={[
+                    ['시장·날짜', `${day.market} · ${day.date}`],
+                    ['상태', day.reason],
+                    [
+                      '정규장',
+                      day.closed
+                        ? '운영하지 않음'
+                        : dayUs
+                          ? `${dayUs.openEt} ~ ${dayUs.closeEt} ET`
+                          : '09:00~15:30 KST',
+                    ],
+                    [
+                      '한국시간',
+                      day.closed
+                        ? '해당 거래일 휴장'
+                        : dayUs
+                          ? `${dayUs.openKst} ~ ${dayUs.closeKst}`
+                          : `${day.date} 09:00~15:30`,
+                    ],
+                  ]}
+                />
+                <Body>
+                  휴장·조기 폐장 일정이 일반 시간표보다 우선합니다. 미국 예제의
+                  2026-11-27은 정규장이 13:00 ET에 끝납니다. 이날 NYSE Arca
+                  장후도 17:00 ET에 종료합니다.
+                </Body>
+              </Result>
+              <Takeaways
+                items={[
+                  '거래시간은 시장·세션·거래일에 따라 다릅니다.',
+                  '어떤 세션을 포함하는지에 따라 캔들 수·가격 범위·거래 공백이 달라집니다.',
+                  '미국 정규장은 서머타임과 한국의 익일 날짜까지 확인합니다.',
                 ]}
               />
-              {day.early ? (
-                <Body>
-                  2026-11-27은 정규장이 13:00 ET에 끝납니다. NYSE Arca 등 공지에
-                  명시된 시장의 이날 장후 거래도 17:00 ET에 종료합니다.
-                </Body>
-              ) : null}
-              <Body>
-                휴장·조기 폐장 일정이 평일의 일반 시간표보다 우선합니다. 한국
-                휴일과 미국 휴일은 같지 않습니다. 증권사의 예약 주문 접수는
-                거래소의 주문 접수와 별개입니다.
-              </Body>
-            </Result>
-          ) : null}
-          {day ? (
-            <Takeaways
-              items={[
-                '거래소·거래 구간·거래일을 함께 확인합니다.',
-                '주문 접수 가능 시간이 곧 체결 가능 시간은 아닙니다.',
-                '미국 시간은 거래일의 서머타임과 한국의 익일 날짜까지 확인합니다.',
-                '휴장과 조기 폐장은 일반 시간표의 예외입니다.',
-              ]}
-            />
+            </>
           ) : null}
         </Section>
       ) : null}
@@ -254,56 +266,29 @@ function OrdersTable({ buys, sells }: { buys: Quote[]; sells: Quote[] }) {
     </View>
   );
 }
-function LimitResult({ asks, id }: { asks: Quote[]; id: string }) {
-  const result = limitBuy(asks, 20, 10050);
-  return (
-    <Result title="지정가 매수 결과" id={id}>
-      {result.fills.map((fill) => (
-        <Body key={fill.price}>
-          {won(fill.price)} × {fill.quantity}주
-        </Body>
-      ))}
-      <Values
-        rows={[
-          ['가격 상한', won(10050)],
-          ['체결 수량', `${result.quantity}주`],
-          ['미체결 수량', `${result.remaining}주`],
-          [
-            '평균 체결가',
-            result.average === null ? '체결 없음' : won(result.average),
-          ],
-        ]}
-      />
-    </Result>
-  );
-}
 export function AuctionsLesson() {
   const [batches, setBatches] = useState(0);
   const [matched, setMatched] = useState(false);
   const [closing, setClosing] = useState(0);
-  const [regular, setRegular] = useState(false);
-  const [extended, setExtended] = useState(false);
+  const [usOpen, setUsOpen] = useState(false);
+  const [usClose, setUsClose] = useState(false);
   const buys = auctionBuys.slice(0, batches),
     sells = auctionSells.slice(0, batches);
   const auction = callAuction(buys, sells);
   const closingAuction = callAuction(auctionBuys, auctionSells).result;
-  const regularAsks = [{ price: 10010, quantity: 500 }];
-  const extendedAsks = [
-    { price: 10010, quantity: 5 },
-    { price: 10050, quantity: 10 },
-    { price: 10100, quantity: 20 },
-  ];
   return (
     <>
       <Basis>KRX 일반주식 기준 · 가격과 주문은 가상 예제</Basis>
       <Section title="실습 A · 주문을 모아 시가 결정" id="auction-a">
         <Body>
-          세 묶음의 지정가 주문을 접수한 뒤 체결 가능한 수량을 비교합니다. 접수
-          중에는 거래가 발생하지 않습니다.
+          단일가는 주문을 모은 뒤 하나의 가격으로 체결하는 방식입니다.
+          08:30~09:00에 세 묶음의 가상 지정가 주문을 제출하세요. 즉시 체결되지
+          않고 개장 전 주문이 모입니다. 개장을 진행하면 시가와 정규장 첫 캔들이
+          만들어집니다.
         </Body>
         <LessonAction
           id="auction-collect"
-          label={`지정가 주문 묶음 접수 (${batches}/3)`}
+          label={`개장 전 가상 주문 제출 (${batches}/3)`}
           disabled={batches === 3}
           onPress={() => setBatches(Math.min(3, batches + 1))}
         />
@@ -342,6 +327,22 @@ export function AuctionsLesson() {
         />
         {matched ? (
           <Result title="개장 체결 결과" id="auction-result">
+            <CandleSeries
+              id="auction-open-candle"
+              domain={priceDomain([10000, 10200])}
+              timeline
+              items={[
+                { label: '개장 전 · 주문 수집만, 새 캔들 없음', candle: null },
+                {
+                  label: '09:00 · 시가 결정과 첫 캔들의 시작',
+                  candle: ohlcFromPrices([auction.result.price]),
+                },
+              ]}
+            />
+            <Body>
+              처음 한 번의 체결만 있어 시가·고가·저가·종가가 같습니다. 이후 같은
+              시간 구간에 체결이 이어지면 첫 캔들의 몸통과 꼬리가 만들어집니다.
+            </Body>
             <Body>
               {won(auction.result.price)}에서 {auction.result.quantity}주가
               단일가격으로 체결되어 시가가 됩니다. 수집 중 예상체결가는 실제
@@ -397,6 +398,25 @@ export function AuctionsLesson() {
           {closing >= 2 ? (
             <>
               <Result title="정규장 마감 결과" id="close-result">
+                <CandleSeries
+                  id="auction-close-candle"
+                  domain={priceDomain([10180, closingAuction.price])}
+                  timeline
+                  items={[
+                    {
+                      label: '장중 마지막 체결 · 10,180원',
+                      candle: ohlcFromPrices([10180]),
+                    },
+                    {
+                      label: '15:20~15:30 주문 수집 · 새 체결 없음',
+                      candle: null,
+                    },
+                    {
+                      label: '15:30 종가 단일가 · 정규장 마지막 체결',
+                      candle: ohlcFromPrices([closingAuction.price]),
+                    },
+                  ]}
+                />
                 <Body>
                   종가 단일가에서 {closingAuction.quantity}주가{' '}
                   {won(closingAuction.price)}에 체결되었습니다. 정규장 종가는{' '}
@@ -420,66 +440,89 @@ export function AuctionsLesson() {
                 ]}
               />
               <Body>
-                현재 표시가격은 선택한 거래 구간의 최근 체결가격일 수 있습니다.
                 장후 체결은 이미 확정된 정규장 종가를 덮어쓰지 않습니다. 이
-                체결은 종가로만 거래하는 시간외 종가거래가 아니라 KRX 애프터마켓
-                예제입니다.
+                예제는 당일 종가로만 거래하는 시간외 종가거래 이후의 KRX
+                애프터마켓입니다.
               </Body>
             </Result>
           ) : null}
         </Section>
       ) : null}
       {closing === 3 ? (
-        <Section title="실습 C · 같은 가격 조건, 다른 잔량" id="auction-c">
+        <Section title="실습 C · 미국 개장·마감과 비교" id="auction-c">
           <Body>
-            10,050원 이하에서 20주 지정가 매수를 두 환경에 각각 적용합니다.
+            미국에도 개장·마감 경매가 있습니다. NYSE 정규장 개장 09:30 ET와 마감
+            16:00 ET에 가격이 형성되는 예시를 눌러보세요. 경매는 주문을 모아
+            가격을 결정하는 과정이며 장중의 연속 체결과 다를 수 있습니다.
           </Body>
-          <OrdersTable buys={[]} sells={regularAsks} />
           <LessonAction
-            id="session-regular-buy"
-            label="정규장 예제 · 20주 지정가 매수"
-            disabled={regular}
-            onPress={() => setRegular(true)}
+            id="auction-us-open"
+            label="09:30 ET · 개장 경매 체결 보기"
+            disabled={usOpen}
+            onPress={() => setUsOpen(true)}
           />
-          {regular ? (
+          {usOpen ? (
             <>
-              <LimitResult id="session-regular-result" asks={regularAsks} />
-              <Body>
-                한 가격의 대기 물량으로 주문 전체를 체결할 수 있습니다.
-              </Body>
-              <Section title="이어서 · 잔량이 적은 시간외 예제">
-                <OrdersTable buys={[]} sells={extendedAsks} />
-                <LessonAction
-                  id="session-extended-buy"
-                  label="시간외 예제 · 같은 지정가 매수"
-                  disabled={extended}
-                  onPress={() => setExtended(true)}
+              <Result title="미국 정규장 첫 캔들" id="auction-us-open-result">
+                <CandleSeries
+                  id="auction-us-open-candle"
+                  domain={priceDomain([100, 102])}
+                  formatPrice={(n) => `${n.toLocaleString('ko-KR')}달러`}
+                  items={[
+                    {
+                      label: '개장 경매의 첫 체결 · 시가 102달러',
+                      candle: ohlcFromPrices([102]),
+                    },
+                  ]}
                 />
-                {extended ? (
-                  <>
-                    <LimitResult
-                      id="session-extended-result"
-                      asks={extendedAsks}
-                    />
-                    <Body>
-                      10,100원은 매수가격 상한을 넘으므로 체결하지 않습니다.
-                      시간외에는 잔량과 허용 주문유형이 다를 수 있으며 시장가가
-                      항상 가능한 것은 아닙니다. 장전·장후의 가격 변화로 정규장
-                      방향을 예측할 수 있다는 뜻도 아닙니다.
-                    </Body>
-                  </>
-                ) : null}
-              </Section>
+                <Body>
+                  개장 가격이 정규장 첫 캔들의 출발점이 됩니다. 한국과 미국의
+                  주문 종류·참가 조건·경매 규칙이 모두 같다는 뜻은 아닙니다.
+                </Body>
+              </Result>
+              <Body>
+                장중 마지막 체결 101.8달러 이후 마감 경매에서 102.2달러에
+                체결되는 별도 가상 사례입니다.
+              </Body>
+              <LessonAction
+                id="auction-us-close"
+                label="16:00 ET · 마감 경매 체결 보기"
+                disabled={usClose}
+                onPress={() => setUsClose(true)}
+              />
             </>
           ) : null}
-          {extended ? (
-            <Takeaways
-              items={[
-                '단일가는 주문을 모은 뒤 하나의 가격으로 체결합니다.',
-                '예상체결가·정규장 종가·장후 최근 체결가격의 기준은 다릅니다.',
-                '지정가의 가격 조건을 넘으면 대기 물량이 있어도 체결하지 않습니다.',
-              ]}
-            />
+          {usClose ? (
+            <>
+              <Result
+                title="미국 정규장 마지막 캔들"
+                id="auction-us-close-result"
+              >
+                <CandleSeries
+                  id="auction-us-close-candle"
+                  domain={priceDomain([101.8, 102.2])}
+                  formatPrice={(n) => `${n.toLocaleString('ko-KR')}달러`}
+                  items={[
+                    {
+                      label: '마지막 구간 · 종가 102.2달러',
+                      candle: ohlcFromPrices([101.8, 102.2]),
+                    },
+                  ]}
+                />
+                <Body>
+                  시장마다 개장·마감에 가격을 결정하는 제도가 있습니다. 거래소별
+                  세부 규칙을 같은 제도로 일반화하지 않습니다.
+                </Body>
+              </Result>
+              <Takeaways
+                items={[
+                  '주문 수집 중에는 새 체결이나 캔들이 생기지 않습니다.',
+                  '개장 체결은 시가와 첫 캔들의 시작, 마감 체결은 정규장 종가에 연결됩니다.',
+                  '장후 체결가격과 확정된 정규장 종가는 구분합니다.',
+                  '한국과 미국의 개장·마감 제도에는 공통 목적과 서로 다른 세부 규칙이 있습니다.',
+                ]}
+              />
+            </>
           ) : null}
         </Section>
       ) : null}
@@ -492,50 +535,84 @@ export function GapsLesson() {
   const [closed, setClosed] = useState(false);
   const [extended, setExtended] = useState(false);
   const [viewed, setViewed] = useState(false);
-  const prior = sessionTrades[0].price;
   const regular = sessionOhlc(sessionTrades, false).candle;
-  const display = sessionOhlc(sessionTrades, extended);
-  const domain = priceDomain(sessionTrades.map((trade) => trade.price));
   return (
     <>
-      <Basis>KRX 정규장과 NXT 장전·장후를 합친 가상 기록 · 기업행동 없음</Basis>
-      <Section title="실습 A · 다음 거래일 개장" id="gaps-a">
+      <Basis>한국 KRX · 미국 NYSE Arca 구간의 가상 기록 · 기업행동 없음</Basis>
+      <Section title="실습 A · 갭" id="gaps-a">
         <Body>
-          정규장만 표시한 차트에서 전 거래일 종가와 다음 시가를 확인합니다.
+          갭(Gap)은 이전 거래 구간의 마지막 가격과 다음 거래 구간의 시작 가격
+          사이에 차이가 생기는 현상입니다. 위로 시작하면 갭 상승, 아래로
+          시작하면 갭 하락입니다.
+        </Body>
+        <Body>
+          다음 거래일 개장을 눌러 두 시장의 전일 캔들 옆에 새 시가가 만들어지는
+          모습을 확인하세요.
         </Body>
         <LessonAction
           id="gap-open"
-          label="다음 거래일 개장 진행"
+          label="한국·미국 다음 거래일 개장 진행"
           disabled={opened}
           onPress={() => setOpened(true)}
         />
-        <LessonPlot
-          id="gap-plot"
-          domain={domain}
-          labels={['전 거래일 종가', '정규장 거래 공백', '다음 시가']}
-          series={[
-            {
-              name: '정규장 기록',
-              values: [prior, null, opened ? regular.open : null],
-            },
-          ]}
-        />
+        {marketExamples.map((market) => {
+          const prior = market.trades[0].price;
+          const next = sessionOhlc(market.trades, false).candle.open;
+          return (
+            <CandleSeries
+              key={market.id}
+              id={`gap-${market.id}-candles`}
+              timeline
+              domain={priceDomain([prior, next])}
+              formatPrice={(n) =>
+                `${n.toLocaleString('ko-KR')}${market.currency}`
+              }
+              items={[
+                {
+                  label: `${market.name} · 전 거래일 마지막 캔들`,
+                  candle: ohlcFromPrices([prior]),
+                },
+                { label: '정규장 거래 공백', candle: null },
+                {
+                  label: '다음 정규장 첫 체결로 시작한 캔들',
+                  candle: opened ? ohlcFromPrices([next]) : null,
+                },
+              ]}
+            />
+          );
+        })}
         {opened ? (
-          <Result title="개장 결과" id="gap-result">
+          <Result title="두 시장의 갭 결과" id="gap-result">
+            <Values
+              rows={marketExamples.map((market) => {
+                const prior = market.trades[0].price;
+                const next = sessionOhlc(market.trades, false).candle.open;
+                return [
+                  market.name,
+                  `${prior.toLocaleString('ko-KR')}${market.currency} → ${next.toLocaleString('ko-KR')}${market.currency} · 갭 상승 ${percent(changeRate(prior, next))}`,
+                ];
+              })}
+            />
             <Body>
-              전일 종가 {won(prior)}와 다음 시가 {won(regular.open)} 사이에{' '}
-              {won(regular.open - prior)}의 갭이 생겼습니다. 정규장 거래가 없는
-              동안에도 정보와 주문 의사는 바뀔 수 있습니다.
-            </Body>
-            <Body>
-              정규장 차트의 빈 구간이 다른 시장이나 장전·장후의 무거래까지
-              뜻하지는 않습니다. 갭이 반드시 메워진다는 규칙도 없습니다.
+              정규장이 끝나면 거래 공백이 존재하고 그 사이에도 새로운 정보와
+              주문 의사는 바뀔 수 있습니다. 다음 거래가 이전 종가와 다른
+              가격에서 시작하면 갭이 보입니다. 정규장 차트의 공백은
+              장전·장후까지 거래가 없었다는 뜻은 아닙니다.
             </Body>
           </Result>
         ) : null}
       </Section>
       {opened ? (
-        <Section title="실습 B · 음봉과 전일 대비 상승" id="gaps-b">
+        <Section title="실습 B · 음봉인데 전일 대비 상승" id="gaps-b">
+          <Body>
+            시가는 구간의 첫 체결가격, 종가는 마지막 체결가격입니다. 전일 종가는
+            이전 거래일의 마지막 정규장 가격입니다. 등락률은 비교 기준가격에
+            대한 변화율입니다.
+          </Body>
+          <Body>
+            당일 종가를 확인하고 ‘시가와 비교한 방향’과 ‘전일 종가와 비교한
+            등락률’을 따로 읽어보세요.
+          </Body>
           <LessonAction
             id="gap-close"
             label="당일 종가 확인"
@@ -543,40 +620,63 @@ export function GapsLesson() {
             onPress={() => setClosed(true)}
           />
           {closed ? (
-            <Result title="두 가지 비교 기준" id="gap-close-result">
-              <CandleSeries
-                id="gap-candle"
-                domain={domain}
-                items={[{ label: '당일 정규장', candle: regular }]}
-              />
+            <Result
+              title="음봉과 +6%가 함께 나타나는 이유"
+              id="gap-close-result"
+            >
+              {marketExamples.map((market) => (
+                <CandleSeries
+                  key={market.id}
+                  id={market.id === 'kr' ? 'gap-candle' : 'gap-us-candle'}
+                  domain={priceDomain(market.trades.map((r) => r.price))}
+                  formatPrice={(n) =>
+                    `${n.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}${market.currency}`
+                  }
+                  items={[
+                    {
+                      label: `${market.name} · 당일 정규장`,
+                      candle: sessionOhlc(market.trades, false).candle,
+                    },
+                  ]}
+                />
+              ))}
               <Values
                 rows={[
+                  ['시가 / 종가 / 전일 종가', '10,700원 / 10,600원 / 10,000원'],
                   [
                     '캔들 방향',
                     regular.close < regular.open
                       ? '음봉 · 종가 < 시가'
                       : '양봉 · 종가 > 시가',
                   ],
-                  ['전일 대비', percent(changeRate(prior, regular.close))],
+                  [
+                    '전일 대비 등락률',
+                    `(${regular.close.toLocaleString('ko-KR')} ÷ 10,000 - 1) × 100 = ${percent(changeRate(10000, regular.close))}`,
+                  ],
                 ]}
               />
               <Body>
-                시가 {won(regular.open)}보다 종가 {won(regular.close)}가 낮아
-                음봉이지만, 전일 종가 {won(prior)}보다 높아 전일 대비
-                상승입니다. 기업행동이 있는 날의 기준가격과 차트 조정은
-                ‘조정주가 읽기’에서 구분합니다.
+                갭 상승 후 시가보다 낮게 마감해도 전일 종가보다 높을 수
+                있습니다. 캔들 색은 시가·종가의 관계를 나타냅니다. 이 앱은 양봉
+                녹색, 음봉 빨간색이며 색만으로 전일 대비 상승·하락을 판단하지
+                않습니다.
               </Body>
             </Result>
           ) : null}
         </Section>
       ) : null}
       {closed ? (
-        <Section title="실습 C · 같은 기록, 다른 표시 범위" id="gaps-c">
+        <Section title="실습 C · 정규장 캔들과 시간외 포함 캔들" id="gaps-c">
+          <Body>
+            두 시장 각각의 동일한 원본 가격 기록에서 포함 세션을 바꿔 하루의
+            시가·고가·저가·종가를 다시 계산합니다. 선택 후 캔들 모양과 원본 체결
+            목록을 함께 확인하세요.
+          </Body>
           <Choices
             id="gap-scope"
             options={[
               { value: 'regular', label: '정규장만' },
-              { value: 'extended', label: '장전·정규장·장후 포함' },
+              { value: 'extended', label: '시간외 포함' },
             ]}
             value={extended ? 'extended' : 'regular'}
             onChange={(value) => {
@@ -584,266 +684,52 @@ export function GapsLesson() {
               setViewed(true);
             }}
           />
-          <CandleSeries
-            id="gap-scope-candle"
-            domain={domain}
-            items={[
-              {
-                label: extended
-                  ? '확장 구간 자체 집계 · 공식 정규장 OHLC 아님'
-                  : '가상 정규장 OHLC',
-                candle: display.candle,
-              },
-            ]}
-          />
-          <Values
-            rows={display.records.map(
-              (record) =>
-                [
-                  `${record.time} · ${record.session === 'regular' ? '정규장' : record.session === 'pre' ? '장전' : '장후'}`,
-                  won(record.price),
-                ] as const,
-            )}
-          />
+          {marketExamples.map((market) => {
+            const display = sessionOhlc(market.trades, extended);
+            const format = (n: number) =>
+              `${n.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}${market.currency}`;
+            return (
+              <Section key={market.id} title={market.name}>
+                <CandleSeries
+                  id={
+                    market.id === 'kr'
+                      ? 'gap-scope-candle'
+                      : 'gap-us-scope-candle'
+                  }
+                  domain={priceDomain(market.trades.map((r) => r.price))}
+                  formatPrice={format}
+                  items={[
+                    {
+                      label: extended
+                        ? '시간외 포함 자체 집계 · 공식 정규장 OHLC와 구분'
+                        : '정규장 OHLC',
+                      candle: display.candle,
+                    },
+                  ]}
+                />
+                <Values
+                  rows={display.records.map((record) => [
+                    `${record.time} ${market.zone} · ${record.session === 'regular' ? '정규장' : record.session === 'pre' ? '장전' : '장후'}`,
+                    format(record.price),
+                  ])}
+                />
+              </Section>
+            );
+          })}
           {viewed ? (
-            <Result title="표시 범위 해석">
-              <Body>
-                두 화면은 같은 원본 거래 기록을 구간으로 필터링해 집계합니다.
-                포함 구간이 달라지면 시가·고가·저가·종가도 달라질 수 있습니다.
-                거래 구간 밖 시간을 접는 차트와 공백을 남기는 차트는 같은 기록을
-                다르게 배치할 수 있습니다.
-              </Body>
-            </Result>
-          ) : null}
-        </Section>
-      ) : null}
-      {viewed ? (
-        <Takeaways
-          items={[
-            '정규장 차트의 공백이 다른 거래 구간에서도 거래가 없었다는 뜻은 아닙니다.',
-            '캔들 방향은 시가와 종가, 전일 대비 등락률은 전 거래일 기준과 비교합니다.',
-            '표시 구간을 바꾸면 같은 기록의 OHLC 집계값도 달라질 수 있습니다.',
-          ]}
-        />
-      ) : null}
-    </>
-  );
-}
-
-export function SafeguardsLesson() {
-  const [halt, setHalt] = useState(0);
-  const [vi, setVi] = useState(0);
-  const [orderPrice, setOrderPrice] = useState<number | null>(null);
-  const [submitted, setSubmitted] = useState(false);
-  const [upper, setUpper] = useState(false);
-  const [lower, setLower] = useState(false);
-  const base = 10000,
-    floor = base * 0.7,
-    ceiling = base * 1.3;
-  const viResult = callAuction(auctionBuys, auctionSells).result;
-  const viLabels = [
-    '연속매매',
-    'VI 발동',
-    '단일가 주문 수집',
-    '단일가 체결',
-    '연속매매 재개',
-  ];
-  return (
-    <>
-      <Basis>KRX 일반주식 · 기업행동 없는 가상 사례</Basis>
-      <Section title="실습 A · 거래정지와 재개" id="halt-a">
-        <LessonAction
-          id="halt-apply"
-          label="가상 거래정지 적용"
-          disabled={halt > 0}
-          onPress={() => setHalt(1)}
-        />
-        <LessonPlot
-          id="halt-plot"
-          domain={priceDomain([10000, 10100, 10400])}
-          labels={['09:50', '10:00', '10:05~10:30', '재개 10:31']}
-          series={[
-            {
-              name: halt
-                ? '거래정지 구간을 남긴 체결 기록'
-                : '거래정지 전 체결 기록',
-              values: [10000, 10100, null, null],
-            },
-          ]}
-        />
-        {halt > 0 ? (
-          <>
-            <Result title="거래정지 구간" id="halt-result">
-              <Body>
-                10:05~10:30은 가상 거래정지 구간입니다. 거래 기록이 없으므로
-                가격 0의 캔들을 만들지 않습니다. 데이터 누락과 실제 거래정지는
-                원인이 다르며 차트 공백만으로 원인을 단정할 수 없습니다.
-              </Body>
-            </Result>
-            <LessonAction
-              id="halt-resume"
-              label="거래 재개 · 첫 체결 확인"
-              disabled={halt === 2}
-              onPress={() => setHalt(2)}
-            />
-          </>
-        ) : null}
-        {halt === 2 ? (
-          <Result title="재개 후 첫 체결" id="halt-resume-result">
-            <LessonPlot
-              id="halt-resumed-plot"
-              domain={priceDomain([10000, 10100, 10400])}
-              labels={['09:50', '10:00', '10:05~10:30', '재개 10:31']}
-              series={[
-                {
-                  name: '거래 재개를 포함한 기록',
-                  values: [10000, 10100, null, 10400],
-                },
-              ]}
-            />
-            <Body>
-              재개 후 첫 거래가 {won(10400)}에 체결되었습니다. 거래정지 이전
-              가격과 다를 수 있습니다.
-            </Body>
-          </Result>
-        ) : null}
-      </Section>
-      {halt === 2 ? (
-        <Section title="실습 B · VI의 완화 구간" id="vi-b">
-          <Body>
-            VI는 급격한 가격 변동에 대응해 매매 방식을 잠시 바꾸는 장치입니다.
-            일반 거래정지와 구분합니다.
-          </Body>
-          <LessonAction
-            id="vi-step"
-            label={
-              [
-                'VI 발동 상황 적용',
-                '완화 구간에 지정가 주문 접수',
-                '개념상 2분 경과 · 단일가 체결',
-                '연속매매 재개',
-                'VI 체험 완료',
-              ][vi]
-            }
-            disabled={vi === 4}
-            onPress={() => setVi(Math.min(4, vi + 1))}
-          />
-          <Values
-            id="vi-state"
-            rows={[
-              ['매매 상태', viLabels[vi]],
-              [
-                '교육상 시각',
-                ['10:00:00', '10:00:01', '10:01:00', '10:02:01', '10:02:02'][
-                  vi
-                ],
-              ],
-              [
-                '주문 접수',
-                vi === 1 || vi === 2
-                  ? '단일가 주문 접수 가능'
-                  : '해당 매매 방식에 따라 가능',
-              ],
-              ['현재가', won(vi < 3 ? 10000 : viResult.price)],
-              ['이번 체결량', `${vi < 3 ? 0 : viResult.quantity}주`],
-            ]}
-          />
-          {vi === 2 ? (
-            <OrdersTable buys={auctionBuys} sells={auctionSells} />
-          ) : null}
-          <Basis>
-            통상 2분의 완화 구간을 버튼으로 짧게 재현합니다. 화면 조작 시간은
-            실제 제도의 대기시간이 아닙니다. 발동 비율은 시장·종목·유형에 따라
-            다릅니다.
-          </Basis>
-          {vi === 4 ? (
-            <Result title="VI 결과" id="vi-result">
-              <Body>
-                주문 접수까지 모두 중단한 것이 아닙니다. 단일가 주문을 모아{' '}
-                {won(viResult.price)}에 {viResult.quantity}주를 체결한 뒤
-                연속매매로 돌아왔습니다.
-              </Body>
-            </Result>
-          ) : null}
-        </Section>
-      ) : null}
-      {vi === 4 ? (
-        <Section title="실습 C · 가격제한과 체결 상대" id="limits-c">
-          <Values
-            rows={[
-              ['기준가격', won(base)],
-              ['일반주식 상한가', won(ceiling)],
-              ['일반주식 하한가', won(floor)],
-            ]}
-          />
-          <Choices<number>
-            id="limit-price"
-            options={[6800, 7000, 10000, 13000, 13200].map((value) => ({
-              value,
-              label: won(value),
-            }))}
-            value={orderPrice}
-            onChange={setOrderPrice}
-            disabled={submitted}
-          />
-          <LessonAction
-            id="limit-submit"
-            label="선택한 주문가격 검사"
-            disabled={orderPrice === null || submitted}
-            onPress={() => setSubmitted(true)}
-          />
-          {submitted ? (
             <>
-              <Result title="주문가격 검사 결과" id="limit-price-result">
+              <Result title="표시 범위 해석" id="gap-scope-result">
                 <Body>
-                  {won(orderPrice)}:{' '}
-                  {orderPrice < floor || orderPrice > ceiling
-                    ? '가격제한 범위 밖 · 교육 예제 주문 거절'
-                    : '가격제한 범위 안 · 가격 조건 허용, 체결은 별도'}
-                </Body>
-              </Result>
-              <LessonAction
-                id="limit-upper"
-                label="상한가 매수 · 매도 주문 없음"
-                disabled={upper}
-                onPress={() => setUpper(true)}
-              />
-            </>
-          ) : null}
-          {upper ? (
-            <>
-              <Result title="상한가에서의 미체결" id="limit-upper-result">
-                <Body>
-                  {won(ceiling)}에 매수하려 해도 대기 매도 주문이 없으면
-                  체결량은 0주입니다.
-                </Body>
-              </Result>
-              <LessonAction
-                id="limit-lower"
-                label="하한가 매도 · 매수 주문 없음"
-                disabled={lower}
-                onPress={() => setLower(true)}
-              />
-            </>
-          ) : null}
-          {lower ? (
-            <>
-              <Result title="하한가에서의 미체결" id="limit-lower-result">
-                <Body>
-                  {won(floor)}에 매도하려 해도 대기 매수 주문이 없으면 체결량은
-                  0주입니다.
-                </Body>
-                <Body>
-                  ±30%는 이 KRX 일반주식 사례의 일일 가격제한입니다.
-                  미국시장·신규상장 첫날·특수상품에 일괄 적용하지 않으며 투자
-                  손실의 최대 한도도 아닙니다.
+                  같은 종목이라도 시장·거래 세션·차트 데이터 범위가 다르면 캔들
+                  모양이 달라집니다. 범위 전환은 앞서 완료한 갭·음봉 결과를
+                  바꾸지 않습니다.
                 </Body>
               </Result>
               <Takeaways
                 items={[
-                  '거래정지, VI, 가격제한은 서로 다른 제도입니다.',
-                  '허용 가격이라도 체결 상대가 없으면 거래가 성사되지 않습니다.',
-                  '거래 공백은 공식 시장 상태와 함께 해석합니다.',
+                  '갭은 이전 구간의 마지막 가격과 다음 구간의 시작 가격 차이입니다.',
+                  '캔들 방향은 시가와 종가, 전일 대비 등락률은 전일 종가와 비교합니다.',
+                  '같은 원본도 포함 세션에 따라 다른 OHLC가 만들어집니다.',
                 ]}
               />
             </>

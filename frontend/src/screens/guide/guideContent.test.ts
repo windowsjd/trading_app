@@ -6,7 +6,6 @@ import { describe, it, type TestContext } from 'node:test';
 import {
   THICK_ASKS,
   THIN_ASKS,
-  SIZE_ASKS,
   FIVE_MINUTE,
   PATH_A,
   PATH_B,
@@ -133,7 +132,7 @@ function checkReadable(h: any) {
   }
   assert.doesNotMatch(h.text(), /NaN|Infinity/);
 }
-function reachLiquiditySizes(h: any) {
+function completeLiquidity(h: any) {
   h.press('liquidity-compare-run');
   h.finish();
   h.press('liquidity-cancel-run');
@@ -167,33 +166,7 @@ describe('local guide calculations', () => {
     assert.deepEqual(thin.asks, [{ price: 10030, quantity: 3 }]);
     assert.equal(JSON.stringify([THICK_ASKS, THIN_ASKS]), before);
   });
-  it('calculates size-dependent fills including highlight, zero, removal and partial residual frames', () => {
-    for (const [quantity, amount, last, remaining] of [
-      [3, 30030, 10010, 2],
-      [10, 100150, 10020, 3],
-      [20, 200420, 10030, 5],
-      [30, 300770, 10040, 15],
-    ]) {
-      const frames = buyFrames(SIZE_ASKS, quantity);
-      const final = frames.at(-1)!.value;
-      assert.deepEqual(summarize(final.fills), { quantity, amount, average: amount / quantity });
-      assert.equal(final.lastPrice, last);
-      assert.equal(final.asks.at(-1)!.quantity, remaining);
-      assert.deepEqual(final.asks, SIZE_ASKS.filter((row) => row.price >= last).map((row) =>
-        row.price === last ? { ...row, quantity: remaining } : row,
-      ));
-      assert.ok(final.asks.every((row) => row.quantity > 0));
-      for (let i = 1; i < frames.length - 1; i += 2) {
-        const target = frames[i].value;
-        const filled = frames[i + 1].value;
-        assert.equal(target.filledQuantity, undefined);
-        assert.ok(filled.filledQuantity! > 0);
-        assert.equal(filled.lastPrice, target.targetPrice);
-        assert.equal(filled.fills.length, target.fills.length + 1);
-        assert.equal(frames[i].delay, 900);
-        assert.equal(frames[i + 1].delay, 1100);
-      }
-    }
+  it('retains partial fills and empty averages for shared order exercises', () => {
     const limited = buyFrames([{ price: 10010, quantity: 2 }], 3).at(-1)!.value;
     assert.equal(summarize(limited.fills).quantity, 2);
     assert.match(limited.status, /1주 미체결/);
@@ -242,7 +215,7 @@ describe('continuous guide interactions', () => {
     assert.equal(h.renderer.root.findAllByType('Pressable').length, 2);
     checkReadable(h);
   });
-  it('walks liquidity comparison → cancellation → execution → order-size comparisons downward', (t) => {
+  it('walks exactly two liquidity exercises downward and preserves all prior results', (t) => {
     const h = setup(t, 'LiquidityScreen');
     assert.equal(h.find('liquidity-cancel'), undefined);
     const start = h.find('liquidity-compare-run').props.onPress;
@@ -268,24 +241,13 @@ describe('continuous guide interactions', () => {
     h.finish();
     assert.match(h.text('liquidity-trade-book-price'), /10,020원/);
     assert.match(h.text('liquidity-cancel-book-price'), /10,000원/, 'prior result remains frozen');
-    order(h, 'liquidity-trade-result', 'liquidity-size');
-    h.press('liquidity-select-30');
-    h.press('liquidity-size-0-run');
-    h.finish();
-    assert.match(h.text('liquidity-size-0-values'), /300,770원/);
-    assert.match(h.text('liquidity-size-0-values-average'), /10,025.67원/);
-    h.press('liquidity-compare-3');
-    h.press('liquidity-size-1-run');
-    h.finish();
-    order(
-      h,
-      'liquidity-size-0-result',
-      'liquidity-size-1',
-      'liquidity-size-1-result',
-      'lesson-takeaways',
-    );
-    assert.match(h.text('liquidity-size-0-values'), /300,770원/);
-    assert.match(h.text('liquidity-size-1-values'), /30,030원/);
+    order(h, 'liquidity-trade-result', 'lesson-takeaways');
+    assert.equal(h.find('liquidity-size'), undefined);
+    assert.doesNotMatch(h.text(), /실습 3|주문 규모와 가격 충격|30주|3주와 비교|10주와 비교/);
+    assert.match(h.text('liquidity-cancel-book-status'), /다른 시장 참여자/);
+    assert.equal(h.find('liquidity-cancel-run').props.accessibilityLabel, '대기 중인 매도 주문이 취소되는 상황 보기');
+    assert.match(h.text('liquidity-thick-values-average'), /10,010원/);
+    assert.match(h.text('liquidity-thin-values-average'), /10,021원/);
     assert.deepEqual(h.scrolls, [], 'no jump to an earlier exercise');
     checkReadable(h);
     h.press('liquidity-reset');
@@ -293,6 +255,19 @@ describe('continuous guide interactions', () => {
     assert.equal(h.find('liquidity-cancel'), undefined);
     assert.equal(h.find('liquidity-compare-run').props.disabled, false);
     assert.match(h.text('liquidity-thin-price'), /10,000원/);
+  });
+  it('connects all seven beginner terms to one candle before the builder', (t) => {
+    const h = setup(t, 'CandlesScreen');
+    const terms = { high: '고가 (High)', upper: '윗꼬리 (Upper Wick)', close: '종가 (Close)', body: '몸통 (Body)', open: '시가 (Open)', lower: '아랫꼬리 (Lower Wick)', low: '저가 (Low)' };
+    for (const [part, label] of Object.entries(terms)) {
+      assert.ok(h.text(`candle-term-${part}`).includes(label));
+      assert.ok(h.find(`candle-term-${part}`).findAll((node: any) => node.props.testID === `candle-anatomy-${part}`).length, 'term shares its row with its candle position');
+    }
+    order(h, 'candle-term-high', 'candle-term-upper', 'candle-term-close', 'candle-term-body', 'candle-term-open', 'candle-term-lower', 'candle-term-low', 'candle-builder');
+    assert.match(h.text('candle-term-open'), /처음 거래가 체결/);
+    assert.match(h.text('candle-term-close'), /마지막으로 거래가 체결/);
+    assert.match(h.text('candle-term-body'), /높으면 양봉.*낮으면 음봉/);
+    checkReadable(h);
   });
   it('updates SVG geometry, replays both paths and aggregates only after results', (t) => {
     const h = setup(t, 'CandlesScreen');
@@ -442,6 +417,7 @@ describe('continuous guide interactions', () => {
         onPress();
         onPress();
       });
+      assert.equal(h.find(reset).props.accessibilityLabel, '처음부터');
       const before = h.text(status);
       h.focused = false;
       h.update();
@@ -464,9 +440,7 @@ describe('continuous guide interactions', () => {
     it(`${screen} wraps text and stacks comparisons at narrow widths and large font scales`, (t) => {
       const h = setup(t, screen);
       if (screen === 'LiquidityScreen') {
-        reachLiquiditySizes(h);
-        h.press('liquidity-size-0-run');
-        h.finish();
+        completeLiquidity(h);
       }
       if (screen === 'CandlesScreen') {
         h.press('candle-builder-confirm');

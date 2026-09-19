@@ -418,7 +418,7 @@ export default function MarketBasicsScreen() {
               testID={TEST_IDS.guide.restart}
               style={styles.button}
               accessibilityRole="button"
-              accessibilityLabel="처음부터 다시 보기"
+              accessibilityLabel="처음부터"
               onPress={() => {
                 setFirstSnapshot(null);
                 lesson.restart();
@@ -426,7 +426,7 @@ export default function MarketBasicsScreen() {
                 scroll.current?.scrollTo({ y: 0, animated: false });
               }}
             >
-              <Text style={styles.buttonText}>처음부터 다시 보기</Text>
+              <Text style={styles.buttonText}>처음부터</Text>
             </ActionPressable>
           </View>
         ) : null}
