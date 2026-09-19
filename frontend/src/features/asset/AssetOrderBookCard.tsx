@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { formatAssetPrice, formatKrwDecimal, formatKstDateTime } from '../../utils/format';
-import { normalizeOrderBook, type AssetOrderBook } from './orderBook';
+import { formatKstDateTime } from '../../utils/format';
+import { formatOrderBookDecimal, normalizeOrderBook, type AssetOrderBook } from './orderBook';
 
 interface Props {
   book: AssetOrderBook;
@@ -13,16 +13,15 @@ export default function AssetOrderBookCard({ book, isPreview = false }: Props) {
   const snapshot = useMemo(() => normalizeOrderBook(book), [book]);
   const { fontScale } = useWindowDimensions();
   const [availableWidth, setAvailableWidth] = useState(0);
-  const priceText = (price: string) => snapshot.currency === 'KRW'
-    ? formatKrwDecimal(price) : formatAssetPrice(price, snapshot.currency);
   const levels = [...snapshot.asks, ...snapshot.bids];
   // Leave room for every digit, even at large accessibility font sizes. Only
   // the table scrolls horizontally when it cannot fit; the page stays vertical.
-  const priceWidth = Math.max(9, ...levels.map((level) => priceText(level.price).length)) * 9 * fontScale + 24;
+  const priceWidth = Math.max(9, ...levels.map((level) => formatOrderBookDecimal(level.price).length)) * 9 * fontScale + 24;
   const quantityWidth = Math.max(9,
-    ...levels.map((level) => formatKrwDecimal(level.quantity).length),
+    `잔량 (${snapshot.quantityUnit})`.length,
+    ...levels.map((level) => formatOrderBookDecimal(level.quantity).length),
     ...[snapshot.totalAskQuantity, snapshot.totalBidQuantity]
-      .map((value) => value == null ? 0 : formatKrwDecimal(value).length),
+      .map((value) => value == null ? 0 : formatOrderBookDecimal(value).length),
   ) * 9 * fontScale + 24;
   const tableWidth = Math.max(availableWidth, priceWidth + quantityWidth);
   const effectiveTime = snapshot.effectiveAt ?? snapshot.capturedAt;
@@ -30,12 +29,13 @@ export default function AssetOrderBookCard({ book, isPreview = false }: Props) {
   return (
     <View testID="asset-order-book" style={styles.card}>
       <Text accessibilityRole="header" style={styles.title}>호가 · 매도 / 매수</Text>
+      {snapshot.marketLabel ? <Text style={styles.helper}>{snapshot.marketLabel}</Text> : null}
       {isPreview ? (
         <Text testID="asset-order-book-preview-notice" style={styles.preview}>
           개발용 예시 · 실제 시세가 아닙니다.
         </Text>
       ) : null}
-      <Text style={styles.helper}>가격 ({snapshot.currency === 'KRW' ? '원' : snapshot.currency}) · 잔량 (주)</Text>
+      <Text style={styles.helper}>가격 ({snapshot.priceUnit}) · 잔량 ({snapshot.quantityUnit})</Text>
       <Text style={styles.helper}>
         {snapshot.effectiveAt ? '기준' : '수집'} {formatKstDateTime(effectiveTime)} (한국시간)
       </Text>
@@ -59,7 +59,7 @@ export default function AssetOrderBookCard({ book, isPreview = false }: Props) {
                   </View>
                   <View style={styles.row}>
                     <Text style={[styles.columnLabel, { width: priceWidth }]}>{label} 가격</Text>
-                    <Text style={[styles.columnLabel, styles.quantity, { minWidth: quantityWidth }]}>잔량 (주)</Text>
+                    <Text style={[styles.columnLabel, styles.quantity, { minWidth: quantityWidth }]}>잔량 ({snapshot.quantityUnit})</Text>
                   </View>
                   {entries.length === 0 ? <Text style={styles.helper}>{label}호가가 없습니다.</Text> : null}
                   {entries.map((level, index) => {
@@ -69,18 +69,18 @@ export default function AssetOrderBookCard({ book, isPreview = false }: Props) {
                         key={rank}
                         testID={`asset-order-book-${side}-${rank}`}
                         accessible
-                        accessibilityLabel={`${label} ${rank}호가, 가격 ${priceText(level.price)} ${snapshot.currency}, 잔량 ${formatKrwDecimal(level.quantity)}주`}
+                        accessibilityLabel={`${label} ${rank}호가, 가격 ${formatOrderBookDecimal(level.price)} ${snapshot.priceUnit}, 잔량 ${formatOrderBookDecimal(level.quantity)} ${snapshot.quantityUnit}`}
                         style={[styles.row, isAsk ? styles.askRow : styles.bidRow, rank === 1 && styles.bestRow]}
                       >
-                        <Text style={[styles.number, { width: priceWidth }, isAsk ? styles.askText : styles.bidText]}>{priceText(level.price)}</Text>
-                        <Text style={[styles.number, styles.quantity, { minWidth: quantityWidth }]}>{formatKrwDecimal(level.quantity)}</Text>
+                        <Text style={[styles.number, { width: priceWidth }, isAsk ? styles.askText : styles.bidText]}>{formatOrderBookDecimal(level.price)}</Text>
+                        <Text style={[styles.number, styles.quantity, { minWidth: quantityWidth }]}>{formatOrderBookDecimal(level.quantity)}</Text>
                       </View>
                     );
                   })}
                   {total != null ? (
                     <View testID={`asset-order-book-${side}-total`} style={styles.row}>
                       <Text style={[styles.columnLabel, { width: priceWidth }]}>총 {label}잔량</Text>
-                      <Text style={[styles.number, styles.quantity, { minWidth: quantityWidth }]}>{formatKrwDecimal(total)}</Text>
+                      <Text style={[styles.number, styles.quantity, { minWidth: quantityWidth }]}>{formatOrderBookDecimal(total)}</Text>
                     </View>
                   ) : null}
                 </View>

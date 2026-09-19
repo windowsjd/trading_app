@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import type { IsoDateTimeString, MoneyString, QuantityString } from '../../models/dto/common';
-import type { CurrencyCode } from '../market/api';
+import { formatDisplayDecimal } from '../../utils/format.ts';
 
 export const ORDER_BOOK_DEPTH = 10;
 
@@ -12,7 +12,11 @@ export interface OrderBookLevel {
 /** Display snapshot, independent of provider fields and order execution. */
 export interface AssetOrderBook {
   assetId: string;
-  currency: CurrencyCode;
+  /** Market display units, NOT wallet/settlement CurrencyCode (e.g. 원, USDT). */
+  priceUnit: string;
+  quantityUnit: string;
+  /** Optional market heading, e.g. BTC / USDT; the card never parses symbols. */
+  marketLabel?: string;
   /** Best first: asks ascending, bids descending. At most ten per side. */
   asks: readonly OrderBookLevel[];
   bids: readonly OrderBookLevel[];
@@ -24,14 +28,22 @@ export interface AssetOrderBook {
 }
 
 function isNonNegativeDecimal(value: string) {
-  return /^\d+(?:\.\d+)?$/u.test(value);
+  return typeof value === 'string' && /^\d+(?:\.\d+)?$/u.test(value);
+}
+
+/** Exact market values: trim fractional padding, group digits, never round. */
+export function formatOrderBookDecimal(value: string): string {
+  if (!isNonNegativeDecimal(value)) return '-';
+  const [integer, fraction] = formatDisplayDecimal(value).split('.');
+  const grouped = integer.replace(/^0+(?=\d)/u, '').replace(/\B(?=(\d{3})+(?!\d))/gu, ',');
+  return `${grouped}${fraction ? `.${fraction}` : ''}`;
 }
 
 function normalizeLevels(levels: readonly OrderBookLevel[], side: 'asks' | 'bids') {
   return levels
     .filter(({ price, quantity }) =>
       isNonNegativeDecimal(price) && new Decimal(price).gt(0) &&
-      isNonNegativeDecimal(quantity) && new Decimal(quantity).isInteger(),
+      isNonNegativeDecimal(quantity),
     )
     .map((level) => ({ ...level }))
     .sort((a, b) => new Decimal(a.price).cmp(b.price) * (side === 'asks' ? 1 : -1))
@@ -39,13 +51,14 @@ function normalizeLevels(levels: readonly OrderBookLevel[], side: 'asks' | 'bids
 }
 
 function normalizeTotal(value: QuantityString | null | undefined) {
-  return value != null && isNonNegativeDecimal(value) && new Decimal(value).isInteger()
+  return value != null && isNonNegativeDecimal(value)
     ? value : null;
 }
 
 /**
- * Domestic stock display boundary: discard absent/invalid price slots, retain
- * zero share quantities, sort without Number precision loss, and cap depth.
+ * Shared display boundary: discard absent/invalid price slots, retain zero and
+ * fractional quantities, sort without Number precision loss, and cap depth.
+ * Market-specific rules (e.g. integer shares) belong in the future adapter.
  * Provider response decoding belongs in the future adapter, before this step.
  * Partial sides remain partial; no synthetic price or quantity is filled in.
  */

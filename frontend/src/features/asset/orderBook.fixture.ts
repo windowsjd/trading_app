@@ -4,7 +4,8 @@ import type { AssetOrderBook } from './orderBook';
 export function createOrderBookFixture(assetId: string): AssetOrderBook {
   return {
     assetId,
-    currency: 'KRW',
+    priceUnit: '원',
+    quantityUnit: '주',
     capturedAt: '2026-09-18T01:15:31.000Z',
     effectiveAt: '2026-09-18T01:15:30.000Z',
     asks: [
@@ -51,5 +52,60 @@ export function createLongOrderBookFixture(assetId: string): AssetOrderBook {
     })),
     totalAskQuantity: '999999999999999999999999',
     totalBidQuantity: '888888888888888888888888',
+  };
+}
+
+/** Decimal layout examples shared by crypto previews, never actual quotations. */
+export function createCryptoOrderBookFixture(
+  assetId: string,
+  baseAsset: string,
+  long = false,
+): AssetOrderBook {
+  const book: AssetOrderBook = {
+    assetId,
+    priceUnit: 'USDT',
+    quantityUnit: baseAsset,
+    marketLabel: `${baseAsset} / USDT`,
+    capturedAt: '2026-09-18T01:15:31.000Z',
+    effectiveAt: '2026-09-18T01:15:30.000Z',
+    asks: [
+      { price: '68420.10', quantity: '0.003521' },
+      { price: '68420.20', quantity: '0.00125000' },
+      { price: '68420.30', quantity: '12.23456789' },
+      { price: '68420.40', quantity: '0.00000001' },
+      { price: '68420.50', quantity: '12345.6789' },
+      { price: '68420.60', quantity: '0' },
+      { price: '68420.70', quantity: '0.125' },
+      { price: '68420.80', quantity: '123.456789' },
+      { price: '68420.90', quantity: '12.345678' },
+      { price: '68421.00', quantity: '1.23456789' },
+    ],
+    bids: [
+      { price: '68420.00', quantity: '0.004321' },
+      { price: '68419.90', quantity: '0.00250000' },
+      { price: '68419.80', quantity: '23.34567891' },
+      { price: '68419.70', quantity: '0.00000002' },
+      { price: '68419.60', quantity: '23456.7891' },
+      { price: '68419.50', quantity: '0.00000003' },
+      { price: '68419.40', quantity: '0.25' },
+      { price: '68419.30', quantity: '234.567891' },
+      { price: '68419.20', quantity: '23.456789' },
+      { price: '68419.10', quantity: '2.34567891' },
+    ],
+    // Depth snapshots need not supply exchange totals. Do not synthesize them.
+  };
+  if (!long) return book;
+  return {
+    ...book,
+    asks: book.asks.map((level, index) => ({
+      price: `1234567890123456789${level.price}`,
+      quantity: index === 3 ? '0.000000000000000001'
+        : index === 4 ? '12345678901234567890.123456789012345678' : level.quantity,
+    })),
+    bids: book.bids.map((level, index) => ({
+      price: `1234567890123456789${level.price}`,
+      quantity: index === 3 ? '0.000000000000000002'
+        : index === 4 ? '23456789012345678901.234567890123456789' : level.quantity,
+    })),
   };
 }

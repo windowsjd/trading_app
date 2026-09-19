@@ -37,7 +37,7 @@ Current implementation status:
 
 ## Realtime prices
 
-Domestic stock order book UI and its opt-in development fixtures are described
+Shared domestic stock / crypto order book UI and its opt-in fixtures are described
 in [domestic-order-book.md](docs/domestic-order-book.md). No order book provider
 API is connected; release builds exclude the fixtures.
 
