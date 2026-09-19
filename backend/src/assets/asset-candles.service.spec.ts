@@ -1887,6 +1887,9 @@ describe('AssetCandlesService', () => {
     ['BTC/USD', 'BTCUSDT'],
     ['BTC-USD', 'BTCUSDT'],
     ['BTC_USD', 'BTCUSDT'],
+    ['币安人生', '币安人生USDT'],
+    ['币安人生USDT', '币安人生USDT'],
+    ['币安人生/USD', '币安人生USDT'],
   ])('normalizes crypto symbol %s to %s', async (symbol, expectedSymbol) => {
     const { prisma, binancePublicClient, service } = createService();
     prisma.asset.findUnique.mockResolvedValueOnce(

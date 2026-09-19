@@ -1,5 +1,8 @@
 import { BinanceSymbolMetadataService } from './binance-symbol-metadata.service';
-import { BINANCE_FIXED_SYMBOLS } from './binance-fixed-asset-universe';
+import {
+  BINANCE_FIXED_ASSET_UNIVERSE,
+  BINANCE_FIXED_SYMBOLS,
+} from './binance-fixed-asset-universe';
 
 function exchangeInfo(entries: Array<[string, string]>) {
   return {
@@ -27,6 +30,37 @@ function createService(
 }
 
 describe('BinanceSymbolMetadataService', () => {
+  it('prefers live precision over fallback for all fifteen additions', async () => {
+    const additions = BINANCE_FIXED_ASSET_UNIVERSE.slice(10);
+    const { service } = createService(
+      jest.fn().mockResolvedValue({
+        response: exchangeInfo(
+          additions.map((entry) => [entry.symbol, '0.000000001']),
+        ),
+        receivedAt: new Date(),
+      }),
+    );
+    for (const entry of additions) {
+      expect(
+        service.getPrecision({ market: 'BINANCE', symbol: entry.symbol }),
+      ).toMatchObject({
+        priceTickSize: entry.priceTickSize,
+        displayPriceDecimals: entry.displayPriceDecimals,
+        source: 'fixed_universe',
+      });
+    }
+    await service.refresh();
+    for (const entry of additions) {
+      expect(
+        service.getPrecision({ market: 'BINANCE', symbol: entry.symbol }),
+      ).toMatchObject({
+        priceTickSize: '0.000000001',
+        displayPriceDecimals: 9,
+        source: 'exchange_info',
+      });
+    }
+  });
+
   it('serves the reviewed fixed-universe fallback before any refresh completes', () => {
     const { service } = createService();
 
@@ -41,7 +75,7 @@ describe('BinanceSymbolMetadataService', () => {
     ).toMatchObject({ source: 'fixed_universe' });
   });
 
-  it('has fallback metadata for all 10 fixed symbols', () => {
+  it('has fallback metadata for all 25 fixed symbols', () => {
     const { service } = createService();
 
     for (const symbol of BINANCE_FIXED_SYMBOLS) {

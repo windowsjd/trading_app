@@ -41,12 +41,12 @@ type ActiveAssetTargetRecord = {
   isActive: boolean;
 };
 
-// Env-target fallback shares the fixed 10-symbol universe used by the config
+// Env-target fallback shares the fixed 25-symbol universe used by the config
 // service and seeds — no separate BTC/ETH default lives here.
 const DEFAULT_BINANCE_SYMBOLS: string[] = [...BINANCE_FIXED_SYMBOLS];
 const DOMESTIC_KRX_MARKETS = new Set(['KRX', 'KOSPI', 'KOSDAQ', 'KONEX']);
 const US_STOCK_MARKETS = new Set(['NAS', 'NASDAQ', 'NYS', 'NYSE']);
-const BINANCE_SYMBOL_PATTERN = /^[A-Z0-9]{1,32}$/u;
+const BINANCE_SYMBOL_PATTERN = /^[A-Z0-9\p{Script=Han}]{1,32}$/u;
 const KIS_US_SYMBOL_PATTERN = /^[A-Z0-9][A-Z0-9.-]{0,19}$/u;
 
 @Injectable()

@@ -38,7 +38,7 @@ describe('LiveCandleStreamSupervisorService', () => {
     socket.open();
     await new Promise((resolve) => setImmediate(resolve));
     const streams = (JSON.parse(socket.sent[0]) as { params: string[] }).params;
-    expect(streams).toHaveLength(30);
+    expect(streams).toHaveLength(BINANCE_FIXED_SYMBOLS.length * 3);
     for (const symbol of BINANCE_FIXED_SYMBOLS) {
       expect(streams).toContain(`${symbol.toLowerCase()}@depth10`);
       socket.emit(
@@ -68,7 +68,9 @@ describe('LiveCandleStreamSupervisorService', () => {
       }),
     );
     await new Promise((resolve) => setImmediate(resolve));
-    expect(fixture.orderBookPubSub.publish).toHaveBeenCalledTimes(10);
+    expect(fixture.orderBookPubSub.publish).toHaveBeenCalledTimes(
+      BINANCE_FIXED_SYMBOLS.length,
+    );
     expect(fixture.binanceTickerIngestion.ingestTicker).toHaveBeenCalledTimes(
       1,
     );
@@ -82,7 +84,9 @@ describe('LiveCandleStreamSupervisorService', () => {
         data: { lastUpdateId: 2, asks: [], bids: [] },
       }),
     );
-    expect(fixture.orderBookPubSub.publish).toHaveBeenCalledTimes(10);
+    expect(fixture.orderBookPubSub.publish).toHaveBeenCalledTimes(
+      BINANCE_FIXED_SYMBOLS.length,
+    );
     socket.close(1000, 'done');
     await connected;
     await fixture.orderBooks.onModuleDestroy();

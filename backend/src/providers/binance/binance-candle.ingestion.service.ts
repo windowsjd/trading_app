@@ -14,7 +14,7 @@ import {
 // Binance weekly klines open on Monday 00:00 UTC; the epoch (1970-01-01) was
 // a Thursday, so the weekly grid is offset by four days.
 const WEEK_GRID_OFFSET_MS = 4 * 24 * 60 * 60_000;
-const SYMBOL_PATTERN = /^[A-Z0-9]{1,32}$/u;
+const SYMBOL_PATTERN = /^[A-Z0-9\p{Script=Han}]{1,32}$/u;
 const DECIMAL_PATTERN = /^(?:0|[1-9]\d*)(?:\.\d+)?$/u;
 
 /**

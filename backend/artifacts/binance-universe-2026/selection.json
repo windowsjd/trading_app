@@ -1,0 +1,2850 @@
+{
+  "startedAt": "2026-09-19T12:12:17.082536+00:00",
+  "completedAt": "2026-09-19T12:12:17.392853+00:00",
+  "replay": true,
+  "acquisition": {
+    "startedAt": "2026-09-19T12:03:40.434961+00:00",
+    "completedAt": "2026-09-19T12:05:49.472364+00:00",
+    "source": "https://api.binance.com",
+    "candidateCount": 493
+  },
+  "startInclusive": "2026-01-01T00:00:00Z",
+  "endExclusive": "2026-09-19T00:00:00Z",
+  "restSource": "https://api.binance.com",
+  "metadataSource": "https://www.binance.com/bapi/asset/v2/public/asset/asset/get-all-asset",
+  "exchangeInfoServerTime": 1789819356201,
+  "exchangeInfoSha256": "66c7e57430c4a8c53866329f26a0caa9d1e9dc77d1188ae815a0c4d765551574",
+  "metadataSha256": "618355d16349c5f4f29a9a842be6bf72a4acc02ce50ab244ae1c3a92a792ea86",
+  "finalExchangeInfoServerTime": 1789819609949,
+  "finalExchangeInfoSha256": "37920743a84bfcb6bf0943401dff2099306b01db83169e4c06da87193ccb2288",
+  "calculation": "SUM(1d kline[7]); exact decimal strings; no annualization",
+  "tieBreaker": "symbol ascending Unicode code point order",
+  "existingSymbols": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "BNBUSDT",
+    "XRPUSDT",
+    "SOLUSDT",
+    "TRXUSDT",
+    "DOGEUSDT",
+    "ZECUSDT",
+    "XLMUSDT",
+    "LINKUSDT"
+  ],
+  "candidateCount": 493,
+  "eligibleCount": 386,
+  "selected": [
+    {
+      "symbol": "SUIUSDT",
+      "baseAsset": "SUI",
+      "name": "Sui",
+      "quoteVolume": "11524719209.76761000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Layer1_Layer2",
+        "Launchpool",
+        "pos"
+      ],
+      "sha256": "2e2b684101c9ef6fc5e8e85fd5cd3491df5252b0f127e3492340cdec23dfc7b8",
+      "rank": 1
+    },
+    {
+      "symbol": "NIGHTUSDT",
+      "baseAsset": "NIGHT",
+      "name": "Midnight",
+      "quoteVolume": "9905832262.18606000",
+      "days": 192,
+      "firstOpenTime": 1773187200000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00001000",
+      "displayPriceDecimals": 5,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Infrastructure",
+        "Layer1_Layer2",
+        "Seed"
+      ],
+      "sha256": "ca9c6b4cbb94d66084df0a56f37140844c0e583cbf1b2b3924cc31200b6e1ced",
+      "rank": 2
+    },
+    {
+      "symbol": "NEARUSDT",
+      "baseAsset": "NEAR",
+      "name": "NEAR Protocol",
+      "quoteVolume": "9557436410.06610000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00100000",
+      "displayPriceDecimals": 3,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Layer1_Layer2",
+        "pos"
+      ],
+      "sha256": "3ee9a5512c4e3d7c61304444f92db0f19a044f48b664da101ae59d6f868a4b85",
+      "rank": 3
+    },
+    {
+      "symbol": "PEPEUSDT",
+      "baseAsset": "PEPE",
+      "name": "Pepe",
+      "quoteVolume": "9393896856.05057355",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00000001",
+      "displayPriceDecimals": 8,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Meme",
+        "innovation-zone"
+      ],
+      "sha256": "38604c8208492fa2bd1d21a2a1d4e5cbf68b0812eba094779972a86b858eb756",
+      "rank": 4
+    },
+    {
+      "symbol": "ADAUSDT",
+      "baseAsset": "ADA",
+      "name": "Cardano",
+      "quoteVolume": "8801209042.52876000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Layer1_Layer2",
+        "pos",
+        "mining-zone"
+      ],
+      "sha256": "ef07645de7f79c9d56930dd5445df7bf9e384be5b9b6a9026b6fad5495bc88a5",
+      "rank": 5
+    },
+    {
+      "symbol": "TAOUSDT",
+      "baseAsset": "TAO",
+      "name": "Bittensor",
+      "quoteVolume": "8719733267.53339000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.10000000",
+      "displayPriceDecimals": 1,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Layer1_Layer2",
+        "AI"
+      ],
+      "sha256": "f9b59aad556b5cd1676ca705f8efd735ff56b7a7234111b3694c9fa149e62175",
+      "rank": 6
+    },
+    {
+      "symbol": "WLDUSDT",
+      "baseAsset": "WLD",
+      "name": "Worldcoin",
+      "quoteVolume": "7908521895.59872000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "AI",
+        "Infrastructure"
+      ],
+      "sha256": "e8d40eaf4824e033b5d0daf8c4c00f75b011acd37f9c5bc5f56a0da034a3a7bc",
+      "rank": 7
+    },
+    {
+      "symbol": "ENAUSDT",
+      "baseAsset": "ENA",
+      "name": "Ethena",
+      "quoteVolume": "5685639156.57166100",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "defi",
+        "Launchpool"
+      ],
+      "sha256": "93459d64f918fdb30aab85b3891497c2cc320ebeeb474403b0809117056cfd26",
+      "rank": 8
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "baseAsset": "AVAX",
+      "name": "Avalanche",
+      "quoteVolume": "5632948921.55401000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00100000",
+      "displayPriceDecimals": 3,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Layer1_Layer2",
+        "pos",
+        "RWA"
+      ],
+      "sha256": "db4862d334f81d2dd05275d8aad3f6292b2caa1fe416e648e3c054599eedcad2",
+      "rank": 9
+    },
+    {
+      "symbol": "UNIUSDT",
+      "baseAsset": "UNI",
+      "name": "Uniswap",
+      "quoteVolume": "5430831844.05916000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00100000",
+      "displayPriceDecimals": 3,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "defi"
+      ],
+      "sha256": "abb77f4226bd86d0c781d29b48b233c120c611e1b7a7495d32b3f14f1d6fba11",
+      "rank": 10
+    },
+    {
+      "symbol": "CHIPUSDT",
+      "baseAsset": "CHIP",
+      "name": "USD.AI",
+      "quoteVolume": "5248815187.94492000",
+      "days": 151,
+      "firstOpenTime": 1776729600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00001000",
+      "displayPriceDecimals": 5,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "defi",
+        "AI",
+        "Seed"
+      ],
+      "sha256": "78672c54c20070d4a4afa7838473cbefc79989db9af179f9bec46ceed278fe98",
+      "rank": 11
+    },
+    {
+      "symbol": "LTCUSDT",
+      "baseAsset": "LTC",
+      "name": "Litecoin",
+      "quoteVolume": "5117111157.98885000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Payments",
+        "mining-zone"
+      ],
+      "sha256": "efbf5515dbb948c8d8b7244bd2018f34bcb8f7ac4fd13825db7b50e43e188d17",
+      "rank": 12
+    },
+    {
+      "symbol": "ASTERUSDT",
+      "baseAsset": "ASTER",
+      "name": "Aster",
+      "quoteVolume": "4366964196.58235000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00100000",
+      "displayPriceDecimals": 3,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "defi",
+        "Seed",
+        "BSC"
+      ],
+      "sha256": "ebc22a495a5b10cdf596d9e83d7498f8d203984062460a9d5525f9d22e1fd191",
+      "rank": 13
+    },
+    {
+      "symbol": "币安人生USDT",
+      "baseAsset": "币安人生",
+      "name": "币安人生",
+      "quoteVolume": "4322866810.68175000",
+      "days": 255,
+      "firstOpenTime": 1767744000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Meme",
+        "Seed",
+        "BSC"
+      ],
+      "sha256": "9a5377402091e826bfccbedcd1a30284ca01e05433c4df937b52d24f69e3f7b7",
+      "rank": 14
+    },
+    {
+      "symbol": "TRUMPUSDT",
+      "baseAsset": "TRUMP",
+      "name": "OFFICIAL TRUMP",
+      "quoteVolume": "4305546133.53216700",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00100000",
+      "displayPriceDecimals": 3,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Meme",
+        "Seed"
+      ],
+      "sha256": "21573422cc8087d2d0a73c58a827b22173c0eaa1b5376a917ed1ddecfec05a89",
+      "rank": 15
+    }
+  ],
+  "top30": [
+    {
+      "symbol": "SUIUSDT",
+      "baseAsset": "SUI",
+      "name": "Sui",
+      "quoteVolume": "11524719209.76761000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Layer1_Layer2",
+        "Launchpool",
+        "pos"
+      ],
+      "sha256": "2e2b684101c9ef6fc5e8e85fd5cd3491df5252b0f127e3492340cdec23dfc7b8",
+      "rank": 1
+    },
+    {
+      "symbol": "NIGHTUSDT",
+      "baseAsset": "NIGHT",
+      "name": "Midnight",
+      "quoteVolume": "9905832262.18606000",
+      "days": 192,
+      "firstOpenTime": 1773187200000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00001000",
+      "displayPriceDecimals": 5,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Infrastructure",
+        "Layer1_Layer2",
+        "Seed"
+      ],
+      "sha256": "ca9c6b4cbb94d66084df0a56f37140844c0e583cbf1b2b3924cc31200b6e1ced",
+      "rank": 2
+    },
+    {
+      "symbol": "NEARUSDT",
+      "baseAsset": "NEAR",
+      "name": "NEAR Protocol",
+      "quoteVolume": "9557436410.06610000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00100000",
+      "displayPriceDecimals": 3,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Layer1_Layer2",
+        "pos"
+      ],
+      "sha256": "3ee9a5512c4e3d7c61304444f92db0f19a044f48b664da101ae59d6f868a4b85",
+      "rank": 3
+    },
+    {
+      "symbol": "PEPEUSDT",
+      "baseAsset": "PEPE",
+      "name": "Pepe",
+      "quoteVolume": "9393896856.05057355",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00000001",
+      "displayPriceDecimals": 8,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Meme",
+        "innovation-zone"
+      ],
+      "sha256": "38604c8208492fa2bd1d21a2a1d4e5cbf68b0812eba094779972a86b858eb756",
+      "rank": 4
+    },
+    {
+      "symbol": "ADAUSDT",
+      "baseAsset": "ADA",
+      "name": "Cardano",
+      "quoteVolume": "8801209042.52876000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Layer1_Layer2",
+        "pos",
+        "mining-zone"
+      ],
+      "sha256": "ef07645de7f79c9d56930dd5445df7bf9e384be5b9b6a9026b6fad5495bc88a5",
+      "rank": 5
+    },
+    {
+      "symbol": "TAOUSDT",
+      "baseAsset": "TAO",
+      "name": "Bittensor",
+      "quoteVolume": "8719733267.53339000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.10000000",
+      "displayPriceDecimals": 1,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Layer1_Layer2",
+        "AI"
+      ],
+      "sha256": "f9b59aad556b5cd1676ca705f8efd735ff56b7a7234111b3694c9fa149e62175",
+      "rank": 6
+    },
+    {
+      "symbol": "WLDUSDT",
+      "baseAsset": "WLD",
+      "name": "Worldcoin",
+      "quoteVolume": "7908521895.59872000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "AI",
+        "Infrastructure"
+      ],
+      "sha256": "e8d40eaf4824e033b5d0daf8c4c00f75b011acd37f9c5bc5f56a0da034a3a7bc",
+      "rank": 7
+    },
+    {
+      "symbol": "ENAUSDT",
+      "baseAsset": "ENA",
+      "name": "Ethena",
+      "quoteVolume": "5685639156.57166100",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "defi",
+        "Launchpool"
+      ],
+      "sha256": "93459d64f918fdb30aab85b3891497c2cc320ebeeb474403b0809117056cfd26",
+      "rank": 8
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "baseAsset": "AVAX",
+      "name": "Avalanche",
+      "quoteVolume": "5632948921.55401000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00100000",
+      "displayPriceDecimals": 3,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Layer1_Layer2",
+        "pos",
+        "RWA"
+      ],
+      "sha256": "db4862d334f81d2dd05275d8aad3f6292b2caa1fe416e648e3c054599eedcad2",
+      "rank": 9
+    },
+    {
+      "symbol": "UNIUSDT",
+      "baseAsset": "UNI",
+      "name": "Uniswap",
+      "quoteVolume": "5430831844.05916000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00100000",
+      "displayPriceDecimals": 3,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "defi"
+      ],
+      "sha256": "abb77f4226bd86d0c781d29b48b233c120c611e1b7a7495d32b3f14f1d6fba11",
+      "rank": 10
+    },
+    {
+      "symbol": "CHIPUSDT",
+      "baseAsset": "CHIP",
+      "name": "USD.AI",
+      "quoteVolume": "5248815187.94492000",
+      "days": 151,
+      "firstOpenTime": 1776729600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00001000",
+      "displayPriceDecimals": 5,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "defi",
+        "AI",
+        "Seed"
+      ],
+      "sha256": "78672c54c20070d4a4afa7838473cbefc79989db9af179f9bec46ceed278fe98",
+      "rank": 11
+    },
+    {
+      "symbol": "LTCUSDT",
+      "baseAsset": "LTC",
+      "name": "Litecoin",
+      "quoteVolume": "5117111157.98885000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Payments",
+        "mining-zone"
+      ],
+      "sha256": "efbf5515dbb948c8d8b7244bd2018f34bcb8f7ac4fd13825db7b50e43e188d17",
+      "rank": 12
+    },
+    {
+      "symbol": "ASTERUSDT",
+      "baseAsset": "ASTER",
+      "name": "Aster",
+      "quoteVolume": "4366964196.58235000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00100000",
+      "displayPriceDecimals": 3,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "defi",
+        "Seed",
+        "BSC"
+      ],
+      "sha256": "ebc22a495a5b10cdf596d9e83d7498f8d203984062460a9d5525f9d22e1fd191",
+      "rank": 13
+    },
+    {
+      "symbol": "币安人生USDT",
+      "baseAsset": "币安人生",
+      "name": "币安人生",
+      "quoteVolume": "4322866810.68175000",
+      "days": 255,
+      "firstOpenTime": 1767744000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Meme",
+        "Seed",
+        "BSC"
+      ],
+      "sha256": "9a5377402091e826bfccbedcd1a30284ca01e05433c4df937b52d24f69e3f7b7",
+      "rank": 14
+    },
+    {
+      "symbol": "TRUMPUSDT",
+      "baseAsset": "TRUMP",
+      "name": "OFFICIAL TRUMP",
+      "quoteVolume": "4305546133.53216700",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00100000",
+      "displayPriceDecimals": 3,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Meme",
+        "Seed"
+      ],
+      "sha256": "21573422cc8087d2d0a73c58a827b22173c0eaa1b5376a917ed1ddecfec05a89",
+      "rank": 15
+    },
+    {
+      "symbol": "XPLUSDT",
+      "baseAsset": "XPL",
+      "name": "Plasma",
+      "quoteVolume": "4296979948.95189200",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00001000",
+      "displayPriceDecimals": 5,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Seed",
+        "HODLer"
+      ],
+      "sha256": "679db94e0e14f3fec59052657774aea4241a9180b5c360163f1af100403373b9",
+      "rank": 16
+    },
+    {
+      "symbol": "PUMPUSDT",
+      "baseAsset": "PUMP",
+      "name": "Pump.Fun",
+      "quoteVolume": "4202478252.21368700",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00000100",
+      "displayPriceDecimals": 6,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Seed"
+      ],
+      "sha256": "564adcafc4e2d8e8cc579f8fda02a3bf6e35a6a37fe6103b4fa862f61e6af8b2",
+      "rank": 17
+    },
+    {
+      "symbol": "REUSDT",
+      "baseAsset": "RE",
+      "name": "Re",
+      "quoteVolume": "4109804967.72126000",
+      "days": 93,
+      "firstOpenTime": 1781740800000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Seed",
+        "defi"
+      ],
+      "sha256": "ad298af8a729db04ef3ffa12bd05c6a5a2440038d3af5ff089604de5e8f1cf6e",
+      "rank": 18
+    },
+    {
+      "symbol": "DASHUSDT",
+      "baseAsset": "DASH",
+      "name": "Dash",
+      "quoteVolume": "4040952521.17637000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Payments",
+        "mining-zone",
+        "pos"
+      ],
+      "sha256": "fe8f42b11ad81a056113e6aa4d1299c3827625b15defaf59c7b5bcf45bd60b1c",
+      "rank": 19
+    },
+    {
+      "symbol": "SENTUSDT",
+      "baseAsset": "SENT",
+      "name": "Sentient",
+      "quoteVolume": "4036393753.89689000",
+      "days": 240,
+      "firstOpenTime": 1769040000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00001000",
+      "displayPriceDecimals": 5,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "AI",
+        "Seed"
+      ],
+      "sha256": "fc60063417fc58291533b933ba968966ef6d589bce3f6f42ab8a208b82324d5e",
+      "rank": 20
+    },
+    {
+      "symbol": "BCHUSDT",
+      "baseAsset": "BCH",
+      "name": "Bitcoin Cash",
+      "quoteVolume": "3981003136.08540000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.10000000",
+      "displayPriceDecimals": 1,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Payments",
+        "mining-zone"
+      ],
+      "sha256": "75475bcaf8b313f46ee0723fa6f33cc06c027f24b039fe7199fae6ede8f71cc4",
+      "rank": 21
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "baseAsset": "AAVE",
+      "name": "Aave",
+      "quoteVolume": "3969287467.81536000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "defi"
+      ],
+      "sha256": "5620818ab99d79cac33e14b08d0c455f1a82b8bdcc649683e4f401db429182b5",
+      "rank": 22
+    },
+    {
+      "symbol": "FETUSDT",
+      "baseAsset": "FET",
+      "name": "Artificial Superintelligence Alliance",
+      "quoteVolume": "3189886964.74142000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Infrastructure",
+        "pos",
+        "Launchpad",
+        "AI"
+      ],
+      "sha256": "fbe0adc6b6b6c87b6e664a5941720a1c3c616a66991c30b029a58725522f72a9",
+      "rank": 23
+    },
+    {
+      "symbol": "PENGUUSDT",
+      "baseAsset": "PENGU",
+      "name": "Pudgy Penguins",
+      "quoteVolume": "3122197148.33307000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00000100",
+      "displayPriceDecimals": 6,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "NFT",
+        "Solana",
+        "Meme",
+        "Launchpool"
+      ],
+      "sha256": "d104901c51d09c1f797fdc6b880f1b850006ed58dde8fa194555244e9b2e6e88",
+      "rank": 24
+    },
+    {
+      "symbol": "ONDOUSDT",
+      "baseAsset": "ONDO",
+      "name": "Ondo",
+      "quoteVolume": "2932895914.27619000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Infrastructure",
+        "RWA"
+      ],
+      "sha256": "3bdb1c93a45f535eab445982c1852930801af2a3e97f068d1a07b4ffacd996ee",
+      "rank": 25
+    },
+    {
+      "symbol": "ZAMAUSDT",
+      "baseAsset": "ZAMA",
+      "name": "ZAMA",
+      "quoteVolume": "2863562889.32267000",
+      "days": 229,
+      "firstOpenTime": 1769990400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00001000",
+      "displayPriceDecimals": 5,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Infrastructure",
+        "Seed"
+      ],
+      "sha256": "0b5360581eaa15ac05919eb382aaa184733f5be051bad0b8933e5a2b69ede235",
+      "rank": 26
+    },
+    {
+      "symbol": "WLFIUSDT",
+      "baseAsset": "WLFI",
+      "name": "World Liberty Financial",
+      "quoteVolume": "2819612448.16425000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "defi",
+        "Seed"
+      ],
+      "sha256": "618bf6808b17739e9c5e39b8e76449771e12be9b13f8f2f56d0979c4db09431b",
+      "rank": 27
+    },
+    {
+      "symbol": "FILUSDT",
+      "baseAsset": "FIL",
+      "name": "Filecoin",
+      "quoteVolume": "2812349182.05274000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "storage-zone"
+      ],
+      "sha256": "40e567e8ad231db8e8ddf27b61c32bf426a45cf886f4c2eca7ebeee78981cfc8",
+      "rank": 28
+    },
+    {
+      "symbol": "HBARUSDT",
+      "baseAsset": "HBAR",
+      "name": "Hedera Hashgraph",
+      "quoteVolume": "2768307028.13390000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00001000",
+      "displayPriceDecimals": 5,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Layer1_Layer2",
+        "pos"
+      ],
+      "sha256": "948325210c7048fa3c4ecdc558524502a19adf2c9e4fd1c5033d75d5def5ea4e",
+      "rank": 29
+    },
+    {
+      "symbol": "FOGOUSDT",
+      "baseAsset": "FOGO",
+      "name": "FOGO",
+      "quoteVolume": "2734142969.03838000",
+      "days": 247,
+      "firstOpenTime": 1768435200000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00001000",
+      "displayPriceDecimals": 5,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "",
+      "metadataTags": [
+        "Infrastructure",
+        "Layer1_Layer2",
+        "Seed"
+      ],
+      "sha256": "cbf642ea09afff994778f8455bffcf03d01def5cebc361a69b39fe1289c0183e",
+      "rank": 30
+    }
+  ],
+  "excluded": [
+    {
+      "symbol": "USDCUSDT",
+      "baseAsset": "USDC",
+      "name": "USDC",
+      "quoteVolume": "446794808663.54901000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00001000",
+      "displayPriceDecimals": 5,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "stablecoin (including depegged stablecoin designs)",
+      "metadataTags": [
+        "stablecoin"
+      ],
+      "sha256": "9e781693536489a9d7758c22ed8893456d78800c580ee3edd1d9fc5180afcb88"
+    },
+    {
+      "symbol": "USD1USDT",
+      "baseAsset": "USD1",
+      "name": "World Liberty Financial USD",
+      "quoteVolume": "44351057507.62996000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00001000",
+      "displayPriceDecimals": 5,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "stablecoin (including depegged stablecoin designs)",
+      "metadataTags": [
+        "stablecoin"
+      ],
+      "sha256": "eacc5a42f39e15fe30fa0c59493f98cca346cb8ffff6c7b814f22cb18c6f2d03"
+    },
+    {
+      "symbol": "FDUSDUSDT",
+      "baseAsset": "FDUSD",
+      "name": "First Digital USD",
+      "quoteVolume": "11719388119.94690000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "stablecoin (including depegged stablecoin designs)",
+      "metadataTags": [
+        "stablecoin"
+      ],
+      "sha256": "2f08fa7098bd3ce18f90f5844c1d89fdd19d6f3bd229b72e4c9cf5161f444a4e"
+    },
+    {
+      "symbol": "PAXGUSDT",
+      "baseAsset": "PAXG",
+      "name": "PAX Gold",
+      "quoteVolume": "11379496194.11146300",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "commodity-pegged representation",
+      "metadataTags": [
+        "tCommodities"
+      ],
+      "sha256": "0e82075fa615872e52f763d6777ddc4c52f1c8377fc92e3659469b22423515da"
+    },
+    {
+      "symbol": "RLUSDUSDT",
+      "baseAsset": "RLUSD",
+      "name": "Ripple USD",
+      "quoteVolume": "8100822106.29960000",
+      "days": 240,
+      "firstOpenTime": 1769040000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "stablecoin (including depegged stablecoin designs)",
+      "metadataTags": [
+        "stablecoin"
+      ],
+      "sha256": "7bbb31da939c843fd3f9446f45e0a769bed013e547c0f7fc9a6776e9df129fe3"
+    },
+    {
+      "symbol": "XAUTUSDT",
+      "baseAsset": "XAUT",
+      "name": "Tether Gold",
+      "quoteVolume": "5772527798.78727700",
+      "days": 177,
+      "firstOpenTime": 1774483200000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "commodity-pegged representation",
+      "metadataTags": [
+        "tCommodities"
+      ],
+      "sha256": "812dd4a6148043f371ee0fe7165cf0e1d7ad80575202a9282009bab558679a23"
+    },
+    {
+      "symbol": "EURUSDT",
+      "baseAsset": "EUR",
+      "name": "Euro",
+      "quoteVolume": "5226250821.34226000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "fiat, not a plain crypto asset",
+      "metadataTags": [],
+      "sha256": "e3f97c2bc0fe0e96aad0eceafb9ba24913a6cecb988d3065d993288b2b5882bc"
+    },
+    {
+      "symbol": "UUSDT",
+      "baseAsset": "U",
+      "name": "United Stables",
+      "quoteVolume": "5203453795.80390000",
+      "days": 249,
+      "firstOpenTime": 1768262400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "stablecoin (including depegged stablecoin designs)",
+      "metadataTags": [
+        "stablecoin"
+      ],
+      "sha256": "12e271496ead02ebc74ae24cb7065dd608624394fb0e500fe5abb3a8c77a6048"
+    },
+    {
+      "symbol": "SNDKBUSDT",
+      "baseAsset": "SNDKB",
+      "name": "SanDisk (bStocks)",
+      "quoteVolume": "2270183159.47161500",
+      "days": 100,
+      "firstOpenTime": 1781136000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "c692428e4af47d9cf9631ebb7ddcd82539fe7fece0a720b42a6561f6c944094e"
+    },
+    {
+      "symbol": "SPCXBUSDT",
+      "baseAsset": "SPCXB",
+      "name": "SpaceX (bStocks)",
+      "quoteVolume": "2033746853.12991000",
+      "days": 99,
+      "firstOpenTime": 1781222400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "19faaa4cc8a46be576f9bf9b5d32e0f399213d097107037538262022a3cafb28"
+    },
+    {
+      "symbol": "XUSDUSDT",
+      "baseAsset": "XUSD",
+      "name": "XUSD",
+      "quoteVolume": "1659454081.77410000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "stablecoin (including depegged stablecoin designs)",
+      "metadataTags": [
+        "stablecoin"
+      ],
+      "sha256": "35bad6ad0aa66163eb51b058618d386455e7ddf11fd5c19f11457e45ca5f2c47"
+    },
+    {
+      "symbol": "WBTCUSDT",
+      "baseAsset": "WBTC",
+      "name": "Wrapped Bitcoin",
+      "quoteVolume": "1098929213.83991570",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "wrapped/staked representation of another crypto asset",
+      "metadataTags": [],
+      "sha256": "3a64d77a65b0ec3012dd44ca8dcb3dc3e7ee257df6d810a4ff4d3bbd95f1340c"
+    },
+    {
+      "symbol": "BFUSDUSDT",
+      "baseAsset": "BFUSD",
+      "name": "BFUSD",
+      "quoteVolume": "1070099755.02860000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "stablecoin (including depegged stablecoin designs)",
+      "metadataTags": [
+        "stablecoin"
+      ],
+      "sha256": "968c978ed8d0bc0926e1f9622fbc264f062337da5ef76487f8bf37d3f04ec720"
+    },
+    {
+      "symbol": "USDEUSDT",
+      "baseAsset": "USDE",
+      "name": "USD Ethena",
+      "quoteVolume": "1067525051.03320000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "stablecoin (including depegged stablecoin designs)",
+      "metadataTags": [
+        "stablecoin"
+      ],
+      "sha256": "2676cba23a529a9eabcaacb8935afb82e93b37236a7ee47705e22e7c7c3d663b"
+    },
+    {
+      "symbol": "MUBUSDT",
+      "baseAsset": "MUB",
+      "name": "Micron Technology (bStocks)",
+      "quoteVolume": "883330546.79352000",
+      "days": 100,
+      "firstOpenTime": 1781136000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "826d90d6d0f2a8799e8db14b4b222f2acddd23492e1ce517a1ab0c9930a10e74"
+    },
+    {
+      "symbol": "CRCLBUSDT",
+      "baseAsset": "CRCLB",
+      "name": "Circle Internet Group (bStocks)",
+      "quoteVolume": "812938729.83320000",
+      "days": 100,
+      "firstOpenTime": 1781136000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "c395e59d7c93fc3e093988134b547a6e49801843c2857a33e75d09231dc7c75e"
+    },
+    {
+      "symbol": "SKHYBUSDT",
+      "baseAsset": "SKHYB",
+      "name": "SK Hynix (bStocks)",
+      "quoteVolume": "619569770.50792000",
+      "days": 68,
+      "firstOpenTime": 1783900800000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "dbe1e78f0261864187bdfe244d5cc7c1a46894d29599f459f6ad298aedb947c0"
+    },
+    {
+      "symbol": "EURIUSDT",
+      "baseAsset": "EURI",
+      "name": "Eurite",
+      "quoteVolume": "610037862.09384000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "stablecoin (including depegged stablecoin designs)",
+      "metadataTags": [
+        "stablecoin"
+      ],
+      "sha256": "0634abaec489e64414e281ba48fe29d3b48ffb8eed6abeb130d476b0080c1728"
+    },
+    {
+      "symbol": "SOXLBUSDT",
+      "baseAsset": "SOXLB",
+      "name": "Semicon Bull 3X ETF (bStocks)",
+      "quoteVolume": "519808347.13084000",
+      "days": 74,
+      "firstOpenTime": 1783382400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "d0b7591eae9631a8758dba9d92dcf67d03a914a118ecebc8b4f31c11bf0b2dd5"
+    },
+    {
+      "symbol": "WBETHUSDT",
+      "baseAsset": "WBETH",
+      "name": "Wrapped Beacon ETH (WBETH)",
+      "quoteVolume": "513032124.55905600",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "wrapped/staked representation of another crypto asset",
+      "metadataTags": [
+        "defi"
+      ],
+      "sha256": "cf73844f054d9c6f3d043f864e8d655dfce17fefdfc7eaa5504a2af3fdf6b6e4"
+    },
+    {
+      "symbol": "SNXXBUSDT",
+      "baseAsset": "SNXXB",
+      "name": "Tradr 2X Long SNDK ETF (bStocks)",
+      "quoteVolume": "341747324.21730000",
+      "days": 59,
+      "firstOpenTime": 1784678400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "f4417b4e867a29a7b5d5caf5a47d158c136ff7ea69f9b9a06298cebb834e832b"
+    },
+    {
+      "symbol": "MSTRBUSDT",
+      "baseAsset": "MSTRB",
+      "name": "Strategy (bStocks)",
+      "quoteVolume": "334345163.09389000",
+      "days": 88,
+      "firstOpenTime": 1782172800000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "61804841db7ea2e16c22bd7eab62ba0bd61e1db36235ca3458243af9d7d5e381"
+    },
+    {
+      "symbol": "BNSOLUSDT",
+      "baseAsset": "BNSOL",
+      "name": "Binance Staked SOL",
+      "quoteVolume": "295539111.22660000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.10000000",
+      "displayPriceDecimals": 1,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "wrapped/staked representation of another crypto asset",
+      "metadataTags": [
+        "defi"
+      ],
+      "sha256": "f2909bbe91c8a3d9788270f2d3dbef3ca77b546e8df0426f889c895a86823ef0"
+    },
+    {
+      "symbol": "KORUBUSDT",
+      "baseAsset": "KORUB",
+      "name": "South Korea Bull 3X ETF (bStocks)",
+      "quoteVolume": "281880511.03800000",
+      "days": 59,
+      "firstOpenTime": 1784678400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "461fb360715f65695f063fdbdc25578c2d65f51672436f99c8f351f916a0e72d"
+    },
+    {
+      "symbol": "QQQBUSDT",
+      "baseAsset": "QQQB",
+      "name": "Invesco QQQ Trust (bStocks)",
+      "quoteVolume": "238537005.27205000",
+      "days": 81,
+      "firstOpenTime": 1782777600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "815354d6b92f18b8e7e87337f712724ea135e04bdc4f6dfda51b434bf4d4acf4"
+    },
+    {
+      "symbol": "USTCUSDT",
+      "baseAsset": "USTC",
+      "name": "TerraClassicUSD",
+      "quoteVolume": "220508846.78405000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00001000",
+      "displayPriceDecimals": 5,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "stablecoin (including depegged stablecoin designs)",
+      "metadataTags": [
+        "defi"
+      ],
+      "sha256": "d813ea91920a22992666f7e452ef5d7e6fede203256249d6999d7570133b2d1c"
+    },
+    {
+      "symbol": "NVDABUSDT",
+      "baseAsset": "NVDAB",
+      "name": "NVIDIA (bStocks)",
+      "quoteVolume": "159800699.24332000",
+      "days": 100,
+      "firstOpenTime": 1781136000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "00c06a7ccbc31dc7cb37f94a7436f368fe762d82bdb649c57bf83784dfc26fc4"
+    },
+    {
+      "symbol": "TSLABUSDT",
+      "baseAsset": "TSLAB",
+      "name": "Tesla (bStocks)",
+      "quoteVolume": "149980613.33271000",
+      "days": 100,
+      "firstOpenTime": 1781136000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "f74016550b739fe2a879d33e2f2bed088243fd7ae2a47d79636d70313a5ae640"
+    },
+    {
+      "symbol": "SPYBUSDT",
+      "baseAsset": "SPYB",
+      "name": "SPY (bStocks)",
+      "quoteVolume": "133150722.79520000",
+      "days": 74,
+      "firstOpenTime": 1783382400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "67d9d9bfa6898af2185dc2a111135dd2b00ed362fce034c6db2ae6dcd07a6cff"
+    },
+    {
+      "symbol": "DRAMBUSDT",
+      "baseAsset": "DRAMB",
+      "name": "Roundhill Memory ETF (bStocks)",
+      "quoteVolume": "131306231.78130000",
+      "days": 74,
+      "firstOpenTime": 1783382400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "df919d180ba2ab959bd694c55f7968c569e885fd087241533596b2a48c0b796f"
+    },
+    {
+      "symbol": "EWYBUSDT",
+      "baseAsset": "EWYB",
+      "name": "iShares MSCI South Korea ETF (bStocks)",
+      "quoteVolume": "126855842.65547000",
+      "days": 88,
+      "firstOpenTime": 1782172800000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "18db13423574c234264de1e9c7138e8b18741d653f6773f8628ac15aae9f6396"
+    },
+    {
+      "symbol": "INTCBUSDT",
+      "baseAsset": "INTCB",
+      "name": "Intel (bStocks)",
+      "quoteVolume": "116134145.91060000",
+      "days": 88,
+      "firstOpenTime": 1782172800000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "4eac20acc84d0d1e95f82c67deb6d0ea5bbf8e7dea482d3c8c2e69f4556a3205"
+    },
+    {
+      "symbol": "GOOGLBUSDT",
+      "baseAsset": "GOOGLB",
+      "name": "Alphabet (bStocks)",
+      "quoteVolume": "114923447.88211000",
+      "days": 74,
+      "firstOpenTime": 1783382400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "3bc833cb58d7f3f3a4fb68229ca9d52682e489c1110eec0b7ca7fccabe032c88"
+    },
+    {
+      "symbol": "NBISBUSDT",
+      "baseAsset": "NBISB",
+      "name": "Nebius (bStocks)",
+      "quoteVolume": "96523607.16188000",
+      "days": 74,
+      "firstOpenTime": 1783382400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "749423c2093feee71f19b1ad187e87f43944e4af9e94d697e8b563da15b805a1"
+    },
+    {
+      "symbol": "USDSUSDT",
+      "baseAsset": "USDS",
+      "name": "USDS",
+      "quoteVolume": "74608817.33540000",
+      "days": 163,
+      "firstOpenTime": 1775692800000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "stablecoin (including depegged stablecoin designs)",
+      "metadataTags": [
+        "stablecoin"
+      ],
+      "sha256": "2c59ca27d942ee5e8d7dd69ceb1aa32786ff8b7c104ac0a227c622af30a23e38"
+    },
+    {
+      "symbol": "MRVLBUSDT",
+      "baseAsset": "MRVLB",
+      "name": "Marvell Technology (bStocks)",
+      "quoteVolume": "62430441.75483000",
+      "days": 66,
+      "firstOpenTime": 1784073600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "d5098e6310a7fd76772ce0d43b4a626f1a0ffac410450bf8772cb7d5a73ea8b3"
+    },
+    {
+      "symbol": "AXTIBUSDT",
+      "baseAsset": "AXTIB",
+      "name": "AXT (bStocks)",
+      "quoteVolume": "59849095.49990000",
+      "days": 59,
+      "firstOpenTime": 1784678400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "394229cc38832a52e5caa3961500f3ec7f203d5fb1139df92542ba6237bd768d"
+    },
+    {
+      "symbol": "MUUBUSDT",
+      "baseAsset": "MUUB",
+      "name": "Direxion MU Bull 2X ETF (bStocks)",
+      "quoteVolume": "56570213.71250000",
+      "days": 59,
+      "firstOpenTime": 1784678400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "317e1925d81c1177a7326a569f39040e20e663bb10288d5e221055d42c2cd60c"
+    },
+    {
+      "symbol": "KGSTUSDT",
+      "baseAsset": "KGST",
+      "name": "Kyrgyz Som Stablecoin",
+      "quoteVolume": "56262108.54914400",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00000100",
+      "displayPriceDecimals": 6,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "stablecoin (including depegged stablecoin designs)",
+      "metadataTags": [
+        "stablecoin"
+      ],
+      "sha256": "e64f1d185057df82a9c89af3810c8c8b757c02dd27093377634b581511cc9b48"
+    },
+    {
+      "symbol": "TUSDUSDT",
+      "baseAsset": "TUSD",
+      "name": "TrueUSD",
+      "quoteVolume": "53890936.09220000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "stablecoin (including depegged stablecoin designs)",
+      "metadataTags": [
+        "stablecoin"
+      ],
+      "sha256": "0cc8d5ba12554e262b89dbbea29ce19d013669761248d043e4fa2733833d4372"
+    },
+    {
+      "symbol": "LITEBUSDT",
+      "baseAsset": "LITEB",
+      "name": "Lumentum (bStocks)",
+      "quoteVolume": "52305459.82000000",
+      "days": 81,
+      "firstOpenTime": 1782777600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "b554191c18a14138b0371b4de7629092025d6c6fd429b05ca57bf689cca244dd"
+    },
+    {
+      "symbol": "AAPLBUSDT",
+      "baseAsset": "AAPLB",
+      "name": "Apple (bStocks)",
+      "quoteVolume": "50701541.69810000",
+      "days": 52,
+      "firstOpenTime": 1785283200000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "84ad2a871b40a40b09bf16e4d507882e8428deae2833d61d39dc599e1504336b"
+    },
+    {
+      "symbol": "AAOIBUSDT",
+      "baseAsset": "AAOIB",
+      "name": "Applied Optoelectronics (bStocks)",
+      "quoteVolume": "49574196.64102000",
+      "days": 66,
+      "firstOpenTime": 1784073600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "f6198e43c4c736c8b7806b2f6b661c9d5864a99585f020975df268bf82e172dd"
+    },
+    {
+      "symbol": "AMDBUSDT",
+      "baseAsset": "AMDB",
+      "name": "Advanced Micro Devices (bStocks)",
+      "quoteVolume": "45846744.25125000",
+      "days": 88,
+      "firstOpenTime": 1782172800000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "9e0885637b1a7feb0813b79d1648f69e739bba95e30adf7c0d6da7c1ba2ae806"
+    },
+    {
+      "symbol": "SOXSBUSDT",
+      "baseAsset": "SOXSB",
+      "name": "Direxion Semiconductor Bear 3X ETF (bStocks)",
+      "quoteVolume": "45049437.66110000",
+      "days": 52,
+      "firstOpenTime": 1785283200000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "57431f8e7757dc470e77baa0abc2c09ce8812fe1f684bf28d01bfdbd794ec7cc"
+    },
+    {
+      "symbol": "COINBUSDT",
+      "baseAsset": "COINB",
+      "name": "Coinbase (bStocks)",
+      "quoteVolume": "43348147.09146000",
+      "days": 74,
+      "firstOpenTime": 1783382400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "d6be8de0fe9ad9478899b6564d380cd39f6e8dbad262c100a7099cb70398e89a"
+    },
+    {
+      "symbol": "BNCBUSDT",
+      "baseAsset": "BNCB",
+      "name": "CEA Industries (bStocks)",
+      "quoteVolume": "42284031.41600000",
+      "days": 5,
+      "firstOpenTime": 1789344000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks",
+        "newListing"
+      ],
+      "sha256": "332b4a1e4424862545c8d21e6c1f4150e4edadb12d60cb1cb33e31ec8e177937"
+    },
+    {
+      "symbol": "HOODBUSDT",
+      "baseAsset": "HOODB",
+      "name": "Robinhood (bStocks)",
+      "quoteVolume": "37103926.47169000",
+      "days": 66,
+      "firstOpenTime": 1784073600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "574d5a7802ec5d4f68276474d4870b7c765aece61083dead1e78d703326913f0"
+    },
+    {
+      "symbol": "METABUSDT",
+      "baseAsset": "METAB",
+      "name": "Meta (bStocks)",
+      "quoteVolume": "36174486.67232000",
+      "days": 81,
+      "firstOpenTime": 1782777600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "133cd7976bc0e292e16d00b99e91538b1c6344ae3c15017a5c06e95b79947472"
+    },
+    {
+      "symbol": "BMNRBUSDT",
+      "baseAsset": "BMNRB",
+      "name": "BitMine Immersion Technologies (bStocks)",
+      "quoteVolume": "33570161.43960000",
+      "days": 45,
+      "firstOpenTime": 1785888000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "ae09c73c6b91c3747ad8ea13add7d658351a14a4ff8964ce4df4110446258db0"
+    },
+    {
+      "symbol": "CBRSBUSDT",
+      "baseAsset": "CBRSB",
+      "name": "Cerebras (bStocks)",
+      "quoteVolume": "32170042.65354000",
+      "days": 74,
+      "firstOpenTime": 1783382400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "50d4fad8698db9cc8e1c05219f2dc171c9da6174ed3dcfc5266a68b7e6a31e76"
+    },
+    {
+      "symbol": "AVGOBUSDT",
+      "baseAsset": "AVGOB",
+      "name": "Broadcom (bStocks)",
+      "quoteVolume": "29472971.89113000",
+      "days": 66,
+      "firstOpenTime": 1784073600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "ba99d264b9fe8a297a61a447d910478cec2be24ca43dd363c0b3d10580dda621"
+    },
+    {
+      "symbol": "WDCBUSDT",
+      "baseAsset": "WDCB",
+      "name": "Western Digital (bStocks)",
+      "quoteVolume": "24686658.68330000",
+      "days": 74,
+      "firstOpenTime": 1783382400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "7a19ec6e1d59a4148aeb54ab3f5bfcbde243dcde8cfb1858e29274bee4126566"
+    },
+    {
+      "symbol": "USDPUSDT",
+      "baseAsset": "USDP",
+      "name": "Pax Dollar",
+      "quoteVolume": "22213253.39250000",
+      "days": 261,
+      "firstOpenTime": 1767225600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.00010000",
+      "displayPriceDecimals": 4,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "stablecoin (including depegged stablecoin designs)",
+      "metadataTags": [
+        "stablecoin"
+      ],
+      "sha256": "6f09d003614ddb42f1c65c0876e449eecebeba155cd6ae12ff4f229e1dec8a34"
+    },
+    {
+      "symbol": "COHRBUSDT",
+      "baseAsset": "COHRB",
+      "name": "Coherent (bStocks)",
+      "quoteVolume": "22058068.06463000",
+      "days": 45,
+      "firstOpenTime": 1785888000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "7504288f02a338cd1e8090143feadb67e2adc7eb254be0ea6230cff61634bacc"
+    },
+    {
+      "symbol": "MVLLBUSDT",
+      "baseAsset": "MVLLB",
+      "name": "GraniteShares 2X Long MRVL ETF (bStocks)",
+      "quoteVolume": "21582178.52730000",
+      "days": 59,
+      "firstOpenTime": 1784678400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "a277bb7888a50ea2fd076c4d16223a3141b63260c4a86c59cf24bd4f38e60421"
+    },
+    {
+      "symbol": "ORCLBUSDT",
+      "baseAsset": "ORCLB",
+      "name": "Oracle (bStocks)",
+      "quoteVolume": "20772103.01754000",
+      "days": 59,
+      "firstOpenTime": 1784678400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "caf2b4cb7bc68475c553f7f8e631e9b4a05deff97627f4434c53d630e9cf0f4e"
+    },
+    {
+      "symbol": "BABABUSDT",
+      "baseAsset": "BABAB",
+      "name": "Alibaba (bStocks)",
+      "quoteVolume": "20729507.73418000",
+      "days": 66,
+      "firstOpenTime": 1784073600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "9a327f03909f6cf488aaf548c4e82942f6f5ed349e18ea8735a725b83ecc430d"
+    },
+    {
+      "symbol": "BEBUSDT",
+      "baseAsset": "BEB",
+      "name": "Bloom Energy (bStocks)",
+      "quoteVolume": "19198479.00735000",
+      "days": 52,
+      "firstOpenTime": 1785283200000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "accf39a479ef104953d4a983718c41fd7bebf8b15716a7b9ece0b088c4e81956"
+    },
+    {
+      "symbol": "GLWBUSDT",
+      "baseAsset": "GLWB",
+      "name": "Corning (bStocks)",
+      "quoteVolume": "16673198.85116000",
+      "days": 74,
+      "firstOpenTime": 1783382400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "486f2340c153caf65e439e16433e93f2ae9e90ca33b69de1149fee9aaf8122bb"
+    },
+    {
+      "symbol": "CRWVBUSDT",
+      "baseAsset": "CRWVB",
+      "name": "CoreWeave (bStocks)",
+      "quoteVolume": "15992924.79210000",
+      "days": 59,
+      "firstOpenTime": 1784678400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "eebca619b1e319a4a674b7e26c30efa379912eaffe42c5c2f1b23ce5ee2b8066"
+    },
+    {
+      "symbol": "MSFTBUSDT",
+      "baseAsset": "MSFTB",
+      "name": "Microsoft (bStocks)",
+      "quoteVolume": "15875566.75468000",
+      "days": 81,
+      "firstOpenTime": 1782777600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "14879524a84fde528b1e93e4ec2728ca90a3e9eb19d682fe402ca603168d819a"
+    },
+    {
+      "symbol": "RKLBBUSDT",
+      "baseAsset": "RKLBB",
+      "name": "Rocket Lab (bStocks)",
+      "quoteVolume": "15647624.57810000",
+      "days": 66,
+      "firstOpenTime": 1784073600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "c19a6bfe5b306d517d62bdd20998f2ab275a9fd436d3efe09a7109e2daae2f28"
+    },
+    {
+      "symbol": "QCOMBUSDT",
+      "baseAsset": "QCOMB",
+      "name": "Qualcomm (bStocks)",
+      "quoteVolume": "15260673.19899000",
+      "days": 74,
+      "firstOpenTime": 1783382400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "5451290bf89036b513c3452db8e7a140c30a4c38d219488d0ad0faa3c7486986"
+    },
+    {
+      "symbol": "TSMBUSDT",
+      "baseAsset": "TSMB",
+      "name": "TSMC (bStocks)",
+      "quoteVolume": "15254047.62009000",
+      "days": 66,
+      "firstOpenTime": 1784073600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "94d87890c4613b88b9045f46275003091a3adbcf8f16f29e1ae0b3627df12d92"
+    },
+    {
+      "symbol": "ARMBUSDT",
+      "baseAsset": "ARMB",
+      "name": "ARM (bStocks)",
+      "quoteVolume": "15158512.73086000",
+      "days": 66,
+      "firstOpenTime": 1784073600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "ac791284e97403562aae855d8f9bdf5ab8e320ffa1e291d460470672090ddc84"
+    },
+    {
+      "symbol": "TQQQBUSDT",
+      "baseAsset": "TQQQB",
+      "name": "ProShares UltraPro QQQ (bStocks)",
+      "quoteVolume": "15098189.61270000",
+      "days": 59,
+      "firstOpenTime": 1784678400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "4a592dba16f7d7bb6e48eaf929d98bc23d9da1e662aea7464aa1677292862b8c"
+    },
+    {
+      "symbol": "IRENBUSDT",
+      "baseAsset": "IRENB",
+      "name": "IREN Limited (bStocks)",
+      "quoteVolume": "13998955.66380000",
+      "days": 45,
+      "firstOpenTime": 1785888000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "3665f7e457b928e6d28763e2b104edf67573eefb65a74980567daa7327af16b0"
+    },
+    {
+      "symbol": "GMEBUSDT",
+      "baseAsset": "GMEB",
+      "name": "GameStop (bStocks)",
+      "quoteVolume": "13858250.61280000",
+      "days": 38,
+      "firstOpenTime": 1786492800000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "5d5094e076b956aef2740193c5258793a6cd758726aceb391552a612040575b7"
+    },
+    {
+      "symbol": "INTWBUSDT",
+      "baseAsset": "INTWB",
+      "name": "GraniteShares 2X Long INTC ETF (bStocks)",
+      "quoteVolume": "13048568.26190000",
+      "days": 59,
+      "firstOpenTime": 1784678400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "633848c949b05bf7a20c8dd0a52121a7d8b06cf9ead8a645f58a19d8a7e674ea"
+    },
+    {
+      "symbol": "PLTRBUSDT",
+      "baseAsset": "PLTRB",
+      "name": "Palantir (bStocks)",
+      "quoteVolume": "13048134.15696000",
+      "days": 81,
+      "firstOpenTime": 1782777600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "e4d5512b0a0bed31e6112c70a229947769a739f5a859a902febea9d8e95dfd5f"
+    },
+    {
+      "symbol": "IBMBUSDT",
+      "baseAsset": "IBMB",
+      "name": "IBM (bStocks)",
+      "quoteVolume": "12859806.87413000",
+      "days": 66,
+      "firstOpenTime": 1784073600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "12a1e048f42757525f9fcae22acf41881a50a1a6cc2628647e9a8345903b76f1"
+    },
+    {
+      "symbol": "NOKBUSDT",
+      "baseAsset": "NOKB",
+      "name": "Nokia (bStocks)",
+      "quoteVolume": "12503782.17990000",
+      "days": 66,
+      "firstOpenTime": 1784073600000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "4a5b8d95e8c20a4844b2132737226faa795307b51852f82f4fa5f552cfd5d5df"
+    },
+    {
+      "symbol": "FLNCBUSDT",
+      "baseAsset": "FLNCB",
+      "name": "Fluence Energy (bStocks)",
+      "quoteVolume": "11546428.46460000",
+      "days": 52,
+      "firstOpenTime": 1785283200000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "12a821fafcedd1fab8000e3805783d491d0f3636f6e3fc73e4093ea9ce68bbdf"
+    },
+    {
+      "symbol": "SMCIBUSDT",
+      "baseAsset": "SMCIB",
+      "name": "Super Micro Computer (bStocks)",
+      "quoteVolume": "11204875.93920000",
+      "days": 45,
+      "firstOpenTime": 1785888000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "ac293332b2bfbb118efdf500abca5dd33a3568305e89baf9f3203fa0394a3d5f"
+    },
+    {
+      "symbol": "CRDOBUSDT",
+      "baseAsset": "CRDOB",
+      "name": "Credo Technology (bStocks)",
+      "quoteVolume": "10534098.72765000",
+      "days": 45,
+      "firstOpenTime": 1785888000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "d5acf1f82d11faebeca72939c12178f0ab0faa0225e977b7b658a56c7f2bc6a7"
+    },
+    {
+      "symbol": "DJTBUSDT",
+      "baseAsset": "DJTB",
+      "name": "Trump Media & Technology Group (bStocks)",
+      "quoteVolume": "8825655.46200000",
+      "days": 24,
+      "firstOpenTime": 1787702400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "98e00d3692cfd5d0b8d538c37470021e0bb7425d6328c9f603cb7a4ff8ea6458"
+    },
+    {
+      "symbol": "AMATBUSDT",
+      "baseAsset": "AMATB",
+      "name": "Applied Materials (bStocks)",
+      "quoteVolume": "8807536.90191000",
+      "days": 52,
+      "firstOpenTime": 1785283200000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "e2fe0a00c7a56c7c72ceef6e9f6a554fe8cf070e799ebcd28cea751c32b55db6"
+    },
+    {
+      "symbol": "USARBUSDT",
+      "baseAsset": "USARB",
+      "name": "USA Rare Earth (bStocks)",
+      "quoteVolume": "8091040.38880000",
+      "days": 45,
+      "firstOpenTime": 1785888000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "7ea532b3b4aea084c7003549282899fe9361449c8cdf3a17f9d6860629668672"
+    },
+    {
+      "symbol": "QNTBUSDT",
+      "baseAsset": "QNTB",
+      "name": "Quantinuum (bStocks)",
+      "quoteVolume": "7960019.88320000",
+      "days": 59,
+      "firstOpenTime": 1784678400000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "0b867d6688b7a81e07c43f5504d61cb512d0a0877f034ba2cb4a0a8289a1f434"
+    },
+    {
+      "symbol": "DELLBUSDT",
+      "baseAsset": "DELLB",
+      "name": "Dell (bStocks)",
+      "quoteVolume": "7841341.57428000",
+      "days": 52,
+      "firstOpenTime": 1785283200000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "23d4e102bd3e1905c21b3cdd9a57671a1374aabe5342ccf5e4ce6ac66014bad2"
+    },
+    {
+      "symbol": "ASTSBUSDT",
+      "baseAsset": "ASTSB",
+      "name": "AST SpaceMobile (bStocks)",
+      "quoteVolume": "7681950.25030000",
+      "days": 45,
+      "firstOpenTime": 1785888000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "3476c22c4875585ce1de8f4ab9fbd2721984b5b1a35b6dbf878e89219db2aa9e"
+    },
+    {
+      "symbol": "AMZNBUSDT",
+      "baseAsset": "AMZNB",
+      "name": "Amazon (bStocks)",
+      "quoteVolume": "7289462.11107000",
+      "days": 52,
+      "firstOpenTime": 1785283200000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "bb2df599434d2a6629c907ab6c3f8fe5cc21079a91c2cc900176349385bc29bf"
+    },
+    {
+      "symbol": "ALABBUSDT",
+      "baseAsset": "ALABB",
+      "name": "Astera Labs (bStocks)",
+      "quoteVolume": "7162785.09527000",
+      "days": 45,
+      "firstOpenTime": 1785888000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "3cebf3a68e806b2f559748a6618c03cfba70cb4fe303fe2086b73f60d58b3253"
+    },
+    {
+      "symbol": "ASMLBUSDT",
+      "baseAsset": "ASMLB",
+      "name": "ASML (bStocks)",
+      "quoteVolume": "5315327.03902600",
+      "days": 45,
+      "firstOpenTime": 1785888000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "c2990c11e353be647b693f233c1cff3ea3a066739a3fcb5e99c1a4f1bb4b1651"
+    },
+    {
+      "symbol": "NFLXBUSDT",
+      "baseAsset": "NFLXB",
+      "name": "Netflix (bStocks)",
+      "quoteVolume": "4635084.10280000",
+      "days": 45,
+      "firstOpenTime": 1785888000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "fb53ecebd758a96127610f67d5a9f2bd481f96eaf9de6c3fcc0c0c094cc070d8"
+    },
+    {
+      "symbol": "SMHBUSDT",
+      "baseAsset": "SMHB",
+      "name": "VanEck Semiconductor ETF (bStocks)",
+      "quoteVolume": "3058919.50679000",
+      "days": 52,
+      "firstOpenTime": 1785283200000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "fefcd1e2dbec452af1f8484b6e6ad9cb44d80cfd46aa05b87f0388b038e51697"
+    },
+    {
+      "symbol": "MRNABUSDT",
+      "baseAsset": "MRNAB",
+      "name": "Moderna (bStocks)",
+      "quoteVolume": "2997961.80606000",
+      "days": 17,
+      "firstOpenTime": 1788307200000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks",
+        "newListing"
+      ],
+      "sha256": "15c55ab64c912cd4516b82180f461807d5404db4f6b1c58ecc50ff62adbe9136"
+    },
+    {
+      "symbol": "PYPLBUSDT",
+      "baseAsset": "PYPLB",
+      "name": "Paypal (bStocks)",
+      "quoteVolume": "2734776.13770000",
+      "days": 52,
+      "firstOpenTime": 1785283200000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "3300d1f11f539282a1f8783ed2fb1349407eca79097fd26568fe1c51c354f206"
+    },
+    {
+      "symbol": "HIMSBUSDT",
+      "baseAsset": "HIMSB",
+      "name": "Hims & Hers (bStocks)",
+      "quoteVolume": "1361249.47180000",
+      "days": 10,
+      "firstOpenTime": 1788912000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks",
+        "newListing"
+      ],
+      "sha256": "bc06aa8c37bedf1cfff68181aa5ca79546e49147f9cc45438a87f10e7d90ec66"
+    },
+    {
+      "symbol": "RDDTBUSDT",
+      "baseAsset": "RDDTB",
+      "name": "Reddit (bStocks)",
+      "quoteVolume": "1112083.19485000",
+      "days": 3,
+      "firstOpenTime": 1789516800000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks",
+        "newListing"
+      ],
+      "sha256": "d3fc70a9fbd08615246b28fd16b343f19ea385815b410936bea27c83f926e8ff"
+    },
+    {
+      "symbol": "STXBUSDT",
+      "baseAsset": "STXB",
+      "name": "Seagate (bStocks)",
+      "quoteVolume": "773789.32700000",
+      "days": 17,
+      "firstOpenTime": 1788307200000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "5c39b6403f0a333e8621d331795abcd2a002cdb605c4f670b356e81c252a50a9"
+    },
+    {
+      "symbol": "CRMBUSDT",
+      "baseAsset": "CRMB",
+      "name": "Salesforce (bStocks)",
+      "quoteVolume": "746790.68986000",
+      "days": 10,
+      "firstOpenTime": 1788912000000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks",
+        "newListing"
+      ],
+      "sha256": "8c6ff7d5a870b8eb6e21a06421cf94f4b845bd139aa2aaca898e1dc4b6614790"
+    },
+    {
+      "symbol": "GSBUSDT",
+      "baseAsset": "GSB",
+      "name": "Goldman Sachs (bStocks)",
+      "quoteVolume": "741517.21182500",
+      "days": 52,
+      "firstOpenTime": 1785283200000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks"
+      ],
+      "sha256": "256bd1fc333d2f8db83dd1ab82360198f160effbd89c2fb50a24d920ad684d73"
+    },
+    {
+      "symbol": "SQQQBUSDT",
+      "baseAsset": "SQQQB",
+      "name": "ProShares UltraPro Short QQQ (bStocks)",
+      "quoteVolume": "715428.73740000",
+      "days": 17,
+      "firstOpenTime": 1788307200000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks",
+        "newListing"
+      ],
+      "sha256": "755dc8a74ec94d5d399afcfe7c0921af606b75dd2d07e09ebf7f138a667dadc3"
+    },
+    {
+      "symbol": "CRWDBUSDT",
+      "baseAsset": "CRWDB",
+      "name": "CrowdStrike (bStocks)",
+      "quoteVolume": "610387.74447000",
+      "days": 17,
+      "firstOpenTime": 1788307200000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks",
+        "newListing"
+      ],
+      "sha256": "b679e75ddd3cc97260eb311a2d32c12e1189c610675aee2f1d0359bd5d54f72b"
+    },
+    {
+      "symbol": "GPROBUSDT",
+      "baseAsset": "GPROB",
+      "name": "GoPro (bStocks)",
+      "quoteVolume": "605727.14900000",
+      "days": 3,
+      "firstOpenTime": 1789516800000,
+      "lastOpenTime": 1789689600000,
+      "tickSize": "0.01000000",
+      "displayPriceDecimals": 2,
+      "status": "TRADING",
+      "spotAllowed": true,
+      "quoteAsset": "USDT",
+      "exclusion": "tokenized stock/ETF representation (including leveraged ETFs)",
+      "metadataTags": [
+        "bStocks",
+        "newListing"
+      ],
+      "sha256": "81d3059ad4036164e68ab2e4b8dc846dcab6395f4fb1a1868c48bacf80662460"
+    }
+  ],
+  "zeroDaySymbols": []
+}

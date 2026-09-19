@@ -17,9 +17,37 @@ import {
   resolveActiveAssetTargetsFromRecords,
   resolveEnvProviderTargets,
 } from './provider-target-resolver.service';
-import { BINANCE_FIXED_SYMBOLS } from './binance/binance-fixed-asset-universe';
+import {
+  BINANCE_FIXED_ASSET_UNIVERSE,
+  BINANCE_FIXED_SYMBOLS,
+} from './binance/binance-fixed-asset-universe';
 
 describe('ProviderTargetResolverService', () => {
+  it('includes all fixed assets in active and merged targets using either base or USDT symbols', async () => {
+    const records = BINANCE_FIXED_ASSET_UNIVERSE.flatMap((entry) =>
+      [entry.baseAsset, entry.symbol].map((symbol) =>
+        asset({
+          id: `asset-${symbol}`,
+          symbol,
+          market: 'BINANCE',
+          assetType: AssetType.crypto,
+          currencyCode: CurrencyCode.USD,
+        }),
+      ),
+    );
+    const active = resolveActiveAssetTargetsFromRecords(records);
+    expect(active.binanceSymbols).toEqual([...BINANCE_FIXED_SYMBOLS]);
+    expect(active.unsupportedAssets).toEqual([]);
+    const service = new ProviderTargetResolverService({
+      asset: { findMany: jest.fn().mockResolvedValue(records) },
+    } as never);
+    const merged = await service.resolveProviderTargets({
+      targetSource: 'merged',
+      env: { BINANCE_CRYPTO_SYMBOLS: 'BTCUSDT,ETHUSDT' },
+    });
+    expect(merged.binanceSymbols).toEqual([...BINANCE_FIXED_SYMBOLS]);
+  });
+
   it('builds Binance BTCUSDT target from active BTC crypto asset', () => {
     const targets = resolveActiveAssetTargetsFromRecords([
       asset({
@@ -140,10 +168,10 @@ describe('ProviderTargetResolverService', () => {
     expect(targets.kisUsSymbols).toEqual(['AAPL', 'TSLA']);
   });
 
-  it('falls back to the fixed 10-symbol Binance universe when the env watchlist is unset', () => {
+  it('falls back to the fixed 25-symbol Binance universe when the env watchlist is unset', () => {
     const targets = resolveEnvProviderTargets({});
     expect(targets.binanceSymbols).toEqual([...BINANCE_FIXED_SYMBOLS]);
-    expect(targets.binanceSymbols).toHaveLength(10);
+    expect(targets.binanceSymbols).toHaveLength(25);
   });
 
   it('honors an explicit BINANCE_CRYPTO_SYMBOLS env override over the fixed default', () => {

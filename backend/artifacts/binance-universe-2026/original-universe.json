@@ -1,0 +1,122 @@
+[
+  {
+    "symbol": "BTCUSDT",
+    "priceTickSize": "0.01000000",
+    "displayPriceDecimals": 2,
+    "baseAsset": "BTC",
+    "name": "Bitcoin",
+    "market": "BINANCE",
+    "assetType": "crypto",
+    "currencyCode": "USD",
+    "priceCurrency": "USD",
+    "settlementCurrency": "USD"
+  },
+  {
+    "symbol": "ETHUSDT",
+    "priceTickSize": "0.01000000",
+    "displayPriceDecimals": 2,
+    "baseAsset": "ETH",
+    "name": "Ethereum",
+    "market": "BINANCE",
+    "assetType": "crypto",
+    "currencyCode": "USD",
+    "priceCurrency": "USD",
+    "settlementCurrency": "USD"
+  },
+  {
+    "symbol": "BNBUSDT",
+    "priceTickSize": "0.01000000",
+    "displayPriceDecimals": 2,
+    "baseAsset": "BNB",
+    "name": "BNB",
+    "market": "BINANCE",
+    "assetType": "crypto",
+    "currencyCode": "USD",
+    "priceCurrency": "USD",
+    "settlementCurrency": "USD"
+  },
+  {
+    "symbol": "XRPUSDT",
+    "priceTickSize": "0.00010000",
+    "displayPriceDecimals": 4,
+    "baseAsset": "XRP",
+    "name": "XRP",
+    "market": "BINANCE",
+    "assetType": "crypto",
+    "currencyCode": "USD",
+    "priceCurrency": "USD",
+    "settlementCurrency": "USD"
+  },
+  {
+    "symbol": "SOLUSDT",
+    "priceTickSize": "0.01000000",
+    "displayPriceDecimals": 2,
+    "baseAsset": "SOL",
+    "name": "Solana",
+    "market": "BINANCE",
+    "assetType": "crypto",
+    "currencyCode": "USD",
+    "priceCurrency": "USD",
+    "settlementCurrency": "USD"
+  },
+  {
+    "symbol": "TRXUSDT",
+    "priceTickSize": "0.00010000",
+    "displayPriceDecimals": 4,
+    "baseAsset": "TRX",
+    "name": "TRON",
+    "market": "BINANCE",
+    "assetType": "crypto",
+    "currencyCode": "USD",
+    "priceCurrency": "USD",
+    "settlementCurrency": "USD"
+  },
+  {
+    "symbol": "DOGEUSDT",
+    "priceTickSize": "0.00001000",
+    "displayPriceDecimals": 5,
+    "baseAsset": "DOGE",
+    "name": "Dogecoin",
+    "market": "BINANCE",
+    "assetType": "crypto",
+    "currencyCode": "USD",
+    "priceCurrency": "USD",
+    "settlementCurrency": "USD"
+  },
+  {
+    "symbol": "ZECUSDT",
+    "priceTickSize": "0.01000000",
+    "displayPriceDecimals": 2,
+    "baseAsset": "ZEC",
+    "name": "Zcash",
+    "market": "BINANCE",
+    "assetType": "crypto",
+    "currencyCode": "USD",
+    "priceCurrency": "USD",
+    "settlementCurrency": "USD"
+  },
+  {
+    "symbol": "XLMUSDT",
+    "priceTickSize": "0.00010000",
+    "displayPriceDecimals": 4,
+    "baseAsset": "XLM",
+    "name": "Stellar",
+    "market": "BINANCE",
+    "assetType": "crypto",
+    "currencyCode": "USD",
+    "priceCurrency": "USD",
+    "settlementCurrency": "USD"
+  },
+  {
+    "symbol": "LINKUSDT",
+    "priceTickSize": "0.00100000",
+    "displayPriceDecimals": 3,
+    "baseAsset": "LINK",
+    "name": "Chainlink",
+    "market": "BINANCE",
+    "assetType": "crypto",
+    "currencyCode": "USD",
+    "priceCurrency": "USD",
+    "settlementCurrency": "USD"
+  }
+]

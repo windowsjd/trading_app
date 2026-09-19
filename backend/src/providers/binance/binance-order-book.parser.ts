@@ -29,7 +29,7 @@ export function parseBinanceDepth(frame: string): BinanceDepthResult {
   const stream = typeof envelope.stream === 'string' ? envelope.stream : '';
   if (!stream.includes('@depth') && !('lastUpdateId' in raw))
     return { state: 'other' };
-  const match = /^([a-z0-9]+usdt)@depth10$/u.exec(stream);
+  const match = /^([a-z0-9\p{Script=Han}]+usdt)@depth10$/u.exec(stream);
   if (!match || raw === envelope)
     return { state: 'invalid', reason: 'INVALID_DEPTH_STREAM' };
   const sequence =

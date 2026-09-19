@@ -25,12 +25,12 @@ import {
 import type { AssetUniverseDesired } from './lib/asset-universe-upsert';
 
 /**
- * Seed the fixed 10-symbol Binance Spot crypto universe into `assets`.
+ * Seed the fixed 25-symbol Binance Spot crypto universe into `assets`.
  *
  * Safety contract:
  *  - `--dry-run` (also the default with no flag) never writes; `--apply` writes.
  *  - `--apply` + `--dry-run` together is a validation error.
- *  - Before ANY write, all 10 symbols are validated against the public
+ *  - Before ANY write, all 25 symbols are validated against the public
  *    `GET /api/v3/exchangeInfo`; a single failure aborts the whole run with no
  *    DB change (no partial registration).
  *  - `--skip-provider-validation` is an explicit offline escape hatch, refused

@@ -97,6 +97,15 @@ describe('CandleResponseBuilder.buildPersisted source diagnostics', () => {
     },
   );
 
+  it('preserves a verified Han symbol in persisted crypto candle responses', () => {
+    const response = builder.buildPersisted(
+      asset(AssetType.crypto, { symbol: '币安人生USDT' }),
+      query('14d', '30m', 672),
+      [],
+    );
+    expect(response.data.source).toMatchObject({ symbol: '币安人生USDT' });
+  });
+
   it('clamps the crypto requestedCount at the Binance single-call cap', () => {
     const response = builder.buildPersisted(
       asset(AssetType.crypto, {

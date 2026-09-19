@@ -216,10 +216,13 @@ export class CandleResponseBuilder {
 
   private normalizeCryptoSymbol(symbol: string): string {
     const normalized = symbol.trim().toUpperCase().replace(/\s+/gu, '');
-    const pair = normalized.match(/^([A-Z0-9]{1,20})[/_-](?:USDT|USD)$/u);
+    const pair = normalized.match(
+      /^([A-Z0-9\p{Script=Han}]{1,20})[/_-](?:USDT|USD)$/u,
+    );
     if (pair) return `${pair[1]}USDT`;
-    if (/^[A-Z0-9]{1,30}USDT$/u.test(normalized)) return normalized;
-    const usd = normalized.match(/^([A-Z0-9]{1,20})USD$/u);
+    if (/^[A-Z0-9\p{Script=Han}]{1,30}USDT$/u.test(normalized))
+      return normalized;
+    const usd = normalized.match(/^([A-Z0-9\p{Script=Han}]{1,20})USD$/u);
     if (usd) return `${usd[1]}USDT`;
     throw this.badRequest(
       'ASSET_CANDLES_UNSUPPORTED_SYMBOL',

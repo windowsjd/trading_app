@@ -1,0 +1,897 @@
+{
+  "verifiedAt": "2026-09-19T12:19:56.013Z",
+  "database": "dpg-da7ac0e1egvs73e2sv20-a.singapore-postgres.render.com/trading_app_fbbk",
+  "originalContractsAndIdsPreserved": 10,
+  "activeUniverse": 25,
+  "fiveMinuteWindow": {
+    "from": "2026-08-15T12:13:01.422Z",
+    "to": "2026-09-19T12:13:01.422Z"
+  },
+  "assets": [
+    {
+      "symbol": "SUIUSDT",
+      "assetId": "7836f2bd-dbeb-4f10-a565-59e981b578ec",
+      "baseAsset": "SUI",
+      "priceLocal": "0.85920000",
+      "priceKrw": "1185.95376000",
+      "priceCurrency": "USD",
+      "effectiveAt": "2026-09-19T12:11:20.230Z",
+      "capturedAt": "2026-09-19T12:11:20.981Z",
+      "source": "binance_public_rest_24hr_ticker",
+      "previousDayClose": "0.81440000",
+      "previousDayClosed": true,
+      "baselineMatchesProvider": true,
+      "ready5m": true,
+      "coverage": {
+        "startsAtRequestedFrom": true,
+        "contiguousCoveredTo": "2026-09-19T12:13:01.422Z",
+        "newestCompletedAt": "2026-09-19T12:16:10.057Z",
+        "hasInteriorGap": false
+      },
+      "feeds": [
+        {
+          "_count": {
+            "_all": 365
+          },
+          "_min": {
+            "openTime": "2025-09-20T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T00:00:00.000Z"
+          },
+          "interval": "1d"
+        },
+        {
+          "_count": {
+            "_all": 52
+          },
+          "_min": {
+            "openTime": "2025-09-22T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-14T00:00:00.000Z"
+          },
+          "interval": "1w"
+        },
+        {
+          "_count": {
+            "_all": 10080
+          },
+          "_min": {
+            "openTime": "2026-08-15T12:15:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T12:10:00.000Z"
+          },
+          "interval": "5m"
+        }
+      ]
+    },
+    {
+      "symbol": "NIGHTUSDT",
+      "assetId": "2e55fb56-df33-4219-902e-ea934cdce157",
+      "baseAsset": "NIGHT",
+      "priceLocal": "0.02485000",
+      "priceKrw": "34.30045500",
+      "priceCurrency": "USD",
+      "effectiveAt": "2026-09-19T12:11:09.521Z",
+      "capturedAt": "2026-09-19T12:11:21.340Z",
+      "source": "binance_public_rest_24hr_ticker",
+      "previousDayClose": "0.02402000",
+      "previousDayClosed": true,
+      "baselineMatchesProvider": true,
+      "ready5m": true,
+      "coverage": {
+        "startsAtRequestedFrom": true,
+        "contiguousCoveredTo": "2026-09-19T12:13:01.422Z",
+        "newestCompletedAt": "2026-09-19T12:15:32.286Z",
+        "hasInteriorGap": false
+      },
+      "feeds": [
+        {
+          "_count": {
+            "_all": 193
+          },
+          "_min": {
+            "openTime": "2026-03-11T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T00:00:00.000Z"
+          },
+          "interval": "1d"
+        },
+        {
+          "_count": {
+            "_all": 28
+          },
+          "_min": {
+            "openTime": "2026-03-09T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-14T00:00:00.000Z"
+          },
+          "interval": "1w"
+        },
+        {
+          "_count": {
+            "_all": 10080
+          },
+          "_min": {
+            "openTime": "2026-08-15T12:15:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T12:10:00.000Z"
+          },
+          "interval": "5m"
+        }
+      ]
+    },
+    {
+      "symbol": "NEARUSDT",
+      "assetId": "d5292b83-8bdf-4817-b752-ebd02ef9917b",
+      "baseAsset": "NEAR",
+      "priceLocal": "3.66800000",
+      "priceKrw": "5062.94040000",
+      "priceCurrency": "USD",
+      "effectiveAt": "2026-09-19T12:11:20.472Z",
+      "capturedAt": "2026-09-19T12:11:21.680Z",
+      "source": "binance_public_rest_24hr_ticker",
+      "previousDayClose": "3.76300000",
+      "previousDayClosed": true,
+      "baselineMatchesProvider": true,
+      "ready5m": true,
+      "coverage": {
+        "startsAtRequestedFrom": true,
+        "contiguousCoveredTo": "2026-09-19T12:13:01.422Z",
+        "newestCompletedAt": "2026-09-19T12:15:33.676Z",
+        "hasInteriorGap": false
+      },
+      "feeds": [
+        {
+          "_count": {
+            "_all": 365
+          },
+          "_min": {
+            "openTime": "2025-09-20T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T00:00:00.000Z"
+          },
+          "interval": "1d"
+        },
+        {
+          "_count": {
+            "_all": 52
+          },
+          "_min": {
+            "openTime": "2025-09-22T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-14T00:00:00.000Z"
+          },
+          "interval": "1w"
+        },
+        {
+          "_count": {
+            "_all": 10080
+          },
+          "_min": {
+            "openTime": "2026-08-15T12:15:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T12:10:00.000Z"
+          },
+          "interval": "5m"
+        }
+      ]
+    },
+    {
+      "symbol": "PEPEUSDT",
+      "assetId": "c81013a1-7c09-497a-ace5-fa26c14d6437",
+      "baseAsset": "PEPE",
+      "priceLocal": "0.00000381",
+      "priceKrw": "0.00525894",
+      "priceCurrency": "USD",
+      "effectiveAt": "2026-09-19T12:11:21.035Z",
+      "capturedAt": "2026-09-19T12:11:22.028Z",
+      "source": "binance_public_rest_24hr_ticker",
+      "previousDayClose": "0.00000382",
+      "previousDayClosed": true,
+      "baselineMatchesProvider": true,
+      "ready5m": true,
+      "coverage": {
+        "startsAtRequestedFrom": true,
+        "contiguousCoveredTo": "2026-09-19T12:13:01.422Z",
+        "newestCompletedAt": "2026-09-19T12:16:11.508Z",
+        "hasInteriorGap": false
+      },
+      "feeds": [
+        {
+          "_count": {
+            "_all": 365
+          },
+          "_min": {
+            "openTime": "2025-09-20T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T00:00:00.000Z"
+          },
+          "interval": "1d"
+        },
+        {
+          "_count": {
+            "_all": 52
+          },
+          "_min": {
+            "openTime": "2025-09-22T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-14T00:00:00.000Z"
+          },
+          "interval": "1w"
+        },
+        {
+          "_count": {
+            "_all": 10080
+          },
+          "_min": {
+            "openTime": "2026-08-15T12:15:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T12:10:00.000Z"
+          },
+          "interval": "5m"
+        }
+      ]
+    },
+    {
+      "symbol": "ADAUSDT",
+      "assetId": "0f6eab2d-ac3d-41c8-b38a-33a11371d700",
+      "baseAsset": "ADA",
+      "priceLocal": "0.22680000",
+      "priceKrw": "313.05204000",
+      "priceCurrency": "USD",
+      "effectiveAt": "2026-09-19T12:11:17.020Z",
+      "capturedAt": "2026-09-19T12:11:22.374Z",
+      "source": "binance_public_rest_24hr_ticker",
+      "previousDayClose": "0.22440000",
+      "previousDayClosed": true,
+      "baselineMatchesProvider": true,
+      "ready5m": true,
+      "coverage": {
+        "startsAtRequestedFrom": true,
+        "contiguousCoveredTo": "2026-09-19T12:13:01.422Z",
+        "newestCompletedAt": "2026-09-19T12:13:35.460Z",
+        "hasInteriorGap": false
+      },
+      "feeds": [
+        {
+          "_count": {
+            "_all": 365
+          },
+          "_min": {
+            "openTime": "2025-09-20T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T00:00:00.000Z"
+          },
+          "interval": "1d"
+        },
+        {
+          "_count": {
+            "_all": 52
+          },
+          "_min": {
+            "openTime": "2025-09-22T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-14T00:00:00.000Z"
+          },
+          "interval": "1w"
+        },
+        {
+          "_count": {
+            "_all": 10080
+          },
+          "_min": {
+            "openTime": "2026-08-15T12:15:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T12:10:00.000Z"
+          },
+          "interval": "5m"
+        }
+      ]
+    },
+    {
+      "symbol": "TAOUSDT",
+      "assetId": "62f573af-8c44-4d70-be90-d6e58fdc4c7c",
+      "baseAsset": "TAO",
+      "priceLocal": "268.70000000",
+      "priceKrw": "370886.61000000",
+      "priceCurrency": "USD",
+      "effectiveAt": "2026-09-19T12:11:21.615Z",
+      "capturedAt": "2026-09-19T12:11:22.730Z",
+      "source": "binance_public_rest_24hr_ticker",
+      "previousDayClose": "250.20000000",
+      "previousDayClosed": true,
+      "baselineMatchesProvider": true,
+      "ready5m": true,
+      "coverage": {
+        "startsAtRequestedFrom": true,
+        "contiguousCoveredTo": "2026-09-19T12:13:01.422Z",
+        "newestCompletedAt": "2026-09-19T12:16:57.917Z",
+        "hasInteriorGap": false
+      },
+      "feeds": [
+        {
+          "_count": {
+            "_all": 365
+          },
+          "_min": {
+            "openTime": "2025-09-20T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T00:00:00.000Z"
+          },
+          "interval": "1d"
+        },
+        {
+          "_count": {
+            "_all": 52
+          },
+          "_min": {
+            "openTime": "2025-09-22T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-14T00:00:00.000Z"
+          },
+          "interval": "1w"
+        },
+        {
+          "_count": {
+            "_all": 10080
+          },
+          "_min": {
+            "openTime": "2026-08-15T12:15:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T12:10:00.000Z"
+          },
+          "interval": "5m"
+        }
+      ]
+    },
+    {
+      "symbol": "WLDUSDT",
+      "assetId": "951bd83c-0f76-49a1-8a6d-fcde51aad13f",
+      "baseAsset": "WLD",
+      "priceLocal": "0.43240000",
+      "priceKrw": "596.84172000",
+      "priceCurrency": "USD",
+      "effectiveAt": "2026-09-19T12:11:22.034Z",
+      "capturedAt": "2026-09-19T12:11:23.076Z",
+      "source": "binance_public_rest_24hr_ticker",
+      "previousDayClose": "0.42460000",
+      "previousDayClosed": true,
+      "baselineMatchesProvider": true,
+      "ready5m": true,
+      "coverage": {
+        "startsAtRequestedFrom": true,
+        "contiguousCoveredTo": "2026-09-19T12:13:01.422Z",
+        "newestCompletedAt": "2026-09-19T12:17:27.706Z",
+        "hasInteriorGap": false
+      },
+      "feeds": [
+        {
+          "_count": {
+            "_all": 365
+          },
+          "_min": {
+            "openTime": "2025-09-20T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T00:00:00.000Z"
+          },
+          "interval": "1d"
+        },
+        {
+          "_count": {
+            "_all": 52
+          },
+          "_min": {
+            "openTime": "2025-09-22T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-14T00:00:00.000Z"
+          },
+          "interval": "1w"
+        },
+        {
+          "_count": {
+            "_all": 10080
+          },
+          "_min": {
+            "openTime": "2026-08-15T12:15:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T12:10:00.000Z"
+          },
+          "interval": "5m"
+        }
+      ]
+    },
+    {
+      "symbol": "ENAUSDT",
+      "assetId": "e520d3c3-4e1c-4faf-81a1-1aa8c50f4f9d",
+      "baseAsset": "ENA",
+      "priceLocal": "0.19700000",
+      "priceKrw": "271.91910000",
+      "priceCurrency": "USD",
+      "effectiveAt": "2026-09-19T12:11:22.548Z",
+      "capturedAt": "2026-09-19T12:11:23.411Z",
+      "source": "binance_public_rest_24hr_ticker",
+      "previousDayClose": "0.16840000",
+      "previousDayClosed": true,
+      "baselineMatchesProvider": true,
+      "ready5m": true,
+      "coverage": {
+        "startsAtRequestedFrom": true,
+        "contiguousCoveredTo": "2026-09-19T12:13:01.422Z",
+        "newestCompletedAt": "2026-09-19T12:15:00.837Z",
+        "hasInteriorGap": false
+      },
+      "feeds": [
+        {
+          "_count": {
+            "_all": 365
+          },
+          "_min": {
+            "openTime": "2025-09-20T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T00:00:00.000Z"
+          },
+          "interval": "1d"
+        },
+        {
+          "_count": {
+            "_all": 52
+          },
+          "_min": {
+            "openTime": "2025-09-22T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-14T00:00:00.000Z"
+          },
+          "interval": "1w"
+        },
+        {
+          "_count": {
+            "_all": 10080
+          },
+          "_min": {
+            "openTime": "2026-08-15T12:15:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T12:10:00.000Z"
+          },
+          "interval": "5m"
+        }
+      ]
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "assetId": "26bdb394-a85d-4472-9139-0fc28cf00ca3",
+      "baseAsset": "AVAX",
+      "priceLocal": "9.22100000",
+      "priceKrw": "12727.74630000",
+      "priceCurrency": "USD",
+      "effectiveAt": "2026-09-19T12:11:23.047Z",
+      "capturedAt": "2026-09-19T12:11:23.770Z",
+      "source": "binance_public_rest_24hr_ticker",
+      "previousDayClose": "8.20400000",
+      "previousDayClosed": true,
+      "baselineMatchesProvider": true,
+      "ready5m": true,
+      "coverage": {
+        "startsAtRequestedFrom": true,
+        "contiguousCoveredTo": "2026-09-19T12:13:01.422Z",
+        "newestCompletedAt": "2026-09-19T12:14:11.605Z",
+        "hasInteriorGap": false
+      },
+      "feeds": [
+        {
+          "_count": {
+            "_all": 365
+          },
+          "_min": {
+            "openTime": "2025-09-20T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T00:00:00.000Z"
+          },
+          "interval": "1d"
+        },
+        {
+          "_count": {
+            "_all": 52
+          },
+          "_min": {
+            "openTime": "2025-09-22T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-14T00:00:00.000Z"
+          },
+          "interval": "1w"
+        },
+        {
+          "_count": {
+            "_all": 10080
+          },
+          "_min": {
+            "openTime": "2026-08-15T12:15:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T12:10:00.000Z"
+          },
+          "interval": "5m"
+        }
+      ]
+    },
+    {
+      "symbol": "UNIUSDT",
+      "assetId": "47f03eab-9e31-45c5-a0bf-1852add26fa0",
+      "baseAsset": "UNI",
+      "priceLocal": "9.12200000",
+      "priceKrw": "12591.09660000",
+      "priceCurrency": "USD",
+      "effectiveAt": "2026-09-19T12:11:20.905Z",
+      "capturedAt": "2026-09-19T12:11:24.109Z",
+      "source": "binance_public_rest_24hr_ticker",
+      "previousDayClose": "8.86500000",
+      "previousDayClosed": true,
+      "baselineMatchesProvider": true,
+      "ready5m": true,
+      "coverage": {
+        "startsAtRequestedFrom": true,
+        "contiguousCoveredTo": "2026-09-19T12:13:01.422Z",
+        "newestCompletedAt": "2026-09-19T12:17:27.047Z",
+        "hasInteriorGap": false
+      },
+      "feeds": [
+        {
+          "_count": {
+            "_all": 365
+          },
+          "_min": {
+            "openTime": "2025-09-20T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T00:00:00.000Z"
+          },
+          "interval": "1d"
+        },
+        {
+          "_count": {
+            "_all": 52
+          },
+          "_min": {
+            "openTime": "2025-09-22T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-14T00:00:00.000Z"
+          },
+          "interval": "1w"
+        },
+        {
+          "_count": {
+            "_all": 10080
+          },
+          "_min": {
+            "openTime": "2026-08-15T12:15:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T12:10:00.000Z"
+          },
+          "interval": "5m"
+        }
+      ]
+    },
+    {
+      "symbol": "CHIPUSDT",
+      "assetId": "852e899c-5994-4d38-a8d6-a353e487fdea",
+      "baseAsset": "CHIP",
+      "priceLocal": "0.04505000",
+      "priceKrw": "62.18251500",
+      "priceCurrency": "USD",
+      "effectiveAt": "2026-09-19T12:11:20.357Z",
+      "capturedAt": "2026-09-19T12:11:24.446Z",
+      "source": "binance_public_rest_24hr_ticker",
+      "previousDayClose": "0.04489000",
+      "previousDayClosed": true,
+      "baselineMatchesProvider": true,
+      "ready5m": true,
+      "coverage": {
+        "startsAtRequestedFrom": true,
+        "contiguousCoveredTo": "2026-09-19T12:13:01.422Z",
+        "newestCompletedAt": "2026-09-19T12:14:12.263Z",
+        "hasInteriorGap": false
+      },
+      "feeds": [
+        {
+          "_count": {
+            "_all": 152
+          },
+          "_min": {
+            "openTime": "2026-04-21T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T00:00:00.000Z"
+          },
+          "interval": "1d"
+        },
+        {
+          "_count": {
+            "_all": 22
+          },
+          "_min": {
+            "openTime": "2026-04-20T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-14T00:00:00.000Z"
+          },
+          "interval": "1w"
+        },
+        {
+          "_count": {
+            "_all": 10080
+          },
+          "_min": {
+            "openTime": "2026-08-15T12:15:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T12:10:00.000Z"
+          },
+          "interval": "5m"
+        }
+      ]
+    },
+    {
+      "symbol": "LTCUSDT",
+      "assetId": "6100a2c6-5640-489d-bfd2-af7495f7ca05",
+      "baseAsset": "LTC",
+      "priceLocal": "58.20000000",
+      "priceKrw": "80333.46000000",
+      "priceCurrency": "USD",
+      "effectiveAt": "2026-09-19T12:11:24.074Z",
+      "capturedAt": "2026-09-19T12:11:24.792Z",
+      "source": "binance_public_rest_24hr_ticker",
+      "previousDayClose": "58.15000000",
+      "previousDayClosed": true,
+      "baselineMatchesProvider": true,
+      "ready5m": true,
+      "coverage": {
+        "startsAtRequestedFrom": true,
+        "contiguousCoveredTo": "2026-09-19T12:13:01.422Z",
+        "newestCompletedAt": "2026-09-19T12:14:59.842Z",
+        "hasInteriorGap": false
+      },
+      "feeds": [
+        {
+          "_count": {
+            "_all": 365
+          },
+          "_min": {
+            "openTime": "2025-09-20T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T00:00:00.000Z"
+          },
+          "interval": "1d"
+        },
+        {
+          "_count": {
+            "_all": 52
+          },
+          "_min": {
+            "openTime": "2025-09-22T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-14T00:00:00.000Z"
+          },
+          "interval": "1w"
+        },
+        {
+          "_count": {
+            "_all": 10080
+          },
+          "_min": {
+            "openTime": "2026-08-15T12:15:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T12:10:00.000Z"
+          },
+          "interval": "5m"
+        }
+      ]
+    },
+    {
+      "symbol": "ASTERUSDT",
+      "assetId": "6a895095-de0a-4963-83f8-e9237d3ffe24",
+      "baseAsset": "ASTER",
+      "priceLocal": "0.76900000",
+      "priceKrw": "1061.45070000",
+      "priceCurrency": "USD",
+      "effectiveAt": "2026-09-19T12:11:23.726Z",
+      "capturedAt": "2026-09-19T12:11:25.147Z",
+      "source": "binance_public_rest_24hr_ticker",
+      "previousDayClose": "0.76700000",
+      "previousDayClosed": true,
+      "baselineMatchesProvider": true,
+      "ready5m": true,
+      "coverage": {
+        "startsAtRequestedFrom": true,
+        "contiguousCoveredTo": "2026-09-19T12:13:01.422Z",
+        "newestCompletedAt": "2026-09-19T12:13:35.981Z",
+        "hasInteriorGap": false
+      },
+      "feeds": [
+        {
+          "_count": {
+            "_all": 349
+          },
+          "_min": {
+            "openTime": "2025-10-06T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T00:00:00.000Z"
+          },
+          "interval": "1d"
+        },
+        {
+          "_count": {
+            "_all": 50
+          },
+          "_min": {
+            "openTime": "2025-10-06T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-14T00:00:00.000Z"
+          },
+          "interval": "1w"
+        },
+        {
+          "_count": {
+            "_all": 10080
+          },
+          "_min": {
+            "openTime": "2026-08-15T12:15:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T12:10:00.000Z"
+          },
+          "interval": "5m"
+        }
+      ]
+    },
+    {
+      "symbol": "币安人生USDT",
+      "assetId": "c39ba644-afe6-428f-80f2-b91944c00b86",
+      "baseAsset": "币安人生",
+      "priceLocal": "0.51000000",
+      "priceKrw": "703.95300000",
+      "priceCurrency": "USD",
+      "effectiveAt": "2026-09-19T12:11:21.574Z",
+      "capturedAt": "2026-09-19T12:11:25.504Z",
+      "source": "binance_public_rest_24hr_ticker",
+      "previousDayClose": "0.51520000",
+      "previousDayClosed": true,
+      "baselineMatchesProvider": true,
+      "ready5m": true,
+      "coverage": {
+        "startsAtRequestedFrom": true,
+        "contiguousCoveredTo": "2026-09-19T12:13:01.422Z",
+        "newestCompletedAt": "2026-09-19T12:17:48.008Z",
+        "hasInteriorGap": false
+      },
+      "feeds": [
+        {
+          "_count": {
+            "_all": 256
+          },
+          "_min": {
+            "openTime": "2026-01-07T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T00:00:00.000Z"
+          },
+          "interval": "1d"
+        },
+        {
+          "_count": {
+            "_all": 37
+          },
+          "_min": {
+            "openTime": "2026-01-05T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-14T00:00:00.000Z"
+          },
+          "interval": "1w"
+        },
+        {
+          "_count": {
+            "_all": 10080
+          },
+          "_min": {
+            "openTime": "2026-08-15T12:15:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T12:10:00.000Z"
+          },
+          "interval": "5m"
+        }
+      ]
+    },
+    {
+      "symbol": "TRUMPUSDT",
+      "assetId": "3e86bf50-ceaa-40f3-8aac-82a86ddfbf5c",
+      "baseAsset": "TRUMP",
+      "priceLocal": "2.05500000",
+      "priceKrw": "2836.51650000",
+      "priceCurrency": "USD",
+      "effectiveAt": "2026-09-19T12:11:24.929Z",
+      "capturedAt": "2026-09-19T12:11:25.855Z",
+      "source": "binance_public_rest_24hr_ticker",
+      "previousDayClose": "2.08400000",
+      "previousDayClosed": true,
+      "baselineMatchesProvider": true,
+      "ready5m": true,
+      "coverage": {
+        "startsAtRequestedFrom": true,
+        "contiguousCoveredTo": "2026-09-19T12:13:01.422Z",
+        "newestCompletedAt": "2026-09-19T12:16:55.173Z",
+        "hasInteriorGap": false
+      },
+      "feeds": [
+        {
+          "_count": {
+            "_all": 365
+          },
+          "_min": {
+            "openTime": "2025-09-20T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T00:00:00.000Z"
+          },
+          "interval": "1d"
+        },
+        {
+          "_count": {
+            "_all": 52
+          },
+          "_min": {
+            "openTime": "2025-09-22T00:00:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-14T00:00:00.000Z"
+          },
+          "interval": "1w"
+        },
+        {
+          "_count": {
+            "_all": 10080
+          },
+          "_min": {
+            "openTime": "2026-08-15T12:15:00.000Z"
+          },
+          "_max": {
+            "openTime": "2026-09-19T12:10:00.000Z"
+          },
+          "interval": "5m"
+        }
+      ]
+    }
+  ]
+}

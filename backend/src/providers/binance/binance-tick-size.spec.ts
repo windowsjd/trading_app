@@ -100,8 +100,8 @@ describe('readBinanceSymbolPricePrecision', () => {
 });
 
 describe('fixed universe fallback precision', () => {
-  it('declares a self-consistent tickSize/decimals pair for all 10 symbols', () => {
-    expect(BINANCE_FIXED_ASSET_UNIVERSE).toHaveLength(10);
+  it('declares a self-consistent tickSize/decimals pair for all 25 symbols', () => {
+    expect(BINANCE_FIXED_ASSET_UNIVERSE).toHaveLength(25);
     for (const entry of BINANCE_FIXED_ASSET_UNIVERSE) {
       expect(parseTickSizeDisplayDecimals(entry.priceTickSize)).toBe(
         entry.displayPriceDecimals,

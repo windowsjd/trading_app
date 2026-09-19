@@ -4,7 +4,7 @@ Explicit operator-run provider ingestion foundation, including an operator/admin
 
 The fixed 40-symbol KIS stock watchlist (15 domestic + 25 US) is defined in code at `src/providers/kis/kis-fixed-asset-universe.ts` and used as the default for `KIS_DOMESTIC_SYMBOLS`/`KIS_US_SYMBOLS` when those env vars are unset. Seed the corresponding assets with `pnpm tsx scripts/seed-kis-fixed-asset-universe.ts` (or `pnpm dev:seed-kis-universe`).
 
-The fixed 10-symbol Binance Spot crypto MVP universe is defined in code at `src/providers/binance/binance-fixed-asset-universe.ts` (BTC, ETH, BNB, XRP, SOL, TRX, DOGE, ZEC, XLM, LINK — all `<BASE>USDT`). Selection is reviewed and static (selection date 2026-07-25): BTC/ETH are pre-existing; the other 8 exclude stablecoins and wrapped/pegged assets; Binance Spot USDT-pair support is required; market-cap ranking drifts, so it is a curated fixed universe rather than a dynamic feed. Assets are stored as `market=BINANCE`, `assetType=crypto`, `currencyCode=priceCurrency=settlementCurrency=USD` (USDT-as-USD MVP policy — no `CurrencyCode.USDT`), with Prisma-default UUID ids. Seed them with `pnpm dev:seed-binance-universe -- --apply`, which validates every symbol against the public `GET /api/v3/exchangeInfo` (exact symbol, `status=TRADING`, Spot permission, `quoteAsset=USDT`, matching `baseAsset`) before any write and upserts on the `(market, symbol)` key in one transaction; a single validation failure aborts with no DB change. `BINANCE_REST_BASE_URL` overrides the `https://api.binance.com` default. Register both universes plus the non-destructive dev baseline in one idempotent step with `pnpm dev:recover-local-data -- --apply`.
+The fixed 25-symbol Binance Spot universe is defined in `src/providers/binance/binance-fixed-asset-universe.ts`. The original ten contracts are retained; fifteen additions are selected by cumulative 2026-01-01 through 2026-09-18 UTC daily USDT quote volume. See [the research and rollout record](binance-universe-2026-ytd.md) for rankings, exclusions, precision and verification. The list stays fixed after selection. Assets are stored as `market=BINANCE`, `assetType=crypto`, `currencyCode=priceCurrency=settlementCurrency=USD` (USDT-as-USD MVP policy — no `CurrencyCode.USDT`), with Prisma-default UUID ids. Seed them with `pnpm dev:seed-binance-universe -- --apply`, which validates every symbol against the public `GET /api/v3/exchangeInfo` (exact symbol, `status=TRADING`, Spot permission, `quoteAsset=USDT`, matching `baseAsset`) before any write and upserts on the `(market, symbol)` key in one transaction; a single validation failure aborts with no DB change. `BINANCE_REST_BASE_URL` overrides the `https://api.binance.com` default. Register both universes plus the non-destructive dev baseline in one idempotent step with `pnpm dev:recover-local-data -- --apply`.
 
 ## Scope
 
@@ -40,7 +40,7 @@ This project remains a virtual trading app. External provider APIs are used only
 
 - Uses public REST market data only.
 - Does not use Binance API key or secret.
-- Symbols come from ONE source of truth. When `BINANCE_CRYPTO_SYMBOLS` is unset/blank, both `ProviderConfigService.binance.symbols` (general ticker WebSocket) and `resolveEnvProviderTargets().binanceSymbols` (REST env targeting) fall back to `BINANCE_FIXED_SYMBOLS` (the fixed 10-symbol universe); there is no separate `['BTCUSDT','ETHUSDT']` default in either place. `active_assets`/`merged` targeting instead builds symbols from the registered active DB assets, so all registered coins are covered, not just BTC/ETH.
+- Symbols come from ONE source of truth. When `BINANCE_CRYPTO_SYMBOLS` is unset/blank, both `ProviderConfigService.binance.symbols` (general ticker WebSocket) and `resolveEnvProviderTargets().binanceSymbols` (REST env targeting) fall back to `BINANCE_FIXED_SYMBOLS` (the fixed 25-symbol universe); there is no separate `['BTCUSDT','ETHUSDT']` default in either place. `active_assets`/`merged` targeting instead builds symbols from the registered active DB assets, so all registered coins are covered, not just BTC/ETH.
 - REST 24hr ticker ingestion writes snapshots with `sourceName=binance_public_rest_24hr_ticker`; the Spot ticker WebSocket writes `sourceName=binance_spot_ws_ticker`. Both are eligible for crypto reads (`BINANCE_CRYPTO_USD_PROVIDER_SOURCE_PRIORITY`), so a coin is "price available" once either source has a fresh row.
 - In live-candle mode (`CANDLE_LIVE_STREAMING_ENABLED=true` + `CANDLE_LIVE_BINANCE_ENABLED=true`) the standalone ticker streaming service is disabled, so the live-candle supervisor's single owned Binance connection subscribes BOTH `<symbol>@kline_5m` (candles) AND `<symbol>@ticker`, routing ticker frames through the shared `BinanceWebSocketIngestionService` so `asset_price_snapshots` keep updating for the REST-backed market list. Startup backfill reuses `SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP` (no second startup ingestion path).
 - Inserts `asset_price_snapshots` rows with `sourceType=provider_api` and `currencyCode=USD` only when an existing active `BINANCE` crypto asset mapping is unambiguous.
@@ -184,13 +184,13 @@ Binance:
 pnpm tsx scripts/provider-ingest-binance-prices.ts --dry-run --symbols BTCUSDT,ETHUSDT --requested-by local-operator
 ```
 
-Opt-in real Binance public market-data smoke for the fixed 10-symbol universe (read-only: public REST + WebSocket only, no DB, no API key, refused under `NODE_ENV=production`, reports `NOT_RUN` without the flag):
+Opt-in real Binance public market-data smoke for the fixed 25-symbol universe (read-only: public REST + WebSocket only, no DB, no API key, refused under `NODE_ENV=production`, reports `NOT_RUN` without the flag):
 
 ```bash
 BINANCE_MARKET_DATA_SMOKE=1 pnpm smoke:binance-fixed-universe
 ```
 
-It verifies exchangeInfo TRADING/Spot/USDT, `PRICE_FILTER.tickSize` vs the declared `displayPriceDecimals`, REST 24hr ticker prices, and WS `@ticker` delivery for all 10 symbols.
+It verifies exchangeInfo TRADING/Spot/USDT, `PRICE_FILTER.tickSize` vs the declared `displayPriceDecimals`, REST 24hr ticker prices, WS `@ticker` delivery, and parsed `@depth10` 10+10 snapshots for all 25 symbols.
 
 KIS WebSocket trade prices:
 

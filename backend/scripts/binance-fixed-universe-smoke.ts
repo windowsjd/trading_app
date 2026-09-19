@@ -11,10 +11,12 @@ import {
   validateBinanceSpotUniverse,
 } from '../src/providers/binance/binance-exchange-info.validation';
 import { readBinanceSymbolPricePrecision } from '../src/providers/binance/binance-tick-size';
+import { parseBinanceDepth } from '../src/providers/binance/binance-order-book.parser';
+import { Decimal } from '@prisma/client/runtime/client';
 import { loadRuntimeEnv } from './lib/load-runtime-env';
 
 /**
- * Opt-in real Binance public market-data smoke for the fixed 10-symbol universe.
+ * Opt-in real Binance public market-data smoke for the fixed 25-symbol universe.
  *
  *   BINANCE_MARKET_DATA_SMOKE=1 pnpm smoke:binance-fixed-universe
  *
@@ -22,10 +24,11 @@ import { loadRuntimeEnv } from './lib/load-runtime-env';
  * touches the database (no reads, writes, resets), needs no API key, and is
  * refused under NODE_ENV=production. Without the env flag it reports NOT_RUN and
  * exits 0 (never a fake pass). It verifies:
- *   1. exchangeInfo TRADING/Spot/USDT for all 10,
+ *   1. exchangeInfo TRADING/Spot/USDT for all 25,
  *   1b. exchangeInfo PRICE_FILTER.tickSize matches the declared display decimals,
- *   2. REST 24hr ticker returns a positive price for all 10,
+ *   2. REST 24hr ticker returns a positive price for all 25,
  *   3. the WS ticker stream delivers at least one tick per symbol within a bound.
+ *   4. the existing depth parser accepts a real 10+10 snapshot per symbol.
  */
 
 const WS_RECEIVE_BUDGET_MS = 15_000;
@@ -98,7 +101,10 @@ async function main() {
       );
       continue;
     }
-    if (live.displayPriceDecimals !== entry.displayPriceDecimals) {
+    if (
+      live.displayPriceDecimals !== entry.displayPriceDecimals ||
+      !new Decimal(live.priceTickSize).eq(entry.priceTickSize)
+    ) {
       console.error(
         `  x tickSize ${entry.symbol}: live ${live.priceTickSize} (${live.displayPriceDecimals}d) != declared ${entry.priceTickSize} (${entry.displayPriceDecimals}d)`,
       );
@@ -139,7 +145,9 @@ async function main() {
   console.log(`REST 24hr ticker: ${restOk}/${BINANCE_FIXED_SYMBOLS.length}`);
 
   // 3) WS ticker: at least one tick per symbol within the budget.
-  const wsReceived = await collectWsTickerSymbols(config.wsMarketDataBaseUrl);
+  const { tickers: wsReceived, depths } = await collectWsSymbols(
+    config.wsMarketDataBaseUrl,
+  );
   const wsOk = BINANCE_FIXED_SYMBOLS.filter((s) => wsReceived.has(s)).length;
   console.log(`WS ticker received: ${wsOk}/${BINANCE_FIXED_SYMBOLS.length}`);
   for (const symbol of BINANCE_FIXED_SYMBOLS) {
@@ -148,39 +156,63 @@ async function main() {
         `  x WS ${symbol}: no tick within ${WS_RECEIVE_BUDGET_MS}ms`,
       );
   }
+  const depthOk = BINANCE_FIXED_SYMBOLS.filter((symbol) =>
+    depths.has(symbol),
+  ).length;
+  console.log(
+    `WS depth10 (10 asks + 10 bids): ${depthOk}/${BINANCE_FIXED_SYMBOLS.length}`,
+  );
+  for (const symbol of BINANCE_FIXED_SYMBOLS) {
+    if (!depths.has(symbol))
+      console.error(`  x depth10 ${symbol}: no valid full snapshot`);
+  }
 
   const pass =
     validation.ok &&
     tickSizeOk === BINANCE_FIXED_SYMBOLS.length &&
     restOk === BINANCE_FIXED_SYMBOLS.length &&
-    wsOk === BINANCE_FIXED_SYMBOLS.length;
+    wsOk === BINANCE_FIXED_SYMBOLS.length &&
+    depthOk === BINANCE_FIXED_SYMBOLS.length;
   console.log(`\nbinance-fixed-universe-smoke: ${pass ? 'PASS' : 'FAIL'}`);
   if (!pass) process.exitCode = 1;
 }
 
-function collectWsTickerSymbols(wsBaseUrl: string): Promise<Set<string>> {
+function collectWsSymbols(
+  wsBaseUrl: string,
+): Promise<{ tickers: Set<string>; depths: Set<string> }> {
   const base = wsBaseUrl.replace(/\/+$/u, '');
-  const streams = BINANCE_FIXED_SYMBOLS.map(
-    (s) => `${s.toLowerCase()}@ticker`,
-  ).join('/');
+  const streams = BINANCE_FIXED_SYMBOLS.flatMap((s) => [
+    `${s.toLowerCase()}@ticker`,
+    `${s.toLowerCase()}@depth10`,
+  ]).join('/');
   const url = `${base}/stream?streams=${streams}`;
   const received = new Set<string>();
+  const depths = new Set<string>();
 
   return new Promise((resolve) => {
     const socket = new WsWebSocket(url);
     const done = () => {
       clearTimeout(timer);
       try {
-        socket.close();
+        socket.terminate();
       } catch {
         // ignore
       }
-      resolve(received);
+      resolve({ tickers: received, depths });
     };
     const timer = setTimeout(done, WS_RECEIVE_BUDGET_MS);
     socket.on('message', (data: Buffer) => {
       try {
-        const frame = JSON.parse(data.toString('utf8')) as {
+        const text = data.toString('utf8');
+        const depth = parseBinanceDepth(text);
+        if (
+          depth.state === 'depth' &&
+          depth.asks.length === 10 &&
+          depth.bids.length === 10
+        ) {
+          depths.add(depth.symbol);
+        }
+        const frame = JSON.parse(text) as {
           data?: { e?: string; s?: string };
         };
         if (
@@ -188,8 +220,12 @@ function collectWsTickerSymbols(wsBaseUrl: string): Promise<Set<string>> {
           typeof frame.data.s === 'string'
         ) {
           received.add(frame.data.s.toUpperCase());
-          if (received.size >= BINANCE_FIXED_SYMBOLS.length) done();
         }
+        if (
+          received.size >= BINANCE_FIXED_SYMBOLS.length &&
+          depths.size >= BINANCE_FIXED_SYMBOLS.length
+        )
+          done();
       } catch {
         // ignore malformed frames
       }

@@ -4,7 +4,7 @@ import { parseAssetOrderBook, isOrderBookStale, supportsLiveOrderBook } from './
 import { createCryptoOrderBookFixture } from './orderBook.fixture.ts';
 
 describe('live order book contract', () => {
-  for (const base of ['BTC', 'ETH', 'XRP']) {
+  for (const base of ['BTC', 'ETH', 'XRP', 'PEPE', '币安人生']) {
     it(`accepts ${base} 10+10 neutral snapshots without rounding or provider fields`, () => {
       const book = createCryptoOrderBookFixture(base, base, true);
       if (base === 'XRP') {
@@ -56,6 +56,10 @@ describe('live order book contract', () => {
   it('uses asset metadata only to enable crypto; backend remains the supported-universe authority', () => {
     const asset = { assetType: 'crypto' as const, market: 'BINANCE', symbol: 'BTCUSDT', priceCurrency: 'USD' as const, isActive: true };
     assert.equal(supportsLiveOrderBook(asset), true);
+    assert.equal(supportsLiveOrderBook({ ...asset, symbol: '币安人生USDT' }), true);
+    for (const symbol of ['币安人生USDT@depth10', '币安人生/USDT', '<script>', '币安人生 USDT']) {
+      assert.equal(supportsLiveOrderBook({ ...asset, symbol }), false);
+    }
     for (const override of [{ market: 'OTHER' }, { isActive: false }, { priceCurrency: 'KRW' as const }, { assetType: 'domestic_stock' as const }]) {
       assert.equal(supportsLiveOrderBook({ ...asset, ...override }), false);
     }

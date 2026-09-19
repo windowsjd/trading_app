@@ -197,11 +197,11 @@ describe('provider config', () => {
     expect(config.binance.symbols).toEqual(['BTCUSDT', 'ETHUSDT']);
   });
 
-  it('defaults Binance symbols to the fixed 10-symbol universe when unset', () => {
+  it('defaults Binance symbols to the fixed 25-symbol universe when unset', () => {
     expect(buildProviderConfig({}).binance.symbols).toEqual([
       ...BINANCE_FIXED_SYMBOLS,
     ]);
-    expect(buildProviderConfig({}).binance.symbols).toHaveLength(10);
+    expect(buildProviderConfig({}).binance.symbols).toHaveLength(25);
   });
 
   it('defaults Binance symbols to the fixed universe when the env value is blank', () => {

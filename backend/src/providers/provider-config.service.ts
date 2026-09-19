@@ -222,10 +222,10 @@ export function buildProviderConfig(env: ProviderEnv): ProviderConfig {
     wsMarketDataBaseUrl:
       readOptionalTrimmedEnv(env, 'BINANCE_WS_MARKET_DATA_BASE_URL') ??
       'wss://stream.binance.com:9443',
-    // Fallback is the fixed 10-symbol Binance MVP universe (single source of
+    // Fallback is the fixed 25-symbol Binance MVP universe (single source of
     // truth), NOT a separate BTC/ETH pair. The ticker WebSocket streaming
     // service subscribes from this list, so an unset BINANCE_CRYPTO_SYMBOLS
-    // must still stream all 10 registered coins.
+    // must still stream all 25 registered coins.
     symbols:
       binanceSymbols.length > 0 ? binanceSymbols : [...BINANCE_FIXED_SYMBOLS],
     usdtAsUsdEquivalent: readBooleanEnv(

@@ -9,6 +9,8 @@ jest.mock('../../generated/prisma/client', () => ({
   CurrencyCode: { USD: 'USD' },
 }));
 import { BinanceOrderBookService } from './binance-order-book.service';
+import { BINANCE_FIXED_ASSET_UNIVERSE } from './binance-fixed-asset-universe';
+import type { OrderBookEvent } from '../order-book.types';
 
 const frame = (id: number | string, symbol = 'btcusdt') =>
   JSON.stringify({
@@ -31,12 +33,53 @@ function setup(assets = [{ id: 'btc', symbol: 'BTCUSDT' }]) {
 }
 
 describe('shared Binance order book processor', () => {
+  it('maps and publishes depth10 for every fixed asset, including the fifteen additions', async () => {
+    const entries = BINANCE_FIXED_ASSET_UNIVERSE;
+    const { service, pubsub, prisma } = setup(
+      entries.map((entry, index) => ({
+        id: `asset-${entry.symbol}`,
+        symbol: index % 2 ? entry.baseAsset : entry.symbol,
+      })),
+    );
+    const targets = await service.loadTargets();
+    expect(targets.size).toBe(25);
+    const query = prisma.asset.findMany.mock.calls[0] as unknown as [
+      { where: { symbol: { in: string[] } } },
+    ];
+    for (const entry of entries) {
+      expect(query[0].where.symbol.in).toEqual(
+        expect.arrayContaining([entry.symbol, entry.baseAsset]),
+      );
+      expect(targets.get(entry.symbol)).toEqual({
+        assetId: `asset-${entry.symbol}`,
+        symbol: entry.symbol,
+        baseAsset: entry.baseAsset,
+      });
+      service.handleFrame(
+        frame(1, entry.symbol.toLowerCase()),
+        receivedAt,
+        targets,
+      );
+      const published = pubsub.publish.mock.calls.at(-1) as unknown as [
+        OrderBookEvent,
+      ];
+      expect(published[0].book).toMatchObject({
+        assetId: `asset-${entry.symbol}`,
+        quantityUnit: entry.baseAsset,
+        priceUnit: 'USDT',
+      });
+    }
+    await service.onModuleDestroy();
+  });
+
   it('maps only active Binance crypto USD assets in the fixed universe and fails closed on ambiguity', async () => {
     const { service, prisma } = setup([
       { id: 'a', symbol: 'BTC' },
       { id: 'b', symbol: 'BTCUSDT' },
       { id: 'c', symbol: 'ETHUSDT' },
       { id: 'd', symbol: 'NOTSUPPORTEDUSDT' },
+      { id: 'e', symbol: '币安人生' },
+      { id: 'f', symbol: '币安人生USDT' },
     ]);
     expect([...(await service.loadTargets())]).toEqual([
       ['ETHUSDT', { assetId: 'c', symbol: 'ETHUSDT', baseAsset: 'ETH' }],

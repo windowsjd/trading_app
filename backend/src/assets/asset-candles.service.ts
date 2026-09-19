@@ -1872,7 +1872,9 @@ export class AssetCandlesService {
 
     const symbol = rawSymbol.replace(/\s+/gu, '');
     if (/[/_-]/u.test(symbol)) {
-      const pair = symbol.match(/^([A-Z0-9]{1,20})[/_-](USDT|USD)$/u);
+      const pair = symbol.match(
+        /^([A-Z0-9\p{Script=Han}]{1,20})[/_-](USDT|USD)$/u,
+      );
       if (pair) {
         return `${pair[1]}USDT`;
       }
@@ -1884,16 +1886,16 @@ export class AssetCandlesService {
       );
     }
 
-    if (/^[A-Z0-9]{1,30}USDT$/u.test(symbol)) {
+    if (/^[A-Z0-9\p{Script=Han}]{1,30}USDT$/u.test(symbol)) {
       return symbol;
     }
 
-    const usdPair = symbol.match(/^([A-Z0-9]{1,20})USD$/u);
+    const usdPair = symbol.match(/^([A-Z0-9\p{Script=Han}]{1,20})USD$/u);
     if (usdPair) {
       return `${usdPair[1]}USDT`;
     }
 
-    if (/^[A-Z0-9]{1,20}$/u.test(symbol)) {
+    if (/^[A-Z0-9\p{Script=Han}]{1,20}$/u.test(symbol)) {
       return `${symbol}USDT`;
     }
 

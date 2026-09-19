@@ -42,6 +42,7 @@ import { type AssetType } from '../generated/prisma/client';
 import { KIS_DOMESTIC_PERIOD_SOURCE } from '../providers/kis/candles/kis-period-candle.types';
 import { BINANCE_CANDLE_SOURCE } from '../providers/binance/binance-candle.types';
 import { BinanceCandleIngestionService } from '../providers/binance/binance-candle.ingestion.service';
+import { BINANCE_FIXED_ASSET_UNIVERSE } from '../providers/binance/binance-fixed-asset-universe';
 
 const DAY = 24 * 60 * 60_000;
 const FIVE_MIN = 5 * 60_000;
@@ -1145,6 +1146,29 @@ describe('MarketCandleSyncService', () => {
     expect(row.targetTo.getTime()).toBe(to.getTime());
     expect(row.coveredFrom?.getTime()).toBe(from.getTime());
     expect(row.coveredTo?.getTime()).toBe(to.getTime());
+  });
+
+  it('includes every fixed Binance asset in 5m, daily and weekly sync targets', async () => {
+    const assets = BINANCE_FIXED_ASSET_UNIVERSE.map((entry) => ({
+      ...CRYPTO_ASSET,
+      id: `asset-${entry.symbol}`,
+      symbol: entry.symbol,
+    }));
+    const harness = createHarness({ assets });
+    harness.binanceCandles.fetchKlinesPage.mockResolvedValue(binancePage());
+    const result = await harness.service.syncAssets({
+      targets: ['5m', '1d', '1w'],
+      now: NOW,
+    });
+    expect(result.totalFeeds).toBe(75);
+    expect(result.processedAssets).toBe(25);
+    for (const entry of BINANCE_FIXED_ASSET_UNIVERSE) {
+      for (const interval of ['5m', '1d', '1w']) {
+        expect(harness.binanceCandles.fetchKlinesPage).toHaveBeenCalledWith(
+          expect.objectContaining({ symbol: entry.symbol, interval }),
+        );
+      }
+    }
   });
 
   it('honors continueOnError=false by skipping later assets after a failure', async () => {

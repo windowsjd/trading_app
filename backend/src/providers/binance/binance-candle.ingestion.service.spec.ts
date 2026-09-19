@@ -50,6 +50,21 @@ describe('BinanceCandleIngestionService', () => {
     return { service, fetchKlines };
   };
 
+  it('accepts the exchangeInfo-verified Han symbol without changing its provider identity', async () => {
+    const { service, fetchKlines } = createService([[kline(MONDAY, DAY)]]);
+    const page = await service.fetchKlinesPage({
+      symbol: '币安人生USDT',
+      interval: '1d',
+      from: new Date(MONDAY),
+      to: new Date(MONDAY + DAY),
+      now: new Date(MONDAY + 2 * DAY),
+    });
+    expect(fetchKlines).toHaveBeenCalledWith(
+      expect.objectContaining({ symbol: '币安人生USDT' }),
+    );
+    expect(page.acceptedRows).toBe(1);
+  });
+
   it('pages forward with startTime and a 1000-row boundary, deduplicating openTimes', async () => {
     const from = MONDAY;
     const firstPage = Array.from({ length: 1000 }, (_, index) =>

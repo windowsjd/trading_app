@@ -45,7 +45,7 @@ import { runProviderIngestionCheck } from './dev-run-provider-ingestions';
  *
  * Does ONLY additive, idempotent work: keeps the dev season open, creates the
  * dev user/participant/wallets/grant when absent (never resetting existing
- * balances or ledgers), and registers the fixed 40 KIS stocks + 10 Binance
+ * balances or ledgers), and registers the fixed 40 KIS stocks + 25 Binance
  * crypto assets. It never drops, truncates, deletes, or resets anything.
  *
  * `--dry-run` (default) plans without writing; `--apply` writes;
@@ -103,7 +103,7 @@ async function main(argv: string[]) {
       console.log(line);
     }
 
-    // 4) Binance fixed universe (10) — validated against exchangeInfo first.
+    // 4) Binance fixed universe — validated against exchangeInfo first.
     console.log('\n[4/5] Binance fixed asset universe');
     const binance = await seedBinanceFixedAssetUniverse({
       prisma,
@@ -113,7 +113,10 @@ async function main(argv: string[]) {
     if (binance.validation.skipped) {
       console.log('  provider validation: SKIPPED');
     } else if (binance.validation.ok) {
-      console.log('  provider validation: OK (10/10 TRADING Spot USDT)');
+      const count = binance.universe?.counts.total ?? 0;
+      console.log(
+        `  provider validation: OK (${count}/${count} TRADING Spot USDT)`,
+      );
     } else {
       console.error('  provider validation: FAILED — Binance not registered:');
       for (const failure of binance.validation.failures) {

@@ -91,7 +91,7 @@ Official specification: https://github.com/binance/binance-spot-api-docs/blob/ma
   symbol/event time이 없으므로 별도 socket 대신 기존 연결의 endpoint를 `/stream`으로
   바꿨다. 설정된 host/query는 보존한다. ticker bid/ask, 등락률, DB throttle은 그대로다.
 - 최대 provider 구독 설정은 stream 수가 아니라 symbol 수였다. Live owner는 이를
-  유지하면서 3 streams/symbol 기준 1024 한도를 추가로 지킨다(현재 10종목은 30 streams).
+  유지하면서 3 streams/symbol 기준 1024 한도를 추가로 지킨다(현재 25종목은 75 streams).
 - 기존 candle backpressure는 sequence/revision, ticker는 최신값 coalescing이었다.
   order book은 기존 flush timer/byte threshold를 재사용하고 독립 pending map을 둔다.
 - 기존 Frontend 계약·normalization·fixture를 다시 만들 필요가 없었다. 카드 변경은

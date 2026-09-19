@@ -8,7 +8,7 @@ export const ORDER_BOOK_FIRST_SNAPSHOT_TIMEOUT_MS = 10_000;
 export function supportsLiveOrderBook(asset: Pick<AssetDetailAssetDto, 'assetType' | 'market' | 'symbol' | 'isActive' | 'priceCurrency'> | undefined): boolean {
   // Server checks the active fixed universe as the authoritative boundary.
   return !!asset && asset.isActive && asset.assetType === 'crypto' &&
-    asset.market === 'BINANCE' && asset.priceCurrency === 'USD' && /^[A-Z0-9]{1,32}$/u.test(asset.symbol);
+    asset.market === 'BINANCE' && asset.priceCurrency === 'USD' && /^[A-Z0-9\p{Script=Han}]{1,32}$/u.test(asset.symbol);
 }
 
 function record(value: unknown): value is Record<string, unknown> {

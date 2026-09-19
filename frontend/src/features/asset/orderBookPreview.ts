@@ -22,7 +22,7 @@ export function getOrderBookPreview(
     // USDT or the base asset from a bare BTC symbol or from priceCurrency alone.
     if (asset.assetType === 'crypto' && asset.priceCurrency === 'USD' &&
         asset.market.trim().toUpperCase() === 'BINANCE') {
-      const pair = /^([A-Z0-9]+)USDT$/u.exec(asset.symbol.trim().toUpperCase());
+      const pair = /^([A-Z0-9\p{Script=Han}]+)USDT$/u.exec(asset.symbol.trim().toUpperCase());
       if (pair) return createCryptoOrderBookFixture(asset.id, pair[1], long);
     }
   }
