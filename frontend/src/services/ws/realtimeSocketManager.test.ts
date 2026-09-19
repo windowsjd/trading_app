@@ -67,6 +67,38 @@ function sentFrames(socket: FakeSocket): Array<Record<string, unknown>> {
 }
 
 describe("RealtimeSocketManager", () => {
+  it('shares and restores reference-counted order book subscriptions without disturbing ticker/candle', async () => {
+    const manager = createManager();
+    const book = collect(); const other = collect(); const ticker = collect(); const candle = collect();
+    const offTicker = manager.subscribe({ channel: 'asset_ticker', assetId: 'btc' }, ticker.listener);
+    const offCandle = manager.subscribe({ channel: 'asset_candle', assetId: 'btc', interval: '5m' }, candle.listener);
+    const offBook = manager.subscribe({ channel: 'asset_order_book', assetId: 'btc' }, book.listener);
+    const offOther = manager.subscribe({ channel: 'asset_order_book', assetId: 'eth' }, other.listener);
+    await delay(5); const first = FakeSocket.instances[0]; first.open();
+    first.receive({ type: 'subscribed', channel: 'asset_order_book', assetId: 'btc' });
+    const late = collect(); const offLate = manager.subscribe({ channel: 'asset_order_book', assetId: 'btc' }, late.listener);
+    assert.ok(late.events.some(e => e.kind === 'message' && e.payload.type === 'subscribed'));
+    assert.equal(sentFrames(first).filter(f => f.channel === 'asset_order_book' && f.assetId === 'btc').length, 1);
+    first.receive({ type: 'asset_order_book', assetId: 'btc', asks: [], bids: [] });
+    first.receive({ type: 'asset_order_book', asks: [], bids: [] });
+    assert.equal(book.events.filter(e => e.kind === 'message' && e.payload.type === 'asset_order_book').length, 1);
+    assert.equal(other.events.filter(e => e.kind === 'message').length, 0);
+    assert.equal(ticker.events.filter(e => e.kind === 'message').length, 0);
+    assert.equal(candle.events.filter(e => e.kind === 'message').length, 0);
+    assert.equal(FakeSocket.instances.length, 1);
+    first.drop(); await delay(10); const second = FakeSocket.instances[1]; second.open();
+    assert.deepEqual(sentFrames(second).map(f => f.channel).sort(), ['asset_candle', 'asset_order_book', 'asset_order_book', 'asset_ticker']);
+    assert.ok(book.events.some(e => e.kind === 'restored'));
+    offBook(); assert.equal(sentFrames(second).filter(f => f.type === 'unsubscribe').length, 0);
+    offLate(); assert.equal(sentFrames(second).filter(f => f.type === 'unsubscribe' && f.assetId === 'btc' && f.channel === 'asset_order_book').length, 1);
+    assert.equal(second.closed.length, 0);
+    second.receive({ type: 'asset_ticker', assetId: 'btc' });
+    second.receive({ type: 'asset_candle', assetId: 'btc', interval: '5m' });
+    assert.equal(ticker.events.filter(e => e.kind === 'message').length, 1);
+    assert.equal(candle.events.filter(e => e.kind === 'message').length, 1);
+    offOther(); offTicker(); offCandle(); assert.equal(second.closed.length, 1);
+  });
+
   it("shares FX with price channels, isolates pairs and restores the FX subscription", async () => {
     const manager = createManager();
     const fx = collect();

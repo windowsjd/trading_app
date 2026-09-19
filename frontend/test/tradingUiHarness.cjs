@@ -43,6 +43,7 @@ function createTradingUiHarness(screenName) {
     StyleSheet: { create: styles => styles }, Platform: { OS: 'web' },
   };
   const mocks = {
+    '@react-navigation/native': { useIsFocused: () => h.isFocused ?? true },
     react: { ...React,
       useMemo: fn => fn(),
       useState: initial => {
@@ -97,6 +98,7 @@ function createTradingUiHarness(screenName) {
     '../../features/asset/api': { ...timeframes },
     '../../features/wallet/api': {},
     '../../features/asset/useAssetTicker': { useAssetTicker: () => ({ latestTicker: h.ticker, isStale: h.tickerStale }) },
+    '../../features/asset/useAssetOrderBook': { useAssetOrderBook: (options) => { h.orderBookOptions = options; return h.orderBookState ?? { latestOrderBook: null, statusMessage: '호가 정보를 불러오는 중입니다.' }; } },
     '../../features/asset/useAssetCandle': { useAssetCandle: (options) => { h.liveCandleOptions = options; return {}; } },
     '../../features/asset/useStaleRecheck': { useStaleRecheck: () => {} },
     '../../features/wallet/useFxRateUpdates': { useFxRateUpdates: () => {} },

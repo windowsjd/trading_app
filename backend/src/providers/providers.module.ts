@@ -39,10 +39,14 @@ import { KisDomesticPeriodAdapter } from './kis/candles/kis-domestic-period.adap
 import { KisOverseasPeriodAdapter } from './kis/candles/kis-overseas-period.adapter';
 import { KisPeriodCandleNormalizerService } from './kis/candles/kis-period-candle-normalizer.service';
 import { BinanceCandleIngestionService } from './binance/binance-candle.ingestion.service';
+import { BinanceOrderBookService } from './binance/binance-order-book.service';
+import { OrderBookPubSubService } from './order-book-pubsub.service';
 
 @Module({
   imports: [PrismaModule, RedisModule],
   providers: [
+    OrderBookPubSubService,
+    BinanceOrderBookService,
     ProviderConfigService,
     ProviderHttpClient,
     ExchangeRateClient,
@@ -99,6 +103,8 @@ import { BinanceCandleIngestionService } from './binance/binance-candle.ingestio
     MarketSnapshotHealthService,
   ],
   exports: [
+    OrderBookPubSubService,
+    BinanceOrderBookService,
     ProviderConfigService,
     ExchangeRateIngestionService,
     KoreaEximExchangeClient,

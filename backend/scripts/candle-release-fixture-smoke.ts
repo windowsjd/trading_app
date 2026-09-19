@@ -11,6 +11,7 @@
  * when every scenario passed and all fixture rows/keys were cleaned up.
  */
 import 'dotenv/config';
+import { BinanceOrderBookService } from '../src/providers/binance/binance-order-book.service';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -822,6 +823,10 @@ async function main() {
           } as never,
           { ...liveConfig, connectionLivenessTimeoutMs: 3_600_000 },
           () => sockets.shift() ?? new FakeProviderSocket(),
+          new BinanceOrderBookService(
+            supervisorPrisma as never,
+            { publish: () => Promise.resolve(true) } as never,
+          ),
         );
         const context = (
           provider: 'binance' | 'kis',

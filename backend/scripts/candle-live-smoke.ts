@@ -25,6 +25,7 @@
  * report; only aggregate counters.
  */
 import 'dotenv/config';
+import { BinanceOrderBookService } from '../src/providers/binance/binance-order-book.service';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -303,6 +304,10 @@ async function main() {
     new BinanceWebSocketIngestionService(prisma, providerConfig),
     liveConfig,
     defaultLiveCandleSocketFactory,
+    new BinanceOrderBookService(
+      scopedPrisma as never,
+      { publish: () => Promise.resolve(true) } as never,
+    ),
   );
 
   const supervisorProvider = provider === 'binance' ? 'binance' : 'kis';

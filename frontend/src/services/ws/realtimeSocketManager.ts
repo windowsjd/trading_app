@@ -10,11 +10,11 @@
  * reconnectWithFreshToken() call.
  */
 
-export type RealtimeChannel = 'asset_ticker' | 'asset_candle' | 'fx_rate';
+export type RealtimeChannel = 'asset_ticker' | 'asset_candle' | 'asset_order_book' | 'fx_rate';
 
 export type RealtimeSubscriptionSpec =
   | {
-      channel: 'asset_ticker' | 'asset_candle';
+      channel: 'asset_ticker' | 'asset_candle' | 'asset_order_book';
       assetId: string;
       interval?: string;
       pair?: never;
@@ -303,6 +303,12 @@ export class RealtimeSocketManager {
       this.emitToMatches('asset_candle', payload, true);
       return;
     }
+    if (payload.type === 'asset_order_book') {
+      if (typeof payload.assetId === 'string' && payload.assetId) {
+        this.emitToMatches('asset_order_book', payload, false);
+      }
+      return;
+    }
     if (payload.type === 'fx_rate_updated') {
       this.emitToMatches('fx_rate', payload, true);
       return;
@@ -310,6 +316,7 @@ export class RealtimeSocketManager {
     if (
       payload.channel === 'asset_ticker' ||
       payload.channel === 'asset_candle' ||
+      payload.channel === 'asset_order_book' ||
       payload.channel === 'fx_rate'
     ) {
       this.emitToMatches(payload.channel, payload, false);

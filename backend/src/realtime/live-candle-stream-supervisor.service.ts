@@ -36,6 +36,11 @@ import {
   normalizeKisUsMarketCode,
 } from '../providers/kis/kis-websocket.subscription';
 import { ProviderPricePubSubService } from './provider-price-pubsub.service';
+import {
+  BinanceOrderBookService,
+  type BinanceOrderBookTarget,
+} from '../providers/binance/binance-order-book.service';
+import { binanceCombinedStreamUrl } from '../providers/binance/binance-order-book.parser';
 
 export const LIVE_CANDLE_SOCKET_FACTORY = Symbol('LIVE_CANDLE_SOCKET_FACTORY');
 
@@ -93,6 +98,7 @@ export class LiveCandleStreamSupervisorService
     @Inject(LIVE_CANDLE_CONFIG) private readonly config: LiveCandleConfig,
     @Inject(LIVE_CANDLE_SOCKET_FACTORY)
     private readonly socketFactory: LiveCandleSocketFactory,
+    private readonly orderBooks: BinanceOrderBookService,
   ) {}
 
   onModuleInit(): void {
@@ -269,22 +275,29 @@ export class LiveCandleStreamSupervisorService
       if (symbol) bySymbol.set(symbol, asset);
     }
     const desiredSymbols = [...bySymbol.keys()];
+    // Metadata failures use the existing owned-connection retry loop.
+    const orderBookTargets = await this.orderBooks.loadTargets();
     const cappedSymbols = desiredSymbols.slice(
       0,
-      this.config.maxProviderSubscriptionsPerShard,
+      Math.min(
+        this.config.maxProviderSubscriptionsPerShard,
+        Math.floor(1024 / 3),
+      ),
     );
     if (cappedSymbols.length === 0) throw namedError('BINANCE_STREAMS_EMPTY');
-    // One owned connection carries BOTH the 5m kline stream (candles) and the
-    // ticker stream (price snapshots) per symbol. This keeps a single Binance
-    // socket under a single owner lease while still feeding
+    // One owned connection carries kline, ticker and display-only depth,
+    // under a single owner lease while still feeding
     // asset_price_snapshots in live-candle mode (where the standalone ticker
     // streaming service is disabled).
     const streams = cappedSymbols.flatMap((symbol) => [
       `${symbol.toLowerCase()}@kline_5m`,
       `${symbol.toLowerCase()}@ticker`,
+      ...(orderBookTargets.has(symbol)
+        ? [`${symbol.toLowerCase()}@depth10`]
+        : []),
     ]);
     const socket = this.socketFactory(
-      `${provider.binance.wsMarketDataBaseUrl.replace(/\/+$/u, '')}/ws`,
+      binanceCombinedStreamUrl(provider.binance.wsMarketDataBaseUrl),
     );
     context.socket = socket;
     await waitForOpen(socket);
@@ -322,11 +335,12 @@ export class LiveCandleStreamSupervisorService
       });
     });
     socket.on('message', (data: unknown) => {
+      if (context.lost || this.stopping || context.socket !== socket) return;
       lastFrameAt = Date.now();
       this.health.updateProvider('binance', {
         lastFrameAt: new Date().toISOString(),
       });
-      this.handleBinanceMessage(data, bySymbol, context);
+      this.handleBinanceMessage(data, bySymbol, context, orderBookTargets);
     });
     socket.send(
       JSON.stringify({ method: 'SUBSCRIBE', params: streams, id: 1 }),
@@ -335,7 +349,7 @@ export class LiveCandleStreamSupervisorService
       state:
         desiredSymbols.length > cappedSymbols.length ? 'degraded' : 'connected',
       connectedAt: new Date().toISOString(),
-      // Subscription counts are per SYMBOL (each symbol opens 2 streams).
+      // Subscription counts are per SYMBOL (up to 3 streams per symbol).
       subscriptionsRequested: desiredSymbols.length,
       subscriptionsActive: cappedSymbols.length,
       subscriptionsFailed: desiredSymbols.length - cappedSymbols.length,
@@ -476,9 +490,11 @@ export class LiveCandleStreamSupervisorService
     data: unknown,
     assets: Map<string, LiveCandleAsset>,
     context: OwnedProviderContext,
+    orderBookTargets: ReadonlyMap<string, BinanceOrderBookTarget>,
   ): void {
     const text = socketDataToText(data);
     if (!text) return this.health.increment('eventsRejected');
+    if (this.orderBooks.handleFrame(text, new Date(), orderBookTargets)) return;
     // Route by event type so a ticker frame is never handed to the kline
     // parser (or vice versa), which would inflate the rejected-event counter.
     if (readBinanceStreamEventType(text) === '24hrTicker') {

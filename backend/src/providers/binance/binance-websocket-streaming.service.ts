@@ -1,4 +1,9 @@
 import {
+  BinanceOrderBookService,
+  type BinanceOrderBookTarget,
+} from './binance-order-book.service';
+import { binanceCombinedStreamUrl } from './binance-order-book.parser';
+import {
   Injectable,
   Logger,
   OnModuleDestroy,
@@ -93,6 +98,7 @@ export class BinanceWebSocketStreamingService
   private connectPromise: Promise<void> | null = null;
   private readonly pendingMessages = new Set<Promise<void>>();
   private streamNames: string[] = [];
+  private orderBookTargets = new Map<string, BinanceOrderBookTarget>();
   private reconnectAttempt = 0;
   private stopping = false;
 
@@ -131,6 +137,7 @@ export class BinanceWebSocketStreamingService
     private readonly ingestionService: BinanceWebSocketIngestionService,
     private readonly latestPriceCache: BinanceRealtimePriceCacheService,
     private readonly realtimePriceEventBus: BinanceRealtimePriceEventBus,
+    private readonly orderBooks: BinanceOrderBookService,
   ) {}
 
   onModuleInit(): void {
@@ -239,7 +246,15 @@ export class BinanceWebSocketStreamingService
         return;
       }
 
-      const streamNames = buildTickerStreamNames(config.binance.symbols);
+      // Let the existing reconnect loop retry metadata failures; silently
+      // subscribing without depth would keep it absent until the next rollover.
+      this.orderBookTargets = await this.orderBooks.loadTargets();
+      const streamNames = [
+        ...buildTickerStreamNames(config.binance.symbols),
+        ...[...this.orderBookTargets.keys()].map(
+          (symbol) => `${symbol.toLowerCase()}@depth10`,
+        ),
+      ];
       if (streamNames.length === 0) {
         this.recordError(
           'BINANCE_STREAMS_EMPTY',
@@ -287,7 +302,7 @@ export class BinanceWebSocketStreamingService
     streamNames: readonly string[];
   }): Promise<void> {
     const socket = new input.websocketConstructor(
-      buildBinanceStreamUrl(input.config.binance.wsMarketDataBaseUrl),
+      binanceCombinedStreamUrl(input.config.binance.wsMarketDataBaseUrl),
     );
     this.socket = socket;
     this.streamNames = [...input.streamNames];
@@ -307,6 +322,7 @@ export class BinanceWebSocketStreamingService
 
     this.attachPingPong(socket);
     socket.addEventListener('message', (event) => {
+      if (this.socket !== socket || this.stopping) return;
       this.handleSocketMessage({ event });
     });
     socket.addEventListener('error', () => {
@@ -340,14 +356,16 @@ export class BinanceWebSocketStreamingService
     this.status.connecting = false;
     this.status.reconnecting = false;
     this.status.lastConnectedAt = now;
-    this.status.subscribedSymbolCount = input.streamNames.length;
+    this.status.subscribedSymbolCount = new Set(
+      input.streamNames.map((stream) => stream.split('@')[0]),
+    ).size;
     this.status.lastErrorCode = null;
     this.status.lastErrorMessage = null;
     this.reconnectAttempt = 0;
     this.startHeartbeat(input.config.binance.wsStreamingHeartbeatTimeoutMs);
     this.startMaxConnectionTimer(socket);
     this.logger.log(
-      `Binance WebSocket streaming connected with ${input.streamNames.length} ticker streams.`,
+      `Binance WebSocket streaming connected with ${input.streamNames.length} ticker/depth streams.`,
     );
   }
 
@@ -378,6 +396,9 @@ export class BinanceWebSocketStreamingService
     const receivedAt = new Date();
     this.status.receivedFrames += 1;
     this.status.lastMessageAt = receivedAt.toISOString();
+
+    if (this.orderBooks.handleFrame(text, receivedAt, this.orderBookTargets))
+      return;
 
     const parsed = parseBinanceWebSocketMessage({
       frame: text,
@@ -674,15 +695,6 @@ function buildTickerStreamNames(symbols: readonly string[]): string[] {
   }
 
   return streams;
-}
-
-function buildBinanceStreamUrl(baseUrl: string): string {
-  const base = baseUrl.replace(/\/+$/u, '');
-  if (/\/(?:ws|stream)(?:\?|$)/u.test(base)) {
-    return base;
-  }
-
-  return `${base}/ws`;
 }
 
 function resolveNativeWebSocketConstructor(): NativeWebSocketConstructor {

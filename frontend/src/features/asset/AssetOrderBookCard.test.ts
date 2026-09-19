@@ -11,6 +11,19 @@ const text = (node: any): string => typeof node === 'string' ? node : (node.chil
 const host = (renderer: any, testID: string) => renderer.root.find((node: any) => node.type === 'View' && node.props.testID === testID);
 
 describe('order book card rendering', () => {
+  it('shows live delay/reconnect status while retaining the full common book', () => {
+    const h = interactionHarness();
+    const Card = h.load('src/features/asset/AssetOrderBookCard.tsx').default;
+    const book = { ...createCryptoOrderBookFixture('btc', 'BTC'), effectiveAt: null };
+    const renderer = h.render(React.createElement(Card, { book, statusMessage: '호가 정보가 지연되고 있습니다.' }));
+    assert.match(text(renderer.root), /호가 정보가 지연되고 있습니다/);
+    assert.match(text(renderer.root), /매도호가 · 10단계/); assert.match(text(renderer.root), /매수호가 · 10단계/);
+    assert.doesNotMatch(text(renderer.root), /개발용 예시/);
+    act(() => renderer.update(React.createElement(Card, { book, statusMessage: null })));
+    assert.doesNotMatch(text(renderer.root), /지연되고/);
+    act(() => renderer.unmount());
+  });
+
   it('shows 10 asks descending then 10 bids descending, with exact paired quantities', () => {
     const h = interactionHarness();
     const Card = h.load('src/features/asset/AssetOrderBookCard.tsx').default;

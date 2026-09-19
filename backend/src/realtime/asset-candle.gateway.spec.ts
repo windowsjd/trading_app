@@ -165,6 +165,8 @@ function register(
     subscriptions: new Map(),
     candleSubscriptions,
     pendingCandles: new Map(),
+    orderBookSubscriptions: new Map(),
+    pendingOrderBooks: new Map(),
   });
 }
 

@@ -62,6 +62,17 @@ import type {
   TickerFanoutMetrics,
   TickerFanoutMetricsSource,
 } from './ticker-fanout-metrics';
+import { OrderBookPubSubService } from '../providers/order-book-pubsub.service';
+import {
+  BinanceOrderBookService,
+  type BinanceOrderBookTarget,
+} from '../providers/binance/binance-order-book.service';
+import type { OrderBookEvent } from '../providers/order-book.types';
+
+type OrderBookSubscription = {
+  target: BinanceOrderBookTarget | null;
+  sequence: string | null;
+};
 
 type AccessTokenPayload = {
   sub?: unknown;
@@ -83,6 +94,9 @@ type ClientState = {
    * ticker backlog — it just skips straight to the newest price.
    */
   pendingTickers: Map<string, Record<string, unknown>>;
+  // Includes validations in flight, bounding concurrent subscribe requests.
+  orderBookSubscriptions: Map<string, OrderBookSubscription>;
+  pendingOrderBooks: Map<string, OrderBookEvent>;
 };
 
 type SubscriptionMessage = {
@@ -109,6 +123,7 @@ const DEFAULT_CANDLE_BACKPRESSURE_BYTES = 1_048_576;
  * queued asset is evicted so the newest prices always win.
  */
 const MAX_PENDING_TICKERS_PER_CLIENT = 64;
+const MAX_ORDER_BOOK_SUBSCRIPTIONS = 20;
 
 @Injectable()
 @WebSocketGateway({
@@ -136,6 +151,7 @@ export class AssetTickerGateway
   private unsubscribeLiveCandles: (() => void) | null = null;
   private unsubscribeLiveCandleStatus: (() => void) | null = null;
   private unsubscribeProviderPrices: (() => void) | null = null;
+  private unsubscribeOrderBooks: (() => void) | null = null;
   private backpressureTimer: NodeJS.Timeout | null = null;
   private liveCandlePubSubStatus: LiveCandlePubSubStatus = 'disabled';
   // Debug/health counters for ticker delivery (see getTickerFanoutMetrics).
@@ -159,6 +175,8 @@ export class AssetTickerGateway
     private readonly liveCandleConfig?: LiveCandleConfig,
     @Optional()
     private readonly providerPricePubSub?: ProviderPricePubSubService,
+    @Optional() private readonly orderBookPubSub?: OrderBookPubSubService,
+    @Optional() private readonly orderBooks?: BinanceOrderBookService,
   ) {}
 
   onModuleInit() {
@@ -189,8 +207,12 @@ export class AssetTickerGateway
       this.flushPendingCandles();
       this.flushPendingTickers();
       this.flushPendingFxRateUpdates();
+      this.flushPendingOrderBooks();
     }, CANDLE_BACKPRESSURE_FLUSH_MS);
     this.backpressureTimer.unref?.();
+    this.unsubscribeOrderBooks =
+      this.orderBookPubSub?.subscribe((event) => this.pushOrderBook(event)) ??
+      null;
   }
 
   onModuleDestroy() {
@@ -208,6 +230,12 @@ export class AssetTickerGateway
     this.unsubscribeLiveCandleStatus = null;
     this.unsubscribeProviderPrices?.();
     this.unsubscribeProviderPrices = null;
+    this.unsubscribeOrderBooks?.();
+    this.unsubscribeOrderBooks = null;
+    for (const state of this.clients.values()) {
+      state.orderBookSubscriptions.clear();
+      state.pendingOrderBooks.clear();
+    }
     if (this.backpressureTimer) clearInterval(this.backpressureTimer);
     this.backpressureTimer = null;
   }
@@ -226,16 +254,21 @@ export class AssetTickerGateway
       candleSubscriptions: new Map(),
       pendingCandles: new Map(),
       pendingTickers: new Map(),
+      orderBookSubscriptions: new Map(),
+      pendingOrderBooks: new Map(),
     });
     client.on('message', (data) => {
       void this.handleMessage(client, data.toString());
     });
     client.on('error', () => {
-      this.clients.delete(client);
+      this.handleDisconnect(client);
     });
   }
 
   handleDisconnect(client: WebSocket) {
+    const state = this.clients.get(client);
+    state?.orderBookSubscriptions.clear();
+    state?.pendingOrderBooks.clear();
     this.clients.delete(client);
   }
 
@@ -270,11 +303,24 @@ export class AssetTickerGateway
     }
 
     if (typeof message.assetId !== 'string' || message.assetId.trim() === '') {
+      if (message.channel === 'asset_order_book') {
+        this.sendJson(client, {
+          type: 'subscription_error',
+          channel: 'asset_order_book',
+          assetId: typeof message.assetId === 'string' ? message.assetId : null,
+          code: 'INVALID_SUBSCRIPTION',
+        });
+        return;
+      }
       this.sendInvalidSubscription(client);
       return;
     }
 
     const assetId = message.assetId.trim();
+    if (message.channel === 'asset_order_book') {
+      await this.handleOrderBookSubscription(client, state, message, assetId);
+      return;
+    }
     if (message.channel === 'asset_candle') {
       await this.handleCandleSubscription(client, state, message, assetId);
       return;
@@ -312,6 +358,133 @@ export class AssetTickerGateway
     }
 
     this.sendInvalidSubscription(client);
+  }
+
+  private async handleOrderBookSubscription(
+    client: WebSocket,
+    state: ClientState,
+    message: SubscriptionMessage,
+    assetId: string,
+  ): Promise<void> {
+    const error = (code: string) =>
+      this.sendJson(client, {
+        type: 'subscription_error',
+        channel: 'asset_order_book',
+        assetId,
+        code,
+      });
+    if (message.type === 'unsubscribe') {
+      state.orderBookSubscriptions.delete(assetId);
+      state.pendingOrderBooks.delete(assetId);
+      this.sendJson(client, {
+        type: 'unsubscribed',
+        channel: 'asset_order_book',
+        assetId,
+      });
+      return;
+    }
+    if (message.type !== 'subscribe' || assetId.length > 80) {
+      error('INVALID_SUBSCRIPTION');
+      return;
+    }
+    const existing = state.orderBookSubscriptions.get(assetId);
+    if (existing) {
+      if (existing.target)
+        this.sendJson(client, {
+          type: 'subscribed',
+          channel: 'asset_order_book',
+          assetId,
+        });
+      return;
+    }
+    if (state.orderBookSubscriptions.size >= MAX_ORDER_BOOK_SUBSCRIPTIONS) {
+      error('SUBSCRIPTION_LIMIT');
+      return;
+    }
+    const subscription: OrderBookSubscription = {
+      target: null,
+      sequence: null,
+    };
+    state.orderBookSubscriptions.set(assetId, subscription);
+    const stillSubscribed = () =>
+      this.clients.get(client) === state &&
+      state.orderBookSubscriptions.get(assetId) === subscription;
+    try {
+      const targets = await this.orderBooks?.loadTargets();
+      if (!stillSubscribed()) return;
+      const target =
+        targets &&
+        [...targets.values()].find((entry) => entry.assetId === assetId);
+      if (!target || !this.orderBookPubSub) {
+        state.orderBookSubscriptions.delete(assetId);
+        error('UNSUPPORTED_ASSET');
+        return;
+      }
+      subscription.target = target;
+      this.sendJson(client, {
+        type: 'subscribed',
+        channel: 'asset_order_book',
+        assetId,
+      });
+    } catch {
+      if (!stillSubscribed()) return;
+      state.orderBookSubscriptions.delete(assetId);
+      error('ORDER_BOOK_UNAVAILABLE');
+    }
+  }
+
+  private pushOrderBook(event: OrderBookEvent): void {
+    for (const [client, state] of this.clients) {
+      if (client.readyState !== WebSocket.OPEN) {
+        this.clients.delete(client);
+        continue;
+      }
+      const subscription = state.orderBookSubscriptions.get(event.book.assetId);
+      if (!subscription?.target) continue;
+      // An incorrectly mapped internal event must not cross asset boundaries.
+      if (
+        event.book.priceUnit !== 'USDT' ||
+        event.book.quantityUnit !== subscription.target.baseAsset ||
+        event.book.marketLabel !== `${subscription.target.baseAsset} / USDT`
+      )
+        continue;
+      if (
+        subscription.sequence !== null &&
+        BigInt(event.sequence) <= BigInt(subscription.sequence)
+      )
+        continue;
+      subscription.sequence = event.sequence;
+      state.pendingOrderBooks.set(event.book.assetId, event);
+      this.flushClientOrderBooks(client, state);
+    }
+  }
+
+  private flushClientOrderBooks(client: WebSocket, state: ClientState): void {
+    for (const [assetId, event] of state.pendingOrderBooks) {
+      if (!state.orderBookSubscriptions.get(assetId)?.target) {
+        state.pendingOrderBooks.delete(assetId);
+        continue;
+      }
+      if (
+        client.bufferedAmount >
+        (this.liveCandleConfig?.websocketBackpressureBytes ??
+          DEFAULT_CANDLE_BACKPRESSURE_BYTES)
+      )
+        return;
+      if (!this.sendJson(client, { type: 'asset_order_book', ...event.book }))
+        return;
+      state.pendingOrderBooks.delete(assetId);
+    }
+  }
+
+  private flushPendingOrderBooks(): void {
+    for (const [client, state] of this.clients) {
+      if (client.readyState !== WebSocket.OPEN) {
+        this.clients.delete(client);
+        continue;
+      }
+      this.flushClientOrderBooks(client, state);
+    }
   }
 
   private pushFxRateUpdate(): void {

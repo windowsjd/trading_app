@@ -37,13 +37,13 @@ Current implementation status:
 
 ## Realtime prices
 
-Shared domestic stock / crypto order book UI and its opt-in fixtures are described
-in [domestic-order-book.md](docs/domestic-order-book.md). No order book provider
-API is connected; release builds exclude the fixtures.
+Shared order book UI, Binance realtime depth, and domestic development preview are described
+in [domestic-order-book.md](docs/domestic-order-book.md). Release builds exclude
+the fixtures; crypto detail uses real Binance snapshots without fixture fallback.
 
 - One shared authenticated WebSocket per app session
   (`services/ws/realtimeSocketManager.ts`). Screens register reference-counted
-  `asset_ticker` / `asset_candle` subscriptions; nobody opens a second socket.
+  `asset_ticker` / `asset_candle` / `asset_order_book` subscriptions; nobody opens a second socket.
 - `features/asset/assetTickerPolicy.ts` is the single accept/stale policy for
   both the market list and the detail screen: duplicate snapshot ids are
   ignored, older event times never overwrite newer ones, and staleness is

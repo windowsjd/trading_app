@@ -52,6 +52,8 @@ describe('asset candle synthetic fanout harness', () => {
           ['asset-1\u00005m', { lastSequence: 0, lastRevision: -1 }],
         ]),
         pendingCandles: new Map(),
+        orderBookSubscriptions: new Map(),
+        pendingOrderBooks: new Map(),
       });
     }
 

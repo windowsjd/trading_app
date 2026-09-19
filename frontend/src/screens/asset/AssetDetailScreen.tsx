@@ -1,6 +1,8 @@
 import { applyTickerMarketState, canOverlayAssetTicker } from "../../features/asset/assetTickerPolicy";
 import { getAssetTradingWarning } from "../../features/asset/tradingUx";
 import React, { useEffect, useMemo, useState } from "react";
+import { useAssetOrderBook } from '../../features/asset/useAssetOrderBook';
+import { supportsLiveOrderBook } from '../../features/asset/assetOrderBookPolicy';
 import {
   View,
   Text,
@@ -10,6 +12,7 @@ import {
 } from "react-native";
 import ActionPressable from '../../components/common/ActionPressable';
 import { useQuery } from "@tanstack/react-query";
+import { useIsFocused } from '@react-navigation/native';
 
 import type { AssetDetailScreenProps } from "../../app/navigation/types";
 import { useRootNavigation } from "../../app/navigation/navigationHooks";
@@ -68,6 +71,7 @@ function isPriceAvailable(price?: AssetDetailPriceDto | null) {
 
 export default function AssetDetailScreen({ route, navigation }: Props) {
   const rootNavigation = useRootNavigation();
+  const isFocused = useIsFocused();
   const { assetId } = route.params;
   const [selectedTimeframe, setSelectedTimeframe] =
     useState<AssetChartTimeframe>(DEFAULT_ASSET_CHART_TIMEFRAME);
@@ -146,6 +150,11 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
     if (candleResyncVersion > 0) void refetchCandles();
   }, [candleResyncVersion, refetchCandles]);
 
+  const liveOrderBookEnabled = supportsLiveOrderBook(detailQuery.data?.asset);
+  const { latestOrderBook, statusMessage: orderBookStatus } = useAssetOrderBook({
+    assetId, wsUrl: assetTickerWsUrl ?? '', enabled: liveOrderBookEnabled && isFocused,
+  });
+
   if (detailQuery.isLoading) {
     return <FullPageLoading message="종목 정보를 불러오는 중입니다." />;
   }
@@ -162,9 +171,10 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
   }
 
   const asset = applyTickerMarketState(detailQuery.data.asset, latestTicker);
-  // Future market-data adapter supplies AssetOrderBook here, independently of
-  // price/candle/position queries. Until then only explicit dev previews exist.
-  const orderBook = getOrderBookPreview(asset);
+  // Crypto always uses the live path, including failures and initial loading.
+  // The development flag continues to control only the domestic screen preview.
+  const previewOrderBook = asset.assetType === 'domestic_stock' ? getOrderBookPreview(asset) : null;
+  const orderBook = liveOrderBookEnabled ? latestOrderBook : previewOrderBook;
   const displayTicker = canOverlayAssetTicker(asset, latestTicker) ? latestTicker : null;
   const price = asset.price;
   // The quantity shown, and the quantity 매도 is gated on, both come from the
@@ -512,7 +522,13 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
           ) : null}
         </View>
 
-        {orderBook ? <AssetOrderBookCard book={orderBook} isPreview /> : null}
+        {orderBook ? <AssetOrderBookCard book={orderBook} isPreview={!!previewOrderBook} statusMessage={liveOrderBookEnabled ? orderBookStatus : null} /> :
+          liveOrderBookEnabled ? (
+            <View testID="asset-order-book-loading" style={styles.card}>
+              <Text style={styles.helper}>호가 · 매도 / 매수</Text>
+              <Text testID="asset-order-book-status" accessibilityLiveRegion="polite" style={styles.label}>{orderBookStatus}</Text>
+            </View>
+          ) : null}
 
         <View style={styles.row}>
           <CTAButton

@@ -22,8 +22,93 @@ import { readLiveCandleConfig } from '../assets/live-candle.config';
 import { LiveCandleHealthService } from '../assets/live-candle-health.service';
 import { BINANCE_FIXED_SYMBOLS } from '../providers/binance/binance-fixed-asset-universe';
 import { LiveCandleStreamSupervisorService } from './live-candle-stream-supervisor.service';
+import { BinanceOrderBookService } from '../providers/binance/binance-order-book.service';
 
 describe('LiveCandleStreamSupervisorService', () => {
+  it('supplies depth for the fixed universe beside combined ticker/kline on one owned connection', async () => {
+    const socket = new FakeSocket();
+    const fixture = setup(
+      () => socket,
+      BINANCE_FIXED_SYMBOLS.map((symbol) =>
+        cryptoAsset(`asset-${symbol}`, symbol),
+      ),
+    );
+    const context = ownerContext();
+    const connected = connectBinance(fixture.service, context);
+    socket.open();
+    await new Promise((resolve) => setImmediate(resolve));
+    const streams = (JSON.parse(socket.sent[0]) as { params: string[] }).params;
+    expect(streams).toHaveLength(30);
+    for (const symbol of BINANCE_FIXED_SYMBOLS) {
+      expect(streams).toContain(`${symbol.toLowerCase()}@depth10`);
+      socket.emit(
+        'message',
+        JSON.stringify({
+          stream: `${symbol.toLowerCase()}@depth10`,
+          data: {
+            lastUpdateId: 1,
+            asks: [['0.00001', '0.00000001']],
+            bids: [],
+          },
+        }),
+      );
+    }
+    socket.emit(
+      'message',
+      JSON.stringify({
+        stream: 'btcusdt@ticker',
+        data: JSON.parse(binanceTickerFrame()) as unknown,
+      }),
+    );
+    socket.emit(
+      'message',
+      JSON.stringify({
+        stream: 'btcusdt@kline_5m',
+        data: JSON.parse(binanceFrame()) as unknown,
+      }),
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(fixture.orderBookPubSub.publish).toHaveBeenCalledTimes(10);
+    expect(fixture.binanceTickerIngestion.ingestTicker).toHaveBeenCalledTimes(
+      1,
+    );
+    expect(fixture.pipeline.process).toHaveBeenCalledTimes(1);
+    expect(fixture.factory).toHaveBeenCalledTimes(1);
+    context.lost = true;
+    socket.emit(
+      'message',
+      JSON.stringify({
+        stream: 'btcusdt@depth10',
+        data: { lastUpdateId: 2, asks: [], bids: [] },
+      }),
+    );
+    expect(fixture.orderBookPubSub.publish).toHaveBeenCalledTimes(10);
+    socket.close(1000, 'done');
+    await connected;
+    await fixture.orderBooks.onModuleDestroy();
+  });
+
+  it('respects the existing symbol shard cap while adding depth', async () => {
+    const socket = new FakeSocket();
+    const fixture = setup(
+      () => socket,
+      [cryptoAsset('btc', 'BTCUSDT'), cryptoAsset('eth', 'ETHUSDT')],
+      1,
+    );
+    const connected = connectBinance(fixture.service, ownerContext());
+    socket.open();
+    await new Promise((resolve) => setImmediate(resolve));
+    expect((JSON.parse(socket.sent[0]) as { params: string[] }).params).toEqual(
+      ['btcusdt@kline_5m', 'btcusdt@ticker', 'btcusdt@depth10'],
+    );
+    expect(fixture.health.snapshot().providers.binance).toMatchObject({
+      subscriptionsActive: 1,
+      subscriptionsFailed: 1,
+    });
+    socket.close(1000, 'done');
+    await connected;
+  });
+
   it('opens one Binance owner connection, subscribes native 5m klines, handles ping, and restores pipeline continuity', async () => {
     const socket = new FakeSocket();
     const fixture = setup(() => socket);
@@ -38,10 +123,10 @@ describe('LiveCandleStreamSupervisorService', () => {
     await connected;
     await Promise.resolve();
 
-    expect(fixture.factory).toHaveBeenCalledWith('wss://stream.example/ws');
+    expect(fixture.factory).toHaveBeenCalledWith('wss://stream.example/stream');
     expect(JSON.parse(socket.sent[0])).toEqual({
       method: 'SUBSCRIBE',
-      params: ['btcusdt@kline_5m', 'btcusdt@ticker'],
+      params: ['btcusdt@kline_5m', 'btcusdt@ticker', 'btcusdt@depth10'],
       id: 1,
     });
     expect(socket.pong).toHaveBeenCalledWith(Buffer.from('heartbeat'));
@@ -515,6 +600,11 @@ function setup(
     }),
   };
   const factory = jest.fn(socketFactory);
+  const orderBookPubSub = { publish: jest.fn().mockResolvedValue(true) };
+  const orderBooks = new BinanceOrderBookService(
+    prisma as never,
+    orderBookPubSub as never,
+  );
   const service = new LiveCandleStreamSupervisorService(
     prisma as never,
     locks as never,
@@ -534,6 +624,7 @@ function setup(
       ...configOverrides,
     },
     factory,
+    orderBooks,
   );
   return {
     service,
@@ -543,6 +634,8 @@ function setup(
     health,
     binanceTickerIngestion,
     factory,
+    orderBooks,
+    orderBookPubSub,
   };
 }
 

@@ -27,6 +27,7 @@ import { BinanceRealtimePriceCacheService } from './binance-realtime-price-cache
 import { BinanceRealtimePriceEventBus } from './binance-realtime-price-event-bus.service';
 import type { BinanceWebSocketIngestionService } from './binance-websocket.ingestion.service';
 import { BinanceWebSocketStreamingService } from './binance-websocket-streaming.service';
+import { BinanceOrderBookService } from './binance-order-book.service';
 
 describe('Binance WebSocket streaming service', () => {
   const originalWebSocket = globalThis.WebSocket;
@@ -110,7 +111,7 @@ describe('Binance WebSocket streaming service', () => {
     await flushAsync();
 
     const socket = FakeWebSocket.instances[0];
-    expect(socket.url).toBe('ws://example.test/ws');
+    expect(socket.url).toBe('ws://example.test/stream');
     expect(socket.sent).toHaveLength(1);
     expect(JSON.parse(socket.sent[0])).toEqual({
       method: 'SUBSCRIBE',
@@ -202,6 +203,100 @@ describe('Binance WebSocket streaming service', () => {
       created: 1,
       latestPriceCount: 1,
     });
+  });
+
+  it('subscribes active depth on the same socket and keeps combined ticker ingestion separate', async () => {
+    const pubsub = { publish: jest.fn().mockResolvedValue(true) };
+    const orderBooks = new BinanceOrderBookService(
+      {
+        asset: {
+          findMany: jest
+            .fn()
+            .mockResolvedValue([{ id: 'btc', symbol: 'BTCUSDT' }]),
+        },
+      } as never,
+      pubsub as never,
+    );
+    const ingestionService = createIngestionService();
+    service = createService({ orderBooks, ingestionService });
+    service.start();
+    await flushAsync();
+    const socket = FakeWebSocket.instances[0];
+    expect(JSON.parse(socket.sent[0]).params).toEqual([
+      'btcusdt@ticker',
+      'ethusdt@ticker',
+      'btcusdt@depth10',
+    ]);
+    socket.emitMessage(
+      JSON.stringify({
+        stream: 'btcusdt@depth10',
+        data: {
+          lastUpdateId: 1,
+          asks: [['100.10', '0.00125000']],
+          bids: [['100.09', '2.5']],
+        },
+      }),
+    );
+    await flushAsync();
+    expect(pubsub.publish).toHaveBeenCalledTimes(1);
+    expect(pubsub.publish.mock.calls[0][0].book).toMatchObject({
+      assetId: 'btc',
+      effectiveAt: null,
+      quantityUnit: 'BTC',
+    });
+    expect(ingestionService.ingestParsedMessage).not.toHaveBeenCalled();
+    socket.emitMessage(
+      tickerFrame({
+        symbol: 'BTCUSDT',
+        price: '100',
+        eventTime: '2026-09-19T00:00:00.000Z',
+      }),
+    );
+    await flushAsync();
+    expect(ingestionService.ingestParsedMessage).toHaveBeenCalledTimes(1);
+    expect(ingestionService.ingestParsedMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({ state: 'ticker' }),
+      expect.anything(),
+    );
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    expect(service.getStatus().subscribedSymbolCount).toBe(2);
+    await orderBooks.onModuleDestroy();
+  });
+
+  it('does not even load depth targets when the live-candle owner is enabled', async () => {
+    process.env.CANDLE_LIVE_STREAMING_ENABLED = 'true';
+    process.env.CANDLE_LIVE_BINANCE_ENABLED = 'true';
+    const orderBooks = { loadTargets: jest.fn(), handleFrame: jest.fn() };
+    service = createService({ orderBooks: orderBooks as never });
+    service.start();
+    await flushAsync();
+    expect(orderBooks.loadTargets).not.toHaveBeenCalled();
+    expect(FakeWebSocket.instances).toHaveLength(0);
+  });
+
+  it('retries target lookup failures through the existing reconnect path', async () => {
+    const orderBooks = {
+      loadTargets: jest
+        .fn()
+        .mockRejectedValueOnce(new Error('metadata unavailable'))
+        .mockResolvedValue(new Map()),
+      handleFrame: jest.fn().mockReturnValue(false),
+    };
+    service = createService({
+      orderBooks: orderBooks as never,
+      configService: configServiceForTest({
+        reconnectMinMs: 250,
+        reconnectMaxMs: 250,
+      }),
+    });
+    service.start();
+    await flushAsync();
+    expect(FakeWebSocket.instances).toHaveLength(0);
+    expect(service.getStatus().reconnecting).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await flushAsync();
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    expect(orderBooks.loadTargets).toHaveBeenCalledTimes(2);
   });
 
   it('keeps latest cache fresh when DB snapshots are throttled', async () => {
@@ -366,6 +461,7 @@ function createService(
     ingestionService?: Partial<BinanceWebSocketIngestionService>;
     latestPriceCache?: BinanceRealtimePriceCacheService;
     eventBus?: BinanceRealtimePriceEventBus;
+    orderBooks?: BinanceOrderBookService;
   } = {},
 ): BinanceWebSocketStreamingService {
   return new BinanceWebSocketStreamingService(
@@ -373,6 +469,11 @@ function createService(
     input.ingestionService ?? createIngestionService(),
     input.latestPriceCache ?? new BinanceRealtimePriceCacheService(),
     input.eventBus ?? new BinanceRealtimePriceEventBus(),
+    input.orderBooks ??
+      new BinanceOrderBookService(
+        { asset: { findMany: jest.fn().mockResolvedValue([]) } } as never,
+        { publish: jest.fn().mockResolvedValue(true) } as never,
+      ),
   );
 }
 

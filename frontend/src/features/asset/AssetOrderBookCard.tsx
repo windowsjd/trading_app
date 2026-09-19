@@ -6,10 +6,11 @@ import { formatOrderBookDecimal, normalizeOrderBook, type AssetOrderBook } from 
 interface Props {
   book: AssetOrderBook;
   isPreview?: boolean;
+  statusMessage?: string | null;
 }
 
 /** Read-only display. No quote selection or coupling to order/valuation state. */
-export default function AssetOrderBookCard({ book, isPreview = false }: Props) {
+export default function AssetOrderBookCard({ book, isPreview = false, statusMessage }: Props) {
   const snapshot = useMemo(() => normalizeOrderBook(book), [book]);
   const { fontScale } = useWindowDimensions();
   const [availableWidth, setAvailableWidth] = useState(0);
@@ -30,6 +31,7 @@ export default function AssetOrderBookCard({ book, isPreview = false }: Props) {
     <View testID="asset-order-book" style={styles.card}>
       <Text accessibilityRole="header" style={styles.title}>호가 · 매도 / 매수</Text>
       {snapshot.marketLabel ? <Text style={styles.helper}>{snapshot.marketLabel}</Text> : null}
+      {statusMessage ? <Text testID="asset-order-book-status" accessibilityLiveRegion="polite" style={styles.preview}>{statusMessage}</Text> : null}
       {isPreview ? (
         <Text testID="asset-order-book-preview-notice" style={styles.preview}>
           개발용 예시 · 실제 시세가 아닙니다.
