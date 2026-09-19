@@ -25,14 +25,8 @@ import {
 import { supportsLiveOrderBook } from '../../features/asset/assetOrderBookPolicy';
 import { useAssetOrderBook } from '../../features/asset/useAssetOrderBook';
 import AssetOrderLadder from '../../features/asset/AssetOrderLadder';
-import {
-  findAccountPosition,
-  getTradingAccountPositions,
-} from '../../features/tradingAccount/api';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
-import { getAccountDisplay } from '../../features/tradingAccount/accountDisplay';
-import { getIntegrityErrorMessage } from '../../features/tradingAccount/integrityErrors';
-import { getPositionDisplay } from '../../features/position/display';
+import AccountHoldings from './AccountHoldings';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 import { buildWsUrl } from '../../constants/env';
@@ -46,8 +40,6 @@ import ActionPressable from '../../components/common/ActionPressable';
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
-import SectionSkeleton from '../../components/states/SectionSkeleton';
-import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import OrderPanel from '../order/OrderPanel';
 
 export default function AssetDetailScreen(props: AssetDetailScreenProps) {
@@ -66,20 +58,9 @@ export function AssetTradingScreen({
   const [showKrw, setShowKrw] = useState(false);
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
   const { selectedAccountId, selectedAccount } = useTradingAccount();
-  const accountId = selectedAccountId ?? '';
-  const hasAccount = !!selectedAccountId;
   const detailQuery = useQuery({
     queryKey: QUERY_KEYS.asset.detail(assetId),
     queryFn: () => getAssetDetail(assetId),
-  });
-  const positionQuery = useQuery({
-    queryKey: QUERY_KEYS.tradingAccount.positions(accountId, {
-      assetId,
-      limit: 20,
-    }),
-    queryFn: () =>
-      getTradingAccountPositions(accountId, { assetId, limit: 20, offset: 0 }),
-    enabled: hasAccount,
   });
   const { latestTicker, showReconnectBanner, isStale } = useAssetTicker({
     assetId,
@@ -130,15 +111,6 @@ export function AssetTradingScreen({
       : getUnavailablePriceText(asset);
   const changeRate = formatPercent(displayPrice.changeRate);
   const pair = getTradingPair(asset);
-  const position = findAccountPosition(positionQuery.data, assetId);
-  const hasPosition = Number(position?.quantity ?? '0') > 0;
-  const positionDisplay = position ? getPositionDisplay(position) : null;
-  const accountDisplay = selectedAccount
-    ? getAccountDisplay(selectedAccount)
-    : null;
-  const positionIntegrityMessage = positionQuery.isError
-    ? getIntegrityErrorMessage(positionQuery.error)
-    : null;
   const currentPrice = (
     <View style={styles.currentPrice} testID="asset-current-price">
       <Text style={styles.priceLabel}>
@@ -162,17 +134,25 @@ export function AssetTradingScreen({
           contentContainerStyle={styles.content}
         >
           <View style={styles.header}>
-            <ActionPressable
-              testID="asset-change-pair"
-              style={styles.pairButton}
-              accessibilityRole="button"
-              accessibilityLabel={`종목 변경, ${pair}`}
-              onPress={() =>
-                navigation.navigate('MarketSearch', { returnToAsset: true })
-              }
-            >
-              <Text style={styles.pair}>{pair} ▾</Text>
-            </ActionPressable>
+            <View style={styles.pairGroup} testID="asset-pair-header">
+              <ActionPressable
+                testID="asset-change-pair"
+                style={styles.pairButton}
+                accessibilityRole="button"
+                accessibilityLabel={`종목 변경, ${pair}`}
+                onPress={() =>
+                  navigation.navigate('MarketSearch', { returnToAsset: true })
+                }
+              >
+                <Text style={styles.pair}>{pair} ▾</Text>
+              </ActionPressable>
+              {asset.assetType === 'domestic_stock' ||
+              asset.assetType === 'us_stock' ? (
+                <Text testID="asset-market-status" style={styles.marketBadge}>
+                  {getStockMarketStatus(asset.marketStatus)}
+                </Text>
+              ) : null}
+            </View>
             <View style={styles.tools}>
               {asset.priceCurrency !== 'KRW' ? (
                 <ActionPressable
@@ -233,11 +213,6 @@ export function AssetTradingScreen({
                 ? '등락률 -'
                 : `${Number(displayPrice.changeRate) > 0 ? '+' : ''}${changeRate}%`}
             </Text>
-            {asset.assetType === 'domestic_stock' ? (
-              <Text testID="asset-market-status" style={styles.marketBadge}>
-                {getStockMarketStatus(asset.marketStatus)}
-              </Text>
-            ) : null}
           </View>
           {showReconnectBanner ? (
             <Text
@@ -285,87 +260,12 @@ export function AssetTradingScreen({
               )}
             </View>
           </View>
-          <View style={styles.card}>
-            {/* WHICH account these holdings belong to is stated on the card
-              itself: a quantity with no account next to it is not an answer to
-              "do I own this" when the user holds several accounts. */}
-            <Text style={styles.label}>
-              내 포지션
-              {accountDisplay ? ` · ${accountDisplay.title}` : ''}
-            </Text>
-            {accountDisplay ? (
-              <Text style={styles.accountBadge}>
-                {accountDisplay.statusLabel}
-              </Text>
-            ) : null}
-            {!hasAccount ? (
-              <InlineEmptyState
-                title="계정이 없습니다."
-                message="계정을 개설하면 보유 현황을 볼 수 있습니다."
-              />
-            ) : positionQuery.isLoading ? (
-              <SectionSkeleton lines={4} />
-            ) : positionIntegrityMessage ? (
-              <>
-                <InlineEmptyState
-                  title="보유 내역을 안전하게 표시할 수 없습니다."
-                  message={positionIntegrityMessage}
-                />
-                <ActionPressable
-                  style={styles.retryButton}
-                  onPress={() => void positionQuery.refetch()}
-                >
-                  <Text style={styles.retryText}>포지션 다시 시도</Text>
-                </ActionPressable>
-                <AdminDiagnosticPanel error={positionQuery.error} />
-              </>
-            ) : positionQuery.isError ? (
-              <>
-                <InlineEmptyState
-                  title="포지션을 불러오지 못했습니다."
-                  message="자산 정보는 계속 볼 수 있습니다."
-                />
-                <ActionPressable
-                  style={styles.retryButton}
-                  onPress={() => void positionQuery.refetch()}
-                >
-                  <Text style={styles.retryText}>포지션 다시 시도</Text>
-                </ActionPressable>
-                <AdminDiagnosticPanel error={positionQuery.error} />
-              </>
-            ) : hasPosition && position ? (
-              <>
-                <Text style={styles.helper}>
-                  수량 {positionDisplay?.quantity ?? '-'}
-                </Text>
-                <Text style={styles.helper}>
-                  평균단가 {positionDisplay?.averageCost ?? '-'}
-                </Text>
-                <Text style={styles.helper}>
-                  현재가 {positionDisplay?.currentPrice ?? '시세 조회 불가'}
-                </Text>
-                <Text style={styles.helper}>
-                  평가금액 {positionDisplay?.positionValueKrw ?? '-'}
-                </Text>
-                <Text style={styles.helper}>
-                  평가손익 {positionDisplay?.unrealizedPnlKrw ?? '-'}
-                </Text>
-                <Text style={styles.helper}>
-                  수익률 {positionDisplay?.returnRate ?? '-'}
-                </Text>
-                {positionDisplay?.priceNotice ? (
-                  <Text style={styles.inlineWarningText}>
-                    {positionDisplay.priceNotice}
-                  </Text>
-                ) : null}
-              </>
-            ) : (
-              <InlineEmptyState
-                title="보유 없음"
-                message="아직 이 자산을 보유하고 있지 않습니다."
-              />
-            )}
-          </View>
+          <AccountHoldings
+            key={selectedAccountId ?? 'no-account'}
+            accountId={selectedAccountId}
+            account={selectedAccount}
+            assetId={assetId}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -375,7 +275,20 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   content: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 32, gap: 12 },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  pairButton: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center' },
+  pairGroup: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    columnGap: 8,
+  },
+  pairButton: {
+    flexShrink: 1,
+    minWidth: 0,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
   pair: { fontSize: 20, fontWeight: '700', color: '#202a35' },
   tools: { flexDirection: 'row', gap: 4, flexShrink: 0 },
   iconButton: {
@@ -427,33 +340,5 @@ const styles = StyleSheet.create({
     color: '#202a35',
   },
   stockPrice: { flex: 1, justifyContent: 'center', minHeight: 280 },
-  card: {
-    borderTopWidth: 1,
-    borderColor: '#edf0f3',
-    paddingTop: 16,
-    gap: 8,
-    marginTop: 8,
-  },
-  label: { fontSize: 13, color: '#697583' },
-  helper: { fontSize: 14, color: '#536170' },
-  accountBadge: {
-    flexShrink: 0,
-    alignSelf: 'flex-start',
-    fontSize: 12,
-    color: '#536170',
-    backgroundColor: '#f2f5f7',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  retryButton: {
-    alignSelf: 'flex-start',
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#dfe4e9',
-    borderRadius: 8,
-  },
-  retryText: { color: '#202a35' },
-  inlineWarningText: { fontSize: 13, color: '#725400' },
   bannerText: { fontSize: 12, color: '#725400' },
 });

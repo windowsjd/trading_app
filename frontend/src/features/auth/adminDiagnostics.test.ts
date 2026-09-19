@@ -74,7 +74,7 @@ describe('admin inline diagnostics visibility', () => {
       'screens/home/PortfolioScreen.tsx',
       'screens/order/OrderPanel.tsx',
       'screens/wallet/WalletFxScreen.tsx',
-      'screens/asset/AssetDetailScreen.tsx',
+      'screens/asset/AccountHoldings.tsx',
     ]) {
       assert.match(read(sourcePath), /AdminDiagnosticPanel/u, sourcePath);
     }

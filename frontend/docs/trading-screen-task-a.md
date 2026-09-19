@@ -1,5 +1,7 @@
 **작업 A — 마켓 종목 상세/거래 화면 개편 결과**
 
+> 후속 작업 B에서 하단 단일 포지션을 계좌별 보유종목/필터로 교체하고 주식 상태 badge를 pair 옆으로 이동했다. 현재 구현과 검증은 [작업 B 보고](trading-screen-task-b.md)를 참고한다. 아래는 작업 A 당시 기록이다.
+
 2026-09-19. 구현과 검증은 frontend 범위에서 수행했다. Web 화면 검증은 실제 React Native Web 컴포넌트와 React Navigation을 Chromium에서 실행하되, API·시세 입력을 테스트 데이터로 대체했다. 운영 서버 주문이나 실제 Binance/KIS 연결 성공을 의미하지 않는다.
 
 1. **기존 구조 조사**: AssetDetailScreen이 상세 REST, ticker, 계좌별 position, candle REST/live, timeframe, chart, orderbook과 주문 진입 버튼을 함께 소유했다. OrderScreen에는 수량·지정가 검증, 잔액/보유량, 매수 quote→create, 매도 견적 확인→create, 만료/재견적, 멱등키, 계좌 바인딩과 성공 sheet가 있었다. 기존 displayPricePolicy, ticker/depth/candle hook, 정규화, mapper, account binding, quotedAction, successState, invalidation, 검색/navigation 및 테스트를 확인했다.

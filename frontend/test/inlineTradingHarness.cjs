@@ -86,12 +86,30 @@ function inlineTradingHarness() {
   const api = load(resolve('src/features/tradingAccount/api.ts'), {
     '../../services/api/client': {
       apiClient: {
+        get: async (url, config) => {
+          const id = url.split('/')[2];
+          const { limit, offset } = config.params;
+          h.holdingsReads ??= [];
+          h.holdingsReads.push({ id, offset, limit });
+          const result = h.holdings?.[id] ?? [{
+            ...h.assets[h.assetId], assetId: h.assetId, positionId: id + h.assetId,
+            quantity: h.positions[id] ?? '0', averageCost: '700', currencyCode: 'USD',
+            valuation: { state: 'unavailable' },
+          }];
+          if (h.holdingsGate?.[id]) await h.holdingsGate[id].promise;
+          if (h.holdingsError) throw h.holdingsError;
+          return { data: { success: true, data: {
+            tradingAccountId: id, state: 'available', positions: result.slice(offset, offset + limit),
+            pagination: { offset, limit, total: result.length, returned: result.slice(offset, offset + limit).length, nextOffset: offset + limit < result.length ? offset + limit : null },
+          } } };
+        },
         post: async (url, body) => {
           h.requests.push({ url, body });
           const isQuote = url.endsWith('/quote');
           if (isQuote && h.quoteGate) await h.quoteGate.promise;
           if (!isQuote && h.createGate) await h.createGate.promise;
           if (!isQuote && h.failure) throw h.failure;
+          if (!isQuote) h.onCreate?.(url, body);
           const asset = h.assets[body.assetId];
           const data = isQuote
             ? {
@@ -131,10 +149,12 @@ function inlineTradingHarness() {
     },
   });
   h.client = new query.QueryClient({
-    defaultOptions: { mutations: { retry: false, gcTime: Infinity } },
+    defaultOptions: { mutations: { retry: false, gcTime: Infinity }, queries: { retry: false, gcTime: Infinity } },
   });
+  const invalidate = h.client.invalidateQueries.bind(h.client);
   h.client.invalidateQueries = async (options) => {
     h.invalidations.push(options.queryKey);
+    return invalidate(options);
   };
   const native = {
     ...Object.fromEntries(
@@ -173,6 +193,7 @@ function inlineTradingHarness() {
       useQuery: (options) => {
         h.queries.push(options);
         const [scope, resource, id] = options.queryKey;
+        if (options.queryKey[3] === 'holdings') return query.useQuery(options);
         const base = {
           isLoading: false,
           isPending: false,
@@ -310,6 +331,7 @@ function inlineTradingHarness() {
     resolve('src/screens/order/OrderPanel.tsx'),
     mocks,
   );
+  mocks['./AccountHoldings'] = load(resolve('src/screens/asset/AccountHoldings.tsx'), mocks);
   mocks['../../features/asset/AssetOrderLadder'] = load(
     resolve('src/features/asset/AssetOrderLadder.tsx'),
     mocks,

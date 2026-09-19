@@ -174,10 +174,11 @@ describe('the styles long text depends on are present', () => {
     );
   });
 
-  it('AssetDetailScreen: the account badge cannot be shrunk away', () => {
-    const source = read('screens/asset/AssetDetailScreen.tsx');
+  it('AccountHoldings: account text and complete amounts wrap without truncation', () => {
+    const source = read('screens/asset/AccountHoldings.tsx');
 
-    assert.match(source, /accountBadge:\s*\{[^}]*flexShrink:\s*0/s);
+    assert.match(source, /display.title.*display.statusLabel/s);
+    assert.match(source, /metric:\s*\{[^}]*flexWrap:\s*'wrap'/s);
     assert.ok(!/numberOfLines=\{/.test(source));
   });
 

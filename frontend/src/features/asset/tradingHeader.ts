@@ -2,7 +2,9 @@ import type { AssetDetailAssetDto } from './api';
 import { getAssetNameDisplay } from '../../utils/format.ts';
 
 /** Binance's quote symbol stays in market data; the account settles in USD. */
-export function getTradingAssetName(asset: AssetDetailAssetDto) {
+export function getTradingAssetName(
+  asset: Pick<AssetDetailAssetDto, 'assetType' | 'market' | 'symbol' | 'name'>,
+) {
   return asset.assetType === 'crypto' && asset.market === 'BINANCE'
     ? asset.symbol.replace(/USDT$/u, '')
     : getAssetNameDisplay(asset).primary;

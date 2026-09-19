@@ -120,6 +120,7 @@ function createTradingUiHarness(screenName) {
   };
   const order = load(resolve(__dirname, '../src/screens/order/OrderPanel.tsx'), mocks);
   mocks['../order/OrderPanel'] = order;
+  mocks['./AccountHoldings'] = load(resolve(__dirname, '../src/screens/asset/AccountHoldings.tsx'), mocks);
   const module = screenName === 'order/OrderScreen.tsx' ? order : load(resolve(__dirname, '../src/screens', screenName), mocks);
   const screen = module.AssetTradingScreen ?? module.AssetChartContent ?? module.OrderForm ?? module.default;
   function expand(node) {

@@ -1,6 +1,7 @@
 import { getApiErrorInfo } from '../../services/api/errorMapper.ts';
 import { isTradingAccountScopeMismatchError } from './accountScope.ts';
 import { DailyEquityContractError } from './dailyEquity.ts';
+import { HoldingsContractError } from './holdings.ts';
 
 /**
  * Structural integrity errors are NOT empty data (작업 9 §B-9).
@@ -101,6 +102,7 @@ export function classifyAccountError(error: unknown): AccountErrorKind {
   // fail-closed treatment — not a generic "잠시 후 다시 시도" (작업 10 §A-10).
   if (isTradingAccountScopeMismatchError(error)) return 'integrity';
   if (error instanceof DailyEquityContractError) return 'integrity';
+  if (error instanceof HoldingsContractError) return 'integrity';
 
   const info = getApiErrorInfo(error);
 

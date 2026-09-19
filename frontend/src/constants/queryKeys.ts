@@ -315,6 +315,8 @@ export const QUERY_KEYS = {
 
     positionsAll: (accountId: string) =>
       ['tradingAccount', 'positions', accountId] as const,
+    holdings: (accountId: string) =>
+      [...QUERY_KEYS.tradingAccount.positionsAll(accountId), 'holdings'] as const,
     positions: (accountId: string, filters?: Record<string, unknown>) =>
       [
         'tradingAccount',

@@ -1,7 +1,8 @@
 # 한국주식·암호화폐 공통 호가창
 
-`AssetOrderBook`과 `AssetOrderBookCard`는 Provider와 주문 처리에 독립된 표시 계층이다.
-한국주식은 개발 Preview를 유지하며, Binance 암호화폐 상세 화면은 실제 10호가를 구독한다.
+`AssetOrderBook`은 Provider와 주문 처리에 독립된 표시 계약이다.
+현재 AssetDetail 거래 화면은 좌측 `OrderPanel`, 우측 `AssetOrderLadder`의 Binance 10+10호가 또는 주식 현재가, 하단 `AccountHoldings`를 표시한다. 차트는 별도 `AssetChartScreen`에 있다.
+`AssetOrderBookCard`는 공통 카드의 개발 harness/렌더 테스트용으로 남아 있다.
 Backend 계약과 검증 기록은 [order-book-api-contract.md](../../backend/docs/order-book-api-contract.md)를 참고한다.
 
 ## 현재 데이터 흐름
@@ -9,7 +10,7 @@ Backend 계약과 검증 기록은 [order-book-api-contract.md](../../backend/do
 ```text
 기존 Binance owner → 공통 depth parser/processor → Redis Pub/Sub
 → /api/v1/ws asset_order_book → RealtimeSocketManager
-→ useAssetOrderBook → AssetOrderBookCard
+→ useAssetOrderBook → AssetOrderLadder (AssetDetail 우측)
 ```
 
 - 기존 React Query의 종목 상세·차트·계정별 포지션 키와 현재가 선택은 그대로다.
@@ -68,20 +69,13 @@ interface AssetOrderBook {
 
 ## Preview 정책과 사용
 
-```bash
-# 한국주식 개발 Preview
-EXPO_PUBLIC_ORDER_BOOK_PREVIEW=true npx expo start --web
-# 긴 숫자 테스트
-EXPO_PUBLIC_ORDER_BOOK_PREVIEW=true EXPO_PUBLIC_ORDER_BOOK_PREVIEW_LONG=true npx expo start --web
-```
+현재 AssetDetail은 국내주식 Preview나 inline chart를 표시하지 않는다. 국내·미국주식은
+종목 옆 한글 시장상태 badge와 우측 현재가를 표시하고, 차트 아이콘으로 전체화면 차트에 진입한다.
 
-한국주식 상세의 차트 아래에 예시 카드가 나타나며 `개발용 예시 · 실제 시세가 아닙니다.`를
-표시한다. 환경변수 변경 시 개발 서버를 재시작한다.
-
-**암호화폐 상세는 이 플래그와 관계없이 실시간 경로를 사용한다.** 로딩·Provider 장애·
-구독 오류 시 fixture로 fallback하지 않는다. crypto fixture와 `getOrderBookPreview`는
-공통 카드의 개발 harness/렌더 테스트에서 계속 사용할 수 있다. 별도 플래그는 추가하지 않았다.
-`__DEV__`의 양의 분기 안에 둔 require를 유지해 production bundle에서 fixture를 제거한다.
+`AssetOrderBookCard`, `getOrderBookPreview`와 crypto fixture는 공통 카드의 개발
+harness/렌더 테스트에서 사용할 수 있다. `EXPO_PUBLIC_ORDER_BOOK_PREVIEW` 및
+`EXPO_PUBLIC_ORDER_BOOK_PREVIEW_LONG` 플래그를 켜도 현재 거래 화면에 가상 호가를 추가하지 않는다.
+암호화폐 상세의 로딩·Provider 장애·구독 오류에는 fixture로 fallback하지 않는다.
 
 ## 검증
 
