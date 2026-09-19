@@ -37,6 +37,10 @@ Current implementation status:
 
 ## Realtime prices
 
+Domestic stock order book UI and its opt-in development fixtures are described
+in [domestic-order-book.md](docs/domestic-order-book.md). No order book provider
+API is connected; release builds exclude the fixtures.
+
 - One shared authenticated WebSocket per app session
   (`services/ws/realtimeSocketManager.ts`). Screens register reference-counted
   `asset_ticker` / `asset_candle` subscriptions; nobody opens a second socket.

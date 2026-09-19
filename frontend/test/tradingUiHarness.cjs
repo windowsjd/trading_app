@@ -101,6 +101,8 @@ function createTradingUiHarness(screenName) {
     '../../features/asset/useStaleRecheck': { useStaleRecheck: () => {} },
     '../../features/wallet/useFxRateUpdates': { useFxRateUpdates: () => {} },
     '../../components/charts': { CandlestickChart: 'CandlestickChart' },
+    '../../features/asset/AssetOrderBookCard': { default: 'AssetOrderBookCard', __esModule: true },
+    '../../features/asset/orderBookPreview': load(resolve(__dirname, '../src/features/asset/orderBookPreview.ts'), {}),
     '../../components/charts/ChartTimeframeSelector': { default: 'ChartTimeframeSelector', __esModule: true },
     ...Object.fromEntries(['FullPageLoading', 'ErrorState', 'InlineEmptyState', 'SectionSkeleton',
       'BlockedState', 'AdminDiagnosticPanel'].map(name => ['../../components/states/' + name, { default: name, __esModule: true }])),

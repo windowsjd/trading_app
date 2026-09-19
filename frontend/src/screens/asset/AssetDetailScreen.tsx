@@ -57,6 +57,8 @@ import CTAButton from "../../components/common/CTAButton";
 import AdminDiagnosticPanel from "../../components/states/AdminDiagnosticPanel";
 import { CandlestickChart } from "../../components/charts";
 import ChartTimeframeSelector from "../../components/charts/ChartTimeframeSelector";
+import AssetOrderBookCard from "../../features/asset/AssetOrderBookCard";
+import { getOrderBookPreview } from "../../features/asset/orderBookPreview";
 
 type Props = AssetDetailScreenProps;
 
@@ -160,6 +162,9 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
   }
 
   const asset = applyTickerMarketState(detailQuery.data.asset, latestTicker);
+  // Future market-data adapter supplies AssetOrderBook here, independently of
+  // price/candle/position queries. Until then only explicit dev previews exist.
+  const orderBook = getOrderBookPreview(asset);
   const displayTicker = canOverlayAssetTicker(asset, latestTicker) ? latestTicker : null;
   const price = asset.price;
   // The quantity shown, and the quantity 매도 is gated on, both come from the
@@ -506,6 +511,8 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
             <Text style={styles.debug}>{chartDebugInfo}</Text>
           ) : null}
         </View>
+
+        {orderBook ? <AssetOrderBookCard book={orderBook} isPreview /> : null}
 
         <View style={styles.row}>
           <CTAButton
