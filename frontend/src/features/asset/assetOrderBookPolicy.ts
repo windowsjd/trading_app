@@ -3,6 +3,7 @@ import type { AssetDetailAssetDto } from './api';
 import { normalizeOrderBook, type AssetOrderBook, type OrderBookLevel } from './orderBook.ts';
 
 export const ORDER_BOOK_STALE_MS = 5_000;
+export const ORDER_BOOK_FIRST_SNAPSHOT_TIMEOUT_MS = 10_000;
 
 export function supportsLiveOrderBook(asset: Pick<AssetDetailAssetDto, 'assetType' | 'market' | 'symbol' | 'isActive' | 'priceCurrency'> | undefined): boolean {
   // Server checks the active fixed universe as the authoritative boundary.
@@ -54,6 +55,7 @@ export function parseAssetOrderBook(value: unknown, assetId: string): AssetOrder
 }
 
 export function isOrderBookStale(book: AssetOrderBook | null, receivedAt: number | null, now: number): boolean {
+  // Both times belong to this client. Server capturedAt is only for ordering/display.
   return !!book && receivedAt !== null &&
-    Math.max(now - receivedAt, now - Date.parse(book.capturedAt)) > ORDER_BOOK_STALE_MS;
+    now - receivedAt > ORDER_BOOK_STALE_MS;
 }

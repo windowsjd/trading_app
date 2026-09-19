@@ -64,11 +64,18 @@ for the next provider frame instead of receiving a cached or synthetic book.
 
 The existing shared socket owns transport/reconnect/restoration. A display-only
 hook validates snapshots, isolates asset changes and rechecks freshness with the
-existing foreground timer. Over five seconds since the last valid snapshot is
-stale (also considering server capturedAt so queued old data is not fresh).
-Loading, reconnect, auth/subscription errors and delay are visible without
+existing foreground timer. Over five seconds since the last valid snapshot's
+local receipt is stale. Server capturedAt is retained for ordering/display, never
+compared to the client clock for freshness. After a subscription ACK, ten seconds
+without a first valid snapshot shows unavailable; a later valid snapshot recovers
+automatically. Reconnect cancels this initial wait until the new ACK. Previously
+received books remain visible with reconnect/stale status. Auth/subscription errors
+take priority over reconnect, unavailable, stale and initial loading, in that order.
+Loading, reconnect, auth/subscription errors, unavailable and delay are visible without
 affecting orders. Crypto detail always uses this live path; fixtures remain
 available only to development UI harnesses. Domestic stock preview is unchanged.
+See [frontend state policy and mapping-cache investigation](../../frontend/docs/domestic-order-book.md)
+for timer cleanup and the decision to retain current fail-closed DB validation.
 
 Official specification: https://github.com/binance/binance-spot-api-docs/blob/master/web-socket-streams.md#partial-book-depth-streams
 

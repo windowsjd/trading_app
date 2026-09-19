@@ -37,13 +37,20 @@ describe('live order book contract', () => {
     assert.equal(parseAssetOrderBook(null, 'btc'), null);
   });
 
-  it('turns stale strictly after five seconds and never treats queued server data as fresh', () => {
+  it('turns stale strictly after five seconds in the client clock domain', () => {
     const book = { ...createCryptoOrderBookFixture('btc', 'BTC'), capturedAt: new Date(10000).toISOString() };
     assert.equal(isOrderBookStale(book, 10000, 15000), false);
     assert.equal(isOrderBookStale(book, 10000, 15001), true);
-    assert.equal(isOrderBookStale(book, 20000, 20000), true);
-    assert.equal(isOrderBookStale({ ...book, capturedAt: new Date(30000).toISOString() }, 10000, 15001), true);
     assert.equal(isOrderBookStale(null, null, 20000), false);
+    assert.equal(isOrderBookStale(book, null, 20000), false);
+  });
+
+  it('ignores server/client clock skew in either direction for freshness', () => {
+    for (const serverTime of [1000, 300000]) {
+      const book = { ...createCryptoOrderBookFixture('btc', 'BTC'), capturedAt: new Date(serverTime).toISOString() };
+      assert.equal(isOrderBookStale(book, 20000, 20000), false, 'a just-received valid snapshot is fresh');
+      assert.equal(isOrderBookStale(book, 10000, 20000), true, 'future server time cannot keep a silent stream fresh');
+    }
   });
 
   it('uses asset metadata only to enable crypto; backend remains the supported-universe authority', () => {

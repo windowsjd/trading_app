@@ -165,6 +165,34 @@ const { load } = require('../../../test/ledgerTestHarness.cjs');
 const { getOrderBookPreview } = load(new URL('./orderBookPreview.ts', import.meta.url).pathname, {});
 
 describe('asset detail preview isolation and regression', () => {
+  for (const [statusMessage, hasBook] of [
+    ['호가 정보를 현재 수신할 수 없습니다.', false],
+    ['호가 정보가 지연되고 있습니다.', true],
+    ['호가 연결을 복구하는 중입니다.', true],
+  ] as const) {
+    it(`keeps buy/sell independent of ${statusMessage}`, () => withPreview(false, 'true', () => {
+      const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
+      Object.assign(h.asset, { assetType: 'crypto', market: 'BINANCE', symbol: 'BTCUSDT', priceCurrency: 'USD',
+        settlementCurrency: 'USD', marketStatus: 'open', tradable: true, tradeBlockedReason: null });
+      h.positionQuery.data.positions = [{ assetId: h.asset.id, quantity: '0.125', averageCost: '70000', currencyCode: 'USD', valuation: { state: 'unavailable' } }];
+      h.orderBookState = { latestOrderBook: hasBook ? createCryptoOrderBookFixture(h.asset.id, 'BTC') : null, statusMessage };
+      const tree = h.render();
+      const cards = elements(tree, 'AssetOrderBookCard');
+      assert.equal(cards.length, hasBook ? 1 : 0, 'unavailable production data never falls back to a fixture');
+      if (hasBook) {
+        assert.equal(cards[0].props.statusMessage, statusMessage);
+        assert.equal(cards[0].props.isPreview, false);
+      } else assert.ok(textContent(tree).includes(statusMessage));
+      for (const side of ['buy', 'sell'] as const) {
+        const button = h.control(tree, TEST_IDS.assetDetail[`${side}Button`]);
+        assert.equal(h.renderCta(button).props.disabled, false);
+        button.props.onPress();
+      }
+      assert.deepEqual(h.navigation, ['buy', 'sell'].map((side) => ['Order', { assetId: h.asset.id, side, accountId: h.account.id }]));
+      assert.deepEqual(h.requests, []);
+    }));
+  }
+
   it('uses live crypto books despite the preview flag and keeps loading/errors free of fixtures', () => withPreview(true, 'true', () => {
     const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
     Object.assign(h.asset, { assetType: 'crypto', market: 'BINANCE', symbol: 'BTCUSDT', priceCurrency: 'USD', tradable: true });
