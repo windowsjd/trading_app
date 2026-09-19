@@ -72,7 +72,7 @@ describe('admin inline diagnostics visibility', () => {
 
     for (const sourcePath of [
       'screens/home/PortfolioScreen.tsx',
-      'screens/order/OrderScreen.tsx',
+      'screens/order/OrderPanel.tsx',
       'screens/wallet/WalletFxScreen.tsx',
       'screens/asset/AssetDetailScreen.tsx',
     ]) {

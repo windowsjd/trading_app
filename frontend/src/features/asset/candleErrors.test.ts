@@ -95,7 +95,7 @@ describe('asset detail screen wiring', () => {
   const screenSource = readFileSync(
     join(
       dirname(fileURLToPath(import.meta.url)),
-      '../../screens/asset/AssetDetailScreen.tsx',
+      '../../screens/asset/AssetChartScreen.tsx',
     ),
     'utf8',
   );

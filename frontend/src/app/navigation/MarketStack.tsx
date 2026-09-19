@@ -25,7 +25,7 @@ export default function MarketStack() {
       <Stack.Screen
         name="AssetDetail"
         component={AssetDetailScreen}
-        options={{ title: '종목 상세' }}
+        options={{ title: '거래' }}
       />
       <Stack.Screen
         name="Order"

@@ -33,7 +33,7 @@ function setup() {
 
 describe('chart timeframe selector', () => {
   it('drives the actual detail screen candle query, live interval and viewport reset for every selection', () => {
-    const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
+    const h = createTradingUiHarness('asset/AssetChartScreen.tsx');
     h.candles = [{ time: '2026-09-16T00:00:00Z', open: '100', high: '102', low: '99', close: '101', volume: '20' }];
     for (const timeframe of ASSET_CHART_TIMEFRAMES) {
       const selector = elements(h.render(), 'ChartTimeframeSelector')[0];
@@ -127,7 +127,7 @@ describe('chart timeframe selector', () => {
   });
 
   it('keeps candle query/live-candle/viewport bindings and leaves the bottom tabs outside this policy', () => {
-    const screen = readFileSync(resolve('src/screens/asset/AssetDetailScreen.tsx'), 'utf8');
+    const screen = readFileSync(resolve('src/screens/asset/AssetChartScreen.tsx'), 'utf8');
     assert.match(screen, /<ChartTimeframeSelector\s+selectedTimeframe=\{selectedTimeframe\}\s+onSelect=\{setSelectedTimeframe\}/);
     for (const call of ['QUERY_KEYS.asset.candles', 'getAssetCandles']) {
       const start = screen.indexOf(`${call}(assetId, {`);

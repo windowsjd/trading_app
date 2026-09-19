@@ -19,6 +19,7 @@ const chartSource = read('CandlestickChart.tsx');
 const rendererSource = read('CandlestickChartRenderer.tsx');
 const nativeGestureSource = read('CandlestickGestures.native.tsx');
 const webGestureSource = read('CandlestickGestures.web.tsx');
+const fullScreenSource = read('../../screens/asset/AssetChartScreen.tsx');
 const detailScreenSource = read('../../screens/asset/AssetDetailScreen.tsx');
 
 describe('chart controls: zoom UI is gone', () => {
@@ -111,13 +112,10 @@ describe('chart height', () => {
     );
   });
 
-  it('does not pin a fixed chart height from the detail screen', () => {
-    const chartUsage = detailScreenSource.slice(
-      detailScreenSource.indexOf('<CandlestickChart'),
-      detailScreenSource.indexOf('<CandlestickChart') + 500,
-    );
-    assert.ok(chartUsage.length > 0, 'detail screen renders the chart');
-    assert.ok(!chartUsage.includes('height='), 'no fixed height prop passed');
+  it('measures the fullscreen content area and removes the inline chart', () => {
+    assert.doesNotMatch(detailScreenSource, /CandlestickChart|getAssetCandles|useAssetCandle/);
+    assert.match(fullScreenSource, /height=\{chartHeight > 0 \? chartHeight : undefined\}/);
+    assert.match(fullScreenSource, /onLayout=/);
   });
 });
 
@@ -132,16 +130,15 @@ describe('existing behaviour that must not regress', () => {
   });
 
   it('keeps the timeframe selector and its viewport reset key', () => {
-    assert.ok(detailScreenSource.includes('<ChartTimeframeSelector'));
-    assert.ok(detailScreenSource.includes('onSelect={setSelectedTimeframe}'));
-    assert.ok(!detailScreenSource.includes('ASSET_CHART_TIMEFRAMES.map'));
+    assert.ok(fullScreenSource.includes('<ChartTimeframeSelector'));
+    assert.ok(fullScreenSource.includes('onSelect={setSelectedTimeframe}'));
+    assert.ok(!fullScreenSource.includes('ASSET_CHART_TIMEFRAMES.map'));
     assert.ok(
-      detailScreenSource.includes(
+      fullScreenSource.includes(
         'viewportResetKey={`${assetId}:${selectedTimeframe.interval}`}',
       ),
       'switching timeframe resets the viewport to the latest default window',
     );
-    assert.ok(detailScreenSource.includes('flexWrap'));
   });
 
   it('keeps the SVG clip path and price precision plumbing', () => {
@@ -149,7 +146,7 @@ describe('existing behaviour that must not regress', () => {
     assert.ok(rendererSource.includes('clipPath='));
     assert.ok(chartSource.includes('displayPriceDecimals'));
     assert.ok(rendererSource.includes('displayPriceDecimals'));
-    assert.ok(detailScreenSource.includes('displayPriceDecimals={displayPriceDecimals}'));
+    assert.ok(fullScreenSource.includes('displayPriceDecimals={displayPrice.displayPriceDecimals}'));
   });
 });
 

@@ -1,101 +1,77 @@
-import { applyTickerMarketState, canOverlayAssetTicker } from "../../features/asset/assetTickerPolicy";
-import { getAssetTradingWarning } from "../../features/asset/tradingUx";
-import React, { useEffect, useMemo, useState } from "react";
-import { useAssetOrderBook } from '../../features/asset/useAssetOrderBook';
-import { supportsLiveOrderBook } from '../../features/asset/assetOrderBookPolicy';
+import React, { useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
-} from "react-native";
-import ActionPressable from '../../components/common/ActionPressable';
-import { useQuery } from "@tanstack/react-query";
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { useIsFocused } from '@react-navigation/native';
-
-import type { AssetDetailScreenProps } from "../../app/navigation/types";
-import { useRootNavigation } from "../../app/navigation/navigationHooks";
+import { useQuery } from '@tanstack/react-query';
+import Svg, { Path } from 'react-native-svg';
+import type { AssetDetailScreenProps } from '../../app/navigation/types';
+import { useRootNavigation } from '../../app/navigation/navigationHooks';
+import { getAssetDetail } from '../../features/asset/api';
+import { useAssetTicker } from '../../features/asset/useAssetTicker';
+import { applyTickerMarketState } from '../../features/asset/assetTickerPolicy';
+import { selectDisplayPrice } from '../../features/asset/displayPricePolicy';
 import {
-  DEFAULT_ASSET_CHART_TIMEFRAME,
-  getAssetCandles,
-  getAssetDetail,
-  type AssetChartTimeframe,
-  type AssetDetailPriceDto,
-} from "../../features/asset/api";
+  getStockMarketStatus,
+  getTradingPair,
+} from '../../features/asset/tradingHeader';
+import { supportsLiveOrderBook } from '../../features/asset/assetOrderBookPolicy';
+import { useAssetOrderBook } from '../../features/asset/useAssetOrderBook';
+import AssetOrderLadder from '../../features/asset/AssetOrderLadder';
 import {
   findAccountPosition,
   getTradingAccountPositions,
-} from "../../features/tradingAccount/api";
-import { getPositionDisplay } from "../../features/position/display";
-import { useTradingAccount } from "../../features/tradingAccount/TradingAccountContext";
-import {
-  getCapabilityBlockMessage,
-  isSeasonNotActiveReason,
-} from "../../features/tradingAccount/capabilities";
-import { getIntegrityErrorMessage } from "../../features/tradingAccount/integrityErrors";
-import { getAccountDisplay } from "../../features/tradingAccount/accountDisplay";
-import { useAssetTicker } from "../../features/asset/useAssetTicker";
-import { selectDisplayPrice } from "../../features/asset/displayPricePolicy";
-import { useAssetCandle } from "../../features/asset/useAssetCandle";
-import { describeCandleError } from "../../features/asset/candleErrors";
-import { mergeAssetCandleSnapshot } from "../../features/asset/liveCandle";
-import { isTradableMarketStatus } from "../../features/asset/mapper";
-import { QUERY_KEYS } from "../../constants/queryKeys";
-import { TEST_IDS } from "../../constants/testIds";
-import { buildWsUrl } from "../../constants/env";
+} from '../../features/tradingAccount/api';
+import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
+import { getAccountDisplay } from '../../features/tradingAccount/accountDisplay';
+import { getIntegrityErrorMessage } from '../../features/tradingAccount/integrityErrors';
+import { getPositionDisplay } from '../../features/position/display';
+import { QUERY_KEYS } from '../../constants/queryKeys';
+import { TEST_IDS } from '../../constants/testIds';
+import { buildWsUrl } from '../../constants/env';
 import {
   formatAssetPrice,
   formatKrw,
   formatPercent,
-  getAssetNameDisplay,
   getUnavailablePriceText,
-} from "../../utils/format";
+} from '../../utils/format';
+import ActionPressable from '../../components/common/ActionPressable';
+import FullPageLoading from '../../components/states/FullPageLoading';
+import ErrorState from '../../components/states/ErrorState';
+import InlineEmptyState from '../../components/states/InlineEmptyState';
+import SectionSkeleton from '../../components/states/SectionSkeleton';
+import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
+import OrderPanel from '../order/OrderPanel';
 
-import FullPageLoading from "../../components/states/FullPageLoading";
-import ErrorState from "../../components/states/ErrorState";
-import InlineEmptyState from "../../components/states/InlineEmptyState";
-import SectionSkeleton from "../../components/states/SectionSkeleton";
-import CTAButton from "../../components/common/CTAButton";
-import AdminDiagnosticPanel from "../../components/states/AdminDiagnosticPanel";
-import { CandlestickChart } from "../../components/charts";
-import ChartTimeframeSelector from "../../components/charts/ChartTimeframeSelector";
-import AssetOrderBookCard from "../../features/asset/AssetOrderBookCard";
-import { getOrderBookPreview } from "../../features/asset/orderBookPreview";
-
-type Props = AssetDetailScreenProps;
-
-function isPriceAvailable(price?: AssetDetailPriceDto | null) {
-  return price?.state === "available" && !!price.currentPrice;
+export default function AssetDetailScreen(props: AssetDetailScreenProps) {
+  // No old ticker, KRW preference or order input survives a pair replacement.
+  return <AssetTradingScreen key={props.route.params.assetId} {...props} />;
 }
 
-export default function AssetDetailScreen({ route, navigation }: Props) {
+export function AssetTradingScreen({
+  route,
+  navigation,
+}: AssetDetailScreenProps) {
+  const { assetId } = route.params;
   const rootNavigation = useRootNavigation();
   const isFocused = useIsFocused();
-  const { assetId } = route.params;
-  const [selectedTimeframe, setSelectedTimeframe] =
-    useState<AssetChartTimeframe>(DEFAULT_ASSET_CHART_TIMEFRAME);
-  const assetTickerWsUrl = useMemo(() => buildWsUrl("/api/v1/ws"), []);
-
-  // Market data is PUBLIC and shared by every account and every user, so asset
-  // detail, price and candles keep their account-free cache keys (작업 10 §A-3).
-  // Only the two user-owned facts below — what I hold and what I may do — are
-  // account-scoped.
-  const {
-    selectedAccountId,
-    selectedAccount,
-    capabilities,
-    isLoading: accountsLoading,
-    isEmpty: noAccounts,
-  } = useTradingAccount();
-  const accountId = selectedAccountId ?? "";
+  const headerHeight = useHeaderHeight();
+  const [showKrw, setShowKrw] = useState(false);
+  const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
+  const { selectedAccountId, selectedAccount } = useTradingAccount();
+  const accountId = selectedAccountId ?? '';
   const hasAccount = !!selectedAccountId;
-
   const detailQuery = useQuery({
     queryKey: QUERY_KEYS.asset.detail(assetId),
     queryFn: () => getAssetDetail(assetId),
   });
-
   const positionQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.positions(accountId, {
       assetId,
@@ -103,63 +79,22 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
     }),
     queryFn: () =>
       getTradingAccountPositions(accountId, { assetId, limit: 20, offset: 0 }),
-    // No accountId, no financial request. An account-less call would either be
-    // a legacy current-participant read or a 404 — both wrong here.
     enabled: hasAccount,
   });
-
-  const candlesQuery = useQuery({
-    queryKey: QUERY_KEYS.asset.candles(assetId, {
-      range: selectedTimeframe.range,
-      interval: selectedTimeframe.interval,
-      limit: selectedTimeframe.limit,
-    }),
-    queryFn: () =>
-      getAssetCandles(assetId, {
-        range: selectedTimeframe.range,
-        interval: selectedTimeframe.interval,
-        limit: selectedTimeframe.limit,
-      }),
-  });
-
-  const {
-    latestTicker,
-    showReconnectBanner,
-    isStale: isTickerStale,
-  } = useAssetTicker({
+  const { latestTicker, showReconnectBanner, isStale } = useAssetTicker({
     assetId,
-    wsUrl: assetTickerWsUrl ?? "",
-    enabled: !!assetTickerWsUrl,
+    wsUrl: wsUrl ?? '',
+    enabled: isFocused && !!wsUrl,
   });
-  const {
-    latestCandle,
-    isStale: isCandleStale,
-    resyncVersion: candleResyncVersion,
-    liveEnabled: candleLiveEnabled,
-  } = useAssetCandle({
-    assetId,
-    interval: selectedTimeframe.interval,
-    wsUrl: assetTickerWsUrl ?? "",
-    enabled: !!assetTickerWsUrl,
-  });
-
-  // `refetch` is identity-stable in react-query, so naming it as a dependency
-  // states the real dependency without re-running on every render.
-  const refetchCandles = candlesQuery.refetch;
-  useEffect(() => {
-    if (candleResyncVersion > 0) void refetchCandles();
-  }, [candleResyncVersion, refetchCandles]);
-
   const liveOrderBookEnabled = supportsLiveOrderBook(detailQuery.data?.asset);
-  const { latestOrderBook, statusMessage: orderBookStatus } = useAssetOrderBook({
-    assetId, wsUrl: assetTickerWsUrl ?? '', enabled: liveOrderBookEnabled && isFocused,
+  const { latestOrderBook, statusMessage } = useAssetOrderBook({
+    assetId,
+    wsUrl: wsUrl ?? '',
+    enabled: liveOrderBookEnabled && isFocused,
   });
-
-  if (detailQuery.isLoading) {
+  if (detailQuery.isLoading)
     return <FullPageLoading message="종목 정보를 불러오는 중입니다." />;
-  }
-
-  if (detailQuery.isError || !detailQuery.data) {
+  if (detailQuery.isError || !detailQuery.data)
     return (
       <ErrorState
         title="종목 정보를 불러오지 못했습니다."
@@ -168,459 +103,357 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
         diagnosticError={detailQuery.error}
       />
     );
-  }
-
-  const asset = applyTickerMarketState(detailQuery.data.asset, latestTicker);
-  // Crypto always uses the live path, including failures and initial loading.
-  // The development flag continues to control only the domestic screen preview.
-  const previewOrderBook = asset.assetType === 'domestic_stock' ? getOrderBookPreview(asset) : null;
-  const orderBook = liveOrderBookEnabled ? latestOrderBook : previewOrderBook;
-  const displayTicker = canOverlayAssetTicker(asset, latestTicker) ? latestTicker : null;
-  const price = asset.price;
-  // The quantity shown, and the quantity 매도 is gated on, both come from the
-  // SELECTED account's position read. Because the query key carries the
-  // accountId, a switch produces a different query with no data rather than the
-  // previous account's holdings under the new account's heading.
+  const ticker = latestTicker?.assetId === assetId ? latestTicker : null;
+  const asset = applyTickerMarketState(detailQuery.data.asset, ticker);
+  const displayPrice = selectDisplayPrice({
+    latestTicker: ticker,
+    assetType: asset.assetType,
+    marketStatus: asset.marketStatus,
+    restPrice: asset.price,
+    assetPriceCurrency: asset.priceCurrency,
+    assetDisplayPriceDecimals: asset.displayPriceDecimals,
+  });
+  const krwAvailable =
+    displayPrice.priceKrwState === 'available' &&
+    displayPrice.priceKrw !== null;
+  const converted = showKrw && asset.priceCurrency !== 'KRW';
+  const priceText = converted
+    ? krwAvailable
+      ? `₩${formatKrw(displayPrice.priceKrw)}`
+      : '환산 불가'
+    : displayPrice.priceLocal !== null
+      ? formatAssetPrice(
+          displayPrice.priceLocal,
+          displayPrice.priceCurrency,
+          displayPrice.displayPriceDecimals,
+        )
+      : getUnavailablePriceText(asset);
+  const changeRate = formatPercent(displayPrice.changeRate);
+  const pair = getTradingPair(asset);
   const position = findAccountPosition(positionQuery.data, assetId);
-  const hasPosition = Number(position?.quantity ?? "0") > 0;
+  const hasPosition = Number(position?.quantity ?? '0') > 0;
   const positionDisplay = position ? getPositionDisplay(position) : null;
   const accountDisplay = selectedAccount
     ? getAccountDisplay(selectedAccount)
     : null;
-  const priceAvailable = isPriceAvailable(price);
-  const livePriceAvailable = !!displayTicker?.priceLocal;
-  const orderPriceAvailable = priceAvailable || livePriceAvailable;
-
-  // ONE basis for the whole price block: while a realtime ticker is shown,
-  // its local price and KRW state/reason are taken from that ticker — REST and
-  // realtime values are never mixed (see displayPricePolicy).
-  const displayPrice = selectDisplayPrice({
-    latestTicker: displayTicker,
-    assetType: asset.assetType,
-    marketStatus: asset.marketStatus,
-    restPrice: price,
-    assetPriceCurrency: asset.priceCurrency,
-    assetDisplayPriceDecimals: asset.displayPriceDecimals,
-  });
-  const displayPriceLocal = displayPrice.priceLocal;
-  const displayPriceCurrency =
-    displayPrice.priceCurrency ?? asset.priceCurrency;
-  const displayPriceKrw = displayPrice.priceKrw;
-  const displayPriceKrwState = displayPrice.priceKrwState;
-  // Same basis as every other price field: a realtime ticker without a change
-  // rate shows no change rate — the older REST one never fills in next to a
-  // newer realtime price.
-  const displayChangeRate = displayPrice.changeRate;
-  const formattedChangeRate = formatPercent(displayChangeRate);
-  const displayPriceDecimals = displayPrice.displayPriceDecimals;
-  const displayPriceKrwMessage = displayPrice.priceKrwMessage;
-  const assetNameDisplay = getAssetNameDisplay(asset);
-  // Dev-only chart diagnostics (never rendered in production builds): how many
-  // candles the API returned vs requested for the selected range/interval, and
-  // whether the provider window was truncated (Binance single-call cap).
-  const isDevBuild = (globalThis as { __DEV__?: boolean }).__DEV__ === true;
-  const chartDebugInfo =
-    isDevBuild && candlesQuery.data
-      ? `dev · candles=${candlesQuery.data.candles.length} · req=${
-          candlesQuery.data.source?.requestedCount ?? "-"
-        } · ret=${candlesQuery.data.source?.returnedCount ?? "-"} · ${
-          candlesQuery.data.range
-        }/${candlesQuery.data.interval}${
-          candlesQuery.data.source?.truncated ? " · truncated" : ""
-        }`
-      : null;
-  const chartCandles = mergeAssetCandleSnapshot(
-    candlesQuery.data,
-    isCandleStale ? null : latestCandle,
-    selectedTimeframe.limit,
-  );
-
-  /**
-   * Trading permission comes from the SELECTED account, not from a global
-   * `getCurrentSeason()` (작업 10 §A-3). Those are different questions: the app
-   * can be in the middle of an active season while the account the user is
-   * looking at is their general account, a settled season's account, or a
-   * suspended one. The season fact that matters is the one attached to THIS
-   * account, which `getTradingAccountCapabilities` already reads from
-   * `account.season.seasonStatus`.
-   */
-  const accountBlockedReason = accountsLoading
-    ? "계정 정보를 확인하는 중입니다."
-    : noAccounts || !capabilities
-      ? "거래 가능한 계정이 없습니다."
-      : getCapabilityBlockMessage(capabilities, capabilities.tradeBlockReason);
-
-  // Server-detected damage is never presented as "you hold nothing".
   const positionIntegrityMessage = positionQuery.isError
     ? getIntegrityErrorMessage(positionQuery.error)
     : null;
-
-  const assetHardBlockedReason = !asset.isActive ? "비활성 자산입니다." : null;
-
-  const isDomesticMarketClosed =
-    asset.assetType === "domestic_stock" && asset.marketStatus === "closed";
-  const marketClosedNoticeIsRedundant =
-    isDomesticMarketClosed &&
-    asset.tradeBlockedReason?.trim().toUpperCase() === "MARKET_CLOSED";
-  const assetWarningReason =
-    (marketClosedNoticeIsRedundant ? null : getAssetTradingWarning(asset)) ??
-    (!isDomesticMarketClosed && !isTradableMarketStatus(asset.marketStatus)
-      ? "장 상태는 주문 견적에서 최종 확인됩니다."
-      : isTickerStale
-        ? "실시간 시세 최신성이 낮습니다. 서버 견적에서 최종 확인됩니다."
-        : !orderPriceAvailable
-          ? "현재 화면 시세가 없어도 서버 견적에서 최종 확인됩니다."
-          : displayPriceKrwState && displayPriceKrwState !== "available"
-            ? (displayPriceKrwMessage ??
-              "KRW 환산 시세를 사용할 수 없습니다. 서버 견적에서 최종 확인됩니다.")
-            : null);
-
-  const buyBlockedReason = accountBlockedReason ?? assetHardBlockedReason;
-  const sellBlockedReason =
-    buyBlockedReason ??
-    (positionQuery.isError
-      ? "보유 수량을 확인할 수 없어 매도할 수 없습니다."
-      : positionQuery.isLoading
-        ? "보유 수량을 확인하는 중입니다."
-        : // 매도 is gated on THIS account's real quantity — never on a cached
-          // number from a previously selected account.
-          !hasPosition
-          ? "보유 수량이 없어 매도할 수 없습니다."
-          : null);
-
-  const openOrderScreen = (side: "buy" | "sell") => {
-    if (!selectedAccountId) return;
-    // The account is pinned into the route: the order flow targets the account
-    // that was selected when the button was pressed, whatever happens to the
-    // selection afterwards (작업 10 §A-2).
-    navigation.navigate("Order", {
-      assetId,
-      side,
-      accountId: selectedAccountId,
-    });
-  };
-
+  const currentPrice = (
+    <View style={styles.currentPrice} testID="asset-current-price">
+      <Text style={styles.priceLabel}>
+        현재가 {converted ? 'KRW' : asset.priceCurrency}
+      </Text>
+      <Text style={styles.price} selectable>
+        {priceText}
+      </Text>
+    </View>
+  );
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView
-        testID={TEST_IDS.assetDetail.screen}
-        contentContainerStyle={styles.content}
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        keyboardVerticalOffset={headerHeight}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.card}>
-          <Text style={styles.title}>{assetNameDisplay.primary}</Text>
-          {assetNameDisplay.secondary ? (
-            <Text style={styles.helper}>{assetNameDisplay.secondary}</Text>
-          ) : null}
-          <Text style={styles.value}>
-            {orderPriceAvailable
-              ? formatAssetPrice(
-                  displayPriceLocal,
-                  displayPriceCurrency,
-                  displayPriceDecimals,
-                )
-              : getUnavailablePriceText(asset)}
-          </Text>
-          {asset.priceCurrency !== "KRW" ? (
-            <Text style={styles.helper}>
-              KRW 환산{" "}
-              {displayPriceKrwState === "available"
-                ? formatKrw(displayPriceKrw)
-                : `사용 불가${
-                    displayPrice.priceKrwReason
-                      ? ` (${displayPrice.priceKrwReason})`
-                      : ""
-                  }`}
-            </Text>
-          ) : null}
-          <Text style={styles.helper}>
-            등락률 {formattedChangeRate === '-' ? '-' : `${formattedChangeRate}%`}
-          </Text>
-          <Text style={styles.helper}>시장 상태: {asset.marketStatus}</Text>
-          <Text style={styles.helper}>
-            거래 상태: {asset.tradable ? "거래 가능" : "거래 제한"}
-          </Text>
-          <Text style={styles.helper}>
-            결제 통화 {asset.settlementCurrency}
-          </Text>
-          {asset.settlementCurrency === "USD" ? (
-            <Text style={styles.helper}>USD Wallet으로 결제됩니다.</Text>
-          ) : null}
-          {buyBlockedReason ? (
-            <View
-              testID={TEST_IDS.tradingAccount.capabilityNotice}
-              style={styles.inlineWarning}
+        <ScrollView
+          testID={TEST_IDS.assetDetail.screen}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.content}
+        >
+          <View style={styles.header}>
+            <ActionPressable
+              testID="asset-change-pair"
+              style={styles.pairButton}
+              accessibilityRole="button"
+              accessibilityLabel={`종목 변경, ${pair}`}
+              onPress={() =>
+                navigation.navigate('MarketSearch', { returnToAsset: true })
+              }
             >
-              <Text style={styles.inlineWarningText}>{buyBlockedReason}</Text>
-              {capabilities?.isSeason &&
-                isSeasonNotActiveReason(capabilities.tradeBlockReason) ? (
+              <Text style={styles.pair}>{pair} ▾</Text>
+            </ActionPressable>
+            <View style={styles.tools}>
+              {asset.priceCurrency !== 'KRW' ? (
                 <ActionPressable
-                  style={styles.retryButton}
-                  onPress={() => rootNavigation.navigate("SeasonJoin")}
+                  testID="asset-krw-toggle"
+                  style={[styles.iconButton, showKrw && styles.toggleActive]}
+                  accessibilityRole="button"
+                  accessibilityLabel="현재가 KRW 환산 표시"
+                  accessibilityState={{
+                    selected: showKrw,
+                    disabled: !krwAvailable && !showKrw,
+                  }}
+                  disabled={!krwAvailable && !showKrw}
+                  onPress={() => setShowKrw((value) => !value)}
                 >
-                  <Text style={styles.retryText}>시즌 안내 보기</Text>
+                  <Text
+                    style={[
+                      styles.toggleText,
+                      showKrw && styles.toggleTextActive,
+                      !krwAvailable && !showKrw && styles.muted,
+                    ]}
+                  >
+                    KRW
+                  </Text>
                 </ActionPressable>
               ) : null}
+              <ActionPressable
+                testID="asset-open-chart"
+                style={styles.iconButton}
+                accessibilityRole="button"
+                accessibilityLabel="전체화면 차트 열기"
+                onPress={() =>
+                  rootNavigation.navigate('AssetChart', { assetId })
+                }
+              >
+                <Svg width={22} height={22} viewBox="0 0 24 24" aria-hidden>
+                  <Path
+                    d="M5 3v18M2 8h6v7H2zM12 2v17M9 5h6v8H9zM19 6v16M16 11h6v7h-6z"
+                    fill="none"
+                    stroke="#354251"
+                    strokeWidth={1.5}
+                  />
+                </Svg>
+              </ActionPressable>
             </View>
-          ) : null}
-          {assetWarningReason ? (
-            <View style={styles.inlineWarning}>
-              <Text style={styles.inlineWarningText}>{assetWarningReason}</Text>
-              <AdminDiagnosticPanel
-                diagnostic={detailQuery.data.priceErrors?.[0]?.diagnostic}
-              />
-            </View>
-          ) : null}
-
-          {showReconnectBanner ? (
-            <View
-              testID={TEST_IDS.assetDetail.reconnectBanner}
-              style={styles.banner}
+          </View>
+          <View style={styles.subheader}>
+            <Text
+              style={[
+                styles.changeRate,
+                Number(displayPrice.changeRate) > 0
+                  ? styles.up
+                  : Number(displayPrice.changeRate) < 0
+                    ? styles.down
+                    : null,
+              ]}
             >
-              <Text style={styles.bannerText}>
-                실시간 연결이 불안정합니다. 마지막 성공 데이터를 표시 중입니다.
+              {changeRate === '-'
+                ? '등락률 -'
+                : `${Number(displayPrice.changeRate) > 0 ? '+' : ''}${changeRate}%`}
+            </Text>
+            {asset.assetType === 'domestic_stock' ? (
+              <Text testID="asset-market-status" style={styles.marketBadge}>
+                {getStockMarketStatus(asset.marketStatus)}
               </Text>
-            </View>
-          ) : null}
-        </View>
-
-        <View style={styles.card}>
-          {/* WHICH account these holdings belong to is stated on the card
-              itself: a quantity with no account next to it is not an answer to
-              "do I own this" when the user holds several accounts. */}
-          <Text style={styles.label}>
-            내 포지션
-            {accountDisplay ? ` · ${accountDisplay.title}` : ""}
-          </Text>
-          {accountDisplay ? (
-            <Text style={styles.accountBadge}>
-              {accountDisplay.statusLabel}
+            ) : null}
+          </View>
+          {showReconnectBanner ? (
+            <Text
+              testID={TEST_IDS.assetDetail.reconnectBanner}
+              style={styles.bannerText}
+            >
+              실시간 연결 복구 중 · 마지막 시세
             </Text>
           ) : null}
-          {!hasAccount ? (
-            <InlineEmptyState
-              title="계정이 없습니다."
-              message="계정을 개설하면 보유 현황을 볼 수 있습니다."
-            />
-          ) : positionQuery.isLoading ? (
-            <SectionSkeleton lines={4} />
-          ) : positionIntegrityMessage ? (
-            <>
+          {isStale ? (
+            <Text style={styles.bannerText}>
+              실시간 시세 최신성이 낮습니다. 서버 견적에서 최종 확인됩니다.
+            </Text>
+          ) : null}
+          <View style={styles.tradingRow} testID="asset-trading-columns">
+            <View style={styles.orderColumn} testID="asset-order-column">
+              {selectedAccountId ? (
+                <OrderPanel
+                  key={`${assetId}:${selectedAccountId}`}
+                  assetId={assetId}
+                  accountId={selectedAccountId}
+                  enabled={isFocused}
+                  onReturnToAsset={() => {}}
+                />
+              ) : (
+                <InlineEmptyState
+                  title="계정이 없습니다."
+                  message="계정을 개설하면 주문할 수 있습니다."
+                />
+              )}
+            </View>
+            <View style={styles.priceColumn} testID="asset-price-column">
+              {liveOrderBookEnabled ? (
+                <AssetOrderLadder
+                  book={
+                    latestOrderBook?.assetId === assetId
+                      ? latestOrderBook
+                      : null
+                  }
+                  statusMessage={statusMessage}
+                  currentPrice={currentPrice}
+                />
+              ) : (
+                <View style={styles.stockPrice}>{currentPrice}</View>
+              )}
+            </View>
+          </View>
+          <View style={styles.card}>
+            {/* WHICH account these holdings belong to is stated on the card
+              itself: a quantity with no account next to it is not an answer to
+              "do I own this" when the user holds several accounts. */}
+            <Text style={styles.label}>
+              내 포지션
+              {accountDisplay ? ` · ${accountDisplay.title}` : ''}
+            </Text>
+            {accountDisplay ? (
+              <Text style={styles.accountBadge}>
+                {accountDisplay.statusLabel}
+              </Text>
+            ) : null}
+            {!hasAccount ? (
               <InlineEmptyState
-                title="보유 내역을 안전하게 표시할 수 없습니다."
-                message={positionIntegrityMessage}
+                title="계정이 없습니다."
+                message="계정을 개설하면 보유 현황을 볼 수 있습니다."
               />
-              <ActionPressable
-                style={styles.retryButton}
-                onPress={() => void positionQuery.refetch()}
-              >
-                <Text style={styles.retryText}>포지션 다시 시도</Text>
-              </ActionPressable>
-              <AdminDiagnosticPanel error={positionQuery.error} />
-            </>
-          ) : positionQuery.isError ? (
-            <>
-              <InlineEmptyState
-                title="포지션을 불러오지 못했습니다."
-                message="자산 정보는 계속 볼 수 있습니다."
-              />
-              <ActionPressable
-                style={styles.retryButton}
-                onPress={() => void positionQuery.refetch()}
-              >
-                <Text style={styles.retryText}>포지션 다시 시도</Text>
-              </ActionPressable>
-              <AdminDiagnosticPanel error={positionQuery.error} />
-            </>
-          ) : hasPosition && position ? (
-            <>
-              <Text style={styles.helper}>
-                수량 {positionDisplay?.quantity ?? "-"}
-              </Text>
-              <Text style={styles.helper}>
-                평균단가 {positionDisplay?.averageCost ?? "-"}
-              </Text>
-              <Text style={styles.helper}>
-                현재가 {positionDisplay?.currentPrice ?? "시세 조회 불가"}
-              </Text>
-              <Text style={styles.helper}>
-                평가금액 {positionDisplay?.positionValueKrw ?? "-"}
-              </Text>
-              <Text style={styles.helper}>
-                평가손익 {positionDisplay?.unrealizedPnlKrw ?? "-"}
-              </Text>
-              <Text style={styles.helper}>
-                수익률 {positionDisplay?.returnRate ?? "-"}
-              </Text>
-              {positionDisplay?.priceNotice ? (
-                <Text style={styles.inlineWarningText}>
-                  {positionDisplay.priceNotice}
+            ) : positionQuery.isLoading ? (
+              <SectionSkeleton lines={4} />
+            ) : positionIntegrityMessage ? (
+              <>
+                <InlineEmptyState
+                  title="보유 내역을 안전하게 표시할 수 없습니다."
+                  message={positionIntegrityMessage}
+                />
+                <ActionPressable
+                  style={styles.retryButton}
+                  onPress={() => void positionQuery.refetch()}
+                >
+                  <Text style={styles.retryText}>포지션 다시 시도</Text>
+                </ActionPressable>
+                <AdminDiagnosticPanel error={positionQuery.error} />
+              </>
+            ) : positionQuery.isError ? (
+              <>
+                <InlineEmptyState
+                  title="포지션을 불러오지 못했습니다."
+                  message="자산 정보는 계속 볼 수 있습니다."
+                />
+                <ActionPressable
+                  style={styles.retryButton}
+                  onPress={() => void positionQuery.refetch()}
+                >
+                  <Text style={styles.retryText}>포지션 다시 시도</Text>
+                </ActionPressable>
+                <AdminDiagnosticPanel error={positionQuery.error} />
+              </>
+            ) : hasPosition && position ? (
+              <>
+                <Text style={styles.helper}>
+                  수량 {positionDisplay?.quantity ?? '-'}
                 </Text>
-              ) : null}
-            </>
-          ) : (
-            <InlineEmptyState
-              title="보유 없음"
-              message="아직 이 자산을 보유하고 있지 않습니다."
-            />
-          )}
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.label}>차트</Text>
-          <ChartTimeframeSelector
-            selectedTimeframe={selectedTimeframe}
-            onSelect={setSelectedTimeframe}
-          />
-
-          {candlesQuery.isLoading ? (
-            <SectionSkeleton lines={5} />
-          ) : candlesQuery.isError ? (
-            <>
-              {/* A failed chart request must read as a failure with its
-                  reason, not as a loading skeleton. The one exception is the
-                  5m baseline still syncing, which is a "preparing" state. */}
+                <Text style={styles.helper}>
+                  평균단가 {positionDisplay?.averageCost ?? '-'}
+                </Text>
+                <Text style={styles.helper}>
+                  현재가 {positionDisplay?.currentPrice ?? '시세 조회 불가'}
+                </Text>
+                <Text style={styles.helper}>
+                  평가금액 {positionDisplay?.positionValueKrw ?? '-'}
+                </Text>
+                <Text style={styles.helper}>
+                  평가손익 {positionDisplay?.unrealizedPnlKrw ?? '-'}
+                </Text>
+                <Text style={styles.helper}>
+                  수익률 {positionDisplay?.returnRate ?? '-'}
+                </Text>
+                {positionDisplay?.priceNotice ? (
+                  <Text style={styles.inlineWarningText}>
+                    {positionDisplay.priceNotice}
+                  </Text>
+                ) : null}
+              </>
+            ) : (
               <InlineEmptyState
-                title={describeCandleError(candlesQuery.error).title}
-                message={describeCandleError(candlesQuery.error).message}
+                title="보유 없음"
+                message="아직 이 자산을 보유하고 있지 않습니다."
               />
-              <AdminDiagnosticPanel error={candlesQuery.error} />
-              <ActionPressable
-                testID={TEST_IDS.assetDetail.chartRetry}
-                style={styles.retryButton}
-                onPress={() => void candlesQuery.refetch()}
-              >
-                <Text style={styles.retryText}>차트 다시 시도</Text>
-              </ActionPressable>
-            </>
-          ) : chartCandles.length ? (
-            <CandlestickChart
-              candles={chartCandles}
-              currencyCode={displayPriceCurrency}
-              displayPriceDecimals={displayPriceDecimals}
-              currentPrice={displayPrice.isRealtime ? displayPrice.priceLocal : null}
-              emptyMessage="가격 추이를 표시하려면 데이터가 더 필요합니다."
-              viewportResetKey={`${assetId}:${selectedTimeframe.interval}`}
-            />
-          ) : (
-            <InlineEmptyState message="표시할 차트 데이터가 없습니다." />
-          )}
-          {candleLiveEnabled && isCandleStale ? (
-            <View style={styles.banner}>
-              <Text style={styles.bannerText}>
-                실시간 캔들이 지연되어 HTTP 기준 데이터를 표시 중입니다.
-              </Text>
-            </View>
-          ) : null}
-          {candleLiveEnabled && latestCandle?.delayed ? (
-            <View style={styles.banner}>
-              <Text style={styles.bannerText}>
-                미국 캔들은 KIS 지연 체결 피드를 사용합니다.
-              </Text>
-            </View>
-          ) : null}
-          {chartDebugInfo ? (
-            <Text style={styles.debug}>{chartDebugInfo}</Text>
-          ) : null}
-        </View>
-
-        {orderBook ? <AssetOrderBookCard book={orderBook} isPreview={!!previewOrderBook} statusMessage={liveOrderBookEnabled ? orderBookStatus : null} /> :
-          liveOrderBookEnabled ? (
-            <View testID="asset-order-book-loading" style={styles.card}>
-              <Text style={styles.helper}>호가 · 매도 / 매수</Text>
-              <Text testID="asset-order-book-status" accessibilityLiveRegion="polite" style={styles.label}>{orderBookStatus}</Text>
-            </View>
-          ) : null}
-
-        <View style={styles.row}>
-          <CTAButton
-            testID={TEST_IDS.assetDetail.buyButton}
-            label="매수"
-            state={buyBlockedReason ? "blocked" : "enabled"}
-            style={styles.flex}
-            onPress={() => openOrderScreen("buy")}
-          />
-          <CTAButton
-            testID={TEST_IDS.assetDetail.sellButton}
-            label="매도"
-            state={sellBlockedReason ? "blocked" : "enabled"}
-            style={styles.flex}
-            onPress={() => openOrderScreen("sell")}
-          />
-        </View>
-
-        {sellBlockedReason &&
-        !buyBlockedReason &&
-        (hasPosition || positionQuery.isError || positionQuery.isLoading) ? (
-          <Text style={styles.errorText}>{sellBlockedReason}</Text>
-        ) : null}
-      </ScrollView>
+            )}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  content: { padding: 16, gap: 12, paddingBottom: 24 },
-  row: { flexDirection: "row", gap: 10, flexWrap: "wrap" },
-  flex: { flex: 1 },
-  card: {
-    borderWidth: 1,
-    borderColor: "#e8e8e8",
-    borderRadius: 14,
-    padding: 16,
-    backgroundColor: "#fafafa",
+  container: { flex: 1, backgroundColor: '#fff' },
+  content: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 32, gap: 12 },
+  header: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  pairButton: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center' },
+  pair: { fontSize: 20, fontWeight: '700', color: '#202a35' },
+  tools: { flexDirection: 'row', gap: 4, flexShrink: 0 },
+  iconButton: {
+    minWidth: 44,
+    minHeight: 44,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f2f5f7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toggleActive: { backgroundColor: '#202a35' },
+  toggleText: { fontSize: 11, fontWeight: '700', color: '#536170' },
+  toggleTextActive: { color: '#fff' },
+  muted: { opacity: 0.4 },
+  subheader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 8,
   },
-  title: { fontSize: 24, fontWeight: "700" },
-  label: { fontSize: 13, color: "#666" },
-  value: { fontSize: 20, fontWeight: "700" },
-  helper: { fontSize: 14, color: "#444" },
-  // Its own line and its own track: a status that can be shrunk away by a long
-  // season name is a status that reads as "운영 중" when it is not.
-  accountBadge: {
-    alignSelf: "flex-start",
-    flexShrink: 0,
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#333",
-    backgroundColor: "#ececec",
-    borderRadius: 999,
-    paddingHorizontal: 10,
+  changeRate: { fontSize: 13, color: '#697583', fontVariant: ['tabular-nums'] },
+  up: { color: '#a13e3b' },
+  down: { color: '#315f9b' },
+  marketBadge: {
+    fontSize: 11,
+    color: '#697583',
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    overflow: "hidden",
+    backgroundColor: '#eef1f4',
+    borderRadius: 5,
   },
-  debug: { fontSize: 11, color: "#9aa0a6", marginTop: 6 },
-  errorText: { fontSize: 14, color: "#c62828" },
-
-  retryButton: {
-    marginTop: 8,
-    alignSelf: "flex-start",
-    borderWidth: 1,
-    borderColor: "#111",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "#fff",
+  tradingRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 12,
+    borderTopWidth: 1,
+    borderColor: '#edf0f3',
+    paddingTop: 14,
   },
-  retryText: { color: "#111", fontWeight: "600" },
-  inlineWarning: {
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: "#F2D48B",
-    borderRadius: 10,
-    padding: 10,
-    backgroundColor: "#FFF8E1",
+  orderColumn: { flex: 1.15, minWidth: 0 },
+  priceColumn: { flex: 1, minWidth: 0, overflow: 'hidden' },
+  currentPrice: { paddingVertical: 14, gap: 4, minWidth: 0 },
+  priceLabel: { fontSize: 11, color: '#7c8793' },
+  price: {
+    fontSize: 19,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+    color: '#202a35',
+  },
+  stockPrice: { flex: 1, justifyContent: 'center', minHeight: 280 },
+  card: {
+    borderTopWidth: 1,
+    borderColor: '#edf0f3',
+    paddingTop: 16,
     gap: 8,
-  },
-  inlineWarningText: { color: "#725400", fontSize: 13 },
-  banner: {
     marginTop: 8,
+  },
+  label: { fontSize: 13, color: '#697583' },
+  helper: { fontSize: 14, color: '#536170' },
+  accountBadge: {
+    flexShrink: 0,
+    alignSelf: 'flex-start',
+    fontSize: 12,
+    color: '#536170',
+    backgroundColor: '#f2f5f7',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  retryButton: {
+    alignSelf: 'flex-start',
     padding: 10,
-    borderRadius: 10,
-    backgroundColor: "#FFF3CD",
+    borderWidth: 1,
+    borderColor: '#dfe4e9',
+    borderRadius: 8,
   },
-  bannerText: {
-    color: "#7A5D00",
-    fontSize: 13,
-  },
+  retryText: { color: '#202a35' },
+  inlineWarningText: { fontSize: 13, color: '#725400' },
+  bannerText: { fontSize: 12, color: '#725400' },
 });

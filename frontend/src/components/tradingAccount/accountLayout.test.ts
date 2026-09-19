@@ -163,11 +163,11 @@ describe('the styles long text depends on are present', () => {
     );
   });
 
-  it('OrderScreen: the bound-account header wraps and keeps its badge', () => {
-    const source = read('screens/order/OrderScreen.tsx');
+  it('OrderPanel: the bound-account label wraps inside its column', () => {
+    const source = read('screens/order/OrderPanel.tsx');
 
-    assert.match(source, /accountTitle:\s*\{[^}]*minWidth:\s*0/s);
-    assert.match(source, /accountBadge:\s*\{[^}]*flexShrink:\s*0/s);
+    assert.match(source, /panel:\s*\{[^}]*minWidth:\s*0/s);
+    assert.match(source, /account(?:Label|Badge):/s);
     assert.ok(
       !/numberOfLines=\{/.test(source),
       'nothing on the order screen may be cut to one line',

@@ -11,7 +11,7 @@ const marketRow = read('features/market/MarketAssetRow.tsx');
 const marketScreen = read('screens/market/MarketScreen.tsx');
 const marketSearch = read('screens/market/MarketSearchScreen.tsx');
 const assetDetail = read('screens/asset/AssetDetailScreen.tsx');
-const orderScreen = read('screens/order/OrderScreen.tsx');
+const orderScreen = read('screens/order/OrderPanel.tsx');
 const orderMapper = read('features/order/mapper.ts');
 const recordMapper = read('features/record/api.ts');
 const recordOrderList = read('screens/record/RecordOrderListScreen.tsx');
@@ -22,8 +22,9 @@ describe('numeric asset symbol display contract', () => {
   it('uses shared helpers across market, detail, order and record surfaces', () => {
     assert.match(marketRow, /getAssetSymbolMarketDisplay\(displayItem\)/u);
     assert.match(marketSearch, /getAssetSymbolMarketDisplay\(item\)/u);
-    assert.match(assetDetail, /getAssetNameDisplay\(asset\)/u);
-    assert.match(orderScreen, /getAssetNameDisplay\(asset\)/u);
+    assert.match(assetDetail, /getTradingPair\(asset\)/u);
+    assert.match(read('features/asset/tradingHeader.ts'), /getAssetNameDisplay\(asset\)/u);
+    assert.match(orderScreen, /getTradingAssetName\(asset\)/u);
     assert.match(orderMapper, /getAssetNameDisplay\(asset\)/u);
     assert.match(recordMapper, /getAssetSymbolDisplay\(/u);
     assert.match(recordOrderList, /display\.symbol \?/u);
@@ -54,7 +55,7 @@ describe('separate asset and account availability display contract', () => {
   });
 
   it('sanitizes asset reasons on detail and order surfaces', () => {
-    assert.match(assetDetail, /getAssetTradingWarning\(/u);
+    assert.match(assetDetail, /<OrderPanel/u);
     assert.match(orderScreen, /getAssetTradingWarning\(/u);
     assert.doesNotMatch(assetDetail, /asset\.tradeBlockedReason\s*\?\?/u);
     assert.doesNotMatch(orderScreen, /asset\.tradeBlockedReason\s*\?\?/u);

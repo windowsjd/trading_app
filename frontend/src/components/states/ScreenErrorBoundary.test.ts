@@ -49,7 +49,7 @@ function harness() {
     '../../components/states/ScreenErrorBoundary': { default: Boundary, __esModule: true },
   };
   for (const name of ['./AuthStack', './MainTabs', '../../screens/auth/SplashScreen',
-    '../../screens/entry/ModeSelectionScreen', '../../screens/season/SeasonJoinScreen']) {
+    '../../screens/asset/AssetChartScreen', '../../screens/entry/ModeSelectionScreen', '../../screens/season/SeasonJoinScreen']) {
     rootMocks[name] = { default: name, __esModule: true };
   }
   const Root = load(resolve('src/app/navigation/RootNavigator.tsx'), rootMocks).default;

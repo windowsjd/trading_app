@@ -16,7 +16,7 @@ function stripComments(source: string) {
 const successSheet = stripComments(
   read('screens/order/OrderSuccessBottomSheet.tsx'),
 );
-const orderScreen = stripComments(read('screens/order/OrderScreen.tsx'));
+const orderScreen = stripComments(read('screens/order/OrderPanel.tsx'));
 const orderApi = stripComments(read('features/order/api.ts'));
 
 describe('order completion display contract', () => {
@@ -97,7 +97,7 @@ describe('order quote display and safety contract', () => {
     assert.match(orderScreen, /value=\{quantity\}/u);
     assert.match(orderScreen, /value=\{limitPrice\}/u);
     assert.match(walletScreen, /value=\{amount\}/u);
-    assert.doesNotMatch(orderScreen, /value=\{formatDisplayDecimal\(/u);
-    assert.doesNotMatch(walletScreen, /value=\{formatDisplayDecimal\(/u);
+    assert.doesNotMatch(orderScreen, /<TextInput[^>]*value=\{formatDisplayDecimal\(/u);
+    assert.doesNotMatch(walletScreen, /<TextInput[^>]*value=\{formatDisplayDecimal\(/u);
   });
 });

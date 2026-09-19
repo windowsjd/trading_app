@@ -55,7 +55,7 @@ function getChangeRateText(item: MarketAssetItemDto) {
   return `${formatPercent(item.price.changeRate)}%`;
 }
 
-export default function MarketSearchScreen({ navigation }: Props) {
+export default function MarketSearchScreen({ navigation, route }: Props) {
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
   const [assetType, setAssetType] = useState<SearchScope>('all');
   const [searchText, setSearchText] = useState('');
@@ -216,7 +216,9 @@ export default function MarketSearchScreen({ navigation }: Props) {
               testID={TEST_IDS.market.item(item.id)}
               style={styles.itemRow}
               onPress={() =>
-                navigation.navigate('AssetDetail', { assetId: item.id })
+                route.params?.returnToAsset
+                  ? navigation.popTo('AssetDetail', { assetId: item.id })
+                  : navigation.navigate('AssetDetail', { assetId: item.id })
               }
             >
               <View>

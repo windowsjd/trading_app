@@ -29,6 +29,9 @@ export default function CTAButton({
   return (
     <ActionPressable
       testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled, busy: state === 'loading' }}
       style={[
         styles.button,
         state === 'blocked' && styles.blocked,

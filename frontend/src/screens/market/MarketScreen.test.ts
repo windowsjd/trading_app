@@ -62,6 +62,6 @@ it('uses the shared socket for market and search session transitions without per
   assert.doesNotMatch(marketSearch, /refetchInterval/u);
   const detail = read('screens/asset/AssetDetailScreen.tsx');
   assert.match(detail, /applyTickerMarketState/u);
-  assert.match(detail, /latestTicker: displayTicker/u);
+  assert.match(detail, /latestTicker: ticker/u);
   assert.doesNotMatch(detail, /refetchInterval/u);
 });

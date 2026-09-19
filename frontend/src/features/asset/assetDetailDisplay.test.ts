@@ -9,10 +9,11 @@ const source = readFileSync(
 );
 
 describe('AssetDetailScreen display contract', () => {
-  it('hides market and internal price metadata while retaining settlement currency', () => {
+  it('hides market and internal price metadata and shows settlement currency in the pair', () => {
     assert.doesNotMatch(source, /시장\s+\{asset\.market\}/);
     assert.doesNotMatch(source, /가격 통화/);
-    assert.match(source, /결제 통화\s+\{asset\.settlementCurrency\}/);
+    assert.match(source, /getTradingPair\(asset\)/);
+    assert.doesNotMatch(source, /결제 통화|Wallet으로|시장 상태:|거래 상태:/);
 
     assert.doesNotMatch(source, /가격 수집/);
     assert.doesNotMatch(source, /가격 기준/);
@@ -27,11 +28,8 @@ describe('AssetDetailScreen display contract', () => {
     assert.doesNotMatch(source, /Domestic stock orders use the KRW wallet\./);
   });
 
-  it('keeps dynamic market and tradable values after colon labels', () => {
-    assert.match(source, /시장 상태:\s+\{asset\.marketStatus\}/);
-    assert.match(
-      source,
-      /거래 상태:\s+\{asset\.tradable\s+\?\s+"거래 가능"\s+:\s+"거래 제한"\}/,
-    );
+  it('localizes only the domestic market badge', () => {
+    assert.match(source, /asset.assetType === 'domestic_stock'/);
+    assert.match(source, /getStockMarketStatus\(asset.marketStatus\)/);
   });
 });

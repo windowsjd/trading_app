@@ -16,15 +16,15 @@ describe('asset detail information and trading controls', () => {
   for (const assetType of ['domestic_stock', 'crypto']) {
     for (const [changeRate, expected] of [
       [null, '-'], [undefined, '-'], ['', '-'], ['NaN', '-'],
-      ['1.23000000', '1.23%'], ['-0.46000000', '-0.46%'], ['0.00000000', '0%'],
+      ['1.23000000', '+1.23%'], ['-0.46000000', '-0.46%'], ['0.00000000', '0%'],
     ]) {
       it(`renders ${assetType} REST change rate ${changeRate} as ${expected}`, () => {
         const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
         h.asset.assetType = assetType;
         h.asset.price.changeRate = changeRate;
         const tree = h.render();
-        const label = elements(tree, 'Text').find((node: any) => textContent(node).startsWith('등락률 '));
-        assert.equal(textContent(label), `등락률 ${expected}`);
+        const label = elements(tree, 'Text').find((node: any) => textContent(node) === (expected === '-' ? '등락률 -' : expected));
+        assert.equal(textContent(label), expected === '-' ? '등락률 -' : expected);
       });
     }
   }
@@ -39,8 +39,8 @@ describe('asset detail information and trading controls', () => {
         priceCapturedAt: h.asset.price.priceCapturedAt, changeRate,
       };
       const tree = h.render();
-      const label = elements(tree, 'Text').find((node: any) => textContent(node).startsWith('등락률 '));
-      assert.equal(textContent(label), `등락률 ${expected}`);
+      const label = elements(tree, 'Text').find((node: any) => textContent(node) === (expected === '-' ? '등락률 -' : expected));
+      assert.equal(textContent(label), expected === '-' ? '등락률 -' : expected);
       assert.doesNotMatch(textContent(tree), /등락률 -%|등락률 1\.23%/);
     });
   }
@@ -48,8 +48,8 @@ describe('asset detail information and trading controls', () => {
   it('keeps closed status and tradability while hiding duplicate market copy and KRW conversion', () => {
     const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
     const text = textContent(h.render());
-    assert.match(text, /시장 상태: closed/);
-    assert.match(text, /거래 상태: 거래 제한/);
+    assert.match(text, /장마감/);
+    assert.doesNotMatch(text, /거래 상태:|시장 상태:/);
     assert.doesNotMatch(text, /현재 시장이 닫혀 있습니다\.|장 상태는 주문 견적에서 최종 확인됩니다\.|KRW 환산/);
     assert.equal(h.asset.marketStatus, 'closed');
     assert.equal(h.asset.tradable, false);
@@ -87,11 +87,14 @@ describe('asset detail information and trading controls', () => {
       Object.assign(h.asset, { assetType, priceCurrency: 'USD', settlementCurrency: 'USD',
         marketStatus: 'open', tradable: true, tradeBlockedReason: null });
       h.asset.price.priceCurrency = 'USD';
-      assert.match(textContent(h.render()), /KRW 환산 70,000/);
+      let tree = h.render();
+      h.control(tree, 'asset-krw-toggle').props.onPress();
+      tree = h.render();
+      assert.match(textContent(tree), /₩70,000/);
       h.asset.price.priceKrwState = 'unavailable';
       const text = textContent(h.render());
-      assert.match(text, /KRW 환산 사용 불가/);
-      assert.match(text, /KRW 환산 시세를 사용할 수 없습니다/);
+      assert.match(text, /환산 불가/);
+      assert.doesNotMatch(text, /KRW 환산 시세를 사용할 수 없습니다/);
     });
   }
 
@@ -101,30 +104,14 @@ describe('asset detail information and trading controls', () => {
     assert.match(textContent(h.render()), /현재 시장이 닫혀 있습니다\./);
   });
 
-  for (const quantity of ['0', '2']) {
-    it(`keeps the actual sell CTA ${quantity === '0' ? 'disabled' : 'enabled'} for quantity ${quantity}`, () => {
-      const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
-      setPosition(h, quantity);
-      const tree = h.render();
-      assert.ok(!textContent(tree).includes(noHoldingsMessage));
-      const sell = h.control(tree, TEST_IDS.assetDetail.sellButton);
-      assert.equal(h.renderCta(sell).props.disabled, quantity === '0');
-      assert.equal(h.renderCta(h.control(tree, TEST_IDS.assetDetail.buyButton)).props.disabled, false);
-      if (quantity !== '0') {
-        sell.props.onPress();
-        assert.deepEqual(h.navigation, [['Order', { assetId: 'asset-1', side: 'sell', accountId: 'account-1' }]]);
-      }
-    });
-  }
-
-  for (const state of ['isLoading', 'isError']) {
-    it(`retains holdings lookup warnings and sell blocking for ${state}`, () => {
-      const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
-      h.positionQuery[state] = true;
-      assert.match(textContent(h.render()), /보유 수량을 확인/);
-      assert.equal(h.renderCta(h.control(h.render(), TEST_IDS.assetDetail.sellButton)).props.disabled, true);
-    });
-  }
+  it('switches sides inline without adding Order routes', () => {
+    const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
+    const tree = h.render();
+    for (const side of ['buy', 'sell']) {
+      h.control(tree, TEST_IDS.assetDetail[`${side}Button`]).props.onPress();
+    }
+    assert.deepEqual(h.navigation, []);
+  });
 });
 
 describe('sell order display without changing gates', () => {
@@ -135,7 +122,7 @@ describe('sell order display without changing gates', () => {
       let tree = h.render();
       h.control(tree, TEST_IDS.order.quantityInput).props.onChangeText('1');
       tree = h.render();
-      assert.ok(!textContent(tree).includes(noHoldingsMessage));
+      assert.equal(textContent(tree).includes(noHoldingsMessage), quantity === '0');
       assert.equal(h.renderCta(h.control(tree, TEST_IDS.order.quoteSubmit)).props.disabled, quantity === '0');
       assert.equal(h.renderCta(h.control(tree, TEST_IDS.order.executeSubmit)).props.disabled, true, 'execution still requires a quote');
       const ratios = elements(tree, 'Pressable').filter((node: any) => ['25%', '50%', '75%', '100%'].includes(textContent(node)));

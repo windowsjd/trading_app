@@ -24,7 +24,7 @@ export type HomeStackParamList = {
 
 export type MarketStackParamList = {
   Market: undefined;
-  MarketSearch: undefined;
+  MarketSearch: { returnToAsset?: boolean } | undefined;
   AssetDetail: { assetId: string };
   /**
    * `accountId` is REQUIRED, not optional (작업 10 §A-2).
@@ -84,6 +84,7 @@ export type MainTabParamList = {
 };
 
 export type RootStackParamList = {
+  AssetChart: { assetId: string };
   Splash: undefined;
   AuthStack: NavigatorScreenParams<AuthStackParamList> | undefined;
   /**

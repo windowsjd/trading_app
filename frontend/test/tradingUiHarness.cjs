@@ -41,8 +41,13 @@ function createTradingUiHarness(screenName) {
     ...Object.fromEntries(['View', 'Text', 'SafeAreaView', 'ScrollView', 'TextInput',
       'Pressable', 'KeyboardAvoidingView'].map(name => [name, name])),
     StyleSheet: { create: styles => styles }, Platform: { OS: 'web' },
+    useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
   };
   const mocks = {
+    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+    '@react-navigation/elements': { useHeaderHeight: () => 0 },
+    'react-native-svg': { default: 'Svg', Path: 'Path', __esModule: true },
+    '../../features/asset/AssetOrderLadder': { default: props => React.createElement('AssetOrderLadder', props, props.currentPrice), __esModule: true },
     '@react-navigation/native': { useIsFocused: () => h.isFocused ?? true },
     react: { ...React,
       useMemo: fn => fn(),
@@ -113,10 +118,19 @@ function createTradingUiHarness(screenName) {
     './OrderSuccessBottomSheet': { default: 'OrderSuccessBottomSheet', __esModule: true },
     './FxSuccessBottomSheet': { default: 'FxSuccessBottomSheet', __esModule: true },
   };
-  const screen = load(resolve(__dirname, '../src/screens', screenName), mocks).default;
+  const order = load(resolve(__dirname, '../src/screens/order/OrderPanel.tsx'), mocks);
+  mocks['../order/OrderPanel'] = order;
+  const module = screenName === 'order/OrderScreen.tsx' ? order : load(resolve(__dirname, '../src/screens', screenName), mocks);
+  const screen = module.AssetTradingScreen ?? module.AssetChartContent ?? module.OrderForm ?? module.default;
+  function expand(node) {
+    if (Array.isArray(node)) return node.map(expand);
+    if (!React.isValidElement(node)) return node;
+    if (typeof node.type === 'function') return expand(node.type(node.props));
+    return React.cloneElement(node, {}, expand(node.props.children));
+  }
   h.render = (side = 'sell') => {
     index = 0; effects = []; h.queries = [];
-    const tree = screen({ route: { params: { assetId: h.asset.id, accountId: h.account.id, side } }, navigation });
+    const tree = expand(screen({ assetId: h.asset.id, accountId: h.account.id, side, onReturnToAsset: () => {}, route: { params: { assetId: h.asset.id, accountId: h.account.id, side } }, navigation }));
     effects.forEach(fn => fn());
     return tree;
   };

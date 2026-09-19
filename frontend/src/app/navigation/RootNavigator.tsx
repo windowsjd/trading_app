@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import type { RootStackParamList } from './types';
 import { rootNavigationRef } from './navigationRef';
+import AssetChartScreen from '../../screens/asset/AssetChartScreen';
 import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
 import SplashScreen from '../../screens/auth/SplashScreen';
@@ -31,6 +32,7 @@ export default function RootNavigator() {
         <Stack.Screen name="ModeSelection" component={ModeSelectionScreen} />
         <Stack.Screen name="MainTabs" component={MainTabs} />
         <Stack.Screen name="SeasonJoin" component={SeasonJoinScreen} />
+        <Stack.Screen name="AssetChart" component={AssetChartScreen} options={{ presentation: 'fullScreenModal' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

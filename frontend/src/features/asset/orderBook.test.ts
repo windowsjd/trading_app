@@ -164,145 +164,53 @@ function withPreview(dev: boolean | undefined, flag: string | undefined, run: ()
 const { load } = require('../../../test/ledgerTestHarness.cjs');
 const { getOrderBookPreview } = load(new URL('./orderBookPreview.ts', import.meta.url).pathname, {});
 
-describe('asset detail preview isolation and regression', () => {
-  for (const [statusMessage, hasBook] of [
-    ['호가 정보를 현재 수신할 수 없습니다.', false],
-    ['호가 정보가 지연되고 있습니다.', true],
-    ['호가 연결을 복구하는 중입니다.', true],
-  ] as const) {
-    it(`keeps buy/sell independent of ${statusMessage}`, () => withPreview(false, 'true', () => {
+describe('asset detail live book isolation', () => {
+  for (const statusMessage of ['호가 정보를 현재 수신할 수 없습니다.', '호가 정보가 지연되고 있습니다.', '호가 연결을 복구하는 중입니다.']) {
+    it(`keeps order inputs independent of ${statusMessage}`, () => withPreview(true, 'true', () => {
       const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
-      Object.assign(h.asset, { assetType: 'crypto', market: 'BINANCE', symbol: 'BTCUSDT', priceCurrency: 'USD',
-        settlementCurrency: 'USD', marketStatus: 'open', tradable: true, tradeBlockedReason: null });
-      h.positionQuery.data.positions = [{ assetId: h.asset.id, quantity: '0.125', averageCost: '70000', currencyCode: 'USD', valuation: { state: 'unavailable' } }];
-      h.orderBookState = { latestOrderBook: hasBook ? createCryptoOrderBookFixture(h.asset.id, 'BTC') : null, statusMessage };
+      Object.assign(h.asset, { assetType: 'crypto', market: 'BINANCE', symbol: 'BTCUSDT', priceCurrency: 'USD', settlementCurrency: 'USD', tradable: true });
+      h.orderBookState = { latestOrderBook: null, statusMessage };
       const tree = h.render();
-      const cards = elements(tree, 'AssetOrderBookCard');
-      assert.equal(cards.length, hasBook ? 1 : 0, 'unavailable production data never falls back to a fixture');
-      if (hasBook) {
-        assert.equal(cards[0].props.statusMessage, statusMessage);
-        assert.equal(cards[0].props.isPreview, false);
-      } else assert.ok(textContent(tree).includes(statusMessage));
-      for (const side of ['buy', 'sell'] as const) {
-        const button = h.control(tree, TEST_IDS.assetDetail[`${side}Button`]);
-        assert.equal(h.renderCta(button).props.disabled, false);
-        button.props.onPress();
-      }
-      assert.deepEqual(h.navigation, ['buy', 'sell'].map((side) => ['Order', { assetId: h.asset.id, side, accountId: h.account.id }]));
+      const ladder = elements(tree, 'AssetOrderLadder')[0];
+      assert.equal(ladder.props.book, null, 'never falls back to fixtures');
+      assert.equal(ladder.props.statusMessage, statusMessage);
+      assert.ok(h.control(tree, TEST_IDS.order.quantityInput));
       assert.deepEqual(h.requests, []);
     }));
   }
-
-  it('uses live crypto books despite the preview flag and keeps loading/errors free of fixtures', () => withPreview(true, 'true', () => {
+  it('passes real crypto depth and canonical current price to the compact ladder, with no candles on the main screen', () => {
     const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
-    Object.assign(h.asset, { assetType: 'crypto', market: 'BINANCE', symbol: 'BTCUSDT', priceCurrency: 'USD', tradable: true });
-    assert.equal(elements(h.render(), 'AssetOrderBookCard').length, 0);
-    assert.match(textContent(h.render()), /호가 정보를 불러오는 중/);
-    assert.equal(h.orderBookOptions.enabled, true);
-    h.candles = [{ time: '2026-09-19T00:00:00Z', open: '100', high: '101', low: '99', close: '100', volume: '1' }];
+    Object.assign(h.asset, { assetType: 'crypto', market: 'BINANCE', symbol: 'BTCUSDT', priceCurrency: 'USD', settlementCurrency: 'USD', tradable: true });
     const book = createCryptoOrderBookFixture(h.asset.id, 'BTC');
-    h.orderBookState = { latestOrderBook: book, statusMessage: '호가 정보가 지연되고 있습니다.' };
-    const tree = h.render(); const card = elements(tree, 'AssetOrderBookCard')[0];
-    assert.equal(card.props.book, book); assert.equal(card.props.isPreview, false);
-    assert.match(card.props.statusMessage, /지연/);
-    assert.ok(elements(tree, 'CandlestickChart').length > 0);
-    assert.ok(elements(tree).some((node: any) => node.props.testID === TEST_IDS.assetDetail.buyButton));
-    assert.deepEqual(h.requests, []);
-    h.orderBookState = { latestOrderBook: null, statusMessage: '호가 정보를 구독할 수 없습니다.' };
-    assert.equal(elements(h.render(), 'AssetOrderBookCard').length, 0);
-    assert.match(textContent(h.render()), /구독할 수 없습니다/);
+    h.orderBookState = { latestOrderBook: book, statusMessage: null };
+    const tree = h.render();
+    const ladder = elements(tree, 'AssetOrderLadder')[0];
+    assert.equal(ladder.props.book, book);
+    assert.equal(ladder.props.currentPrice.props.testID, 'asset-current-price');
+    assert.equal(elements(tree, 'CandlestickChart').length, 0);
+    assert.ok(h.queries.every((q: any) => q.queryKey[1] !== 'candles'));
+    assert.equal(h.liveCandleOptions, undefined);
     h.isFocused = false; h.render(); assert.equal(h.orderBookOptions.enabled, false);
-  }));
-
-  for (const [dev, flag] of [[false, 'true'], [undefined, 'true'], [true, undefined], [true, 'false'], [true, 'typo']] as const) {
-    it(`does not expose fixtures when dev=${dev}, flag=${flag}`, () => withPreview(dev, flag, () => {
+  });
+  for (const dev of [true, false]) {
+    it(`never renders a domestic fixture (dev=${dev}, preview=true, long=true)`, () => withPreview(dev, 'true', () => {
       const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
+      assert.equal(elements(h.render(), 'AssetOrderLadder').length, 0);
       assert.equal(elements(h.render(), 'AssetOrderBookCard').length, 0);
-      Object.assign(h.asset, { assetType: 'crypto', market: 'BINANCE', symbol: 'BTCUSDT', priceCurrency: 'USD' });
-      assert.equal(elements(h.render(), 'AssetOrderBookCard').length, 0);
+      assert.match(textContent(h.render()), /70,000원/);
+      assert.equal(h.orderBookOptions.enabled, false);
     }, true));
   }
-
-  it('leaves US stocks untouched even when preview is enabled', () => withPreview(true, 'true', () => {
+  it('hides a previous asset book before a new snapshot arrives', () => {
     const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
-    h.asset.assetType = 'us_stock';
-    assert.equal(elements(h.render(), 'AssetOrderBookCard').length, 0);
+    Object.assign(h.asset, { assetType: 'crypto', market: 'BINANCE', symbol: 'BTCUSDT', priceCurrency: 'USD' });
+    h.orderBookState = { latestOrderBook: createCryptoOrderBookFixture('previous', 'BNB'), statusMessage: null };
+    assert.equal(elements(h.render(), 'AssetOrderLadder')[0].props.book, null);
+  });
+  it('keeps standalone preview helpers available for lessons, never as trading data', () => withPreview(true, 'true', () => {
+    const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
+    assert.deepEqual(getOrderBookPreview(h.asset), createOrderBookFixture(h.asset.id));
+    Object.assign(h.asset, { assetType: 'crypto', market: 'BINANCE', symbol: 'BTCUSDT', priceCurrency: 'USD' });
+    assert.deepEqual(getOrderBookPreview(h.asset), createCryptoOrderBookFixture(h.asset.id, 'BTC'));
   }));
-
-  it('rejects a domestic asset with an unexpected currency', () => withPreview(true, 'true', () => {
-    const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
-    h.asset.priceCurrency = 'USD';
-    assert.equal(elements(h.render(), 'AssetOrderBookCard').length, 0);
-  }));
-
-  it('renders the dev book while preserving price, chart, queries and account-bound buy/sell routes', () => withPreview(true, '1', () => {
-    const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
-    h.candles = [{ time: '2026-09-18T01:00:00Z', open: '70000', high: '71000', low: '69000', close: '70500', volume: '100' }];
-    h.positionQuery.data.positions = [{ assetId: h.asset.id, quantity: '2', averageCost: '70000', currencyCode: 'KRW', valuation: { state: 'unavailable' } }];
-    const tree = h.render();
-    const card = elements(tree, 'AssetOrderBookCard')[0];
-    assert.equal(card.props.isPreview, true);
-    assert.deepEqual(card.props.book, createOrderBookFixture(h.asset.id));
-    assert.match(textContent(tree), /70,000원/);
-    assert.match(textContent(tree), /시장 상태: closed/);
-    assert.deepEqual(elements(tree, 'CandlestickChart')[0].props.candles, h.candles);
-    assert.equal(h.queries.length, 3, 'no new HTTP query or cache added');
-    for (const side of ['buy', 'sell']) {
-      const cta = h.control(tree, TEST_IDS.assetDetail[`${side}Button` as 'buyButton' | 'sellButton']);
-      assert.equal(h.renderCta(cta).props.disabled, false);
-      cta.props.onPress();
-    }
-    assert.deepEqual(h.navigation, ['buy', 'sell'].map((side) => ['Order', { assetId: h.asset.id, side, accountId: h.account.id }]));
-    assert.deepEqual(h.requests, [], 'fixture and its rows never submit orders');
-    h.asset.id = 'kr-2';
-    assert.equal(elements(h.render(), 'AssetOrderBookCard')[0].props.book.assetId, 'kr-2');
-  }));
-
-  it('uses the long layout fixture only after opting in', () => withPreview(true, 'true', () => {
-    const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
-    assert.deepEqual(elements(h.render(), 'AssetOrderBookCard')[0].props.book, createLongOrderBookFixture(h.asset.id));
-  }, true));
-
-  for (const [symbol, base] of [['BTCUSDT', 'BTC'], ['ETHUSDT', 'ETH'], ['XRPUSDT', 'XRP'], ['1INCHUSDT', '1INCH'], [' ethusdt ', 'ETH']]) {
-    it(`derives ${base} / USDT from the existing ${symbol} asset contract`, () => withPreview(true, 'true', () => {
-      const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
-      Object.assign(h.asset, { assetType: 'crypto', market: 'BINANCE', symbol, priceCurrency: 'USD', settlementCurrency: 'USD' });
-      const tree = h.render();
-      const book = getOrderBookPreview(h.asset);
-      assert.equal(elements(tree, 'AssetOrderBookCard').length, 0, 'crypto detail never falls back to preview');
-      assert.deepEqual(book, createCryptoOrderBookFixture(h.asset.id, base));
-      assert.equal(book.asks.length, 10);
-      assert.equal(book.bids.length, 10);
-      assert.equal(h.asset.priceCurrency, 'USD');
-      assert.equal(h.asset.settlementCurrency, 'USD');
-      assert.equal(h.queries.length, 3);
-      assert.deepEqual(h.requests, []);
-    }));
-  }
-
-  for (const overrides of [
-    { symbol: 'BTC' }, { symbol: 'BTCUSD' }, { symbol: 'ETHBTC' },
-    { symbol: 'USDT' }, { symbol: '' }, { symbol: 'BTC/USDT' },
-    { market: 'OTHER' }, { priceCurrency: 'KRW' }, { assetType: 'us_stock' },
-  ]) {
-    it(`does not guess a crypto pair for ${JSON.stringify(overrides)}`, () => withPreview(true, 'true', () => {
-      const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
-      Object.assign(h.asset, { assetType: 'crypto', market: 'BINANCE', symbol: 'BTCUSDT', priceCurrency: 'USD', ...overrides });
-      assert.equal(getOrderBookPreview(h.asset), null);
-      assert.equal(elements(h.render(), 'AssetOrderBookCard').length, 0);
-    }));
-  }
-
-  it('reuses the LONG flag for crypto and refreshes units across asset changes', () => withPreview(true, 'true', () => {
-    const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
-    assert.equal(elements(h.render(), 'AssetOrderBookCard')[0].props.book.quantityUnit, '주');
-    Object.assign(h.asset, { id: 'btc', assetType: 'crypto', market: 'BINANCE', symbol: 'BTCUSDT', priceCurrency: 'USD' });
-    assert.deepEqual(getOrderBookPreview(h.asset), createCryptoOrderBookFixture('btc', 'BTC', true));
-    assert.equal(elements(h.render(), 'AssetOrderBookCard').length, 0);
-    Object.assign(h.asset, { id: 'eth', symbol: 'ETHUSDT' });
-    assert.deepEqual(getOrderBookPreview(h.asset), createCryptoOrderBookFixture('eth', 'ETH', true));
-    assert.equal(elements(h.render(), 'AssetOrderBookCard').length, 0);
-    Object.assign(h.asset, { id: 'kr-2', assetType: 'domestic_stock', market: 'KRX', symbol: '005930', priceCurrency: 'KRW' });
-    assert.deepEqual(elements(h.render(), 'AssetOrderBookCard')[0].props.book, createLongOrderBookFixture('kr-2'));
-  }, true));
 });
