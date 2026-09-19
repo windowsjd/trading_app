@@ -52,6 +52,8 @@ import {
 } from '../orders/market-calendar/market-session-override.store';
 import { AssetsService } from './assets.service';
 import { AssetTickerGateway } from '../realtime/asset-ticker.gateway';
+import { KIS_DOMESTIC_PERIOD_SOURCE } from '../providers/kis/candles/kis-period-candle.types';
+import { BINANCE_CANDLE_SOURCE } from '../providers/binance/binance-candle.types';
 import { DailyChangeRateService } from './daily-change-rate.service';
 import { MarketCandlesRepository } from './market-candles.repository';
 
@@ -1537,7 +1539,7 @@ describe('AssetsService', () => {
       prisma.assetPriceSnapshot.findMany.mockResolvedValue([current]);
       prisma.fxRateSnapshot.findMany.mockResolvedValue(freshUsdKrwProviderSnapshots());
       prisma.marketCandle.findMany.mockResolvedValue([{
-        assetId: fixture.id, interval: '1d', sourceProvider: isCrypto ? 'binance' : 'kis', isClosed: true,
+        assetId: fixture.id, interval: '1d', sourceProvider: isCrypto ? BINANCE_CANDLE_SOURCE : KIS_DOMESTIC_PERIOD_SOURCE, isClosed: true,
         openTime: new Date(isCrypto ? '2026-07-19T00:00:00Z' : '2026-07-15T15:00:00Z'),
         closeTime: new Date(isCrypto ? '2026-07-20T00:00:00Z' : '2026-07-16T15:00:00Z'),
         sourceUpdatedAt: new Date(isCrypto ? '2026-07-20T00:00:00Z' : '2026-07-16T15:00:00Z'),
@@ -1555,8 +1557,10 @@ describe('AssetsService', () => {
       };
       expect(await internal.buildSnapshotTickerMessage(fixture.id)).toMatchObject({ changeRate: '10.00000000' });
       const event = { type: isCrypto ? 'binance_realtime_price' : 'kis_realtime_price', assetId: fixture.id,
-        price: { price: '120', currencyCode: currency, sourceName, changeRate: '-99.9',
+        price: { price: '110', currencyCode: currency, sourceName, changeRate: '-99.9',
           effectiveAt: testNow.toISOString(), capturedAt: testNow.toISOString() } };
+      expect(await internal.buildRealtimeTickerMessageFromEvent(event)).toMatchObject({ priceLocal: '110', changeRate: '10.00000000' });
+      event.price.price = '120';
       expect(await internal.buildRealtimeTickerMessageFromEvent(event)).toMatchObject({ priceLocal: '120', changeRate: '20.00000000' });
       event.price.price = '130'; event.price.changeRate = '999';
       expect(await internal.buildRealtimeTickerMessageFromEvent(event)).toMatchObject({ priceLocal: '130', changeRate: '30.00000000' });

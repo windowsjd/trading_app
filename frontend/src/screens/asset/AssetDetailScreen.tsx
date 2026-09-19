@@ -211,6 +211,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
   // rate shows no change rate — the older REST one never fills in next to a
   // newer realtime price.
   const displayChangeRate = displayPrice.changeRate;
+  const formattedChangeRate = formatPercent(displayChangeRate);
   const displayPriceDecimals = displayPrice.displayPriceDecimals;
   const displayPriceKrwMessage = displayPrice.priceKrwMessage;
   const assetNameDisplay = getAssetNameDisplay(asset);
@@ -332,7 +333,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
             </Text>
           ) : null}
           <Text style={styles.helper}>
-            등락률 {formatPercent(displayChangeRate)}%
+            등락률 {formattedChangeRate === '-' ? '-' : `${formattedChangeRate}%`}
           </Text>
           <Text style={styles.helper}>시장 상태: {asset.marketStatus}</Text>
           <Text style={styles.helper}>

@@ -37,6 +37,11 @@ import { KisDomesticFiveMinuteBuilder } from '../providers/kis/candles/kis-domes
 import { KisPeriodCandleNormalizerService } from '../providers/kis/candles/kis-period-candle-normalizer.service';
 import { MarketCandleSyncInputError } from './market-candle-sync.types';
 import type { MarketCandleSyncConfig } from './market-candle-sync.config';
+import { DailyChangeRateService } from './daily-change-rate.service';
+import { type AssetType } from '../generated/prisma/client';
+import { KIS_DOMESTIC_PERIOD_SOURCE } from '../providers/kis/candles/kis-period-candle.types';
+import { BINANCE_CANDLE_SOURCE } from '../providers/binance/binance-candle.types';
+import { BinanceCandleIngestionService } from '../providers/binance/binance-candle.ingestion.service';
 
 const DAY = 24 * 60 * 60_000;
 const FIVE_MIN = 5 * 60_000;
@@ -479,6 +484,121 @@ describe('MarketCandleSyncService', () => {
       binanceCandles,
     };
   };
+
+  it.each([
+    {
+      asset: DOMESTIC_ASSET,
+      source: KIS_DOMESTIC_PERIOD_SOURCE,
+      baseline: '2026-09-16T15:00:00Z',
+      effectiveAt: '2026-09-18T06:30:00Z',
+    },
+    {
+      asset: CRYPTO_ASSET,
+      source: BINANCE_CANDLE_SOURCE,
+      baseline: '2026-09-18T00:00:00Z',
+      effectiveAt: '2026-09-19T03:00:00Z',
+    },
+  ])(
+    'feeds normalized $source sync writes directly to the daily return reader',
+    async ({ asset, source, baseline, effectiveAt }) => {
+      const harness = createHarness({ assets: [asset] });
+      const now = new Date('2026-09-19T03:00:00Z');
+      const from = new Date(baseline);
+      const to = new Date(from.getTime() + DAY);
+      if (asset.assetType === 'domestic_stock') {
+        harness.domesticPeriodAdapter.fetchPeriodPage.mockResolvedValue({
+          state: 'ok',
+          rows: [
+            {
+              value: {
+                stck_bsop_date: '20260917',
+                stck_oprc: '100',
+                stck_hgpr: '102',
+                stck_lwpr: '99',
+                stck_clpr: '100',
+                acml_vol: '1000',
+                acml_tr_pbmn: '100000',
+              },
+              receivedAt: now,
+              sequence: 0,
+            },
+          ],
+          providerReturnedRows: 1,
+          blankRows: 0,
+          oldestDate: '20260917',
+          latestDate: '20260917',
+          trCont: 'D',
+        });
+      } else {
+        const ingestion = new BinanceCandleIngestionService({
+          fetchKlines: jest.fn().mockResolvedValue({
+            response: [
+              [
+                from.getTime(),
+                '100',
+                '102',
+                '99',
+                '100',
+                '1000',
+                to.getTime() - 1,
+                '100000',
+              ],
+            ],
+            receivedAt: now,
+          }),
+        } as never);
+        harness.binanceCandles.fetchKlinesPage.mockImplementation(
+          (
+            input: Parameters<
+              BinanceCandleIngestionService['fetchKlinesPage']
+            >[0],
+          ) => ingestion.fetchKlinesPage(input),
+        );
+      }
+      const result = await harness.service.syncAsset({
+        assetId: asset.id,
+        targets: ['1d'],
+        mode: 'repair' as never,
+        from,
+        to,
+        now,
+      });
+      expect(result.feeds[0]).toMatchObject({
+        status: 'completed',
+        provider: source,
+        writtenRows: 1,
+      });
+      const storedRows = harness.upserted.flat();
+      expect(storedRows).toHaveLength(1);
+      expect(storedRows[0]).toMatchObject({
+        assetId: asset.id,
+        interval: '1d',
+        sourceProvider: source,
+        openTime: from,
+        closeTime: to,
+        isClosed: true,
+        sourceUpdatedAt: now,
+      });
+      // Preserve the actual producer output, including Decimal OHLC, timestamps,
+      // and sourceProvider. Only the storage I/O boundary is replaced.
+      const findRange = jest.fn().mockResolvedValue(storedRows);
+      const dailyReturn = new DailyChangeRateService({ findRange } as never);
+      expect(
+        await dailyReturn.calculate({
+          asset: { ...asset, assetType: asset.assetType as AssetType },
+          price: '110',
+          effectiveAt: new Date(effectiveAt),
+          now,
+        }),
+      ).toBe('10.00000000');
+      expect(findRange).toHaveBeenCalledWith({
+        assetId: asset.id,
+        interval: '1d',
+        from,
+        to: new Date(from.getTime() + 1),
+      });
+    },
+  );
 
   it('advances the checkpoint cursor only after each page is written', async () => {
     const harness = createHarness();

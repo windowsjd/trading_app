@@ -6,6 +6,8 @@ import {
   type MarketCalendarAsset,
 } from '../orders/market-calendar.policy';
 import { zonedDateTimeToUtc } from '../providers/kis/candles/kis-candle-time';
+import { KIS_DOMESTIC_PERIOD_SOURCE } from '../providers/kis/candles/kis-period-candle.types';
+import { BINANCE_CANDLE_SOURCE } from '../providers/binance/binance-candle.types';
 import { MarketCandlesRepository } from './market-candles.repository';
 
 const DAY_MS = 86_400_000;
@@ -14,7 +16,7 @@ type BaselineWindow = {
   openTime: Date;
   closeTime: Date;
   completedAt: Date;
-  provider: 'kis' | 'binance';
+  provider: typeof KIS_DOMESTIC_PERIOD_SOURCE | typeof BINANCE_CANDLE_SOURCE;
 };
 type CacheEntry = {
   key: string;
@@ -127,7 +129,7 @@ function dailyBaselineWindow(input: {
       openTime: new Date(end - DAY_MS),
       closeTime: new Date(end),
       completedAt: new Date(end),
-      provider: 'binance',
+      provider: BINANCE_CANDLE_SOURCE,
     };
   }
   if (input.asset.assetType !== 'domestic_stock') return null;
@@ -159,6 +161,6 @@ function dailyBaselineWindow(input: {
     openTime,
     closeTime: new Date(openTime.getTime() + DAY_MS),
     completedAt: previous.closeTime,
-    provider: 'kis',
+    provider: KIS_DOMESTIC_PERIOD_SOURCE,
   };
 }

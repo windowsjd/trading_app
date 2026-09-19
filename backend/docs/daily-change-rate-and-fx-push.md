@@ -4,7 +4,7 @@ This additive presentation change keeps price/provider/calendar/candle storage a
 
 - Domestic stocks: select the session owning the displayed price using the existing market calendar. During trading this is the open session; after close, before open, on holidays and weekends it is the latest completed session. Compare its displayed price with the preceding actual KRX session's confirmed daily close. Do not reset the day's return to zero at market close.
 - Crypto: compare the displayed price with the preceding UTC calendar day's confirmed daily close. Binance rolling 24h `P` and KIS raw change fields are not canonical daily returns.
-- Source of truth: existing `market_candles` closed `1d` rows from `kis` / `binance`, at the exact expected daily window (KRX local midnight, crypto UTC midnight). Intraday carried price snapshots do not prove an official daily close. Missing, wrong-window, unclosed or invalid evidence returns null; no search for older prices or provider fetch is added.
+- Source of truth: existing `market_candles` closed `1d` rows from `KIS_DOMESTIC_PERIOD_SOURCE` (`kis_domestic_period`) / `BINANCE_CANDLE_SOURCE` (`binance_klines`), at the exact expected daily window (KRX local midnight, crypto UTC midnight). The reader must share these exact source constants with the sync producer; abbreviated `kis` / `binance` and KIS minute sources are not daily evidence. Intraday carried price snapshots do not prove an official daily close. Missing, wrong-window, unclosed or invalid evidence returns null; no search for older prices or provider fetch is added. The UI renders unavailable change rates as `-`, without `%`.
 - REST and realtime use one Decimal calculation. A bounded process-local cache coalesces baseline reads per asset/window, expires after 30 seconds (5 seconds for unavailable results), and never serves expired data on errors. Price changes cause no DB writes.
 - FX ingestion publishes a value-free `fx_rate_updated` invalidation on the existing provider-price Redis PubSub channel after successful snapshot creation. The existing gateway forwards it only to USD/KRW `fx_rate` subscribers. Clients resync `GET /api/v1/fx/rates/current?refresh=false`; raw snapshot rates are never sent or selected by the client.
 - Socket subscription acknowledgement and restored Redis subscriptions trigger REST resync. React Query still performs initial REST loading. A five-minute REST fallback recovers missed notifications, failed publication and unavailable PubSub even if the app socket remains connected; server `validUntil` expiry and foreground entry also resync. All reads use refresh=false, so display notifications do not increase external provider calls.
@@ -77,3 +77,57 @@ Protocol: subscribe/unsubscribe `{ type, channel: "fx_rate", pair: "USD/KRW" }`;
 - provider 연결·실기기·배포 환경의 실제 Redis를 사용하는 수동 왕복 확인은 수행하지 않았다. 장중 KIS, UTC 경계 Binance, 앱 백그라운드 복귀와 실제 환율 ingestion → 열린 환전 화면 반영을 배포 환경에서 확인할 수 있다.
 - UI 레이아웃과 금액 formatter는 수정하지 않았다. 기존 작업 1 정보 구조/거래 제한 회귀 테스트는 유지하고 전체 frontend suite에서 통과했다.
 - Backend 전체 변경 파일 lint는 위에 기록한 기존 오류 5건 때문에 완전 통과 상태가 아니다. 이번 추가 코드의 check-only 검사와 공식 gated lint는 통과했다.
+
+## 2026-09-19 sourceProvider 계약 보정
+
+최신 코드와 실제 원격 DB 모두에서 source mismatch를 확인했다. `MarketCandleSyncService.sourceProviderFor()`는 국내 1d/1w에 `KIS_DOMESTIC_PERIOD_SOURCE = 'kis_domestic_period'`, Binance에 `BINANCE_CANDLE_SOURCE = 'binance_klines'`를 사용한다. Sync는 normalization 결과에 이 source를 붙여 `MarketCandlesRepository.upsertMany()`에 전달하며 repository는 `market_candles.source_provider`에 그대로 저장한다. 기존 daily reader는 각각 `kis`, `binance`만 허용했다. Daily unit fixture와 Assets REST/realtime fixture까지 이 잘못된 축약값을 사용하여 실제 저장 계약과의 불일치를 놓쳤다.
+
+수정은 reader의 provider 타입과 baseline provider를 기존 canonical constant에 연결하는 것이다. `row.sourceProvider !== window.provider`의 정확한 비교와 나머지 evidence 검증은 그대로다. 자산, 1d interval, 확정 여부, 정확한 open/close window, 유효한 sourceUpdatedAt, 미래/조기 확정 거부, 양수 가격 및 OHLC 검증을 완화하지 않았다. 누락된 기준 일봉은 여전히 null이며 다른 날짜 fallback이나 synthetic previous close를 만들지 않는다.
+
+변경 파일은 다음 7개다.
+
+| 파일 | 변경 |
+| --- | --- |
+| `backend/src/assets/daily-change-rate.service.ts` | 저장 파이프라인의 두 canonical source constant 직접 재사용 |
+| `backend/src/assets/daily-change-rate.service.spec.ts` | 실제 source fixture, 주말/휴장/UTC 경계, 양 자산군의 source/evidence 거부 회귀 |
+| `backend/src/assets/assets.service.spec.ts` | 실제 source fixture와 같은 현재가격의 REST/realtime 동등성 |
+| `backend/src/assets/market-candle-sync.service.spec.ts` | 실제 KIS normalization 및 Binance ingestion → sync upsert 입력 → daily reader 계약 테스트; 외부 API/DB I/O만 대체 |
+| `frontend/src/screens/asset/AssetDetailScreen.tsx` | 포맷된 값이 `-`이면 `%` 생략 |
+| `frontend/src/features/asset/tradingUiDisplay.test.ts` | 국내주식/crypto의 null·양수·음수·0 화면 렌더링, ticker null에 REST 등락률을 붙이지 않는 회귀 |
+| `backend/docs/daily-change-rate-and-fx-push.md` | 저장 source 계약 수정 및 검증 기록 |
+
+Market list와 search는 null 등락률에 기존 시장 상태/거래 경고 문구를 표시하므로 변경하지 않았다. 실제 숫자 0은 `0%`, null/undefined/비정상 값은 상세에서 `등락률 -`로 표시한다. 계산식 `(currentPrice - previousClose) / previousClose * 100`과 API 금융 문자열 계약은 유지한다.
+
+REST list/detail/price는 `AssetsService.calculateChangeRate()`를 통해 같은 daily service를 사용한다. 실시간 gateway도 현재 provider frame의 가격을 이 함수에 전달하며 provider 자체 change field는 무시한다. 재연결 snapshot ticker는 REST의 가격/등락률 쌍을 사용한다. 실제 source fixture로 현재가격 110 → 10%, 120 → 20%, 130 → 30%를 검증했고, provider change field를 `-99.9`와 `999`로 보내도 canonical 계산을 덮어쓰지 않았다. Frontend의 기존 ticker 기준 선택과 null 보존도 통과했다.
+
+### Production read-only 확인
+
+2026-09-19 08:08:48.535 UTC(17:08:48.535 KST), 설정된 원격 DB에서 `default_transaction_read_only=on`, `BEGIN READ ONLY`를 확인하고 SELECT 후 ROLLBACK했다. 해당 기간 KRX 활성 calendar override는 없었다. 아래 가격은 기존 `selectMarketAwareAssetPriceSnapshotBySourcePriority()`로 선택한 값이며, 같은 조회 데이터를 변경 전 HEAD의 service와 수정 후 build에 로컬로 적용해 비교했다. 배포된 API/앱을 변경하거나 배포 후 화면을 확인한 것은 아니다.
+
+| 자산 | 표시 기준 가격 / effectiveAt (UTC) | 기준 1d 종가 | 원본 reader | 수정 reader |
+| --- | --- | --- | --- | --- |
+| 삼성전자 005930 | 260250 / 2026-09-18 06:13:57 | 252500 | null | `3.06930693` |
+| 기아 000270 | 121500 / 2026-09-18 06:14:00 | 해당 기준 일봉 없음 | null | null |
+| BTCUSDT | 81181.51 / 2026-09-19 08:08:47.016 | 80883.87 | null | `0.36798437` |
+
+| evidence | 삼성전자 | BTCUSDT |
+| --- | --- | --- |
+| interval / isClosed | `1d` / `true` | `1d` / `true` |
+| sourceProvider | `kis_domestic_period` | `binance_klines` |
+| openTime (UTC) | 2026-09-16 15:00:00 | 2026-09-18 00:00:00 |
+| closeTime (UTC) | 2026-09-17 15:00:00 | 2026-09-19 00:00:00 |
+| sourceUpdatedAt (UTC) | 2026-09-19 08:07:26.121 | 2026-09-19 04:40:18.835 |
+
+토요일의 KRX 최신 완료 세션은 금요일 9월 18일이고 비교 기준은 목요일 9월 17일이다. 위 국내주식 표시가격은 완료 세션에서 선택된 기존 snapshot이며 확정 종가라고 추정하지 않았다. 기아의 기준 일봉 누락은 별도의 데이터 상태다. 이번 수정으로 값을 채우거나 sync/row rewrite를 실행하지 않았다.
+
+### 이번 변경 검증과 기존 CI 구분
+
+- Backend targeted daily/Assets/sync: 3 suites, 179 tests 통과.
+- Backend `pnpm test --runInBand`: 199 suites, 2,920 tests 통과. 여기에는 Assets, realtime ticker gateway, candle sync/source/normalization, calendar 및 기존 주문/가격 회귀가 포함된다. Opt-in 43 suites/47 tests는 skip이다.
+- Backend `pnpm typecheck`, `pnpm build`, `pnpm lint:candles:check`, `pnpm lint:accounts:check`, `pnpm format:candles:check` 및 변경 production service의 check-only ESLint 통과.
+- Backend `pnpm test:e2e --runInBand`: 341 tests 통과. 최초 샌드박스 실행의 HTTP listen `EPERM`은 허용된 로컬 실행으로 해소했다.
+- Frontend `npm run check`: accounts/guides gated lint, typecheck, 전체 77 test files 통과. 상세 렌더링과 market/ticker changeRate 회귀 포함.
+- Frontend `CI=1 npm run export:web`: production web export 통과.
+- 신규 실패 없음. 변경분에 대한 원격 전체 CI와 opt-in PostgreSQL/live integration의 로컬 실행은 **NOT_RUN**이다.
+- 변경 전 HEAD `266a799406e5febc5ead8df8dec9120e2bc0ef1a`의 [CI #109](https://github.com/windowsjd/trading_app/actions/runs/35428548545) 로그를 별도로 확인했다. Backend/Frontend quality와 E2E는 성공했다. Core PostgreSQL은 `trading-account-trading-scope`, `general-account-trading` 2건, Limit PostgreSQL은 `limit-order-transaction-time`, `trading-transaction-time`, `trading-fee-pinning` 3건이 `MARKET_CLOSED`로 실패했다. Candle fixture는 clean-working-tree 요구로 smoke 시작 전에 실패했다. 모두 이번 미커밋 변경을 포함하지 않은 기존 CI 실패다.
+- 전체 diff와 `git diff --check` 확인: DB/schema/migration/data rewrite, producer source 이름, candle sync/저장 정책, KRX calendar/carry-forward/snapshot 선택, KIS/Binance 현재가 수집, 주문/체결/matching, Portfolio/Position/Wallet/시즌/FX/호가창 변경 없음. 새로운 abstraction/framework/API는 추가하지 않았다.

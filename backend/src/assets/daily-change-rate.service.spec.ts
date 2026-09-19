@@ -5,6 +5,9 @@ jest.mock('../generated/prisma/client', () => ({
   PrismaClient: class PrismaClient {},
 }));
 import { Prisma, type AssetType } from '../generated/prisma/client';
+import { KIS_DOMESTIC_PERIOD_SOURCE } from '../providers/kis/candles/kis-period-candle.types';
+import { KIS_DOMESTIC_CANDLE_SOURCE } from '../providers/kis/candles/kis-candle.types';
+import { BINANCE_CANDLE_SOURCE } from '../providers/binance/binance-candle.types';
 import { DailyChangeRateService } from './daily-change-rate.service';
 
 const krx = {
@@ -18,11 +21,15 @@ const crypto = {
   market: 'BINANCE',
 };
 const day = 86_400_000;
-function candle(open: string, provider = 'kis', close = '100') {
+function candle(
+  open: string,
+  provider: string = KIS_DOMESTIC_PERIOD_SOURCE,
+  close = '100',
+) {
   const openTime = new Date(open);
   const closeTime = new Date(openTime.getTime() + day);
   return {
-    assetId: provider === 'kis' ? krx.id : crypto.id,
+    assetId: provider === KIS_DOMESTIC_PERIOD_SOURCE ? krx.id : crypto.id,
     interval: '1d',
     openTime,
     closeTime,
@@ -71,6 +78,18 @@ describe('canonical daily return', () => {
       '2026-06-17T15:00:00Z',
     ],
     [
+      'Sunday retains Friday return',
+      '2026-06-21T03:00:00Z',
+      '2026-06-19T06:30:00Z',
+      '2026-06-17T15:00:00Z',
+    ],
+    [
+      '2026-09-19 Saturday retains Friday return',
+      '2026-09-19T03:00:00Z',
+      '2026-09-18T06:30:00Z',
+      '2026-09-16T15:00:00Z',
+    ],
+    [
       'preopen retains Friday return',
       '2026-06-21T23:59:59Z',
       '2026-06-19T06:30:00Z',
@@ -117,7 +136,7 @@ describe('canonical daily return', () => {
 
   it('uses one fixed UTC daily close across price changes and immediately switches at 09:00 KST', async () => {
     const { service, findRange } = setup([
-      candle('2026-06-18T00:00:00Z', 'binance'),
+      candle('2026-06-18T00:00:00Z', BINANCE_CANDLE_SOURCE),
     ]);
     const calculate = (price: string, now: string) =>
       service.calculate({
@@ -130,7 +149,7 @@ describe('canonical daily return', () => {
     expect(await calculate('120', '2026-06-19T23:59:59Z')).toBe('20.00000000');
     expect(findRange).toHaveBeenCalledTimes(1);
     findRange.mockResolvedValue([
-      candle('2026-06-19T00:00:00Z', 'binance', '120'),
+      candle('2026-06-19T00:00:00Z', BINANCE_CANDLE_SOURCE, '120'),
     ]);
     expect(await calculate('126', '2026-06-20T00:00:00Z')).toBe('5.00000000');
     expect(findRange).toHaveBeenLastCalledWith({
@@ -141,47 +160,130 @@ describe('canonical daily return', () => {
     });
   });
 
-  it.each([
-    'missing',
-    'unclosed',
-    'wrong day',
-    'wrong provider',
-    'bad close time',
-    'zero',
-    'negative',
-    'NaN',
-    'bad OHLC',
-    'future observation',
-    'unconfirmed close',
+  describe.each([
+    {
+      asset: krx,
+      provider: KIS_DOMESTIC_PERIOD_SOURCE,
+      baseline: '2026-06-18T15:00:00Z',
+      completedAt: '2026-06-19T06:30:00Z',
+    },
+    {
+      asset: crypto,
+      provider: BINANCE_CANDLE_SOURCE,
+      baseline: '2026-06-21T00:00:00Z',
+      completedAt: '2026-06-22T00:00:00Z',
+    },
   ])(
-    'returns null for %s without substituting another snapshot/day',
-    async (reason) => {
-      const row = candle('2026-06-18T15:00:00Z');
-      if (reason === 'unclosed') row.isClosed = false;
-      if (reason === 'wrong day')
-        row.openTime = new Date('2026-06-17T15:00:00Z');
-      if (reason === 'wrong provider') row.sourceProvider = 'manual';
-      if (reason === 'bad close time')
-        row.closeTime = new Date(row.closeTime.getTime() - 1);
-      if (reason === 'zero') row.close = new Prisma.Decimal(0);
-      if (reason === 'negative') row.close = new Prisma.Decimal(-1);
-      if (reason === 'NaN') row.close = new Prisma.Decimal(NaN);
-      if (reason === 'bad OHLC') row.close = new Prisma.Decimal(201);
-      if (reason === 'future observation')
-        row.sourceUpdatedAt = new Date('2027-01-01');
-      if (reason === 'unconfirmed close')
-        row.sourceUpdatedAt = new Date('2026-06-19T05:00:00Z');
-      const { service, findRange } = setup(reason === 'missing' ? [] : [row]);
-      const now = new Date('2026-06-22T03:00:00Z');
-      expect(
-        await service.calculate({
-          asset: krx,
-          price: '110',
-          effectiveAt: now,
-          now,
-        }),
-      ).toBeNull();
-      expect(findRange).toHaveBeenCalledTimes(1);
+    '$asset.assetType evidence validation',
+    ({ asset, provider, baseline, completedAt }) => {
+      it.each([
+        'missing',
+        'duplicate',
+        'wrong asset',
+        'wrong interval',
+        'unclosed',
+        'wrong day',
+        'bad close time',
+        'zero',
+        'negative',
+        'NaN',
+        'bad OHLC',
+        'inverted high/low',
+        'open above high',
+        'open below low',
+        'close below low',
+        'future observation',
+        'invalid observation',
+        'unconfirmed close',
+      ])(
+        'returns null for %s without falling back to another day',
+        async (reason) => {
+          const row = candle(baseline, provider);
+          if (reason === 'wrong asset') row.assetId = 'other-asset';
+          if (reason === 'wrong interval') row.interval = '5m';
+          if (reason === 'unclosed') row.isClosed = false;
+          if (reason === 'wrong day')
+            row.openTime = new Date(row.openTime.getTime() - day);
+          if (reason === 'bad close time')
+            row.closeTime = new Date(row.closeTime.getTime() - 1);
+          if (reason === 'zero') row.close = new Prisma.Decimal(0);
+          if (reason === 'negative') row.close = new Prisma.Decimal(-1);
+          if (reason === 'NaN') row.close = new Prisma.Decimal(NaN);
+          if (reason === 'bad OHLC') row.close = new Prisma.Decimal(201);
+          if (reason === 'inverted high/low') row.high = new Prisma.Decimal(49);
+          if (reason === 'open above high') row.open = new Prisma.Decimal(201);
+          if (reason === 'open below low') row.open = new Prisma.Decimal(49);
+          if (reason === 'close below low') row.close = new Prisma.Decimal(49);
+          if (reason === 'future observation')
+            row.sourceUpdatedAt = new Date('2027-01-01');
+          if (reason === 'invalid observation')
+            row.sourceUpdatedAt = new Date(NaN);
+          if (reason === 'unconfirmed close')
+            row.sourceUpdatedAt = new Date(Date.parse(completedAt) - 1);
+          const rows =
+            reason === 'missing'
+              ? []
+              : reason === 'duplicate'
+                ? [row, row]
+                : [row];
+          const { service, findRange } = setup(rows);
+          const now = new Date('2026-06-22T03:00:00Z');
+          expect(
+            await service.calculate({
+              asset,
+              price: '110',
+              effectiveAt: now,
+              now,
+            }),
+          ).toBeNull();
+          expect(findRange).toHaveBeenCalledTimes(1);
+          expect(findRange).toHaveBeenCalledWith({
+            assetId: asset.id,
+            interval: '1d',
+            from: new Date(baseline),
+            to: new Date(Date.parse(baseline) + 1),
+          });
+        },
+      );
+
+      it.each([
+        'manual',
+        'kis',
+        'binance',
+        KIS_DOMESTIC_CANDLE_SOURCE,
+        KIS_DOMESTIC_PERIOD_SOURCE,
+        BINANCE_CANDLE_SOURCE,
+        `${KIS_DOMESTIC_PERIOD_SOURCE}_untrusted`,
+        `untrusted_${BINANCE_CANDLE_SOURCE}`,
+      ])(
+        'accepts source %s only when it is the exact canonical source for the asset',
+        async (sourceProvider) => {
+          // Change only the source so an asset/window mismatch cannot hide a permissive source check.
+          const row = { ...candle(baseline, provider), sourceProvider };
+          const { service } = setup([row]);
+          const now = new Date('2026-06-22T03:00:00Z');
+          expect(
+            await service.calculate({
+              asset,
+              price: '110',
+              effectiveAt: now,
+              now,
+            }),
+          ).toBe(sourceProvider === provider ? '10.00000000' : null);
+        },
+      );
+
+      it.each(['0', '-1', 'NaN', 'Infinity'])(
+        'rejects invalid displayed price %s',
+        async (price) => {
+          const { service, findRange } = setup([candle(baseline, provider)]);
+          const now = new Date('2026-06-22T03:00:00Z');
+          expect(
+            await service.calculate({ asset, price, effectiveAt: now, now }),
+          ).toBeNull();
+          expect(findRange).not.toHaveBeenCalled();
+        },
+      );
     },
   );
 
@@ -205,7 +307,7 @@ describe('canonical daily return', () => {
 
   it("does not carry yesterday's crypto baseline across UTC midnight when the new closed candle is missing", async () => {
     const { service, findRange } = setup([
-      candle('2026-06-18T00:00:00Z', 'binance'),
+      candle('2026-06-18T00:00:00Z', BINANCE_CANDLE_SOURCE),
     ]);
     const before = new Date('2026-06-19T23:59:59Z');
     expect(

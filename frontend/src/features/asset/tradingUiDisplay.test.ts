@@ -13,6 +13,38 @@ function setPosition(h: any, quantity: string) {
 }
 
 describe('asset detail information and trading controls', () => {
+  for (const assetType of ['domestic_stock', 'crypto']) {
+    for (const [changeRate, expected] of [
+      [null, '-'], [undefined, '-'], ['', '-'], ['NaN', '-'],
+      ['1.23000000', '1.23%'], ['-0.46000000', '-0.46%'], ['0.00000000', '0%'],
+    ]) {
+      it(`renders ${assetType} REST change rate ${changeRate} as ${expected}`, () => {
+        const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
+        h.asset.assetType = assetType;
+        h.asset.price.changeRate = changeRate;
+        const tree = h.render();
+        const label = elements(tree, 'Text').find((node: any) => textContent(node).startsWith('등락률 '));
+        assert.equal(textContent(label), `등락률 ${expected}`);
+      });
+    }
+  }
+
+  for (const [changeRate, expected] of [[null, '-'], [undefined, '-'], ['-0.46000000', '-0.46%']]) {
+    it(`renders ticker change rate ${changeRate} without borrowing the REST return`, () => {
+      const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
+      h.asset.marketStatus = 'open';
+      h.asset.price.changeRate = '1.23000000';
+      h.ticker = {
+        type: 'asset_ticker', assetId: h.asset.id, priceLocal: '71000', priceCurrency: 'KRW',
+        priceCapturedAt: h.asset.price.priceCapturedAt, changeRate,
+      };
+      const tree = h.render();
+      const label = elements(tree, 'Text').find((node: any) => textContent(node).startsWith('등락률 '));
+      assert.equal(textContent(label), `등락률 ${expected}`);
+      assert.doesNotMatch(textContent(tree), /등락률 -%|등락률 1\.23%/);
+    });
+  }
+
   it('keeps closed status and tradability while hiding duplicate market copy and KRW conversion', () => {
     const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
     const text = textContent(h.render());
