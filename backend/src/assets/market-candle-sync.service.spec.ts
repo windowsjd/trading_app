@@ -38,7 +38,7 @@ import { KisPeriodCandleNormalizerService } from '../providers/kis/candles/kis-p
 import { MarketCandleSyncInputError } from './market-candle-sync.types';
 import type { MarketCandleSyncConfig } from './market-candle-sync.config';
 import { DailyChangeRateService } from './daily-change-rate.service';
-import { type AssetType } from '../generated/prisma/client';
+import { type AssetType, type MarketCandle } from '../generated/prisma/client';
 import { KIS_DOMESTIC_PERIOD_SOURCE } from '../providers/kis/candles/kis-period-candle.types';
 import { BINANCE_CANDLE_SOURCE } from '../providers/binance/binance-candle.types';
 import { BinanceCandleIngestionService } from '../providers/binance/binance-candle.ingestion.service';
@@ -395,12 +395,41 @@ describe('MarketCandleSyncService', () => {
       },
     };
     const upserted: unknown[][] = [];
+    const stored = new Map<string, MarketCandle>();
     const repository = {
       upsertMany: jest.fn((rows: unknown[]) => {
         upserted.push(rows);
+        for (const row of rows as MarketCandle[]) {
+          stored.set(
+            `${row.assetId}:${row.interval}:${row.openTime.getTime()}`,
+            row,
+          );
+        }
         return Promise.resolve({ writtenCount: rows.length });
       }),
       findLatest: jest.fn().mockResolvedValue(null),
+      findRange: jest.fn(
+        ({
+          assetId,
+          interval,
+          from,
+          to,
+        }: {
+          assetId: string;
+          interval: string;
+          from: Date;
+          to: Date;
+        }) =>
+          Promise.resolve(
+            [...stored.values()].filter(
+              (row) =>
+                row.assetId === assetId &&
+                row.interval === interval &&
+                row.openTime >= from &&
+                row.openTime < to,
+            ),
+          ),
+      ),
     };
     const stateRepository = new FakeStateRepository();
     const lockEvents: string[] = [];
@@ -474,6 +503,7 @@ describe('MarketCandleSyncService', () => {
       service,
       prisma,
       repository,
+      stored,
       upserted,
       stateRepository,
       lockService,
@@ -1288,7 +1318,7 @@ describe('MarketCandleSyncService', () => {
     };
 
     for (const interval of ['1d', '1w'] as const) {
-      it(`completes KRX ${interval} at the first session after a weekend lower bound`, async () => {
+      it(`stops KRX ${interval} paging at the first session after a weekend lower bound`, async () => {
         const harness = createHarness({ assets: [DOMESTIC_ASSET] });
         harness.domesticPeriodAdapter.fetchPeriodPage
           .mockResolvedValueOnce({
@@ -1327,15 +1357,23 @@ describe('MarketCandleSyncService', () => {
           endDate: '20260831',
         });
         const feed = result.feeds[0];
-        expect(feed.stopReason).toBe('target_reached');
-        expect(feed.completionReason).toBe('target_reached');
-        expect(feed.coverageComplete).toBe(true);
-        expect(feed.coveredFrom).toEqual(productionFrom);
-        expect(feed.coveredTo).toEqual(productionTo);
+        expect(feed.stopReason).toBe(
+          interval === '1d' ? 'data_incomplete' : 'target_reached',
+        );
+        expect(feed.completionReason).toBe(
+          interval === '1d' ? 'data_incomplete' : 'target_reached',
+        );
+        expect(feed.coverageComplete).toBe(interval === '1w');
+        expect(feed.coveredFrom).toEqual(
+          interval === '1d' ? null : productionFrom,
+        );
+        expect(feed.coveredTo).toEqual(interval === '1d' ? null : productionTo);
         const state = harness.stateRepository.rows[0];
         expect(state.targetFrom).toEqual(productionFrom);
         expect(state.targetTo).toEqual(productionTo);
-        expect(state.coveredFrom).toEqual(productionFrom);
+        expect(state.coveredFrom).toEqual(
+          interval === '1d' ? null : productionFrom,
+        );
       });
     }
 
@@ -1407,8 +1445,14 @@ describe('MarketCandleSyncService', () => {
       harness.overseasPeriodAdapter.fetchPeriodPage
         .mockResolvedValueOnce({
           state: 'ok',
-          rows: [overseasRow('20260710'), overseasRow('20260706')],
-          providerReturnedRows: 2,
+          rows: [
+            '20260710',
+            '20260709',
+            '20260708',
+            '20260707',
+            '20260706',
+          ].map(overseasRow),
+          providerReturnedRows: 5,
           blankRows: 0,
           oldestDate: '20260706',
           latestDate: '20260710',
@@ -1699,7 +1743,7 @@ describe('MarketCandleSyncService', () => {
       const feed = result.feeds[0];
       expect(feed.status).toBe('completed');
       expect(feed.coverageComplete).toBe(false);
-      expect(feed.completionReason).toBe('empty_page_before_target');
+      expect(feed.completionReason).toBe('data_incomplete');
       expect(
         callArg<{ fromDate: string }>(
           harness.domesticPeriodAdapter.fetchPeriodPage,
@@ -2217,6 +2261,380 @@ describe('MarketCandleSyncService', () => {
     });
   });
 
+  describe('KIS daily stored session completeness', () => {
+    const kia = {
+      ...DOMESTIC_ASSET,
+      id: 'kia',
+      symbol: '000270',
+      market: 'KRX',
+    };
+    const now = new Date('2026-09-21T12:00:00Z');
+    const from = new Date('2026-09-15T15:00:00Z');
+    const to = new Date('2026-09-18T15:00:00Z');
+    const raw = (date: string) => ({
+      value: {
+        stck_bsop_date: date,
+        stck_oprc: '121600',
+        stck_hgpr: '121800',
+        stck_lwpr: '119200',
+        stck_clpr: '120900',
+        acml_vol: '565032',
+        acml_tr_pbmn: '67974036600',
+      },
+      receivedAt: now,
+      sequence: 0,
+    });
+    const page = (dates: string[]) => ({
+      state: 'ok',
+      rows: dates.map(raw),
+      providerReturnedRows: dates.length,
+      blankRows: 0,
+      oldestDate: dates.at(-1) ?? null,
+      latestDate: dates[0] ?? null,
+      trCont: null,
+    });
+    const setup = (dates = ['20260918', '20260916']) => {
+      const harness = createHarness({ assets: [kia] });
+      harness.domesticPeriodAdapter.fetchPeriodPage.mockResolvedValue(
+        page(dates),
+      );
+      return harness;
+    };
+    const run = (harness: ReturnType<typeof setup>, range = { from, to }) =>
+      harness.service.syncAsset({
+        assetId: kia.id,
+        targets: ['1d'],
+        mode: 'repair' as never,
+        resume: false,
+        ...range,
+        now,
+      });
+    const seedMiddle = async (harness: ReturnType<typeof setup>) => {
+      const normalized =
+        new KisPeriodCandleNormalizerService().normalizeDomesticPeriodRows({
+          rows: [raw('20260917')],
+          interval: '1d',
+          from,
+          to,
+          now,
+        });
+      await harness.repository.upsertMany(
+        normalized.candles.map((candle) => ({
+          ...candle,
+          assetId: kia.id,
+          interval: '1d',
+          sourceProvider: KIS_DOMESTIC_PERIOD_SOURCE,
+        })),
+      );
+    };
+    afterEach(() => resetMarketSessionOverrideStoreForTest());
+
+    it('preserves 9/16 and 9/18 but never certifies the missing 9/17 session', async () => {
+      const harness = setup();
+      expect((await run(harness)).feeds[0]).toMatchObject({
+        status: 'completed',
+        writtenRows: 2,
+        complete: false,
+        coverageComplete: false,
+        completionReason: 'data_incomplete',
+        stopReason: 'data_incomplete',
+        coveredFrom: null,
+        coveredTo: null,
+      });
+      expect(harness.stored.size).toBe(2);
+      expect(harness.stateRepository.rows[0]).toMatchObject({
+        coverageComplete: false,
+        completionReason: 'data_incomplete',
+        coveredFrom: null,
+        coveredTo: null,
+      });
+      expect(harness.repository.findRange).toHaveBeenCalledTimes(1);
+    });
+
+    it('certifies all three sessions after the canonical writes', async () => {
+      const harness = setup(['20260918', '20260917', '20260916']);
+      expect((await run(harness)).feeds[0]).toMatchObject({
+        writtenRows: 3,
+        coverageComplete: true,
+        completionReason: 'target_reached',
+      });
+    });
+
+    it('audits all pages together after backward paging finishes', async () => {
+      const harness = setup();
+      harness.domesticPeriodAdapter.fetchPeriodPage
+        .mockResolvedValueOnce(page(['20260918', '20260917']))
+        .mockResolvedValueOnce(page(['20260916']));
+      expect((await run(harness)).feeds[0]).toMatchObject({
+        pagesFetched: 2,
+        writtenRows: 3,
+        coverageComplete: true,
+      });
+      expect(harness.repository.findRange).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([false, true])(
+      'checks US daily storage completeness (middle present=%s)',
+      async (middlePresent) => {
+        const us = {
+          ...kia,
+          id: 'us',
+          symbol: 'AAPL',
+          market: 'NAS',
+          assetType: 'us_stock',
+        };
+        const harness = createHarness({ assets: [us] });
+        const dates = middlePresent
+          ? ['20260918', '20260917', '20260916']
+          : ['20260918', '20260916'];
+        harness.overseasPeriodAdapter.fetchPeriodPage.mockResolvedValue({
+          ...page(dates),
+          rows: dates.map((date) => ({
+            value: {
+              xymd: date,
+              open: '100',
+              high: '102',
+              low: '99',
+              clos: '101',
+              tvol: '10',
+            },
+            receivedAt: now,
+            sequence: 0,
+          })),
+        });
+        const result = await harness.service.syncAsset({
+          assetId: us.id,
+          targets: ['1d'],
+          mode: 'repair' as never,
+          from: new Date('2026-09-16T04:00:00Z'),
+          to: new Date('2026-09-19T04:00:00Z'),
+          now,
+        });
+        expect(result.feeds[0].coverageComplete).toBe(middlePresent);
+        expect(result.feeds[0].completionReason).toBe(
+          middlePresent ? 'target_reached' : 'data_incomplete',
+        );
+      },
+    );
+
+    it('does not require weekend candles between Friday and Monday', async () => {
+      const harness = setup(['20260921', '20260918']);
+      expect(
+        (
+          await run(harness, {
+            from: new Date('2026-09-17T15:00:00Z'),
+            to: new Date('2026-09-21T12:00:00Z'),
+          })
+        ).feeds[0].coverageComplete,
+      ).toBe(true);
+    });
+
+    it('does not require the May 5 holiday candle between real sessions', async () => {
+      const harness = setup(['20260506', '20260504']);
+      expect(
+        (
+          await run(harness, {
+            from: new Date('2026-05-03T15:00:00Z'),
+            to: new Date('2026-05-06T15:00:00Z'),
+          })
+        ).feeds[0].coverageComplete,
+      ).toBe(true);
+    });
+
+    it('accepts a CLOSED override in the middle of the range', async () => {
+      applyMarketSessionOverrideSnapshot(
+        [
+          {
+            market: 'KRX',
+            localDate: '2026-09-17',
+            overrideType: 'closed',
+            openTime: null,
+            closeTime: null,
+            reason: 'closure',
+          },
+        ],
+        now,
+      );
+      expect((await run(setup())).feeds[0].coverageComplete).toBe(true);
+    });
+
+    it('requires a custom open session even on a static holiday', async () => {
+      applyMarketSessionOverrideSnapshot(
+        [
+          {
+            market: 'KRX',
+            localDate: '2026-05-05',
+            overrideType: 'custom',
+            openTime: '100000',
+            closeTime: '140000',
+            reason: 'custom',
+          },
+        ],
+        now,
+      );
+      const harness = setup(['20260506', '20260504']);
+      const range = {
+        from: new Date('2026-05-03T15:00:00Z'),
+        to: new Date('2026-05-06T15:00:00Z'),
+      };
+      expect((await run(harness, range)).feeds[0].completionReason).toBe(
+        'data_incomplete',
+      );
+      harness.domesticPeriodAdapter.fetchPeriodPage.mockResolvedValue(
+        page(['20260506', '20260505', '20260504']),
+      );
+      expect((await run(harness, range)).feeds[0].coverageComplete).toBe(true);
+    });
+
+    it('does not count a raw row rejected for malformed OHLC', async () => {
+      const harness = setup();
+      const response = page(['20260918', '20260917', '20260916']);
+      response.rows[1].value.stck_hgpr = '1';
+      harness.domesticPeriodAdapter.fetchPeriodPage.mockResolvedValue(response);
+      expect((await run(harness)).feeds[0]).toMatchObject({
+        providerReturnedRows: 3,
+        writtenRows: 2,
+        rejectedRows: 1,
+        coverageComplete: false,
+        completionReason: 'data_incomplete',
+      });
+    });
+
+    it('counts valid stored evidence omitted from this provider response', async () => {
+      const harness = setup();
+      await seedMiddle(harness);
+      expect((await run(harness)).feeds[0]).toMatchObject({
+        writtenRows: 2,
+        coverageComplete: true,
+        completionReason: 'target_reached',
+      });
+      expect(harness.stored.size).toBe(3);
+    });
+
+    it.each([
+      'source',
+      'asset',
+      'interval',
+      'unclosed',
+      'window',
+      'ohlc',
+      'volume',
+      'early',
+      'future',
+    ])('rejects invalid stored %s evidence', async (kind) => {
+      const harness = setup();
+      await seedMiddle(harness);
+      const row = [...harness.stored.values()][0];
+      if (kind === 'source') row.sourceProvider = 'kis';
+      if (kind === 'asset') row.assetId = 'other';
+      if (kind === 'interval') row.interval = '1w';
+      if (kind === 'unclosed') row.isClosed = false;
+      if (kind === 'window')
+        row.closeTime = new Date(row.closeTime.getTime() - 1);
+      if (kind === 'ohlc') row.high = row.low;
+      if (kind === 'volume') row.volume = row.volume.negated();
+      if (kind === 'early')
+        row.sourceUpdatedAt = new Date('2026-09-17T06:00:00Z');
+      if (kind === 'future')
+        row.sourceUpdatedAt = new Date('2099-01-01T00:00:00Z');
+      expect((await run(harness)).feeds[0].coverageComplete).toBe(false);
+    });
+
+    it('repairs one KIA day with one canonical provider-derived row and is idempotent', async () => {
+      const harness = setup(['20260917']);
+      const range = {
+        from: new Date('2026-09-16T15:00:00Z'),
+        to: new Date('2026-09-17T15:00:00Z'),
+      };
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        expect((await run(harness, range)).feeds[0]).toMatchObject({
+          writtenRows: 1,
+          coverageComplete: true,
+          completionReason: 'target_reached',
+        });
+      }
+      expect(harness.stored.size).toBe(1);
+      const row = [...harness.stored.values()][0];
+      expect(row).toMatchObject({
+        assetId: kia.id,
+        interval: '1d',
+        openTime: range.from,
+        closeTime: range.to,
+        sourceProvider: KIS_DOMESTIC_PERIOD_SOURCE,
+        isClosed: true,
+      });
+      expect(row.close.toString()).toBe('120900');
+    });
+
+    it('includes an intersecting bucket when repair starts after session close', async () => {
+      const harness = setup(['20260917']);
+      expect(
+        (
+          await run(harness, {
+            from: new Date('2026-09-17T07:00:00Z'),
+            to: new Date('2026-09-17T08:00:00Z'),
+          })
+        ).feeds[0].coverageComplete,
+      ).toBe(true);
+      expect(harness.repository.findRange).toHaveBeenCalledWith({
+        assetId: kia.id,
+        interval: '1d',
+        from: new Date('2026-09-16T15:00:00Z'),
+        to: new Date('2026-09-17T08:00:00Z'),
+      });
+    });
+
+    it('does not require a still-open session to be closed', async () => {
+      const harness = setup(['20260918']);
+      expect(
+        (
+          await harness.service.syncAsset({
+            assetId: kia.id,
+            targets: ['1d'],
+            mode: 'repair' as never,
+            from: new Date('2026-09-17T15:00:00Z'),
+            to: new Date('2026-09-21T04:00:00Z'),
+            now: new Date('2026-09-21T04:00:00Z'),
+          })
+        ).feeds[0].coverageComplete,
+      ).toBe(true);
+    });
+
+    it('fails closed if coverage ends after a calendar-covered first session', async () => {
+      const harness = setup();
+      const result = await harness.service.syncAsset({
+        assetId: kia.id,
+        targets: ['1d'],
+        mode: 'repair' as never,
+        from: new Date('2027-12-28T15:00:00Z'),
+        to: new Date('2028-01-05T15:00:00Z'),
+        now: new Date('2028-01-06T00:00:00Z'),
+      });
+      expect(result.feeds[0]).toMatchObject({
+        status: 'failed',
+        stopReason: 'calendar_unavailable',
+        coverageComplete: false,
+      });
+      expect(
+        harness.domesticPeriodAdapter.fetchPeriodPage,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('preserves writes without certifying coverage when the evidence read fails', async () => {
+      const harness = setup(['20260918', '20260917', '20260916']);
+      harness.repository.findRange.mockRejectedValueOnce(
+        new Error('database unavailable'),
+      );
+      expect((await run(harness)).feeds[0]).toMatchObject({
+        status: 'failed',
+        coverageComplete: false,
+        errorCode: 'CANDLE_EVIDENCE_READ_FAILED',
+      });
+      expect(harness.stored.size).toBe(3);
+      expect(harness.stateRepository.rows[0].cursorJson).toBeNull();
+    });
+  });
+
   // Regression: the default 1d/1w lookback is 365 days, so its target range
   // reaches into the PREVIOUS calendar year. With the 2025 datasets present
   // the range is calendar-covered and the provider adapter must actually be
@@ -2296,9 +2714,9 @@ describe('MarketCandleSyncService', () => {
       // Not misclassified as a calendar gap or a confirmed-empty holiday.
       expect(feed.stopReason).not.toBe('calendar_unavailable');
       expect(feed.status).toBe('completed');
-      expect(feed.stopReason).toBe('target_reached');
-      expect(feed.coverageComplete).toBe(true);
-      expect(feed.completionReason).toBe('target_reached');
+      expect(feed.stopReason).toBe('data_incomplete');
+      expect(feed.coverageComplete).toBe(false);
+      expect(feed.completionReason).toBe('data_incomplete');
       expect(feed.acceptedRows).toBeGreaterThan(0);
       expect(feed.writtenRows).toBeGreaterThan(0);
     });
@@ -2334,8 +2752,8 @@ describe('MarketCandleSyncService', () => {
       // US session has not opened yet at 05:00 EDT.
       expect(call.endDate).toBe('20260717');
       expect(feed.status).toBe('completed');
-      expect(feed.stopReason).toBe('target_reached');
-      expect(feed.coverageComplete).toBe(true);
+      expect(feed.stopReason).toBe('data_incomplete');
+      expect(feed.coverageComplete).toBe(false);
       expect(feed.acceptedRows).toBeGreaterThan(0);
     });
 
@@ -2426,7 +2844,8 @@ describe('MarketCandleSyncService', () => {
         expect(call.fromDate).toBe('20250721');
         expect(call.endDate).toBe(endDate);
         expect(feed.status).toBe('completed');
-        expect(feed.stopReason).toBe('target_reached');
+        expect(feed.stopReason).toBe('data_incomplete');
+        expect(feed.coverageComplete).toBe(false);
       }
     });
 

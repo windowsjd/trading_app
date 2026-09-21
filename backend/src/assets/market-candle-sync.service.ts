@@ -23,7 +23,10 @@ import {
 } from '../providers/kis/candles/kis-period-candle.types';
 import { KisDomesticPeriodAdapter } from '../providers/kis/candles/kis-domestic-period.adapter';
 import { KisOverseasPeriodAdapter } from '../providers/kis/candles/kis-overseas-period.adapter';
-import { KisPeriodCandleNormalizerService } from '../providers/kis/candles/kis-period-candle-normalizer.service';
+import {
+  KisPeriodCandleNormalizerService,
+  resolveKisDailyPeriodWindows,
+} from '../providers/kis/candles/kis-period-candle-normalizer.service';
 import { BinanceCandleIngestionService } from '../providers/binance/binance-candle.ingestion.service';
 import {
   BINANCE_CANDLE_SOURCE,
@@ -812,6 +815,48 @@ export class MarketCandleSyncService {
         latestOpenTime = later(latestOpenTime, last);
       }
 
+      // Cursor reach proves a provider sweep, not complete stored daily data.
+      // Audit once, after the final write, including evidence from older runs.
+      if (
+        descriptor.kind !== 'binance' &&
+        feed === '1d' &&
+        page.nextCursor === null &&
+        SWEEP_TERMINAL_REASONS.has(page.stopReason ?? 'provider_exhausted')
+      ) {
+        try {
+          const evidence = await this.inspectKisDailyEvidence(
+            asset,
+            sourceProvider,
+            targetFrom,
+            new Date(Math.min(targetTo.getTime(), options.now.getTime())),
+            options.now,
+          );
+          if (evidence !== 'complete') {
+            page = {
+              ...page,
+              complete: false,
+              stopReason: evidence,
+              coveredFrom: null,
+              coveredTo: null,
+              coverageSealed: true,
+            };
+            // Never retain a previous checkpoint's unaudited coverage claim.
+            coveredFrom = null;
+            coveredTo = null;
+          }
+        } catch (error) {
+          stopReason = 'write_failed';
+          status = MarketCandleSyncStatus.failed;
+          errorCode = 'CANDLE_EVIDENCE_READ_FAILED';
+          errorMessage = redactText(messageOf(error));
+          await this.stateRepository.markFailed(state.id, {
+            errorCode,
+            errorMessage,
+          });
+          break;
+        }
+      }
+
       // A page that found a hole seals the run's coverage claim: everything
       // fetched afterwards is still stored, but the confirmed range stops at
       // the hole instead of being bridged by the min/max merge.
@@ -964,6 +1009,61 @@ export class MarketCandleSyncService {
     };
   }
 
+  private async inspectKisDailyEvidence(
+    asset: SyncAssetRecord,
+    sourceProvider: string,
+    from: Date,
+    to: Date,
+    now: Date,
+  ): Promise<'complete' | 'data_incomplete' | 'calendar_unavailable'> {
+    const market = resolveCalendarMarket(asset);
+    const windows = market
+      ? resolveKisDailyPeriodWindows(market, from, to)
+      : null;
+    if (windows === null) return 'calendar_unavailable';
+    const required = windows.filter((window) => window.closedAt <= now);
+    if (required.length === 0) return 'complete';
+    // findRange filters openTime, so expand the lower edge to the first
+    // intersecting bucket (an incremental target can start mid-session).
+    const rows = await this.repository.findRange({
+      assetId: asset.id,
+      interval: '1d',
+      from: required[0].openTime,
+      to,
+    });
+    const byOpenTime = new Map(
+      rows.map((row) => [row.openTime.getTime(), row]),
+    );
+    // Provider receipt timestamps normally follow the run's captured `now`.
+    const observedAt = new Date(Math.max(now.getTime(), Date.now()));
+    const complete = required.every((window) => {
+      const row = byOpenTime.get(window.openTime.getTime());
+      return (
+        row !== undefined &&
+        row.assetId === asset.id &&
+        row.interval === '1d' &&
+        row.sourceProvider === sourceProvider &&
+        row.isClosed &&
+        row.closeTime.getTime() === window.closeTime.getTime() &&
+        Number.isFinite(row.sourceUpdatedAt.getTime()) &&
+        row.sourceUpdatedAt >= window.closedAt &&
+        row.sourceUpdatedAt <= observedAt &&
+        [row.open, row.high, row.low, row.close].every(
+          (value) => value.isFinite() && value.gt(0),
+        ) &&
+        row.high.gte(row.open) &&
+        row.high.gte(row.close) &&
+        row.high.gte(row.low) &&
+        row.low.lte(row.open) &&
+        row.low.lte(row.close) &&
+        row.volume.isFinite() &&
+        row.volume.gte(0) &&
+        (row.amount === null || (row.amount.isFinite() && row.amount.gte(0)))
+      );
+    });
+    return complete ? 'complete' : 'data_incomplete';
+  }
+
   // One checkpointable page for the feed. See MarketCandleFeedPage.
   private async fetchFeedPage(input: {
     asset: SyncAssetRecord;
@@ -985,11 +1085,18 @@ export class MarketCandleSyncService {
     if (effectiveTo.getTime() <= input.from.getTime()) {
       return emptyFeedPage('target_reached', true);
     }
-    const range = inspectMarketSessionsInRange(
-      input.asset,
-      input.from,
-      effectiveTo,
-    );
+    const market = resolveCalendarMarket(input.asset);
+    const dailyWindows =
+      input.feed === '1d' && market
+        ? resolveKisDailyPeriodWindows(market, input.from, effectiveTo)
+        : null;
+    const range =
+      input.feed === '1d'
+        ? {
+            calendarCovered: dailyWindows !== null,
+            hasTradingSession: (dailyWindows?.length ?? 0) > 0,
+          }
+        : inspectMarketSessionsInRange(input.asset, input.from, effectiveTo);
     if (!range.calendarCovered) {
       return emptyFeedPage('calendar_unavailable', false);
     }
@@ -1202,7 +1309,8 @@ export class MarketCandleSyncService {
     if (page.oldestDate <= providerFromDate) {
       // The date cursor chained contiguously from targetTo down past
       // the first real session at/after targetFrom, so the original target
-      // range is provider-confirmed. Clamp to `now`: a target ending in the
+      // range was swept. Daily storage evidence is checked after upsert,
+      // before this candidate coverage is checkpointed. A target ending in the
       // future cannot be confirmed beyond now.
       const coveredToMs = Math.min(input.to.getTime(), input.now.getTime());
       return {

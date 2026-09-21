@@ -85,6 +85,7 @@ import { MarketCandleSyncService } from './src/assets/market-candle-sync.service
 import { KisPeriodCandleNormalizerService } from './src/providers/kis/candles/kis-period-candle-normalizer.service';
 import { readMarketCandleSyncConfig } from './src/assets/market-candle-sync.config';
 import { AssetCandlesCacheService } from './src/assets/asset-candles-cache.service';
+import { DailyChangeRateService } from './src/assets/daily-change-rate.service';
 import { readCandleCacheConfig } from './src/assets/asset-candles-cache.config';
 import { buildCandleGenerationKey } from './src/assets/asset-candles-cache.keys';
 
@@ -415,7 +416,7 @@ async function main() {
         assetId: asset.id,
         targets: ['5m', '1d', '1w'],
         mode: 'repair' as never,
-        from: new Date('2026-07-07T00:00:00Z'),
+        from: new Date(asset.id === domestic.id ? '2026-07-06T15:00:00Z' : '2026-07-07T04:00:00Z'),
         to: new Date('2026-07-09T23:00:00Z'),
         now: NOW,
       });
@@ -427,7 +428,53 @@ async function main() {
       assert.ok((await countRows(asset.id, '5m')) > 0);
       assert.ok((await countRows(asset.id, '1d')) > 0);
       assert.ok((await countRows(asset.id, '1w')) > 0);
+      assert.equal(synced.feeds.find(feed => feed.interval === '1d')?.coverageComplete, true);
     }
+
+    // Real storage evidence: interior gap -> one-day repair -> existing row
+    // omitted by a later page. Both repository and checkpoint assertions use DB.
+    const dailyNow = new Date('2026-09-18T08:00:00Z');
+    const dailyFrom = new Date('2026-09-15T15:00:00Z');
+    const dailyTo = new Date('2026-09-18T08:00:00Z');
+    let dailyDates = ['20260918', '20260916'];
+    domesticPeriodStub.fetchPeriodPage = async () => ({
+      state: 'ok',
+      rows: dailyDates.map(date => ({
+        value: { stck_bsop_date: date, stck_oprc: '100', stck_hgpr: '102',
+          stck_lwpr: '99', stck_clpr: '100', acml_vol: '1000', acml_tr_pbmn: '100000' },
+        receivedAt: dailyNow, sequence: 0,
+      })),
+      providerReturnedRows: dailyDates.length, blankRows: 0,
+      oldestDate: dailyDates[dailyDates.length - 1], latestDate: dailyDates[0], trCont: null,
+    });
+    const dailyInput = { assetId: domestic.id, targets: ['1d'] as const,
+      mode: 'repair' as never, from: dailyFrom, to: dailyTo, now: dailyNow, resume: false };
+    const gap = (await syncService.syncAsset(dailyInput)).feeds[0];
+    assert.equal(gap.coverageComplete, false);
+    assert.equal(gap.completionReason, 'data_incomplete');
+    const gapState = await stateRepository.findById(gap.syncStateId!);
+    assert.equal(gapState?.coverageComplete, false);
+    assert.equal(gapState?.coveredFrom, null);
+    assert.equal((await repository.findRange({ assetId: domestic.id, interval: '1d', from: dailyFrom, to: dailyTo })).length, 2);
+
+    const baselineFrom = new Date('2026-09-16T15:00:00Z');
+    const baselineTo = new Date('2026-09-17T15:00:00Z');
+    const dailyPrice = { asset: domestic, price: '110', effectiveAt: new Date('2026-09-18T06:00:00Z'), now: dailyNow };
+    assert.equal(await new DailyChangeRateService(repository).calculate(dailyPrice), null);
+    dailyDates = ['20260917'];
+    const repaired = (await syncService.syncAsset({ ...dailyInput, from: baselineFrom, to: baselineTo })).feeds[0];
+    assert.equal(repaired.coverageComplete, true);
+    assert.equal(repaired.writtenRows, 1);
+    const baseline = await repository.findRange({ assetId: domestic.id, interval: '1d', from: baselineFrom, to: baselineTo });
+    assert.equal(baseline.length, 1);
+    assert.equal(baseline[0].sourceProvider, 'kis_domestic_period');
+    assert.equal(baseline[0].isClosed, true);
+    assert.equal(baseline[0].closeTime.toISOString(), baselineTo.toISOString());
+    assert.equal(await new DailyChangeRateService(repository).calculate(dailyPrice), '10.00000000');
+    dailyDates = ['20260918', '20260916'];
+    const existing = (await syncService.syncAsset(dailyInput)).feeds[0];
+    assert.equal(existing.coverageComplete, true);
+    assert.equal((await repository.findRange({ assetId: domestic.id, interval: '1d', from: dailyFrom, to: dailyTo })).length, 3);
 
     // 6) Higher intervals aggregate from the stored 5m rows.
     for (const interval of ['15m', '30m', '1h', '4h'] as const) {

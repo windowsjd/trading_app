@@ -5,7 +5,10 @@ jest.mock('../../../generated/prisma/client', () => {
   return { Prisma: { Decimal: runtime.Decimal } };
 });
 
-import { KisPeriodCandleNormalizerService } from './kis-period-candle-normalizer.service';
+import {
+  KisPeriodCandleNormalizerService,
+  resolveKisDailyPeriodWindows,
+} from './kis-period-candle-normalizer.service';
 import type { KisRawCandleRow } from './kis-candle.types';
 
 const domesticRow = (
@@ -50,6 +53,31 @@ describe('KisPeriodCandleNormalizerService', () => {
   const service = new KisPeriodCandleNormalizerService();
   const wideFrom = new Date('2025-01-01T00:00:00Z');
   const wideTo = new Date('2027-01-01T00:00:00Z');
+
+  it('uses the same US daily windows on either side of DST for evidence and normalization', () => {
+    const from = new Date('2026-03-06T12:00:00Z');
+    const to = new Date('2026-03-09T23:00:00Z');
+    const windows = resolveKisDailyPeriodWindows('US', from, to);
+    expect(windows?.map((window) => window.openTime.toISOString())).toEqual([
+      '2026-03-06T05:00:00.000Z',
+      '2026-03-09T04:00:00.000Z',
+    ]);
+    const normalized = service.normalizeOverseasPeriodRows({
+      rows: [usRow('20260306'), usRow('20260309')],
+      interval: '1d',
+      from,
+      to,
+      now: to,
+    });
+    expect(
+      windows?.map(({ openTime, closeTime }) => ({ openTime, closeTime })),
+    ).toEqual(
+      normalized.candles.map(({ openTime, closeTime }) => ({
+        openTime,
+        closeTime,
+      })),
+    );
+  });
 
   describe('domestic daily', () => {
     it('anchors candles to the Asia/Seoul trading date and closes them at the actual session end', () => {

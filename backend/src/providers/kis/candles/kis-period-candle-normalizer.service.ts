@@ -10,7 +10,8 @@ import {
   type KisPeriodInterval,
   type KisPeriodNormalizationResult,
 } from './kis-period-candle.types';
-import { zonedDateTimeToUtc } from './kis-candle-time';
+import { hasEffectiveMarketCalendarForDate } from '../../../orders/market-holidays.config';
+import { formatZonedCursor, zonedDateTimeToUtc } from './kis-candle-time';
 
 const KOREA_TIME_ZONE = 'Asia/Seoul';
 const US_TIME_ZONE = 'America/New_York';
@@ -222,6 +223,38 @@ type PeriodWindow = {
   // the trading date, or the week's last real session end).
   closedAt: Date;
 };
+
+/**
+ * Daily windows intersecting a sync range, using exactly the normalizer's
+ * calendar and bucket contract. null means calendar unavailable, never holiday.
+ * Check EVERY local date, including dates after the first trading session.
+ */
+export function resolveKisDailyPeriodWindows(
+  calendarMarket: 'KRX' | 'US',
+  from: Date,
+  to: Date,
+): PeriodWindow[] | null {
+  const market = calendarMarket === 'KRX' ? DOMESTIC_MARKET : OVERSEAS_MARKET;
+  const firstDate = formatZonedCursor(from, market.timeZone).date;
+  const lastDate = formatZonedCursor(
+    new Date(to.getTime() - 1),
+    market.timeZone,
+  ).date;
+  const windows: PeriodWindow[] = [];
+  for (
+    let date: string | null = firstDate;
+    date !== null && date <= lastDate;
+    date = addDaysToYmd(date, 1)
+  ) {
+    const dashedDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
+    if (!hasEffectiveMarketCalendarForDate(calendarMarket, dashedDate)) {
+      return null;
+    }
+    const window = resolvePeriodWindow(date, '1d', market);
+    if (window) windows.push(window);
+  }
+  return windows;
+}
 
 function resolvePeriodWindow(
   dateText: string,
