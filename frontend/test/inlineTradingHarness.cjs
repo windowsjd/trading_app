@@ -185,6 +185,7 @@ function inlineTradingHarness() {
     h.refetches++;
   };
   const mocks = {
+    './QuantityRatioSlider': load(resolve('src/screens/order/QuantityRatioSlider.web.tsx'), {}),
     react: React,
     'react-native': native,
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
@@ -236,6 +237,7 @@ function inlineTradingHarness() {
                   currencyCode: 'USD',
                   balanceAmount: h.usdBalance ?? '10000',
                   reservedAmount: h.usdReserved ?? '1000',
+                  availableAmount: h.usdAvailable,
                 },
                 { currencyCode: 'KRW', balanceAmount: h.krwBalance ?? '1000000' },
               ],
@@ -336,6 +338,9 @@ function inlineTradingHarness() {
     resolve('src/screens/order/OrderPanel.tsx'),
     mocks,
   );
+  h.OrderScreen = load(resolve('src/screens/order/OrderScreen.tsx'), {
+    ...mocks, './OrderPanel': mocks['../order/OrderPanel'],
+  }).default;
   mocks['./AccountHoldings'] = load(resolve('src/screens/asset/AccountHoldings.tsx'), mocks);
   mocks['../../features/asset/AssetOrderLadder'] = load(
     resolve('src/features/asset/AssetOrderLadder.tsx'),
@@ -355,7 +360,7 @@ function inlineTradingHarness() {
       query.QueryClientProvider,
       { client: h.client },
       React.createElement(h.Screen, {
-        route: { params: { assetId: h.assetId } },
+        route: { params: { assetId: h.assetId, accountId: h.routeAccountId ?? h.accountId, side: 'buy' } },
         navigation: nav,
       }),
     );
@@ -377,7 +382,7 @@ function inlineTradingHarness() {
   };
   h.node = (id) =>
     h.renderer.root.findAll(
-      (node) => typeof node.type === 'string' && node.props.testID === id,
+      (node) => typeof node.type === 'string' && (node.props.testID ?? node.props['data-testid']) === id,
     )[0];
   h.press = async (id) => {
     const node = h.node(id);
@@ -386,6 +391,8 @@ function inlineTradingHarness() {
   };
   h.input = async (id, value) =>
     act(async () => h.node(id).props.onChangeText(value));
+  h.slide = async (percent) => act(async () =>
+    h.node('order-quantity-slider').props.onChange({ currentTarget: { valueAsNumber: percent } }));
   h.success = () => h.renderer.root.findByType('OrderSuccessBottomSheet').props;
   return h;
 }

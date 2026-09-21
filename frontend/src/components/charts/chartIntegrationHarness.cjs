@@ -76,6 +76,7 @@ function createChartHarness(platform = 'android') {
         GestureDetector: 'GestureDetector',
         Gesture: {
           Pan: () => new (load(resolve(rnghRoot, 'handlers/gestures/panGesture')).PanGesture)(),
+          Tap: () => new (load(resolve(rnghRoot, 'handlers/gestures/tapGesture')).TapGesture)(),
           Pinch: () => new (load(resolve(rnghRoot, 'handlers/gestures/pinchGesture')).PinchGesture)(),
           LongPress: () => new (load(resolve(rnghRoot, 'handlers/gestures/longPressGesture')).LongPressGesture)(),
           Race: (...gestures) => new (load(resolve(rnghRoot, 'handlers/gestures/gestureComposition')).ComposedGesture)(...gestures),

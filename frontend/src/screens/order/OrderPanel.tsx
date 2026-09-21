@@ -85,6 +85,7 @@ import { formatCurrency, formatDisplayDecimal } from '../../utils/format';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
 import OrderSuccessBottomSheet from './OrderSuccessBottomSheet';
+import QuantityRatioSlider from './QuantityRatioSlider';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 
 type Props = {
@@ -237,6 +238,8 @@ export function OrderForm({
   const accountChangedAway = shouldResetBoundFlow(binding);
 
   const [quantity, setQuantity] = useState('');
+  const [chosenRatio, setChosenRatio] = useState<number | null>(null);
+  const { fontScale } = useWindowDimensions();
   const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
   const [limitPrice, setLimitPrice] = useState('');
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -599,20 +602,46 @@ export function OrderForm({
   const inputErrorMessage =
     fieldError ?? (quantity.trim() ? inputInvalidReason : null);
 
-  const applyQuantityRatio = (ratio: (typeof RATIO_BUTTONS)[number]) => {
+  // Keep the original operation order and flooring for both ratio inputs.
+  const quantityAtRatio = (ratio: number) =>
+    side === 'sell'
+      ? (positionQuantityValue ?? 0) * ratio
+      : ((buyAvailableValue ?? 0) * ratio) /
+        ((ratioPriceValue ?? 0) * (1 + BUY_FEE_BUFFER));
+  // Preserve the chosen percentage through six-decimal flooring, but only
+  // while it still describes this quantity at the current price/balance.
+  const activeRatio =
+    !ratioDisabledReason &&
+    chosenRatio !== null &&
+    (chosenRatio === 0
+      ? quantity === ''
+      : formatQuantityInput(quantityAtRatio(chosenRatio)) === quantity)
+      ? chosenRatio
+      : null;
+  const capacity = quantityAtRatio(1);
+  const inputRatio =
+    !ratioDisabledReason && Number.isFinite(capacity) && capacity > 0
+      ? Math.min(1, (parsePositiveDecimal(quantity) ?? 0) / capacity)
+      : 0;
+  const displayedRatio = activeRatio ?? inputRatio;
+
+  const applyQuantityRatio = (value: number) => {
     if (submitLockRef.current) return;
+    if (!Number.isFinite(value)) return;
+    const ratio = Math.max(0, Math.min(1, value));
     if (ratioDisabledReason) {
       setFieldError(ratioDisabledReason);
       return;
     }
 
-    const nextQuantity =
-      side === 'sell'
-        ? formatQuantityInput((positionQuantityValue ?? 0) * ratio)
-        : formatQuantityInput(
-            ((buyAvailableValue ?? 0) * ratio) /
-              ((ratioPriceValue ?? 0) * (1 + BUY_FEE_BUFFER)),
-          );
+    if (ratio === 0) {
+      setQuantity('');
+      setChosenRatio(0);
+      resetOrderActionState();
+      return;
+    }
+
+    const nextQuantity = formatQuantityInput(quantityAtRatio(ratio));
 
     if (!nextQuantity) {
       setFieldError('계산된 수량이 너무 작습니다.');
@@ -620,6 +649,7 @@ export function OrderForm({
     }
 
     setQuantity(nextQuantity);
+    setChosenRatio(ratio);
     resetOrderActionState();
   };
 
@@ -688,6 +718,7 @@ export function OrderForm({
   const resetInput = (update: () => void) => {
     if (submitLockRef.current) return;
     update();
+    setChosenRatio(null);
     resetOrderActionState();
   };
   return (
@@ -765,19 +796,54 @@ export function OrderForm({
           placeholder="수량 입력"
         />
       </View>
+      <View style={styles.group}>
+        <View style={styles.ratioLabel}>
+          <Text style={styles.label}>수량 비율</Text>
+          <Text
+            style={[
+              styles.label,
+              styles.ratioValue,
+              { flexBasis: 36 * fontScale },
+            ]}
+          >
+            {Math.round(displayedRatio * 100)}%
+          </Text>
+        </View>
+        <QuantityRatioSlider
+          value={displayedRatio}
+          disabled={pending || !!ratioDisabledReason}
+          disabledReason={ratioDisabledReason ?? undefined}
+          onChange={applyQuantityRatio}
+        />
+      </View>
       <View style={styles.ratios}>
         {RATIO_BUTTONS.map((ratio) => (
           <ActionPressable
             key={ratio}
             accessibilityRole="button"
             accessibilityLabel={`주문 가능 수량 ${getRatioLabel(ratio)}`}
+            aria-pressed={activeRatio === ratio}
             testID={`order-ratio-${Math.round(ratio * 100)}`}
-            style={styles.ratioButton}
+            style={[
+              styles.ratioButton,
+              { flexBasis: 34 * fontScale },
+              activeRatio === ratio && styles.ratioSelected,
+              pending && styles.ratioPending,
+            ]}
+            hitSlop={{ top: 6, bottom: 6 }}
             disabled={pending}
-            accessibilityState={{ disabled: pending }}
+            accessibilityState={{
+              disabled: pending,
+              selected: activeRatio === ratio,
+            }}
             onPress={() => applyQuantityRatio(ratio)}
           >
-            <Text style={[styles.ratioText, pending && styles.muted]}>
+            <Text
+              style={[
+                styles.ratioText,
+                activeRatio === ratio && styles.activeText,
+              ]}
+            >
               {getRatioLabel(ratio)}
             </Text>
           </ActionPressable>
@@ -1031,22 +1097,40 @@ const styles = StyleSheet.create({
     color: '#202a35',
     backgroundColor: '#fff',
   },
-  ratios: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  ratios: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: 3,
+    rowGap: 12,
+    paddingVertical: 6,
+  },
+  ratioLabel: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: 4,
+    justifyContent: 'space-between',
+  },
+  // Reserve space for 100% so digit changes cannot move the track during a drag.
+  ratioValue: {
+    flexShrink: 1,
+    fontVariant: ['tabular-nums'],
+    textAlign: 'right',
+  },
   ratioButton: {
     flexGrow: 1,
-    flexBasis: '44%',
+    flexShrink: 1,
     minWidth: 0,
-    minHeight: 44,
+    minHeight: 32,
     borderWidth: 1,
     borderColor: '#dfe4e9',
     borderRadius: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 2,
+    paddingVertical: 4,
     alignItems: 'center',
     justifyContent: 'center',
   },
   ratioText: { fontSize: 12, fontWeight: '600', color: '#354251' },
-  muted: { color: '#9ba3ab' },
+  ratioSelected: { backgroundColor: '#202a35', borderColor: '#202a35' },
+  ratioPending: { opacity: 0.4 },
   preview: {
     gap: 8,
     borderTopWidth: 1,

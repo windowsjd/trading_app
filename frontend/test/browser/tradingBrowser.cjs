@@ -211,6 +211,83 @@ async function run() {
       );
       records.push({ kind: 'role-guard', role });
     }
+    for (const width of [320, 390, 768])
+      for (const fontScale of [1, 1.5, 2]) {
+        await page.setViewportSize({ width, height: 844 });
+        await open('asset=BNB&fontScale=' + fontScale);
+        await id('inline-order-panel').waitFor();
+        await id('asset-detail-sell-button').click();
+        const column = await id('asset-order-column').boundingBox();
+        const boxes = await Promise.all(
+          [25, 50, 75, 100].map((p) => id('order-ratio-' + p).boundingBox()),
+        );
+        for (const box of [
+          ...boxes,
+          await id('order-quantity-slider').boundingBox(),
+        ]) {
+          assert.ok(
+            box.x >= column.x - 1 &&
+              box.x + box.width <= column.x + column.width + 1,
+            'quantity controls fit column',
+          );
+        }
+        if (fontScale === 1)
+          assert.equal(
+            new Set(boxes.map((box) => box.y)).size,
+            1,
+            'compact presets occupy one row',
+          );
+        await id('order-ratio-50').click();
+        assert.equal(await id('order-quantity-slider').inputValue(), '50');
+        assert.equal(await id('order-quantity-input').inputValue(), '2');
+        assert.equal(
+          await id('order-ratio-50').evaluate(
+            (el) => getComputedStyle(el).backgroundColor,
+          ),
+          'rgb(32, 42, 53)',
+        );
+        await id('order-quantity-slider').focus();
+        await page.keyboard.press('ArrowRight');
+        assert.equal(await id('order-quantity-input').inputValue(), '2.04');
+        assert.equal(
+          await id('order-ratio-50').getAttribute('aria-pressed'),
+          'false',
+        );
+        await page.keyboard.press('End');
+        assert.equal(await id('order-quantity-input').inputValue(), '4');
+        await page.keyboard.press('Home');
+        assert.equal(await id('order-quantity-input').inputValue(), '');
+        const bar = await id('order-quantity-slider').boundingBox();
+        await page.mouse.click(bar.x + bar.width / 2, bar.y + bar.height / 2);
+        assert.equal(await id('order-quantity-input').inputValue(), '2');
+        await page.mouse.move(bar.x + bar.width / 2, bar.y + bar.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(bar.x + bar.width + 20, bar.y + bar.height / 2, {
+          steps: 4,
+        });
+        assert.equal(
+          await id('order-quantity-input').inputValue(),
+          '4',
+          'quantity changes during drag',
+        );
+        await page.mouse.move(bar.x - 20, bar.y + bar.height / 2, { steps: 4 });
+        await page.mouse.up();
+        assert.equal(await id('order-quantity-input').inputValue(), '');
+        await id('order-quantity-input').fill('1.48');
+        assert.equal(await id('order-quantity-slider').inputValue(), '37');
+        for (const p of [25, 50, 75, 100])
+          assert.equal(
+            await id('order-ratio-' + p).getAttribute('aria-pressed'),
+            'false',
+          );
+        await id('order-ratio-75').click();
+        if (width === 320)
+          await page.screenshot({
+            path: path.join(out, `quantity-${width}-${fontScale}.png`),
+            fullPage: true,
+          });
+        records.push({ kind: 'quantity-slider', width, fontScale });
+      }
     for (const asset of ['BTC', 'BNB', 'PEPE', 'SUI', '币安人生'])
       for (const side of ['buy', 'sell'])
         for (const type of ['market', 'limit']) {

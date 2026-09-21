@@ -44,6 +44,7 @@ function createTradingUiHarness(screenName) {
     useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
   };
   const mocks = {
+    './QuantityRatioSlider': load(resolve(__dirname, '../src/screens/order/QuantityRatioSlider.web.tsx'), {}),
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
     '@react-navigation/elements': { useHeaderHeight: () => 0 },
     'react-native-svg': { default: 'Svg', Path: 'Path', __esModule: true },

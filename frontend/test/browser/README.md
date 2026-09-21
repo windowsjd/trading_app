@@ -26,6 +26,13 @@ charts, pointer release/cancel/blur/capture/visibility/buttons=0, X pan/zoom,
 Y range/center/clamp and shared candle/current-price/crosshair mapping,
 latest/timeframe reset and active gesture unmount.
 
+Quantity controls additionally cover 320/390/768px × font scale 1/1.5/2:
+one-row presets at the default scale, selected styling, keyboard arrows/Home/End,
+track clicks and dragging beyond both ends, immediate quantity updates, and
+manual-input synchronization. The larger-font drag also checks that changing
+percentage digits does not move the track. The unit suite exercises both order
+screens, both account modes and the installed native gesture event receiver.
+
 Font scaling is simulated in RN Web Text/TextInput and useWindowDimensions;
 this is not an Android/iOS accessibility or physical gesture test. The normal
 `npm run check` separately runs component tests and installed RNGH event-receiver
