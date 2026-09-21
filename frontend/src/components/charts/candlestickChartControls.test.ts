@@ -82,7 +82,7 @@ describe('chart controls: zoom UI is gone', () => {
       'reset returns to 60 slots at rightOffset 0',
     );
     assert.ok(
-      /resetToLatest = useCallback\(\(\) => \{\s*setCrosshair\(null\);/.test(
+      /resetToLatest = useCallback\(\(\) => \{\s*setManualPriceScale\(null\);\s*gestureStartPriceRef.current = null;\s*setCrosshair\(null\);/.test(
         chartSource,
       ),
       'reset also clears the crosshair',
@@ -170,7 +170,7 @@ describe('gesture adapters', () => {
     assert.ok(nativeGestureSource.includes('createChartGestureSession'));
     assert.ok(nativeGestureSource.includes("session.takeOver('pinch')"));
     assert.ok(nativeGestureSource.includes("session.end('pan')"));
-    assert.ok(nativeGestureSource.includes("session.end('pinch')"));
+    assert.ok(nativeGestureSource.includes("session.end(twoMode)"));
     assert.ok(nativeGestureSource.includes("session.end('crosshair')"));
     // The adapter must not call the chart's lifecycle callbacks directly any
     // more — that is what used to double-fire onGestureEnd.
@@ -189,25 +189,25 @@ describe('gesture adapters', () => {
     assert.ok(webGestureSource.includes("addEventListener('wheel', onWheel, { passive: false })"));
     assert.ok(webGestureSource.includes('event.preventDefault()'));
     assert.ok(webGestureSource.includes('createWheelGestureSession'));
-    assert.ok(webGestureSource.includes('wheelSession.dispose()'), 'idle timer cleaned up');
+    assert.ok(webGestureSource.includes('wheel.dispose()'), 'idle timer cleaned up');
     assert.ok(webGestureSource.includes("handling === 'zoom'"));
-    assert.ok(webGestureSource.includes("addEventListener('mousedown'"), 'mouse drag pan kept');
-    assert.ok(webGestureSource.includes("addEventListener('mousemove'"), 'hover crosshair kept');
-    assert.ok(webGestureSource.includes('wheelSession.end();'), 'mouse down closes any open wheel session');
+    assert.ok(webGestureSource.includes("addEventListener('pointerdown'"), 'mouse drag pan kept');
+    assert.ok(webGestureSource.includes("addEventListener('pointermove'"), 'hover crosshair kept');
+    assert.ok(webGestureSource.includes('wheel.end();'), 'mouse down closes any open wheel session');
   });
 
   it('web: a wheel during a drag is consumed before any session work', () => {
     assert.ok(
-      webGestureSource.includes('dragActive: dragRef.current.active'),
+      webGestureSource.includes('dragActive: !!drag'),
       'the wheel handler knows whether a drag is running',
     );
     const wheelHandler = webGestureSource.slice(
       webGestureSource.indexOf('const onWheel ='),
-      webGestureSource.indexOf('const onMouseDown ='),
+      webGestureSource.indexOf("node.addEventListener('pointerdown'"),
     );
     const preventIndex = wheelHandler.indexOf('event.preventDefault()');
     const consumeIndex = wheelHandler.indexOf("handling === 'consume'");
-    const sessionIndex = wheelHandler.indexOf('wheelSession.');
+    const sessionIndex = wheelHandler.indexOf('wheel.');
     assert.ok(preventIndex > 0 && consumeIndex > 0 && sessionIndex > 0);
     assert.ok(
       preventIndex < consumeIndex,

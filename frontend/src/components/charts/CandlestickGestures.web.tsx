@@ -1,6 +1,5 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View } from 'react-native';
-
 import {
   createWheelGestureSession,
   resolveWheelHandling,
@@ -8,159 +7,140 @@ import {
 } from './candlestickGesturePolicy';
 import type { CandlestickGesturesProps } from './CandlestickGestures';
 
-/**
- * Web gesture adapter (react-native-web).
- *
- *  - LEFT MOUSE DRAG pans; the crosshair is suppressed while dragging and
- *    returns on the next hover move.
- *  - HOVER shows the crosshair; leaving the chart clears it.
- *  - A wheel that arrives DURING a drag is swallowed (still `preventDefault`,
- *    but no zoom/pan and no wheel session): one gesture owns the viewport at a
- *    time. Wheels work normally again after mouseup.
- *  - WHEEL over the chart zooms about the pointer — a plain vertical wheel,
- *    and equally Ctrl/Cmd + wheel, which is what browsers report for a
- *    trackpad pinch. Shift + wheel and horizontal trackpad input pan instead.
- *    Every wheel event the chart handles calls `preventDefault()` (the
- *    listener is `passive: false`), so the page neither scrolls nor
- *    browser-zooms while the pointer is over the chart; wheels anywhere else
- *    never reach this adapter and scroll the detail screen normally.
- *  - A wheel BURST is one gesture: the viewport is snapshotted once and each
- *    event applies the accumulated zoom/pan against it, so fast scrolling
- *    accumulates instead of re-zooming a stale snapshot (see
- *    `createWheelGestureSession`).
- */
-export default function CandlestickGestures({
-  children,
-  innerWidth,
-  paddingLeft,
-  slotWidth,
-  chartWidth,
-  chartHeight,
-  onGestureStart,
-  onPan,
-  onZoom,
-  onCrosshair,
-  onGestureEnd,
-}: CandlestickGesturesProps) {
+/** DOM adapter: one pointer owns either plot X-pan or price-axis Y-scale.
+ * Capture tracks outside release; every cancellation also closes wheel state. */
+export default function CandlestickGestures(props: CandlestickGesturesProps) {
   const containerRef = useRef<View>(null);
-  const dragRef = useRef<{ active: boolean; startX: number }>({
-    active: false,
-    startX: 0,
-  });
-  // Handlers are attached once; the latest callbacks are read through a ref.
-  const handlersRef = useRef({
-    innerWidth,
-    paddingLeft,
-    slotWidth,
-    chartWidth,
-    chartHeight,
-    onGestureStart,
-    onPan,
-    onZoom,
-    onCrosshair,
-    onGestureEnd,
-  });
-  handlersRef.current = {
-    innerWidth,
-    paddingLeft,
-    slotWidth,
-    chartWidth,
-    chartHeight,
-    onGestureStart,
-    onPan,
-    onZoom,
-    onCrosshair,
-    onGestureEnd,
-  };
-
-  const toLocal = useCallback((node: HTMLElement, clientX: number, clientY: number) => {
-    const rect = node.getBoundingClientRect();
-    return { x: clientX - rect.left, y: clientY - rect.top };
-  }, []);
+  const handlersRef = useRef(props);
+  handlersRef.current = props;
 
   useEffect(() => {
     const node = containerRef.current as unknown as HTMLElement | null;
     if (!node?.addEventListener) return undefined;
-
-    const wheelSession = createWheelGestureSession({
+    const previousStyles = {
+      userSelect: node.style.userSelect,
+      touchAction: node.style.touchAction,
+    };
+    node.style.userSelect = 'none';
+    node.style.touchAction = 'pan-y';
+    let drag: {
+      id: number;
+      x: number;
+      y: number;
+      mode: 'pan' | 'priceScale';
+    } | null = null;
+    const local = (event: { clientX: number; clientY: number }) => {
+      const rect = node.getBoundingClientRect();
+      return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    };
+    const wheel = createWheelGestureSession({
       onGestureStart: () => handlersRef.current.onGestureStart(),
-      onZoom: (scale, focalX) => handlersRef.current.onZoom(scale, focalX),
-      onPan: (translationX) => handlersRef.current.onPan(translationX),
+      onZoom: (scale, x) => handlersRef.current.onZoom(scale, x),
+      onPan: (x) => handlersRef.current.onPan(x),
       onGestureEnd: () => handlersRef.current.onGestureEnd(),
     });
-
-    const onWheel = (event: WheelEvent) => {
-      const handlers = handlersRef.current;
-      const handling = resolveWheelHandling(event, {
-        dragActive: dragRef.current.active,
-      });
-      if (handling === 'skip') return;
-      // The chart handles every wheel that lands on it, so the page must not
-      // scroll or browser-zoom underneath it — including the wheels swallowed
-      // during a drag.
-      event.preventDefault();
-      // Mid-drag: consumed, but no zoom, no pan and NO wheel session, so the
-      // drag keeps its own viewport snapshot and its single start/end pair.
-      if (handling === 'consume') return;
-      const local = toLocal(node, event.clientX, event.clientY);
-      if (handling === 'zoom') {
-        wheelSession.zoom(
-          wheelZoomScale(event.deltaY),
-          local.x - handlers.paddingLeft,
-        );
-        return;
-      }
-      wheelSession.pan(-(event.deltaX || event.deltaY));
-    };
-
-    const onMouseDown = (event: MouseEvent) => {
-      if (event.button !== 0) return;
-      // A drag owns the viewport snapshot: close any open wheel session first.
-      wheelSession.end();
-      dragRef.current = { active: true, startX: event.clientX };
-      handlersRef.current.onGestureStart();
-      handlersRef.current.onCrosshair(null);
-    };
-
-    const onMouseMove = (event: MouseEvent) => {
-      const handlers = handlersRef.current;
-      if (dragRef.current.active) {
-        handlers.onPan(event.clientX - dragRef.current.startX);
-        return;
-      }
-      const local = toLocal(node, event.clientX, event.clientY);
-      handlers.onCrosshair(local);
-    };
-
     const endDrag = () => {
-      if (!dragRef.current.active) return;
-      dragRef.current = { active: false, startX: 0 };
+      const previous = drag;
+      drag = null; // Clear first: releasePointerCapture may emit capture loss.
+      if (!previous) return;
+      if (node.hasPointerCapture?.(previous.id))
+        node.releasePointerCapture(previous.id);
       handlersRef.current.onGestureEnd();
     };
-
-    const onMouseLeave = () => {
+    const cancel = () => {
       endDrag();
-      wheelSession.end();
+      wheel.end();
       handlersRef.current.onCrosshair(null);
     };
-
-    node.addEventListener('wheel', onWheel, { passive: false });
-    node.addEventListener('mousedown', onMouseDown);
-    node.addEventListener('mousemove', onMouseMove);
-    node.addEventListener('mouseleave', onMouseLeave);
-    // Releasing outside the chart must still end the drag.
-    window.addEventListener('mouseup', endDrag);
-
-    return () => {
-      node.removeEventListener('wheel', onWheel);
-      node.removeEventListener('mousedown', onMouseDown);
-      node.removeEventListener('mousemove', onMouseMove);
-      node.removeEventListener('mouseleave', onMouseLeave);
-      window.removeEventListener('mouseup', endDrag);
-      // Drop the pending idle timer so it cannot fire after unmount.
-      wheelSession.dispose();
+    const onDown = (event: PointerEvent) => {
+      if (event.button !== 0 || event.isPrimary === false || drag) return;
+      wheel.end();
+      const point = local(event);
+      const h = handlersRef.current;
+      drag = {
+        id: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        mode: point.x >= h.paddingLeft + h.innerWidth ? 'priceScale' : 'pan',
+      };
+      event.preventDefault();
+      try {
+        node.setPointerCapture?.(event.pointerId);
+      } catch {
+        /* Window release still applies. */
+      }
+      h.onGestureStart();
+      h.onCrosshair(null);
     };
-  }, [toLocal]);
+    const onMove = (event: PointerEvent) => {
+      if (!drag || event.pointerId !== drag.id) return;
+      // Recover even when the browser never delivered the terminal event.
+      if ((event.buttons & 1) === 0) {
+        cancel();
+        return;
+      }
+      event.preventDefault();
+      const h = handlersRef.current;
+      if (drag.mode === 'priceScale') h.onPriceScale(event.clientY - drag.y);
+      else h.onPan(event.clientX - drag.x);
+    };
+    const onHover = (event: PointerEvent) => {
+      if (drag || event.buttons !== 0) return;
+      handlersRef.current.onCrosshair(local(event));
+    };
+    const onUp = (event: PointerEvent) => {
+      if (drag?.id === event.pointerId) cancel();
+    };
+    const onOut = (event: PointerEvent) => {
+      if (!event.relatedTarget) cancel();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') cancel();
+    };
+    const onWheel = (event: WheelEvent) => {
+      const handling = resolveWheelHandling(event, { dragActive: !!drag });
+      if (handling === 'skip') return;
+      event.preventDefault();
+      if (handling === 'consume') return;
+      if (handling === 'zoom')
+        wheel.zoom(
+          wheelZoomScale(event.deltaY),
+          local(event).x - handlersRef.current.paddingLeft,
+        );
+      else wheel.pan(-(event.deltaX || event.deltaY));
+    };
 
-  return <View ref={containerRef}>{children}</View>;
+    node.addEventListener('pointerdown', onDown);
+    node.addEventListener('pointermove', onHover);
+    node.addEventListener('pointerleave', cancel);
+    node.addEventListener('lostpointercapture', onUp);
+    node.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('pointermove', onMove, { passive: false });
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    window.addEventListener('pointerout', onOut);
+    window.addEventListener('blur', cancel);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      cancel();
+      Object.assign(node.style, previousStyles);
+      wheel.dispose();
+      node.removeEventListener('pointerdown', onDown);
+      node.removeEventListener('pointermove', onHover);
+      node.removeEventListener('pointerleave', cancel);
+      node.removeEventListener('lostpointercapture', onUp);
+      node.removeEventListener('wheel', onWheel);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      window.removeEventListener('pointerout', onOut);
+      window.removeEventListener('blur', cancel);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
+  return (
+    <View ref={containerRef} testID="candlestick-gestures">
+      {props.children}
+    </View>
+  );
 }

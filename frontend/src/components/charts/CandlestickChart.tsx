@@ -1,3 +1,4 @@
+import { priceRange, capturePriceScale, scalePriceByPixels, scaledPriceRange, type ManualPriceScale } from './candlestickPriceScale';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   LayoutChangeEvent,
@@ -116,6 +117,7 @@ function parseCandles(candles: CandlestickChartCandle[]): ParsedCandle[] {
       high === null ||
       low === null ||
       close === null ||
+      open <= 0 || high <= 0 || low <= 0 || close <= 0 ||
       !Number.isFinite(time)
     ) {
       continue;
@@ -148,18 +150,7 @@ function getPriceRange(candles: ParsedCandle[], currentPriceValue: number | null
     minY = Math.min(minY, currentPriceValue);
     maxY = Math.max(maxY, currentPriceValue);
   }
-  let range = maxY - minY;
-  if (range <= 0) {
-    const bump = Math.max(Math.abs(maxY) * 0.01, 1);
-    minY -= bump;
-    maxY += bump;
-    range = maxY - minY;
-  }
-  const pad = range * 0.08;
-  minY -= pad;
-  maxY += pad;
-  range = maxY - minY;
-  return { minY, maxY, range };
+  return priceRange(minY, maxY);
 }
 
 /**
@@ -204,6 +195,12 @@ export default function CandlestickChart({
   const [crosshair, setCrosshair] = useState<{ x: number; y: number } | null>(
     null,
   );
+
+  const [manualPriceScale, setManualPriceScale] = useState<ManualPriceScale | null>(null);
+  const manualPriceScaleRef = useRef(manualPriceScale);
+  manualPriceScaleRef.current = manualPriceScale;
+  const gestureStartPriceRef = useRef<ManualPriceScale | null>(null);
+  const geometryRef = useRef<CandlestickChartGeometry | null>(null);
 
   const parsed = useMemo(() => parseCandles(candles), [candles]);
   const total = parsed.length;
@@ -260,6 +257,8 @@ export default function CandlestickChart({
     const previousTotal = previousTotalRef.current;
     previousTotalRef.current = total;
     if (keyChanged) {
+      setManualPriceScale(null);
+      gestureStartPriceRef.current = null;
       setCrosshair(null);
       setViewport(resetViewport(total));
       return;
@@ -276,6 +275,8 @@ export default function CandlestickChart({
 
   const handleGestureStart = useCallback(() => {
     gestureStartViewportRef.current = viewportRef.current;
+    gestureStartPriceRef.current = manualPriceScaleRef.current ??
+      (geometryRef.current ? capturePriceScale(geometryRef.current) : null);
   }, []);
 
   const handlePan = useCallback((translationX: number) => {
@@ -310,6 +311,11 @@ export default function CandlestickChart({
     });
   }, []);
 
+  const handlePriceScale = useCallback((deltaY: number) => {
+    const start = gestureStartPriceRef.current;
+    if (start) setManualPriceScale(scalePriceByPixels(start, deltaY));
+  }, []);
+
   const handleCrosshair = useCallback(
     (position: { x: number; y: number } | null) => {
       if (!position) {
@@ -334,6 +340,8 @@ export default function CandlestickChart({
   }, []);
 
   const resetToLatest = useCallback(() => {
+    setManualPriceScale(null);
+    gestureStartPriceRef.current = null;
     setCrosshair(null);
     setViewport(resetViewport(totalRef.current));
   }, []);
@@ -358,14 +366,15 @@ export default function CandlestickChart({
         viewport.visibleCount,
         endIndex - startIndex,
       ),
-      ...getPriceRange(
+      ...(manualPriceScale ? scaledPriceRange(manualPriceScale) : getPriceRange(
         parsed.slice(startIndex, endIndex),
         isViewingLatest(viewport)
           ? (toNumber(currentPrice ?? null) ?? parsed[total - 1].close)
           : null,
-      ),
+      )),
     };
   }, [
+    manualPriceScale,
     parsed,
     total,
     viewport,
@@ -378,6 +387,8 @@ export default function CandlestickChart({
     slotWidth,
     bodyWidth,
   ]);
+
+  geometryRef.current = geometry;
 
   // Visible window + buffer only: at most ~180 + 4 SVG candle groups even when
   // 1000 candles are loaded.
@@ -422,7 +433,7 @@ export default function CandlestickChart({
 
   // The viewport is off its default window, so the reset affordance would do
   // something. (It is the only chart button: zoom has no controls.)
-  const canResetViewport = !isDefaultViewport(viewport, total);
+  const canResetViewport = !!manualPriceScale || !isDefaultViewport(viewport, total);
 
   const accessibilityLabel = [
     '캔들 차트',
@@ -453,6 +464,7 @@ export default function CandlestickChart({
           onGestureStart={handleGestureStart}
           onPan={handlePan}
           onZoom={handleZoom}
+          onPriceScale={handlePriceScale}
           onCrosshair={handleCrosshair}
           onGestureEnd={handleGestureEnd}
         >

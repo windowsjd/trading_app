@@ -1,5 +1,4 @@
 import { NativeModules, Platform } from 'react-native';
-import { parsePublicBooleanFlag } from './publicFlags';
 
 const API_BASE_PATH = '/api/v1';
 const WS_ENDPOINT_PATH = `${API_BASE_PATH}/ws`;
@@ -11,7 +10,6 @@ declare const process:
       env?: {
         EXPO_PUBLIC_API_ORIGIN?: string;
         EXPO_PUBLIC_WS_BASE_URL?: string;
-        EXPO_PUBLIC_LIMIT_ORDER_ENABLED?: string;
       };
     }
   | undefined;
@@ -22,7 +20,7 @@ declare const process:
  * expressions whose property is a literal starting with `EXPO_PUBLIC_`; a
  * dynamic `process.env[key]` lookup is invisible to it, so the value never
  * reaches the bundle and every flag silently reads as unset. Do not refactor
- * these three reads back behind a key-taking helper.
+ * these reads back behind a key-taking helper.
  */
 const RAW_API_ORIGIN =
   typeof process === 'undefined'
@@ -33,11 +31,6 @@ const RAW_WS_BASE_URL =
   typeof process === 'undefined'
     ? undefined
     : process.env?.EXPO_PUBLIC_WS_BASE_URL;
-
-const RAW_LIMIT_ORDER_ENABLED =
-  typeof process === 'undefined'
-    ? undefined
-    : process.env?.EXPO_PUBLIC_LIMIT_ORDER_ENABLED;
 
 /** Shared normalization applied to an ALREADY statically-read raw value. */
 function normalizeEnvValue(rawValue: string | undefined) {
@@ -123,16 +116,6 @@ export const API_BASE_URL = apiOrigin
   : API_BASE_PATH;
 
 export const WS_BASE_URL = configuredWsBaseUrl || toWsOrigin(apiOrigin);
-
-/**
- * Limit-buy order UI flag (shows the market/limit toggle). Default OFF: only an
- * explicit 'true' or '1' enables it. Whether a submitted order is auto-filled
- * is server-authoritative via the quote/create executionPolicy, not this flag.
- * Existing submitted limit orders stay visible and cancelable regardless.
- */
-export const LIMIT_ORDER_ENABLED = parsePublicBooleanFlag(
-  RAW_LIMIT_ORDER_ENABLED,
-);
 
 export function buildWsUrl(path: string) {
   if (!WS_BASE_URL) return null;

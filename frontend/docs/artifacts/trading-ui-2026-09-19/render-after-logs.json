@@ -1,0 +1,10 @@
+[
+  {
+    "timestamp": "2026-09-19T13:06:41.118286238Z",
+    "message": "\u001b[32m[Nest] 73  - \u001b[39m09/19/2026, 1:06:41 PM \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[BinanceWebSocketStreamingService] \u001b[39m\u001b[32mBinance WebSocket streaming connected with 50 ticker/depth streams.\u001b[39m"
+  },
+  {
+    "timestamp": "2026-09-19T13:06:51.122964003Z",
+    "message": "    binanceSymbolCount: 25,"
+  }
+]

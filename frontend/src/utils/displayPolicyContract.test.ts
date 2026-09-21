@@ -24,7 +24,7 @@ describe('numeric asset symbol display contract', () => {
     assert.match(marketSearch, /getAssetSymbolMarketDisplay\(item\)/u);
     assert.match(assetDetail, /getTradingPair\(asset\)/u);
     assert.match(read('features/asset/tradingHeader.ts'), /getAssetNameDisplay\(asset\)/u);
-    assert.match(orderScreen, /getTradingAssetName\(asset\)/u);
+    assert.match(orderScreen, /label=\{side === 'buy' \? '매수' : '매도'\}/u);
     assert.match(orderMapper, /getAssetNameDisplay\(asset\)/u);
     assert.match(recordMapper, /getAssetSymbolDisplay\(/u);
     assert.match(recordOrderList, /display\.symbol \?/u);
@@ -63,7 +63,7 @@ describe('separate asset and account availability display contract', () => {
 
   it('uses account-aware capability and API-error messages', () => {
     assert.match(generalAccountHome, /getCapabilityBlockMessage\(/u);
-    assert.match(orderScreen, /capabilities\?\.isGeneral === true/u);
+    assert.match(orderScreen, /!action.request.seasonUi/u);
     assert.match(walletFxScreen, /capabilities\?\.isGeneral === true/u);
     assert.doesNotMatch(generalAccountHome, /CAPABILITY_BLOCK_MESSAGE\[/u);
   });

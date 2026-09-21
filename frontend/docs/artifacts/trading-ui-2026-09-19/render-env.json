@@ -1,0 +1,37 @@
+{
+  "BINANCE_CRYPTO_SYMBOLS": {
+    "httpStatus": 404
+  },
+  "SCHEDULER_PROVIDER_TARGET_SOURCE": {
+    "httpStatus": 404
+  },
+  "BINANCE_WEBSOCKET_STREAMING_ENABLED": {
+    "key": "BINANCE_WEBSOCKET_STREAMING_ENABLED",
+    "value": "true"
+  },
+  "CANDLE_LIVE_STREAMING_ENABLED": {
+    "key": "CANDLE_LIVE_STREAMING_ENABLED",
+    "value": "false"
+  },
+  "CANDLE_LIVE_BINANCE_ENABLED": {
+    "key": "CANDLE_LIVE_BINANCE_ENABLED",
+    "value": "false"
+  },
+  "BINANCE_PUBLIC_MARKET_DATA_ENABLED": {
+    "key": "BINANCE_PUBLIC_MARKET_DATA_ENABLED",
+    "value": "true"
+  },
+  "PROVIDER_INGESTION_ENABLED": {
+    "key": "PROVIDER_INGESTION_ENABLED",
+    "value": "true"
+  },
+  "LIMIT_ORDER_ENABLED": {
+    "httpStatus": 404
+  },
+  "SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED": {
+    "httpStatus": 404
+  },
+  "environmentGroups": {
+    "count": 0
+  }
+}

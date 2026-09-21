@@ -1,3 +1,4 @@
+import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
 import React, { useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -54,6 +55,7 @@ export function AssetTradingScreen({
   const { assetId } = route.params;
   const rootNavigation = useRootNavigation();
   const isFocused = useIsFocused();
+  const isAdmin = useAdminDiagnostics();
   const headerHeight = useHeaderHeight();
   const [showKrw, setShowKrw] = useState(false);
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
@@ -210,11 +212,11 @@ export function AssetTradingScreen({
               ]}
             >
               {changeRate === '-'
-                ? '등락률 -'
-                : `${Number(displayPrice.changeRate) > 0 ? '+' : ''}${changeRate}%`}
+                ? '전일대비 -'
+                : `전일대비 ${Number(displayPrice.changeRate) > 0 ? '+' : ''}${changeRate}%`}
             </Text>
           </View>
-          {showReconnectBanner ? (
+          {isAdmin && showReconnectBanner ? (
             <Text
               testID={TEST_IDS.assetDetail.reconnectBanner}
               style={styles.bannerText}
@@ -222,7 +224,7 @@ export function AssetTradingScreen({
               실시간 연결 복구 중 · 마지막 시세
             </Text>
           ) : null}
-          {isStale ? (
+          {isAdmin && isStale ? (
             <Text style={styles.bannerText}>
               실시간 시세 최신성이 낮습니다. 서버 견적에서 최종 확인됩니다.
             </Text>

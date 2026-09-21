@@ -11,6 +11,8 @@ function createChartHarness(platform = 'android') {
   const cache = new Map();
   let current;
   const windowEvents = new Map();
+  const documentEvents = new Map();
+  const document = { visibilityState: 'visible', addEventListener: (n, fn) => documentEvents.set(n, fn), removeEventListener: n => documentEvents.delete(n) };
   const window = {
     addEventListener: (name, fn) => windowEvents.set(name, fn),
     removeEventListener: (name) => windowEvents.delete(name),
@@ -87,7 +89,7 @@ function createChartHarness(platform = 'android') {
       compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
       fileName: file,
     }).outputText;
-    new Function('require', 'module', 'exports', 'window', '__DEV__', code)(localRequire, module, module.exports, window, false);
+    new Function('require', 'module', 'exports', 'window', 'document', '__DEV__', code)(localRequire, module, module.exports, window, document, false);
     return module.exports;
   }
   function component(file, props) {
@@ -119,7 +121,7 @@ function createChartHarness(platform = 'android') {
       update(handler, fields) { receiver({ handlerTag: handler.handlerTag, ...fields }); },
     };
   }
-  return { component, attach, dimensions, windowEvents };
+  return { component, attach, dimensions, windowEvents, documentEvents, document };
 }
 
 function elements(node, type) {

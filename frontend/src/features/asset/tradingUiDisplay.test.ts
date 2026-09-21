@@ -23,8 +23,8 @@ describe('asset detail information and trading controls', () => {
         h.asset.assetType = assetType;
         h.asset.price.changeRate = changeRate;
         const tree = h.render();
-        const label = elements(tree, 'Text').find((node: any) => textContent(node) === (expected === '-' ? '등락률 -' : expected));
-        assert.equal(textContent(label), expected === '-' ? '등락률 -' : expected);
+        const label = elements(tree, 'Text').find((node: any) => textContent(node) === `전일대비 ${expected}`);
+        assert.equal(textContent(label), `전일대비 ${expected}`);
       });
     }
   }
@@ -39,8 +39,8 @@ describe('asset detail information and trading controls', () => {
         priceCapturedAt: h.asset.price.priceCapturedAt, changeRate,
       };
       const tree = h.render();
-      const label = elements(tree, 'Text').find((node: any) => textContent(node) === (expected === '-' ? '등락률 -' : expected));
-      assert.equal(textContent(label), expected === '-' ? '등락률 -' : expected);
+      const label = elements(tree, 'Text').find((node: any) => textContent(node) === `전일대비 ${expected}`);
+      assert.equal(textContent(label), `전일대비 ${expected}`);
       assert.doesNotMatch(textContent(tree), /등락률 -%|등락률 1\.23%/);
     });
   }
@@ -75,9 +75,11 @@ describe('asset detail information and trading controls', () => {
     });
   }
 
-  it('still shows a stale ticker warning after hiding the duplicate closed notice', () => {
+  it('shows a technical stale ticker warning to admin only', () => {
     const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
     h.tickerStale = true;
+    assert.doesNotMatch(textContent(h.render()), /실시간 시세 최신성이 낮습니다/);
+    h.role = 'admin';
     assert.match(textContent(h.render()), /실시간 시세 최신성이 낮습니다/);
   });
 
@@ -123,11 +125,11 @@ describe('sell order display without changing gates', () => {
       h.control(tree, TEST_IDS.order.quantityInput).props.onChangeText('1');
       tree = h.render();
       assert.equal(textContent(tree).includes(noHoldingsMessage), quantity === '0');
-      assert.equal(h.renderCta(h.control(tree, TEST_IDS.order.quoteSubmit)).props.disabled, quantity === '0');
-      assert.equal(h.renderCta(h.control(tree, TEST_IDS.order.executeSubmit)).props.disabled, true, 'execution still requires a quote');
+      assert.equal(h.renderCta(h.control(tree, TEST_IDS.order.executeSubmit)).props.disabled, quantity === '0');
+      assert.equal(h.renderCta(h.control(tree, TEST_IDS.order.executeSubmit)).props.disabled, quantity === '0', 'one-action still blocks empty holdings');
       const ratios = elements(tree, 'Pressable').filter((node: any) => ['25%', '50%', '75%', '100%'].includes(textContent(node)));
       assert.equal(ratios.length, 4);
-      assert.ok(ratios.every((node: any) => node.props.disabled === (quantity === '0')));
+      assert.ok(ratios.every((node: any) => node.props.disabled === false));
     });
   }
 
@@ -136,7 +138,7 @@ describe('sell order display without changing gates', () => {
     h.account.status = 'suspended';
     const tree = h.render();
     assert.match(textContent(tree), /일시정지된 계정입니다/);
-    assert.equal(h.renderCta(h.control(tree, TEST_IDS.order.quoteSubmit)).props.disabled, true);
+    assert.equal(h.renderCta(h.control(tree, TEST_IDS.order.executeSubmit)).props.disabled, true);
   });
 
   for (const state of ['isLoading', 'isError']) {
@@ -145,7 +147,7 @@ describe('sell order display without changing gates', () => {
       h.positionQuery[state] = true;
       const tree = h.render();
       assert.match(textContent(tree), /보유 수량을 확인/);
-      assert.equal(h.renderCta(h.control(tree, TEST_IDS.order.quoteSubmit)).props.disabled, true);
+      assert.equal(h.renderCta(h.control(tree, TEST_IDS.order.executeSubmit)).props.disabled, true);
     });
   }
 });

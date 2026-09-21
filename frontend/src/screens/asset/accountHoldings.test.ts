@@ -171,7 +171,6 @@ describe('holdings in AssetDetail with real React Query and order invalidation',
               : TEST_IDS.assetDetail.sellButton,
           );
           await h.input(TEST_IDS.order.quantityInput, quantity);
-          if (side === 'sell') await h.press(TEST_IDS.order.quoteSubmit);
           await h.press(TEST_IDS.order.executeSubmit);
           await h.flush();
           assert.equal(h.success().visible, true);

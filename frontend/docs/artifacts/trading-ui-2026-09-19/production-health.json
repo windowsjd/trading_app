@@ -1,0 +1,114 @@
+{
+  "health": {
+    "httpStatus": 200,
+    "response": {
+      "success": true,
+      "data": {
+        "service": "ok"
+      }
+    }
+  },
+  "health/db": {
+    "httpStatus": 200,
+    "response": {
+      "success": true,
+      "data": {
+        "database": "ok"
+      }
+    }
+  },
+  "readiness": {
+    "httpStatus": 200,
+    "data": {
+      "app": "ok",
+      "status": "degraded",
+      "reasons": [
+        "MARKET_CALENDAR_PROVISIONAL"
+      ],
+      "database": "ok",
+      "redis": "ok",
+      "currentTime": "2026-09-19T13:07:33.362Z",
+      "binanceWebSocketStreaming": {
+        "enabled": true,
+        "running": true,
+        "state": "connected",
+        "connected": true,
+        "connecting": false,
+        "reconnecting": false,
+        "subscribedSymbolCount": 25,
+        "subscribedStreams": [
+          "btcusdt@ticker",
+          "ethusdt@ticker",
+          "bnbusdt@ticker",
+          "xrpusdt@ticker",
+          "solusdt@ticker",
+          "trxusdt@ticker",
+          "dogeusdt@ticker",
+          "zecusdt@ticker",
+          "xlmusdt@ticker",
+          "linkusdt@ticker",
+          "suiusdt@ticker",
+          "nightusdt@ticker",
+          "nearusdt@ticker",
+          "pepeusdt@ticker",
+          "adausdt@ticker",
+          "taousdt@ticker",
+          "wldusdt@ticker",
+          "enausdt@ticker",
+          "avaxusdt@ticker",
+          "uniusdt@ticker",
+          "chipusdt@ticker",
+          "ltcusdt@ticker",
+          "asterusdt@ticker",
+          "币安人生usdt@ticker",
+          "trumpusdt@ticker",
+          "btcusdt@depth10",
+          "ethusdt@depth10",
+          "bnbusdt@depth10",
+          "xrpusdt@depth10",
+          "solusdt@depth10",
+          "trxusdt@depth10",
+          "dogeusdt@depth10",
+          "zecusdt@depth10",
+          "xlmusdt@depth10",
+          "linkusdt@depth10",
+          "suiusdt@depth10",
+          "nightusdt@depth10",
+          "nearusdt@depth10",
+          "pepeusdt@depth10",
+          "adausdt@depth10",
+          "taousdt@depth10",
+          "wldusdt@depth10",
+          "enausdt@depth10",
+          "avaxusdt@depth10",
+          "uniusdt@depth10",
+          "chipusdt@depth10",
+          "ltcusdt@depth10",
+          "asterusdt@depth10",
+          "币安人生usdt@depth10",
+          "trumpusdt@depth10"
+        ],
+        "lastStartedAt": "2026-09-19T13:06:38.121Z",
+        "lastConnectedAt": "2026-09-19T13:06:41.117Z",
+        "lastDisconnectedAt": null,
+        "lastMessageAt": "2026-09-19T13:07:33.423Z",
+        "lastTickerAt": "2026-09-19T13:07:33.423Z",
+        "lastSnapshotAt": "2026-09-19T13:07:33.027Z",
+        "reconnectCount": 0,
+        "nextReconnectAt": null,
+        "nextReconnectDelayMs": null,
+        "receivedFrames": 2298,
+        "receivedTickers": 1070,
+        "acknowledged": 1,
+        "created": 214,
+        "skipped": 855,
+        "failed": 0,
+        "latestPriceCount": 25,
+        "eventListenerCount": 1,
+        "lastErrorCode": null,
+        "lastErrorMessage": null
+      },
+      "limitOrderMatchingEnabled": false
+    }
+  }
+}

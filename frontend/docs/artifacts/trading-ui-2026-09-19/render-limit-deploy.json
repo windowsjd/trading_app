@@ -1,0 +1,26 @@
+{
+  "serviceId": "srv-da84cg8u01pc73cjasa0",
+  "serviceName": "trading_app",
+  "previousDeployId": "dep-dan7us8jo6nc7399guj0",
+  "commit": "5862e1a849f769d45f033f1656183df55163bd0f",
+  "change": {
+    "LIMIT_ORDER_ENABLED": "true"
+  },
+  "matchingChanged": false,
+  "binanceChanged": false,
+  "configuredFlag": {
+    "key": "LIMIT_ORDER_ENABLED",
+    "value": "true"
+  },
+  "deploy": {
+    "id": "dep-dan8h8v40ujc73b24ar0",
+    "status": "live",
+    "createdAt": "2026-09-19T13:05:39.389278Z",
+    "finishedAt": "2026-09-19T13:06:42.022239Z",
+    "commit": {
+      "id": "5862e1a849f769d45f033f1656183df55163bd0f",
+      "message": "\uc554\ud638\ud654\ud3d0 \uc885\ubaa9\ucd94\uac00",
+      "createdAt": "2026-09-19T12:26:20Z"
+    }
+  }
+}

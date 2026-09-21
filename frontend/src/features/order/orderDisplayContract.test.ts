@@ -72,13 +72,13 @@ describe('order quote display and safety contract', () => {
   });
 
   it('keeps quote execution, expiry, requote and idempotency guards', () => {
-    assert.match(orderScreen, /quoteId:\s*quoteData\.quoteId/u);
-    assert.match(orderScreen, /isOrderQuoteExpired\(quoteData, quoteNow\)/u);
-    assert.match(orderScreen, /getOrderQuoteExpiresInSeconds\(quoteData, quoteNow\)/u);
-    assert.match(orderScreen, /if \(quoteExpired\)/u);
-    assert.match(orderScreen, /!quoteExpired/u);
-    assert.match(orderScreen, /order_requote_required/u);
-    assert.match(orderScreen, /idempotencyKey:\s*executeIdempotencyKey/u);
+    assert.match(orderScreen, /runQuotedAction\(action/u);
+    assert.match(orderScreen, /validateOrderQuote\(request.payload, quote\)/u);
+    assert.match(orderScreen, /quoteId:\s*quote\.quoteId/u);
+    assert.match(orderScreen, /idempotencyKey:\s*key/u);
+    assert.match(orderScreen, /isOrderRequoteRequiredCode/u);
+    assert.match(orderScreen, /isOrderIdempotencyConflictCode/u);
+    assert.doesNotMatch(orderScreen, /TEST_IDS.order.quoteSubmit/u);
 
     for (const field of [
       'quoteId',

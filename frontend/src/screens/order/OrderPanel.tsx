@@ -1,4 +1,8 @@
-import { getTradingAssetName } from '../../features/asset/tradingHeader';
+import { UP_COLOR } from '../../components/charts/candleColors';
+import {
+  validateOrderQuote,
+  OrderQuoteValidationError,
+} from '../../features/order/validateOrderQuote';
 import { applyTickerMarketState } from '../../features/asset/assetTickerPolicy';
 import { getAssetTradingWarning } from '../../features/asset/tradingUx';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -51,15 +55,11 @@ import {
 import { type WalletCurrency } from '../../features/wallet/api';
 import { getWalletAvailableAmount } from '../../features/wallet/mapper';
 import {
-  getLimitOrderSuccessMessage,
-  getOrderQuoteDisplay,
-  getOrderQuoteExpiresInSeconds,
   isOrderIdempotencyConflictCode,
-  isOrderQuoteExpired,
   isOrderRequoteRequiredCode,
   isOrderSuccess,
 } from '../../features/order/mapper';
-import { buildWsUrl, LIMIT_ORDER_ENABLED } from '../../constants/env';
+import { buildWsUrl } from '../../constants/env';
 import { useAssetTicker } from '../../features/asset/useAssetTicker';
 import { selectDisplayPrice } from '../../features/asset/displayPricePolicy';
 import { useStaleRecheck } from '../../features/asset/useStaleRecheck';
@@ -73,7 +73,6 @@ import {
   type QuotedAction,
 } from '../../features/tradingAccount/quotedAction';
 import { ERROR_CODE } from '../../models/enums/errorCode';
-import type { OrderFlowState } from '../../models/enums/viewState';
 import {
   BLOCKED_REASON_MESSAGE,
   getApiErrorCode,
@@ -81,11 +80,7 @@ import {
   mapOrderErrorCodeToBlockedReason,
 } from '../../services/api/errorMapper';
 import { createIdempotencyKey } from '../../utils/idempotency';
-import {
-  formatAssetPrice,
-  formatCurrency,
-  formatDisplayDecimal,
-} from '../../utils/format';
+import { formatCurrency, formatDisplayDecimal } from '../../utils/format';
 
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
@@ -138,20 +133,6 @@ export default function OrderPanel(props: Props) {
     </View>
   );
 }
-type OrderDomainState = Extract<
-  OrderFlowState,
-  | 'order_quote_rejected'
-  | 'order_requote_required'
-  | 'order_idempotency_conflict'
-  | 'order_failed'
->;
-
-const QUOTE_EXPIRED_MESSAGE =
-  '견적 유효 시간이 지났습니다. 다시 견적을 받아주세요.';
-const REQUOTE_REQUIRED_MESSAGE =
-  '가격 또는 환율이 변경되었습니다. 다시 견적을 받아주세요.';
-const IDEMPOTENCY_CONFLICT_MESSAGE =
-  '이미 다른 내용으로 처리 중인 요청입니다. 새 견적을 받아 다시 시도해주세요.';
 const BUY_FEE_BUFFER = 0.002;
 const RATIO_BUTTONS = [0.25, 0.5, 0.75, 1] as const;
 
@@ -256,71 +237,50 @@ export function OrderForm({
   const accountChangedAway = shouldResetBoundFlow(binding);
 
   const [quantity, setQuantity] = useState('');
-  const showLimitToggle = LIMIT_ORDER_ENABLED;
-  const [orderTypeState, setOrderTypeState] = useState<'market' | 'limit'>(
-    'market',
-  );
-  const orderType = showLimitToggle ? orderTypeState : 'market';
+  const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
   const [limitPrice, setLimitPrice] = useState('');
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [domainError, setDomainError] = useState<string | null>(null);
   const [diagnosticError, setDiagnosticError] = useState<unknown>(null);
-  const [quoteData, setQuoteData] = useState<OrderQuoteDto | null>(null);
-  const [executeIdempotencyKey, setExecuteIdempotencyKey] = useState<
-    string | null
-  >(null);
-  const [orderDomainState, setOrderDomainState] =
-    useState<OrderDomainState | null>(null);
   const [successState, setSuccessState] = useState(EMPTY_ORDER_SUCCESS_STATE);
   // Create clears the active quote so stale inputs cannot be re-submitted,
   // while this immutable snapshot remains available to the success sheet.
   const successData = successState.data;
   const successQuoteData = successState.quote;
-  const [quoteNow, setQuoteNow] = useState(() => Date.now());
-  type BuyRequest = {
+  const [, setQuoteNow] = useState(() => Date.now());
+  type OrderRequest = {
     accountId: string;
     epoch: number;
+    revision: number;
     seasonUi: boolean;
     payload: Parameters<typeof quoteTradingAccountOrder>[1];
   };
-  const buyActionRef = useRef<QuotedAction<BuyRequest, OrderQuoteDto> | null>(
-    null,
-  );
-  const buySubmitLockRef = useRef(false);
-  const sellSubmitLockRef = useRef(false);
+  const orderActionRef = useRef<QuotedAction<
+    OrderRequest,
+    OrderQuoteDto
+  > | null>(null);
+  const submitLockRef = useRef(false);
   const quoteRevisionRef = useRef(0);
-  const buyScopeRef = useRef({ key: '', epoch: 0, mounted: true });
+  const scopeRef = useRef({ key: '', epoch: 0, mounted: true });
   const scopeKey = `${accountId}:${selectedAccountId ?? ''}:${accountKnown}:${assetId}:${side}`;
-  if (buyScopeRef.current.key !== scopeKey) {
-    buyActionRef.current = null;
-    buyScopeRef.current = {
+  if (scopeRef.current.key !== scopeKey) {
+    orderActionRef.current = null;
+    scopeRef.current = {
       key: scopeKey,
-      epoch: buyScopeRef.current.epoch + 1,
+      epoch: scopeRef.current.epoch + 1,
       mounted: true,
     };
   }
   useEffect(() => {
-    buyScopeRef.current.mounted = true;
+    scopeRef.current.mounted = true;
     return () => {
-      buyScopeRef.current.mounted = false;
+      scopeRef.current.mounted = false;
     };
   }, []);
-  const isBuyCurrent = (request: BuyRequest) =>
-    buyScopeRef.current.mounted && request.epoch === buyScopeRef.current.epoch;
-  const latestQuoteInputRef = useRef<{
-    assetId: string;
-    side: typeof side;
-    quantity: string;
-    orderType: 'market' | 'limit';
-    limitPrice: string;
-  }>({
-    assetId,
-    side,
-    quantity: '',
-    orderType: 'market',
-    limitPrice: '',
-  });
-
+  const isActionCurrent = (request: OrderRequest) =>
+    scopeRef.current.mounted &&
+    request.epoch === scopeRef.current.epoch &&
+    request.revision === quoteRevisionRef.current;
   const assetQuery = useQuery({
     queryKey: QUERY_KEYS.asset.detail(assetId),
     queryFn: () => getAssetDetail(assetId),
@@ -338,11 +298,17 @@ export function OrderForm({
   });
   useStaleRecheck(enabled && side === 'buy', () => setQuoteNow(Date.now()));
 
-  const buyMutation = useMutation({
-    mutationFn: (action: QuotedAction<BuyRequest, OrderQuoteDto>) =>
+  const orderMutation = useMutation({
+    mutationFn: (action: QuotedAction<OrderRequest, OrderQuoteDto>) =>
       runQuotedAction(action, {
-        quote: (request) =>
-          quoteTradingAccountOrder(request.accountId, request.payload),
+        quote: async (request) => {
+          const quote = await quoteTradingAccountOrder(
+            request.accountId,
+            request.payload,
+          );
+          validateOrderQuote(request.payload, quote);
+          return quote;
+        },
         execute: (request, quote, key) =>
           createTradingAccountOrder(request.accountId, {
             assetId: request.payload.assetId,
@@ -354,15 +320,15 @@ export function OrderForm({
               ? { orderType: 'limit' as const, limitPrice: quote.limitPrice }
               : {}),
           }),
-        isCurrent: () => isBuyCurrent(action.request),
+        isCurrent: () => isActionCurrent(action.request),
       }),
     retry: false,
     onSettled: () => {
-      buySubmitLockRef.current = false;
+      submitLockRef.current = false;
     },
     onSuccess: async (data, action) => {
       if (!data) return;
-      if (isBuyCurrent(action.request)) {
+      if (isActionCurrent(action.request)) {
         if (isOrderSuccess(data.result)) {
           setSuccessState(captureOrderSuccess(data.result, data.quote));
           setQuantity('');
@@ -380,20 +346,23 @@ export function OrderForm({
       });
     },
     onError: (error, action) => {
-      if (!isBuyCurrent(action.request)) return;
+      if (!isActionCurrent(action.request)) return;
       setDiagnosticError(error);
       const code = getApiErrorCode(error);
-      if (
+      if (error instanceof OrderQuoteValidationError) {
+        orderActionRef.current = null;
+        setDomainError(error.message);
+      } else if (
         isOrderRequoteRequiredCode(code) ||
         isOrderIdempotencyConflictCode(code)
       ) {
-        buyActionRef.current = null;
+        orderActionRef.current = null;
         setDomainError(
           code === ERROR_CODE.QUOTE_EXPIRED
-            ? '주문 견적이 만료되었습니다. 매수하기를 다시 눌러주세요.'
+            ? '주문 견적이 만료되었습니다. 주문 버튼을 다시 눌러주세요.'
             : isOrderIdempotencyConflictCode(code)
               ? '이미 처리 중인 요청입니다. 주문 내역을 확인해주세요.'
-              : '가격 또는 환율이 변경되어 주문하지 못했습니다. 매수하기를 다시 눌러주세요.',
+              : '가격 또는 환율이 변경되어 주문하지 못했습니다. 주문 버튼을 다시 눌러주세요.',
         );
       } else {
         setDomainError(
@@ -402,7 +371,7 @@ export function OrderForm({
       }
     },
   });
-  const buyPending = buyMutation.isPending;
+  const orderPending = orderMutation.isPending;
 
   const positionQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.positions(accountId, {
@@ -420,186 +389,22 @@ export function OrderForm({
     enabled: accountKnown && side === 'buy',
   });
 
-  latestQuoteInputRef.current = {
-    assetId,
-    side,
-    quantity: quantity.trim(),
-    orderType,
-    limitPrice: limitPrice.trim(),
-  };
-
-  useEffect(() => {
-    if (!quoteData) return undefined;
-
-    setQuoteNow(Date.now());
-    const intervalId = setInterval(() => {
-      setQuoteNow(Date.now());
-    }, 1000);
-
-    return () => clearInterval(intervalId);
-  }, [quoteData]);
-
-  type SellQuoteRequest = {
-    payload: Parameters<typeof quoteTradingAccountOrder>[1];
-    epoch: number;
-    revision: number;
-  };
-  const isSellQuoteCurrent = (request: SellQuoteRequest) =>
-    buyScopeRef.current.mounted &&
-    request.epoch === buyScopeRef.current.epoch &&
-    request.revision === quoteRevisionRef.current;
-  const quoteMutation = useMutation({
-    // The accountId is closed over from the bound form, so every quote this screen
-    // issues names the same account for as long as the screen exists.
-    mutationFn: (request: SellQuoteRequest) =>
-      quoteTradingAccountOrder(accountId, request.payload),
-    retry: false,
-    onSuccess: (result, request) => {
-      if (!isSellQuoteCurrent(request)) return;
-      const variables = request.payload;
-      const latestInput = latestQuoteInputRef.current;
-      if (
-        variables.assetId !== latestInput.assetId ||
-        variables.side !== latestInput.side ||
-        variables.quantity !== latestInput.quantity ||
-        (variables.orderType ?? 'market') !== latestInput.orderType ||
-        (variables.limitPrice ?? '') !== latestInput.limitPrice
-      ) {
-        return;
-      }
-
-      setQuoteData(result);
-      setExecuteIdempotencyKey(createIdempotencyKey('order'));
-      setOrderDomainState(null);
-      setFieldError(null);
-      setDomainError(null);
-      setDiagnosticError(null);
-      setSuccessState(clearOrderSuccess());
-    },
-    onError: (error, request) => {
-      if (!isSellQuoteCurrent(request)) return;
-      const variables = request.payload;
-      const latestInput = latestQuoteInputRef.current;
-      if (
-        variables.assetId !== latestInput.assetId ||
-        variables.side !== latestInput.side ||
-        variables.quantity !== latestInput.quantity ||
-        (variables.orderType ?? 'market') !== latestInput.orderType ||
-        (variables.limitPrice ?? '') !== latestInput.limitPrice
-      ) {
-        return;
-      }
-
-      const code = getApiErrorCode(error);
-      setDiagnosticError(error);
-
-      setQuoteData(null);
-      setExecuteIdempotencyKey(null);
-      setOrderDomainState('order_quote_rejected');
-      setDomainError(
-        isOrderRequoteRequiredCode(code)
-          ? REQUOTE_REQUIRED_MESSAGE
-          : getOrderDomainErrorMessage(code, capabilities?.isGeneral === true),
-      );
-    },
-  });
-
-  type SellCreateRequest = {
-    payload: Parameters<typeof createTradingAccountOrder>[1];
-    epoch: number;
-    quote: OrderQuoteDto;
-    seasonUi: boolean;
-  };
-  const createMutation = useMutation({
-    mutationFn: (request: SellCreateRequest) =>
-      createTradingAccountOrder(accountId, request.payload),
-    retry: false,
-    onSettled: () => {
-      sellSubmitLockRef.current = false;
-    },
-    onSuccess: async (result, request) => {
-      // An already-sent create still belongs to the old account. Refresh that
-      // account even after unmount, but never show its success in a new flow.
-      await invalidateAfterOrderCreate(queryClient, accountId, {
-        seasonUi: request.seasonUi,
-      });
-      if (
-        !buyScopeRef.current.mounted ||
-        request.epoch !== buyScopeRef.current.epoch
-      )
-        return;
-      if (!isOrderSuccess(result)) {
-        setOrderDomainState('order_failed');
-        setDomainError(
-          '주문 결과를 확인할 수 없습니다. 잠시 후 다시 확인해주세요.',
-        );
-        return;
-      }
-
-      setSuccessState(captureOrderSuccess(result, request.quote));
-      setQuoteData(null);
-      setExecuteIdempotencyKey(null);
-      setOrderDomainState(null);
-      setFieldError(null);
-      setDomainError(null);
-      setDiagnosticError(null);
-    },
-    onError: (error, request) => {
-      if (
-        !buyScopeRef.current.mounted ||
-        request.epoch !== buyScopeRef.current.epoch
-      )
-        return;
-      const code = getApiErrorCode(error);
-      setDiagnosticError(error);
-
-      if (isOrderRequoteRequiredCode(code)) {
-        setQuoteData(null);
-        setExecuteIdempotencyKey(null);
-        setOrderDomainState('order_requote_required');
-        setDomainError(
-          code === ERROR_CODE.QUOTE_EXPIRED
-            ? QUOTE_EXPIRED_MESSAGE
-            : REQUOTE_REQUIRED_MESSAGE,
-        );
-        return;
-      }
-
-      if (isOrderIdempotencyConflictCode(code)) {
-        setQuoteData(null);
-        setExecuteIdempotencyKey(null);
-        setOrderDomainState('order_idempotency_conflict');
-        setDomainError(IDEMPOTENCY_CONFLICT_MESSAGE);
-        return;
-      }
-
-      setOrderDomainState('order_failed');
-      setDomainError(
-        getOrderDomainErrorMessage(code, capabilities?.isGeneral === true),
-      );
-    },
-  });
-
   const resetOrderActionState = () => {
-    if (buySubmitLockRef.current || sellSubmitLockRef.current) return;
-    buyActionRef.current = null;
+    if (submitLockRef.current) return;
+    orderActionRef.current = null;
     quoteRevisionRef.current += 1;
     setFieldError(null);
     setDomainError(null);
     setDiagnosticError(null);
-    setQuoteData(null);
-    setExecuteIdempotencyKey(null);
-    setOrderDomainState(null);
     setSuccessState(clearOrderSuccess());
-    quoteMutation.reset();
-    createMutation.reset();
+    orderMutation.reset();
   };
 
   // Standalone OrderScreen keeps its route account and blocks after a switch.
   // Inline panels instead remount with empty inputs for the new selected account.
   useEffect(() => {
     if (!accountChangedAway) return;
-    buyActionRef.current = null;
+    orderActionRef.current = null;
     quoteRevisionRef.current += 1;
 
     setQuantity('');
@@ -607,15 +412,7 @@ export function OrderForm({
     setFieldError(null);
     setDomainError(null);
     setDiagnosticError(null);
-    setQuoteData(null);
-    setExecuteIdempotencyKey(null);
-    setOrderDomainState(null);
     setSuccessState(clearOrderSuccess());
-    quoteMutation.reset();
-    createMutation.reset();
-    // Mutation objects are recreated every render; depending on them here would
-    // re-run this on every render instead of only when the account changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountChangedAway]);
 
   const limitPriceInvalidReason = useMemo(
@@ -626,16 +423,6 @@ export function OrderForm({
   const inputInvalidReason = useMemo(
     () => validateQuantity(quantity) ?? limitPriceInvalidReason,
     [quantity, limitPriceInvalidReason],
-  );
-
-  const quoteExpired = useMemo(
-    () => (quoteData ? isOrderQuoteExpired(quoteData, quoteNow) : false),
-    [quoteData, quoteNow],
-  );
-
-  const quoteExpiresInSeconds = useMemo(
-    () => (quoteData ? getOrderQuoteExpiresInSeconds(quoteData, quoteNow) : 0),
-    [quoteData, quoteNow],
   );
 
   const asset = assetQuery.data?.asset
@@ -683,15 +470,6 @@ export function OrderForm({
     assetId,
   );
 
-  // Price precision comes from asset metadata, including when a quote arrives.
-  const quoteDisplay = useMemo(
-    () =>
-      quoteData
-        ? getOrderQuoteDisplay(quoteData, asset?.displayPriceDecimals)
-        : null,
-    [quoteData, asset?.displayPriceDecimals],
-  );
-
   /**
    * Every gate below is about the ROUTE account. General and season accounts
    * share this flow; suspended/closed accounts cannot open new orders; season
@@ -725,10 +503,12 @@ export function OrderForm({
         ? '현재 화면 시세가 없어 비율 수량 계산은 제한됩니다. 견적은 서버가 최종 판정합니다.'
         : null);
 
+  const positionUnavailable =
+    positionQuery.isError || positionQuery.data?.state === 'unavailable';
   const sellBlockedReason =
     side === 'sell' && positionQuery.isLoading
       ? '보유 수량을 확인하는 중입니다.'
-      : side === 'sell' && positionQuery.isError
+      : side === 'sell' && positionUnavailable
         ? '보유 수량을 확인할 수 없어 매도할 수 없습니다.'
         : side === 'sell' && Number(positionQuantity) <= 0
           ? '보유 수량이 없어 매도할 수 없습니다.'
@@ -738,6 +518,14 @@ export function OrderForm({
 
   const preOrderBlockedReason =
     accountBlockedReason ?? assetHardBlockedReason ?? sellBlockedReason;
+  // Empty holdings still block submission. Only the initial input-dependent
+  // error is quiet; account/position service failures stay visible.
+  const visibleBlockedReason =
+    accountBlockedReason ??
+    assetHardBlockedReason ??
+    (positionQuery.isLoading || positionUnavailable || quantity.trim()
+      ? sellBlockedReason
+      : null);
 
   const settlementCurrency = isWalletCurrency(asset?.settlementCurrency)
     ? asset.settlementCurrency
@@ -766,7 +554,7 @@ export function OrderForm({
 
     if (side === 'sell') {
       if (positionQuery.isLoading) return '보유 수량을 확인하는 중입니다.';
-      if (positionQuery.isError) return '보유 수량을 확인할 수 없습니다.';
+      if (positionUnavailable) return '보유 수량을 확인할 수 없습니다.';
       if (!positionQuantityValue) return '보유 수량이 없습니다.';
       return null;
     }
@@ -791,7 +579,7 @@ export function OrderForm({
     orderType,
     accountBlockedReason,
     assetHardBlockedReason,
-    positionQuery.isError,
+    positionUnavailable,
     positionQuery.isLoading,
     positionQuantityValue,
     ratioPriceValue,
@@ -802,94 +590,17 @@ export function OrderForm({
     walletsQuery.isLoading,
   ]);
 
-  const viewState = useMemo<OrderFlowState>(() => {
-    if (createMutation.isPending) return 'order_submitting';
-    if (quoteMutation.isPending) return 'order_quote_loading';
-    if (successData) return 'order_success';
-    if (orderDomainState) return orderDomainState;
-    if (quoteData && quoteExpired) return 'order_quote_expired';
-    if (quoteData) return 'order_quote_ready';
-    if (inputInvalidReason) {
-      return quantity.trim() || fieldError
-        ? 'order_input_invalid'
-        : 'order_input_idle';
-    }
-    return 'order_input_idle';
-  }, [
-    createMutation.isPending,
-    quoteMutation.isPending,
-    successData,
-    orderDomainState,
-    quoteData,
-    quoteExpired,
-    inputInvalidReason,
-    quantity,
-    fieldError,
-  ]);
-
   const canExecute =
     !preOrderBlockedReason &&
     !inputInvalidReason &&
-    !!quoteData &&
-    !quoteExpired &&
-    !!executeIdempotencyKey &&
-    orderDomainState !== 'order_requote_required' &&
-    orderDomainState !== 'order_idempotency_conflict';
-
-  const canBuyExecute =
-    !preOrderBlockedReason &&
-    !inputInvalidReason &&
-    !!preview &&
+    (side === 'sell' || !!preview) &&
     !successData &&
-    !buyActionRef.current?.completed;
-
+    !orderActionRef.current?.completed;
   const inputErrorMessage =
-    fieldError ??
-    (viewState === 'order_input_invalid' ? inputInvalidReason : null);
-
-  const requestQuote = () => {
-    if (
-      sellSubmitLockRef.current ||
-      quoteMutation.isPending ||
-      accountChangedAway
-    )
-      return;
-    if (preOrderBlockedReason) {
-      setDomainError(preOrderBlockedReason);
-      return;
-    }
-
-    if (inputInvalidReason) {
-      setFieldError(inputInvalidReason);
-      return;
-    }
-
-    setFieldError(null);
-    setDomainError(null);
-    setDiagnosticError(null);
-    setQuoteData(null);
-    setExecuteIdempotencyKey(null);
-    setOrderDomainState(null);
-    setSuccessState(clearOrderSuccess());
-    createMutation.reset();
-
-    quoteRevisionRef.current += 1;
-    quoteMutation.mutate({
-      epoch: buyScopeRef.current.epoch,
-      revision: quoteRevisionRef.current,
-      payload: {
-        assetId,
-        side,
-        quantity: quantity.trim(),
-        ...(orderType === 'limit'
-          ? { orderType: 'limit' as const, limitPrice: limitPrice.trim() }
-          : {}),
-      },
-    });
-  };
+    fieldError ?? (quantity.trim() ? inputInvalidReason : null);
 
   const applyQuantityRatio = (ratio: (typeof RATIO_BUTTONS)[number]) => {
-    if (buySubmitLockRef.current || sellSubmitLockRef.current) return;
+    if (submitLockRef.current) return;
     if (ratioDisabledReason) {
       setFieldError(ratioDisabledReason);
       return;
@@ -912,85 +623,28 @@ export function OrderForm({
     resetOrderActionState();
   };
 
-  const executeQuote = () => {
-    if (
-      sellSubmitLockRef.current ||
-      createMutation.isPending ||
-      accountChangedAway
-    )
-      return;
-    if (preOrderBlockedReason) {
-      setDomainError(preOrderBlockedReason);
-      return;
-    }
-
-    if (inputInvalidReason) {
-      setFieldError(inputInvalidReason);
-      return;
-    }
-
-    if (!quoteData) {
-      setDomainError('먼저 견적을 확인해주세요.');
-      return;
-    }
-
-    if (quoteExpired) {
-      setDomainError(QUOTE_EXPIRED_MESSAGE);
-      return;
-    }
-
-    if (!executeIdempotencyKey) {
-      setOrderDomainState('order_failed');
-      setDomainError(getErrorMessageFromCode(ERROR_CODE.IDEMPOTENCY_REQUIRED));
-      return;
-    }
-
-    setFieldError(null);
-    setDomainError(null);
-    setDiagnosticError(null);
-    setOrderDomainState(null);
-
-    sellSubmitLockRef.current = true;
-    createMutation.mutate({
-      epoch: buyScopeRef.current.epoch,
-      quote: quoteData,
-      seasonUi: capabilities?.isSeason ?? false,
-      payload: {
-        quoteId: quoteData.quoteId,
-        assetId,
-        side,
-        quantity: quoteData.quantity,
-        idempotencyKey: executeIdempotencyKey,
-        ...(orderType === 'limit'
-          ? {
-              orderType: 'limit' as const,
-              // Server-quoted canonical limit price wins over the raw input.
-              limitPrice: quoteData.limitPrice ?? limitPrice.trim(),
-            }
-          : {}),
-      },
-    });
-  };
-
-  const submitBuy = () => {
+  const submitOrder = () => {
     if (
       accountChangedAway ||
-      buySubmitLockRef.current ||
-      buyPending ||
-      !canBuyExecute
+      submitLockRef.current ||
+      orderPending ||
+      !canExecute
     )
       return;
     setFieldError(null);
     setDomainError(null);
     setDiagnosticError(null);
-    buyActionRef.current ??= {
+    // An uncertain create response retains this exact quote/key for a user
+    // retry. It never silently obtains a second executable order.
+    orderActionRef.current ??= {
       request: {
         accountId,
-        epoch: buyScopeRef.current.epoch,
+        epoch: scopeRef.current.epoch,
+        revision: quoteRevisionRef.current,
         seasonUi: capabilities?.isSeason ?? false,
         payload: {
           assetId,
-          side: 'buy',
+          side,
           quantity: quantity.trim(),
           ...(orderType === 'limit'
             ? { orderType: 'limit', limitPrice: limitPrice.trim() }
@@ -999,8 +653,8 @@ export function OrderForm({
       },
       idempotencyKey: createIdempotencyKey('order'),
     };
-    buySubmitLockRef.current = true;
-    buyMutation.mutate(buyActionRef.current);
+    submitLockRef.current = true;
+    orderMutation.mutate(orderActionRef.current);
   };
 
   if (assetQuery.isLoading || accountsLoading)
@@ -1027,12 +681,12 @@ export function OrderForm({
         <AdminDiagnosticPanel error={assetQuery.error} />
       </View>
     );
-  const pending = buyPending || createMutation.isPending;
+  const pending = orderPending;
   const integrityMessage =
     getIntegrityErrorMessage(positionQuery.error) ??
     getIntegrityErrorMessage(walletsQuery.error);
   const resetInput = (update: () => void) => {
-    if (buySubmitLockRef.current || sellSubmitLockRef.current) return;
+    if (submitLockRef.current) return;
     update();
     resetOrderActionState();
   };
@@ -1056,30 +710,30 @@ export function OrderForm({
           style={[styles.typeTab, orderType === 'market' && styles.typeActive]}
           onPress={() => {
             if (orderType !== 'market')
-              resetInput(() => setOrderTypeState('market'));
+              resetInput(() => {
+                setOrderType('market');
+                setLimitPrice('');
+              });
           }}
         >
           <Text style={styles.typeText}>시장가</Text>
         </ActionPressable>
-        {showLimitToggle ? (
-          <ActionPressable
-            testID={TEST_IDS.order.typeToggleLimit}
-            accessibilityRole="tab"
-            accessibilityLabel="지정가"
-            accessibilityState={{
-              selected: orderType === 'limit',
-              disabled: pending,
-            }}
-            disabled={pending}
-            style={[styles.typeTab, orderType === 'limit' && styles.typeActive]}
-            onPress={() => {
-              if (orderType !== 'limit')
-                resetInput(() => setOrderTypeState('limit'));
-            }}
-          >
-            <Text style={styles.typeText}>지정가</Text>
-          </ActionPressable>
-        ) : null}
+        <ActionPressable
+          testID={TEST_IDS.order.typeToggleLimit}
+          accessibilityRole="tab"
+          accessibilityLabel="지정가"
+          accessibilityState={{
+            selected: orderType === 'limit',
+            disabled: pending,
+          }}
+          disabled={pending}
+          style={[styles.typeTab, orderType === 'limit' && styles.typeActive]}
+          onPress={() => {
+            if (orderType !== 'limit') resetInput(() => setOrderType('limit'));
+          }}
+        >
+          <Text style={styles.typeText}>지정가</Text>
+        </ActionPressable>
       </View>
       <View style={styles.group}>
         <Text style={styles.label}>가격 ({asset.settlementCurrency})</Text>
@@ -1119,15 +773,11 @@ export function OrderForm({
             accessibilityLabel={`주문 가능 수량 ${getRatioLabel(ratio)}`}
             testID={`order-ratio-${Math.round(ratio * 100)}`}
             style={styles.ratioButton}
-            disabled={pending || !!ratioDisabledReason}
+            disabled={pending}
+            accessibilityState={{ disabled: pending }}
             onPress={() => applyQuantityRatio(ratio)}
           >
-            <Text
-              style={[
-                styles.ratioText,
-                (pending || !!ratioDisabledReason) && styles.muted,
-              ]}
-            >
+            <Text style={[styles.ratioText, pending && styles.muted]}>
               {getRatioLabel(ratio)}
             </Text>
           </ActionPressable>
@@ -1146,12 +796,12 @@ export function OrderForm({
           {integrityMessage}
         </Text>
       ) : null}
-      {preOrderBlockedReason ? (
+      {visibleBlockedReason ? (
         <Text
           testID={TEST_IDS.tradingAccount.capabilityNotice}
           style={styles.errorText}
         >
-          {preOrderBlockedReason}
+          {visibleBlockedReason}
         </Text>
       ) : null}
       {assetWarningReason ? (
@@ -1230,111 +880,15 @@ export function OrderForm({
               )}
             </View>
           ) : null}
-          <CTAButton
-            testID={TEST_IDS.order.executeSubmit}
-            label={`매수 ${getTradingAssetName(asset)}`}
-            style={styles.buyActive}
-            state={
-              buyPending ? 'loading' : canBuyExecute ? 'enabled' : 'disabled'
-            }
-            onPress={submitBuy}
-          />
         </>
-      ) : (
-        <>
-          {quoteMutation.isPending ? (
-            <SectionSkeleton lines={3} />
-          ) : quoteDisplay && quoteData ? (
-            <View style={styles.preview}>
-              <Amount
-                label={orderType === 'limit' ? '지정가' : '예상 체결가'}
-                value={
-                  orderType === 'limit'
-                    ? formatAssetPrice(
-                        quoteData.limitPrice,
-                        quoteData.currencyCode,
-                        asset.displayPriceDecimals,
-                      )
-                    : quoteDisplay.price
-                }
-              />
-              <Amount label="수량" value={quoteDisplay.quantity} />
-              <Amount
-                label="예상 주문금액"
-                value={formatCurrency(
-                  quoteData.quotedGrossAmount ?? quoteData.grossAmount,
-                  quoteData.currencyCode,
-                )}
-              />
-              <Amount
-                label="예상 수수료"
-                value={formatCurrency(
-                  quoteData.quotedFeeAmount ?? quoteData.feeAmount,
-                  quoteData.currencyCode,
-                )}
-              />
-              <Amount
-                label="예상 순수령액"
-                value={formatCurrency(
-                  quoteData.quotedNetAmount ?? quoteData.netAmount,
-                  quoteData.currencyCode,
-                )}
-              />
-              {orderType === 'limit' ? (
-                <>
-                  <Amount
-                    label="예약 예정 수량"
-                    value={formatDisplayDecimal(quoteData.reservedQuantity)}
-                  />
-                  <Text style={styles.helper}>
-                    {getLimitOrderSuccessMessage(
-                      quoteData.executionPolicy,
-                      side,
-                    )}
-                  </Text>
-                </>
-              ) : null}
-              <Text style={styles.helper}>
-                남은 시간 {quoteExpiresInSeconds}초
-              </Text>
-              {quoteExpired ? (
-                <Text style={styles.errorText}>{QUOTE_EXPIRED_MESSAGE}</Text>
-              ) : null}
-            </View>
-          ) : null}
-          <CTAButton
-            testID={TEST_IDS.order.quoteSubmit}
-            label={
-              quoteExpired || orderDomainState === 'order_requote_required'
-                ? '견적 다시 받기'
-                : '견적 확인'
-            }
-            state={
-              quoteMutation.isPending
-                ? 'loading'
-                : preOrderBlockedReason || pending
-                  ? 'blocked'
-                  : inputInvalidReason
-                    ? 'disabled'
-                    : 'enabled'
-            }
-            onPress={requestQuote}
-          />
-          <CTAButton
-            testID={TEST_IDS.order.executeSubmit}
-            label={`매도 ${getTradingAssetName(asset)}`}
-            style={styles.sellActive}
-            state={
-              createMutation.isPending
-                ? 'loading'
-                : canExecute
-                  ? 'enabled'
-                  : 'disabled'
-            }
-            onPress={executeQuote}
-          />
-        </>
-      )}
+      ) : null}
+      <CTAButton
+        testID={TEST_IDS.order.executeSubmit}
+        label={side === 'buy' ? '매수' : '매도'}
+        style={side === 'buy' ? styles.buyActive : styles.sellActive}
+        state={pending ? 'loading' : canExecute ? 'enabled' : 'disabled'}
+        onPress={submitOrder}
+      />
       <OrderSuccessBottomSheet
         visible={!!successData}
         payload={successData}
@@ -1425,7 +979,7 @@ const styles = StyleSheet.create({
     color: '#555',
     textAlign: 'center',
   },
-  buyActive: { backgroundColor: '#a13e3b' },
+  buyActive: { backgroundColor: UP_COLOR },
   sellActive: { backgroundColor: '#315f9b' },
   activeText: { color: '#fff' },
   typeTab: {

@@ -126,8 +126,30 @@ export function isWithinChartBounds(
 }
 
 /** One gesture at a time owns the chart. */
-export type ChartGestureType = 'pan' | 'pinch' | 'crosshair';
+export type ChartGestureType = 'pan' | 'pinch' | 'crosshair' | 'priceScale';
 export type ChartGestureOwner = ChartGestureType | 'none';
+
+export type ChartTouch = { id: number; x: number; y: number };
+export type TouchPair = readonly [ChartTouch, ChartTouch];
+
+/** Lock one intention until lift. Distance change wins over mixed movement;
+ * Y scaling requires both fingers moving together, predominantly vertically. */
+export function classifyTwoFingerGesture(start: TouchPair, current: TouchPair): 'pinch' | 'priceScale' | null {
+  if (start.some((touch, index) => touch.id !== current[index].id)) return null;
+  const distance = (pair: TouchPair) => Math.hypot(pair[1].x - pair[0].x, pair[1].y - pair[0].y);
+  const initialDistance = distance(start);
+  const ratio = distance(current) / initialDistance;
+  if (!Number.isFinite(ratio) || initialDistance < 8 || ratio <= 0) return null;
+  if (Math.abs(Math.log(ratio)) >= 0.06) return 'pinch';
+  const dy0 = current[0].y - start[0].y;
+  const dy1 = current[1].y - start[1].y;
+  const dy = (dy0 + dy1) / 2;
+  const dx = (current[0].x + current[1].x - start[0].x - start[1].x) / 2;
+  return dy0 * dy1 > 0 && Math.abs(dy) > HORIZONTAL_PAN_SLOP_PX &&
+    Math.abs(dy) > Math.abs(dx) * 1.2 &&
+    Math.abs(dy0 - dy1) < Math.max(6, Math.abs(dy) * 0.35)
+    ? 'priceScale' : null;
+}
 
 export type ChartGestureSession = {
   owner: () => ChartGestureOwner;

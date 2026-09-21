@@ -40,7 +40,6 @@ test('env.ts reads every EXPO_PUBLIC var with static dot notation', () => {
   // these regressed to a computed lookup the value would silently never reach
   // the bundle and the flag would read as unset in every build.
   for (const name of [
-    'EXPO_PUBLIC_LIMIT_ORDER_ENABLED',
     'EXPO_PUBLIC_API_ORIGIN',
     'EXPO_PUBLIC_WS_BASE_URL',
   ]) {
@@ -69,9 +68,6 @@ test('env.ts contains no dynamic process.env key access', () => {
   );
 });
 
-test('the limit order flag is derived from the shared parser', () => {
-  assert.match(
-    envSource,
-    /export const LIMIT_ORDER_ENABLED = parsePublicBooleanFlag\(\s*RAW_LIMIT_ORDER_ENABLED,?\s*\)/,
-  );
+test('limit orders do not depend on a build-time opt-in', () => {
+  assert.doesNotMatch(envSource, /LIMIT_ORDER_ENABLED/);
 });

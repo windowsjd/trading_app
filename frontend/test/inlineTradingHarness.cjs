@@ -24,6 +24,7 @@ function inlineTradingHarness() {
     assetId: 'bnb',
     accountId: 'general',
     focused: true,
+    role: 'user',
     requests: [],
     invalidations: [],
     queries: [],
@@ -108,11 +109,13 @@ function inlineTradingHarness() {
           const isQuote = url.endsWith('/quote');
           if (isQuote && h.quoteGate) await h.quoteGate.promise;
           if (!isQuote && h.createGate) await h.createGate.promise;
+          if (isQuote && h.quoteFailure) throw h.quoteFailure;
           if (!isQuote && h.failure) throw h.failure;
           if (!isQuote) h.onCreate?.(url, body);
           const asset = h.assets[body.assetId];
           const data = isQuote
             ? {
+                state: 'available',
                 asset,
                 side: body.side,
                 quantity: body.quantity,
@@ -143,7 +146,7 @@ function inlineTradingHarness() {
                   state: body.orderType === 'limit' ? 'submitted' : 'executed',
                 },
               };
-          return { data: { success: true, data } };
+          return { data: { success: true, data: isQuote ? { ...data, ...h.quoteOverride } : data } };
         },
       },
     },
@@ -187,6 +190,7 @@ function inlineTradingHarness() {
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
     '@react-navigation/elements': { useHeaderHeight: () => 48 },
     'react-native-svg': { default: 'Svg', Path: 'Path', __esModule: true },
+    '../../features/auth/useAdminDiagnostics': { useAdminDiagnostics: () => h.role === 'admin' },
     '@react-navigation/native': { useIsFocused: () => h.focused },
     '@tanstack/react-query': {
       ...query,
@@ -225,14 +229,15 @@ function inlineTradingHarness() {
         if (resource === 'wallets')
           return {
             ...base,
+            ...h.walletState,
             data: {
               wallets: [
                 {
                   currencyCode: 'USD',
-                  balanceAmount: '10000',
-                  reservedAmount: '1000',
+                  balanceAmount: h.usdBalance ?? '10000',
+                  reservedAmount: h.usdReserved ?? '1000',
                 },
-                { currencyCode: 'KRW', balanceAmount: '1000000' },
+                { currencyCode: 'KRW', balanceAmount: h.krwBalance ?? '1000000' },
               ],
             },
           };
@@ -241,6 +246,7 @@ function inlineTradingHarness() {
             ...base,
             ...h.positionState,
             data: {
+              state: h.positionDataState ?? 'available',
               positions: [
                 {
                   assetId: h.assetId,
@@ -274,11 +280,10 @@ function inlineTradingHarness() {
     '../../app/navigation/navigationHooks': { useRootNavigation: () => nav },
     '../../constants/env': {
       buildWsUrl: () => 'ws://test/api/v1/ws',
-      LIMIT_ORDER_ENABLED: true,
     },
     '../../features/asset/api': timeframes,
     '../../features/asset/useAssetTicker': {
-      useAssetTicker: () => ({ latestTicker: h.ticker }),
+      useAssetTicker: () => ({ latestTicker: h.ticker, isStale: h.tickerStale, showReconnectBanner: h.reconnect }),
     },
     '../../features/asset/useAssetOrderBook': {
       useAssetOrderBook: (options) => {

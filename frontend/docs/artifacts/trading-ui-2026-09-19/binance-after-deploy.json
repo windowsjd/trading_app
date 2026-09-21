@@ -1,0 +1,527 @@
+{
+  "startedAt": "2026-09-19T13:07:15.618Z",
+  "mode": "standalone",
+  "database": "trading_app_fbbk",
+  "observations": [
+    {
+      "observedAt": "2026-09-19T13:07:18.771Z",
+      "assets": [
+        {
+          "symbol": "SUIUSDT",
+          "assetId": "7836f2bd-dbeb-4f10-a565-59e981b578ec",
+          "price": "0.84780000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:07:14.275Z",
+          "effectiveAt": "2026-09-19T13:07:14.236Z"
+        },
+        {
+          "symbol": "NIGHTUSDT",
+          "assetId": "2e55fb56-df33-4219-902e-ea934cdce157",
+          "price": "0.02465000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:07:10.829Z",
+          "effectiveAt": "2026-09-19T13:07:10.566Z"
+        },
+        {
+          "symbol": "NEARUSDT",
+          "assetId": "d5292b83-8bdf-4817-b752-ebd02ef9917b",
+          "price": "3.58400000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:07:14.167Z",
+          "effectiveAt": "2026-09-19T13:07:14.117Z"
+        },
+        {
+          "symbol": "PEPEUSDT",
+          "assetId": "c81013a1-7c09-497a-ace5-fa26c14d6437",
+          "price": "0.00000382",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:07:13.279Z",
+          "effectiveAt": "2026-09-19T13:07:13.244Z"
+        },
+        {
+          "symbol": "ADAUSDT",
+          "assetId": "0f6eab2d-ac3d-41c8-b38a-33a11371d700",
+          "price": "0.22720000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:07:14.421Z",
+          "effectiveAt": "2026-09-19T13:07:14.307Z"
+        },
+        {
+          "symbol": "TAOUSDT",
+          "assetId": "62f573af-8c44-4d70-be90-d6e58fdc4c7c",
+          "price": "266.00000000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:07:13.716Z",
+          "effectiveAt": "2026-09-19T13:07:13.621Z"
+        },
+        {
+          "symbol": "WLDUSDT",
+          "assetId": "951bd83c-0f76-49a1-8a6d-fcde51aad13f",
+          "price": "0.43140000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:07:14.327Z",
+          "effectiveAt": "2026-09-19T13:07:14.289Z"
+        },
+        {
+          "symbol": "ENAUSDT",
+          "assetId": "e520d3c3-4e1c-4faf-81a1-1aa8c50f4f9d",
+          "price": "0.19960000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:07:13.626Z",
+          "effectiveAt": "2026-09-19T13:07:13.590Z"
+        },
+        {
+          "symbol": "AVAXUSDT",
+          "assetId": "26bdb394-a85d-4472-9139-0fc28cf00ca3",
+          "price": "9.25700000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:07:15.106Z",
+          "effectiveAt": "2026-09-19T13:07:15.071Z"
+        },
+        {
+          "symbol": "UNIUSDT",
+          "assetId": "47f03eab-9e31-45c5-a0bf-1852add26fa0",
+          "price": "9.01200000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:07:14.097Z",
+          "effectiveAt": "2026-09-19T13:07:14.061Z"
+        },
+        {
+          "symbol": "CHIPUSDT",
+          "assetId": "852e899c-5994-4d38-a8d6-a353e487fdea",
+          "price": "0.04389000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:07:14.636Z",
+          "effectiveAt": "2026-09-19T13:07:14.600Z"
+        },
+        {
+          "symbol": "LTCUSDT",
+          "assetId": "6100a2c6-5640-489d-bfd2-af7495f7ca05",
+          "price": "57.82000000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:07:16.234Z",
+          "effectiveAt": "2026-09-19T13:07:16.199Z"
+        },
+        {
+          "symbol": "ASTERUSDT",
+          "assetId": "6a895095-de0a-4963-83f8-e9237d3ffe24",
+          "price": "0.76700000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:07:14.440Z",
+          "effectiveAt": "2026-09-19T13:07:14.362Z"
+        },
+        {
+          "symbol": "币安人生USDT",
+          "assetId": "c39ba644-afe6-428f-80f2-b91944c00b86",
+          "price": "0.51400000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:07:09.531Z",
+          "effectiveAt": "2026-09-19T13:07:09.495Z"
+        },
+        {
+          "symbol": "TRUMPUSDT",
+          "assetId": "3e86bf50-ceaa-40f3-8aac-82a86ddfbf5c",
+          "price": "2.05300000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:07:14.978Z",
+          "effectiveAt": "2026-09-19T13:07:14.943Z"
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-09-19T13:08:10.598Z",
+      "assets": [
+        {
+          "symbol": "SUIUSDT",
+          "assetId": "7836f2bd-dbeb-4f10-a565-59e981b578ec",
+          "price": "0.84820000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:08:06.425Z",
+          "effectiveAt": "2026-09-19T13:08:06.236Z"
+        },
+        {
+          "symbol": "NIGHTUSDT",
+          "assetId": "2e55fb56-df33-4219-902e-ea934cdce157",
+          "price": "0.02464000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:08:03.921Z",
+          "effectiveAt": "2026-09-19T13:08:03.566Z"
+        },
+        {
+          "symbol": "NEARUSDT",
+          "assetId": "d5292b83-8bdf-4817-b752-ebd02ef9917b",
+          "price": "3.58500000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:08:06.423Z",
+          "effectiveAt": "2026-09-19T13:08:06.117Z"
+        },
+        {
+          "symbol": "PEPEUSDT",
+          "assetId": "c81013a1-7c09-497a-ace5-fa26c14d6437",
+          "price": "0.00000382",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:08:04.320Z",
+          "effectiveAt": "2026-09-19T13:08:04.244Z"
+        },
+        {
+          "symbol": "ADAUSDT",
+          "assetId": "0f6eab2d-ac3d-41c8-b38a-33a11371d700",
+          "price": "0.22740000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:08:06.223Z",
+          "effectiveAt": "2026-09-19T13:08:05.307Z"
+        },
+        {
+          "symbol": "TAOUSDT",
+          "assetId": "62f573af-8c44-4d70-be90-d6e58fdc4c7c",
+          "price": "265.80000000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:08:06.656Z",
+          "effectiveAt": "2026-09-19T13:08:06.621Z"
+        },
+        {
+          "symbol": "WLDUSDT",
+          "assetId": "951bd83c-0f76-49a1-8a6d-fcde51aad13f",
+          "price": "0.43070000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:08:03.822Z",
+          "effectiveAt": "2026-09-19T13:08:03.289Z"
+        },
+        {
+          "symbol": "ENAUSDT",
+          "assetId": "e520d3c3-4e1c-4faf-81a1-1aa8c50f4f9d",
+          "price": "0.19980000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:08:03.924Z",
+          "effectiveAt": "2026-09-19T13:08:03.590Z"
+        },
+        {
+          "symbol": "AVAXUSDT",
+          "assetId": "26bdb394-a85d-4472-9139-0fc28cf00ca3",
+          "price": "9.24900000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:08:05.110Z",
+          "effectiveAt": "2026-09-19T13:08:05.071Z"
+        },
+        {
+          "symbol": "UNIUSDT",
+          "assetId": "47f03eab-9e31-45c5-a0bf-1852add26fa0",
+          "price": "9.02300000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:08:06.330Z",
+          "effectiveAt": "2026-09-19T13:08:06.062Z"
+        },
+        {
+          "symbol": "CHIPUSDT",
+          "assetId": "852e899c-5994-4d38-a8d6-a353e487fdea",
+          "price": "0.04389000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:08:03.925Z",
+          "effectiveAt": "2026-09-19T13:08:03.600Z"
+        },
+        {
+          "symbol": "LTCUSDT",
+          "assetId": "6100a2c6-5640-489d-bfd2-af7495f7ca05",
+          "price": "57.79000000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:08:03.727Z",
+          "effectiveAt": "2026-09-19T13:08:03.199Z"
+        },
+        {
+          "symbol": "ASTERUSDT",
+          "assetId": "6a895095-de0a-4963-83f8-e9237d3ffe24",
+          "price": "0.76700000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:08:03.827Z",
+          "effectiveAt": "2026-09-19T13:08:03.362Z"
+        },
+        {
+          "symbol": "币安人生USDT",
+          "assetId": "c39ba644-afe6-428f-80f2-b91944c00b86",
+          "price": "0.51260000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:08:06.322Z",
+          "effectiveAt": "2026-09-19T13:08:05.495Z"
+        },
+        {
+          "symbol": "TRUMPUSDT",
+          "assetId": "3e86bf50-ceaa-40f3-8aac-82a86ddfbf5c",
+          "price": "2.05300000",
+          "source": "binance_spot_ws_ticker",
+          "capturedAt": "2026-09-19T13:08:08.020Z",
+          "effectiveAt": "2026-09-19T13:08:07.943Z"
+        }
+      ]
+    }
+  ],
+  "depth": {
+    "cc4de508-9cef-42b8-be1e-a23f3bbd5bb4": {
+      "count": 33,
+      "firstAt": "2026-09-19T13:07:22.377Z",
+      "lastAt": "2026-09-19T13:08:06.833Z",
+      "marketLabel": "TRX / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:06.522Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "6a895095-de0a-4963-83f8-e9237d3ffe24": {
+      "count": 40,
+      "firstAt": "2026-09-19T13:07:22.377Z",
+      "lastAt": "2026-09-19T13:08:07.725Z",
+      "marketLabel": "ASTER / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:07.397Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "43d1bad5-3e40-4b6c-bd8c-8b52ee84f841": {
+      "count": 46,
+      "firstAt": "2026-09-19T13:07:22.448Z",
+      "lastAt": "2026-09-19T13:08:08.869Z",
+      "marketLabel": "LINK / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:08.518Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "c589384f-3565-4743-9f04-394472420fd5": {
+      "count": 47,
+      "firstAt": "2026-09-19T13:07:22.486Z",
+      "lastAt": "2026-09-19T13:08:08.880Z",
+      "marketLabel": "ZEC / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:08.528Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "c39ba644-afe6-428f-80f2-b91944c00b86": {
+      "count": 31,
+      "firstAt": "2026-09-19T13:07:22.491Z",
+      "lastAt": "2026-09-19T13:08:07.862Z",
+      "marketLabel": "币安人生 / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:07.531Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "2e55fb56-df33-4219-902e-ea934cdce157": {
+      "count": 26,
+      "firstAt": "2026-09-19T13:07:22.563Z",
+      "lastAt": "2026-09-19T13:08:08.970Z",
+      "marketLabel": "NIGHT / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:08.617Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "fa6efb77-95c7-47cb-a031-99225bc63dd2": {
+      "count": 47,
+      "firstAt": "2026-09-19T13:07:22.601Z",
+      "lastAt": "2026-09-19T13:08:08.970Z",
+      "marketLabel": "DOGE / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:08.618Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "e520d3c3-4e1c-4faf-81a1-1aa8c50f4f9d": {
+      "count": 47,
+      "firstAt": "2026-09-19T13:07:22.602Z",
+      "lastAt": "2026-09-19T13:08:08.978Z",
+      "marketLabel": "ENA / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:08.626Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "852e899c-5994-4d38-a8d6-a353e487fdea": {
+      "count": 31,
+      "firstAt": "2026-09-19T13:07:22.602Z",
+      "lastAt": "2026-09-19T13:08:08.988Z",
+      "marketLabel": "CHIP / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:08.635Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "62f573af-8c44-4d70-be90-d6e58fdc4c7c": {
+      "count": 47,
+      "firstAt": "2026-09-19T13:07:22.623Z",
+      "lastAt": "2026-09-19T13:08:09.010Z",
+      "marketLabel": "TAO / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:08.656Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "bc418dfc-72e7-4c2d-9e5c-a1695ce5e097": {
+      "count": 47,
+      "firstAt": "2026-09-19T13:07:22.800Z",
+      "lastAt": "2026-09-19T13:08:09.187Z",
+      "marketLabel": "SOL / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:08.830Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "3e86bf50-ceaa-40f3-8aac-82a86ddfbf5c": {
+      "count": 47,
+      "firstAt": "2026-09-19T13:07:22.946Z",
+      "lastAt": "2026-09-19T13:08:09.339Z",
+      "marketLabel": "TRUMP / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:08.978Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "3163292e-4b23-47eb-adbf-159dacf63749": {
+      "count": 47,
+      "firstAt": "2026-09-19T13:07:23.023Z",
+      "lastAt": "2026-09-19T13:08:09.411Z",
+      "marketLabel": "BTC / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:09.050Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "db2cfa79-2a83-4c98-8a67-af0ba5db1dec": {
+      "count": 47,
+      "firstAt": "2026-09-19T13:07:23.023Z",
+      "lastAt": "2026-09-19T13:08:09.412Z",
+      "marketLabel": "ETH / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:09.051Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "47f03eab-9e31-45c5-a0bf-1852add26fa0": {
+      "count": 47,
+      "firstAt": "2026-09-19T13:07:23.096Z",
+      "lastAt": "2026-09-19T13:08:09.493Z",
+      "marketLabel": "UNI / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:09.127Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "26bdb394-a85d-4472-9139-0fc28cf00ca3": {
+      "count": 47,
+      "firstAt": "2026-09-19T13:07:23.096Z",
+      "lastAt": "2026-09-19T13:08:09.695Z",
+      "marketLabel": "AVAX / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:09.326Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "1106dee2-26f6-42e8-b9c1-d9254b15590a": {
+      "count": 47,
+      "firstAt": "2026-09-19T13:07:23.121Z",
+      "lastAt": "2026-09-19T13:08:09.695Z",
+      "marketLabel": "BNB / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:09.326Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "d5292b83-8bdf-4817-b752-ebd02ef9917b": {
+      "count": 46,
+      "firstAt": "2026-09-19T13:07:23.123Z",
+      "lastAt": "2026-09-19T13:08:08.630Z",
+      "marketLabel": "NEAR / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:08.284Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "6100a2c6-5640-489d-bfd2-af7495f7ca05": {
+      "count": 46,
+      "firstAt": "2026-09-19T13:07:23.217Z",
+      "lastAt": "2026-09-19T13:08:08.668Z",
+      "marketLabel": "LTC / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:08.320Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "7836f2bd-dbeb-4f10-a565-59e981b578ec": {
+      "count": 46,
+      "firstAt": "2026-09-19T13:07:23.246Z",
+      "lastAt": "2026-09-19T13:08:08.671Z",
+      "marketLabel": "SUI / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:08.324Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "c81013a1-7c09-497a-ace5-fa26c14d6437": {
+      "count": 44,
+      "firstAt": "2026-09-19T13:07:23.254Z",
+      "lastAt": "2026-09-19T13:08:08.675Z",
+      "marketLabel": "PEPE / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:08.328Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "951bd83c-0f76-49a1-8a6d-fcde51aad13f": {
+      "count": 46,
+      "firstAt": "2026-09-19T13:07:23.304Z",
+      "lastAt": "2026-09-19T13:08:08.675Z",
+      "marketLabel": "WLD / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:08.329Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "0f6eab2d-ac3d-41c8-b38a-33a11371d700": {
+      "count": 44,
+      "firstAt": "2026-09-19T13:07:23.319Z",
+      "lastAt": "2026-09-19T13:08:08.690Z",
+      "marketLabel": "ADA / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:08.343Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "369f8a2e-38da-4f36-b268-475f52acf98d": {
+      "count": 46,
+      "firstAt": "2026-09-19T13:07:23.328Z",
+      "lastAt": "2026-09-19T13:08:08.768Z",
+      "marketLabel": "XRP / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:08.419Z",
+      "askCount": 10,
+      "bidCount": 10
+    },
+    "b326e192-993a-4fe9-9f3a-0f05d0208f08": {
+      "count": 46,
+      "firstAt": "2026-09-19T13:07:23.360Z",
+      "lastAt": "2026-09-19T13:08:08.774Z",
+      "marketLabel": "XLM / USDT",
+      "priceUnit": "USDT",
+      "capturedAt": "2026-09-19T13:08:08.425Z",
+      "askCount": 10,
+      "bidCount": 10
+    }
+  },
+  "finishedAt": "2026-09-19T13:08:10.598Z",
+  "continuouslyUpdated": [
+    "SUIUSDT",
+    "NIGHTUSDT",
+    "NEARUSDT",
+    "PEPEUSDT",
+    "ADAUSDT",
+    "TAOUSDT",
+    "WLDUSDT",
+    "ENAUSDT",
+    "AVAXUSDT",
+    "UNIUSDT",
+    "CHIPUSDT",
+    "LTCUSDT",
+    "ASTERUSDT",
+    "币安人生USDT",
+    "TRUMPUSDT"
+  ]
+}

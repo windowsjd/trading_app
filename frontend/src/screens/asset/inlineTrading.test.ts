@@ -28,7 +28,6 @@ describe('inline order lifecycle with real React and query mutations', () => {
           }
           await h.input(qty, '0.125');
           await h.press('asset-krw-toggle');
-          if (side === 'sell') await h.press(TEST_IDS.order.quoteSubmit);
           await h.press(submit);
           await h.flush();
           assert.equal(h.requests.length, 2);
@@ -95,7 +94,7 @@ describe('inline order lifecycle with real React and query mutations', () => {
       t.after(h.close);
       await h.press(sell);
       await h.input(qty, '1');
-      await h.press(TEST_IDS.order.quoteSubmit);
+      await h.press(submit);
       if (change === 'side') await h.press(TEST_IDS.assetDetail.buyButton);
       else {
         if (change === 'account') h.accountId = 'season';
@@ -118,7 +117,6 @@ describe('inline order lifecycle with real React and query mutations', () => {
       t.after(h.close);
       if (side === 'sell') await h.press(sell);
       await h.input(qty, '1');
-      if (side === 'sell') await h.press(TEST_IDS.order.quoteSubmit);
       await h.press(submit);
       h.accountId = 'season';
       await h.update();
@@ -138,7 +136,6 @@ describe('inline order lifecycle with real React and query mutations', () => {
       t.after(h.close);
       if (side === 'sell') await h.press(sell);
       await h.input(qty, '0.5');
-      if (side === 'sell') await h.press(TEST_IDS.order.quoteSubmit);
       const action = h.node(submit).props.onPress;
       await act(async () => {
         action();
@@ -161,15 +158,10 @@ describe('inline order lifecycle with real React and query mutations', () => {
         t.after(h.close);
         if (side === 'sell') await h.press(sell);
         await h.input(qty, '0.5');
-        if (side === 'sell') await h.press(TEST_IDS.order.quoteSubmit);
-        await h.press(submit);
+          await h.press(submit);
         await h.flush();
         assert.equal(h.success().visible, false);
         h.failure = null;
-        if (side === 'sell') {
-          assert.equal(h.node(submit).props.state, 'disabled');
-          await h.press(TEST_IDS.order.quoteSubmit);
-        }
         await h.press(submit);
         await h.flush();
         assert.equal(
@@ -199,38 +191,28 @@ describe('inline order lifecycle with real React and query mutations', () => {
     assert.deepEqual(h.requests[2], h.requests[1]);
     assert.equal(h.success().visible, true);
   });
-  it('rejects an expired sell quote and permits a new quote', async (t) => {
-    const h = inlineTradingHarness();
-    h.ttl = -1;
-    await h.mount();
-    t.after(h.close);
-    await h.press(sell);
-    await h.input(qty, '1');
-    await h.press(TEST_IDS.order.quoteSubmit);
-    await h.flush();
-    assert.equal(h.node(submit).props.state, 'disabled');
-    await h.press(submit);
+  it('rejects an expired sell quote before create, then allows an explicit retry', async (t) => {
+    const h = inlineTradingHarness(); h.ttl = -1;
+    await h.mount(); t.after(h.close);
+    await h.press(sell); await h.input(qty, '1'); await h.press(submit); await h.flush();
     assert.equal(h.requests.length, 1);
-    h.ttl = 60000;
-    await h.press(TEST_IDS.order.quoteSubmit);
-    await h.flush();
-    await h.press(submit);
-    await h.flush();
+    assert.equal(h.success().visible, false);
+    h.ttl = 60000; await h.press(submit); await h.flush();
+    assert.equal(h.requests.length, 3);
     assert.equal(h.success().visible, true);
   });
-  it('invalidates a pending sell quote when an input changes away and back', async (t) => {
-    const h = inlineTradingHarness();
-    h.quoteGate = deferred();
-    await h.mount();
-    t.after(h.close);
-    await h.press(sell);
-    await h.input(qty, '1');
-    await h.press(TEST_IDS.order.quoteSubmit);
-    await h.input(qty, '2');
-    await h.input(qty, '1');
-    await act(async () => h.quoteGate.resolve());
-    await h.flush();
-    assert.equal(h.node(submit).props.state, 'disabled');
+  it('locks sell input and type controls through quote and create, including direct stale callbacks', async (t) => {
+    const h = inlineTradingHarness(); h.quoteGate = deferred();
+    await h.mount(); t.after(h.close);
+    await h.press(sell); await h.input(qty, '1'); await h.press(submit); await h.flush();
+    assert.equal(h.node(qty).props.editable, false);
+    assert.equal(h.node(TEST_IDS.order.typeToggleLimit).props.disabled, true);
+    await h.input(qty, '2'); await h.press(TEST_IDS.order.typeToggleLimit);
+    assert.equal(h.node(qty).props.value, '1');
+    await act(async () => h.quoteGate.resolve()); await h.flush();
+    assert.equal(h.requests.length, 2);
+    assert.equal(h.requests[1].body.quantity, '1');
+    assert.equal(h.requests[1].body.orderType, undefined);
   });
   it('uses each account holdings for ratios and blocks overselling and suspended accounts', async (t) => {
     const h = inlineTradingHarness();
@@ -245,11 +227,11 @@ describe('inline order lifecycle with real React and query mutations', () => {
     await h.press('order-ratio-100');
     assert.equal(h.node(qty).props.value, '1');
     await h.input(qty, '2');
-    assert.equal(h.node(TEST_IDS.order.quoteSubmit).props.state, 'blocked');
+    assert.equal(h.node(submit).props.state, 'disabled');
     h.accounts[1].status = 'suspended';
     await h.update();
     await h.input(qty, '0.5');
-    assert.equal(h.node(TEST_IDS.order.quoteSubmit).props.state, 'blocked');
+    assert.equal(h.node(submit).props.state, 'disabled');
   });
   it('keeps old account holdings and quotes away after switching A → B → A', async (t) => {
     const h = inlineTradingHarness();

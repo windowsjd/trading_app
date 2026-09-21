@@ -1,0 +1,447 @@
+{
+  "records": [
+    {
+      "kind": "layout",
+      "width": 320,
+      "fontScale": 1,
+      "asset": "BTC"
+    },
+    {
+      "kind": "layout",
+      "width": 320,
+      "fontScale": 1,
+      "asset": "BNB"
+    },
+    {
+      "kind": "layout",
+      "width": 320,
+      "fontScale": 1,
+      "asset": "PEPE"
+    },
+    {
+      "kind": "layout",
+      "width": 320,
+      "fontScale": 1,
+      "asset": "SUI"
+    },
+    {
+      "kind": "layout",
+      "width": 320,
+      "fontScale": 1,
+      "asset": "币安人生"
+    },
+    {
+      "kind": "layout",
+      "width": 320,
+      "fontScale": 1.5,
+      "asset": "BTC"
+    },
+    {
+      "kind": "layout",
+      "width": 320,
+      "fontScale": 1.5,
+      "asset": "BNB"
+    },
+    {
+      "kind": "layout",
+      "width": 320,
+      "fontScale": 1.5,
+      "asset": "PEPE"
+    },
+    {
+      "kind": "layout",
+      "width": 320,
+      "fontScale": 1.5,
+      "asset": "SUI"
+    },
+    {
+      "kind": "layout",
+      "width": 320,
+      "fontScale": 1.5,
+      "asset": "币安人生"
+    },
+    {
+      "kind": "layout",
+      "width": 360,
+      "fontScale": 1,
+      "asset": "BTC"
+    },
+    {
+      "kind": "layout",
+      "width": 360,
+      "fontScale": 1,
+      "asset": "BNB"
+    },
+    {
+      "kind": "layout",
+      "width": 360,
+      "fontScale": 1,
+      "asset": "PEPE"
+    },
+    {
+      "kind": "layout",
+      "width": 360,
+      "fontScale": 1,
+      "asset": "SUI"
+    },
+    {
+      "kind": "layout",
+      "width": 360,
+      "fontScale": 1,
+      "asset": "币安人生"
+    },
+    {
+      "kind": "layout",
+      "width": 360,
+      "fontScale": 1.5,
+      "asset": "BTC"
+    },
+    {
+      "kind": "layout",
+      "width": 360,
+      "fontScale": 1.5,
+      "asset": "BNB"
+    },
+    {
+      "kind": "layout",
+      "width": 360,
+      "fontScale": 1.5,
+      "asset": "PEPE"
+    },
+    {
+      "kind": "layout",
+      "width": 360,
+      "fontScale": 1.5,
+      "asset": "SUI"
+    },
+    {
+      "kind": "layout",
+      "width": 360,
+      "fontScale": 1.5,
+      "asset": "币安人生"
+    },
+    {
+      "kind": "layout",
+      "width": 390,
+      "fontScale": 1,
+      "asset": "BTC"
+    },
+    {
+      "kind": "layout",
+      "width": 390,
+      "fontScale": 1,
+      "asset": "BNB"
+    },
+    {
+      "kind": "layout",
+      "width": 390,
+      "fontScale": 1,
+      "asset": "PEPE"
+    },
+    {
+      "kind": "layout",
+      "width": 390,
+      "fontScale": 1,
+      "asset": "SUI"
+    },
+    {
+      "kind": "layout",
+      "width": 390,
+      "fontScale": 1,
+      "asset": "币安人生"
+    },
+    {
+      "kind": "layout",
+      "width": 390,
+      "fontScale": 1.5,
+      "asset": "BTC"
+    },
+    {
+      "kind": "layout",
+      "width": 390,
+      "fontScale": 1.5,
+      "asset": "BNB"
+    },
+    {
+      "kind": "layout",
+      "width": 390,
+      "fontScale": 1.5,
+      "asset": "PEPE"
+    },
+    {
+      "kind": "layout",
+      "width": 390,
+      "fontScale": 1.5,
+      "asset": "SUI"
+    },
+    {
+      "kind": "layout",
+      "width": 390,
+      "fontScale": 1.5,
+      "asset": "币安人生"
+    },
+    {
+      "kind": "layout",
+      "width": 430,
+      "fontScale": 1,
+      "asset": "BTC"
+    },
+    {
+      "kind": "layout",
+      "width": 430,
+      "fontScale": 1,
+      "asset": "BNB"
+    },
+    {
+      "kind": "layout",
+      "width": 430,
+      "fontScale": 1,
+      "asset": "PEPE"
+    },
+    {
+      "kind": "layout",
+      "width": 430,
+      "fontScale": 1,
+      "asset": "SUI"
+    },
+    {
+      "kind": "layout",
+      "width": 430,
+      "fontScale": 1,
+      "asset": "币安人生"
+    },
+    {
+      "kind": "layout",
+      "width": 430,
+      "fontScale": 1.5,
+      "asset": "BTC"
+    },
+    {
+      "kind": "layout",
+      "width": 430,
+      "fontScale": 1.5,
+      "asset": "BNB"
+    },
+    {
+      "kind": "layout",
+      "width": 430,
+      "fontScale": 1.5,
+      "asset": "PEPE"
+    },
+    {
+      "kind": "layout",
+      "width": 430,
+      "fontScale": 1.5,
+      "asset": "SUI"
+    },
+    {
+      "kind": "layout",
+      "width": 430,
+      "fontScale": 1.5,
+      "asset": "币安人生"
+    },
+    {
+      "kind": "role-guard",
+      "role": "user"
+    },
+    {
+      "kind": "role-guard",
+      "role": "operator"
+    },
+    {
+      "kind": "role-guard",
+      "role": "admin"
+    },
+    {
+      "kind": "role-guard",
+      "role": "unknown"
+    },
+    {
+      "kind": "role-guard",
+      "role": "error"
+    },
+    {
+      "kind": "quote-create",
+      "asset": "BTC",
+      "side": "buy",
+      "type": "market"
+    },
+    {
+      "kind": "quote-create",
+      "asset": "BTC",
+      "side": "buy",
+      "type": "limit"
+    },
+    {
+      "kind": "quote-create",
+      "asset": "BTC",
+      "side": "sell",
+      "type": "market"
+    },
+    {
+      "kind": "quote-create",
+      "asset": "BTC",
+      "side": "sell",
+      "type": "limit"
+    },
+    {
+      "kind": "quote-create",
+      "asset": "BNB",
+      "side": "buy",
+      "type": "market"
+    },
+    {
+      "kind": "quote-create",
+      "asset": "BNB",
+      "side": "buy",
+      "type": "limit"
+    },
+    {
+      "kind": "quote-create",
+      "asset": "BNB",
+      "side": "sell",
+      "type": "market"
+    },
+    {
+      "kind": "quote-create",
+      "asset": "BNB",
+      "side": "sell",
+      "type": "limit"
+    },
+    {
+      "kind": "quote-create",
+      "asset": "PEPE",
+      "side": "buy",
+      "type": "market"
+    },
+    {
+      "kind": "quote-create",
+      "asset": "PEPE",
+      "side": "buy",
+      "type": "limit"
+    },
+    {
+      "kind": "quote-create",
+      "asset": "PEPE",
+      "side": "sell",
+      "type": "market"
+    },
+    {
+      "kind": "quote-create",
+      "asset": "PEPE",
+      "side": "sell",
+      "type": "limit"
+    },
+    {
+      "kind": "quote-create",
+      "asset": "SUI",
+      "side": "buy",
+      "type": "market"
+    },
+    {
+      "kind": "quote-create",
+      "asset": "SUI",
+      "side": "buy",
+      "type": "limit"
+    },
+    {
+      "kind": "quote-create",
+      "asset": "SUI",
+      "side": "sell",
+      "type": "market"
+    },
+    {
+      "kind": "quote-create",
+      "asset": "SUI",
+      "side": "sell",
+      "type": "limit"
+    },
+    {
+      "kind": "quote-create",
+      "asset": "币安人生",
+      "side": "buy",
+      "type": "market"
+    },
+    {
+      "kind": "quote-create",
+      "asset": "币安人生",
+      "side": "buy",
+      "type": "limit"
+    },
+    {
+      "kind": "quote-create",
+      "asset": "币安人生",
+      "side": "sell",
+      "type": "market"
+    },
+    {
+      "kind": "quote-create",
+      "asset": "币安人生",
+      "side": "sell",
+      "type": "limit"
+    },
+    {
+      "kind": "asset-chart",
+      "asset": "BTC"
+    },
+    {
+      "kind": "asset-chart",
+      "asset": "BNB"
+    },
+    {
+      "kind": "asset-chart",
+      "asset": "PEPE"
+    },
+    {
+      "kind": "asset-chart",
+      "asset": "SUI"
+    },
+    {
+      "kind": "asset-chart",
+      "asset": "币安人生"
+    },
+    {
+      "kind": "han-market-detail"
+    },
+    {
+      "kind": "han-search-detail-chart"
+    },
+    {
+      "kind": "pointer-release",
+      "terminal": "inside"
+    },
+    {
+      "kind": "pointer-release",
+      "terminal": "outside"
+    },
+    {
+      "kind": "pointer-release",
+      "terminal": "leave"
+    },
+    {
+      "kind": "pointer-release",
+      "terminal": "blur"
+    },
+    {
+      "kind": "pointer-release",
+      "terminal": "cancel"
+    },
+    {
+      "kind": "pointer-release",
+      "terminal": "capture"
+    },
+    {
+      "kind": "pointer-release",
+      "terminal": "buttons"
+    },
+    {
+      "kind": "pointer-release",
+      "terminal": "visibility"
+    },
+    {
+      "kind": "chart-y-scale-wheel-reset-timeframe-unmount",
+      "lineY": 151.38752004917438
+    }
+  ],
+  "errors": []
+}

@@ -31,13 +31,14 @@ function setup(extra = {}) {
   const detector = adapter.render();
   adapter.flushEffects();
   const events = harness.attach(detector.props.gesture);
+  const pricePan = events.handlers.find((handler) => handler.config.minPointers === 2)!;
   const pinch = events.handlers.find((handler) => handler.handlerName === 'PinchGestureHandler')!;
   const pan = events.handlers.find((handler) => handler.config.activeOffsetXEnd)!;
   const crosshair = events.handlers.find((handler) => handler.config.activateAfterLongPress || handler.handlerName === 'LongPressGestureHandler')!;
   const geometry = () => elements(chart.render()).find((element) => element.props.geometry)!.props;
   const renderer = () => harness.component('CandlestickChartRenderer.tsx', geometry()).render();
   const down = () => events.handlers.forEach((handler) => events.state(handler, UNDETERMINED, BEGAN));
-  return { harness, chart, adapter, detector, events, pinch, pan, crosshair, intents, geometry, renderer, down };
+  return { harness, chart, adapter, detector, events, pinch, pricePan, pan, crosshair, intents, geometry, renderer, down };
 }
 
 describe('native adapter → RNGH JS event receiver → chart state → shared renderer', () => {
@@ -301,4 +302,59 @@ describe('native adapter → RNGH JS event receiver → chart state → shared r
       }
     }
   });
+});
+
+for (const terminal of [END, CANCELLED, FAILED]) {
+  it(`two-finger parallel Y scale shares geometry and ends on ${terminal}`, () => {
+    const h = setup(); h.down();
+    const touch = (eventType: number, dy: number, spread = 0) => h.events.update(h.pricePan, {
+      eventType, numberOfTouches: 2, allTouches: [
+        {id:1,x:80-spread,y:100+dy},{id:2,x:180+spread,y:100+dy}], changedTouches: [],
+    });
+    const before = h.geometry().geometry;
+    touch(1, 0); // TOUCHES_DOWN
+    h.events.state(h.pricePan, BEGAN, ACTIVE, { numberOfPointers: 2 });
+    touch(2, 50); // TOUCHES_MOVE
+    const after = h.geometry().geometry;
+    assert.ok(after.range > before.range);
+    assert.equal(after.startIndex, before.startIndex);
+    assert.ok(Math.abs(after.minY+after.range/2-before.minY-before.range/2) < 1e-8);
+    // A subsequent pinch movement cannot steal an already claimed Y scale.
+    h.events.state(h.pinch, BEGAN, ACTIVE, { numberOfPointers: 2 });
+    touch(2, 70, 30);
+    assert.equal(h.geometry().geometry.slotWidth, before.slotWidth);
+    h.events.state(h.pricePan, ACTIVE, terminal);
+    h.events.state(h.pinch, ACTIVE, terminal);
+    assert.deepEqual(h.intents, ['start','end']);
+    elements(h.chart.render(), 'Pressable')[0].props.onPress();
+    assert.deepEqual(h.geometry().geometry, before);
+  });
+}
+
+it('raw touch release prevents a late pinch update from restarting Y scale as X zoom', () => {
+  const h = setup(); h.down();
+  const touches = (eventType: number, dy: number, count = 2) => h.events.update(h.pricePan, {
+    eventType, numberOfTouches: count, allTouches: count === 2 ? [
+      { id: 1, x: 80, y: 100 + dy }, { id: 2, x: 180, y: 100 + dy },
+    ] : [], changedTouches: [],
+  });
+  touches(1, 0);
+  h.events.state(h.pricePan, BEGAN, ACTIVE);
+  h.events.state(h.pinch, BEGAN, ACTIVE);
+  touches(2, 50);
+  touches(3, 50, 0); // TOUCHES_UP may arrive before recognizer finalization.
+  const released = h.geometry().geometry;
+  h.events.update(h.pinch, { scale: 2, focalX: 150, numberOfPointers: 1 });
+  assert.deepEqual(h.geometry().geometry, released);
+  assert.deepEqual(h.intents, ['start', 'end']);
+  h.events.state(h.pricePan, ACTIVE, END);
+  h.events.state(h.pinch, ACTIVE, END);
+  assert.deepEqual(h.intents, ['start', 'end']);
+  // New candles keep the manual range valid; a new asset/timeframe resets it.
+  h.chart.props.candles = [...candles, { ...candles.at(-1), time: '2026-09-02T00:00:00Z', high: 1000 }];
+  h.chart.render(); h.chart.flushEffects();
+  assert.equal(h.geometry().geometry.range, released.range);
+  h.chart.props.viewportResetKey = 'other-asset:1h';
+  h.chart.render(); h.chart.flushEffects();
+  assert.ok(h.geometry().geometry.maxY > 1000);
 });

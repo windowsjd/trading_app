@@ -33,7 +33,7 @@ describe('MarketScreen partial-price warning policy', () => {
   });
 
   it('keeps the realtime reconnect warning', () => {
-    assert.match(marketScreen, /\{showReconnectBanner \? \(/u);
+    assert.match(marketScreen, /\{isAdmin && showReconnectBanner \? \(/u);
     assert.match(
       marketScreen,
       /실시간 연결이 불안정합니다\. 마지막 수신 가격을 표시하고\s+있습니다\./u,

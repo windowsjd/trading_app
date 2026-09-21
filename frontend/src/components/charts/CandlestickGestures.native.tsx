@@ -8,38 +8,16 @@ import {
   createChartGestureSession,
   isWithinChartBounds,
   pinchScale,
+  classifyTwoFingerGesture,
+  type TouchPair,
+  type ChartTouch,
 } from './candlestickGesturePolicy';
 import type { CandlestickGesturesProps } from './CandlestickGestures';
 
-/**
- * Native (iOS/Android) gesture adapter. There are no zoom controls on screen:
- * these gestures are the whole zoom/pan vocabulary.
- *
- * Recognizers and how they stay out of each other's way:
- *  - PINCH (two fingers) zooms about the finger midpoint. It TAKES OVER the
- *    session, so a long press that turns into a pinch ends the crosshair first
- *    and the pinch still reports exactly one start and one end.
- *  - A delayed PAN activates after a stationary hold (~300ms), then tracks
- *    crosshair scrubbing in both directions. RNGH enforces its native movement
- *    slop before activation; afterwards movement does not cancel the hold.
- *    This needs neither a manual state manager nor Reanimated.
- *  - CHART PAN is a one-finger pan constrained with `activeOffsetX` /
- *    `failOffsetY`: it activates only for clearly horizontal drags, so the
- *    detail screen keeps scrolling vertically. It claims the session on
- *    ACTIVATION (not on touch down), so it never blocks a long press, and it
- *    measures translation from the activation point so the chart does not jump
- *    by the activation slop.
- *
- * Crosshair and chart pan RACE: the first active recognizer cancels the other.
- * Pinch is simultaneous with that race, so adding a second finger can zoom.
- * Pending recognizers never claim the JS session or disable page scrolling.
- * Every start/end goes through `createChartGestureSession`, so the chart sees
- * one `onGestureStart`/`onGestureEnd` per real gesture no matter how many of
- * these simultaneous recognizers finalize for a single lift.
- *
- * A drag maps 1:1 to candles and stops at the data edges — no inertia, fling
- * or rubber-band in this first version.
- */
+/** One-finger horizontal pan/long-press race alongside simultaneous native
+ * pinch and two-finger pan recognizers. Shared touch intention locks either
+ * X zoom or parallel vertical Y scaling until lift. No manual activation or
+ * Reanimated dependency: pending recognition never owns the chart session. */
 export default function CandlestickGestures({
   children,
   paddingLeft,
@@ -48,6 +26,7 @@ export default function CandlestickGestures({
   onGestureStart,
   onPan,
   onZoom,
+  onPriceScale,
   onCrosshair,
   onGestureEnd,
 }: CandlestickGesturesProps) {
@@ -105,27 +84,121 @@ export default function CandlestickGestures({
       })
       .runOnJS(true);
 
+    let pairStart: TouchPair | null = null;
+    let pairNow: TouchPair | null = null;
+    let twoMode: 'pinch' | 'priceScale' | null = null;
+    let pinchActive = false;
+    let twoPanActive = false;
+    let rawTouchesAvailable = false;
+    const finishTwo = () => {
+      if (twoMode) session.end(twoMode);
+      pairStart = pairNow = null;
+      twoMode = null;
+    };
+    const applyTouches = () => {
+      if (!pairStart || !pairNow || (!pinchActive && !twoPanActive)) return;
+      const mode = twoMode ?? classifyTwoFingerGesture(pairStart, pairNow);
+      if (!mode) return;
+      if (!twoMode) {
+        twoMode = mode;
+        session.takeOver(mode);
+      }
+      if (!session.isOwner(mode)) return;
+      if (mode === 'priceScale') {
+        onPriceScale(
+          (pairNow[0].y + pairNow[1].y - pairStart[0].y - pairStart[1].y) / 2,
+        );
+      } else {
+        onZoom(
+          pinchScale(
+            Math.hypot(
+              pairNow[1].x - pairNow[0].x,
+              pairNow[1].y - pairNow[0].y,
+            ),
+            Math.hypot(
+              pairStart[1].x - pairStart[0].x,
+              pairStart[1].y - pairStart[0].y,
+            ),
+          ),
+          (pairNow[0].x + pairNow[1].x) / 2 - paddingLeft,
+        );
+      }
+    };
+    const readTouches = (event: {
+      allTouches: ChartTouch[];
+      numberOfTouches: number;
+    }) => {
+      rawTouchesAvailable = true;
+      if (event.numberOfTouches !== 2 || event.allTouches.length !== 2) {
+        finishTwo();
+        return;
+      }
+      const touches = [...event.allTouches].sort((a, b) => a.id - b.id);
+      const next: TouchPair = [touches[0], touches[1]];
+      if (
+        pairStart &&
+        pairStart.some((touch, index) => touch.id !== next[index].id)
+      )
+        finishTwo();
+      pairStart ??= next;
+      pairNow = next;
+      applyTouches();
+    };
     const pinch = Gesture.Pinch()
+      .onTouchesDown(readTouches)
+      .onTouchesMove(readTouches)
+      .onTouchesUp(finishTwo)
+      .onTouchesCancelled(finishTwo)
       .onStart(() => {
-        // Android enters BEGAN on the FIRST finger, before a pinch exists.
-        // Claiming onBegin would block every one-finger pan and long press.
-        // A long press (or an in-flight pan) that turns into a pinch hands the
-        // session over: the previous gesture ends once, the pinch starts once.
-        session.takeOver('pinch');
+        pinchActive = true;
+        applyTouches();
       })
       .onUpdate((event) => {
-        if (!session.isOwner('pinch')) return;
-        // `event.scale` is already relative to the pinch start; the shared
-        // policy bounds it so a single bad frame cannot explode the zoom.
-        onZoom(pinchScale(event.scale, 1), event.focalX - paddingLeft);
+        if (rawTouchesAvailable) {
+          applyTouches();
+          return;
+        }
+        // Native scale remains a fallback if a platform starts delivering
+        // recognizer updates before its raw two-touch snapshot.
+        if (twoMode === 'priceScale') return;
+        if (!twoMode && Math.abs(Math.log(event.scale)) >= 0.06) {
+          twoMode = 'pinch';
+          session.takeOver('pinch');
+        }
+        if (session.isOwner('pinch'))
+          onZoom(pinchScale(event.scale, 1), event.focalX - paddingLeft);
       })
       .onFinalize(() => {
-        session.end('pinch');
+        pinchActive = false;
+        if (twoMode === 'pinch' || !twoPanActive) finishTwo();
+      })
+      .runOnJS(true);
+    const pricePan = Gesture.Pan()
+      .minPointers(2)
+      .maxPointers(2)
+      .minDistance(0)
+      .averageTouches(true)
+      .onTouchesDown(readTouches)
+      .onTouchesMove(readTouches)
+      .onTouchesUp(finishTwo)
+      .onTouchesCancelled(finishTwo)
+      .onStart(() => {
+        twoPanActive = true;
+        applyTouches();
+      })
+      .onUpdate(applyTouches)
+      .onFinalize(() => {
+        twoPanActive = false;
+        if (twoMode === 'priceScale' || !pinchActive) finishTwo();
       })
       .runOnJS(true);
 
     return {
-      gesture: Gesture.Simultaneous(pinch, Gesture.Race(crosshairPan, chartPan)),
+      gesture: Gesture.Simultaneous(
+        pinch,
+        pricePan,
+        Gesture.Race(crosshairPan, chartPan),
+      ),
       session,
     };
   }, [
@@ -135,6 +208,7 @@ export default function CandlestickGestures({
     onGestureStart,
     onPan,
     onZoom,
+    onPriceScale,
     onCrosshair,
     onGestureEnd,
   ]);

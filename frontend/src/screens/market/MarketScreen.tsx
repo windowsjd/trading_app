@@ -1,3 +1,4 @@
+import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
@@ -37,6 +38,7 @@ const TABS: Array<{ key: AssetType; label: string }> = [
 const CRYPTO_PRICE_BASIS_TEXT = '가격 기준: Binance Spot 최근 체결가';
 
 export default function MarketScreen({ navigation }: Props) {
+  const isAdmin = useAdminDiagnostics();
   const [selectedTab, setSelectedTab] = useState<AssetType>('domestic_stock');
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
 
@@ -169,7 +171,7 @@ export default function MarketScreen({ navigation }: Props) {
             ) : null}
 
             {/* One screen-level notice; rows never repeat a connection error. */}
-            {showReconnectBanner ? (
+            {isAdmin && showReconnectBanner ? (
               <View
                 testID={TEST_IDS.market.reconnectBanner}
                 style={styles.inlineWarning}

@@ -52,35 +52,37 @@ export default function AccountHoldings({
 
   return (
     <View style={styles.section} testID="account-holdings">
-      <Text style={styles.title} testID="holdings-count">
-        보유 종목{data && !query.isError ? ` ${positions.length}` : ''}
-      </Text>
+      <View style={styles.header}>
+        <Text style={styles.title} testID="holdings-count">
+          보유 종목{data && !query.isError ? ` ${positions.length}` : ''}
+        </Text>
+        <View style={styles.filters}>
+          {(['all', 'current'] as const).map((value) => (
+            <ActionPressable
+              key={value}
+              testID={`holdings-filter-${value}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected: filter === value }}
+              onPress={() => setFilter(value)}
+              style={[styles.filter, filter === value && styles.selectedFilter]}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  filter === value && styles.selectedText,
+                ]}
+              >
+                {value === 'all' ? '전체 보유' : '현재 종목'}
+              </Text>
+            </ActionPressable>
+          ))}
+        </View>
+      </View>
       {display ? (
         <Text style={styles.account}>
           {display.title} · {display.statusLabel}
         </Text>
       ) : null}
-      <View style={styles.filters}>
-        {(['all', 'current'] as const).map((value) => (
-          <ActionPressable
-            key={value}
-            testID={`holdings-filter-${value}`}
-            accessibilityRole="button"
-            accessibilityState={{ selected: filter === value }}
-            onPress={() => setFilter(value)}
-            style={[styles.filter, filter === value && styles.selectedFilter]}
-          >
-            <Text
-              style={[
-                styles.filterText,
-                filter === value && styles.selectedText,
-              ]}
-            >
-              {value === 'all' ? '전체 보유' : '현재 종목'}
-            </Text>
-          </ActionPressable>
-        ))}
-      </View>
       {!accountId ? (
         <InlineEmptyState
           title="계정이 없습니다."
@@ -185,19 +187,25 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 18, fontWeight: '700', color: '#202a35' },
   account: { fontSize: 12, color: '#697583' },
-  filters: { flexDirection: 'row', gap: 8 },
+  header: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+  },
+  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   filter: {
-    flex: 1,
     minWidth: 0,
-    minHeight: 44,
-    padding: 10,
-    borderRadius: 8,
+    minHeight: 32,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 999,
     backgroundColor: '#f2f5f7',
     alignItems: 'center',
     justifyContent: 'center',
   },
   selectedFilter: { backgroundColor: '#202a35' },
-  filterText: { fontSize: 14, color: '#536170', textAlign: 'center' },
+  filterText: { fontSize: 12, color: '#536170', textAlign: 'center' },
   selectedText: { color: '#fff', fontWeight: '600' },
   row: {
     borderWidth: 1,

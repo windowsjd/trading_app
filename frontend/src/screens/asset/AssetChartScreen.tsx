@@ -1,3 +1,4 @@
+import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -37,6 +38,7 @@ export default function AssetChartScreen(props: Props) {
 export function AssetChartContent({ route, navigation }: Props) {
   const { assetId } = route.params;
   const isFocused = useIsFocused();
+  const isAdmin = useAdminDiagnostics();
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
   const [selectedTimeframe, setSelectedTimeframe] =
     useState<AssetChartTimeframe>(DEFAULT_ASSET_CHART_TIMEFRAME);
@@ -145,7 +147,7 @@ export function AssetChartContent({ route, navigation }: Props) {
           </Text>
         </ActionPressable>
       ) : null}
-      {candleLiveEnabled && isCandleStale ? (
+      {isAdmin && candleLiveEnabled && isCandleStale ? (
         <Text style={styles.notice}>
           실시간 캔들 지연 · 최근 조회 데이터 표시
         </Text>
