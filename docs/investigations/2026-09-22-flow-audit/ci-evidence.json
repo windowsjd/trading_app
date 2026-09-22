@@ -1,0 +1,93 @@
+{
+  "observed_date": "2026-09-22",
+  "repository": "windowsjd/trading_app",
+  "head": {
+    "id": 35624316629,
+    "sha": "dc138a3ffede091c32b17359ec79585ec7f32e9c",
+    "status": "completed",
+    "conclusion": "failure",
+    "url": "https://github.com/windowsjd/trading_app/actions/runs/35624316629",
+    "created_at": "2026-09-21T16:14:22Z"
+  },
+  "baseline": {
+    "id": 35613759643,
+    "sha": "fc79a794e4024bf4eb8c955f4dcd590135b6495a",
+    "status": "completed",
+    "conclusion": "failure",
+    "url": "https://github.com/windowsjd/trading_app/actions/runs/35613759643",
+    "created_at": "2026-09-21T14:40:40Z"
+  },
+  "jobs": [
+    {
+      "id": 106414794861,
+      "name": "Release-critical E2E",
+      "status": "completed",
+      "conclusion": "success",
+      "failedSteps": []
+    },
+    {
+      "id": 106414795200,
+      "name": "Limit order PostgreSQL integration",
+      "status": "completed",
+      "conclusion": "success",
+      "failedSteps": []
+    },
+    {
+      "id": 106414795327,
+      "name": "Candle fixture integration",
+      "status": "completed",
+      "conclusion": "failure",
+      "failedSteps": [
+        {
+          "name": "Run release fixture smoke (no provider credentials)",
+          "number": 10
+        }
+      ]
+    },
+    {
+      "id": 106414795408,
+      "name": "Frontend quality",
+      "status": "completed",
+      "conclusion": "success",
+      "failedSteps": []
+    },
+    {
+      "id": 106414795454,
+      "name": "Core account PostgreSQL integration",
+      "status": "completed",
+      "conclusion": "success",
+      "failedSteps": []
+    },
+    {
+      "id": 106414795461,
+      "name": "Backend quality",
+      "status": "completed",
+      "conclusion": "success",
+      "failedSteps": []
+    }
+  ],
+  "branch": {
+    "name": "main",
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    }
+  },
+  "rulesets": [],
+  "rulesetsNote": "Read-only GitHub REST rulesets query returned [] during this audit",
+  "failureEvidence": {
+    "head": [
+      "2026-09-21T16:14:58.1991874Z The working tree is dirty (or its status could not be verified); a release smoke must run from a clean checkout of the commit it claims to validate. Set SMOKE_ALLOW_DIRTY=1 only for development runs — dirty artifacts are never release validation.",
+      "2026-09-21T16:14:58.2675339Z ##[error]Process completed with exit code 2."
+    ],
+    "baseline": [
+      "2026-09-21T14:41:26.0618499Z The working tree is dirty (or its status could not be verified); a release smoke must run from a clean checkout of the commit it claims to validate. Set SMOKE_ALLOW_DIRTY=1 only for development runs — dirty artifacts are never release validation.",
+      "2026-09-21T14:41:26.1147361Z ##[error]Process completed with exit code 2."
+    ]
+  }
+}

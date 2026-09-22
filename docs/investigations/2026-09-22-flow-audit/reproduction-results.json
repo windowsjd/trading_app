@@ -1,0 +1,193 @@
+{
+  "scope": "offline actual-source control-flow; DB/HTTP/storage/provider doubles",
+  "sessions": [
+    {
+      "kind": "success",
+      "storedIdentity": "A",
+      "notifyCount": 0,
+      "observation": "late A refresh overwrites B tokens and retries A request"
+    },
+    {
+      "kind": "failure",
+      "storedIdentity": null,
+      "notifyCount": 1,
+      "observation": "late A failure clears B tokens"
+    },
+    {
+      "kind": "storage-failure",
+      "storedIdentity": "A",
+      "notifyCount": 0,
+      "observation": "storage rejection prevents expiry notification"
+    }
+  ],
+  "matcher": [
+    {
+      "mode": "general",
+      "side": "buy",
+      "cycles": 3,
+      "queried": [
+        [
+          "order-1",
+          "order-2"
+        ],
+        [
+          "order-1",
+          "order-2"
+        ],
+        [
+          "order-1",
+          "order-2"
+        ]
+      ],
+      "filled": [],
+      "ordersConsidered": [
+        0,
+        0,
+        0
+      ],
+      "batchExhausted": [
+        false,
+        false,
+        false
+      ],
+      "thirdOrderHasValidPlan": true
+    },
+    {
+      "mode": "general",
+      "side": "sell",
+      "cycles": 3,
+      "queried": [
+        [
+          "order-1",
+          "order-2"
+        ],
+        [
+          "order-1",
+          "order-2"
+        ],
+        [
+          "order-1",
+          "order-2"
+        ]
+      ],
+      "filled": [],
+      "ordersConsidered": [
+        0,
+        0,
+        0
+      ],
+      "batchExhausted": [
+        false,
+        false,
+        false
+      ],
+      "thirdOrderHasValidPlan": true
+    },
+    {
+      "mode": "season",
+      "side": "buy",
+      "cycles": 3,
+      "queried": [
+        [
+          "order-1",
+          "order-2"
+        ],
+        [
+          "order-1",
+          "order-2"
+        ],
+        [
+          "order-1",
+          "order-2"
+        ]
+      ],
+      "filled": [],
+      "ordersConsidered": [
+        0,
+        0,
+        0
+      ],
+      "batchExhausted": [
+        false,
+        false,
+        false
+      ],
+      "thirdOrderHasValidPlan": true
+    },
+    {
+      "mode": "season",
+      "side": "sell",
+      "cycles": 3,
+      "queried": [
+        [
+          "order-1",
+          "order-2"
+        ],
+        [
+          "order-1",
+          "order-2"
+        ],
+        [
+          "order-1",
+          "order-2"
+        ]
+      ],
+      "filled": [],
+      "ordersConsidered": [
+        0,
+        0,
+        0
+      ],
+      "batchExhausted": [
+        false,
+        false,
+        false
+      ],
+      "thirdOrderHasValidPlan": true
+    }
+  ],
+  "integrity": [
+    {
+      "exchanges": 100,
+      "ledgerRows": 200,
+      "referenceReads": 20400
+    },
+    {
+      "exchanges": 200,
+      "ledgerRows": 400,
+      "referenceReads": 80800
+    },
+    {
+      "exchanges": 1000,
+      "ledgerRows": 2000,
+      "referenceReads": 2004000
+    }
+  ],
+  "ranking": {
+    "writeOrder": [
+      "2026-09-22T00:02:00.000Z",
+      "2026-09-22T00:01:00.000Z"
+    ],
+    "finalCapturedAt": "2026-09-22T00:01:00.000Z",
+    "finalParticipantValue": "100",
+    "note": "actual public refresh and writer; valuation, scope and DB doubles; not a PostgreSQL lock test"
+  },
+  "seasonJoin": {
+    "seasonEndAt": "2026-09-22T00:00:00.000Z",
+    "joinedAt": "2026-09-22T00:00:00.001Z",
+    "createdRows": [
+      "account",
+      "participant",
+      "wallet",
+      "wallet",
+      "ledger",
+      "equity"
+    ],
+    "note": "actual service and policy, controlled clock and DB doubles; settlement race requires PostgreSQL follow-up"
+  },
+  "gateway": {
+    "defaultNodeExitCode": 1,
+    "unhandledDatabaseRejection": true,
+    "note": "actual timer and ticker lookup; no real DB or socket; deployment NODE_OPTIONS not inspected"
+  }
+}
