@@ -37,6 +37,18 @@ type PortfolioSnapshotSelection<T> = {
   diagnosticContext?: PortfolioValuationDiagnosticContext;
 };
 
+/** One calculation's read reuse only; never retain across ranking refreshes. */
+export type PortfolioValuationSourceReads = {
+  readonly client: Prisma.TransactionClient | PrismaService;
+  readonly valuationAtMs: number;
+  readonly workflow: PortfolioSourceWorkflow;
+  readonly assetPrices: Map<
+    string,
+    Promise<PortfolioSnapshotSelection<PortfolioAssetPriceSnapshotInput>>
+  >;
+  usdKrw?: Promise<PortfolioSnapshotSelection<PortfolioFxRateSnapshotInput>>;
+};
+
 type PositionAssetForSourceSelection = {
   id: string;
   assetType: AssetType;
@@ -153,6 +165,7 @@ export class PortfolioValuationService {
     valuationAt = new Date(),
     sourceEligibilityWorkflow: PortfolioSourceWorkflow = 'home_live_valuation',
     client: Prisma.TransactionClient | PrismaService = this.prisma,
+    sourceReads?: PortfolioValuationSourceReads,
   ): Promise<PortfolioValuationResult> {
     const useSettlementPricePolicy =
       sourceEligibilityWorkflow === 'season_settlement';
@@ -228,6 +241,12 @@ export class PortfolioValuationService {
       sourceEligibilityWorkflow,
       useSettlementPricePolicy,
       client,
+      sourceReads:
+        sourceReads?.client === client &&
+        sourceReads.valuationAtMs === valuationAt.getTime() &&
+        sourceReads.workflow === sourceEligibilityWorkflow
+          ? sourceReads
+          : undefined,
     });
   }
 
@@ -260,16 +279,30 @@ export class PortfolioValuationService {
     sourceEligibilityWorkflow: PortfolioSourceWorkflow;
     useSettlementPricePolicy: boolean;
     client: Prisma.TransactionClient | PrismaService;
+    sourceReads?: PortfolioValuationSourceReads;
   }): Promise<PortfolioValuationResult> {
     const positions = await Promise.all(
       input.positions.map(async (position) => {
-        const priceSelection = await this.findLatestEligibleAssetPriceSnapshot(
-          position.asset,
-          input.valuationAt,
-          input.sourceEligibilityWorkflow,
-          input.useSettlementPricePolicy,
-          input.client,
-        );
+        const priceKey = JSON.stringify([
+          position.asset.id,
+          position.asset.assetType,
+          position.asset.market,
+          position.asset.currencyCode,
+          position.asset.priceCurrency,
+        ]);
+        let priceRead = input.sourceReads?.assetPrices.get(priceKey);
+        if (!priceRead) {
+          priceRead = this.findLatestEligibleAssetPriceSnapshot(
+            position.asset,
+            input.valuationAt,
+            input.sourceEligibilityWorkflow,
+            input.useSettlementPricePolicy,
+            input.client,
+          );
+          // Store the in-flight read too: concurrent positions share it.
+          input.sourceReads?.assetPrices.set(priceKey, priceRead);
+        }
+        const priceSelection = await priceRead;
         return {
           assetId: position.assetId,
           assetType: position.asset.assetType,
@@ -298,14 +331,21 @@ export class PortfolioValuationService {
           !position.quantity.eq(0),
       );
 
-    const usdKrwSelection = needsUsdConversion
-      ? await this.findLatestEligibleUsdKrwSnapshot(
+    let usdKrwSelection: PortfolioSnapshotSelection<PortfolioFxRateSnapshotInput> =
+      { snapshot: null };
+    if (needsUsdConversion) {
+      let fxRead = input.sourceReads?.usdKrw;
+      if (!fxRead) {
+        fxRead = this.findLatestEligibleUsdKrwSnapshot(
           input.valuationAt,
           input.sourceEligibilityWorkflow,
           input.useSettlementPricePolicy,
           input.client,
-        )
-      : { snapshot: null };
+        );
+        if (input.sourceReads) input.sourceReads.usdKrw = fxRead;
+      }
+      usdKrwSelection = await fxRead;
+    }
 
     return calculatePortfolioValuation({
       seasonParticipantId: input.subject.seasonParticipantId,

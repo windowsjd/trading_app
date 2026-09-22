@@ -80,10 +80,12 @@ describe('RankingRefreshService', () => {
         // deleted, so routine refresh cannot launder scope damage.
         findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn(),
+        createMany: jest.fn(),
         deleteMany: jest.fn(),
       },
       equitySnapshot: {
         create: jest.fn(),
+        createMany: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
       },
@@ -242,6 +244,7 @@ describe('RankingRefreshService', () => {
       // currentRank moved.
       expect(prisma.seasonRanking.deleteMany).not.toHaveBeenCalled();
       expect(prisma.seasonRanking.create).not.toHaveBeenCalled();
+      expect(prisma.seasonRanking.createMany).not.toHaveBeenCalled();
       expect(prisma.seasonParticipant.update).not.toHaveBeenCalled();
     };
 
@@ -328,7 +331,7 @@ describe('RankingRefreshService', () => {
 
       expect(result).toMatchObject({ skipped: false, rankingsCreated: 1 });
       expect(prisma.seasonRanking.deleteMany).toHaveBeenCalledTimes(1);
-      expect(prisma.seasonRanking.create).toHaveBeenCalledTimes(1);
+      expect(prisma.seasonRanking.createMany).toHaveBeenCalledTimes(1);
     });
 
     it.each([0, 1, 86_400_000])(
@@ -356,7 +359,9 @@ describe('RankingRefreshService', () => {
         expect(prisma.seasonParticipant.update).not.toHaveBeenCalled();
         expect(prisma.seasonRanking.deleteMany).not.toHaveBeenCalled();
         expect(prisma.seasonRanking.create).not.toHaveBeenCalled();
+        expect(prisma.seasonRanking.createMany).not.toHaveBeenCalled();
         expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
+        expect(prisma.equitySnapshot.createMany).not.toHaveBeenCalled();
       },
     );
 
@@ -401,6 +406,8 @@ describe('RankingRefreshService', () => {
           'account-of-sp-1',
           capturedAt,
           'live_portfolio_valuation',
+          expect.anything(),
+          expect.objectContaining({ valuationAtMs: capturedAt.getTime() }),
         );
         expect(
           valuation.calculateTradingAccountValuation,
@@ -409,6 +416,8 @@ describe('RankingRefreshService', () => {
           'account-of-sp-1',
           actualStart,
           'live_portfolio_valuation',
+          expect.anything(),
+          expect.objectContaining({ valuationAtMs: actualStart.getTime() }),
         );
         expect(
           valuation.calculateTradingAccountValuation,

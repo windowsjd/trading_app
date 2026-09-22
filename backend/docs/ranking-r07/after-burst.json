@@ -1,0 +1,123 @@
+{
+  "label": "after-burst",
+  "capturedAt": "2026-09-22T00:01:00.000Z",
+  "node": "v24.14.1",
+  "samples": 3,
+  "warmupPerShapeMode": 1,
+  "definitions": {
+    "resetPolicy": "Keep prior publication with capturedAt=basis-1ms; first warm-up starts empty, all measured runs validate/replace an existing ranking set. Remove only generated scheduled snapshots between runs.",
+    "burst": "Optional mode: first participant valuation pauses, 20 same-key participant triggers and one scheduler trigger arrive, then release and await all. Explicit basis,+1s,+2s; no sleeps. fullParticipantEvaluations=actual scalar valuation calls/P.",
+    "sqlStatements": "Actual pg Client.query completions including BEGIN/COMMIT/SET; fixture/reset/hash SQL excluded.",
+    "historyRowsRead": "Driver rowCount for SELECT of equity_snapshots.total_asset_krw; excludes scheduled bucket existence checks.",
+    "holdingsQueries": "SELECT statements mentioning trading_accounts/cash_wallets/positions/assets; includes scope-validation relation reads.",
+    "lockHeldMs": "FOR UPDATE response to COMMIT response on the same connection; uncontended isolated local database.",
+    "historyMaxRowsPerQuery": "Maximum driver rows returned by a history query, not process peak memory.",
+    "outputHash": "SHA256 of normalized persisted rankings and participant current values; entity IDs replaced by fixture ordinals.",
+    "sqlElapsedMs": "Sum of driver query durations; concurrent query durations overlap and are not an additive wall-time breakdown."
+  },
+  "results": [
+    {
+      "shape": {
+        "p": 100,
+        "k": 3,
+        "h": 20
+      },
+      "mode": "burst",
+      "samples": [
+        {
+          "sqlStatements": 1783,
+          "selectStatements": 1569,
+          "historyQueries": 21,
+          "historyRowsRead": 6068,
+          "historyMaxRowsPerQuery": 336,
+          "priceQueries": 9,
+          "fxQueries": 6,
+          "holdingsQueries": 1208,
+          "participantWrites": 200,
+          "rankingWrites": 4,
+          "equityWrites": 1,
+          "lockHeldMs": 135.93420500000002,
+          "sqlElapsedMs": 596.110911000003,
+          "byTable": {
+            "season_participants": 512,
+            "trading_accounts": 308,
+            "cash_wallets": 300,
+            "positions": 300,
+            "assets": 300,
+            "asset_price_snapshots": 9,
+            "fx_rate_snapshots": 6,
+            "equity_snapshots": 23,
+            "season_rankings": 10
+          },
+          "wallMs": 360.7887210000001,
+          "triggerRequests": 22,
+          "valuationCalls": 300,
+          "fullParticipantEvaluations": 3,
+          "outputHash": "20b3d2a5627251a5c0e30a29315c2fd43f006bcca819ab5c72f38bab9406a089"
+        },
+        {
+          "sqlStatements": 1783,
+          "selectStatements": 1569,
+          "historyQueries": 21,
+          "historyRowsRead": 6068,
+          "historyMaxRowsPerQuery": 336,
+          "priceQueries": 9,
+          "fxQueries": 6,
+          "holdingsQueries": 1208,
+          "participantWrites": 200,
+          "rankingWrites": 4,
+          "equityWrites": 1,
+          "lockHeldMs": 132.0563860000002,
+          "sqlElapsedMs": 555.3097100000109,
+          "byTable": {
+            "season_participants": 512,
+            "trading_accounts": 308,
+            "positions": 300,
+            "cash_wallets": 300,
+            "assets": 300,
+            "asset_price_snapshots": 9,
+            "fx_rate_snapshots": 6,
+            "equity_snapshots": 23,
+            "season_rankings": 10
+          },
+          "wallMs": 338.4115969999998,
+          "triggerRequests": 22,
+          "valuationCalls": 300,
+          "fullParticipantEvaluations": 3,
+          "outputHash": "20b3d2a5627251a5c0e30a29315c2fd43f006bcca819ab5c72f38bab9406a089"
+        },
+        {
+          "sqlStatements": 1783,
+          "selectStatements": 1569,
+          "historyQueries": 21,
+          "historyRowsRead": 6068,
+          "historyMaxRowsPerQuery": 336,
+          "priceQueries": 9,
+          "fxQueries": 6,
+          "holdingsQueries": 1208,
+          "participantWrites": 200,
+          "rankingWrites": 4,
+          "equityWrites": 1,
+          "lockHeldMs": 123.27182300000004,
+          "sqlElapsedMs": 558.8214209999946,
+          "byTable": {
+            "season_participants": 512,
+            "trading_accounts": 308,
+            "cash_wallets": 300,
+            "positions": 300,
+            "assets": 300,
+            "asset_price_snapshots": 9,
+            "fx_rate_snapshots": 6,
+            "equity_snapshots": 23,
+            "season_rankings": 10
+          },
+          "wallMs": 326.9646969999999,
+          "triggerRequests": 22,
+          "valuationCalls": 300,
+          "fullParticipantEvaluations": 3,
+          "outputHash": "20b3d2a5627251a5c0e30a29315c2fd43f006bcca819ab5c72f38bab9406a089"
+        }
+      ]
+    }
+  ]
+}

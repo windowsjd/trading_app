@@ -1,0 +1,85 @@
+{
+  "execution": "env-free checkout of local HEAD plus candidate files; separate loopback PostgreSQL ranking_r07_regression; all existing migrations deployed",
+  "commands": [
+    {
+      "command": "pnpm run typecheck",
+      "status": "PASS"
+    },
+    {
+      "command": "pnpm run build",
+      "status": "PASS"
+    },
+    {
+      "command": "pnpm exec jest --runInBand",
+      "status": "PASS",
+      "suitesPassed": 203,
+      "testsPassed": 2987,
+      "suitesSkipped": 44,
+      "testsSkipped": 48,
+      "skipNote": "Existing opt-in/conditional tests. Thirteen PostgreSQL wrappers were separately run with opt-in."
+    },
+    {
+      "command": "pnpm exec jest --runInBand src/ranking/ranking-consistency.integration.spec.ts src/ranking/season-ranking-scope.integration.spec.ts src/orders/limit-order-reservation.integration.spec.ts src/orders/limit-order-create-race.integration.spec.ts src/orders/limit-order-transaction-time.integration.spec.ts src/orders/trading-transaction-time.integration.spec.ts src/orders/trading-fee-pinning.integration.spec.ts src/orders/limit-order-create-no-redis.integration.spec.ts src/orders/limit-order-idempotent-replay.integration.spec.ts src/orders/limit-order-matching.integration.spec.ts src/orders/orders.execute.integration.spec.ts src/fx/fx.execute.integration.spec.ts src/mvp-flow.integration.spec.ts",
+      "status": "PASS",
+      "suitesPassed": 13,
+      "wrapperTestsPassed": 13,
+      "rankingConsistencyScenarios": 30,
+      "environment": {
+        "TRADING_ACCOUNT_DB_INTEGRATION": "1",
+        "ORDER_EXECUTE_DB_INTEGRATION": "1",
+        "FX_EXECUTE_DB_INTEGRATION": "1",
+        "LIMIT_ORDER_RESERVATION_DB_INTEGRATION": "1",
+        "LIMIT_ORDER_MATCHING_DB_INTEGRATION": "1",
+        "LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION": "1",
+        "MVP_FLOW_DB_SMOKE": "1",
+        "NODE_ENV": "test",
+        "TZ": "UTC",
+        "LIMIT_ORDER_ENABLED": "true",
+        "DOTENV_CONFIG_PATH": "/dev/null",
+        "DATABASE_URL": "postgresql://ranking_test@127.0.0.1:55439/ranking_r07_regression?schema=public"
+      }
+    },
+    {
+      "command": "pnpm run test:e2e --runInBand",
+      "status": "PASS",
+      "testsPassed": 341,
+      "environment": "no application environment variables; no .env"
+    },
+    {
+      "command": "pnpm exec eslint --no-fix --max-warnings=0 src/ranking/ranking-refresh.service.ts src/ranking/ranking-refresh-batching.spec.ts src/ranking/current-ranking-publication.ts src/ranking/current-ranking-publication.spec.ts src/portfolio/portfolio-valuation-source-reads.spec.ts scripts/ranking-refresh-benchmark.ts",
+      "status": "PASS"
+    },
+    {
+      "command": "pnpm exec eslint --no-fix src/portfolio/portfolio-valuation.service.ts",
+      "status": "FAIL_EXISTING_DEBT",
+      "headErrors": 43,
+      "candidateErrors": 43,
+      "rules": "prettier/prettier; unchanged lines only"
+    },
+    {
+      "command": "pnpm exec eslint --no-fix src/ranking/ranking-refresh.service.spec.ts",
+      "status": "FAIL_EXISTING_DEBT",
+      "headErrors": 7,
+      "candidateErrors": 7,
+      "rules": "no-unsafe-* in pre-existing mocks; unchanged lines only"
+    },
+    {
+      "command": "pnpm exec eslint --no-fix --max-warnings=0 --rule 'prettier/prettier: off' src/portfolio/portfolio-valuation.service.ts",
+      "status": "PASS"
+    },
+    {
+      "command": "pnpm exec prettier --check src/ranking/ranking-refresh.service.ts src/ranking/ranking-refresh.service.spec.ts src/ranking/ranking-refresh-batching.spec.ts src/ranking/current-ranking-publication.ts src/ranking/current-ranking-publication.spec.ts src/portfolio/portfolio-valuation-source-reads.spec.ts scripts/ranking-refresh-benchmark.ts",
+      "status": "PASS"
+    },
+    {
+      "command": "git diff --check",
+      "status": "PASS"
+    }
+  ],
+  "notRun": [
+    "Production load, real provider calls, multi-host pool benchmark, process peak memory",
+    "Unrelated opt-in PostgreSQL suites beyond the listed thirteen",
+    "Candle fixture R10 remediation; existing remote failure retained"
+  ],
+  "ciWorkflowChanged": false
+}

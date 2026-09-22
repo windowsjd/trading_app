@@ -1,0 +1,20 @@
+{
+  "baselineHead": "34628d13d2c30d50ea8a2458ba960736437319a0",
+  "initialWorkingTree": "clean",
+  "postgresVersion": "16.15",
+  "nodeVersion": "v24.14.1",
+  "database": "isolated loopback ranking_r07; fresh migrated schema; no .env",
+  "comparison": "same final benchmark script and fixtures; one process per run, baseline and candidate run sequentially on the same host; warm-up and 3 measured samples per condition",
+  "candidateFileSha256": {
+    "backend/src/ranking/ranking-refresh.service.ts": "e74dddcaf8e791e19e56942f5f678ca6cdcef6547be552f2b9011d329e1ea1ec",
+    "backend/src/ranking/current-ranking-publication.ts": "4ed46c14cd8e7f8ed2f7e7c58a3d2a41793e74971dc40c71810238ded4de80bd",
+    "backend/src/portfolio/portfolio-valuation.service.ts": "c4251f8021d7f06a2b4b8c73ba00d45055dc8b470da9b2c5f22b3ed801aeed33",
+    "backend/scripts/ranking-refresh-benchmark.ts": "518016b3f01dcef0d18c288423979723e855905a708af2c999576039ab9841e6"
+  },
+  "equivalence": {
+    "singleRefreshConditions": 12,
+    "allPersistedRankingAndParticipantHashesMatch": true,
+    "allHistoryRowCountsMatch": true
+  },
+  "peakMemoryMeasured": false
+}

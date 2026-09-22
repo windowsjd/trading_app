@@ -6,7 +6,11 @@ import {
   SeasonStatus,
   SnapshotReason,
 } from '../generated/prisma/client';
-import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
+import {
+  PortfolioValuationService,
+  type PortfolioValuationSourceReads,
+} from '../portfolio/portfolio-valuation.service';
+import type { PortfolioValuationResult } from '../portfolio/portfolio-valuation.policy';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   assignSequentialRanks,
@@ -24,6 +28,10 @@ import {
 } from './season-ranking-scope';
 import { lockSeasonForWrite } from './season-write-lock';
 import { isCurrentRankingSuperseded } from './current-ranking-generation';
+import {
+  insertCurrentRankingRows,
+  insertMissingScheduledEquitySnapshots,
+} from './current-ranking-publication';
 
 type RankableParticipant = {
   id: string;
@@ -52,10 +60,11 @@ type CurrentRankingValuation = {
   cryptoValueKrw: string;
   maxDrawdown: string;
   reachedReturnAt: Date;
-  history: EquityPoint[];
 };
 
 const CURRENT_RANK_TYPE = SeasonRankingType.daily;
+// Bound live history storage independently of the total participant count.
+const HISTORY_PARTICIPANT_BATCH_SIZE = 16;
 type RefreshRequest = {
   capturedAt: Date;
   useCurrentTime: boolean;
@@ -219,49 +228,77 @@ export class RankingRefreshService {
       );
 
       const valuations: CurrentRankingValuation[] = [];
-      for (const participant of participants) {
-        const tradingAccountId = participantScopes.get(participant.id)!;
-        const valuation =
-          await this.portfolioValuationService.calculateTradingAccountValuation(
-            tradingAccountId,
-            capturedAt,
-            'live_portfolio_valuation',
-          );
-        if (valuation.seasonParticipantId !== participant.id) {
-          throw new Error(
-            `Trading account ${tradingAccountId} is not owned by ranking participant ${participant.id}.`,
-          );
+      const sourceReads: PortfolioValuationSourceReads = {
+        client: this.prisma,
+        valuationAtMs: capturedAt.getTime(),
+        workflow: 'live_portfolio_valuation',
+        assetPrices: new Map(),
+      };
+      for (
+        let offset = 0;
+        offset < participants.length;
+        offset += HISTORY_PARTICIPANT_BATCH_SIZE
+      ) {
+        const batch = participants.slice(
+          offset,
+          offset + HISTORY_PARTICIPANT_BATCH_SIZE,
+        );
+        const batchValuations: Array<{
+          participant: RankableParticipant;
+          valuation: PortfolioValuationResult;
+        }> = [];
+        // Holdings still use the canonical account reader. Do not multiply
+        // its per-asset queries by launching every participant concurrently.
+        for (const participant of batch) {
+          const tradingAccountId = participantScopes.get(participant.id)!;
+          const valuation =
+            await this.portfolioValuationService.calculateTradingAccountValuation(
+              tradingAccountId,
+              capturedAt,
+              'live_portfolio_valuation',
+              this.prisma,
+              sourceReads,
+            );
+          if (valuation.seasonParticipantId !== participant.id) {
+            throw new Error(
+              `Trading account ${tradingAccountId} is not owned by ranking participant ${participant.id}.`,
+            );
+          }
+          batchValuations.push({ participant, valuation });
         }
-        const history = await this.findEquityHistory(
-          participant.id,
+        const histories = await this.findEquityHistory(
+          batch.map((participant) => participantScopes.get(participant.id)!),
           participantScopes,
         );
-        const currentPoint = {
-          totalAssetKrw: new Prisma.Decimal(valuation.totalAssetKrw),
-          returnRate: new Prisma.Decimal(valuation.returnRate),
-          capturedAt,
-          createdAt: capturedAt,
-        };
-        const mergedHistory = appendCurrentPoint(history, currentPoint);
-        const returnRate = new Prisma.Decimal(valuation.returnRate);
-
-        valuations.push({
-          participant,
-          totalAssetKrw: valuation.totalAssetKrw,
-          returnRate: valuation.returnRate,
-          krwCash: valuation.krwCash,
-          usdCashKrw: valuation.usdCashKrw,
-          domesticStockValueKrw: valuation.domesticStockValueKrw,
-          usStockValueKrw: valuation.usStockValueKrw,
-          cryptoValueKrw: valuation.cryptoValueKrw,
-          maxDrawdown: formatDecimal(calculateMaxDrawdown(mergedHistory), 8),
-          reachedReturnAt: calculateReachedReturnAt(
-            mergedHistory,
-            returnRate,
+        for (const { participant, valuation } of batchValuations) {
+          const history =
+            histories.get(participantScopes.get(participant.id)!) ?? [];
+          const currentPoint = {
+            totalAssetKrw: new Prisma.Decimal(valuation.totalAssetKrw),
+            returnRate: new Prisma.Decimal(valuation.returnRate),
             capturedAt,
-          ),
-          history: mergedHistory,
-        });
+            createdAt: capturedAt,
+          };
+          const mergedHistory = appendCurrentPoint(history, currentPoint);
+          const returnRate = new Prisma.Decimal(valuation.returnRate);
+
+          valuations.push({
+            participant,
+            totalAssetKrw: valuation.totalAssetKrw,
+            returnRate: valuation.returnRate,
+            krwCash: valuation.krwCash,
+            usdCashKrw: valuation.usdCashKrw,
+            domesticStockValueKrw: valuation.domesticStockValueKrw,
+            usStockValueKrw: valuation.usStockValueKrw,
+            cryptoValueKrw: valuation.cryptoValueKrw,
+            maxDrawdown: formatDecimal(calculateMaxDrawdown(mergedHistory), 8),
+            reachedReturnAt: calculateReachedReturnAt(
+              mergedHistory,
+              returnRate,
+              capturedAt,
+            ),
+          });
+        }
       }
 
       return await this.replaceCurrentRankings({
@@ -339,7 +376,7 @@ export class RankingRefreshService {
   }
 
   /**
-   * Max-drawdown / reached-return history for ONE participant.
+   * Complete max-drawdown / reached-return history for a bounded account batch.
    *
    * Every row is scope-checked before it is used. A mis-scoped row is not
    * dropped: silently excluding a low point would LOWER this participant's max
@@ -347,14 +384,19 @@ export class RankingRefreshService {
    * (작업 8 §9.2).
    */
   private async findEquityHistory(
-    seasonParticipantId: string,
+    tradingAccountIds: readonly string[],
     participantScopes: ReadonlyMap<string, string>,
-  ): Promise<EquityPoint[]> {
+  ): Promise<Map<string, EquityPoint[]>> {
     const rows = await this.prisma.equitySnapshot.findMany({
       where: {
-        tradingAccountId: participantScopes.get(seasonParticipantId)!,
+        tradingAccountId: { in: [...tradingAccountIds] },
       },
-      orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+      orderBy: [
+        { tradingAccountId: 'asc' },
+        { capturedAt: 'asc' },
+        { createdAt: 'asc' },
+        { id: 'asc' },
+      ],
       select: {
         id: true,
         tradingAccountId: true,
@@ -374,7 +416,13 @@ export class RankingRefreshService {
       participantScopes,
     });
 
-    return rows;
+    const histories = new Map<string, EquityPoint[]>();
+    for (const row of rows) {
+      const history = histories.get(row.tradingAccountId) ?? [];
+      history.push(row);
+      histories.set(row.tradingAccountId, history);
+    }
+    return histories;
   }
 
   private async replaceCurrentRankings(input: {
@@ -480,41 +528,21 @@ export class RankingRefreshService {
         }
 
         if (input.createEquitySnapshots) {
-          const bucketStart = floorToFiveMinuteBucket(input.capturedAt);
-          const bucketEnd = new Date(bucketStart.getTime() + 5 * 60_000);
-          for (const valuation of input.valuations) {
-            const existing = await tx.equitySnapshot.findFirst({
-              where: {
-                tradingAccountId: valuation.participant.tradingAccountId,
-                snapshotReason: SnapshotReason.scheduled,
-                capturedAt: {
-                  gte: bucketStart,
-                  lt: bucketEnd,
-                },
-              },
-              select: {
-                id: true,
-              },
-            });
-            if (existing) {
-              continue;
-            }
-
-            await tx.equitySnapshot.create({
-              data: {
-                tradingAccountId: valuation.participant.tradingAccountId,
-                totalAssetKrw: valuation.totalAssetKrw,
-                returnRate: valuation.returnRate,
-                krwCash: valuation.krwCash,
-                usdCashKrw: valuation.usdCashKrw,
-                domesticStockValueKrw: valuation.domesticStockValueKrw,
-                usStockValueKrw: valuation.usStockValueKrw,
-                cryptoValueKrw: valuation.cryptoValueKrw,
-                snapshotReason: SnapshotReason.scheduled,
-                capturedAt: input.capturedAt,
-              },
-            });
-          }
+          await insertMissingScheduledEquitySnapshots(tx, {
+            capturedAt: input.capturedAt,
+            rows: input.valuations.map((valuation) => ({
+              tradingAccountId: valuation.participant.tradingAccountId,
+              totalAssetKrw: valuation.totalAssetKrw,
+              returnRate: valuation.returnRate,
+              krwCash: valuation.krwCash,
+              usdCashKrw: valuation.usdCashKrw,
+              domesticStockValueKrw: valuation.domesticStockValueKrw,
+              usStockValueKrw: valuation.usStockValueKrw,
+              cryptoValueKrw: valuation.cryptoValueKrw,
+              snapshotReason: SnapshotReason.scheduled,
+              capturedAt: input.capturedAt,
+            })),
+          });
         }
 
         for (const valuation of input.valuations) {
@@ -551,28 +579,24 @@ export class RankingRefreshService {
           seasonParticipantIds: rows.map((row) => row.seasonParticipantId),
         });
 
-        for (const row of rows) {
-          await tx.seasonRanking.create({
-            data: {
-              seasonId: input.seasonId,
-              seasonParticipantId: row.seasonParticipantId,
-              tradingAccountId: scopes.get(row.seasonParticipantId)!
-                .tradingAccountId,
-              rankType: CURRENT_RANK_TYPE,
-              rank: row.rank,
-              totalAssetKrw: row.totalAssetKrw,
-              returnRate: row.returnRate,
-              maxDrawdown: row.maxDrawdown,
-              totalFillCount: row.totalFillCount,
-              reachedReturnAt: row.reachedReturnAt,
-              rankingDate: input.rankingDate,
-              capturedAt: input.capturedAt,
-            },
-            select: {
-              id: true,
-            },
-          });
-        }
+        await insertCurrentRankingRows(
+          tx,
+          rows.map((row) => ({
+            seasonId: input.seasonId,
+            seasonParticipantId: row.seasonParticipantId,
+            tradingAccountId: scopes.get(row.seasonParticipantId)!
+              .tradingAccountId,
+            rankType: CURRENT_RANK_TYPE,
+            rank: row.rank,
+            totalAssetKrw: row.totalAssetKrw,
+            returnRate: row.returnRate,
+            maxDrawdown: row.maxDrawdown,
+            totalFillCount: row.totalFillCount,
+            reachedReturnAt: row.reachedReturnAt,
+            rankingDate: input.rankingDate,
+            capturedAt: input.capturedAt,
+          })),
+        );
 
         return { wrote: true as const };
       },
@@ -668,8 +692,4 @@ function appendCurrentPoint(
 
 function formatDecimal(value: Prisma.Decimal, scale: number) {
   return value.toFixed(scale);
-}
-
-function floorToFiveMinuteBucket(date: Date): Date {
-  return new Date(Math.floor(date.getTime() / (5 * 60_000)) * 5 * 60_000);
 }
