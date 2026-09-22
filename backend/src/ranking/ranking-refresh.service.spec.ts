@@ -17,6 +17,7 @@ jest.mock('../generated/prisma/client', () => {
     },
     Prisma: {
       Decimal,
+      TransactionIsolationLevel: { ReadCommitted: 'ReadCommitted' },
     },
     PrismaClient: class PrismaClient {},
     SeasonRankingType: {
@@ -70,10 +71,11 @@ describe('RankingRefreshService', () => {
         findUnique: jest.fn(),
       },
       seasonParticipant: {
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         update: jest.fn(),
       },
       seasonRanking: {
+        findFirst: jest.fn().mockResolvedValue(null),
         // 작업 8 보완 §A-3: the existing set is read and verified BEFORE it is
         // deleted, so routine refresh cannot launder scope damage.
         findMany: jest.fn().mockResolvedValue([]),
@@ -222,7 +224,7 @@ describe('RankingRefreshService', () => {
       prisma.seasonRanking.create.mockResolvedValue({ id: 'new-ranking' });
       prisma.seasonParticipant.update.mockResolvedValue({ id: 'sp-1' });
 
-      return { prisma, service };
+      return { prisma, service, valuation };
     };
 
     const expectRefreshAborted = async (
@@ -327,6 +329,108 @@ describe('RankingRefreshService', () => {
       expect(result).toMatchObject({ skipped: false, rankingsCreated: 1 });
       expect(prisma.seasonRanking.deleteMany).toHaveBeenCalledTimes(1);
       expect(prisma.seasonRanking.create).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([0, 1, 86_400_000])(
+      'does not write any part of a generation when persisted capturedAt is %i ms newer',
+      async (difference) => {
+        const { prisma, service } = setup([
+          existingRankingRow('r-1', 'sp-1', 'user-1'),
+        ]);
+        prisma.seasonRanking.findFirst.mockResolvedValue({
+          capturedAt: new Date(capturedAt.getTime() + difference),
+        });
+        const result = await service.refreshCurrentRankingForSeason(
+          'season-1',
+          {
+            capturedAt,
+            createEquitySnapshots: true,
+          },
+        );
+        expect(result).toEqual({ skipped: true, reason: 'stale_generation' });
+        expect(prisma.seasonRanking.findFirst).toHaveBeenCalledWith({
+          where: { seasonId: 'season-1', rankType: SeasonRankingType.daily },
+          orderBy: { capturedAt: 'desc' },
+          select: { capturedAt: true },
+        });
+        expect(prisma.seasonParticipant.update).not.toHaveBeenCalled();
+        expect(prisma.seasonRanking.deleteMany).not.toHaveBeenCalled();
+        expect(prisma.seasonRanking.create).not.toHaveBeenCalled();
+        expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
+      },
+    );
+
+    it('recalculates a queued implicit-time trigger using its actual start time', async () => {
+      const { service, valuation } = setup([]);
+      let enter!: () => void;
+      let release!: () => void;
+      const entered = new Promise<void>((resolve) => {
+        enter = resolve;
+      });
+      const released = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const calculate =
+        valuation.calculateTradingAccountValuation.getMockImplementation()!;
+      valuation.calculateTradingAccountValuation.mockImplementationOnce(
+        async () => {
+          enter();
+          await released;
+          return calculate();
+        },
+      );
+      jest.useFakeTimers({ now: capturedAt });
+      try {
+        const first = service.refreshCurrentRankingAfterParticipantChange(
+          'season-1',
+          'sp-1',
+        );
+        await entered;
+        const next = service.refreshCurrentRankingAfterParticipantChange(
+          'season-1',
+          'sp-1',
+        );
+        const actualStart = new Date(capturedAt.getTime() + 60_000);
+        jest.setSystemTime(actualStart);
+        release();
+        await Promise.all([first, next]);
+        expect(
+          valuation.calculateTradingAccountValuation,
+        ).toHaveBeenNthCalledWith(
+          1,
+          'account-of-sp-1',
+          capturedAt,
+          'live_portfolio_valuation',
+        );
+        expect(
+          valuation.calculateTradingAccountValuation,
+        ).toHaveBeenNthCalledWith(
+          2,
+          'account-of-sp-1',
+          actualStart,
+          'live_portfolio_valuation',
+        );
+        expect(
+          valuation.calculateTradingAccountValuation,
+        ).toHaveBeenCalledTimes(2);
+      } finally {
+        release();
+        jest.useRealTimers();
+      }
+    });
+
+    it('still reports scope damage even when the attempted generation is stale', async () => {
+      const { prisma, service } = setup([
+        existingRankingRow('r-1', 'sp-1', 'user-1', {
+          tradingAccountId: 'foreign-account',
+        }),
+      ]);
+      prisma.seasonRanking.findFirst.mockResolvedValue({ capturedAt });
+      await expectRefreshAborted(
+        prisma,
+        service,
+        'SEASON_RANKING_SCOPE_MISMATCH',
+      );
     });
   });
 });

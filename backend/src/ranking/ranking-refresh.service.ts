@@ -23,6 +23,7 @@ import {
   SEASON_RANKING_SCOPE_SELECT,
 } from './season-ranking-scope';
 import { lockSeasonForWrite } from './season-write-lock';
+import { isCurrentRankingSuperseded } from './current-ranking-generation';
 
 type RankableParticipant = {
   id: string;
@@ -55,6 +56,21 @@ type CurrentRankingValuation = {
 };
 
 const CURRENT_RANK_TYPE = SeasonRankingType.daily;
+type RefreshRequest = {
+  capturedAt: Date;
+  useCurrentTime: boolean;
+  createEquitySnapshots: boolean;
+};
+type RefreshResult =
+  | { skipped: false; rankingsCreated: number; rankingDate: string }
+  | {
+      skipped: true;
+      reason: 'season_not_active' | 'stale_generation' | 'participants_changed';
+    };
+type RunningRefresh = {
+  pending: RefreshRequest | null;
+  promise: Promise<RefreshResult>;
+};
 const RANKABLE_PARTICIPANT_STATUSES: readonly ParticipantStatus[] = [
   ParticipantStatus.active,
   ParticipantStatus.finished,
@@ -64,7 +80,7 @@ const RANKABLE_PARTICIPANT_STATUSES: readonly ParticipantStatus[] = [
 @Injectable()
 export class RankingRefreshService {
   private readonly logger = new Logger(RankingRefreshService.name);
-  private readonly runningSeasonRefreshes = new Set<string>();
+  private readonly runningSeasonRefreshes = new Map<string, RunningRefresh>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -74,7 +90,7 @@ export class RankingRefreshService {
   async refreshCurrentRankingAfterParticipantChange(
     seasonId: string,
     seasonParticipantId: string,
-    capturedAt = new Date(),
+    capturedAt?: Date,
   ) {
     void seasonParticipantId;
 
@@ -92,19 +108,73 @@ export class RankingRefreshService {
       createEquitySnapshots?: boolean;
       lockKey?: string;
     } = {},
-  ) {
-    const capturedAt = options.capturedAt ?? new Date();
-    const createEquitySnapshots = options.createEquitySnapshots === true;
+  ): Promise<RefreshResult> {
+    const request: RefreshRequest = {
+      capturedAt: options.capturedAt ?? new Date(),
+      useCurrentTime: options.capturedAt === undefined,
+      createEquitySnapshots: options.createEquitySnapshots === true,
+    };
     const lockKey = options.lockKey ?? `season:${seasonId}`;
-
-    if (this.runningSeasonRefreshes.has(lockKey)) {
-      this.logger.warn(
-        `Current ranking refresh skipped because a refresh is already running for ${lockKey}.`,
-      );
-      return { skipped: true as const, reason: 'already_running' as const };
+    const running = this.runningSeasonRefreshes.get(lockKey);
+    if (running) {
+      const previous = running.pending;
+      const next =
+        previous && previous.capturedAt > request.capturedAt
+          ? previous
+          : request;
+      running.pending = {
+        ...next,
+        createEquitySnapshots:
+          request.createEquitySnapshots ||
+          previous?.createEquitySnapshots === true,
+      };
+      return running.promise;
     }
 
-    this.runningSeasonRefreshes.add(lockKey);
+    const state = { pending: request } as RunningRefresh;
+    this.runningSeasonRefreshes.set(lockKey, state);
+    state.promise = this.drainRefreshes(seasonId, lockKey, state);
+    return state.promise;
+  }
+
+  private async drainRefreshes(
+    seasonId: string,
+    lockKey: string,
+    state: RunningRefresh,
+  ): Promise<RefreshResult> {
+    let result: RefreshResult | undefined;
+    let failure: Error | undefined;
+    // A trigger arriving during calculation gets a trailing calculation, even
+    // if the first one fails. No transaction is held while waiting/calculating.
+    try {
+      while (state.pending) {
+        const request = state.pending;
+        state.pending = null;
+        try {
+          result = await this.calculateAndReplace(
+            seasonId,
+            request.useCurrentTime ? new Date() : request.capturedAt,
+            request.createEquitySnapshots,
+          );
+          failure = undefined;
+        } catch (error) {
+          failure = error instanceof Error ? error : new Error(String(error));
+        }
+      }
+      if (failure !== undefined) throw failure;
+      return result!;
+    } finally {
+      // Remove synchronously with the final pending check: a later trigger
+      // must not attach to an already drained promise and disappear.
+      this.runningSeasonRefreshes.delete(lockKey);
+    }
+  }
+
+  private async calculateAndReplace(
+    seasonId: string,
+    capturedAt: Date,
+    createEquitySnapshots: boolean,
+  ): Promise<RefreshResult> {
     try {
       const season = await this.prisma.season.findUnique({
         where: {
@@ -207,8 +277,6 @@ export class RankingRefreshService {
         error instanceof Error ? error.stack : undefined,
       );
       throw error;
-    } finally {
-      this.runningSeasonRefreshes.delete(lockKey);
     }
   }
 
@@ -329,157 +397,193 @@ export class RankingRefreshService {
         }))
         .toSorted(compareRankingRows),
     );
+    const ranksByParticipant = new Map(
+      rows.map((row) => [row.seasonParticipantId, row.rank]),
+    );
 
-    const outcome = await this.prisma.$transaction(async (tx) => {
-      // SERIALIZATION POINT (작업 8 §13.1). The status check before the
-      // transaction was a read of state that settlement may have changed since.
-      // Holding the season row means settlement either finished before this
-      // write started (and the re-check below stops it) or waits until it ends.
-      const season = await lockSeasonForWrite(tx, input.seasonId);
-      if (
-        !season ||
-        season.status !== SeasonStatus.active ||
-        input.capturedAt.getTime() < season.startAt.getTime() ||
-        input.capturedAt.getTime() >= season.endAt.getTime()
-      ) {
-        // A settled/ended season's results are final. Writing daily rows now
-        // would resurrect a leaderboard that has already been closed out.
-        return { wrote: false as const };
-      }
+    const outcome = await this.prisma.$transaction(
+      async (tx) => {
+        // SERIALIZATION POINT (작업 8 §13.1). The status check before the
+        // transaction was a read of state that settlement may have changed since.
+        // Holding the season row means settlement either finished before this
+        // write started (and the re-check below stops it) or waits until it ends.
+        const season = await lockSeasonForWrite(tx, input.seasonId);
+        if (
+          !season ||
+          season.status !== SeasonStatus.active ||
+          input.capturedAt.getTime() < season.startAt.getTime() ||
+          input.capturedAt.getTime() >= season.endAt.getTime()
+        ) {
+          // A settled/ended season's results are final. Writing daily rows now
+          // would resurrect a leaderboard that has already been closed out.
+          return {
+            wrote: false as const,
+            reason: 'season_not_active' as const,
+          };
+        }
 
-      // 작업 8 보완 §A-3: VERIFY THE SET THIS REFRESH IS ABOUT TO DESTROY.
-      //
-      // The refresh policy is delete-then-recreate, and the recreate always
-      // produces correctly scoped rows. That combination silently LAUNDERS
-      // damage: a row left with a null scope by an old writer, or one pointing
-      // at the wrong account, disappears on the next five-minute tick and comes
-      // back looking healthy. The repair script then reports nothing to fix,
-      // and the deploy-boundary damage it exists to count is gone — along with
-      // any chance of learning which accounts were affected.
-      //
-      // So the existing set is read and verified BEFORE anything is deleted and
-      // before any participant's `currentRank` is touched. A damaged set stops
-      // the refresh with the same structured code the readers use; an operator
-      // repairs it, and only then does routine refreshing resume.
-      const existingRankings = await tx.seasonRanking.findMany({
-        where: {
-          seasonId: input.seasonId,
-          rankType: CURRENT_RANK_TYPE,
-          rankingDate: input.rankingDate,
-        },
-        select: {
-          ...SEASON_RANKING_SCOPE_SELECT,
-          id: true,
-        },
-      });
-      assertSeasonRankingScopes(existingRankings);
+        // 작업 8 보완 §A-3: VERIFY THE SET THIS REFRESH IS ABOUT TO DESTROY.
+        //
+        // The refresh policy is delete-then-recreate, and the recreate always
+        // produces correctly scoped rows. That combination silently LAUNDERS
+        // damage: a row left with a null scope by an old writer, or one pointing
+        // at the wrong account, disappears on the next five-minute tick and comes
+        // back looking healthy. The repair script then reports nothing to fix,
+        // and the deploy-boundary damage it exists to count is gone — along with
+        // any chance of learning which accounts were affected.
+        //
+        // So the existing set is read and verified BEFORE anything is deleted and
+        // before any participant's `currentRank` is touched. A damaged set stops
+        // the refresh with the same structured code the readers use; an operator
+        // repairs it, and only then does routine refreshing resume.
+        const existingRankings = await tx.seasonRanking.findMany({
+          where: {
+            seasonId: input.seasonId,
+            rankType: CURRENT_RANK_TYPE,
+            rankingDate: input.rankingDate,
+          },
+          select: {
+            ...SEASON_RANKING_SCOPE_SELECT,
+            id: true,
+          },
+        });
+        assertSeasonRankingScopes(existingRankings);
 
-      if (input.createEquitySnapshots) {
-        const bucketStart = floorToFiveMinuteBucket(input.capturedAt);
-        const bucketEnd = new Date(bucketStart.getTime() + 5 * 60_000);
-        for (const valuation of input.valuations) {
-          const existing = await tx.equitySnapshot.findFirst({
-            where: {
-              tradingAccountId: valuation.participant.tradingAccountId,
-              snapshotReason: SnapshotReason.scheduled,
-              capturedAt: {
-                gte: bucketStart,
-                lt: bucketEnd,
+        // The lock serializes publication, not the preceding calculations. This
+        // check must precede EVERY write, including participant/equity updates.
+        if (
+          await isCurrentRankingSuperseded(tx, {
+            seasonId: input.seasonId,
+            capturedAt: input.capturedAt,
+          })
+        ) {
+          return { wrote: false as const, reason: 'stale_generation' as const };
+        }
+
+        // An empty generation has no ranking row to carry capturedAt. Recheck
+        // membership so a calculation from before exclusion cannot resurrect it.
+        const currentParticipants = await tx.seasonParticipant.findMany({
+          where: {
+            seasonId: input.seasonId,
+            participantStatus: { in: [...RANKABLE_PARTICIPANT_STATUSES] },
+          },
+          select: { id: true },
+        });
+        if (
+          currentParticipants.length !== rows.length ||
+          currentParticipants.some((row) => !ranksByParticipant.has(row.id))
+        ) {
+          return {
+            wrote: false as const,
+            reason: 'participants_changed' as const,
+          };
+        }
+
+        if (input.createEquitySnapshots) {
+          const bucketStart = floorToFiveMinuteBucket(input.capturedAt);
+          const bucketEnd = new Date(bucketStart.getTime() + 5 * 60_000);
+          for (const valuation of input.valuations) {
+            const existing = await tx.equitySnapshot.findFirst({
+              where: {
+                tradingAccountId: valuation.participant.tradingAccountId,
+                snapshotReason: SnapshotReason.scheduled,
+                capturedAt: {
+                  gte: bucketStart,
+                  lt: bucketEnd,
+                },
               },
+              select: {
+                id: true,
+              },
+            });
+            if (existing) {
+              continue;
+            }
+
+            await tx.equitySnapshot.create({
+              data: {
+                tradingAccountId: valuation.participant.tradingAccountId,
+                totalAssetKrw: valuation.totalAssetKrw,
+                returnRate: valuation.returnRate,
+                krwCash: valuation.krwCash,
+                usdCashKrw: valuation.usdCashKrw,
+                domesticStockValueKrw: valuation.domesticStockValueKrw,
+                usStockValueKrw: valuation.usStockValueKrw,
+                cryptoValueKrw: valuation.cryptoValueKrw,
+                snapshotReason: SnapshotReason.scheduled,
+                capturedAt: input.capturedAt,
+              },
+            });
+          }
+        }
+
+        for (const valuation of input.valuations) {
+          await tx.seasonParticipant.update({
+            where: {
+              id: valuation.participant.id,
+            },
+            data: {
+              totalAssetKrw: valuation.totalAssetKrw,
+              totalReturnRate: valuation.returnRate,
+              maxDrawdown: valuation.maxDrawdown,
+              currentRank:
+                ranksByParticipant.get(valuation.participant.id) ?? null,
             },
             select: {
               id: true,
             },
           });
-          if (existing) {
-            continue;
-          }
+        }
 
-          await tx.equitySnapshot.create({
+        await tx.seasonRanking.deleteMany({
+          where: {
+            seasonId: input.seasonId,
+            rankType: CURRENT_RANK_TYPE,
+            rankingDate: input.rankingDate,
+          },
+        });
+
+        // Resolved for ALL rows before any insert (작업 8 §8): a participant with
+        // a broken account link aborts the whole refresh rather than leaving a
+        // leaderboard that is missing one competitor.
+        const scopes = await resolveSeasonRankingAccountScopes(tx, {
+          seasonId: input.seasonId,
+          seasonParticipantIds: rows.map((row) => row.seasonParticipantId),
+        });
+
+        for (const row of rows) {
+          await tx.seasonRanking.create({
             data: {
-              tradingAccountId: valuation.participant.tradingAccountId,
-              totalAssetKrw: valuation.totalAssetKrw,
-              returnRate: valuation.returnRate,
-              krwCash: valuation.krwCash,
-              usdCashKrw: valuation.usdCashKrw,
-              domesticStockValueKrw: valuation.domesticStockValueKrw,
-              usStockValueKrw: valuation.usStockValueKrw,
-              cryptoValueKrw: valuation.cryptoValueKrw,
-              snapshotReason: SnapshotReason.scheduled,
+              seasonId: input.seasonId,
+              seasonParticipantId: row.seasonParticipantId,
+              tradingAccountId: scopes.get(row.seasonParticipantId)!
+                .tradingAccountId,
+              rankType: CURRENT_RANK_TYPE,
+              rank: row.rank,
+              totalAssetKrw: row.totalAssetKrw,
+              returnRate: row.returnRate,
+              maxDrawdown: row.maxDrawdown,
+              totalFillCount: row.totalFillCount,
+              reachedReturnAt: row.reachedReturnAt,
+              rankingDate: input.rankingDate,
               capturedAt: input.capturedAt,
+            },
+            select: {
+              id: true,
             },
           });
         }
-      }
 
-      for (const valuation of input.valuations) {
-        const row = rows.find(
-          (candidate) =>
-            candidate.seasonParticipantId === valuation.participant.id,
-        );
-        await tx.seasonParticipant.update({
-          where: {
-            id: valuation.participant.id,
-          },
-          data: {
-            totalAssetKrw: valuation.totalAssetKrw,
-            totalReturnRate: valuation.returnRate,
-            maxDrawdown: valuation.maxDrawdown,
-            currentRank: row?.rank ?? null,
-          },
-          select: {
-            id: true,
-          },
-        });
-      }
-
-      await tx.seasonRanking.deleteMany({
-        where: {
-          seasonId: input.seasonId,
-          rankType: CURRENT_RANK_TYPE,
-          rankingDate: input.rankingDate,
-        },
-      });
-
-      // Resolved for ALL rows before any insert (작업 8 §8): a participant with
-      // a broken account link aborts the whole refresh rather than leaving a
-      // leaderboard that is missing one competitor.
-      const scopes = await resolveSeasonRankingAccountScopes(tx, {
-        seasonId: input.seasonId,
-        seasonParticipantIds: rows.map((row) => row.seasonParticipantId),
-      });
-
-      for (const row of rows) {
-        await tx.seasonRanking.create({
-          data: {
-            seasonId: input.seasonId,
-            seasonParticipantId: row.seasonParticipantId,
-            tradingAccountId: scopes.get(row.seasonParticipantId)!
-              .tradingAccountId,
-            rankType: CURRENT_RANK_TYPE,
-            rank: row.rank,
-            totalAssetKrw: row.totalAssetKrw,
-            returnRate: row.returnRate,
-            maxDrawdown: row.maxDrawdown,
-            totalFillCount: row.totalFillCount,
-            reachedReturnAt: row.reachedReturnAt,
-            rankingDate: input.rankingDate,
-            capturedAt: input.capturedAt,
-          },
-          select: {
-            id: true,
-          },
-        });
-      }
-
-      return { wrote: true as const };
-    });
+        return { wrote: true as const };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
+    );
 
     if (!outcome.wrote) {
       this.logger.warn(
-        `Current ranking refresh for season ${input.seasonId} was skipped: the season was no longer active in its ranking window when its row lock was acquired.`,
+        `Current ranking refresh for season ${input.seasonId} was skipped: ${outcome.reason}.`,
       );
-      return { skipped: true as const, reason: 'season_not_active' as const };
+      return { skipped: true as const, reason: outcome.reason };
     }
 
     this.logger.log(

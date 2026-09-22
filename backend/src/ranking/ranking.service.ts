@@ -181,9 +181,22 @@ export class RankingService {
     }
 
     const parsedQuery = this.parseQuery(query);
+    // Every query that contributes to one response observes the same committed
+    // generation. MVCC reads do not take the Season writer's row lock.
+    return this.prisma.$transaction(
+      (tx) => this.readRankingSnapshot(tx, userId, parsedQuery),
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
+  }
+
+  private async readRankingSnapshot(
+    client: Prisma.TransactionClient,
+    userId: string,
+    parsedQuery: ParsedRankingQuery,
+  ): Promise<RankingResponse> {
     const season = parsedQuery.seasonId
-      ? await this.findSeasonById(parsedQuery.seasonId)
-      : await this.findCurrentSeason();
+      ? await this.findSeasonById(parsedQuery.seasonId, client)
+      : await this.findCurrentSeason(client);
 
     if (!season) {
       return this.unavailableResponse({
@@ -210,17 +223,19 @@ export class RankingService {
           season.id,
           parsedQuery.rankType,
           parsedQuery.rankingDate,
+          client,
         )
       : await this.findLatestRankingDateMetadata(
           season.id,
           parsedQuery.rankType,
+          client,
         );
     this.assertCapturedAtMatchesSelectedSnapshot(
       parsedQuery.capturedAt,
       selectedRanking,
     );
 
-    const participant = await this.findParticipant(season.id, userId);
+    const participant = await this.findParticipant(season.id, userId, client);
 
     if (!selectedRanking) {
       return this.unavailableResponse({
@@ -244,7 +259,7 @@ export class RankingService {
     // of it is counted or served. Verifying only the requested page let damage
     // outside the window return a clean 200 — including on `top10`, whose ten
     // rows say nothing about the ninety below them.
-    await assertSeasonRankingSetScope(this.prisma, {
+    await assertSeasonRankingSetScope(client, {
       seasonId: season.id,
       rankType: parsedQuery.rankType,
       rankingDate: selectedRanking.rankingDate,
@@ -262,10 +277,11 @@ export class RankingService {
       ? this.isParticipantRankingVisible(participant)
       : false;
     const [totalParticipants, myRankingRow] = await Promise.all([
-      this.prisma.seasonRanking.count({ where }),
+      client.seasonRanking.count({ where }),
       participant && participantRankingVisible
-        ? this.prisma.seasonRanking.findUnique({
+        ? client.seasonRanking.findUnique({
             where: {
+              capturedAt: selectedRanking.capturedAt,
               seasonId_rankType_rankingDate_tradingAccountId: {
                 seasonId: season.id,
                 rankType: parsedQuery.rankType,
@@ -303,7 +319,7 @@ export class RankingService {
       totalParticipants,
       myRank: myRankingRow?.rank ?? null,
     });
-    const rankingRows = await this.prisma.seasonRanking.findMany({
+    const rankingRows = await client.seasonRanking.findMany({
       where: {
         ...where,
         ...(window.maxRank ? { rank: { lte: window.maxRank } } : {}),
@@ -523,9 +539,11 @@ export class RankingService {
     return trimmed === '' ? undefined : trimmed;
   }
 
-  private async findCurrentSeason(): Promise<RankingSeason | null> {
+  private async findCurrentSeason(
+    client: Prisma.TransactionClient,
+  ): Promise<RankingSeason | null> {
     for (const status of CURRENT_SEASON_STATUS_PRIORITY) {
-      const season = await this.prisma.season.findFirst({
+      const season = await client.season.findFirst({
         where: {
           status,
         },
@@ -549,8 +567,9 @@ export class RankingService {
 
   private async findSeasonById(
     seasonId: string,
+    client: Prisma.TransactionClient,
   ): Promise<RankingSeason | null> {
-    return this.prisma.season.findUnique({
+    return client.season.findUnique({
       where: {
         id: seasonId,
       },
@@ -582,8 +601,9 @@ export class RankingService {
   private async findLatestRankingDateMetadata(
     seasonId: string,
     rankType: SeasonRankingType,
+    client: Prisma.TransactionClient,
   ) {
-    return this.prisma.seasonRanking.findFirst({
+    return client.seasonRanking.findFirst({
       where: {
         seasonId,
         rankType,
@@ -604,8 +624,9 @@ export class RankingService {
     seasonId: string,
     rankType: SeasonRankingType,
     rankingDate: Date,
+    client: Prisma.TransactionClient,
   ) {
-    return this.prisma.seasonRanking.findFirst({
+    return client.seasonRanking.findFirst({
       where: {
         seasonId,
         rankType,
@@ -619,8 +640,12 @@ export class RankingService {
     });
   }
 
-  private async findParticipant(seasonId: string, userId: string) {
-    return this.prisma.seasonParticipant.findUnique({
+  private async findParticipant(
+    seasonId: string,
+    userId: string,
+    client: Prisma.TransactionClient,
+  ) {
+    return client.seasonParticipant.findUnique({
       where: {
         seasonId_userId: {
           seasonId,

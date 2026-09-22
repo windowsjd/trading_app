@@ -300,6 +300,7 @@ jobs:
           src/portfolio/snapshot-scope-audit.integration.spec.ts
           src/trading-accounts/general-trading-audit.integration.spec.ts
           src/ranking/season-ranking-scope.integration.spec.ts
+          src/ranking/ranking-consistency.integration.spec.ts
           src/seasons/seasons.join.integration.spec.ts
           src/auth/auth.integration.spec.ts
           src/ops/ops-job-lock.integration.spec.ts

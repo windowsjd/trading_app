@@ -109,6 +109,7 @@ jest.mock('../src/generated/prisma/client', () => {
     },
     Prisma: {
       Decimal,
+      TransactionIsolationLevel: { RepeatableRead: 'RepeatableRead' },
       PrismaClientKnownRequestError: class PrismaClientKnownRequestError extends Error {},
     },
     PrismaClient: class PrismaClient {},

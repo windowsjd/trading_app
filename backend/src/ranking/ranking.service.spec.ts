@@ -10,6 +10,7 @@ jest.mock('../generated/prisma/client', () => {
     },
     Prisma: {
       Decimal,
+      TransactionIsolationLevel: { RepeatableRead: 'RepeatableRead' },
     },
     ParticipantStatus: {
       registered: 'registered',
@@ -106,6 +107,7 @@ describe('RankingService', () => {
 
   const createService = () => {
     const prisma = createPrisma();
+    prisma.$transaction.mockImplementation((callback) => callback(prisma));
     const service = new RankingService(prisma as never);
 
     return { prisma, service };
@@ -130,7 +132,6 @@ describe('RankingService', () => {
     expect(prisma.fxExecuteRequest.create).not.toHaveBeenCalled();
     expect(prisma.fxExecuteRequest.update).not.toHaveBeenCalled();
     expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
-    expect(prisma.$transaction).not.toHaveBeenCalled();
   };
 
   const mockCurrentSeason = (prisma: ReturnType<typeof createPrisma>) => {
@@ -295,6 +296,14 @@ describe('RankingService', () => {
       },
     });
     expectNoRankingWrites(prisma);
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+    });
+    expect(prisma.seasonRanking.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ capturedAt }),
+      }),
+    );
   });
 
   it('hides myRanking when the joined participant is ranking hidden', async () => {
