@@ -79,6 +79,20 @@ describe('SeasonsService', () => {
       create: jest.fn(),
       findUnique: jest.fn(),
     },
+    $queryRaw: jest.fn().mockImplementation((sql: TemplateStringsArray) =>
+      Promise.resolve(
+        sql.join('').includes('clock_timestamp')
+          ? [{ now: new Date() }]
+          : [
+              {
+                id: 'season-1',
+                status: 'active',
+                start_at: new Date(Date.now() - 86400000),
+                end_at: new Date(Date.now() + 86400000),
+              },
+            ],
+      ),
+    ),
     $executeRaw: jest.fn().mockResolvedValue(1),
     user: {
       findUnique: jest.fn(),

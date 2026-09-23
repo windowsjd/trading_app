@@ -3912,6 +3912,16 @@ describe('AppController (e2e)', () => {
       expectedStatus: 201,
       setup: () => {
         mockActiveUser();
+        prisma.$queryRaw
+          .mockResolvedValueOnce([
+            {
+              id: season.id,
+              status: season.status,
+              start_at: season.startAt,
+              end_at: season.endAt,
+            },
+          ])
+          .mockResolvedValueOnce([{ now: season.startAt }]);
         prisma.season.findUnique.mockResolvedValueOnce(season);
         prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
         prisma.tradingAccount.create.mockResolvedValueOnce({
@@ -3948,7 +3958,7 @@ describe('AppController (e2e)', () => {
             userId: user.id,
             mode: 'season',
             status: 'active',
-            openedAt: expect.any(Date),
+            openedAt: season.startAt,
           }),
           select: { id: true },
         });

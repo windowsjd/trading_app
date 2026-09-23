@@ -1008,4 +1008,147 @@ describe('AssetTickerGateway', () => {
       priceKrwReason: 'FX_RATE_UNAVAILABLE',
     });
   });
+  describe('fallback timer ownership', () => {
+    const setup = () => {
+      const h = createGateway(binanceSelection(5));
+      const internal = h.gateway as unknown as {
+        runTickerPoll(): Promise<void>;
+        pushChangedTickers(): Promise<void>;
+        logger: { warn(message: unknown): void };
+      };
+      const warn = jest
+        .spyOn(internal.logger, 'warn')
+        .mockImplementation(() => undefined);
+      const attached = attachClient(h.gateway, 'A');
+      attached.state.subscriptions.set('B', null);
+      attached.state.subscriptions.set('C', null);
+      h.assetsService.getAssetPriceForTicker.mockImplementation((id: string) => {
+        const selection = binanceSelection(5);
+        return Promise.resolve({
+          ...selection,
+          asset: { ...selection.asset, id },
+        });
+      });
+      return { ...h, ...attached, internal, warn };
+    };
+
+    it('isolates an asset rejection and delivers B/C through the timer', async () => {
+      const h = setup();
+      h.assetsService.getAssetPriceForTicker.mockRejectedValueOnce(
+        new Error('sensitive provider payload'),
+      );
+      h.gateway.onModuleInit();
+      try {
+        await jest.advanceTimersByTimeAsync(3000);
+        expect(h.assetsService.getAssetPriceForTicker).toHaveBeenCalledTimes(3);
+        expect(h.client.send).toHaveBeenCalledTimes(2);
+        expect(h.warn).toHaveBeenCalledWith({
+          event: 'ticker_poll_asset_failed',
+          assetId: 'A',
+          code: 'TICKER_SNAPSHOT_FAILED',
+        });
+        expect(JSON.stringify(h.warn.mock.calls)).not.toContain('sensitive');
+        expect(
+          h.client.send.mock.calls.map(
+            ([message]) => JSON.parse(message).assetId,
+          ),
+        ).toEqual(['B', 'C']);
+      } finally {
+        h.gateway.onModuleDestroy();
+      }
+    });
+
+    it('skips timer ticks while a slow snapshot is pending and releases after failure', async () => {
+      const h = setup();
+      let reject!: (error: Error) => void;
+      h.assetsService.getAssetPriceForTicker.mockImplementationOnce(
+        () =>
+          new Promise((_resolve, no) => {
+            reject = no;
+          }),
+      );
+      h.gateway.onModuleInit();
+      try {
+        await jest.advanceTimersByTimeAsync(9000);
+        expect(h.assetsService.getAssetPriceForTicker).toHaveBeenCalledTimes(1);
+        reject(new Error('slow query failed'));
+        await jest.advanceTimersByTimeAsync(0);
+        expect(h.assetsService.getAssetPriceForTicker).toHaveBeenCalledTimes(3);
+        await jest.advanceTimersByTimeAsync(3000);
+        expect(h.assetsService.getAssetPriceForTicker).toHaveBeenCalledTimes(6);
+        expect(h.client.send).toHaveBeenCalledTimes(3);
+      } finally {
+        h.gateway.onModuleDestroy();
+      }
+    });
+
+    it('survives all snapshot failures and retries next period', async () => {
+      const h = setup();
+      const success =
+        h.assetsService.getAssetPriceForTicker.getMockImplementation()!;
+      h.assetsService.getAssetPriceForTicker.mockRejectedValue(
+        new Error('db down'),
+      );
+      h.gateway.onModuleInit();
+      try {
+        await jest.advanceTimersByTimeAsync(3000);
+        expect(h.warn).toHaveBeenCalledTimes(3);
+        expect(h.client.send).not.toHaveBeenCalled();
+        h.assetsService.getAssetPriceForTicker.mockImplementation(success);
+        await jest.advanceTimersByTimeAsync(3000);
+        expect(h.client.send).toHaveBeenCalledTimes(3);
+      } finally {
+        h.gateway.onModuleDestroy();
+      }
+    });
+
+    it('owns unexpected whole-poll rejection and clears the busy flag', async () => {
+      const h = setup();
+      const poll = jest
+        .spyOn(h.internal, 'pushChangedTickers')
+        .mockRejectedValueOnce(new Error('unexpected'));
+      h.gateway.onModuleInit();
+      try {
+        await jest.advanceTimersByTimeAsync(6000);
+        expect(poll).toHaveBeenCalledTimes(2);
+        expect(h.warn).toHaveBeenCalledWith({
+          event: 'ticker_poll_failed',
+          code: 'TICKER_POLL_FAILED',
+        });
+        expect(h.client.send).toHaveBeenCalledTimes(3);
+      } finally {
+        h.gateway.onModuleDestroy();
+      }
+    });
+
+    it('stops an in-flight poll and queued timer callbacks after destroy', async () => {
+      const h = setup();
+      let release!: (value: unknown) => void;
+      h.assetsService.getAssetPriceForTicker.mockImplementationOnce(
+        () =>
+          new Promise((yes) => {
+            release = yes;
+          }),
+      );
+      h.gateway.onModuleInit();
+      await jest.advanceTimersByTimeAsync(3000);
+      h.gateway.onModuleDestroy();
+      release(binanceSelection(5));
+      await jest.advanceTimersByTimeAsync(9000);
+      await h.internal.runTickerPoll();
+      expect(jest.getTimerCount()).toBe(0);
+      expect(h.assetsService.getAssetPriceForTicker).toHaveBeenCalledTimes(1);
+      expect(h.client.send).not.toHaveBeenCalled();
+    });
+
+    it('a failing socket does not block another client', async () => {
+      const h = setup();
+      h.client.send.mockImplementation(() => {
+        throw new Error('socket closed');
+      });
+      const healthy = attachClient(h.gateway, 'A');
+      await expect(h.internal.runTickerPoll()).resolves.toBeUndefined();
+      expect(healthy.client.send).toHaveBeenCalledTimes(1);
+    });
+  });
 });

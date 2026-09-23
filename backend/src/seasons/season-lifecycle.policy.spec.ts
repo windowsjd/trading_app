@@ -97,4 +97,28 @@ describe('season lifecycle policy', () => {
       }),
     );
   });
+  it.each([
+    [
+      'before start',
+      SeasonStatus.active,
+      new Date(startAt.getTime() - 1),
+      'SEASON_NOT_STARTED',
+    ],
+    ['at start', SeasonStatus.active, startAt, null],
+    ['before end', SeasonStatus.active, new Date(endAt.getTime() - 1), null],
+    ['at end', SeasonStatus.active, endAt, 'SEASON_ENDED'],
+    [
+      'after end',
+      SeasonStatus.active,
+      new Date(endAt.getTime() + 1),
+      'SEASON_ENDED',
+    ],
+    ['upcoming', SeasonStatus.upcoming, within, 'SEASON_NOT_ACTIVE'],
+    ['ended', SeasonStatus.ended, within, 'SEASON_NOT_ACTIVE'],
+    ['settled', SeasonStatus.settled, within, 'SEASON_NOT_ACTIVE'],
+  ] as const)('join boundary: %s', (_label, status, now, code) => {
+    const decide = () => assertSeasonJoinable(season(status), now);
+    if (code) expect(decide).toThrow(expect.objectContaining({ code }));
+    else expect(decide).not.toThrow();
+  });
 });

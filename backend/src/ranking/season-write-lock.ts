@@ -2,8 +2,8 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import { Prisma, SeasonStatus } from '../generated/prisma/client';
 
 /**
- * The ONE serialization point for every writer that changes a season's ranking
- * or settlement result (작업 8 §13).
+ * The shared serialization point for season joins, ranking publication
+ * and settlement (작업 8 §13).
  *
  * WHY A DB ROW LOCK AND NOT THE EXISTING IN-MEMORY SET
  * ---------------------------------------------------

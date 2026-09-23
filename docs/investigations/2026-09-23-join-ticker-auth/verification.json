@@ -1,0 +1,164 @@
+{
+  "baseline": {
+    "head": "94c4b94e49723ba291ca15721cf0d5d78a530d50",
+    "workingTree": "clean",
+    "endingHeadUnchanged": true,
+    "committed": false,
+    "pushed": false
+  },
+  "environment": {
+    "node": "v24.14.1",
+    "postgresql": "16.15",
+    "timezone": "UTC",
+    "isolatedServices": true
+  },
+  "validation": {
+    "backendUnit": {
+      "status": "PASS",
+      "suitesPassed": 204,
+      "suitesSkipped": 44,
+      "testsPassed": 3003,
+      "testsSkipped": 48
+    },
+    "backendFocused": {
+      "status": "PASS",
+      "suites": 5,
+      "tests": 58
+    },
+    "backendE2E": {
+      "status": "PASS",
+      "tests": 341
+    },
+    "postgresql": {
+      "status": "PASS",
+      "suites": 30,
+      "outerTests": 30,
+      "initialRun": {
+        "passed": 29,
+        "failed": 1,
+        "suite": "general-performance-hardening.integration.spec.ts",
+        "error": "GENERAL_PERFORMANCE_INTEGRITY"
+      },
+      "baselineComparison": {
+        "passed": 2,
+        "failed": 1,
+        "error": "active general account must get a daily row",
+        "sameExactFailureProven": false
+      },
+      "currentIndividualRerun": "PASS"
+    },
+    "frontendCheck": {
+      "status": "PASS",
+      "tests": 1189,
+      "suites": 165,
+      "skipped": 0
+    },
+    "frontendTargeted": {
+      "status": "PASS",
+      "tests": 54,
+      "suites": 8
+    },
+    "backendTypecheck": "PASS",
+    "backendBuild": "PASS",
+    "frontendTypecheck": "PASS",
+    "webExport": "PASS",
+    "ciLintFormatGates": "PASS",
+    "changedProductLint": {
+      "status": "FAIL",
+      "baselineIdenticalErrors": 2,
+      "newErrors": 0,
+      "rules": [
+        "@typescript-eslint/no-base-to-string",
+        "@typescript-eslint/no-unnecessary-type-assertion"
+      ]
+    },
+    "migrationDeploy": "PASS",
+    "migrationStatus": "PASS",
+    "schemaDrift": "none",
+    "dryRunAudits": {
+      "status": "PASS",
+      "findings": 0,
+      "writes": 0,
+      "commands": [
+        "pnpm run trading-accounts:repair-links",
+        "pnpm run trading-accounts:repair-ranking-scope",
+        "pnpm run trading-accounts:audit-general"
+      ]
+    },
+    "gitDiffCheck": "PASS"
+  },
+  "defectDetection": {
+    "r03": {
+      "method": "New join PostgreSQL spec on isolated baseline source",
+      "result": "Expected FAIL: missing FOR UPDATE wait"
+    },
+    "r05": {
+      "method": "Actual gateway timer callback, synthetic rejection, Node strict child process, in-memory legacy mutation",
+      "legacyExit": 1,
+      "currentExit": 0
+    },
+    "auth": {
+      "method": "Actual client interceptor and Login/Signup mutation harness, pre-fix execution",
+      "newCasesFailedBefore": 6,
+      "newCasesPassedAfter": 6
+    }
+  },
+  "scopeLimits": {
+    "settlementRace": "Production lock/state transition boundary reproduced, not the full settlement service join race",
+    "liveProviderSmoke": "not run",
+    "deviceOrBrowserE2E": "not run",
+    "candleReleaseFixture": "not run; unrelated R10"
+  },
+  "hostedCI": {
+    "appliesTo": "baseline HEAD only, not uncommitted patch",
+    "runs": [
+      {
+        "head": "94c4b94e49723ba291ca15721cf0d5d78a530d50",
+        "id": 35841928188,
+        "status": "completed",
+        "result": "failure",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/35841928188"
+      }
+    ],
+    "jobs": [
+      {
+        "name": "Limit order PostgreSQL integration",
+        "result": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/35841928188/job/107118784481",
+        "failedSteps": []
+      },
+      {
+        "name": "Backend quality",
+        "result": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/35841928188/job/107118784670",
+        "failedSteps": []
+      },
+      {
+        "name": "Core account PostgreSQL integration",
+        "result": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/35841928188/job/107118784704",
+        "failedSteps": []
+      },
+      {
+        "name": "Candle fixture integration",
+        "result": "failure",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/35841928188/job/107118784759",
+        "failedSteps": [
+          "Run release fixture smoke (no provider credentials)"
+        ]
+      },
+      {
+        "name": "Release-critical E2E",
+        "result": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/35841928188/job/107118784856",
+        "failedSteps": []
+      },
+      {
+        "name": "Frontend quality",
+        "result": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/35841928188/job/107118784996",
+        "failedSteps": []
+      }
+    ]
+  }
+}

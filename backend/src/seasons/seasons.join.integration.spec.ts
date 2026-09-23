@@ -27,6 +27,15 @@ describe('SeasonsService.joinSeason DB integration', () => {
       }
 
       expect(result.stderr).toBe('');
+      for (const label of [
+        'R03-PG-1',
+        'R03-PG-2',
+        'R03-PG-3',
+        'R03-PG-4',
+        'R03-PG-5',
+      ]) {
+        expect(result.stdout).toContain(label);
+      }
       expect(result.stdout).toContain('season join db integration ok');
     },
     130_000,
@@ -36,6 +45,9 @@ describe('SeasonsService.joinSeason DB integration', () => {
 const SEASON_JOIN_DB_RUNNER = `
 import 'dotenv/config';
 import assert from 'node:assert/strict';
+import { Client } from 'pg';
+import { lockSeasonForWriteOrThrow } from './src/ranking/season-write-lock';
+import { SeasonLifecycleTransitionJobService } from './src/batch/season-lifecycle-transition-job.service';
 import { HttpException } from '@nestjs/common';
 import {
   CurrencyCode,
@@ -58,9 +70,13 @@ async function main() {
   await prisma.$connect();
 
   try {
+    await runCase('R03-PG-1 endAt while waiting', testWaitPastEnd);
+    await runCase('R03-PG-2 join wins lifecycle', testJoinWinsLifecycle);
+    await runCase('R03-PG-3 lifecycle wins', testLifecycleWinsJoin);
+    await runCase('R03-PG-4 settlement boundary', testSettlementBoundaryWinsJoin);
     await runCase('active join writes participant wallets and initial grant ledger', testActiveJoinWritePath);
     await runCase('duplicate join is conflict without duplicate side effects', testDuplicateJoinConflict);
-    await runCase('concurrent duplicate join does not double wallet or ledger rows', testConcurrentDuplicateJoinRace);
+    await runCase('R03-PG-5 concurrent duplicate join does not double wallet or ledger rows', testConcurrentDuplicateJoinRace);
     await runCase('inactive seasons reject join without partial writes', testInactiveSeasonRejection);
     await runCase('active status outside start/end rejects join', testActiveStatusOutsideSeasonWindowRejection);
     await runCase('transaction failure injection rolls back participant wallet and ledger writes', testFailureInjectionRollback);
@@ -169,6 +185,7 @@ async function testConcurrentDuplicateJoinRace() {
     assert.equal(getErrorCode(failures[0].reason), 'SEASON_ALREADY_JOINED');
 
     const state = await readJoinState(scenario);
+    assert.equal(await prisma.tradingAccount.count({ where: { userId: scenario.userId, mode: 'season' } }), 1);
     assert.equal(state.participantCount, 1);
     assert.equal(state.walletCount, 2);
     assert.equal(state.krwWalletCount, 1);
@@ -279,6 +296,173 @@ async function testFailureInjectionRollback() {
     } finally {
       await cleanupScenario(scenario);
     }
+  }
+}
+
+async function openObserver() {
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  await client.connect();
+  return client;
+}
+function deferred() {
+  let resolve;
+  const promise = new Promise((yes) => { resolve = yes; });
+  return { promise, resolve };
+}
+async function waitBlocked(observer, blockerPid, queryPart) {
+  const deadline = Date.now() + 8000;
+  while (Date.now() < deadline) {
+    const found = await observer.query(
+      "SELECT 1 FROM pg_stat_activity WHERE $1::int = ANY(pg_blocking_pids(pid)) AND query ILIKE $2",
+      [blockerPid, '%' + queryPart + '%'],
+    );
+    if (found.rowCount) return;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  throw new Error('expected row-lock wait did not occur: ' + queryPart);
+}
+async function afterEnd(observer, endAt) {
+  const deadline = Date.now() + 8000;
+  while (Date.now() < deadline) {
+    const { rows } = await observer.query('SELECT clock_timestamp() AS now');
+    if (rows[0].now >= endAt) return rows[0].now;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  throw new Error('DB time never reached endAt');
+}
+async function financialCounts() {
+  return Promise.all([
+    prisma.tradingAccount.count(), prisma.seasonParticipant.count(),
+    prisma.cashWallet.count(), prisma.walletTransaction.count(), prisma.equitySnapshot.count(),
+  ]);
+}
+async function shortSeason(label) {
+  const [clock] = await prisma.$queryRawUnsafe('SELECT clock_timestamp() AS now');
+  const endAt = new Date(clock.now.getTime() + 2000);
+  return { ...await createScenario(label, { endAt }), endAt };
+}
+async function testWaitPastEnd() {
+  const scenario = await shortSeason('wait-past-end');
+  const blocker = await openObserver(), observer = await openObserver();
+  let pending;
+  try {
+    const before = await financialCounts();
+    await blocker.query('BEGIN');
+    await blocker.query('SELECT id FROM seasons WHERE id = $1 FOR UPDATE', [scenario.seasonId]);
+    const { rows } = await blocker.query('SELECT pg_backend_pid() AS pid, clock_timestamp() AS now');
+    assert.ok(rows[0].now < scenario.endAt, 'join starts before endAt');
+    pending = service.joinSeason(scenario.seasonId, scenario.userId).then(value => ({ value }), error => ({ error }));
+    await waitBlocked(observer, rows[0].pid, 'FOR UPDATE');
+    await afterEnd(observer, scenario.endAt);
+    await blocker.query('COMMIT');
+    const result = await pending;
+    assert.equal(getErrorCode(result.error), 'SEASON_ENDED');
+    assert.deepEqual(await financialCounts(), before, 'no account or financial writes after waiting past end');
+  } finally {
+    await blocker.query('ROLLBACK');
+    if (pending) await pending;
+    await blocker.end(); await observer.end(); await cleanupScenario(scenario);
+  }
+}
+async function testJoinWinsLifecycle() {
+  const scenario = await shortSeason('join-wins');
+  const entered = deferred(), release = deferred();
+  const observer = await openObserver();
+  let join, transition;
+  try {
+    let joinPid;
+    const delayed = new SeasonsService({
+      $transaction: callback => prisma.$transaction(tx => callback(new Proxy(tx, {
+        get(target, key) {
+          if (key === 'user') return { findUnique: async args => {
+            const [row] = await tx.$queryRawUnsafe('SELECT pg_backend_pid() AS pid');
+            joinPid = row.pid; entered.resolve(); await release.promise;
+            return tx.user.findUnique(args);
+          } };
+          return Reflect.get(target, key);
+        },
+      })), { timeout: 15000 }),
+    });
+    join = delayed.joinSeason(scenario.seasonId, scenario.userId);
+    await entered.promise;
+    const now = await afterEnd(observer, scenario.endAt);
+    const lifecycle = new SeasonLifecycleTransitionJobService({}, prisma);
+    transition = lifecycle.runLifecycleTransition({ now, dryRun: false });
+    await waitBlocked(observer, joinPid, 'UPDATE');
+    assert.equal(await prisma.seasonParticipant.count({ where: { seasonId: scenario.seasonId } }), 0, 'no partial visibility');
+    release.resolve();
+    const response = await join;
+    await transition;
+    const participant = await prisma.seasonParticipant.findUniqueOrThrow({ where: { id: response.data.seasonParticipantId } });
+    const account = await prisma.tradingAccount.findUniqueOrThrow({ where: { id: participant.tradingAccountId } });
+    const current = await prisma.season.findUniqueOrThrow({ where: { id: scenario.seasonId } });
+    assert.equal(current.status, 'ended');
+    assert.ok(participant.joinedAt >= current.startAt && participant.joinedAt < current.endAt);
+    assert.equal(account.openedAt.getTime(), participant.joinedAt.getTime());
+    const ledger = await prisma.walletTransaction.findFirstOrThrow({ where: { tradingAccountId: account.id } });
+    const equity = await prisma.equitySnapshot.findFirstOrThrow({ where: { tradingAccountId: account.id } });
+    assert.equal(ledger.occurredAt.getTime(), participant.joinedAt.getTime());
+    assert.equal(equity.capturedAt.getTime(), participant.joinedAt.getTime());
+    assert.equal((await readJoinState(scenario)).walletCount, 2);
+    // Same production settlement lock/state/read boundary sees the committed join.
+    await prisma.$transaction(async tx => {
+      const locked = await lockSeasonForWriteOrThrow(tx, scenario.seasonId);
+      assert.equal(locked.status, 'ended');
+      const visible = await tx.seasonParticipant.findMany({ where: { seasonId: scenario.seasonId }, include: { tradingAccount: true } });
+      assert.equal(visible.length, 1);
+      assert.equal(visible[0].tradingAccount.id, account.id);
+    });
+  } finally {
+    release.resolve();
+    await Promise.allSettled([join, transition].filter(Boolean));
+    await observer.end(); await cleanupScenario(scenario);
+  }
+}
+async function testLifecycleWinsJoin() {
+  const scenario = await createScenario('lifecycle-wins');
+  const blocker = await openObserver(), observer = await openObserver();
+  let pending;
+  try {
+    const before = await financialCounts();
+    await blocker.query('BEGIN');
+    // The lifecycle job's UPDATE itself takes the conflicting row lock.
+    await blocker.query("UPDATE seasons SET status = 'ended' WHERE id = $1 AND status = 'active'", [scenario.seasonId]);
+    const { rows } = await blocker.query('SELECT pg_backend_pid() AS pid');
+    pending = service.joinSeason(scenario.seasonId, scenario.userId).then(value => ({ value }), error => ({ error }));
+    await waitBlocked(observer, rows[0].pid, 'FOR UPDATE');
+    await blocker.query('COMMIT');
+    assert.equal(getErrorCode((await pending).error), 'SEASON_NOT_ACTIVE');
+    assert.deepEqual(await financialCounts(), before);
+  } finally {
+    await blocker.query('ROLLBACK'); if (pending) await pending;
+    await blocker.end(); await observer.end(); await cleanupScenario(scenario);
+  }
+}
+async function testSettlementBoundaryWinsJoin() {
+  const scenario = await createScenario('settlement-wins', { status: SeasonStatus.ended });
+  const observer = await openObserver(), entered = deferred(), release = deferred();
+  let pending, settling;
+  try {
+    const before = await financialCounts();
+    let pid;
+    // Reproduces production lock -> allowed ended state -> final status update.
+    // This is not the full valuation/final ranking/settlement service.
+    settling = prisma.$transaction(async tx => {
+      const locked = await lockSeasonForWriteOrThrow(tx, scenario.seasonId);
+      assert.equal(locked.status, 'ended');
+      const [row] = await tx.$queryRawUnsafe('SELECT pg_backend_pid() AS pid'); pid = row.pid;
+      await tx.season.update({ where: { id: scenario.seasonId }, data: { status: 'settled' } });
+      entered.resolve(); await release.promise;
+    }, { timeout: 15000 });
+    await entered.promise;
+    pending = service.joinSeason(scenario.seasonId, scenario.userId).then(value => ({ value }), error => ({ error }));
+    await waitBlocked(observer, pid, 'FOR UPDATE'); release.resolve(); await settling;
+    assert.equal(getErrorCode((await pending).error), 'SEASON_NOT_ACTIVE');
+    assert.deepEqual(await financialCounts(), before);
+    assert.equal((await prisma.season.findUniqueOrThrow({ where: { id: scenario.seasonId } })).status, 'settled');
+  } finally {
+    release.resolve(); await Promise.allSettled([pending, settling].filter(Boolean));
+    await observer.end(); await cleanupScenario(scenario);
   }
 }
 

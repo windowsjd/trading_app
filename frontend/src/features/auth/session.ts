@@ -57,14 +57,25 @@ export async function authenticateSession(
   queryClient: SessionQueryClient,
   authenticate: () => Promise<LoginResponseDto>,
 ) {
-  const expected = getSessionGeneration();
-  const result = await authenticate();
-  assertCurrentSession(expected);
-  const generation =
-    result.user.status === 'active'
-      ? await beginSession(queryClient, result.user, result.tokens, expected)
-      : expected;
-  return { ...result, generation };
+  // Explicit auth owns a new attempt before HTTP starts, so a restoring /me
+  // response cannot expire this attempt while its login/signup is in flight.
+  const expected = startSessionInstall(getSessionGeneration());
+  resetSessionExpiryNotice();
+  clearSessionCache(queryClient);
+  try {
+    const result = await authenticate();
+    assertCurrentSession(expected);
+    const generation =
+      result.user.status === 'active'
+        ? await beginSession(queryClient, result.user, result.tokens, expected)
+        : expected;
+    return { ...result, generation };
+  } catch (error) {
+    if (isCurrentSession(expected)) {
+      await endSession(queryClient, undefined, { generation: expected });
+    }
+    throw error;
+  }
 }
 
 type EndSessionOptions = {

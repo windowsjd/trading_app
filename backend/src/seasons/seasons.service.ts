@@ -14,6 +14,7 @@ import {
 } from '../generated/prisma/client';
 import { buildPagination, type Pagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
+import { lockSeasonForWrite } from '../ranking/season-write-lock';
 import {
   assertSeasonJoinable,
   getEffectiveSeasonMode,
@@ -227,6 +228,28 @@ export class SeasonsService {
 
     try {
       result = await this.prisma.$transaction(async (tx) => {
+        const lockedSeason = await lockSeasonForWrite(tx, seasonId);
+        if (!lockedSeason) {
+          this.throwApiError(
+            HttpStatus.NOT_FOUND,
+            'SEASON_NOT_FOUND',
+            'Season not found',
+          );
+        }
+        // A separate statement runs AFTER lock acquisition. now()/CURRENT_TIMESTAMP
+        // would retain the transaction start time even after waiting past endAt.
+        const [clock] = await tx.$queryRaw<Array<{ now: Date }>>`
+          SELECT clock_timestamp() AS "now"
+        `;
+        if (!clock?.now) {
+          this.throwApiError(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            'SEASON_JOIN_FAILED',
+            'Database transaction clock is unavailable.',
+          );
+        }
+        const joinedAt = clock.now;
+        this.assertSeasonJoinable(lockedSeason, joinedAt);
         const season = await tx.season.findUnique({
           where: {
             id: seasonId,
@@ -247,8 +270,6 @@ export class SeasonsService {
             'Season not found',
           );
         }
-
-        this.assertSeasonJoinable(season, new Date());
 
         const user = await tx.user.findUnique({
           where: {
@@ -288,7 +309,6 @@ export class SeasonsService {
           return { kind: 'already-joined' } as const;
         }
 
-        const joinedAt = new Date();
         const initialCapitalKrw = this.formatDecimal(
           season.initialCapitalKrw,
           8,

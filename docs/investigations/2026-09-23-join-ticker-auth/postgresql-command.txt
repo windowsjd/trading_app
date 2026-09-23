@@ -1,0 +1,52 @@
+# Run from backend/, against an isolated migrated test database only.
+# PostgreSQL 16.15 / UTC; Redis loopback test instance; Node v24.14.1.
+# These ports identify the ephemeral services used in this investigation.
+env \
+  DATABASE_URL=postgresql://nayuta@127.0.0.1:55439/r03_tests \
+  REDIS_URL=redis://127.0.0.1:56389 \
+  LIMIT_ORDER_RESERVATION_DB_INTEGRATION=1 \
+  LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION=1 \
+  LIMIT_ORDER_MATCHING_DB_INTEGRATION=1 \
+  ORDER_EXECUTE_DB_INTEGRATION=1 \
+  FX_EXECUTE_DB_INTEGRATION=1 \
+  MVP_FLOW_DB_SMOKE=1 \
+  TRADING_ACCOUNT_DB_INTEGRATION=1 \
+  GENERAL_TRADING_DB_INTEGRATION=1 \
+  GENERAL_FX_DB_INTEGRATION=1 \
+  SEASON_JOIN_DB_INTEGRATION=1 \
+  AUTH_DB_SMOKE=1 \
+  OPS_JOB_LOCK_DB_SMOKE=1 \
+  LIMIT_ORDER_ENABLED=true \
+  AD_REWARD_ENABLED=true \
+  JWT_ACCESS_SECRET=isolated-r03-test-secret \
+  pnpm exec jest --runInBand \
+  src/orders/limit-order-reservation.integration.spec.ts \
+  src/orders/limit-order-create-race.integration.spec.ts \
+  src/orders/limit-order-transaction-time.integration.spec.ts \
+  src/orders/trading-transaction-time.integration.spec.ts \
+  src/orders/trading-fee-pinning.integration.spec.ts \
+  src/orders/limit-order-create-no-redis.integration.spec.ts \
+  src/orders/limit-order-idempotent-replay.integration.spec.ts \
+  src/orders/limit-order-matching.integration.spec.ts \
+  src/orders/orders.execute.integration.spec.ts \
+  src/fx/fx.execute.integration.spec.ts \
+  src/mvp-flow.integration.spec.ts \
+  src/assets/assets-tradability.integration.spec.ts \
+  src/seasons/trading-account.integration.spec.ts \
+  src/seasons/trading-account-link.integration.spec.ts \
+  src/seasons/trading-account-financial-scope.integration.spec.ts \
+  src/seasons/trading-account-trading-scope.integration.spec.ts \
+  src/trading-accounts/general-account.integration.spec.ts \
+  src/orders/general-account-trading.integration.spec.ts \
+  src/fx/general-account-fx.integration.spec.ts \
+  src/orders/order-replay-and-cancel-scope.integration.spec.ts \
+  src/portfolio/general-performance-hardening.integration.spec.ts \
+  src/portfolio/krx-closed-price.integration.spec.ts \
+  src/portfolio/krx-session-close-recovery.integration.spec.ts \
+  src/portfolio/snapshot-scope-audit.integration.spec.ts \
+  src/trading-accounts/general-trading-audit.integration.spec.ts \
+  src/ranking/season-ranking-scope.integration.spec.ts \
+  src/ranking/ranking-consistency.integration.spec.ts \
+  src/seasons/seasons.join.integration.spec.ts \
+  src/auth/auth.integration.spec.ts \
+  src/ops/ops-job-lock.integration.spec.ts

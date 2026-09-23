@@ -263,3 +263,103 @@ it('Splash restore cannot seed identity or navigate after B has logged in', asyn
   assert.equal(h.queryClient.getQueryData(h.keys.me).id, 'B');
   assert.deepEqual(h.routes, []);
 });
+
+describe('explicit authentication supersedes cold-start restoring requests', () => {
+  for (const kind of ['Login', 'Signup']) {
+    for (const oldStatus of [401, 200]) {
+      it(`${kind} survives old restoring /me ${oldStatus} while auth HTTP is pending`, async (t) => {
+        const h = screenHarness();
+        t.after(h.close);
+        h.attachExpiry();
+        const oldEntered = deferred(),
+          oldReply = deferred();
+        const authEntered = deferred(),
+          authReply = deferred();
+        let oldConfig: any, authConfig: any;
+        h.setTransport((r: any) => {
+          if (r.url === '/me') {
+            oldConfig = r;
+            oldEntered.resolve();
+            return oldReply.promise;
+          }
+          if (r.url.startsWith('/auth/')) {
+            authConfig = r;
+            authEntered.resolve();
+            return authReply.promise;
+          }
+          assert.equal(r.url, '/trading-accounts');
+          assert.equal(r.headers.Authorization, 'Bearer B-access');
+          return Promise.resolve(h.ok(r, { accounts: [{ id: 'account-B' }] }));
+        });
+        const old = h.api.get('/me').then(
+          (r: any) => {
+            h.queryClient.setQueryData(h.keys.me, r.data.data);
+            return 'accepted';
+          },
+          () => 'discarded',
+        );
+        await oldEntered.promise;
+        h.load(`src/screens/auth/${kind}Screen.tsx`).default({ navigation: {} });
+        const pending = h.mutation().mutationFn({});
+        const result = pending.then(
+          (value: any) => ({ value }),
+          (error: unknown) => ({ error }),
+        );
+        await authEntered.promise;
+        if (oldStatus === 401) oldReply.reject(h.unauthorized(oldConfig));
+        else oldReply.resolve(h.ok(oldConfig, h.user('A')));
+        await old;
+        authReply.resolve(
+          h.ok(authConfig, { user: h.user('B'), tokens: h.credentials('B') }),
+        );
+        const completed = await result;
+        assert.equal(
+          completed.error,
+          undefined,
+          'old restoring request must not cancel explicit auth',
+        );
+        await h.mutation().onSuccess(completed.value);
+        assert.equal(await old, 'discarded');
+        assert.equal(h.queryClient.getQueryData(h.keys.me).id, 'B');
+        assert.equal(h.disk.get('accessToken'), 'B-access');
+        assert.equal(h.disk.get('refreshToken'), 'B-refresh');
+        assert.deepEqual(h.queryClient.getQueryData(h.keys.tradingAccount.list('B')), {
+          accounts: [{ id: 'account-B' }],
+        });
+        assert.deepEqual(h.routes, [{ index: 0, routes: [{ name: 'ModeSelection' }] }]);
+        assert.equal(h.expiryCalls, 0);
+        assert.deepEqual(h.navigation, []);
+      });
+    }
+    it(`${kind} HTTP failure never activates old restoring credentials`, async (t) => {
+      const h = screenHarness();
+      t.after(h.close);
+      h.attachExpiry();
+      const oldEntered = deferred(),
+        oldReply = deferred();
+      let oldConfig: any;
+      h.setTransport((r: any) => {
+        if (r.url === '/me') {
+          oldConfig = r;
+          oldEntered.resolve();
+          return oldReply.promise;
+        }
+        return Promise.reject(h.unauthorized(r));
+      });
+      const old = h.api.get('/me').catch(() => undefined);
+      await oldEntered.promise;
+      h.load(`src/screens/auth/${kind}Screen.tsx`).default({ navigation: {} });
+      await assert.rejects(h.mutation().mutationFn({}));
+      oldReply.resolve(h.ok(oldConfig, h.user('A')));
+      await old;
+      assert.equal(
+        h.owner.canUseSessionCredentials(h.owner.getSessionGeneration()),
+        false,
+      );
+      assert.equal(h.queryClient.getQueryData(h.keys.me), undefined);
+      assert.equal(h.disk.has('accessToken'), false);
+      assert.deepEqual(h.routes, []);
+      assert.equal(h.expiryCalls, 0);
+    });
+  }
+});

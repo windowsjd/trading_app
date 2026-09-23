@@ -15,6 +15,7 @@ import { JwtService } from '@nestjs/jwt';
 import {
   Inject,
   Injectable,
+  Logger,
   OnModuleDestroy,
   OnModuleInit,
   Optional,
@@ -146,6 +147,9 @@ export class AssetTickerGateway
   >();
   private readonly clients = new Map<WebSocket, ClientState>();
   private pollTimer: NodeJS.Timeout | null = null;
+  private readonly logger = new Logger(AssetTickerGateway.name);
+  private pollInFlight = false;
+  private destroyed = false;
   private unsubscribeKisRealtimePrices: (() => void) | null = null;
   private unsubscribeBinanceRealtimePrices: (() => void) | null = null;
   private unsubscribeLiveCandles: (() => void) | null = null;
@@ -181,7 +185,7 @@ export class AssetTickerGateway
 
   onModuleInit() {
     this.pollTimer = setInterval(() => {
-      void this.pushChangedTickers();
+      void this.runTickerPoll();
     }, TICKER_POLL_INTERVAL_MS);
     this.unsubscribeKisRealtimePrices = this.kisRealtimePriceEventBus.subscribe(
       (event) => this.pushRealtimePriceEvent(event),
@@ -216,6 +220,7 @@ export class AssetTickerGateway
   }
 
   onModuleDestroy() {
+    this.destroyed = true;
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
@@ -627,6 +632,21 @@ export class AssetTickerGateway
     }
   }
 
+  private async runTickerPoll(): Promise<void> {
+    if (this.destroyed || this.pollInFlight) return;
+    this.pollInFlight = true;
+    try {
+      await this.pushChangedTickers();
+    } catch {
+      this.logger.warn({
+        event: 'ticker_poll_failed',
+        code: 'TICKER_POLL_FAILED',
+      });
+    } finally {
+      this.pollInFlight = false;
+    }
+  }
+
   private async pushChangedTickers() {
     const assetIds = new Set<string>();
     for (const state of this.clients.values()) {
@@ -636,7 +656,21 @@ export class AssetTickerGateway
     }
 
     for (const assetId of assetIds) {
-      const ticker = await this.buildSnapshotTickerMessage(assetId);
+      if (this.destroyed) return;
+      let ticker: Awaited<
+        ReturnType<AssetTickerGateway['buildSnapshotTickerMessage']>
+      >;
+      try {
+        ticker = await this.buildSnapshotTickerMessage(assetId);
+      } catch {
+        this.logger.warn({
+          event: 'ticker_poll_asset_failed',
+          assetId,
+          code: 'TICKER_SNAPSHOT_FAILED',
+        });
+        continue;
+      }
+      if (this.destroyed) return;
       if (!ticker) {
         continue;
       }

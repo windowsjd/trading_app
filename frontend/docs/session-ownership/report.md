@@ -165,3 +165,7 @@ Backend 수정 없음. API 경로·request/response contract 변경 없음 (`/ap
 기존 추론과 분리해 제품 소스, 신규 harness/tests, 모든 token install/clear·session begin/end·expiry 호출자를 다시 읽고 전체 tracked diff와 신규 파일을 검토했다. old 401/success/failure, native write 완료 순서, pending expiry, teardown 중 새 로그인, 동일 사용자 재로그인, retry 직전 token read를 확인했다.
 
 변경은 frontend auth/session 소유권, 해당 호출부, 테스트·검증 문서·lint scope에 한정된다. backend/주문/환전/랭킹/시즌 참가 정책·UI 디자인 변경 없음. 기존 사용자 변경은 시작 시 없었으며 기존 기대값이나 cache/금융 정책을 완화하지 않았다. 전체 파일 rename/불필요한 포맷 변경, production test hook, 임시 debug code, 새 infrastructure/영구 상태 없음. 작은 runtime coordinator와 기존 helper 재사용으로 작업 범위를 유지했다.
+
+## 2026-09-23 AUTH-EDGE 후속 검증
+
+cold-start `restoring`의 `/me`가 Login/Signup HTTP 진행 중 늦게 401을 반환하면, 이전 구현은 같은 generation을 만료시켜 새 인증 성공을 폐기했다. `authenticateSession`이 **HTTP 시작 전에** 기존 `startSessionInstall`로 새 시도 소유권을 예약하도록 수정했다. 실패 시 자기 시도만 종료하며, 기존 credential 설치·storage 직렬화·expiry/refresh 계약은 유지한다. Login/Signup × old 401/200/인증 실패의 6개 신규 테스트는 수정 전 실패, 수정 후 통과했다. 상세 증거는 [R03/R05/AUTH-EDGE 보고서](../../../docs/investigations/2026-09-23-join-ticker-auth/report.md)에 기록했다.
