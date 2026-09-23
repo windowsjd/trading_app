@@ -10,10 +10,13 @@ import ActionPressable from '../../components/common/ActionPressable';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import type { SignupScreenProps } from '../../app/navigation/types';
-import { signup } from '../../features/auth/api';
-import { beginSession } from '../../features/auth/session';
+import { signup, type SignupRequestDto } from '../../features/auth/api';
+import { authenticateSession, endSession } from '../../features/auth/session';
 import { useEnterApp } from '../../features/auth/useEnterApp';
-import { clearTokens, saveTokens } from '../../services/storage/tokenStorage';
+import {
+  isCurrentSession,
+  SessionSupersededError,
+} from '../../services/api/sessionOwnership';
 import {
   getApiErrorCode,
   getApiErrorDisplayMessage,
@@ -61,38 +64,32 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
     useState<AuthViewState | null>(null);
 
   const signupMutation = useMutation({
-    mutationFn: signup,
+    mutationFn: (payload: SignupRequestDto) =>
+      authenticateSession(queryClient, () => signup(payload)),
     onSuccess: async (result) => {
+      if (!isCurrentSession(result.generation)) return;
       setSubmitError(null);
       setBlockedAuthState(null);
 
-      await saveTokens(
-        result.tokens.accessToken,
-        result.tokens.refreshToken,
-      );
-
       if (result.user.status !== 'active') {
-        await clearTokens();
+        await endSession(queryClient, undefined, { generation: result.generation });
         const nextBlockedState = getBlockedAuthState(result.user.status);
         setBlockedAuthState(nextBlockedState);
         setSubmitError(getBlockedAuthMessage(nextBlockedState));
         return;
       }
 
-      // Same session install as login (작업 10 §A-7): the account list must be
-      // available immediately, without an app restart.
-      await beginSession(queryClient, result.user);
-
       try {
         // A brand-new signup is a new login (작업 13 §2): the user chooses
         // 일반 투자 or 시즌 투자 on the mode-selection screen — which also
         // handles their "no accounts yet" state.
-        await enterApp(result.user.id, 'new_login');
+        await enterApp(result.user.id, 'new_login', result.generation);
       } catch (error) {
+        if (!isCurrentSession(result.generation)) return;
         const code = getApiErrorCode(error);
 
         if (isAuthUserInactiveError(code)) {
-          await clearTokens();
+          await endSession(queryClient, undefined, { generation: result.generation });
           setSubmitError(getBlockedAuthMessage(null));
           return;
         }
@@ -104,6 +101,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
       }
     },
     onError: (error: unknown) => {
+      if (error instanceof SessionSupersededError) return;
       const code = getApiErrorCode(error);
       setBlockedAuthState(null);
       setSubmitError(

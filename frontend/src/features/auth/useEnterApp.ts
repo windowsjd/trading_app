@@ -1,6 +1,10 @@
 import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
+import {
+  assertCurrentSession,
+  getSessionGeneration,
+} from '../../services/api/sessionOwnership';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
 import {
   resetToHome,
@@ -33,12 +37,18 @@ export function useEnterApp() {
   const queryClient = useQueryClient();
 
   return useCallback(
-    async (userId: string, intent: AuthedEntryIntent) => {
+    async (
+      userId: string,
+      intent: AuthedEntryIntent,
+      generation = getSessionGeneration(),
+    ) => {
+      assertCurrentSession(generation);
       const route = await loadEntryRoute(queryClient, userId, intent, {
         loadAccounts: getTradingAccounts,
         readStoredAccountId: readSelectedAccountId,
       });
 
+      assertCurrentSession(generation);
       if (route === 'home') {
         resetToHome(rootNavigation);
         return;

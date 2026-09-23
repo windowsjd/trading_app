@@ -1,0 +1,54 @@
+{
+  "baseHead": "2861023901c7dee25cdb80da9197a080ea740c57",
+  "runs": [
+    {
+      "id": 35733340297,
+      "head": "2861023901c7dee25cdb80da9197a080ea740c57",
+      "url": "https://github.com/windowsjd/trading_app/actions/runs/35733340297",
+      "number": 120,
+      "status": "completed",
+      "conclusion": "failure"
+    }
+  ],
+  "jobs": [
+    {
+      "name": "Limit order PostgreSQL integration",
+      "conclusion": "success",
+      "url": "https://github.com/windowsjd/trading_app/actions/runs/35733340297/job/106764182684",
+      "failedSteps": []
+    },
+    {
+      "name": "Frontend quality",
+      "conclusion": "success",
+      "url": "https://github.com/windowsjd/trading_app/actions/runs/35733340297/job/106764182760",
+      "failedSteps": []
+    },
+    {
+      "name": "Release-critical E2E",
+      "conclusion": "success",
+      "url": "https://github.com/windowsjd/trading_app/actions/runs/35733340297/job/106764182853",
+      "failedSteps": []
+    },
+    {
+      "name": "Backend quality",
+      "conclusion": "success",
+      "url": "https://github.com/windowsjd/trading_app/actions/runs/35733340297/job/106764182907",
+      "failedSteps": []
+    },
+    {
+      "name": "Candle fixture integration",
+      "conclusion": "failure",
+      "url": "https://github.com/windowsjd/trading_app/actions/runs/35733340297/job/106764183065",
+      "failedSteps": [
+        "Run release fixture smoke (no provider credentials)"
+      ]
+    },
+    {
+      "name": "Core account PostgreSQL integration",
+      "conclusion": "success",
+      "url": "https://github.com/windowsjd/trading_app/actions/runs/35733340297/job/106764183202",
+      "failedSteps": []
+    }
+  ],
+  "note": "Hosted result for the committed baseline, not for the current uncommitted changes. Candle fixture failure is outside R01/R02."
+}

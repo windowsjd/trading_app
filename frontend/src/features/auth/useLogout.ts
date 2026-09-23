@@ -5,7 +5,6 @@ import { QUERY_KEYS } from '../../constants/queryKeys';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
 import { logout as revokeSession } from './api';
 import { endSession } from './session';
-import { getRefreshToken } from '../../services/storage/tokenStorage';
 import type { MeDto } from '../me/api';
 
 /**
@@ -20,8 +19,7 @@ import type { MeDto } from '../me/api';
  *
  * The server revoke is best effort; the local teardown is not. A user who
  * pressed 로그아웃 on a shared device must end up logged out even if the network
- * is down — so the revoke sits in its own try/catch and the local clear runs in
- * `finally`.
+ * is down — so revocation runs independently of the local teardown.
  *
  * The userId is read from the cache BEFORE the clear, because it is the key
  * under which this user's account selection is stored and there is nowhere else
@@ -34,19 +32,12 @@ export function useLogout() {
   return useCallback(async () => {
     const userId =
       queryClient.getQueryData<MeDto>(QUERY_KEYS.me)?.id ?? null;
-    const refreshToken = await getRefreshToken();
-
-    try {
-      await revokeSession(refreshToken);
-    } catch {
-      // Best effort: the local session ends regardless.
-    } finally {
-      await endSession(queryClient, userId);
-    }
-
-    rootNavigation.reset({
-      index: 0,
-      routes: [{ name: 'AuthStack', params: { screen: 'Login' } }],
+    await endSession(queryClient, userId, {
+      revoke: revokeSession,
+      resetToLogin: () => rootNavigation.reset({
+        index: 0,
+        routes: [{ name: 'AuthStack', params: { screen: 'Login' } }],
+      }),
     });
   }, [queryClient, rootNavigation]);
 }

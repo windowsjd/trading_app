@@ -28,6 +28,8 @@
  */
 
 export type SessionExpiryTeardownSteps = {
+  /** A later login must not receive this teardown's cache/navigation effects. */
+  isCurrent?: () => boolean;
   /** Must be synchronous: the cache has to be gone before any await. */
   clearCache: () => void;
   /** Tokens and any per-user storage. May reject. */
@@ -39,11 +41,12 @@ export type SessionExpiryTeardownSteps = {
 export async function runSessionExpiryTeardown(
   steps: SessionExpiryTeardownSteps,
 ): Promise<void> {
+  if (steps.isCurrent?.() === false) return;
   steps.clearCache();
 
   try {
     await steps.clearCredentials();
   } finally {
-    steps.resetToLogin();
+    if (steps.isCurrent?.() !== false) steps.resetToLogin();
   }
 }

@@ -17,7 +17,8 @@ import {
 } from '../../features/season/mapper';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
-import { clearTokens } from '../../services/storage/tokenStorage';
+import { endSession } from '../../features/auth/session';
+import { getRequestGeneration } from '../../services/api/client';
 import {
   getApiErrorCode,
   getErrorMessageFromCode,
@@ -131,7 +132,9 @@ export default function SeasonJoinScreen({ navigation }: Props) {
       setJoinErrorCode(code ?? 'UNKNOWN');
 
       if (code === ERROR_CODE.USER_NOT_ACTIVE) {
-        await clearTokens();
+        await endSession(queryClient, undefined, {
+          generation: getRequestGeneration(error),
+        });
         return;
       }
 

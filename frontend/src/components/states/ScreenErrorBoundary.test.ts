@@ -10,6 +10,7 @@ const { create, act } = require('react-test-renderer');
 const { useQuery, useQueryClient } = require('@tanstack/react-query');
 const { load, elements } = require('../../../test/ledgerTestHarness.cjs');
 const expiry = require('../../services/api/sessionExpiry.ts');
+const ownership = require('../../services/api/sessionOwnership.ts');
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
 function harness() {
@@ -34,8 +35,8 @@ function harness() {
   }
   const Providers = load(resolve('src/app/AppProviders.tsx'), {
     '../features/tradingAccount/TradingAccountContext': { TradingAccountProvider: AccountProvider },
-    '../features/auth/session': { endSession: (client: any) => {
-      client.clear(); h.operations.push('credentials-cleared'); return Promise.resolve();
+    '../features/auth/session': { endSession: (client: any, _user: unknown, options: any) => {
+      client.clear(); h.operations.push('credentials-cleared'); options.resetToLogin(); return Promise.resolve();
     } },
     '../services/api/sessionExpiry': expiry,
     './navigation/navigationRef': { resetToLoginFromRef: () => {
@@ -150,6 +151,7 @@ describe('root screen render boundary', () => {
         if (renderFailure) throw new Error('intentional render failure');
         return React.createElement('Text', null, 'ready');
       }
+      ownership.activateSession(ownership.startSessionInstall(ownership.getSessionGeneration()));
       expiry.resetSessionExpiryNotice();
       await h.mount(React.createElement(Screen));
       h.client.setQueryData(QUERY_KEYS.record.infiniteSeasons(), { pages: [], pageParams: [] });

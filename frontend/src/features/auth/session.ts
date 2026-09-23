@@ -1,61 +1,130 @@
-import { clearTokens } from '../../services/storage/tokenStorage';
+import {
+  clearTokens,
+  readRefreshTokenForCleanup,
+  runSessionStorage,
+  saveTokens,
+} from '../../services/storage/tokenStorage';
 import { resetSessionExpiryNotice } from '../../services/api/sessionExpiry';
+import {
+  activateSession,
+  assertCurrentSession,
+  getSessionGeneration,
+  invalidateSession,
+  isCurrentSession,
+  reportSessionStorageFailure,
+  startSessionInstall,
+} from '../../services/api/sessionOwnership';
 import { clearSelectedAccountId } from '../tradingAccount/selectionStorage';
 import {
   clearSessionCache,
   seedSessionCache,
   type SessionQueryClient,
 } from './sessionCache.ts';
-import type { AuthUserDto } from './api';
-
-/**
- * The session boundary — the ONE place a user's session is installed and torn
- * down (작업 10 §A-7 · §A-8).
- *
- * This module is the thin composition of two halves: the token/AsyncStorage
- * teardown here, and the query-cache teardown in `sessionCache.ts`, which
- * carries the reasoning about why the cache is CLEARED rather than invalidated
- * and why it is cleared wholesale rather than by key list.
- */
+import { runSessionExpiryTeardown } from './sessionTeardown.ts';
+import type { AuthTokensDto, AuthUserDto, LoginResponseDto } from './api';
 
 export type { SessionQueryClient };
 
-/** Called after a successful login/signup, BEFORE navigating into the app. */
+/** Reserve ownership BEFORE token I/O. Cache activation requires a complete
+ * credential install; an unsuccessful/partial multiSet never installs `me`. */
 export async function beginSession(
   queryClient: SessionQueryClient,
   user: AuthUserDto,
+  tokens: AuthTokensDto,
+  expected = getSessionGeneration(),
 ) {
-  await seedSessionCache(queryClient, user);
-  // The expiry notice is one-shot per session; re-arm it for this one.
+  const owner = startSessionInstall(expected);
   resetSessionExpiryNotice();
+  clearSessionCache(queryClient);
+  try {
+    await saveTokens(tokens.accessToken, tokens.refreshToken, owner);
+  } catch (error) {
+    if (isCurrentSession(owner)) {
+      reportSessionStorageFailure('install tokens');
+      await endSession(queryClient, undefined, { generation: owner });
+    }
+    throw error;
+  }
+  assertCurrentSession(owner);
+  activateSession(owner);
+  await seedSessionCache(queryClient, user);
+  assertCurrentSession(owner);
+  return owner;
 }
 
-/**
- * Called on explicit logout AND on an unrecoverable session expiry.
- *
- * Local teardown always completes even when the server logout call failed: a
- * user who pressed 로그아웃 on a shared device must not stay logged in because
- * the network was down. The caller does the server revoke (best effort) and
- * then calls this.
- *
- * `userId` is omitted on expiry, where `me` is already gone. The stored account
- * SELECTION is then left in place on purpose — it is an opaque pointer under a
- * per-user key, and keeping it returns the same user to the same account when
- * they sign back in.
- */
-export async function endSession(
+/** Captures the login/signup request's owner as well as the install's owner. */
+export async function authenticateSession(
+  queryClient: SessionQueryClient,
+  authenticate: () => Promise<LoginResponseDto>,
+) {
+  const expected = getSessionGeneration();
+  const result = await authenticate();
+  assertCurrentSession(expected);
+  const generation =
+    result.user.status === 'active'
+      ? await beginSession(queryClient, result.user, result.tokens, expected)
+      : expected;
+  return { ...result, generation };
+}
+
+type EndSessionOptions = {
+  generation?: number;
+  resetToLogin?: () => void;
+  revoke?: (refreshToken: string | null) => Promise<unknown>;
+};
+export type SessionCleanupResult = {
+  tokensRemoved: boolean;
+  selectionRemoved: boolean | null;
+};
+let teardown: { generation: number; promise: Promise<SessionCleanupResult> } | null =
+  null;
+
+/** Runtime invalidation and cache clear precede all storage/network awaits.
+ * Expiry passes its already-invalidated owner and omits per-user cleanup. */
+export function endSession(
   queryClient: SessionQueryClient,
   userId?: string | null,
-) {
-  // The cache goes FIRST, synchronously, before any await (작업 12 §4). It used
-  // to wait behind the AsyncStorage round-trip, which left a window in which
-  // the tokens were gone but the previous session's balances were still
-  // readable — and a screen rendering during that window paints them.
-  clearSessionCache(queryClient);
-
-  await clearTokens();
-
-  if (userId) {
-    await clearSelectedAccountId(userId);
-  }
+  options: EndSessionOptions = {},
+): Promise<SessionCleanupResult> {
+  const owner = invalidateSession(options.generation ?? getSessionGeneration());
+  if (owner === null)
+    return Promise.resolve({ tokensRemoved: false, selectionRemoved: null });
+  if (teardown?.generation === owner) return teardown.promise;
+  const result: SessionCleanupResult = { tokensRemoved: false, selectionRemoved: null };
+  const promise = runSessionExpiryTeardown({
+    isCurrent: () => isCurrentSession(owner),
+    clearCache: () => clearSessionCache(queryClient),
+    clearCredentials: async () => {
+      if (options.revoke) {
+        try {
+          const token = await readRefreshTokenForCleanup(owner);
+          // Revoke is independent of local completion and never uses B's token.
+          if (isCurrentSession(owner)) void options.revoke(token).catch(() => undefined);
+        } catch {
+          if (isCurrentSession(owner))
+            reportSessionStorageFailure('read refresh token for logout');
+        }
+      }
+      try {
+        await clearTokens(owner);
+        result.tokensRemoved = true;
+      } catch {
+        if (isCurrentSession(owner)) reportSessionStorageFailure('remove tokens');
+      }
+      if (userId && isCurrentSession(owner)) {
+        try {
+          result.selectionRemoved = await runSessionStorage(owner, () =>
+            clearSelectedAccountId(userId),
+          );
+        } catch {
+          result.selectionRemoved = false;
+          if (isCurrentSession(owner))
+            reportSessionStorageFailure('remove account selection');
+        }
+      }
+    },
+    resetToLogin: () => options.resetToLogin?.(),
+  }).then(() => result);
+  teardown = { generation: owner, promise };
+  return promise;
 }

@@ -10,10 +10,13 @@ import ActionPressable from '../../components/common/ActionPressable';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import type { LoginScreenProps } from '../../app/navigation/types';
-import { login } from '../../features/auth/api';
-import { beginSession } from '../../features/auth/session';
+import { login, type LoginRequestDto } from '../../features/auth/api';
+import { authenticateSession, endSession } from '../../features/auth/session';
 import { useEnterApp } from '../../features/auth/useEnterApp';
-import { clearTokens, saveTokens } from '../../services/storage/tokenStorage';
+import {
+  isCurrentSession,
+  SessionSupersededError,
+} from '../../services/api/sessionOwnership';
 import {
   getApiErrorCode,
   getApiErrorDisplayMessage,
@@ -58,42 +61,33 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
     useState<AuthViewState | null>(null);
 
   const loginMutation = useMutation({
-    mutationFn: login,
+    mutationFn: (payload: LoginRequestDto) =>
+      authenticateSession(queryClient, () => login(payload)),
     onSuccess: async (result) => {
+      if (!isCurrentSession(result.generation)) return;
       setSubmitError(null);
       setBlockedAuthState(null);
 
-      await saveTokens(
-        result.tokens.accessToken,
-        result.tokens.refreshToken,
-      );
-
       if (result.user.status !== 'active') {
-        await clearTokens();
+        await endSession(queryClient, undefined, { generation: result.generation });
         const nextBlockedState = getBlockedAuthState(result.user.status);
         setBlockedAuthState(nextBlockedState);
         setSubmitError(getBlockedAuthMessage(nextBlockedState));
         return;
       }
 
-      // Install THIS user's session before anything reads the cache: the
-      // previous user's entries are dropped, `me` is seeded from the login
-      // response (so the account provider stops sitting on its pre-login 401),
-      // and the owned-account list is fetched for the new user — all without an
-      // app restart (작업 10 §A-7).
-      await beginSession(queryClient, result.user);
-
       try {
         // A NEW login always lands on mode selection (작업 13 §2): which
         // account this session is about — 일반 투자 or 시즌 투자 — is the
         // user's choice, not an inference from what they happen to own or
         // from a stored selection.
-        await enterApp(result.user.id, 'new_login');
+        await enterApp(result.user.id, 'new_login', result.generation);
       } catch (error) {
+        if (!isCurrentSession(result.generation)) return;
         const code = getApiErrorCode(error);
 
         if (isAuthUserInactiveError(code)) {
-          await clearTokens();
+          await endSession(queryClient, undefined, { generation: result.generation });
           setSubmitError(getBlockedAuthMessage(null));
           return;
         }
@@ -105,6 +99,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
       }
     },
     onError: (error: unknown) => {
+      if (error instanceof SessionSupersededError) return;
       const code = getApiErrorCode(error);
       setBlockedAuthState(null);
       setSubmitError(

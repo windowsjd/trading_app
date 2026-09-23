@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { reportSessionStorageFailure } from '../../services/api/sessionOwnership.ts';
 
 /**
  * Persisted account choice, SCOPED TO THE USER (작업 9 §B-2).
@@ -47,10 +48,12 @@ export async function writeSelectedAccountId(
   }
 }
 
-export async function clearSelectedAccountId(userId: string): Promise<void> {
+export async function clearSelectedAccountId(userId: string): Promise<boolean> {
   try {
     await AsyncStorage.removeItem(getSelectionStorageKey(userId));
+    return true;
   } catch {
-    // Ignored for the same reason as above.
+    reportSessionStorageFailure('remove account selection');
+    return false;
   }
 }

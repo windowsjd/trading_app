@@ -10,7 +10,12 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import type { SplashScreenProps } from '../../app/navigation/types';
 import { resetToLogin } from '../../app/navigation/seasonRouting';
-import { getAccessToken, clearTokens } from '../../services/storage/tokenStorage';
+import { getAccessToken } from '../../services/storage/tokenStorage';
+import { endSession } from '../../features/auth/session';
+import {
+  getSessionGeneration,
+  isCurrentSession,
+} from '../../services/api/sessionOwnership';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { getMe } from '../../features/me/api';
 import { useEnterApp } from '../../features/auth/useEnterApp';
@@ -35,6 +40,7 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
 
   useEffect(() => {
     let mounted = true;
+    const generation = getSessionGeneration();
 
     /**
      * Session restore (작업 11 §3 · 작업 13 §2·§5): token → identity → owned
@@ -56,10 +62,10 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
      */
     async function bootstrap() {
       try {
-        const accessToken = await getAccessToken();
+        const accessToken = await getAccessToken(generation);
 
         if (!accessToken) {
-          if (!mounted) return;
+          if (!mounted || !isCurrentSession(generation)) return;
 
           resetToLogin(navigation);
           return;
@@ -67,17 +73,20 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
 
         const me = await getMe();
 
-        if (!mounted) return;
+        if (!mounted || !isCurrentSession(generation)) return;
 
         queryClient.setQueryData(QUERY_KEYS.me, me);
-        await enterApp(me.id, 'session_restore');
+        await enterApp(me.id, 'session_restore', generation);
       } catch (error) {
-        if (!mounted) return;
+        if (!mounted || !isCurrentSession(generation)) return;
 
         const code = getApiErrorCode(error);
 
         if (isAuthUserInactiveError(code)) {
-          await clearTokens();
+          const ending = endSession(queryClient, undefined, { generation });
+          const endedGeneration = getSessionGeneration();
+          await ending;
+          if (!mounted || !isCurrentSession(endedGeneration)) return;
           setBootstrapError({
             kind: 'inactive',
             message: getErrorMessageFromCode(code),

@@ -7,13 +7,20 @@ import {
   setSessionExpiredHandler,
 } from './sessionExpiry.ts';
 
+import { activateSession, getSessionGeneration, startSessionInstall } from './sessionOwnership.ts';
+
+function startSession() {
+  activateSession(startSessionInstall(getSessionGeneration()));
+  resetSessionExpiryNotice();
+}
+
 /**
  * Module state is global by design (one axios singleton, one app root), so
  * every test starts from a known state rather than a leftover one.
  */
 beforeEach(() => {
   setSessionExpiredHandler(null);
-  resetSessionExpiryNotice();
+  startSession();
 });
 
 describe('session expiry notice', () => {
@@ -93,7 +100,7 @@ describe('session expiry notice', () => {
     notifySessionExpired();
     assert.equal(calls, 1);
 
-    resetSessionExpiryNotice();
+    startSession();
     notifySessionExpired();
 
     assert.equal(calls, 2);
@@ -104,7 +111,7 @@ describe('session expiry notice', () => {
     // re-registers. The remembered expiry belongs to the dead session and must
     // not tear down the fresh login.
     notifySessionExpired();
-    resetSessionExpiryNotice();
+    startSession();
 
     let calls = 0;
     setSessionExpiredHandler(() => calls++);

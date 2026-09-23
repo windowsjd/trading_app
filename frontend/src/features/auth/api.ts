@@ -44,6 +44,7 @@ export async function login(payload: LoginRequestDto) {
   const response = await apiClient.post<ApiSuccessResponse<LoginResponseDto>>(
     '/auth/login',
     payload,
+    { skipSessionAuth: true },
   );
 
   return response.data.data;
@@ -53,6 +54,7 @@ export async function signup(payload: SignupRequestDto) {
   const response = await apiClient.post<ApiSuccessResponse<SignupResponseDto>>(
     '/auth/signup',
     payload,
+    { skipSessionAuth: true },
   );
 
   return response.data.data;
@@ -62,6 +64,7 @@ export async function logout(refreshToken?: string | null) {
   const response = await apiClient.post<ApiSuccessResponse<LogoutResponseDto>>(
     '/auth/logout',
     refreshToken ? { refreshToken } : {},
+    { skipSessionAuth: true },
   );
 
   return response.data.data;
