@@ -18,6 +18,7 @@ import {
 import {
   LimitOrderCandidateRepository,
   type LimitMatchCandidate,
+  type LimitMatchCursor,
 } from './limit-order-candidate.repository';
 import { LimitOrderCandleEvidenceService } from './limit-order-candle-evidence.service';
 import {
@@ -25,18 +26,21 @@ import {
   type LimitFillPlan,
 } from './limit-order-execution.service';
 
-/** Upper bound on assets scanned per cycle. The fixed asset universe is tiny,
- * so this only guards against pathological data, never real load. */
-const MAX_ASSET_SCAN = 1_000;
+/** Bound DB reads independently of the number of fill attempts. */
+const SCANS_PER_ATTEMPT = 4;
+const MAX_SCANS_PER_CYCLE = 1_000;
+const CANDIDATE_PAGE_SIZE = 200;
 
 export type LimitMatchingSummary = {
   assetsScanned: number;
+  candidatesScanned: number;
   ordersConsidered: number;
   filledPathA: number;
   filledPathB: number;
   skipped: number;
   errors: number;
   batchExhausted: boolean;
+  scanExhausted: boolean;
 };
 
 /**
@@ -50,6 +54,7 @@ export type LimitMatchingSummary = {
 @Injectable()
 export class LimitOrderMatchingService {
   private readonly logger = new Logger(LimitOrderMatchingService.name);
+  private nextCandidate: LimitMatchCursor | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -90,12 +95,14 @@ export class LimitOrderMatchingService {
 
     const summary: LimitMatchingSummary = {
       assetsScanned: 0,
+      candidatesScanned: 0,
       ordersConsidered: 0,
       filledPathA: 0,
       filledPathB: 0,
       skipped: 0,
       errors: 0,
       batchExhausted: false,
+      scanExhausted: false,
     };
 
     // Deduped set of participants whose rankings need a refresh after commit.
@@ -104,49 +111,74 @@ export class LimitOrderMatchingService {
       { seasonId: string; participantId: string }
     >();
 
-    let budget = batchSize;
-    const assetIds = await this.candidates.findAssetIdsWithFillableLimitBuys(
-      cycleNow,
-      MAX_ASSET_SCAN,
+    let attemptsRemaining = batchSize;
+    let scansRemaining = Math.min(
+      batchSize * SCANS_PER_ATTEMPT,
+      MAX_SCANS_PER_CYCLE,
     );
+    const assetEvidence = new Map<
+      string,
+      {
+        snapshot: { id: string; price: Prisma.Decimal } | null;
+        candles: Awaited<
+          ReturnType<
+            LimitOrderCandleEvidenceService['findEligibleClosedCandlesForAsset']
+          >
+        >;
+      }
+    >();
 
-    for (const assetId of assetIds) {
-      if (budget <= 0) {
-        summary.batchExhausted = true;
+    while (scansRemaining > 0 && attemptsRemaining > 0) {
+      const pageSize = Math.min(scansRemaining, CANDIDATE_PAGE_SIZE);
+      const page = await this.candidates.findFillableLimitOrdersAfter(
+        cycleNow,
+        pageSize,
+        this.nextCandidate,
+      );
+      if (page.length === 0) {
+        this.nextCandidate = null;
         break;
       }
-      summary.assetsScanned += 1;
 
-      const candidates = await this.candidates.findFillableLimitBuysForAsset(
-        assetId,
-        cycleNow,
-        budget,
-      );
-      if (candidates.length === 0) continue;
+      for (const row of page) {
+        // Progress includes no-plan orders, skipped fills, and execution errors.
+        // It is a value keyset, so a removed cursor row is harmless.
+        this.nextCandidate = row.cursor;
+        summary.candidatesScanned += 1;
+        scansRemaining -= 1;
+        const candidate = row.candidate;
+        if (!candidate) continue;
 
-      const asset = candidates[0].asset;
-      const pathASnapshot = await this.resolvePathASnapshot(asset, cycleNow);
-      const eligibleCandles =
-        await this.candleEvidence.findEligibleClosedCandlesForAsset(
-          { assetType: asset.assetType, market: asset.market, id: asset.id },
-          cycleNow,
-          candleLookbackMs,
-        );
-
-      for (const candidate of candidates) {
-        if (budget <= 0) {
-          summary.batchExhausted = true;
-          break;
+        let evidence = assetEvidence.get(row.assetId);
+        if (!evidence) {
+          evidence = {
+            snapshot: await this.resolvePathASnapshot(
+              candidate.asset,
+              cycleNow,
+            ),
+            candles:
+              await this.candleEvidence.findEligibleClosedCandlesForAsset(
+                {
+                  assetType: candidate.asset.assetType,
+                  market: candidate.asset.market,
+                  id: candidate.asset.id,
+                },
+                cycleNow,
+                candleLookbackMs,
+              ),
+          };
+          assetEvidence.set(row.assetId, evidence);
+          summary.assetsScanned += 1;
         }
+
         const plan = this.buildFillPlan(
           candidate,
-          pathASnapshot,
-          eligibleCandles,
+          evidence.snapshot,
+          evidence.candles,
         );
         if (!plan) continue;
-
         summary.ordersConsidered += 1;
-        budget -= 1;
+        attemptsRemaining -= 1;
         try {
           const outcome = await this.execution.fillLimitOrder({
             orderId: candidate.id,
@@ -175,14 +207,22 @@ export class LimitOrderMatchingService {
             JSON.stringify({
               event: 'limit_order_fill_failed',
               orderId: candidate.id,
-              assetId,
+              assetId: row.assetId,
               path: plan.path,
               error: error instanceof Error ? error.message : 'Unknown error',
             }),
           );
         }
+        if (attemptsRemaining === 0) break;
+      }
+      if (attemptsRemaining === 0) break;
+      if (page.length < pageSize) {
+        this.nextCandidate = null;
+        break;
       }
     }
+    summary.batchExhausted = attemptsRemaining === 0;
+    summary.scanExhausted = scansRemaining === 0;
 
     // Ranking refresh AFTER the fills commit (fire-and-forget, deduped), exactly
     // like the market-order path — never awaited inside a fill transaction.

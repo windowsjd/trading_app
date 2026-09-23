@@ -37,6 +37,11 @@ describe('Limit order scheduler matching DB integration', () => {
       }
 
       for (const name of [
+        'R04 PostgreSQL FIFO across both sides and account modes',
+        'R04 N+1 season BUY reaches locked execution',
+        'R04 N+1 Path B touch survives prefix orders',
+        'R04 cancellation after candidate scan is skipped',
+        'R04 prior fill after candidate scan is not duplicated',
         'path A fills at the snapshot price with improvement',
         'path A does not fill above the limit',
         'path B fills at the limit price off a candle touch',

@@ -19,6 +19,14 @@ import { PrismaService } from '../prisma/prisma.service';
  * participant-less account. The execution transaction re-verifies every fact,
  * so these filters are work-reduction only, never authority.
  */
+export type LimitMatchCursor = { submittedAt: Date; id: string };
+
+export type LimitMatchScanRow = {
+  cursor: LimitMatchCursor;
+  assetId: string;
+  candidate: LimitMatchCandidate | null;
+};
+
 export type LimitMatchCandidate = {
   id: string;
   side?: OrderSide;
@@ -151,36 +159,52 @@ export class LimitOrderCandidateRepository {
   }
 
   /**
-   * Fillable submitted limit orders for one asset, oldest first (FIFO by
-   * submittedAt then id). Bounded to `limit`.
+   * A bounded page across ALL assets, ordered by the existing FIFO key.
+   * The cursor is a value, not a row reference: cancellation/fill may remove
+   * its row before the next cycle. Locked execution remains the authority.
    */
-  async findFillableLimitBuysForAsset(
-    assetId: string,
+  async findFillableLimitOrdersAfter(
     now: Date,
     limit: number,
-  ): Promise<LimitMatchCandidate[]> {
+    after: LimitMatchCursor | null,
+  ): Promise<LimitMatchScanRow[]> {
+    const where: Prisma.OrderWhereInput = after
+      ? {
+          AND: [
+            this.fillableWhere(now),
+            {
+              OR: [
+                { submittedAt: { gt: after.submittedAt } },
+                { submittedAt: after.submittedAt, id: { gt: after.id } },
+              ],
+            },
+          ],
+        }
+      : this.fillableWhere(now);
     const rows = await this.prisma.order.findMany({
-      where: { ...this.fillableWhere(now), assetId },
+      where,
       orderBy: [{ submittedAt: 'asc' }, { id: 'asc' }],
       take: limit,
       select: CANDIDATE_SELECT,
     });
 
-    return rows.flatMap((row) => {
-      // Reservation fields are non-null by the where clause; narrow explicitly
-      // for Prisma's nullable field types. Locked execution remains the final
-      // integrity authority.
+    return rows.map((row) => {
+      // Keep even a defensive narrowing failure in the scan, so it cannot
+      // pin progress at the same page. Execution still validates every field.
+      const cursor = { submittedAt: row.submittedAt, id: row.id };
       if (
         row.reservationFeeRate === null ||
         (row.side === OrderSide.buy && row.reservedAmount === null) ||
-        (row.side === OrderSide.sell && row.reservedQuantity === null)
+        (row.side === OrderSide.sell && row.reservedQuantity === null) ||
+        !row.tradingAccountId
       ) {
-        return [];
+        return { cursor, assetId: row.assetId, candidate: null };
       }
-      if (!row.tradingAccountId) return [];
       const season = row.tradingAccount.seasonParticipant?.season ?? null;
-      return [
-        {
+      return {
+        cursor,
+        assetId: row.assetId,
+        candidate: {
           id: row.id,
           side: row.side,
           tradingAccountId: row.tradingAccountId,
@@ -196,7 +220,7 @@ export class LimitOrderCandidateRepository {
           seasonEndAt: season?.endAt ?? null,
           asset: row.asset,
         },
-      ];
+      };
     });
   }
 }

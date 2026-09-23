@@ -19,6 +19,7 @@ import {
   OrderStatus,
   OrderType,
   ParticipantStatus,
+  Prisma,
   SeasonStatus,
   WalletTransactionType,
 } from '../src/generated/prisma/client';
@@ -30,8 +31,12 @@ import { LimitOrderCreateService } from '../src/orders/limit-order-create.servic
 import { LimitOrderCancelService } from '../src/orders/limit-order-cancel.service';
 import { OrdersService } from '../src/orders/orders.service';
 import { LimitOrderCandidateRepository } from '../src/orders/limit-order-candidate.repository';
+import { reserveAvailablePositionQuantity } from '../src/orders/position-reservation-atomic';
 import { LimitOrderCandleEvidenceService } from '../src/orders/limit-order-candle-evidence.service';
-import { LimitOrderExecutionService } from '../src/orders/limit-order-execution.service';
+import {
+  LimitOrderExecutionService,
+  type LimitFillPlan,
+} from '../src/orders/limit-order-execution.service';
 import { LimitOrderMatchingService } from '../src/orders/limit-order-matching.service';
 
 const RUN = process.env.LIMIT_ORDER_MATCHING_DB_INTEGRATION;
@@ -83,6 +88,26 @@ async function main(): Promise<void> {
   assert.ok(process.env.DATABASE_URL, 'DATABASE_URL must be configured.');
   await prisma.$connect();
   try {
+    await run(
+      'R04 PostgreSQL FIFO across both sides and account modes',
+      testR04CandidatePaging,
+    );
+    await run(
+      'R04 N+1 season BUY reaches locked execution',
+      testR04SeasonBuyProgress,
+    );
+    await run(
+      'R04 N+1 Path B touch survives prefix orders',
+      testR04PathBProgress,
+    );
+    await run(
+      'R04 cancellation after candidate scan is skipped',
+      testR04CancelAfterScan,
+    );
+    await run(
+      'R04 prior fill after candidate scan is not duplicated',
+      testR04FilledAfterScan,
+    );
     await run(
       'path A fills at the snapshot price with improvement',
       testPathAImprovement,
@@ -136,6 +161,359 @@ function boundary5mAgo(now: Date, minutesAgo: number): Date {
 // ---------------------------------------------------------------------------
 // Scenarios
 // ---------------------------------------------------------------------------
+
+async function testR04CandidatePaging(): Promise<void> {
+  const s = await createScenario('r04-candidate-page');
+  const general = await prisma.tradingAccount.create({
+    data: {
+      userId: s.userId,
+      mode: 'general',
+      status: 'active',
+      initialCapitalKrw: '13500000.00000000',
+      openedAt: s.now,
+    },
+    select: { id: true },
+  });
+  await prisma.cashWallet.createMany({
+    data: [
+      {
+        tradingAccountId: general.id,
+        currencyCode: CurrencyCode.USD,
+        balanceAmount: START_BALANCE,
+        reservedAmount: ZERO,
+      },
+      {
+        tradingAccountId: general.id,
+        currencyCode: CurrencyCode.KRW,
+        balanceAmount: ZERO,
+        reservedAmount: ZERO,
+      },
+    ],
+  });
+
+  const created: Array<{ id: string; submittedAt: Date }> = [];
+  for (const [modeIndex, accountId] of [
+    s.tradingAccountId,
+    general.id,
+  ].entries()) {
+    const position = await prisma.position.create({
+      data: {
+        tradingAccountId: accountId,
+        assetId: s.assetId,
+        quantity: '3.00000000',
+        reservedQuantity: ZERO,
+        averageCost: '80.00000000',
+        currencyCode: CurrencyCode.USD,
+      },
+    });
+    assert.equal(
+      await reserveAvailablePositionQuantity(prisma, {
+        positionId: position.id,
+        tradingAccountId: accountId,
+        assetId: s.assetId,
+        quantity: '3.00000000',
+      }),
+      1,
+    );
+    for (const [sideIndex, side] of [OrderSide.buy, OrderSide.sell].entries()) {
+      const submittedAt = new Date(s.now.getTime() + modeIndex * 2 + sideIndex);
+      for (const index of [0, 1, 2]) {
+        const limitPrice =
+          index === 2
+            ? '100.00000000'
+            : side === OrderSide.buy
+              ? '50.00000000'
+              : '150.00000000';
+        const reservedAmount = index === 2 ? '100.10000000' : '50.05000000';
+        if (side === OrderSide.buy) {
+          await reservation.reserveForLimitBuy(prisma, {
+            tradingAccountId: accountId,
+            currencyCode: CurrencyCode.USD,
+            amount: reservedAmount,
+          });
+        }
+        const row = await prisma.order.create({
+          data: {
+            tradingAccountId: accountId,
+            assetId: s.assetId,
+            side,
+            orderType: OrderType.limit,
+            status: OrderStatus.submitted,
+            quantity: '1.00000000',
+            limitPrice,
+            currencyCode: CurrencyCode.USD,
+            reservedAmount: side === OrderSide.buy ? reservedAmount : null,
+            reservedQuantity: side === OrderSide.sell ? '1.00000000' : null,
+            reservationFeeRate: FEE_RATE,
+            submittedAt,
+          },
+          select: { id: true },
+        });
+        created.push({ id: row.id, submittedAt });
+      }
+    }
+  }
+
+  const first = await candidateRepo.findFillableLimitOrdersAfter(
+    s.now,
+    2,
+    null,
+  );
+  assert.equal(first.length, 2);
+  assert.ok(first.every((row) => row.candidate?.side === OrderSide.buy));
+  const canceled = first[1].candidate!;
+  await cancelService.cancelOwnedLimitBuyOrder({
+    userId: s.userId,
+    orderId: canceled.id,
+    canceledAt: s.now,
+  });
+  const scanned = [...first];
+  let cursor = first[1].cursor;
+  for (let pageNumber = 0; pageNumber < 8; pageNumber++) {
+    const page = await candidateRepo.findFillableLimitOrdersAfter(
+      s.now,
+      2,
+      cursor,
+    );
+    assert.ok(page.length <= 2);
+    if (page.length === 0) break;
+    scanned.push(...page);
+    cursor = page[page.length - 1].cursor;
+  }
+  const expected = [...created].sort(
+    (a, b) =>
+      a.submittedAt.getTime() - b.submittedAt.getTime() ||
+      a.id.localeCompare(b.id),
+  );
+  assert.deepEqual(
+    scanned.map((row) => row.cursor.id),
+    expected.map((row) => row.id),
+  );
+  assert.equal(scanned.length, 12);
+  assert.equal(
+    (await prisma.order.findUniqueOrThrow({ where: { id: canceled.id } }))
+      .status,
+    OrderStatus.canceled,
+  );
+  const seasonWallet = await readWallet(s);
+  assert.equal(
+    seasonWallet.reserved,
+    new Prisma.Decimal('200.20000000')
+      .minus(canceled.reservedAmount!)
+      .toFixed(8),
+  );
+  for (const accountId of [s.tradingAccountId, general.id]) {
+    const position = await prisma.position.findUniqueOrThrow({
+      where: {
+        tradingAccountId_assetId: {
+          tradingAccountId: accountId,
+          assetId: s.assetId,
+        },
+      },
+    });
+    assert.equal(position.reservedQuantity.toFixed(8), '3.00000000');
+  }
+}
+
+async function testR04SeasonBuyProgress(): Promise<void> {
+  const s = await createScenario('r04-season-buy');
+  const submittedAt = new Date(s.now.getTime() - 60_000);
+  const first = await createSubmittedLimitOrder(s, {
+    limitPrice: '50.00000000',
+    quantity: '1.00000000',
+    reservedAmount: '50.05000000',
+    submittedAt,
+  });
+  const second = await createSubmittedLimitOrder(s, {
+    limitPrice: '50.00000000',
+    quantity: '1.00000000',
+    reservedAmount: '50.05000000',
+    submittedAt: new Date(submittedAt.getTime() + 1),
+  });
+  const third = await createSubmittedLimitOrder(s, {
+    limitPrice: '100.00000000',
+    quantity: '1.00000000',
+    reservedAmount: '100.10000000',
+    submittedAt: new Date(submittedAt.getTime() + 2),
+  });
+  const snapshot = await createAssetPriceSnapshot(s, '100.00000000', s.now);
+  await createFreshFxSnapshot(s.now);
+
+  const summary = await matching.matchDueLimitOrders({
+    now: s.now,
+    batchSize: 2,
+  });
+  assert.equal(summary.filledPathA, 1);
+  assert.equal(summary.ordersConsidered, 1);
+  assert.ok(summary.candidatesScanned >= 3);
+  assert.equal((await readOrder(first.id)).status, OrderStatus.submitted);
+  assert.equal((await readOrder(second.id)).status, OrderStatus.submitted);
+  const filled = await readOrder(third.id);
+  assert.equal(filled.status, OrderStatus.executed);
+  assert.equal(filled.executedPrice, '100.00000000');
+  assert.equal(filled.assetPriceSnapshotId, snapshot.id);
+  assert.ok(filled.reservationReleasedAt);
+  const wallet = await readWallet(s);
+  assert.equal(wallet.balance, '9899.90000000');
+  assert.equal(wallet.reserved, '100.10000000');
+  assert.equal((await readPosition(s))?.quantity, '1.00000000');
+  await matching.matchDueLimitOrders({ now: s.now, batchSize: 2 });
+  assert.equal(
+    await prisma.walletTransaction.count({
+      where: { referenceId: third.id, txType: WalletTransactionType.order_buy },
+    }),
+    1,
+    'cursor wrap cannot fill the same order twice',
+  );
+}
+
+async function testR04PathBProgress(): Promise<void> {
+  const s = await createScenario('r04-path-b');
+  const prefixAt = boundary5mAgo(s.now, 15);
+  const touchAt = boundary5mAgo(s.now, 10);
+  const first = await createSubmittedLimitOrder(s, {
+    limitPrice: '50.00000000',
+    quantity: '1.00000000',
+    reservedAmount: '50.05000000',
+    submittedAt: prefixAt,
+  });
+  const second = await createSubmittedLimitOrder(s, {
+    limitPrice: '50.00000000',
+    quantity: '1.00000000',
+    reservedAmount: '50.05000000',
+    submittedAt: new Date(prefixAt.getTime() + 1),
+  });
+  const third = await createSubmittedLimitOrder(s, {
+    limitPrice: '100.00000000',
+    quantity: '1.00000000',
+    reservedAmount: '100.10000000',
+    submittedAt: touchAt,
+  });
+  await createAssetPriceSnapshot(s, '101.00000000', s.now);
+  await createFreshFxSnapshot(s.now);
+  await createClosedCandle(s, { openTime: touchAt, low: '90.00000000' });
+
+  const summary = await matching.matchDueLimitOrders({
+    now: s.now,
+    batchSize: 2,
+  });
+  assert.equal(summary.filledPathA, 0);
+  assert.equal(summary.filledPathB, 1);
+  assert.ok(summary.candidatesScanned >= 3);
+  assert.equal((await readOrder(first.id)).status, OrderStatus.submitted);
+  assert.equal((await readOrder(second.id)).status, OrderStatus.submitted);
+  const filled = await readOrder(third.id);
+  assert.equal(filled.status, OrderStatus.executed);
+  assert.equal(filled.executedPrice, '100.00000000');
+  assert.ok(filled.limitOrderCandleEvidenceId);
+  assert.equal(filled.assetPriceSnapshotId, null);
+  assert.ok(filled.reservationReleasedAt);
+  assert.equal((await readWallet(s)).reserved, '100.10000000');
+}
+
+async function testR04StaleCandidate(
+  label: string,
+  change: (
+    input: { orderId: string; plan: LimitFillPlan },
+    userId: string,
+    now: Date,
+  ) => Promise<void>,
+): Promise<{ scenario: Scenario; orderId: string; skipped: number }> {
+  const s = await createScenario(label);
+  const submittedAt = new Date(s.now.getTime() - 60_000);
+  for (const offset of [0, 1]) {
+    await createSubmittedLimitOrder(s, {
+      limitPrice: '50.00000000',
+      quantity: '1.00000000',
+      reservedAmount: '50.05000000',
+      submittedAt: new Date(submittedAt.getTime() + offset),
+    });
+  }
+  const order = await createSubmittedLimitOrder(s, {
+    limitPrice: '100.00000000',
+    quantity: '1.00000000',
+    reservedAmount: '100.10000000',
+    submittedAt: new Date(submittedAt.getTime() + 2),
+  });
+  await createAssetPriceSnapshot(s, '100.00000000', s.now);
+  await createFreshFxSnapshot(s.now);
+  let targetAttempted = false;
+  const racedExecution = {
+    fillLimitOrder: async (input: { orderId: string; plan: LimitFillPlan }) => {
+      if (input.orderId === order.id) {
+        targetAttempted = true;
+        await change(input, s.userId, s.now);
+      }
+      return execution.fillLimitOrder(input);
+    },
+  } as unknown as LimitOrderExecutionService;
+  const matcher = new LimitOrderMatchingService(
+    prisma,
+    candidateRepo,
+    candleEvidence,
+    racedExecution,
+  );
+  let skipped = 0;
+  for (let cycle = 0; cycle < 8 && !targetAttempted; cycle++) {
+    const summary = await matcher.matchDueLimitOrders({
+      now: s.now,
+      batchSize: 2,
+    });
+    skipped += summary.skipped;
+  }
+  assert.ok(targetAttempted, 'the target must reach locked execution');
+  return { scenario: s, orderId: order.id, skipped };
+}
+
+async function testR04CancelAfterScan(): Promise<void> {
+  const result = await testR04StaleCandidate(
+    'r04-cancel-race',
+    async (input, userId, now) => {
+      await cancelService.cancelOwnedLimitBuyOrder({
+        userId,
+        orderId: input.orderId,
+        canceledAt: now,
+      });
+    },
+  );
+  assert.equal(result.skipped, 1);
+  assert.equal((await readOrder(result.orderId)).status, OrderStatus.canceled);
+  assert.deepEqual(await readWallet(result.scenario), {
+    balance: START_BALANCE,
+    reserved: '100.10000000',
+  });
+  assert.equal(
+    await prisma.walletTransaction.count({
+      where: {
+        referenceId: result.orderId,
+        txType: WalletTransactionType.order_buy,
+      },
+    }),
+    0,
+  );
+}
+
+async function testR04FilledAfterScan(): Promise<void> {
+  const result = await testR04StaleCandidate(
+    'r04-filled-race',
+    async (input) => {
+      const first = await execution.fillLimitOrder(input);
+      assert.equal(first.state, 'filled');
+    },
+  );
+  assert.equal(result.skipped, 1);
+  assert.equal((await readOrder(result.orderId)).status, OrderStatus.executed);
+  assert.equal(
+    await prisma.walletTransaction.count({
+      where: {
+        referenceId: result.orderId,
+        txType: WalletTransactionType.order_buy,
+      },
+    }),
+    1,
+  );
+  assert.equal((await readWallet(result.scenario)).reserved, '100.10000000');
+}
 
 async function testPathAImprovement(): Promise<void> {
   const s = await createScenario('a-improve');
