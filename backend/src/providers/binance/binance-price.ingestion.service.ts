@@ -22,6 +22,7 @@ export type BinancePriceIngestionOptions = {
   dryRun?: boolean;
   requestedBy?: string;
   symbols?: readonly string[];
+  isLockOwned?: () => boolean;
 };
 
 export type BinancePriceIngestionResult = {
@@ -89,6 +90,9 @@ export class BinancePriceIngestionService {
       const summaries: BinanceSymbolIngestionSummary[] = [];
 
       for (const symbol of symbols) {
+        if (options.isLockOwned && !options.isLockOwned()) {
+          throw new Error('Ops job lock ownership was lost.');
+        }
         summaries.push(
           await this.ingestOneSymbol({
             symbol,
@@ -289,7 +293,9 @@ export class BinancePriceIngestionService {
       },
     });
 
-    return fxRate ? new Prisma.Decimal(price).mul(fxRate.rate).toFixed(8) : null;
+    return fxRate
+      ? new Prisma.Decimal(price).mul(fxRate.rate).toFixed(8)
+      : null;
   }
 
   private async findMappedAsset(input: {

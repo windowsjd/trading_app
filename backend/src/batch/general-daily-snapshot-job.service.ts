@@ -192,6 +192,9 @@ export class GeneralDailySnapshotJobService {
     };
 
     for (const account of accounts) {
+      if (input.isLockOwned && !input.isLockOwned()) {
+        throw new Error('Ops job lock ownership was lost.');
+      }
       if (existingAccountIds.has(account.id)) {
         result.accounts.existing += 1;
         continue;

@@ -419,6 +419,14 @@ export async function assertGeneralAccountFxRowsIntegrity(
     },
   });
 
+  const ledgersByReferenceId = new Map<string | null, typeof ledgers>();
+  for (const ledger of ledgers) {
+    const referenceId = ledger.referenceId;
+    const linked = ledgersByReferenceId.get(referenceId) ?? [];
+    linked.push(ledger);
+    ledgersByReferenceId.set(referenceId, linked);
+  }
+
   for (const exchange of exchanges) {
     if (
       exchange.fxExecuteRequests.length !== 1 ||
@@ -431,7 +439,7 @@ export async function assertGeneralAccountFxRowsIntegrity(
         `general exchange ${exchange.id} does not have exactly one succeeded account-scoped execute request`,
       );
     }
-    const linked = ledgers.filter((row) => row.referenceId === exchange.id);
+    const linked = ledgersByReferenceId.get(exchange.id) ?? [];
     const source = linked.filter(
       (row) => row.txType === WalletTransactionType.exchange_source,
     );

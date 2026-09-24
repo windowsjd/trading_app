@@ -41,6 +41,39 @@ describe('OpsJobLockService DB smoke', () => {
     },
     70_000,
   );
+  it(
+    RUN_OPS_JOB_LOCK_DB_SMOKE
+      ? 'renews, loses, and transfers a live lease across two PostgreSQL clients'
+      : 'lease race needs OPS_JOB_LOCK_DB_SMOKE=1',
+    () => {
+      if (!RUN_OPS_JOB_LOCK_DB_SMOKE) return;
+      const result = spawnSync(
+        'pnpm',
+        ['tsx', 'scripts/ops-lease-integration.ts'],
+        {
+          cwd: process.cwd(),
+          env: process.env,
+          encoding: 'utf8',
+          timeout: 60_000,
+        },
+      );
+      if (result.status !== 0) {
+        throw new Error(
+          ['Ops lease integration failed.', result.stdout, result.stderr].join(
+            '\n',
+          ),
+        );
+      }
+      expect(result.stdout).toContain('normal lease renewal blocks takeover');
+      expect(result.stdout).toContain(
+        'expired lease takeover stops old units and protects successor',
+      );
+      expect(result.stdout).toContain(
+        'renewal DB error stops next unit and closes timer',
+      );
+    },
+    70_000,
+  );
 });
 
 const OPS_JOB_LOCK_DB_SMOKE_RUNNER = `

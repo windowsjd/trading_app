@@ -32,6 +32,8 @@ export type MarketCandleReconciliationInput = {
   maxPages?: number;
   continueOnError?: boolean;
   now?: Date;
+  isLockOwned?: () => boolean;
+  signal?: AbortSignal;
 };
 
 export type ReconciliationAssetResult = {
@@ -112,6 +114,9 @@ export class MarketCandleReconciliationService {
     });
     const results: ReconciliationAssetResult[] = [];
     for (const asset of assets) {
+      if (input.isLockOwned && !input.isLockOwned()) {
+        throw new Error('Ops job lock ownership was lost.');
+      }
       const targets =
         input.targets ??
         (asset.assetType === AssetType.crypto ? ['5m'] : ['5m', '1d']);
@@ -132,6 +137,7 @@ export class MarketCandleReconciliationService {
           to: range.to,
           resume: false,
           now,
+          signal: input.signal,
           budget: {
             maxPages: Math.min(
               input.maxPages ?? this.config.maxPages,

@@ -210,6 +210,21 @@ function structuredError(code: string): HttpException {
  * account selection, per-account atomicity, and the dry-run report.
  */
 describe('GeneralDailySnapshotJobService', () => {
+  it('finishes the current account but starts no next account after lease loss', async () => {
+    const { service, prisma, tx, setAccounts } = createService();
+    setAccounts([account('account-1'), account('account-2')]);
+    let checks = 0;
+
+    await expect(
+      service.run({
+        snapshotDate: SNAPSHOT_DATE,
+        isLockOwned: () => ++checks === 1,
+      }),
+    ).rejects.toThrow('Ops job lock ownership was lost.');
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.dailyPortfolioSnapshot.create).toHaveBeenCalledTimes(1);
+  });
+
   it('bulk checks 100 accounts once and opens a transaction only for the missing account', async () => {
     const { service, prisma, tx, setAccounts, performanceService } =
       createService();

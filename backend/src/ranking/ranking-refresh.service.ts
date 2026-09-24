@@ -319,7 +319,10 @@ export class RankingRefreshService {
 
   async refreshCurrentRankingsForActiveSeasons(
     capturedAt = new Date(),
-    options: { createEquitySnapshots?: boolean } = {},
+    options: {
+      createEquitySnapshots?: boolean;
+      isLockOwned?: () => boolean;
+    } = {},
   ) {
     const seasons = await this.prisma.season.findMany({
       where: {
@@ -339,6 +342,9 @@ export class RankingRefreshService {
     const results: unknown[] = [];
 
     for (const season of seasons) {
+      if (options.isLockOwned && !options.isLockOwned()) {
+        throw new Error('Ops job lock ownership was lost.');
+      }
       results.push(
         await this.refreshCurrentRankingForSeason(season.id, {
           capturedAt,

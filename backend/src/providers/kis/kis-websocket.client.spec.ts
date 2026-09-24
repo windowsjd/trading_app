@@ -80,6 +80,50 @@ describe('KIS WebSocket client', () => {
     );
   });
 
+  it('does not ingest a new frame after the Ops lease is lost', async () => {
+    const events: string[] = [];
+    const FakeWebSocket = createFakeWebSocket(events);
+    globalThis.WebSocket = FakeWebSocket as never;
+    const ingestion = {
+      buildSubscriptionTargets: jest.fn().mockResolvedValue({
+        targets: [
+          {
+            kind: 'domestic_krx_realtime_trade',
+            trId: 'H0STCNT0',
+            trKey: '005930',
+            symbol: '005930',
+            marketCode: 'KRX',
+          },
+        ],
+        skipped: [],
+      }),
+      ingestParsedMessage: jest.fn(),
+    };
+    const client = new KisWebSocketClient(
+      configServiceForTest(),
+      {
+        requestConfiguredWebSocketApprovalKey: jest.fn().mockResolvedValue({
+          state: 'available',
+          response: { approvalKey: 'approval-for-test' },
+        }),
+      } as unknown as KisAuthClient,
+      ingestion as unknown as KisWebSocketIngestionService,
+    );
+    let owned = true;
+    const pending = client.runTradePriceIngestion({
+      dryRun: true,
+      durationMs: 100,
+      isLockOwned: () => owned,
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(events).toContain('send:subscribe');
+    owned = false;
+    FakeWebSocket.instances[0].emitMessage({ data: 'stale frame' });
+    await pending;
+    expect(ingestion.ingestParsedMessage).not.toHaveBeenCalled();
+    expect(events).toContain('close');
+  });
+
   it('falls back to the ws package when global WebSocket is unavailable', async () => {
     globalThis.WebSocket = undefined as never;
     const client = new KisWebSocketClient(
@@ -212,6 +256,10 @@ function createFakeWebSocket(events: string[]) {
     ): void {
       events.push(`remove:${type}`);
       this.listeners.get(type)?.delete(listener);
+    }
+
+    emitMessage(event: unknown): void {
+      this.emit('message', event);
     }
 
     private emit(type: string, event: unknown): void {

@@ -25,6 +25,7 @@ export type KisWebSocketRunOptions = {
   domesticSymbols?: readonly string[];
   usSymbols?: readonly string[];
   maxSnapshots?: number;
+  isLockOwned?: () => boolean;
 };
 
 export type KisWebSocketRunResult = {
@@ -140,6 +141,7 @@ export class KisWebSocketClient {
         dryRun,
         requestedBy: options.requestedBy,
         maxSnapshots: options.maxSnapshots,
+        isLockOwned: options.isLockOwned,
       });
     } catch (error) {
       if (
@@ -170,6 +172,7 @@ export class KisWebSocketClient {
     dryRun: boolean;
     requestedBy?: string;
     maxSnapshots?: number;
+    isLockOwned?: () => boolean;
   }): Promise<KisWebSocketRunResult> {
     const socket = new input.websocketConstructor(input.wsBaseUrl);
     const pendingMessages = new Set<Promise<void>>();
@@ -194,6 +197,10 @@ export class KisWebSocketClient {
     await waitForKisSocketOpen(socket, Math.min(input.durationMs, 10000));
 
     const messageListener = (event: unknown) => {
+      if (input.isLockOwned && !input.isLockOwned()) {
+        closeKisSocket(socket);
+        return;
+      }
       const promise = this.handleSocketMessage({
         event,
         approvalKey: input.approvalKey,

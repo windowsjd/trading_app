@@ -42,6 +42,7 @@ import {
   Prisma,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { RankingRefreshService } from '../ranking/ranking-refresh.service';
 import { LimitOrderCandidateRepository } from './limit-order-candidate.repository';
 import { LimitOrderCandleEvidenceService } from './limit-order-candle-evidence.service';
 import type {
@@ -193,22 +194,30 @@ function fixture(initial: Row[]) {
           rows.find((row) => row.id === orderId)!.status = OrderStatus.canceled;
           return { state: 'skipped', orderId, reason: 'not_submitted_limit' };
         }
-        rows.find((row) => row.id === orderId)!.status = OrderStatus.executed;
+        const row = rows.find((item) => item.id === orderId)!;
+        row.status = OrderStatus.executed;
+        const season = row.tradingAccount.seasonParticipant;
         return {
           state: 'filled',
           orderId,
           path: plan.path,
-          seasonId: null,
-          seasonParticipantId: null,
+          seasonId: season ? season.season.id : null,
+          seasonParticipantId: season ? orderId : null,
         };
       },
     ),
   } as unknown as LimitOrderExecutionService;
+  const rankingRefresh = {
+    refreshCurrentRankingAfterParticipantChange: jest
+      .fn()
+      .mockResolvedValue(undefined),
+  };
   const matcher = new LimitOrderMatchingService(
     prisma,
     new LimitOrderCandidateRepository(prisma),
     new LimitOrderCandleEvidenceService(prisma),
     execution,
+    rankingRefresh as unknown as RankingRefreshService,
   );
   const price = jest.fn(async () => ({
     id: 'snapshot',
@@ -217,7 +226,16 @@ function fixture(initial: Row[]) {
   (
     matcher as unknown as { resolvePathASnapshot: typeof price }
   ).resolvePathASnapshot = price;
-  return { rows, queries, fills, failing, skipping, matcher, price };
+  return {
+    rows,
+    queries,
+    fills,
+    failing,
+    skipping,
+    matcher,
+    price,
+    rankingRefresh,
+  };
 }
 
 describe('limit matcher candidate progress', () => {
@@ -406,6 +424,47 @@ describe('limit matcher candidate progress', () => {
       filledPathB: 0,
     });
   });
+  it('keeps the in-flight fill but starts no next order after lease loss', async () => {
+    const h = fixture([
+      order('first', 0, OrderSide.buy, 'general', 'A', 100),
+      order('second', 1, OrderSide.buy, 'general', 'A', 100),
+    ]);
+    let checks = 0;
+    await expect(
+      h.matcher.matchDueLimitOrders({
+        now: NOW,
+        batchSize: 2,
+        isLockOwned: () => ++checks <= 2,
+      }),
+    ).rejects.toThrow('Ops job lock ownership was lost.');
+    expect(h.fills.map((fill) => fill.id)).toEqual(['first']);
+    expect(h.rows.find((row) => row.id === 'first')?.status).toBe(
+      OrderStatus.executed,
+    );
+    expect(h.rows.find((row) => row.id === 'second')?.status).toBe(
+      OrderStatus.submitted,
+    );
+  });
+
+  it('still refreshes a committed season fill before stopping on lease loss', async () => {
+    const h = fixture([
+      order('first', 0, OrderSide.buy, 'season', 'A', 100),
+      order('second', 1, OrderSide.buy, 'season', 'A', 100),
+    ]);
+    let checks = 0;
+    await expect(
+      h.matcher.matchDueLimitOrders({
+        now: NOW,
+        batchSize: 2,
+        isLockOwned: () => ++checks <= 2,
+      }),
+    ).rejects.toThrow('Ops job lock ownership was lost.');
+    expect(h.fills.map((fill) => fill.id)).toEqual(['first']);
+    expect(
+      h.rankingRefresh.refreshCurrentRankingAfterParticipantChange,
+    ).toHaveBeenCalledWith('season', 'first');
+  });
+
   it('finds later Path B touch inside lookback', async () => {
     const h = fixture([
       order('1', 0, OrderSide.buy, 'season'),

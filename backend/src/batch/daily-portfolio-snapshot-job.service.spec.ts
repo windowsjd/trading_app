@@ -452,6 +452,33 @@ describe('DailyPortfolioSnapshotJobService', () => {
     });
   });
 
+  it('finishes the current participant but starts no next participant after lease loss', async () => {
+    const { service, prisma, valuationService } = createService();
+    mockSeason(prisma, SeasonStatus.active);
+    mockParticipants(prisma, [
+      { id: 'sp-1', userId: 'user-1' },
+      { id: 'sp-2', userId: 'user-2' },
+    ]);
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([]);
+    valuationService.calculateTradingAccountValuation.mockResolvedValue(
+      valuation('sp-1'),
+    );
+    prisma.dailyPortfolioSnapshot.create.mockResolvedValue({ id: 'snap-1' });
+    let checks = 0;
+
+    await expect(
+      service.run({
+        seasonId: 'season-1',
+        snapshotDate,
+        isLockOwned: () => ++checks === 1,
+      }),
+    ).rejects.toThrow('Ops job lock ownership was lost.');
+    expect(
+      valuationService.calculateTradingAccountValuation,
+    ).toHaveBeenCalledTimes(1);
+    expect(prisma.dailyPortfolioSnapshot.create).toHaveBeenCalledTimes(1);
+  });
+
   it('creates snapshots for valuation-available active participants', async () => {
     const { service, prisma, valuationService } = createService();
     mockSeason(prisma, SeasonStatus.ended);

@@ -86,6 +86,7 @@ export class LimitOrderMatchingService {
     now: Date;
     batchSize?: number;
     candleLookbackMs?: number;
+    isLockOwned?: () => boolean;
   }): Promise<LimitMatchingSummary> {
     const config = this.readConfig();
     const batchSize = input.batchSize ?? config.batchSize;
@@ -110,6 +111,11 @@ export class LimitOrderMatchingService {
       string,
       { seasonId: string; participantId: string }
     >();
+    const refreshRankingsAfterCommittedFills = () => {
+      for (const target of rankingTargets.values()) {
+        this.refreshRankingAfterFill(target.seasonId, target.participantId);
+      }
+    };
 
     let attemptsRemaining = batchSize;
     let scansRemaining = Math.min(
@@ -129,6 +135,10 @@ export class LimitOrderMatchingService {
     >();
 
     while (scansRemaining > 0 && attemptsRemaining > 0) {
+      if (input.isLockOwned && !input.isLockOwned()) {
+        refreshRankingsAfterCommittedFills();
+        throw new Error('Ops job lock ownership was lost.');
+      }
       const pageSize = Math.min(scansRemaining, CANDIDATE_PAGE_SIZE);
       const page = await this.candidates.findFillableLimitOrdersAfter(
         cycleNow,
@@ -177,6 +187,10 @@ export class LimitOrderMatchingService {
           evidence.candles,
         );
         if (!plan) continue;
+        if (input.isLockOwned && !input.isLockOwned()) {
+          refreshRankingsAfterCommittedFills();
+          throw new Error('Ops job lock ownership was lost.');
+        }
         summary.ordersConsidered += 1;
         attemptsRemaining -= 1;
         try {
@@ -226,9 +240,7 @@ export class LimitOrderMatchingService {
 
     // Ranking refresh AFTER the fills commit (fire-and-forget, deduped), exactly
     // like the market-order path — never awaited inside a fill transaction.
-    for (const target of rankingTargets.values()) {
-      this.refreshRankingAfterFill(target.seasonId, target.participantId);
-    }
+    refreshRankingsAfterCommittedFills();
 
     return summary;
   }

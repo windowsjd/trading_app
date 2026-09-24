@@ -194,8 +194,13 @@ export class OpsJobRunnerService {
       OpsJobName.limit_order_matching,
       input,
       'limit_order_matching:current',
-      async () =>
-        service.matchDueLimitOrders({ now, batchSize: input.batchSize }),
+      async (context) =>
+        service.matchDueLimitOrders({
+          now,
+          batchSize: input.batchSize,
+          isLockOwned: context.isLockOwned,
+        }),
+      { renewLock: true },
     );
   }
 
@@ -204,12 +209,15 @@ export class OpsJobRunnerService {
       OpsJobName.provider_fx_ingest,
       input,
       'provider_fx_ingest:usd_krw',
-      async () => {
+      async (context) => {
         const koreaExim =
           await this.koreaEximExchangeIngestionService.ingestUsdKrw({
             dryRun: false,
             requestedBy: input.requestedBy ?? undefined,
           });
+        if (!context.isLockOwned()) {
+          throw new Error('Ops job lock ownership was lost.');
+        }
         const exchangeRate =
           await this.exchangeRateIngestionService.ingestUsdKrw({
             dryRun: false,
@@ -243,7 +251,7 @@ export class OpsJobRunnerService {
       OpsJobName.provider_binance_ingest,
       input,
       'provider_binance_ingest:prices',
-      async () => {
+      async (context) => {
         const targets =
           await this.providerTargetResolver.resolveProviderTargets({
             targetSource: input.targetSource,
@@ -265,6 +273,7 @@ export class OpsJobRunnerService {
           dryRun: false,
           requestedBy: input.requestedBy ?? undefined,
           symbols: targets.binanceSymbols,
+          isLockOwned: context.isLockOwned,
         });
 
         const response = {
@@ -287,6 +296,7 @@ export class OpsJobRunnerService {
 
         return response;
       },
+      { renewLock: true },
     );
   }
 
@@ -305,7 +315,7 @@ export class OpsJobRunnerService {
       OpsJobName.provider_kis_ingest,
       input,
       'provider_kis_ingest:rest_current_price',
-      async () => {
+      async (context) => {
         const targets =
           await this.providerTargetResolver.resolveProviderTargets({
             targetSource: input.targetSource,
@@ -348,6 +358,7 @@ export class OpsJobRunnerService {
             domesticSymbols: marketPlan.targets.kisDomesticSymbols,
             usSymbols: marketPlan.targets.kisUsSymbols,
             maxSnapshots: input.maxSnapshots,
+            isLockOwned: context.isLockOwned,
           });
 
         const response = {
@@ -370,6 +381,7 @@ export class OpsJobRunnerService {
 
         return response;
       },
+      { renewLock: true },
     );
   }
 
@@ -378,7 +390,7 @@ export class OpsJobRunnerService {
       OpsJobName.provider_kis_ingest,
       input,
       'provider_kis_ingest:websocket_trade',
-      async () => {
+      async (context) => {
         const targets =
           await this.providerTargetResolver.resolveProviderTargets({
             targetSource: input.targetSource,
@@ -421,6 +433,7 @@ export class OpsJobRunnerService {
           domesticSymbols: marketPlan.targets.kisDomesticSymbols,
           usSymbols: marketPlan.targets.kisUsSymbols,
           maxSnapshots: input.maxSnapshots,
+          isLockOwned: context.isLockOwned,
         });
 
         const response = {
@@ -457,6 +470,7 @@ export class OpsJobRunnerService {
 
         return response;
       },
+      { renewLock: true },
     );
   }
 
@@ -467,10 +481,12 @@ export class OpsJobRunnerService {
       OpsJobName.season_ranking_generation,
       input,
       'season_ranking_generation:current',
-      async () =>
+      async (context) =>
         this.rankingRefreshService.refreshCurrentRankingsForActiveSeasons(now, {
           createEquitySnapshots: input.createEquitySnapshots === true,
+          isLockOwned: context.isLockOwned,
         }),
+      { renewLock: true },
     );
   }
 
@@ -490,6 +506,7 @@ export class OpsJobRunnerService {
             input.idempotencyKey ??
             `season-lifecycle-transition:${now.toISOString()}`,
         }),
+      { renewLock: true },
     );
   }
 
@@ -500,7 +517,7 @@ export class OpsJobRunnerService {
       OpsJobName.season_settlement,
       input,
       'season_settlement:ended',
-      async () => {
+      async (context) => {
         const seasons = await this.prisma.season.findMany({
           where: {
             status: SeasonStatus.ended,
@@ -519,6 +536,9 @@ export class OpsJobRunnerService {
         }> = [];
 
         for (const season of seasons) {
+          if (!context.isLockOwned()) {
+            throw new Error('Ops job lock ownership was lost.');
+          }
           const settlementDate = this.formatDateOnly(season.endAt);
           const batchResponse = await this.seasonSettlementJobService.run({
             seasonId: season.id,
@@ -540,6 +560,7 @@ export class OpsJobRunnerService {
           settled,
         };
       },
+      { renewLock: true },
     );
   }
 
@@ -644,10 +665,11 @@ export class OpsJobRunnerService {
       OpsJobName.market_candle_sync,
       input,
       'market_candle_sync:manual',
-      async () => {
+      async (context) => {
         const summary = await this.marketCandleSyncService.syncAssets({
           ...syncInput,
           dryRun: false,
+          signal: context.signal,
         });
         const serialized = this.serializeMarketCandleSyncSummary(summary);
         if (summary.failedFeeds > 0) {
@@ -689,11 +711,13 @@ export class OpsJobRunnerService {
       OpsJobName.market_candle_reconciliation,
       jobInput,
       `market_candle_reconciliation:${market.toLowerCase()}`,
-      async () => {
+      async (context) => {
         const summary = await this.marketCandleReconciliationService?.reconcile(
           {
             ...parsed,
             dryRun: false,
+            isLockOwned: context.isLockOwned,
+            signal: context.signal,
           },
         );
         if (!summary) throw new Error('Reconciliation service disappeared.');
@@ -962,8 +986,9 @@ export class OpsJobRunnerService {
       OpsJobName.daily_portfolio_snapshot,
       input,
       `daily_portfolio_snapshot:general:${snapshotDate ?? 'missing-date'}`,
-      async () => {
+      async (context) => {
         const response = await this.generalDailySnapshotJobService.run({
+          isLockOwned: context.isLockOwned,
           snapshotDate: snapshotDate ?? undefined,
           snapshotTimezone: input.snapshotTimezone,
           requestedBy: input.requestedBy ?? undefined,
@@ -975,6 +1000,7 @@ export class OpsJobRunnerService {
         );
         return response.data;
       },
+      { renewLock: true },
     );
   }
 
@@ -1037,6 +1063,7 @@ export class OpsJobRunnerService {
     }
 
     const lockKey = this.buildDailySnapshotLockKey(seasonId, snapshotDate);
+    const acquiredAtMs = Date.now();
     const lock = await this.lockService.acquireLock({
       jobName,
       lockKey,
@@ -1083,8 +1110,19 @@ export class OpsJobRunnerService {
       throw error;
     }
 
+    const lease = this.startLockLease({
+      lockKey,
+      ownerId: lock.ownerId,
+      ttlSeconds: input.lockTtlSeconds ?? this.defaultLockTtlSeconds(),
+      acquiredAtMs,
+      renew: true,
+    });
+
     try {
+      if (!lease.isLockOwned())
+        throw new Error('Ops job lock ownership was lost.');
       const batchResponse = await this.dailyPortfolioSnapshotJobService.run({
+        isLockOwned: lease.isLockOwned,
         seasonId,
         snapshotDate,
         dryRun,
@@ -1099,6 +1137,8 @@ export class OpsJobRunnerService {
       this.assertDailySnapshotBatchComplete(
         batchResponse.data.run.resultPayloadJson,
       );
+      if (!(await lease.settle()))
+        throw new Error('Ops job lock ownership was lost.');
       const succeeded = await this.runService.recordSucceeded(run, {
         resultJson: {
           batchRunId: batchResponse.data.run.id,
@@ -1110,9 +1150,14 @@ export class OpsJobRunnerService {
         },
       });
 
+      await lease.stop();
+      if (!lease.isLockOwned())
+        throw new Error('Ops job lock ownership was lost.');
       return this.successResponse(succeeded);
     } catch (error) {
-      const failure = this.extractFailure(error);
+      const failure = lease.isLockOwned()
+        ? this.extractFailure(error)
+        : this.lockLossFailure(jobName);
       const failed = await this.runService.recordFailed(run, {
         errorCode: failure.code,
         errorMessage: failure.message,
@@ -1130,6 +1175,7 @@ export class OpsJobRunnerService {
         },
       };
     } finally {
+      await lease.stop();
       await this.lockService.releaseLock({
         lockKey,
         ownerId: lock.ownerId,
@@ -1141,15 +1187,89 @@ export class OpsJobRunnerService {
     return `daily_portfolio_snapshot:${seasonId}:${snapshotDate}`;
   }
 
+  private startLockLease(input: {
+    lockKey: string;
+    ownerId: string;
+    ttlSeconds: number;
+    acquiredAtMs: number;
+    renew: boolean;
+  }) {
+    const ttlSeconds = Number.isSafeInteger(input.ttlSeconds)
+      ? Math.max(1, input.ttlSeconds)
+      : 1;
+    const ttlMs = ttlSeconds * 1000;
+    let deadlineMs = input.acquiredAtMs + ttlMs;
+    let owned = true;
+    let renewalPromise: Promise<void> | null = null;
+    const controller = new AbortController();
+    const lose = () => {
+      owned = false;
+      controller.abort();
+    };
+    const isLockOwned = () => {
+      if (Date.now() >= deadlineMs) lose();
+      return owned;
+    };
+    const timer = input.renew
+      ? setInterval(
+          () => {
+            if (renewalPromise || !isLockOwned()) return;
+            const startedAtMs = Date.now();
+            renewalPromise = this.lockService
+              .extendLock({
+                lockKey: input.lockKey,
+                ownerId: input.ownerId,
+                ttlSeconds,
+              })
+              .then((extended) => {
+                // A late response cannot revive a lease whose previous deadline
+                // passed while the DB request was in flight.
+                if (!extended || !isLockOwned()) lose();
+                else deadlineMs = startedAtMs + ttlMs;
+              })
+              .catch(lose)
+              .finally(() => {
+                renewalPromise = null;
+              });
+          },
+          Math.max(100, Math.floor(ttlMs / 3)),
+        )
+      : null;
+    return {
+      isLockOwned,
+      signal: controller.signal,
+      async settle() {
+        if (renewalPromise) await renewalPromise;
+        return isLockOwned();
+      },
+      async stop() {
+        if (timer) clearInterval(timer);
+        if (renewalPromise) await renewalPromise;
+      },
+    };
+  }
+
+  private lockLossFailure(jobName: OpsJobName) {
+    return {
+      code: 'OPS_JOB_LOCK_LOST',
+      message: `${jobName} lock ownership was lost.`,
+      resultJson: undefined,
+    };
+  }
+
   private async runLockedOpsJob(
     jobName: OpsJobName,
     input: OpsJobRunnerInput,
     lockKey: string,
-    handler: (context: { isLockOwned: () => boolean }) => Promise<unknown>,
+    handler: (context: {
+      isLockOwned: () => boolean;
+      signal: AbortSignal;
+    }) => Promise<unknown>,
     options: { renewLock?: boolean; dryRunResult?: unknown } = {},
   ): Promise<OpsJobRunnerResponse> {
     const trigger = input.trigger ?? OpsJobTrigger.manual_script;
     const dryRun = input.dryRun === true;
+    const acquiredAtMs = Date.now();
     const lock = await this.lockService.acquireLock({
       jobName,
       lockKey,
@@ -1196,53 +1316,40 @@ export class OpsJobRunnerService {
       throw error;
     }
 
-    let lockOwned = true;
-    let renewalRunning = false;
-    let renewalPromise: Promise<void> | null = null;
-    const ttlSeconds = input.lockTtlSeconds ?? this.defaultLockTtlSeconds();
-    const renewal = options.renewLock
-      ? setInterval(
-          () => {
-            if (renewalRunning || !lockOwned) return;
-            renewalRunning = true;
-            renewalPromise = this.lockService
-              .extendLock({
-                lockKey,
-                ownerId: lock.ownerId,
-                ttlSeconds,
-              })
-              .then((extended) => {
-                if (!extended) lockOwned = false;
-              })
-              .catch(() => {
-                lockOwned = false;
-              })
-              .finally(() => {
-                renewalRunning = false;
-              });
-          },
-          Math.max(100, Math.floor((ttlSeconds * 1000) / 3)),
-        )
-      : null;
+    const lease = this.startLockLease({
+      lockKey,
+      ownerId: lock.ownerId,
+      ttlSeconds: input.lockTtlSeconds ?? this.defaultLockTtlSeconds(),
+      acquiredAtMs,
+      renew: options.renewLock === true,
+    });
 
     try {
+      if (!lease.isLockOwned())
+        throw new Error('Ops job lock ownership was lost.');
       const resultJson = dryRun
         ? (options.dryRunResult ?? {
             dryRun: true,
             message: `${jobName} would run when dryRun is false.`,
           })
-        : await handler({ isLockOwned: () => lockOwned });
-      if (renewalPromise) await renewalPromise;
-      if (!lockOwned) {
-        throw new Error(`${jobName} lock ownership was lost.`);
-      }
+        : await handler({
+            isLockOwned: lease.isLockOwned,
+            signal: lease.signal,
+          });
+      if (!(await lease.settle()))
+        throw new Error('Ops job lock ownership was lost.');
       const succeeded = await this.runService.recordSucceeded(run, {
         resultJson,
       });
+      await lease.stop();
+      if (!lease.isLockOwned())
+        throw new Error('Ops job lock ownership was lost.');
 
       return this.successResponse(succeeded);
     } catch (error) {
-      const failure = this.extractFailure(error);
+      const failure = lease.isLockOwned()
+        ? this.extractFailure(error)
+        : this.lockLossFailure(jobName);
       const failed = await this.runService.recordFailed(run, {
         errorCode: failure.code,
         errorMessage: failure.message,
@@ -1260,8 +1367,7 @@ export class OpsJobRunnerService {
         },
       };
     } finally {
-      if (renewal) clearInterval(renewal);
-      if (renewalPromise) await renewalPromise;
+      await lease.stop();
       await this.lockService.releaseLock({
         lockKey,
         ownerId: lock.ownerId,

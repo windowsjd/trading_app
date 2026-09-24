@@ -42,6 +42,7 @@ export type KisRestCurrentPriceIngestionOptions = {
   usSymbols?: readonly string[];
   maxSnapshots?: number;
   secrets?: readonly string[];
+  isLockOwned?: () => boolean;
 };
 
 type KisRestCurrentPriceTarget =
@@ -126,6 +127,9 @@ export class KisRestCurrentPriceIngestionService {
 
       const summaries: KisRestCurrentPriceSummary[] = [...targets.skipped];
       for (const target of targets.targets) {
+        if (options.isLockOwned && !options.isLockOwned()) {
+          throw new Error('Ops job lock ownership was lost.');
+        }
         if (
           options.maxSnapshots !== undefined &&
           countAcceptedSnapshots(summaries) >= options.maxSnapshots

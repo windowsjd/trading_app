@@ -9,6 +9,8 @@ export type GeneralDailySnapshotJobInput = {
   dryRun?: boolean;
   requestedBy?: string;
   idempotencyKey?: string;
+  /** Ops lease guard; checked only before starting another subject. */
+  isLockOwned?: () => boolean;
 };
 
 export type GeneralDailySnapshotJobRequestPayload = {

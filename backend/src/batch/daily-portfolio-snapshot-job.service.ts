@@ -131,6 +131,9 @@ export class DailyPortfolioSnapshotJobService {
     };
 
     for (const participant of participants) {
+      if (input.isLockOwned && !input.isLockOwned()) {
+        throw new Error('Ops job lock ownership was lost.');
+      }
       if (input.snapshotTimezone) {
         capturedAt = new Date();
         if (

@@ -182,6 +182,7 @@ describe('OpsJobRunnerService', () => {
     const marketCandleReconciliationService = {
       reconcile: jest.fn(),
     };
+    const limitOrderMatchingService = { matchDueLimitOrders: jest.fn() };
     const prisma = {
       tradingAccount: {
         findFirst: jest.fn().mockResolvedValue({ id: 'account-1' }),
@@ -224,6 +225,7 @@ describe('OpsJobRunnerService', () => {
       marketCandleRetentionService,
       marketCandleSyncService,
       marketCandleReconciliationService,
+      limitOrderMatchingService,
       prisma,
       service: new OpsJobRunnerService(
         dailyPortfolioSnapshotJobService as never,
@@ -243,6 +245,7 @@ describe('OpsJobRunnerService', () => {
         runService as never,
         generalDailySnapshotJobService as never,
         marketCandleReconciliationService as never,
+        limitOrderMatchingService as never,
       ),
     };
   };
@@ -1135,6 +1138,7 @@ describe('OpsJobRunnerService', () => {
       },
     });
     expect(binancePriceIngestionService.ingestPrices).toHaveBeenCalledWith({
+      isLockOwned: expect.any(Function),
       dryRun: false,
       requestedBy: 'scheduler',
       symbols: ['BTCUSDT', 'ETHUSDT'],
@@ -1273,6 +1277,7 @@ describe('OpsJobRunnerService', () => {
     expect(
       kisRestCurrentPriceIngestionService.ingestCurrentPrices,
     ).toHaveBeenCalledWith({
+      isLockOwned: expect.any(Function),
       dryRun: false,
       requestedBy: 'scheduler',
       domesticSymbols: ['005930'],
@@ -1367,6 +1372,7 @@ describe('OpsJobRunnerService', () => {
       domesticSymbols: ['005930'],
       usSymbols: [],
       maxSnapshots: 10,
+      isLockOwned: expect.any(Function),
     });
     expect(runService.recordSucceeded).toHaveBeenCalledWith(
       {
@@ -1445,6 +1451,7 @@ describe('OpsJobRunnerService', () => {
     expect(
       kisRestCurrentPriceIngestionService.ingestCurrentPrices,
     ).toHaveBeenCalledWith({
+      isLockOwned: expect.any(Function),
       dryRun: false,
       requestedBy: 'scheduler',
       domesticSymbols: [],
@@ -1736,6 +1743,7 @@ describe('OpsJobRunnerService', () => {
       },
     });
     expect(dailyPortfolioSnapshotJobService.run).toHaveBeenCalledWith({
+      isLockOwned: expect.any(Function),
       seasonId: 'season-1',
       snapshotDate: '2026-06-08',
       dryRun: true,
@@ -1841,11 +1849,228 @@ describe('OpsJobRunnerService', () => {
     expect(
       rankingRefreshService.refreshCurrentRankingsForActiveSeasons,
     ).toHaveBeenCalledWith(new Date('2026-06-08T00:05:00.000Z'), {
+      isLockOwned: expect.any(Function),
       createEquitySnapshots: true,
     });
     expect(lockService.releaseLock).toHaveBeenCalledWith({
       lockKey: 'season_ranking_generation:current',
       ownerId: 'owner-ranking',
+    });
+  });
+
+  describe('lease ownership', () => {
+    beforeEach(() => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-09-23T12:00:00.000Z'));
+    });
+    afterEach(() => jest.useRealTimers());
+
+    it.each(['false', 'reject'] as const)(
+      'stops limit-order work after renewal %s and records lock loss',
+      async (failure) => {
+        const f = createService();
+        f.lockService.acquireLock.mockResolvedValue({
+          acquired: true,
+          lockKey: 'limit_order_matching:current',
+          ownerId: 'old-owner',
+          expiresAt: new Date(Date.now() + 1000),
+        });
+        f.runService.createRunning.mockResolvedValue({
+          id: 'run-1',
+          startedAt: new Date(),
+        });
+        f.runService.recordFailed.mockResolvedValue({
+          serialized: serializedRun({ status: OpsJobRunStatus.failed }),
+        });
+        f.lockService.extendLock.mockImplementation(() =>
+          failure === 'false'
+            ? Promise.resolve(false)
+            : Promise.reject(new Error('synthetic renewal DB failure')),
+        );
+        let started!: () => void;
+        let resume!: () => void;
+        const entered = new Promise<void>((resolve) => {
+          started = resolve;
+        });
+        const barrier = new Promise<void>((resolve) => {
+          resume = resolve;
+        });
+        const units: string[] = [];
+        f.limitOrderMatchingService.matchDueLimitOrders.mockImplementation(
+          async ({ isLockOwned }: { isLockOwned: () => boolean }) => {
+            units.push('first');
+            started();
+            await barrier;
+            if (isLockOwned()) units.push('second');
+            return { candidatesScanned: units.length };
+          },
+        );
+        const pending = f.service.runLimitOrderMatchingJob({
+          lockTtlSeconds: 1,
+        });
+        await entered;
+        await jest.advanceTimersByTimeAsync(350);
+        resume();
+        const result = await pending;
+        expect(result).toMatchObject({
+          success: false,
+          error: { code: 'OPS_JOB_LOCK_LOST' },
+        });
+        expect(units).toEqual(['first']);
+        expect(f.runService.recordSucceeded).not.toHaveBeenCalled();
+        expect(f.runService.recordFailed).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ errorCode: 'OPS_JOB_LOCK_LOST' }),
+        );
+        expect(f.lockService.releaseLock).toHaveBeenCalledWith({
+          lockKey: 'limit_order_matching:current',
+          ownerId: 'old-owner',
+        });
+        expect(jest.getTimerCount()).toBe(0);
+      },
+    );
+
+    it('does not start the second FX provider after a short lease expires', async () => {
+      const f = createService();
+      f.lockService.acquireLock.mockResolvedValue({
+        acquired: true,
+        lockKey: 'provider_fx_ingest:usd_krw',
+        ownerId: 'old-owner',
+        expiresAt: new Date(Date.now() + 1000),
+      });
+      f.runService.createRunning.mockResolvedValue({
+        id: 'run-1',
+        startedAt: new Date(),
+      });
+      f.runService.recordFailed.mockResolvedValue({
+        serialized: serializedRun({ status: OpsJobRunStatus.failed }),
+      });
+      f.koreaEximExchangeIngestionService.ingestUsdKrw.mockImplementation(
+        async () => {
+          await jest.advanceTimersByTimeAsync(1100);
+          return { success: true, created: 1, skipped: 0, wouldCreate: 0 };
+        },
+      );
+      expect(
+        await f.service.runProviderFxIngestJob({ lockTtlSeconds: 1 }),
+      ).toMatchObject({
+        success: false,
+        error: { code: 'OPS_JOB_LOCK_LOST' },
+      });
+      expect(
+        f.exchangeRateIngestionService.ingestUsdKrw,
+      ).not.toHaveBeenCalled();
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it('does not report success when a renewal fails during run finalization', async () => {
+      const f = createService();
+      f.lockService.acquireLock.mockResolvedValue({
+        acquired: true,
+        lockKey: 'limit_order_matching:current',
+        ownerId: 'old-owner',
+        expiresAt: new Date(Date.now() + 1000),
+      });
+      f.runService.createRunning.mockResolvedValue({
+        id: 'run-1',
+        startedAt: new Date(),
+      });
+      f.runService.recordFailed.mockResolvedValue({
+        serialized: serializedRun({ status: OpsJobRunStatus.failed }),
+      });
+      f.limitOrderMatchingService.matchDueLimitOrders.mockResolvedValue({
+        candidatesScanned: 1,
+      });
+      let finishSuccess!: () => void;
+      let enteredSuccess!: () => void;
+      const successStarted = new Promise<void>((resolve) => {
+        enteredSuccess = resolve;
+      });
+      const successBarrier = new Promise<void>((resolve) => {
+        finishSuccess = resolve;
+      });
+      f.runService.recordSucceeded.mockImplementation(async () => {
+        enteredSuccess();
+        await successBarrier;
+        return { serialized: serializedRun() };
+      });
+      let finishRenewal!: (extended: boolean) => void;
+      let enteredRenewal!: () => void;
+      const renewalStarted = new Promise<void>((resolve) => {
+        enteredRenewal = resolve;
+      });
+      const renewalBarrier = new Promise<boolean>((resolve) => {
+        finishRenewal = resolve;
+      });
+      f.lockService.extendLock.mockImplementation(() => {
+        enteredRenewal();
+        return renewalBarrier;
+      });
+
+      const pending = f.service.runLimitOrderMatchingJob({ lockTtlSeconds: 1 });
+      await successStarted;
+      await jest.advanceTimersByTimeAsync(350);
+      await renewalStarted;
+      finishSuccess();
+      await Promise.resolve();
+      finishRenewal(false);
+      expect(await pending).toMatchObject({
+        success: false,
+        error: { code: 'OPS_JOB_LOCK_LOST' },
+      });
+      expect(f.runService.recordFailed).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ errorCode: 'OPS_JOB_LOCK_LOST' }),
+      );
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it('finishes an in-flight settlement then refuses the next season', async () => {
+      const f = createService();
+      f.lockService.acquireLock.mockResolvedValue({
+        acquired: true,
+        lockKey: 'season_settlement:ended',
+        ownerId: 'old-owner',
+        expiresAt: new Date(Date.now() + 1000),
+      });
+      f.runService.createRunning.mockResolvedValue({
+        id: 'run-1',
+        startedAt: new Date(),
+      });
+      f.runService.recordFailed.mockResolvedValue({
+        serialized: serializedRun({ status: OpsJobRunStatus.failed }),
+      });
+      f.lockService.extendLock.mockResolvedValue(false);
+      f.prisma.season.findMany.mockResolvedValue([
+        { id: 'season-a', endAt: new Date('2026-09-22T00:00:00Z') },
+        { id: 'season-b', endAt: new Date('2026-09-22T01:00:00Z') },
+      ]);
+      let started!: () => void;
+      let resume!: () => void;
+      const entered = new Promise<void>((resolve) => {
+        started = resolve;
+      });
+      const barrier = new Promise<void>((resolve) => {
+        resume = resolve;
+      });
+      f.seasonSettlementJobService.run.mockImplementation(async () => {
+        started();
+        await barrier;
+        return { data: { run: { id: 'batch-a', status: 'succeeded' } } };
+      });
+      const pending = f.service.runSeasonSettlementJob({ lockTtlSeconds: 1 });
+      await entered;
+      await jest.advanceTimersByTimeAsync(350);
+      resume();
+      const result = await pending;
+      expect(result).toMatchObject({
+        success: false,
+        error: { code: 'OPS_JOB_LOCK_LOST' },
+      });
+      expect(f.seasonSettlementJobService.run).toHaveBeenCalledTimes(1);
+      expect(f.seasonSettlementJobService.run).toHaveBeenCalledWith(
+        expect.objectContaining({ seasonId: 'season-a' }),
+      );
+      expect(jest.getTimerCount()).toBe(0);
     });
   });
 });
