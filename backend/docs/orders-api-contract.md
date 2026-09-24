@@ -11,6 +11,18 @@
 > account-scoped with no participant fallback. See
 > `docs/trading-account-orders-api-contract.md`.
 
+## Lock order (current contract)
+
+Season authorization locks use Season `FOR SHARE` → TradingAccount `FOR SHARE` →
+SeasonParticipant (`FOR SHARE` for limit registration; `FOR NO KEY UPDATE` for
+market/limit fills and FX that update valuation). Quote-based writes lock Quote
+first; existing-order execution then locks Order before financial writes.
+General mutations use TradingAccount `FOR UPDATE` for the TWR boundary.
+Automatic limit fills take authorization → Order → CashWallet/Position; cancel
+and ended-season cleanup take Order → CashWallet/Position without acquiring
+authorization locks afterward. Ranking/settlement lock Season first. See
+`src/seasons/season-trading-lock.ts` and the transaction-time/create-race tests.
+
 ## Financial execution time (current contract)
 
 Season and general market orders, including the existing execute endpoint, use
@@ -426,7 +438,8 @@ fills or an exchange order book:
   (`autoExecutionEnabled` true → `mode: "scheduler_snapshot_candle"`, else
   `reservation_only`).
 - Create's final TTL/season/stock-session checks use DB `clock_timestamp()`
-  after Quote/Participant/Season locks. The same time becomes submittedAt.
+  after Quote → Season → TradingAccount → SeasonParticipant authorization locks,
+  before the wallet/position reservation write. The same time becomes submittedAt.
 - No public execute API, provider order API, liquidity allocation, or
   partial fill exists for limit orders; the internal order-execute path
   rejects `orderType=limit` with `LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED`.

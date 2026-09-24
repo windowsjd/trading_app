@@ -142,6 +142,11 @@ Lock behavior:
 - Existing expired or released lock: takeover is allowed.
 - Success/failure releases the lock by `lockKey + ownerId`.
 - Lock TTL defaults to `SCHEDULER_LOCK_TTL_SECONDS=600`.
+- Long jobs opt into renewal at TTL/3. Extension requires the unexpired current owner; release also requires ownerId, so an old worker cannot release a successor lock.
+- The runner tracks a local deadline. Deadline expiry, false extension or renewal DB error permanently loses ownership, aborts its signal and records `success=false`, `OPS_JOB_LOCK_LOST` / failed Ops run. A late renewal response cannot revive ownership.
+- Binance/KIS ingestion, matching, ranking/settlement, general/season daily snapshots, lifecycle and candle retention/sync/reconciliation use existing callbacks or AbortSignal at safe work boundaries. FX ingestion also checks ownership between providers.
+- Lifecycle checks ownership before its status transaction and before ended-season reservation cleanup. Cleanup checks before each bounded selection (default 100) and again before its transaction. A transaction already started may finish/rollback atomically; lease loss prevents the next batch. The next normal tick processes leftovers even if no season transitioned.
+- These are scheduling boundaries, not financial correctness locks: Order row locks, atomic reservation release+cancel, idempotency and settlement reservation checks remain required.
 
 Default lock keys:
 
@@ -151,6 +156,7 @@ Default lock keys:
 - `provider_kis_ingest:rest_current_price` when `KIS_PRICE_INGESTION_MODE=rest_current_price`
 - `daily_portfolio_snapshot:{seasonId}:{date}`
 - `season_ranking_generation:current`
+- `season_lifecycle_transition:current`
 - `season_settlement:ended`
 - `reward_marker`
 
@@ -306,6 +312,7 @@ Coverage:
 - An active unexpired lock blocks a second acquire.
 - An expired lock can be taken over.
 - Release by `lockKey + ownerId` allows reacquire.
+- Real two-client lease tests cover renewal, expiry/takeover, DB renewal error, old-owner release protection and next-unit stop. Lifecycle tests additionally cover 102 buy/sell reservations, first-batch commit after lease loss, failed Ops audit and successor self-healing.
 
 The smoke is disabled by default because it must run only against an explicit test database. Default `pnpm test` records the disabled reason and does not touch a real DB.
 
@@ -355,11 +362,13 @@ Ops job `limit_order_matching`, added additively to `OpsJobName`. Default
   matching work.
 - One cycle: for each asset with fillable submitted limit orders, evaluate path A
   (fresh provider snapshot) then path B (closed 5m candle touch), and fill
-  qualifying orders each in its OWN transaction, oldest first. Bounded by
-  `LIMIT_ORDER_MATCH_BATCH_SIZE` fills per cycle; the rest roll over. One order's
-  error is isolated and retried next cycle; a DB-level failure fails the job run.
-- `resultJson` carries `assetsScanned / ordersConsidered / filledPathA /
-  filledPathB / skipped / errors / batchExhausted`.
+  qualifying orders each in its OWN transaction. A `(submittedAt, id)` keyset
+  cursor advances across cycles and wraps at EOF. `LIMIT_ORDER_MATCH_BATCH_SIZE`
+  bounds fill attempts separately from the scan budget, so nonmatching early
+  orders do not starve later candidates. Order errors are isolated; query-level
+  failure fails the run.
+- `resultJson` carries `assetsScanned / candidatesScanned / ordersConsidered /
+  filledPathA / filledPathB / skipped / errors / batchExhausted / scanExhausted`.
 - Startup validation caps the interval at half the 10s provider execute
   freshness, and warns (not fails) if matching is enabled while
   `LIMIT_ORDER_ENABLED=false` (a legitimate "drain existing orders" state).

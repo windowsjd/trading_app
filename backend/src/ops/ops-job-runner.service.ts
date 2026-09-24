@@ -497,8 +497,9 @@ export class OpsJobRunnerService {
       OpsJobName.season_lifecycle_transition,
       input,
       'season_lifecycle_transition:current',
-      async () =>
+      async (context) =>
         this.seasonLifecycleTransitionJobService.run({
+          isLockOwned: context.isLockOwned,
           now: now.toISOString(),
           dryRun: input.dryRun === true,
           requestedBy: input.requestedBy ?? undefined,

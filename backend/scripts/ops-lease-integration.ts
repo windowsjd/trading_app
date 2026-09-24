@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { runSeasonLifecycleLeaseIntegration } from './season-lifecycle-lease-integration';
 import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
 import {
@@ -296,6 +297,7 @@ async function main() {
     await normalRenewal();
     await takeoverAfterExpiredLease();
     await renewalError();
+    await runSeasonLifecycleLeaseIntegration(prismaA, prismaB);
   } finally {
     await clean();
     await Promise.all([prismaA.$disconnect(), prismaB.$disconnect()]);

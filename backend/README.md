@@ -1,6 +1,6 @@
 # trading_app Backend
 
-Season-based virtual trading app backend built with NestJS, Prisma 7 adapter style, PostgreSQL, and Redis.
+Season/general virtual trading app backend built with NestJS, Prisma 7 adapter style, PostgreSQL, and Redis.
 
 This service owns backend APIs, database access, financial calculations, and server-side write paths for the MVP. Financial values are exchanged as strings.
 
@@ -27,14 +27,14 @@ reservation, command/exchange/ledger, and performance integrity read-only.
   remain unavailable; see `docs/trading-modes-and-accounts.md` and
   `docs/general-account-and-ad-rewards-api-contract.md`. Ad rewards are disabled
   by default (`AD_REWARD_ENABLED`) and no real ad-network adapter exists yet.
-- Season write paths require effective active season state: `status=active` and `startAt <= now < endAt` for join, FX quote/execute, and orders quote/create/execute. Public order cancel is currently blocked with `ORDER_CANCEL_NOT_SUPPORTED`.
+- Season write paths require effective active season state: `status=active` and `startAt <= now < endAt` for join, FX quote/execute, and orders quote/create/execute. Limit cancel and ended-season reservation cleanup remain available after trading closes; market cancel returns `ORDER_CANCEL_NOT_SUPPORTED`.
 - Home as one aggregate API.
 - Home settled final-result read model from existing `rankType=final` `season_rankings`.
 - Wallets, records, ranking, and orders read APIs.
 - Return-rate values are percentages everywhere; the schema column name is unchanged.
-- FX quote checks the joined participant's source cash wallet balance before storing a durable quote. FX execute consumes durable quotes and reprices at execute time from fresh `provider_api` USD/KRW rows. Korea EXIM exchange (`korea_exim_exchange_rate`) is preferred, and ExchangeRate-API (`exchange_rate_api`) remains the fallback provider.
+- FX quote checks the resolved TradingAccount's available source cash wallet balance before storing a durable quote. FX execute consumes durable quotes and reprices at execute time from fresh `provider_api` USD/KRW rows. Korea EXIM exchange (`korea_exim_exchange_rate`) is preferred, and ExchangeRate-API (`exchange_rate_api`) remains the fallback provider.
 - `GET /api/v1/fx/rates/current` returns the current stored USD/KRW rate. `refresh=true` may refresh Korea EXIM exchange data only when both `PROVIDER_INGESTION_ENABLED=true` and `KOREA_EXIM_EXCHANGE_ENABLED=true`; otherwise it falls back to existing DB snapshots, using only approved `admin_manual` rows when provider rows are unavailable.
-- Orders quote stores durable quotes; `POST /api/v1/orders` requires `quoteId` and `idempotencyKey`, creates the market order, consumes the quote, and immediately executes from fresh `provider_api` asset/FX rows.
+- Orders quote stores durable quotes. Market create consumes the quote and executes from fresh provider evidence; limit BUY/SELL create commits a submitted order and cash/position reservation. Scheduler Path A/B matching fills limits when enabled. Both modes pin quote-time fees; see the current order/finance contracts.
 - Stock order quote/create/execute enforce regular market hours. Crypto orders and FX quote/execute do not receive a market-hours block in this gate.
 - FX execute and orders create idempotency request hashes include `quoteId`, so the same idempotency key with a different quote conflicts instead of replaying an old result.
 - KRW and USD cash wallets. US stocks and USD-settled crypto use the USD wallet.
@@ -65,7 +65,7 @@ These are intentionally outside the current implementation and should not be add
 - KIS order/account/balance/fill/deposit/withdrawal APIs, KIS orderbook/hoga, Binance authenticated/order/account/user-data APIs, and real external trading/account integrations.
 - External payment, point, coupon, gifticon, delivery, cash-out, or provider-backed reward fulfillment. App-internal operator/admin reward fulfillment creates `SeasonReward` rows only when fulfilled.
 - Access token blacklist/revocation, server-side session auth, and cookie auth.
-- Matching engine, partial fill, or exact order execute replay.
+- Partial fills and external-exchange matching. Internal PostgreSQL scheduler Path A/B matching and committed order replay are implemented.
 - Fake, static, sample, temporary, or fallback business price data.
 
 ## Environment Variables
@@ -259,7 +259,7 @@ Serving configuration: `CANDLE_SERVING_CURRENT_DB_FRESHNESS_MS` (default `60000`
 
 WebSocket current/higher candle updates and disabled-by-default canonical reconciliation are implemented by the unit-3 live pipeline. See [`docs/candle-live-operations.md`](docs/candle-live-operations.md) — it also documents the versioned KRX/US market calendar (2025–2026 audited; KRX 2027 provisional until the official KRX year-end notice — readiness reports `MARKET_CALENDAR_COVERAGE_MISSING` for missing years and `MARKET_CALENDAR_PROVISIONAL` for provisional ones, both degraded, and `MARKET_CALENDAR_REQUIRED_FROM_YEAR`/`MARKET_CALENDAR_REQUIRED_THROUGH_YEAR` override the default previous-through-next-year required range, which the 365-day 1d/1w sync lookback depends on; uncovered dates fail safe), stale-Redis fallback semantics, old-generation live bucket recovery, connection liveness (`CANDLE_LIVE_CONNECTION_LIVENESS_TIMEOUT_MS`, supervisor watchdog) vs trade freshness (`CANDLE_LIVE_TRADE_STALE_THRESHOLD_MS`, readiness only; `CANDLE_LIVE_STALE_THRESHOLD_MS` is a deprecated fallback for both), the shared frontend WebSocket, the release fixture smoke (`CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture`), the real-provider long-smoke harness (`pnpm run smoke:candle-live`), and smoke commit traceability (`SMOKE_GIT_COMMIT`, `SMOKE_ALLOW_DIRTY`, NOT_RUN reports via `pnpm run smoke:candle-report`).
 
-CI: `.github/workflows/ci.yml` gates every PR and `main` push with three jobs — **Backend quality** (`pnpm run lint:candles:check`, `pnpm run format:candles:check`, `pnpm run typecheck`, `pnpm run build`, `pnpm test`), **Frontend quality** (`npm run typecheck`, `npm test`; the Expo app has no build script — typecheck is the compile gate), and **Candle fixture integration** (PostgreSQL+Redis services, `prisma migrate deploy`, the fixture smoke with artifact commit/dirty verification). The candle layer is the required lint/format gate; repository-wide lint debt outside it is known and not yet gated. Long real-provider smokes are never run in CI — see the runbook in [`docs/candle-live-operations.md`](docs/candle-live-operations.md).
+CI: `.github/workflows/ci.yml` defines six jobs: **Backend quality**, **Frontend quality** (including web export), **Release-critical E2E**, **Core account PostgreSQL integration**, **Limit order PostgreSQL integration**, and **Candle fixture integration** (PostgreSQL 16 + Redis 7, migrations, fixture smoke and commit/clean artifact verification). Check-only lint gates remain scoped. Real-provider smokes are manual; see [`docs/candle-live-operations.md`](docs/candle-live-operations.md).
 
 Important operational behavior:
 
@@ -559,6 +559,21 @@ Before production launch:
 - Deploy the API server on a public HTTPS/WSS domain.
 
 Do not print or commit provider API keys or local env contents. Provider row insertion foundation exists, provider-backed execute is open only through durable quote gates, and real account/order APIs remain STOP.
+
+## Prisma generated client policy
+
+`prisma/schema.prisma` generates **tracked** TypeScript into `src/generated/prisma`
+(40 files). Production source, scripts and tests import that client; `nest build`
+compiles it. `build`/`typecheck`/test scripts have no automatic generate hook.
+CI explicitly runs generate after the frozen install. Deployment settings outside
+this repository must not be assumed to add a missing generation step.
+
+Keep schema and generated output in the same change: run `pnpm install --frozen-lockfile`
+then `pnpm exec prisma generate` and include resulting client changes. Verify the
+committed candidate in a fresh checkout with the same commands followed by
+`git diff --exit-code` and empty `git status --porcelain`. The old `.gitignore`
+entry `/generated/prisma` is not the current output `/src/generated/prisma`.
+Do not hide client drift or bypass the release smoke clean-tree guard.
 
 ## Tests
 

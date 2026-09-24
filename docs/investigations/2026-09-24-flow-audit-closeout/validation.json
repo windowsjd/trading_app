@@ -1,0 +1,366 @@
+{
+  "startHead": "3663dc0e1fcf34989eaca80c465817a3cbbd717b",
+  "startWorkingTree": "clean",
+  "originalHeadUnchanged": false,
+  "verificationCommit": "3ab39a026bb85d647a071bf3567f33ed3a7c9ad1",
+  "verificationCheckout": "/tmp/trading-final-audit/final-clean",
+  "modifiedBackendFiles": {
+    "backend/AGENTS.md": "bb2fdf82fef70cdf0930fa5f2fae061295b721ebed238998f8af137501e2a3a8",
+    "backend/README.md": "cd80fd862f8920333b1c951c6b3f2a7e7903556c8a7a4dc191eb749131a53519",
+    "backend/docs/README.md": "787fd4255216b5a37de0109b505ba65637b9a93e3ebd3ab01c132d50036a72e4",
+    "backend/docs/codex-rulepack.md": "23656e15ba50c264a12905373559838492e768de59b1b1a71ab77283f4faf67a",
+    "backend/docs/orders-api-contract.md": "a3322802137aeb773e16c447c3f4e2aba4cf4e453e4f9825568acd2fc0c7bc17",
+    "backend/docs/policy-decisions.md": "28cf9131032c0075d932f8584aa4ec2b086fd51064482aae1574e74e16301c9f",
+    "backend/docs/scheduler-ops-foundation.md": "55d2c5b7fcd73ef104ede9c9ee334002a82e9ed483dce1f6916f9c69d1c70983",
+    "backend/docs/trading-modes-and-accounts.md": "bae39d68b36767e3172ddeee7c785b9ef33aa1e984a250ab9b1eed595cf19a5f",
+    "backend/scripts/ops-lease-integration.ts": "295c95866319f063007091c9d40bb5a23a8cf8eb5063a60a655bce93abc4676a",
+    "backend/src/batch/season-lifecycle-transition-job.service.spec.ts": "3cc81789bcc815406b9d1ae3a69af67c25fc55ff76b83b52a01e7aa09993a7c5",
+    "backend/src/batch/season-lifecycle-transition-job.service.ts": "4c4d829c7c7a4632d7d85ad53c860f3b45ab7862c1baec0473de0c54ce45916c",
+    "backend/src/batch/season-lifecycle-transition-job.types.ts": "b23a7d7abb4f62fdb18a2d95604723a08d5fb99b78b6f1734106e99c9344ecef",
+    "backend/src/generated/prisma/internal/class.ts": "62c9086676d0abc49ce9275087a6c1342b995857bf78a78a2dff3800d10587bf",
+    "backend/src/ops/ops-job-lock.integration.spec.ts": "94f1d17e137738d8bf339d9124c741d27f36e23c200d08dced7e744a972f9611",
+    "backend/src/ops/ops-job-runner.service.ts": "7ec4f1d9e38525b0f62c0df8b040d0e72d7cc3581eabaf406a92f45c953deda8",
+    "backend/src/orders/limit-order-cancel.service.spec.ts": "7d9645ead479ac42aef2394ec8055b7caa9426b19947d888b5a9f93ae1ab0f6a",
+    "backend/src/orders/limit-order-cancel.service.ts": "b96510531774084e785c47a00f5036c7bd271fc016c11498c2adb882451a681c",
+    "backend/scripts/season-lifecycle-lease-integration.ts": "28554940394c1411635923258d2ce6e5a102b7174897c621e0bff15669ff067a"
+  },
+  "environment": {
+    "node": "24.14.1",
+    "pnpm": "10.33.0",
+    "postgres": "16.15",
+    "postgresTimezone": "UTC",
+    "redis": "7.0.15",
+    "services": "isolated loopback processes; no operational DB or provider credentials"
+  },
+  "backendQuality": [
+    {
+      "step": "lint:candles:check",
+      "command": [
+        "pnpm",
+        "run",
+        "lint:candles:check"
+      ],
+      "exitCode": 0,
+      "seconds": 8.69
+    },
+    {
+      "step": "format:candles:check",
+      "command": [
+        "pnpm",
+        "run",
+        "format:candles:check"
+      ],
+      "exitCode": 0,
+      "seconds": 1.82
+    },
+    {
+      "step": "lint:accounts:check",
+      "command": [
+        "pnpm",
+        "run",
+        "lint:accounts:check"
+      ],
+      "exitCode": 0,
+      "seconds": 4.41
+    },
+    {
+      "step": "typecheck",
+      "command": [
+        "pnpm",
+        "run",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "seconds": 5.84
+    },
+    {
+      "step": "build",
+      "command": [
+        "pnpm",
+        "run",
+        "build"
+      ],
+      "exitCode": 0,
+      "seconds": 8.5
+    },
+    {
+      "step": "unit",
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand"
+      ],
+      "exitCode": 0,
+      "seconds": 15.8
+    },
+    {
+      "step": "e2e",
+      "command": [
+        "pnpm",
+        "run",
+        "test:e2e",
+        "--runInBand"
+      ],
+      "exitCode": 0,
+      "seconds": 11.48
+    }
+  ],
+  "database": [
+    {
+      "step": "migration-status",
+      "command": [
+        "pnpm",
+        "exec",
+        "prisma",
+        "migrate",
+        "status"
+      ],
+      "exitCode": 0,
+      "seconds": 0.74
+    },
+    {
+      "step": "schema-drift",
+      "command": [
+        "pnpm",
+        "exec",
+        "prisma",
+        "migrate",
+        "diff",
+        "--from-config-datasource",
+        "--to-schema",
+        "prisma/schema.prisma",
+        "--exit-code"
+      ],
+      "exitCode": 0,
+      "seconds": 0.71
+    },
+    {
+      "step": "core-pg",
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "src/assets/assets-tradability.integration.spec.ts",
+        "src/seasons/trading-account.integration.spec.ts",
+        "src/seasons/trading-account-link.integration.spec.ts",
+        "src/seasons/trading-account-financial-scope.integration.spec.ts",
+        "src/seasons/trading-account-trading-scope.integration.spec.ts",
+        "src/trading-accounts/general-account.integration.spec.ts",
+        "src/orders/general-account-trading.integration.spec.ts",
+        "src/fx/general-account-fx.integration.spec.ts",
+        "src/orders/order-replay-and-cancel-scope.integration.spec.ts",
+        "src/portfolio/general-performance-hardening.integration.spec.ts",
+        "src/portfolio/krx-closed-price.integration.spec.ts",
+        "src/portfolio/krx-session-close-recovery.integration.spec.ts",
+        "src/portfolio/snapshot-scope-audit.integration.spec.ts",
+        "src/trading-accounts/general-trading-audit.integration.spec.ts",
+        "src/ranking/season-ranking-scope.integration.spec.ts",
+        "src/ranking/ranking-consistency.integration.spec.ts",
+        "src/seasons/seasons.join.integration.spec.ts",
+        "src/auth/auth.integration.spec.ts",
+        "src/ops/ops-job-lock.integration.spec.ts"
+      ],
+      "exitCode": 0,
+      "seconds": 49.32
+    },
+    {
+      "step": "limit-pg",
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "src/orders/limit-order-reservation.integration.spec.ts",
+        "src/orders/limit-order-create-race.integration.spec.ts",
+        "src/orders/limit-order-transaction-time.integration.spec.ts",
+        "src/orders/trading-transaction-time.integration.spec.ts",
+        "src/orders/trading-fee-pinning.integration.spec.ts",
+        "src/orders/limit-order-create-no-redis.integration.spec.ts",
+        "src/orders/limit-order-idempotent-replay.integration.spec.ts",
+        "src/orders/limit-order-matching.integration.spec.ts",
+        "src/orders/orders.execute.integration.spec.ts",
+        "src/fx/fx.execute.integration.spec.ts",
+        "src/mvp-flow.integration.spec.ts"
+      ],
+      "exitCode": 0,
+      "seconds": 65.97
+    },
+    {
+      "step": "trading-accounts:repair-links",
+      "command": [
+        "pnpm",
+        "run",
+        "trading-accounts:repair-links"
+      ],
+      "exitCode": 0,
+      "seconds": 0.56
+    },
+    {
+      "step": "trading-accounts:repair-ranking-scope",
+      "command": [
+        "pnpm",
+        "run",
+        "trading-accounts:repair-ranking-scope"
+      ],
+      "exitCode": 0,
+      "seconds": 0.55
+    },
+    {
+      "step": "trading-accounts:audit-general",
+      "command": [
+        "pnpm",
+        "run",
+        "trading-accounts:audit-general"
+      ],
+      "exitCode": 0,
+      "seconds": 0.57
+    }
+  ],
+  "frontend": [
+    {
+      "step": "lint:accounts:check",
+      "command": [
+        "npm",
+        "run",
+        "lint:accounts:check"
+      ],
+      "exitCode": 0,
+      "seconds": 4.55
+    },
+    {
+      "step": "typecheck",
+      "command": [
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "seconds": 3.1
+    },
+    {
+      "step": "test",
+      "command": [
+        "npm",
+        "run",
+        "test"
+      ],
+      "exitCode": 0,
+      "seconds": 4.11
+    },
+    {
+      "step": "export:web",
+      "command": [
+        "npm",
+        "run",
+        "export:web"
+      ],
+      "exitCode": 0,
+      "seconds": 8.98
+    }
+  ],
+  "release": {
+    "candidateCommit": "3ab39a026bb85d647a071bf3567f33ed3a7c9ad1",
+    "artifact": "/tmp/trading-final-audit/final-clean/backend/artifacts/candle-smoke/fixture-2026-09-24T03-26-35-946Z.json",
+    "steps": [
+      {
+        "step": "install",
+        "command": [
+          "pnpm",
+          "install",
+          "--frozen-lockfile"
+        ],
+        "exitCode": 0
+      },
+      {
+        "step": "generate",
+        "command": [
+          "pnpm",
+          "exec",
+          "prisma",
+          "generate"
+        ],
+        "exitCode": 0
+      },
+      {
+        "step": "diff",
+        "command": [
+          "git",
+          "diff",
+          "--exit-code"
+        ],
+        "exitCode": 0
+      },
+      {
+        "step": "status",
+        "command": [
+          "git",
+          "status",
+          "--porcelain"
+        ],
+        "exitCode": 0
+      },
+      {
+        "step": "migrate",
+        "command": [
+          "pnpm",
+          "exec",
+          "prisma",
+          "migrate",
+          "deploy"
+        ],
+        "exitCode": 0
+      },
+      {
+        "step": "migrate-status",
+        "command": [
+          "pnpm",
+          "exec",
+          "prisma",
+          "migrate",
+          "status"
+        ],
+        "exitCode": 0
+      }
+    ],
+    "smokeExitCode": 0,
+    "gitCommit": "3ab39a026bb85d647a071bf3567f33ed3a7c9ad1",
+    "gitDirty": false,
+    "result": "passed",
+    "passed": 24,
+    "failed": 0,
+    "priorFixtureNames": [
+      "fixture-2026-07-13T10-23-13-789Z.json"
+    ],
+    "newFixtureNames": [
+      "fixture-2026-09-24T03-26-35-946Z.json"
+    ],
+    "seconds": 0.06
+  },
+  "hostedCI": "not verified; no push performed",
+  "firstDatabaseAttempt": {
+    "result": "failed",
+    "reason": "Temporary PostgreSQL inherited KST; repeated on a fresh UTC database matching CI and passed."
+  },
+  "counts": {
+    "unitSuitesPassed": 206,
+    "unitTestsPassed": 3052,
+    "unitSuitesSkipped": 44,
+    "unitTestsSkipped": 48,
+    "e2eTestsPassed": 341,
+    "corePgSuitesPassed": 19,
+    "corePgTestsPassed": 20,
+    "limitPgSuitesPassed": 11,
+    "limitPgTestsPassed": 11,
+    "frontendTestsPassed": 1189,
+    "fixtureScenariosPassed": 24
+  },
+  "finalOriginalHead": "3663dc0e1fcf34989eaca80c465817a3cbbd717b",
+  "concurrentHeadChange": {
+    "type": "commit message amend observed during final verification",
+    "sameTreeAsStart": true,
+    "tree": "022073a01127036e8877a15ebec0acdc04ef23b5",
+    "preserved": true
+  }
+}

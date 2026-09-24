@@ -338,11 +338,15 @@ export class LimitOrderCancelService {
   async cleanupEndedSeasonLimitReservations(input: {
     now: Date;
     batchSize?: number;
+    isLockOwned?: () => boolean;
   }): Promise<LimitReservationCleanupResult> {
     const batchSize = input.batchSize ?? 100;
     let canceledOrderCount = 0;
 
     for (;;) {
+      if (input.isLockOwned && !input.isLockOwned()) {
+        throw new Error('Ops job lock ownership was lost.');
+      }
       const batch = await this.prisma.order.findMany({
         where: {
           status: OrderStatus.submitted,
@@ -366,6 +370,11 @@ export class LimitOrderCancelService {
       }
 
       const batchIds = batch.map((row) => row.id);
+      // Selection may have waited past lease loss. Once the transaction
+      // starts, release + cancel completes atomically without lease checks.
+      if (input.isLockOwned && !input.isLockOwned()) {
+        throw new Error('Ops job lock ownership was lost.');
+      }
       const batchCanceled = await this.prisma.$transaction(async (tx) => {
         // Re-lock and re-validate inside the transaction: a user cancel may
         // have raced the selection above.

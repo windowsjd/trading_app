@@ -55,6 +55,7 @@ export class SeasonLifecycleTransitionJobService {
         this.runLifecycleTransition({
           now: parsedNow ?? startedAt,
           dryRun,
+          isLockOwned: input.isLockOwned,
         }),
     });
   }
@@ -62,6 +63,7 @@ export class SeasonLifecycleTransitionJobService {
   private async runLifecycleTransition(input: {
     now: Date;
     dryRun: boolean;
+    isLockOwned?: () => boolean;
   }): Promise<SeasonLifecycleTransitionJobResult> {
     const result = this.createBaseResult(input.now, input.dryRun);
     const candidates = await this.findLifecycleCandidates(
@@ -81,6 +83,9 @@ export class SeasonLifecycleTransitionJobService {
       return result;
     }
 
+    if (input.isLockOwned && !input.isLockOwned()) {
+      throw new Error('Ops job lock ownership was lost.');
+    }
     const transitioned = await this.prisma.$transaction(async (tx) => {
       const refreshedCandidates = await this.findLifecycleCandidates(
         tx,
@@ -141,9 +146,13 @@ export class SeasonLifecycleTransitionJobService {
     // reservations. Runs every tick — not only when a transition happened —
     // so leftovers from an earlier crashed run are healed automatically.
     if (this.limitOrderCancelService) {
+      if (input.isLockOwned && !input.isLockOwned()) {
+        throw new Error('Ops job lock ownership was lost.');
+      }
       const cleanup =
         await this.limitOrderCancelService.cleanupEndedSeasonLimitReservations({
           now: input.now,
+          isLockOwned: input.isLockOwned,
         });
       transitioned.summary.limitOrdersCanceled = cleanup.canceledOrderCount;
     }

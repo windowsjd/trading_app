@@ -164,14 +164,16 @@ describe('SeasonLifecycleTransitionJobService', () => {
     ]);
     prisma.season.updateMany.mockResolvedValueOnce({ count: 1 });
 
+    const isLockOwned = () => true;
     const response = await service.run({
+      isLockOwned,
       now: now.toISOString(),
       idempotencyKey: 'cleanup-key',
     });
 
     expect(
       limitOrderCancelService.cleanupEndedSeasonLimitReservations,
-    ).toHaveBeenCalledWith({ now });
+    ).toHaveBeenCalledWith({ now, isLockOwned });
     expect(response.data.run.resultPayloadJson).toMatchObject({
       summary: {
         ended: 1,
@@ -210,6 +212,34 @@ describe('SeasonLifecycleTransitionJobService', () => {
       },
     });
   });
+
+  it.each(['before transaction', 'during transaction'] as const)(
+    'stops new lifecycle work after lease loss %s',
+    async (boundary) => {
+      const { batchService, prisma } = createService();
+      const cleanup = { cleanupEndedSeasonLimitReservations: jest.fn() };
+      const service = new SeasonLifecycleTransitionJobService(
+        batchService as never,
+        prisma as never,
+        cleanup as never,
+      );
+      let owned = boundary !== 'before transaction';
+      prisma.season.findMany.mockResolvedValue([]);
+      prisma.$transaction.mockImplementation(async (callback) => {
+        owned = false;
+        return callback(prisma);
+      });
+      await expect(
+        service.run({ now: now.toISOString(), isLockOwned: () => owned }),
+      ).rejects.toThrow('Ops job lock ownership was lost.');
+      expect(prisma.$transaction).toHaveBeenCalledTimes(
+        boundary === 'before transaction' ? 0 : 1,
+      );
+      expect(
+        cleanup.cleanupEndedSeasonLimitReservations,
+      ).not.toHaveBeenCalled();
+    },
+  );
 
   it('blocks duplicate active seasons', async () => {
     const { prisma, service } = createService();

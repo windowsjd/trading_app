@@ -558,6 +558,28 @@ describe('LimitOrderCancelService', () => {
   });
 
   describe('season-end cleanup', () => {
+    it.each(['before selection', 'during selection'] as const)(
+      'does not start a cleanup transaction after lease loss %s',
+      async (boundary) => {
+        const { prisma, service } = createService();
+        let owned = boundary !== 'before selection';
+        prisma.order.findMany.mockImplementation(async () => {
+          owned = false;
+          return [{ id: 'order-1' }];
+        });
+        await expect(
+          service.cleanupEndedSeasonLimitReservations({
+            now: canceledAt,
+            isLockOwned: () => owned,
+          }),
+        ).rejects.toThrow('Ops job lock ownership was lost.');
+        expect(prisma.order.findMany).toHaveBeenCalledTimes(
+          boundary === 'before selection' ? 0 : 1,
+        );
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+      },
+    );
+
     it('cancels ended-season limit buys in bounded batches with season_ended reason', async () => {
       const { prisma, service } = createService();
       prisma.order.findMany

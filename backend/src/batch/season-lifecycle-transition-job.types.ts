@@ -2,6 +2,7 @@ export const SEASON_LIFECYCLE_TRANSITION_JOB_NAME =
   'season-lifecycle-transition' as const;
 
 export type SeasonLifecycleTransitionJobInput = {
+  isLockOwned?: () => boolean;
   now?: string;
   dryRun?: boolean;
   requestedBy?: string;

@@ -64,6 +64,9 @@ describe('OpsJobLockService DB smoke', () => {
           ),
         );
       }
+      expect(result.stdout).toContain(
+        'lifecycle lease loss preserves batch 1, stops batch 2',
+      );
       expect(result.stdout).toContain('normal lease renewal blocks takeover');
       expect(result.stdout).toContain(
         'expired lease takeover stops old units and protects successor',

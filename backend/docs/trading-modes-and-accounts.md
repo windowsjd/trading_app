@@ -21,6 +21,11 @@
 
 이 현재 상태가 아래 과거 전환 단계 설명보다 우선한다.
 
+- SeasonRanking.tradingAccountId도 `20260910120000` migration에서 NOT NULL로 강화됐다. participant relation은 시즌 랭킹 식별자로 유지한다.
+- 일반 TWR/외부자금 경계, 양 모드 market/limit BUY·SELL 및 FX, 정산 transaction의 모든 season account 종료는 구현되어 있다.
+- §0의 작업별 구현 이력, §3의 transitional ERD/nullable/repair 설명, §8/8-A/8-B의 migration 배포 단계와 §9의 당시 후속 계획은 **Historical / superseded**다. 현재 운영 명령과 금융 scope는 위 목록 및 account API/finance/order 계약을 따른다.
+- fee pinning·금융 lock order·matcher는 [현재 정책](policy-decisions.md), lease 경계는 [Ops 계약](scheduler-ops-foundation.md)을 확인한다.
+
 **설계 확정(정책으로 고정, 코드 여부와 무관):**
 
 - 시즌모드와 일반모드 규칙, 모드별 자산 완전 분리 원칙
@@ -28,7 +33,7 @@
 - 매월/정기 자동 지급을 하지 않는 정책 (grantAnchorDay·nextGrantAt류 개념 전면 폐기)
 - 보상형 광고를 통한 추가 가상자금 정책
 - 광고 보상금을 투자손익·대표 수익률에서 제외하는 원칙
-- 향후 시간가중수익률(TWR) 적용 원칙
+- 시간가중수익률(TWR) 적용 원칙 (구현됨)
 - TradingAccount 공통 거래계정 구조
 
 **구현됨:**
@@ -1897,7 +1902,9 @@ KRW↔USD FX는 모두 2026-08-18에 기존 account-scoped 코어로
 활성화됐다. 이 문단은 과거 작업 범위를 설명하며 현재 미구현
 상태를 의미하지 않는다.
 
-## 9. 후속 작업 권장 순서
+## 9. 당시 후속 작업 권장 순서 (Historical / superseded)
+
+아래는 전환 당시 계획이다. NOT NULL/participant 금융 scope 제거, 일반 주문·FX/TWR, 정산 account closure는 완료됐으며 다시 계획하지 않는다. 실제 광고 provider 연동은 별도 후속 범위다.
 
 1. `season_participants.trading_account_id` NOT NULL 강화 (§3.5.5의 전제조건 5가지 확인 후)
 2. ~~스냅샷 3모델(EquitySnapshot·DailyPortfolioSnapshot·SeasonRanking)의 accountId 전환~~
