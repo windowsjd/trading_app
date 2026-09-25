@@ -25,6 +25,7 @@ function inlineTradingHarness() {
     accountId: 'general',
     focused: true,
     role: 'user',
+    priceErrors: [],
     requests: [],
     invalidations: [],
     queries: [],
@@ -210,7 +211,7 @@ function inlineTradingHarness() {
             ...base,
             data:
               resource === 'detail'
-                ? { asset: h.assets[id] }
+                ? { asset: h.assets[id], priceErrors: h.priceErrors }
                 : {
                     interval: options.queryKey[4],
                     candles: [
@@ -327,13 +328,25 @@ function inlineTradingHarness() {
         'ErrorState',
         'InlineEmptyState',
         'SectionSkeleton',
-        'AdminDiagnosticPanel',
       ].map((name) => [
         '../../components/states/' + name,
         { default: name, __esModule: true },
       ]),
     ),
   };
+  mocks['../../components/states/AdminDiagnosticPanel'] = load(
+    resolve('src/components/states/AdminDiagnosticPanel.tsx'),
+    {
+      'react-native': native,
+      '../../features/me/api': {
+        getMe: async () => {
+          if (h.meGate) await h.meGate.promise;
+          if (h.meError) throw h.meError;
+          return { role: h.role };
+        },
+      },
+    },
+  );
   mocks['../order/OrderPanel'] = load(
     resolve('src/screens/order/OrderPanel.tsx'),
     mocks,

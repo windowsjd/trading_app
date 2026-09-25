@@ -41,6 +41,7 @@ import ActionPressable from '../../components/common/ActionPressable';
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
+import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import OrderPanel from '../order/OrderPanel';
 
 export default function AssetDetailScreen(props: AssetDetailScreenProps) {
@@ -216,6 +217,11 @@ export function AssetTradingScreen({
                 : `전일대비 ${Number(displayPrice.changeRate) > 0 ? '+' : ''}${changeRate}%`}
             </Text>
           </View>
+          <AdminDiagnosticPanel
+            diagnostic={detailQuery.data.priceErrors?.find(
+              (error) => error.assetId === assetId && error.diagnostic,
+            )?.diagnostic}
+          />
           {isAdmin && showReconnectBanner ? (
             <Text
               testID={TEST_IDS.assetDetail.reconnectBanner}
@@ -237,6 +243,7 @@ export function AssetTradingScreen({
                   assetId={assetId}
                   accountId={selectedAccountId}
                   enabled={isFocused}
+                  showAssetPriceDiagnostic={false}
                   onReturnToAsset={() => {}}
                 />
               ) : (

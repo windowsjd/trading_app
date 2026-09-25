@@ -202,10 +202,12 @@ for (const role of ['user', 'operator', 'admin'])
       if (screen === 'chart') h.Screen = h.Chart;
       await h.mount();
       t.after(h.close);
-      assert.equal(
-        /실시간 연결 복구|실시간 시세 최신성|실시간 캔들 지연/.test(text(h)),
-        role === 'admin',
-      );
+      if (screen === 'detail') {
+        assert.equal(/실시간 연결 복구/.test(text(h)), role === 'admin');
+        assert.equal(/실시간 시세 최신성/.test(text(h)), role === 'admin');
+      } else {
+        assert.equal(/실시간 캔들 지연/.test(text(h)), role === 'admin');
+      }
       if (screen === 'chart')
         assert.match(text(h), /미국 캔들은 KIS 지연 체결 피드/);
     });

@@ -93,6 +93,7 @@ type Props = {
   accountId: string;
   initialSide?: 'buy' | 'sell';
   enabled?: boolean;
+  showAssetPriceDiagnostic?: boolean;
   onReturnToAsset: () => void;
 };
 
@@ -210,6 +211,7 @@ export function OrderForm({
   accountId,
   side,
   enabled = true,
+  showAssetPriceDiagnostic = true,
   onReturnToAsset,
 }: Props & { side: 'buy' | 'sell' }) {
   // accountId is immutable for this mounted form, supplied by the route or
@@ -872,6 +874,13 @@ export function OrderForm({
       ) : null}
       {assetWarningReason ? (
         <Text style={styles.warningText}>{assetWarningReason}</Text>
+      ) : null}
+      {showAssetPriceDiagnostic ? (
+        <AdminDiagnosticPanel
+          diagnostic={assetQuery.data?.priceErrors?.find(
+            (error) => error.assetId === assetId && error.diagnostic,
+          )?.diagnostic}
+        />
       ) : null}
       {inputErrorMessage ? (
         <Text style={styles.errorText}>{inputErrorMessage}</Text>
