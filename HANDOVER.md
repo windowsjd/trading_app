@@ -12,6 +12,15 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 주문 화면 경고·중복 라벨 후속 정리 (2026-09-30)
+
+기준 커밋은 `808c25fe`(`ui변경`)이며, 시작 전 `origin/main`과 일치하는 clean tree를 확인했다. Backend 동작은 변경하지 않았다.
+
+- 화면 표시 가격의 존재와 주문 입력용 indicative preview 신선도를 구분했다. REST 가격이 보이지만 preview에 부적합하면 “시세 없음” 대신 “오래됨”으로 설명하고, 실제 가격이 없을 때만 “시세 없음”을 쓴다. 사용자가 유효한 값을 입력하면 기존처럼 서버 Quote를 요청하며 가격 권한·freshness 수치는 유지한다.
+- 국내/미국 주식의 CLOSED 시장가에는 정규장 외 주문 불가 안내 하나만 남기고 중복 MARKET_CLOSED·preview 경고와 그 경고에 붙던 관리자 진단을 제거했다. CLOSED 지정가의 반복 대기 문구를 지웠지만 정수 지정가 Quote/Create와 submitted·예약·matcher 정책은 그대로다.
+- 주문 입력과 보유/대기 영역에서만 General/Season 계정 상태 라벨을 제거했다. 계정 binding, pending Order 조회·polling, 매수/매도 색상은 유지했다.
+- `backend/README.md`의 오래된 주식 장 시간·holiday 설명을 현재 market/limit 및 calendar fail-closed 계약과 맞췄다. 실제 화면 렌더 회귀와 기존 주문/대기/진단 검사를 수행했다.
+
 ### 작업 단위: 거래 화면 대기 목록·주문 side 색상 B (2026-09-29)
 
 시작 전 `git fetch origin main` 후 HEAD = origin/main, clean tree를 확인했다. Frontend만 변경했다.

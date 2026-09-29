@@ -100,10 +100,12 @@ describe('asset detail information and trading controls', () => {
     });
   }
 
-  it('does not change other asset classes market-closed warnings', () => {
+  it('uses the stock CLOSED market notice for US stock without a duplicate warning', () => {
     const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
     h.asset.assetType = 'us_stock';
-    assert.match(textContent(h.render()), /현재 시장이 닫혀 있습니다\./);
+    const text = textContent(h.render());
+    assert.match(text, /정규장 외에는 시장가 주문을 할 수 없습니다/);
+    assert.doesNotMatch(text, /현재 시장이 닫혀 있습니다\./);
   });
 
   it('switches sides inline without adding Order routes', () => {

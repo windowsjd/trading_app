@@ -163,21 +163,19 @@ describe('the styles long text depends on are present', () => {
     );
   });
 
-  it('OrderPanel: the bound-account label wraps inside its column', () => {
+  it('OrderPanel: the order content wraps inside its column', () => {
     const source = read('screens/order/OrderPanel.tsx');
 
     assert.match(source, /panel:\s*\{[^}]*minWidth:\s*0/s);
-    assert.match(source, /account(?:Label|Badge):/s);
     assert.ok(
       !/numberOfLines=\{/.test(source),
       'nothing on the order screen may be cut to one line',
     );
   });
 
-  it('AccountHoldings: account text and complete amounts wrap without truncation', () => {
+  it('AccountHoldings: complete amounts wrap without truncation', () => {
     const source = read('screens/asset/AccountHoldings.tsx');
 
-    assert.match(source, /display.title.*display.statusLabel/s);
     assert.match(source, /metric:\s*\{[^}]*flexWrap:\s*'wrap'/s);
     assert.ok(!/numberOfLines=\{/.test(source));
   });

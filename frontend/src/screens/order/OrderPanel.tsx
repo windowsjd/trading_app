@@ -22,10 +22,7 @@ import { useRootNavigation } from '../../app/navigation/navigationHooks';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 
-import {
-  getAssetDetail,
-  type AssetDetailPriceDto,
-} from '../../features/asset/api';
+import { getAssetDetail } from '../../features/asset/api';
 import { isTradableMarketStatus } from '../../features/asset/mapper';
 import type { OrderQuoteDto } from '../../features/order/api';
 import {
@@ -45,7 +42,6 @@ import {
   resolveAccountBinding,
   shouldResetBoundFlow,
 } from '../../features/tradingAccount/accountBinding';
-import { getAccountDisplay } from '../../features/tradingAccount/accountDisplay';
 import { getIntegrityErrorMessage } from '../../features/tradingAccount/integrityErrors';
 import { invalidateAfterOrderCreate } from '../../features/tradingAccount/invalidation';
 import {
@@ -143,10 +139,6 @@ export default function OrderPanel(props: Props) {
 const BUY_FEE_BUFFER = 0.002;
 const RATIO_BUTTONS = [0.25, 0.5, 0.75, 1] as const;
 
-function isPriceAvailable(price?: AssetDetailPriceDto | null) {
-  return price?.state === 'available' && !!price.currentPrice;
-}
-
 function getOrderDomainErrorMessage(
   code?: string | null,
   isGeneralAccount = false,
@@ -240,7 +232,6 @@ export function OrderForm({
   });
   const routeAccount = binding.state === 'bound' ? binding.account : null;
   const capabilities = binding.state === 'bound' ? binding.capabilities : null;
-  const accountDisplay = routeAccount ? getAccountDisplay(routeAccount) : null;
   const accountKnown = binding.state === 'bound';
   const accountChangedAway = shouldResetBoundFlow(binding);
 
@@ -486,6 +477,8 @@ export function OrderForm({
     displayPrice,
     Date.now(),
   );
+  const displayedPriceAvailable = displayPrice.priceLocal !== null;
+  const stockMarketClosed = isStock && asset?.marketStatus === 'closed';
   const tradeFeeRate = !feeQuery.isError
     ? feeQuery.data?.feePolicy?.tradeFeeRate
     : null;
@@ -527,7 +520,9 @@ export function OrderForm({
       : null);
   const previewNotice =
     !isAmountBuy && orderType === 'market' && !previewPriceAvailable
-      ? '현재 시세가 없거나 오래되어 예상 금액을 표시할 수 없습니다.'
+      ? displayedPriceAvailable
+        ? '현재 화면 시세가 오래되어 예상 금액을 표시할 수 없습니다.'
+        : '현재 화면 시세가 없어 예상 금액을 표시할 수 없습니다.'
       : feeQuery.isPending
         ? '수수료 정보를 확인하는 중입니다.'
         : '수수료 정보를 불러오지 못해 예상 금액을 표시할 수 없습니다.';
@@ -555,16 +550,13 @@ export function OrderForm({
   // Server marketStatus is a UX hint; Quote/Create revalidate their own clock.
   // Never change the selected order type automatically.
   const sessionNotice =
-    isStock && asset?.marketStatus === 'closed'
-      ? orderType === 'market'
-        ? '정규장 외에는 시장가 주문을 할 수 없습니다. 지정가를 선택하면 다음 정규장을 기다리는 주문을 등록할 수 있습니다.'
-        : '정규장 외 지정가는 예약 후 대기하며, 다음 적격 정규장 가격부터 체결을 판단합니다.'
+    stockMarketClosed && orderType === 'market'
+      ? '정규장 외에는 시장가 주문을 할 수 없습니다. 지정가를 선택하면 다음 정규장을 기다리는 주문을 등록할 수 있습니다.'
       : null;
 
   const assetWarningReason =
-    (asset?.assetType === 'domestic_stock' &&
-    asset.marketStatus === 'closed' &&
-    asset.tradeBlockedReason?.trim().toUpperCase() === 'MARKET_CLOSED'
+    (stockMarketClosed &&
+    asset?.tradeBlockedReason?.trim().toUpperCase() === 'MARKET_CLOSED'
       ? null
       : asset
         ? getAssetTradingWarning(asset)
@@ -574,10 +566,16 @@ export function OrderForm({
     !isTradableMarketStatus(asset.marketStatus)
       ? '장 상태는 서버 견적에서 최종 확인됩니다.'
       : asset &&
-          (side === 'buy' ? !previewPriceAvailable : !isPriceAvailable(price))
+          orderType === 'market' &&
+          !stockMarketClosed &&
+          (side === 'buy' ? !previewPriceAvailable : !displayedPriceAvailable)
         ? isAmountBuy
-          ? '현재 시세가 없거나 오래되어 예상 수량을 표시할 수 없습니다. 견적은 서버가 최종 판정합니다.'
-          : '현재 화면 시세가 없어 비율 수량 계산은 제한됩니다. 견적은 서버가 최종 판정합니다.'
+          ? displayedPriceAvailable
+            ? '현재 화면 시세가 오래되어 예상 수량을 표시할 수 없습니다. 견적은 서버가 최종 판정합니다.'
+            : '현재 화면 시세가 없어 예상 수량을 표시할 수 없습니다. 견적은 서버가 최종 판정합니다.'
+          : displayedPriceAvailable
+            ? '현재 화면 시세가 오래되어 비율 수량 계산은 제한됩니다. 견적은 서버가 최종 판정합니다.'
+            : '현재 화면 시세가 없어 비율 수량 계산은 제한됩니다. 견적은 서버가 최종 판정합니다.'
         : null);
 
   const positionUnavailable =
@@ -628,7 +626,6 @@ export function OrderForm({
   const ratioDisabledReason = useMemo(() => {
     if (accountBlockedReason || assetHardBlockedReason)
       return accountBlockedReason ?? assetHardBlockedReason;
-
     if (side === 'sell') {
       if (positionQuery.isLoading) return '보유 수량을 확인하는 중입니다.';
       if (positionUnavailable) return '보유 수량을 확인할 수 없습니다.';
@@ -650,14 +647,20 @@ export function OrderForm({
         : null;
     }
     if (!ratioPriceValue) {
+      if (stockMarketClosed && orderType === 'market')
+        return '정규장 외에는 시장가 주문을 할 수 없습니다.';
       return orderType === 'limit'
         ? '지정가를 입력하면 비율 수량을 계산할 수 있습니다.'
-        : '현재가가 없어 비율 수량을 계산할 수 없습니다.';
+        : displayedPriceAvailable
+          ? '현재 화면 시세가 오래되어 비율 수량을 계산할 수 없습니다.'
+          : '현재가가 없어 비율 수량을 계산할 수 없습니다.';
     }
 
     return null;
   }, [
     isAmountBuy,
+    displayedPriceAvailable,
+    stockMarketClosed,
     buyAvailable,
     tradeFeeRate,
     buyAvailableValue,
@@ -818,11 +821,6 @@ export function OrderForm({
   };
   return (
     <View style={styles.panel} testID={TEST_IDS.order.screen}>
-      {accountDisplay ? (
-        <Text style={styles.accountLabel}>
-          {accountDisplay.title} · {accountDisplay.statusLabel}
-        </Text>
-      ) : null}
       <View style={styles.tabs}>
         <ActionPressable
           testID={TEST_IDS.order.typeToggleMarket}
@@ -997,7 +995,7 @@ export function OrderForm({
         <>
           <Text style={styles.warningText}>{assetWarningReason}</Text>
           {(showAssetPriceDiagnostic || displayPrice.priceLocal !== null) &&
-          (side === 'buy' ? !previewPriceAvailable : !isPriceAvailable(price)) ? (
+          (side === 'buy' ? !previewPriceAvailable : !displayedPriceAvailable) ? (
             <AdminDiagnosticPanel
               diagnostic={showAssetPriceDiagnostic &&
                 displayPrice.priceLocal === null &&
@@ -1047,7 +1045,7 @@ export function OrderForm({
           }
         />
       ) : null}
-      {side === 'buy' ? (
+      {side === 'buy' && !(stockMarketClosed && orderType === 'market') ? (
         <>
           {!inputInvalidReason ? (
             <View style={styles.preview} testID="order-indicative-preview">
@@ -1239,7 +1237,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-  accountLabel: { fontSize: 11, color: '#697583' },
   group: { gap: 4, minWidth: 0 },
   label: { fontSize: 12, color: '#697583' },
   helper: { fontSize: 12, color: '#536170' },

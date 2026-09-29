@@ -88,7 +88,7 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     assert.match(visibleText(h), /ASSET_PRICE_UNAVAILABLE/);
     assert.match(
       visibleText(h),
-      /현재 시세가 없거나 오래되어 예상 수량을 표시할 수 없습니다/,
+      /현재 화면 시세가 없어 예상 수량을 표시할 수 없습니다/,
     );
     await h.press('order-ratio-25');
     assert.ok(Number(h.node(TEST_IDS.order.quantityInput).props.value) > 0);
@@ -128,7 +128,7 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     assert.equal(h.node('admin-diagnostic-toggle'), undefined);
     assert.match(
       visibleText(h),
-      /현재 시세가 없거나 오래되어 예상 수량을 표시할 수 없습니다/,
+      /현재 화면 시세가 없어 예상 수량을 표시할 수 없습니다/,
     );
     h.priceErrors = [{ ...priceError, diagnostic: undefined }];
     await h.update();
@@ -175,7 +175,7 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     await h.flush();
     assert.ok(h.node('admin-diagnostic-toggle'));
     assert.equal(h.node('admin-diagnostic-content'), undefined);
-    assert.match(visibleText(h), /현재 시세가 없거나 오래되어 예상 수량을 표시할 수 없습니다/);
+    assert.match(visibleText(h), /현재 화면 시세가 오래되어 예상 수량을 표시할 수 없습니다/);
     await h.press('admin-diagnostic-toggle');
     assert.match(visibleText(h), /Client runtime 상태/);
     assert.doesNotMatch(visibleText(h), /Backend Exception|Request ID|Application Stack/);
@@ -210,7 +210,7 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     assert.match(visibleText(h), /tickerPriceAvailable/);
     assert.doesNotMatch(visibleText(h), /Backend Exception|Request ID|Application Stack/);
     assert.match(visibleText(h), /ASSET_PRICE_UNAVAILABLE/);
-    assert.match(visibleText(h), /현재 시세가 없거나 오래되어 예상 수량을 표시할 수 없습니다/);
+    assert.match(visibleText(h), /현재 화면 시세가 없어 예상 수량을 표시할 수 없습니다/);
   });
 
   it('does not attach an older REST diagnosis to a newer ticker failure', async (t) => {

@@ -7,7 +7,6 @@ import {
   type TradingAccountDto,
 } from '../../features/tradingAccount/api';
 import { getAccountHoldings } from '../../features/tradingAccount/holdings';
-import { getAccountDisplay } from '../../features/tradingAccount/accountDisplay';
 import { getIntegrityErrorMessage } from '../../features/tradingAccount/integrityErrors';
 import { getTradingAssetName } from '../../features/asset/tradingHeader';
 import { getPositionDisplay } from '../../features/position/display';
@@ -43,7 +42,6 @@ export default function AccountHoldings({
   // if a caller ever seeds the wrong account into this cache entry.
   const data =
     query.data?.tradingAccountId === accountId ? query.data : undefined;
-  const display = account?.id === accountId ? getAccountDisplay(account) : null;
   const integrityMessage = query.isError
     ? getIntegrityErrorMessage(query.error)
     : null;
@@ -81,11 +79,6 @@ export default function AccountHoldings({
           ))}
         </View>
       </View>
-      {display ? (
-        <Text style={styles.account}>
-          {display.title} · {display.statusLabel}
-        </Text>
-      ) : null}
       {!accountId ? (
         <InlineEmptyState
           title="계정이 없습니다."
@@ -195,7 +188,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   title: { fontSize: 18, fontWeight: '700', color: '#202a35' },
-  account: { fontSize: 12, color: '#697583' },
   header: {
     flexDirection: 'row',
     flexWrap: 'wrap',
