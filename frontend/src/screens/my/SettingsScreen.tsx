@@ -6,6 +6,8 @@ import {
   SafeAreaView,
   TextInput,
   Alert,
+  ScrollView,
+  Switch,
 } from 'react-native';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -29,6 +31,8 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
   const meQuery = useQuery({
     queryKey: QUERY_KEYS.me,
     queryFn: getMe,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const [nickname, setNickname] = useState('');
@@ -49,6 +53,22 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
     onError: () => {
       Alert.alert('저장 실패', '닉네임 변경에 실패했습니다.');
     },
+  });
+
+  const privacyMutation = useMutation({
+    mutationFn: (portfolioPublic: boolean) => updateMe({ portfolioPublic }),
+    onSuccess: async (me) => {
+      queryClient.setQueryData(QUERY_KEYS.me, me);
+      await queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.ranking.userSeasonSummary(me.id),
+        exact: true,
+      });
+    },
+    onError: () =>
+      Alert.alert(
+        '저장 실패',
+        '공개 설정을 변경하지 못했습니다. 다시 시도해주세요.',
+      ),
   });
 
   const onSaveNickname = () => {
@@ -83,7 +103,10 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View testID={TEST_IDS.settings.screen} style={styles.content}>
+      <ScrollView
+        testID={TEST_IDS.settings.screen}
+        contentContainerStyle={styles.content}
+      >
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>닉네임 변경</Text>
 
@@ -108,6 +131,32 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
         </View>
 
         <View style={styles.card}>
+          <Text style={styles.sectionTitle}>친구에게 포트폴리오 공개</Text>
+          <Text style={styles.helper}>
+            친구가 내 현재 시즌 포트폴리오를 볼 수 있습니다.
+          </Text>
+          <Switch
+            accessibilityLabel="친구에게 포트폴리오 공개"
+            testID="settings-portfolio-public"
+            value={meQuery.data.portfolioPublic === true}
+            disabled={
+              privacyMutation.isPending ||
+              typeof meQuery.data.portfolioPublic !== 'boolean'
+            }
+            onValueChange={(value) => privacyMutation.mutate(value)}
+          />
+          <Text style={styles.helper}>
+            {privacyMutation.isPending
+              ? '저장 중...'
+              : typeof meQuery.data.portfolioPublic !== 'boolean'
+                ? '공개 설정 확인 중...'
+                : meQuery.data.portfolioPublic
+                  ? '공개'
+                  : '비공개'}
+          </Text>
+        </View>
+
+        <View style={styles.card}>
           <Text style={styles.sectionTitle}>알림 설정</Text>
 
           <ActionPressable
@@ -120,7 +169,8 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
           </ActionPressable>
 
           <Text style={styles.helper}>
-            현재 문서 기준으로 서버 연동 알림 설정 API는 아직 명시되지 않았습니다.
+            현재 문서 기준으로 서버 연동 알림 설정 API는 아직 명시되지
+            않았습니다.
           </Text>
         </View>
 
@@ -136,7 +186,7 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
         >
           <Text style={styles.logoutText}>로그아웃</Text>
         </ActionPressable>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

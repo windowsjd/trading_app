@@ -1,0 +1,186 @@
+{
+  "results": [
+    {
+      "screen": "overall",
+      "width": 320,
+      "fontScale": 1,
+      "overflow": []
+    },
+    {
+      "screen": "friends",
+      "width": 320,
+      "fontScale": 1,
+      "overflow": []
+    },
+    {
+      "screen": "notices",
+      "width": 320,
+      "fontScale": 1,
+      "overflow": []
+    },
+    {
+      "screen": "settings",
+      "width": 320,
+      "fontScale": 1,
+      "overflow": []
+    },
+    {
+      "screen": "summary",
+      "width": 320,
+      "fontScale": 1,
+      "overflow": []
+    },
+    {
+      "screen": "overall",
+      "width": 320,
+      "fontScale": 2,
+      "overflow": []
+    },
+    {
+      "screen": "friends",
+      "width": 320,
+      "fontScale": 2,
+      "overflow": []
+    },
+    {
+      "screen": "notices",
+      "width": 320,
+      "fontScale": 2,
+      "overflow": []
+    },
+    {
+      "screen": "settings",
+      "width": 320,
+      "fontScale": 2,
+      "overflow": []
+    },
+    {
+      "screen": "summary",
+      "width": 320,
+      "fontScale": 2,
+      "overflow": []
+    },
+    {
+      "screen": "overall",
+      "width": 390,
+      "fontScale": 1,
+      "overflow": []
+    },
+    {
+      "screen": "friends",
+      "width": 390,
+      "fontScale": 1,
+      "overflow": []
+    },
+    {
+      "screen": "notices",
+      "width": 390,
+      "fontScale": 1,
+      "overflow": []
+    },
+    {
+      "screen": "settings",
+      "width": 390,
+      "fontScale": 1,
+      "overflow": []
+    },
+    {
+      "screen": "summary",
+      "width": 390,
+      "fontScale": 1,
+      "overflow": []
+    },
+    {
+      "screen": "overall",
+      "width": 390,
+      "fontScale": 2,
+      "overflow": []
+    },
+    {
+      "screen": "friends",
+      "width": 390,
+      "fontScale": 2,
+      "overflow": []
+    },
+    {
+      "screen": "notices",
+      "width": 390,
+      "fontScale": 2,
+      "overflow": []
+    },
+    {
+      "screen": "settings",
+      "width": 390,
+      "fontScale": 2,
+      "overflow": []
+    },
+    {
+      "screen": "summary",
+      "width": 390,
+      "fontScale": 2,
+      "overflow": []
+    },
+    {
+      "screen": "overall",
+      "width": 768,
+      "fontScale": 1,
+      "overflow": []
+    },
+    {
+      "screen": "friends",
+      "width": 768,
+      "fontScale": 1,
+      "overflow": []
+    },
+    {
+      "screen": "notices",
+      "width": 768,
+      "fontScale": 1,
+      "overflow": []
+    },
+    {
+      "screen": "settings",
+      "width": 768,
+      "fontScale": 1,
+      "overflow": []
+    },
+    {
+      "screen": "summary",
+      "width": 768,
+      "fontScale": 1,
+      "overflow": []
+    },
+    {
+      "screen": "overall",
+      "width": 768,
+      "fontScale": 2,
+      "overflow": []
+    },
+    {
+      "screen": "friends",
+      "width": 768,
+      "fontScale": 2,
+      "overflow": []
+    },
+    {
+      "screen": "notices",
+      "width": 768,
+      "fontScale": 2,
+      "overflow": []
+    },
+    {
+      "screen": "settings",
+      "width": 768,
+      "fontScale": 2,
+      "overflow": []
+    },
+    {
+      "screen": "summary",
+      "width": 768,
+      "fontScale": 2,
+      "overflow": []
+    }
+  ],
+  "errors": [],
+  "privacy": "passed"
+}

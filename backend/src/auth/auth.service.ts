@@ -49,6 +49,7 @@ type PublicUserRecord = {
   email: string;
   nickname: string;
   profileImageUrl: string | null;
+  portfolioPublic: boolean;
   role: UserRole;
   status: UserStatus;
   createdAt: Date;
@@ -341,6 +342,7 @@ export class AuthService implements OnModuleInit {
         email: true,
         nickname: true,
         profileImageUrl: true,
+        portfolioPublic: true,
         role: true,
         status: true,
         createdAt: true,
@@ -375,6 +377,7 @@ export class AuthService implements OnModuleInit {
         email: true,
         nickname: true,
         profileImageUrl: true,
+        portfolioPublic: true,
         role: true,
         status: true,
         createdAt: true,
@@ -417,6 +420,16 @@ export class AuthService implements OnModuleInit {
       data.profileImageUrl = this.parseProfileImageUrl(body.profileImageUrl);
     }
 
+    if (this.hasOwn(body, 'portfolioPublic')) {
+      if (typeof body.portfolioPublic !== 'boolean') {
+        this.throwBadRequest(
+          'VALIDATION_ERROR',
+          'portfolioPublic must be a boolean.',
+        );
+      }
+      data.portfolioPublic = body.portfolioPublic;
+    }
+
     if (Object.keys(data).length === 0) {
       return this.buildCurrentUserResponse(currentUser);
     }
@@ -432,6 +445,7 @@ export class AuthService implements OnModuleInit {
           email: true,
           nickname: true,
           profileImageUrl: true,
+          portfolioPublic: true,
           role: true,
           status: true,
           createdAt: true,
@@ -464,6 +478,7 @@ export class AuthService implements OnModuleInit {
         email: user.email,
         nickname: user.nickname,
         profileImageUrl: user.profileImageUrl,
+        portfolioPublic: user.portfolioPublic,
         role: user.role,
         status: user.status,
         createdAt: user.createdAt.toISOString(),

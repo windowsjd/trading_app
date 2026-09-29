@@ -88,7 +88,7 @@ describe('mode-aware bottom tabs', () => {
       ['MarketTab', 'MarketStack', '마켓', 'market'],
       ['GuideTab', 'GuideStack', '가이드', 'guide'],
       ['RecordTab', 'RecordStack', '전적', 'record'],
-      ['MyTab', 'MyStack', 'MY', 'profile'],
+      ['MyTab', 'MyStack', '전체', 'menu'],
     ]);
   });
 
@@ -98,7 +98,7 @@ describe('mode-aware bottom tabs', () => {
       ['MarketTab', 'MarketStack', '마켓', 'market'],
       ['RankingTab', 'RankingStack', '랭킹', 'ranking'],
       ['RecordTab', 'RecordStack', '전적', 'record'],
-      ['MyTab', 'MyStack', 'MY', 'profile'],
+      ['MyTab', 'MyStack', '전체', 'menu'],
     ]);
   });
 
@@ -147,7 +147,7 @@ describe('bottom tab icon contract', () => {
     assert.match(icons, /import Svg, \{ Circle, Path \} from 'react-native-svg'/);
     assert.deepEqual(
       [...icons.matchAll(/case '(\w+)':/g)].map((match) => match[1]),
-      ['home', 'market', 'guide', 'ranking', 'record', 'profile'],
+      ['home', 'market', 'guide', 'ranking', 'record', 'menu', 'profile'],
     );
     assert.match(icons, /width=\{size\}\s+height=\{size\}/);
     assert.match(icons, /viewBox="0 0 24 24"/);

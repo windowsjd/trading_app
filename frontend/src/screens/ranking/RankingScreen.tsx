@@ -41,7 +41,7 @@ type Props = RankingScreenProps;
 
 const TABS: Array<{ key: RankingScope; label: string }> = [
   { key: 'all', label: '전체' },
-  { key: 'near_me', label: '내 주변' },
+  { key: 'friends', label: '친구' },
   { key: 'top10', label: 'TOP10' },
 ];
 
@@ -104,8 +104,8 @@ export default function RankingScreen({ navigation }: Props) {
     initialPageParam: {
       offset: 0,
       rankType: undefined as RankingRankType | undefined,
-      rankingDate: null as string | null,
-      capturedAt: null as string | null,
+      rankingDate: null,
+      capturedAt: null,
     },
     refetchInterval: (query) => {
       const data = query.state.data as
@@ -155,6 +155,7 @@ export default function RankingScreen({ navigation }: Props) {
     rankType,
   ]);
 
+  const refetchRankings = rankingQuery.refetch;
   React.useEffect(() => {
     if (rankingErrorCode !== ERROR_CODE.RANKING_SNAPSHOT_CHANGED) return;
     if (snapshotResetAttemptRef.current > 0) return;
@@ -162,8 +163,8 @@ export default function RankingScreen({ navigation }: Props) {
     snapshotResetAttemptRef.current += 1;
     void queryClient
       .resetQueries({ queryKey: rankingQueryKey, exact: true })
-      .then(() => rankingQuery.refetch());
-  }, [queryClient, rankingErrorCode, rankingQuery.refetch, rankingQueryKey]);
+      .then(() => refetchRankings());
+  }, [queryClient, rankingErrorCode, refetchRankings, rankingQueryKey]);
 
   const viewState = useMemo(() => {
     if (seasonQuery.isLoading || rankingQuery.isLoading) {
@@ -217,7 +218,7 @@ export default function RankingScreen({ navigation }: Props) {
         onRetry={() => {
           void queryClient
             .resetQueries({ queryKey: rankingQueryKey, exact: true })
-            .then(() => rankingQuery.refetch());
+            .then(() => refetchRankings());
         }}
       />
     );
@@ -229,8 +230,8 @@ export default function RankingScreen({ navigation }: Props) {
         title="랭킹을 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
         onRetry={() => {
-          seasonQuery.refetch();
-          rankingQuery.refetch();
+          void seasonQuery.refetch();
+          void rankingQuery.refetch();
         }}
       />
     );
@@ -241,17 +242,6 @@ export default function RankingScreen({ navigation }: Props) {
       <EmptyState
         title="랭킹 생성 대기 중입니다."
         message="랭킹 스냅샷이 생성되면 이곳에 표시됩니다."
-        actionLabel={hasNotJoined ? '시즌 참가하기' : undefined}
-        onAction={hasNotJoined ? () => rootNavigation.navigate('SeasonJoin') : undefined}
-      />
-    );
-  }
-
-  if (viewState === 'ranking_empty') {
-    return (
-      <EmptyState
-        title="아직 랭킹 데이터가 없습니다."
-        message="참가자가 쌓이면 랭킹이 표시됩니다."
         actionLabel={hasNotJoined ? '시즌 참가하기' : undefined}
         onAction={hasNotJoined ? () => rootNavigation.navigate('SeasonJoin') : undefined}
       />
@@ -269,7 +259,7 @@ export default function RankingScreen({ navigation }: Props) {
         contentContainerStyle={styles.content}
         onEndReached={() => {
           if (rankingQuery.hasNextPage && !rankingQuery.isFetchingNextPage) {
-            rankingQuery.fetchNextPage();
+            void rankingQuery.fetchNextPage();
           }
         }}
         onEndReachedThreshold={0.4}
@@ -290,7 +280,7 @@ export default function RankingScreen({ navigation }: Props) {
               </Text>
             </View>
 
-            {selectedTab !== 'near_me' && top3.length > 0 ? (
+            {selectedTab !== 'friends' && top3.length > 0 ? (
               <View style={styles.card}>
                 <Text style={styles.label}>상위 랭커</Text>
                 <View style={styles.topRow}>
@@ -319,8 +309,8 @@ export default function RankingScreen({ navigation }: Props) {
                 const testID =
                   tab.key === 'all'
                     ? TEST_IDS.ranking.tabAll
-                    : tab.key === 'near_me'
-                    ? TEST_IDS.ranking.tabNearMe
+                    : tab.key === 'friends'
+                    ? TEST_IDS.ranking.tabFriends
                     : TEST_IDS.ranking.tabTop10;
 
                 return (
@@ -338,6 +328,21 @@ export default function RankingScreen({ navigation }: Props) {
               })}
             </View>
           </>
+        }
+        ListEmptyComponent={
+          selectedTab === 'friends' ? (
+            <EmptyState
+              title="현재 시즌 랭킹에 표시할 친구가 없습니다."
+              message="친구를 추가하거나 친구의 시즌 참가를 기다려주세요."
+              actionLabel="친구 찾기"
+              onAction={() => navigation.navigate('MyTab', { screen: 'Friends' })}
+            />
+          ) : (
+            <EmptyState
+              title="아직 랭킹 데이터가 없습니다."
+              message="참가자가 쌓이면 랭킹이 표시됩니다."
+            />
+          )
         }
         renderItem={({ item }) => (
           <RankingRow

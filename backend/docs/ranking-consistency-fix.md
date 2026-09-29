@@ -33,7 +33,7 @@ admin daily writer는 동일 Season 잠금 아래 교체할 **해당 날짜**의
 
 writer가 A를 삭제하고 B를 commit해도 기존 reader는 PostgreSQL MVCC로 A의 행·참가자 공개 상태를 끝까지 읽는다. 새 reader는 B를 읽는다. 외부 호출, valuation, write/row lock은 읽기 transaction에 넣지 않았다. 기존 전체 set scope 검사의 O(P) 비용은 유지한다. 데이터베이스 오류/timeout을 혼합 available 응답으로 바꾸는 fallback은 없다.
 
-이전 capturedAt으로 다음 페이지를 요청했을 때의 `409 RANKING_SNAPSHOT_CHANGED`, all/top10/near_me의 window 계산, pagination 응답 의미는 유지한다.
+이전 capturedAt으로 다음 페이지를 요청했을 때의 `409 RANKING_SNAPSHOT_CHANGED`, all/top10/friends의 window 계산, pagination 응답 의미는 유지한다.
 
 ## 조사한 호출 경계
 

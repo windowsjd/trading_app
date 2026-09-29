@@ -1484,7 +1484,7 @@ FinalTierAssignmentJobService, SeasonSettlementJobService(기존 final ranking
 변경 없음: returnRate desc → maxDrawdown asc → totalFillCount asc → target
 return 도달 시각 → userId → seasonParticipantId. 순위는 sequential(1,2,3,4)
 유지이며 공동순위를 도입하지 않는다. 시즌 returnRate는 초기자본 기준이고 TWR을
-쓰지 않는다. hidden·excluded 공개 필터, near_me·top10·pagination, provisional
+쓰지 않는다. hidden·excluded 공개 필터, friends·top10·pagination, provisional
 tier, final tier cutoff 비율 모두 그대로다.
 
 ### 8-A.11 ranking writer 동시성 (season row lock)

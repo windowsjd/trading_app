@@ -517,10 +517,6 @@ export type EnumAssetTypeFieldUpdateOperationsInput = {
   set?: $Enums.AssetType
 }
 
-export type BoolFieldUpdateOperationsInput = {
-  set?: boolean
-}
-
 export type AssetCreateNestedOneWithoutPriceSnapshotsInput = {
   create?: Prisma.XOR<Prisma.AssetCreateWithoutPriceSnapshotsInput, Prisma.AssetUncheckedCreateWithoutPriceSnapshotsInput>
   connectOrCreate?: Prisma.AssetCreateOrConnectWithoutPriceSnapshotsInput

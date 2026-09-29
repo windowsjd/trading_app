@@ -236,6 +236,7 @@ jobs:
       REDIS_URL: redis://localhost:6379
       # Ownership, participant↔account linkage, financial scope, trading scope,
       # general-account creation and initial grant, snapshot/ranking scope.
+      FRIENDS_DB_INTEGRATION: "1"
       TRADING_ACCOUNT_DB_INTEGRATION: "1"
       # Complete general trading lifecycle: KRW market buy, market sell,
       # limit buy/sell reservations, cancel/release, matcher fill/skip, TWR,
@@ -301,6 +302,7 @@ jobs:
           src/trading-accounts/general-trading-audit.integration.spec.ts
           src/ranking/season-ranking-scope.integration.spec.ts
           src/ranking/ranking-consistency.integration.spec.ts
+          src/friends/friends.integration.spec.ts
           src/seasons/seasons.join.integration.spec.ts
           src/auth/auth.integration.spec.ts
           src/ops/ops-job-lock.integration.spec.ts

@@ -274,11 +274,14 @@ model User {
   passwordHash    String     @map("password_hash")
   nickname        String     @unique
   profileImageUrl String?    @map("profile_image_url")
+  portfolioPublic Boolean    @default(true) @map("portfolio_public")
   status          UserStatus @default(active)
   role            UserRole   @default(user)
   createdAt       DateTime   @default(now()) @map("created_at")
   updatedAt       DateTime   @updatedAt @map("updated_at")
 
+  friendshipsLow              Friendship[]               @relation("FriendshipLow")
+  friendshipsHigh             Friendship[]               @relation("FriendshipHigh")
   seasonParticipants          SeasonParticipant[]
   tradingAccounts             TradingAccount[]
   fxExecuteRequests           FxExecuteRequest[]
@@ -294,6 +297,27 @@ model User {
   rewardFulfillmentsCanceled  RewardFulfillmentRequest[] @relation("RewardFulfillmentCanceledBy")
 
   @@map("users")
+}
+
+enum FriendshipStatus {
+  pending
+  accepted
+}
+
+model Friendship {
+  id              String           @id @default(uuid())
+  lowUserId       String           @map("low_user_id")
+  highUserId      String           @map("high_user_id")
+  requesterUserId String           @map("requester_user_id")
+  status          FriendshipStatus @default(pending)
+  createdAt       DateTime         @default(now()) @map("created_at")
+  lowUser         User             @relation("FriendshipLow", fields: [lowUserId], references: [id], onDelete: Restrict)
+  highUser        User             @relation("FriendshipHigh", fields: [highUserId], references: [id], onDelete: Restrict)
+
+  @@unique([lowUserId, highUserId])
+  @@index([lowUserId, status, createdAt, id])
+  @@index([highUserId, status, createdAt, id])
+  @@map("friendships")
 }
 
 model OperatorAuditLog {

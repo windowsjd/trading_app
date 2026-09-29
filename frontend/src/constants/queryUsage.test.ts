@@ -65,7 +65,7 @@ it('no production key factory is shared by normal and infinite query hooks', (t)
 
 describe('mixed-shape resource keys', () => {
   it('separates shapes with identical filters while retaining season/account identity', () => {
-    const rank = { scope: 'near_me', seasonId: 'season-a', limit: 50, offset: 0 };
+    const rank = { scope: 'friends', seasonId: 'season-a', limit: 50, offset: 0 };
     const filters = { assetType: 'domestic_stock', limit: 20 };
     const pairs = [
       [QUERY_KEYS.record.seasons({ limit: 20 }), QUERY_KEYS.record.infiniteSeasons({ limit: 20 })],

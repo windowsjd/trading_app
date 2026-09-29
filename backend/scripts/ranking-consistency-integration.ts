@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { HttpException, Logger } from '@nestjs/common';
 import { Prisma, SeasonRankingType } from '../src/generated/prisma/client';
+import { friendshipPair } from '../src/friends/friendship.policy';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { PortfolioValuationService } from '../src/portfolio/portfolio-valuation.service';
 import { writeSeasonRankings } from '../src/portfolio/season-ranking-generation';
@@ -552,7 +553,7 @@ function interleavedReader(hook: ReadHook, publish: () => Promise<void>) {
   return { service: new RankingService(root), didFire: () => fired };
 }
 
-async function readerCase(hook: ReadHook, scope: 'all' | 'top10' | 'near_me') {
+async function readerCase(hook: ReadHook, scope: 'all' | 'top10' | 'friends') {
   const f = await fixture(13);
   await balances(f, 'A');
   await db.seasonParticipant.update({
@@ -567,6 +568,17 @@ async function readerCase(hook: ReadHook, scope: 'all' | 'top10' | 'near_me') {
     capturedAt: basis,
   });
   const userId = f.participants[7].userId;
+  if (scope === 'friends') {
+    await db.friendship.createMany({
+      data: f.participants
+        .filter((p) => p.userId !== userId)
+        .map((p) => ({
+          ...friendshipPair(userId, p.userId),
+          requesterUserId: userId,
+          status: 'accepted',
+        })),
+    });
+  }
   const query: RankingQuery = {
     seasonId: f.seasonId,
     scope,
@@ -723,7 +735,7 @@ async function scopeIntegrity() {
       (error: unknown) => errorCode(error) === 'SEASON_RANKING_SCOPE_MISMATCH',
     );
   }
-  for (const scope of ['all', 'top10', 'near_me']) {
+  for (const scope of ['all', 'top10', 'friends']) {
     await assert.rejects(
       reader.getRanking(f.participants[0].userId, {
         seasonId: f.seasonId,
@@ -814,6 +826,11 @@ async function cliDailyWriter() {
 }
 
 async function cleanup() {
+  await db.friendship.deleteMany({
+    where: {
+      OR: [{ lowUserId: { in: users } }, { highUserId: { in: users } }],
+    },
+  });
   await db.seasonRanking.deleteMany({ where: { seasonId: { in: seasons } } });
   await db.equitySnapshot.deleteMany({
     where: { tradingAccountId: { in: accounts } },
@@ -889,7 +906,7 @@ async function main() {
       'season start inclusive / end exclusive',
       seasonTimeBoundaries,
     );
-    for (const scope of ['all', 'top10', 'near_me'] as const) {
+    for (const scope of ['all', 'top10', 'friends'] as const) {
       for (const hook of [
         'metadata-after',
         'count-after',

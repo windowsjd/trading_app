@@ -1,3 +1,4 @@
+import { FriendsModule } from './friends/friends.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER } from '@nestjs/core';
@@ -40,6 +41,7 @@ import { WalletsModule } from './wallets/wallets.module';
     AssetsModule,
     AuthModule,
     BatchModule,
+    FriendsModule,
     FxModule,
     HomeModule,
     OperatorModule,

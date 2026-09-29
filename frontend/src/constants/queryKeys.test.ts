@@ -136,12 +136,12 @@ describe('invalidation prefixes cannot cross accounts', () => {
     // 작업 11 §10.1: Home names the selected account's season explicitly, the
     // public tab means "current". They must not share one entry.
     assert.notDeepEqual(
-      QUERY_KEYS.ranking.list({ scope: 'near_me', seasonId: 'season-1' }),
-      QUERY_KEYS.ranking.list({ scope: 'near_me', seasonId: 'season-2' }),
+      QUERY_KEYS.ranking.list({ scope: 'friends', seasonId: 'season-1' }),
+      QUERY_KEYS.ranking.list({ scope: 'friends', seasonId: 'season-2' }),
     );
     assert.notDeepEqual(
-      QUERY_KEYS.ranking.list({ scope: 'near_me', seasonId: 'season-1' }),
-      QUERY_KEYS.ranking.list({ scope: 'near_me' }),
+      QUERY_KEYS.ranking.list({ scope: 'friends', seasonId: 'season-1' }),
+      QUERY_KEYS.ranking.list({ scope: 'friends' }),
     );
   });
 

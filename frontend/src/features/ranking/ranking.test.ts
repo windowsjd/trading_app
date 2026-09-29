@@ -17,7 +17,7 @@ const compiled = new Map<string, string>();
 // The project's Node test runner cannot import TSX or native modules directly.
 // Compile the actual screen/dependencies and render with React + RN Web. Only
 // I/O hooks are stubbed; row rendering, formatters, states and press handlers run.
-function createHarness() {
+function createHarness(scope?: string) {
   const modules = new Map<string, any>();
   const mocks = new Map<string, any>();
   const presses: any[] = [];
@@ -36,6 +36,7 @@ function createHarness() {
   const navigation = { navigate: (...args: any[]) => navigations.push(args) };
   const mockLocal = (file: string, value: any) => mocks.set(path.join(src, file), value);
 
+  if (scope) mocks.set('react', { ...React, useState: (initial: unknown) => initial === 'all' ? [scope, () => {}] : React.useState(initial) });
   mocks.set('react-native', {
     ...native,
     Pressable: (props: any) => {
@@ -48,6 +49,7 @@ function createHarness() {
       return React.createElement(native.FlatList, props);
     },
   });
+  mocks.set('@react-navigation/native', { useFocusEffect: () => {} });
   mocks.set('@tanstack/react-query', {
     useQuery: (options: any) => {
       queryOptions.push(options);
@@ -255,7 +257,7 @@ describe('ranking API and query contract', () => {
   it('returns the wire payload directly and preserves default scope limits', async () => {
     const h = createHarness();
     const { getRankings } = h.load(path.join(src, 'features/ranking/api'));
-    for (const scope of ['all', 'near_me', 'top10']) {
+    for (const scope of ['all', 'friends', 'top10']) {
       assert.strictEqual(await getRankings({ scope }), h.page);
       const url = new URL(h.requests.at(-1)!, 'https://fixture.invalid');
       assert.equal(url.pathname, '/ranking');
@@ -306,13 +308,13 @@ describe('ranking API and query contract', () => {
 
 const summaryFixture: UserSeasonSummaryDto = {
   state: 'available',
-  user: { id: 'user-2', nickname: 'trader-2' },
+  user: { id: 'user-2', nickname: 'trader-2', profileImageUrl: null },
   season: {
-    id: 'season-1', status: 'active', rank: 2, provisionalTier: 'silver', finalTier: null,
+    id: 'season-1', name: '시즌 1', maxDrawdown: '0', status: 'active', rank: 2, provisionalTier: 'silver', finalTier: null,
     percentile: '100.00000000', returnRate: '9.00000000', totalAssetKrw: '999998.00000000', totalFillCount: 4,
   },
-  allocation: { cashKrwValue: '999998.00000000', domesticStockValueKrw: '0', usStockValueKrw: '0', cryptoValueKrw: '0' },
-  topPositions: [],
+  portfolioAccess: 'available',
+  portfolio: { valuationState: 'available', allocation: { cashKrwValue: '999998.00000000', domesticStockValueKrw: '0', usStockValueKrw: '0', cryptoValueKrw: '0' }, holdings: [], history: [] },
 };
 
 describe('existing user season summary', () => {
@@ -323,7 +325,7 @@ describe('existing user season summary', () => {
     assert.match(html, /trader-2/);
     assert.match(html, /silver/);
     assert.match(html, /999,998/);
-    await h.queryOptions[0].queryFn();
+    await h.queryOptions[0].queryFn({});
     assert.equal(h.requests[0], '/users/user-2/season-summary');
   });
 
@@ -379,7 +381,7 @@ describe('other ranking consumers', () => {
       const params = new URL(h.requests.at(-1)!, 'https://fixture.invalid').searchParams;
       assert.equal(params.get('seasonId'), 'season-1');
       assert.equal(params.get('rankType'), 'final');
-      assert.equal(params.get('scope'), 'near_me');
+      assert.equal(params.get('scope'), 'all');
       assert.equal(params.get('limit'), '1');
       for (const state of [notJoined, unavailable]) {
         h.page.myRanking = state;
@@ -414,4 +416,51 @@ describe('other ranking consumers', () => {
     const options = h.queryOptions.find((q) => q.queryKey[0] === 'ranking');
     assert.equal(options.enabled, false);
   });
+});
+
+
+describe('friend portfolio access rendering', () => {
+  it('keeps competition info but never renders cached private holdings', () => {
+    for (const [access, message] of [['private', '비공개'], ['not_friend', '친구 요청을 수락한']] as const) {
+      const h = createHarness();
+      const data = structuredClone(summaryFixture);
+      data.portfolioAccess = access;
+      data.portfolio!.holdings = [{ assetId: 'private-asset', name: 'PRIVATE_HOLDING', symbol: 'SECRET', assetType: 'crypto', weight: '30' }];
+      h.queries.set('ranking', h.ready(data));
+      const html = h.render('ranking/UserSeasonSummaryScreen', { route: { params: { userId: 'user-2' } } });
+      assert.ok(html.includes(message));
+      assert.match(html, /trader-2|999,998/);
+      assert.doesNotMatch(html, /PRIVATE_HOLDING|SECRET|자산 배분/);
+    }
+  });
+  it('shows persisted history and holdings, and suppresses them during permission refresh', () => {
+    const h = createHarness();
+    const data = structuredClone(summaryFixture);
+    data.portfolio!.holdings = [{ assetId: 'a', name: '보유종목', symbol: 'BTCUSDT', assetType: 'crypto', weight: null }];
+    data.portfolio!.history = [{ date: '2026-09-29', totalAssetKrw: '1000000', returnRate: '1' }];
+    h.queries.set('ranking', h.ready(data));
+    const render = () => h.render('ranking/UserSeasonSummaryScreen', { route: { params: { userId: 'user-2' } } });
+    assert.match(render(), /BTCUSDT/);
+    assert.match(render(), /비중 확인 불가/);
+    assert.match(render(), /2026-09-29/);
+    h.queries.set('ranking', { ...h.ready(data), isFetching: true });
+    assert.doesNotMatch(render(), /BTCUSDT|2026-09-29/);
+    h.queries.set('ranking', { ...h.ready(data), isError: true });
+    assert.doesNotMatch(render(), /BTCUSDT|2026-09-29/);
+  });
+});
+
+
+it('friend ranking empty state keeps the tabs and opens friend discovery', () => {
+  const h = createHarness('friends');
+  h.page.rankings = [];
+  const html = h.render();
+  assert.match(html, /현재 시즌 랭킹에 표시할 친구가 없습니다/);
+  assert.match(html, /친구 찾기/);
+  assert.doesNotMatch(html, /내 주변/);
+  const { TEST_IDS } = h.load(path.join(src, 'constants/testIds'));
+  assert.ok(h.presses.some((press) => press.testID === TEST_IDS.ranking.tabFriends));
+  const cta = h.presses.find((press) => renderToStaticMarkup(press.children).includes('친구 찾기'));
+  cta.onPress();
+  assert.deepEqual(h.navigations.at(-1), ['MyTab', { screen: 'Friends' }]);
 });

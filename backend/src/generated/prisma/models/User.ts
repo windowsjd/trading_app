@@ -30,6 +30,7 @@ export type UserMinAggregateOutputType = {
   passwordHash: string | null
   nickname: string | null
   profileImageUrl: string | null
+  portfolioPublic: boolean | null
   status: $Enums.UserStatus | null
   role: $Enums.UserRole | null
   createdAt: Date | null
@@ -42,6 +43,7 @@ export type UserMaxAggregateOutputType = {
   passwordHash: string | null
   nickname: string | null
   profileImageUrl: string | null
+  portfolioPublic: boolean | null
   status: $Enums.UserStatus | null
   role: $Enums.UserRole | null
   createdAt: Date | null
@@ -54,6 +56,7 @@ export type UserCountAggregateOutputType = {
   passwordHash: number
   nickname: number
   profileImageUrl: number
+  portfolioPublic: number
   status: number
   role: number
   createdAt: number
@@ -68,6 +71,7 @@ export type UserMinAggregateInputType = {
   passwordHash?: true
   nickname?: true
   profileImageUrl?: true
+  portfolioPublic?: true
   status?: true
   role?: true
   createdAt?: true
@@ -80,6 +84,7 @@ export type UserMaxAggregateInputType = {
   passwordHash?: true
   nickname?: true
   profileImageUrl?: true
+  portfolioPublic?: true
   status?: true
   role?: true
   createdAt?: true
@@ -92,6 +97,7 @@ export type UserCountAggregateInputType = {
   passwordHash?: true
   nickname?: true
   profileImageUrl?: true
+  portfolioPublic?: true
   status?: true
   role?: true
   createdAt?: true
@@ -177,6 +183,7 @@ export type UserGroupByOutputType = {
   passwordHash: string
   nickname: string
   profileImageUrl: string | null
+  portfolioPublic: boolean
   status: $Enums.UserStatus
   role: $Enums.UserRole
   createdAt: Date
@@ -210,10 +217,13 @@ export type UserWhereInput = {
   passwordHash?: Prisma.StringFilter<"User"> | string
   nickname?: Prisma.StringFilter<"User"> | string
   profileImageUrl?: Prisma.StringNullableFilter<"User"> | string | null
+  portfolioPublic?: Prisma.BoolFilter<"User"> | boolean
   status?: Prisma.EnumUserStatusFilter<"User"> | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFilter<"User"> | $Enums.UserRole
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
+  friendshipsLow?: Prisma.FriendshipListRelationFilter
+  friendshipsHigh?: Prisma.FriendshipListRelationFilter
   seasonParticipants?: Prisma.SeasonParticipantListRelationFilter
   tradingAccounts?: Prisma.TradingAccountListRelationFilter
   fxExecuteRequests?: Prisma.FxExecuteRequestListRelationFilter
@@ -235,10 +245,13 @@ export type UserOrderByWithRelationInput = {
   passwordHash?: Prisma.SortOrder
   nickname?: Prisma.SortOrder
   profileImageUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  portfolioPublic?: Prisma.SortOrder
   status?: Prisma.SortOrder
   role?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  friendshipsLow?: Prisma.FriendshipOrderByRelationAggregateInput
+  friendshipsHigh?: Prisma.FriendshipOrderByRelationAggregateInput
   seasonParticipants?: Prisma.SeasonParticipantOrderByRelationAggregateInput
   tradingAccounts?: Prisma.TradingAccountOrderByRelationAggregateInput
   fxExecuteRequests?: Prisma.FxExecuteRequestOrderByRelationAggregateInput
@@ -263,10 +276,13 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.UserWhereInput | Prisma.UserWhereInput[]
   passwordHash?: Prisma.StringFilter<"User"> | string
   profileImageUrl?: Prisma.StringNullableFilter<"User"> | string | null
+  portfolioPublic?: Prisma.BoolFilter<"User"> | boolean
   status?: Prisma.EnumUserStatusFilter<"User"> | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFilter<"User"> | $Enums.UserRole
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
+  friendshipsLow?: Prisma.FriendshipListRelationFilter
+  friendshipsHigh?: Prisma.FriendshipListRelationFilter
   seasonParticipants?: Prisma.SeasonParticipantListRelationFilter
   tradingAccounts?: Prisma.TradingAccountListRelationFilter
   fxExecuteRequests?: Prisma.FxExecuteRequestListRelationFilter
@@ -288,6 +304,7 @@ export type UserOrderByWithAggregationInput = {
   passwordHash?: Prisma.SortOrder
   nickname?: Prisma.SortOrder
   profileImageUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  portfolioPublic?: Prisma.SortOrder
   status?: Prisma.SortOrder
   role?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -306,6 +323,7 @@ export type UserScalarWhereWithAggregatesInput = {
   passwordHash?: Prisma.StringWithAggregatesFilter<"User"> | string
   nickname?: Prisma.StringWithAggregatesFilter<"User"> | string
   profileImageUrl?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
+  portfolioPublic?: Prisma.BoolWithAggregatesFilter<"User"> | boolean
   status?: Prisma.EnumUserStatusWithAggregatesFilter<"User"> | $Enums.UserStatus
   role?: Prisma.EnumUserRoleWithAggregatesFilter<"User"> | $Enums.UserRole
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"User"> | Date | string
@@ -318,10 +336,13 @@ export type UserCreateInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
@@ -343,10 +364,13 @@ export type UserUncheckedCreateInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
@@ -368,10 +392,13 @@ export type UserUpdateInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
@@ -393,10 +420,13 @@ export type UserUncheckedUpdateInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
@@ -418,6 +448,7 @@ export type UserCreateManyInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
@@ -430,6 +461,7 @@ export type UserUpdateManyMutationInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -442,6 +474,7 @@ export type UserUncheckedUpdateManyInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -454,6 +487,7 @@ export type UserCountOrderByAggregateInput = {
   passwordHash?: Prisma.SortOrder
   nickname?: Prisma.SortOrder
   profileImageUrl?: Prisma.SortOrder
+  portfolioPublic?: Prisma.SortOrder
   status?: Prisma.SortOrder
   role?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -466,6 +500,7 @@ export type UserMaxOrderByAggregateInput = {
   passwordHash?: Prisma.SortOrder
   nickname?: Prisma.SortOrder
   profileImageUrl?: Prisma.SortOrder
+  portfolioPublic?: Prisma.SortOrder
   status?: Prisma.SortOrder
   role?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -478,6 +513,7 @@ export type UserMinOrderByAggregateInput = {
   passwordHash?: Prisma.SortOrder
   nickname?: Prisma.SortOrder
   profileImageUrl?: Prisma.SortOrder
+  portfolioPublic?: Prisma.SortOrder
   status?: Prisma.SortOrder
   role?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -502,6 +538,10 @@ export type NullableStringFieldUpdateOperationsInput = {
   set?: string | null
 }
 
+export type BoolFieldUpdateOperationsInput = {
+  set?: boolean
+}
+
 export type EnumUserStatusFieldUpdateOperationsInput = {
   set?: $Enums.UserStatus
 }
@@ -512,6 +552,34 @@ export type EnumUserRoleFieldUpdateOperationsInput = {
 
 export type DateTimeFieldUpdateOperationsInput = {
   set?: Date | string
+}
+
+export type UserCreateNestedOneWithoutFriendshipsLowInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutFriendshipsLowInput, Prisma.UserUncheckedCreateWithoutFriendshipsLowInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutFriendshipsLowInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserCreateNestedOneWithoutFriendshipsHighInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutFriendshipsHighInput, Prisma.UserUncheckedCreateWithoutFriendshipsHighInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutFriendshipsHighInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutFriendshipsLowNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutFriendshipsLowInput, Prisma.UserUncheckedCreateWithoutFriendshipsLowInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutFriendshipsLowInput
+  upsert?: Prisma.UserUpsertWithoutFriendshipsLowInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutFriendshipsLowInput, Prisma.UserUpdateWithoutFriendshipsLowInput>, Prisma.UserUncheckedUpdateWithoutFriendshipsLowInput>
+}
+
+export type UserUpdateOneRequiredWithoutFriendshipsHighNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutFriendshipsHighInput, Prisma.UserUncheckedCreateWithoutFriendshipsHighInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutFriendshipsHighInput
+  upsert?: Prisma.UserUpsertWithoutFriendshipsHighInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutFriendshipsHighInput, Prisma.UserUpdateWithoutFriendshipsHighInput>, Prisma.UserUncheckedUpdateWithoutFriendshipsHighInput>
 }
 
 export type UserCreateNestedOneWithoutOperatorAuditLogsInput = {
@@ -700,16 +768,267 @@ export type UserUpdateOneRequiredWithoutFxExecuteRequestsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutFxExecuteRequestsInput, Prisma.UserUpdateWithoutFxExecuteRequestsInput>, Prisma.UserUncheckedUpdateWithoutFxExecuteRequestsInput>
 }
 
+export type UserCreateWithoutFriendshipsLowInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+}
+
+export type UserUncheckedCreateWithoutFriendshipsLowInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+}
+
+export type UserCreateOrConnectWithoutFriendshipsLowInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutFriendshipsLowInput, Prisma.UserUncheckedCreateWithoutFriendshipsLowInput>
+}
+
+export type UserCreateWithoutFriendshipsHighInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+}
+
+export type UserUncheckedCreateWithoutFriendshipsHighInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+}
+
+export type UserCreateOrConnectWithoutFriendshipsHighInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutFriendshipsHighInput, Prisma.UserUncheckedCreateWithoutFriendshipsHighInput>
+}
+
+export type UserUpsertWithoutFriendshipsLowInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutFriendshipsLowInput, Prisma.UserUncheckedUpdateWithoutFriendshipsLowInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutFriendshipsLowInput, Prisma.UserUncheckedCreateWithoutFriendshipsLowInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutFriendshipsLowInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutFriendshipsLowInput, Prisma.UserUncheckedUpdateWithoutFriendshipsLowInput>
+}
+
+export type UserUpdateWithoutFriendshipsLowInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+}
+
+export type UserUncheckedUpdateWithoutFriendshipsLowInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+}
+
+export type UserUpsertWithoutFriendshipsHighInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutFriendshipsHighInput, Prisma.UserUncheckedUpdateWithoutFriendshipsHighInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutFriendshipsHighInput, Prisma.UserUncheckedCreateWithoutFriendshipsHighInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutFriendshipsHighInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutFriendshipsHighInput, Prisma.UserUncheckedUpdateWithoutFriendshipsHighInput>
+}
+
+export type UserUpdateWithoutFriendshipsHighInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+}
+
+export type UserUncheckedUpdateWithoutFriendshipsHighInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+}
+
 export type UserCreateWithoutOperatorAuditLogsInput = {
   id?: string
   email: string
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
@@ -730,10 +1049,13 @@ export type UserUncheckedCreateWithoutOperatorAuditLogsInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
@@ -770,10 +1092,13 @@ export type UserUpdateWithoutOperatorAuditLogsInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
@@ -794,10 +1119,13 @@ export type UserUncheckedUpdateWithoutOperatorAuditLogsInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
@@ -818,10 +1146,13 @@ export type UserCreateWithoutRefreshTokenSessionsInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
@@ -842,10 +1173,13 @@ export type UserUncheckedCreateWithoutRefreshTokenSessionsInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
@@ -882,10 +1216,13 @@ export type UserUpdateWithoutRefreshTokenSessionsInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
@@ -906,10 +1243,13 @@ export type UserUncheckedUpdateWithoutRefreshTokenSessionsInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
@@ -930,10 +1270,13 @@ export type UserCreateWithoutTradingAccountsInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
@@ -954,10 +1297,13 @@ export type UserUncheckedCreateWithoutTradingAccountsInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
@@ -994,10 +1340,13 @@ export type UserUpdateWithoutTradingAccountsInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
@@ -1018,10 +1367,13 @@ export type UserUncheckedUpdateWithoutTradingAccountsInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
@@ -1042,10 +1394,13 @@ export type UserCreateWithoutSeasonParticipantsInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
@@ -1066,10 +1421,13 @@ export type UserUncheckedCreateWithoutSeasonParticipantsInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
@@ -1106,10 +1464,13 @@ export type UserUpdateWithoutSeasonParticipantsInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
@@ -1130,10 +1491,13 @@ export type UserUncheckedUpdateWithoutSeasonParticipantsInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
@@ -1154,10 +1518,13 @@ export type UserCreateWithoutUserBadgesInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
@@ -1178,10 +1545,13 @@ export type UserUncheckedCreateWithoutUserBadgesInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
@@ -1218,10 +1588,13 @@ export type UserUpdateWithoutUserBadgesInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
@@ -1242,10 +1615,13 @@ export type UserUncheckedUpdateWithoutUserBadgesInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
@@ -1266,10 +1642,13 @@ export type UserCreateWithoutSeasonRewardsInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
@@ -1290,10 +1669,13 @@ export type UserUncheckedCreateWithoutSeasonRewardsInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
@@ -1330,10 +1712,13 @@ export type UserUpdateWithoutSeasonRewardsInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
@@ -1354,10 +1739,13 @@ export type UserUncheckedUpdateWithoutSeasonRewardsInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
@@ -1378,10 +1766,13 @@ export type UserCreateWithoutRewardFulfillmentTargetsInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
@@ -1402,10 +1793,13 @@ export type UserUncheckedCreateWithoutRewardFulfillmentTargetsInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
@@ -1431,10 +1825,13 @@ export type UserCreateWithoutRewardFulfillmentsRequestedInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
@@ -1455,10 +1852,13 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsRequestedInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
@@ -1484,10 +1884,13 @@ export type UserCreateWithoutRewardFulfillmentsProcessedInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
@@ -1508,10 +1911,13 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsProcessedInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
@@ -1537,10 +1943,13 @@ export type UserCreateWithoutRewardFulfillmentsCanceledInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
@@ -1561,10 +1970,13 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsCanceledInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
@@ -1601,10 +2013,13 @@ export type UserUpdateWithoutRewardFulfillmentTargetsInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
@@ -1625,10 +2040,13 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentTargetsInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
@@ -1660,10 +2078,13 @@ export type UserUpdateWithoutRewardFulfillmentsRequestedInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
@@ -1684,10 +2105,13 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsRequestedInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
@@ -1719,10 +2143,13 @@ export type UserUpdateWithoutRewardFulfillmentsProcessedInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
@@ -1743,10 +2170,13 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsProcessedInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
@@ -1778,10 +2208,13 @@ export type UserUpdateWithoutRewardFulfillmentsCanceledInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
@@ -1802,10 +2235,13 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsCanceledInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
@@ -1826,10 +2262,13 @@ export type UserCreateWithoutAdRewardClaimsInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
@@ -1850,10 +2289,13 @@ export type UserUncheckedCreateWithoutAdRewardClaimsInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
@@ -1890,10 +2332,13 @@ export type UserUpdateWithoutAdRewardClaimsInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
@@ -1914,10 +2359,13 @@ export type UserUncheckedUpdateWithoutAdRewardClaimsInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
@@ -1938,10 +2386,13 @@ export type UserCreateWithoutQuotesInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
@@ -1962,10 +2413,13 @@ export type UserUncheckedCreateWithoutQuotesInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
@@ -2002,10 +2456,13 @@ export type UserUpdateWithoutQuotesInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
@@ -2026,10 +2483,13 @@ export type UserUncheckedUpdateWithoutQuotesInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
@@ -2050,10 +2510,13 @@ export type UserCreateWithoutFxExecuteRequestsInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
@@ -2074,10 +2537,13 @@ export type UserUncheckedCreateWithoutFxExecuteRequestsInput = {
   passwordHash: string
   nickname: string
   profileImageUrl?: string | null
+  portfolioPublic?: boolean
   status?: $Enums.UserStatus
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
@@ -2114,10 +2580,13 @@ export type UserUpdateWithoutFxExecuteRequestsInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
@@ -2138,10 +2607,13 @@ export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
@@ -2162,6 +2634,8 @@ export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
  */
 
 export type UserCountOutputType = {
+  friendshipsLow: number
+  friendshipsHigh: number
   seasonParticipants: number
   tradingAccounts: number
   fxExecuteRequests: number
@@ -2178,6 +2652,8 @@ export type UserCountOutputType = {
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  friendshipsLow?: boolean | UserCountOutputTypeCountFriendshipsLowArgs
+  friendshipsHigh?: boolean | UserCountOutputTypeCountFriendshipsHighArgs
   seasonParticipants?: boolean | UserCountOutputTypeCountSeasonParticipantsArgs
   tradingAccounts?: boolean | UserCountOutputTypeCountTradingAccountsArgs
   fxExecuteRequests?: boolean | UserCountOutputTypeCountFxExecuteRequestsArgs
@@ -2201,6 +2677,20 @@ export type UserCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensi
    * Select specific fields to fetch from the UserCountOutputType
    */
   select?: Prisma.UserCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountFriendshipsLowArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.FriendshipWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountFriendshipsHighArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.FriendshipWhereInput
 }
 
 /**
@@ -2301,10 +2791,13 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   passwordHash?: boolean
   nickname?: boolean
   profileImageUrl?: boolean
+  portfolioPublic?: boolean
   status?: boolean
   role?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  friendshipsLow?: boolean | Prisma.User$friendshipsLowArgs<ExtArgs>
+  friendshipsHigh?: boolean | Prisma.User$friendshipsHighArgs<ExtArgs>
   seasonParticipants?: boolean | Prisma.User$seasonParticipantsArgs<ExtArgs>
   tradingAccounts?: boolean | Prisma.User$tradingAccountsArgs<ExtArgs>
   fxExecuteRequests?: boolean | Prisma.User$fxExecuteRequestsArgs<ExtArgs>
@@ -2327,6 +2820,7 @@ export type UserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   passwordHash?: boolean
   nickname?: boolean
   profileImageUrl?: boolean
+  portfolioPublic?: boolean
   status?: boolean
   role?: boolean
   createdAt?: boolean
@@ -2339,6 +2833,7 @@ export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   passwordHash?: boolean
   nickname?: boolean
   profileImageUrl?: boolean
+  portfolioPublic?: boolean
   status?: boolean
   role?: boolean
   createdAt?: boolean
@@ -2351,14 +2846,17 @@ export type UserSelectScalar = {
   passwordHash?: boolean
   nickname?: boolean
   profileImageUrl?: boolean
+  portfolioPublic?: boolean
   status?: boolean
   role?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "passwordHash" | "nickname" | "profileImageUrl" | "status" | "role" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
+export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "passwordHash" | "nickname" | "profileImageUrl" | "portfolioPublic" | "status" | "role" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  friendshipsLow?: boolean | Prisma.User$friendshipsLowArgs<ExtArgs>
+  friendshipsHigh?: boolean | Prisma.User$friendshipsHighArgs<ExtArgs>
   seasonParticipants?: boolean | Prisma.User$seasonParticipantsArgs<ExtArgs>
   tradingAccounts?: boolean | Prisma.User$tradingAccountsArgs<ExtArgs>
   fxExecuteRequests?: boolean | Prisma.User$fxExecuteRequestsArgs<ExtArgs>
@@ -2380,6 +2878,8 @@ export type UserIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
 export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "User"
   objects: {
+    friendshipsLow: Prisma.$FriendshipPayload<ExtArgs>[]
+    friendshipsHigh: Prisma.$FriendshipPayload<ExtArgs>[]
     seasonParticipants: Prisma.$SeasonParticipantPayload<ExtArgs>[]
     tradingAccounts: Prisma.$TradingAccountPayload<ExtArgs>[]
     fxExecuteRequests: Prisma.$FxExecuteRequestPayload<ExtArgs>[]
@@ -2400,6 +2900,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     passwordHash: string
     nickname: string
     profileImageUrl: string | null
+    portfolioPublic: boolean
     status: $Enums.UserStatus
     role: $Enums.UserRole
     createdAt: Date
@@ -2798,6 +3299,8 @@ readonly fields: UserFieldRefs;
  */
 export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
+  friendshipsLow<T extends Prisma.User$friendshipsLowArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$friendshipsLowArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FriendshipPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  friendshipsHigh<T extends Prisma.User$friendshipsHighArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$friendshipsHighArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FriendshipPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   seasonParticipants<T extends Prisma.User$seasonParticipantsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$seasonParticipantsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SeasonParticipantPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   tradingAccounts<T extends Prisma.User$tradingAccountsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$tradingAccountsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TradingAccountPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   fxExecuteRequests<T extends Prisma.User$fxExecuteRequestsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$fxExecuteRequestsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FxExecuteRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -2845,6 +3348,7 @@ export interface UserFieldRefs {
   readonly passwordHash: Prisma.FieldRef<"User", 'String'>
   readonly nickname: Prisma.FieldRef<"User", 'String'>
   readonly profileImageUrl: Prisma.FieldRef<"User", 'String'>
+  readonly portfolioPublic: Prisma.FieldRef<"User", 'Boolean'>
   readonly status: Prisma.FieldRef<"User", 'UserStatus'>
   readonly role: Prisma.FieldRef<"User", 'UserRole'>
   readonly createdAt: Prisma.FieldRef<"User", 'DateTime'>
@@ -3239,6 +3743,54 @@ export type UserDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Internal
    * Limit how many Users to delete.
    */
   limit?: number
+}
+
+/**
+ * User.friendshipsLow
+ */
+export type User$friendshipsLowArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Friendship
+   */
+  select?: Prisma.FriendshipSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Friendship
+   */
+  omit?: Prisma.FriendshipOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FriendshipInclude<ExtArgs> | null
+  where?: Prisma.FriendshipWhereInput
+  orderBy?: Prisma.FriendshipOrderByWithRelationInput | Prisma.FriendshipOrderByWithRelationInput[]
+  cursor?: Prisma.FriendshipWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.FriendshipScalarFieldEnum | Prisma.FriendshipScalarFieldEnum[]
+}
+
+/**
+ * User.friendshipsHigh
+ */
+export type User$friendshipsHighArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Friendship
+   */
+  select?: Prisma.FriendshipSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Friendship
+   */
+  omit?: Prisma.FriendshipOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FriendshipInclude<ExtArgs> | null
+  where?: Prisma.FriendshipWhereInput
+  orderBy?: Prisma.FriendshipOrderByWithRelationInput | Prisma.FriendshipOrderByWithRelationInput[]
+  cursor?: Prisma.FriendshipWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.FriendshipScalarFieldEnum | Prisma.FriendshipScalarFieldEnum[]
 }
 
 /**

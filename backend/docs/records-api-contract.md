@@ -467,39 +467,36 @@ Protected public summary for a target user's season result. This endpoint does n
       "finalTier": "diamond",
       "rewardGranted": true,
       "totalAssetKrw": "11500000.00000000",
-      "returnRate": "0.15000000",
-      "orderCount": 8,
-      "exchangeCount": 2
+      "returnRate": "15.00000000"
     },
-    "publicPortfolioSummary": {
-      "state": "available | partial_unavailable | unavailable | not_joined",
-      "totalAssetKrw": "11500000.00000000",
-      "returnRate": "0.15000000",
-      "allocation": {
-        "domesticStockRate": "20.00000000",
-        "usStockRate": "35.00000000",
-        "cryptoRate": "15.00000000",
-        "cashRate": "30.00000000"
-      },
-      "topHoldings": [
-        {
-          "symbol": "AAPL",
-          "name": "Apple Inc.",
-          "market": "NASDAQ",
-          "assetType": "us_stock",
-          "weightRate": "12.00000000",
-          "returnRate": "3.00000000",
-          "returnRateState": "available",
-          "valuationState": "available"
-        }
-      ],
-      "valuationErrors": []
-    }
+    "portfolioAccess": "unavailable",
+    "portfolioReason": "USE_CURRENT_SEASON_SUMMARY",
+    "portfolio": null
   }
 }
 ```
 
-`publicPortfolioSummary.topHoldings` is capped at 5 holdings sorted by KRW value. It exposes public asset metadata, weight, return state, and valuation state only. It does not expose raw row ids.
+This route returns public competition summary only. The former
+`publicPortfolioSummary` payload is removed, including allocation, holdings
+and position return rates. It cannot be used to bypass friendship/privacy.
+
+## GET /api/v1/users/:userId/season-summary
+
+Authenticated competition summary for the currently selected season. Existing
+public rank/tier/return/total assets remain readable without a friendship.
+The user includes `id`, `nickname`, `profileImageUrl`; the season includes
+`name` and canonical ranking `maxDrawdown` when available.
+
+`portfolioAccess` distinguishes `available`, `private`, `not_friend` and
+`unavailable`. `portfolio` is null unless the viewer is an accepted friend,
+the target is active and sharing, and the selected season/account is active
+and the target is participating and visible. It contains only aggregate
+allocation, public holding metadata/weights, and real daily history from the
+last 30 days. No general or past-season portfolio is shared.
+
+Missing prices produce `valuationState: unavailable`, null allocation/weights,
+and retain authorized public holding names/history; zero is never fabricated.
+See [full policy and routes](friends-api-contract.md).
 
 ### Error Codes
 

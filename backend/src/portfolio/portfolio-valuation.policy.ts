@@ -103,6 +103,7 @@ export type PortfolioValuationInput = {
 };
 
 export type PortfolioValuationResult = {
+  positionValues: Array<{ assetId: string; valueKrw: string }>;
   seasonParticipantId: string | null;
   tradingAccountId: string | null;
   totalAssetKrw: string;
@@ -171,6 +172,7 @@ export function calculatePortfolioValuation(
     usdCashKrw = usdCash.mul(usdKrwRate);
   }
 
+  const positionValues: PortfolioValuationResult['positionValues'] = [];
   let assetValueKrw = new Prisma.Decimal(0);
   let domesticStockValueKrw = new Prisma.Decimal(0);
   let usStockValueKrw = new Prisma.Decimal(0);
@@ -249,6 +251,10 @@ export function calculatePortfolioValuation(
       ? quantity.mul(toDecimal(priceSnapshot.priceKrw, 'assetPrice.priceKrw'))
       : convertToKrw(positionValue, priceSnapshot.currencyCode, conversionRate);
 
+    positionValues.push({
+      assetId: position.assetId,
+      valueKrw: formatMoneyScale8(positionValueKrw),
+    });
     assetValueKrw = assetValueKrw.add(positionValueKrw);
     switch (position.assetType) {
       case AssetType.domestic_stock:
@@ -273,6 +279,7 @@ export function calculatePortfolioValuation(
     .mul(100);
 
   return {
+    positionValues,
     seasonParticipantId: input.seasonParticipantId,
     tradingAccountId: input.tradingAccountId ?? null,
     totalAssetKrw: formatMoneyScale8(totalAssetKrw),

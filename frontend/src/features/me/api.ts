@@ -10,9 +10,11 @@ export interface MeDto {
   role: UserRole;
   status: UserStatus;
   createdAt: string;
+  portfolioPublic: boolean;
 }
 
 export interface UpdateMeRequestDto {
+  portfolioPublic?: boolean;
   nickname?: string;
   profileImageUrl?: string | null;
 }

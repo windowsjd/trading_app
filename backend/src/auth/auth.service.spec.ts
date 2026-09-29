@@ -308,6 +308,44 @@ describe('AuthService', () => {
     });
   });
 
+  it('persists an explicit false and returns it from GET /me', async () => {
+    const { prisma, service } = createService();
+    prisma.user.findUnique.mockResolvedValue({
+      ...activeUser,
+      portfolioPublic: true,
+    });
+    prisma.user.update.mockResolvedValue({
+      ...activeUser,
+      portfolioPublic: false,
+    });
+    expect(
+      (await service.updateMe('user-1', { portfolioPublic: false })).data
+        .portfolioPublic,
+    ).toBe(false);
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { portfolioPublic: false } }),
+    );
+    prisma.user.findUnique.mockResolvedValue({
+      ...activeUser,
+      portfolioPublic: false,
+    });
+    expect((await service.me('user-1')).data.portfolioPublic).toBe(false);
+  });
+
+  it.each(['false', 0, null, {}, []])(
+    'rejects non-Boolean portfolio privacy: %p',
+    async (value) => {
+      const { prisma, service } = createService();
+      prisma.user.findUnique.mockResolvedValue(activeUser);
+      await expectHttpError(
+        service.updateMe('user-1', { portfolioPublic: value }),
+        HttpStatus.BAD_REQUEST,
+        'VALIDATION_ERROR',
+      );
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    },
+  );
+
   it('rejects duplicate nickname when updating my profile', async () => {
     const { prisma, service } = createService();
     prisma.user.findUnique

@@ -104,9 +104,9 @@ export default function MainTabs() {
         name="MyTab"
         component={MyStack}
         options={{
-          title: 'MY',
+          title: '전체',
           tabBarIcon: ({ color, size }) => (
-            <TabBarIcon name="profile" color={color} size={size} />
+            <TabBarIcon name="menu" color={color} size={size} />
           ),
         }}
       />

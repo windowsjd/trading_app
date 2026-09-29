@@ -1,3 +1,4 @@
+import { acceptedFriendUserWhere } from '../friends/friendship.policy';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import {
   ParticipantStatus,
@@ -31,7 +32,7 @@ export type RankingQuery = {
 };
 
 type RankingSectionState = 'available' | 'unavailable' | 'not_joined';
-type RankingScope = 'all' | 'near_me' | 'top10';
+type RankingScope = 'all' | 'friends' | 'top10';
 
 type RankingSeason = {
   id: string;
@@ -314,14 +315,27 @@ export class RankingService {
     if (myRankingRow) {
       assertSeasonRankingScope(myRankingRow);
     }
+    const listWhere =
+      parsedQuery.scope === 'friends'
+        ? {
+            ...where,
+            seasonParticipant: {
+              ...PUBLIC_RANKING_PARTICIPANT_WHERE,
+              user: acceptedFriendUserWhere(userId),
+            },
+          }
+        : where;
+    const listTotal =
+      parsedQuery.scope === 'friends'
+        ? await client.seasonRanking.count({ where: listWhere })
+        : totalParticipants;
     const window = this.resolveRankingWindow({
       query: parsedQuery,
-      totalParticipants,
-      myRank: myRankingRow?.rank ?? null,
+      totalParticipants: listTotal,
     });
     const rankingRows = await client.seasonRanking.findMany({
       where: {
-        ...where,
+        ...listWhere,
         ...(window.maxRank ? { rank: { lte: window.maxRank } } : {}),
       },
       orderBy: [{ rank: 'asc' }, { seasonParticipantId: 'asc' }],
@@ -403,7 +417,7 @@ export class RankingService {
   private parseScope(value: string | undefined): RankingScope {
     const text = this.parseOptionalText(value) ?? 'all';
 
-    if (text === 'all' || text === 'near_me' || text === 'top10') {
+    if (text === 'all' || text === 'friends' || text === 'top10') {
       return text;
     }
 
@@ -728,7 +742,6 @@ export class RankingService {
   private resolveRankingWindow(input: {
     query: ParsedRankingQuery;
     totalParticipants: number;
-    myRank: number | null;
   }) {
     if (input.query.scope === 'top10') {
       const paginationTotal = Math.min(input.totalParticipants, TOP10_LIMIT);
@@ -739,24 +752,6 @@ export class RankingService {
         offset,
         paginationTotal,
         maxRank: TOP10_LIMIT,
-      };
-    }
-
-    if (input.query.scope === 'near_me' && input.myRank !== null) {
-      const maxOffset = Math.max(
-        input.totalParticipants - input.query.limit,
-        0,
-      );
-      const centeredOffset = Math.max(
-        input.myRank - 1 - Math.floor(input.query.limit / 2),
-        0,
-      );
-
-      return {
-        limit: input.query.limit,
-        offset: Math.min(centeredOffset, maxOffset),
-        paginationTotal: input.totalParticipants,
-        maxRank: null,
       };
     }
 

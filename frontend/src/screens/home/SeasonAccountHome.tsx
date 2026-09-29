@@ -126,13 +126,13 @@ export default function SeasonAccountHome({
   });
 
   /**
-   * The leaderboard row for THIS account's season, named explicitly. `near_me`
+   * The leaderboard row for THIS account's season, named explicitly. `all&limit=1`
    * is requested for its `myRanking`; the surrounding rows are the ranking
    * tab's job, not Home's.
    */
   const rankingQuery = useQuery({
     queryKey: QUERY_KEYS.ranking.list({
-      scope: 'near_me',
+      scope: 'all',
       seasonId: season?.seasonId ?? null,
       rankType,
       limit: 1,
@@ -140,7 +140,7 @@ export default function SeasonAccountHome({
     }),
     queryFn: () =>
       getRankings({
-        scope: 'near_me',
+        scope: 'all',
         seasonId: season?.seasonId,
         rankType,
         limit: 1,

@@ -119,7 +119,7 @@ export const TEST_IDS = {
     screen: 'ranking-screen',
     retry: 'ranking-retry',
     tabAll: 'ranking-tab-all',
-    tabNearMe: 'ranking-tab-near-me',
+    tabFriends: 'ranking-tab-friends',
     tabTop10: 'ranking-tab-top10',
     joinCta: 'ranking-join-cta',
     item: (userId: string) => `ranking-item-${userId}`,
@@ -159,7 +159,6 @@ export const TEST_IDS = {
   my: {
     screen: 'my-screen',
     rewardMenu: 'my-reward-menu',
-    settingsMenu: 'my-settings-menu',
     logoutMenu: 'my-logout-menu',
   },
 

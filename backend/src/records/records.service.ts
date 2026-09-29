@@ -1,4 +1,12 @@
-import { closedMarketPriceScope, findMarketAwareAssetPriceCandidates } from '../providers/asset-price-snapshot-query';
+import {
+  readPortfolioAccess,
+  type PortfolioAccess,
+} from '../friends/friendship.policy';
+import type { FriendPortfolio } from '../friends/friend-portfolio.types';
+import {
+  closedMarketPriceScope,
+  findMarketAwareAssetPriceCandidates,
+} from '../providers/asset-price-snapshot-query';
 import {
   HttpException,
   HttpStatus,
@@ -91,11 +99,6 @@ type SeasonEquityState = 'available' | 'empty' | 'not_joined';
 type SectionState = 'available' | 'unavailable';
 type PerformanceState = 'available' | 'unavailable';
 type ProfitAnalysisState = 'available' | 'unavailable' | 'partial_unavailable';
-type PublicPortfolioSummaryState =
-  | 'available'
-  | 'unavailable'
-  | 'not_joined'
-  | 'partial_unavailable';
 type ValuationErrorCode =
   | 'ASSET_PRICE_UNAVAILABLE'
   | 'PRICE_STALE'
@@ -233,36 +236,6 @@ type ProfitAnalysis = {
   items: ProfitAnalysisItem[];
   valuationErrors: Array<{
     assetId: string;
-    code: ValuationErrorCode;
-    message: string;
-  }>;
-};
-
-type PublicPortfolioSummary = {
-  state: PublicPortfolioSummaryState;
-  totalAssetKrw: string | null;
-  returnRate: string | null;
-  allocation: {
-    domesticStockRate: string;
-    usStockRate: string;
-    cryptoRate: string;
-    cashRate: string;
-  };
-  topHoldings: Array<{
-    symbol: string;
-    name: string;
-    market: string;
-    assetType: AssetType;
-    weightRate: string;
-    returnRate: string | null;
-    returnRateState: 'available' | 'unavailable';
-    valuationState: 'available' | 'unavailable';
-  }>;
-  valuationErrors: Array<{
-    symbol: string;
-    name: string;
-    market: string;
-    assetType: AssetType | null;
     code: ValuationErrorCode;
     message: string;
   }>;
@@ -531,7 +504,9 @@ type UserSeasonRecordSummaryResponse = {
       totalAssetKrw: string | null;
       returnRate: string | null;
     } | null;
-    publicPortfolioSummary: PublicPortfolioSummary;
+    portfolio: null;
+    portfolioAccess: 'unavailable';
+    portfolioReason: 'USE_CURRENT_SEASON_SUMMARY';
     reason?: string;
     message?: string;
   };
@@ -541,12 +516,10 @@ type UserCurrentSeasonSummaryResponse = {
   success: true;
   data: {
     state: 'available' | 'not_joined' | 'unavailable';
-    user: {
-      id: string;
-      nickname: string;
-    };
+    user: { id: string; nickname: string; profileImageUrl: string | null };
     season: {
       id: string;
+      name: string;
       status: SeasonStatus;
       rank: number | null;
       provisionalTier: string | null;
@@ -554,20 +527,12 @@ type UserCurrentSeasonSummaryResponse = {
       percentile: string | null;
       returnRate: string | null;
       totalAssetKrw: string | null;
+      maxDrawdown: string | null;
       totalFillCount: number;
     } | null;
-    allocation: {
-      cashKrwValue: string;
-      domesticStockValueKrw: string;
-      usStockValueKrw: string;
-      cryptoValueKrw: string;
-    };
-    topPositions: Array<{
-      assetId: string;
-      symbol: string;
-      name: string;
-      weight: string;
-    }>;
+    portfolioAccess: PortfolioAccess;
+    portfolioReason?: string;
+    portfolio: FriendPortfolio | null;
     reason?: string;
     message?: string;
   };
@@ -1317,7 +1282,9 @@ export class RecordsService {
           user: targetUser,
           season: publicSeason,
           summary: null,
-          publicPortfolioSummary: this.notJoinedPublicPortfolioSummary(),
+          portfolio: null,
+          portfolioAccess: 'unavailable',
+          portfolioReason: 'USE_CURRENT_SEASON_SUMMARY',
           reason: 'SEASON_NOT_JOINED',
           message: 'The user has not joined this season.',
         },
@@ -1334,17 +1301,15 @@ export class RecordsService {
           user: targetUser,
           season: publicSeason,
           summary: null,
-          publicPortfolioSummary: this.emptyPublicPortfolioSummary(),
+          portfolio: null,
+          portfolioAccess: 'unavailable',
+          portfolioReason: 'USE_CURRENT_SEASON_SUMMARY',
           reason: hiddenReason.reason,
           message: hiddenReason.message,
         },
       };
     }
 
-    const publicPortfolioSummary = await this.buildPublicPortfolioSummary(
-      participant.tradingAccountId,
-      new Date(),
-    );
     const metric = this.selectBestMetric(
       participant.seasonRankings[0],
       participant.tradingAccount.dailyPortfolioSnapshots[0],
@@ -1367,15 +1332,9 @@ export class RecordsService {
             : null,
           returnRate: metric ? this.formatDecimal(metric.returnRate, 8) : null,
         },
-        publicPortfolioSummary: {
-          ...publicPortfolioSummary,
-          totalAssetKrw:
-            publicPortfolioSummary.totalAssetKrw ??
-            (metric ? this.formatDecimal(metric.totalAssetKrw, 8) : null),
-          returnRate:
-            publicPortfolioSummary.returnRate ??
-            (metric ? this.formatDecimal(metric.returnRate, 8) : null),
-        },
+        portfolio: null,
+        portfolioAccess: 'unavailable',
+        portfolioReason: 'USE_CURRENT_SEASON_SUMMARY',
       },
     };
   }
@@ -1399,6 +1358,7 @@ export class RecordsService {
         select: {
           id: true,
           nickname: true,
+          profileImageUrl: true,
         },
       }),
       this.findCurrentSeason(),
@@ -1419,8 +1379,8 @@ export class RecordsService {
           state: 'unavailable',
           user: targetUser,
           season: null,
-          allocation: this.emptyPublicValueAllocation(),
-          topPositions: [],
+          portfolioAccess: 'unavailable',
+          portfolio: null,
           reason: 'CURRENT_SEASON_NOT_FOUND',
           message: 'Current season is not configured.',
         },
@@ -1439,6 +1399,8 @@ export class RecordsService {
           user: targetUser,
           season: {
             id: season.id,
+            name: season.name,
+            maxDrawdown: null,
             status: season.status,
             rank: null,
             provisionalTier: null,
@@ -1448,8 +1410,8 @@ export class RecordsService {
             totalAssetKrw: null,
             totalFillCount: 0,
           },
-          allocation: this.emptyPublicValueAllocation(),
-          topPositions: [],
+          portfolioAccess: 'unavailable',
+          portfolio: null,
           reason: 'SEASON_NOT_JOINED',
           message: 'The user has not joined the current season.',
         },
@@ -1466,6 +1428,8 @@ export class RecordsService {
           user: targetUser,
           season: {
             id: season.id,
+            name: season.name,
+            maxDrawdown: null,
             status: season.status,
             rank: null,
             provisionalTier: null,
@@ -1475,27 +1439,42 @@ export class RecordsService {
             totalAssetKrw: null,
             totalFillCount: 0,
           },
-          allocation: this.emptyPublicValueAllocation(),
-          topPositions: [],
+          portfolioAccess: 'unavailable',
+          portfolio: null,
           reason: hiddenReason.reason,
           message: hiddenReason.message,
         },
       };
     }
 
-    const [ranking, portfolio] = await Promise.all([
-      this.findLatestPublicRanking(
-        season.id,
-        participant.id,
-        participant.tradingAccountId,
-        season.status,
-      ),
-      this.buildPublicSeasonSummaryPortfolio(
-        participant.id,
-        participant.tradingAccountId,
-        new Date(),
-      ),
-    ]);
+    const ranking = await this.findLatestPublicRanking(
+      season.id,
+      participant.id,
+      participant.tradingAccountId,
+      season.status,
+    );
+    let portfolioAccess = await readPortfolioAccess(
+      this.prisma,
+      authUserId,
+      parsedTargetUserId,
+    );
+    let portfolioReason: string | undefined;
+    if (
+      portfolioAccess === 'available' &&
+      (season.status !== SeasonStatus.active ||
+        participant.tradingAccount.status !== 'active')
+    ) {
+      portfolioAccess = 'unavailable';
+      portfolioReason = 'CURRENT_ACTIVE_SEASON_UNAVAILABLE';
+    }
+    let portfolio =
+      portfolioAccess === 'available'
+        ? await this.buildFriendPortfolio(
+            participant.id,
+            participant.tradingAccountId,
+            new Date(),
+          )
+        : null;
     const metric =
       ranking ??
       this.selectBestMetric(
@@ -1528,6 +1507,17 @@ export class RecordsService {
     const isFinalRanking = ranking?.rankType === SeasonRankingType.final;
     const isDailyRanking = ranking?.rankType === SeasonRankingType.daily;
 
+    // Recheck after the financial reads, so an in-flight deletion/privacy save
+    // cannot return a payload after the permission was revoked.
+    if (portfolio) {
+      portfolioAccess = await readPortfolioAccess(
+        this.prisma,
+        authUserId,
+        parsedTargetUserId,
+      );
+      if (portfolioAccess !== 'available') portfolio = null;
+    }
+
     return {
       success: true,
       data: {
@@ -1535,6 +1525,10 @@ export class RecordsService {
         user: targetUser,
         season: {
           id: season.id,
+          name: season.name,
+          maxDrawdown: ranking
+            ? this.formatDecimal(ranking.maxDrawdown, 8)
+            : null,
           status: season.status,
           rank:
             ranking?.rank ?? participant.currentRank ?? participant.finalRank,
@@ -1560,8 +1554,9 @@ export class RecordsService {
             : null,
           totalFillCount: ranking?.totalFillCount ?? participant.totalFillCount,
         },
-        allocation: portfolio.allocation,
-        topPositions: portfolio.topPositions,
+        portfolioAccess,
+        portfolioReason,
+        portfolio,
       },
     };
   }
@@ -1752,205 +1747,6 @@ export class RecordsService {
     };
   }
 
-  private async buildPublicPortfolioSummary(
-    tradingAccountId: string,
-    valuationAt: Date,
-  ): Promise<PublicPortfolioSummary> {
-    const [positions, cashWallets] = await Promise.all([
-      this.findProfitPositions(tradingAccountId),
-      this.prisma.cashWallet.findMany({
-        where: {
-          tradingAccountId,
-        },
-        select: {
-          currencyCode: true,
-          balanceAmount: true,
-        },
-      }),
-    ]);
-    const openPositions = positions.filter(
-      (position) => !position.quantity.eq(0),
-    );
-    const needsUsdKrw =
-      openPositions.some(
-        (position) => position.currencyCode === CurrencyCode.USD,
-      ) ||
-      cashWallets.some(
-        (wallet) =>
-          wallet.currencyCode === CurrencyCode.USD &&
-          !wallet.balanceAmount.eq(0),
-      );
-    const usdKrwSelection = await this.findUsdKrwSelectionForRecords(
-      needsUsdKrw,
-      valuationAt,
-    );
-    const valuationErrors: PublicPortfolioSummary['valuationErrors'] = [];
-    let cashKrw = new Prisma.Decimal(0);
-
-    for (const wallet of cashWallets) {
-      if (wallet.currencyCode === CurrencyCode.KRW) {
-        cashKrw = cashKrw.add(wallet.balanceAmount);
-        continue;
-      }
-
-      if (wallet.balanceAmount.eq(0)) {
-        continue;
-      }
-
-      if (usdKrwSelection?.state !== 'available') {
-        valuationErrors.push({
-          symbol: 'USD',
-          name: 'USD Cash',
-          market: 'cash',
-          assetType: null,
-          code: usdKrwSelection?.code ?? 'FX_RATE_UNAVAILABLE',
-          message:
-            usdKrwSelection?.message ??
-            'USD/KRW FX rate snapshot is unavailable.',
-        });
-        continue;
-      }
-
-      cashKrw = cashKrw.add(wallet.balanceAmount.mul(usdKrwSelection.rate));
-    }
-
-    const holdings = await Promise.all(
-      openPositions.map(async (position) => {
-        try {
-          if (
-            position.currencyCode === CurrencyCode.USD &&
-            usdKrwSelection?.state === 'unavailable'
-          ) {
-            throw new RecordsValuationError(
-              usdKrwSelection.code,
-              usdKrwSelection.message,
-            );
-          }
-
-          const priceSnapshot = await this.findLatestEligibleAssetPriceSnapshot(
-            position.asset,
-            position.currencyCode,
-            valuationAt,
-          );
-          const positionValue = position.quantity.mul(priceSnapshot.price);
-          const positionValueKrw = this.convertToKrwForRecords(
-            positionValue,
-            position.currencyCode,
-            usdKrwSelection,
-          );
-          const returnRate = position.averageCost.eq(0)
-            ? null
-            : priceSnapshot.price
-                .sub(position.averageCost)
-                .div(position.averageCost)
-                .mul(100);
-
-          return {
-            position,
-            positionValueKrw,
-            returnRate,
-            error: null,
-          };
-        } catch (caught) {
-          const valuationError =
-            caught instanceof RecordsValuationError
-              ? caught
-              : new RecordsValuationError(
-                  'ASSET_PRICE_UNAVAILABLE',
-                  `Asset valuation is unavailable for asset ${position.assetId}.`,
-                );
-          valuationErrors.push({
-            symbol: position.asset.symbol,
-            name: position.asset.name,
-            market: position.asset.market,
-            assetType: position.asset.assetType,
-            code: valuationError.code,
-            message: this.publicValuationErrorMessage(valuationError.code),
-          });
-
-          return {
-            position,
-            positionValueKrw: new Prisma.Decimal(0),
-            returnRate: null,
-            error: valuationError,
-          };
-        }
-      }),
-    );
-    const availableHoldings = holdings.filter((holding) => !holding.error);
-    const domesticStockValueKrw = availableHoldings
-      .filter(
-        (holding) =>
-          holding.position.asset.assetType === AssetType.domestic_stock,
-      )
-      .reduce(
-        (sum, holding) => sum.add(holding.positionValueKrw),
-        new Prisma.Decimal(0),
-      );
-    const usStockValueKrw = availableHoldings
-      .filter(
-        (holding) => holding.position.asset.assetType === AssetType.us_stock,
-      )
-      .reduce(
-        (sum, holding) => sum.add(holding.positionValueKrw),
-        new Prisma.Decimal(0),
-      );
-    const cryptoValueKrw = availableHoldings
-      .filter(
-        (holding) => holding.position.asset.assetType === AssetType.crypto,
-      )
-      .reduce(
-        (sum, holding) => sum.add(holding.positionValueKrw),
-        new Prisma.Decimal(0),
-      );
-    const totalAssetKrw = cashKrw
-      .add(domesticStockValueKrw)
-      .add(usStockValueKrw)
-      .add(cryptoValueKrw);
-    const denominator = totalAssetKrw.eq(0) ? null : totalAssetKrw;
-
-    return {
-      state: valuationErrors.length === 0 ? 'available' : 'partial_unavailable',
-      totalAssetKrw: this.formatDecimal(totalAssetKrw, 8),
-      returnRate: null,
-      allocation: {
-        domesticStockRate: this.formatRateFromPart(
-          domesticStockValueKrw,
-          denominator,
-        ),
-        usStockRate: this.formatRateFromPart(usStockValueKrw, denominator),
-        cryptoRate: this.formatRateFromPart(cryptoValueKrw, denominator),
-        cashRate: this.formatRateFromPart(cashKrw, denominator),
-      },
-      topHoldings: availableHoldings
-        .toSorted((left, right) => {
-          const valueDiff = right.positionValueKrw.cmp(left.positionValueKrw);
-          if (valueDiff !== 0) {
-            return valueDiff;
-          }
-
-          return left.position.assetId.localeCompare(right.position.assetId);
-        })
-        .slice(0, 5)
-        .map((holding) => ({
-          symbol: holding.position.asset.symbol,
-          name: holding.position.asset.name,
-          market: holding.position.asset.market,
-          assetType: holding.position.asset.assetType,
-          weightRate: this.formatRateFromPart(
-            holding.positionValueKrw,
-            denominator,
-          ),
-          returnRate: holding.returnRate
-            ? this.formatDecimal(holding.returnRate, 8)
-            : null,
-          returnRateState: holding.returnRate ? 'available' : 'unavailable',
-          valuationState: 'available' as const,
-        })),
-      valuationErrors,
-    };
-  }
-
   private async findLatestPublicRanking(
     seasonId: string,
     seasonParticipantId: string,
@@ -2013,6 +1809,7 @@ export class RecordsService {
         rank: true,
         rankingDate: true,
         totalAssetKrw: true,
+        maxDrawdown: true,
         returnRate: true,
         totalFillCount: true,
         capturedAt: true,
@@ -2028,130 +1825,99 @@ export class RecordsService {
     return ranking;
   }
 
-  private async buildPublicSeasonSummaryPortfolio(
+  private async buildFriendPortfolio(
     seasonParticipantId: string,
     tradingAccountId: string,
     valuationAt: Date,
-  ): Promise<{
-    allocation: UserCurrentSeasonSummaryResponse['data']['allocation'];
-    topPositions: UserCurrentSeasonSummaryResponse['data']['topPositions'];
-  }> {
-    if (!this.portfolioValuationService) {
-      return {
-        allocation: this.emptyPublicValueAllocation(),
-        topPositions: [],
-      };
-    }
-
+  ): Promise<FriendPortfolio> {
+    let valuation: PortfolioValuationResult | null = null;
     try {
-      const valuation =
-        await this.portfolioValuationService.calculateTradingAccountValuation(
-          tradingAccountId,
-          valuationAt,
-          'home_live_valuation',
-        );
-      if (valuation.seasonParticipantId !== seasonParticipantId) {
+      valuation = this.portfolioValuationService
+        ? await this.portfolioValuationService.calculateTradingAccountValuation(
+            tradingAccountId,
+            valuationAt,
+            'home_live_valuation',
+          )
+        : null;
+      if (valuation && valuation.seasonParticipantId !== seasonParticipantId) {
         throw new PortfolioValuationError(
           'TRADING_ACCOUNT_SCOPE_MISMATCH',
-          `Trading account ${tradingAccountId} is not owned by participant ${seasonParticipantId}.`,
+          'Portfolio account ownership mismatch.',
         );
       }
-
-      return {
-        allocation: this.publicValueAllocationFromValuation(valuation),
-        topPositions: await this.buildPublicTopPositions(
-          tradingAccountId,
-          valuation.totalAssetKrw,
-        ),
-      };
     } catch (error) {
-      if (!(error instanceof PortfolioValuationError)) {
+      // Structural corruption is an error, never a fake empty portfolio.
+      if (
+        !(error instanceof PortfolioValuationError) ||
+        ![
+          'ASSET_PRICE_UNAVAILABLE',
+          'ASSET_PRICE_STALE',
+          'PRICE_STALE',
+          'FX_RATE_UNAVAILABLE',
+          'FX_RATE_STALE',
+        ].includes(error.code)
+      )
         throw error;
-      }
-
-      return {
-        allocation: this.emptyPublicValueAllocation(),
-        topPositions: [],
-      };
     }
-  }
-
-  private publicValueAllocationFromValuation(
-    valuation: PortfolioValuationResult,
-  ): UserCurrentSeasonSummaryResponse['data']['allocation'] {
+    const since = new Date(valuationAt);
+    since.setUTCHours(0, 0, 0, 0);
+    since.setUTCDate(since.getUTCDate() - 29);
+    const [positions, snapshots] = await Promise.all([
+      this.prisma.position.findMany({
+        where: { tradingAccountId, quantity: { gt: 0 } },
+        select: {
+          assetId: true,
+          asset: { select: { name: true, symbol: true, assetType: true } },
+        },
+        orderBy: { assetId: 'asc' },
+      }),
+      this.prisma.dailyPortfolioSnapshot.findMany({
+        where: {
+          tradingAccountId,
+          snapshotDate: { gte: since, lte: valuationAt },
+        },
+        select: { snapshotDate: true, totalAssetKrw: true, returnRate: true },
+        orderBy: { snapshotDate: 'asc' },
+        take: 30,
+      }),
+    ]);
+    const values = new Map(
+      valuation?.positionValues.map((position) => [
+        position.assetId,
+        position.valueKrw,
+      ]),
+    );
+    const denominator = valuation
+      ? new Prisma.Decimal(valuation.totalAssetKrw)
+      : null;
     return {
-      cashKrwValue: new Prisma.Decimal(valuation.krwCash)
-        .add(valuation.usdCashKrw)
-        .toFixed(8),
-      domesticStockValueKrw: valuation.domesticStockValueKrw,
-      usStockValueKrw: valuation.usStockValueKrw,
-      cryptoValueKrw: valuation.cryptoValueKrw,
-    };
-  }
-
-  private async buildPublicTopPositions(
-    tradingAccountId: string,
-    totalAssetKrw: string,
-  ): Promise<UserCurrentSeasonSummaryResponse['data']['topPositions']> {
-    const denominator = new Prisma.Decimal(totalAssetKrw);
-    if (denominator.eq(0)) {
-      return [];
-    }
-
-    const positions = await this.prisma.position.findMany({
-      where: {
-        tradingAccountId,
-        quantity: {
-          gt: 0,
-        },
-        marketValueKrw: {
-          not: null,
-        },
-      },
-      select: {
-        assetId: true,
-        marketValueKrw: true,
-        asset: {
-          select: {
-            symbol: true,
-            name: true,
-          },
-        },
-      },
-    });
-
-    return positions
-      .filter((position) => position.marketValueKrw !== null)
-      .toSorted((left, right) => {
-        const leftValue = left.marketValueKrw ?? new Prisma.Decimal(0);
-        const rightValue = right.marketValueKrw ?? new Prisma.Decimal(0);
-        const valueDiff = rightValue.cmp(leftValue);
-        if (valueDiff !== 0) {
-          return valueDiff;
-        }
-
-        return left.assetId.localeCompare(right.assetId);
-      })
-      .slice(0, 5)
-      .map((position) => ({
+      valuationState: valuation ? 'available' : 'unavailable',
+      allocation: valuation
+        ? {
+            cashKrwValue: new Prisma.Decimal(valuation.krwCash)
+              .add(valuation.usdCashKrw)
+              .toFixed(8),
+            domesticStockValueKrw: valuation.domesticStockValueKrw,
+            usStockValueKrw: valuation.usStockValueKrw,
+            cryptoValueKrw: valuation.cryptoValueKrw,
+          }
+        : null,
+      holdings: positions.map((position) => ({
         assetId: position.assetId,
-        symbol: position.asset.symbol,
-        name: position.asset.name,
-        weight: this.formatDecimal(
-          (position.marketValueKrw ?? new Prisma.Decimal(0))
-            .div(denominator)
-            .mul(100),
-          8,
-        ),
-      }));
-  }
-
-  private emptyPublicValueAllocation(): UserCurrentSeasonSummaryResponse['data']['allocation'] {
-    return {
-      cashKrwValue: this.formatDecimal(new Prisma.Decimal(0), 8),
-      domesticStockValueKrw: this.formatDecimal(new Prisma.Decimal(0), 8),
-      usStockValueKrw: this.formatDecimal(new Prisma.Decimal(0), 8),
-      cryptoValueKrw: this.formatDecimal(new Prisma.Decimal(0), 8),
+        ...position.asset,
+        weight:
+          denominator?.gt(0) && values.has(position.assetId)
+            ? new Prisma.Decimal(values.get(position.assetId)!)
+                .div(denominator)
+                .mul(100)
+                .toFixed(8)
+            : null,
+      })),
+      history: snapshots.map((point) => ({
+        date: this.formatDateOnly(point.snapshotDate),
+        totalAssetKrw: this.formatDecimal(point.totalAssetKrw, 8),
+        returnRate: this.formatDecimal(point.returnRate, 8),
+      })),
     };
   }
 
@@ -2193,10 +1959,17 @@ export class RecordsService {
       workflow: 'positions_live_valuation',
       asset,
     });
-    const priceRead = { asset: { ...asset, currencyCode: currencyCode }, workflow: 'positions_live_valuation' as const, now: valuationAt };
+    const priceRead = {
+      asset: { ...asset, currencyCode: currencyCode },
+      workflow: 'positions_live_valuation' as const,
+      now: valuationAt,
+    };
     const closedScope = closedMarketPriceScope(priceRead);
     const providerCandidates = providerEligibility.eligible
-      ? await findMarketAwareAssetPriceCandidates(this.prisma, { ...priceRead, sourceNames: providerEligibility.sourceNames })
+      ? await findMarketAwareAssetPriceCandidates(this.prisma, {
+          ...priceRead,
+          sourceNames: providerEligibility.sourceNames,
+        })
       : [];
     const providerSelection = providerEligibility.eligible
       ? selectMarketAwareAssetPriceSnapshotBySourcePriority({
@@ -2385,17 +2158,6 @@ export class RecordsService {
     return amount.mul(usdKrwSelection.rate);
   }
 
-  private formatRateFromPart(
-    part: Prisma.Decimal,
-    denominator: Prisma.Decimal | null,
-  ): string {
-    if (!denominator || denominator.eq(0)) {
-      return this.formatDecimal(new Prisma.Decimal(0), 8);
-    }
-
-    return this.formatDecimal(part.div(denominator).mul(100), 8);
-  }
-
   private unavailableProfitAnalysis(): ProfitAnalysis {
     return {
       state: 'unavailable',
@@ -2407,43 +2169,6 @@ export class RecordsService {
       items: [],
       valuationErrors: [],
     };
-  }
-
-  private notJoinedPublicPortfolioSummary(): PublicPortfolioSummary {
-    return {
-      ...this.emptyPublicPortfolioSummary(),
-      state: 'not_joined',
-    };
-  }
-
-  private emptyPublicPortfolioSummary(): PublicPortfolioSummary {
-    return {
-      state: 'unavailable',
-      totalAssetKrw: null,
-      returnRate: null,
-      allocation: {
-        domesticStockRate: this.formatDecimal(new Prisma.Decimal(0), 8),
-        usStockRate: this.formatDecimal(new Prisma.Decimal(0), 8),
-        cryptoRate: this.formatDecimal(new Prisma.Decimal(0), 8),
-        cashRate: this.formatDecimal(new Prisma.Decimal(0), 8),
-      },
-      topHoldings: [],
-      valuationErrors: [],
-    };
-  }
-
-  private publicValuationErrorMessage(code: ValuationErrorCode): string {
-    switch (code) {
-      case 'PRICE_STALE':
-        return 'Asset price snapshot is stale.';
-      case 'FX_RATE_UNAVAILABLE':
-        return 'USD/KRW FX rate snapshot is unavailable.';
-      case 'FX_RATE_STALE':
-        return 'USD/KRW FX rate snapshot is stale.';
-      case 'ASSET_PRICE_UNAVAILABLE':
-      default:
-        return 'Asset price snapshot is unavailable.';
-    }
   }
 
   private async buildExchangeSection(
@@ -3011,6 +2736,7 @@ export class RecordsService {
           select: {
             id: true,
             mode: true,
+            status: true,
             userId: true,
             dailyPortfolioSnapshots: {
               orderBy: [

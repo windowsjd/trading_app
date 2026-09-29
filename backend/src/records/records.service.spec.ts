@@ -127,6 +127,7 @@ describe('RecordsService', () => {
   const participantAccount = {
     id: 'account-sp-1',
     mode: 'season',
+    status: 'active',
     userId: 'user-1',
   };
 
@@ -1562,6 +1563,10 @@ describe('RecordsService', () => {
   it('returns current public user season summary without private activity data', async () => {
     const portfolioValuationService = {
       calculateTradingAccountValuation: jest.fn().mockResolvedValue({
+        positionValues: [
+          { assetId: 'asset-nvda', valueKrw: '4436261.39000000' },
+          { assetId: 'asset-btc', valueKrw: '2000000' },
+        ],
         seasonParticipantId: participant.id,
         tradingAccountId: participantAccount.id,
         totalAssetKrw: '13812590.00000000',
@@ -1591,6 +1596,13 @@ describe('RecordsService', () => {
       id: 'user-2',
       nickname: 'legendTrader',
     });
+    prisma.user.findUnique.mockResolvedValue({
+      status: 'active',
+      portfolioPublic: true,
+      friendshipsLow: [{ id: 'f' }],
+      friendshipsHigh: [],
+    });
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([]);
     mockCurrentSeason(prisma);
     mockDetailedParticipant(prisma);
     prisma.seasonRanking.findFirst.mockResolvedValueOnce({
@@ -1611,13 +1623,14 @@ describe('RecordsService', () => {
       totalAssetKrw: new Prisma.Decimal('13812590.00000000'),
       returnRate: new Prisma.Decimal('38.12590000'),
       totalFillCount: 41,
+      maxDrawdown: new Prisma.Decimal(0),
       capturedAt,
     });
     prisma.seasonRanking.count.mockResolvedValueOnce(300);
     prisma.position.findMany.mockResolvedValueOnce([
       {
         assetId: 'asset-nvda',
-        marketValueKrw: new Prisma.Decimal('4436261.39000000'),
+        marketValueKrw: new Prisma.Decimal('1'), // stale stored value must not drive the live weight
         asset: {
           symbol: 'NVDA',
         },
@@ -1660,19 +1673,22 @@ describe('RecordsService', () => {
         totalAssetKrw: '13812590.00000000',
         totalFillCount: 41,
       },
-      allocation: {
-        cashKrwValue: '2000000.00000000',
-        domesticStockValueKrw: '3000000.00000000',
-        usStockValueKrw: '4000000.00000000',
-        cryptoValueKrw: '4812590.00000000',
+      portfolioAccess: 'available',
+      portfolio: {
+        allocation: {
+          cashKrwValue: '2000000.00000000',
+          domesticStockValueKrw: '3000000.00000000',
+          usStockValueKrw: '4000000.00000000',
+          cryptoValueKrw: '4812590.00000000',
+        },
       },
     });
-    expect(response.data.topPositions[0]).toMatchObject({
+    expect(response.data.portfolio!.holdings[0]).toMatchObject({
       assetId: 'asset-nvda',
       symbol: 'NVDA',
       weight: '32.11752025',
     });
-    expect(response.data.topPositions).toHaveLength(2);
+    expect(response.data.portfolio!.holdings).toHaveLength(2);
     expect(prisma.order.findMany).not.toHaveBeenCalled();
     expect(prisma.exchangeTransaction.findMany).not.toHaveBeenCalled();
     expect(prisma.walletTransaction.findMany).not.toHaveBeenCalled();
@@ -1682,6 +1698,89 @@ describe('RecordsService', () => {
     expect(serialized).not.toContain('balanceAfter');
     expect(serialized).not.toContain('averageCost');
     expect(serialized).not.toContain('quantity');
+    expectNoRecordWrites(prisma);
+  });
+
+  it.each([
+    {
+      access: 'not_friend',
+      status: 'active',
+      portfolioPublic: true,
+      friendshipsLow: [],
+      friendshipsHigh: [],
+    },
+    {
+      access: 'private',
+      status: 'active',
+      portfolioPublic: false,
+      friendshipsLow: [{ id: 'accepted' }],
+      friendshipsHigh: [],
+    },
+    {
+      access: 'unavailable',
+      status: 'suspended',
+      portfolioPublic: true,
+      friendshipsLow: [{ id: 'accepted' }],
+      friendshipsHigh: [],
+    },
+  ])('omits all portfolio reads and payload for $access', async (target) => {
+    const valuation = { calculateTradingAccountValuation: jest.fn() };
+    const { prisma, service } = createService(valuation);
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-2',
+      nickname: 'public',
+      ...target,
+    });
+    mockCurrentSeason(prisma);
+    mockDetailedParticipant(prisma);
+    const result = await service.getUserCurrentSeasonSummary(
+      'viewer-1',
+      'user-2',
+    );
+    expect(result.data.portfolioAccess).toBe(target.access);
+    expect(result.data.portfolio).toBeNull();
+    expect(result.data.season?.totalAssetKrw).not.toBeNull();
+    expect(result.data).not.toHaveProperty('allocation');
+    expect(result.data).not.toHaveProperty('topPositions');
+    expect(valuation.calculateTradingAccountValuation).not.toHaveBeenCalled();
+    expect(prisma.position.findMany).not.toHaveBeenCalled();
+    expectNoRecordWrites(prisma);
+  });
+
+  it('drops the payload if privacy changes while valuation is being read', async () => {
+    const valuation = {
+      calculateTradingAccountValuation: jest.fn().mockResolvedValue({
+        seasonParticipantId: participant.id,
+        totalAssetKrw: '100',
+        krwCash: '100',
+        usdCashKrw: '0',
+        domesticStockValueKrw: '0',
+        usStockValueKrw: '0',
+        cryptoValueKrw: '0',
+        positionValues: [],
+      }),
+    };
+    const { prisma, service } = createService(valuation);
+    const relation = {
+      status: 'active',
+      portfolioPublic: true,
+      friendshipsLow: [{ id: 'accepted' }],
+      friendshipsHigh: [],
+    };
+    prisma.user.findUnique
+      .mockResolvedValueOnce({ id: 'user-2', nickname: 'public' })
+      .mockResolvedValueOnce(relation)
+      .mockResolvedValueOnce({ ...relation, portfolioPublic: false });
+    mockCurrentSeason(prisma);
+    mockDetailedParticipant(prisma);
+    prisma.position.findMany.mockResolvedValue([]);
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([]);
+    const result = await service.getUserCurrentSeasonSummary(
+      'viewer',
+      'user-2',
+    );
+    expect(result.data.portfolioAccess).toBe('private');
+    expect(result.data.portfolio).toBeNull();
     expectNoRecordWrites(prisma);
   });
 
@@ -1718,7 +1817,7 @@ describe('RecordsService', () => {
         totalAssetKrw: null,
         totalFillCount: 0,
       },
-      topPositions: [],
+      portfolio: null,
     });
     expect(prisma.seasonRanking.findFirst).not.toHaveBeenCalled();
     expect(
@@ -1750,10 +1849,8 @@ describe('RecordsService', () => {
         id: 'season-1',
         rank: null,
       },
-      allocation: {
-        cashKrwValue: '0.00000000',
-      },
-      topPositions: [],
+      portfolioAccess: 'unavailable',
+      portfolio: null,
       reason: 'SEASON_NOT_JOINED',
     });
     expect(
@@ -1850,18 +1947,10 @@ describe('RecordsService', () => {
         totalAssetKrw: '12000000.00000000',
         returnRate: '20.00000000',
       },
-      publicPortfolioSummary: {
-        state: 'available',
-        topHoldings: [
-          { symbol: 'FFF' },
-          { symbol: 'EEE' },
-          { symbol: 'DDD' },
-          { symbol: 'CCC' },
-          { symbol: 'BBB' },
-        ],
-      },
+      portfolioAccess: 'unavailable',
+      portfolio: null,
     });
-    expect(response.data.publicPortfolioSummary.topHoldings).toHaveLength(5);
+    expect(prisma.position.findMany).not.toHaveBeenCalled();
     expect(response.data.summary).not.toHaveProperty('orderCount');
     expect(response.data.summary).not.toHaveProperty('exchangeCount');
     expect(response.data).not.toHaveProperty('orders');
@@ -1901,12 +1990,7 @@ describe('RecordsService', () => {
     expect(response.data).toMatchObject({
       state: 'available',
       summary: null,
-      publicPortfolioSummary: {
-        state: 'unavailable',
-        totalAssetKrw: null,
-        returnRate: null,
-        topHoldings: [],
-      },
+      portfolio: null,
       reason: 'RANKING_HIDDEN',
     });
     expect(prisma.order.count).not.toHaveBeenCalled();
@@ -1942,22 +2026,9 @@ describe('RecordsService', () => {
       'season-1',
     );
 
-    expect(response.data.publicPortfolioSummary).toMatchObject({
-      state: 'partial_unavailable',
-      valuationErrors: [
-        {
-          symbol: 'AAA',
-          name: 'AAA Name',
-          market: 'KRX',
-          assetType: AssetType.domestic_stock,
-          code: 'ASSET_PRICE_UNAVAILABLE',
-          message: 'Asset price snapshot is unavailable.',
-        },
-      ],
-    });
-    expect(JSON.stringify(response.data.publicPortfolioSummary)).not.toContain(
-      'asset-private-1',
-    );
+    expect(response.data.portfolio).toBeNull();
+    expect(JSON.stringify(response.data)).not.toContain('asset-private-1');
+    expect(prisma.position.findMany).not.toHaveBeenCalled();
     expect(prisma.order.count).not.toHaveBeenCalled();
     expect(prisma.exchangeTransaction.count).not.toHaveBeenCalled();
     expectNoRecordWrites(prisma);

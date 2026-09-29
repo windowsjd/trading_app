@@ -355,3 +355,11 @@ export const OpsJobTrigger = {
 } as const
 
 export type OpsJobTrigger = (typeof OpsJobTrigger)[keyof typeof OpsJobTrigger]
+
+
+export const FriendshipStatus = {
+  pending: 'pending',
+  accepted: 'accepted'
+} as const
+
+export type FriendshipStatus = (typeof FriendshipStatus)[keyof typeof FriendshipStatus]

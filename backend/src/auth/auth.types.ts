@@ -30,6 +30,7 @@ export type RefreshTokenRequestBody = {
 };
 
 export type UpdateProfileRequestBody = {
+  portfolioPublic?: unknown;
   nickname?: unknown;
   profileImageUrl?: unknown;
 };
@@ -74,6 +75,7 @@ export type CurrentUserResponse = {
     email: string;
     nickname: string;
     profileImageUrl: string | null;
+    portfolioPublic: boolean;
     role: UserRole;
     status: UserStatus;
     createdAt: string;

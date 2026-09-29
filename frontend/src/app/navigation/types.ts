@@ -69,6 +69,10 @@ export type RecordStackParamList = {
 };
 
 export type MyStackParamList = {
+  Overall: undefined;
+  Friends: undefined;
+  Notices: undefined;
+  UserSeasonSummary: { userId: string };
   My: undefined;
   Reward: undefined;
   Settings: undefined;

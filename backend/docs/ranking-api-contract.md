@@ -68,6 +68,21 @@ Operator-run daily ranking and final settlement ranking use the same persisted p
   - Default: `0`.
   - Must be a non-negative integer.
 
+## Scope
+
+`scope` accepts `all` (default), `friends`, or `top10`. The former `near_me`
+contract is removed; callers needing only `myRanking` use `all&limit=1`.
+`friends` selects only accepted, active friends with visible ranking rows in
+the selected season/snapshot, before counting and pagination. Global `rank`,
+percentile denominator and tier remain unchanged; the viewer is not in this
+list. `myRanking` retains its existing independent visibility rules. Friends
+without a season row are omitted; an empty friend result remains available
+with an empty list, distinct from an unavailable ranking snapshot.
+
+Friendship/public settings do not restrict existing competition metrics.
+Holdings/allocation/history are available only through the guarded
+[friend portfolio response](friends-api-contract.md).
+
 ## Available Response
 
 ```json
@@ -221,7 +236,7 @@ target; the account identifies the scored portfolio. Every reader selects and
 verifies both before returning anything.
 
 `tradingAccountId` is INTERNAL. It is never present in a ranking, myRanking, or
-near_me response — a public leaderboard does not expose another user's account
+friends response — a public leaderboard does not expose another user's account
 id.
 
 Absence vs damage are different answers:

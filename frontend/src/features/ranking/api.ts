@@ -9,7 +9,7 @@ import type {
 } from '../../models/dto/common';
 import type { SeasonStatus } from '../../models/dto/season';
 
-export type RankingScope = 'all' | 'near_me' | 'top10';
+export type RankingScope = 'all' | 'friends' | 'top10';
 export type RankingRankType = 'daily' | 'final';
 interface RankingMetricsDto {
   seasonParticipantId: string;
@@ -56,12 +56,10 @@ export interface RankingsResponseDto {
 
 export interface UserSeasonSummaryDto {
   state: 'available' | 'not_joined' | 'unavailable';
-  user: {
-    id: string;
-    nickname: string;
-  };
+  user: { id: string; nickname: string; profileImageUrl: string | null };
   season: {
     id: string;
+    name: string;
     status: SeasonStatus;
     rank: number | null;
     provisionalTier: string | null;
@@ -69,20 +67,32 @@ export interface UserSeasonSummaryDto {
     returnRate: RateString | null;
     percentile: PercentString | null;
     totalAssetKrw: MoneyString | null;
+    maxDrawdown: PercentString | null;
     totalFillCount: number;
   } | null;
-  allocation: {
-    cashKrwValue: MoneyString;
-    domesticStockValueKrw: MoneyString;
-    usStockValueKrw: MoneyString;
-    cryptoValueKrw: MoneyString;
-  };
-  topPositions: Array<{
-    assetId: string;
-    symbol: string;
-    name: string;
-    weight: string;
-  }>;
+  portfolioAccess: 'available' | 'private' | 'not_friend' | 'unavailable';
+  portfolioReason?: string;
+  portfolio: {
+    valuationState: 'available' | 'unavailable';
+    allocation: {
+      cashKrwValue: MoneyString;
+      domesticStockValueKrw: MoneyString;
+      usStockValueKrw: MoneyString;
+      cryptoValueKrw: MoneyString;
+    } | null;
+    holdings: Array<{
+      assetId: string;
+      symbol: string;
+      name: string;
+      assetType: string;
+      weight: PercentString | null;
+    }>;
+    history: Array<{
+      date: string;
+      totalAssetKrw: MoneyString;
+      returnRate: PercentString;
+    }>;
+  } | null;
   reason?: string;
   message?: string;
 }
@@ -105,7 +115,10 @@ export interface GetRankingsParams {
 }
 
 export function getRankingTier(
-  item: Pick<RankingMetricsDto, 'provisionalTier' | 'finalTier'> | null | undefined,
+  item:
+    | Pick<RankingMetricsDto, 'provisionalTier' | 'finalTier'>
+    | null
+    | undefined,
   rankType?: RankingRankType,
 ) {
   if (rankType === 'final') {
@@ -115,7 +128,9 @@ export function getRankingTier(
   return item?.provisionalTier ?? item?.finalTier ?? '-';
 }
 
-export async function getRankings(params: GetRankingsParams): Promise<RankingsResponseDto> {
+export async function getRankings(
+  params: GetRankingsParams,
+): Promise<RankingsResponseDto> {
   const limit = params.limit ?? (params.scope === 'top10' ? 10 : 50);
   const offset = params.offset ?? 0;
   const searchParams = new URLSearchParams();
@@ -128,17 +143,20 @@ export async function getRankings(params: GetRankingsParams): Promise<RankingsRe
   if (params.rankingDate) searchParams.set('rankingDate', params.rankingDate);
   if (params.capturedAt) searchParams.set('capturedAt', params.capturedAt);
 
-  const response = await apiClient.get<
-    ApiSuccessResponse<RankingsResponseDto>
-  >(`/ranking?${searchParams.toString()}`);
+  const response = await apiClient.get<ApiSuccessResponse<RankingsResponseDto>>(
+    `/ranking?${searchParams.toString()}`,
+  );
 
   return response.data.data;
 }
 
-export async function getUserSeasonSummary(userId: string) {
+export async function getUserSeasonSummary(
+  userId: string,
+  signal?: AbortSignal,
+) {
   const response = await apiClient.get<
     ApiSuccessResponse<UserSeasonSummaryDto>
-  >(`/users/${userId}/season-summary`);
+  >(`/users/${encodeURIComponent(userId)}/season-summary`, { signal });
 
   return response.data.data;
 }

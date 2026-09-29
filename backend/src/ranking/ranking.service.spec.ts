@@ -530,7 +530,7 @@ describe('RankingService', () => {
     expectNoRankingWrites(prisma);
   });
 
-  it('returns a scope=near_me window around my ranking', async () => {
+  it('filters friends before pagination while preserving global rank and tier', async () => {
     const { prisma, service } = createService();
     mockCurrentSeason(prisma);
     prisma.seasonRanking.findFirst.mockResolvedValueOnce({
@@ -542,7 +542,9 @@ describe('RankingService', () => {
       participantStatus: ParticipantStatus.active,
       rankingHiddenAt: null,
     });
-    prisma.seasonRanking.count.mockResolvedValueOnce(100);
+    prisma.seasonRanking.count
+      .mockResolvedValueOnce(100)
+      .mockResolvedValueOnce(10);
     prisma.seasonRanking.findUnique.mockResolvedValueOnce({
       ...rankingScopeFor('sp-50', 'user-50'),
       id: 'ranking-sp-50',
@@ -564,24 +566,32 @@ describe('RankingService', () => {
     );
 
     const response = await service.getRanking('user-50', {
-      scope: 'near_me',
+      scope: 'friends',
       limit: '10',
     });
 
     expect(response.data.pagination).toMatchObject({
       limit: 10,
-      offset: 44,
-      total: 100,
+      offset: 0,
+      total: 10,
       returned: 10,
-      nextOffset: 54,
+      nextOffset: null,
     });
     expect(response.data.rankings.map((row) => row.rank)).toEqual([
       45, 46, 47, 48, 49, 50, 51, 52, 53, 54,
     ]);
     expect(prisma.seasonRanking.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        skip: 44,
+        skip: 0,
         take: 10,
+        where: expect.objectContaining({
+          seasonParticipant: expect.objectContaining({
+            user: expect.objectContaining({
+              status: 'active',
+              OR: expect.any(Array),
+            }),
+          }),
+        }),
       }),
     );
     expectNoRankingWrites(prisma);
@@ -712,7 +722,7 @@ describe('RankingService', () => {
     const { service } = createService();
 
     await expect(
-      service.getRanking('user-1', { scope: 'friends' }),
+      service.getRanking('user-1', { scope: 'near_me' }),
     ).rejects.toBeInstanceOf(HttpException);
   });
 

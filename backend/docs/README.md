@@ -6,6 +6,7 @@ First compare current implementation, tests and migrations with explicit current
 
 1. API contracts — the request/response contract for each surface:
    - `docs/auth-api-contract.md`
+   - `docs/friends-api-contract.md`
    - `docs/fx-api-contract.md`
    - `docs/orders-api-contract.md`
    - `docs/assets-api-contract.md`

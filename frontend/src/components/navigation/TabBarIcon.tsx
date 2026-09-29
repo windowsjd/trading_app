@@ -8,7 +8,8 @@ type TabIconName =
   | 'guide'
   | 'ranking'
   | 'record'
-  | 'profile';
+  | 'profile'
+  | 'menu';
 
 type Props = {
   name: TabIconName;
@@ -42,6 +43,9 @@ export default function TabBarIcon({ name, color, size }: Props) {
       drawing = (
         <Path d="M8 5H5v16h14V5h-3 M8 3h8v4H8z M8 11h8 M8 15h8 M8 18h5" />
       );
+      break;
+    case 'menu':
+      drawing = <Path d="M4 6h16 M4 12h16 M4 18h16" />;
       break;
     case 'profile':
       drawing = (

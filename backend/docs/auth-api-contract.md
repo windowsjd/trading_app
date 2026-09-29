@@ -134,3 +134,12 @@ It revokes all active refresh sessions for `request.user.userId`.
 ## Operator Boundary
 
 `GET /api/v1/operator/me` is documented separately in `docs/operator-api-contract.md`.
+
+## Friend portfolio privacy
+
+`GET /api/v1/me` and `PATCH /api/v1/me` include `portfolioPublic: boolean`.
+It defaults to true in PostgreSQL for both existing and new users. PATCH accepts
+only a Boolean, including an explicit false; strings, numbers and null fail
+with `VALIDATION_ERROR`. Nickname/profile updates keep their existing contract.
+This setting shares a current active-season portfolio with accepted friends
+only. See [friend policy](friends-api-contract.md).

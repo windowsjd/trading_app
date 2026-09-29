@@ -37,3 +37,14 @@ Font scaling is simulated in RN Web Text/TextInput and useWindowDimensions;
 this is not an Android/iOS accessibility or physical gesture test. The normal
 `npm run check` separately runs component tests and installed RNGH event-receiver
 integration tests. Device testing remains a separate release check.
+
+
+Friend screens use the same external tools and `nativeWeb.jsx` font-scale
+adapter. Run `NODE_PATH=/path/to/browser-tools/node_modules node
+test/browser/friendsBrowser.cjs` from frontend. It checks 320/390/768px × font
+scale 1/2, long nicknames/holdings, overall/friends/notices/settings/portfolio,
+server-returned toggle state, and private/non-friend sections. Reports and
+screenshots go to `/tmp/trading-friends-browser` (override with
+`FRIENDS_BROWSER_OUTPUT`). Fixtures are test-only and all external requests are
+blocked. Native Android text measurement, keyboard and screen-reader checks
+remain manual.

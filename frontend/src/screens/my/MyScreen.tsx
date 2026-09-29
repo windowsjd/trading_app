@@ -55,7 +55,7 @@ export default function MyScreen({ navigation }: Props) {
    */
   const rankingQuery = useQuery({
     queryKey: QUERY_KEYS.ranking.list({
-      scope: 'near_me',
+      scope: 'all',
       seasonId,
       rankType,
       limit: 1,
@@ -63,7 +63,7 @@ export default function MyScreen({ navigation }: Props) {
     }),
     queryFn: () =>
       getRankings({
-        scope: 'near_me',
+        scope: 'all',
         seasonId,
         rankType,
         limit: 1,
@@ -202,14 +202,6 @@ export default function MyScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('Reward')}
           >
             <Text style={styles.menuText}>내 보상 / 뱃지</Text>
-          </ActionPressable>
-
-          <ActionPressable
-            testID={TEST_IDS.my.settingsMenu}
-            style={styles.menuRow}
-            onPress={() => navigation.navigate('Settings')}
-          >
-            <Text style={styles.menuText}>설정</Text>
           </ActionPressable>
 
           <ActionPressable
