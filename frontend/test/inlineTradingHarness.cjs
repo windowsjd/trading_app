@@ -24,6 +24,7 @@ function inlineTradingHarness() {
     assetId: 'bnb',
     accountId: 'general',
     focused: true,
+    connectionState: 'subscribed',
     role: 'user',
     priceErrors: [],
     requests: [],
@@ -185,6 +186,16 @@ function inlineTradingHarness() {
   const refetch = () => {
     h.refetches++;
   };
+  const meApi = {
+    getMe: async () => {
+      if (h.meGate) await h.meGate.promise;
+      if (h.meError) throw h.meError;
+      return { role: h.role };
+    },
+  };
+  const adminHook = load(resolve('src/features/auth/useAdminDiagnostics.ts'), {
+    '../me/api': meApi,
+  });
   const mocks = {
     './QuantityRatioSlider': load(resolve('src/screens/order/QuantityRatioSlider.web.tsx'), {}),
     react: React,
@@ -192,7 +203,7 @@ function inlineTradingHarness() {
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
     '@react-navigation/elements': { useHeaderHeight: () => 48 },
     'react-native-svg': { default: 'Svg', Path: 'Path', __esModule: true },
-    '../../features/auth/useAdminDiagnostics': { useAdminDiagnostics: () => h.role === 'admin' },
+    '../../features/auth/useAdminDiagnostics': adminHook,
     '@react-navigation/native': { useIsFocused: () => h.focused },
     '@tanstack/react-query': {
       ...query,
@@ -286,7 +297,7 @@ function inlineTradingHarness() {
     },
     '../../features/asset/api': timeframes,
     '../../features/asset/useAssetTicker': {
-      useAssetTicker: () => ({ latestTicker: h.ticker, isStale: h.tickerStale, showReconnectBanner: h.reconnect }),
+      useAssetTicker: () => ({ latestTicker: h.ticker, connectionState: h.connectionState, isStale: h.tickerStale, showReconnectBanner: h.reconnect }),
     },
     '../../features/asset/useAssetOrderBook': {
       useAssetOrderBook: (options) => {
@@ -338,15 +349,18 @@ function inlineTradingHarness() {
     resolve('src/components/states/AdminDiagnosticPanel.tsx'),
     {
       'react-native': native,
-      '../../features/me/api': {
-        getMe: async () => {
-          if (h.meGate) await h.meGate.promise;
-          if (h.meError) throw h.meError;
-          return { role: h.role };
-        },
-      },
+      '../../features/me/api': meApi,
     },
   );
+  mocks['./AdminAssetPriceStatus'] = load(
+    resolve('src/screens/asset/AdminAssetPriceStatus.tsx'),
+    {
+      'react-native': native,
+      '../../features/auth/useAdminDiagnostics': adminHook,
+      '../../features/asset/useStaleRecheck': { useStaleRecheck: () => {} },
+    },
+  );
+  mocks['../asset/AdminAssetPriceStatus'] = mocks['./AdminAssetPriceStatus'];
   mocks['../order/OrderPanel'] = load(
     resolve('src/screens/order/OrderPanel.tsx'),
     mocks,

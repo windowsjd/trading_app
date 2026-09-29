@@ -28,6 +28,7 @@ import { useAssetOrderBook } from '../../features/asset/useAssetOrderBook';
 import AssetOrderLadder from '../../features/asset/AssetOrderLadder';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import AccountHoldings from './AccountHoldings';
+import AdminAssetPriceStatus from './AdminAssetPriceStatus';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 import { buildWsUrl } from '../../constants/env';
@@ -65,7 +66,7 @@ export function AssetTradingScreen({
     queryKey: QUERY_KEYS.asset.detail(assetId),
     queryFn: () => getAssetDetail(assetId),
   });
-  const { latestTicker, showReconnectBanner, isStale } = useAssetTicker({
+  const { latestTicker, connectionState, showReconnectBanner, isStale } = useAssetTicker({
     assetId,
     wsUrl: wsUrl ?? '',
     enabled: isFocused && !!wsUrl,
@@ -221,6 +222,16 @@ export function AssetTradingScreen({
             diagnostic={detailQuery.data.priceErrors?.find(
               (error) => error.assetId === assetId && error.diagnostic,
             )?.diagnostic}
+          />
+          <AdminAssetPriceStatus
+            assetId={assetId}
+            restPrice={detailQuery.data.asset.price}
+            priceErrors={detailQuery.data.priceErrors}
+            ticker={ticker}
+            displayPrice={displayPrice}
+            connectionState={connectionState}
+            reconnecting={showReconnectBanner}
+            tickerStale={isStale}
           />
           {isAdmin && showReconnectBanner ? (
             <Text

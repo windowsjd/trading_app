@@ -202,9 +202,11 @@ for (const role of ['user', 'operator', 'admin'])
       if (screen === 'chart') h.Screen = h.Chart;
       await h.mount();
       t.after(h.close);
+      await h.flush();
       if (screen === 'detail') {
         assert.equal(/실시간 연결 복구/.test(text(h)), role === 'admin');
         assert.equal(/실시간 시세 최신성/.test(text(h)), role === 'admin');
+        assert.equal(Boolean(h.node('admin-asset-price-status')), role === 'admin');
       } else {
         assert.equal(/실시간 캔들 지연/.test(text(h)), role === 'admin');
       }

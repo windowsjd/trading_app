@@ -37,6 +37,10 @@ export interface AssetDetailPriceDto {
   priceEffectiveAt?: IsoDateTimeString | null;
   assetPriceSnapshotId?: string | null;
   priceSource?: SourceMetadata;
+  reason?: string | null;
+  message?: string | null;
+  priceKrwReason?: string | null;
+  priceKrwMessage?: string | null;
 }
 
 export interface AssetDetailAssetDto {

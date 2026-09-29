@@ -51,6 +51,7 @@ import {
   resetMarketSessionOverrideStoreForTest,
 } from '../orders/market-calendar/market-session-override.store';
 import { AssetsService } from './assets.service';
+import { adminDiagnosticRequestMiddleware } from '../common/admin-diagnostics';
 import { AssetTickerGateway } from '../realtime/asset-ticker.gateway';
 import { KIS_DOMESTIC_PERIOD_SOURCE } from '../providers/kis/candles/kis-period-candle.types';
 import { BINANCE_CANDLE_SOURCE } from '../providers/binance/binance-candle.types';
@@ -1444,6 +1445,80 @@ describe('AssetsService', () => {
     expect(response.data.asset.tradingNote.message).toContain(
       'Crypto is USD-settled',
     );
+    expectNoAssetWrites(prisma);
+  });
+
+  it.each(['admin', 'user', 'operator'] as const)(
+    'returns real price failure with role-scoped diagnostic for %s',
+    async (role) => {
+      const { prisma, service } = createService();
+      prisma.asset.findUnique.mockResolvedValueOnce(
+        asset({ id: 'asset-missing-price' }),
+      );
+      prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(null);
+      const request = {
+        method: 'GET',
+        originalUrl: '/api/v1/assets/asset-missing-price',
+        headers: { 'x-request-id': `asset-${role}` },
+        user: undefined as { userId: string; role: typeof role } | undefined,
+      };
+      let read!: ReturnType<AssetsService['getAsset']>;
+      adminDiagnosticRequestMiddleware(
+        request as never,
+        { setHeader: jest.fn() } as never,
+        () => {
+          // The guard attaches the current DB role after request middleware.
+          request.user = { userId: 'user-1', role };
+          read = service.getAsset('user-1', 'asset-missing-price');
+        },
+      );
+      const response = await read;
+      expect(response.data.asset.price).toMatchObject({
+        state: 'unavailable',
+        reason: 'ASSET_PRICE_UNAVAILABLE',
+      });
+      expect(response.data.priceErrors[0]).toMatchObject({
+        assetId: 'asset-missing-price',
+        code: 'ASSET_PRICE_UNAVAILABLE',
+      });
+      if (role === 'admin') {
+        expect(response.data.priceErrors[0].diagnostic).toMatchObject({
+          code: 'ASSET_PRICE_UNAVAILABLE',
+          httpStatus: 200,
+          requestId: 'asset-admin',
+          operation: 'ASSET_PRICE_READ',
+          failureStage: 'asset_price_selection',
+        });
+      } else {
+        expect(response.data.priceErrors[0]).not.toHaveProperty('diagnostic');
+      }
+      expectNoAssetWrites(prisma);
+    },
+  );
+
+  it('keeps a 90-second provider snapshot available for REST display without priceErrors', async () => {
+    const { prisma, service } = createService();
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({ id: 'asset-krx', assetType: AssetType.domestic_stock }),
+    );
+    const capturedAt = new Date(Date.now() - 90_000);
+    prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
+      providerPriceSnapshot(
+        'price-90-seconds',
+        'kis_krx_realtime_trade',
+        '70000.00000000',
+        CurrencyCode.KRW,
+        capturedAt,
+      ),
+    ]);
+
+    const response = await service.getAsset('user-1', 'asset-krx');
+    expect(response.data.asset.price).toMatchObject({
+      state: 'available',
+      currentPrice: '70000.00000000',
+      priceCapturedAt: capturedAt.toISOString(),
+    });
+    expect(response.data.priceErrors).toEqual([]);
     expectNoAssetWrites(prisma);
   });
 

@@ -87,6 +87,7 @@ import CTAButton from '../../components/common/CTAButton';
 import OrderSuccessBottomSheet from './OrderSuccessBottomSheet';
 import QuantityRatioSlider from './QuantityRatioSlider';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
+import AdminAssetPriceStatus from '../asset/AdminAssetPriceStatus';
 
 type Props = {
   assetId: string;
@@ -296,7 +297,7 @@ export function OrderForm({
     enabled: accountKnown && side === 'buy',
   });
   const tickerUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
-  const { latestTicker } = useAssetTicker({
+  const { latestTicker, connectionState, showReconnectBanner, isStale } = useAssetTicker({
     assetId,
     wsUrl: tickerUrl ?? '',
     enabled: enabled && side === 'buy' && !!tickerUrl,
@@ -876,11 +877,25 @@ export function OrderForm({
         <Text style={styles.warningText}>{assetWarningReason}</Text>
       ) : null}
       {showAssetPriceDiagnostic ? (
-        <AdminDiagnosticPanel
-          diagnostic={assetQuery.data?.priceErrors?.find(
-            (error) => error.assetId === assetId && error.diagnostic,
-          )?.diagnostic}
-        />
+        <>
+          <AdminDiagnosticPanel
+            diagnostic={assetQuery.data?.priceErrors?.find(
+              (error) => error.assetId === assetId && error.diagnostic,
+            )?.diagnostic}
+          />
+          {side === 'buy' || !isPriceAvailable(price) ? (
+            <AdminAssetPriceStatus
+              assetId={assetId}
+              restPrice={price}
+              priceErrors={assetQuery.data?.priceErrors}
+              ticker={latestTicker?.assetId === assetId ? latestTicker : null}
+              displayPrice={displayPrice}
+              connectionState={connectionState}
+              reconnecting={showReconnectBanner}
+              tickerStale={isStale}
+            />
+          ) : null}
+        </>
       ) : null}
       {inputErrorMessage ? (
         <Text style={styles.errorText}>{inputErrorMessage}</Text>
