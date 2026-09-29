@@ -28,7 +28,6 @@ import { useAssetOrderBook } from '../../features/asset/useAssetOrderBook';
 import AssetOrderLadder from '../../features/asset/AssetOrderLadder';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import AccountHoldings from './AccountHoldings';
-import AdminAssetPriceStatus from './AdminAssetPriceStatus';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 import { buildWsUrl } from '../../constants/env';
@@ -66,11 +65,12 @@ export function AssetTradingScreen({
     queryKey: QUERY_KEYS.asset.detail(assetId),
     queryFn: () => getAssetDetail(assetId),
   });
-  const { latestTicker, connectionState, showReconnectBanner, isStale } = useAssetTicker({
-    assetId,
-    wsUrl: wsUrl ?? '',
-    enabled: isFocused && !!wsUrl,
-  });
+  const { latestTicker, connectionState, showReconnectBanner, isStale } =
+    useAssetTicker({
+      assetId,
+      wsUrl: wsUrl ?? '',
+      enabled: isFocused && !!wsUrl,
+    });
   const liveOrderBookEnabled = supportsLiveOrderBook(detailQuery.data?.asset);
   const { latestOrderBook, statusMessage } = useAssetOrderBook({
     assetId,
@@ -123,6 +123,33 @@ export function AssetTradingScreen({
       <Text style={styles.price} selectable>
         {priceText}
       </Text>
+      {displayPrice.priceLocal === null || (converted && !krwAvailable) ? (
+        <AdminDiagnosticPanel
+          diagnostic={
+            displayPrice.basis === 'realtime' ||
+            displayPrice.basis === 'snapshot'
+              ? undefined
+              : detailQuery.data.priceErrors?.find(
+                  (error) => error.assetId === assetId && error.diagnostic,
+                )?.diagnostic
+          }
+          runtime={
+            displayPrice.basis === 'realtime' ||
+            displayPrice.basis === 'snapshot'
+              ? {
+                  assetId,
+                  connectionState,
+                  tickerPriceAvailable: ticker?.priceLocal != null,
+                  tickerReason: ticker?.reason,
+                  tickerMessage: ticker?.message,
+                  priceKrwState: displayPrice.priceKrwState,
+                  priceKrwReason: displayPrice.priceKrwReason,
+                  priceCapturedAt: displayPrice.priceCapturedAt,
+                }
+              : null
+          }
+        />
+      ) : null}
     </View>
   );
   return (
@@ -218,21 +245,6 @@ export function AssetTradingScreen({
                 : `전일대비 ${Number(displayPrice.changeRate) > 0 ? '+' : ''}${changeRate}%`}
             </Text>
           </View>
-          <AdminDiagnosticPanel
-            diagnostic={detailQuery.data.priceErrors?.find(
-              (error) => error.assetId === assetId && error.diagnostic,
-            )?.diagnostic}
-          />
-          <AdminAssetPriceStatus
-            assetId={assetId}
-            restPrice={detailQuery.data.asset.price}
-            priceErrors={detailQuery.data.priceErrors}
-            ticker={ticker}
-            displayPrice={displayPrice}
-            connectionState={connectionState}
-            reconnecting={showReconnectBanner}
-            tickerStale={isStale}
-          />
           {isAdmin && showReconnectBanner ? (
             <Text
               testID={TEST_IDS.assetDetail.reconnectBanner}
@@ -241,10 +253,30 @@ export function AssetTradingScreen({
               실시간 연결 복구 중 · 마지막 시세
             </Text>
           ) : null}
+          {isAdmin && showReconnectBanner ? (
+            <AdminDiagnosticPanel
+              runtime={{
+                assetId,
+                connectionState,
+                reconnecting: showReconnectBanner,
+                tickerCapturedAt: ticker?.priceCapturedAt,
+              }}
+            />
+          ) : null}
           {isAdmin && isStale ? (
             <Text style={styles.bannerText}>
               실시간 시세 최신성이 낮습니다. 서버 견적에서 최종 확인됩니다.
             </Text>
+          ) : null}
+          {isAdmin && isStale ? (
+            <AdminDiagnosticPanel
+              runtime={{
+                assetId,
+                connectionState,
+                tickerStale: isStale,
+                tickerCapturedAt: ticker?.priceCapturedAt,
+              }}
+            />
           ) : null}
           <View style={styles.tradingRow} testID="asset-trading-columns">
             <View style={styles.orderColumn} testID="asset-order-column">

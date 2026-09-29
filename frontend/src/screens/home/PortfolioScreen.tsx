@@ -300,6 +300,9 @@ export default function PortfolioScreen({ navigation }: Props) {
             title={ACCOUNT_INTEGRITY_TITLE}
             message={integrityFailure.message}
             onRetry={integrityFailure.retry}
+            diagnosticError={
+              overviewQuery.error ?? positionsQuery.error ?? equityQuery.error
+            }
           />
         </View>
       </SafeAreaView>
@@ -374,9 +377,12 @@ export default function PortfolioScreen({ navigation }: Props) {
                   {portfolioNotice.title}
                 </Text>
                 <Text style={styles.helper}>{portfolioNotice.message}</Text>
-                <AdminDiagnosticPanel
-                  diagnostic={overview.sectionErrors[0]?.diagnostic}
-                />
+                {overview.sectionErrors.map((error, index) => (
+                  <AdminDiagnosticPanel
+                    key={index}
+                    diagnostic={error.diagnostic}
+                  />
+                ))}
               </View>
             ) : null}
 

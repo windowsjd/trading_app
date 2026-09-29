@@ -12,15 +12,31 @@ import { getApiErrorDiagnostic } from '../../services/api/errorMapper';
 type Props = {
   diagnostic?: AdminDiagnosticDto | null;
   error?: unknown;
+  /** Observed client state only; never represents a backend failure. */
+  runtime?: Record<string, string | number | boolean | null | undefined> | null;
 };
 
-export default function AdminDiagnosticPanel({ diagnostic, error }: Props) {
+export default function AdminDiagnosticPanel({
+  diagnostic,
+  error,
+  runtime,
+}: Props) {
   const [expanded, setExpanded] = useState(false);
   const resolved = diagnostic ?? getApiErrorDiagnostic(error);
+  const runtimeFacts =
+    !resolved && runtime
+      ? Object.fromEntries(
+          Object.entries(runtime).filter(
+            ([, value]) => value !== undefined && value !== null,
+          ),
+        )
+      : null;
+  const hasRuntimeFacts =
+    !!runtimeFacts && Object.keys(runtimeFacts).length > 0;
   const meQuery = useQuery({
     queryKey: QUERY_KEYS.me,
     queryFn: getMe,
-    enabled: Boolean(resolved),
+    enabled: Boolean(resolved) || hasRuntimeFacts,
   });
   const serializedEvidence = useMemo(
     () => formatJson(resolved?.evidence),
@@ -31,10 +47,14 @@ export default function AdminDiagnosticPanel({ diagnostic, error }: Props) {
     [resolved?.entities],
   );
 
-  // The backend is the security boundary and never emits this payload to a
-  // non-admin. The current /me role is checked as a second UI guard so a stale
-  // or manually injected client object still does not create an admin panel.
-  if (!shouldShowAdminDiagnostic(meQuery.data?.role, resolved)) return null;
+  // The backend emits its diagnostic only for the current DB admin role.
+  // /me also guards both backend payloads and observed client runtime facts.
+  if (
+    meQuery.isError ||
+    (!shouldShowAdminDiagnostic(meQuery.data?.role, resolved) &&
+      !(meQuery.data?.role === 'admin' && hasRuntimeFacts))
+  )
+    return null;
 
   return (
     <View style={styles.container} testID="admin-diagnostic-panel">
@@ -52,83 +72,91 @@ export default function AdminDiagnosticPanel({ diagnostic, error }: Props) {
 
       {expanded ? (
         <View style={styles.content} testID="admin-diagnostic-content">
-          <Section title="오류 정보">
-            <Line label="Code" value={resolved.code} />
-            <Line label="HTTP" value={String(resolved.httpStatus)} />
-            <Line label="Domain" value={resolved.domain} />
-            <Line label="Operation" value={resolved.operation} />
-            <Line label="Failure stage" value={resolved.failureStage} />
-            <Line label="Timestamp" value={resolved.timestamp} />
-            <Line label="Request ID" value={resolved.requestId} />
-          </Section>
+          {resolved ? (
+            <>
+              <Section title="오류 정보">
+                <Line label="Code" value={resolved.code} />
+                <Line label="HTTP" value={String(resolved.httpStatus)} />
+                <Line label="Domain" value={resolved.domain} />
+                <Line label="Operation" value={resolved.operation} />
+                <Line label="Failure stage" value={resolved.failureStage} />
+                <Line label="Timestamp" value={resolved.timestamp} />
+                <Line label="Request ID" value={resolved.requestId} />
+              </Section>
 
-          {serializedEntities ? (
-            <Section title="관련 식별자">
-              <CodeText>{serializedEntities}</CodeText>
+              {serializedEntities ? (
+                <Section title="관련 식별자">
+                  <CodeText>{serializedEntities}</CodeText>
+                </Section>
+              ) : null}
+
+              {serializedEvidence ? (
+                <Section title="판단 근거">
+                  <CodeText>{serializedEvidence}</CodeText>
+                </Section>
+              ) : null}
+
+              <Section title="Backend Exception">
+                <Line label="Type" value={resolved.exception.type} />
+                <Line label="Message" value={resolved.exception.message} />
+                {resolved.exception.cause ? (
+                  <Line label="Cause" value={resolved.exception.cause} />
+                ) : null}
+              </Section>
+
+              <Section title="Application Stack">
+                <CodeText>
+                  {(resolved.exception.applicationStack.length
+                    ? resolved.exception.applicationStack
+                    : resolved.exception.stack
+                  ).join('\n') || '(stack unavailable)'}
+                </CodeText>
+              </Section>
+
+              <Section title="진단 이벤트">
+                <CodeText>
+                  {resolved.diagnosticEvents.events
+                    .map(
+                      (entry) =>
+                        `${entry.timestamp} ${entry.level.toUpperCase()} ${entry.event}\n${entry.message}${entry.context ? `\n${formatJson(entry.context)}` : ''}`,
+                    )
+                    .join('\n\n') || '(diagnostic events unavailable)'}
+                </CodeText>
+              </Section>
+
+              <Section title="관련 Server Logs">
+                <CodeText>
+                  {resolved.serverLogs.entries
+                    .map(
+                      (entry) =>
+                        `${entry.timestamp} ${entry.level.toUpperCase()}${entry.context ? ` [${entry.context}]` : ''}\n${entry.message}${entry.details?.length ? `\n${formatJson(entry.details)}` : ''}`,
+                    )
+                    .join('\n\n') || '(related application logs unavailable)'}
+                </CodeText>
+              </Section>
+
+              {resolved.nextInvestigation?.length ? (
+                <Section title="다음 조사 위치">
+                  {resolved.nextInvestigation.map((hint) => (
+                    <CodeText key={hint}>{hint}</CodeText>
+                  ))}
+                </Section>
+              ) : null}
+
+              {resolved.truncated ||
+              resolved.diagnosticEvents.truncated ||
+              resolved.serverLogs.truncated ||
+              resolved.exception.truncated ? (
+                <Text style={styles.truncated}>
+                  진단 정보가 길어 일부만 표시되었습니다.
+                </Text>
+              ) : null}
+            </>
+          ) : (
+            <Section title="Client runtime 상태">
+              <CodeText>{JSON.stringify(runtimeFacts, null, 2)}</CodeText>
             </Section>
-          ) : null}
-
-          {serializedEvidence ? (
-            <Section title="판단 근거">
-              <CodeText>{serializedEvidence}</CodeText>
-            </Section>
-          ) : null}
-
-          <Section title="Backend Exception">
-            <Line label="Type" value={resolved.exception.type} />
-            <Line label="Message" value={resolved.exception.message} />
-            {resolved.exception.cause ? (
-              <Line label="Cause" value={resolved.exception.cause} />
-            ) : null}
-          </Section>
-
-          <Section title="Application Stack">
-            <CodeText>
-              {(resolved.exception.applicationStack.length
-                ? resolved.exception.applicationStack
-                : resolved.exception.stack
-              ).join('\n') || '(stack unavailable)'}
-            </CodeText>
-          </Section>
-
-          <Section title="진단 이벤트">
-            <CodeText>
-              {resolved.diagnosticEvents.events
-                .map(
-                  (entry) =>
-                    `${entry.timestamp} ${entry.level.toUpperCase()} ${entry.event}\n${entry.message}${entry.context ? `\n${formatJson(entry.context)}` : ''}`,
-                )
-                .join('\n\n') || '(diagnostic events unavailable)'}
-            </CodeText>
-          </Section>
-
-          <Section title="관련 Server Logs">
-            <CodeText>
-              {resolved.serverLogs.entries
-                .map(
-                  (entry) =>
-                    `${entry.timestamp} ${entry.level.toUpperCase()}${entry.context ? ` [${entry.context}]` : ''}\n${entry.message}${entry.details?.length ? `\n${formatJson(entry.details)}` : ''}`,
-                )
-                .join('\n\n') || '(related application logs unavailable)'}
-            </CodeText>
-          </Section>
-
-          {resolved.nextInvestigation?.length ? (
-            <Section title="다음 조사 위치">
-              {resolved.nextInvestigation.map((hint) => (
-                <CodeText key={hint}>{hint}</CodeText>
-              ))}
-            </Section>
-          ) : null}
-
-          {resolved.truncated ||
-          resolved.diagnosticEvents.truncated ||
-          resolved.serverLogs.truncated ||
-          resolved.exception.truncated ? (
-            <Text style={styles.truncated}>
-              진단 정보가 길어 일부만 표시되었습니다.
-            </Text>
-          ) : null}
+          )}
         </View>
       ) : null}
     </View>
@@ -184,7 +212,9 @@ const styles = StyleSheet.create({
     borderColor: '#9a6700',
     borderRadius: 10,
     backgroundColor: '#fff8c5',
-    overflow: 'hidden',
+    alignSelf: 'stretch',
+    maxWidth: '100%',
+    minWidth: 0,
   },
   toggle: { paddingHorizontal: 12, paddingVertical: 11 },
   toggleText: { color: '#6f4b00', fontSize: 14, fontWeight: '700' },
@@ -196,8 +226,14 @@ const styles = StyleSheet.create({
   },
   section: { gap: 6, minWidth: 0 },
   sectionTitle: { color: '#4d2d00', fontWeight: '700', fontSize: 13 },
-  line: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, minWidth: 0 },
-  label: { width: 92, flexShrink: 0, color: '#6f4b00', fontSize: 12 },
+  line: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+    gap: 8,
+    minWidth: 0,
+  },
+  label: { width: 92, flexShrink: 1, color: '#6f4b00', fontSize: 12 },
   value: {
     flex: 1,
     flexShrink: 1,
@@ -206,7 +242,9 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   code: {
+    minWidth: 0,
     flexShrink: 1,
+    maxWidth: '100%',
     color: '#24292f',
     backgroundColor: '#fff',
     borderRadius: 6,

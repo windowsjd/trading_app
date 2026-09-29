@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { describe, it } from 'node:test';
+import { TEST_IDS } from '../../constants/testIds.ts';
 import type { AdminDiagnosticDto } from '../../models/dto/common.ts';
 import { applyTicker, toAssetTickerAcceptState } from '../../features/asset/assetTickerPolicy.ts';
 
@@ -8,9 +9,6 @@ const { inlineTradingHarness, deferred } = createRequire(import.meta.url)(
   '../../../test/inlineTradingHarness.cjs',
 );
 const visibleText = (h: any) => JSON.stringify(h.renderer.toJSON());
-const nodeText = (node: any): string =>
-  typeof node === 'string' ? node : (node?.children ?? []).map(nodeText).join('');
-const statusText = (h: any) => nodeText(h.node('admin-asset-price-status'));
 const diagnostic: AdminDiagnosticDto = {
   version: 1,
   code: 'ASSET_PRICE_UNAVAILABLE',
@@ -38,6 +36,37 @@ const unavailable = (h: any) => {
 };
 
 describe('asset detail HTTP 200 price diagnostics', () => {
+  it('shows an actual HTTP quote failure beside the order error, collapsed', async (t) => {
+    const h = inlineTradingHarness();
+    h.role = 'admin';
+    const quoteDiagnostic = {
+      ...diagnostic,
+      code: 'PRICE_STALE',
+      httpStatus: 503,
+      requestId: 'quote-request-123456789',
+      domain: 'ORDER',
+      operation: 'ORDER_QUOTE',
+      evidence: { providerSnapshotId: 'snapshot-987654321' },
+    };
+    h.quoteFailure = {
+      response: {
+        status: 503,
+        data: { error: { code: 'PRICE_STALE', diagnostic: quoteDiagnostic } },
+      },
+    };
+    await h.mount();
+    t.after(h.close);
+    await h.input(TEST_IDS.order.quantityInput, '1');
+    await h.press(TEST_IDS.order.executeSubmit);
+    await h.flush();
+    assert.ok(h.node('admin-diagnostic-toggle'));
+    assert.equal(h.node('admin-diagnostic-content'), undefined);
+    await h.press('admin-diagnostic-toggle');
+    assert.match(visibleText(h), /quote-request-123456789/);
+    assert.match(visibleText(h), /snapshot-987654321/);
+    assert.match(visibleText(h), /ORDER_QUOTE/);
+  });
+
   it('gives admin the backend diagnostic in the detail screen, once, alongside existing price warnings', async (t) => {
     const h = inlineTradingHarness();
     h.role = 'admin';
@@ -68,7 +97,7 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     );
   });
 
-  it('shows an FX conversion partial failure with a valid local price on the standalone order screen', async (t) => {
+  it('does not show technical details when FX conversion has no consumer error on the standalone order screen', async (t) => {
     const h = inlineTradingHarness();
     h.Screen = h.OrderScreen;
     h.role = 'admin';
@@ -88,11 +117,8 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     await h.mount();
     t.after(h.close);
     await h.flush();
-    assert.ok(h.node('admin-diagnostic-toggle'));
-    await h.press('admin-diagnostic-toggle');
-    assert.match(visibleText(h), /ASSET_PRICE_KRW_CONVERSION/);
-    assert.ok(h.node('admin-asset-price-status'));
-    assert.match(statusText(h), /KRW 환산: 사용 불가/);
+    assert.equal(h.node('admin-diagnostic-toggle'), undefined);
+    assert.equal(h.node('admin-asset-price-status'), undefined);
   });
 
   it('does not invent a diagnostic for missing price, unrelated price errors or normal price', async (t) => {
@@ -125,7 +151,7 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     assert.equal(h.node('admin-asset-price-status'), undefined);
   });
 
-  it('keeps a REST failure visible when a newer ticker restores the displayed price', async (t) => {
+  it('keeps the normal display when a newer ticker resolves the visible REST failure', async (t) => {
     const h = inlineTradingHarness();
     h.role = 'admin';
     unavailable(h);
@@ -138,14 +164,11 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     await h.mount();
     t.after(h.close);
     await h.flush();
-    assert.ok(h.node('admin-diagnostic-toggle'));
-    assert.ok(h.node('admin-asset-price-status'));
-    assert.match(statusText(h), /화면 시세 기준: WebSocket 실시간/);
-    assert.match(statusText(h), /REST 가격 상태: unavailable/);
-    assert.match(statusText(h), /시장가 참고 시세: 사용 가능/);
+    assert.equal(h.node('admin-diagnostic-toggle'), undefined);
+    assert.equal(h.node('admin-asset-price-status'), undefined);
   });
 
-  it('explains REST display availability versus the 60-second preview limit without a backend diagnostic', async (t) => {
+  it('places a client runtime diagnosis inside the visible stale preview warning', async (t) => {
     const h = inlineTradingHarness();
     h.role = 'admin';
     h.assets.bnb.price.priceCapturedAt = new Date(Date.now() - 90_000).toISOString();
@@ -153,16 +176,14 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     await h.mount();
     t.after(h.close);
     await h.flush();
-    assert.equal(h.node('admin-diagnostic-toggle'), undefined);
-    assert.ok(h.node('admin-asset-price-status'));
-    assert.match(statusText(h), /화면 시세 기준: REST/);
-    assert.match(statusText(h), /REST 가격 상태: available/);
-    assert.match(statusText(h), /REST 가격 오류: 없음/);
-    assert.match(statusText(h), /preview 기준 60초를 초과/);
+    assert.ok(h.node('admin-diagnostic-toggle'));
+    assert.equal(h.node('admin-diagnostic-content'), undefined);
     assert.match(visibleText(h), /현재 화면 시세가 없어 비율 수량 계산은 제한됩니다/);
+    await h.press('admin-diagnostic-toggle');
+    assert.match(visibleText(h), /Client runtime 상태/);
+    assert.doesNotMatch(visibleText(h), /Backend Exception|Request ID|Application Stack/);
     await h.press('order-ratio-25');
     assert.match(visibleText(h), /현재가가 없어 비율 수량을 계산할 수 없습니다/);
-    assert.equal(h.node('admin-diagnostic-toggle'), undefined);
   });
 
   it('explains when an accepted unavailable WebSocket ticker replaces a valid REST display', async (t) => {
@@ -185,14 +206,34 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     await h.mount();
     t.after(h.close);
     await h.flush();
-    assert.equal(h.node('admin-diagnostic-toggle'), undefined);
-    assert.ok(h.node('admin-asset-price-status'));
-    assert.match(statusText(h), /화면 시세 기준: WebSocket 실시간/);
-    assert.match(statusText(h), /REST 가격 상태: available/);
-    assert.match(statusText(h), /REST 가격 오류: 없음/);
-    assert.match(statusText(h), /WebSocket 현재가: 없음/);
+    assert.ok(h.node('admin-diagnostic-toggle'));
+    assert.equal(h.node('admin-diagnostic-content'), undefined);
+    await h.press('admin-diagnostic-toggle');
+    assert.match(visibleText(h), /Client runtime 상태/);
+    assert.match(visibleText(h), /tickerPriceAvailable/);
+    assert.doesNotMatch(visibleText(h), /Backend Exception|Request ID|Application Stack/);
     assert.match(visibleText(h), /ASSET_PRICE_UNAVAILABLE/);
     assert.match(visibleText(h), /현재 화면 시세가 없어 비율 수량 계산은 제한됩니다/);
+  });
+
+  it('does not attach an older REST diagnosis to a newer ticker failure', async (t) => {
+    const h = inlineTradingHarness();
+    h.role = 'admin';
+    unavailable(h);
+    h.priceErrors = [priceError];
+    h.ticker = {
+      type: 'asset_ticker', assetId: 'bnb', priceLocal: null,
+      priceKrw: null, priceKrwState: 'unavailable',
+      priceCapturedAt: new Date().toISOString(),
+      reason: 'ASSET_PRICE_UNAVAILABLE',
+    };
+    await h.mount();
+    t.after(h.close);
+    await h.flush();
+    assert.ok(h.node('admin-diagnostic-toggle'));
+    await h.press('admin-diagnostic-toggle');
+    assert.match(visibleText(h), /Client runtime 상태/);
+    assert.doesNotMatch(visibleText(h), /price-request|Backend Exception|Request ID/);
   });
 
   it('explains a ticker-only FX conversion failure without inventing a REST diagnostic', async (t) => {
@@ -210,9 +251,7 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     t.after(h.close);
     await h.flush();
     assert.equal(h.node('admin-diagnostic-toggle'), undefined);
-    assert.ok(h.node('admin-asset-price-status'));
-    assert.match(statusText(h), /KRW 환산: 사용 불가 · FX_RATE_UNAVAILABLE/);
-    assert.match(statusText(h), /화면 시세 기준: WebSocket 실시간/);
+    assert.equal(h.node('admin-asset-price-status'), undefined);
     assert.equal(h.node('asset-krw-toggle').props.disabled, true);
   });
 
@@ -224,9 +263,11 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     await h.mount();
     t.after(h.close);
     await h.flush();
-    assert.ok(h.node('admin-asset-price-status'));
-    assert.equal(h.node('admin-diagnostic-toggle'), undefined);
-    assert.match(statusText(h), /preview 기준 60초를 초과/);
+    assert.equal(h.node('admin-asset-price-status'), undefined);
+    assert.ok(h.node('admin-diagnostic-toggle'));
+    await h.press('admin-diagnostic-toggle');
+    assert.match(visibleText(h), /previewPriceAvailable/);
+    assert.doesNotMatch(visibleText(h), /Backend Exception|Request ID/);
   });
 
   for (const role of ['user', 'operator'] as const) {

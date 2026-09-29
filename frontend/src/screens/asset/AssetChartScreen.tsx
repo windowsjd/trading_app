@@ -1,6 +1,6 @@
 import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
@@ -147,10 +147,23 @@ export function AssetChartContent({ route, navigation }: Props) {
           </Text>
         </ActionPressable>
       ) : null}
+      {detailQuery.isError ? (
+        <AdminDiagnosticPanel error={detailQuery.error} />
+      ) : null}
       {isAdmin && candleLiveEnabled && isCandleStale ? (
         <Text style={styles.notice}>
           실시간 캔들 지연 · 최근 조회 데이터 표시
         </Text>
+      ) : null}
+      {isAdmin && candleLiveEnabled && isCandleStale ? (
+        <AdminDiagnosticPanel
+          runtime={{
+            assetId,
+            candleInterval: selectedTimeframe.interval,
+            candleStale: isCandleStale,
+            sourceUpdatedAt: latestCandle?.sourceUpdatedAt,
+          }}
+        />
       ) : null}
       {candleLiveEnabled && latestCandle?.delayed ? (
         <Text style={styles.notice}>
@@ -166,7 +179,7 @@ export function AssetChartContent({ route, navigation }: Props) {
         {candlesQuery.isLoading ? (
           <SectionSkeleton lines={8} />
         ) : candlesQuery.isError ? (
-          <View style={styles.error}>
+          <ScrollView contentContainerStyle={styles.error}>
             <InlineEmptyState
               title={describeCandleError(candlesQuery.error).title}
               message={describeCandleError(candlesQuery.error).message}
@@ -181,7 +194,7 @@ export function AssetChartContent({ route, navigation }: Props) {
             >
               <Text>차트 다시 시도</Text>
             </ActionPressable>
-          </View>
+          </ScrollView>
         ) : chartCandles.length ? (
           <CandlestickChart
             candles={chartCandles}

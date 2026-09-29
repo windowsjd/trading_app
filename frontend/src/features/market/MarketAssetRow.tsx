@@ -11,7 +11,8 @@ import {
 } from '../../utils/format';
 import type { AssetTickerMessage } from '../asset/assetTickerPolicy';
 import { getAssetTradingWarning } from '../asset/tradingUx';
-import type { MarketAssetItemDto } from './api';
+import type { AssetPriceErrorDto, MarketAssetItemDto } from './api';
+import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import { mergeMarketAssetTicker } from './mergeMarketAssetTicker';
 
 type Props = {
@@ -21,6 +22,7 @@ type Props = {
   ticker?: AssetTickerMessage | null;
   /** True when this row's realtime price is past the freshness threshold. */
   isStale?: boolean;
+  priceError?: AssetPriceErrorDto;
   onPress: (assetId: string) => void;
 };
 
@@ -42,7 +44,13 @@ function getChangeRateText(item: MarketAssetItemDto) {
  * prop, so the memo comparator below short-circuits every other row instead of
  * the screen rebuilding a merged object per row on every tick.
  */
-function MarketAssetRowComponent({ item, ticker, isStale, onPress }: Props) {
+function MarketAssetRowComponent({
+  item,
+  ticker,
+  isStale,
+  priceError,
+  onPress,
+}: Props) {
   const displayItem = useMemo(
     () => mergeMarketAssetTicker(item, ticker ?? undefined),
     [item, ticker],
@@ -51,29 +59,41 @@ function MarketAssetRowComponent({ item, ticker, isStale, onPress }: Props) {
   const symbolMarketDisplay = getAssetSymbolMarketDisplay(displayItem);
 
   return (
-    <ActionPressable
-      testID={TEST_IDS.market.item(item.id)}
-      style={styles.itemRow}
-      onPress={() => onPress(item.id)}
-    >
-      <View>
-        <Text style={styles.itemSymbol}>{nameDisplay.primary}</Text>
-        {symbolMarketDisplay ? (
-          <Text style={styles.helper}>{symbolMarketDisplay}</Text>
-        ) : null}
-      </View>
+    <View>
+      <ActionPressable
+        testID={TEST_IDS.market.item(item.id)}
+        style={styles.itemRow}
+        onPress={() => onPress(item.id)}
+      >
+        <View>
+          <Text style={styles.itemSymbol}>{nameDisplay.primary}</Text>
+          {symbolMarketDisplay ? (
+            <Text style={styles.helper}>{symbolMarketDisplay}</Text>
+          ) : null}
+        </View>
 
-      <View style={styles.alignEnd}>
-        <Text style={[styles.itemPrice, isStale && displayItem.marketStatus !== 'closed' && styles.itemPriceStale]}>
-          {getAssetPriceText(displayItem)}
-        </Text>
-        <Text style={styles.helper}>{getChangeRateText(displayItem)}</Text>
-        <Text style={styles.helper}>
-          {displayItem.marketStatus} ·{' '}
-          {displayItem.tradable ? '거래 가능' : '거래 제한'}
-        </Text>
-      </View>
-    </ActionPressable>
+        <View style={styles.alignEnd}>
+          <Text
+            style={[
+              styles.itemPrice,
+              isStale &&
+                displayItem.marketStatus !== 'closed' &&
+                styles.itemPriceStale,
+            ]}
+          >
+            {getAssetPriceText(displayItem)}
+          </Text>
+          <Text style={styles.helper}>{getChangeRateText(displayItem)}</Text>
+          <Text style={styles.helper}>
+            {displayItem.marketStatus} ·{' '}
+            {displayItem.tradable ? '거래 가능' : '거래 제한'}
+          </Text>
+        </View>
+      </ActionPressable>
+      {priceError && displayItem.price?.state !== 'available' ? (
+        <AdminDiagnosticPanel diagnostic={priceError.diagnostic} />
+      ) : null}
+    </View>
   );
 }
 
@@ -85,6 +105,7 @@ export const MarketAssetRow = React.memo(
     // that asset actually receives a newer accepted ticker.
     (previous.ticker ?? null) === (next.ticker ?? null) &&
     previous.isStale === next.isStale &&
+    previous.priceError === next.priceError &&
     previous.onPress === next.onPress,
 );
 

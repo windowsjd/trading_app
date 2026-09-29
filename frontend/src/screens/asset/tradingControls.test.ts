@@ -206,7 +206,8 @@ for (const role of ['user', 'operator', 'admin'])
       if (screen === 'detail') {
         assert.equal(/실시간 연결 복구/.test(text(h)), role === 'admin');
         assert.equal(/실시간 시세 최신성/.test(text(h)), role === 'admin');
-        assert.equal(Boolean(h.node('admin-asset-price-status')), role === 'admin');
+        assert.equal(h.node('admin-asset-price-status'), undefined);
+        assert.equal(Boolean(h.node('admin-diagnostic-toggle')), role === 'admin');
       } else {
         assert.equal(/실시간 캔들 지연/.test(text(h)), role === 'admin');
       }

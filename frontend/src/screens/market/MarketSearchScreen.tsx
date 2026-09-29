@@ -34,6 +34,7 @@ import {
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import EmptyState from '../../components/states/EmptyState';
+import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 
 type Props = NativeStackScreenProps<MarketStackParamList, 'MarketSearch'>;
 type SearchScope = AssetType | 'all';
@@ -131,6 +132,7 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
         title="검색 결과를 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
         onRetry={() => searchQuery.refetch()}
+        diagnosticError={searchQuery.error}
       />
     );
   }
@@ -186,6 +188,13 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
                 <Text style={styles.inlineWarningText}>
                   일부 검색 결과의 시세를 아직 불러오지 못했습니다.
                 </Text>
+                {searchQuery.data?.pages.flatMap((page) => page.priceErrors ?? [])
+                  .map((error, index) => (
+                    <AdminDiagnosticPanel
+                      key={index}
+                      diagnostic={error.diagnostic}
+                    />
+                  ))}
               </View>
             ) : null}
           </View>

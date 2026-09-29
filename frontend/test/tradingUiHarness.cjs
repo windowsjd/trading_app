@@ -116,8 +116,6 @@ function createTradingUiHarness(screenName) {
     ...Object.fromEntries(['FullPageLoading', 'ErrorState', 'InlineEmptyState', 'SectionSkeleton',
       'BlockedState', 'AdminDiagnosticPanel'].map(name => ['../../components/states/' + name, { default: name, __esModule: true }])),
     ...Object.fromEntries(['AccountSwitcher', 'PreviewAmounts'].map(name => ['../../components/tradingAccount/' + name, { default: name, __esModule: true }])),
-    './AdminAssetPriceStatus': { default: () => null, __esModule: true },
-    '../asset/AdminAssetPriceStatus': { default: () => null, __esModule: true },
     '../../components/common/CTAButton': { default: 'CTAButton', __esModule: true },
     './OrderSuccessBottomSheet': { default: 'OrderSuccessBottomSheet', __esModule: true },
     './FxSuccessBottomSheet': { default: 'FxSuccessBottomSheet', __esModule: true },

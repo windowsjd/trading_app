@@ -26,6 +26,7 @@ import { useMarketTickers } from '../../features/market/useMarketTickers';
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import EmptyState from '../../components/states/EmptyState';
+import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 
 type Props = MarketScreenProps;
 
@@ -76,6 +77,14 @@ export default function MarketScreen({ navigation }: Props) {
   }, [marketQuery.data]);
 
   const assetIds = useMemo(() => items.map((item) => item.id), [items]);
+  const priceErrorsByAssetId = useMemo(
+    () => new Map(
+      marketQuery.data?.pages
+        .flatMap((page) => page.priceErrors ?? [])
+        .map((error) => [error.assetId, error] as const) ?? [],
+    ),
+    [marketQuery.data],
+  );
 
   // Live overlay: the currently loaded rows subscribe on the app's shared
   // socket. Changing tab releases the previous tab's rows; loading another page
@@ -111,6 +120,7 @@ export default function MarketScreen({ navigation }: Props) {
         onRetry={() => {
           void marketQuery.refetch();
         }}
+        diagnosticError={marketQuery.error}
       />
     );
   }
@@ -180,6 +190,10 @@ export default function MarketScreen({ navigation }: Props) {
                   실시간 연결이 불안정합니다. 마지막 수신 가격을 표시하고
                   있습니다.
                 </Text>
+                <AdminDiagnosticPanel runtime={{
+                  reconnecting: showReconnectBanner,
+                  subscribedAssetCount: assetIds.length,
+                }} />
               </View>
             ) : null}
           </View>
@@ -195,6 +209,7 @@ export default function MarketScreen({ navigation }: Props) {
             item={item}
             ticker={tickersByAssetId.get(item.id) ?? null}
             isStale={staleAssetIds.has(item.id)}
+            priceError={priceErrorsByAssetId.get(item.id)}
             onPress={openAsset}
           />
         )}

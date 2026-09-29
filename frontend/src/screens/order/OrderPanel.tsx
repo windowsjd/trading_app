@@ -87,7 +87,6 @@ import CTAButton from '../../components/common/CTAButton';
 import OrderSuccessBottomSheet from './OrderSuccessBottomSheet';
 import QuantityRatioSlider from './QuantityRatioSlider';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
-import AdminAssetPriceStatus from '../asset/AdminAssetPriceStatus';
 
 type Props = {
   assetId: string;
@@ -865,6 +864,9 @@ export function OrderForm({
           {integrityMessage}
         </Text>
       ) : null}
+      {integrityMessage ? (
+        <AdminDiagnosticPanel error={positionQuery.error ?? walletsQuery.error} />
+      ) : null}
       {visibleBlockedReason ? (
         <Text
           testID={TEST_IDS.tradingAccount.capabilityNotice}
@@ -873,26 +875,40 @@ export function OrderForm({
           {visibleBlockedReason}
         </Text>
       ) : null}
-      {assetWarningReason ? (
-        <Text style={styles.warningText}>{assetWarningReason}</Text>
+      {visibleBlockedReason && side === 'sell' && positionUnavailable ? (
+        <AdminDiagnosticPanel
+          error={positionQuery.error}
+          diagnostic={positionQuery.data?.valuationErrors?.find(
+            (error) => error.diagnostic,
+          )?.diagnostic}
+        />
       ) : null}
-      {showAssetPriceDiagnostic ? (
+      {assetWarningReason ? (
         <>
-          <AdminDiagnosticPanel
-            diagnostic={assetQuery.data?.priceErrors?.find(
-              (error) => error.assetId === assetId && error.diagnostic,
-            )?.diagnostic}
-          />
-          {side === 'buy' || !isPriceAvailable(price) ? (
-            <AdminAssetPriceStatus
-              assetId={assetId}
-              restPrice={price}
-              priceErrors={assetQuery.data?.priceErrors}
-              ticker={latestTicker?.assetId === assetId ? latestTicker : null}
-              displayPrice={displayPrice}
-              connectionState={connectionState}
-              reconnecting={showReconnectBanner}
-              tickerStale={isStale}
+          <Text style={styles.warningText}>{assetWarningReason}</Text>
+          {(showAssetPriceDiagnostic || displayPrice.priceLocal !== null) &&
+          (side === 'buy' ? !previewPriceAvailable : !isPriceAvailable(price)) ? (
+            <AdminDiagnosticPanel
+              diagnostic={showAssetPriceDiagnostic &&
+                displayPrice.priceLocal === null &&
+                displayPrice.basis !== 'realtime' &&
+                displayPrice.basis !== 'snapshot'
+                ? assetQuery.data?.priceErrors?.find(
+                    (error) => error.assetId === assetId && error.diagnostic,
+                  )?.diagnostic
+                : undefined}
+              runtime={displayPrice.priceLocal !== null ||
+                displayPrice.basis === 'realtime' ||
+                displayPrice.basis === 'snapshot' ? {
+                assetId,
+                connectionState,
+                reconnecting: showReconnectBanner,
+                tickerStale: isStale,
+                displayedPriceBasis: displayPrice.basis,
+                displayedPriceAvailable: displayPrice.priceLocal !== null,
+                priceCapturedAt: displayPrice.priceCapturedAt,
+                previewPriceAvailable,
+              } : null}
             />
           ) : null}
         </>
@@ -954,6 +970,29 @@ export function OrderForm({
               ) : (
                 <>
                   <Text style={styles.warningText}>{previewNotice}</Text>
+                  {orderType === 'market' && !previewPriceAvailable && !assetWarningReason ? (
+                    <AdminDiagnosticPanel
+                      diagnostic={showAssetPriceDiagnostic &&
+                        displayPrice.priceLocal === null &&
+                        displayPrice.basis !== 'realtime' &&
+                        displayPrice.basis !== 'snapshot'
+                        ? assetQuery.data?.priceErrors?.find(
+                        (error) => error.assetId === assetId && error.diagnostic,
+                      )?.diagnostic : undefined}
+                      runtime={displayPrice.priceLocal !== null ||
+                        displayPrice.basis === 'realtime' ||
+                        displayPrice.basis === 'snapshot' ? {
+                        assetId,
+                        displayedPriceBasis: displayPrice.basis,
+                        displayedPriceAvailable: displayPrice.priceLocal !== null,
+                        priceCapturedAt: displayPrice.priceCapturedAt,
+                        previewPriceAvailable,
+                      } : null}
+                    />
+                  ) : null}
+                  {feeQuery.isError ? (
+                    <AdminDiagnosticPanel error={feeQuery.error} />
+                  ) : null}
                   {orderType === 'market' && !previewPriceAvailable ? (
                     <CTAButton
                       label="시세 다시 불러오기"

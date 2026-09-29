@@ -410,6 +410,7 @@ export default function WalletFxScreen({ navigation }: Props) {
             title={ACCOUNT_INTEGRITY_TITLE}
             message={integrityFailure.message}
             onRetry={integrityFailure.retry}
+            diagnosticError={walletsQuery.error}
           />
         </View>
       </SafeAreaView>
@@ -498,7 +499,15 @@ export default function WalletFxScreen({ navigation }: Props) {
                 state={rateQuery.isLoading ? 'loading' : 'enabled'}
                 onPress={() => void rateQuery.refetch()}
               />
-              <AdminDiagnosticPanel error={rateQuery.error} />
+              <AdminDiagnosticPanel
+                error={rateQuery.error}
+                runtime={!rateQuery.isError && rateQuery.data?.state === 'available' ? {
+                  rateState: rateQuery.data.state,
+                  capturedAt: rateQuery.data.capturedAt,
+                  validUntil: rateQuery.data.validUntil,
+                  previewRateAvailable: false,
+                } : null}
+              />
             </>
           )}
         </View>
@@ -591,6 +600,9 @@ export default function WalletFxScreen({ navigation }: Props) {
               <Text style={styles.helper}>받는 통화에서 수수료가 차감됩니다. 실제 환전 금액은 실행 시 확정됩니다.</Text>
             </> : <>
               <Text style={styles.errorText}>{!availableRate ? '현재 환율이 없거나 오래되어 예상 수령액을 표시할 수 없습니다.' : feeQuery.isPending ? '수수료 정보를 확인하는 중입니다.' : '수수료 정보를 불러오지 못해 예상 수령액을 표시할 수 없습니다.'}</Text>
+              {feeQuery.isError ? (
+                <AdminDiagnosticPanel error={feeQuery.error} />
+              ) : null}
               {feeQuery.isError ? <CTAButton label="수수료 다시 불러오기" onPress={() => void feeQuery.refetch()} /> : null}
             </>}
           </View>

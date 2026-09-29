@@ -352,15 +352,6 @@ function inlineTradingHarness() {
       '../../features/me/api': meApi,
     },
   );
-  mocks['./AdminAssetPriceStatus'] = load(
-    resolve('src/screens/asset/AdminAssetPriceStatus.tsx'),
-    {
-      'react-native': native,
-      '../../features/auth/useAdminDiagnostics': adminHook,
-      '../../features/asset/useStaleRecheck': { useStaleRecheck: () => {} },
-    },
-  );
-  mocks['../asset/AdminAssetPriceStatus'] = mocks['./AdminAssetPriceStatus'];
   mocks['../order/OrderPanel'] = load(
     resolve('src/screens/order/OrderPanel.tsx'),
     mocks,

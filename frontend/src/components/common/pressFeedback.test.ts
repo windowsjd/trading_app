@@ -293,6 +293,7 @@ describe('general ripple interaction', () => {
     let prices = 0;
     const { MarketAssetRow } = h.load('src/features/market/MarketAssetRow.tsx', {
       '../../components/common/ActionPressable': { default: h.ActionPressable, __esModule: true },
+      '../../components/states/AdminDiagnosticPanel': { default: () => null, __esModule: true },
       '../../utils/format': {
         getAssetNameDisplay: (item: any) => ({ primary: item.id }), getAssetSymbolMarketDisplay: () => '',
         getAssetPriceText: () => { prices++; return '100'; }, formatPercent: () => '0',
@@ -400,6 +401,7 @@ describe('touch coverage and exclusions', () => {
     const React = require('react');
     const { MarketAssetRow } = load(resolve('src/features/market/MarketAssetRow.tsx'), {
       react: { ...React, useMemo: (fn: () => unknown) => fn() }, 'react-native': native,
+      '../../components/states/AdminDiagnosticPanel': { default: () => null, __esModule: true },
     });
     const props = { item: { id: 'btc' }, ticker: { assetId: 'btc' }, isStale: false, onPress: () => {} };
     assert.equal(MarketAssetRow.compare(props, { ...props }), true);
