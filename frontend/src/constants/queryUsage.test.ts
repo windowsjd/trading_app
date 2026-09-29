@@ -71,6 +71,7 @@ describe('mixed-shape resource keys', () => {
       [QUERY_KEYS.record.seasons({ limit: 20 }), QUERY_KEYS.record.infiniteSeasons({ limit: 20 })],
       [QUERY_KEYS.ranking.list(rank), QUERY_KEYS.ranking.infiniteList(rank)],
       [QUERY_KEYS.tradingAccount.positions('a', filters), QUERY_KEYS.tradingAccount.infinitePositions('a', filters)],
+      [QUERY_KEYS.tradingAccount.pendingOrders('a'), QUERY_KEYS.tradingAccount.orders('a', { status: 'submitted', limit: 100 })],
     ];
     for (const [page, infinite] of pairs) assert.notEqual(hashKey(page), hashKey(infinite));
     assert.notEqual(hashKey(QUERY_KEYS.ranking.infiniteList(rank)),
@@ -87,13 +88,14 @@ describe('mixed-shape resource keys', () => {
       QUERY_KEYS.record.seasons(), QUERY_KEYS.record.infiniteSeasons(),
       QUERY_KEYS.ranking.list({ scope: 'all' }), QUERY_KEYS.ranking.infiniteList({ scope: 'all' }),
       QUERY_KEYS.tradingAccount.positions('a'), QUERY_KEYS.tradingAccount.infinitePositions('a'),
+      QUERY_KEYS.tradingAccount.pendingOrders('a'),
     ];
-    const other = QUERY_KEYS.tradingAccount.infinitePositions('b');
+    const others = [QUERY_KEYS.tradingAccount.infinitePositions('b'), QUERY_KEYS.tradingAccount.pendingOrders('b')];
     try {
-      for (const key of [...keys, other]) client.setQueryData(key, {});
+      for (const key of [...keys, ...others]) client.setQueryData(key, {});
       await invalidateAfterOrderCreate(client, 'a', { seasonUi: true });
       for (const key of keys) assert.equal(client.getQueryState(key)?.isInvalidated, true);
-      assert.equal(client.getQueryState(other)?.isInvalidated, false);
+      for (const other of others) assert.equal(client.getQueryState(other)?.isInvalidated, false);
       // Ranking snapshot recovery targets only the infinite leaderboard.
       await client.resetQueries({ queryKey: QUERY_KEYS.ranking.infiniteList({ scope: 'all' }), exact: true });
       assert.equal(client.getQueryData(QUERY_KEYS.ranking.infiniteList({ scope: 'all' })), undefined);

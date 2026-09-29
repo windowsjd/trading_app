@@ -1,5 +1,9 @@
 import type { RecordOrderItemDto } from './api';
-import type { TradingAccountOrdersDto } from '../tradingAccount/api';
+import type {
+  TradingAccountOrdersDto,
+  getTradingAccountOrders,
+} from '../tradingAccount/api';
+import { isOpenLimitOrder } from './openOrder.ts';
 
 /**
  * Adapts an account-scoped order row to the row shape the order list already
@@ -65,4 +69,54 @@ export function toRecordOrderItems(
   data: TradingAccountOrdersDto | null | undefined,
 ): RecordOrderItemDto[] {
   return (data?.orders ?? []).map(toRecordOrderItem);
+}
+
+export class PendingOrdersContractError extends Error {
+  constructor() {
+    super('대기 주문 응답을 안전하게 표시할 수 없습니다.');
+    this.name = 'PendingOrdersContractError';
+  }
+}
+
+/** Fetch every submitted page before publishing a pending list. Offset pages
+ * can shift while the matcher runs; a changed count or duplicate ID fails the
+ * read instead of silently presenting an incomplete list. The next poll retries. */
+export async function getAccountPendingOrders(
+  accountId: string,
+  fetchPage: typeof getTradingAccountOrders,
+) {
+  const items: RecordOrderItemDto[] = [];
+  const ids = new Set<string>();
+  let offset = 0;
+  let total: number | undefined;
+  for (;;) {
+    const page = await fetchPage(accountId, { status: 'submitted', limit: 100, offset });
+    const { pagination } = page;
+    if (
+      page.tradingAccountId !== accountId ||
+      !Number.isSafeInteger(pagination.total) ||
+      pagination.total < 0 ||
+      pagination.offset !== offset ||
+      pagination.returned !== page.orders.length ||
+      (total !== undefined && total !== pagination.total)
+    ) throw new PendingOrdersContractError();
+    total = pagination.total;
+    for (const [index, item] of toRecordOrderItems(page).entries()) {
+      const rawSide = page.orders[index].side;
+      const id = item.orderId ?? item.id;
+      if (!id || ids.has(id) || (rawSide !== 'buy' && rawSide !== 'sell'))
+        throw new PendingOrdersContractError();
+      ids.add(id);
+      if (isOpenLimitOrder(item)) items.push(item);
+    }
+    const end = offset + page.orders.length;
+    const next = pagination.nextOffset;
+    if (next === null) {
+      if (end !== total) throw new PendingOrdersContractError();
+      return { tradingAccountId: accountId, items };
+    }
+    if (!Number.isSafeInteger(next) || next !== end || next <= offset || next >= total)
+      throw new PendingOrdersContractError();
+    offset = next;
+  }
 }

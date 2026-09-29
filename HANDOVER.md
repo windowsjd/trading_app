@@ -12,6 +12,15 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 거래 화면 대기 목록·주문 side 색상 B (2026-09-29)
+
+시작 전 `git fetch origin main` 후 HEAD = origin/main, clean tree를 확인했다. Frontend만 변경했다.
+
+- 거래 화면의 보유 영역에 `대기 목록`을 별도 view state로 추가했다. Position과 예약 필드로 주문을 추정하지 않고, 현재 `accountId`의 `/api/v1/trading-accounts/:accountId/orders?status=submitted` Order를 조회해 `orderType=limit && status=submitted`인 BUY/SELL만 표시한다. 기존 account-scoped mapper와 주문 표시 helper를 재사용한다.
+- 서버의 `nextOffset`을 따라 최대 100건씩 전 페이지를 모은 뒤 한 번에 공개한다. 페이지 중 실패·계정 불일치·중복/이동이 확인되면 부분 목록이나 거짓 empty를 보여 주지 않는다. 화면이 선택되고 앱이 활성일 때 기존 거래내역 수준인 4초 간격으로 갱신하며, 신규 주문에는 기존 계정별 invalidation을 사용한다. 체결/취소로 대기 주문이 사라지면 같은 계정의 보유·지갑·포트폴리오 캐시를 기존 함수로 갱신한다. General/Season과 계정 전환은 account ID를 query key 및 응답 경계에서 확인한다.
+- OrderPanel의 매수/매도 탭과 최종 CTA, 실제 호가창과 공통 호가 카드, 대기 행에서 매수/bid=초록, 매도/ask=빨강을 적용했다. 차트 상승·하락 및 평가손익 색상은 유지하고 호가 정렬·값·체결 authority에는 손대지 않았다.
+- 회귀는 실제 React Query 거래 화면, 전체 페이지·계정 전환·오류·상태 갱신, 주문 패널과 두 호가 컴포넌트의 렌더 결과를 검증한다. Backend/DB/주문 금융 로직 변경은 없다.
+
 ### 작업 단위: 주문 정책 A — 소수 주식·장외 지정가·Crypto amount·preview 분리 (2026-09-29)
 
 시작은 `git fetch origin main` 후 HEAD = origin/main `afcf701f`, clean tree였다. General/Season 공통 OrdersService와 기존 reservation/matcher를 확장했다.

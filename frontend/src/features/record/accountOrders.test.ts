@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { toRecordOrderItem, toRecordOrderItems } from './accountOrders.ts';
+import { getAccountPendingOrders, PendingOrdersContractError, toRecordOrderItem, toRecordOrderItems } from './accountOrders.ts';
 // `openOrder.ts` is deliberately free of the api-client import chain, so the
 // predicate the list's polling and cancel button depend on can be exercised
 // here. `record/api.ts` itself pulls in axios + AsyncStorage and is not
@@ -134,5 +134,37 @@ describe('account-scoped order rows adapt to the record row shape', () => {
       }).length,
       1,
     );
+  });
+});
+
+
+describe('complete account pending order read', () => {
+  const rows = Array.from({ length: 101 }, (_, index) => accountOrderRow({ orderId: `order-${index}`, side: index % 2 ? 'sell' : 'buy' }));
+  const page = (orders: Record<string, unknown>[], offset: number, total = rows.length, accountId = 'acc-1') => ({
+    state: 'available' as const,
+    tradingAccountId: accountId,
+    orders,
+    pagination: { limit: 100, offset, total, returned: orders.length, nextOffset: offset + orders.length < total ? offset + orders.length : null },
+  });
+  it('uses status filter and nextOffset, including both sides across pages', async () => {
+    const reads: any[] = [];
+    const result = await getAccountPendingOrders('acc-1', (async (id: string, params: any) => {
+      reads.push([id, params.status, params.limit, params.offset]);
+      return page(rows.slice(params.offset, params.offset + params.limit), params.offset);
+    }) as any);
+    assert.equal(result.items.length, 101);
+    assert.equal(result.items[100].side, 'buy');
+    assert.deepEqual(reads, [['acc-1', 'submitted', 100, 0], ['acc-1', 'submitted', 100, 100]]);
+  });
+  it('does not publish a partial list when a later page fails or shifts', async () => {
+    await assert.rejects(getAccountPendingOrders('acc-1', (async (_id: string, params: any) => {
+      if (params.offset) throw new Error('offline');
+      return page(rows.slice(0, 100), 0);
+    }) as any), /offline/);
+    await assert.rejects(getAccountPendingOrders('acc-1', (async (_id: string, params: any) =>
+      params.offset ? page([rows[0]], 100) : page(rows.slice(0, 100), 0)
+    ) as any), PendingOrdersContractError);
+    await assert.rejects(getAccountPendingOrders('acc-1', (async () => page([], 0, 0, 'acc-2')) as any), PendingOrdersContractError);
+    await assert.rejects(getAccountPendingOrders('acc-1', (async () => page([accountOrderRow({ side: undefined })], 0, 1)) as any), PendingOrdersContractError);
   });
 });

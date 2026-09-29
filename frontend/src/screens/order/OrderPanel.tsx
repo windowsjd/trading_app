@@ -1,5 +1,5 @@
 import Decimal from 'decimal.js';
-import { UP_COLOR } from '../../components/charts/candleColors';
+import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';
 import {
   validateOrderQuote,
   OrderQuoteValidationError,
@@ -1218,8 +1218,8 @@ const styles = StyleSheet.create({
     color: '#555',
     textAlign: 'center',
   },
-  buyActive: { backgroundColor: UP_COLOR },
-  sellActive: { backgroundColor: '#315f9b' },
+  buyActive: { backgroundColor: BUY_COLOR },
+  sellActive: { backgroundColor: SELL_COLOR },
   activeText: { color: '#fff' },
   typeTab: {
     flex: 1,

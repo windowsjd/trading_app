@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { BUY_COLOR, SELL_COLOR, BUY_BACKGROUND, SELL_BACKGROUND } from '../order/sideColors';
 import {
   ScrollView,
   StyleSheet,
@@ -163,10 +164,10 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     flexShrink: 0,
   },
-  ask: { color: '#315f9b' },
-  bid: { color: '#a13e3b' },
-  askRow: { backgroundColor: '#f3f6fb' },
-  bidRow: { backgroundColor: '#fcf4f3' },
+  ask: { color: SELL_COLOR },
+  bid: { color: BUY_COLOR },
+  askRow: { backgroundColor: SELL_BACKGROUND },
+  bidRow: { backgroundColor: BUY_BACKGROUND },
   status: { fontSize: 11, color: '#8b641e' },
   hint: { fontSize: 10, color: '#7c8793' },
 });

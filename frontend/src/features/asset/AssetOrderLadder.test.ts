@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { describe, it } from 'node:test';
 import { createCryptoOrderBookFixture } from './orderBook.fixture.ts';
+import { formatOrderBookDecimal } from './orderBook.ts';
 const require = createRequire(import.meta.url);
-const { interactionHarness, React, act } = require('../../../test/interactionTestHarness.cjs');
+const { interactionHarness, flatten, React, act } = require('../../../test/interactionTestHarness.cjs');
 
 describe('compact trading depth presentation', () => {
   for (const fontScale of [1, 1.5, 2]) {
@@ -36,5 +37,26 @@ describe('compact trading depth presentation', () => {
     t.after(() => act(() => renderer.unmount()));
     assert.equal(renderer.root.findAllByType('ScrollView').length, 0);
     assert.ok(JSON.stringify(renderer.toJSON()).includes('$763.79'));
+  });
+});
+
+
+describe('order side colors in the trading ladder', () => {
+  it('uses red asks and green bids without changing the best levels', (t) => {
+    const h = interactionHarness();
+    const Ladder = h.load('src/features/asset/AssetOrderLadder.tsx').default;
+    const book = createCryptoOrderBookFixture('btc', 'BTC', true);
+    const renderer = h.render(React.createElement(Ladder, { book, statusMessage: null, currentPrice: React.createElement('Text', null, '$777') }));
+    t.after(() => act(() => renderer.unmount()));
+    const ask = renderer.root.findByProps({ testID: 'asset-order-book-asks-1' });
+    const bid = renderer.root.findByProps({ testID: 'asset-order-book-bids-1' });
+    assert.equal(flatten(ask.props.style).backgroundColor, '#fef2f2');
+    assert.equal(flatten(bid.props.style).backgroundColor, '#f0fdf4');
+    assert.equal(flatten(ask.children[0].props.style).color, '#dc2626');
+    assert.equal(flatten(bid.children[0].props.style).color, '#16a34a');
+    assert.match(ask.props.accessibilityLabel, /매도 1호가/);
+    assert.match(bid.props.accessibilityLabel, /매수 1호가/);
+    assert.equal(ask.children[0].props.children, formatOrderBookDecimal(book.asks[0].price));
+    assert.equal(bid.children[0].props.children, formatOrderBookDecimal(book.bids[0].price));
   });
 });

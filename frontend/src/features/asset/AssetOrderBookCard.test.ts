@@ -6,7 +6,7 @@ import { formatOrderBookDecimal } from './orderBook.ts';
 import { formatKrwDecimal } from '../../utils/format.ts';
 
 const require = createRequire(import.meta.url);
-const { interactionHarness, React, act } = require('../../../test/interactionTestHarness.cjs');
+const { interactionHarness, flatten, React, act } = require('../../../test/interactionTestHarness.cjs');
 const text = (node: any): string => typeof node === 'string' ? node : (node.children ?? []).map(text).join('');
 const host = (renderer: any, testID: string) => renderer.root.find((node: any) => node.type === 'View' && node.props.testID === testID);
 
@@ -130,6 +130,24 @@ describe('order book card rendering', () => {
     assert.match(text(host(renderer, 'asset-order-book-bids-total')), /12,345,678,901,234,567,890\.123456789012345678/);
     act(() => renderer.update(React.createElement(Card, { book: { ...book, bids: [] } })));
     assert.match(text(renderer.root), /매수호가가 없습니다/);
+    act(() => renderer.unmount());
+  });
+});
+
+
+describe('order side colors in the shared card', () => {
+  it('uses the same red asks and green bids as the trading ladder', () => {
+    const h = interactionHarness();
+    const Card = h.load('src/features/asset/AssetOrderBookCard.tsx').default;
+    const renderer = h.render(React.createElement(Card, { book: createOrderBookFixture('kr-1') }));
+    const ask = host(renderer, 'asset-order-book-asks-1');
+    const bid = host(renderer, 'asset-order-book-bids-1');
+    assert.equal(flatten(ask.props.style).backgroundColor, '#fef2f2');
+    assert.equal(flatten(bid.props.style).backgroundColor, '#f0fdf4');
+    assert.equal(flatten(ask.children[0].props.style).color, '#dc2626');
+    assert.equal(flatten(bid.children[0].props.style).color, '#16a34a');
+    assert.match(ask.props.accessibilityLabel, /매도 1호가/);
+    assert.match(bid.props.accessibilityLabel, /매수 1호가/);
     act(() => renderer.unmount());
   });
 });

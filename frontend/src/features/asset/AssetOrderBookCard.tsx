@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { BUY_COLOR, SELL_COLOR, BUY_BACKGROUND, SELL_BACKGROUND } from '../order/sideColors';
 import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { formatKstDateTime } from '../../utils/format';
 import { formatOrderBookDecimal, normalizeOrderBook, type AssetOrderBook } from './orderBook';
@@ -107,9 +108,9 @@ const styles = StyleSheet.create({
   columnLabel: { fontSize: 12, lineHeight: 20, color: '#666', padding: 8, textAlign: 'right', flexShrink: 0 },
   number: { fontSize: 14, lineHeight: 22, fontVariant: ['tabular-nums'], color: '#333', textAlign: 'right', paddingHorizontal: 12, paddingVertical: 6, flexShrink: 0 },
   quantity: { flex: 1 },
-  askText: { color: '#315f9b' },
-  bidText: { color: '#a13e3b' },
-  askRow: { backgroundColor: '#f1f5fc' },
-  bidRow: { backgroundColor: '#fcf3f2' },
+  askText: { color: SELL_COLOR },
+  bidText: { color: BUY_COLOR },
+  askRow: { backgroundColor: SELL_BACKGROUND },
+  bidRow: { backgroundColor: BUY_BACKGROUND },
   bestRow: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#bac5ce' },
 });

@@ -313,6 +313,7 @@ export function AssetTradingScreen({
             </View>
           </View>
           <AccountHoldings
+            isFocused={isFocused}
             key={selectedAccountId ?? 'no-account'}
             accountId={selectedAccountId}
             account={selectedAccount}

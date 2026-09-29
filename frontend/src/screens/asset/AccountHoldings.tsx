@@ -17,24 +17,27 @@ import ActionPressable from '../../components/common/ActionPressable';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
+import PendingOrders from './PendingOrders';
 
 type Props = {
   accountId: string | null;
   account: TradingAccountDto | null;
   assetId: string;
+  isFocused: boolean;
 };
 
 export default function AccountHoldings({
   accountId,
   account,
   assetId,
+  isFocused,
 }: Props) {
-  const [filter, setFilter] = useState<'all' | 'current'>('all');
+  const [filter, setFilter] = useState<'all' | 'current' | 'pending'>('all');
   const query = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.holdings(accountId ?? ''),
     queryFn: () =>
       getAccountHoldings(accountId ?? '', getTradingAccountPositions),
-    enabled: !!accountId,
+    enabled: !!accountId && filter !== 'pending',
   });
   // No previous-account placeholder; the envelope check also protects display
   // if a caller ever seeds the wrong account into this cache entry.
@@ -46,18 +49,18 @@ export default function AccountHoldings({
     : null;
   const positions = data?.positions ?? [];
   const visible =
-    filter === 'all'
-      ? positions
-      : positions.filter((position) => position.assetId === assetId);
+    filter === 'current'
+      ? positions.filter((position) => position.assetId === assetId)
+      : positions;
 
   return (
     <View style={styles.section} testID="account-holdings">
       <View style={styles.header}>
         <Text style={styles.title} testID="holdings-count">
-          보유 종목{data && !query.isError ? ` ${positions.length}` : ''}
+          {filter === 'pending' ? '대기 주문' : `보유 종목${data && !query.isError ? ` ${positions.length}` : ''}`}
         </Text>
         <View style={styles.filters}>
-          {(['all', 'current'] as const).map((value) => (
+          {(['all', 'current', 'pending'] as const).map((value) => (
             <ActionPressable
               key={value}
               testID={`holdings-filter-${value}`}
@@ -72,7 +75,7 @@ export default function AccountHoldings({
                   filter === value && styles.selectedText,
                 ]}
               >
-                {value === 'all' ? '전체 보유' : '현재 종목'}
+                {value === 'all' ? '전체 보유' : value === 'current' ? '현재 종목' : '대기 목록'}
               </Text>
             </ActionPressable>
           ))}
@@ -87,6 +90,12 @@ export default function AccountHoldings({
         <InlineEmptyState
           title="계정이 없습니다."
           message="계정을 개설하면 보유 현황을 볼 수 있습니다."
+        />
+      ) : filter === 'pending' ? (
+        <PendingOrders
+          accountId={accountId}
+          isFocused={isFocused}
+          seasonUi={account?.id === accountId && account.mode === 'season'}
         />
       ) : query.isError ? (
         <>

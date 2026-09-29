@@ -300,3 +300,149 @@ describe('holdings in AssetDetail with real React Query and order invalidation',
       });
     }
 });
+
+
+const pendingOrder = (id: string, side: 'buy' | 'sell', overrides: Record<string, unknown> = {}) => ({
+  id,
+  orderId: id,
+  asset: { id: `asset-${id}`, symbol: `${id.toUpperCase()}USDT`, name: `긴 종목 이름 ${id}` },
+  side,
+  orderType: 'limit',
+  status: 'submitted',
+  quantity: '12345678901234567890.12345678',
+  limitPrice: '12345678901234567890.12345678',
+  currencyCode: 'USD',
+  submittedAt: '2026-09-29T00:00:00.000Z',
+  ...overrides,
+});
+const pendingIds = (h: any) => h.renderer.root.findAll((node: any) =>
+  typeof node.type === 'string' && /^pending-order-/.test(node.props.testID ?? ''),
+).map((node: any) => node.props.testID);
+
+describe('pending limit orders in the real trading screen', () => {
+  it('keeps holdings filters and shows a distinct empty pending state', async (t) => {
+    const h = inlineTradingHarness();
+    h.holdings = { general: [holding('btc')] };
+    h.orders = { general: [] };
+    await h.mount(); t.after(h.close); await h.flush();
+    assert.deepEqual(ids(h), ['holding-btc']);
+    await h.press('holdings-filter-current');
+    assert.deepEqual(ids(h), []);
+    await h.press('holdings-filter-pending'); await h.flush();
+    assert.equal(h.node('holdings-filter-pending').props.accessibilityState.selected, true);
+    assert.deepEqual(pendingIds(h), []);
+    assert.match(empty(h), /대기 중인 지정가 주문이 없습니다/);
+    assert.deepEqual(h.orderReads.map((read: any) => [read.id, read.status, read.offset]), [['general', 'submitted', 0]]);
+    await h.press('holdings-filter-all');
+    assert.deepEqual(ids(h), ['holding-btc']);
+  });
+
+  it('shows BUY and SELL, excludes other lifecycle rows, and wraps long values at 320px / 2× font', async (t) => {
+    const h = inlineTradingHarness();
+    h.dimensions.fontScale = 2;
+    h.orders = { general: [
+      pendingOrder('buy', 'buy'), pendingOrder('sell', 'sell'),
+      pendingOrder('market', 'buy', { orderType: 'market' }),
+      pendingOrder('done', 'buy', { status: 'executed' }),
+      pendingOrder('cancel', 'sell', { status: 'canceled' }),
+      pendingOrder('reject', 'buy', { status: 'rejected' }),
+    ] };
+    await h.mount(); t.after(h.close); await h.press('holdings-filter-pending'); await h.flush();
+    assert.deepEqual(pendingIds(h), ['pending-order-buy', 'pending-order-sell']);
+    const buy = h.node('pending-order-buy');
+    const sell = h.node('pending-order-sell');
+    assert.match(text(buy), /지정가 매수 · 미체결/);
+    assert.match(text(sell), /지정가 매도 · 미체결/);
+    assert.match(text(buy), /주문 수량12,345,678,901,234,567,890.12345678/);
+    assert.match(text(sell), /지정가12,345,678,901,234,567,890.12345678/);
+    assert.ok(buy.findAllByType('Text').every((node: any) => node.props.numberOfLines === undefined));
+    assert.equal(buy.findAllByType('View').find((node: any) => node.props.style?.flexWrap === 'wrap') !== undefined, true);
+    assert.equal(h.dimensions.width, 320);
+  });
+
+  it('keeps all three filters accessible at 430px', async (t) => {
+    const h = inlineTradingHarness();
+    h.dimensions.width = 430;
+    h.orders = { general: [pendingOrder('buy', 'buy')] };
+    await h.mount(); t.after(h.close); await h.flush();
+    for (const value of ['all', 'current', 'pending']) {
+      await h.press(`holdings-filter-${value}`);
+      assert.equal(h.node(`holdings-filter-${value}`).props.accessibilityState.selected, true);
+    }
+    await h.flush();
+    assert.deepEqual(pendingIds(h), ['pending-order-buy']);
+  });
+
+  it('switches General to Season without ever showing the old account row', async (t) => {
+    const h = inlineTradingHarness();
+    h.orders = { general: [pendingOrder('a', 'buy')], season: [pendingOrder('b', 'sell')] };
+    await h.mount(); t.after(h.close); await h.press('holdings-filter-pending'); await h.flush();
+    assert.deepEqual(pendingIds(h), ['pending-order-a']);
+    h.orderGate = { season: deferred() };
+    h.accountId = 'season'; await h.update();
+    assert.deepEqual(pendingIds(h), []);
+    await h.press('holdings-filter-pending');
+    assert.deepEqual(pendingIds(h), []);
+    await act(async () => h.orderGate.season.resolve()); await h.flush();
+    assert.deepEqual(pendingIds(h), ['pending-order-b']);
+    assert.deepEqual(h.orderReads.map((read: any) => read.id), ['general', 'season']);
+  });
+
+  it('refreshes create, matcher execution and cancellation from the account-scoped key', async (t) => {
+    const h = inlineTradingHarness();
+    h.orders = { general: [pendingOrder('buy', 'buy')] };
+    await h.mount(); t.after(h.close); await h.press('holdings-filter-pending'); await h.flush();
+    assert.deepEqual(pendingIds(h), ['pending-order-buy']);
+    h.orders.general.push(pendingOrder('sell', 'sell'));
+    await act(async () => invalidateAfterOrderCreate(h.client, 'general')); await h.flush();
+    assert.deepEqual(pendingIds(h), ['pending-order-buy', 'pending-order-sell']);
+    h.invalidations = [];
+    h.orders.general[0].status = 'executed';
+    await act(async () => h.client.refetchQueries({ queryKey: QUERY_KEYS.tradingAccount.ordersAll('general') })); await h.flush();
+    assert.deepEqual(pendingIds(h), ['pending-order-sell']);
+    assert.ok(h.invalidations.some((key: any[]) => key[1] === 'positions' && key[2] === 'general'));
+    assert.ok(h.invalidations.every((key: any[]) => key[2] !== 'season'));
+    h.orders.general[1].status = 'canceled';
+    await act(async () => h.client.refetchQueries({ queryKey: QUERY_KEYS.tradingAccount.ordersAll('general') })); await h.flush();
+    assert.deepEqual(pendingIds(h), []);
+    assert.match(empty(h), /대기 중인 지정가 주문이 없습니다/);
+    assert.ok(h.queries.some((q: any) => q.queryKey[1] === 'orders' && q.refetchInterval === 4000));
+  });
+
+  it('reads every submitted page before displaying the list', async (t) => {
+    const h = inlineTradingHarness();
+    h.orders = { general: Array.from({ length: 205 }, (_, i) => pendingOrder(`o${i}`, i % 2 ? 'sell' : 'buy')) };
+    await h.mount(); t.after(h.close); await h.press('holdings-filter-pending'); await h.flush();
+    assert.equal(pendingIds(h).length, 205);
+    assert.deepEqual(h.orderReads.map((read: any) => read.offset), [0, 100, 200]);
+    assert.match(text(h.node('pending-orders-list')), /대기 주문 205건/);
+  });
+
+  for (const integrity of [false, true]) it(`distinguishes ${integrity ? 'integrity' : 'network'} failure from empty`, async (t) => {
+    const h = inlineTradingHarness();
+    h.orders = { general: [] };
+    h.orderError = integrity ? { response: { status: 409, data: { error: { code: 'TRADING_ACCOUNT_INTEGRITY' } } } } : new Error('offline');
+    await h.mount(); t.after(h.close); await h.press('holdings-filter-pending'); await h.flush();
+    assert.match(empty(h), integrity ? /대기 주문을 안전하게 표시할 수 없습니다/ : /대기 주문을 불러오지 못했습니다/);
+    assert.doesNotMatch(empty(h), /대기 중인 지정가 주문이 없습니다/);
+    h.orderError = null; await h.press('pending-orders-retry'); await h.flush();
+    assert.match(empty(h), /대기 중인 지정가 주문이 없습니다/);
+  });
+});
+
+
+describe('order panel side colors in the trading screen', () => {
+  it('keeps BUY green and SELL red on selected tabs and final CTA', async (t) => {
+    const h = inlineTradingHarness();
+    await h.mount(); t.after(h.close); await h.flush();
+    const color = (node: any) => (Array.isArray(node.props.style)
+      ? Object.assign({}, ...node.props.style.filter(Boolean))
+      : node.props.style).backgroundColor;
+    assert.equal(color(h.node(TEST_IDS.assetDetail.buyButton)), '#16a34a');
+    assert.equal(color(h.node(TEST_IDS.order.executeSubmit)), '#16a34a');
+    await h.press(TEST_IDS.assetDetail.sellButton); await h.flush();
+    assert.equal(color(h.node(TEST_IDS.assetDetail.sellButton)), '#dc2626');
+    assert.equal(color(h.node(TEST_IDS.order.executeSubmit)), '#dc2626');
+    assert.equal(h.node(TEST_IDS.order.executeSubmit).props.state, 'disabled');
+  });
+});

@@ -23,6 +23,7 @@ function deferred() {
 function inlineTradingHarness() {
   const h = {
     assetId: 'bnb',
+    dimensions: { width: 320, height: 700, fontScale: 1 },
     accountId: 'general',
     focused: true,
     connectionState: 'subscribed',
@@ -93,6 +94,16 @@ function inlineTradingHarness() {
         get: async (url, config) => {
           const id = url.split('/')[2];
           const { limit, offset } = config.params;
+          if (url.endsWith('/orders')) {
+            h.orderReads ??= [];
+            h.orderReads.push({ id, ...config.params });
+            if (h.orderGate?.[id]) await h.orderGate[id].promise;
+            if (h.orderError) throw h.orderError;
+            const orders = (h.orders?.[id] ?? []).filter((row) => !config.params.status || row.status === config.params.status);
+            const page = orders.slice(offset, offset + limit);
+            return { data: { success: true, data: { tradingAccountId: h.orderEnvelopeId ?? id, state: 'available', orders: page,
+              pagination: { offset, limit, total: orders.length, returned: page.length, nextOffset: offset + limit < orders.length ? offset + limit : null } } } };
+          }
           h.holdingsReads ??= [];
           h.holdingsReads.push({ id, offset, limit });
           const result = h.holdings?.[id] ?? [{
@@ -181,7 +192,8 @@ function inlineTradingHarness() {
     ),
     StyleSheet: { create: (value) => value },
     Platform: { OS: 'android' },
-    useWindowDimensions: () => ({ width: 320, height: 700, fontScale: 1 }),
+    AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
+    useWindowDimensions: () => h.dimensions,
   };
   const nav = {
     navigate: (...args) => h.navigation.push(args),
@@ -216,7 +228,7 @@ function inlineTradingHarness() {
       useQuery: (options) => {
         h.queries.push(options);
         const [scope, resource, id] = options.queryKey;
-        if (options.queryKey[3] === 'holdings') return query.useQuery(options);
+        if (options.queryKey[3] === 'holdings' || resource === 'orders') return query.useQuery(options);
         const base = {
           isLoading: false,
           isPending: false,
@@ -365,6 +377,11 @@ function inlineTradingHarness() {
   h.OrderScreen = load(resolve('src/screens/order/OrderScreen.tsx'), {
     ...mocks, './OrderPanel': mocks['../order/OrderPanel'],
   }).default;
+  mocks['../../features/record/api'] = load(resolve('src/features/record/api.ts'), {
+    '../../services/api/client': { apiClient: {} },
+    './openOrder': require('../src/features/record/openOrder.ts'),
+  });
+  mocks['./PendingOrders'] = load(resolve('src/screens/asset/PendingOrders.tsx'), mocks);
   mocks['./AccountHoldings'] = load(resolve('src/screens/asset/AccountHoldings.tsx'), mocks);
   mocks['../../features/asset/AssetOrderLadder'] = load(
     resolve('src/features/asset/AssetOrderLadder.tsx'),

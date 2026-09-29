@@ -336,6 +336,8 @@ export const QUERY_KEYS = {
 
     ordersAll: (accountId: string) =>
       ['tradingAccount', 'orders', accountId] as const,
+    pendingOrders: (accountId: string) =>
+      [...QUERY_KEYS.tradingAccount.ordersAll(accountId), 'pending', 'complete'] as const,
     orders: (accountId: string, filters?: Record<string, unknown>) =>
       [
         'tradingAccount',
