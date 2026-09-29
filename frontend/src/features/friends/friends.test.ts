@@ -112,13 +112,23 @@ describe('overall menu and server privacy setting', () => {
     elements(tree, 'Pressable').forEach((node: any) => node.props.onPress());
     assert.deepEqual(navigations, ['My', 'Friends', 'Notices', 'Settings']);
   });
-  it('renders the persisted Boolean and sends a Boolean change without optimistic disclosure', async () => {
+  it('renders the persisted Boolean and updates /me cache before PATCH resolves', async () => {
     const mutations: any[] = [], options: any[] = [], saved: any[] = [];
     const data = { id: 'me', nickname: 'me', portfolioPublic: false };
+    let cached = data;
     const Screen = load(resolve('src/screens/my/SettingsScreen.tsx'), {
-      react: { ...React, useState: (value: any) => [value, () => {}], useEffect: () => {} },
+      react: { ...React, useState: (value: any) => [value, () => {}], useEffect: () => {}, useRef: (value: any) => ({ current: value }) },
       'react-native': { View: 'View', Text: 'Text', SafeAreaView: 'SafeAreaView', ScrollView: 'ScrollView', Switch: 'Switch', TextInput: 'TextInput', Alert: { alert: () => {} }, StyleSheet: { create: (value: any) => value } },
-      '@tanstack/react-query': { useQuery: () => ({ data }), useQueryClient: () => ({ setQueryData: (...args: any[]) => saved.push(args), invalidateQueries: async () => {} }), useMutation: (option: any) => { options.push(option); return { mutate: (value: any) => mutations.push(value) }; } },
+      '@tanstack/react-query': {
+        useQuery: () => ({ data }),
+        useQueryClient: () => ({
+          getQueryData: () => cached,
+          setQueryData: (...args: any[]) => { cached = typeof args[1] === 'function' ? args[1](cached) : args[1]; saved.push(args); },
+          cancelQueries: async () => {},
+          invalidateQueries: async () => {},
+        }),
+        useMutation: (option: any) => { options.push(option); return { isPending: false, mutate: (value: any) => mutations.push(value) }; },
+      },
       '../../features/me/api': { getMe: () => {}, updateMe: async (value: any) => value },
       '../../features/auth/useLogout': { useLogout: () => () => {} },
       '../../components/states/FullPageLoading': { default: 'Loading' }, '../../components/states/ErrorState': { default: 'Error' },
@@ -126,9 +136,12 @@ describe('overall menu and server privacy setting', () => {
     const toggle = elements(Screen({}), 'Switch')[0];
     assert.equal(toggle.props.value, false);
     toggle.props.onValueChange(true);
-    assert.deepEqual(mutations, [true]); assert.equal(toggle.props.value, false);
+    assert.deepEqual(mutations, [true]);
+    const context = await options[1].onMutate(true);
+    assert.equal(cached.portfolioPublic, true);
+    assert.equal(cached.nickname, 'me');
     assert.deepEqual(await options[1].mutationFn(true), { portfolioPublic: true });
-    await options[1].onSuccess({ ...data, portfolioPublic: true });
-    assert.deepEqual(saved[0], [QUERY_KEYS.me, { ...data, portfolioPublic: true }]);
+    await options[1].onSuccess({ ...data, portfolioPublic: true }, true, context);
+    assert.deepEqual(saved.at(-1), [QUERY_KEYS.me, { ...data, portfolioPublic: true }]);
   });
 });

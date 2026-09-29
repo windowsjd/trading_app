@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import type { MyStackParamList } from '../../app/navigation/types';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 
-import { getMe, updateMe } from '../../features/me/api';
+import { getMe, updateMe, type MeDto } from '../../features/me/api';
 import { useLogout } from '../../features/auth/useLogout';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
@@ -37,6 +37,7 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
 
   const [nickname, setNickname] = useState('');
   const [notificationEnabled, setNotificationEnabled] = useState(true);
+  const privacyRequestInFlight = useRef(false);
 
   useEffect(() => {
     if (meQuery.data) {
@@ -57,19 +58,63 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
 
   const privacyMutation = useMutation({
     mutationFn: (portfolioPublic: boolean) => updateMe({ portfolioPublic }),
-    onSuccess: async (me) => {
+    onMutate: async (portfolioPublic) => {
+      await queryClient.cancelQueries({ queryKey: QUERY_KEYS.me, exact: true });
+      const previousMe = queryClient.getQueryData<MeDto>(QUERY_KEYS.me);
+      if (previousMe) {
+        queryClient.setQueryData<MeDto>(QUERY_KEYS.me, {
+          ...previousMe,
+          portfolioPublic,
+        });
+      }
+      return {
+        userId: previousMe?.id,
+        previousPortfolioPublic: previousMe?.portfolioPublic,
+      };
+    },
+    onSuccess: (me, _portfolioPublic, context) => {
+      // A late PATCH response must not repopulate /me after logout or a
+      // different user's login.
+      if (
+        !context?.userId ||
+        me.id !== context.userId ||
+        queryClient.getQueryData<MeDto>(QUERY_KEYS.me)?.id !== context.userId
+      )
+        return;
       queryClient.setQueryData(QUERY_KEYS.me, me);
-      await queryClient.invalidateQueries({
+      // This self-summary can contain privacy-dependent data. Refresh it
+      // without extending the switch's mutation pending state.
+      void queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.ranking.userSeasonSummary(me.id),
         exact: true,
       });
     },
-    onError: () =>
+    onError: (_error, _portfolioPublic, context) => {
+      if (
+        context?.userId &&
+        typeof context.previousPortfolioPublic === 'boolean'
+      ) {
+        queryClient.setQueryData<MeDto>(QUERY_KEYS.me, (current) =>
+          current?.id === context.userId
+            ? { ...current, portfolioPublic: context.previousPortfolioPublic }
+            : current,
+        );
+      }
       Alert.alert(
         '저장 실패',
         '공개 설정을 변경하지 못했습니다. 다시 시도해주세요.',
-      ),
+      );
+    },
+    onSettled: () => {
+      privacyRequestInFlight.current = false;
+    },
   });
+
+  const onChangePortfolioPublic = (value: boolean) => {
+    if (privacyRequestInFlight.current || privacyMutation.isPending) return;
+    privacyRequestInFlight.current = true;
+    privacyMutation.mutate(value);
+  };
 
   const onSaveNickname = () => {
     if (!nickname.trim()) {
@@ -143,16 +188,14 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
               privacyMutation.isPending ||
               typeof meQuery.data.portfolioPublic !== 'boolean'
             }
-            onValueChange={(value) => privacyMutation.mutate(value)}
+            onValueChange={onChangePortfolioPublic}
           />
           <Text style={styles.helper}>
-            {privacyMutation.isPending
-              ? '저장 중...'
-              : typeof meQuery.data.portfolioPublic !== 'boolean'
-                ? '공개 설정 확인 중...'
-                : meQuery.data.portfolioPublic
-                  ? '공개'
-                  : '비공개'}
+            {typeof meQuery.data.portfolioPublic !== 'boolean'
+              ? '공개 설정 확인 중...'
+              : meQuery.data.portfolioPublic
+                ? '공개'
+                : '비공개'}
           </Text>
         </View>
 
