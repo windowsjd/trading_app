@@ -213,7 +213,7 @@ async function price(
   currencyCode = CurrencyCode.USD,
   sourceName = 'binance_public_rest_24hr_ticker',
 ) {
-  const observedAt = new Date(Date.now() - 1_000);
+  const observedAt = new Date();
   return prisma.assetPriceSnapshot.create({
     data: {
       assetId,
@@ -229,7 +229,7 @@ async function price(
 }
 
 async function freshUsdKrwRate() {
-  const observedAt = new Date(Date.now() - 1_000);
+  const observedAt = new Date();
   const row = await prisma.fxRateSnapshot.create({
     data: {
       baseCurrency: CurrencyCode.USD,
@@ -246,7 +246,9 @@ async function freshUsdKrwRate() {
 }
 
 async function market(userId, accountId, assetId, side, quantity, key) {
-  const request = { assetId, side, orderType: 'market', quantity };
+  const asset = await prisma.asset.findUniqueOrThrow({where:{id:assetId}});
+  const request = { assetId, side, orderType: 'market',
+    ...(side === 'buy' && asset.assetType === 'crypto' ? {amount:new Prisma.Decimal(quantity).mul('100').toFixed(8)} : {quantity}) };
   const quote = await orders.quoteOrderForTradingAccount(
     userId,
     accountId,
@@ -272,7 +274,7 @@ async function limit(userId, accountId, assetId, side, quantity, limitPrice, key
     assetId,
     side,
     orderType: 'limit',
-    quantity,
+    ...(side === 'buy' ? {amount:new Prisma.Decimal(quantity).mul(limitPrice).toFixed(8)} : {quantity}),
     limitPrice,
   };
   const quote = await orders.quoteOrderForTradingAccount(
@@ -569,7 +571,7 @@ async function main() {
       assetId,
       side: 'buy',
       orderType: 'market',
-      quantity: '1.000000',
+      amount: '100',
     }),
     'ASSET_PRICE_UNAVAILABLE',
   );
@@ -579,7 +581,7 @@ async function main() {
     assetId,
     side: 'buy',
     orderType: 'market',
-    quantity: '1.000000',
+    amount: '100',
   };
   const repriceQuote = await orders.quoteOrderForTradingAccount(
     userId,
@@ -602,7 +604,7 @@ async function main() {
       assetId,
       side: 'buy',
       orderType: 'limit',
-      quantity: '1000000.000000',
+      amount: '100000000',
       limitPrice: '100.00000000',
     }),
     'INSUFFICIENT_AVAILABLE_BALANCE',
@@ -621,7 +623,7 @@ async function main() {
     assetId,
     side: 'buy',
     orderType: 'limit',
-    quantity: '1.000000',
+    amount: '90',
     limitPrice: '90.00000000',
   };
   const mismatchQuote = await orders.quoteOrderForTradingAccount(
@@ -632,7 +634,7 @@ async function main() {
   await expectCode(
     orders.createOrderForTradingAccount(userId, accountId, {
       ...mismatchRequest,
-      quantity: '2.000000',
+      amount: '180',
       quoteId: mismatchQuote.data.quoteId,
       idempotencyKey: 'mismatch-' + randomUUID(),
     }),
@@ -704,14 +706,14 @@ async function main() {
   const conflictQuote = await orders.quoteOrderForTradingAccount(
     userId,
     accountId,
-    { assetId, side: 'buy', orderType: 'market', quantity: '1.000000' },
+    { assetId, side: 'buy', orderType: 'market', amount: '100' },
   );
   await expectCode(
     orders.createOrderForTradingAccount(userId, accountId, {
       assetId,
       side: 'buy',
       orderType: 'market',
-      quantity: '1.000000',
+      amount: '100',
       quoteId: conflictQuote.data.quoteId,
       idempotencyKey: marketKey,
     }),
@@ -909,7 +911,7 @@ async function main() {
       assetId,
       side: 'buy',
       orderType: 'market',
-      quantity: '1.000000',
+      amount: '100',
     }),
     'TRADING_ACCOUNT_NOT_ACTIVE',
   );
@@ -942,7 +944,7 @@ async function main() {
       assetId,
       side: 'buy',
       orderType: 'market',
-      quantity: '1.000000',
+      amount: '100',
     }),
     'TRADING_ACCOUNT_NOT_ACTIVE',
   );

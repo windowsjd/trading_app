@@ -6,7 +6,7 @@ const itDbIntegration = RUN_DB_INTEGRATION ? it : it.skip;
 
 describe('Limit order post-lock transaction clock DB integration', () => {
   itDbIntegration(
-    'rechecks quote TTL, season end, and stock close after row-lock waits',
+    'rechecks quote TTL and season end, and accepts confirmed stock close after row-lock waits',
     () => {
       const result = spawnSync(
         'pnpm',
@@ -296,16 +296,16 @@ async function runBlockedCreate(scenario, quoteId, key, target, expectedCode, af
       where: { id: scenario.walletId },
       select: { reservedAmount: true },
     });
-    assert.equal(wallet.reservedAmount.toFixed(8), ZERO);
+    assert.equal(wallet.reservedAmount.toFixed(8), expectedCode === 'NO_ERROR' ? '100.10000000' : ZERO);
     assert.equal(
       await prisma.order.count({ where: { tradingAccountId: scenario.tradingAccountId } }),
-      0,
+      expectedCode === 'NO_ERROR' ? 1 : 0,
     );
     const quote = await prisma.quote.findUnique({
       where: { id: quoteId },
       select: { consumedAt: true },
     });
-    assert.equal(quote.consumedAt, null);
+    assert.equal(quote.consumedAt !== null, expectedCode === 'NO_ERROR');
   } finally {
     await blocker.query('ROLLBACK').catch(() => undefined);
     await blocker.end();
@@ -390,7 +390,7 @@ async function testMarketClose() {
       quoteId,
       'market-close',
       closeAt,
-      'MARKET_CLOSED',
+      'NO_ERROR',
       async () => {
         const status = getAssetTradingStatus(
           { assetType: AssetType.domestic_stock, market: 'KRX' },

@@ -12,6 +12,18 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 주문 정책 A — 소수 주식·장외 지정가·Crypto amount·preview 분리 (2026-09-29)
+
+시작은 `git fetch origin main` 후 HEAD = origin/main `afcf701f`, clean tree였다. General/Season 공통 OrdersService와 기존 reservation/matcher를 확장했다.
+
+- 소수 주식은 시장가 거래를 유지하고 지정가만 Decimal 정수 판정으로 막는다. 예약 주문의 정수 계약을 제품 의도대로 명시하려는 변경이다.
+- 확정 CLOSED에서도 정수 지정가를 등록하되 calendar unavailable은 fail-closed한다. 장외 거래소/NXT 체결이 아니라 다음 정규장을 기다리는 GTC-style 등록이다. 과거 종가 체결을 막기 위해 matcher A에 제출 시각 하한을 추가하고 B의 첫 전체 봉 정책, 양쪽의 미래 evidence/현재 캘린더 검증을 유지·보강했다.
+- Crypto BUY는 원금 amount가 사용자 intent다. 서버 Quote에서 예상 수량, 시장가 실행 가격에서 최종 수량을 내림 계산한다. 지정가는 Quote 수량을 유지하고 가격 개선 차액은 기존 예약 해제로 반환한다. 화면 시세로 계산한 수량이 자금 이동을 결정하지 않게 하기 위한 설계다.
+- `Quote.sourceAmount`를 order/crypto/buy에 한정해 원금으로 사용한다. FX 의미와 quoted 예약 필드는 보존하며 schema는 주석만 추가, migration은 없다. amount를 quote/create hash에 묶고 fee pinning·TTL·30bps·replay-first·원자적 금융 쓰기를 유지했다.
+- Frontend 수동 입력은 preview가 없어도 Quote를 요청한다. 표시용 시세의 장애가 서버의 가격 확보 권한을 막지 않게 분리했다. 비율 계산만 필요한 가격/계좌 fee를 요구한다.
+- 새로운 Crypto BUY Quote/Create caller는 quantity 대신 amount를 보내야 한다. 이미 commit된 주문 replay와 기존 submitted 주문 lifecycle은 보존한다. 신규 서버와 프런트 계약을 함께 배포해야 한다. B 대기목록/색상은 건드리지 않았다.
+- PostgreSQL 격리 DB에서 정책/예약/실행/재시도/시간 경계와 계좌·FX 회귀를 검증했다. 최종 명령·결과·범위는 [주문 정책 기록](backend/docs/order-input-policy.md)에 기록한다. 운영/개발 DB 변경, commit/push/배포는 하지 않았다.
+
 ### 작업 단위: 일반계정 KRW↔USD FX 공통 코어 활성화 (2026-08-18, WORK-ID GENERAL-ACCOUNT-FX-V1)
 
 **시작 SHA** `4b048f8783a9596024093d2e72d75d1d0aa6f26d` (`git fetch --prune`

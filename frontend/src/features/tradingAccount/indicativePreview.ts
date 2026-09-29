@@ -122,3 +122,46 @@ export function fxPreview(input: {
       input.fromCurrency === 'KRW' ? ('USD' as const) : ('KRW' as const),
   };
 }
+
+/** Crypto buy preview uses gross principal. Quantity is indicative only. */
+export function amountBuyPreview(amount: string, feeRate?: string | null) {
+  if (!isPositiveInput(amount, 8) || !validFee(feeRate)) return null;
+  const gross = new D(amount);
+  const fee = gross.mul(feeRate).toDecimalPlaces(8);
+  return {
+    grossAmount: money(gross),
+    feeAmount: money(fee),
+    totalAmount: money(gross.add(fee)),
+  };
+}
+
+export function indicativeBuyQuantity(amount: string, price?: string | null) {
+  if (!isPositiveInput(amount, 8) || !price || !isPositiveInput(price, 8))
+    return null;
+  return new D(amount)
+    .div(price)
+    .toDecimalPlaces(6, Decimal.ROUND_DOWN)
+    .toFixed(6);
+}
+
+/** Reserve fee headroom using the account's real fee policy, not a constant. */
+export function buyAmountAtRatio(
+  available: string | null,
+  feeRate: string | null | undefined,
+  ratio: number,
+) {
+  if (
+    !available ||
+    !isPositiveInput(available, 8) ||
+    !validFee(feeRate) ||
+    !Number.isFinite(ratio) ||
+    ratio < 0 ||
+    ratio > 1
+  )
+    return null;
+  return new D(available)
+    .mul(ratio)
+    .div(new D(1).add(feeRate))
+    .toDecimalPlaces(8, Decimal.ROUND_DOWN)
+    .toFixed(8);
+}

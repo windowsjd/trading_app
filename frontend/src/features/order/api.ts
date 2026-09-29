@@ -29,15 +29,18 @@ export interface LimitOrderExecutionPolicyDto {
   candleExecutionPricePolicy?: 'limit_price' | null;
 }
 
-export interface OrderQuoteRequestDto {
+export type OrderInputDto =
+  | { amount: MoneyString; quantity?: never }
+  | { quantity: QuantityString; amount?: never };
+
+export type OrderQuoteRequestDto = OrderInputDto & {
   assetId: string;
   side: OrderSide;
-  quantity: QuantityString;
   /** Omitted → market (historical default). */
   orderType?: OrderTypeDto;
   /** Required when orderType='limit'; forbidden for market. */
   limitPrice?: MoneyString;
-}
+};
 
 export interface OrderQuoteAssetDto {
   id: string;
@@ -50,6 +53,8 @@ export interface OrderQuoteAssetDto {
 }
 
 export interface OrderQuoteDto {
+  /** Crypto BUY gross principal intent, excluding fees. */
+  amount?: MoneyString;
   state: SectionState;
   season?: Record<string, unknown> | null;
   participant?: Record<string, unknown> | null;
@@ -107,17 +112,10 @@ export interface OrderQuoteDto {
   executionPolicy?: LimitOrderExecutionPolicyDto;
 }
 
-export interface CreateOrderRequestDto {
+export type CreateOrderRequestDto = OrderQuoteRequestDto & {
   quoteId: string;
-  assetId: string;
-  side: OrderSide;
-  quantity: QuantityString;
   idempotencyKey: string;
-  /** Omitted → market (historical default). */
-  orderType?: OrderTypeDto;
-  /** Required when orderType='limit'; must equal the quoted limitPrice. */
-  limitPrice?: MoneyString;
-}
+};
 
 export interface CreatedOrderDto {
   id?: string;

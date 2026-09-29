@@ -94,7 +94,7 @@ describe('order quote display and safety contract', () => {
   it('leaves order and FX raw input state unformatted while typing', () => {
     const walletScreen = read('screens/wallet/WalletFxScreen.tsx');
 
-    assert.match(orderScreen, /value=\{quantity\}/u);
+    assert.match(orderScreen, /value=\{orderInput\}/u);
     assert.match(orderScreen, /value=\{limitPrice\}/u);
     assert.match(walletScreen, /value=\{amount\}/u);
     assert.doesNotMatch(orderScreen, /<TextInput[^>]*value=\{formatDisplayDecimal\(/u);

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import Decimal from 'decimal.js';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import { TEST_IDS } from '../../constants/testIds.ts';
@@ -82,7 +83,9 @@ for (const assetId of ['bnb', 'samsung']) {
     t.after(h.close);
     for (const percent of [25, 50, 75, 100]) {
       await h.press(`order-ratio-${percent}`);
-      assert.equal(h.node(qty).props.value, String(percent / 100));
+      assert.equal(h.node(qty).props.value, assetId === 'bnb'
+        ? new Decimal('100.2').mul(percent / 100).div('1.001').toDecimalPlaces(8, Decimal.ROUND_DOWN).toFixed(8)
+        : String(percent / 100));
     }
   });
 }
@@ -118,6 +121,7 @@ for (const scenario of ['zero', 'wallet', 'price', 'limit', 'position']) {
       h.usdReserved = '0';
     }
     if (scenario === 'wallet') h.walletState = { isError: true };
+    if (scenario === 'price' || scenario === 'limit') h.assets.bnb.assetType = 'us_stock';
     if (scenario === 'price') h.assets.bnb.price = { state: 'unavailable' };
     if (scenario === 'position') h.positionState = { isError: true };
     await h.mount();

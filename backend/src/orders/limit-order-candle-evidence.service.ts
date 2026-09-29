@@ -3,6 +3,7 @@ import { AssetType, OrderSide, Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   resolveRegularSessionForEvent,
+  resolveStockMarketSessionState,
   type MarketCalendarAsset,
 } from './market-calendar.policy';
 import {
@@ -62,6 +63,12 @@ export class LimitOrderCandleEvidenceService {
     now: Date,
     lookbackMs: number,
   ): Promise<EligibleClosedCandle[]> {
+    if (
+      asset.assetType !== AssetType.crypto &&
+      resolveStockMarketSessionState(asset, now)?.state ===
+        'calendar_unavailable'
+    )
+      return [];
     const lookbackFloor = new Date(now.getTime() - lookbackMs);
     const rows = await this.prisma.marketCandle.findMany({
       where: {
@@ -90,6 +97,13 @@ export class LimitOrderCandleEvidenceService {
     const eligible: EligibleClosedCandle[] = [];
     for (const row of rows) {
       if (!isCandleWithinLookback(row.openTime, now, lookbackMs)) continue;
+      if (
+        row.closeTime > now ||
+        row.sourceUpdatedAt > now ||
+        row.updatedAt > now ||
+        row.closeTime.getTime() !== row.openTime.getTime() + 300_000
+      )
+        continue;
 
       if (isStock) {
         // The whole window must lie inside one valid session. A candle whose

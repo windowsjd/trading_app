@@ -561,6 +561,8 @@ describe('OrdersService', () => {
       side,
       orderType,
       quantity,
+      sourceAmount:
+        (overrides.sourceAmount as Prisma.Decimal | undefined) ?? null,
       limitPrice,
       currencyCode,
       quotedPrice,
@@ -587,6 +589,7 @@ describe('OrdersService', () => {
           side,
           orderType,
           quantity,
+          amount: overrides.sourceAmount as Prisma.Decimal | undefined,
           limitPrice,
           currencyCode,
         }),
@@ -1642,7 +1645,7 @@ describe('OrdersService', () => {
       assetId: 'asset-btc',
       side: 'buy',
       orderType: 'market',
-      quantity: '0.01000000',
+      amount: '500',
     });
 
     expect(response.data).toMatchObject({
@@ -1652,6 +1655,8 @@ describe('OrdersService', () => {
         market: 'BINANCE',
         currencyCode: CurrencyCode.USD,
       },
+      amount: '500.00000000',
+      quantity: '0.010000',
       currencyCode: CurrencyCode.USD,
       grossAmount: '500.00000000',
       feeAmount: '0.50000000',
@@ -2125,6 +2130,7 @@ describe('OrdersService', () => {
       asset,
       currencyCode: CurrencyCode.USD,
       quantity: new Prisma.Decimal('0.010000'),
+      sourceAmount: new Prisma.Decimal('500'),
       quotedPrice: new Prisma.Decimal('50000.00000000'),
       assetPriceSnapshotId: 'aps-btc-1',
       fxRateSnapshotId: 'fx-1',
@@ -2136,6 +2142,7 @@ describe('OrdersService', () => {
       asset,
       currencyCode: CurrencyCode.USD,
       quantity: new Prisma.Decimal('0.010000'),
+      sourceAmount: new Prisma.Decimal('500'),
       quotedPrice: new Prisma.Decimal('50000.00000000'),
       assetPriceSnapshotId: 'aps-btc-1',
       fxRateSnapshotId: 'fx-1',
@@ -2178,7 +2185,7 @@ describe('OrdersService', () => {
       assetId: 'asset-btc',
       side: 'buy',
       orderType: 'market',
-      quantity: '0.010000',
+      amount: '500',
       quoteId: 'quote-order-create-1',
       idempotencyKey: 'order-create-key-btc',
     });
@@ -3064,6 +3071,7 @@ describe('OrdersService', () => {
         order: {
           orderId: 'order-execute-1',
           status: OrderStatus.executed,
+          quantity: '2.000000',
           executedPrice: '100.00000000',
           grossAmount: '200.00000000',
           feeAmount: '0.20000000',
@@ -3136,6 +3144,7 @@ describe('OrdersService', () => {
         },
         data: {
           status: OrderStatus.executed,
+          quantity: '2.000000',
           executedPrice: '100.00000000',
           grossAmount: '200.00000000',
           feeAmount: '0.20000000',

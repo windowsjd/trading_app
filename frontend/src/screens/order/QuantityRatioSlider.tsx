@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 export type QuantityRatioSliderProps = {
+  accessibilityLabel?: string;
   value: number;
   disabled: boolean;
   disabledReason?: string;
@@ -49,7 +50,7 @@ export default function QuantityRatioSlider(props: QuantityRatioSliderProps) {
         testID="order-quantity-slider"
         accessible
         accessibilityRole="adjustable"
-        accessibilityLabel="주문 수량 비율"
+        accessibilityLabel={props.accessibilityLabel ?? '주문 수량 비율'}
         accessibilityHint={props.disabledReason}
         accessibilityState={{ disabled: props.disabled }}
         accessibilityValue={{

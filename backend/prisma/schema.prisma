@@ -1061,6 +1061,8 @@ model Quote {
   limitPrice           Decimal?      @map("limit_price") @db.Decimal(24, 8)
   fromCurrency         CurrencyCode? @map("from_currency")
   toCurrency           CurrencyCode? @map("to_currency")
+  // FX: input source currency amount. Order crypto BUY: gross principal intent
+  // in currencyCode (excludes fees); other order quotes leave this null.
   sourceAmount         Decimal?      @map("source_amount") @db.Decimal(24, 8)
   targetAmount         Decimal?      @map("target_amount") @db.Decimal(24, 8)
   currencyCode         CurrencyCode? @map("currency_code")

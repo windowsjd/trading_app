@@ -75,7 +75,14 @@ import { debitAvailableCash } from '../wallets/cash-wallet-atomic';
 import { diagnoseCashWalletMutationFailure } from '../wallets/cash-wallet-failure-diagnosis';
 import { assertCashWalletTradingAccountScope } from '../wallets/cash-wallet-scope';
 import { readGeneralTradeFeeRate } from './general-trading.config';
-import { assertAssetTradable, MarketHoursError } from './market-hours.policy';
+import {
+  assertOrderSessionAllowed,
+  MarketHoursError,
+} from './market-hours.policy';
+import {
+  assertOrderInputPolicy,
+  quantityFromBuyAmount,
+} from './order-input-policy';
 import { isLimitOrderEnabled } from './limit-order.config';
 import { readLimitOrderMatchingConfig } from './limit-order-matching.config';
 import { limitOrderErrorCodes } from './limit-order-error-policy';
@@ -119,6 +126,7 @@ export type OrderRequestBody = {
   side?: unknown;
   orderType?: unknown;
   quantity?: unknown;
+  amount?: unknown;
   limitPrice?: unknown;
   currencyCode?: unknown;
   quoteId?: unknown;
@@ -174,10 +182,13 @@ type ParsedOrderRequest = {
   assetId: string;
   side: OrderSide;
   orderType: OrderType;
-  quantity: Prisma.Decimal;
+  quantity: Prisma.Decimal | null;
+  amount: Prisma.Decimal | null;
   limitPrice: Prisma.Decimal | null;
   currencyCode?: CurrencyCode;
 };
+
+type PricedOrderRequest = ParsedOrderRequest & { quantity: Prisma.Decimal };
 
 type OrderCreateIdempotency = {
   idempotencyKey: string;
@@ -232,7 +243,7 @@ type OrderDetailResponse = {
 type OrderQuoteCalculation = {
   context: TradingContext;
   asset: OrderAsset;
-  request: ParsedOrderRequest;
+  request: PricedOrderRequest;
   price: Prisma.Decimal;
   grossAmount: Prisma.Decimal;
   feeAmount: Prisma.Decimal;
@@ -271,7 +282,8 @@ type DurableOrderQuoteForCreate = {
   assetId: string | null;
   side: OrderSide | null;
   orderType: OrderType | null;
-  quantity: Prisma.Decimal | null;
+  quantity: Prisma.Decimal;
+  sourceAmount: Prisma.Decimal | null;
   limitPrice: Prisma.Decimal | null;
   currencyCode: CurrencyCode | null;
   quotedPrice: Prisma.Decimal;
@@ -422,6 +434,7 @@ type OrderExecutionRecord = {
     side: OrderSide | null;
     orderType: OrderType | null;
     quantity: Prisma.Decimal | null;
+    sourceAmount: Prisma.Decimal | null;
     limitPrice: Prisma.Decimal | null;
     currencyCode: CurrencyCode | null;
     quotedPrice: Prisma.Decimal | null;
@@ -448,6 +461,7 @@ type OrderExecutionRecord = {
 };
 
 type OrderExecutionPlan = {
+  quantity: Prisma.Decimal;
   executedAt: Date;
   executedPrice: Prisma.Decimal;
   quotedPrice: Prisma.Decimal;
@@ -540,6 +554,7 @@ const ORDER_EXECUTION_SELECT = {
       side: true,
       orderType: true,
       quantity: true,
+      sourceAmount: true,
       limitPrice: true,
       currencyCode: true,
       quotedPrice: true,
@@ -815,21 +830,21 @@ export class OrdersService {
 
   private async quoteLimitBuyOrderForContext(
     userId: string,
-    request: ParsedOrderRequest,
+    inputRequest: ParsedOrderRequest,
     quoteAt: Date,
     context: TradingContext,
   ): Promise<OrderQuoteResponse> {
-    if (request.side === OrderSide.sell) {
+    if (inputRequest.side === OrderSide.sell) {
       return this.quoteLimitSellOrderForContext(
         userId,
-        request,
+        inputRequest,
         quoteAt,
         context,
       );
     }
-    const { participant, tradingAccountId } = context;
+    const { tradingAccountId } = context;
     const limitOrderCreate = this.requireLimitOrderCreateService();
-    if (!request.limitPrice) {
+    if (!inputRequest.limitPrice) {
       this.throwApiError(
         HttpStatus.BAD_REQUEST,
         limitOrderErrorCodes.INVALID_LIMIT_PRICE,
@@ -837,7 +852,14 @@ export class OrdersService {
       );
     }
 
-    const asset = await this.findUsableAsset(request.assetId);
+    const asset = await this.findUsableAsset(inputRequest.assetId);
+    assertOrderInputPolicy({ ...inputRequest, assetType: asset.assetType });
+    const request: PricedOrderRequest = {
+      ...inputRequest,
+      quantity: inputRequest.amount
+        ? quantityFromBuyAmount(inputRequest.amount, inputRequest.limitPrice)
+        : inputRequest.quantity!,
+    };
     if (
       request.currencyCode &&
       request.currencyCode !== this.getAssetSettlementCurrency(asset)
@@ -858,16 +880,15 @@ export class OrdersService {
         'Separate price and settlement currencies are not supported for order execution yet.',
       );
     }
-    // Same session policy as market orders: stocks only while the market is
-    // open (calendar fail-closed), crypto 24h.
-    this.assertOrderAssetTradable(asset, quoteAt);
+    // Confirmed CLOSED permits registration; an unknown calendar fails closed.
+    this.assertOrderAssetTradable(asset, quoteAt, OrderType.limit);
 
     const settlementCurrency = this.getAssetSettlementCurrency(asset);
     const preview = await limitOrderCreate.buildLimitBuyQuotePreview({
       tradingAccountId,
       assetId: asset.id,
       currencyCode: settlementCurrency,
-      limitPrice: request.limitPrice,
+      limitPrice: request.limitPrice!,
       quantity: request.quantity,
       tradeFeeRate: context.feeRate,
     });
@@ -890,7 +911,7 @@ export class OrdersService {
       context,
       asset,
       request,
-      price: request.limitPrice,
+      price: request.limitPrice!,
       grossAmount: preview.grossAmount,
       feeAmount: preview.feeAmount,
       netAmount: preview.reservedAmount,
@@ -947,7 +968,7 @@ export class OrdersService {
       success: true,
       data: {
         ...this.formatOrderQuoteData(durableQuote),
-        limitPrice: this.formatDecimal(request.limitPrice, monetaryScale),
+        limitPrice: this.formatDecimal(request.limitPrice!, monetaryScale),
         quotedFeeRate: formatDecimalScale(basis.quotedFeeRate, feeRateScale),
         quotedGrossAmount: this.formatDecimal(
           basis.quotedGrossAmount,
@@ -988,18 +1009,25 @@ export class OrdersService {
 
   private async quoteLimitSellOrderForContext(
     userId: string,
-    request: ParsedOrderRequest,
+    inputRequest: ParsedOrderRequest,
     quoteAt: Date,
     context: TradingContext,
   ): Promise<OrderQuoteResponse> {
-    if (!request.limitPrice) {
+    if (!inputRequest.limitPrice) {
       this.throwApiError(
         HttpStatus.BAD_REQUEST,
         limitOrderErrorCodes.INVALID_LIMIT_PRICE,
         'limitPrice is required for limit orders.',
       );
     }
-    const asset = await this.findUsableAsset(request.assetId);
+    const asset = await this.findUsableAsset(inputRequest.assetId);
+    assertOrderInputPolicy({ ...inputRequest, assetType: asset.assetType });
+    const request: PricedOrderRequest = {
+      ...inputRequest,
+      quantity: inputRequest.amount
+        ? quantityFromBuyAmount(inputRequest.amount, inputRequest.limitPrice)
+        : inputRequest.quantity!,
+    };
     const settlementCurrency = this.getAssetSettlementCurrency(asset);
     if (request.currencyCode && request.currencyCode !== settlementCurrency) {
       this.throwApiError(
@@ -1015,13 +1043,13 @@ export class OrdersService {
         'Separate price and settlement currencies are not supported for order execution yet.',
       );
     }
-    this.assertOrderAssetTradable(asset, quoteAt);
+    this.assertOrderAssetTradable(asset, quoteAt, OrderType.limit);
     const preview =
       await this.requireLimitOrderCreateService().buildLimitSellQuotePreview({
         tradingAccountId: context.tradingAccountId,
         assetId: asset.id,
         currencyCode: settlementCurrency,
-        limitPrice: request.limitPrice,
+        limitPrice: request.limitPrice!,
         quantity: request.quantity,
         tradeFeeRate: context.feeRate,
       });
@@ -1038,7 +1066,7 @@ export class OrdersService {
       context,
       asset,
       request,
-      price: request.limitPrice,
+      price: request.limitPrice!,
       grossAmount: preview.grossAmount,
       feeAmount: preview.feeAmount,
       netAmount: preview.netAmount,
@@ -1084,7 +1112,7 @@ export class OrdersService {
       success: true,
       data: {
         ...this.formatOrderQuoteData(durableQuote),
-        limitPrice: this.formatDecimal(request.limitPrice, monetaryScale),
+        limitPrice: this.formatDecimal(request.limitPrice!, monetaryScale),
         quotedFeeRate: formatDecimalScale(basis.quotedFeeRate, feeRateScale),
         quotedGrossAmount: this.formatDecimal(
           basis.quotedGrossAmount,
@@ -1322,7 +1350,7 @@ export class OrdersService {
         });
         const price = roundDecimalHalfUp(quote.quotedPrice, monetaryScale);
         const grossAmount = roundDecimalHalfUp(
-          request.quantity.mul(price),
+          quote.quantity.mul(price),
           monetaryScale,
         );
         const feeAmount = roundDecimalHalfUp(
@@ -1344,7 +1372,7 @@ export class OrdersService {
             side: request.side,
             orderType: OrderType.market,
             status: OrderStatus.submitted,
-            quantity: this.formatDecimal(request.quantity, quantityScale),
+            quantity: this.formatDecimal(quote.quantity, quantityScale),
             limitPrice: null,
             executedPrice: null,
             currencyCode: this.getAssetSettlementCurrency(quote.asset),
@@ -1641,7 +1669,11 @@ export class OrdersService {
           request,
           now: transactionNow,
         });
-        this.assertOrderAssetTradable(quote.asset, transactionNow);
+        this.assertOrderAssetTradable(
+          quote.asset,
+          transactionNow,
+          OrderType.limit,
+        );
 
         if (!quote.limitPrice) {
           this.throwApiError(
@@ -1666,7 +1698,7 @@ export class OrdersService {
             },
           },
           tradingAccountId,
-          quantity: request.quantity,
+          quantity: quote.quantity,
           idempotency,
           submittedAt: transactionNow,
           autoExecutionEnabled:
@@ -2563,8 +2595,11 @@ export class OrdersService {
               'Season order has no fee source.',
             )),
     });
+    const quantity = quote.sourceAmount
+      ? quantityFromBuyAmount(quote.sourceAmount, priceContext.price)
+      : order.quantity;
     const grossAmount = roundDecimalHalfUp(
-      order.quantity.mul(priceContext.price),
+      quantity.mul(priceContext.price),
       monetaryScale,
     );
     const feeAmount = roundDecimalHalfUp(
@@ -2594,6 +2629,7 @@ export class OrdersService {
         : null;
 
     return {
+      quantity,
       executedAt,
       executedPrice: priceContext.price,
       quotedPrice: quote.quotedPrice,
@@ -2725,6 +2761,7 @@ export class OrdersService {
       side: order.side,
       orderType: order.orderType,
       quantity: order.quantity,
+      amount: quote.sourceAmount,
       limitPrice: order.orderType === OrderType.limit ? order.limitPrice : null,
       currencyCode: order.currencyCode,
     });
@@ -2750,6 +2787,13 @@ export class OrdersService {
         this.formatNullableDecimal(order.limitPrice, monetaryScale) ||
       quote.currencyCode !== order.currencyCode ||
       quote.requestHash !== expectedHash ||
+      (quote.sourceAmount != null &&
+        (order.asset.assetType !== AssetType.crypto ||
+          order.side !== OrderSide.buy ||
+          !quote.quotedPrice ||
+          !quote.quantity.eq(
+            quantityFromBuyAmount(quote.sourceAmount, quote.quotedPrice),
+          ))) ||
       !quote.quotedPrice
     ) {
       this.throwApiError(
@@ -2996,6 +3040,7 @@ export class OrdersService {
     order: OrderExecutionRecord,
     plan: OrderExecutionPlan,
   ): Promise<OrderExecutionTransactionResult> {
+    order = { ...order, quantity: plan.quantity };
     // Verified account scope FIRST: the order, wallet, position, and quote
     // must all name the same trading account before any money moves.
     const tradingAccountId = this.requireOrderTradingScope(order);
@@ -4210,6 +4255,7 @@ export class OrdersService {
       },
       data: {
         status: OrderStatus.executed,
+        quantity: this.formatDecimal(plan.quantity, quantityScale),
         executedPrice: this.formatDecimal(plan.executedPrice, monetaryScale),
         grossAmount: this.formatDecimal(plan.grossAmount, monetaryScale),
         feeAmount: this.formatDecimal(plan.feeAmount, monetaryScale),
@@ -4385,12 +4431,18 @@ export class OrdersService {
       sourceWorkflow: OrderQuoteSourceWorkflow;
     },
   ): Promise<OrderQuoteCalculation> {
-    const { participant, tradingAccountId, request, quoteAt, sourceWorkflow } =
-      input;
-    const asset = await this.findUsableAsset(request.assetId);
+    const {
+      participant,
+      tradingAccountId,
+      request: inputRequest,
+      quoteAt,
+      sourceWorkflow,
+    } = input;
+    const asset = await this.findUsableAsset(inputRequest.assetId);
+    assertOrderInputPolicy({ ...inputRequest, assetType: asset.assetType });
     if (
-      request.currencyCode &&
-      request.currencyCode !== this.getAssetSettlementCurrency(asset)
+      inputRequest.currencyCode &&
+      inputRequest.currencyCode !== this.getAssetSettlementCurrency(asset)
     ) {
       this.throwApiError(
         HttpStatus.BAD_REQUEST,
@@ -4411,11 +4463,17 @@ export class OrdersService {
     this.assertOrderAssetTradable(asset, quoteAt);
 
     const priceContext = await this.resolveOrderPrice(
-      request,
+      inputRequest,
       asset,
       quoteAt,
       sourceWorkflow,
     );
+    const request: PricedOrderRequest = {
+      ...inputRequest,
+      quantity: inputRequest.amount
+        ? quantityFromBuyAmount(inputRequest.amount, priceContext.price)
+        : inputRequest.quantity!,
+    };
     const grossAmount = roundDecimalHalfUp(
       request.quantity.mul(priceContext.price),
       monetaryScale,
@@ -4530,6 +4588,7 @@ export class OrdersService {
       side: quote.request.side,
       orderType: quote.request.orderType,
       quantity: quote.request.quantity,
+      amount: quote.request.amount,
       limitPrice: quote.request.limitPrice,
       currencyCode: this.getAssetSettlementCurrency(quote.asset),
     });
@@ -4543,6 +4602,9 @@ export class OrdersService {
         side: quote.request.side,
         orderType: quote.request.orderType,
         quantity: this.formatDecimal(quote.request.quantity, quantityScale),
+        sourceAmount: quote.request.amount
+          ? this.formatDecimal(quote.request.amount, monetaryScale)
+          : null,
         limitPrice: quote.request.limitPrice
           ? this.formatDecimal(quote.request.limitPrice, monetaryScale)
           : null,
@@ -4682,6 +4744,7 @@ export class OrdersService {
         side: true,
         orderType: true,
         quantity: true,
+        sourceAmount: true,
         limitPrice: true,
         currencyCode: true,
         quotedPrice: true,
@@ -4761,6 +4824,14 @@ export class OrdersService {
       );
     }
 
+    assertOrderInputPolicy({
+      ...input.request,
+      assetType: quote.asset.assetType,
+    });
+    const canonicalQuantity =
+      input.request.amount && quote.quotedPrice
+        ? quantityFromBuyAmount(input.request.amount, quote.quotedPrice)
+        : input.request.quantity;
     const expectedRequestHash = computeOrderQuoteRequestHash({
       userId: input.userId,
       seasonParticipantId: input.seasonParticipantId,
@@ -4769,6 +4840,7 @@ export class OrdersService {
       side: input.request.side,
       orderType: input.request.orderType,
       quantity: input.request.quantity,
+      amount: input.request.amount,
       limitPrice: input.request.limitPrice,
       currencyCode: this.getAssetSettlementCurrency(quote.asset),
     });
@@ -4787,8 +4859,11 @@ export class OrdersService {
       quote.side !== input.request.side ||
       quote.orderType !== input.request.orderType ||
       !quote.quantity ||
+      !canonicalQuantity ||
+      this.formatNullableDecimal(quote.sourceAmount ?? null, monetaryScale) !==
+        this.formatNullableDecimal(input.request.amount, monetaryScale) ||
       this.formatDecimal(quote.quantity, quantityScale) !==
-        this.formatDecimal(input.request.quantity, quantityScale) ||
+        this.formatDecimal(canonicalQuantity, quantityScale) ||
       quoteLimitPriceText !== requestLimitPriceText ||
       quote.currencyCode !== this.getAssetSettlementCurrency(quote.asset) ||
       quote.requestHash !== expectedRequestHash ||
@@ -4805,6 +4880,7 @@ export class OrdersService {
     return {
       ...quote,
       quotedPrice: quote.quotedPrice,
+      quantity: quote.quantity,
       asset: quote.asset,
     };
   }
@@ -4853,7 +4929,9 @@ export class OrdersService {
       assetId: request.assetId,
       side: request.side,
       orderType: request.orderType,
-      quantity: this.formatDecimal(request.quantity, quantityScale),
+      ...(request.amount
+        ? { amount: this.formatDecimal(request.amount, monetaryScale) }
+        : { quantity: this.formatDecimal(request.quantity!, quantityScale) }),
       // Included in the hash so replaying the same idempotencyKey with a
       // different limitPrice is an ORDER_IDEMPOTENCY_CONFLICT. Market
       // requests keep the historical null (hash-compatible).
@@ -4884,6 +4962,22 @@ export class OrdersService {
 
     const orderType = this.parseOrderType(body.orderType);
     const side = this.parseRequiredSide(body.side);
+    if (
+      this.hasProvidedValue(body.amount) &&
+      this.hasProvidedValue(body.quantity)
+    ) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'INVALID_ORDER_INPUT',
+        'Provide amount or quantity, never both.',
+      );
+    }
+    const amount = this.hasProvidedValue(body.amount)
+      ? this.parsePositiveDecimalField(body.amount, 'amount')
+      : null;
+    const quantity = amount
+      ? null
+      : this.parsePositiveQuantityField(body.quantity);
 
     if (orderType === OrderType.market) {
       // Historical behavior: a market request carrying limitPrice keeps the
@@ -4900,7 +4994,8 @@ export class OrdersService {
         assetId: this.parseRequiredText(body.assetId, 'assetId'),
         side,
         orderType,
-        quantity: this.parsePositiveQuantityField(body.quantity),
+        quantity,
+        amount,
         limitPrice: null,
         currencyCode: this.parseOptionalCurrencyCode(body.currencyCode),
       };
@@ -4918,7 +5013,8 @@ export class OrdersService {
       assetId: this.parseRequiredText(body.assetId, 'assetId'),
       side,
       orderType,
-      quantity: this.parsePositiveQuantityField(body.quantity),
+      quantity,
+      amount,
       limitPrice: this.parsePositiveDecimalField(
         body.limitPrice,
         'limitPrice',
@@ -5951,6 +6047,9 @@ export class OrdersService {
       side: quote.request.side,
       orderType: quote.request.orderType,
       quantity: this.formatDecimal(quote.request.quantity, quantityScale),
+      ...(quote.request.amount
+        ? { amount: this.formatDecimal(quote.request.amount, monetaryScale) }
+        : {}),
       price: this.formatDecimal(quote.price, monetaryScale),
       currencyCode: this.getAssetSettlementCurrency(quote.asset),
       grossAmount: this.formatDecimal(quote.grossAmount, monetaryScale),
@@ -6093,9 +6192,10 @@ export class OrdersService {
   private assertOrderAssetTradable(
     asset: Pick<OrderAsset, 'assetType' | 'market'> & { id?: string },
     now: Date,
+    orderType: OrderType = OrderType.market,
   ) {
     try {
-      assertAssetTradable(asset, now);
+      assertOrderSessionAllowed(asset, now, orderType);
     } catch (error) {
       if (error instanceof MarketHoursError) {
         const market = resolveCalendarMarket(asset);
@@ -6110,7 +6210,10 @@ export class OrdersService {
             calendarOverrideRuntime: getMarketSessionOverrideRuntimeStatus(),
             selectionResult: 'REJECTED',
             rejectedReason: error.code,
-            normalCriteria: 'The asset market session must be open.',
+            normalCriteria:
+              orderType === OrderType.limit
+                ? 'The calendar must be available; confirmed CLOSED permits registration.'
+                : 'The asset market session must be open.',
           },
           nextInvestigation: [
             'backend/src/orders/market-hours.policy.ts',

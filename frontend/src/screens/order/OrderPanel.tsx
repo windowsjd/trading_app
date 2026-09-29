@@ -1,3 +1,4 @@
+import Decimal from 'decimal.js';
 import { UP_COLOR } from '../../components/charts/candleColors';
 import {
   validateOrderQuote,
@@ -64,6 +65,10 @@ import { useAssetTicker } from '../../features/asset/useAssetTicker';
 import { selectDisplayPrice } from '../../features/asset/displayPricePolicy';
 import { useStaleRecheck } from '../../features/asset/useStaleRecheck';
 import {
+  amountBuyPreview,
+  buyAmountAtRatio,
+  indicativeBuyQuantity,
+  isPositiveInput,
   formatPreviewMoney,
   isPreviewPriceAvailable,
   orderPreview,
@@ -157,8 +162,8 @@ function getOrderDomainErrorMessage(
     : getErrorMessageFromCode(code);
 }
 
-function validateQuantity(quantity: string) {
-  const trimmed = quantity.trim();
+function validateQuantity(orderInput: string) {
+  const trimmed = orderInput.trim();
 
   if (!trimmed) return '수량을 입력해주세요.';
   if (!/^(?:\d+|\d*\.\d{1,6})$/.test(trimmed)) {
@@ -239,7 +244,10 @@ export function OrderForm({
   const accountKnown = binding.state === 'bound';
   const accountChangedAway = shouldResetBoundFlow(binding);
 
-  const [quantity, setQuantity] = useState('');
+  const [orderInput, setOrderInput] = useState('');
+  const [quotedPreview, setQuotedPreview] = useState<OrderQuoteDto | null>(
+    null,
+  );
   const [chosenRatio, setChosenRatio] = useState<number | null>(null);
   const { fontScale } = useWindowDimensions();
   const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
@@ -312,13 +320,16 @@ export function OrderForm({
             request.payload,
           );
           validateOrderQuote(request.payload, quote);
+          if (isActionCurrent(request)) setQuotedPreview(quote);
           return quote;
         },
         execute: (request, quote, key) =>
           createTradingAccountOrder(request.accountId, {
             assetId: request.payload.assetId,
             side: request.payload.side,
-            quantity: quote.quantity,
+            ...(request.payload.amount !== undefined
+              ? { amount: request.payload.amount }
+              : { quantity: quote.quantity }),
             quoteId: quote.quoteId,
             idempotencyKey: key,
             ...(request.payload.orderType === 'limit'
@@ -336,7 +347,8 @@ export function OrderForm({
       if (isActionCurrent(action.request)) {
         if (isOrderSuccess(data.result)) {
           setSuccessState(captureOrderSuccess(data.result, data.quote));
-          setQuantity('');
+          setOrderInput('');
+          setQuotedPreview(null);
           setFieldError(null);
           setDomainError(null);
           setDiagnosticError(null);
@@ -356,12 +368,14 @@ export function OrderForm({
       const code = getApiErrorCode(error);
       if (error instanceof OrderQuoteValidationError) {
         orderActionRef.current = null;
+        setQuotedPreview(null);
         setDomainError(error.message);
       } else if (
         isOrderRequoteRequiredCode(code) ||
         isOrderIdempotencyConflictCode(code)
       ) {
         orderActionRef.current = null;
+        setQuotedPreview(null);
         setDomainError(
           code === ERROR_CODE.QUOTE_EXPIRED
             ? '주문 견적이 만료되었습니다. 주문 버튼을 다시 눌러주세요.'
@@ -384,7 +398,11 @@ export function OrderForm({
       limit: 20,
     }),
     queryFn: () =>
-      getTradingAccountPositions(accountId, { assetId, limit: 20, offset: 0 }),
+      getTradingAccountPositions(accountId, {
+        assetId,
+        limit: 20,
+        offset: 0,
+      }),
     enabled: accountKnown,
   });
 
@@ -397,6 +415,7 @@ export function OrderForm({
   const resetOrderActionState = () => {
     if (submitLockRef.current) return;
     orderActionRef.current = null;
+    setQuotedPreview(null);
     quoteRevisionRef.current += 1;
     setFieldError(null);
     setDomainError(null);
@@ -410,9 +429,10 @@ export function OrderForm({
   useEffect(() => {
     if (!accountChangedAway) return;
     orderActionRef.current = null;
+    setQuotedPreview(null);
     quoteRevisionRef.current += 1;
 
-    setQuantity('');
+    setOrderInput('');
     setLimitPrice('');
     setFieldError(null);
     setDomainError(null);
@@ -425,17 +445,34 @@ export function OrderForm({
     [orderType, limitPrice],
   );
 
-  const inputInvalidReason = useMemo(
-    () => validateQuantity(quantity) ?? limitPriceInvalidReason,
-    [quantity, limitPriceInvalidReason],
-  );
-
   const asset = assetQuery.data?.asset
     ? applyTickerMarketState(
         assetQuery.data.asset,
         latestTicker?.assetId === assetId ? latestTicker : null,
       )
     : undefined;
+  const isAmountBuy = asset?.assetType === 'crypto' && side === 'buy';
+  const isStock =
+    asset?.assetType === 'domestic_stock' || asset?.assetType === 'us_stock';
+  const inputInvalidReason = useMemo(() => {
+    if (isAmountBuy) {
+      return (
+        (isPositiveInput(orderInput, 8)
+          ? null
+          : '매수 금액은 0보다 큰 숫자와 소수점 이하 최대 8자리로 입력해주세요.') ??
+        limitPriceInvalidReason
+      );
+    }
+    return (
+      validateQuantity(orderInput) ??
+      (isStock &&
+      orderType === 'limit' &&
+      !new Decimal(orderInput.trim()).isInteger()
+        ? '주식 소수점 수량은 시장가만 가능합니다. 지정가는 정수 수량을 입력해주세요.'
+        : null) ??
+      limitPriceInvalidReason
+    );
+  }, [orderInput, isAmountBuy, isStock, orderType, limitPriceInvalidReason]);
   const price = asset?.price;
   const displayPrice = selectDisplayPrice({
     latestTicker: latestTicker?.assetId === assetId ? latestTicker : null,
@@ -449,23 +486,47 @@ export function OrderForm({
     displayPrice,
     Date.now(),
   );
-  const preview =
+  const tradeFeeRate = !feeQuery.isError
+    ? feeQuery.data?.feePolicy?.tradeFeeRate
+    : null;
+  const indicativePreview =
     side === 'buy' && !inputInvalidReason
-      ? orderPreview({
-          quantity: quantity.trim(),
-          price:
-            orderType === 'limit'
-              ? limitPrice.trim()
-              : previewPriceAvailable
-                ? displayPrice.priceLocal
-                : null,
-          feeRate: !feeQuery.isError
-            ? feeQuery.data?.feePolicy?.tradeFeeRate
-            : null,
-        })
+      ? isAmountBuy
+        ? amountBuyPreview(orderInput.trim(), tradeFeeRate)
+        : orderPreview({
+            quantity: orderInput.trim(),
+            price:
+              orderType === 'limit'
+                ? limitPrice.trim()
+                : previewPriceAvailable
+                  ? displayPrice.priceLocal
+                  : null,
+            feeRate: !feeQuery.isError
+              ? feeQuery.data?.feePolicy?.tradeFeeRate
+              : null,
+          })
       : null;
+  const preview = quotedPreview
+    ? {
+        grossAmount: quotedPreview.grossAmount,
+        feeAmount: quotedPreview.feeAmount,
+        totalAmount: quotedPreview.netAmount,
+      }
+    : indicativePreview;
+  const estimatedQuantity =
+    quotedPreview?.quantity ??
+    (isAmountBuy
+      ? indicativeBuyQuantity(
+          orderInput.trim(),
+          orderType === 'limit'
+            ? limitPrice.trim()
+            : previewPriceAvailable
+              ? displayPrice.priceLocal
+              : null,
+        )
+      : null);
   const previewNotice =
-    orderType === 'market' && !previewPriceAvailable
+    !isAmountBuy && orderType === 'market' && !previewPriceAvailable
       ? '현재 시세가 없거나 오래되어 예상 금액을 표시할 수 없습니다.'
       : feeQuery.isPending
         ? '수수료 정보를 확인하는 중입니다.'
@@ -491,6 +552,15 @@ export function OrderForm({
   const assetHardBlockedReason =
     asset && !asset.isActive ? '비활성 자산입니다.' : null;
 
+  // Server marketStatus is a UX hint; Quote/Create revalidate their own clock.
+  // Never change the selected order type automatically.
+  const sessionNotice =
+    isStock && asset?.marketStatus === 'closed'
+      ? orderType === 'market'
+        ? '정규장 외에는 시장가 주문을 할 수 없습니다. 지정가를 선택하면 다음 정규장을 기다리는 주문을 등록할 수 있습니다.'
+        : '정규장 외 지정가는 예약 후 대기하며, 다음 적격 정규장 가격부터 체결을 판단합니다.'
+      : null;
+
   const assetWarningReason =
     (asset?.assetType === 'domestic_stock' &&
     asset.marketStatus === 'closed' &&
@@ -505,7 +575,9 @@ export function OrderForm({
       ? '장 상태는 서버 견적에서 최종 확인됩니다.'
       : asset &&
           (side === 'buy' ? !previewPriceAvailable : !isPriceAvailable(price))
-        ? '현재 화면 시세가 없어 비율 수량 계산은 제한됩니다. 견적은 서버가 최종 판정합니다.'
+        ? isAmountBuy
+          ? '현재 시세가 없거나 오래되어 예상 수량을 표시할 수 없습니다. 견적은 서버가 최종 판정합니다.'
+          : '현재 화면 시세가 없어 비율 수량 계산은 제한됩니다. 견적은 서버가 최종 판정합니다.'
         : null);
 
   const positionUnavailable =
@@ -517,7 +589,7 @@ export function OrderForm({
         ? '보유 수량을 확인할 수 없어 매도할 수 없습니다.'
         : side === 'sell' && Number(positionQuantity) <= 0
           ? '보유 수량이 없어 매도할 수 없습니다.'
-          : side === 'sell' && Number(quantity) > Number(positionQuantity)
+          : side === 'sell' && Number(orderInput) > Number(positionQuantity)
             ? '보유 수량을 초과하여 매도할 수 없습니다.'
             : null;
 
@@ -528,7 +600,7 @@ export function OrderForm({
   const visibleBlockedReason =
     accountBlockedReason ??
     assetHardBlockedReason ??
-    (positionQuery.isLoading || positionUnavailable || quantity.trim()
+    (positionQuery.isLoading || positionUnavailable || orderInput.trim()
       ? sellBlockedReason
       : null);
 
@@ -572,6 +644,11 @@ export function OrderForm({
     if (!buyAvailableValue) {
       return `${settlementCurrency} 사용 가능 잔액이 없습니다.`;
     }
+    if (isAmountBuy) {
+      return buyAmountAtRatio(buyAvailable, tradeFeeRate, 1) === null
+        ? '수수료 정보를 확인해야 매수 금액 비율을 계산할 수 있습니다.'
+        : null;
+    }
     if (!ratioPriceValue) {
       return orderType === 'limit'
         ? '지정가를 입력하면 비율 수량을 계산할 수 있습니다.'
@@ -580,6 +657,9 @@ export function OrderForm({
 
     return null;
   }, [
+    isAmountBuy,
+    buyAvailable,
+    tradeFeeRate,
     buyAvailableValue,
     orderType,
     accountBlockedReason,
@@ -598,32 +678,39 @@ export function OrderForm({
   const canExecute =
     !preOrderBlockedReason &&
     !inputInvalidReason &&
-    (side === 'sell' || !!preview) &&
     !successData &&
     !orderActionRef.current?.completed;
   const inputErrorMessage =
-    fieldError ?? (quantity.trim() ? inputInvalidReason : null);
+    fieldError ?? (orderInput.trim() ? inputInvalidReason : null);
 
-  // Keep the original operation order and flooring for both ratio inputs.
+  // Stock ratios retain their existing fee buffer; crypto uses the server's
+  // fee policy and writes gross amount, never a client execution quantity.
   const quantityAtRatio = (ratio: number) =>
     side === 'sell'
       ? (positionQuantityValue ?? 0) * ratio
       : ((buyAvailableValue ?? 0) * ratio) /
         ((ratioPriceValue ?? 0) * (1 + BUY_FEE_BUFFER));
+  const inputAtRatio = (ratio: number) => {
+    if (isAmountBuy) return buyAmountAtRatio(buyAvailable, tradeFeeRate, ratio);
+    const value = quantityAtRatio(ratio);
+    return formatQuantityInput(
+      isStock && orderType === 'limit' ? Math.floor(value) : value,
+    );
+  };
   // Preserve the chosen percentage through six-decimal flooring, but only
-  // while it still describes this quantity at the current price/balance.
+  // while it still describes this input at the current price/balance.
   const activeRatio =
     !ratioDisabledReason &&
     chosenRatio !== null &&
     (chosenRatio === 0
-      ? quantity === ''
-      : formatQuantityInput(quantityAtRatio(chosenRatio)) === quantity)
+      ? orderInput === ''
+      : inputAtRatio(chosenRatio) === orderInput)
       ? chosenRatio
       : null;
-  const capacity = quantityAtRatio(1);
+  const capacity = isAmountBuy ? Number(inputAtRatio(1)) : quantityAtRatio(1);
   const inputRatio =
     !ratioDisabledReason && Number.isFinite(capacity) && capacity > 0
-      ? Math.min(1, (parsePositiveDecimal(quantity) ?? 0) / capacity)
+      ? Math.min(1, (parsePositiveDecimal(orderInput) ?? 0) / capacity)
       : 0;
   const displayedRatio = activeRatio ?? inputRatio;
 
@@ -637,20 +724,24 @@ export function OrderForm({
     }
 
     if (ratio === 0) {
-      setQuantity('');
+      setOrderInput('');
       setChosenRatio(0);
       resetOrderActionState();
       return;
     }
 
-    const nextQuantity = formatQuantityInput(quantityAtRatio(ratio));
+    const nextQuantity = inputAtRatio(ratio);
 
-    if (!nextQuantity) {
-      setFieldError('계산된 수량이 너무 작습니다.');
+    if (!nextQuantity || Number(nextQuantity) <= 0) {
+      setFieldError(
+        isAmountBuy
+          ? '계산된 매수 금액이 너무 작습니다.'
+          : '계산된 수량이 너무 작습니다.',
+      );
       return;
     }
 
-    setQuantity(nextQuantity);
+    setOrderInput(nextQuantity);
     setChosenRatio(ratio);
     resetOrderActionState();
   };
@@ -677,7 +768,9 @@ export function OrderForm({
         payload: {
           assetId,
           side,
-          quantity: quantity.trim(),
+          ...(isAmountBuy
+            ? { amount: orderInput.trim() }
+            : { quantity: orderInput.trim() }),
           ...(orderType === 'limit'
             ? { orderType: 'limit', limitPrice: limitPrice.trim() }
             : {}),
@@ -786,21 +879,34 @@ export function OrderForm({
         )}
       </View>
       <View style={styles.group}>
-        <Text style={styles.label}>수량</Text>
+        <Text style={styles.label}>
+          {isAmountBuy ? `매수 금액 (${asset.settlementCurrency})` : '수량'}
+        </Text>
         <OrderNumberInput
           testID={TEST_IDS.order.quantityInput}
-          accessibilityLabel="주문 수량"
+          accessibilityLabel={
+            isAmountBuy ? `매수 금액 ${asset.settlementCurrency}` : '주문 수량'
+          }
           editable={!pending}
           style={styles.input}
-          value={quantity}
-          onChangeText={(value) => resetInput(() => setQuantity(value))}
+          value={orderInput}
+          onChangeText={(value) => resetInput(() => setOrderInput(value))}
           keyboardType="decimal-pad"
-          placeholder="수량 입력"
+          placeholder={isAmountBuy ? '매수 금액 입력' : '수량 입력'}
         />
       </View>
+      {isAmountBuy ? (
+        <Text style={styles.helper} testID="order-estimated-quantity">
+          {estimatedQuantity
+            ? `예상 수량 약 ${formatDisplayDecimal(estimatedQuantity)} ${asset.symbol?.replace(/USDT$/, '') ?? ''}`
+            : '예상 수량은 서버 견적에서 확인됩니다.'}
+        </Text>
+      ) : null}
       <View style={styles.group}>
         <View style={styles.ratioLabel}>
-          <Text style={styles.label}>수량 비율</Text>
+          <Text style={styles.label}>
+            {isAmountBuy ? '매수 금액 비율' : '수량 비율'}
+          </Text>
           <Text
             style={[
               styles.label,
@@ -812,6 +918,7 @@ export function OrderForm({
           </Text>
         </View>
         <QuantityRatioSlider
+          accessibilityLabel={isAmountBuy ? '매수 금액 비율' : '주문 수량 비율'}
           value={displayedRatio}
           disabled={pending || !!ratioDisabledReason}
           disabledReason={ratioDisabledReason ?? undefined}
@@ -823,7 +930,7 @@ export function OrderForm({
           <ActionPressable
             key={ratio}
             accessibilityRole="button"
-            accessibilityLabel={`주문 가능 수량 ${getRatioLabel(ratio)}`}
+            accessibilityLabel={`${isAmountBuy ? '매수 금액' : '주문 가능 수량'} ${getRatioLabel(ratio)}`}
             aria-pressed={activeRatio === ratio}
             testID={`order-ratio-${Math.round(ratio * 100)}`}
             style={[
@@ -882,6 +989,9 @@ export function OrderForm({
             (error) => error.diagnostic,
           )?.diagnostic}
         />
+      ) : null}
+      {sessionNotice ? (
+        <Text style={styles.warningText}>{sessionNotice}</Text>
       ) : null}
       {assetWarningReason ? (
         <>
@@ -944,7 +1054,7 @@ export function OrderForm({
               {preview ? (
                 <>
                   <Amount
-                    label="예상 주문금액"
+                    label={isAmountBuy ? '매수 원금' : '예상 주문금액'}
                     value={formatPreviewMoney(
                       preview.grossAmount,
                       asset.settlementCurrency,

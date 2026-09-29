@@ -316,11 +316,11 @@ async function testRequestHashConflict(): Promise<void> {
   );
   await assertCommitted(scenario, first);
 
-  // Same quote, same key, DIFFERENT quantity: a genuinely different request.
+  // Same quote, same key, DIFFERENT amount: a genuinely different request.
   await assertErrorCode(
     orders.createOrder(scenario.userId, {
       ...createBody(scenario, quoteId, key),
-      quantity: '3.000000',
+      amount: '300000',
     }),
     'ORDER_IDEMPOTENCY_CONFLICT',
   );
@@ -592,6 +592,7 @@ async function createLimitQuote(scenario: Scenario): Promise<string> {
       side: OrderSide.buy,
       orderType: OrderType.limit,
       quantity: QUANTITY,
+      sourceAmount: '200000',
       limitPrice: LIMIT_PRICE,
       currencyCode: CurrencyCode.KRW,
       quotedPrice: LIMIT_PRICE,
@@ -608,7 +609,8 @@ async function createLimitQuote(scenario: Scenario): Promise<string> {
         assetId: scenario.assetId,
         side: 'buy',
         orderType: 'limit',
-        quantity: QUANTITY,
+        quantity: null,
+        amount: '200000',
         limitPrice: LIMIT_PRICE,
         currencyCode: CurrencyCode.KRW,
       }),
@@ -628,7 +630,7 @@ function createBody(
     assetId: scenario.assetId,
     side: 'buy',
     orderType: 'limit',
-    quantity: QUANTITY,
+    amount: '200000',
     limitPrice: LIMIT_PRICE,
     idempotencyKey,
   };

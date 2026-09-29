@@ -269,7 +269,7 @@ function marketRequest(s: Scenario) {
     assetId: s.asset.id,
     orderType: 'market',
     side: 'buy',
-    quantity: '0.01',
+    amount: '1',
   };
 }
 

@@ -3,13 +3,75 @@
 > 작업 5 (2026-08-03): the same order surface is also exposed account-scoped
 > under `/api/v1/trading-accounts/:accountId/orders[...]`, sharing this
 > service core (fees, quote consumption, wallet/ledger/position writes,
-> idempotency, rollback). This legacy surface is UNCHANGED — routes,
-> request/response contracts, error codes, pagination, and filters all stay.
+> idempotency, rollback). Routes, pagination and filters are unchanged.
+> The current input policy below applies to BOTH route surfaces.
 > Orders, quotes, positions, wallets, and ledgers use required
 > `tradingAccountId` as their only ownership key. Cross-account relationships
 > fail closed with the existing integrity codes, and order idempotency is
 > account-scoped with no participant fallback. See
 > `docs/trading-account-orders-api-contract.md`.
+
+## Order input and session policy (2026-09-29, current)
+
+| Asset / side | Market input | Limit input | Confirmed CLOSED registration |
+| --- | --- | --- | --- |
+| domestic_stock / us_stock BUY and SELL | Positive quantity, up to 6 decimal places | Positive integer quantity + limitPrice | Market rejected; limit allowed |
+| Crypto BUY | Gross principal amount, excluding fees | Gross principal amount + limitPrice | 24h |
+| Crypto SELL | Positive quantity, up to 6 decimal places | Positive quantity + limitPrice | 24h |
+
+Stock `1.0` and `1.000000` are integers (Decimal.isInteger); fractional limit
+orders return `FRACTIONAL_LIMIT_ORDER_NOT_SUPPORTED` (400). Stock market orders
+still accept fractional quantities. Both types fail closed with
+`MARKET_CALENDAR_UNAVAILABLE` (409) when calendar state is unknown. Confirmed
+weekend/holiday/after-close status permits integer limit registration, subject
+to the existing account, lifecycle, Quote TTL and resource checks. Create
+rechecks the session using the post-lock database clock. This is GTC-style
+registration awaiting regular-session evidence, NOT After Market/NXT execution.
+No selected order type is automatically converted.
+
+Crypto BUY requests use `amount` (positive decimal string, scale <= 8) instead
+of `quantity`. It is denominated in the asset's settlement/price currency
+(current Binance assets: USD). The server returns both `amount` and estimated
+`quantity`; fees and total payment remain `feeAmount` and `netAmount`.
+For example, market BUY body:
+
+```json
+{"assetId":"<crypto asset>","side":"buy","orderType":"market","amount":"100","currencyCode":"USD"}
+```
+
+Create sends the SAME amount plus `quoteId` and `idempotencyKey`; limit also
+sends the SAME `limitPrice`. Sending both amount and quantity, quantity-only
+new crypto BUY, or amount on another asset/side returns `INVALID_ORDER_INPUT`
+(400). Invalid amount/precision or an amount too small to produce positive
+quantity/notional returns `INVALID_AMOUNT` (400). Existing stock and crypto
+SELL quantity contracts and their canonical hash serialization are retained.
+
+`floor6(amount / serverPrice)` determines quantity. Quote stores the input
+principal in `Quote.sourceAmount`, estimated quantity in `Quote.quantity`, and
+binds amount into the order quote requestHash. FX retains its own sourceAmount
+meaning under `quoteType=fx`; order quotes leave FX from/toCurrency and
+`targetAmount` null. Other orders leave sourceAmount null. No schema migration.
+Create validates amount, hash, ownership, canonical quoted quantity, status and
+TTL. Its idempotency hash includes normalized amount instead of quantity.
+Changing amount cannot reuse a quote or committed create key; numerically equal
+amounts replay the same stored result. Quote POST still creates a new durable
+quote on each call and does not introduce a quote idempotency key.
+
+Market execution keeps provider repricing and maxChangeBps, then recalculates
+quantity from durable amount and actual execution price. Order.quantity,
+Position and gross/fee/net wallet/ledger writes use that same final quantity
+atomically. Gross cannot exceed amount; rounding down may leave less than one
+quantity increment unspent. Fees use the existing pinned rate/round8 policy.
+Limit quantity is fixed at Quote from amount/limitPrice; Create reserves the
+pinned gross + fee. A better fill price can lower gross, and the existing fill
+transaction releases the entire reservation while debiting actual gross + fee.
+
+Frontend indicative preview is display/ratio assistance, not permission to
+request Quote. A valid manual quantity/amount may request server Quote without
+a display price or local fee preview. Server quote quantity takes precedence
+over indicative quantity. Crypto BUY ratios use available settlement cash and
+the existing account fee policy; stock BUY ratios still need a usable price.
+See [order-input-policy.md](order-input-policy.md) for intent and validation.
 
 ## Lock order (current contract)
 
@@ -31,8 +93,8 @@ quote/authorization/order locks. PostgreSQL `now()` / `CURRENT_TIMESTAMP` and
 request arrival time are not final execution clocks. Quote TTL, provider asset
 freshness, stock session, USD/KRW freshness and price/rate movement, account
 status, and season/participant lifecycle gates are checked against that clock
-and transaction-time rows. Crypto remains continuous; stock session policy is
-unchanged. No provider network call is introduced inside the transaction.
+and transaction-time rows. Crypto remains continuous; stock markets must be
+open for market execution, while limit registration accepts confirmed CLOSED. No provider network call is introduced inside the transaction.
 
 A newly created market order uses that value for `submittedAt`, `executedAt`,
 explicit create timestamps, ledger `occurredAt` and execution equity snapshot
@@ -50,10 +112,13 @@ reservation release time and execution snapshot `capturedAt`.
 - Path A: the exact snapshot selected during the cycle is read again in the
   fill transaction. Its price/scope/source, non-future `effectiveAt` and
   `capturedAt`, execute freshness and the current stock session must still be
-  valid at `transactionNow`. Otherwise skip the fill and retry next cycle.
+  valid at `transactionNow`, with `effectiveAt >= order.submittedAt`. Otherwise
+  skip the fill and retry next cycle. The scan also enforces this lower bound.
 - Path B: candle `closeTime` is historical `evidenceAt`, not execution time.
   Preserve closed 5-minute candle, first-eligible submit boundary, candle's
-  own stock session, season-end containment and BUY/SELL touch rules. Do not
+  own stock session, season-end containment and BUY/SELL touch rules. The close,
+  source-update and finalization timestamps must not be in the future. Both
+  paths fail closed if the current stock calendar is unavailable. Do not
   impose current price freshness or a current open-session requirement on a
   historical candle. Account/participant status, season status/window and USD
   FX freshness still gate execution at `transactionNow`, so no fill crosses
@@ -89,8 +154,8 @@ use the lifecycle locks described below, without a general-account TWR fence.
 - Upbit/Bithumb and KRW crypto trading are out of MVP scope.
 - `CurrencyCode.USDT` is not introduced; Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage.
 - Orders quote may use fresh eligible `provider_api` market data first.
-- Stock quote/create/execute never carries a previous completed-session price forward. `MARKET_CLOSED` is returned before price freshness selection while closed; after open, the price must belong to the current session. Execute keeps the 10-second threshold.
-- `MARKET_CLOSED` (409) means a CONFIRMED non-trading instant: holiday, weekend, outside session hours, or an operator closure override. When the session cannot be decided at all — a date in a year without a calendar dataset, or the operator override snapshot not yet loaded (cold start) — the order is still blocked fail-closed, but with the distinct code `MARKET_CALENDAR_UNAVAILABLE` (409). Clients must branch on the code, never on the message text. This code is additive; `MARKET_CLOSED` keeps its meaning for real closures.
+- Stock MARKET quote/create/execute never carries a previous completed-session price forward. `MARKET_CLOSED` is returned before price freshness selection while closed; after open, the price must belong to the current session. Execute keeps the 10-second threshold. Limit Quote/Create uses the user limit price and permits confirmed CLOSED; matching still requires eligible post-submission regular-session evidence.
+- `MARKET_CLOSED` (409) means a CONFIRMED non-trading instant: holiday, weekend, outside session hours, or an operator closure override. When the session cannot be decided at all — a date in a year without a calendar dataset, or the operator override snapshot not yet loaded (cold start) — both market and limit registration are blocked fail-closed, with the distinct code `MARKET_CALENDAR_UNAVAILABLE` (409). Clients must branch on the code, never on the message text. This code is additive; `MARKET_CLOSED` keeps its meaning for real closures.
 - Orders create uses the durable quote to start immediate market execution and requires fresh eligible `provider_api` market data at execution time.
 - `POST /api/v1/orders/:orderId/execute` is not the required public user flow and is not mounted in the controller; the service method is retained only for internal compatibility/deprecation.
 - Current quote is a reference estimate, not a guaranteed execution price. Provider-backed execute reprices at execute time from fresh provider_api data, compares against the quote price/rate, and rejects excessive movement.
@@ -197,9 +262,9 @@ use the lifecycle locks described below, without a general-account TWR fence.
 {
   "assetId": "<string>",
   "side": "buy | sell",
-  "orderType": "market optional; limit is not supported",
-  "quantity": "<decimal string>",
-  "limitPrice": "not supported",
+  "orderType": "market optional; limit described below",
+  "quantity": "<decimal string; crypto BUY uses amount instead>",
+  "limitPrice": "omit for market; required for limit",
   "currencyCode": "KRW | USD optional"
 }
 ```
@@ -208,8 +273,8 @@ use the lifecycle locks described below, without a general-account TWR fence.
 
 - Active season and joined participant are required.
 - Asset must exist and be active.
-- `quantity` must be a positive decimal string fitting `Decimal(24, 8)`.
-- Only market orders are supported. `orderType=limit` or any provided `limitPrice` returns `ORDER_TYPE_NOT_SUPPORTED`.
+- `quantity` must be a positive decimal string, scale <= 6, within `Decimal(24, 8)`. Crypto BUY uses amount instead; stock limit quantities must be integers.
+- The market path rejects any provided `limitPrice` with `ORDER_TYPE_NOT_SUPPORTED`. For `orderType=limit`, see Limit Orders below.
 - Market orders use fresh eligible `provider_api` asset price first, then latest eligible `admin_manual` fallback with `effectiveAt <= quoteAt`.
 - Eligible provider source mapping is domestic KRX -> `kis_krx_realtime_trade`, US NAS/NYS -> `kis_us_delayed_trade`, and BINANCE USD crypto -> `binance_public_rest_24hr_ticker`.
 - Provider asset price freshness uses capturedAt age <= 60 seconds and requires `effectiveAt` inside the current stock session. Closed-market carry-forward is not eligible for orders.
@@ -240,7 +305,8 @@ require requote (`QUOTE_MISMATCH`). Committed create replay preserves the stored
 response and financial effect; legacy submitted-order execute retains its
 `already_executed` response contract with persisted amounts and execution time.
 No replay recalculates fees from current configuration. Limit reservation fee
-pinning, transaction-time gates and idempotency scope/hash remain unchanged.
+pinning, transaction-time gates and idempotency scope remain unchanged. Quantity-only
+hashes remain compatible; crypto BUY hashes bind amount as specified above.
 
 ### Response
 
@@ -314,9 +380,9 @@ Same body as `POST /api/v1/orders/quote`.
 {
   "assetId": "<string>",
   "side": "buy | sell",
-  "orderType": "market optional; limit is not supported",
-  "quantity": "<decimal string>",
-  "limitPrice": "not supported",
+  "orderType": "market optional; limit described below",
+  "quantity": "<decimal string; crypto BUY uses amount instead>",
+  "limitPrice": "omit for market; required for limit",
   "currencyCode": "KRW | USD optional",
   "quoteId": "<string>",
   "idempotencyKey": "<non-empty string>"
@@ -334,7 +400,7 @@ Same body as `POST /api/v1/orders/quote`.
   - `quoteId`
   - `side`
   - `orderType`
-  - `quantity`
+  - `amount` for crypto BUY, otherwise `quantity`
   - `limitPrice`
   - `currencyCode`
 - `idempotencyKey` is excluded from the request hash.
@@ -349,7 +415,7 @@ Same body as `POST /api/v1/orders/quote`.
   - different request hash: `ORDER_IDEMPOTENCY_CONFLICT`.
 - Replay prefers stored `orders.response_payload_json`.
 - If stored response is missing, replay falls back to formatting the existing order row.
-- New create validates the active durable quote by id, user, trading account, asset, side, orderType, quantity, limitPrice, currencyCode, expiry, status, and quote requestHash.
+- New create validates the active durable quote by id, user, trading account, asset, side, orderType, amount intent/canonical quantity, limitPrice, currencyCode, expiry, status, and quote requestHash.
 - New create uses the durable quote persisted by `POST /api/v1/orders/quote`, then reprices at execution time from fresh provider_api rows.
 - Create response includes `order.quoteId` through the standard order item.
 - Execute-time provider repricing determines the actual fill values.
@@ -381,8 +447,8 @@ The existing reservation/matcher lifecycle supports both sides without partial
 fills or an exchange order book:
 
 - Limit BUY and SELL; full-quantity, GTC-style.
-- KRX / US stocks (registration only while the market is open, calendar
-  fail-closed) and Binance USD-equivalent crypto (24h).
+- KRX / US stocks (integer quantities; registration while OPEN or confirmed
+  CLOSED, calendar unavailable fail-closed) and Binance USD-equivalent crypto (24h).
 - Creating a limit buy reserves cash (`reservedAmount = grossAmount +
   feeAmount`); creating a limit sell reserves existing position quantity
   (`reservedQuantity = quantity`). Both store `status=submitted`.
@@ -456,8 +522,8 @@ fills or an exchange order book:
 
 ### Limit Quote (`POST /api/v1/orders/quote` with `orderType: "limit"`)
 
-Request: `assetId`, `side: "buy" | "sell"`, `orderType: "limit"`, `quantity`,
-`limitPrice` (positive decimal string, scale ≤ 8), optional `currencyCode`
+Request: `assetId`, `side: "buy" | "sell"`, `orderType: "limit"`,
+`amount` for crypto BUY or `quantity` otherwise, `limitPrice` (positive decimal string, scale ≤ 8), optional `currencyCode`
 matching the asset settlement currency. `orderType` omitted keeps the
 historical market default; a market request carrying `limitPrice` keeps the
 historical `ORDER_TYPE_NOT_SUPPORTED` rejection.
@@ -502,7 +568,7 @@ present with side-aware estimates so existing clients keep working; the
 ### Limit Create (`POST /api/v1/orders` with `orderType: "limit"`)
 
 Same durable-quote validation as market orders (TTL 15s, `QUOTE_MISMATCH`
-covers assetId/side/orderType/quantity/limitPrice/currency/hash). In ONE
+covers assetId/side/orderType/amount intent/canonical quantity/limitPrice/currency/hash). In ONE
 transaction: atomic cash or position reservation (two concurrent creates can
 never double-book the same available balance/quantity), `submitted` order row
 (stores side-appropriate `reservedAmount`/`reservedQuantity` and the quote-time
@@ -510,7 +576,7 @@ never double-book the same available balance/quantity), `submitted` order row
 quote consumption, and the idempotent response payload. Any failure rolls
 the reservation back. Idempotency: same quote + same key + same payload
 replays the stored response; same quote + same key + different
-limitPrice/quantity/orderType/assetId → `ORDER_IDEMPOTENCY_CONFLICT`. The
+limitPrice/quantity/amount/orderType/assetId → `ORDER_IDEMPOTENCY_CONFLICT`. The
 replay runs BEFORE `LIMIT_ORDER_ENABLED`, before the create-service wiring
 check and before every health gate — see *Limit-create replay ordering and
 operational errors* at the end of this document.
@@ -608,8 +674,8 @@ message, alreadyCanceled, reservedAmountReleased, reservedQuantityReleased }`.
 This endpoint is not currently exposed by `OrdersController`. The retained service method is internal compatibility/deprecation code only. The required public user flow is `POST /api/v1/orders` with a durable `quoteId` and `idempotencyKey`, which immediately executes market orders.
 
 The retained internal method rejects every limit order with
-`LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED`. There is no limit-execution path
-at all today; automatic matching is planned as separate work.
+`LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED`. Limit fills use the separate
+scheduler matcher and reservation-aware execution service described above.
 
 ### Request
 
@@ -624,7 +690,7 @@ at all today; automatic matching is planned as separate work.
 - Empty `orderId` returns `INVALID_ORDER_ID`.
 - Missing or unowned orders return `ORDER_NOT_FOUND`.
 - The order's season must be active; ended/settled/upcoming seasons cannot execute.
-- Only market orders are supported; limit orders return `ORDER_TYPE_NOT_SUPPORTED`.
+- This internal execute path accepts only market orders; limits return `LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED`.
 - Only `status = submitted` can create a new execution.
 - `status = executed` returns a duplicate current-state response without wallet, position, ledger, or order mutation.
 - `status = canceled` and `status = rejected` return `ORDER_NOT_EXECUTABLE`.
@@ -743,6 +809,12 @@ at all today; automatic matching is planned as separate work.
 
 ## Error Codes
 
+- `INVALID_ORDER_INPUT` (400; amount/quantity contract mismatch)
+- `INVALID_AMOUNT` (400; invalid amount or unrepresentable quantity/notional)
+- `FRACTIONAL_LIMIT_ORDER_NOT_SUPPORTED` (400; stock limit quantity is not an integer)
+- `MARKET_CLOSED` (409; stock market orders only)
+- `MARKET_CALENDAR_UNAVAILABLE` (409; stock market and limit registration)
+
 - `UNAUTHORIZED`
 - `INVALID_ORDER_ID`
 - `ORDER_NOT_FOUND`
@@ -751,7 +823,7 @@ at all today; automatic matching is planned as separate work.
 - `ORDER_CANCEL_CONFLICT`
 - `LIMIT_ORDER_DISABLED` (limit quote/create while the feature flag is off)
 - `LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED` (internal execute path refuses
-  limit orders; there is no limit-execution path)
+  limit orders; scheduler matching owns limit execution)
 - `LIMIT_BUY_ONLY` is retained as a legacy client/error enum but the current
   writer no longer emits it; limit sell is supported.
 - `INVALID_LIMIT_PRICE`
@@ -822,7 +894,8 @@ For either limit side, `POST /api/v1/orders` runs in exactly this order:
 
 1. authenticate the caller;
 2. parse the body and compute the canonical request hash (`quoteId`,
-   `assetId`, `side`, `orderType`, `quantity`, `limitPrice`, `currencyCode`) —
+   `assetId`, `side`, `orderType`, `amount` for crypto BUY or `quantity` otherwise,
+   `limitPrice`, `currencyCode`) —
    a body too malformed to hash still returns its ordinary validation error;
 3. look up the caller's existing order **for that quote**;
 4. if one exists and the hash matches, return the stored first

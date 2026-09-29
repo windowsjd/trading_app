@@ -3,6 +3,7 @@ import type { QuantityRatioSliderProps } from './QuantityRatioSlider';
 
 /** The browser owns pointer capture, touch, keyboard and slider semantics. */
 export default function QuantityRatioSlider({
+  accessibilityLabel = '주문 수량 비율',
   value,
   disabled,
   disabledReason,
@@ -12,7 +13,7 @@ export default function QuantityRatioSlider({
     <input
       type="range"
       data-testid="order-quantity-slider"
-      aria-label="주문 수량 비율"
+      aria-label={accessibilityLabel}
       aria-valuetext={`${Math.round(value * 100)}%`}
       title={disabledReason}
       min={0}

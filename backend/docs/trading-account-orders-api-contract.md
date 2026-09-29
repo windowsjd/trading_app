@@ -1,5 +1,10 @@
 # Account-Scoped Orders & Positions API Contract
 
+> 2026-09-29 current: General/Season 모두 [공통 주문 입력 정책](orders-api-contract.md#order-input-and-session-policy-2026-09-29-current)을 적용한다.
+> Crypto BUY는 `amount` 원금 입력, 나머지는 기존 `quantity` 입력이다. Quote/Create 모두 같은 amount를 보내며 서버가 수량을 확정한다.
+> 주식 소수 시장가는 유지하고 소수 지정가는 거절한다. 정수 지정가는 확정 CLOSED에도 등록하며 calendar unavailable은 거절한다.
+> 기존 account scope·replay·예약·fee pinning은 유지한다. 새 endpoint/migration은 없다.
+
 ## Status
 
 Implemented for season and general accounts (작업 5, general trading expansion
@@ -216,9 +221,10 @@ Both modes use post-lock PostgreSQL `clock_timestamp()` (`transactionNow`) for
 final quote/freshness/market checks and execution/ledger/equity timestamps.
 Season status, start/end and participant gates are additional authorization.
 Matcher `cycleNow` is only a scan/scheduling clock. Path A revalidates its exact
-snapshot at transaction time and skips stale/future or closed-session evidence;
+snapshot at transaction time and skips pre-submission, stale/future or closed-session evidence;
 Path B retains historical closed-candle touch evidence without current price
-freshness. Both paths require current execution authorization and fresh USD FX.
+freshness. Both paths reject current calendar unavailability and future evidence,
+and require current execution authorization and fresh USD FX.
 Committed replay keeps stored results and timestamps. See the financial-time
 section of `orders-api-contract.md` for the full common policy.
 

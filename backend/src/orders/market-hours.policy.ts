@@ -1,4 +1,4 @@
-import { AssetType } from '../generated/prisma/client';
+import { AssetType, OrderType } from '../generated/prisma/client';
 import {
   resolveCalendarMarket,
   resolveStockMarketSessionState,
@@ -78,4 +78,17 @@ export function assertAssetTradable(asset: MarketHoursAsset, now: Date): void {
   if (!status.tradable) {
     throw new MarketHoursError(status.reason, status.message);
   }
+}
+
+/** Registration permission only. Matching still requires regular-session evidence. */
+export function assertOrderSessionAllowed(
+  asset: MarketHoursAsset,
+  now: Date,
+  orderType: OrderType,
+): void {
+  const status = getAssetTradingStatus(asset, now);
+  if (status.tradable) return;
+  if (orderType === OrderType.limit && status.reason === 'MARKET_CLOSED')
+    return;
+  throw new MarketHoursError(status.reason, status.message);
 }

@@ -59,7 +59,7 @@ function order(
   mode: 'general' | 'season' = 'general',
   assetId = 'A',
   price?: number,
-  submittedAt = new Date(NOW.getTime() - 600_000 + position * 1000),
+  submittedAt = new Date(NOW.getTime() - 600_000 + position),
 ) {
   return {
     id,
@@ -222,6 +222,7 @@ function fixture(initial: Row[]) {
   const price = jest.fn(async () => ({
     id: 'snapshot',
     price: new Prisma.Decimal(100),
+    effectiveAt: NOW,
   }));
   (
     matcher as unknown as { resolvePathASnapshot: typeof price }

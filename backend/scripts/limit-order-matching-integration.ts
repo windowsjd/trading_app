@@ -953,6 +953,7 @@ async function createClosedCandle(
       isClosed: true,
       sourceProvider: 'binance',
       sourceUpdatedAt: new Date(input.openTime.getTime() + 300_000),
+      updatedAt: new Date(input.openTime.getTime() + 300_000),
     },
   });
 }

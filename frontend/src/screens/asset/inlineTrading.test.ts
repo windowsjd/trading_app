@@ -40,7 +40,8 @@ describe('inline order lifecycle with real React and query mutations', () => {
             `/trading-accounts/${accountId}/orders`,
           );
           assert.equal(h.requests[1].body.side, side);
-          assert.equal(h.requests[1].body.quantity, '0.125');
+          assert.equal(h.requests[1].body[side === 'buy' ? 'amount' : 'quantity'], '0.125');
+          assert.equal(h.requests[1].body[side === 'buy' ? 'quantity' : 'amount'], undefined);
           assert.equal(h.requests[1].body.orderType ?? 'market', type);
           assert.equal(
             h.requests[1].body.limitPrice,
@@ -50,7 +51,11 @@ describe('inline order lifecycle with real React and query mutations', () => {
           assert.ok(h.requests[1].body.idempotencyKey);
           assert.ok(!('currencyCode' in h.requests[1].body));
           assert.equal(h.success().visible, true);
-          assert.equal(h.success().quote.quantity, '0.125');
+          if (side === 'sell') assert.equal(h.success().quote.quantity, '0.125');
+          else {
+            assert.equal(h.success().quote.amount, '0.125');
+            assert.ok(Number(h.success().quote.quantity) > 0);
+          }
           assert.ok(
             h.invalidations.some((key: any[]) => key.includes(accountId)),
           );

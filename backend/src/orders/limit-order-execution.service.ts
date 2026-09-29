@@ -7,7 +7,6 @@ import {
 import {
   AssetType,
   CurrencyCode,
-  FxRateSourceType,
   OrderSide,
   OrderStatus,
   OrderType,
@@ -340,6 +339,13 @@ export class LimitOrderExecutionService {
       }
       const tradingAccountId = order.tradingAccountId;
 
+      // Confirmed CLOSED permits historical regular-session candles, but a
+      // missing current calendar cannot authorize either evidence path.
+      const marketStatus = getAssetTradingStatus(order.asset, transactionNow);
+      if (!marketStatus.tradable && marketStatus.reason !== 'MARKET_CLOSED') {
+        return { state: 'skipped', orderId, reason: marketStatus.reason };
+      }
+
       // Path A is an execution-time price; the cycle's exact evidence must
       // still be fresh and in the current stock session. Never refresh over
       // the network or silently substitute a different price in this fill.
@@ -360,6 +366,7 @@ export class LimitOrderExecutionService {
           evidence.assetId !== order.assetId ||
           evidence.currencyCode !==
             (order.asset.priceCurrency ?? order.asset.currencyCode) ||
+          evidence.effectiveAt < order.submittedAt ||
           !evidence.price.eq(plan.executedPrice)
         ) {
           return {
@@ -393,6 +400,9 @@ export class LimitOrderExecutionService {
             : resolveRegularSessionForEvent(order.asset, plan.candle.openTime);
         if (
           evidenceAt > transactionNow ||
+          plan.candle.sourceUpdatedAt > transactionNow ||
+          plan.candle.finalizedAt > transactionNow ||
+          evidenceAt.getTime() !== plan.candle.openTime.getTime() + 300_000 ||
           (order.asset.assetType !== AssetType.crypto &&
             (!session || evidenceAt > session.closeTime)) ||
           !plan.executedPrice.eq(order.limitPrice) ||

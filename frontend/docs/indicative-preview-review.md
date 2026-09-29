@@ -1,5 +1,7 @@
 # 매수·환전 Indicative Preview 변경 보고서
 
+> 2026-09-29 주문 정책 A 추가: 아래는 9월 12일 작업 기록이다. 현재 `OrderPanel`은 preview 가격/수수료 계산 실패와 수동 주문 Quote 요청을 분리한다. 유효한 입력은 서버 Quote에 보내고 domain error를 표시한다. Crypto BUY는 수수료 제외 `amount` 입력이며 서버 Quote 수량을 우선 표시하고 Create에도 원래 amount를 보낸다. 비율은 settlement available cash와 기존 account feePolicy로 amount를 계산한다. Crypto SELL과 주식은 quantity 입력, 주식 소수 지정가는 입력 단계와 서버에서 모두 거절한다. 서버 marketStatus로 휴장 시장가 이유/지정가 대기를 안내하며 자동 유형 전환은 없다. FX preview/execute 정책은 이번 작업에서 변경하지 않았다. [공통 계약](../../backend/docs/orders-api-contract.md), [설계·검증](../../backend/docs/order-input-policy.md) 참조.
+
 검증일: 2026-09-12. 로컬 작업만 수행했으며 commit/push, GitHub 수정, 배포, 운영 DB 변경은 하지 않았다.
 
 ## A. 최초 구조

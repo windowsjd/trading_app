@@ -1,3 +1,4 @@
+import Decimal from 'decimal.js';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
@@ -37,15 +38,14 @@ for (const screen of ['inline', 'standalone'])
           }
           const capacity =
             side === 'buy'
-              ? type === 'limit'
-                ? 2
-                : 1
+              ? 100.2 / 1.001
               : Number(h.positions[account]);
+          const valueAt = (percent: number) => side === 'buy'
+            ? new Decimal('100.2').mul(percent / 100).div('1.001').toDecimalPlaces(8, Decimal.ROUND_DOWN).toFixed(8)
+            : String(Math.floor(((capacity * percent) / 100) * 1e6) / 1e6);
           for (const percent of [25, 50, 75, 100]) {
             await h.press(`order-ratio-${percent}`);
-            const expected = String(
-              Math.floor(((capacity * percent) / 100) * 1e6) / 1e6,
-            );
+            const expected = valueAt(percent);
             assert.equal(h.node(qty).props.value, expected);
             assert.equal(h.node(slider).props.value, percent);
             assert.deepEqual(selected(h), [percent]);
@@ -65,7 +65,7 @@ for (const screen of ['inline', 'standalone'])
             assert.equal(h.node(qty).props.value, expected);
           }
           await h.slide(37);
-          assert.equal(h.node(qty).props.value, String(capacity * 0.37));
+          assert.equal(h.node(qty).props.value, valueAt(37));
           assert.equal(h.node(slider).props.value, 37);
           assert.deepEqual(selected(h), []);
           await h.slide(50);
@@ -91,9 +91,9 @@ for (const screen of ['inline', 'standalone'])
           await h.slide(-10);
           assert.equal(h.node(qty).props.value, '');
           await h.slide(110);
-          assert.equal(h.node(qty).props.value, String(capacity));
+          assert.equal(h.node(qty).props.value, valueAt(100));
           await h.slide(NaN);
-          assert.equal(h.node(qty).props.value, String(capacity));
+          assert.equal(h.node(qty).props.value, valueAt(100));
           assert.equal(h.requests.length, 0);
         });
 
@@ -119,9 +119,10 @@ test('six-decimal flooring preserves the selected ratio; rejected tiny quantity 
 
 test('manual edits, price, reservations, limit changes and side/account changes never retain stale selection', async (t) => {
   const h = inlineTradingHarness();
-  h.usdBalance = '100.2';
+  h.assets.bnb.assetType = 'us_stock';
+  h.usdBalance = '1002';
   h.usdReserved = '0';
-  h.usdAvailable = '100.2';
+  h.usdAvailable = '1002';
   h.assets.bnb.price.currentPrice = '100';
   await h.mount();
   t.after(h.close);
@@ -131,14 +132,14 @@ test('manual edits, price, reservations, limit changes and side/account changes 
     price: { ...h.assets.bnb.price, currentPrice: '200' },
   };
   await h.update();
-  assert.equal(h.node(qty).props.value, '0.5');
+  assert.equal(h.node(qty).props.value, '5');
   assert.equal(h.node(slider).props.value, 100);
   assert.deepEqual(selected(h), []);
   await h.press('order-ratio-50');
-  h.usdReserved = '50.1';
-  h.usdAvailable = '50.1';
+  h.usdReserved = '501';
+  h.usdAvailable = '501';
   await h.update();
-  assert.equal(h.node(qty).props.value, '0.25');
+  assert.equal(h.node(qty).props.value, '2.5');
   assert.equal(h.node(slider).props.value, 100);
   assert.deepEqual(selected(h), []);
   await h.press(TEST_IDS.order.typeToggleLimit);
@@ -146,7 +147,7 @@ test('manual edits, price, reservations, limit changes and side/account changes 
   await h.input(TEST_IDS.order.limitPriceInput, '100');
   await h.press('order-ratio-100');
   await h.input(TEST_IDS.order.limitPriceInput, '50');
-  assert.equal(h.node(qty).props.value, '0.5');
+  assert.equal(h.node(qty).props.value, '5');
   assert.equal(h.node(slider).props.value, 50);
   assert.deepEqual(selected(h), []);
   await h.press('order-ratio-75');
@@ -196,6 +197,7 @@ for (const scenario of [
     }
     if (scenario === 'wallet-loading') h.walletState = { isLoading: true };
     if (scenario === 'wallet-error') h.walletState = { isError: true };
+    if (scenario === 'price' || scenario === 'limit') h.assets.bnb.assetType = 'us_stock';
     if (scenario === 'price') h.assets.bnb.price = { state: 'unavailable' };
     if (scenario === 'holding') h.positions.general = '0';
     if (scenario === 'position-loading') h.positionState = { isLoading: true };
@@ -253,8 +255,8 @@ test('quote/create pending protects every quantity input, then success resets pe
   assert.equal(h.node(qty).props.value, '');
   assert.equal(h.node(slider).props.value, 0);
   assert.deepEqual(selected(h), []);
-  assert.equal(h.requests[0].body.quantity, value);
-  assert.equal(h.requests[1].body.quantity, value);
+  assert.equal(h.requests[0].body.amount, value);
+  assert.equal(h.requests[1].body.amount, value);
   assert.ok(h.invalidations.length);
 });
 

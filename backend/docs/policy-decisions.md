@@ -6,6 +6,16 @@
 > `tradingAccountId` 하나다. 아래 작업 7·8의 nullable scope와 dual-write 설명은
 > 당시 rolling migration 결정 이력이며, 현행 계약으로 해석하지 않는다.
 
+## 주문 입력·장외 지정가 (2026-09-29, current)
+
+- 국내/미국 주식의 소수 수량은 시장가만 허용한다. 지정가는 Decimal 정수 판정으로 거절하여 `1.000000`은 허용한다. 소수 수량의 즉시 거래와 예약 주문의 정수 계약을 구분하기 위한 제품 정책이다.
+- 주식 시장가는 OPEN만, 지정가 Quote/Create는 OPEN 및 확정 CLOSED를 허용한다. calendar unavailable은 둘 다 거절하고 Create lock 후 DB 시각으로 재검증한다. 장외 등록은 다음 정규장을 기다리는 GTC-style 예약이며 After Market/NXT 체결이 아니다.
+- Matcher A는 현재 정규장·제출 이후의 fresh snapshot만 사용한다. B는 제출 이후 첫 전체 5분봉을 유지한다. 미래 evidence와 현재 calendar unavailable은 모두 거절하여 마지막 종가/과거 봉이 새 주문을 체결하지 않게 한다.
+- Crypto BUY의 사용자 intent는 수수료 제외 원금 `amount`다. 서버에서 amount/가격을 scale 6으로 내림한다. 시장가는 실행 가격으로 최종 수량을 재계산하고 지정가는 Quote 수량을 고정한다. 같은 실행 가격의 수량·원금·수수료를 원자적으로 기록하기 위한 설계다.
+- 주문 Crypto BUY의 `Quote.sourceAmount`에 원금을 저장하고 quote/create hash에 amount를 포함한다. quoteType 및 asset/side로 FX 의미와 구분하며, 다른 주문 sourceAmount는 null이다. 기존 컬럼으로 intent를 보존할 수 있어 migration은 만들지 않는다.
+- Frontend preview 실패는 수동 주문 Quote 요청을 막지 않는다. preview는 정보/비율 계산, 서버 Quote/Create는 금융 권한이다. Crypto BUY 비율은 사용 가능 현금과 계좌별 기존 fee를 사용하여 100% 원금+fee가 예산을 넘지 않게 한다.
+- fee pinning, TTL/maxChangeBps, reservation, 전량 체결, 소유권, replay-first와 General/Season 공통 코어를 유지한다. 세부 계약은 [orders-api-contract.md](orders-api-contract.md), 검증은 [order-input-policy.md](order-input-policy.md)를 따른다.
+
 ## Execute-Time Repricing (Durable Quote)
 
 - 주문 매수/환전 입력 화면의 indicative preview는 기존 표시 시세/환율과 계좌별 수수료율로 계산하며 Quote를 저장하지 않는다. 최종 버튼에서만 기존 quote → execute를 호출한다. 매도 흐름은 유지한다.
@@ -36,7 +46,7 @@
   근거: 시장이 열렸는데 현재 세션 데이터가 없는 상태는 정상 휴장이 아니라 provider 지연 또는 장애다.
 - 주식시장 폐장 후·주말·전일 휴장에는 자산별 KRX/US 캘린더가 가리키는 최근 완료 세션 안의 마지막 유효 `provider_api` 가격을 read/display, live valuation, current ranking, daily portfolio snapshot, market snapshot health에 사용할 수 있다. 해당 세션 가격이 없으면 더 오래된 세션으로 넘어가지 않는다.
   근거: 닫힌 시장의 무거래는 정상이지만, 평가 근거는 가장 최근 완료 세션으로 유계되어야 한다.
-- 주문 quote/create/execute에는 완료 세션 carry-forward를 사용하지 않는다. 휴장 중에는 가격 선택보다 `MARKET_CLOSED`를 우선하고, 개장 후 execute는 현재 세션의 10초 freshness를 유지한다.
+- 주식 시장가 quote/create/execute에는 완료 세션 carry-forward를 사용하지 않는다. 휴장 중에는 가격 선택보다 `MARKET_CLOSED`를 우선하고, 개장 후 execute는 현재 세션의 10초 freshness를 유지한다. 지정가 등록은 사용자 가격으로 확정 CLOSED에서도 허용하고 체결 evidence는 위의 제출·정규장 경계를 지킨다.
   근거: 표시·평가의 종가 보존과 자금 변동 경로의 체결 안전성은 분리되어야 한다.
 - KRX와 미국 시장 상태는 자산별로 독립 판정하고 crypto는 24시간 freshness 정책을 유지한다. 시즌 날짜, 주문 생성 시각, 거래 내역 날짜, 사용자 활동일에는 주식시장 휴장일을 적용하지 않는다.
   근거: 혼합 포트폴리오와 일반 도메인 날짜를 한 시장의 휴장 여부로 함께 중단하면 안 된다.
@@ -162,7 +172,7 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
 - 경로 A(fresh snapshot): 자산의 최신 유효 `provider_api` AssetPriceSnapshot이
   매수는 limitPrice 이하, 매도는 limitPrice 이상이면 **snapshot 가격**으로 체결(가격 개선 허용). 기존 시장가 execute의
   source eligibility·freshness·시장세션 판정을 그대로 재사용(admin_manual/official_batch
-  거절, 주식은 개장 세션 필요, crypto 24h).
+  거절, 주식은 개장 세션 필요, crypto 24h). snapshot effectiveAt은 order.submittedAt 이후여야 하며 scan과 fill transaction에서 모두 검증한다.
 - 경로 B(closed 5분봉 터치): 경로 A 미체결분에 대해, 마감된 5분봉의 매수 low가
   limitPrice 이하 또는 매도 high가 limitPrice 이상이면 **order.limitPrice**로 체결
   (candle low/high는 터치 evidence일 뿐). 주문 제출 시각을

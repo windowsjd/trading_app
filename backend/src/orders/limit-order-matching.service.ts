@@ -125,7 +125,11 @@ export class LimitOrderMatchingService {
     const assetEvidence = new Map<
       string,
       {
-        snapshot: { id: string; price: Prisma.Decimal } | null;
+        snapshot: {
+          id: string;
+          price: Prisma.Decimal;
+          effectiveAt: Date;
+        } | null;
         candles: Awaited<
           ReturnType<
             LimitOrderCandleEvidenceService['findEligibleClosedCandlesForAsset']
@@ -253,7 +257,11 @@ export class LimitOrderMatchingService {
    */
   private buildFillPlan(
     candidate: LimitMatchCandidate,
-    pathASnapshot: { id: string; price: Prisma.Decimal } | null,
+    pathASnapshot: {
+      id: string;
+      price: Prisma.Decimal;
+      effectiveAt: Date;
+    } | null,
     eligibleCandles: Awaited<
       ReturnType<
         LimitOrderCandleEvidenceService['findEligibleClosedCandlesForAsset']
@@ -263,6 +271,7 @@ export class LimitOrderMatchingService {
     const side = candidate.side ?? OrderSide.buy;
     if (
       pathASnapshot &&
+      pathASnapshot.effectiveAt >= candidate.submittedAt &&
       ((side === OrderSide.buy &&
         pathASnapshot.price.lte(candidate.limitPrice)) ||
         (side === OrderSide.sell &&
@@ -302,7 +311,7 @@ export class LimitOrderMatchingService {
   private async resolvePathASnapshot(
     asset: LimitMatchCandidate['asset'],
     now: Date,
-  ): Promise<{ id: string; price: Prisma.Decimal } | null> {
+  ): Promise<{ id: string; price: Prisma.Decimal; effectiveAt: Date } | null> {
     const eligibility = resolveAssetProviderEligibility({
       workflow: 'orders_execute',
       asset: {
@@ -348,7 +357,11 @@ export class LimitOrderMatchingService {
     });
 
     return selection.state === 'selected'
-      ? { id: selection.snapshot.id, price: selection.snapshot.price }
+      ? {
+          id: selection.snapshot.id,
+          price: selection.snapshot.price,
+          effectiveAt: selection.snapshot.effectiveAt,
+        }
       : null;
   }
 

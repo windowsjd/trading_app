@@ -189,6 +189,7 @@ jobs:
       - name: Limit order PostgreSQL integration tests
         run: >-
           pnpm exec jest --runInBand
+          src/orders/order-input-policy.integration.spec.ts
           src/orders/limit-order-reservation.integration.spec.ts
           src/orders/limit-order-create-race.integration.spec.ts
           src/orders/limit-order-transaction-time.integration.spec.ts

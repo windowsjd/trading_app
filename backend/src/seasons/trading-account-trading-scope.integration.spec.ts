@@ -912,8 +912,8 @@ async function testLimitLifecycleAndFill() {
       currencyCode: CurrencyCode.KRW,
       sourceType: 'provider_api',
       sourceName: 'kis_krx_realtime_trade',
-      effectiveAt: new Date(Date.now() - 1_000),
-      capturedAt: new Date(Date.now() - 1_000),
+      effectiveAt: new Date(),
+      capturedAt: new Date(),
     },
     select: { id: true },
   });

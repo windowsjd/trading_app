@@ -2,6 +2,7 @@
 // reads and HTTP responses. Scope changes unmount the actual shared order form.
 const { resolve } = require('node:path');
 const React = require('react');
+const Decimal = require('decimal.js');
 const { create, act } = require('react-test-renderer');
 const query = require('@tanstack/react-query');
 const { load } = require('./ledgerTestHarness.cjs');
@@ -115,12 +116,16 @@ function inlineTradingHarness() {
           if (!isQuote && h.failure) throw h.failure;
           if (!isQuote) h.onCreate?.(url, body);
           const asset = h.assets[body.assetId];
+          const quantity = body.amount !== undefined
+            ? new Decimal(body.amount).div(body.limitPrice ?? asset.price.currentPrice ?? '100')
+              .toDecimalPlaces(6, Decimal.ROUND_DOWN).toFixed(6) : body.quantity;
           const data = isQuote
             ? {
                 state: 'available',
                 asset,
                 side: body.side,
-                quantity: body.quantity,
+                quantity,
+                ...(body.amount !== undefined ? { amount: body.amount } : {}),
                 orderType: body.orderType ?? 'market',
                 quoteId: `q-${h.requests.length}`,
                 expiresAt: new Date(
@@ -141,6 +146,7 @@ function inlineTradingHarness() {
             : {
                 order: {
                   ...body,
+                  quantity,
                   asset,
                   currencyCode: asset.settlementCurrency,
                 },
@@ -238,7 +244,7 @@ function inlineTradingHarness() {
                   },
           };
         if (resource === 'detail')
-          return { ...base, data: { feePolicy: { tradeFeeRate: '0.001' } } };
+          return { ...base, data: { feePolicy: { tradeFeeRate: h.feeRate ?? '0.001' } } };
         if (resource === 'wallets')
           return {
             ...base,

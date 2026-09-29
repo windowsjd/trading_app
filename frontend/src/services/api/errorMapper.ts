@@ -310,13 +310,21 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.SEASON_NOT_FOUND:
       return '현재 시즌이 설정되지 않았습니다.';
     case ERROR_CODE.MARKET_CLOSED:
-      return '장 마감으로 주문할 수 없습니다.';
+      return '정규장 외에는 시장가 주문을 할 수 없습니다. 지정가를 직접 선택해주세요.';
     case ERROR_CODE.MARKET_CALENDAR_UNAVAILABLE:
       return '시장 운영 정보를 확인할 수 없어 주문할 수 없습니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.LIMIT_ORDER_DISABLED:
       return '지정가 주문 기능이 아직 활성화되지 않았습니다.';
     case ERROR_CODE.LIMIT_BUY_ONLY:
       return '지정가 주문은 현재 매수만 지원합니다.';
+    case ERROR_CODE.FRACTIONAL_LIMIT_ORDER_NOT_SUPPORTED:
+      return '주식 소수점 수량은 시장가만 가능합니다. 지정가는 정수 수량을 입력해주세요.';
+    case ERROR_CODE.INVALID_AMOUNT:
+      return '매수 금액을 확인해주세요. 주문 가능한 최소 수량보다 작을 수 있습니다.';
+    case ERROR_CODE.INVALID_ORDER_INPUT:
+      return '암호화폐 매수는 매수 금액을, 다른 주문은 수량을 입력해주세요.';
+    case ERROR_CODE.PRICE_UNAVAILABLE:
+      return '서버에서 주문 가능한 시세를 확인할 수 없습니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.INVALID_LIMIT_PRICE:
       return '지정가 가격을 확인해주세요. 0보다 큰 숫자여야 합니다.';
     case ERROR_CODE.INSUFFICIENT_AVAILABLE_BALANCE:

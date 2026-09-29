@@ -495,18 +495,14 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
     });
 
-    it('rejects stock limit quotes while the market is closed', async () => {
+    it('allows stock limit quotes while the market is confirmed closed', async () => {
       jest.setSystemTime(krxClosedAt);
       const { prisma, service } = createService();
-      prisma.season.findFirst.mockResolvedValueOnce(activeSeason);
-      prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
-      prisma.asset.findUnique.mockResolvedValueOnce(krxAsset);
-
-      await expectErrorCode(
-        service.quoteOrder('user-1', limitQuoteBody),
-        'MARKET_CLOSED',
-      );
-      expect(prisma.quote.create).not.toHaveBeenCalled();
+      mockQuoteContext(prisma);
+      const result = await service.quoteOrder('user-1', limitQuoteBody);
+      expect(result.data.reservedAmount).toBe('150150.00000000');
+      expect(prisma.quote.create).toHaveBeenCalledTimes(1);
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
     });
 
     it('fails closed with MARKET_CALENDAR_UNAVAILABLE when the calendar cannot decide', async () => {
@@ -539,7 +535,8 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         ...limitQuoteBody,
         assetId: 'asset-btc',
         limitPrice: '100.00000000',
-        quantity: '1.000000',
+        quantity: undefined,
+        amount: '100',
         currencyCode: CurrencyCode.USD,
       });
 
@@ -1173,20 +1170,14 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       expect(prisma.$executeRaw).not.toHaveBeenCalled();
     });
 
-    it('blocks stock limit creates while the market is closed', async () => {
+    it('registers stock limit creates while the market is confirmed closed', async () => {
       jest.setSystemTime(krxClosedAt);
       const { prisma, service } = createService();
-      prisma.season.findFirst.mockResolvedValueOnce(activeSeason);
-      prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
-      prisma.order.findFirst.mockResolvedValueOnce(null);
-      prisma.quote.findFirst.mockResolvedValueOnce(activeQuoteRecord());
-
-      await expectErrorCode(
-        service.createOrder('user-1', limitCreateBody),
-        'MARKET_CLOSED',
-      );
-      expect(prisma.$executeRaw).not.toHaveBeenCalled();
-      expect(prisma.order.create).not.toHaveBeenCalled();
+      mockCreateContext(prisma);
+      const result = await service.createOrder('user-1', limitCreateBody);
+      expect(result.data.order.status).toBe(OrderStatus.submitted);
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+      expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
     });
 
     it('fails closed on create when calendar coverage is unavailable', async () => {

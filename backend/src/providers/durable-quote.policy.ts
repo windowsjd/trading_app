@@ -33,7 +33,9 @@ export type OrderQuoteRequestHashInput = {
   assetId: string;
   side: string;
   orderType: string;
-  quantity: DecimalInput;
+  quantity: DecimalInput | null;
+  /** Order-only gross principal intent; absent on released quantity quotes. */
+  amount?: DecimalInput | null;
   limitPrice: DecimalInput | null;
   currencyCode: string;
 };
@@ -107,7 +109,9 @@ export function computeOrderQuoteRequestHash(
     assetId: normalizeRequiredString(input.assetId, 'assetId'),
     side: normalizeRequiredString(input.side, 'side'),
     orderType: normalizeRequiredString(input.orderType, 'orderType'),
-    quantity: formatMoneyScale8(input.quantity),
+    ...(input.amount != null
+      ? { amount: formatMoneyScale8(input.amount) }
+      : { quantity: formatMoneyScale8(input.quantity!) }),
     limitPrice: input.limitPrice ? formatMoneyScale8(input.limitPrice) : null,
     currencyCode: normalizeCurrency(input.currencyCode, 'currencyCode'),
   });

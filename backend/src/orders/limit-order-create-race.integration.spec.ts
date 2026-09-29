@@ -298,7 +298,8 @@ async function createLimitQuote(scenario, overrides = {}) {
     assetId: scenario.assetId,
     side: 'buy',
     orderType: 'limit',
-    quantity: QUANTITY,
+    amount: '200000',
+    quantity: null,
     limitPrice: LIMIT_PRICE,
     currencyCode: CurrencyCode.KRW,
   });
@@ -313,6 +314,7 @@ async function createLimitQuote(scenario, overrides = {}) {
       side: OrderSide.buy,
       orderType: OrderType.limit,
       quantity: QUANTITY,
+      sourceAmount: '200000',
       limitPrice: LIMIT_PRICE,
       currencyCode: CurrencyCode.KRW,
       quotedPrice: LIMIT_PRICE,
@@ -336,7 +338,7 @@ function createBody(scenario, quoteId, idempotencyKey) {
     assetId: scenario.assetId,
     side: 'buy',
     orderType: 'limit',
-    quantity: QUANTITY,
+    amount: '200000',
     limitPrice: LIMIT_PRICE,
     idempotencyKey,
   };

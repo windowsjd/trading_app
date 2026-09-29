@@ -1,5 +1,7 @@
 # 거래 transaction-time 정책 통일 검토
 
+> 2026-09-29 추가: 아래는 당시 검토 기록이다. 현재 지정가 Create는 lock 후 DB 시각의 **확정 CLOSED도 허용**하며 calendar unavailable·TTL·계좌·시즌 endAt은 계속 차단한다. 시장가 CLOSED 차단은 유지한다. Matcher A에 effectiveAt >= submittedAt을 scan/transaction 양쪽에 추가하고, A/B 모두 현재 캘린더 미확인 및 미래 evidence를 거절한다. Crypto BUY 실행 가격으로 최종 수량을 확정하는 변경도 동일 transaction clock/원자성 규칙을 따른다. [현재 정책 및 검증](order-input-policy.md)을 참조한다.
+
 ## 기준과 작업 위치
 
 - 시작 명령: `git fetch --prune`

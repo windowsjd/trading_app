@@ -66,6 +66,7 @@ import {
   OrderStatus,
   OrderType,
   ParticipantStatus,
+  Prisma,
   RefreshTokenSessionStatus,
   SeasonStatus,
   WalletTransactionDirection,
@@ -640,7 +641,7 @@ async function executeOrderFlow() {
     assetId: scenario.usdAssetId,
     side: OrderSide.buy,
     orderType: OrderType.market,
-    quantity: buyQuantity,
+    amount: new Prisma.Decimal(buyQuantity).mul(usdAssetPrice).toFixed(8),
   };
 
   const quoteResponse = await ordersService.quoteOrder(scenario.userId, orderBody);

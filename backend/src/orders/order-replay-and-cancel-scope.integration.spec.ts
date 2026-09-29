@@ -90,6 +90,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { HttpException } from '@nestjs/common';
 import {
+  Prisma,
   AssetPriceSourceType,
   AssetType,
   CurrencyCode,
@@ -286,7 +287,7 @@ async function marketBuy(scenario, assetId, idempotencyKey, quantity) {
     assetId,
     side: 'buy',
     orderType: 'market',
-    quantity: quantity || '1',
+    amount: new Prisma.Decimal(quantity || '1').mul('100').toFixed(8),
   };
   const quote = await orders.quoteOrderForTradingAccount(
     scenario.userId,
@@ -448,7 +449,7 @@ async function verifyCommittedMarketReplay() {
     orders.createOrderForTradingAccount(
       scenario.userId,
       scenario.accountId,
-      Object.assign({}, retryBody, { quantity: '2' }),
+      Object.assign({}, retryBody, { amount: '200' }),
     ),
     409,
     'ORDER_IDEMPOTENCY_CONFLICT',
@@ -481,7 +482,7 @@ async function verifyGatesStillBlockNewOrders(assetId) {
       assetId,
       side: 'buy',
       orderType: 'market',
-      quantity: '1',
+      amount: '100',
       quoteId: randomUUID(),
       idempotencyKey: 'blocked-' + randomUUID().slice(0, 8),
     }),
@@ -505,7 +506,7 @@ async function verifyGatesStillBlockNewOrders(assetId) {
       assetId,
       side: 'buy',
       orderType: 'market',
-      quantity: '1',
+      amount: '100',
       quoteId: randomUUID(),
       idempotencyKey: 'blocked-' + randomUUID().slice(0, 8),
     }),
@@ -537,7 +538,7 @@ async function createSubmittedLimitBuy(scenario, assetId, label) {
     assetId,
     side: 'buy',
     orderType: 'limit',
-    quantity: '2',
+    amount: '200',
     limitPrice: '100',
   };
   const quote = await orders.quoteOrderForTradingAccount(

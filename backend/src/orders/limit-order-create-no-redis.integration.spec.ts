@@ -106,7 +106,7 @@ async function main() {
       assetId: scenario.assetId,
       side: 'buy',
       orderType: 'limit',
-      quantity: QUANTITY,
+      amount: '200000',
       limitPrice: LIMIT_PRICE,
     });
     const quoteId = quoteResponse.data.quoteId;
@@ -123,7 +123,7 @@ async function main() {
       assetId: scenario.assetId,
       side: 'buy',
       orderType: 'limit',
-      quantity: QUANTITY,
+      amount: '200000',
       limitPrice: LIMIT_PRICE,
       idempotencyKey: PREFIX + '-create',
     });

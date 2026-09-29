@@ -272,7 +272,9 @@ async function orderBody(s: Scenario, limit = false) {
     assetId: s.asset.id,
     side: 'buy',
     orderType: limit ? 'limit' : 'market',
-    quantity: '0.010000',
+    ...(s.asset.assetType === 'crypto'
+      ? { amount: '1' }
+      : { quantity: limit ? '1' : '0.010000' }),
     ...(limit ? { limitPrice: '100.00000000' } : {}),
   };
   const quoted = await orders.quoteOrderForTradingAccount(
@@ -654,6 +656,11 @@ async function fxTests(mode: TradingAccountMode) {
 async function limitOrder(s: Scenario) {
   const body = await orderBody(s, true);
   await orders.createOrderForTradingAccount(s.userId, s.accountId, body);
+  const observedAt = await dbNow();
+  await prisma.assetPriceSnapshot.update({
+    where: { id: s.price.id },
+    data: { effectiveAt: observedAt, capturedAt: observedAt },
+  });
   return prisma.order.findFirstOrThrow({
     where: { tradingAccountId: s.accountId },
   });
@@ -685,6 +692,7 @@ async function historicalPlan(
       isClosed: true,
       sourceProvider: 'binance_spot_klines',
       sourceUpdatedAt: closeTime,
+      updatedAt: closeTime,
     },
   });
   const eligible = await candles.findEligibleClosedCandlesForAsset(
@@ -720,6 +728,17 @@ async function limitTests(mode: TradingAccountMode) {
         else {
           until = new Date((await dbNow()).getTime() + 2000);
           setSession(await dbNow(), until);
+        }
+        if (boundary === 'price') {
+          // This scenario ages the selected snapshot across a lock wait; the
+          // order must already exist before that synthetic evidence time.
+          const aged = await prisma.assetPriceSnapshot.findUniqueOrThrow({
+            where: { id: s.price.id },
+          });
+          await prisma.order.update({
+            where: { id: order.id },
+            data: { submittedAt: new Date(aged.effectiveAt.getTime() - 1) },
+          });
         }
         const before = await financialState(s);
         // Actual matcher selects evidence at cycleNow and waits on the Order.

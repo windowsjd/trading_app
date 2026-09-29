@@ -16,18 +16,18 @@ export function validateOrderQuote(
       '주문 견적이 만료되었습니다. 다시 시도해주세요.',
     );
   }
-  const sameDecimal = (left: string | undefined, right: string | undefined) => {
+  const positiveDecimal = (value: string | undefined) => {
     try {
-      return (
-        !!left &&
-        !!right &&
-        new Decimal(left).isPositive() &&
-        new Decimal(left).isFinite() &&
-        new Decimal(left).eq(right)
-      );
+      const parsed = value ? new Decimal(value) : null;
+      return parsed?.isFinite() && parsed.gt(0) ? parsed : null;
     } catch {
-      return false;
+      return null;
     }
+  };
+  const sameDecimal = (left: string | undefined, right: string | undefined) => {
+    const a = positiveDecimal(left);
+    const b = positiveDecimal(right);
+    return !!a && !!b && a.eq(b);
   };
   if (
     quote.state !== 'available' ||
@@ -35,7 +35,11 @@ export function validateOrderQuote(
     quote.asset?.id !== request.assetId ||
     quote.side !== request.side ||
     quote.orderType !== (request.orderType ?? 'market') ||
-    !sameDecimal(quote.quantity, request.quantity) ||
+    !(request.amount !== undefined
+      ? sameDecimal(quote.amount, request.amount) &&
+        !!positiveDecimal(quote.quantity)
+      : quote.amount == null &&
+        sameDecimal(quote.quantity, request.quantity)) ||
     (request.orderType === 'limit' &&
       !sameDecimal(quote.limitPrice, request.limitPrice))
   ) {
