@@ -170,6 +170,7 @@ test('manual edits, price, reservations, limit changes and side/account changes 
   assert.equal(h.node(slider).props.value, 25);
   assert.deepEqual(selected(h), []);
   h.accountId = 'season';
+  h.routeAccountId = 'season';
   await h.update();
   assert.equal(h.node(qty).props.value, '');
   assert.equal(h.node(slider).props.value, 0);

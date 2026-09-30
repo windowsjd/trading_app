@@ -18,8 +18,15 @@ import { applyTickerMarketState } from '../../features/asset/assetTickerPolicy';
 import { selectDisplayPrice } from '../../features/asset/displayPricePolicy';
 import { mergeAssetCandleSnapshot } from '../../features/asset/liveCandle';
 import { describeCandleError } from '../../features/asset/candleErrors';
-import { getTradingPair } from '../../features/asset/tradingHeader';
-import { formatAssetPrice } from '../../utils/format';
+import {
+  getStockMarketStatus,
+  getTradingPair,
+} from '../../features/asset/tradingHeader';
+import {
+  formatAssetPrice,
+  formatPercent,
+  getUnavailablePriceText,
+} from '../../utils/format';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 import { buildWsUrl } from '../../constants/env';
@@ -36,7 +43,27 @@ export default function AssetChartScreen(props: Props) {
 }
 
 export function AssetChartContent({ route, navigation }: Props) {
-  const { assetId } = route.params;
+  return (
+    <AssetMarketChart
+      assetId={route.params.assetId}
+      onBack={() => navigation.goBack()}
+    />
+  );
+}
+
+type AssetMarketChartProps = {
+  assetId: string;
+  variant?: 'fullscreen' | 'detail';
+  onBack?: () => void;
+  onChangePair?: () => void;
+};
+
+export function AssetMarketChart({
+  assetId,
+  variant = 'fullscreen',
+  onBack,
+  onChangePair,
+}: AssetMarketChartProps) {
   const isFocused = useIsFocused();
   const isAdmin = useAdminDiagnostics();
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
@@ -104,37 +131,86 @@ export function AssetChartContent({ route, navigation }: Props) {
       : null,
     selectedTimeframe.limit,
   );
-  return (
-    <SafeAreaView style={styles.screen} testID="asset-chart-screen">
-      <View style={styles.header}>
-        <ActionPressable
-          testID="asset-chart-back"
-          accessibilityRole="button"
-          accessibilityLabel="차트 뒤로가기"
-          style={styles.back}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backText}>←</Text>
-        </ActionPressable>
+  const detailView = variant === 'detail';
+  const changeRate = formatPercent(displayPrice.changeRate);
+  const chartBody = (
+    <>
+      <View style={[styles.header, detailView && styles.detailHeader]}>
+        {!detailView ? (
+          <ActionPressable
+            testID="asset-chart-back"
+            accessibilityRole="button"
+            accessibilityLabel="차트 뒤로가기"
+            style={styles.back}
+            onPress={onBack}
+          >
+            <Text style={styles.backText}>←</Text>
+          </ActionPressable>
+        ) : null}
         <View style={styles.heading}>
-          <Text style={styles.title}>
-            {asset ? getTradingPair(asset) : '차트'}
+          {detailView && onChangePair ? (
+            <ActionPressable
+              testID="asset-change-pair"
+              style={styles.pairButton}
+              accessibilityRole="button"
+              accessibilityLabel={`종목 변경, ${asset ? getTradingPair(asset) : '종목'}`}
+              onPress={onChangePair}
+            >
+              <Text style={styles.title}>
+                {asset ? getTradingPair(asset) : '종목'} ▾
+              </Text>
+            </ActionPressable>
+          ) : (
+            <Text style={styles.title}>
+              {asset ? getTradingPair(asset) : '차트'}
+            </Text>
+          )}
+          {detailView && asset &&
+          (asset.assetType === 'domestic_stock' ||
+            asset.assetType === 'us_stock') ? (
+            <Text testID="asset-market-status" style={styles.marketBadge}>
+              {getStockMarketStatus(asset.marketStatus)}
+            </Text>
+          ) : null}
+          <Text
+            style={detailView ? styles.detailPrice : styles.price}
+            selectable
+          >
+            {detailView && displayPrice.priceLocal === null && asset
+              ? getUnavailablePriceText(asset)
+              : formatAssetPrice(
+                  displayPrice.priceLocal,
+                  displayPrice.priceCurrency,
+                  displayPrice.displayPriceDecimals,
+                )}
           </Text>
-          <Text style={styles.price}>
-            {formatAssetPrice(
-              displayPrice.priceLocal,
-              displayPrice.priceCurrency,
-              displayPrice.displayPriceDecimals,
-            )}
-          </Text>
+          {detailView ? (
+            <Text
+              testID="asset-change-rate"
+              style={[
+                styles.changeRate,
+                Number(displayPrice.changeRate) > 0
+                  ? styles.up
+                  : Number(displayPrice.changeRate) < 0
+                    ? styles.down
+                    : null,
+              ]}
+            >
+              {changeRate === '-'
+                ? '전일대비 -'
+                : `전일대비 ${Number(displayPrice.changeRate) > 0 ? '+' : ''}${changeRate}%`}
+            </Text>
+          ) : null}
         </View>
       </View>
-      <View style={styles.toolbar}>
-        <ChartTimeframeSelector
-          selectedTimeframe={selectedTimeframe}
-          onSelect={setSelectedTimeframe}
-        />
-      </View>
+      {!detailView ? (
+        <View style={styles.toolbar}>
+          <ChartTimeframeSelector
+            selectedTimeframe={selectedTimeframe}
+            onSelect={setSelectedTimeframe}
+          />
+        </View>
+      ) : null}
       {detailQuery.isError ? (
         <ActionPressable
           style={styles.retry}
@@ -210,11 +286,54 @@ export function AssetChartContent({ route, navigation }: Props) {
           <InlineEmptyState message="표시할 차트 데이터가 없습니다." />
         )}
       </View>
+      {detailView ? (
+        <View style={styles.toolbar}>
+          <ChartTimeframeSelector
+            selectedTimeframe={selectedTimeframe}
+            onSelect={setSelectedTimeframe}
+          />
+        </View>
+      ) : null}
+    </>
+  );
+  return detailView ? (
+    <View style={styles.screen} testID={TEST_IDS.assetDetail.screen}>
+      {chartBody}
+    </View>
+  ) : (
+    <SafeAreaView style={styles.screen} testID="asset-chart-screen">
+      {chartBody}
     </SafeAreaView>
   );
 }
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#fff' },
+  detailHeader: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 14 },
+  detailPrice: {
+    fontSize: 30,
+    fontWeight: '700',
+    color: '#202a35',
+    fontVariant: ['tabular-nums'],
+    flexShrink: 1,
+  },
+  pairButton: {
+    alignSelf: 'flex-start',
+    minHeight: 44,
+    justifyContent: 'center',
+    maxWidth: '100%',
+  },
+  marketBadge: {
+    alignSelf: 'flex-start',
+    fontSize: 11,
+    color: '#697583',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#eef1f4',
+    borderRadius: 5,
+  },
+  changeRate: { fontSize: 13, color: '#697583', flexShrink: 1 },
+  up: { color: '#a13e3b' },
+  down: { color: '#315f9b' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -230,7 +349,7 @@ const styles = StyleSheet.create({
   },
   backText: { fontSize: 26, color: '#202a35' },
   heading: { flex: 1, minWidth: 0, gap: 4 },
-  title: { fontSize: 18, fontWeight: '700', color: '#202a35' },
+  title: { fontSize: 18, fontWeight: '700', color: '#202a35', flexShrink: 1 },
   price: { fontSize: 15, color: '#536170' },
   toolbar: { paddingHorizontal: 12, paddingBottom: 8 },
   chart: { flex: 1, minHeight: 0 },

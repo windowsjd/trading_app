@@ -12,14 +12,14 @@ function setPosition(h: any, quantity: string) {
     currencyCode: 'KRW', valuation: { state: 'unavailable' } }];
 }
 
-describe('asset detail information and trading controls', () => {
+describe('Order screen information and trading controls', () => {
   for (const assetType of ['domestic_stock', 'crypto']) {
     for (const [changeRate, expected] of [
       [null, '-'], [undefined, '-'], ['', '-'], ['NaN', '-'],
       ['1.23000000', '+1.23%'], ['-0.46000000', '-0.46%'], ['0.00000000', '0%'],
     ]) {
       it(`renders ${assetType} REST change rate ${changeRate} as ${expected}`, () => {
-        const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
+        const h = createTradingUiHarness('order/OrderScreen.tsx');
         h.asset.assetType = assetType;
         h.asset.price.changeRate = changeRate;
         const tree = h.render();
@@ -31,7 +31,7 @@ describe('asset detail information and trading controls', () => {
 
   for (const [changeRate, expected] of [[null, '-'], [undefined, '-'], ['-0.46000000', '-0.46%']]) {
     it(`renders ticker change rate ${changeRate} without borrowing the REST return`, () => {
-      const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
+      const h = createTradingUiHarness('order/OrderScreen.tsx');
       h.asset.marketStatus = 'open';
       h.asset.price.changeRate = '1.23000000';
       h.ticker = {
@@ -46,7 +46,7 @@ describe('asset detail information and trading controls', () => {
   }
 
   it('keeps closed status and tradability while hiding duplicate market copy and KRW conversion', () => {
-    const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
+    const h = createTradingUiHarness('order/OrderScreen.tsx');
     const text = textContent(h.render());
     assert.match(text, /장마감/);
     assert.doesNotMatch(text, /거래 상태:|시장 상태:/);
@@ -56,7 +56,7 @@ describe('asset detail information and trading controls', () => {
   });
 
   it('also hides the closed-status fallback with an older payload missing the reason', () => {
-    const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
+    const h = createTradingUiHarness('order/OrderScreen.tsx');
     h.asset.tradable = true;
     h.asset.tradeBlockedReason = null;
     assert.doesNotMatch(textContent(h.render()), /장 상태는 주문 견적에서 최종 확인됩니다\./);
@@ -69,14 +69,14 @@ describe('asset detail information and trading controls', () => {
     ['PROVIDER_UNAVAILABLE', '거래 제한 가능성이 있습니다.'],
   ]) {
     it(`preserves ${reason} warnings while the Korean market is closed`, () => {
-      const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
+      const h = createTradingUiHarness('order/OrderScreen.tsx');
       h.asset.tradeBlockedReason = reason;
       assert.ok(textContent(h.render()).includes(copy));
     });
   }
 
   it('shows a technical stale ticker warning to admin only', () => {
-    const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
+    const h = createTradingUiHarness('order/OrderScreen.tsx');
     h.tickerStale = true;
     assert.doesNotMatch(textContent(h.render()), /실시간 시세 최신성이 낮습니다/);
     h.role = 'admin';
@@ -85,7 +85,7 @@ describe('asset detail information and trading controls', () => {
 
   for (const assetType of ['us_stock', 'crypto']) {
     it(`preserves USD asset conversion and unavailable conversion warnings for ${assetType}`, () => {
-      const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
+      const h = createTradingUiHarness('order/OrderScreen.tsx');
       Object.assign(h.asset, { assetType, priceCurrency: 'USD', settlementCurrency: 'USD',
         marketStatus: 'open', tradable: true, tradeBlockedReason: null });
       h.asset.price.priceCurrency = 'USD';
@@ -101,15 +101,15 @@ describe('asset detail information and trading controls', () => {
   }
 
   it('uses the stock CLOSED market notice for US stock without a duplicate warning', () => {
-    const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
+    const h = createTradingUiHarness('order/OrderScreen.tsx');
     h.asset.assetType = 'us_stock';
     const text = textContent(h.render());
     assert.match(text, /정규장 외에는 시장가 주문을 할 수 없습니다/);
     assert.doesNotMatch(text, /현재 시장이 닫혀 있습니다\./);
   });
 
-  it('switches sides inline without adding Order routes', () => {
-    const h = createTradingUiHarness('asset/AssetDetailScreen.tsx');
+  it('switches sides within Order without adding routes', () => {
+    const h = createTradingUiHarness('order/OrderScreen.tsx');
     const tree = h.render();
     for (const side of ['buy', 'sell']) {
       h.control(tree, TEST_IDS.assetDetail[`${side}Button`]).props.onPress();

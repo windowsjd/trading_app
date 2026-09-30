@@ -68,6 +68,8 @@ export const TEST_IDS = {
   assetDetail: {
     screen: 'asset-detail-screen',
     buyButton: 'asset-detail-buy-button',
+    openBuyOrder: 'asset-detail-open-buy-order',
+    openSellOrder: 'asset-detail-open-sell-order',
     sellButton: 'asset-detail-sell-button',
     reconnectBanner: 'asset-detail-reconnect-banner',
     chartRetry: 'asset-detail-chart-retry',

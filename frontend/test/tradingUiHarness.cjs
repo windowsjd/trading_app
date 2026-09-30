@@ -122,10 +122,14 @@ function createTradingUiHarness(screenName) {
   };
   const order = load(resolve(__dirname, '../src/screens/order/OrderPanel.tsx'), mocks);
   mocks['../order/OrderPanel'] = order;
+  mocks['./OrderPanel'] = order;
   mocks['./PendingOrders'] = { default: 'PendingOrders', __esModule: true };
   mocks['./AccountHoldings'] = load(resolve(__dirname, '../src/screens/asset/AccountHoldings.tsx'), mocks);
-  const module = screenName === 'order/OrderScreen.tsx' ? order : load(resolve(__dirname, '../src/screens', screenName), mocks);
-  const screen = module.AssetTradingScreen ?? module.AssetChartContent ?? module.OrderForm ?? module.default;
+  mocks['../asset/AccountHoldings'] = mocks['./AccountHoldings'];
+  const chartModule = load(resolve(__dirname, '../src/screens/asset/AssetChartScreen.tsx'), mocks);
+  mocks['./AssetChartScreen'] = chartModule;
+  const module = load(resolve(__dirname, '../src/screens', screenName), mocks);
+  const screen = module.OrderTradingScreen ?? module.AssetDetailContent ?? module.AssetChartContent ?? module.OrderForm ?? module.default;
   function expand(node) {
     if (Array.isArray(node)) return node.map(expand);
     if (!React.isValidElement(node)) return node;

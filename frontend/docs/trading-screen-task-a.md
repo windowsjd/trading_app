@@ -1,5 +1,7 @@
 **작업 A — 마켓 종목 상세/거래 화면 개편 결과**
 
+> 현재 화면 흐름은 [종목 상세와 주문 화면](asset-detail-order-flow.md)을 참고한다. 아래 기록의 인라인 거래 화면은 당시 구현이다.
+>
 > 후속 작업 B에서 하단 단일 포지션을 계좌별 보유종목/필터로 교체하고 주식 상태 badge를 pair 옆으로 이동했다. 현재 구현과 검증은 [작업 B 보고](trading-screen-task-b.md)를 참고한다. 아래는 작업 A 당시 기록이다.
 
 2026-09-19. 구현과 검증은 frontend 범위에서 수행했다. Web 화면 검증은 실제 React Native Web 컴포넌트와 React Navigation을 Chromium에서 실행하되, API·시세 입력을 테스트 데이터로 대체했다. 운영 서버 주문이나 실제 Binance/KIS 연결 성공을 의미하지 않는다.

@@ -243,7 +243,7 @@ function inlineTradingHarness() {
                 ? { asset: h.assets[id], priceErrors: h.priceErrors }
                 : {
                     interval: options.queryKey[4],
-                    candles: [
+                    candles: h.candlesByKey?.[`${id}:${options.queryKey[4]}`] ?? [
                       {
                         time: '2026-09-19T00:00:00Z',
                         open: '760',
@@ -374,9 +374,6 @@ function inlineTradingHarness() {
     resolve('src/screens/order/OrderPanel.tsx'),
     mocks,
   );
-  h.OrderScreen = load(resolve('src/screens/order/OrderScreen.tsx'), {
-    ...mocks, './OrderPanel': mocks['../order/OrderPanel'],
-  }).default;
   mocks['../../features/record/api'] = load(resolve('src/features/record/api.ts'), {
     '../../services/api/client': { apiClient: {} },
     './openOrder': require('../src/features/record/openOrder.ts'),
@@ -387,28 +384,29 @@ function inlineTradingHarness() {
     resolve('src/features/asset/AssetOrderLadder.tsx'),
     mocks,
   );
-  h.Detail = load(
-    resolve('src/screens/asset/AssetDetailScreen.tsx'),
-    mocks,
-  ).default;
-  h.Chart = load(
-    resolve('src/screens/asset/AssetChartScreen.tsx'),
-    mocks,
-  ).default;
-  h.Screen = h.Detail;
+  mocks['../asset/AccountHoldings'] = mocks['./AccountHoldings'];
+  mocks['./OrderPanel'] = mocks['../order/OrderPanel'];
+  h.OrderScreen = load(resolve('src/screens/order/OrderScreen.tsx'), mocks).default;
+  const chartModule = load(resolve('src/screens/asset/AssetChartScreen.tsx'), mocks);
+  h.Chart = chartModule.default;
+  mocks['./AssetChartScreen'] = chartModule;
+  h.Detail = load(resolve('src/screens/asset/AssetDetailScreen.tsx'), mocks).default;
+  h.Screen = h.OrderScreen;
   const element = () =>
     React.createElement(
       query.QueryClientProvider,
       { client: h.client },
       React.createElement(h.Screen, {
-        route: { params: { assetId: h.assetId, accountId: h.routeAccountId ?? h.accountId, side: 'buy' } },
+        route: { params: { assetId: h.assetId, accountId: h.routeAccountId ?? h.accountId, side: h.routeSide ?? 'buy' } },
         navigation: nav,
       }),
     );
-  h.mount = async () =>
-    act(async () => {
+  h.mount = async () => {
+    h.routeAccountId ??= h.accountId;
+    return act(async () => {
       h.renderer = create(element());
     });
+  };
   h.update = async () =>
     act(async () => {
       h.renderer.update(element());

@@ -7,12 +7,16 @@ const source = readFileSync(
   path.join(process.cwd(), 'src/screens/asset/AssetDetailScreen.tsx'),
   'utf8',
 );
+const chartSource = readFileSync(
+  path.join(process.cwd(), 'src/screens/asset/AssetChartScreen.tsx'),
+  'utf8',
+);
 
 describe('AssetDetailScreen display contract', () => {
   it('hides market and internal price metadata and shows settlement currency in the pair', () => {
     assert.doesNotMatch(source, /시장\s+\{asset\.market\}/);
     assert.doesNotMatch(source, /가격 통화/);
-    assert.match(source, /getTradingPair\(asset\)/);
+    assert.match(chartSource, /getTradingPair\(asset\)/);
     assert.doesNotMatch(source, /결제 통화|Wallet으로|시장 상태:|거래 상태:/);
 
     assert.doesNotMatch(source, /가격 수집/);
@@ -29,7 +33,7 @@ describe('AssetDetailScreen display contract', () => {
   });
 
   it('localizes only the domestic market badge', () => {
-    assert.match(source, /asset.assetType === 'domestic_stock'/);
-    assert.match(source, /getStockMarketStatus\(asset.marketStatus\)/);
+    assert.match(chartSource, /asset.assetType === 'domestic_stock'/);
+    assert.match(chartSource, /getStockMarketStatus\(asset.marketStatus\)/);
   });
 });

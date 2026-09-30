@@ -43,7 +43,7 @@ const empty = (h: any) =>
     .map((n: any) => n.props.title)
     .join(' ');
 
-describe('holdings in AssetDetail with real React Query and order invalidation', () => {
+describe('holdings in Order with real React Query and order invalidation', () => {
   it('all/current filters, missing asset and zero positions; changing asset resets filter/input/KRW', async (t) => {
     const h = inlineTradingHarness();
     h.assetId = 'btc';
@@ -127,6 +127,7 @@ describe('holdings in AssetDetail with real React Query and order invalidation',
       pending = invalidateAfterOrderCreate(h.client, 'general');
     });
     h.accountId = 'season';
+    h.routeAccountId = 'season';
     await h.update();
     assert.deepEqual(ids(h), []);
     assert.equal(h.renderer.root.findAllByType('SectionSkeleton').length, 1);
@@ -138,6 +139,7 @@ describe('holdings in AssetDetail with real React Query and order invalidation',
     await h.flush();
     assert.deepEqual(ids(h), ['holding-bnb']);
     h.accountId = 'general';
+    h.routeAccountId = 'general';
     await h.update();
     await h.flush();
     assert.deepEqual(ids(h), ['holding-btc', 'holding-eth', 'holding-samsung']);
@@ -379,7 +381,8 @@ describe('pending limit orders in the real trading screen', () => {
     await h.mount(); t.after(h.close); await h.press('holdings-filter-pending'); await h.flush();
     assert.deepEqual(pendingIds(h), ['pending-order-a']);
     h.orderGate = { season: deferred() };
-    h.accountId = 'season'; await h.update();
+    h.accountId = 'season';
+    h.routeAccountId = 'season'; await h.update();
     assert.deepEqual(pendingIds(h), []);
     await h.press('holdings-filter-pending');
     assert.deepEqual(pendingIds(h), []);

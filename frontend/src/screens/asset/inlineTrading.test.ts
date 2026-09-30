@@ -12,7 +12,7 @@ const qty = TEST_IDS.order.quantityInput;
 const submit = TEST_IDS.order.executeSubmit;
 const sell = TEST_IDS.assetDetail.sellButton;
 
-describe('inline order lifecycle with real React and query mutations', () => {
+describe('Order screen lifecycle with real React and query mutations', () => {
   for (const accountId of ['general', 'season'])
     for (const side of ['buy', 'sell'])
       for (const type of ['market', 'limit']) {
@@ -68,7 +68,7 @@ describe('inline order lifecycle with real React and query mutations', () => {
           );
           await act(async () => h.success().onGoAssetDetail());
           assert.equal(h.success().visible, false);
-          assert.deepEqual(h.navigation, []);
+          assert.deepEqual(h.navigation, [['back']]);
         });
       }
   for (const change of ['account', 'asset', 'side']) {
@@ -82,8 +82,12 @@ describe('inline order lifecycle with real React and query mutations', () => {
       assert.equal(h.requests.length, 1);
       if (change === 'side') await h.press(sell);
       else {
-        if (change === 'account') h.accountId = 'season';
-        else h.assetId = 'btc';
+        if (change === 'account') {
+          h.accountId = 'season';
+          h.routeAccountId = 'season';
+        } else {
+          h.assetId = 'btc';
+        }
         await h.update();
       }
       assert.equal(h.node(qty).props.value, '');
@@ -102,8 +106,12 @@ describe('inline order lifecycle with real React and query mutations', () => {
       await h.press(submit);
       if (change === 'side') await h.press(TEST_IDS.assetDetail.buyButton);
       else {
-        if (change === 'account') h.accountId = 'season';
-        else h.assetId = 'btc';
+        if (change === 'account') {
+          h.accountId = 'season';
+          h.routeAccountId = 'season';
+        } else {
+          h.assetId = 'btc';
+        }
         await h.update();
       }
       await act(async () => h.quoteGate.resolve());
@@ -124,6 +132,7 @@ describe('inline order lifecycle with real React and query mutations', () => {
       await h.input(qty, '1');
       await h.press(submit);
       h.accountId = 'season';
+      h.routeAccountId = 'season';
       await h.update();
       await act(async () => h.createGate.resolve());
       await h.flush();
@@ -227,6 +236,7 @@ describe('inline order lifecycle with real React and query mutations', () => {
     await h.press('order-ratio-100');
     assert.equal(h.node(qty).props.value, '4');
     h.accountId = 'season';
+      h.routeAccountId = 'season';
     await h.update();
     await h.press(sell);
     await h.press('order-ratio-100');
@@ -246,8 +256,10 @@ describe('inline order lifecycle with real React and query mutations', () => {
     await h.input(qty, '1');
     await h.press(submit);
     h.accountId = 'season';
+      h.routeAccountId = 'season';
     await h.update();
     h.accountId = 'general';
+    h.routeAccountId = 'general';
     await h.update();
     await act(async () => h.quoteGate.resolve());
     await h.flush();

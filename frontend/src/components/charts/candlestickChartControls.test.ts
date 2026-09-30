@@ -112,21 +112,18 @@ describe('chart height', () => {
     );
   });
 
-  it('measures the fullscreen content area and removes the inline chart', () => {
-    assert.doesNotMatch(detailScreenSource, /CandlestickChart|getAssetCandles|useAssetCandle/);
+  it('measures the chart content and shares it with detail', () => {
+    assert.match(detailScreenSource, /<AssetMarketChart/);
     assert.match(fullScreenSource, /height=\{chartHeight > 0 \? chartHeight : undefined\}/);
     assert.match(fullScreenSource, /onLayout=/);
   });
 });
 
 describe('existing behaviour that must not regress', () => {
-  it('keeps the detail screen on ONE vertical ScrollView', () => {
-    assert.equal(
-      (detailScreenSource.match(/<ScrollView/g) ?? []).length,
-      1,
-      'no nested scroll views were added for the taller chart',
-    );
-    assert.ok(!detailScreenSource.includes('horizontal'), 'no horizontal scroll view');
+  it('keeps the chart and footer visible without nested scrolling', () => {
+    assert.equal((detailScreenSource.match(/<ScrollView/g) ?? []).length, 0);
+    assert.match(detailScreenSource, /<AssetMarketChart/);
+    assert.match(detailScreenSource, /<View style=\{styles.footer\}/);
   });
 
   it('keeps the timeframe selector and its viewport reset key', () => {
