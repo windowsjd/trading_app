@@ -16,8 +16,10 @@ jest.mock('./live-candle-pubsub.service', () => ({
 }));
 import { AssetTickerGateway } from './asset-ticker.gateway';
 import { BinanceRealtimePriceEventBus } from '../providers/binance/binance-realtime-price-event-bus.service';
+import { MarketPriceEventService } from '../providers/market-price-event.service';
 import { KisRealtimePriceEventBus } from '../providers/kis/kis-realtime-price-event-bus.service';
 import type { OrderBookEvent } from '../providers/order-book.types';
+import { MarketOrderBookSubscriptionService } from '../providers/market-order-book-subscription.service';
 
 const target = { assetId: 'btc', symbol: 'BTCUSDT', baseAsset: 'BTC' };
 function snapshot(
@@ -83,8 +85,10 @@ function setup() {
     { get: jest.fn().mockReturnValue('secret') } as never,
     { getAssetPriceForTicker: jest.fn().mockResolvedValue(null) } as never,
     { getMetadata: jest.fn() } as never,
-    new KisRealtimePriceEventBus(),
-    new BinanceRealtimePriceEventBus(),
+    new MarketPriceEventService(
+      new KisRealtimePriceEventBus(),
+      new BinanceRealtimePriceEventBus(),
+    ),
     undefined,
     undefined,
     { websocketBackpressureBytes: 10 } as never,
@@ -95,7 +99,7 @@ function setup() {
         return off;
       },
     } as never,
-    books as never,
+    new MarketOrderBookSubscriptionService(books as never),
   );
   gateway.onModuleInit();
   const internals = gateway as unknown as {

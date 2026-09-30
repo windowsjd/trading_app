@@ -36,6 +36,41 @@ describe('provider realtime transport', () => {
     expect(parseProviderEvent('invalid')).toBeNull();
   });
 
+  it('normalizes existing Redis price messages and drops provider-only fields', () => {
+    expect(
+      parseProviderEvent(
+        JSON.stringify({
+          type: 'kis_realtime_price',
+          assetId: 'us-1',
+          snapshotState: null,
+          price: {
+            kind: 'us_delayed_trade',
+            trId: 'HDFSCNT0',
+            providerSymbol: 'NAS:AAPL',
+            rawPayload: { secret: 'never-forward' },
+            price: '100.00000000',
+            currencyCode: 'USD',
+            sourceName: 'kis_us_delayed_trade',
+            effectiveAt: '2026-09-30T01:00:00.000Z',
+            capturedAt: '2026-09-30T01:00:01.000Z',
+          },
+        }),
+      ),
+    ).toEqual({
+      type: 'market_price',
+      assetId: 'us-1',
+      snapshotState: null,
+      delayed: true,
+      price: {
+        price: '100.00000000',
+        currencyCode: 'USD',
+        sourceName: 'kis_us_delayed_trade',
+        effectiveAt: '2026-09-30T01:00:00.000Z',
+        capturedAt: '2026-09-30T01:00:01.000Z',
+      },
+    });
+  });
+
   it('resyncs after Redis recovery even with live candles disabled and shares the price channel', async () => {
     const client = Object.assign(new EventEmitter(), {
       subscribe: jest.fn().mockResolvedValue(1),

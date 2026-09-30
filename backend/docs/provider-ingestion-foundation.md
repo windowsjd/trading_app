@@ -12,6 +12,16 @@ This foundation supports market data provider configuration, secret redaction, r
 
 This project remains a virtual trading app. External provider APIs are used only for market data evidence. Real orders, account linkage, balances, deposits, withdrawals, fills, and trading endpoints are not implemented.
 
+## Application market-data boundary
+
+Provider transports, authentication, raw symbols, and payload parsing remain in `src/providers/`. The app WebSocket gateway now subscribes to `MarketPriceEventService`, which normalizes existing KIS/Binance local price events into an asset ID, price, currency, source name, timestamps, delay status, snapshot status, and optional top of book. Missing bid/ask data stays absent. `ProviderPricePubSubService` accepts the existing Redis price messages and normalizes them at receive time; the Redis wire format is unchanged for current publishers. Provider stream names, TR IDs, raw payloads, and credentials do not enter the app ticker event.
+
+`MarketOrderBookSubscriptionService` resolves the current Binance order-book universe and expected units/label before gateway fan-out. The gateway handles only mapped asset IDs and normalized `AssetOrderBook` levels. This does not make KIS hoga snapshots an execution-price source. The current Binance depth feed and KIS REST hoga snapshot flow remain distinct capabilities; a provider without depth must not be given a synthetic book.
+
+Price snapshots, stored candles, and live candle events already have internal normalized forms. In particular, managed candle serving reads stored candles, while provider-specific fetch/normalization runs in the KIS/Binance candle ingestion adapters. The legacy direct candle fallback in `AssetCandlesService` still contains KIS/Binance request and response handling, including provider-specific public `source` metadata. Replacing that fallback or its public metadata needs separate compatibility work; this change does not claim it is provider independent.
+
+`sourceType`, `sourceName`, `effectiveAt`, `capturedAt`, asset mapping, currency, freshness, and source priority retain their current meanings. `market-daily-candle-source.ts` keeps the current stored daily-candle source names used for display change rate at the provider boundary. `source-eligibility.policy.ts` remains the explicit financial-use gate for each source name; onboarding another stock provider requires a deliberate policy review there. The normalized realtime and order-book boundaries do not alter quote/create/execute prices, valuation, market sessions, or settlement. Provider-specific data availability is represented by the presence of a price event, top-of-book data, stored candle, or order-book depth, not by fabricated values.
+
 ## Implemented Providers
 
 ### Korea EXIM Exchange
@@ -46,7 +56,6 @@ This project remains a virtual trading app. External provider APIs are used only
 - Inserts `asset_price_snapshots` rows with `sourceType=provider_api` and `currencyCode=USD` only when an existing active `BINANCE` crypto asset mapping is unambiguous.
 - Does not create fake assets.
 - MVP treats Binance USDT quote pairs as USD-equivalent for internal USD snapshot storage. USDT depeg risk is not modeled in this MVP foundation.
-- WebSocket ingestion is not implemented.
 
 ### KIS
 

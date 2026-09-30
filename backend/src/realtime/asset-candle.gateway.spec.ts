@@ -13,6 +13,7 @@ jest.mock('../assets/assets.service', () => ({
 }));
 
 import { BinanceRealtimePriceEventBus } from '../providers/binance/binance-realtime-price-event-bus.service';
+import { MarketPriceEventService } from '../providers/market-price-event.service';
 import { KisRealtimePriceEventBus } from '../providers/kis/kis-realtime-price-event-bus.service';
 import type { AssetCandleSnapshotEvent } from '../assets/live-candle.types';
 import { AssetTickerGateway } from './asset-ticker.gateway';
@@ -36,8 +37,10 @@ describe('AssetTickerGateway asset_candle channel', () => {
       config as never,
       { getAssetPriceForTicker: jest.fn() } as never,
       { getMetadata: jest.fn().mockResolvedValue(null) } as never,
-      new KisRealtimePriceEventBus(),
-      new BinanceRealtimePriceEventBus(),
+      new MarketPriceEventService(
+        new KisRealtimePriceEventBus(),
+        new BinanceRealtimePriceEventBus(),
+      ),
       undefined,
       overlay as never,
       {

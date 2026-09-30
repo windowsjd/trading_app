@@ -34,13 +34,9 @@ import {
 } from './realtime-asset-metadata-cache.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
-  BinanceRealtimePriceEvent,
-  BinanceRealtimePriceEventBus,
-} from '../providers/binance/binance-realtime-price-event-bus.service';
-import {
-  KisRealtimePriceEvent,
-  KisRealtimePriceEventBus,
-} from '../providers/kis/kis-realtime-price-event-bus.service';
+  MarketPriceEventService,
+  type MarketPriceEvent,
+} from '../providers/market-price-event.service';
 import {
   LIVE_CANDLE_CONFIG,
   type LiveCandleConfig,
@@ -55,23 +51,21 @@ import {
   LiveCandlePubSubService,
   type LiveCandlePubSubStatus,
 } from './live-candle-pubsub.service';
-import {
-  ProviderPricePubSubService,
-  type ProviderRealtimePriceEvent,
-} from './provider-price-pubsub.service';
+import { ProviderPricePubSubService } from './provider-price-pubsub.service';
 import type {
   TickerFanoutMetrics,
   TickerFanoutMetricsSource,
 } from './ticker-fanout-metrics';
 import { OrderBookPubSubService } from '../providers/order-book-pubsub.service';
 import {
-  BinanceOrderBookService,
-  type BinanceOrderBookTarget,
-} from '../providers/binance/binance-order-book.service';
+  MarketOrderBookSubscriptionService,
+  matchesMarketOrderBookTarget,
+  type MarketOrderBookTarget,
+} from '../providers/market-order-book-subscription.service';
 import type { OrderBookEvent } from '../providers/order-book.types';
 
 type OrderBookSubscription = {
-  target: BinanceOrderBookTarget | null;
+  target: MarketOrderBookTarget | null;
   sequence: string | null;
 };
 
@@ -108,10 +102,7 @@ type SubscriptionMessage = {
   pair?: unknown;
 };
 
-type RealtimePriceEvent =
-  | KisRealtimePriceEvent
-  | BinanceRealtimePriceEvent
-  | ProviderRealtimePriceEvent;
+type RealtimePriceEvent = MarketPriceEvent;
 
 const TICKER_POLL_INTERVAL_MS = 3000;
 const CANDLE_BACKPRESSURE_FLUSH_MS = 100;
@@ -150,8 +141,7 @@ export class AssetTickerGateway
   private readonly logger = new Logger(AssetTickerGateway.name);
   private pollInFlight = false;
   private destroyed = false;
-  private unsubscribeKisRealtimePrices: (() => void) | null = null;
-  private unsubscribeBinanceRealtimePrices: (() => void) | null = null;
+  private unsubscribeMarketPrices: (() => void) | null = null;
   private unsubscribeLiveCandles: (() => void) | null = null;
   private unsubscribeLiveCandleStatus: (() => void) | null = null;
   private unsubscribeProviderPrices: (() => void) | null = null;
@@ -170,8 +160,7 @@ export class AssetTickerGateway
     private readonly assetsService: AssetsService,
     // Static asset identity for realtime events; NEVER a per-event DB read.
     private readonly realtimeAssetMetadata: RealtimeAssetMetadataCacheService,
-    private readonly kisRealtimePriceEventBus: KisRealtimePriceEventBus,
-    private readonly binanceRealtimePriceEventBus: BinanceRealtimePriceEventBus,
+    private readonly marketPriceEvents: MarketPriceEventService,
     @Optional() private readonly liveCandlePubSub?: LiveCandlePubSubService,
     @Optional() private readonly liveCandleOverlay?: LiveCandleOverlayService,
     @Optional()
@@ -180,20 +169,17 @@ export class AssetTickerGateway
     @Optional()
     private readonly providerPricePubSub?: ProviderPricePubSubService,
     @Optional() private readonly orderBookPubSub?: OrderBookPubSubService,
-    @Optional() private readonly orderBooks?: BinanceOrderBookService,
+    @Optional()
+    private readonly orderBooks?: MarketOrderBookSubscriptionService,
   ) {}
 
   onModuleInit() {
     this.pollTimer = setInterval(() => {
       void this.runTickerPoll();
     }, TICKER_POLL_INTERVAL_MS);
-    this.unsubscribeKisRealtimePrices = this.kisRealtimePriceEventBus.subscribe(
-      (event) => this.pushRealtimePriceEvent(event),
+    this.unsubscribeMarketPrices = this.marketPriceEvents.subscribe((event) =>
+      this.pushRealtimePriceEvent(event),
     );
-    this.unsubscribeBinanceRealtimePrices =
-      this.binanceRealtimePriceEventBus.subscribe((event) =>
-        this.pushRealtimePriceEvent(event),
-      );
     this.unsubscribeLiveCandles =
       this.liveCandlePubSub?.subscribe((event) =>
         this.pushLiveCandleEvent(event),
@@ -225,10 +211,8 @@ export class AssetTickerGateway
       clearInterval(this.pollTimer);
       this.pollTimer = null;
     }
-    this.unsubscribeKisRealtimePrices?.();
-    this.unsubscribeKisRealtimePrices = null;
-    this.unsubscribeBinanceRealtimePrices?.();
-    this.unsubscribeBinanceRealtimePrices = null;
+    this.unsubscribeMarketPrices?.();
+    this.unsubscribeMarketPrices = null;
     this.unsubscribeLiveCandles?.();
     this.unsubscribeLiveCandles = null;
     this.unsubscribeLiveCandleStatus?.();
@@ -415,11 +399,8 @@ export class AssetTickerGateway
       this.clients.get(client) === state &&
       state.orderBookSubscriptions.get(assetId) === subscription;
     try {
-      const targets = await this.orderBooks?.loadTargets();
+      const target = await this.orderBooks?.loadTarget(assetId);
       if (!stillSubscribed()) return;
-      const target =
-        targets &&
-        [...targets.values()].find((entry) => entry.assetId === assetId);
       if (!target || !this.orderBookPubSub) {
         state.orderBookSubscriptions.delete(assetId);
         error('UNSUPPORTED_ASSET');
@@ -447,11 +428,7 @@ export class AssetTickerGateway
       const subscription = state.orderBookSubscriptions.get(event.book.assetId);
       if (!subscription?.target) continue;
       // An incorrectly mapped internal event must not cross asset boundaries.
-      if (
-        event.book.priceUnit !== 'USDT' ||
-        event.book.quantityUnit !== subscription.target.baseAsset ||
-        event.book.marketLabel !== `${subscription.target.baseAsset} / USDT`
-      )
+      if (!matchesMarketOrderBookTarget(event.book, subscription.target))
         continue;
       if (
         subscription.sequence !== null &&
@@ -1079,9 +1056,7 @@ export class AssetTickerGateway
       if (selection.state !== 'selected') return null;
     }
 
-    const delayed =
-      event.type === 'kis_realtime_price' &&
-      event.price.sourceName === 'kis_us_delayed_trade';
+    const delayed = event.delayed;
     // A stored snapshot's `priceKrw` would belong to an OLDER local price, so
     // KRW is computed for THIS price from the currently eligible USD/KRW
     // selection (short-TTL cached) and reported unavailable when there is none.

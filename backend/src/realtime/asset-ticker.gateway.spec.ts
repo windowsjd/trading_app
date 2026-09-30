@@ -23,6 +23,7 @@ jest.mock('./live-candle-pubsub.service', () => ({
 
 import { CurrencyCode } from '../generated/prisma/client';
 import { BinanceRealtimePriceEventBus } from '../providers/binance/binance-realtime-price-event-bus.service';
+import { MarketPriceEventService, normalizeMarketPriceEvent } from '../providers/market-price-event.service';
 import { KisRealtimePriceEventBus } from '../providers/kis/kis-realtime-price-event-bus.service';
 import { AssetTickerGateway } from './asset-ticker.gateway';
 
@@ -84,8 +85,7 @@ describe('AssetTickerGateway', () => {
       configService as never,
       assetsService as never,
       realtimeAssetMetadata as never,
-      eventBus,
-      binanceEventBus,
+      new MarketPriceEventService(eventBus, binanceEventBus),
     );
 
     return {
@@ -117,7 +117,7 @@ describe('AssetTickerGateway', () => {
           event: unknown,
         ): Promise<Record<string, unknown>>;
       }
-    ).buildRealtimeTickerMessageFromEvent(event);
+    ).buildRealtimeTickerMessageFromEvent(normalizeMarketPriceEvent(event));
 
   it('formats WS ticker from the REST asset price selection policy', async () => {
     const { assetsService, gateway, prisma } = createGateway({
@@ -666,7 +666,7 @@ describe('AssetTickerGateway', () => {
       gateway as unknown as {
         pushRealtimePriceEvent(event: unknown): Promise<void>;
       }
-    ).pushRealtimePriceEvent(event);
+    ).pushRealtimePriceEvent(normalizeMarketPriceEvent(event));
 
   const flushPendingTickers = (gateway: AssetTickerGateway) =>
     (

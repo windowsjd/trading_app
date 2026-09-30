@@ -9,8 +9,10 @@ import {
   LIVE_CANDLE_CONFIG,
   type LiveCandleConfig,
 } from '../assets/live-candle.config';
-import type { BinanceRealtimePriceEvent } from '../providers/binance/binance-realtime-price-event-bus.service';
-import type { KisRealtimePriceEvent } from '../providers/kis/kis-realtime-price-event-bus.service';
+import {
+  normalizeMarketPriceEvent,
+  type MarketPriceEvent,
+} from '../providers/market-price-event.service';
 import { readRedisConfig } from '../redis/redis.config';
 import { RedisService } from '../redis/redis.service';
 import {
@@ -21,9 +23,7 @@ import {
 
 export { PROVIDER_PRICE_PUBSUB_CHANNEL } from '../providers/fx-rate-update-event';
 
-export type ProviderRealtimePriceEvent =
-  | BinanceRealtimePriceEvent
-  | KisRealtimePriceEvent;
+export type ProviderRealtimePriceEvent = MarketPriceEvent;
 
 type Listener = (event: ProviderRealtimePriceEvent | FxRateUpdateEvent) => void;
 
@@ -99,7 +99,7 @@ export class ProviderPricePubSubService
     return () => this.listeners.delete(listener);
   }
 
-  async publish(event: ProviderRealtimePriceEvent): Promise<boolean> {
+  async publish(event: unknown): Promise<boolean> {
     try {
       await this.redis.publish(
         PROVIDER_PRICE_PUBSUB_CHANNEL,
@@ -121,20 +121,7 @@ export function parseProviderEvent(
       return control.pair === 'USD/KRW' ? FX_RATE_UPDATE_EVENT : null;
     }
     if (!control) return null;
-    const event = control as Partial<ProviderRealtimePriceEvent>;
-    if (
-      (event.type !== 'binance_realtime_price' &&
-        event.type !== 'kis_realtime_price') ||
-      typeof event.assetId !== 'string' ||
-      !event.price ||
-      typeof event.price.price !== 'string' ||
-      typeof event.price.sourceName !== 'string' ||
-      typeof event.price.effectiveAt !== 'string' ||
-      typeof event.price.capturedAt !== 'string'
-    ) {
-      return null;
-    }
-    return event as ProviderRealtimePriceEvent;
+    return normalizeMarketPriceEvent(control);
   } catch {
     return null;
   }

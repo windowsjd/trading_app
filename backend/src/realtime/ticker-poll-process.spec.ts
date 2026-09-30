@@ -35,7 +35,7 @@ const assets = { getAssetPriceForTicker: async () => {
   });
   throw new Error('synthetic snapshot failure');
 } };
-const gateway = new AssetTickerGateway({}, {}, {}, assets, {}, events, events);
+const gateway = new AssetTickerGateway({}, {}, {}, assets, {}, events);
 gateway.clients.set({ readyState: 1, bufferedAmount: 0, send() {} }, {
   subscriptions: new Map([['asset-A', null]]), pendingTickers: new Map(),
   candleSubscriptions: new Map(), pendingCandles: new Map(),

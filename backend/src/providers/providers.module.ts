@@ -41,6 +41,8 @@ import { KisPeriodCandleNormalizerService } from './kis/candles/kis-period-candl
 import { BinanceCandleIngestionService } from './binance/binance-candle.ingestion.service';
 import { BinanceOrderBookService } from './binance/binance-order-book.service';
 import { OrderBookPubSubService } from './order-book-pubsub.service';
+import { MarketPriceEventService } from './market-price-event.service';
+import { MarketOrderBookSubscriptionService } from './market-order-book-subscription.service';
 
 @Module({
   imports: [PrismaModule, RedisModule],
@@ -96,6 +98,8 @@ import { OrderBookPubSubService } from './order-book-pubsub.service';
     KisRestHogaIngestionService,
     KisRealtimePriceCacheService,
     KisRealtimePriceEventBus,
+    MarketPriceEventService,
+    MarketOrderBookSubscriptionService,
     KisWebSocketIngestionService,
     KisWebSocketClient,
     KisWebSocketStreamingService,
@@ -130,6 +134,8 @@ import { OrderBookPubSubService } from './order-book-pubsub.service';
     KisRestHogaIngestionService,
     KisRealtimePriceCacheService,
     KisRealtimePriceEventBus,
+    MarketPriceEventService,
+    MarketOrderBookSubscriptionService,
     KisWebSocketIngestionService,
     KisWebSocketClient,
     KisWebSocketStreamingService,

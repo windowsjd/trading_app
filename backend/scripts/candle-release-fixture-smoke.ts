@@ -72,6 +72,7 @@ import { LiveCandlePubSubService } from '../src/realtime/live-candle-pubsub.serv
 import { AssetTickerGateway } from '../src/realtime/asset-ticker.gateway';
 import { KisRealtimePriceEventBus } from '../src/providers/kis/kis-realtime-price-event-bus.service';
 import { BinanceRealtimePriceEventBus } from '../src/providers/binance/binance-realtime-price-event-bus.service';
+import { MarketPriceEventService } from '../src/providers/market-price-event.service';
 import { resolveMarketSession } from '../src/orders/market-calendar.policy';
 
 if (process.env.CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE !== '1') {
@@ -1016,8 +1017,10 @@ async function main() {
           { get: () => `fixture-${namespace}` } as never,
           { getAssetPriceForTicker: () => Promise.resolve(null) } as never,
           { getMetadata: () => Promise.resolve(null) } as never,
-          new KisRealtimePriceEventBus(),
-          new BinanceRealtimePriceEventBus(),
+          new MarketPriceEventService(
+            new KisRealtimePriceEventBus(),
+            new BinanceRealtimePriceEventBus(),
+          ),
           pubsub,
           overlay,
           liveConfig,

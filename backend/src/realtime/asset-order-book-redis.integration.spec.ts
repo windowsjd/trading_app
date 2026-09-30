@@ -26,7 +26,9 @@ import {
   ORDER_BOOK_CHANNEL,
 } from '../providers/order-book-pubsub.service';
 import { BinanceOrderBookService } from '../providers/binance/binance-order-book.service';
+import { MarketOrderBookSubscriptionService } from '../providers/market-order-book-subscription.service';
 import { BinanceRealtimePriceEventBus } from '../providers/binance/binance-realtime-price-event-bus.service';
+import { MarketPriceEventService } from '../providers/market-price-event.service';
 import { KisRealtimePriceEventBus } from '../providers/kis/kis-realtime-price-event-bus.service';
 import { AssetTickerGateway } from './asset-ticker.gateway';
 
@@ -60,14 +62,16 @@ describe('depth -> real Redis -> separate gateway -> /api/v1/ws', () => {
         { get: () => 'smoke-secret' } as never,
         {} as never,
         {} as never,
-        new KisRealtimePriceEventBus(),
-        new BinanceRealtimePriceEventBus(),
+        new MarketPriceEventService(
+          new KisRealtimePriceEventBus(),
+          new BinanceRealtimePriceEventBus(),
+        ),
         undefined,
         undefined,
         undefined,
         undefined,
         subscriber,
-        books,
+        new MarketOrderBookSubscriptionService(books),
       );
       const server = new WebSocketServer({
         host: '127.0.0.1',
