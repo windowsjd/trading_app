@@ -1,5 +1,5 @@
+import { semantic } from '../../theme/tokens';
 import React, { useMemo, useState } from 'react';
-import { BUY_COLOR, SELL_COLOR, BUY_BACKGROUND, SELL_BACKGROUND } from '../order/sideColors';
 import {
   ScrollView,
   StyleSheet,
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', minHeight: 23 },
   column: {
     fontSize: 10,
-    color: '#7c8793',
+    color: semantic.muted,
     textAlign: 'right',
     paddingVertical: 6,
     paddingHorizontal: 4,
@@ -158,16 +158,16 @@ const styles = StyleSheet.create({
   number: {
     fontSize: 11,
     fontVariant: ['tabular-nums'],
-    color: '#536170',
+    color: semantic.secondary,
     textAlign: 'right',
     paddingHorizontal: 4,
     paddingVertical: 3,
     flexShrink: 0,
   },
-  ask: { color: SELL_COLOR },
-  bid: { color: BUY_COLOR },
-  askRow: { backgroundColor: SELL_BACKGROUND },
-  bidRow: { backgroundColor: BUY_BACKGROUND },
-  status: { fontSize: 11, color: '#8b641e' },
-  hint: { fontSize: 10, color: '#7c8793' },
+  ask: { color: semantic.sell },
+  bid: { color: semantic.buy },
+  askRow: { backgroundColor: semantic.sellSurface },
+  bidRow: { backgroundColor: semantic.buySurface },
+  status: { fontSize: 11, color: semantic.warning },
+  hint: { fontSize: 10, color: semantic.muted },
 });

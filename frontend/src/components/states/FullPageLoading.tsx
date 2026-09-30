@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React from 'react';
 import { SafeAreaView, View, Text, ActivityIndicator, StyleSheet } from '../../theme/native';
 
@@ -19,7 +20,7 @@ export default function FullPageLoading({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: semantic.screen },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -29,6 +30,6 @@ const styles = StyleSheet.create({
   message: {
     marginTop: 12,
     fontSize: 14,
-    color: '#444',
+    color: semantic.secondary,
   },
 });

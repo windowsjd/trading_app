@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useMemo, useState } from 'react';
 import {
   View,
@@ -162,7 +163,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           value={email}
           onChangeText={setEmail}
           placeholder="이메일"
-          placeholderTextColor="#546e7a"
+          placeholderTextColor={semantic.placeholder}
           keyboardType="email-address"
           autoCapitalize="none"
           style={styles.input}
@@ -173,7 +174,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           value={nickname}
           onChangeText={setNickname}
           placeholder="닉네임"
-          placeholderTextColor="#546e7a"
+          placeholderTextColor={semantic.placeholder}
           style={styles.input}
         />
 
@@ -182,7 +183,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           value={password}
           onChangeText={setPassword}
           placeholder="비밀번호"
-          placeholderTextColor="#546e7a"
+          placeholderTextColor={semantic.placeholder}
           secureTextEntry
           style={styles.input}
         />
@@ -192,7 +193,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           placeholder="비밀번호 확인"
-          placeholderTextColor="#546e7a"
+          placeholderTextColor={semantic.placeholder}
           secureTextEntry
           style={styles.input}
         />
@@ -231,7 +232,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: semantic.screen },
   content: {
     flex: 1,
     padding: 24,
@@ -246,40 +247,40 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: semantic.border,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 14,
     fontSize: 16,
-    backgroundColor: '#fff',
-    color: '#111',
+    backgroundColor: semantic.screen,
+    color: semantic.text,
   },
   primaryButton: {
-    backgroundColor: '#111',
+    backgroundColor: semantic.selected,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 8,
   },
   primaryButtonText: {
-    color: '#fff',
+    color: semantic.onAccent,
     fontSize: 16,
     fontWeight: '700',
   },
   secondaryButton: {
     borderWidth: 1,
-    borderColor: '#111',
+    borderColor: semantic.selected,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
   },
   secondaryButtonText: {
-    color: '#111',
+    color: semantic.text,
     fontSize: 16,
     fontWeight: '700',
   },
   errorText: {
-    color: '#c62828',
+    color: semantic.negative,
     lineHeight: 20,
   },
 });

@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useMemo, useState } from 'react';
 import {
   View,
@@ -386,24 +387,24 @@ export default function SeasonJoinScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: semantic.screen },
   content: { flex: 1, padding: 20, gap: 12 },
   card: {
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: semantic.border,
     borderRadius: 12,
     padding: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: semantic.surface,
     gap: 8,
   },
   title: { fontSize: 24, fontWeight: '700' },
-  helper: { fontSize: 14, lineHeight: 22, color: '#444' },
+  helper: { fontSize: 14, lineHeight: 22, color: semantic.secondary },
   secondaryButton: {
     borderWidth: 1,
-    borderColor: '#111',
+    borderColor: semantic.selected,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
   },
-  secondaryButtonText: { color: '#111', fontSize: 16, fontWeight: '700' },
+  secondaryButtonText: { color: semantic.text, fontSize: 16, fontWeight: '700' },
 });

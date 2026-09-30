@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useCallback, useState } from 'react';
 import {
   Alert,
@@ -264,16 +265,16 @@ function FriendButton({
   );
 }
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#fff' },
+  screen: { flex: 1, backgroundColor: semantic.screen },
   content: { padding: 16, gap: 12, paddingBottom: 32 },
   header: { gap: 12 },
   card: {
     padding: 16,
     gap: 12,
     borderWidth: 1,
-    borderColor: '#e8e8e8',
+    borderColor: semantic.border,
     borderRadius: 14,
-    backgroundColor: '#fafafa',
+    backgroundColor: semantic.surface,
   },
   actions: {
     flexDirection: 'row',
@@ -284,18 +285,18 @@ const styles = StyleSheet.create({
   button: {
     padding: 12,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: semantic.border,
     borderRadius: 12,
-    backgroundColor: '#fff',
+    backgroundColor: semantic.surface,
     flexShrink: 1,
   },
-  selected: { backgroundColor: '#e6eefb', borderColor: '#5076ad' },
+  selected: { backgroundColor: semantic.infoSurface, borderColor: semantic.info },
   buttonText: { fontSize: 15, flexShrink: 1 },
   nickname: { fontSize: 18, fontWeight: '700', flex: 1, minWidth: 0 },
-  helper: { fontSize: 14, color: '#555', flexShrink: 1 },
+  helper: { fontSize: 14, color: semantic.secondary, flexShrink: 1 },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: semantic.border,
     padding: 14,
     borderRadius: 12,
     fontSize: 16,

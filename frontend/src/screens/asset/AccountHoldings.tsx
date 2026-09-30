@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from '../../theme/native';
 import { useQuery } from '@tanstack/react-query';
@@ -182,12 +183,12 @@ function HoldingRow({ position }: { position: PositionItemDto }) {
 const styles = StyleSheet.create({
   section: {
     borderTopWidth: 1,
-    borderColor: '#edf0f3',
+    borderColor: semantic.border,
     paddingTop: 16,
     marginTop: 8,
     gap: 12,
   },
-  title: { fontSize: 18, fontWeight: '700', color: '#202a35' },
+  title: { fontSize: 18, fontWeight: '700', color: semantic.text },
   header: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -201,22 +202,22 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 999,
-    backgroundColor: '#f2f5f7',
+    backgroundColor: semantic.raised,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  selectedFilter: { backgroundColor: '#202a35' },
-  filterText: { fontSize: 12, color: '#536170', textAlign: 'center' },
-  selectedText: { color: '#fff', fontWeight: '600' },
+  selectedFilter: { backgroundColor: semantic.selected },
+  filterText: { fontSize: 12, color: semantic.secondary, textAlign: 'center' },
+  selectedText: { color: semantic.onAccent, fontWeight: '600' },
   row: {
     borderWidth: 1,
-    borderColor: '#edf0f3',
+    borderColor: semantic.border,
     borderRadius: 12,
     padding: 14,
     gap: 12,
     minWidth: 0,
   },
-  pair: { fontSize: 17, fontWeight: '700', color: '#202a35' },
+  pair: { fontSize: 17, fontWeight: '700', color: semantic.text },
   // A long value moves below its label. It can then wrap across the full row;
   // neither native font scaling nor large KRW values require truncation.
   metric: {
@@ -226,22 +227,22 @@ const styles = StyleSheet.create({
     columnGap: 12,
     rowGap: 4,
   },
-  label: { fontSize: 13, color: '#697583' },
+  label: { fontSize: 13, color: semantic.muted },
   value: {
     fontSize: 14,
-    color: '#536170',
+    color: semantic.secondary,
     fontVariant: ['tabular-nums'],
     flexShrink: 1,
     maxWidth: '100%',
   },
-  up: { color: '#a13e3b' },
-  down: { color: '#315f9b' },
-  notice: { fontSize: 12, color: '#725400' },
+  up: { color: semantic.rise },
+  down: { color: semantic.fall },
+  notice: { fontSize: 12, color: semantic.warning },
   retry: {
     alignSelf: 'flex-start',
     padding: 10,
     borderWidth: 1,
-    borderColor: '#dfe4e9',
+    borderColor: semantic.border,
     borderRadius: 8,
   },
 });

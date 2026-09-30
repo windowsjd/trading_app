@@ -214,3 +214,25 @@ test('changing assets restores USD as the default display choice', async (t) => 
   assert.equal(h.node('asset-currency-usd').props.accessibilityState.selected, true);
   assert.match(h.node('asset-detail-primary-price').props.children, /^\$/);
 });
+
+test('settlement badge shows USD for Binance and stays separate from the display toggle', async (t) => {
+  const h = inlineTradingHarness();
+  await openDetail(h); t.after(h.close);
+  assert.equal(h.node('asset-settlement-currency').children.join(''), 'USD');
+  assert.doesNotMatch(JSON.stringify(h.node('asset-settlement-currency').children), /USDT/);
+  assert.ok(text(h).indexOf('asset-detail-name') < text(h).indexOf('asset-settlement-currency'));
+  await h.press('asset-currency-krw');
+  assert.equal(h.node('asset-settlement-currency').children.join(''), 'USD');
+});
+
+test('domestic asset shows KRW and a long name wraps beside the badge', async (t) => {
+  const h = inlineTradingHarness();
+  h.assetId = 'samsung';
+  h.assets.samsung.name = '아주 긴 이름을 가진 국내 상장 종목 삼성전자 보통주';
+  await openDetail(h); t.after(h.close);
+  assert.equal(h.node('asset-settlement-currency').children.join(''), 'KRW');
+  assert.equal(h.node('asset-detail-name').children.join(''), h.assets.samsung.name);
+  const row = h.node('asset-detail-name').parent;
+  assert.equal(row.props.style.flexWrap, 'wrap');
+  assert.equal(row.props.style.flexDirection, 'row');
+});

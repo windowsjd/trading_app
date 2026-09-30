@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from '../../theme/native';
@@ -146,9 +147,14 @@ export function AssetMarketChart({
     <>
       {detailView ? (
         <View style={styles.detailHeader}>
-          <Text testID="asset-detail-name" style={styles.assetName}>
-            {asset ? getAssetNameDisplay(asset).primary : '종목'}
-          </Text>
+          <View style={styles.assetNameRow}>
+            <Text testID="asset-detail-name" style={styles.assetName}>
+              {asset ? getAssetNameDisplay(asset).primary : '종목'}
+            </Text>
+            {asset ? <Text testID="asset-settlement-currency" style={styles.settlementBadge}>
+              {asset.settlementCurrency}
+            </Text> : null}
+          </View>
           <ActionPressable
             testID="asset-change-pair"
             style={styles.symbolButton}
@@ -325,44 +331,46 @@ export function AssetMarketChart({
   );
 }
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#fff' },
+  screen: { flex: 1, backgroundColor: semantic.screen },
   detailContent: { flexGrow: 1 },
   detailHeader: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, gap: 6 },
-  assetName: { fontSize: 28, fontWeight: '800', color: '#202a35', flexShrink: 1 },
+  assetNameRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8, rowGap: 4 },
+  settlementBadge: { fontSize: 11, fontWeight: '700', color: semantic.secondary, backgroundColor: semantic.raised, overflow: 'hidden', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 4 },
+  assetName: { minWidth: 0, fontSize: 28, fontWeight: '800', color: semantic.text, flexShrink: 1 },
   symbolButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center',
-    backgroundColor: '#eef1f4', borderRadius: 8, paddingHorizontal: 10 },
-  symbolText: { fontSize: 13, fontWeight: '600', color: '#536170' },
+    backgroundColor: semantic.raised, borderRadius: 8, paddingHorizontal: 10 },
+  symbolText: { fontSize: 13, fontWeight: '600', color: semantic.secondary },
   detailPriceRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center',
     gap: 10, paddingTop: 8 },
   detailPriceStack: { flex: 1, minWidth: 0, gap: 2 },
-  secondaryPrice: { fontSize: 14, color: '#697583', flexShrink: 1 },
+  secondaryPrice: { fontSize: 14, color: semantic.muted, flexShrink: 1 },
   currencyToggle: { flexDirection: 'row', flexShrink: 0, borderRadius: 10,
-    backgroundColor: '#eef1f4', padding: 3, gap: 2 },
+    backgroundColor: semantic.raised, padding: 3, gap: 2 },
   currencyOption: { minWidth: 44, minHeight: 44, borderRadius: 8,
     alignItems: 'center', justifyContent: 'center' },
-  currencySelected: { backgroundColor: '#fff' },
-  currencyText: { fontSize: 15, fontWeight: '700', color: '#697583' },
-  currencySelectedText: { color: '#202a35' },
+  currencySelected: { backgroundColor: semantic.screen },
+  currencyText: { fontSize: 15, fontWeight: '700', color: semantic.muted },
+  currencySelectedText: { color: semantic.text },
   marketInfo: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, paddingTop: 6 },
   detailPrice: {
     fontSize: 34,
     fontWeight: '700',
-    color: '#202a35',
+    color: semantic.text,
     fontVariant: ['tabular-nums'],
     flexShrink: 1,
   },
   marketBadge: {
     alignSelf: 'flex-start',
     fontSize: 11,
-    color: '#697583',
+    color: semantic.muted,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    backgroundColor: '#eef1f4',
+    backgroundColor: semantic.raised,
     borderRadius: 5,
   },
-  changeRate: { fontSize: 13, color: '#697583', flexShrink: 1 },
-  up: { color: '#a13e3b' },
-  down: { color: '#315f9b' },
+  changeRate: { fontSize: 13, color: semantic.muted, flexShrink: 1 },
+  up: { color: semantic.rise },
+  down: { color: semantic.fall },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -376,10 +384,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backText: { fontSize: 26, color: '#202a35' },
+  backText: { fontSize: 26, color: semantic.text },
   heading: { flex: 1, minWidth: 0, gap: 4 },
-  title: { fontSize: 18, fontWeight: '700', color: '#202a35', flexShrink: 1 },
-  price: { fontSize: 15, color: '#536170' },
+  title: { fontSize: 18, fontWeight: '700', color: semantic.text, flexShrink: 1 },
+  price: { fontSize: 15, color: semantic.secondary },
   toolbar: { paddingHorizontal: 12, paddingBottom: 8 },
   chart: { flex: 1, minHeight: 0 },
   detailChart: { minHeight: 260 },
@@ -387,14 +395,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingBottom: 8,
     fontSize: 12,
-    color: '#8b641e',
+    color: semantic.warning,
   },
   error: { padding: 16, gap: 12 },
   retry: {
     alignSelf: 'flex-start',
     padding: 12,
     borderWidth: 1,
-    borderColor: '#dfe4e9',
+    borderColor: semantic.border,
     borderRadius: 8,
   },
 });

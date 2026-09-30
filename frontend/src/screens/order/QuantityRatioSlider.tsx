@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useRef, useState } from 'react';
 import { StyleSheet, View } from '../../theme/native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -91,14 +92,14 @@ const styles = StyleSheet.create({
     height: 4,
     marginHorizontal: THUMB_SIZE / 2,
     borderRadius: 2,
-    backgroundColor: '#dfe4e9',
+    backgroundColor: semantic.border,
   },
-  fill: { height: 4, borderRadius: 2, backgroundColor: '#202a35' },
+  fill: { height: 4, borderRadius: 2, backgroundColor: semantic.selected },
   thumb: {
     position: 'absolute',
     width: THUMB_SIZE,
     height: THUMB_SIZE,
     borderRadius: THUMB_SIZE / 2,
-    backgroundColor: '#202a35',
+    backgroundColor: semantic.selected,
   },
 });

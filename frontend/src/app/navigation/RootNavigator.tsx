@@ -1,6 +1,8 @@
 import React from 'react';
 import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { useAppearance } from '../../theme/appearance';
+import { useReducedMotion } from '../../theme/useReducedMotion';
+import { rootTransition } from './transitionPolicy';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import type { RootStackParamList } from './types';
@@ -17,6 +19,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
   const { mode, colors } = useAppearance();
+  const reducedMotion = useReducedMotion();
   const navigationTheme = {
     ...(mode === 'dark' ? DarkTheme : DefaultTheme),
     colors: {
@@ -33,7 +36,7 @@ export default function RootNavigator() {
       <Stack.Navigator
         id="RootStack"
         initialRouteName="Splash"
-        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.screen } }}
+        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.screen }, ...rootTransition(reducedMotion) }}
         // Keep navigation and session/account providers alive during a render
         // failure. Retrying remounts only this root screen (MainTabs opens Home).
         screenLayout={({ children }) => (
@@ -45,7 +48,7 @@ export default function RootNavigator() {
         <Stack.Screen name="ModeSelection" component={ModeSelectionScreen} />
         <Stack.Screen name="MainTabs" component={MainTabs} />
         <Stack.Screen name="SeasonJoin" component={SeasonJoinScreen} />
-        <Stack.Screen name="AssetChart" component={AssetChartScreen} options={{ presentation: 'fullScreenModal' }} />
+        <Stack.Screen name="AssetChart" component={AssetChartScreen} options={{ presentation: 'fullScreenModal', animation: reducedMotion ? 'none' : 'fade' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

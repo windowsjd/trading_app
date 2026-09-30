@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -28,7 +29,7 @@ type Props = NativeStackScreenProps<MyStackParamList, 'Settings'>;
 
 export default function SettingsScreen({ navigation: _navigation }: Props) {
   const queryClient = useQueryClient();
-  const { preference, setPreference, colors, mode } = useAppearance();
+  const { preference, setPreference, colors } = useAppearance();
 
   const meQuery = useQuery({
     queryKey: QUERY_KEYS.me,
@@ -199,8 +200,8 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
             친구가 내 현재 시즌 포트폴리오를 볼 수 있습니다.
           </Text>
           <Switch
-            trackColor={{ false: colors.border, true: mode === 'dark' ? '#79d68b' : '#16a34a' }}
-            thumbColor={mode === 'dark' ? colors.text : '#ffffff'}
+            trackColor={{ false: colors.border, true: colors.positive }}
+            thumbColor={colors.text}
             accessibilityLabel="친구에게 포트폴리오 공개"
             testID="settings-portfolio-public"
             value={meQuery.data.portfolioPublic === true}
@@ -255,54 +256,54 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: semantic.screen },
   content: { padding: 16, gap: 12 },
   card: {
     borderWidth: 1,
-    borderColor: '#e8e8e8',
+    borderColor: semantic.border,
     borderRadius: 14,
     padding: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: semantic.surface,
     gap: 10,
   },
   sectionTitle: { fontSize: 18, fontWeight: '700' },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: semantic.border,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    backgroundColor: '#fff',
+    backgroundColor: semantic.screen,
     fontSize: 16,
   },
   modeChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   modeChoice: { minHeight: 44, minWidth: 78, paddingHorizontal: 12, borderRadius: 10,
-    borderWidth: 1, borderColor: '#dfe4e9', alignItems: 'center', justifyContent: 'center' },
-  modeSelected: { backgroundColor: '#202a35', borderColor: '#202a35' },
-  modeText: { fontSize: 14, fontWeight: '600', color: '#536170' },
-  modeSelectedText: { color: '#fff' },
+    borderWidth: 1, borderColor: semantic.border, alignItems: 'center', justifyContent: 'center' },
+  modeSelected: { backgroundColor: semantic.selected, borderColor: semantic.selected },
+  modeText: { fontSize: 14, fontWeight: '600', color: semantic.secondary },
+  modeSelectedText: { color: semantic.onAccent },
   menuRow: {
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: '#fff',
+    backgroundColor: semantic.screen,
     paddingHorizontal: 14,
   },
   menuText: { fontSize: 16, fontWeight: '600' },
-  helper: { fontSize: 14, color: '#444', lineHeight: 20 },
+  helper: { fontSize: 14, color: semantic.secondary, lineHeight: 20 },
   primaryButton: {
-    backgroundColor: '#111',
+    backgroundColor: semantic.selected,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
   },
-  primaryButtonText: { color: '#fff', fontWeight: '700' },
+  primaryButtonText: { color: semantic.onAccent, fontWeight: '700' },
   logoutButton: {
-    backgroundColor: '#fff0f0',
+    backgroundColor: semantic.negativeSurface,
     borderWidth: 1,
-    borderColor: '#f2b8b8',
+    borderColor: semantic.border,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
   },
-  logoutText: { color: '#c62828', fontWeight: '700' },
+  logoutText: { color: semantic.negative, fontWeight: '700' },
 });

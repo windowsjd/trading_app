@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, View } from '../../theme/native';
 
@@ -95,20 +96,20 @@ export default function AccountSetupPanel({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: semantic.screen },
   // flexGrow (not flex) so the copy scrolls instead of clipping at large font
   // scales, which is where the longest sentence here stops fitting (§20).
   content: { flexGrow: 1, padding: 20, gap: 12, justifyContent: 'center' },
   card: {
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: semantic.border,
     borderRadius: 12,
     padding: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: semantic.surface,
     gap: 8,
   },
   title: { fontSize: 22, fontWeight: '700', lineHeight: 30 },
-  message: { fontSize: 14, color: '#444', lineHeight: 21 },
-  helper: { fontSize: 13, color: '#666', lineHeight: 19 },
-  error: { fontSize: 14, color: '#c62828', lineHeight: 21 },
+  message: { fontSize: 14, color: semantic.secondary, lineHeight: 21 },
+  helper: { fontSize: 13, color: semantic.secondary, lineHeight: 19 },
+  error: { fontSize: 14, color: semantic.negative, lineHeight: 21 },
 });

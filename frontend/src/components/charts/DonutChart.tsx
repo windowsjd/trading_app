@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from '../../theme/native';
 import Svg, { Circle } from 'react-native-svg';
@@ -42,7 +43,7 @@ export default function DonutChart({
   valueFormatter = formatDefaultValue,
   emptyMessage = '자산 배분 데이터가 없습니다.',
 }: DonutChartProps) {
-  const { mode, colors } = useAppearance();
+  const { colors } = useAppearance();
   const sanitizedSegments = useMemo(
     () =>
       segments
@@ -96,7 +97,7 @@ export default function DonutChart({
               cx={center}
               cy={center}
               r={radius}
-              stroke={mode === 'dark' ? colors.border : '#eef0f3'}
+              stroke={colors.border}
               strokeWidth={safeThickness}
               fill="none"
             />
@@ -175,11 +176,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   centerTitle: {
-    color: '#777',
+    color: semantic.muted,
     fontSize: 12,
   },
   centerValue: {
-    color: '#111',
+    color: semantic.text,
     fontSize: 14,
     fontWeight: '700',
     maxWidth: 96,
@@ -203,12 +204,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   legendLabel: {
-    color: '#222',
+    color: semantic.text,
     fontSize: 13,
     fontWeight: '700',
   },
   legendValue: {
-    color: '#666',
+    color: semantic.secondary,
     fontSize: 12,
     marginTop: 2,
   },

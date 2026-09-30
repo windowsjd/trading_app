@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
@@ -115,13 +116,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 14,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: semantic.border,
   },
   itemSymbol: { fontSize: 16, fontWeight: '700' },
   itemPrice: { fontSize: 15, fontWeight: '600' },
-  itemPriceStale: { color: '#8a6d00' },
+  itemPriceStale: { color: semantic.warning },
   alignEnd: { alignItems: 'flex-end' },
-  helper: { fontSize: 14, color: '#444' },
+  helper: { fontSize: 14, color: semantic.secondary },
 });
 
 export default MarketAssetRow;

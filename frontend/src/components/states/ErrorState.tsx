@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React from 'react';
 import {
   SafeAreaView,
@@ -51,7 +52,7 @@ export default function ErrorState({
  * it does not keeps both behaviours.
  */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: semantic.screen },
   center: {
     flexGrow: 1,
     alignItems: 'center',
@@ -66,20 +67,20 @@ const styles = StyleSheet.create({
   },
   message: {
     fontSize: 14,
-    color: '#444',
+    color: semantic.secondary,
     lineHeight: 20,
     textAlign: 'center',
   },
   button: {
     marginTop: 16,
-    backgroundColor: '#111',
+    backgroundColor: semantic.selected,
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 18,
     alignItems: 'center',
   },
   buttonText: {
-    color: '#fff',
+    color: semantic.onAccent,
     fontWeight: '700',
   },
 });

@@ -98,10 +98,10 @@ export default function CandlestickChartRenderer({
   firstVisibleTime,
   lastVisibleTime,
 }: CandlestickChartRendererProps) {
-  const { mode, colors } = useAppearance();
-  const gridColor = mode === 'dark' ? colors.border : '#eef1f4';
-  const axisColor = mode === 'dark' ? colors.muted : '#98a2b3';
-  const crosshairColor = mode === 'dark' ? colors.secondary : '#64748b';
+  const { colors } = useAppearance();
+  const gridColor = colors.border;
+  const axisColor = colors.muted;
+  const crosshairColor = colors.secondary;
   const {
     padding,
     innerWidth,

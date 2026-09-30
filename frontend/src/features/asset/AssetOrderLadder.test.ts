@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens.ts';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { describe, it } from 'node:test';
@@ -50,10 +51,10 @@ describe('order side colors in the trading ladder', () => {
     t.after(() => act(() => renderer.unmount()));
     const ask = renderer.root.findByProps({ testID: 'asset-order-book-asks-1' });
     const bid = renderer.root.findByProps({ testID: 'asset-order-book-bids-1' });
-    assert.equal(flatten(ask.props.style).backgroundColor, '#fef2f2');
-    assert.equal(flatten(bid.props.style).backgroundColor, '#f0fdf4');
-    assert.equal(flatten(ask.children[0].props.style).color, '#dc2626');
-    assert.equal(flatten(bid.children[0].props.style).color, '#16a34a');
+    assert.equal(flatten(ask.props.style).backgroundColor, semantic.sellSurface);
+    assert.equal(flatten(bid.props.style).backgroundColor, semantic.buySurface);
+    assert.equal(flatten(ask.children[0].props.style).color, semantic.sell);
+    assert.equal(flatten(bid.children[0].props.style).color, semantic.buy);
     assert.match(ask.props.accessibilityLabel, /매도 1호가/);
     assert.match(bid.props.accessibilityLabel, /매수 1호가/);
     assert.equal(ask.children[0].props.children, formatOrderBookDecimal(book.asks[0].price));

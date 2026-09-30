@@ -1,5 +1,6 @@
 import React from 'react';
 import type { QuantityRatioSliderProps } from './QuantityRatioSlider';
+import { useAppearance } from '../../theme/appearance';
 
 /** The browser owns pointer capture, touch, keyboard and slider semantics. */
 export default function QuantityRatioSlider({
@@ -9,6 +10,7 @@ export default function QuantityRatioSlider({
   disabledReason,
   onChange,
 }: QuantityRatioSliderProps) {
+  const { colors } = useAppearance();
   return (
     <input
       type="range"
@@ -29,7 +31,7 @@ export default function QuantityRatioSlider({
         minWidth: 0,
         height: 44,
         margin: 0,
-        accentColor: '#202a35',
+        accentColor: colors.selected,
         cursor: disabled ? 'default' : 'pointer',
         opacity: disabled ? 0.4 : 1,
       }}

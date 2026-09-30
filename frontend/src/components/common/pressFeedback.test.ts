@@ -60,6 +60,7 @@ describe('general ripple interaction', () => {
       assert.equal(button.props.testID, 'action');
       assert.equal(button.props.accessibilityLabel, '실행');
       act(() => button.props.onPressIn(event));
+      assert.equal(rootScale(), 0.995, 'compression is visible on touch-down');
       const ripple = circle(renderer).props.style;
       assert.equal(ripple.left + ripple.width / 2, 30, 'pageX minus rootX, not child locationX');
       assert.equal(ripple.top + ripple.height / 2, 15);
@@ -131,12 +132,12 @@ describe('general ripple interaction', () => {
     assert.deepEqual(getRippleGeometry(undefined, undefined, { pageX: 100, pageY: 200, width: 200, height: 60 }), { x: 100, y: 30, radius: Math.hypot(100, 30) });
   });
 
-  it('lightens dark/blue/gray surfaces with a weaker neutral wash and leaves white alone', () => {
+  it('lightens dark surfaces and darkens near-white surfaces at touch-down', () => {
     for (const color of [0xff111111, 0xff0066cc, 0xffcccccc]) {
-      assert.deepEqual(getFeedbackPalette(color), { washOpacity: 0.045, rippleColor: 'rgba(255,255,255,0.16)' });
+      assert.deepEqual(getFeedbackPalette(color), { washOpacity: 0.045, washColor: '#fff', rippleColor: 'rgba(255,255,255,0.16)' });
     }
     for (const color of [0xfffafafa, 0xffffffff, null]) {
-      assert.deepEqual(getFeedbackPalette(color), { washOpacity: 0, rippleColor: 'rgba(0,0,0,0.10)' });
+      assert.deepEqual(getFeedbackPalette(color), { washOpacity: 0.05, washColor: '#000', rippleColor: 'rgba(0,0,0,0.10)' });
     }
   });
 

@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import { priceRange, capturePriceScale, scalePriceByPixels, scaledPriceRange, type ManualPriceScale } from './candlestickPriceScale';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -505,7 +506,7 @@ const styles = StyleSheet.create({
   wrapper: { width: '100%', position: 'relative' },
   container: {
     width: '100%',
-    backgroundColor: '#ffffff',
+    backgroundColor: semantic.screen,
     borderRadius: 8,
     overflow: 'hidden',
   },
@@ -517,11 +518,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: '#dfe3e8',
+    borderColor: semantic.border,
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.92)',
+    backgroundColor: semantic.surface,
   },
-  resetText: { fontSize: 12, fontWeight: '600', color: '#111' },
+  resetText: { fontSize: 12, fontWeight: '600', color: semantic.text },
 });

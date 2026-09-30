@@ -1,5 +1,8 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Platform } from '../../theme/native';
+import { useReducedMotion } from '../../theme/useReducedMotion';
+import { stackTransition } from './transitionPolicy';
 
 import type { RecordStackParamList } from './types';
 import RecordSeasonListScreen from '../../screens/record/RecordSeasonListScreen';
@@ -11,8 +14,9 @@ import RecordExchangeListScreen from '../../screens/record/RecordExchangeListScr
 const Stack = createNativeStackNavigator<RecordStackParamList>();
 
 export default function RecordStack() {
+  const reducedMotion = useReducedMotion();
   return (
-    <Stack.Navigator id="RecordStack">
+    <Stack.Navigator id="RecordStack" screenOptions={stackTransition(reducedMotion, Platform.OS)}>
       <Stack.Screen
         name="RecordSeasonList"
         component={RecordSeasonListScreen}

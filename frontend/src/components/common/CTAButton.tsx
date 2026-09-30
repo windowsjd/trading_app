@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React from 'react';
 import {
   Text,
@@ -42,7 +43,7 @@ export default function CTAButton({
       disabled={disabled}
     >
       {state === 'loading' ? (
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={semantic.onAccent} />
       ) : (
         <Text style={styles.text}>{label}</Text>
       )}
@@ -52,7 +53,7 @@ export default function CTAButton({
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: '#111',
+    backgroundColor: semantic.selected,
     borderRadius: 12,
     paddingVertical: 14,
     // Horizontal padding so a long Korean label does not run to the edges, and
@@ -68,7 +69,7 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   text: {
-    color: '#fff',
+    color: semantic.onAccent,
     fontWeight: '700',
     textAlign: 'center',
     lineHeight: 21,

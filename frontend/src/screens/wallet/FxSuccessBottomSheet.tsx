@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from '../../theme/native';
 
@@ -73,7 +74,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: '#eef7ee',
+    backgroundColor: semantic.positiveSurface,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
@@ -81,7 +82,7 @@ const styles = StyleSheet.create({
   iconText: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#2e7d32',
+    color: semantic.positive,
   },
   title: {
     fontSize: 20,
@@ -90,10 +91,10 @@ const styles = StyleSheet.create({
   },
   card: {
     borderWidth: 1,
-    borderColor: '#e8e8e8',
+    borderColor: semantic.border,
     borderRadius: 14,
     padding: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: semantic.surface,
     gap: 10,
   },
   row: {
@@ -104,14 +105,14 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    color: '#666',
+    color: semantic.secondary,
     flexShrink: 1,
     maxWidth: '45%',
   },
   value: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#111',
+    color: semantic.text,
     flex: 1,
     textAlign: 'right',
   },

@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
@@ -226,32 +227,32 @@ export default function MarketScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: semantic.screen },
   content: { padding: 16, paddingBottom: 24 },
   headerSection: { gap: 12, marginBottom: 12 },
   tabRow: { flexDirection: 'row', gap: 8 },
   tabButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: semantic.border,
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: semantic.screen,
   },
-  tabButtonActive: { backgroundColor: '#111', borderColor: '#111' },
-  tabText: { color: '#111', fontWeight: '600', fontSize: 14 },
-  tabTextActive: { color: '#fff', fontWeight: '600' },
+  tabButtonActive: { backgroundColor: semantic.selected, borderColor: semantic.selected },
+  tabText: { color: semantic.text, fontWeight: '600', fontSize: 14 },
+  tabTextActive: { color: semantic.onAccent, fontWeight: '600' },
   searchEntry: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: semantic.border,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    backgroundColor: '#fff',
+    backgroundColor: semantic.screen,
   },
   searchEntryText: {
-    color: '#666',
+    color: semantic.secondary,
     fontSize: 16,
   },
   itemRow: {
@@ -259,21 +260,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 14,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: semantic.border,
   },
   itemSymbol: { fontSize: 16, fontWeight: '700' },
   itemPrice: { fontSize: 15, fontWeight: '600' },
   alignEnd: { alignItems: 'flex-end' },
-  helper: { fontSize: 14, color: '#444' },
+  helper: { fontSize: 14, color: semantic.secondary },
   inlineWarning: {
     borderWidth: 1,
-    borderColor: '#F2D48B',
+    borderColor: semantic.border,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#FFF8E1',
+    backgroundColor: semantic.warningSurface,
   },
-  inlineWarningText: { fontSize: 13, color: '#725400' },
-  priceBasisText: { fontSize: 13, color: '#666' },
+  inlineWarningText: { fontSize: 13, color: semantic.warning },
+  priceBasisText: { fontSize: 13, color: semantic.secondary },
   footerLoader: { paddingVertical: 16 },
 });

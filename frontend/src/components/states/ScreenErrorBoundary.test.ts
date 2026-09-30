@@ -48,6 +48,7 @@ function harness() {
     '@react-navigation/native-stack': { createNativeStackNavigator: () => ({ Navigator: 'Navigator', Screen: 'Screen' }) },
     './navigationRef': { rootNavigationRef: {} },
     '../../components/states/ScreenErrorBoundary': { default: Boundary, __esModule: true },
+    '../../theme/useReducedMotion': { useReducedMotion: () => false },
   };
   for (const name of ['./AuthStack', './MainTabs', '../../screens/auth/SplashScreen',
     '../../screens/asset/AssetChartScreen', '../../screens/entry/ModeSelectionScreen', '../../screens/season/SeasonJoinScreen']) {

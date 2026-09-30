@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React from 'react';
 import { SafeAreaView, View, Text, StyleSheet } from '../../theme/native';
 import ActionPressable from '../common/ActionPressable';
@@ -32,7 +33,7 @@ export default function EmptyState({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: semantic.screen },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -47,21 +48,21 @@ const styles = StyleSheet.create({
   },
   message: {
     fontSize: 14,
-    color: '#444',
+    color: semantic.secondary,
     lineHeight: 20,
     textAlign: 'center',
   },
   button: {
     marginTop: 16,
     borderWidth: 1,
-    borderColor: '#111',
+    borderColor: semantic.selected,
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 18,
     alignItems: 'center',
   },
   buttonText: {
-    color: '#111',
+    color: semantic.text,
     fontWeight: '700',
   },
 });

@@ -1,5 +1,6 @@
 import Decimal from 'decimal.js';
 import assert from 'node:assert/strict';
+import { semantic } from '../../theme/tokens.ts';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import { TEST_IDS } from '../../constants/testIds.ts';
@@ -53,12 +54,12 @@ for (const screen of ['inline', 'standalone'])
               const button = h.node(`order-ratio-${other}`);
               assert.equal(
                 flatten(button.props.style).backgroundColor,
-                other === percent ? '#202a35' : undefined,
+                other === percent ? semantic.selected : undefined,
               );
               const label = button.findByType('Text');
               assert.equal(
                 flatten(label.props.style).color,
-                other === percent ? '#fff' : '#354251',
+                other === percent ? semantic.onAccent : semantic.text,
               );
             }
             await h.slide(percent);

@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useMemo } from 'react';
 import {
   SafeAreaView,
@@ -302,22 +303,22 @@ function GeneralExistingCard({
  * widths.
  */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: semantic.screen },
   content: { flexGrow: 1, padding: 20, gap: 10, justifyContent: 'center' },
   title: { fontSize: 24, fontWeight: '700', lineHeight: 32 },
-  subtitle: { fontSize: 13, color: '#546e7a', lineHeight: 19, marginBottom: 6 },
+  subtitle: { fontSize: 13, color: semantic.secondary, lineHeight: 19, marginBottom: 6 },
   sectionLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#78909c',
+    color: semantic.muted,
     marginTop: 8,
   },
   card: {
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: semantic.border,
     borderRadius: 12,
     padding: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: semantic.surface,
     gap: 8,
   },
   cardHeaderRow: {
@@ -326,35 +327,35 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   cardHeaderTitle: { flex: 1, flexShrink: 1, minWidth: 0 },
-  cardTitle: { fontSize: 17, fontWeight: '700', color: '#212121', lineHeight: 24 },
-  cardBody: { fontSize: 14, color: '#444', lineHeight: 21 },
-  cardNotice: { fontSize: 12, color: '#78909c', lineHeight: 18 },
-  errorText: { fontSize: 13, color: '#c62828', lineHeight: 20 },
+  cardTitle: { fontSize: 17, fontWeight: '700', color: semantic.text, lineHeight: 24 },
+  cardBody: { fontSize: 14, color: semantic.secondary, lineHeight: 21 },
+  cardNotice: { fontSize: 12, color: semantic.muted, lineHeight: 18 },
+  errorText: { fontSize: 13, color: semantic.negative, lineHeight: 20 },
   badge: {
     flexShrink: 0,
     paddingVertical: 3,
     paddingHorizontal: 8,
     borderRadius: 999,
-    backgroundColor: '#e3f2fd',
+    backgroundColor: semantic.infoSurface,
   },
-  badgeText: { fontSize: 11, fontWeight: '700', color: '#1565c0' },
+  badgeText: { fontSize: 11, fontWeight: '700', color: semantic.info },
   pastRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
     borderWidth: 1,
-    borderColor: '#eceff1',
+    borderColor: semantic.border,
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 14,
   },
   pastRowText: { flex: 1, flexShrink: 1, minWidth: 0, gap: 2 },
-  pastRowTitle: { fontSize: 14, fontWeight: '600', color: '#37474f' },
-  pastRowSubtitle: { fontSize: 12, color: '#78909c', lineHeight: 17 },
+  pastRowTitle: { fontSize: 14, fontWeight: '600', color: semantic.secondary },
+  pastRowSubtitle: { fontSize: 12, color: semantic.muted, lineHeight: 17 },
   pastRowAction: {
     flexShrink: 0,
     fontSize: 12,
-    color: '#1565c0',
+    color: semantic.info,
     fontWeight: '700',
     paddingTop: 2,
   },

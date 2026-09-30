@@ -1,5 +1,5 @@
+import { semantic } from '../../theme/tokens';
 import React, { useMemo, useState } from 'react';
-import { BUY_COLOR, SELL_COLOR, BUY_BACKGROUND, SELL_BACKGROUND } from '../order/sideColors';
 import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from '../../theme/native';
 import { formatKstDateTime } from '../../utils/format';
 import { formatOrderBookDecimal, normalizeOrderBook, type AssetOrderBook } from './orderBook';
@@ -97,20 +97,20 @@ export default function AssetOrderBookCard({ book, isPreview = false, statusMess
 }
 
 const styles = StyleSheet.create({
-  card: { borderWidth: 1, borderColor: '#e8e8e8', borderRadius: 14, padding: 16, backgroundColor: '#fafafa', gap: 8 },
-  title: { fontSize: 16, lineHeight: 24, fontWeight: '700', color: '#111' },
-  preview: { fontSize: 13, lineHeight: 20, color: '#725400', backgroundColor: '#FFF8E1', padding: 8, borderRadius: 8 },
-  helper: { fontSize: 12, lineHeight: 19, color: '#666' },
+  card: { borderWidth: 1, borderColor: semantic.border, borderRadius: 14, padding: 16, backgroundColor: semantic.surface, gap: 8 },
+  title: { fontSize: 16, lineHeight: 24, fontWeight: '700', color: semantic.text },
+  preview: { fontSize: 13, lineHeight: 20, color: semantic.warning, backgroundColor: semantic.warningSurface, padding: 8, borderRadius: 8 },
+  helper: { fontSize: 12, lineHeight: 19, color: semantic.secondary },
   side: { gap: 2, marginTop: 8 },
   heading: { paddingVertical: 4 },
   sideTitle: { fontSize: 14, lineHeight: 22, fontWeight: '700' },
   row: { flexDirection: 'row', alignItems: 'center', minHeight: 34 },
-  columnLabel: { fontSize: 12, lineHeight: 20, color: '#666', padding: 8, textAlign: 'right', flexShrink: 0 },
-  number: { fontSize: 14, lineHeight: 22, fontVariant: ['tabular-nums'], color: '#333', textAlign: 'right', paddingHorizontal: 12, paddingVertical: 6, flexShrink: 0 },
+  columnLabel: { fontSize: 12, lineHeight: 20, color: semantic.secondary, padding: 8, textAlign: 'right', flexShrink: 0 },
+  number: { fontSize: 14, lineHeight: 22, fontVariant: ['tabular-nums'], color: semantic.text, textAlign: 'right', paddingHorizontal: 12, paddingVertical: 6, flexShrink: 0 },
   quantity: { flex: 1 },
-  askText: { color: SELL_COLOR },
-  bidText: { color: BUY_COLOR },
-  askRow: { backgroundColor: SELL_BACKGROUND },
-  bidRow: { backgroundColor: BUY_BACKGROUND },
-  bestRow: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#bac5ce' },
+  askText: { color: semantic.sell },
+  bidText: { color: semantic.buy },
+  askRow: { backgroundColor: semantic.sellSurface },
+  bidRow: { backgroundColor: semantic.buySurface },
+  bestRow: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: semantic.border },
 });

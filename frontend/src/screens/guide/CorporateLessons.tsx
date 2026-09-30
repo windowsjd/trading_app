@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useState } from 'react';
 import { View } from '../../theme/native';
 import { Body, LessonAction, Result, Section, Takeaways } from './LessonUi';
@@ -110,14 +111,14 @@ function DividendBalance({ stage }: { stage: 'before' | 'ex' | 'paid' }) {
         accessible
         accessibilityLabel={`관련 총 가치 ${won(values.total)}. 주식 ${won(values.stock)}, 받을 배당금 ${won(values.receivable)}, 지급 현금 ${won(values.cash)}`}
       >
-        <View style={{ flex: values.stock, backgroundColor: '#245b76' }} />
+        <View style={{ flex: values.stock, backgroundColor: semantic.info }} />
         {values.receivable > 0 ? (
           <View
-            style={{ flex: values.receivable, backgroundColor: '#995b16' }}
+            style={{ flex: values.receivable, backgroundColor: semantic.warning }}
           />
         ) : null}
         {values.cash > 0 ? (
-          <View style={{ flex: values.cash, backgroundColor: '#16a34a' }} />
+          <View style={{ flex: values.cash, backgroundColor: semantic.positive }} />
         ) : null}
       </View>
       <Basis>

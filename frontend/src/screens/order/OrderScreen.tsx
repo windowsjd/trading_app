@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
 import React, { useMemo, useState } from 'react';
 import {
@@ -61,7 +62,7 @@ export function OrderTradingScreen({
   const isAdmin = useAdminDiagnostics();
   const headerHeight = useHeaderHeight();
   const { width } = useWindowDimensions();
-  const { mode, colors } = useAppearance();
+  const { colors } = useAppearance();
   const compact = width < 600;
   const [showKrw, setShowKrw] = useState(false);
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
@@ -228,7 +229,7 @@ export function OrderTradingScreen({
                   <Path
                     d="M5 3v18M2 8h6v7H2zM12 2v17M9 5h6v8H9zM19 6v16M16 11h6v7h-6z"
                     fill="none"
-                    stroke={mode === 'dark' ? colors.secondary : '#354251'}
+                    stroke={colors.secondary}
                     strokeWidth={1.5}
                   />
                 </Svg>
@@ -284,8 +285,8 @@ export function OrderTradingScreen({
               }}
             />
           ) : null}
-          <View style={[styles.tradingRow, compact && styles.tradingStack]} testID="asset-trading-columns">
-            <View style={[styles.orderColumn, compact && styles.fullWidthColumn]} testID="asset-order-column">
+          <View style={[styles.tradingRow, compact && styles.compactTradingRow]} testID="asset-trading-columns">
+            <View style={styles.orderColumn} testID="asset-order-column">
               {account ? (
                 <OrderPanel
                   key={`${assetId}:${accountId}:${side}`}
@@ -303,7 +304,7 @@ export function OrderTradingScreen({
                 />
               )}
             </View>
-            <View style={[styles.priceColumn, compact && styles.fullWidthColumn]} testID="asset-price-column">
+            <View style={styles.priceColumn} testID="asset-price-column">
               {liveOrderBookEnabled ? (
                 <AssetOrderLadder
                   book={
@@ -332,7 +333,7 @@ export function OrderTradingScreen({
   );
 }
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: semantic.screen },
   content: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 32, gap: 12 },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   pairGroup: {
@@ -349,20 +350,20 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
   },
-  pair: { fontSize: 20, fontWeight: '700', color: '#202a35' },
+  pair: { fontSize: 20, fontWeight: '700', color: semantic.text },
   tools: { flexDirection: 'row', gap: 4, flexShrink: 0 },
   iconButton: {
     minWidth: 44,
     minHeight: 44,
     padding: 8,
     borderRadius: 8,
-    backgroundColor: '#f2f5f7',
+    backgroundColor: semantic.raised,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  toggleActive: { backgroundColor: '#202a35' },
-  toggleText: { fontSize: 11, fontWeight: '700', color: '#536170' },
-  toggleTextActive: { color: '#fff' },
+  toggleActive: { backgroundColor: semantic.selected },
+  toggleText: { fontSize: 11, fontWeight: '700', color: semantic.secondary },
+  toggleTextActive: { color: semantic.onAccent },
   muted: { opacity: 0.4 },
   subheader: {
     flexDirection: 'row',
@@ -370,15 +371,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  changeRate: { fontSize: 13, color: '#697583', fontVariant: ['tabular-nums'] },
-  up: { color: '#a13e3b' },
-  down: { color: '#315f9b' },
+  changeRate: { fontSize: 13, color: semantic.muted, fontVariant: ['tabular-nums'] },
+  up: { color: semantic.rise },
+  down: { color: semantic.fall },
   marketBadge: {
     fontSize: 11,
-    color: '#697583',
+    color: semantic.muted,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    backgroundColor: '#eef1f4',
+    backgroundColor: semantic.raised,
     borderRadius: 5,
   },
   tradingRow: {
@@ -386,21 +387,20 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
     gap: 12,
     borderTopWidth: 1,
-    borderColor: '#edf0f3',
+    borderColor: semantic.border,
     paddingTop: 14,
   },
-  tradingStack: { flexDirection: 'column' },
-  fullWidthColumn: { flex: 0, width: '100%' },
+  compactTradingRow: { gap: 6 },
   orderColumn: { flex: 1.15, minWidth: 0 },
   priceColumn: { flex: 1, minWidth: 0, overflow: 'hidden' },
   currentPrice: { paddingVertical: 14, gap: 4, minWidth: 0 },
-  priceLabel: { fontSize: 11, color: '#7c8793' },
+  priceLabel: { fontSize: 11, color: semantic.muted },
   price: {
     fontSize: 19,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
-    color: '#202a35',
+    color: semantic.text,
   },
   stockPrice: { flex: 1, justifyContent: 'center', minHeight: 280 },
-  bannerText: { fontSize: 12, color: '#725400' },
+  bannerText: { fontSize: 12, color: semantic.warning },
 });

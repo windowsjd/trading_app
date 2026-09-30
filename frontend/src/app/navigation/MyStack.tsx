@@ -1,5 +1,8 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Platform } from '../../theme/native';
+import { useReducedMotion } from '../../theme/useReducedMotion';
+import { stackTransition } from './transitionPolicy';
 
 import type { MyStackParamList } from './types';
 import OverallScreen from '../../screens/my/OverallScreen';
@@ -13,8 +16,9 @@ import SettingsScreen from '../../screens/my/SettingsScreen';
 const Stack = createNativeStackNavigator<MyStackParamList>();
 
 export default function MyStack() {
+  const reducedMotion = useReducedMotion();
   return (
-    <Stack.Navigator id="MyStack" initialRouteName="Overall">
+    <Stack.Navigator id="MyStack" initialRouteName="Overall" screenOptions={stackTransition(reducedMotion, Platform.OS)}>
       <Stack.Screen
         name="Overall"
         component={OverallScreen}

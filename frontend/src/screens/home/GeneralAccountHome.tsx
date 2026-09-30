@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
@@ -360,31 +361,31 @@ const styles = StyleSheet.create({
   content: { padding: 16, gap: 12, paddingBottom: 24 },
   card: {
     borderWidth: 1,
-    borderColor: '#e8e8e8',
+    borderColor: semantic.border,
     borderRadius: 14,
     padding: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: semantic.surface,
     gap: 8,
   },
-  label: { fontSize: 13, color: '#666' },
+  label: { fontSize: 13, color: semantic.secondary },
   // Ten-plus digit amounts wrap instead of running off the screen.
   big: { fontSize: 26, fontWeight: '700', lineHeight: 34, flexShrink: 1 },
-  helper: { fontSize: 14, color: '#444', lineHeight: 21 },
-  note: { fontSize: 13, color: '#725400', lineHeight: 19 },
+  helper: { fontSize: 14, color: semantic.secondary, lineHeight: 21 },
+  note: { fontSize: 13, color: semantic.warning, lineHeight: 19 },
   warningBox: {
     borderRadius: 12,
     padding: 12,
-    backgroundColor: '#FFF3CD',
+    backgroundColor: semantic.warningSurface,
     gap: 4,
   },
   noticeBox: {
     borderRadius: 12,
     padding: 12,
-    backgroundColor: '#EEF3FB',
+    backgroundColor: semantic.infoSurface,
     gap: 4,
   },
-  warningTitle: { fontSize: 14, fontWeight: '700', color: '#7A5D00' },
-  warningText: { fontSize: 13, color: '#7A5D00', lineHeight: 19 },
+  warningTitle: { fontSize: 14, fontWeight: '700', color: semantic.warning },
+  warningText: { fontSize: 13, color: semantic.warning, lineHeight: 19 },
   positionRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -396,17 +397,17 @@ const styles = StyleSheet.create({
   // never pushed off the row.
   positionName: { flex: 1, minWidth: 0, fontSize: 14, lineHeight: 20 },
   positionValue: { flexShrink: 0, fontSize: 14, fontWeight: '600' },
-  positionMeta: { fontSize: 13, color: '#555', lineHeight: 19 },
-  priceNotice: { fontSize: 13, color: '#9A6700', lineHeight: 19 },
+  positionMeta: { fontSize: 13, color: semantic.secondary, lineHeight: 19 },
+  priceNotice: { fontSize: 13, color: semantic.warning, lineHeight: 19 },
   retryButton: {
     marginTop: 8,
     alignSelf: 'flex-start',
     borderWidth: 1,
-    borderColor: '#111',
+    borderColor: semantic.selected,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#fff',
+    backgroundColor: semantic.screen,
   },
-  retryText: { color: '#111', fontWeight: '600' },
+  retryText: { color: semantic.text, fontWeight: '600' },
 });

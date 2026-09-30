@@ -1,5 +1,8 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Platform } from '../../theme/native';
+import { useReducedMotion } from '../../theme/useReducedMotion';
+import { stackTransition } from './transitionPolicy';
 
 import type { MarketStackParamList } from './types';
 import MarketScreen from '../../screens/market/MarketScreen';
@@ -10,8 +13,9 @@ import OrderScreen from '../../screens/order/OrderScreen';
 const Stack = createNativeStackNavigator<MarketStackParamList>();
 
 export default function MarketStack() {
+  const reducedMotion = useReducedMotion();
   return (
-    <Stack.Navigator id="MarketStack">
+    <Stack.Navigator id="MarketStack" screenOptions={stackTransition(reducedMotion, Platform.OS)}>
       <Stack.Screen
         name="Market"
         component={MarketScreen}

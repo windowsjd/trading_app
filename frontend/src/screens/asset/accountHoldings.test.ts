@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { semantic } from '../../theme/tokens.ts';
 import { createRequire } from 'node:module';
 import { describe, it } from 'node:test';
 import { TEST_IDS } from '../../constants/testIds.ts';
@@ -268,8 +269,8 @@ describe('holdings in Order with real React Query and order invalidation', () =>
     assert.match(before, /이전 시세/);
     assert.equal(ids(h).length, 5);
     for (const [id, color] of [
-      ['btc', '#a13e3b'],
-      ['eth', '#315f9b'],
+      ['btc', semantic.rise],
+      ['eth', semantic.fall],
       ['samsung', null],
     ]) {
       const row = h.node(`holding-${id}`);

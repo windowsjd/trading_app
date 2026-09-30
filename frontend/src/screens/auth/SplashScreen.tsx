@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -139,7 +140,7 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: semantic.screen },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -155,6 +156,6 @@ const styles = StyleSheet.create({
   },
   caption: {
     marginTop: 12,
-    color: '#666',
+    color: semantic.secondary,
   },
 });

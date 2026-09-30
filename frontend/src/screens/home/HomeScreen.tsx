@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React from 'react';
 import { StyleSheet, SafeAreaView, View } from '../../theme/native';
 
@@ -127,6 +128,6 @@ export default function HomeScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: semantic.screen },
   switcherHeader: { paddingHorizontal: 16, paddingTop: 12 },
 });

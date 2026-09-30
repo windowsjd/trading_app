@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from '../../theme/native';
 import ActionPressable from '../common/ActionPressable';
@@ -209,23 +210,23 @@ const styles = StyleSheet.create({
   container: {
     marginTop: 10,
     borderWidth: 1,
-    borderColor: '#9a6700',
+    borderColor: semantic.warning,
     borderRadius: 10,
-    backgroundColor: '#fff8c5',
+    backgroundColor: semantic.warningSurface,
     alignSelf: 'stretch',
     maxWidth: '100%',
     minWidth: 0,
   },
   toggle: { paddingHorizontal: 12, paddingVertical: 11 },
-  toggleText: { color: '#6f4b00', fontSize: 14, fontWeight: '700' },
+  toggleText: { color: semantic.warning, fontSize: 14, fontWeight: '700' },
   content: {
     borderTopWidth: 1,
-    borderTopColor: '#d4a72c',
+    borderTopColor: semantic.border,
     padding: 12,
     gap: 14,
   },
   section: { gap: 6, minWidth: 0 },
-  sectionTitle: { color: '#4d2d00', fontWeight: '700', fontSize: 13 },
+  sectionTitle: { color: semantic.warning, fontWeight: '700', fontSize: 13 },
   line: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -233,11 +234,11 @@ const styles = StyleSheet.create({
     gap: 8,
     minWidth: 0,
   },
-  label: { width: 92, flexShrink: 1, color: '#6f4b00', fontSize: 12 },
+  label: { width: 92, flexShrink: 1, color: semantic.warning, fontSize: 12 },
   value: {
     flex: 1,
     flexShrink: 1,
-    color: '#24292f',
+    color: semantic.text,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -245,13 +246,13 @@ const styles = StyleSheet.create({
     minWidth: 0,
     flexShrink: 1,
     maxWidth: '100%',
-    color: '#24292f',
-    backgroundColor: '#fff',
+    color: semantic.text,
+    backgroundColor: semantic.screen,
     borderRadius: 6,
     padding: 8,
     fontFamily: 'monospace',
     fontSize: 11,
     lineHeight: 17,
   },
-  truncated: { color: '#9a6700', fontSize: 12, lineHeight: 18 },
+  truncated: { color: semantic.warning, fontSize: 12, lineHeight: 18 },
 });

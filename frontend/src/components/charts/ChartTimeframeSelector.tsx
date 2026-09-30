@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from '../../theme/native';
 import { useSafeAreaInsets } from '../../theme/safeArea';
@@ -83,17 +84,17 @@ export default function ChartTimeframeSelector({ selectedTimeframe, onSelect }: 
 }
 
 const styles = StyleSheet.create({
-  trigger: { alignSelf: 'flex-start', maxWidth: '100%', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#111' },
-  triggerText: { color: '#fff', fontWeight: '600', flexShrink: 1 },
+  trigger: { alignSelf: 'flex-start', maxWidth: '100%', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: semantic.selected },
+  triggerText: { color: semantic.onAccent, fontWeight: '600', flexShrink: 1 },
   sheetContent: { flexShrink: 1 },
   header: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 12 },
   title: { flexGrow: 1, flexShrink: 1, fontSize: 20, fontWeight: '700' },
   close: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, maxWidth: '100%' },
-  closeText: { fontSize: 16, color: '#444', flexShrink: 1 },
+  closeText: { fontSize: 16, color: semantic.secondary, flexShrink: 1 },
   list: { flexShrink: 1 },
-  groupTitle: { fontSize: 14, color: '#666', marginTop: 12, marginBottom: 8 },
+  groupTitle: { fontSize: 14, color: semantic.secondary, marginTop: 12, marginBottom: 8 },
   option: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 10 },
-  optionText: { flex: 1, fontSize: 16, color: '#111' },
-  selected: { backgroundColor: '#111' },
-  selectedText: { color: '#fff', fontWeight: '700' },
+  optionText: { flex: 1, fontSize: 16, color: semantic.text },
+  selected: { backgroundColor: semantic.selected },
+  selectedText: { color: semantic.onAccent, fontWeight: '700' },
 });

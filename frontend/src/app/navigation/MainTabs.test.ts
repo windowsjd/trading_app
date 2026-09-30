@@ -24,7 +24,7 @@ const icons = readFileSync(
 
 type AccountMode = 'general' | 'season';
 
-function renderTabs(mode: AccountMode | null, isLoading = false) {
+function renderTabs(mode: AccountMode | null, isLoading = false, appearance: 'light' | 'dark' = 'light', reduced = false) {
   const MainTabs = load(resolve('src/app/navigation/MainTabs.tsx'), {
     'react-native': { useWindowDimensions: () => ({ fontScale: 1 }) },
     'react-native-safe-area-context': {
@@ -36,6 +36,10 @@ function renderTabs(mode: AccountMode | null, isLoading = false) {
         Screen: 'Screen',
       }),
     },
+    '../../theme/appearance': { useAppearance: () => ({ colors: appearance === 'light'
+      ? { navigation: '#ffffff', navigationActive: '#202a35', navigationInactive: '#697583', border: '#dfe4e9' }
+      : { navigation: '#080a0d', navigationActive: '#ffffff', navigationInactive: '#9aa8b6', border: '#435364' } }) },
+    '../../theme/useReducedMotion': { useReducedMotion: () => reduced },
     '../../components/navigation/TabBarButton': {
       default: 'TabBarButton',
       __esModule: true,
@@ -179,9 +183,9 @@ describe('bottom tab icon contract', () => {
       /fontScale > 1\s*\? \{ height: 49 \+ Math\.ceil\(14 \* \(fontScale - 1\)\) \+ insets\.bottom \}\s*: \{\}/,
     );
     assert.doesNotMatch(tabs, /tabBarAllowFontScaling:\s*false/);
-    assert.match(tabs, /tabBarActiveTintColor: '#ffffff'/);
-    assert.match(tabs, /tabBarInactiveTintColor: '#aebbc8'/);
-    assert.match(tabs, /backgroundColor: '#19232e'/);
+    assert.match(tabs, /tabBarActiveTintColor: colors.navigationActive/);
+    assert.match(tabs, /tabBarInactiveTintColor: colors.navigationInactive/);
+    assert.match(tabs, /backgroundColor: colors.navigation/);
   });
 });
 
@@ -199,8 +203,15 @@ describe('bottom tab visual states', () => {
       assert.equal(active.props.width, 25); assert.equal(inactive.props.width, 25);
     }
     const tree = renderTabs('general');
-    assert.equal(tree.props.screenOptions.tabBarActiveTintColor, '#ffffff');
-    assert.equal(tree.props.screenOptions.tabBarInactiveTintColor, '#aebbc8');
-    assert.equal(tree.props.screenOptions.tabBarStyle.backgroundColor, '#19232e');
+    assert.equal(tree.props.screenOptions.tabBarActiveTintColor, '#202a35');
+    assert.equal(tree.props.screenOptions.tabBarInactiveTintColor, '#697583');
+    assert.equal(tree.props.screenOptions.tabBarStyle.backgroundColor, '#ffffff');
+    const dark = renderTabs('general', false, 'dark');
+    assert.equal(dark.props.screenOptions.tabBarActiveTintColor, '#ffffff');
+    assert.equal(dark.props.screenOptions.tabBarInactiveTintColor, '#9aa8b6');
+    assert.equal(dark.props.screenOptions.tabBarStyle.backgroundColor, '#080a0d');
+    assert.equal(tree.props.screenOptions.animation, 'fade');
+    assert.equal(tree.props.screenOptions.transitionSpec.config.duration, 130);
+    assert.equal(renderTabs('general', false, 'light', true).props.screenOptions.animation, 'none');
   });
 });

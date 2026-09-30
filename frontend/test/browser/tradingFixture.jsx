@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppearanceProvider } from '../../src/theme/appearance';
 import Detail from '../../src/screens/asset/AssetDetailScreen';
+import Order from '../../src/screens/order/OrderScreen';
 import Chart from '../../src/screens/asset/AssetChartScreen';
 import Market from '../../src/screens/market/MarketScreen';
 import Search from '../../src/screens/market/MarketSearchScreen';
@@ -23,9 +24,12 @@ function App() {
   const [, refresh] = React.useReducer((n) => n + 1, 0);
   state.navigate = (next, params = {}) => {
     if (params.assetId) state.assetId = params.assetId;
+    if (params.side) state.side = params.side;
     setScreen(
-      next === 'AssetChart'
-        ? 'chart'
+      next === 'Order'
+        ? 'order'
+        : next === 'AssetChart'
+          ? 'chart'
         : next === 'MarketSearch'
           ? 'search'
           : next === 'Market'
@@ -45,6 +49,7 @@ function App() {
   };
   const Component = {
     detail: Detail,
+    order: Order,
     chart: Chart,
     market: Market,
     search: Search,
@@ -60,7 +65,7 @@ function App() {
         >
           <Component
             key={state.assetId + ':' + screen}
-            route={{ params: { assetId: state.assetId, returnToAsset: true } }}
+            route={{ params: { assetId: state.assetId, accountId: state.accountId, side: state.side ?? 'buy', returnToAsset: true } }}
             navigation={navigation}
           />
         </SafeAreaProvider>

@@ -18,6 +18,7 @@ for (const mode of ['light', 'dark'] as const) {
       },
       '@react-navigation/native-stack': { createNativeStackNavigator: () => ({ Navigator: 'Navigator', Screen: 'Screen' }) },
       '../../theme/appearance': { useAppearance: () => ({ mode, colors }) },
+      '../../theme/useReducedMotion': { useReducedMotion: () => false },
       './navigationRef': { rootNavigationRef: {} },
       '../../components/states/ScreenErrorBoundary': { default: 'ScreenErrorBoundary', __esModule: true },
     };

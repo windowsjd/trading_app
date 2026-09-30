@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useMemo } from 'react';
 import {
   View,
@@ -200,30 +201,30 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: semantic.screen },
   content: { padding: 16, paddingBottom: 24 },
   card: {
     borderWidth: 1,
-    borderColor: '#e8e8e8',
+    borderColor: semantic.border,
     borderRadius: 14,
     padding: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: semantic.surface,
     gap: 8,
     marginBottom: 12,
   },
   rowCard: {
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: semantic.border,
     borderRadius: 14,
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: semantic.screen,
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 10,
   },
-  label: { fontSize: 13, color: '#666' },
+  label: { fontSize: 13, color: semantic.secondary },
   itemTitle: { fontSize: 15, fontWeight: '700' },
-  helper: { fontSize: 14, color: '#444' },
+  helper: { fontSize: 14, color: semantic.secondary },
   alignEnd: { alignItems: 'flex-end' },
   footerBox: { marginTop: 12 },
 });

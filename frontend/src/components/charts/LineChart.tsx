@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useCallback, useMemo, useState } from 'react';
 import { type LayoutChangeEvent, StyleSheet, Text, View } from '../../theme/native';
 import Svg, { Circle, Line as SvgLine, Path } from 'react-native-svg';
@@ -40,10 +41,10 @@ export default function LineChart({
   labelFormatter,
   emptyMessage = '차트 데이터가 충분하지 않습니다.',
 }: LineChartProps) {
-  const { mode, colors } = useAppearance();
-  const gridColor = mode === 'dark' ? colors.border : '#eceff3';
-  const markerColor = mode === 'dark' ? colors.screen : '#fff';
-  const crosshairColor = mode === 'dark' ? colors.secondary : '#64748b';
+  const { colors } = useAppearance();
+  const gridColor = colors.border;
+  const markerColor = colors.screen;
+  const crosshairColor = colors.secondary;
   const [width, setWidth] = useState(320);
   // Bind selection to the dataset and layout. Account/range changes cannot
   // momentarily show the old point, even before an effect gets to run.
@@ -203,14 +204,14 @@ export default function LineChart({
 const styles = StyleSheet.create({
   container: { minHeight: 128, gap: 6, minWidth: 0 },
   value: {
-    color: '#111',
+    color: semantic.text,
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 21,
     flexShrink: 1,
   },
   date: {
-    color: '#666',
+    color: semantic.secondary,
     fontSize: 12,
     lineHeight: 18,
     textAlign: 'center',
@@ -219,12 +220,12 @@ const styles = StyleSheet.create({
   guideValue: {
     position: 'absolute',
     maxWidth: '85%',
-    backgroundColor: '#eff6ff',
+    backgroundColor: semantic.infoSurface,
     borderRadius: 4,
     paddingHorizontal: 4,
   },
   guideValueText: {
-    color: '#1d4ed8',
+    color: semantic.info,
     fontSize: 11,
     lineHeight: 18,
     flexShrink: 1,

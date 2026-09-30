@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
@@ -499,11 +500,11 @@ function FilterChip({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: semantic.screen },
   accountHeader: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#333',
+    color: semantic.text,
     paddingBottom: 8,
     lineHeight: 20,
   },
@@ -511,21 +512,21 @@ const styles = StyleSheet.create({
   filterRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   chip: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: semantic.border,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#fff',
+    backgroundColor: semantic.screen,
   },
-  chipActive: { backgroundColor: '#111', borderColor: '#111' },
-  chipText: { color: '#111', fontWeight: '600' },
-  chipTextActive: { color: '#fff', fontWeight: '600' },
+  chipActive: { backgroundColor: semantic.selected, borderColor: semantic.selected },
+  chipText: { color: semantic.text, fontWeight: '600' },
+  chipTextActive: { color: semantic.onAccent, fontWeight: '600' },
   rowCard: {
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: semantic.border,
     borderRadius: 14,
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: semantic.screen,
     marginBottom: 10,
     gap: 12,
   },
@@ -540,23 +541,23 @@ const styles = StyleSheet.create({
   rowNameColumn: { flex: 1, minWidth: 0 },
   cancelButton: {
     borderWidth: 1,
-    borderColor: '#c62828',
+    borderColor: semantic.negative,
     borderRadius: 10,
     paddingVertical: 10,
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: semantic.screen,
   },
   cancelButtonDisabled: {
-    borderColor: '#ddd',
+    borderColor: semantic.border,
   },
   cancelButtonText: {
-    color: '#c62828',
+    color: semantic.negative,
     fontWeight: '700',
     textAlign: 'center',
     lineHeight: 21,
   },
   itemTitle: { fontSize: 15, fontWeight: '700', lineHeight: 21 },
-  helper: { fontSize: 14, color: '#444', lineHeight: 20 },
+  helper: { fontSize: 14, color: semantic.secondary, lineHeight: 20 },
   // The amount column keeps its own track: it is the figure the row is about.
   alignEnd: { alignItems: 'flex-end', flexShrink: 0 },
   footerLoader: { paddingVertical: 16 },

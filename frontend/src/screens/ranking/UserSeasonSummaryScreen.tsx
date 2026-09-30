@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useCallback } from 'react';
 import {
   View,
@@ -207,19 +208,19 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
   );
 }
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#fff' },
+  screen: { flex: 1, backgroundColor: semantic.screen },
   content: { padding: 16, paddingBottom: 32, gap: 12 },
   card: {
     borderWidth: 1,
-    borderColor: '#e8e8e8',
+    borderColor: semantic.border,
     borderRadius: 14,
     padding: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: semantic.surface,
     gap: 10,
   },
   title: { fontSize: 22, fontWeight: '700', flexShrink: 1 },
   label: { fontSize: 17, fontWeight: '700' },
-  helper: { fontSize: 14, color: '#444', flexShrink: 1 },
+  helper: { fontSize: 14, color: semantic.secondary, flexShrink: 1 },
   row: {
     flexDirection: 'row',
     flexWrap: 'wrap',

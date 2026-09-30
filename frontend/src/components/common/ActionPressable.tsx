@@ -1,3 +1,5 @@
+import { resolveSemanticColor } from '../../theme/tokens';
+import { useAppearance } from '../../theme/appearance';
 import React, {
   useCallback,
   useEffect,
@@ -48,6 +50,7 @@ export default function ActionPressable({
   ref,
   ...props
 }: Props) {
+  const { colors } = useAppearance();
   const host = useRef<View>(null);
   const session = useRef({ id: 0, active: false, expanded: false });
   const [ripple, setRipple] = useState<Ripple | null>(null);
@@ -147,6 +150,7 @@ export default function ActionPressable({
       motion.rippleScale.setValue(0.02);
       motion.opacity.setValue(1);
       motion.wash.setValue(1);
+      motion.pressScale.setValue(0.995);
       Animated.timing(motion.pressScale, {
         ...animationOptions,
         useNativeDriver: false,
@@ -224,7 +228,7 @@ export default function ActionPressable({
           StyleSheet.flatten(
             typeof style === 'function' ? style(state) : style,
           ) ?? {};
-        const color = processColor(base.backgroundColor);
+        const color = processColor(resolveSemanticColor(base.backgroundColor, colors) ?? colors.screen);
         const palette = getFeedbackPalette(
           typeof color === 'number' ? color : null,
         );
@@ -255,7 +259,7 @@ export default function ActionPressable({
                   style={[
                     StyleSheet.absoluteFillObject,
                     {
-                      backgroundColor: '#fff',
+                      backgroundColor: palette.washColor,
                       opacity: motion.wash.interpolate({
                         inputRange: [0, 1],
                         outputRange: [0, palette.washOpacity],

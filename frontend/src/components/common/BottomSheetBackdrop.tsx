@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React from 'react';
 import { Modal, Pressable, StyleSheet, View } from '../../theme/native';
 
@@ -37,7 +38,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sheet: {
-    backgroundColor: '#fff',
+    backgroundColor: semantic.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,

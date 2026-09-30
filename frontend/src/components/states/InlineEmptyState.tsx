@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React from 'react';
 import { View, Text, StyleSheet } from '../../theme/native';
 
@@ -19,13 +20,13 @@ export default function InlineEmptyState({
 const styles = StyleSheet.create({
   box: {
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: semantic.border,
     borderRadius: 12,
     padding: 14,
-    backgroundColor: '#fff',
+    backgroundColor: semantic.screen,
     gap: 6,
   },
   // Section notices carry full sentences; they wrap rather than clip.
   title: { fontSize: 15, fontWeight: '700', lineHeight: 21 },
-  message: { fontSize: 14, color: '#444', lineHeight: 20 },
+  message: { fontSize: 14, color: semantic.secondary, lineHeight: 20 },
 });

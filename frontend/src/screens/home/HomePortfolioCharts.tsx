@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from '../../theme/native';
 import { DonutChart, LineChart } from '../../components/charts';
@@ -98,12 +99,12 @@ export default function HomePortfolioCharts({
 const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
-    borderColor: '#e8e8e8',
+    borderColor: semantic.border,
     borderRadius: 14,
     padding: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: semantic.surface,
     gap: 8,
   },
-  label: { fontSize: 13, color: '#666' },
-  note: { fontSize: 12, color: '#666', lineHeight: 18 },
+  label: { fontSize: 13, color: semantic.secondary },
+  note: { fontSize: 12, color: semantic.secondary, lineHeight: 18 },
 });

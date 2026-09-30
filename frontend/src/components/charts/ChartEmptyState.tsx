@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React from 'react';
 import { View, Text, StyleSheet } from '../../theme/native';
 
@@ -17,15 +18,15 @@ const styles = StyleSheet.create({
   container: {
     minHeight: 128,
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: semantic.border,
     borderRadius: 12,
-    backgroundColor: '#fff',
+    backgroundColor: semantic.screen,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
   },
   text: {
-    color: '#555',
+    color: semantic.secondary,
     fontSize: 14,
     textAlign: 'center',
   },

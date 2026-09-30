@@ -109,12 +109,12 @@ describe('ActionPressable real React Native Web visual contract', () => {
         };
         check(false, 1);
         act(() => button().props.onPressIn(event));
-        check(true, 1);
-        act(() => h.animations.find((a: any) => a.options.toValue === 0.99).finish());
-        check(true, 0.99);
+        check(true, 0.995);
+        act(() => h.animations.find((a: any) => a.options.toValue === 0.985).finish());
+        check(true, 0.985);
         // Pressable also sends pressOut when a gesture leaves/cancels; no action.
         act(() => button().props.onPressOut(event));
-        check(false, 0.99);
+        check(false, 0.985);
         h.finish();
         check(false, 1);
       });

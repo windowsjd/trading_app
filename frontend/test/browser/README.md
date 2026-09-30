@@ -1,6 +1,6 @@
 # Trading UI browser regression
 
-`tradingBrowser.cjs` bundles the actual RN Web screens, React Query cache,
+`tradingBrowser.cjs` bundles the current chart-first detail and separate Order route, React Query cache,
 account-bound API wrappers, quote/create flow, shared SVG renderer and web
 pointer adapter. Only transport, authentication/account inputs and navigation
 are fixture boundaries. Outbound requests are blocked except the local server.
@@ -11,6 +11,7 @@ Chromium browser available to Playwright:
 
 ```sh
 NODE_PATH=/path/to/browser-tools/node_modules node test/browser/tradingBrowser.cjs
+NODE_PATH=/path/to/browser-tools/node_modules node test/browser/orderLayoutBrowser.cjs
 ```
 
 Set `PLAYWRIGHT_BROWSERS_PATH` if Chromium uses a non-default installation path.
@@ -25,6 +26,8 @@ lookup, shared `/me` query, Han list/search/navigation/encoding, five asset
 charts, pointer release/cancel/blur/capture/visibility/buttons=0, X pan/zoom,
 Y range/center/clamp and shared candle/current-price/crosshair mapping,
 latest/timeframe reset and active gesture unmount.
+
+The focused `orderLayoutBrowser.cjs` checks 320/360/390px in light and dark mode: two simultaneous columns, visible native value/placeholder/caret colors, long-decimal caret scrolling, buy amount, limit price, sell quantity, ratios, and a quote/create action. Screenshots go to `/tmp/trading-order-browser` (override with `ORDER_BROWSER_OUTPUT`).
 
 Quantity controls additionally cover 320/390/768px × font scale 1/1.5/2:
 one-row presets at the default scale, selected styling, keyboard arrows/Home/End,

@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   AppState,
@@ -7,7 +8,6 @@ import {
   type AppStateStatus,
 } from '../../theme/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';
 import ActionPressable from '../../components/common/ActionPressable';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
@@ -142,19 +142,19 @@ export default function PendingOrders({ accountId, isFocused, seasonUi }: Props)
 
 const styles = StyleSheet.create({
   list: { gap: 10, minWidth: 0 },
-  count: { fontSize: 12, color: '#697583' },
+  count: { fontSize: 12, color: semantic.muted },
   row: {
     borderWidth: 1,
-    borderColor: '#edf0f3',
+    borderColor: semantic.border,
     borderRadius: 12,
     padding: 14,
     gap: 6,
     minWidth: 0,
   },
-  name: { fontSize: 17, fontWeight: '700', color: '#202a35', flexShrink: 1 },
+  name: { fontSize: 17, fontWeight: '700', color: semantic.text, flexShrink: 1 },
   side: { fontSize: 14, fontWeight: '700' },
-  buy: { color: BUY_COLOR },
-  sell: { color: SELL_COLOR },
+  buy: { color: semantic.buy },
+  sell: { color: semantic.sell },
   metric: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -162,10 +162,10 @@ const styles = StyleSheet.create({
     columnGap: 8,
     rowGap: 2,
   },
-  label: { fontSize: 13, color: '#697583' },
+  label: { fontSize: 13, color: semantic.muted },
   value: {
     fontSize: 14,
-    color: '#536170',
+    color: semantic.secondary,
     fontVariant: ['tabular-nums'],
     flexShrink: 1,
     maxWidth: '100%',
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     padding: 10,
     borderWidth: 1,
-    borderColor: '#dfe4e9',
+    borderColor: semantic.border,
     borderRadius: 8,
   },
 });

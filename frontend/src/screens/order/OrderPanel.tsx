@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import Decimal from 'decimal.js';
 import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';
 import {
@@ -1160,8 +1161,7 @@ export function OrderForm({
   );
 }
 
-/** Keep native caret scrolling, with the entire raw value visible underneath
- * whenever it is wider than this column. No truncation or input formatting. */
+/** Keep the native caret and horizontal scrolling in the actual input. */
 function OrderNumberInput(props: TextInputProps) {
   const { fontScale } = useWindowDimensions();
   const [width, setWidth] = useState(0);
@@ -1172,9 +1172,8 @@ function OrderNumberInput(props: TextInputProps) {
       style={styles.group}
       onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
     >
-      <TextInput {...props} style={fontScale > 1
-        ? [props.style, { minHeight: Math.ceil(24 * fontScale + 32) }]
-        : props.style} />
+      <TextInput {...props} style={[props.style, styles.compactInput,
+        fontScale > 1 && { minHeight: Math.ceil(22 * fontScale + 24), lineHeight: Math.ceil(22 * fontScale) }]} />
       {showFullValue ? (
         <Text
           selectable
@@ -1208,19 +1207,19 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 4,
     borderRadius: 8,
-    backgroundColor: '#f1f3f5',
+    backgroundColor: semantic.raised,
     justifyContent: 'center',
     alignItems: 'center',
   },
   tabText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#555',
+    color: semantic.secondary,
     textAlign: 'center',
   },
   buyActive: { backgroundColor: BUY_COLOR },
   sellActive: { backgroundColor: SELL_COLOR },
-  activeText: { color: '#fff' },
+  activeText: { color: semantic.onAccent },
   typeTab: {
     flex: 1,
     minWidth: 0,
@@ -1232,26 +1231,26 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderColor: 'transparent',
   },
-  typeActive: { borderColor: '#202a35', backgroundColor: '#f4f6f8' },
+  typeActive: { borderColor: semantic.selected, backgroundColor: semantic.raised },
   typeText: {
     fontSize: 13,
-    color: '#202a35',
+    color: semantic.text,
     fontWeight: '600',
     textAlign: 'center',
   },
   group: { gap: 4, minWidth: 0 },
-  label: { fontSize: 12, color: '#697583' },
-  helper: { fontSize: 12, color: '#536170' },
+  label: { fontSize: 12, color: semantic.muted },
+  helper: { fontSize: 12, color: semantic.secondary },
   amount: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#202a35',
+    color: semantic.text,
     fontVariant: ['tabular-nums'],
   },
   marketPrice: {
     fontSize: 14,
-    color: '#697583',
-    backgroundColor: '#f4f6f8',
+    color: semantic.muted,
+    backgroundColor: semantic.raised,
     borderRadius: 8,
     padding: 12,
     minHeight: 46,
@@ -1261,15 +1260,16 @@ const styles = StyleSheet.create({
     minWidth: 0,
     minHeight: 54,
     borderWidth: 1,
-    borderColor: '#d9dfe5',
+    borderColor: semantic.border,
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 8,
     fontSize: 16,
     lineHeight: 24,
-    color: '#202a35',
-    backgroundColor: '#fff',
+    color: semantic.text,
+    backgroundColor: semantic.input,
   },
+  compactInput: { flexShrink: 1, paddingHorizontal: 4, fontSize: 14, lineHeight: 22 },
   ratios: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1295,21 +1295,21 @@ const styles = StyleSheet.create({
     minWidth: 0,
     minHeight: 32,
     borderWidth: 1,
-    borderColor: '#dfe4e9',
+    borderColor: semantic.border,
     borderRadius: 6,
     paddingVertical: 4,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ratioText: { fontSize: 12, fontWeight: '600', color: '#354251' },
-  ratioSelected: { backgroundColor: '#202a35', borderColor: '#202a35' },
+  ratioText: { fontSize: 11, fontWeight: '600', color: semantic.text },
+  ratioSelected: { backgroundColor: semantic.selected, borderColor: semantic.selected },
   ratioPending: { opacity: 0.4 },
   preview: {
     gap: 8,
     borderTopWidth: 1,
-    borderColor: '#edf0f3',
+    borderColor: semantic.border,
     paddingTop: 10,
   },
-  errorText: { fontSize: 12, color: '#b32d2d' },
-  warningText: { fontSize: 12, color: '#7a4b00' },
+  errorText: { fontSize: 12, color: semantic.negative },
+  warningText: { fontSize: 12, color: semantic.warning },
 });

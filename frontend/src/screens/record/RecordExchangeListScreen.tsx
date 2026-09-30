@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useMemo } from 'react';
 import {
   View,
@@ -129,20 +130,20 @@ export default function RecordExchangeListScreen({ route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: semantic.screen },
   content: { padding: 16, paddingBottom: 24 },
   rowCard: {
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: semantic.border,
     borderRadius: 14,
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: semantic.screen,
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 10,
   },
   itemTitle: { fontSize: 15, fontWeight: '700' },
-  helper: { fontSize: 14, color: '#444' },
+  helper: { fontSize: 14, color: semantic.secondary },
   alignEnd: { alignItems: 'flex-end' },
   footerLoader: { paddingVertical: 16 },
 });

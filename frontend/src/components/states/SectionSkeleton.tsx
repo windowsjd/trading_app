@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React from 'react';
 import { View, StyleSheet } from '../../theme/native';
 
@@ -31,13 +32,13 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: semantic.border,
     borderRadius: 14,
-    backgroundColor: '#fafafa',
+    backgroundColor: semantic.surface,
   },
   line: {
     width: '100%',
     borderRadius: 8,
-    backgroundColor: '#ececec',
+    backgroundColor: semantic.raised,
   },
 });

@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -94,7 +95,7 @@ export default function AccountSwitcher({ compact = false }: Props) {
         style={[styles.trigger, styles.stateBox]}
         testID={TEST_IDS.tradingAccount.switcherLoading}
       >
-        <ActivityIndicator size="small" color="#1565c0" />
+        <ActivityIndicator size="small" color={semantic.info} />
         <Text style={styles.stateText}>계정 정보를 불러오는 중입니다…</Text>
       </View>
     );
@@ -229,7 +230,7 @@ export default function AccountSwitcher({ compact = false }: Props) {
                 </View>
                 <View style={styles.rowBadgeColumn}>
                   {startGeneral.isPending ? (
-                    <ActivityIndicator size="small" color="#1565c0" />
+                    <ActivityIndicator size="small" color={semantic.info} />
                   ) : (
                     <Text style={styles.startAction}>시작</Text>
                   )}
@@ -306,15 +307,15 @@ function StatusBadge({
 }
 
 const BADGE_TONE = StyleSheet.create({
-  active: { backgroundColor: '#e3f2fd' },
-  suspended: { backgroundColor: '#fff8e1' },
-  closed: { backgroundColor: '#eceff1' },
+  active: { backgroundColor: semantic.infoSurface },
+  suspended: { backgroundColor: semantic.warningSurface },
+  closed: { backgroundColor: semantic.raised },
 });
 
 const BADGE_TEXT_TONE = StyleSheet.create({
-  active: { color: '#1565c0' },
-  suspended: { color: '#ef6c00' },
-  closed: { color: '#546e7a' },
+  active: { color: semantic.info },
+  suspended: { color: semantic.warning },
+  closed: { color: semantic.secondary },
 });
 
 const styles = StyleSheet.create({
@@ -326,35 +327,35 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: '#fff',
+    backgroundColor: semantic.screen,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: semantic.border,
   },
   // flexShrink lets the text column give way; the badge column never does.
   triggerTextColumn: { flex: 1, flexShrink: 1, gap: 2 },
   triggerBadgeColumn: { flexShrink: 0, alignItems: 'flex-end', gap: 4 },
-  triggerLabel: { fontSize: 12, color: '#78909c' },
-  triggerTitle: { fontSize: 16, fontWeight: '700', color: '#212121' },
-  triggerSubtitle: { fontSize: 13, color: '#546e7a' },
-  triggerMeaning: { fontSize: 12, color: '#78909c' },
-  chevron: { fontSize: 12, color: '#1565c0', fontWeight: '600' },
+  triggerLabel: { fontSize: 12, color: semantic.muted },
+  triggerTitle: { fontSize: 16, fontWeight: '700', color: semantic.text },
+  triggerSubtitle: { fontSize: 13, color: semantic.secondary },
+  triggerMeaning: { fontSize: 12, color: semantic.muted },
+  chevron: { fontSize: 12, color: semantic.info, fontWeight: '600' },
 
   stateBox: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  stateText: { flex: 1, fontSize: 13, color: '#546e7a' },
+  stateText: { flex: 1, fontSize: 13, color: semantic.secondary },
   errorBox: { flexDirection: 'column', alignItems: 'stretch', gap: 8 },
-  errorText: { fontSize: 13, color: '#c62828' },
+  errorText: { fontSize: 13, color: semantic.negative },
   retryButton: {
     alignSelf: 'flex-start',
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: '#e3f2fd',
+    backgroundColor: semantic.infoSurface,
   },
-  retryText: { color: '#1565c0', fontWeight: '600' },
+  retryText: { color: semantic.info, fontWeight: '600' },
 
   sheetTitle: { fontSize: 18, fontWeight: '700', marginBottom: 4 },
-  sheetHelp: { fontSize: 13, color: '#546e7a', marginBottom: 12 },
+  sheetHelp: { fontSize: 13, color: semantic.secondary, marginBottom: 12 },
 
   row: {
     flexDirection: 'row',
@@ -364,16 +365,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#eceff1',
+    borderColor: semantic.border,
     marginBottom: 8,
   },
-  rowSelected: { borderColor: '#1565c0', backgroundColor: '#f5faff' },
+  rowSelected: { borderColor: semantic.info, backgroundColor: semantic.infoSurface },
   rowTextColumn: { flex: 1, flexShrink: 1, gap: 2 },
   rowBadgeColumn: { flexShrink: 0, alignItems: 'flex-end', gap: 4 },
-  rowTitle: { fontSize: 15, fontWeight: '700', color: '#212121' },
-  rowSubtitle: { fontSize: 13, color: '#546e7a' },
-  rowMeaning: { fontSize: 12, color: '#78909c' },
-  selectedMark: { fontSize: 11, color: '#1565c0', fontWeight: '700' },
+  rowTitle: { fontSize: 15, fontWeight: '700', color: semantic.text },
+  rowSubtitle: { fontSize: 13, color: semantic.secondary },
+  rowMeaning: { fontSize: 12, color: semantic.muted },
+  selectedMark: { fontSize: 11, color: semantic.info, fontWeight: '700' },
 
   badge: { paddingVertical: 3, paddingHorizontal: 8, borderRadius: 999 },
   badgeText: { fontSize: 11, fontWeight: '700' },
@@ -390,10 +391,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: '#90caf9',
-    backgroundColor: '#f5faff',
+    borderColor: semantic.border,
+    backgroundColor: semantic.infoSurface,
   },
-  startAction: { fontSize: 12, color: '#1565c0', fontWeight: '700' },
+  startAction: { fontSize: 12, color: semantic.info, fontWeight: '700' },
   // Full-width copy and CTA grow vertically, even with large Android fonts.
   seasonJoinBox: {
     flexDirection: 'column',
@@ -403,5 +404,5 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   // Full message, wrapping: a Korean error must never be clipped to fit a row.
-  startError: { marginTop: 6, fontSize: 13, color: '#c62828', lineHeight: 20 },
+  startError: { marginTop: 6, fontSize: 13, color: semantic.negative, lineHeight: 20 },
 });

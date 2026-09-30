@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from '../../theme/native';
 
@@ -32,11 +33,11 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   stacked: { flexDirection: 'column', gap: 3 },
-  label: { fontSize: 14, color: '#555', lineHeight: 21, flexShrink: 1 },
+  label: { fontSize: 14, color: semantic.secondary, lineHeight: 21, flexShrink: 1 },
   value: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111',
+    color: semantic.text,
     lineHeight: 24,
     flexShrink: 1,
     minWidth: 0,

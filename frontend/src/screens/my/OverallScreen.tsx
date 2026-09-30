@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React from 'react';
 import { ScrollView, Text, StyleSheet } from '../../theme/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -30,13 +31,13 @@ export default function OverallScreen({
   );
 }
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#fff' },
+  screen: { flex: 1, backgroundColor: semantic.screen },
   content: { padding: 16, gap: 12 },
   row: {
     padding: 20,
     borderWidth: 1,
-    borderColor: '#e8e8e8',
-    backgroundColor: '#fafafa',
+    borderColor: semantic.border,
+    backgroundColor: semantic.surface,
     borderRadius: 14,
   },
   label: { fontSize: 18, fontWeight: '700', flexShrink: 1 },

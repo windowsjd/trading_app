@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text } from '../../theme/native';
 
@@ -55,20 +56,20 @@ export default function GuideScreen({ navigation }: GuideScreenProps) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: semantic.screen },
   content: { padding: 16, paddingBottom: 32, gap: 12 },
-  introduction: { fontSize: 16, lineHeight: 26, color: '#546e7a', marginBottom: 12 },
-  sectionTitle: { fontSize: 20, lineHeight: 28, fontWeight: '700', color: '#111' },
+  introduction: { fontSize: 16, lineHeight: 26, color: semantic.secondary, marginBottom: 12 },
+  sectionTitle: { fontSize: 20, lineHeight: 28, fontWeight: '700', color: semantic.text },
   card: {
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: semantic.border,
     borderRadius: 14,
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: semantic.screen,
     gap: 8,
   },
-  number: { fontSize: 14, lineHeight: 22, fontWeight: '600', color: '#666' },
-  title: { fontSize: 20, lineHeight: 28, fontWeight: '700', color: '#111' },
-  description: { fontSize: 16, lineHeight: 26, color: '#546e7a' },
-  available: { fontSize: 14, lineHeight: 23, color: '#245b76', fontWeight: '700', marginTop: 4 },
+  number: { fontSize: 14, lineHeight: 22, fontWeight: '600', color: semantic.secondary },
+  title: { fontSize: 20, lineHeight: 28, fontWeight: '700', color: semantic.text },
+  description: { fontSize: 16, lineHeight: 26, color: semantic.secondary },
+  available: { fontSize: 14, lineHeight: 23, color: semantic.secondary, fontWeight: '700', marginTop: 4 },
 });

@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useMemo, useState } from 'react';
 import {
   View,
@@ -298,11 +299,11 @@ function FilterChip({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: semantic.screen },
   accountHeader: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#333',
+    color: semantic.text,
     paddingBottom: 8,
     lineHeight: 20,
   },
@@ -312,40 +313,40 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   title: { fontSize: 24, fontWeight: '700' },
-  label: { fontSize: 13, color: '#666' },
+  label: { fontSize: 13, color: semantic.secondary },
   filterGroup: { gap: 8 },
   filterRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   chip: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: semantic.border,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#fff',
+    backgroundColor: semantic.screen,
   },
-  chipActive: { backgroundColor: '#111', borderColor: '#111' },
-  chipText: { color: '#111', fontWeight: '600' },
-  chipTextActive: { color: '#fff', fontWeight: '600' },
+  chipActive: { backgroundColor: semantic.selected, borderColor: semantic.selected },
+  chipText: { color: semantic.text, fontWeight: '600' },
+  chipTextActive: { color: semantic.onAccent, fontWeight: '600' },
   rowCard: {
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: semantic.border,
     borderRadius: 14,
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: semantic.screen,
     marginBottom: 10,
     gap: 12,
   },
-  asset: { fontSize: 15, lineHeight: 22, color: '#222', flexShrink: 1 },
-  balance: { fontSize: 14, color: '#444', textAlign: 'right' },
+  asset: { fontSize: 15, lineHeight: 22, color: semantic.text, flexShrink: 1 },
+  balance: { fontSize: 14, color: semantic.secondary, textAlign: 'right' },
   itemTitle: { fontSize: 15, fontWeight: '700' },
-  helper: { fontSize: 14, color: '#444' },
+  helper: { fontSize: 14, color: semantic.secondary },
   amount: {
     flexShrink: 1,
     fontSize: 15,
     fontWeight: '700',
     textAlign: 'right',
   },
-  creditAmount: { color: '#166534' },
-  debitAmount: { color: '#b91c1c' },
+  creditAmount: { color: semantic.positive },
+  debitAmount: { color: semantic.negative },
   footerLoader: { paddingVertical: 16 },
 });

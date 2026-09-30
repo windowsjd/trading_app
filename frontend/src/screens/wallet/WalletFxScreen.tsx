@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
@@ -631,58 +632,58 @@ export default function WalletFxScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: semantic.screen },
   content: { padding: 16, gap: 12, paddingBottom: 24 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   flex: { flex: 1 },
   card: {
     borderWidth: 1,
-    borderColor: '#e8e8e8',
+    borderColor: semantic.border,
     borderRadius: 14,
     padding: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: semantic.surface,
     gap: 10,
   },
-  label: { fontSize: 13, color: '#666' },
+  label: { fontSize: 13, color: semantic.secondary },
   value: { fontSize: 16, fontWeight: '700', lineHeight: 24, flexShrink: 1 },
-  helper: { fontSize: 14, color: '#444', lineHeight: 21, flexShrink: 1 },
+  helper: { fontSize: 14, color: semantic.secondary, lineHeight: 21, flexShrink: 1 },
   // Full text, wrapped: a capability notice that is cut to one ellipsised line
   // stops explaining why the button is gone.
   blockedTitle: { fontSize: 17, fontWeight: '700', lineHeight: 24 },
-  blockedMessage: { fontSize: 14, color: '#444', lineHeight: 21 },
-  errorText: { fontSize: 14, color: '#c62828' },
+  blockedMessage: { fontSize: 14, color: semantic.secondary, lineHeight: 21 },
+  errorText: { fontSize: 14, color: semantic.negative },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: semantic.border,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    backgroundColor: '#fff',
+    backgroundColor: semantic.screen,
     fontSize: 16,
   },
   directionChip: {
     flex: 1,
     minWidth: 130,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: semantic.border,
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: semantic.screen,
   },
   directionChipActive: {
-    backgroundColor: '#111',
-    borderColor: '#111',
+    backgroundColor: semantic.selected,
+    borderColor: semantic.selected,
   },
   directionChipText: {
-    color: '#111',
+    color: semantic.text,
     fontWeight: '600',
     lineHeight: 21,
     textAlign: 'center',
     flexShrink: 1,
   },
   directionChipTextActive: {
-    color: '#fff',
+    color: semantic.onAccent,
     fontWeight: '600',
     lineHeight: 21,
     textAlign: 'center',

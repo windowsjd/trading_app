@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React from 'react';
 import { StyleSheet, View } from '../../theme/native';
 import { SafeAreaView } from '../../theme/safeArea';
@@ -63,7 +64,7 @@ export function AssetDetailContent({
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#fff' },
+  screen: { flex: 1, backgroundColor: semantic.screen },
   footer: {
     flexDirection: 'row',
     gap: 10,
@@ -71,8 +72,8 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 8,
     borderTopWidth: 1,
-    borderTopColor: '#edf0f3',
-    backgroundColor: '#fff',
+    borderTopColor: semantic.border,
+    backgroundColor: semantic.screen,
   },
   action: { flex: 1, minWidth: 0, minHeight: 50, paddingHorizontal: 8 },
 });

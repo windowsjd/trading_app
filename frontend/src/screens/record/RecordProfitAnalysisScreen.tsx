@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React from 'react';
 import {
   View,
@@ -342,33 +343,33 @@ export default function RecordProfitAnalysisScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: semantic.screen },
   content: { padding: 16, gap: 12, paddingBottom: 24 },
   row: { flexDirection: 'row', gap: 10 },
   flex: { flex: 1 },
   card: {
     borderWidth: 1,
-    borderColor: '#e8e8e8',
+    borderColor: semantic.border,
     borderRadius: 14,
     padding: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: semantic.surface,
     gap: 8,
   },
   title: { fontSize: 22, fontWeight: '700' },
-  label: { fontSize: 13, color: '#666' },
+  label: { fontSize: 13, color: semantic.secondary },
   itemTitle: { fontSize: 15, fontWeight: '700' },
-  helper: { fontSize: 14, color: '#444' },
-  warningText: { fontSize: 13, color: '#7a4b00' },
+  helper: { fontSize: 14, color: semantic.secondary },
+  warningText: { fontSize: 13, color: semantic.warning },
   chartState: { gap: 8 },
   assetSummaryRow: {
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: semantic.border,
     paddingTop: 10,
     gap: 4,
   },
   assetRow: {
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: semantic.border,
     paddingTop: 10,
     gap: 4,
   },

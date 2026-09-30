@@ -2,6 +2,8 @@ import React from 'react';
 import { useWindowDimensions } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppearance } from '../../theme/appearance';
+import { useReducedMotion } from '../../theme/useReducedMotion';
 
 import TabBarIcon from '../../components/navigation/TabBarIcon';
 import TabBarButton from '../../components/navigation/TabBarButton';
@@ -20,6 +22,8 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 export default function MainTabs() {
   const { fontScale } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const { colors } = useAppearance();
+  const reducedMotion = useReducedMotion();
   const { selectedAccount, isLoading } = useTradingAccount();
 
   // The entry flow normally resolves the account before MainTabs mounts. Keep
@@ -40,11 +44,13 @@ export default function MainTabs() {
         headerShown: false,
         tabBarButton: (props) => <TabBarButton {...props} />,
         tabBarLabelPosition: 'below-icon',
-        tabBarActiveTintColor: '#ffffff',
-        tabBarInactiveTintColor: '#aebbc8',
+        tabBarActiveTintColor: colors.navigationActive,
+        tabBarInactiveTintColor: colors.navigationInactive,
+        animation: reducedMotion ? 'none' : 'fade',
+        transitionSpec: { animation: 'timing', config: { duration: 130 } },
         tabBarStyle: {
-          backgroundColor: '#19232e',
-          borderTopColor: '#354354',
+          backgroundColor: colors.navigation,
+          borderTopColor: colors.border,
           ...(fontScale > 1 ? { height: 49 + Math.ceil(14 * (fontScale - 1)) + insets.bottom } : {}),
         },
         // Navigation keeps the safe area; enlarged labels grow the bar.

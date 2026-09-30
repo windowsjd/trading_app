@@ -109,7 +109,7 @@ async function run() {
     await page.waitForFunction(() => !!window.fixture);
   };
   try {
-    await open();
+    await open('screen=order');
     await id('inline-order-panel').waitFor();
     await page.screenshot({
       path: path.join(out, 'initial.png'),
@@ -134,7 +134,7 @@ async function run() {
         for (const asset of ['BTC', 'BNB', 'PEPE', 'SUI', '币安人生']) {
           await page.setViewportSize({ width, height: 844 });
           await open(
-            'asset=' + encodeURIComponent(asset) + '&fontScale=' + fontScale,
+            'screen=order&asset=' + encodeURIComponent(asset) + '&fontScale=' + fontScale,
           );
           await id('order-type-toggle-limit').waitFor();
           assert.match(
@@ -176,7 +176,7 @@ async function run() {
           await id('order-ratio-25').click();
           assert.match(
             await page.locator('body').innerText(),
-            /지정가를 입력하면 비율 수량/,
+            /매수 금액 비율/,
           );
           await id('order-limit-price-input').fill('100');
           await id('order-ratio-25').click();
@@ -196,7 +196,7 @@ async function run() {
           records.push({ kind: 'layout', width, fontScale, asset });
         }
     for (const role of ['user', 'operator', 'admin', 'unknown', 'error']) {
-      await open('role=' + role);
+      await open('screen=order&role=' + role);
       await id('inline-order-panel').waitFor();
       assert.equal(
         (await page.locator('body').innerText()).includes('실시간 연결 복구'),
@@ -214,7 +214,7 @@ async function run() {
     for (const width of [320, 390, 768])
       for (const fontScale of [1, 1.5, 2]) {
         await page.setViewportSize({ width, height: 844 });
-        await open('asset=BNB&fontScale=' + fontScale);
+        await open('screen=order&asset=BNB&fontScale=' + fontScale);
         await id('inline-order-panel').waitFor();
         await id('asset-detail-sell-button').click();
         const column = await id('asset-order-column').boundingBox();
@@ -291,7 +291,7 @@ async function run() {
     for (const asset of ['BTC', 'BNB', 'PEPE', 'SUI', '币安人生'])
       for (const side of ['buy', 'sell'])
         for (const type of ['market', 'limit']) {
-          await open('asset=' + encodeURIComponent(asset));
+          await open('screen=order&asset=' + encodeURIComponent(asset));
           await id('inline-order-panel').waitFor();
           if (side === 'sell') await id('asset-detail-sell-button').click();
           if (type === 'limit') {
@@ -329,12 +329,14 @@ async function run() {
     }
     await open('screen=market');
     await page.getByText('币安人生', { exact: true }).first().click();
+    await id('asset-detail-open-buy-order').click();
     await id('asset-pair-header').waitFor();
     assert.match(await id('asset-pair-header').innerText(), /币安人生/);
     records.push({ kind: 'han-market-detail' });
     await open('screen=search');
     await page.getByPlaceholder('종목명 또는 심볼 검색').fill('币安人生');
     await page.getByText('币安人生', { exact: true }).first().click();
+    await id('asset-detail-open-buy-order').click();
     await id('asset-pair-header').waitFor();
     assert.match(await id('asset-pair-header').innerText(), /币安人生 \/ USD/);
     assert.ok(
@@ -519,7 +521,7 @@ async function run() {
     await page.mouse.move(box.x + 140, box.y + 150);
     await pause();
     assert.ok((await geometry()).startIndex < 180, 'unmount during active pan');
-    await page.evaluate(() => window.fixture.setScreen('detail'));
+    await page.evaluate(() => window.fixture.setScreen('order'));
     await pause();
     await page.mouse.up();
     await id('inline-order-panel').waitFor();

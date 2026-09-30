@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import { buildWsUrl } from '../../constants/env';
 import { useMarketTickers } from '../../features/market/useMarketTickers';
 import { mergeMarketAssetTicker } from '../../features/market/mergeMarketAssetTicker';
@@ -261,52 +262,52 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: semantic.screen },
   content: { padding: 16, paddingBottom: 24 },
   header: { gap: 12, marginBottom: 12 },
   searchInput: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: semantic.border,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    backgroundColor: '#fff',
+    backgroundColor: semantic.screen,
     fontSize: 16,
   },
   scopeRow: { flexDirection: 'row', gap: 8 },
   scopeChip: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: semantic.border,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#fff',
+    backgroundColor: semantic.screen,
   },
   scopeChipActive: {
-    backgroundColor: '#111',
-    borderColor: '#111',
+    backgroundColor: semantic.selected,
+    borderColor: semantic.selected,
   },
-  scopeChipText: { color: '#111', fontWeight: '600' },
-  scopeChipTextActive: { color: '#fff', fontWeight: '600' },
+  scopeChipText: { color: semantic.text, fontWeight: '600' },
+  scopeChipTextActive: { color: semantic.onAccent, fontWeight: '600' },
   itemRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 14,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: semantic.border,
   },
   itemSymbol: { fontSize: 16, fontWeight: '700' },
   itemPrice: { fontSize: 15, fontWeight: '600' },
   alignEnd: { alignItems: 'flex-end' },
-  helper: { fontSize: 14, color: '#444' },
+  helper: { fontSize: 14, color: semantic.secondary },
   inlineWarning: {
     borderWidth: 1,
-    borderColor: '#F2D48B',
+    borderColor: semantic.border,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#FFF8E1',
+    backgroundColor: semantic.warningSurface,
   },
-  inlineWarningText: { fontSize: 13, color: '#725400' },
+  inlineWarningText: { fontSize: 13, color: semantic.warning },
   footerLoader: { paddingVertical: 16 },
 });

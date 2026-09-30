@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React, { useMemo } from 'react';
 import {
   View,
@@ -218,24 +219,24 @@ export default function MyScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: semantic.screen },
   content: { padding: 16, gap: 12 },
   card: {
     borderWidth: 1,
-    borderColor: '#e8e8e8',
+    borderColor: semantic.border,
     borderRadius: 14,
     padding: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: semantic.surface,
     gap: 10,
   },
   // A long nickname or email wraps rather than running off the card.
   title: { fontSize: 22, fontWeight: '700', lineHeight: 30 },
-  helper: { fontSize: 14, color: '#444', lineHeight: 21 },
+  helper: { fontSize: 14, color: semantic.secondary, lineHeight: 21 },
   menuRow: {
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: semantic.border,
   },
   menuText: { fontSize: 16, fontWeight: '600' },
-  logoutText: { fontSize: 16, fontWeight: '700', color: '#c62828' },
+  logoutText: { fontSize: 16, fontWeight: '700', color: semantic.negative },
 });

@@ -30,6 +30,7 @@ function harness(platform: string, mode: 'general' | 'season' = 'general') {
   });
   const Button = load(resolve('src/components/navigation/TabBarButton.tsx'), {
     '@react-navigation/elements': { PlatformPressable },
+    '../../theme/appearance': { useAppearance: () => ({ colors: { pressed: '#202a3520' } }) },
   }).default;
   const dimensions = { fontScale: 1 };
   const insets = { bottom: 34 };
@@ -37,6 +38,8 @@ function harness(platform: string, mode: 'general' | 'season' = 'general') {
     'react-native': { useWindowDimensions: () => dimensions },
     'react-native-safe-area-context': { useSafeAreaInsets: () => insets },
     '@react-navigation/bottom-tabs': { createBottomTabNavigator: () => ({ Navigator: 'Navigator', Screen: 'Screen' }) },
+    '../../theme/appearance': { useAppearance: () => ({ colors: { navigation: '#ffffff', navigationActive: '#202a35', navigationInactive: '#697583', border: '#dfe4e9' } }) },
+    '../../theme/useReducedMotion': { useReducedMotion: () => false },
     '../../components/navigation/TabBarButton': { default: Button, __esModule: true },
     '../../components/navigation/TabBarIcon': { default: 'TabBarIcon', __esModule: true },
     '../../components/states/FullPageLoading': { default: 'FullPageLoading', __esModule: true },
@@ -90,10 +93,10 @@ describe('bottom tab touch feedback', () => {
             h.animations.length = 0;
             host.props.onPressIn(event);
             if (platform === 'android') {
-              assert.deepEqual(host.props.android_ripple, { color: 'rgba(255, 255, 255, 0.12)', borderless: false });
+              assert.deepEqual(host.props.android_ripple, { color: '#202a3520', borderless: false });
               assert.equal(h.animations.length, 0);
             } else {
-              assert.equal(h.animations[0].toValue, 0.76);
+              assert.equal(h.animations[0].toValue, 0.82);
               assert.equal(h.animations[0].duration, 0, 'feedback starts immediately');
             }
             assert.deepEqual(calls, ['in']);
@@ -116,10 +119,10 @@ describe('bottom tab touch feedback', () => {
 
   it('keeps the existing large-font and safe-area layout policy', () => {
     const h = harness('ios');
-    assert.deepEqual(h.MainTabs().props.screenOptions.tabBarStyle, { backgroundColor: '#19232e', borderTopColor: '#354354' });
+    assert.deepEqual(h.MainTabs().props.screenOptions.tabBarStyle, { backgroundColor: '#ffffff', borderTopColor: '#dfe4e9' });
     h.dimensions.fontScale = 2.4;
     const options = h.MainTabs().props.screenOptions;
     assert.equal(options.tabBarLabelPosition, 'below-icon');
-    assert.deepEqual(options.tabBarStyle, { backgroundColor: '#19232e', borderTopColor: '#354354', height: 49 + Math.ceil(14 * 1.4) + h.insets.bottom });
+    assert.deepEqual(options.tabBarStyle, { backgroundColor: '#ffffff', borderTopColor: '#dfe4e9', height: 49 + Math.ceil(14 * 1.4) + h.insets.bottom });
   });
 });
