@@ -1,7 +1,7 @@
 import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScrollView, StyleSheet, Text, View } from '../../theme/native';
+import { SafeAreaView } from '../../theme/safeArea';
 import { useIsFocused } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -20,11 +20,14 @@ import { mergeAssetCandleSnapshot } from '../../features/asset/liveCandle';
 import { describeCandleError } from '../../features/asset/candleErrors';
 import {
   getStockMarketStatus,
+  getTradingAssetName,
   getTradingPair,
 } from '../../features/asset/tradingHeader';
 import {
   formatAssetPrice,
+  formatKrw,
   formatPercent,
+  getAssetNameDisplay,
   getUnavailablePriceText,
 } from '../../utils/format';
 import { QUERY_KEYS } from '../../constants/queryKeys';
@@ -70,6 +73,7 @@ export function AssetMarketChart({
   const [selectedTimeframe, setSelectedTimeframe] =
     useState<AssetChartTimeframe>(DEFAULT_ASSET_CHART_TIMEFRAME);
   const [chartHeight, setChartHeight] = useState(0);
+  const [displayCurrency, setDisplayCurrency] = useState<'USD' | 'KRW'>('USD');
   const detailQuery = useQuery({
     queryKey: QUERY_KEYS.asset.detail(assetId),
     queryFn: () => getAssetDetail(assetId),
@@ -133,76 +137,89 @@ export function AssetMarketChart({
   );
   const detailView = variant === 'detail';
   const changeRate = formatPercent(displayPrice.changeRate);
+  const usdAsset = displayPrice.priceCurrency === 'USD';
+  const krwAvailable = displayPrice.priceKrwState === 'available' && displayPrice.priceKrw !== null;
+  const usdPrice = formatAssetPrice(displayPrice.priceLocal, displayPrice.priceCurrency, displayPrice.displayPriceDecimals);
+  const krwPrice = krwAvailable ? `${formatKrw(displayPrice.priceKrw)}원` : '원 환산 불가';
+  const useKrw = usdAsset && krwAvailable && displayCurrency === 'KRW';
   const chartBody = (
     <>
-      <View style={[styles.header, detailView && styles.detailHeader]}>
-        {!detailView ? (
-          <ActionPressable
-            testID="asset-chart-back"
-            accessibilityRole="button"
-            accessibilityLabel="차트 뒤로가기"
-            style={styles.back}
-            onPress={onBack}
-          >
-            <Text style={styles.backText}>←</Text>
-          </ActionPressable>
-        ) : null}
-        <View style={styles.heading}>
-          {detailView && onChangePair ? (
-            <ActionPressable
-              testID="asset-change-pair"
-              style={styles.pairButton}
-              accessibilityRole="button"
-              accessibilityLabel={`종목 변경, ${asset ? getTradingPair(asset) : '종목'}`}
-              onPress={onChangePair}
-            >
-              <Text style={styles.title}>
-                {asset ? getTradingPair(asset) : '종목'} ▾
-              </Text>
-            </ActionPressable>
-          ) : (
-            <Text style={styles.title}>
-              {asset ? getTradingPair(asset) : '차트'}
-            </Text>
-          )}
-          {detailView && asset &&
-          (asset.assetType === 'domestic_stock' ||
-            asset.assetType === 'us_stock') ? (
-            <Text testID="asset-market-status" style={styles.marketBadge}>
-              {getStockMarketStatus(asset.marketStatus)}
-            </Text>
-          ) : null}
-          <Text
-            style={detailView ? styles.detailPrice : styles.price}
-            selectable
-          >
-            {detailView && displayPrice.priceLocal === null && asset
-              ? getUnavailablePriceText(asset)
-              : formatAssetPrice(
-                  displayPrice.priceLocal,
-                  displayPrice.priceCurrency,
-                  displayPrice.displayPriceDecimals,
-                )}
+      {detailView ? (
+        <View style={styles.detailHeader}>
+          <Text testID="asset-detail-name" style={styles.assetName}>
+            {asset ? getAssetNameDisplay(asset).primary : '종목'}
           </Text>
-          {detailView ? (
-            <Text
-              testID="asset-change-rate"
-              style={[
-                styles.changeRate,
-                Number(displayPrice.changeRate) > 0
-                  ? styles.up
-                  : Number(displayPrice.changeRate) < 0
-                    ? styles.down
-                    : null,
-              ]}
-            >
-              {changeRate === '-'
-                ? '전일대비 -'
+          <ActionPressable
+            testID="asset-change-pair"
+            style={styles.symbolButton}
+            accessibilityRole="button"
+            accessibilityLabel={`종목 변경, ${asset ? getTradingPair(asset) : '종목'}`}
+            onPress={onChangePair}
+          >
+            <Text style={styles.symbolText}>
+              {asset ? (asset.assetType === 'crypto' ? getTradingAssetName(asset) : asset.symbol) : '종목 변경'} ▾
+            </Text>
+          </ActionPressable>
+          <View style={styles.detailPriceRow}>
+            <View style={styles.detailPriceStack}>
+              <Text testID="asset-detail-primary-price" style={styles.detailPrice} selectable>
+                {displayPrice.priceLocal === null && asset
+                  ? getUnavailablePriceText(asset)
+                  : useKrw ? krwPrice : usdPrice}
+              </Text>
+              {usdAsset ? (
+                <Text testID="asset-detail-secondary-price" style={styles.secondaryPrice} selectable>
+                  {useKrw ? usdPrice : krwPrice}
+                </Text>
+              ) : null}
+            </View>
+            {usdAsset ? (
+              <View style={styles.currencyToggle} accessibilityRole="radiogroup">
+                <ActionPressable testID="asset-currency-usd" accessibilityRole="radio"
+                  accessibilityState={{ selected: !useKrw }}
+                  style={[styles.currencyOption, !useKrw && styles.currencySelected]}
+                  onPress={() => setDisplayCurrency('USD')}>
+                  <Text style={[styles.currencyText, !useKrw && styles.currencySelectedText]}>$</Text>
+                </ActionPressable>
+                <ActionPressable testID="asset-currency-krw" accessibilityRole="radio"
+                  accessibilityState={{ selected: useKrw, disabled: !krwAvailable }}
+                  disabled={!krwAvailable}
+                  style={[styles.currencyOption, useKrw && styles.currencySelected]}
+                  onPress={() => setDisplayCurrency('KRW')}>
+                  <Text style={[styles.currencyText, useKrw && styles.currencySelectedText]}>원</Text>
+                </ActionPressable>
+              </View>
+            ) : null}
+          </View>
+          <View style={styles.marketInfo}>
+            {asset && (asset.assetType === 'domestic_stock' || asset.assetType === 'us_stock') ? (
+              <Text testID="asset-market-status" style={styles.marketBadge}>
+                {getStockMarketStatus(asset.marketStatus)}
+              </Text>
+            ) : null}
+            <Text testID="asset-change-rate" style={[styles.changeRate,
+              Number(displayPrice.changeRate) > 0 ? styles.up : Number(displayPrice.changeRate) < 0 ? styles.down : null]}>
+              {changeRate === '-' ? '전일대비 -'
                 : `전일대비 ${Number(displayPrice.changeRate) > 0 ? '+' : ''}${changeRate}%`}
             </Text>
+          </View>
+          {isAdmin && usdAsset && !krwAvailable ? (
+            <AdminDiagnosticPanel runtime={{ assetId, priceBasis: displayPrice.basis,
+              priceKrwState: displayPrice.priceKrwState, priceKrwReason: displayPrice.priceKrwReason }} />
           ) : null}
         </View>
-      </View>
+      ) : (
+        <View style={styles.header}>
+          <ActionPressable testID="asset-chart-back" accessibilityRole="button"
+            accessibilityLabel="차트 뒤로가기" style={styles.back} onPress={onBack}>
+            <Text style={styles.backText}>←</Text>
+          </ActionPressable>
+          <View style={styles.heading}>
+            <Text style={styles.title}>{asset ? getTradingPair(asset) : '차트'}</Text>
+            <Text style={styles.price} selectable>{usdPrice}</Text>
+          </View>
+        </View>
+      )}
       {!detailView ? (
         <View style={styles.toolbar}>
           <ChartTimeframeSelector
@@ -247,7 +264,7 @@ export function AssetMarketChart({
         </Text>
       ) : null}
       <View
-        style={styles.chart}
+        style={[styles.chart, detailView && styles.detailChart]}
         onLayout={(event) =>
           setChartHeight(Math.floor(event.nativeEvent.layout.height))
         }
@@ -297,9 +314,10 @@ export function AssetMarketChart({
     </>
   );
   return detailView ? (
-    <View style={styles.screen} testID={TEST_IDS.assetDetail.screen}>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.detailContent}
+      nestedScrollEnabled testID={TEST_IDS.assetDetail.screen}>
       {chartBody}
-    </View>
+    </ScrollView>
   ) : (
     <SafeAreaView style={styles.screen} testID="asset-chart-screen">
       {chartBody}
@@ -308,19 +326,30 @@ export function AssetMarketChart({
 }
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#fff' },
-  detailHeader: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 14 },
+  detailContent: { flexGrow: 1 },
+  detailHeader: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, gap: 6 },
+  assetName: { fontSize: 28, fontWeight: '800', color: '#202a35', flexShrink: 1 },
+  symbolButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center',
+    backgroundColor: '#eef1f4', borderRadius: 8, paddingHorizontal: 10 },
+  symbolText: { fontSize: 13, fontWeight: '600', color: '#536170' },
+  detailPriceRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center',
+    gap: 10, paddingTop: 8 },
+  detailPriceStack: { flex: 1, minWidth: 0, gap: 2 },
+  secondaryPrice: { fontSize: 14, color: '#697583', flexShrink: 1 },
+  currencyToggle: { flexDirection: 'row', flexShrink: 0, borderRadius: 10,
+    backgroundColor: '#eef1f4', padding: 3, gap: 2 },
+  currencyOption: { minWidth: 44, minHeight: 44, borderRadius: 8,
+    alignItems: 'center', justifyContent: 'center' },
+  currencySelected: { backgroundColor: '#fff' },
+  currencyText: { fontSize: 15, fontWeight: '700', color: '#697583' },
+  currencySelectedText: { color: '#202a35' },
+  marketInfo: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, paddingTop: 6 },
   detailPrice: {
-    fontSize: 30,
+    fontSize: 34,
     fontWeight: '700',
     color: '#202a35',
     fontVariant: ['tabular-nums'],
     flexShrink: 1,
-  },
-  pairButton: {
-    alignSelf: 'flex-start',
-    minHeight: 44,
-    justifyContent: 'center',
-    maxWidth: '100%',
   },
   marketBadge: {
     alignSelf: 'flex-start',
@@ -353,6 +382,7 @@ const styles = StyleSheet.create({
   price: { fontSize: 15, color: '#536170' },
   toolbar: { paddingHorizontal: 12, paddingBottom: 8 },
   chart: { flex: 1, minHeight: 0 },
+  detailChart: { minHeight: 260 },
   notice: {
     paddingHorizontal: 12,
     paddingBottom: 8,

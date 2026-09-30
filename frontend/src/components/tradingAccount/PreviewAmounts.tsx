@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, Text, View, useWindowDimensions } from '../../theme/native';
 
 /** Stack at narrow widths or larger font scales so full financial values wrap. */
 export default function PreviewAmounts({

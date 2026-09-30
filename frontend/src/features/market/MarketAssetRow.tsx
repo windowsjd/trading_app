@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 
 import { TEST_IDS } from '../../constants/testIds';

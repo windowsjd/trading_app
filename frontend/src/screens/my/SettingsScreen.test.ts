@@ -44,6 +44,7 @@ function settingsHarness(portfolioPublic = true) {
     alerts: [] as string[][],
     renderer: null as any,
     patchFailure: false,
+    appearanceChoices: [] as string[],
   };
   const client: QueryClientType = new QueryClient({
     defaultOptions: {
@@ -73,6 +74,12 @@ function settingsHarness(portfolioPublic = true) {
         return { ...h.serverMe };
       },
     },
+    '../../theme/appearance': { useAppearance: () => {
+      const [preference, select] = React.useState('system');
+      return { preference, mode: preference === 'dark' ? 'dark' : 'light',
+        colors: { border: '#ddd', text: '#111' },
+        setPreference: (value: string) => { h.appearanceChoices.push(value); select(value); } };
+    } },
     '../../features/auth/useLogout': { useLogout: () => async () => {} },
     '../../components/states/FullPageLoading': {
       default: 'FullPageLoading',
@@ -276,5 +283,23 @@ describe('Settings portfolio privacy switch', () => {
     assert.deepEqual(x.h.patches, [{ nickname: '새 이름' }]);
     assert.equal(x.h.serverMe.nickname, '새 이름');
     assert.deepEqual(x.h.alerts, [['저장 완료', '닉네임이 변경되었습니다.']]);
+  });
+});
+
+
+describe('Settings appearance preference', () => {
+  it('offers system, light and dark and applies a choice immediately without a profile PATCH', async (t) => {
+    const x = settingsHarness(); t.after(x.close); await x.mount();
+    for (const value of ['system', 'light', 'dark'] as const) {
+      assert.ok(x.node(TEST_IDS.settings.appearance(value)));
+    }
+    assert.equal(x.node(TEST_IDS.settings.appearance('system')).props.accessibilityState.selected, true);
+    await act(async () => x.node(TEST_IDS.settings.appearance('dark')).props.onPress());
+    assert.equal(x.node(TEST_IDS.settings.appearance('dark')).props.accessibilityState.selected, true);
+    assert.equal(x.node(TEST_IDS.settings.appearance('system')).props.accessibilityState.selected, false);
+    await act(async () => x.node(TEST_IDS.settings.appearance('light')).props.onPress());
+    assert.equal(x.node(TEST_IDS.settings.appearance('light')).props.accessibilityState.selected, true);
+    assert.deepEqual(x.h.appearanceChoices, ['dark', 'light']);
+    assert.deepEqual(x.h.patches, []);
   });
 });

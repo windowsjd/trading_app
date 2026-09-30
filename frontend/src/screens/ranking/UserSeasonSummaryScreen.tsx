@@ -6,7 +6,7 @@ import {
   ScrollView,
   Image,
   RefreshControl,
-} from 'react-native';
+} from '../../theme/native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import { QUERY_KEYS } from '../../constants/queryKeys';

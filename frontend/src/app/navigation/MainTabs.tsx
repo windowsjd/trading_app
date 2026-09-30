@@ -40,11 +40,14 @@ export default function MainTabs() {
         headerShown: false,
         tabBarButton: (props) => <TabBarButton {...props} />,
         tabBarLabelPosition: 'below-icon',
-        // Keep the default 49pt bar at normal font sizes. Extra label space
-        // grows with accessibility text; Navigation still pads the safe area.
-        tabBarStyle: fontScale > 1
-          ? { height: 49 + Math.ceil(14 * (fontScale - 1)) + insets.bottom }
-          : undefined,
+        tabBarActiveTintColor: '#ffffff',
+        tabBarInactiveTintColor: '#aebbc8',
+        tabBarStyle: {
+          backgroundColor: '#19232e',
+          borderTopColor: '#354354',
+          ...(fontScale > 1 ? { height: 49 + Math.ceil(14 * (fontScale - 1)) + insets.bottom } : {}),
+        },
+        // Navigation keeps the safe area; enlarged labels grow the bar.
       }}
     >
       <Tab.Screen
@@ -52,8 +55,8 @@ export default function MainTabs() {
         component={HomeStack}
         options={{
           title: '홈',
-          tabBarIcon: ({ color, size }) => (
-            <TabBarIcon name="home" color={color} size={size} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabBarIcon focused={focused} name="home" color={color} size={size} />
           ),
         }}
       />
@@ -62,8 +65,8 @@ export default function MainTabs() {
         component={MarketStack}
         options={{
           title: '마켓',
-          tabBarIcon: ({ color, size }) => (
-            <TabBarIcon name="market" color={color} size={size} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabBarIcon focused={focused} name="market" color={color} size={size} />
           ),
         }}
       />
@@ -73,8 +76,8 @@ export default function MainTabs() {
           component={GuideStack}
           options={{
             title: '가이드',
-            tabBarIcon: ({ color, size }) => (
-              <TabBarIcon name="guide" color={color} size={size} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabBarIcon focused={focused} name="guide" color={color} size={size} />
             ),
           }}
         />
@@ -84,8 +87,8 @@ export default function MainTabs() {
           component={RankingStack}
           options={{
             title: '랭킹',
-            tabBarIcon: ({ color, size }) => (
-              <TabBarIcon name="ranking" color={color} size={size} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabBarIcon focused={focused} name="ranking" color={color} size={size} />
             ),
           }}
         />
@@ -95,8 +98,8 @@ export default function MainTabs() {
         component={RecordStack}
         options={{
           title: '전적',
-          tabBarIcon: ({ color, size }) => (
-            <TabBarIcon name="record" color={color} size={size} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabBarIcon focused={focused} name="record" color={color} size={size} />
           ),
         }}
       />
@@ -105,8 +108,8 @@ export default function MainTabs() {
         component={MyStack}
         options={{
           title: '전체',
-          tabBarIcon: ({ color, size }) => (
-            <TabBarIcon name="menu" color={color} size={size} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabBarIcon focused={focused} name="menu" color={color} size={size} />
           ),
         }}
       />

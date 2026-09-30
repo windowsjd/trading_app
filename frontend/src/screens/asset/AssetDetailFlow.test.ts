@@ -129,7 +129,8 @@ test('320px and large text keep both order actions flexible below the chart', as
     assert.ok(action.props.label.endsWith('하기'));
   }
   assert.equal(h.node('asset-order-actions').props.style.flexDirection, 'row');
-  assert.ok(h.node(TEST_IDS.assetDetail.screen));
+  assert.equal(h.node(TEST_IDS.assetDetail.screen).type, 'ScrollView');
+  assert.equal(h.node(TEST_IDS.assetDetail.screen).props.contentContainerStyle.flexGrow, 1);
 });
 
 test('detail candle diagnostics stay admin only', async (t) => {
@@ -145,4 +146,71 @@ test('detail candle diagnostics stay admin only', async (t) => {
   t.after(admin.close);
   await admin.flush();
   assert.ok(admin.node('admin-diagnostic-panel'));
+});
+
+test('detail header keeps name, symbol, paired prices, change, chart and actions in order at 320px and fontScale 2', async (t) => {
+  const h = inlineTradingHarness();
+  h.assets.bnb.name = 'A deliberately long Bitcoin themed asset name that wraps';
+  h.dimensions = { width: 320, height: 700, fontScale: 2 };
+  await openDetail(h); t.after(h.close);
+  const screen = text(h);
+  const name = h.node('asset-detail-name');
+  assert.equal(name.props.children, h.assets.bnb.name);
+  assert.equal(name.props.numberOfLines, undefined);
+  assert.match(screen, /\"BNB\",\" ▾\"/);
+  assert.match(h.node('asset-detail-primary-price').props.children, /\$763\.79/);
+  assert.equal(h.node('asset-detail-secondary-price').props.children, '1,054,259원');
+  assert.match(h.node('asset-change-rate').props.children, /전일대비 \+0\.33%/);
+  for (const [before, after] of [
+    ['asset-detail-name', 'asset-change-pair'], ['asset-change-pair', 'asset-detail-primary-price'],
+    ['asset-detail-primary-price', 'asset-change-rate'], ['asset-change-rate', 'CandlestickChart'],
+    ['CandlestickChart', 'ChartTimeframeSelector'], ['ChartTimeframeSelector', 'asset-order-actions'],
+  ]) assert.ok(screen.indexOf(before) < screen.indexOf(after), `${before} before ${after}`);
+});
+
+test('USD/KRW toggle swaps only the same display price pair', async (t) => {
+  const h = inlineTradingHarness();
+  h.ticker = { type: 'asset_ticker', assetId: 'bnb', priceLocal: '900', priceCurrency: 'USD',
+    priceKrw: '1234567', priceKrwState: 'available', changeRate: '2.50' };
+  await openDetail(h); t.after(h.close);
+  const primary = () => h.node('asset-detail-primary-price').props.children;
+  const secondary = () => h.node('asset-detail-secondary-price').props.children;
+  assert.equal(primary(), '$900'); assert.equal(secondary(), '1,234,567원');
+  await h.press('asset-currency-krw');
+  assert.equal(primary(), '1,234,567원'); assert.equal(secondary(), '$900');
+  assert.equal(h.node('asset-change-rate').props.children, '전일대비 +2.5%');
+  assert.deepEqual(h.navigation, []);
+  await h.press('asset-currency-usd'); assert.equal(primary(), '$900');
+});
+
+test('unavailable ticker KRW never borrows REST conversion', async (t) => {
+  const h = inlineTradingHarness();
+  h.ticker = { type: 'asset_ticker', assetId: 'bnb', priceLocal: '900', priceCurrency: 'USD',
+    priceKrw: null, priceKrwState: 'unavailable', changeRate: '2.50' };
+  await openDetail(h); t.after(h.close);
+  assert.equal(h.node('asset-detail-primary-price').props.children, '$900');
+  assert.equal(h.node('asset-detail-secondary-price').props.children, '원 환산 불가');
+  assert.equal(h.node('asset-currency-krw').props.accessibilityState.disabled, true);
+  await h.press('asset-currency-krw');
+  assert.equal(h.node('asset-detail-primary-price').props.children, '$900');
+  assert.doesNotMatch(text(h), /1,054,259원/);
+});
+
+test('domestic KRW stock has no invented USD conversion', async (t) => {
+  const h = inlineTradingHarness(); h.assetId = 'samsung';
+  await openDetail(h); t.after(h.close);
+  assert.equal(h.node('asset-detail-name').props.children, 'Samsung Electronics');
+  assert.match(text(h), /\"005930\",\" ▾\"/);
+  assert.match(h.node('asset-detail-primary-price').props.children, /70,000/);
+  assert.equal(h.node('asset-currency-usd'), undefined);
+  assert.equal(h.node('asset-currency-krw'), undefined);
+});
+
+test('changing assets restores USD as the default display choice', async (t) => {
+  const h = inlineTradingHarness(); await openDetail(h); t.after(h.close);
+  await h.press('asset-currency-krw');
+  assert.equal(h.node('asset-currency-krw').props.accessibilityState.selected, true);
+  h.assetId = 'btc'; await h.update();
+  assert.equal(h.node('asset-currency-usd').props.accessibilityState.selected, true);
+  assert.match(h.node('asset-detail-primary-price').props.children, /^\$/);
 });

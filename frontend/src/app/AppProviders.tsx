@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query';
 
 import { TradingAccountProvider } from '../features/tradingAccount/TradingAccountContext';
+import { AppearanceProvider } from '../theme/appearance';
 import { endSession } from '../features/auth/session';
 import { setSessionExpiredHandler } from '../services/api/sessionExpiry';
 import { resetToLoginFromRef } from './navigation/navigationRef';
@@ -71,7 +72,9 @@ export default function AppProviders({ children }: PropsWithChildren) {
       <SessionExpiryBridge>
         {/* The selected trading account is app-wide state: it decides which
             account EVERY financial screen is about (작업 9 §B-1). */}
-        <TradingAccountProvider>{children}</TradingAccountProvider>
+        <AppearanceProvider>
+          <TradingAccountProvider>{children}</TradingAccountProvider>
+        </AppearanceProvider>
       </SessionExpiryBridge>
     </QueryClientProvider>
   );

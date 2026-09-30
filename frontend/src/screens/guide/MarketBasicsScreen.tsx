@@ -6,7 +6,7 @@ import {
   Text,
   View,
   useWindowDimensions,
-} from 'react-native';
+} from '../../theme/native';
 
 import ActionPressable from '../../components/common/ActionPressable';
 import { TEST_IDS } from '../../constants/testIds';

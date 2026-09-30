@@ -1,5 +1,5 @@
 import React, { useMemo, useRef } from 'react';
-import { View } from 'react-native';
+import { View } from '../../theme/native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import type { LineChartGesturesProps } from './LineChartGestures';
 

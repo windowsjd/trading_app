@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text } from 'react-native';
+import { Text } from '../../theme/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { GuideStackParamList } from '../../app/navigation/types';
 import ActionPressable from '../../components/common/ActionPressable';

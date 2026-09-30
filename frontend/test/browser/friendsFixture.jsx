@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AppearanceProvider } from '../../src/theme/appearance';
 import OverallScreen from '../../src/screens/my/OverallScreen';
 import NoticesScreen from '../../src/screens/my/NoticesScreen';
 import FriendsScreen from '../../src/screens/friends/FriendsScreen';
@@ -25,6 +26,8 @@ const navigation = {
 };
 createRoot(document.getElementById('root')).render(
   <QueryClientProvider client={client}>
-    <Screen navigation={navigation} route={{ params: { userId: 'friend' } }} />
+    <AppearanceProvider>
+      <Screen navigation={navigation} route={{ params: { userId: 'friend' } }} />
+    </AppearanceProvider>
   </QueryClientProvider>,
 );

@@ -7,7 +7,7 @@ import {
   Text,
   TextInput,
   View,
-} from 'react-native';
+} from '../../theme/native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {

@@ -1,6 +1,6 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { StyleSheet, View } from '../../theme/native';
+import { SafeAreaView } from '../../theme/safeArea';
 import type { AssetDetailScreenProps } from '../../app/navigation/types';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';

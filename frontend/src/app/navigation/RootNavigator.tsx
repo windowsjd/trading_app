@@ -1,5 +1,6 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
+import { useAppearance } from '../../theme/appearance';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import type { RootStackParamList } from './types';
@@ -15,12 +16,24 @@ import ScreenErrorBoundary from '../../components/states/ScreenErrorBoundary';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
+  const { mode, colors } = useAppearance();
+  const navigationTheme = {
+    ...(mode === 'dark' ? DarkTheme : DefaultTheme),
+    colors: {
+      ...(mode === 'dark' ? DarkTheme.colors : DefaultTheme.colors),
+      primary: colors.text,
+      background: colors.screen,
+      card: colors.screen,
+      text: colors.text,
+      border: colors.border,
+    },
+  };
   return (
-    <NavigationContainer ref={rootNavigationRef}>
+    <NavigationContainer ref={rootNavigationRef} theme={navigationTheme}>
       <Stack.Navigator
         id="RootStack"
         initialRouteName="Splash"
-        screenOptions={{ headerShown: false }}
+        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.screen } }}
         // Keep navigation and session/account providers alive during a render
         // failure. Retrying remounts only this root screen (MainTabs opens Home).
         screenLayout={({ children }) => (

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { View } from '../../theme/native';
 import { Body, LessonAction, Result, Section, Takeaways } from './LessonUi';
 import { Basis, CandleSeries, Choices, Values } from './MarketLessonUi';
 import {

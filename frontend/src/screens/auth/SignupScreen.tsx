@@ -5,7 +5,7 @@ import {
   TextInput,
   StyleSheet,
   SafeAreaView,
-} from 'react-native';
+} from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 

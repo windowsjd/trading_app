@@ -8,7 +8,7 @@ import {
   Alert,
   ScrollView,
   Switch,
-} from 'react-native';
+} from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -19,6 +19,7 @@ import { TEST_IDS } from '../../constants/testIds';
 
 import { getMe, updateMe, type MeDto } from '../../features/me/api';
 import { useLogout } from '../../features/auth/useLogout';
+import { useAppearance } from '../../theme/appearance';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -27,6 +28,7 @@ type Props = NativeStackScreenProps<MyStackParamList, 'Settings'>;
 
 export default function SettingsScreen({ navigation: _navigation }: Props) {
   const queryClient = useQueryClient();
+  const { preference, setPreference, colors, mode } = useAppearance();
 
   const meQuery = useQuery({
     queryKey: QUERY_KEYS.me,
@@ -176,11 +178,29 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
         </View>
 
         <View style={styles.card}>
+          <Text style={styles.sectionTitle}>화면 모드</Text>
+          <Text style={styles.helper}>이 기기에만 저장됩니다.</Text>
+          <View style={styles.modeChoices} accessibilityRole="radiogroup">
+            {([['system', '시스템'], ['light', '라이트'], ['dark', '다크']] as const).map(([value, label]) => (
+              <ActionPressable key={value} testID={TEST_IDS.settings.appearance(value)}
+                accessibilityRole="radio" accessibilityLabel={label}
+                accessibilityState={{ selected: preference === value }}
+                style={[styles.modeChoice, preference === value && styles.modeSelected]}
+                onPress={() => setPreference(value)}>
+                <Text style={[styles.modeText, preference === value && styles.modeSelectedText]}>{label}</Text>
+              </ActionPressable>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.card}>
           <Text style={styles.sectionTitle}>친구에게 포트폴리오 공개</Text>
           <Text style={styles.helper}>
             친구가 내 현재 시즌 포트폴리오를 볼 수 있습니다.
           </Text>
           <Switch
+            trackColor={{ false: colors.border, true: mode === 'dark' ? '#79d68b' : '#16a34a' }}
+            thumbColor={mode === 'dark' ? colors.text : '#ffffff'}
             accessibilityLabel="친구에게 포트폴리오 공개"
             testID="settings-portfolio-public"
             value={meQuery.data.portfolioPublic === true}
@@ -255,6 +275,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     fontSize: 16,
   },
+  modeChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  modeChoice: { minHeight: 44, minWidth: 78, paddingHorizontal: 12, borderRadius: 10,
+    borderWidth: 1, borderColor: '#dfe4e9', alignItems: 'center', justifyContent: 'center' },
+  modeSelected: { backgroundColor: '#202a35', borderColor: '#202a35' },
+  modeText: { fontSize: 14, fontWeight: '600', color: '#536170' },
+  modeSelectedText: { color: '#fff' },
   menuRow: {
     paddingVertical: 14,
     borderRadius: 12,

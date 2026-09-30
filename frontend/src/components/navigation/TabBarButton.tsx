@@ -8,7 +8,7 @@ export default function TabBarButton(props: BottomTabBarButtonProps) {
     <PlatformPressable
       {...props}
       // Android: a soft ripple confined to this tab. iOS/web: instant dimming.
-      pressColor="rgba(0, 0, 0, 0.12)"
+      pressColor="rgba(255, 255, 255, 0.12)"
       pressOpacity={0.76}
       android_ripple={{ ...props.android_ripple, borderless: false }}
     />

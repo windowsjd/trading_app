@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from '../../theme/native';
+import { useSafeAreaInsets } from '../../theme/safeArea';
 import { ASSET_CHART_TIMEFRAMES, type AssetChartTimeframe } from '../../features/asset/chartTimeframes';
 import ActionPressable from '../common/ActionPressable';
 import BottomSheetBackdrop from '../common/BottomSheetBackdrop';

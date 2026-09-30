@@ -5,7 +5,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   SafeAreaView,
-} from 'react-native';
+} from '../../theme/native';
 import { useQueryClient } from '@tanstack/react-query';
 
 import type { SplashScreenProps } from '../../app/navigation/types';

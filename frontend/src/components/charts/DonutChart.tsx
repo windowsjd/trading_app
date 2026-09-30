@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from '../../theme/native';
 import Svg, { Circle } from 'react-native-svg';
 
 import ChartEmptyState from './ChartEmptyState';
+import { useAppearance } from '../../theme/appearance';
 import { formatDisplayDecimal, formatPercent } from '../../utils/format';
 
 export type DonutChartSegment = {
@@ -41,6 +42,7 @@ export default function DonutChart({
   valueFormatter = formatDefaultValue,
   emptyMessage = '자산 배분 데이터가 없습니다.',
 }: DonutChartProps) {
+  const { mode, colors } = useAppearance();
   const sanitizedSegments = useMemo(
     () =>
       segments
@@ -94,7 +96,7 @@ export default function DonutChart({
               cx={center}
               cy={center}
               r={radius}
-              stroke="#eef0f3"
+              stroke={mode === 'dark' ? colors.border : '#eef0f3'}
               strokeWidth={safeThickness}
               fill="none"
             />

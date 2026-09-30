@@ -4,7 +4,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   ViewStyle,
-} from 'react-native';
+} from '../../theme/native';
 import ActionPressable from './ActionPressable';
 
 type CTAState = 'enabled' | 'disabled' | 'loading' | 'blocked';

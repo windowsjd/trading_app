@@ -5,7 +5,7 @@ import {
   StyleSheet,
   SafeAreaView,
   FlatList,
-} from 'react-native';
+} from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 

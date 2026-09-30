@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from '../../theme/native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 export type QuantityRatioSliderProps = {

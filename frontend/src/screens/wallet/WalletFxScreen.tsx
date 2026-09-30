@@ -8,7 +8,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-} from 'react-native';
+} from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 

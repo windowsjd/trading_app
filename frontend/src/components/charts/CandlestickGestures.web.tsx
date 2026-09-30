@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View } from 'react-native';
+import { View } from '../../theme/native';
 import {
   createWheelGestureSession,
   resolveWheelHandling,

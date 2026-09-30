@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Text, View } from '../../theme/native';
 import Svg, {
   Circle,
   Line,
@@ -8,6 +8,7 @@ import Svg, {
   Text as SvgText,
 } from 'react-native-svg';
 import { UP_COLOR, DOWN_COLOR } from '../../components/charts/candleColors';
+import { useAppearance } from '../../theme/appearance';
 import { LessonAction, lessonStyles as s } from './LessonUi';
 import { won, type Ohlc } from './lessonCalculations';
 
@@ -97,11 +98,12 @@ export function LessonPlot({
   domain: [number, number];
   unit?: string;
 }) {
-  const colors = ['#245b76', '#995b16'];
+  const { mode, colors: themeColors } = useAppearance();
+  const colors = mode === 'dark' ? ['#9acbe2', '#e8bf69'] : ['#245b76', '#995b16'];
   return (
     <View style={s.card} testID={id}>
       <Svg width="100%" height={200} viewBox="0 0 300 200" accessible={false}>
-        <Line x1={24} x2={276} y1={180} y2={180} stroke="#c5ced2" />
+        <Line x1={24} x2={276} y1={180} y2={180} stroke={mode === 'dark' ? themeColors.border : '#c5ced2'} />
         {series.flatMap((line, j) => {
           const segments: string[][] = [[]];
           line.values.forEach((value, i) => {
@@ -179,10 +181,11 @@ export function CandleSeries({
   formatPrice?: (value: number) => string;
   timeline?: boolean;
 }) {
+  const { mode, colors } = useAppearance();
   return (
     <View style={s.card} testID={id}>
       <Svg width="100%" height={210} viewBox="0 0 300 210" accessible={false}>
-        <Line x1={10} x2={10} y1={20} y2={180} stroke="#c5ced2" />
+        <Line x1={10} x2={10} y1={20} y2={180} stroke={mode === 'dark' ? colors.border : '#c5ced2'} />
         {[20, 100, 180].map((level) => (
           <Line
             key={level}
@@ -190,7 +193,7 @@ export function CandleSeries({
             x2={290}
             y1={level}
             y2={level}
-            stroke="#eef1f3"
+            stroke={mode === 'dark' ? colors.border : '#eef1f3'}
           />
         ))}
         {items.map(({ candle }, i) => {
@@ -203,7 +206,7 @@ export function CandleSeries({
                 y={20}
                 width={44}
                 height={160}
-                fill="#eef1f3"
+                fill={mode === 'dark' ? colors.surface : '#eef1f3'}
               />
             );
           const color = candle.close >= candle.open ? UP_COLOR : DOWN_COLOR;
@@ -239,7 +242,7 @@ export function CandleSeries({
                 y={204}
                 fontSize={15}
                 textAnchor="middle"
-                fill="#425966"
+                fill={mode === 'dark' ? colors.secondary : '#425966'}
               >
                 {i + 1}
               </SvgText>

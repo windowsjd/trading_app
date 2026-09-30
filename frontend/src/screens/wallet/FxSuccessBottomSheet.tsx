@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from '../../theme/native';
 
 import BottomSheetBackdrop from '../../components/common/BottomSheetBackdrop';
 import CTAButton from '../../components/common/CTAButton';

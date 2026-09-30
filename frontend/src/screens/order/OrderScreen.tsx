@@ -7,12 +7,14 @@ import {
   StyleSheet,
   Text,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+  useWindowDimensions,
+} from '../../theme/native';
+import { SafeAreaView } from '../../theme/safeArea';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useIsFocused } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import Svg, { Path } from 'react-native-svg';
+import { useAppearance } from '../../theme/appearance';
 import type { OrderScreenProps } from '../../app/navigation/types';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
 import { getAssetDetail } from '../../features/asset/api';
@@ -58,6 +60,9 @@ export function OrderTradingScreen({
   const isFocused = useIsFocused();
   const isAdmin = useAdminDiagnostics();
   const headerHeight = useHeaderHeight();
+  const { width } = useWindowDimensions();
+  const { mode, colors } = useAppearance();
+  const compact = width < 600;
   const [showKrw, setShowKrw] = useState(false);
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
   const { accounts } = useTradingAccount();
@@ -223,7 +228,7 @@ export function OrderTradingScreen({
                   <Path
                     d="M5 3v18M2 8h6v7H2zM12 2v17M9 5h6v8H9zM19 6v16M16 11h6v7h-6z"
                     fill="none"
-                    stroke="#354251"
+                    stroke={mode === 'dark' ? colors.secondary : '#354251'}
                     strokeWidth={1.5}
                   />
                 </Svg>
@@ -279,8 +284,8 @@ export function OrderTradingScreen({
               }}
             />
           ) : null}
-          <View style={styles.tradingRow} testID="asset-trading-columns">
-            <View style={styles.orderColumn} testID="asset-order-column">
+          <View style={[styles.tradingRow, compact && styles.tradingStack]} testID="asset-trading-columns">
+            <View style={[styles.orderColumn, compact && styles.fullWidthColumn]} testID="asset-order-column">
               {account ? (
                 <OrderPanel
                   key={`${assetId}:${accountId}:${side}`}
@@ -298,7 +303,7 @@ export function OrderTradingScreen({
                 />
               )}
             </View>
-            <View style={styles.priceColumn} testID="asset-price-column">
+            <View style={[styles.priceColumn, compact && styles.fullWidthColumn]} testID="asset-price-column">
               {liveOrderBookEnabled ? (
                 <AssetOrderLadder
                   book={
@@ -384,6 +389,8 @@ const styles = StyleSheet.create({
     borderColor: '#edf0f3',
     paddingTop: 14,
   },
+  tradingStack: { flexDirection: 'column' },
+  fullWidthColumn: { flex: 0, width: '100%' },
   orderColumn: { flex: 1.15, minWidth: 0 },
   priceColumn: { flex: 1, minWidth: 0, overflow: 'hidden' },
   currentPrice: { paddingVertical: 14, gap: 4, minWidth: 0 },

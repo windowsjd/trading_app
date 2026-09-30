@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from '../../theme/native';
 import ActionPressable from '../common/ActionPressable';
 import { useQuery } from '@tanstack/react-query';
 

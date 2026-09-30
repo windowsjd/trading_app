@@ -44,7 +44,7 @@ function harness() {
     } },
   }).default;
   const rootMocks: any = {
-    '@react-navigation/native': { NavigationContainer: 'NavigationContainer' },
+    '@react-navigation/native': { NavigationContainer: 'NavigationContainer', DefaultTheme: { colors: {} }, DarkTheme: { colors: {} } },
     '@react-navigation/native-stack': { createNativeStackNavigator: () => ({ Navigator: 'Navigator', Screen: 'Screen' }) },
     './navigationRef': { rootNavigationRef: {} },
     '../../components/states/ScreenErrorBoundary': { default: Boundary, __esModule: true },

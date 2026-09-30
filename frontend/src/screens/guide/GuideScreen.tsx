@@ -1,5 +1,5 @@
 import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text } from '../../theme/native';
 
 import type { GuideScreenProps } from '../../app/navigation/types';
 import ActionPressable from '../../components/common/ActionPressable';

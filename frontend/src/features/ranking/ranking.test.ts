@@ -90,6 +90,9 @@ function createHarness(scope?: string) {
     }
     const localRequire = (id: string) => {
       if (mocks.has(id)) return mocks.get(id);
+      if (id.endsWith('/theme/native')) return mocks.get('react-native');
+      if (id.endsWith('/theme/safeArea')) return { SafeAreaView: native.SafeAreaView };
+      if (id.endsWith('/theme/appearance')) return { useAppearance: () => ({ mode: 'light', colors: {} }) };
       return id.startsWith('.') ? load(path.resolve(path.dirname(file), id)) : require(id);
     };
     new Function('require', 'module', 'exports', compiled.get(file)!)(localRequire, module, module.exports);

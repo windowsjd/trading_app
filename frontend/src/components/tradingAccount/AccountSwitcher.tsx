@@ -6,7 +6,7 @@ import {
   Text,
   useWindowDimensions,
   View,
-} from 'react-native';
+} from '../../theme/native';
 import ActionPressable from '../common/ActionPressable';
 import { useQuery } from '@tanstack/react-query';
 

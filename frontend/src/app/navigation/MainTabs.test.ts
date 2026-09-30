@@ -146,15 +146,14 @@ describe('bottom tab icon contract', () => {
   it('draws every icon with consistent SVG strokes, without text or font assets', () => {
     assert.match(icons, /import Svg, \{ Circle, Path \} from 'react-native-svg'/);
     assert.deepEqual(
-      [...icons.matchAll(/case '(\w+)':/g)].map((match) => match[1]),
+      [...new Set([...icons.matchAll(/case '(\w+)':/g)].map((match) => match[1]))],
       ['home', 'market', 'guide', 'ranking', 'record', 'menu', 'profile'],
     );
     assert.match(icons, /width=\{size\}\s+height=\{size\}/);
     assert.match(icons, /viewBox="0 0 24 24"/);
-    assert.match(
-      icons,
-      /fill="none"\s+stroke=\{color\}\s+strokeWidth=\{2\}/,
-    );
+    assert.match(icons, /fill=\{focused \? color : 'none'\}/);
+    assert.match(icons, /stroke=\{focused \? 'none' : color\}/);
+    assert.match(icons, /case 'home': drawing = <Path/);
     assert.match(icons, /strokeLinecap="round"\s+strokeLinejoin="round"/);
     assert.doesNotMatch(
       icons,
@@ -177,11 +176,31 @@ describe('bottom tab icon contract', () => {
     assert.match(tabs, /insets = useSafeAreaInsets\(\)/);
     assert.match(
       tabs,
-      /fontScale > 1\s*\? \{ height: 49 \+ Math\.ceil\(14 \* \(fontScale - 1\)\) \+ insets\.bottom \}\s*: undefined/,
+      /fontScale > 1\s*\? \{ height: 49 \+ Math\.ceil\(14 \* \(fontScale - 1\)\) \+ insets\.bottom \}\s*: \{\}/,
     );
-    assert.doesNotMatch(
-      tabs,
-      /tabBarAllowFontScaling:\s*false|tabBarActiveTintColor|tabBarInactiveTintColor/,
-    );
+    assert.doesNotMatch(tabs, /tabBarAllowFontScaling:\s*false/);
+    assert.match(tabs, /tabBarActiveTintColor: '#ffffff'/);
+    assert.match(tabs, /tabBarInactiveTintColor: '#aebbc8'/);
+    assert.match(tabs, /backgroundColor: '#19232e'/);
+  });
+});
+
+describe('bottom tab visual states', () => {
+  it('renders white solid selected icons and grey outline inactive icons', () => {
+    const Icon = load(resolve('src/components/navigation/TabBarIcon.tsx'), {
+      'react-native': { View: 'View' },
+      'react-native-svg': { default: 'Svg', Circle: 'Circle', Path: 'Path', __esModule: true },
+    }).default;
+    for (const name of ['home', 'market', 'guide', 'ranking', 'record', 'menu']) {
+      const active = elements(Icon({ name, color: '#ffffff', size: 25, focused: true }), 'Svg')[0];
+      const inactive = elements(Icon({ name, color: '#aebbc8', size: 25, focused: false }), 'Svg')[0];
+      assert.equal(active.props.fill, '#ffffff'); assert.equal(active.props.stroke, 'none');
+      assert.equal(inactive.props.fill, 'none'); assert.equal(inactive.props.stroke, '#aebbc8');
+      assert.equal(active.props.width, 25); assert.equal(inactive.props.width, 25);
+    }
+    const tree = renderTabs('general');
+    assert.equal(tree.props.screenOptions.tabBarActiveTintColor, '#ffffff');
+    assert.equal(tree.props.screenOptions.tabBarInactiveTintColor, '#aebbc8');
+    assert.equal(tree.props.screenOptions.tabBarStyle.backgroundColor, '#19232e');
   });
 });

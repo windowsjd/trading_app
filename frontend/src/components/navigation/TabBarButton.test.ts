@@ -66,9 +66,10 @@ describe('bottom tab touch feedback', () => {
         ]);
         for (const screen of screens) {
           for (const selected of [false, true]) {
-            const icon = screen.props.options.tabBarIcon({ color: selected ? '#007aff' : '#888', size: 25 });
-            assert.equal(icon.props.color, selected ? '#007aff' : '#888');
+            const icon = screen.props.options.tabBarIcon({ color: selected ? '#fff' : '#aaa', size: 25, focused: selected });
+            assert.equal(icon.props.color, selected ? '#fff' : '#aaa');
             assert.equal(icon.props.size, 25);
+            assert.equal(icon.props.focused, selected);
             const calls: string[] = [];
             const props = {
               onPress: () => calls.push('press'), onLongPress: () => calls.push('longPress'),
@@ -89,7 +90,7 @@ describe('bottom tab touch feedback', () => {
             h.animations.length = 0;
             host.props.onPressIn(event);
             if (platform === 'android') {
-              assert.deepEqual(host.props.android_ripple, { color: 'rgba(0, 0, 0, 0.12)', borderless: false });
+              assert.deepEqual(host.props.android_ripple, { color: 'rgba(255, 255, 255, 0.12)', borderless: false });
               assert.equal(h.animations.length, 0);
             } else {
               assert.equal(h.animations[0].toValue, 0.76);
@@ -115,10 +116,10 @@ describe('bottom tab touch feedback', () => {
 
   it('keeps the existing large-font and safe-area layout policy', () => {
     const h = harness('ios');
-    assert.equal(h.MainTabs().props.screenOptions.tabBarStyle, undefined);
+    assert.deepEqual(h.MainTabs().props.screenOptions.tabBarStyle, { backgroundColor: '#19232e', borderTopColor: '#354354' });
     h.dimensions.fontScale = 2.4;
     const options = h.MainTabs().props.screenOptions;
     assert.equal(options.tabBarLabelPosition, 'below-icon');
-    assert.deepEqual(options.tabBarStyle, { height: 49 + Math.ceil(14 * 1.4) + h.insets.bottom });
+    assert.deepEqual(options.tabBarStyle, { backgroundColor: '#19232e', borderTopColor: '#354354', height: 49 + Math.ceil(14 * 1.4) + h.insets.bottom });
   });
 });

@@ -6,7 +6,7 @@ import {
   Text,
   View,
   useWindowDimensions,
-} from 'react-native';
+} from '../../theme/native';
 import {
   formatOrderBookDecimal,
   normalizeOrderBook,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text, View } from '../../theme/native';
 
 import CTAButton from '../common/CTAButton';
 import { TEST_IDS } from '../../constants/testIds';

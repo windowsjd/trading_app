@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from '../../theme/native';
 
 export default function ChartEmptyState({
   message = '표시할 차트 데이터가 없습니다.',

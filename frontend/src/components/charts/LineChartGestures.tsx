@@ -1,5 +1,5 @@
 import React, { type ReactNode } from 'react';
-import { View } from 'react-native';
+import { View } from '../../theme/native';
 
 export type LineChartGesturesProps = {
   children: ReactNode;

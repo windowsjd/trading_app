@@ -10,7 +10,7 @@ import {
   Alert,
   AppState,
   type AppStateStatus,
-} from 'react-native';
+} from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 import {
   useInfiniteQuery,

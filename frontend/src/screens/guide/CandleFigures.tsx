@@ -1,9 +1,10 @@
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Text, View } from '../../theme/native';
 import Svg, { Line, Polyline, Rect } from 'react-native-svg';
 import { candleParts, won, type Ohlc } from './lessonCalculations';
 import { lessonStyles as s } from './LessonUi';
 import { UP_COLOR, DOWN_COLOR } from '../../components/charts/candleColors';
+import { useAppearance } from '../../theme/appearance';
 
 // All teaching candles share a price scale so their shapes are comparable.
 const y = (price: number) => 190 - ((price - 9400) / 1600) * 170;
@@ -152,6 +153,7 @@ export function CandleFigure({
   title: string;
   details?: boolean;
 }) {
+  const { mode, colors } = useAppearance();
   const parts = candleParts(candle);
   const color = candle.close >= candle.open ? UP_COLOR : DOWN_COLOR;
   const label = `${title}. ${parts.direction}. 시가 ${won(candle.open)}, 고가 ${won(candle.high)}, 저가 ${won(candle.low)}, 종가 ${won(candle.close)}.`;
@@ -167,7 +169,7 @@ export function CandleFigure({
             x2={180}
             y1={y(candle.open)}
             y2={y(candle.open)}
-            stroke="#c5ced2"
+            stroke={mode === 'dark' ? colors.border : '#c5ced2'}
             strokeDasharray="4 4"
           />
           <Line
@@ -220,6 +222,7 @@ export function CandleFigure({
   );
 }
 export function PricePath({ prices, id }: { prices: number[]; id: string }) {
+  const { mode, colors } = useAppearance();
   const points = prices
     .map((price, i) => `${20 + i * 80},${y(price)}`)
     .join(' ');
@@ -230,7 +233,7 @@ export function PricePath({ prices, id }: { prices: number[]; id: string }) {
           testID={`${id}-line`}
           points={points}
           fill="none"
-          stroke="#245b76"
+          stroke={mode === 'dark' ? colors.secondary : '#245b76'}
           strokeWidth={3}
         />
       </Svg>

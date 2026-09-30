@@ -5,7 +5,7 @@ import {
   Text,
   View,
   type AppStateStatus,
-} from 'react-native';
+} from '../../theme/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';
 import ActionPressable from '../../components/common/ActionPressable';

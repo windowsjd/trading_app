@@ -1,6 +1,7 @@
 import React, { useId, useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from '../../theme/native';
 import { UP_COLOR, DOWN_COLOR } from './candleColors';
+import { useAppearance } from '../../theme/appearance';
 import Svg, {
   ClipPath,
   Defs,
@@ -84,9 +85,6 @@ export type CandlestickChartRendererProps = {
 };
 
 const GRID_LINES = 4;
-const GRID_COLOR = '#eef1f4';
-const AXIS_TEXT_COLOR = '#98a2b3';
-const CROSSHAIR_COLOR = '#64748b';
 
 export default function CandlestickChartRenderer({
   geometry,
@@ -100,6 +98,10 @@ export default function CandlestickChartRenderer({
   firstVisibleTime,
   lastVisibleTime,
 }: CandlestickChartRendererProps) {
+  const { mode, colors } = useAppearance();
+  const gridColor = mode === 'dark' ? colors.border : '#eef1f4';
+  const axisColor = mode === 'dark' ? colors.muted : '#98a2b3';
+  const crosshairColor = mode === 'dark' ? colors.secondary : '#64748b';
   const {
     padding,
     innerWidth,
@@ -188,14 +190,14 @@ export default function CandlestickChartRenderer({
             y1={y}
             x2={rightEdgeX}
             y2={y}
-            stroke={GRID_COLOR}
+            stroke={gridColor}
             strokeWidth={1}
           />
           <SvgText
             x={rightEdgeX + 4}
             y={y + 3}
             fontSize={chartLabelFontSize(label, padding.right - 8)}
-            fill={AXIS_TEXT_COLOR}
+            fill={axisColor}
           >
             {label}
           </SvgText>
@@ -210,6 +212,8 @@ export default function CandlestickChartRenderer({
     rightEdgeX,
     currencyCode,
     displayPriceDecimals,
+    gridColor,
+    axisColor,
   ]);
 
   const crosshairCandle =
@@ -318,7 +322,7 @@ export default function CandlestickChartRenderer({
               y1={padding.top}
               x2={crosshairX}
               y2={bottomY}
-              stroke={CROSSHAIR_COLOR}
+              stroke={crosshairColor}
               strokeWidth={1}
               strokeDasharray="2 2"
             />
@@ -327,7 +331,7 @@ export default function CandlestickChartRenderer({
               y1={crosshair.y}
               x2={rightEdgeX}
               y2={crosshair.y}
-              stroke={CROSSHAIR_COLOR}
+              stroke={crosshairColor}
               strokeWidth={1}
               strokeDasharray="2 2"
             />
@@ -336,7 +340,7 @@ export default function CandlestickChartRenderer({
               y={crosshair.y - 8}
               width={padding.right}
               height={16}
-              fill={CROSSHAIR_COLOR}
+              fill={crosshairColor}
               rx={2}
             />
             <SvgText
@@ -353,7 +357,7 @@ export default function CandlestickChartRenderer({
               y={bottomY + 4}
               width={timeLabelWidth}
               height={16}
-              fill={CROSSHAIR_COLOR}
+              fill={crosshairColor}
               rx={2}
             />
             <SvgText
@@ -374,7 +378,7 @@ export default function CandlestickChartRenderer({
                 x={padding.left}
                 y={bottomY + 15}
                 fontSize={9}
-                fill={AXIS_TEXT_COLOR}
+                fill={axisColor}
               >
                 {firstTimeLabel}
               </SvgText>
@@ -383,7 +387,7 @@ export default function CandlestickChartRenderer({
               x={rightEdgeX}
               y={bottomY + 15}
               fontSize={chartLabelFontSize(lastTimeLabel, innerWidth)}
-              fill={AXIS_TEXT_COLOR}
+              fill={axisColor}
               textAnchor="end"
             >
               {lastTimeLabel}

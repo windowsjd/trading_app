@@ -1,7 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { type LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
+import { type LayoutChangeEvent, StyleSheet, Text, View } from '../../theme/native';
 import Svg, { Circle, Line as SvgLine, Path } from 'react-native-svg';
 import ChartEmptyState from './ChartEmptyState';
+import { useAppearance } from '../../theme/appearance';
 import LineChartGestures from './LineChartGestures';
 import { formatDisplayDecimal, formatKstDateTime } from '../../utils/format';
 
@@ -39,6 +40,10 @@ export default function LineChart({
   labelFormatter,
   emptyMessage = '차트 데이터가 충분하지 않습니다.',
 }: LineChartProps) {
+  const { mode, colors } = useAppearance();
+  const gridColor = mode === 'dark' ? colors.border : '#eceff3';
+  const markerColor = mode === 'dark' ? colors.screen : '#fff';
+  const crosshairColor = mode === 'dark' ? colors.secondary : '#64748b';
   const [width, setWidth] = useState(320);
   // Bind selection to the dataset and layout. Account/range changes cannot
   // momentarily show the old point, even before an effect gets to run.
@@ -134,7 +139,7 @@ export default function LineChart({
               x2={width - PADDING}
               y1={PADDING + ratio * (height - 2 * PADDING)}
               y2={PADDING + ratio * (height - 2 * PADDING)}
-              stroke="#eceff3"
+              stroke={gridColor}
             />
           ))}
           <Path
@@ -152,7 +157,7 @@ export default function LineChart({
                 x2={width - PADDING}
                 y1={coordinate.y}
                 y2={coordinate.y}
-                stroke="#64748b"
+                stroke={crosshairColor}
                 strokeDasharray="4 4"
               />
               <SvgLine
@@ -160,7 +165,7 @@ export default function LineChart({
                 x2={coordinate.x}
                 y1={PADDING}
                 y2={height - PADDING}
-                stroke="#64748b"
+                stroke={crosshairColor}
                 strokeDasharray="4 4"
               />
             </>
@@ -169,7 +174,7 @@ export default function LineChart({
             cx={coordinate.x}
             cy={coordinate.y}
             r={4}
-            fill={selected ? '#2563eb' : '#fff'}
+            fill={selected ? '#2563eb' : markerColor}
             stroke={selected ? '#fff' : '#2563eb'}
             strokeWidth={2}
           />

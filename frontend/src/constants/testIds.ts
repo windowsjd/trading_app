@@ -175,6 +175,7 @@ export const TEST_IDS = {
   settings: {
     screen: 'settings-screen',
     nicknameInput: 'settings-nickname-input',
+    appearance: (value: 'system' | 'light' | 'dark') => `settings-appearance-${value}`,
     saveNickname: 'settings-save-nickname',
     logout: 'settings-logout',
   },

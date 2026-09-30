@@ -1,5 +1,5 @@
 import React from 'react';
-import { View } from 'react-native';
+import { View } from '../../theme/native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 type TabIconName =
@@ -15,12 +15,23 @@ type Props = {
   name: TabIconName;
   color: string;
   size: number;
+  focused?: boolean;
 };
 
-export default function TabBarIcon({ name, color, size }: Props) {
+export default function TabBarIcon({ name, color, size, focused = false }: Props) {
   let drawing: React.ReactNode;
 
-  switch (name) {
+  if (focused) {
+    switch (name) {
+      case 'home': drawing = <Path d="M12 2 2 10h2v12h16V10h2L12 2Zm-3 19v-8h6v8H9Z" fillRule="evenodd" />; break;
+      case 'market': drawing = <><Path d="M2 7h5v8H2zM9 10h5v8H9zM16 5h6v7h-6z" /><Path d="M4.5 3v18M11.5 3v18M19 2v19" fill="none" stroke={color} strokeWidth={2} /></>; break;
+      case 'guide': drawing = <Path d="M3 3h6c1.3 0 2.5.5 3 1.5C12.5 3.5 13.7 3 15 3h6v17h-6c-1.4 0-2.4.5-3 1-0.6-.5-1.6-1-3-1H3V3Zm8 2v12c-1-.6-2-.8-3-.8H5V5h3c1.3 0 2.3.1 3 0Zm2 0v12c1-.6 2-.8 3-.8h3V5h-3c-1.3 0-2.3.1-3 0Z" fillRule="evenodd" />; break;
+      case 'ranking': drawing = <Path d="M6 2h12v3h4v3c0 3-2 5-5 5-.6 1.5-2 2.5-4 3v3h4v3H7v-3h4v-3c-2-.5-3.4-1.5-4-3-3 0-5-2-5-5V5h4V2Zm0 5H4v1c0 1.2.6 2 2 2V7Zm12 0v3c1.4 0 2-.8 2-2V7h-2Z" fillRule="evenodd" />; break;
+      case 'record': drawing = <Path d="M8 2h8v3h3v17H5V5h3V2Zm2 2v2h4V4h-4Zm-2 6v2h8v-2H8Zm0 4v2h8v-2H8Zm0 4v2h6v-2H8Z" fillRule="evenodd" />; break;
+      case 'menu': drawing = <Path d="M4 5h16v3H4zM4 11h16v3H4zM4 17h16v3H4z" />; break;
+      case 'profile': drawing = <><Circle cx={12} cy={7} r={4} /><Path d="M3 21v-2c0-3 3-5 6-5h6c3 0 6 2 6 5v2H3Z" /></>; break;
+    }
+  } else switch (name) {
     case 'home':
       drawing = <Path d="M3 10 12 3 21 10 M5 9v12h14V9 M9 21v-7h6v7" />;
       break;
@@ -71,8 +82,8 @@ export default function TabBarIcon({ name, color, size }: Props) {
         width={size}
         height={size}
         viewBox="0 0 24 24"
-        fill="none"
-        stroke={color}
+        fill={focused ? color : 'none'}
+        stroke={focused ? 'none' : color}
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"

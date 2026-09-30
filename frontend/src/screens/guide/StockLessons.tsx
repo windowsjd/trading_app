@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Text, View } from 'react-native';
+import { Text, View } from '../../theme/native';
 import {
   Body,
   LessonAction,

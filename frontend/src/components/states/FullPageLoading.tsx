@@ -1,5 +1,5 @@
 import React from 'react';
-import { SafeAreaView, View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { SafeAreaView, View, Text, ActivityIndicator, StyleSheet } from '../../theme/native';
 
 interface FullPageLoadingProps {
   message?: string;

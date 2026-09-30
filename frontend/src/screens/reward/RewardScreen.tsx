@@ -5,7 +5,7 @@ import {
   StyleSheet,
   SafeAreaView,
   FlatList,
-} from 'react-native';
+} from '../../theme/native';
 import { useQuery } from '@tanstack/react-query';
 
 import { QUERY_KEYS } from '../../constants/queryKeys';

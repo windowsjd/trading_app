@@ -13,6 +13,9 @@ function load(file, mocks) {
   }).outputText;
   const localRequire = (name) => {
     if (Object.hasOwn(mocks, name)) return mocks[name];
+    if (name.endsWith('/theme/native')) return mocks['react-native'];
+    if (name.endsWith('/theme/safeArea')) return mocks['react-native-safe-area-context'] ?? { SafeAreaView: 'SafeAreaView' };
+    if (name.endsWith('/theme/appearance')) return { AppearanceProvider: ({ children }) => children, useAppearance: () => ({ preference: 'system', mode: 'light', colors: { screen: '#fff', text: '#111', border: '#ddd' }, setPreference() {} }) };
     // Interaction animation is a native boundary here; its real component has
     // separate render tests. Keep screen/query/gesture tests focused on actions.
     if (name.endsWith('/ActionPressable')) return { default: 'Pressable', __esModule: true };

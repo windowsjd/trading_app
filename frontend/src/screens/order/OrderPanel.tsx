@@ -14,7 +14,7 @@ import {
   TextInput,
   useWindowDimensions,
   type TextInputProps,
-} from 'react-native';
+} from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -1172,7 +1172,9 @@ function OrderNumberInput(props: TextInputProps) {
       style={styles.group}
       onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
     >
-      <TextInput {...props} />
+      <TextInput {...props} style={fontScale > 1
+        ? [props.style, { minHeight: Math.ceil(24 * fontScale + 32) }]
+        : props.style} />
       {showFullValue ? (
         <Text
           selectable
@@ -1257,13 +1259,14 @@ const styles = StyleSheet.create({
   input: {
     width: '100%',
     minWidth: 0,
-    minHeight: 46,
+    minHeight: 54,
     borderWidth: 1,
     borderColor: '#d9dfe5',
     borderRadius: 8,
     paddingHorizontal: 8,
-    paddingVertical: 12,
+    paddingVertical: 8,
     fontSize: 16,
+    lineHeight: 24,
     color: '#202a35',
     backgroundColor: '#fff',
   },

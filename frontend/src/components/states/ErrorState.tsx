@@ -4,7 +4,7 @@ import {
   ScrollView,
   Text,
   StyleSheet,
-} from 'react-native';
+} from '../../theme/native';
 import ActionPressable from '../common/ActionPressable';
 import AdminDiagnosticPanel from './AdminDiagnosticPanel';
 

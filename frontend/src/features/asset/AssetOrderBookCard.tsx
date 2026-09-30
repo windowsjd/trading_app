@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { BUY_COLOR, SELL_COLOR, BUY_BACKGROUND, SELL_BACKGROUND } from '../order/sideColors';
-import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from '../../theme/native';
 import { formatKstDateTime } from '../../utils/format';
 import { formatOrderBookDecimal, normalizeOrderBook, type AssetOrderBook } from './orderBook';
 

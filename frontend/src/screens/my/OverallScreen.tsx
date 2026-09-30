@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, Text, StyleSheet } from 'react-native';
+import { ScrollView, Text, StyleSheet } from '../../theme/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { MyStackParamList } from '../../app/navigation/types';
 import ActionPressable from '../../components/common/ActionPressable';

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, type ViewStyle } from 'react-native';
+import { View, type ViewStyle } from '../../theme/native';
 import type { LineChartGesturesProps } from './LineChartGestures';
 
 export default function LineChartGestures({

@@ -6,7 +6,7 @@ import {
   SafeAreaView,
   FlatList,
   ActivityIndicator,
-} from 'react-native';
+} from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 

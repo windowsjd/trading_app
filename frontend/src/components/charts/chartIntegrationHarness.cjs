@@ -67,7 +67,8 @@ function createChartHarness(platform = 'android') {
     const localRequire = (name) => {
       if (name.endsWith('/ActionPressable')) return { default: 'Pressable', __esModule: true };
       if (name === 'react') return react;
-      if (name === 'react-native') return native;
+      if (name === 'react-native' || name.endsWith('/theme/native')) return native;
+      if (name.endsWith('/theme/appearance')) return { useAppearance: () => ({ mode: 'light', colors: {} }) };
       if (name === 'react-native-svg') return {
         __esModule: true, default: 'svg', ClipPath: 'clipPath', Defs: 'defs',
         G: 'g', Line: 'line', Rect: 'rect', Text: 'text', Circle: 'circle', Path: 'path',

@@ -10,7 +10,7 @@ import {
   TextInput,
   FlatList,
   ActivityIndicator,
-} from 'react-native';
+} from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useInfiniteQuery } from '@tanstack/react-query';
 

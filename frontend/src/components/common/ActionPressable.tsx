@@ -16,7 +16,7 @@ import {
   type PressableProps,
   type PressableStateCallbackType,
   type ViewStyle,
-} from 'react-native';
+} from '../../theme/native';
 import {
   getFeedbackPalette,
   getRippleGeometry,
