@@ -91,43 +91,46 @@ export default function HomeScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Which account every number below belongs to — always on screen, and
-          on every state, so no blocked view is a dead end. */}
-      <View style={styles.switcherHeader}>
-        <AccountSwitcher />
-      </View>
+      <View style={styles.body}>
+        {/* Which account every number below belongs to — always on screen, and
+            on every state, so no blocked view is a dead end. */}
+        <View style={styles.switcherHeader}>
+          <AccountSwitcher home />
+        </View>
 
-      {selectedAccount.mode === 'general' ? (
-        <GeneralAccountHome
-          key={selectedAccount.id}
-          account={selectedAccount}
-          capabilities={capabilities}
-          onOpenLedger={() => navigation.navigate('WalletTransactions')}
-          onOpenOrders={openOrders}
-          onOpenFx={() => navigation.navigate('WalletFx')}
-        />
-      ) : (
-        <SeasonAccountHome
-          key={selectedAccount.id}
-          onOpenOrders={openOrders}
-          account={selectedAccount}
-          capabilities={capabilities}
-          onOpenLedger={() => navigation.navigate('WalletTransactions')}
-          onOpenFx={() => navigation.navigate('WalletFx')}
-          onOpenReward={() =>
-            rootNavigation.navigate('MainTabs', {
-              screen: 'MyTab',
-              params: { screen: 'Reward' },
-            })
-          }
-          onOpenAsset={openAsset}
-        />
-      )}
+        {selectedAccount.mode === 'general' ? (
+          <GeneralAccountHome
+            key={selectedAccount.id}
+            account={selectedAccount}
+            capabilities={capabilities}
+            onOpenLedger={() => navigation.navigate('WalletTransactions')}
+            onOpenOrders={openOrders}
+            onOpenFx={() => navigation.navigate('WalletFx')}
+          />
+        ) : (
+          <SeasonAccountHome
+            key={selectedAccount.id}
+            onOpenOrders={openOrders}
+            account={selectedAccount}
+            capabilities={capabilities}
+            onOpenLedger={() => navigation.navigate('WalletTransactions')}
+            onOpenFx={() => navigation.navigate('WalletFx')}
+            onOpenReward={() =>
+              rootNavigation.navigate('MainTabs', {
+                screen: 'MyTab',
+                params: { screen: 'Reward' },
+              })
+            }
+            onOpenAsset={openAsset}
+          />
+        )}
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: semantic.screen },
+  body: { flex: 1, width: '100%', maxWidth: 640, alignSelf: 'center' },
   switcherHeader: { paddingHorizontal: 16, paddingTop: 12 },
 });

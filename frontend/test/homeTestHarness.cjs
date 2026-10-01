@@ -10,6 +10,7 @@ function createHomeHarness(mode = 'general') {
     defaultOptions: { queries: { retry: false } },
   });
   const h = {
+    client,
     mode,
     queries: [],
     requests: [],
@@ -53,6 +54,7 @@ function createHomeHarness(mode = 'general') {
     ]),
   );
   native.StyleSheet = { create: (styles) => styles };
+  native.useWindowDimensions = () => ({ width: 390, height: 844, fontScale: 1 });
   const root = { navigate: (...args) => h.navigation.push(args) };
   const mocks = {
     react: { ...React, useMemo: (fn) => fn() },
@@ -83,8 +85,11 @@ function createHomeHarness(mode = 'general') {
     '../../app/navigation/navigationHooks': { useRootNavigation: () => root },
     '../../features/ranking/api': {
       getRankings: () => {},
-      getRankingTier: () => '골드',
+      getRankingTier: load(resolve(__dirname, '../src/features/ranking/api.ts'), {
+        '../../services/api/client': { apiClient: {} },
+      }).getRankingTier,
     },
+    '../../features/me/api': { getMe: () => {} },
     '../../components/charts': {
       DonutChart: 'DonutChart',
       LineChart: 'LineChart',
@@ -115,6 +120,8 @@ function createHomeHarness(mode = 'general') {
     './SeasonAccountHome': { default: 'SeasonAccountHome', __esModule: true },
   };
   let observers = [];
+  const hero = load(resolve(__dirname, '../src/screens/home/HomeAssetHero.tsx'), mocks).default;
+  mocks['./HomeAssetHero'] = { default: hero, __esModule: true };
   const charts = load(
     resolve(__dirname, '../src/screens/home/HomePortfolioCharts.tsx'),
     mocks,
@@ -176,9 +183,16 @@ function createHomeHarness(mode = 'general') {
           ? 'GeneralAccountHome'
           : 'SeasonAccountHome'),
     );
-    const tree = (h.account.mode === 'general' ? general : season)(
+    const screenTree = (h.account.mode === 'general' ? general : season)(
       branch.props,
     );
+    const expandHero = (node) => {
+      if (Array.isArray(node)) return node.map(expandHero);
+      if (!React.isValidElement(node)) return node;
+      if (node.type === hero) return hero(node.props);
+      return React.cloneElement(node, {}, expandHero(node.props.children));
+    };
+    const tree = expandHero(screenTree);
     const chart = elements(tree).find((node) => node.type === charts);
     return { tree, chart: chart ? charts(chart.props) : null, branch };
   };
@@ -196,6 +210,8 @@ function createHomeHarness(mode = 'general') {
       cumulativeExternalFundingKrw: '10001000',
       cumulativeAdRewardKrw: '1000',
       investmentPnlKrw: '0',
+      realizedPnlKrw: '1234',
+      unrealizedPnlKrw: '-2345',
     };
     client.setQueryData([...base, 'overview'], {
       tradingAccountId: account.id,
@@ -219,6 +235,12 @@ function createHomeHarness(mode = 'general') {
       keys.tradingAccount.positions(account.id, { limit: 5 }),
       { positions: [] },
     );
+    client.setQueryData(keys.me, { id: 'user-1', nickname: '김재민' });
+    if (account.season) client.setQueryData(keys.ranking.list({
+      scope: 'all', seasonId: account.season.seasonId,
+      rankType: account.season.seasonStatus === 'settled' ? 'final' : 'daily',
+      limit: 1, offset: 0,
+    }), { myRanking: { state: 'available', rank: 2, provisionalTier: 'Silver', finalTier: 'Gold' } });
   };
   h.failEquity = (error) =>
     client

@@ -51,9 +51,11 @@ import type { TradingAccountDto } from '../../features/tradingAccount/api';
 type Props = {
   /** Compact trigger for headers; the sheet is identical either way. */
   compact?: boolean;
+  /** Home context with a small change action; selection still uses this sheet. */
+  home?: boolean;
 };
 
-export default function AccountSwitcher({ compact = false }: Props) {
+export default function AccountSwitcher({ compact = false, home = false }: Props) {
   const {
     accounts,
     selectedAccount,
@@ -140,35 +142,64 @@ export default function AccountSwitcher({ compact = false }: Props) {
 
   return (
     <>
-      <ActionPressable
-        style={styles.trigger}
-        onPress={() => setOpen(true)}
-        accessibilityRole="button"
-        accessibilityLabel={`계정 선택. 현재 ${display.title}, ${display.statusLabel}`}
-        testID={TEST_IDS.tradingAccount.switcherTrigger}
-      >
-        <View style={styles.triggerTextColumn}>
-          <Text style={styles.triggerLabel}>투자 계정</Text>
-          {/* Wraps up to three lines: a long season name stays readable. */}
-          <Text style={styles.triggerTitle} numberOfLines={3}>
-            {display.title}
-          </Text>
-          {!compact && display.subtitle ? (
-            <Text style={styles.triggerSubtitle}>{display.subtitle}</Text>
+      {home ? (
+        <View style={styles.homeContext} testID={TEST_IDS.home.accountContext}>
+          <View style={styles.homeContextRow}>
+            <Text style={styles.homeTitle}>{display.title}</Text>
+            <ActionPressable
+              style={styles.homeChange}
+              onPress={() => setOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`계정 변경. 현재 ${display.title}, ${display.statusLabel}`}
+              testID={TEST_IDS.tradingAccount.switcherTrigger}
+            >
+              <Text style={styles.homeChangeText}>변경</Text>
+            </ActionPressable>
+          </View>
+          {selectedAccount.status !== 'active' ? (
+            <Text style={styles.homeNotice}>계정 {display.statusLabel}</Text>
           ) : null}
-          {!compact ? (
-            <Text style={styles.triggerMeaning}>{display.returnRateLabel}</Text>
+          {selectedAccount.mode === 'season' && (
+            !selectedAccount.season ||
+            selectedAccount.season.seasonStatus !== 'active' ||
+            selectedAccount.season.participantStatus !== 'active'
+          ) ? (
+            <Text style={styles.homeNotice}>
+              {display.subtitle ?? '시즌 정보를 확인할 수 없습니다.'}
+            </Text>
           ) : null}
         </View>
-        <View style={styles.triggerBadgeColumn}>
-          <StatusBadge
-            label={display.statusLabel}
-            tone={display.statusTone}
-            testID={TEST_IDS.tradingAccount.switcherStatus}
-          />
-          <Text style={styles.chevron}>변경</Text>
-        </View>
-      </ActionPressable>
+      ) : (
+        <ActionPressable
+          style={styles.trigger}
+          onPress={() => setOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`계정 선택. 현재 ${display.title}, ${display.statusLabel}`}
+          testID={TEST_IDS.tradingAccount.switcherTrigger}
+        >
+          <View style={styles.triggerTextColumn}>
+            <Text style={styles.triggerLabel}>투자 계정</Text>
+            {/* Wraps up to three lines: a long season name stays readable. */}
+            <Text style={styles.triggerTitle} numberOfLines={3}>
+              {display.title}
+            </Text>
+            {!compact && display.subtitle ? (
+              <Text style={styles.triggerSubtitle}>{display.subtitle}</Text>
+            ) : null}
+            {!compact ? (
+              <Text style={styles.triggerMeaning}>{display.returnRateLabel}</Text>
+            ) : null}
+          </View>
+          <View style={styles.triggerBadgeColumn}>
+            <StatusBadge
+              label={display.statusLabel}
+              tone={display.statusTone}
+              testID={TEST_IDS.tradingAccount.switcherStatus}
+            />
+            <Text style={styles.chevron}>변경</Text>
+          </View>
+        </ActionPressable>
+      )}
 
       <BottomSheetBackdrop visible={open} onClose={() => setOpen(false)}>
         <ScrollView
@@ -319,6 +350,31 @@ const BADGE_TEXT_TONE = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
+  homeContext: {
+    minHeight: 72,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: semantic.border,
+    backgroundColor: semantic.surface,
+    gap: 8,
+  },
+  homeContextRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  homeTitle: { flex: 1, minWidth: 0, fontSize: 20, fontWeight: '700', lineHeight: 28 },
+  homeChange: {
+    flexShrink: 0,
+    minWidth: 44,
+    minHeight: 44,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: semantic.raised,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  homeChangeText: { fontSize: 13, lineHeight: 20, fontWeight: '600', color: semantic.secondary },
+  homeNotice: { fontSize: 13, lineHeight: 20, color: semantic.warning },
   trigger: {
     flexDirection: 'row',
     // Top-aligned, not centred: the text column grows downward as it wraps and

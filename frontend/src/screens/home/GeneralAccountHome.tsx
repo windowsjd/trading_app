@@ -13,7 +13,6 @@ import {
   getTradingAccountWallets,
   type TradingAccountDto,
 } from '../../features/tradingAccount/api';
-import { getReturnRateMethodLabel } from '../../features/tradingAccount/accountDisplay';
 import {
   ACCOUNT_INTEGRITY_TITLE,
   findAccountIntegrityFailure,
@@ -25,7 +24,6 @@ import { getPortfolioNotice } from '../../features/tradingAccount/portfolioMessa
 import { getKnownWalletBalanceAmount } from '../../features/wallet/mapper';
 import {
   formatKrw,
-  formatPercent,
   formatUsd,
   getAssetNameDisplay,
 } from '../../utils/format';
@@ -35,6 +33,7 @@ import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
 import HomePortfolioCharts from './HomePortfolioCharts';
+import HomeAssetHero from './HomeAssetHero';
 
 /**
  * Home for a GENERAL account (작업 10 §A-6).
@@ -197,37 +196,25 @@ export default function GeneralAccountHome({
         </View>
       ) : null}
 
-      <View style={styles.card}>
-        <Text style={styles.label}>총 자산</Text>
-        {summary ? (
-          <>
-            <Text style={styles.big}>{formatKrw(summary.totalAssetKrw)}원</Text>
-            <Text style={styles.helper}>
-              {getReturnRateMethodLabel(summary.returnRateMethod)}{' '}
-              {summary.returnRate === null || summary.returnRate === undefined
-                ? '알 수 없음'
-                : `${formatPercent(summary.returnRate)}%`}
-            </Text>
-            <Text style={styles.helper}>
-              KRW 현금 {formatKrw(summary.krwCash)}
-            </Text>
-            <Text style={styles.helper}>
-              USD 환산 {formatKrw(summary.usdCashKrw)}
-            </Text>
-            <Text style={styles.helper}>
-              보유자산 {formatKrw(summary.assetValueKrw)}
-            </Text>
-          </>
-        ) : (
-          <InlineEmptyState
-            title="수익률을 계산할 수 없습니다."
-            message={
-              portfolioNotice?.message ??
-              '계정 성과 데이터가 아직 준비되지 않았습니다.'
-            }
-          />
-        )}
-      </View>
+      <HomeAssetHero summary={summary} unavailableMessage={portfolioNotice?.message} />
+
+      {summary ? (
+        <View style={styles.card}>
+          <Text style={styles.label}>자산 구성</Text>
+          <Text style={styles.helper}>
+            KRW 현금 {formatKrw(summary.krwCash)}
+          </Text>
+          <Text style={styles.helper}>
+            USD 환산 {formatKrw(summary.usdCashKrw)}
+          </Text>
+          <Text style={styles.helper}>
+            보유자산 {formatKrw(summary.assetValueKrw)}
+          </Text>
+          <Text style={styles.helper}>
+            실현 손익 {formatKrw(summary.realizedPnlKrw)}
+          </Text>
+        </View>
+      ) : null}
 
       {summary ? (
         <View style={styles.card}>
@@ -368,8 +355,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   label: { fontSize: 13, color: semantic.secondary },
-  // Ten-plus digit amounts wrap instead of running off the screen.
-  big: { fontSize: 26, fontWeight: '700', lineHeight: 34, flexShrink: 1 },
   helper: { fontSize: 14, color: semantic.secondary, lineHeight: 21 },
   note: { fontSize: 13, color: semantic.warning, lineHeight: 19 },
   warningBox: {

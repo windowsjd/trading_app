@@ -48,7 +48,8 @@ async function run() {
       await page.getByText('총 자산', { exact: true }).waitFor();
       await theme.canvas(page, appearance);
       await theme.background(page.getByTestId('trading-account-general-summary'), appearance, 'screen');
-      for (const label of ['총 자산', '자금 구성', '지갑 요약', '자산 배분', '자산 추이']) {
+      await theme.background(page.getByText('총 자산', { exact: true }), appearance, 'screen');
+      for (const label of ['자금 구성', '지갑 요약', '자산 배분', '자산 추이']) {
         await theme.background(page.getByText(label, { exact: true }), appearance, 'surface');
       }
       await theme.background(page.getByText('원장 보기', { exact: true }), appearance, 'raised');

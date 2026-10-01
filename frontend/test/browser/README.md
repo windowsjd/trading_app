@@ -58,3 +58,22 @@ It rejects unresolved semantic sentinels in CSS/SVG and saves comparison screens
 The friends runner checks both modes (60 layouts), Settings persistence after reload,
 and system theme changes. Install a Korean font in the browser environment (or set
 `FONTCONFIG_FILE` to a local fontconfig file) so Korean text widths are meaningful.
+
+Home uses the same browser tools and font-scale adapter:
+
+```sh
+NODE_PATH=/path/to/browser-tools/node_modules node test/browser/homeBrowser.cjs
+```
+
+The Home runner executes the actual General/Season screens, AccountSwitcher,
+TradingAccountProvider, React Query, selection storage and appearance provider.
+Only transport and navigation are fixture boundaries; external requests are
+blocked. It checks 320/360/390/430/1280px × light/dark × font scale 1/1.5/2 ×
+both modes × normal/long content (120 layouts), plus 28 exception states. Text
+range measurements detect clipping of Korean, long nicknames/tier names, large
+rank numbers and 16-digit assets. It also checks the context's padding/height,
+asset hierarchy, delayed outgoing responses, account/appearance restoration,
+system theme changes and ledger/orders/FX/reward navigation. Reports and
+screenshots go to `/tmp/trading-home-browser` (override `HOME_BROWSER_OUTPUT`).
+This validates RN Web rendering; Android/iOS font measurement, safe areas,
+touch and screen-reader behavior still require device verification.

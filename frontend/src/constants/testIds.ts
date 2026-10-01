@@ -34,7 +34,13 @@ export const TEST_IDS = {
 
   home: {
     screen: 'home-screen',
+    accountContext: 'home-account-context',
     summaryCard: 'home-summary-card',
+    totalAsset: 'home-total-asset',
+    competition: 'home-competition',
+    nickname: 'home-nickname',
+    rank: 'home-rank',
+    tier: 'home-tier',
     goSeasonJoin: 'home-go-season-join',
     goWalletFx: 'home-go-wallet-fx',
     goPortfolio: 'home-go-portfolio',

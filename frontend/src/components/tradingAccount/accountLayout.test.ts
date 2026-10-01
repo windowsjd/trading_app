@@ -184,8 +184,9 @@ describe('the styles long text depends on are present', () => {
     const source = read('screens/home/GeneralAccountHome.tsx');
 
     // A ten-plus digit total wraps instead of running off the screen.
-    assert.match(source, /big:\s*\{[^}]*flexShrink:\s*1/s);
-    assert.match(source, /big:\s*\{[^}]*lineHeight/s);
+    const hero = read('screens/home/HomeAssetHero.tsx');
+    assert.match(hero, /total:\s*\{[^}]*flexShrink:\s*1/s);
+    assert.match(hero, /total:\s*\{[^}]*lineHeight/s);
     // A long asset name wraps; the amount keeps its own track.
     assert.match(source, /positionName:\s*\{[^}]*minWidth:\s*0/s);
     assert.match(source, /positionValue:\s*\{[^}]*flexShrink:\s*0/s);
@@ -196,9 +197,10 @@ describe('the styles long text depends on are present', () => {
     const source = read('screens/home/SeasonAccountHome.tsx');
 
     // A user-supplied season name is unbounded; it wraps rather than truncating.
-    assert.match(source, /seasonName:\s*\{[^}]*lineHeight/s);
-    assert.match(source, /big:\s*\{[^}]*flexShrink:\s*1/s);
-    assert.match(source, /big:\s*\{[^}]*lineHeight/s);
+    assert.match(read('components/tradingAccount/AccountSwitcher.tsx'), /homeTitle:\s*\{[^}]*lineHeight/s);
+    const hero = read('screens/home/HomeAssetHero.tsx');
+    assert.match(hero, /total:\s*\{[^}]*flexShrink:\s*1/s);
+    assert.match(hero, /total:\s*\{[^}]*lineHeight/s);
     // Rank and tier sit in a two-up row: each half must be allowed to wrap
     // inside itself instead of pushing the other card off screen.
     assert.match(source, /flex:\s*\{[^}]*minWidth:\s*0/s);

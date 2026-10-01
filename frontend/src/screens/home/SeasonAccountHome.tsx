@@ -1,6 +1,6 @@
 import { semantic } from '../../theme/tokens';
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from '../../theme/native';
+import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useQuery } from '@tanstack/react-query';
 
@@ -14,22 +14,18 @@ import {
   type TradingAccountDto,
 } from '../../features/tradingAccount/api';
 import {
-  getAccountDisplay,
-  getReturnRateMethodLabel,
-} from '../../features/tradingAccount/accountDisplay';
-import {
   ACCOUNT_INTEGRITY_TITLE,
   findAccountIntegrityFailure,
 } from '../../features/tradingAccount/accountIntegrityGate';
 import { getCapabilityBlockMessage } from '../../features/tradingAccount/capabilities';
 import type { TradingAccountCapabilities } from '../../features/tradingAccount/capabilities';
 import { getRankings, getRankingTier } from '../../features/ranking/api';
+import { getMe } from '../../features/me/api';
 import { getPositionDisplay } from '../../features/position/display';
 import { getPortfolioNotice } from '../../features/tradingAccount/portfolioMessage';
 import { getKnownWalletBalanceAmount } from '../../features/wallet/mapper';
 import {
   formatKrw,
-  formatPercent,
   formatUsd,
   getAssetNameDisplay,
 } from '../../utils/format';
@@ -39,6 +35,7 @@ import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
 import HomePortfolioCharts from './HomePortfolioCharts';
+import HomeAssetHero from './HomeAssetHero';
 
 /**
  * Home for a SEASON account (작업 11 §10.1).
@@ -88,13 +85,19 @@ export default function SeasonAccountHome({
 }: Props) {
   const accountId = account.id;
   const season = account.season;
-  const display = getAccountDisplay(account);
+  const { fontScale } = useWindowDimensions();
 
   // A settled season is ranked by its FINAL table; a running one by the daily
   // snapshot. Asking for the wrong one returns an empty ranking, which would
   // read as "you are unranked".
   const rankType = season?.seasonStatus === 'settled' ? 'final' : 'daily';
   const isSettled = season?.seasonStatus === 'settled';
+
+  const meQuery = useQuery({
+    queryKey: QUERY_KEYS.me,
+    queryFn: getMe,
+    staleTime: 60_000,
+  });
 
   const portfolioQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.portfolio(accountId),
@@ -239,16 +242,6 @@ export default function SeasonAccountHome({
       testID={TEST_IDS.tradingAccount.seasonSummary}
       contentContainerStyle={styles.content}
     >
-      <View style={styles.card}>
-        {/* The season this screen is about, said before any number appears. */}
-        <Text style={styles.label}>시즌</Text>
-        <Text style={styles.seasonName}>{display.title}</Text>
-        <Text style={styles.helper}>
-          {display.subtitle ?? '시즌 정보를 확인할 수 없습니다.'}
-        </Text>
-        <Text style={styles.helper}>계정 상태 {display.statusLabel}</Text>
-      </View>
-
       {portfolioNotice ? (
         <View style={styles.warningBox}>
           <Text style={styles.warningTitle}>{portfolioNotice.title}</Text>
@@ -256,70 +249,66 @@ export default function SeasonAccountHome({
         </View>
       ) : null}
 
-      <View testID={TEST_IDS.home.summaryCard} style={styles.card}>
-        <Text style={styles.label}>{isSettled ? '최종 자산' : '총 자산'}</Text>
-        {summary ? (
-          <>
-            <Text style={styles.big}>{formatKrw(summary.totalAssetKrw)}원</Text>
-            <Text style={styles.helper}>
-              {getReturnRateMethodLabel(summary.returnRateMethod)}{' '}
-              {summary.returnRate === null || summary.returnRate === undefined
-                ? '알 수 없음'
-                : `${formatPercent(summary.returnRate)}%`}
-            </Text>
-            <Text style={styles.helper}>
-              KRW 현금 {formatKrw(summary.krwCash)}
-            </Text>
-            <Text style={styles.helper}>
-              USD 환산 {formatKrw(summary.usdCashKrw)}
-            </Text>
-            <Text style={styles.helper}>
-              보유자산 {formatKrw(summary.assetValueKrw)}
-            </Text>
-            <Text style={styles.helper}>
-              실현 손익 {formatKrw(summary.realizedPnlKrw)}
-            </Text>
-            <Text style={styles.helper}>
-              평가 손익 {formatKrw(summary.unrealizedPnlKrw)}
-            </Text>
-          </>
-        ) : (
-          // Unavailable performance is said, not rendered as 0원 / 0%.
-          <InlineEmptyState
-            title="수익률을 계산할 수 없습니다."
-            message={
-              portfolioNotice?.message ??
-              '계정 성과 데이터가 아직 준비되지 않았습니다.'
-            }
-          />
-        )}
-      </View>
-
-      <View style={styles.row}>
-        <View style={[styles.card, styles.flex]}>
-          <Text style={styles.label}>
-            {isSettled ? '최종 순위' : '현재 순위'}
-          </Text>
-          {rankingQuery.isLoading ? (
-            <SectionSkeleton lines={1} />
-          ) : (
-            <Text style={styles.medium}>{rank}</Text>
-          )}
+      {tradeNotice ? (
+        <View
+          testID={TEST_IDS.tradingAccount.capabilityNotice}
+          style={styles.noticeBox}
+        >
+          <Text style={styles.warningTitle}>거래 제한</Text>
+          <Text style={styles.warningText}>{tradeNotice}</Text>
         </View>
-        <View style={[styles.card, styles.flex]}>
-          <Text style={styles.label}>
-            {isSettled ? '최종 등급' : '현재 등급'}
-          </Text>
-          {rankingQuery.isLoading ? (
-            <SectionSkeleton lines={1} />
-          ) : (
-            <Text style={styles.medium}>{tier}</Text>
-          )}
+      ) : null}
+
+      <HomeAssetHero
+        summary={summary}
+        settled={isSettled}
+        unavailableMessage={portfolioNotice?.message}
+      />
+
+      <View testID={TEST_IDS.home.competition} style={styles.card}>
+        {meQuery.isLoading ? (
+          <SectionSkeleton lines={1} />
+        ) : meQuery.isError || !meQuery.data ? (
+          <InlineEmptyState message="사용자 정보를 불러오지 못했습니다." />
+        ) : (
+          <Text testID={TEST_IDS.home.nickname} style={styles.nickname}>{meQuery.data.nickname}</Text>
+        )}
+        <View style={styles.row}>
+          <View style={[styles.flex, { flexBasis: 100 * fontScale }]}>
+            <Text style={styles.label}>
+              {isSettled ? '최종 순위' : '현재 순위'}
+            </Text>
+            {rankingQuery.isLoading ? (
+              <SectionSkeleton lines={1} />
+            ) : (
+              <Text testID={TEST_IDS.home.rank} style={styles.medium}>{rank}</Text>
+            )}
+          </View>
+          <View style={[styles.flex, { flexBasis: 100 * fontScale }]}>
+            <Text style={styles.label}>
+              {isSettled ? '최종 등급' : '현재 등급'}
+            </Text>
+            {rankingQuery.isLoading ? (
+              <SectionSkeleton lines={1} />
+            ) : (
+              <Text testID={TEST_IDS.home.tier} style={styles.medium}>{tier}</Text>
+            )}
+          </View>
         </View>
       </View>
 
       {rankingQuery.isError ? (
         <InlineEmptyState message="랭킹 정보를 불러오지 못했습니다. 자산 정보는 위에 표시된 값이 최신입니다." />
+      ) : null}
+
+      {summary ? (
+        <View style={styles.card}>
+          <Text style={styles.label}>자산 구성</Text>
+          <Text style={styles.helper}>KRW 현금 {formatKrw(summary.krwCash)}</Text>
+          <Text style={styles.helper}>USD 환산 {formatKrw(summary.usdCashKrw)}</Text>
+          <Text style={styles.helper}>보유자산 {formatKrw(summary.assetValueKrw)}</Text>
+          <Text style={styles.helper}>실현 손익 {formatKrw(summary.realizedPnlKrw)}</Text>
+        </View>
       ) : null}
 
       <View style={styles.card}>
@@ -412,16 +401,6 @@ export default function SeasonAccountHome({
       {isSettled ? (
         <CTAButton label="보상 확인" onPress={onOpenReward} />
       ) : null}
-
-      {tradeNotice ? (
-        <View
-          testID={TEST_IDS.tradingAccount.capabilityNotice}
-          style={styles.noticeBox}
-        >
-          <Text style={styles.warningTitle}>거래 제한</Text>
-          <Text style={styles.warningText}>{tradeNotice}</Text>
-        </View>
-      ) : null}
     </ScrollView>
   );
 }
@@ -436,13 +415,11 @@ const styles = StyleSheet.create({
     backgroundColor: semantic.surface,
     gap: 8,
   },
-  row: { flexDirection: 'row', gap: 12 },
-  // minWidth:0 so a long tier label wraps inside its half instead of pushing
-  // the other card off the row.
-  flex: { flex: 1, minWidth: 0 },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
+  // Each value can wrap within its track; narrow rows can stack the tracks.
+  flex: { flexGrow: 1, minWidth: 0, gap: 4 },
   label: { fontSize: 13, color: semantic.secondary },
-  seasonName: { fontSize: 20, fontWeight: '700', lineHeight: 28 },
-  big: { fontSize: 26, fontWeight: '700', lineHeight: 34, flexShrink: 1 },
+  nickname: { fontSize: 15, fontWeight: '600', lineHeight: 23 },
   medium: { fontSize: 20, fontWeight: '700', lineHeight: 28 },
   helper: { fontSize: 14, color: semantic.secondary, lineHeight: 21 },
   warningBox: {

@@ -4,6 +4,9 @@ import { URL } from 'node:url';
 import { describe, it } from 'node:test';
 import { createHomeHarness, elements } from '../../../test/homeTestHarness.cjs';
 import { getCapabilityBlockMessage } from '../../features/tradingAccount/capabilities.ts';
+import { QUERY_KEYS } from '../../constants/queryKeys.ts';
+import { TEST_IDS } from '../../constants/testIds.ts';
+import type { TradingAccountPortfolioDto } from '../../features/tradingAccount/api';
 import {
   assertDailyEquity,
   DailyEquityContractError,
@@ -21,6 +24,69 @@ const texts = (node) =>
   elements(node, 'Text')
     .flatMap((node) => node.props.children)
     .join(' ');
+
+describe('Home asset hierarchy and real portfolio/ranking/me sources', () => {
+  for (const mode of ['general', 'season']) {
+    it(`${mode} puts total assets and performance before details, with competition only in season`, (t) => {
+      const h = createHomeHarness(mode);
+      t.after(h.close);
+      h.seed(h.account, fixture[mode].data);
+      const { tree } = h.render();
+      const textNodes = elements(tree, 'Text');
+      const total = textNodes.find((node) => node.props.testID === TEST_IDS.home.totalAsset);
+      assert.equal(total.props.children.join(''), '10,001,000원');
+      assert.ok(total.props.style.fontSize > 26);
+      assert.ok(texts(tree).includes('-2,345'));
+      assert.ok(texts(tree).includes('1,234'));
+      const detail = textNodes.find((node) => texts(node) === '자산 구성');
+      assert.ok(textNodes.indexOf(total) < textNodes.indexOf(detail));
+      const nickname = textNodes.find((node) => node.props.testID === TEST_IDS.home.nickname);
+      const rank = textNodes.find((node) => node.props.testID === TEST_IDS.home.rank);
+      const tier = textNodes.find((node) => node.props.testID === TEST_IDS.home.tier);
+      if (mode === 'season') {
+        assert.equal(texts(nickname), '김재민');
+        assert.equal(texts(rank), '#2');
+        assert.equal(texts(tier), 'Silver');
+        assert.ok(textNodes.indexOf(total) < textNodes.indexOf(nickname));
+        assert.ok(textNodes.indexOf(tier) < textNodes.indexOf(detail));
+        assert.ok(total.props.style.fontSize > rank.props.style.fontSize);
+        assert.ok(h.queries.some((query) => query.queryKey === QUERY_KEYS.me));
+      } else {
+        assert.equal(nickname, undefined);
+        assert.equal(rank, undefined);
+        assert.equal(tier, undefined);
+      }
+      for (const normal of ['진행 중', '참가 중', '운영 중']) assert.ok(!texts(tree).includes(normal));
+    });
+
+    it(`${mode} keeps unknown performance and unavailable summaries explicit`, (t) => {
+      const h = createHomeHarness(mode);
+      t.after(h.close);
+      h.seed(h.account, fixture[mode].data);
+      const key = QUERY_KEYS.tradingAccount.portfolio(h.account.id);
+      const portfolio = h.client.getQueryData<TradingAccountPortfolioDto>(key);
+      assert.ok(portfolio);
+      h.client.setQueryData(key, { ...portfolio, summary: { ...portfolio.summary, returnRate: null } });
+      assert.ok(texts(h.render().tree).includes('알 수 없음'));
+      h.client.setQueryData(key, { ...portfolio, summary: null });
+      const tree = h.render().tree;
+      assert.equal(elements(tree, 'Text').filter((node) => node.props.testID === TEST_IDS.home.totalAsset).length, 0);
+      assert.ok(elements(tree, 'InlineEmptyState').some((node) => node.props.title === '수익률을 계산할 수 없습니다.'));
+    });
+  }
+
+  it('settled season uses final labels and the existing final tier source', (t) => {
+    const h = createHomeHarness('season');
+    t.after(h.close);
+    h.account.season.seasonStatus = 'settled';
+    h.seed(h.account, fixture.season.data);
+    const tree = h.render().tree;
+    for (const text of ['최종 자산', '최종 순위', '최종 등급', 'Gold']) assert.ok(texts(tree).includes(text));
+    const rankingQuery = h.queries.find((query) => query.queryKey[0] === 'ranking');
+    assert.ok(rankingQuery.queryKey.includes(h.account.season.seasonId));
+    assert.ok(rankingQuery.queryKey.includes('final'));
+  });
+});
 
 describe('home exchange shortcut', () => {
   for (const mode of ['general', 'season']) {
@@ -220,7 +286,7 @@ describe('general/season home API, queries, rendering and navigation integration
           assert.ok(text.includes(label));
         assert.ok(!text.includes('현재 순위'));
       } else {
-        for (const label of ['9월 시즌', '현재 순위', '현재 등급'])
+        for (const label of ['김재민', '현재 순위', '현재 등급'])
           assert.ok(text.includes(label));
         assert.ok(!text.includes('자금 구성'));
       }
