@@ -9,7 +9,7 @@ for (const mode of ['light', 'dark'] as const) {
   test(`NavigationContainer and root stack use the ${mode} appearance`, () => {
     const colors = mode === 'dark'
       ? { screen: '#10151c', surface: '#1b2530', text: '#f2f5f7', border: '#435364' }
-      : { screen: '#f2f4f6', surface: '#ffffff', text: '#202a35', border: '#dfe4e9' };
+      : { screen: '#f9fafb', surface: '#ffffff', text: '#202a35', border: '#dfe4e9' };
     const mocks: Record<string, unknown> = {
       '@react-navigation/native': {
         NavigationContainer: 'NavigationContainer',

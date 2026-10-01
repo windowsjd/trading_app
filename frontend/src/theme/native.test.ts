@@ -124,8 +124,8 @@ test('financial roles stay distinct from neutral roles in the actual palettes', 
 });
 
 
-test('surface hierarchy matches white cards on a grey canvas with inset controls', () => {
-  assert.equal(PALETTES.light.screen, '#f2f4f6');
+test('surface hierarchy matches white cards on a near-white canvas with inset controls', () => {
+  assert.equal(PALETTES.light.screen, '#f9fafb');
   assert.equal(PALETTES.light.surface, '#ffffff');
   assert.equal(PALETTES.light.raised, '#f7f8fa');
   assert.equal(PALETTES.light.navigation, '#ffffff');
