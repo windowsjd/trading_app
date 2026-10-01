@@ -40,6 +40,7 @@ function createRecordCacheHarness(total = 23) {
   }
   const native = Object.fromEntries(['View', 'Text', 'SafeAreaView', 'Pressable', 'FlatList'].map(n => [n, n]));
   native.StyleSheet = { create: s => s };
+  native.Platform = { OS: 'android' };
   const mocks = {
     react: { ...React, useMemo: fn => fn() },
     'react-native': native,

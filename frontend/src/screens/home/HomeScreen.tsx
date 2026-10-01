@@ -1,6 +1,7 @@
 import { semantic } from '../../theme/tokens';
 import React from 'react';
-import { StyleSheet, SafeAreaView, View } from '../../theme/native';
+import { StyleSheet, SafeAreaView, View, Platform } from '../../theme/native';
+import { getScreenContentStyle } from '../../theme/screenLayout';
 
 import type { HomeScreenProps } from '../../app/navigation/types';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
@@ -131,6 +132,6 @@ export default function HomeScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: semantic.screen },
-  body: { flex: 1, width: '100%', maxWidth: 640, alignSelf: 'center' },
-  switcherHeader: { paddingHorizontal: 16, paddingTop: 12 },
+  body: { flex: 1 },
+  switcherHeader: { ...getScreenContentStyle(Platform.OS), paddingHorizontal: 16, paddingTop: 12 },
 });

@@ -10,7 +10,7 @@ const STORAGE_KEY = 'trading-app:appearance';
 // screen: page canvas; surface: major cards/sheets; raised/input: inset controls.
 export const PALETTES = {
   light: {
-    screen: '#f9fafb', surface: '#ffffff', raised: '#f7f8fa',
+    screen: '#fcfcfd', surface: '#ffffff', raised: '#f7f8fa',
     text: '#202a35', secondary: '#536170', muted: '#697583',
     border: '#e5e8eb', input: '#f7f8fa', selected: '#202a35',
     placeholder: '#7c8793', cursor: '#202a35', navigation: '#ffffff',

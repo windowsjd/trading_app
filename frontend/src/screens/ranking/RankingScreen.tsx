@@ -1,4 +1,5 @@
 import { semantic } from '../../theme/tokens';
+import { getScreenContentStyle } from '../../theme/screenLayout';
 import React, { useMemo } from 'react';
 import {
   View,
@@ -7,6 +8,7 @@ import {
   SafeAreaView,
   FlatList,
   ActivityIndicator,
+  Platform,
 } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -454,7 +456,7 @@ function RankingRow({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: semantic.screen },
-  content: { padding: 16, paddingBottom: 24 },
+  content: { ...getScreenContentStyle(Platform.OS), padding: 16, paddingBottom: 24 },
   card: {
     borderWidth: 1,
     borderColor: semantic.border,

@@ -68,8 +68,8 @@ NODE_PATH=/path/to/browser-tools/node_modules node test/browser/homeBrowser.cjs
 The Home runner executes the actual General/Season screens, AccountSwitcher,
 TradingAccountProvider, React Query, selection storage and appearance provider.
 Only transport and navigation are fixture boundaries; external requests are
-blocked. It checks 320/360/390/430/1280px × light/dark × font scale 1/1.5/2 ×
-both modes × normal/long content (120 layouts), plus 28 exception states. Text
+blocked. It checks 320/360/390/430/768/1024/1280/1440/1920px × light/dark × font scale 1/1.5/2 ×
+both modes × normal/long content (216 layouts), plus 28 exception states. Text
 range measurements detect clipping of Korean, long nicknames/tier names, large
 rank numbers and 16-digit assets. It also checks the context's padding/height,
 asset hierarchy, delayed outgoing responses, account/appearance restoration,
@@ -77,3 +77,11 @@ system theme changes and ledger/orders/FX/reward navigation. Reports and
 screenshots go to `/tmp/trading-home-browser` (override `HOME_BROWSER_OUTPUT`).
 This validates RN Web rendering; Android/iOS font measurement, safe areas,
 touch and screen-reader behavior still require device verification.
+
+Run `NODE_PATH=/path/to/browser-tools/node_modules node test/browser/rootTabsBrowser.cjs`
+to compare Home, Market, MarketSearch, Ranking, RecordSeasonList, Overall and Guide.
+The 756 layouts use the same widths, appearances, font scales and normal/long
+strings. Each root must share a centered 1120px content cap with 16px horizontal
+padding and a full screen scroll viewport. The runner also exercises actual
+Market/Ranking/Record pagination and navigation. Reports and screenshots go to
+`/tmp/trading-root-tabs-browser` (override `ROOT_TABS_BROWSER_OUTPUT`).

@@ -32,7 +32,10 @@ export default function HomeAssetHero({ summary, settled = false, unavailableMes
           </Text>
           <View style={styles.performance}>
             <Text style={styles.metric}>
-              {getReturnRateMethodLabel(summary.returnRateMethod)}{' '}
+              {/* Home's season context makes the initial-capital explanation redundant. */}
+              {summary.returnRateMethod === 'initial_capital'
+                ? '시즌 수익률'
+                : getReturnRateMethodLabel(summary.returnRateMethod)}{' '}
               <Text style={performanceStyle(summary.returnRate)}>
                 {summary.returnRate === null || summary.returnRate === undefined
                   ? '알 수 없음'

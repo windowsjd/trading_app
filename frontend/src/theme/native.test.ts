@@ -125,10 +125,14 @@ test('financial roles stay distinct from neutral roles in the actual palettes', 
 
 
 test('surface hierarchy matches white cards on a near-white canvas with inset controls', () => {
-  assert.equal(PALETTES.light.screen, '#f9fafb');
+  assert.equal(PALETTES.light.screen, '#fcfcfd');
   assert.equal(PALETTES.light.surface, '#ffffff');
   assert.equal(PALETTES.light.raised, '#f7f8fa');
   assert.equal(PALETTES.light.navigation, '#ffffff');
+  assert.equal(PALETTES.light.border, '#e5e8eb');
+  assert.equal(PALETTES.dark.screen, '#10151c');
+  assert.equal(PALETTES.dark.surface, '#1b2530');
+  assert.equal(PALETTES.dark.raised, '#273543');
   for (const mode of ['light', 'dark'] as const) {
     const colors = PALETTES[mode];
     assert.equal(colors.input, colors.raised);

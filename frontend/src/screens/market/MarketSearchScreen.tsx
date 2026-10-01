@@ -1,4 +1,5 @@
 import { semantic } from '../../theme/tokens';
+import { getScreenContentStyle } from '../../theme/screenLayout';
 import { buildWsUrl } from '../../constants/env';
 import { useMarketTickers } from '../../features/market/useMarketTickers';
 import { mergeMarketAssetTicker } from '../../features/market/mergeMarketAssetTicker';
@@ -11,6 +12,7 @@ import {
   TextInput,
   FlatList,
   ActivityIndicator,
+  Platform,
 } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useInfiniteQuery } from '@tanstack/react-query';
@@ -231,7 +233,7 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
                   : navigation.navigate('AssetDetail', { assetId: item.id })
               }
             >
-              <View>
+              <View style={styles.itemIdentity}>
                 <Text style={styles.itemSymbol}>{nameDisplay.primary}</Text>
                 {symbolMarketDisplay ? (
                   <Text style={styles.helper}>{symbolMarketDisplay}</Text>
@@ -263,7 +265,7 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: semantic.screen },
-  content: { padding: 16, paddingBottom: 24 },
+  content: { ...getScreenContentStyle(Platform.OS), padding: 16, paddingBottom: 24 },
   header: {
     padding: 12, borderRadius: 14,
     backgroundColor: semantic.surface, gap: 12, marginBottom: 12 },
@@ -276,7 +278,8 @@ const styles = StyleSheet.create({
     backgroundColor: semantic.input,
     fontSize: 16,
   },
-  scopeRow: { flexDirection: 'row', gap: 8 },
+  scopeRow: { flexDirection: 'row', gap: 8,
+    ...(Platform.OS === 'web' ? { flexWrap: 'wrap' } as const : {}) },
   scopeChip: {
     borderWidth: 1,
     borderColor: semantic.border,
@@ -298,6 +301,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: semantic.border,
   },
+  itemIdentity: Platform.OS === 'web' ? { flex: 1, minWidth: 0 } : {},
   itemSymbol: { fontSize: 16, fontWeight: '700' },
   itemPrice: { fontSize: 15, fontWeight: '600' },
   alignEnd: { alignItems: 'flex-end' },

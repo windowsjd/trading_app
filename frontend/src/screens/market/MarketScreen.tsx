@@ -1,4 +1,5 @@
 import { semantic } from '../../theme/tokens';
+import { getScreenContentStyle } from '../../theme/screenLayout';
 import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
@@ -8,6 +9,7 @@ import {
   SafeAreaView,
   FlatList,
   ActivityIndicator,
+  Platform,
 } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useInfiniteQuery } from '@tanstack/react-query';
@@ -228,7 +230,7 @@ export default function MarketScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: semantic.screen },
-  content: { padding: 16, paddingBottom: 24 },
+  content: { ...getScreenContentStyle(Platform.OS), padding: 16, paddingBottom: 24 },
   headerSection: {
     padding: 12, borderRadius: 14,
     backgroundColor: semantic.surface, gap: 12, marginBottom: 12 },
@@ -243,8 +245,10 @@ const styles = StyleSheet.create({
     backgroundColor: semantic.raised,
   },
   tabButtonActive: { backgroundColor: semantic.selected, borderColor: semantic.selected },
-  tabText: { color: semantic.text, fontWeight: '600', fontSize: 14 },
-  tabTextActive: { color: semantic.onAccent, fontWeight: '600' },
+  tabText: { color: semantic.text, fontWeight: '600', fontSize: 14,
+    ...(Platform.OS === 'web' ? { maxWidth: '100%', textAlign: 'center' } as const : {}) },
+  tabTextActive: { color: semantic.onAccent, fontWeight: '600',
+    ...(Platform.OS === 'web' ? { maxWidth: '100%', textAlign: 'center' } as const : {}) },
   searchEntry: {
     borderWidth: 1,
     borderColor: semantic.border,

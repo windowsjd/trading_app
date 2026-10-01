@@ -1,6 +1,7 @@
 import { semantic } from '../../theme/tokens';
 import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text } from '../../theme/native';
+import { SafeAreaView, ScrollView, StyleSheet, Text, Platform } from '../../theme/native';
+import { getScreenContentStyle } from '../../theme/screenLayout';
 
 import type { GuideScreenProps } from '../../app/navigation/types';
 import ActionPressable from '../../components/common/ActionPressable';
@@ -57,7 +58,7 @@ export default function GuideScreen({ navigation }: GuideScreenProps) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: semantic.screen },
-  content: { padding: 16, paddingBottom: 32, gap: 12 },
+  content: { ...getScreenContentStyle(Platform.OS), padding: 16, paddingBottom: 32, gap: 12 },
   introduction: { fontSize: 16, lineHeight: 26, color: semantic.secondary, marginBottom: 12 },
   sectionTitle: { fontSize: 20, lineHeight: 28, fontWeight: '700', color: semantic.text },
   card: {

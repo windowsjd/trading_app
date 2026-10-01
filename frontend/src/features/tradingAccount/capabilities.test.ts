@@ -291,7 +291,7 @@ describe('account display never shows a raw UUID and states the return meaning',
     const initial = getReturnRateMethodLabel('initial_capital');
 
     assert.notEqual(twr, initial);
-    assert.match(twr, /시간가중/);
-    assert.match(initial, /초기자본/);
+    assert.equal(twr, '시간가중 수익률');
+    assert.equal(initial, '시즌 수익률 (초기자본 대비)');
   });
 });

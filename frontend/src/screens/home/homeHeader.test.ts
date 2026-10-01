@@ -49,6 +49,8 @@ it('Home context is spacious, quiet and opens the existing account selection she
     assert.ok(flatten(button.props.style).minHeight >= 44);
     assert.match(button.props.accessibilityLabel, /Season 1/);
     act(() => button.props.onPress());
+    assert.ok(h.text().includes('시즌 수익률 (초기자본 대비)'), 'the sheet keeps the initial-capital explanation');
+    assert.ok(h.text().includes('시간가중 수익률'));
     const option = h.renderer.root.findAllByType('Pressable').find(
       (node) => node.props.testID === TEST_IDS.tradingAccount.switcherOption('general-1'),
     );

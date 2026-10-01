@@ -9,7 +9,7 @@ for (const mode of ['light', 'dark'] as const) {
   test(`NavigationContainer and root stack use the ${mode} appearance`, () => {
     const colors = mode === 'dark'
       ? { screen: '#10151c', surface: '#1b2530', text: '#f2f5f7', border: '#435364' }
-      : { screen: '#f9fafb', surface: '#ffffff', text: '#202a35', border: '#dfe4e9' };
+      : { screen: '#fcfcfd', surface: '#ffffff', text: '#202a35', border: '#e5e8eb' };
     const mocks: Record<string, unknown> = {
       '@react-navigation/native': {
         NavigationContainer: 'NavigationContainer',
@@ -32,6 +32,7 @@ for (const mode of ['light', 'dark'] as const) {
     assert.equal(tree.props.theme.colors.background, colors.screen);
     assert.equal(tree.props.theme.colors.card, colors.surface);
     assert.equal(tree.props.theme.colors.text, colors.text);
+    assert.equal(tree.props.theme.colors.border, colors.border);
     const stack = elements(tree, 'Navigator')[0];
     assert.equal(stack.props.screenOptions.contentStyle.backgroundColor, colors.screen);
   });

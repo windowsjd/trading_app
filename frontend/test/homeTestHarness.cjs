@@ -54,6 +54,7 @@ function createHomeHarness(mode = 'general') {
     ]),
   );
   native.StyleSheet = { create: (styles) => styles };
+  native.Platform = { OS: 'android' };
   native.useWindowDimensions = () => ({ width: 390, height: 844, fontScale: 1 });
   const root = { navigate: (...args) => h.navigation.push(args) };
   const mocks = {

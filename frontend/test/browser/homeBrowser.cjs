@@ -52,7 +52,7 @@ async function run() {
     await id('trading-account-switcher-sheet').waitFor({ state: 'hidden' });
   };
   try {
-    for (const appearance of ['light', 'dark']) for (const width of [320, 360, 390, 430, 1280])
+    for (const appearance of ['light', 'dark']) for (const width of [320, 360, 390, 430, 768, 1024, 1280, 1440, 1920])
       for (const fontScale of [1, 1.5, 2]) for (const mode of ['general', 'season']) for (const long of [0, 1]) {
         await page.setViewportSize({ width, height: 844 });
         await page.emulateMedia({ colorScheme: appearance });
@@ -63,11 +63,14 @@ async function run() {
         await theme.background(id('home-account-context'), appearance, 'surface');
         await theme.background(id('home-summary-card'), appearance, 'screen');
         if (mode === 'season') await theme.background(id('home-competition'), appearance, 'surface');
+        const heroText = await id('home-summary-card').textContent();
+        assert.doesNotMatch(heroText, /\(초기자본 대비\)/);
+        assert.match(heroText, mode === 'season' ? /시즌 수익률 -3\.52%/ : /시간가중 수익률 4\.82%/);
         const layout = await page.evaluate(() => {
           const node = (name) => document.querySelector(`[data-testid="${name}"]`);
           const box = (name) => {
             const el = node(name), r = el.getBoundingClientRect(), css = getComputedStyle(el);
-            return { x: r.x, y: r.y, right: r.right, bottom: r.bottom, width: r.width, height: r.height, fontSize: parseFloat(css.fontSize), color: css.color, background: css.backgroundColor };
+            return { x: r.x, y: r.y, right: r.right, bottom: r.bottom, width: r.width, height: r.height, fontSize: parseFloat(css.fontSize), color: css.color, background: css.backgroundColor, borderColor: css.borderTopColor, borderWidth: parseFloat(css.borderTopWidth), paddingHorizontal: parseFloat(css.paddingLeft), paddingVertical: parseFloat(css.paddingTop) };
           };
           const clipped = [];
           for (const name of ['home-account-context', 'home-summary-card', 'home-competition']) {
@@ -108,8 +111,15 @@ async function run() {
           };
         });
         assert.deepEqual(layout.clipped, [], JSON.stringify({ appearance, width, fontScale, mode, long }));
-        assert.ok(layout.context.width <= 608 && layout.context.width >= Math.min(width, 640) - 34);
+        const contentWidth = Math.min(width, 1120) - 32;
+        assert.ok(Math.abs(layout.context.width - contentWidth) <= 1, 'Home uses the shared desktop content width');
+        assert.ok(Math.abs(layout.context.x - (width - contentWidth) / 2) <= 1, 'content stays centered');
         assert.ok(layout.context.height >= 72 && layout.trigger.height >= 44);
+        assert.ok(layout.trigger.width >= 44);
+        assert.ok(layout.context.paddingHorizontal >= 16 && layout.context.paddingVertical >= 12);
+        assert.equal(layout.context.borderWidth, 1);
+        assert.equal(layout.context.borderColor, appearance === 'light' ? 'rgb(229, 232, 235)' : 'rgb(67, 83, 100)');
+        assert.notEqual(layout.context.background, theme.palettes[appearance].screen);
         assert.ok(layout.trigger.right <= layout.context.right - 12);
         assert.ok(layout.titleTextRight <= layout.trigger.x + 1, `title and change trigger never collide: ${layout.titleTextRight} / ${layout.trigger.x}`);
         assert.ok(layout.contrasts.every((ratio) => ratio >= 4.5), 'Hero text and financial colors have readable contrast');
@@ -126,7 +136,7 @@ async function run() {
         if (long && width === 320 && fontScale === 2) await page.screenshot({
           path: path.join(out, `${mode}-${appearance}-320-large-text.png`), fullPage: true,
         });
-        records.push({ appearance, width, fontScale, mode, long, layout });
+        records.push({ appearance, width, fontScale, mode, long, heroText, layout });
       }
 
     for (const appearance of ['light', 'dark']) for (const state of [
@@ -177,6 +187,7 @@ async function run() {
     await page.waitForTimeout(50);
     assert.equal(await id('home-total-asset').textContent(), '12,530,200원');
     assert.equal(await id('home-competition').count(), 0);
+    assert.match(await id('home-summary-card').textContent(), /시간가중 수익률 4\.82%/);
     await page.getByText('원장 보기', { exact: true }).click();
     await page.getByText('주문 내역 보기', { exact: true }).click();
     await page.getByText('환전하기', { exact: true }).click();
@@ -206,6 +217,9 @@ async function run() {
     await switchAccount('season-account');
     assert.equal(await id('home-total-asset').textContent(), '9,648,192원');
     assert.equal(await id('home-nickname').textContent(), '김재민');
+    const seasonHeroText = await id('home-summary-card').textContent();
+    assert.match(seasonHeroText, /시즌 수익률 -3\.52%/);
+    assert.doesNotMatch(seasonHeroText, /\(초기자본 대비\)/);
     const requests = await page.evaluate(() => window.fixture.transport.requests);
     assert.ok(requests.some((request) => request.includes('/ranking?') && request.includes('seasonId=season-1')));
     assert.deepEqual(errors, []);

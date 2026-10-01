@@ -20,6 +20,7 @@ const { interactionHarness, flatten, React, act } = require('../../../test/inter
 const native = {
   Pressable: 'Pressable', Text: 'Text', ActivityIndicator: 'ActivityIndicator',
   Modal: 'Modal', View: 'View', StyleSheet: { create: (styles: unknown) => styles },
+  Platform: { OS: 'android' },
 };
 const event = { nativeEvent: { pageX: 130, pageY: 215, locationX: 3, locationY: 4 } };
 const circle = (renderer: any) => renderer.root.findAllByType('AnimatedView').find((n: any) => n.props.style.width !== undefined);

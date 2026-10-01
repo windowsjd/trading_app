@@ -1,6 +1,6 @@
 import { semantic } from '../../theme/tokens';
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet } from '../../theme/native';
+import { View, Text, StyleSheet, Platform } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 
 import { TEST_IDS } from '../../constants/testIds';
@@ -66,7 +66,7 @@ function MarketAssetRowComponent({
         style={styles.itemRow}
         onPress={() => onPress(item.id)}
       >
-        <View>
+        <View style={styles.identity}>
           <Text style={styles.itemSymbol}>{nameDisplay.primary}</Text>
           {symbolMarketDisplay ? (
             <Text style={styles.helper}>{symbolMarketDisplay}</Text>
@@ -111,6 +111,7 @@ export const MarketAssetRow = React.memo(
 );
 
 const styles = StyleSheet.create({
+  identity: Platform.OS === 'web' ? { flex: 1, minWidth: 0 } : {},
   itemRow: {
     paddingHorizontal: 12, marginBottom: 8, borderRadius: 12,
     backgroundColor: semantic.surface,

@@ -107,7 +107,7 @@ describe('friend API and targeted cache updates', () => {
 describe('overall menu and server privacy setting', () => {
   it('routes to MY, friends, notices and settings', () => {
     const navigations: string[] = [];
-    const Screen = load(resolve('src/screens/my/OverallScreen.tsx'), { 'react-native': { ScrollView: 'ScrollView', Text: 'Text', StyleSheet: { create: (value: any) => value } } }).default;
+    const Screen = load(resolve('src/screens/my/OverallScreen.tsx'), { 'react-native': { ScrollView: 'ScrollView', Text: 'Text', Platform: { OS: 'android' }, StyleSheet: { create: (value: any) => value } } }).default;
     const tree = Screen({ navigation: { navigate: (route: string) => navigations.push(route) } });
     elements(tree, 'Pressable').forEach((node: any) => node.props.onPress());
     assert.deepEqual(navigations, ['My', 'Friends', 'Notices', 'Settings']);

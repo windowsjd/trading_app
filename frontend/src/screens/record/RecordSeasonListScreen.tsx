@@ -1,4 +1,5 @@
 import { semantic } from '../../theme/tokens';
+import { getScreenContentStyle } from '../../theme/screenLayout';
 import React, { useMemo } from 'react';
 import {
   View,
@@ -6,6 +7,7 @@ import {
   StyleSheet,
   SafeAreaView,
   FlatList,
+  Platform,
 } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
@@ -172,7 +174,7 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
               })
             }
           >
-            <View>
+            <View style={styles.identity}>
               <Text style={styles.itemTitle}>{item.seasonName}</Text>
               <Text style={styles.helper}>
                 참가 시각 {formatKstDateTime(item.joinedAt)}
@@ -202,7 +204,7 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: semantic.screen },
-  content: { padding: 16, paddingBottom: 24 },
+  content: { ...getScreenContentStyle(Platform.OS), padding: 16, paddingBottom: 24 },
   card: {
     borderWidth: 1,
     borderColor: semantic.border,
@@ -224,7 +226,9 @@ const styles = StyleSheet.create({
   },
   label: { fontSize: 13, color: semantic.secondary },
   itemTitle: { fontSize: 15, fontWeight: '700' },
+  identity: Platform.OS === 'web' ? { flex: 1, minWidth: 0 } : {},
   helper: { fontSize: 14, color: semantic.secondary },
-  alignEnd: { alignItems: 'flex-end' },
+  alignEnd: { alignItems: 'flex-end',
+    ...(Platform.OS === 'web' ? { flex: 1, minWidth: 0 } : {}) },
   footerBox: { marginTop: 12 },
 });

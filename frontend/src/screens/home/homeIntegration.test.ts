@@ -73,6 +73,34 @@ describe('Home asset hierarchy and real portfolio/ranking/me sources', () => {
       assert.equal(elements(tree, 'Text').filter((node) => node.props.testID === TEST_IDS.home.totalAsset).length, 0);
       assert.ok(elements(tree, 'InlineEmptyState').some((node) => node.props.title === '수익률을 계산할 수 없습니다.'));
     });
+
+    it(`${mode} Hero uses compact labels from the response method, independently of account mode`, (t) => {
+      const h = createHomeHarness(mode);
+      t.after(h.close);
+      h.seed(h.account, fixture[mode].data);
+      const key = QUERY_KEYS.tradingAccount.portfolio(h.account.id);
+      const portfolio = h.client.getQueryData<TradingAccountPortfolioDto>(key);
+      assert.ok(portfolio?.summary);
+      for (const [method, expected] of [
+        ['initial_capital', '시즌 수익률'],
+        ['time_weighted', '시간가중 수익률'],
+      ] as const) {
+        h.client.setQueryData(key, {
+          ...portfolio,
+          summary: { ...portfolio.summary, returnRateMethod: method, returnRate: '-3.52' },
+        });
+        const hero = elements(h.render().tree, 'View').find(
+          (node) => node.props.testID === TEST_IDS.home.summaryCard,
+        );
+        assert.ok(hero);
+        const metric = elements(hero, 'Text').find(
+          (node) => Array.isArray(node.props.children) && node.props.children[0] === expected,
+        );
+        assert.ok(metric, expected);
+        assert.equal(elements(metric, 'Text')[1].props.children, '-3.52%');
+        assert.doesNotMatch(texts(hero), /초기자본 대비/);
+      }
+    });
   }
 
   it('settled season uses final labels and the existing final tier source', (t) => {

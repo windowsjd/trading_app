@@ -1,6 +1,7 @@
 import { semantic } from '../../theme/tokens';
 import React from 'react';
-import { ScrollView, Text, StyleSheet } from '../../theme/native';
+import { ScrollView, Text, StyleSheet, Platform } from '../../theme/native';
+import { getScreenContentStyle } from '../../theme/screenLayout';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { MyStackParamList } from '../../app/navigation/types';
 import ActionPressable from '../../components/common/ActionPressable';
@@ -32,7 +33,7 @@ export default function OverallScreen({
 }
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: semantic.screen },
-  content: { padding: 16, gap: 12 },
+  content: { ...getScreenContentStyle(Platform.OS), padding: 16, gap: 12 },
   row: {
     padding: 20,
     borderWidth: 1,

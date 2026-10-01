@@ -1,6 +1,7 @@
 import { semantic } from '../../theme/tokens';
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from '../../theme/native';
+import { View, Text, StyleSheet, ScrollView, useWindowDimensions, Platform } from '../../theme/native';
+import { getScreenContentStyle } from '../../theme/screenLayout';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useQuery } from '@tanstack/react-query';
 
@@ -406,7 +407,7 @@ export default function SeasonAccountHome({
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, gap: 12, paddingBottom: 24 },
+  content: { ...getScreenContentStyle(Platform.OS), padding: 16, gap: 12, paddingBottom: 24 },
   card: {
     borderWidth: 1,
     borderColor: semantic.border,
