@@ -54,6 +54,15 @@ jobs:
         run: pnpm exec prisma generate
         env:
           DATABASE_URL: postgresql://prisma:prisma@localhost:5432/prisma?schema=public
+      - name: Verify committed Prisma generated artifacts
+        run: |
+          generated_status="$(git status --porcelain --untracked-files=all -- src/generated/prisma)"
+          if [ -n "$generated_status" ]; then
+            echo "::error::Prisma generated artifacts are stale. Run prisma generate and commit src/generated/prisma with schema.prisma."
+            git status --short --untracked-files=all -- src/generated/prisma
+            git diff --stat HEAD -- src/generated/prisma
+            exit 1
+          fi
       - name: Candle-layer lint (check only, no fix)
         run: pnpm run lint:candles:check
       - name: Candle-layer format check
@@ -94,6 +103,8 @@ jobs:
       # that repairs the tree cannot tell you the tree was broken.
       - name: Account/auth layer lint (check only, no fix)
         run: npm run lint:accounts:check
+      - name: Guide layer lint (check only, no fix)
+        run: npm run lint:guides:check
       - name: Typecheck
         run: npm run typecheck
       - name: Tests (node --test, Node 24 type stripping)

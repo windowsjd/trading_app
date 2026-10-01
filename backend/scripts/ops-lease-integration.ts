@@ -142,6 +142,7 @@ function matcherWithPausedFirstFill(
     Promise.resolve({
       id: 'lease-test-snapshot',
       price: new Prisma.Decimal(100),
+      effectiveAt: new Date(),
     });
   return matcher;
 }
@@ -217,7 +218,12 @@ async function takeoverAfterExpiredLease() {
     matcherWithPausedFirstFill(started, finish, filled),
   );
   const pending = service.runLimitOrderMatchingJob({ lockTtlSeconds: 1 });
-  await started.promise;
+  await Promise.race([
+    started.promise,
+    pending.then(() => {
+      throw new Error('Matching run ended before first-fill barrier');
+    }),
+  ]);
   await extensionEntered.promise;
   await delay(1100);
   const takeover = await lockB.acquireLock({

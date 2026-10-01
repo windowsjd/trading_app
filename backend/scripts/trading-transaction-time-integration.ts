@@ -1,3 +1,4 @@
+import { tradingSessions } from '../test/support/trading-session-fixture';
 /** Real PostgreSQL lock waits; no mocked execution clock or provider network. */
 import 'dotenv/config';
 import assert from 'node:assert/strict';
@@ -24,10 +25,8 @@ import { LimitOrderCandleEvidenceService } from '../src/orders/limit-order-candl
 import { LimitOrderCandidateRepository } from '../src/orders/limit-order-candidate.repository';
 import { LimitOrderMatchingService } from '../src/orders/limit-order-matching.service';
 import {
-  applyMarketSessionOverrideSnapshot,
   resetMarketSessionOverrideStoreForTest,
 } from '../src/orders/market-calendar/market-session-override.store';
-import { getZonedParts } from '../src/providers/kis/candles/kis-candle-time';
 import { getAssetTradingStatus } from '../src/orders/market-hours.policy';
 
 const prisma = new PrismaService();
@@ -91,23 +90,7 @@ async function rejected(work: Promise<unknown>, expected: string) {
   });
 }
 function setSession(now: Date, closeAt?: Date) {
-  const p = getZonedParts(closeAt ?? now, 'Asia/Seoul');
-  const pad = (n: number) => String(n).padStart(2, '0');
-  applyMarketSessionOverrideSnapshot(
-    [
-      {
-        market: 'KRX',
-        localDate: `${p.year}-${pad(p.month)}-${pad(p.day)}`,
-        overrideType: 'custom',
-        openTime: '000000',
-        closeTime: closeAt
-          ? `${pad(p.hour)}${pad(p.minute)}${pad(p.second)}`
-          : '235959',
-        reason: 'transaction time integration boundary',
-      },
-    ],
-    now,
-  );
+  tradingSessions.set(now, closeAt);
 }
 
 async function fixture(mode: TradingAccountMode, stock = false) {
@@ -250,6 +233,7 @@ async function cleanup(s: Scenario) {
   await prisma.asset.delete({ where: { id: s.asset.id } });
   await prisma.fxRateSnapshot.delete({ where: { id: s.rate.id } });
   await prisma.user.delete({ where: { id: s.userId } });
+  tradingSessions.reset();
   resetMarketSessionOverrideStoreForTest();
 }
 async function fxBody(s: { userId: string; accountId: string }) {
@@ -984,6 +968,7 @@ async function main() {
     await lifecycleOrderingTests();
     console.log('trading transaction-time integration ok');
   } finally {
+    tradingSessions.reset();
     resetMarketSessionOverrideStoreForTest();
     await prisma.$disconnect();
   }

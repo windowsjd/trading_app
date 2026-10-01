@@ -1,3 +1,4 @@
+import { tradingSessions } from '../test/support/trading-session-fixture';
 /** Order input policy against an isolated PostgreSQL DB; real services and money writes. */
 import 'dotenv/config';
 import assert from 'node:assert/strict';
@@ -20,11 +21,9 @@ import { LimitOrderCandleEvidenceService } from '../src/orders/limit-order-candl
 import { LimitOrderCandidateRepository } from '../src/orders/limit-order-candidate.repository';
 import { LimitOrderMatchingService } from '../src/orders/limit-order-matching.service';
 import {
-  applyMarketSessionOverrideSnapshot,
   resetMarketSessionOverrideStoreForTest,
   markMarketSessionOverrideStoreRequired,
 } from '../src/orders/market-calendar/market-session-override.store';
-import { getZonedParts } from '../src/providers/kis/candles/kis-candle-time';
 
 const prisma = new PrismaService();
 const access = new TradingAccountAccessService(prisma);
@@ -87,23 +86,7 @@ async function rejected(work: Promise<unknown>, expected: string) {
   });
 }
 function setSession(now: Date) {
-  applyMarketSessionOverrideSnapshot(
-    (['KRX', 'US'] as const).map((market) => {
-      const p = getZonedParts(
-        now,
-        market === 'US' ? 'America/New_York' : 'Asia/Seoul',
-      );
-      return {
-        market,
-        localDate: `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`,
-        overrideType: 'custom' as const,
-        openTime: '000000',
-        closeTime: '235959',
-        reason: 'order policy integration regular session',
-      };
-    }),
-    now,
-  );
+  tradingSessions.set(now, undefined, ['KRX', 'US']);
 }
 
 async function fixture(
@@ -329,24 +312,9 @@ async function refresh(s: Scenario, price = '100', effectiveAt?: Date) {
 }
 function closed(s: Scenario) {
   const now = new Date();
-  const p = getZonedParts(
-    now,
-    s.asset.assetType === 'us_stock' ? 'America/New_York' : 'Asia/Seoul',
-  );
-  applyMarketSessionOverrideSnapshot(
-    [
-      {
-        market: s.asset.assetType === 'us_stock' ? 'US' : 'KRX',
-        localDate: `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`,
-        overrideType: 'closed',
-        openTime: null,
-        closeTime: null,
-        reason: 'order input closed registration',
-      },
-    ],
-    now,
-  );
+  tradingSessions.set(now, now, [s.asset.assetType === 'us_stock' ? 'US' : 'KRX']);
 }
+
 async function assertMarketAccounting(
   s: Scenario,
   result: Awaited<ReturnType<typeof create>>,

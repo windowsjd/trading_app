@@ -785,25 +785,25 @@ model MarketSessionOverride {
 }
 
 model Position {
-  id                  String       @id @default(uuid())
-  tradingAccountId    String       @map("trading_account_id")
-  assetId             String       @map("asset_id")
-  quantity            Decimal      @db.Decimal(24, 8)
+  id                 String       @id @default(uuid())
+  tradingAccountId   String       @map("trading_account_id")
+  assetId            String       @map("asset_id")
+  quantity           Decimal      @db.Decimal(24, 8)
   // Quantity locked by submitted limit-sell orders. It remains part of the
   // owned position/equity until fill, but is unavailable to another sell.
-  reservedQuantity    Decimal      @default(0) @map("reserved_quantity") @db.Decimal(24, 8)
-  averageCost         Decimal      @map("average_cost") @db.Decimal(24, 8)
-  currencyCode        CurrencyCode @map("currency_code")
-  realizedPnl         Decimal      @default(0) @map("realized_pnl") @db.Decimal(24, 8)
-  realizedPnlKrw      Decimal      @default(0) @map("realized_pnl_krw") @db.Decimal(24, 8)
-  currentPriceLocal   Decimal?     @map("current_price_local") @db.Decimal(24, 8)
-  currentPriceKrw     Decimal?     @map("current_price_krw") @db.Decimal(24, 8)
-  marketValueLocal    Decimal?     @map("market_value_local") @db.Decimal(24, 8)
-  marketValueKrw      Decimal?     @map("market_value_krw") @db.Decimal(24, 8)
-  unrealizedPnlLocal  Decimal?     @map("unrealized_pnl_local") @db.Decimal(24, 8)
-  unrealizedPnlKrw    Decimal?     @map("unrealized_pnl_krw") @db.Decimal(24, 8)
-  createdAt           DateTime     @default(now()) @map("created_at")
-  updatedAt           DateTime     @updatedAt @map("updated_at")
+  reservedQuantity   Decimal      @default(0) @map("reserved_quantity") @db.Decimal(24, 8)
+  averageCost        Decimal      @map("average_cost") @db.Decimal(24, 8)
+  currencyCode       CurrencyCode @map("currency_code")
+  realizedPnl        Decimal      @default(0) @map("realized_pnl") @db.Decimal(24, 8)
+  realizedPnlKrw     Decimal      @default(0) @map("realized_pnl_krw") @db.Decimal(24, 8)
+  currentPriceLocal  Decimal?     @map("current_price_local") @db.Decimal(24, 8)
+  currentPriceKrw    Decimal?     @map("current_price_krw") @db.Decimal(24, 8)
+  marketValueLocal   Decimal?     @map("market_value_local") @db.Decimal(24, 8)
+  marketValueKrw     Decimal?     @map("market_value_krw") @db.Decimal(24, 8)
+  unrealizedPnlLocal Decimal?     @map("unrealized_pnl_local") @db.Decimal(24, 8)
+  unrealizedPnlKrw   Decimal?     @map("unrealized_pnl_krw") @db.Decimal(24, 8)
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
 
   tradingAccount TradingAccount @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   asset          Asset          @relation(fields: [assetId], references: [id], onDelete: Restrict)
@@ -878,16 +878,16 @@ model Order {
 }
 
 model CashWallet {
-  id                  String       @id @default(uuid())
-  tradingAccountId    String       @map("trading_account_id")
-  currencyCode        CurrencyCode @map("currency_code")
-  balanceAmount       Decimal      @map("balance_amount") @db.Decimal(24, 8)
+  id               String       @id @default(uuid())
+  tradingAccountId String       @map("trading_account_id")
+  currencyCode     CurrencyCode @map("currency_code")
+  balanceAmount    Decimal      @map("balance_amount") @db.Decimal(24, 8)
   // Cash locked by submitted limit-buy orders. Never subtracted from total
   // asset valuation; availableAmount (= balance - reserved) is derived at
   // read time and is the ceiling for every ordinary cash debit.
-  reservedAmount      Decimal      @default(0) @map("reserved_amount") @db.Decimal(24, 8)
-  createdAt           DateTime     @default(now()) @map("created_at")
-  updatedAt           DateTime     @updatedAt @map("updated_at")
+  reservedAmount   Decimal      @default(0) @map("reserved_amount") @db.Decimal(24, 8)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
 
   tradingAccount     TradingAccount      @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   walletTransactions WalletTransaction[]
@@ -899,18 +899,18 @@ model CashWallet {
 }
 
 model WalletTransaction {
-  id                  String                         @id @default(uuid())
-  tradingAccountId    String                         @map("trading_account_id")
-  walletId            String                         @map("wallet_id")
-  currencyCode        CurrencyCode                   @map("currency_code")
-  direction           WalletTransactionDirection
-  txType              WalletTransactionType          @map("tx_type")
-  referenceType       WalletTransactionReferenceType @map("reference_type")
-  referenceId         String?                        @map("reference_id")
-  amount              Decimal                        @db.Decimal(24, 8)
-  balanceAfter        Decimal                        @map("balance_after") @db.Decimal(24, 8)
-  occurredAt          DateTime                       @map("occurred_at")
-  createdAt           DateTime                       @default(now()) @map("created_at")
+  id               String                         @id @default(uuid())
+  tradingAccountId String                         @map("trading_account_id")
+  walletId         String                         @map("wallet_id")
+  currencyCode     CurrencyCode                   @map("currency_code")
+  direction        WalletTransactionDirection
+  txType           WalletTransactionType          @map("tx_type")
+  referenceType    WalletTransactionReferenceType @map("reference_type")
+  referenceId      String?                        @map("reference_id")
+  amount           Decimal                        @db.Decimal(24, 8)
+  balanceAfter     Decimal                        @map("balance_after") @db.Decimal(24, 8)
+  occurredAt       DateTime                       @map("occurred_at")
+  createdAt        DateTime                       @default(now()) @map("created_at")
 
   tradingAccount TradingAccount @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   wallet         CashWallet     @relation(fields: [walletId], references: [id], onDelete: Restrict)
@@ -998,23 +998,23 @@ model AdRewardClaim {
 }
 
 model ExchangeTransaction {
-  id                  String       @id @default(uuid())
-  tradingAccountId    String       @map("trading_account_id")
-  fxRateSnapshotId    String?      @map("fx_rate_snapshot_id")
-  fromCurrency        CurrencyCode @map("from_currency")
-  toCurrency          CurrencyCode @map("to_currency")
-  sourceAmount        Decimal      @map("source_amount") @db.Decimal(24, 8)
-  grossTargetAmount   Decimal      @map("gross_target_amount") @db.Decimal(24, 8)
-  feeRate             Decimal      @map("fee_rate") @db.Decimal(10, 6)
-  feeAmount           Decimal      @map("fee_amount") @db.Decimal(24, 8)
-  feeCurrency         CurrencyCode @map("fee_currency")
-  appliedRate         Decimal      @map("applied_rate") @db.Decimal(18, 8)
-  netTargetAmount     Decimal      @map("net_target_amount") @db.Decimal(24, 8)
-  executedAt          DateTime     @map("executed_at")
-  createdAt           DateTime     @default(now()) @map("created_at")
+  id                String       @id @default(uuid())
+  tradingAccountId  String       @map("trading_account_id")
+  fxRateSnapshotId  String?      @map("fx_rate_snapshot_id")
+  fromCurrency      CurrencyCode @map("from_currency")
+  toCurrency        CurrencyCode @map("to_currency")
+  sourceAmount      Decimal      @map("source_amount") @db.Decimal(24, 8)
+  grossTargetAmount Decimal      @map("gross_target_amount") @db.Decimal(24, 8)
+  feeRate           Decimal      @map("fee_rate") @db.Decimal(10, 6)
+  feeAmount         Decimal      @map("fee_amount") @db.Decimal(24, 8)
+  feeCurrency       CurrencyCode @map("fee_currency")
+  appliedRate       Decimal      @map("applied_rate") @db.Decimal(18, 8)
+  netTargetAmount   Decimal      @map("net_target_amount") @db.Decimal(24, 8)
+  executedAt        DateTime     @map("executed_at")
+  createdAt         DateTime     @default(now()) @map("created_at")
 
-  tradingAccount    TradingAccount  @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
-  fxRateSnapshot    FxRateSnapshot? @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
+  tradingAccount    TradingAccount     @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  fxRateSnapshot    FxRateSnapshot?    @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
   fxExecuteRequests FxExecuteRequest[]
 
   @@index([tradingAccountId, executedAt])

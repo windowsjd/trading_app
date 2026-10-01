@@ -1,3 +1,4 @@
+import { tradingSessions } from '../test/support/trading-session-fixture';
 /** Real PostgreSQL quote → fee source change → execution/replay proof. */
 import 'dotenv/config';
 import assert from 'node:assert/strict';
@@ -13,10 +14,8 @@ import { PortfolioValuationService } from '../src/portfolio/portfolio-valuation.
 import { OrdersService } from '../src/orders/orders.service';
 import { FxService, type FxExecuteSuccessResponse } from '../src/fx/fx.service';
 import {
-  applyMarketSessionOverrideSnapshot,
   resetMarketSessionOverrideStoreForTest,
 } from '../src/orders/market-calendar/market-session-override.store';
-import { getZonedParts } from '../src/providers/kis/candles/kis-candle-time';
 
 const prisma = new PrismaService();
 const access = new TradingAccountAccessService(prisma);
@@ -62,23 +61,7 @@ async function rejected(work: Promise<unknown>, expected: string) {
   });
 }
 function setSession(now: Date, closeAt?: Date) {
-  const p = getZonedParts(closeAt ?? now, 'Asia/Seoul');
-  const pad = (n: number) => String(n).padStart(2, '0');
-  applyMarketSessionOverrideSnapshot(
-    [
-      {
-        market: 'KRX',
-        localDate: `${p.year}-${pad(p.month)}-${pad(p.day)}`,
-        overrideType: 'custom',
-        openTime: '000000',
-        closeTime: closeAt
-          ? `${pad(p.hour)}${pad(p.minute)}${pad(p.second)}`
-          : '235959',
-        reason: 'fee pinning integration boundary',
-      },
-    ],
-    now,
-  );
+  tradingSessions.set(now, closeAt);
 }
 
 async function fixture(mode: TradingAccountMode, stock = true) {
@@ -217,6 +200,7 @@ async function cleanup(s: Scenario) {
   await prisma.asset.delete({ where: { id: s.asset.id } });
   await prisma.fxRateSnapshot.delete({ where: { id: s.rate.id } });
   await prisma.user.delete({ where: { id: s.userId } });
+  tradingSessions.reset();
   resetMarketSessionOverrideStoreForTest();
 }
 async function fxBody(s: { userId: string; accountId: string }) {

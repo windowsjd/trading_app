@@ -60,6 +60,7 @@ describe('General account trading DB integration', () => {
 });
 
 const GENERAL_TRADING_DB_RUNNER = `
+import { tradingSessions } from './test/support/trading-session-fixture';
 import 'dotenv/config';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -89,7 +90,6 @@ import { PositionsService } from './src/positions/positions.service';
 import { getAssetTradingStatus } from './src/orders/market-hours.policy';
 import { resolveStockMarketSessionState } from './src/orders/market-calendar.policy';
 import {
-  applyMarketSessionOverrideSnapshot,
   resetMarketSessionOverrideStoreForTest,
 } from './src/orders/market-calendar/market-session-override.store';
 
@@ -295,6 +295,7 @@ async function limit(userId, accountId, assetId, side, quantity, limitPrice, key
 }
 
 async function cleanup() {
+  tradingSessions.reset();
   resetMarketSessionOverrideStoreForTest();
   if (accountIds.length) {
     await prisma.limitOrderCandleEvidence.deleteMany({
@@ -352,47 +353,7 @@ async function main() {
   const userId = await createUser('owner');
   const strangerId = await createUser('stranger');
   const accountId = await openGeneral(userId);
-  // KRX and NAS regular sessions do not overlap, so at every real instant at
-  // least one stock market supplies a deterministic closed-market assertion.
-  const naturallyClosedMarket = [
-    {
-      assetType: AssetType.domestic_stock,
-      market: 'KRX',
-      currency: CurrencyCode.KRW,
-    },
-    {
-      assetType: AssetType.us_stock,
-      market: 'NAS',
-      currency: CurrencyCode.USD,
-    },
-  ].find(
-    (candidate) =>
-      getAssetTradingStatus(candidate, new Date()).tradable === false,
-  );
-  assert.ok(naturallyClosedMarket, 'at least one stock market must be closed');
-  const localDateParts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date());
-  const localPart = (type) =>
-    localDateParts.find((part) => part.type === type)?.value;
-  const localDate =
-    localPart('year') + '-' + localPart('month') + '-' + localPart('day');
-  applyMarketSessionOverrideSnapshot(
-    [
-      {
-        market: 'KRX',
-        localDate,
-        overrideType: 'custom',
-        openTime: '000000',
-        closeTime: '235959',
-        reason: 'deterministic general trading integration session',
-      },
-    ],
-    new Date(),
-  );
+  tradingSessions.set(new Date());
   assert.deepEqual(
     getAssetTradingStatus(
       { assetType: AssetType.domestic_stock, market: 'KRX' },
@@ -508,23 +469,20 @@ async function main() {
     }),
     'QUOTE_MISMATCH',
   );
-  resetMarketSessionOverrideStoreForTest();
-  // The account still owns ten domestic shares during the crypto scenarios.
-  // After removing the all-day test session, give those holdings valid evidence
-  // for the real calendar, rather than an out-of-session manual price.
+  // Confirmed close and carry-forward evidence use explicit fixture instants.
+  const closeAt = new Date();
+  tradingSessions.set(closeAt, closeAt);
   const domesticState = resolveStockMarketSessionState(
-    { assetType: AssetType.domestic_stock, market: 'KRX' }, new Date(),
+    { assetType: AssetType.domestic_stock, market: 'KRX' }, closeAt,
   );
-  if (domesticState?.state === 'closed') {
-    assert.ok(domesticState.latestCompletedSession);
-    await prisma.assetPriceSnapshot.create({data: {
-      assetId: domesticAssetId, price: '70000.00000000', currencyCode: CurrencyCode.KRW,
-      sourceType: AssetPriceSourceType.provider_api, sourceName: 'kis_krx_realtime_trade',
-      effectiveAt: domesticState.latestCompletedSession.closeTime, capturedAt: new Date(),
-    }});
-  }
-
-  const closedMarket = naturallyClosedMarket;
+  assert.equal(domesticState?.state, 'closed');
+  assert.ok(domesticState.latestCompletedSession);
+  await prisma.assetPriceSnapshot.create({data: {
+    assetId: domesticAssetId, price: '70000.00000000', currencyCode: CurrencyCode.KRW,
+    sourceType: AssetPriceSourceType.provider_api, sourceName: 'kis_krx_realtime_trade',
+    effectiveAt: domesticState.latestCompletedSession.closeTime, capturedAt: closeAt,
+  }});
+  const closedMarket = { assetType: AssetType.domestic_stock, market: 'KRX', currency: CurrencyCode.KRW };
   const closedAsset = await prisma.asset.create({
     data: {
       symbol: 'GTCLOSED' + randomUUID().replace(/-/gu, '').slice(0, 10).toUpperCase(),
