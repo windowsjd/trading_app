@@ -40,4 +40,8 @@ First compare current implementation, tests and migrations with explicit current
 
 Historical HANDOVER/investigation records and explicitly historical migration sections preserve past evidence, not current authority. For orders/FX use the account-scoped contracts above, for lock ordering and fee pinning use `orders-api-contract.md` / current `policy-decisions.md`, and for ownership use the current section of `trading-modes-and-accounts.md`.
 
+[Execution Realism System](execution-realism-system.md) defines the internal,
+Provider-independent liquidity assessment contract and its B1/B2 boundary.
+B1 is assessment only and is not connected to production orders or the ledger.
+
 Read-only/quote source metadata is exposed as backward-compatible optional fields such as `rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation `sourceSummary`. Daily snapshot batch results include public-safe aggregate `sourceSummary`/fallback information in `batch_job_runs.resultPayloadJson`. These fields contain public-safe source type/name/snapshot/timing/fallback reasons only; raw provider payloads and secrets remain excluded.
