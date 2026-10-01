@@ -229,7 +229,9 @@ export default function MarketScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: semantic.screen },
   content: { padding: 16, paddingBottom: 24 },
-  headerSection: { gap: 12, marginBottom: 12 },
+  headerSection: {
+    padding: 12, borderRadius: 14,
+    backgroundColor: semantic.surface, gap: 12, marginBottom: 12 },
   tabRow: { flexDirection: 'row', gap: 8 },
   tabButton: {
     flex: 1,
@@ -238,7 +240,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.raised,
   },
   tabButtonActive: { backgroundColor: semantic.selected, borderColor: semantic.selected },
   tabText: { color: semantic.text, fontWeight: '600', fontSize: 14 },
@@ -249,7 +251,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.raised,
   },
   searchEntryText: {
     color: semantic.secondary,

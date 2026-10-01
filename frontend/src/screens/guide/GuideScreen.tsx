@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
     borderColor: semantic.border,
     borderRadius: 14,
     padding: 16,
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.surface,
     gap: 8,
   },
   number: { fontSize: 14, lineHeight: 22, fontWeight: '600', color: semantic.secondary },

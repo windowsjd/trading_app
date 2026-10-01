@@ -1,3 +1,4 @@
+import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import React, { useMemo, useState } from 'react';
 import {
@@ -322,7 +323,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.raised,
   },
   chipActive: { backgroundColor: semantic.selected, borderColor: semantic.selected },
   chipText: { color: semantic.text, fontWeight: '600' },
@@ -332,7 +333,7 @@ const styles = StyleSheet.create({
     borderColor: semantic.border,
     borderRadius: 14,
     padding: 16,
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.surface,
     marginBottom: 10,
     gap: 12,
   },
@@ -346,7 +347,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'right',
   },
-  creditAmount: { color: semantic.positive },
-  debitAmount: { color: semantic.negative },
+  creditAmount: { color: financial.credit },
+  debitAmount: { color: financial.debit },
   footerLoader: { paddingVertical: 16 },
 });

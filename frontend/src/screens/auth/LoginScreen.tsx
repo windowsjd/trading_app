@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14,
     fontSize: 16,
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.input,
     color: semantic.text,
   },
   primaryButton: {
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   errorText: {
-    color: semantic.negative,
+    color: semantic.error,
     lineHeight: 20,
   },
 });

@@ -651,14 +651,14 @@ const styles = StyleSheet.create({
   // stops explaining why the button is gone.
   blockedTitle: { fontSize: 17, fontWeight: '700', lineHeight: 24 },
   blockedMessage: { fontSize: 14, color: semantic.secondary, lineHeight: 21 },
-  errorText: { fontSize: 14, color: semantic.negative },
+  errorText: { fontSize: 14, color: semantic.error },
   input: {
     borderWidth: 1,
     borderColor: semantic.border,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.input,
     fontSize: 16,
   },
   directionChip: {
@@ -669,7 +669,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.raised,
   },
   directionChipActive: {
     backgroundColor: semantic.selected,

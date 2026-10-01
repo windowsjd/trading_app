@@ -50,7 +50,7 @@ export default function ActionPressable({
   ref,
   ...props
 }: Props) {
-  const { colors } = useAppearance();
+  const { colors, mode } = useAppearance();
   const host = useRef<View>(null);
   const session = useRef({ id: 0, active: false, expanded: false });
   const [ripple, setRipple] = useState<Ripple | null>(null);
@@ -228,7 +228,7 @@ export default function ActionPressable({
           StyleSheet.flatten(
             typeof style === 'function' ? style(state) : style,
           ) ?? {};
-        const color = processColor(resolveSemanticColor(base.backgroundColor, colors) ?? colors.screen);
+        const color = processColor(resolveSemanticColor(base.backgroundColor, colors, mode) ?? colors.screen);
         const palette = getFeedbackPalette(
           typeof color === 'number' ? color : null,
         );

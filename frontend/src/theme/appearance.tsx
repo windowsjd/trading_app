@@ -6,34 +6,30 @@ export type AppearancePreference = 'system' | 'light' | 'dark';
 export type AppearanceMode = 'light' | 'dark';
 
 const STORAGE_KEY = 'trading-app:appearance';
+// App surfaces, text and UI status. Financial meanings live in financialColors.ts.
+// screen: page canvas; surface: major cards/sheets; raised/input: inset controls.
 export const PALETTES = {
   light: {
-    screen: '#ffffff', surface: '#fafafa', raised: '#f1f3f5',
+    screen: '#f2f4f6', surface: '#ffffff', raised: '#f7f8fa',
     text: '#202a35', secondary: '#536170', muted: '#697583',
-    border: '#dfe4e9', input: '#ffffff', selected: '#202a35',
+    border: '#e5e8eb', input: '#f7f8fa', selected: '#202a35',
     placeholder: '#7c8793', cursor: '#202a35', navigation: '#ffffff',
     navigationActive: '#202a35', navigationInactive: '#697583', pressed: '#202a3520',
-    positive: '#16803a', negative: '#bd3030',
-    positiveSurface: '#eef7ee', negativeSurface: '#fff0f0',
+    successSurface: '#eef7ee', errorSurface: '#fff0f0',
     success: '#166534', error: '#b32d2d', warning: '#725400',
     warningSurface: '#fff8e1', info: '#245b76', infoSurface: '#e3f2fd',
     onAccent: '#ffffff', infoAction: '#245b76',
-    buy: '#16a34a', sell: '#dc2626', rise: '#a13e3b', fall: '#315f9b',
-    buySurface: '#f0fdf4', sellSurface: '#fef2f2',
   },
   dark: {
     screen: '#10151c', surface: '#1b2530', raised: '#273543',
     text: '#f2f5f7', secondary: '#c5d0da', muted: '#aebbc8',
-    border: '#435364', input: '#1b2530', selected: '#344657',
+    border: '#435364', input: '#273543', selected: '#344657',
     placeholder: '#aebbc8', cursor: '#f2f5f7', navigation: '#080a0d',
     navigationActive: '#ffffff', navigationInactive: '#9aa8b6', pressed: '#ffffff20',
-    positive: '#79d68b', negative: '#ff8585',
-    positiveSurface: '#1d392b', negativeSurface: '#38232a',
+    successSurface: '#1d392b', errorSurface: '#38232a',
     success: '#79d68b', error: '#ff8585', warning: '#e8bf69',
     warningSurface: '#3a3020', info: '#9acbe2', infoSurface: '#1c3045',
     onAccent: '#ffffff', infoAction: '#245b76',
-    buy: '#79d68b', sell: '#ff8585', rise: '#ff8b86', fall: '#8cbaff',
-    buySurface: '#1d392b', sellSurface: '#38232a',
   },
 } as const;
 

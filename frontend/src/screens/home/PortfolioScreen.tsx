@@ -709,7 +709,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.raised,
   },
   chipActive: {
     backgroundColor: semantic.selected,
@@ -722,7 +722,7 @@ const styles = StyleSheet.create({
     borderColor: semantic.border,
     borderRadius: 14,
     padding: 16,
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.surface,
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 10,

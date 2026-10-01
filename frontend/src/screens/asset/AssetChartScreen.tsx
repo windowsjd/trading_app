@@ -1,3 +1,4 @@
+import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -332,8 +333,11 @@ export function AssetMarketChart({
 }
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: semantic.screen },
-  detailContent: { flexGrow: 1 },
-  detailHeader: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, gap: 6 },
+  detailContent: {
+    margin: 8, borderRadius: 14,
+    backgroundColor: semantic.surface, flexGrow: 1 },
+  detailHeader: {
+    backgroundColor: semantic.surface, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, gap: 6 },
   assetNameRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8, rowGap: 4 },
   settlementBadge: { fontSize: 11, fontWeight: '700', color: semantic.secondary, backgroundColor: semantic.raised, overflow: 'hidden', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 4 },
   assetName: { minWidth: 0, fontSize: 28, fontWeight: '800', color: semantic.text, flexShrink: 1 },
@@ -348,7 +352,7 @@ const styles = StyleSheet.create({
     backgroundColor: semantic.raised, padding: 3, gap: 2 },
   currencyOption: { minWidth: 44, minHeight: 44, borderRadius: 8,
     alignItems: 'center', justifyContent: 'center' },
-  currencySelected: { backgroundColor: semantic.screen },
+  currencySelected: { backgroundColor: semantic.surface },
   currencyText: { fontSize: 15, fontWeight: '700', color: semantic.muted },
   currencySelectedText: { color: semantic.text },
   marketInfo: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, paddingTop: 6 },
@@ -369,9 +373,10 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   changeRate: { fontSize: 13, color: semantic.muted, flexShrink: 1 },
-  up: { color: semantic.rise },
-  down: { color: semantic.fall },
+  up: { color: financial.rise },
+  down: { color: financial.fall },
   header: {
+    backgroundColor: semantic.surface,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -388,8 +393,10 @@ const styles = StyleSheet.create({
   heading: { flex: 1, minWidth: 0, gap: 4 },
   title: { fontSize: 18, fontWeight: '700', color: semantic.text, flexShrink: 1 },
   price: { fontSize: 15, color: semantic.secondary },
-  toolbar: { paddingHorizontal: 12, paddingBottom: 8 },
-  chart: { flex: 1, minHeight: 0 },
+  toolbar: {
+    backgroundColor: semantic.surface, paddingHorizontal: 12, paddingBottom: 8 },
+  chart: {
+    backgroundColor: semantic.surface, flex: 1, minHeight: 0 },
   detailChart: { minHeight: 260 },
   notice: {
     paddingHorizontal: 12,
@@ -399,6 +406,7 @@ const styles = StyleSheet.create({
   },
   error: { padding: 16, gap: 12 },
   retry: {
+    backgroundColor: semantic.raised,
     alignSelf: 'flex-start',
     padding: 12,
     borderWidth: 1,

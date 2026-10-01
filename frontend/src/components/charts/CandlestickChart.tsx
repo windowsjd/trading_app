@@ -506,7 +506,7 @@ const styles = StyleSheet.create({
   wrapper: { width: '100%', position: 'relative' },
   container: {
     width: '100%',
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.surface,
     borderRadius: 8,
     overflow: 'hidden',
   },
@@ -522,7 +522,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: semantic.surface,
+    backgroundColor: semantic.raised,
   },
   resetText: { fontSize: 12, fontWeight: '600', color: semantic.text },
 });

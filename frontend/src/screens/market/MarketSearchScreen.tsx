@@ -264,14 +264,16 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: semantic.screen },
   content: { padding: 16, paddingBottom: 24 },
-  header: { gap: 12, marginBottom: 12 },
+  header: {
+    padding: 12, borderRadius: 14,
+    backgroundColor: semantic.surface, gap: 12, marginBottom: 12 },
   searchInput: {
     borderWidth: 1,
     borderColor: semantic.border,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.input,
     fontSize: 16,
   },
   scopeRow: { flexDirection: 'row', gap: 8 },
@@ -281,7 +283,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.raised,
   },
   scopeChipActive: {
     backgroundColor: semantic.selected,

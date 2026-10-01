@@ -1,3 +1,4 @@
+import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import React, { useState } from 'react';
 import { View } from '../../theme/native';
@@ -118,7 +119,7 @@ function DividendBalance({ stage }: { stage: 'before' | 'ex' | 'paid' }) {
           />
         ) : null}
         {values.cash > 0 ? (
-          <View style={{ flex: values.cash, backgroundColor: semantic.positive }} />
+          <View style={{ flex: values.cash, backgroundColor: financial.credit }} />
         ) : null}
       </View>
       <Basis>

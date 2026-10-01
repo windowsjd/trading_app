@@ -407,7 +407,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.raised,
   },
   retryText: { color: semantic.text, fontWeight: '600' },
 });

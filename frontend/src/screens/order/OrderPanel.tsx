@@ -1290,6 +1290,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   ratioButton: {
+    backgroundColor: semantic.raised,
     flexGrow: 1,
     flexShrink: 1,
     minWidth: 0,
@@ -1310,6 +1311,6 @@ const styles = StyleSheet.create({
     borderColor: semantic.border,
     paddingTop: 10,
   },
-  errorText: { fontSize: 12, color: semantic.negative },
+  errorText: { fontSize: 12, color: semantic.error },
   warningText: { fontSize: 12, color: semantic.warning },
 });

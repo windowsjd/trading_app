@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens';
 import React from 'react';
 import { Text, View } from '../../theme/native';
 import Svg, { Line, Polyline, Rect } from 'react-native-svg';
@@ -121,7 +122,7 @@ export function CandleAnatomy() {
                   right: 0,
                   top: '50%',
                   borderTopWidth: 1,
-                  borderColor: '#425966',
+                  borderColor: semantic.secondary,
                 }}
               />
             </View>

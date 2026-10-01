@@ -1,3 +1,4 @@
+import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import React, { useMemo, useState } from 'react';
 import {
@@ -164,10 +165,10 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     flexShrink: 0,
   },
-  ask: { color: semantic.sell },
-  bid: { color: semantic.buy },
-  askRow: { backgroundColor: semantic.sellSurface },
-  bidRow: { backgroundColor: semantic.buySurface },
+  ask: { color: financial.sell },
+  bid: { color: financial.buy },
+  askRow: { backgroundColor: financial.sellSurface },
+  bidRow: { backgroundColor: financial.buySurface },
   status: { fontSize: 11, color: semantic.warning },
   hint: { fontSize: 10, color: semantic.muted },
 });

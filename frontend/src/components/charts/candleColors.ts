@@ -1,3 +1,5 @@
-// Keep the meaning of candle direction identical in market and lesson charts.
-export const UP_COLOR = '#16a34a';
-export const DOWN_COLOR = '#dc2626';
+import { FINANCIAL_COLORS } from '../../theme/financialColors.ts';
+
+// Compatibility names for chart/lesson renderers; definitions live in the financial palette.
+export const UP_COLOR = FINANCIAL_COLORS.candleUp;
+export const DOWN_COLOR = FINANCIAL_COLORS.candleDown;

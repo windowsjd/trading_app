@@ -111,5 +111,5 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700', lineHeight: 30 },
   message: { fontSize: 14, color: semantic.secondary, lineHeight: 21 },
   helper: { fontSize: 13, color: semantic.secondary, lineHeight: 19 },
-  error: { fontSize: 14, color: semantic.negative, lineHeight: 21 },
+  error: { fontSize: 14, color: semantic.error, lineHeight: 21 },
 });

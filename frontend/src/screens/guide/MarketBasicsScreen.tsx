@@ -1,3 +1,4 @@
+import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -446,7 +447,7 @@ const styles = StyleSheet.create({
   body: { fontSize: 16, lineHeight: 27, color: semantic.secondary },
   helper: { fontSize: 14, lineHeight: 23, color: semantic.secondary },
   bold: { fontWeight: '700' },
-  book: { borderWidth: 1, borderColor: semantic.border, borderRadius: 14, padding: 12, gap: 4 },
+  book: { backgroundColor: semantic.surface, borderWidth: 1, borderColor: semantic.border, borderRadius: 14, padding: 12, gap: 4 },
   bookHeading: { gap: 4, marginBottom: 8 },
   sideTitle: { fontSize: 16, lineHeight: 24, fontWeight: '700', marginVertical: 4 },
   columnHeadings: { flexDirection: 'row', paddingHorizontal: 12, paddingBottom: 4, gap: 12 },
@@ -459,14 +460,14 @@ const styles = StyleSheet.create({
   stackedCell: { flex: 0, textAlign: 'left', alignItems: 'flex-start' },
   quantity: { fontSize: 16, lineHeight: 25, color: semantic.text, fontVariant: ['tabular-nums'] },
   previousQuantity: { fontSize: 14, lineHeight: 22, color: semantic.secondary, fontVariant: ['tabular-nums'] },
-  askRow: { backgroundColor: semantic.infoSurface },
-  bidRow: { backgroundColor: semantic.negativeSurface },
-  askText: { color: semantic.info },
-  bidText: { color: semantic.negative },
-  activeRow: { borderColor: semantic.info, backgroundColor: semantic.surface },
+  askRow: { backgroundColor: financial.sellSurface },
+  bidRow: { backgroundColor: financial.buySurface },
+  askText: { color: financial.sell },
+  bidText: { color: financial.buy },
+  activeRow: { borderColor: semantic.info, backgroundColor: semantic.raised },
   rowNote: { fontSize: 14, lineHeight: 22, color: semantic.secondary },
-  lastPrice: { alignItems: 'center', padding: 12, gap: 4, marginVertical: 8, borderRadius: 8, backgroundColor: semantic.surface },
-  priceChanged: { backgroundColor: semantic.surface },
+  lastPrice: { alignItems: 'center', padding: 12, gap: 4, marginVertical: 8, borderRadius: 8, backgroundColor: semantic.raised },
+  priceChanged: { backgroundColor: semantic.raised },
   previousPrice: { fontSize: 15, lineHeight: 24, color: semantic.secondary, fontVariant: ['tabular-nums'], maxWidth: '100%', textAlign: 'center' },
   lastPriceValue: { fontSize: 26, lineHeight: 38, fontWeight: '700', color: semantic.text, fontVariant: ['tabular-nums'], maxWidth: '100%', textAlign: 'center' },
   executionStatus: { fontSize: 15, lineHeight: 25, color: semantic.secondary, marginTop: 12 },

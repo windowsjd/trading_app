@@ -1,3 +1,4 @@
+import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from '../../theme/native';
@@ -210,6 +211,7 @@ const styles = StyleSheet.create({
   filterText: { fontSize: 12, color: semantic.secondary, textAlign: 'center' },
   selectedText: { color: semantic.onAccent, fontWeight: '600' },
   row: {
+    backgroundColor: semantic.surface,
     borderWidth: 1,
     borderColor: semantic.border,
     borderRadius: 12,
@@ -235,10 +237,11 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     maxWidth: '100%',
   },
-  up: { color: semantic.rise },
-  down: { color: semantic.fall },
+  up: { color: financial.rise },
+  down: { color: financial.fall },
   notice: { fontSize: 12, color: semantic.warning },
   retry: {
+    backgroundColor: semantic.raised,
     alignSelf: 'flex-start',
     padding: 10,
     borderWidth: 1,

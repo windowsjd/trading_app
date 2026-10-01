@@ -89,7 +89,8 @@ const styles = StyleSheet.create({
   sheetContent: { flexShrink: 1 },
   header: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 12 },
   title: { flexGrow: 1, flexShrink: 1, fontSize: 20, fontWeight: '700' },
-  close: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, maxWidth: '100%' },
+  close: {
+    backgroundColor: semantic.raised, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, maxWidth: '100%' },
   closeText: { fontSize: 16, color: semantic.secondary, flexShrink: 1 },
   list: { flexShrink: 1 },
   groupTitle: { fontSize: 14, color: semantic.secondary, marginTop: 12, marginBottom: 8 },

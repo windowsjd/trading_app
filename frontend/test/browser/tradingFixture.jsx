@@ -10,6 +10,7 @@ import Order from '../../src/screens/order/OrderScreen';
 import Chart from '../../src/screens/asset/AssetChartScreen';
 import Market from '../../src/screens/market/MarketScreen';
 import Search from '../../src/screens/market/MarketSearchScreen';
+import Home from '../../src/screens/home/HomeScreen';
 import { state, navigation } from './tradingMocks';
 const client = new QueryClient({
   defaultOptions: {
@@ -53,6 +54,7 @@ function App() {
     chart: Chart,
     market: Market,
     search: Search,
+    home: Home,
   }[screen];
   return (
     <QueryClientProvider client={client}>

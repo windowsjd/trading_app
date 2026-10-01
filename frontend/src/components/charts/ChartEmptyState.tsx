@@ -20,7 +20,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: semantic.border,
     borderRadius: 12,
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.raised,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,

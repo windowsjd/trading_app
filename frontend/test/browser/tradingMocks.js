@@ -150,6 +150,19 @@ export const apiClient = {
       return response({ asset });
     }
     const scoped = { state: 'available', tradingAccountId: state.accountId };
+    if (path.endsWith('/portfolio')) return response({
+      ...scoped, mode: account.mode, sectionErrors: [],
+      summary: {
+        totalAssetKrw: '10001000', krwCash: '1000', usdCashKrw: '9000', assetValueKrw: '9991000',
+        returnRate: '1.25', returnRateMethod: 'time_weighted', initialFundingKrw: '10000000',
+        cumulativeExternalFundingKrw: '10001000', cumulativeAdRewardKrw: '1000', investmentPnlKrw: '125000',
+      },
+      allocation: { state: 'available', cashKrwValue: '10000', domesticStockValueKrw: '1000', usStockValueKrw: '9900000', cryptoValueKrw: '90000' },
+    });
+    if (path.endsWith('/portfolio/equity')) return response({
+      ...scoped, state: 'empty', mode: account.mode, granularity: 'daily', range: '30d',
+      returnRateMethod: 'time_weighted', points: [],
+    });
     if (path.endsWith('/wallets'))
       return response({
         ...scoped,

@@ -200,7 +200,7 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
             친구가 내 현재 시즌 포트폴리오를 볼 수 있습니다.
           </Text>
           <Switch
-            trackColor={{ false: colors.border, true: colors.positive }}
+            trackColor={{ false: colors.border, true: colors.success }}
             thumbColor={colors.text}
             accessibilityLabel="친구에게 포트폴리오 공개"
             testID="settings-portfolio-public"
@@ -273,11 +273,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.input,
     fontSize: 16,
   },
   modeChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  modeChoice: { minHeight: 44, minWidth: 78, paddingHorizontal: 12, borderRadius: 10,
+  modeChoice: {
+    backgroundColor: semantic.raised, minHeight: 44, minWidth: 78, paddingHorizontal: 12, borderRadius: 10,
     borderWidth: 1, borderColor: semantic.border, alignItems: 'center', justifyContent: 'center' },
   modeSelected: { backgroundColor: semantic.selected, borderColor: semantic.selected },
   modeText: { fontSize: 14, fontWeight: '600', color: semantic.secondary },
@@ -285,7 +286,7 @@ const styles = StyleSheet.create({
   menuRow: {
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.raised,
     paddingHorizontal: 14,
   },
   menuText: { fontSize: 16, fontWeight: '600' },
@@ -298,12 +299,12 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: { color: semantic.onAccent, fontWeight: '700' },
   logoutButton: {
-    backgroundColor: semantic.negativeSurface,
+    backgroundColor: semantic.errorSurface,
     borderWidth: 1,
     borderColor: semantic.border,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
   },
-  logoutText: { color: semantic.negative, fontWeight: '700' },
+  logoutText: { color: semantic.error, fontWeight: '700' },
 });

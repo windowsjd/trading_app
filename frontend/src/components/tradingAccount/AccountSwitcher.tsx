@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.surface,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: semantic.border,
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
   stateBox: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   stateText: { flex: 1, fontSize: 13, color: semantic.secondary },
   errorBox: { flexDirection: 'column', alignItems: 'stretch', gap: 8 },
-  errorText: { fontSize: 13, color: semantic.negative },
+  errorText: { fontSize: 13, color: semantic.error },
   retryButton: {
     alignSelf: 'flex-start',
     paddingVertical: 6,
@@ -358,6 +358,7 @@ const styles = StyleSheet.create({
   sheetHelp: { fontSize: 13, color: semantic.secondary, marginBottom: 12 },
 
   row: {
+    backgroundColor: semantic.raised,
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
@@ -404,5 +405,5 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   // Full message, wrapping: a Korean error must never be clipped to fit a row.
-  startError: { marginTop: 6, fontSize: 13, color: semantic.negative, lineHeight: 20 },
+  startError: { marginTop: 6, fontSize: 13, color: semantic.error, lineHeight: 20 },
 });

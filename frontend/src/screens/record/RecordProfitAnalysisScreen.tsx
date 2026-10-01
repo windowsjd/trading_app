@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
   },
   errorRow: {
     borderTopWidth: 1,
-    borderTopColor: '#f1d0d0',
+    borderTopColor: semantic.errorSurface,
     paddingTop: 10,
     gap: 4,
   },

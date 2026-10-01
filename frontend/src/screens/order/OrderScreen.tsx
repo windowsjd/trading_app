@@ -1,3 +1,4 @@
+import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
 import React, { useMemo, useState } from 'react';
@@ -372,8 +373,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   changeRate: { fontSize: 13, color: semantic.muted, fontVariant: ['tabular-nums'] },
-  up: { color: semantic.rise },
-  down: { color: semantic.fall },
+  up: { color: financial.rise },
+  down: { color: financial.fall },
   marketBadge: {
     fontSize: 11,
     color: semantic.muted,
@@ -383,6 +384,8 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   tradingRow: {
+    borderRadius: 12, paddingBottom: 14,
+    backgroundColor: semantic.surface,
     flexDirection: 'row',
     alignItems: 'stretch',
     gap: 12,

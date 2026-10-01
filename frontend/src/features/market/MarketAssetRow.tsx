@@ -112,11 +112,13 @@ export const MarketAssetRow = React.memo(
 
 const styles = StyleSheet.create({
   itemRow: {
+    paddingHorizontal: 12, marginBottom: 8, borderRadius: 12,
+    backgroundColor: semantic.surface,
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 14,
-    borderTopWidth: 1,
-    borderTopColor: semantic.border,
+    borderWidth: 1,
+    borderColor: semantic.border,
   },
   itemSymbol: { fontSize: 16, fontWeight: '700' },
   itemPrice: { fontSize: 15, fontWeight: '600' },

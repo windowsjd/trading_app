@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     maxWidth: '100%',
     color: semantic.text,
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.raised,
     borderRadius: 6,
     padding: 8,
     fontFamily: 'monospace',

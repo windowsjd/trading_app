@@ -1,5 +1,6 @@
 import type { ColorValue, ImageStyle, StyleProp, TextStyle, ViewStyle } from 'react-native';
-import type { AppearancePalette } from './appearance';
+import type { AppearanceMode, AppearancePalette } from './appearance';
+import { resolveFinancialColor } from './financialColors.ts';
 
 /** Explicit roles use valid color sentinels for native/web StyleSheet validation.
  * Only these tokens resolve through the appearance palette; arbitrary hex stays as written. */
@@ -19,10 +20,8 @@ export const semantic = {
   navigationActive: '#0f000d',
   navigationInactive: '#0f000e',
   pressed: '#0f000f',
-  positive: '#0f0010',
-  negative: '#0f0011',
-  positiveSurface: '#0f0012',
-  negativeSurface: '#0f0013',
+  successSurface: '#0f0012',
+  errorSurface: '#0f0013',
   success: '#0f0014',
   error: '#0f0015',
   warning: '#0f0016',
@@ -31,18 +30,16 @@ export const semantic = {
   infoSurface: '#0f0019',
   onAccent: '#0f001a',
   infoAction: '#0f001b',
-  buy: '#0f001c', sell: '#0f001d', rise: '#0f001e', fall: '#0f001f',
-  buySurface: '#0f0020', sellSurface: '#0f0021',
 } as const;
 
 type Role = keyof typeof semantic;
 const roleByValue = Object.fromEntries(Object.entries(semantic).map(([role, value]) => [value, role])) as Record<string, Role>;
-export function resolveSemanticColor(value: ColorValue | undefined, colors: AppearancePalette) {
+export function resolveSemanticColor(value: ColorValue | undefined, colors: AppearancePalette, mode: AppearanceMode) {
   const role = typeof value === 'string' ? roleByValue[value] : undefined;
-  return role ? colors[role] : value;
+  return role ? colors[role] : typeof value === 'string' ? resolveFinancialColor(value, mode) : value;
 }
 
-export function resolveSemanticStyle<T extends ViewStyle | TextStyle | ImageStyle>(style: StyleProp<T>, colors: AppearancePalette): StyleProp<T> {
+export function resolveSemanticStyle<T extends ViewStyle | TextStyle | ImageStyle>(style: StyleProp<T>, colors: AppearancePalette, mode: AppearanceMode): StyleProp<T> {
   if (!style) return style;
   const flatten = (entry: unknown): Record<string, unknown> => Array.isArray(entry)
     ? Object.assign({}, ...entry.map(flatten))
@@ -51,7 +48,7 @@ export function resolveSemanticStyle<T extends ViewStyle | TextStyle | ImageStyl
   const overrides: Record<string, string> = {};
   for (const [property, value] of Object.entries(flat)) {
     if (typeof value !== 'string') continue;
-    const resolved = resolveSemanticColor(value, colors);
+    const resolved = resolveSemanticColor(value, colors, mode);
     if (resolved !== value && typeof resolved === 'string') overrides[property] = resolved;
   }
   return Object.keys(overrides).length ? [style, overrides as unknown as T] : style;

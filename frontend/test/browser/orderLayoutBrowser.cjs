@@ -5,6 +5,7 @@ const http = require('node:http');
 const assert = require('node:assert/strict');
 const esbuild = require('esbuild');
 const { chromium } = require('playwright');
+const theme = require('./appearanceAssertions.cjs');
 const root = path.resolve(__dirname, '../..');
 const out = process.env.ORDER_BROWSER_OUTPUT ?? '/tmp/trading-order-browser';
 
@@ -40,12 +41,47 @@ async function run() {
   const base = `http://127.0.0.1:${server.address().port}`;
   await page.route('**/*', (route) => route.request().url().startsWith(base) ? route.continue() : route.abort());
   try {
+    for (const appearance of ['light', 'dark']) {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.emulateMedia({ colorScheme: appearance });
+      await page.goto(`${base}/?screen=home`);
+      await page.getByText('총 자산', { exact: true }).waitFor();
+      await theme.canvas(page, appearance);
+      await theme.background(page.getByTestId('trading-account-general-summary'), appearance, 'screen');
+      for (const label of ['총 자산', '자금 구성', '지갑 요약', '자산 배분', '자산 추이']) {
+        await theme.background(page.getByText(label, { exact: true }), appearance, 'surface');
+      }
+      await theme.background(page.getByText('원장 보기', { exact: true }), appearance, 'raised');
+      await page.screenshot({ path: path.join(out, `home-${appearance}.png`), fullPage: true });
+      await page.goto(`${base}/?screen=market`);
+      await page.getByTestId('market-item-SUI').waitFor();
+      await theme.canvas(page, appearance);
+      await theme.background(page.getByTestId('market-screen'), appearance, 'screen');
+      await theme.background(page.getByTestId('market-item-SUI'), appearance, 'surface');
+      await theme.background(page.getByText('종목명 또는 심볼 검색', { exact: true }), appearance, 'raised');
+      await page.screenshot({ path: path.join(out, `market-${appearance}.png`), fullPage: true });
+      await page.goto(`${base}/?screen=detail&asset=SUI`);
+      await page.getByTestId('asset-settlement-currency').waitFor();
+      await theme.canvas(page, appearance);
+      await theme.background(page.getByTestId('asset-detail-name'), appearance, 'surface');
+      await theme.background(page.getByTestId('asset-settlement-currency'), appearance, 'raised');
+      await page.screenshot({ path: path.join(out, `detail-${appearance}.png`), fullPage: true });
+      await page.getByTestId('asset-timeframe-selector').click();
+      await page.getByTestId('asset-timeframe-close').waitFor();
+      await theme.background(page.getByRole('heading', { name: '시간봉', exact: true }), appearance, 'surface');
+      await theme.background(page.getByTestId('asset-timeframe-close'), appearance, 'raised');
+      await page.getByTestId('asset-timeframe-close').click();
+    }
+    console.log('appearance hierarchy ok (Home, Market, Detail, timeframe sheet × light/dark)');
     for (const appearance of ['light', 'dark']) for (const width of [320, 360, 390]) {
       await page.setViewportSize({ width, height: 844 });
       await page.emulateMedia({ colorScheme: appearance });
       await page.goto(`${base}/?screen=order&asset=SUI`);
       const byId = (id) => page.getByTestId(id);
       await byId('asset-trading-columns').waitFor();
+      await theme.canvas(page, appearance);
+      await theme.background(byId('asset-trading-columns'), appearance, 'surface');
+      await theme.background(byId('order-quantity-input'), appearance, 'raised');
       const columns = await page.evaluate(() => {
         const rect = (id) => document.querySelector(`[data-testid="${id}"]`).getBoundingClientRect();
         const left = rect('asset-order-column'), right = rect('asset-price-column');

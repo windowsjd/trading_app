@@ -26,7 +26,7 @@ export default function RootNavigator() {
       ...(mode === 'dark' ? DarkTheme.colors : DefaultTheme.colors),
       primary: colors.text,
       background: colors.screen,
-      card: colors.screen,
+      card: colors.surface,
       text: colors.text,
       border: colors.border,
     },

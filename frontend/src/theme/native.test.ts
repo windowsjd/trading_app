@@ -3,15 +3,17 @@ import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 import { semantic, resolveSemanticColor, resolveSemanticStyle } from './tokens.ts';
+import { financial, FINANCIAL_COLORS } from './financialColors.ts';
 
 const require = createRequire(import.meta.url);
 const { load } = require('../../test/ledgerTestHarness.cjs');
 const { inlineTradingHarness } = require('../../test/inlineTradingHarness.cjs');
 const React = require('react');
-const PALETTES = {
-  light: { screen: '#fff', surface: '#fafafa', text: '#202a35', input: '#fff', placeholder: '#7c8793', cursor: '#202a35', border: '#dfe4e9', positive: '#16803a', negative: '#bd3030' },
-  dark: { screen: '#10151c', surface: '#1b2530', text: '#f2f5f7', input: '#1b2530', placeholder: '#aebbc8', cursor: '#f2f5f7', border: '#435364', positive: '#79d68b', negative: '#ff8585' },
-};
+const { PALETTES } = load(resolve('src/theme/appearance.tsx'), {
+  react: React,
+  'react-native': { Appearance: {}, Platform: { OS: 'web' }, StatusBar: 'StatusBar', useColorScheme: () => 'light', View: 'View' },
+  '@react-native-async-storage/async-storage': {},
+});
 const flatten = (style: any): any => Array.isArray(style)
   ? Object.assign({}, ...style.map(flatten)) : (style || {});
 const native = {
@@ -34,13 +36,13 @@ test('explicit semantic tokens resolve in both modes; arbitrary hex is never inf
     const card = UI.View.render({ style: { backgroundColor: semantic.surface, borderColor: semantic.border } }, null);
     assert.equal(flatten(card.props.style).backgroundColor, PALETTES[mode].surface);
     assert.equal(flatten(card.props.style).borderColor, PALETTES[mode].border);
-    const up = UI.Text.render({ style: { color: semantic.negative }, children: '상승' }, null);
-    const down = UI.Text.render({ style: { color: semantic.positive }, children: '매수' }, null);
-    assert.equal(flatten(up.props.style).color, PALETTES[mode].negative);
-    assert.equal(flatten(down.props.style).color, PALETTES[mode].positive);
+    const up = UI.Text.render({ style: { color: financial.rise }, children: '상승' }, null);
+    const down = UI.Text.render({ style: { color: financial.buy }, children: '매수' }, null);
+    assert.equal(flatten(up.props.style).color, FINANCIAL_COLORS.rise[mode]);
+    assert.equal(flatten(down.props.style).color, FINANCIAL_COLORS.buy[mode]);
   }
-  assert.equal(flatten(resolveSemanticStyle({ backgroundColor: '#fafafa' }, PALETTES.dark as any)).backgroundColor, '#fafafa');
-  assert.equal(resolveSemanticColor('#a13e3b', PALETTES.dark as any), '#a13e3b');
+  assert.equal(flatten(resolveSemanticStyle({ backgroundColor: '#fafafa' }, PALETTES.dark, 'dark')).backgroundColor, '#fafafa');
+  assert.equal(resolveSemanticColor('#a13e3b', PALETTES.dark, 'dark'), '#a13e3b');
 });
 
 test('shared native TextInput keeps value, placeholder, caret and selection visible in both modes', () => {
@@ -105,17 +107,36 @@ test('financial roles stay distinct from neutral roles in the actual palettes', 
     '@react-native-async-storage/async-storage': {},
   });
   const { light, dark } = appearance.PALETTES;
-  for (const colors of [light, dark]) {
-    assert.match(colors.buy, /^#/); assert.match(colors.sell, /^#/);
-    assert.notEqual(colors.buy, colors.sell);
-    assert.notEqual(colors.rise, colors.fall);
-    assert.equal(resolveSemanticColor(semantic.buy, colors), colors.buy);
-    assert.equal(resolveSemanticColor(semantic.sell, colors), colors.sell);
-    assert.equal(resolveSemanticColor(semantic.rise, colors), colors.rise);
-    assert.equal(resolveSemanticColor(semantic.fall, colors), colors.fall);
-    assert.equal(resolveSemanticColor(semantic.buySurface, colors), colors.buySurface);
-    assert.equal(resolveSemanticColor(semantic.sellSurface, colors), colors.sellSurface);
+  for (const mode of ['light', 'dark'] as const) {
+    const colors = appearance.PALETTES[mode];
+    assert.match(FINANCIAL_COLORS.buy[mode], /^#/);
+    assert.match(FINANCIAL_COLORS.sell[mode], /^#/);
+    assert.notEqual(FINANCIAL_COLORS.buy[mode], FINANCIAL_COLORS.sell[mode]);
+    assert.notEqual(FINANCIAL_COLORS.rise[mode], FINANCIAL_COLORS.fall[mode]);
+    for (const role of Object.keys(financial) as (keyof typeof financial)[]) {
+      assert.equal(role in colors, false, `${role} must not live in PALETTES`);
+      assert.equal(role in semantic, false, `${role} must not be a neutral token`);
+      assert.equal(resolveSemanticColor(financial[role], colors, mode), FINANCIAL_COLORS[role][mode]);
+    }
   }
   assert.notEqual(light.navigation, dark.navigation);
   assert.equal(dark.navigation, '#080a0d');
+});
+
+
+test('surface hierarchy matches white cards on a grey canvas with inset controls', () => {
+  assert.equal(PALETTES.light.screen, '#f2f4f6');
+  assert.equal(PALETTES.light.surface, '#ffffff');
+  assert.equal(PALETTES.light.raised, '#f7f8fa');
+  assert.equal(PALETTES.light.navigation, '#ffffff');
+  for (const mode of ['light', 'dark'] as const) {
+    const colors = PALETTES[mode];
+    assert.equal(colors.input, colors.raised);
+    assert.equal(new Set([colors.screen, colors.surface, colors.raised]).size, 3);
+    assert.equal(new Set([colors.text, colors.secondary, colors.muted]).size, 3);
+    const UI = themed(mode);
+    for (const role of ['screen', 'surface', 'raised'] as const) {
+      assert.equal(flatten(UI.View.render({ style: { backgroundColor: semantic[role] } }, null).props.style).backgroundColor, colors[role]);
+    }
+  }
 });

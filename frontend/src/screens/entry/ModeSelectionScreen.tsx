@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 17, fontWeight: '700', color: semantic.text, lineHeight: 24 },
   cardBody: { fontSize: 14, color: semantic.secondary, lineHeight: 21 },
   cardNotice: { fontSize: 12, color: semantic.muted, lineHeight: 18 },
-  errorText: { fontSize: 13, color: semantic.negative, lineHeight: 20 },
+  errorText: { fontSize: 13, color: semantic.error, lineHeight: 20 },
   badge: {
     flexShrink: 0,
     paddingVertical: 3,

@@ -1,3 +1,4 @@
+import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from '../../theme/native';
@@ -108,9 +109,9 @@ const styles = StyleSheet.create({
   columnLabel: { fontSize: 12, lineHeight: 20, color: semantic.secondary, padding: 8, textAlign: 'right', flexShrink: 0 },
   number: { fontSize: 14, lineHeight: 22, fontVariant: ['tabular-nums'], color: semantic.text, textAlign: 'right', paddingHorizontal: 12, paddingVertical: 6, flexShrink: 0 },
   quantity: { flex: 1 },
-  askText: { color: semantic.sell },
-  bidText: { color: semantic.buy },
-  askRow: { backgroundColor: semantic.sellSurface },
-  bidRow: { backgroundColor: semantic.buySurface },
+  askText: { color: financial.sell },
+  bidText: { color: financial.buy },
+  askRow: { backgroundColor: financial.sellSurface },
+  bidRow: { backgroundColor: financial.buySurface },
   bestRow: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: semantic.border },
 });

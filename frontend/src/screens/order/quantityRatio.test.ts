@@ -54,7 +54,7 @@ for (const screen of ['inline', 'standalone'])
               const button = h.node(`order-ratio-${other}`);
               assert.equal(
                 flatten(button.props.style).backgroundColor,
-                other === percent ? semantic.selected : undefined,
+                other === percent ? semantic.selected : semantic.raised,
               );
               const label = button.findByType('Text');
               assert.equal(

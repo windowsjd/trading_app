@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     borderTopWidth: 1,
     borderTopColor: semantic.border,
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.surface,
   },
   action: { flex: 1, minWidth: 0, minHeight: 50, paddingHorizontal: 8 },
 });

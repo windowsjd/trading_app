@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.raised,
   },
   secondaryText: { color: semantic.text, fontWeight: '600' },
 });

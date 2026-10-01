@@ -1,3 +1,4 @@
+import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -144,6 +145,7 @@ const styles = StyleSheet.create({
   list: { gap: 10, minWidth: 0 },
   count: { fontSize: 12, color: semantic.muted },
   row: {
+    backgroundColor: semantic.surface,
     borderWidth: 1,
     borderColor: semantic.border,
     borderRadius: 12,
@@ -153,8 +155,8 @@ const styles = StyleSheet.create({
   },
   name: { fontSize: 17, fontWeight: '700', color: semantic.text, flexShrink: 1 },
   side: { fontSize: 14, fontWeight: '700' },
-  buy: { color: semantic.buy },
-  sell: { color: semantic.sell },
+  buy: { color: financial.buy },
+  sell: { color: financial.sell },
   metric: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -171,6 +173,7 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
   },
   retry: {
+    backgroundColor: semantic.raised,
     alignSelf: 'flex-start',
     padding: 10,
     borderWidth: 1,

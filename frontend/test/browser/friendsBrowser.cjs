@@ -3,6 +3,7 @@ const path = require('node:path'),
   fs = require('node:fs'),
   http = require('node:http'),
   assert = require('node:assert/strict');
+const theme = require('./appearanceAssertions.cjs');
 const esbuild = require('esbuild'),
   { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../..'),
@@ -76,6 +77,7 @@ async function main() {
     await page.route('**/*', (route) =>
       route.request().url().startsWith(base) ? route.continue() : route.abort(),
     );
+    for (const appearance of ['light', 'dark'])
     for (const width of [320, 390, 768])
       for (const fontScale of [1, 2])
         for (const screen of [
@@ -86,6 +88,7 @@ async function main() {
           'summary',
         ]) {
           await page.setViewportSize({ width, height: 844 });
+          await page.emulateMedia({ colorScheme: appearance });
           await page.goto(`${base}/?screen=${screen}&fontScale=${fontScale}`);
           await page
             .getByText(
@@ -101,6 +104,16 @@ async function main() {
               { exact: true },
             )
             .waitFor();
+          await theme.canvas(page, appearance);
+          if (screen === 'overall') await theme.background(page.getByText('MY', { exact: true }), appearance, 'surface');
+          if (screen === 'friends') {
+            await theme.background(page.getByText('친구 목록', { exact: true }).locator('..').locator('..'), appearance, 'surface');
+          }
+          if (screen === 'settings') {
+            await theme.background(page.getByText('닉네임 변경', { exact: true }), appearance, 'surface');
+            await theme.background(page.getByPlaceholder('닉네임 입력'), appearance, 'raised');
+          }
+          if (screen === 'summary') await theme.background(page.getByText('최근 30일 자산 / 수익률 추이', { exact: true }), appearance, 'surface');
           const overflow = await page.evaluate(() =>
             [...document.querySelectorAll('#root *')]
               .filter((el) => el.children.length === 0 && el.textContent.trim())
@@ -124,14 +137,27 @@ async function main() {
             [],
             `${screen} width ${width} scale ${fontScale}`,
           );
-          results.push({ screen, width, fontScale, overflow });
+          results.push({ screen, appearance, width, fontScale, overflow });
           if (width === 320 && fontScale === 2)
             await page.screenshot({
-              path: path.join(out, `${screen}-320-scale2.png`),
+              path: path.join(out, `${screen}-${appearance}-320-scale2.png`),
               fullPage: true,
             });
         }
     await page.goto(`${base}/?screen=settings`);
+    await page.getByRole('radio', { name: '라이트', exact: true }).click();
+    await page.waitForFunction(() => document.documentElement.style.colorScheme === 'light');
+    await theme.canvas(page, 'light');
+    await page.reload();
+    await page.getByPlaceholder('닉네임 입력').waitFor();
+    await theme.canvas(page, 'light'); // saved choice overrides the dark OS setting
+    await page.getByRole('radio', { name: '다크', exact: true }).click();
+    await page.waitForFunction(() => document.documentElement.style.colorScheme === 'dark');
+    await theme.canvas(page, 'dark');
+    await page.getByRole('radio', { name: '시스템', exact: true }).click();
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.waitForFunction(() => document.documentElement.style.colorScheme === 'light');
+    await theme.canvas(page, 'light');
     const toggle = page.getByRole('switch');
     await toggle.waitFor();
     assert.equal(await toggle.isChecked(), true);

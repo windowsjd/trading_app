@@ -105,7 +105,7 @@ export default function FriendsScreen({ navigation }: Props) {
         if (tab !== 'search' || search) void refetch();
       }}
       ListHeaderComponent={
-        <View style={styles.header}>
+        <View style={[styles.header, styles.headerCard]}>
           <View style={styles.actions}>
             {tabs.map((item) => (
               <ActionPressable
@@ -267,7 +267,9 @@ function FriendButton({
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: semantic.screen },
   content: { padding: 16, gap: 12, paddingBottom: 32 },
-  header: { gap: 12 },
+  header: {
+    backgroundColor: semantic.surface, gap: 12 },
+  headerCard: { padding: 12, borderRadius: 14 },
   card: {
     padding: 16,
     gap: 12,
@@ -287,7 +289,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: semantic.border,
     borderRadius: 12,
-    backgroundColor: semantic.surface,
+    backgroundColor: semantic.raised,
     flexShrink: 1,
   },
   selected: { backgroundColor: semantic.infoSurface, borderColor: semantic.info },
@@ -295,6 +297,7 @@ const styles = StyleSheet.create({
   nickname: { fontSize: 18, fontWeight: '700', flex: 1, minWidth: 0 },
   helper: { fontSize: 14, color: semantic.secondary, flexShrink: 1 },
   input: {
+    backgroundColor: semantic.input,
     borderWidth: 1,
     borderColor: semantic.border,
     padding: 14,

@@ -1,3 +1,4 @@
+import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import React from 'react';
 import {
@@ -26,10 +27,10 @@ export const lessonStyles = StyleSheet.create({
     borderColor: semantic.border,
     borderRadius: 14,
     gap: 12,
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.surface,
     minWidth: 0,
   },
-  result: { padding: 14, borderRadius: 12, backgroundColor: semantic.surface, gap: 12 },
+  result: { padding: 14, borderRadius: 12, backgroundColor: semantic.raised, gap: 12 },
   action: {
     maxWidth: '100%',
     flexShrink: 1,
@@ -48,7 +49,7 @@ export const lessonStyles = StyleSheet.create({
     color: semantic.onAccent,
     flexShrink: 1,
   },
-  secondary: { backgroundColor: semantic.screen },
+  secondary: { backgroundColor: semantic.raised },
   secondaryText: { color: semantic.secondary },
   disabled: { opacity: 0.6 },
   choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -60,12 +61,12 @@ export const lessonStyles = StyleSheet.create({
     padding: 10,
     gap: 4,
     borderRadius: 6,
-    backgroundColor: semantic.surface,
+    backgroundColor: semantic.raised,
     borderWidth: 1,
     borderColor: 'transparent',
   },
-  ask: { color: semantic.info },
-  bid: { color: semantic.negative },
+  ask: { color: financial.sell },
+  bid: { color: financial.buy },
   active: { borderColor: semantic.warning, backgroundColor: semantic.warningSurface },
   numbers: { flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
   number: {

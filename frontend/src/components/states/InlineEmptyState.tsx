@@ -23,7 +23,7 @@ const styles = StyleSheet.create({
     borderColor: semantic.border,
     borderRadius: 12,
     padding: 14,
-    backgroundColor: semantic.screen,
+    backgroundColor: semantic.raised,
     gap: 6,
   },
   // Section notices carry full sentences; they wrap rather than clip.

@@ -51,3 +51,10 @@ screenshots go to `/tmp/trading-friends-browser` (override with
 `FRIENDS_BROWSER_OUTPUT`). Fixtures are test-only and all external requests are
 blocked. Native Android text measurement, keyboard and screen-reader checks
 remain manual.
+
+The focused runner also verifies the actual computed light/dark canvas, card,
+and inset backgrounds on Home, Market, AssetDetail and the timeframe sheet.
+It rejects unresolved semantic sentinels in CSS/SVG and saves comparison screenshots.
+The friends runner checks both modes (60 layouts), Settings persistence after reload,
+and system theme changes. Install a Korean font in the browser environment (or set
+`FONTCONFIG_FILE` to a local fontconfig file) so Korean text widths are meaningful.

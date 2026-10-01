@@ -43,7 +43,7 @@ export default function LineChart({
 }: LineChartProps) {
   const { colors } = useAppearance();
   const gridColor = colors.border;
-  const markerColor = colors.screen;
+  const markerColor = colors.surface;
   const crosshairColor = colors.secondary;
   const [width, setWidth] = useState(320);
   // Bind selection to the dataset and layout. Account/range changes cannot

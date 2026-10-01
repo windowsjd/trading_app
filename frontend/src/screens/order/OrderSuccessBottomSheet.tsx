@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: semantic.positiveSurface,
+    backgroundColor: semantic.successSurface,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   iconText: {
     fontSize: 24,
     fontWeight: '700',
-    color: semantic.positive,
+    color: semantic.success,
   },
   title: {
     fontSize: 20,
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     borderColor: semantic.border,
     borderRadius: 14,
     padding: 16,
-    backgroundColor: semantic.surface,
+    backgroundColor: semantic.raised,
     gap: 10,
   },
   row: {
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   },
   note: {
     fontSize: 13,
-    color: semantic.positive,
+    color: semantic.success,
   },
   buttonRow: {
     flexDirection: 'row',
