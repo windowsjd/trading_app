@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
   cashValue: { flexGrow: 1, flexShrink: 1, minWidth: 0, textAlign: 'right', fontSize: 16, lineHeight: 24, fontVariant: ['tabular-nums'] },
   holdings: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: semantic.border },
   notice: { fontSize: 13, lineHeight: 20, color: semantic.warning },
-  history: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  historyAction: { padding: 12, minHeight: 44 },
-  historyLabel: { fontSize: 13, lineHeight: 20, color: semantic.secondary },
+  history: { flexDirection: 'row', alignItems: 'stretch', gap: 8 },
+  historyAction: { flex: 1, minWidth: 0, padding: 12, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  historyLabel: { fontSize: 13, lineHeight: 20, color: semantic.secondary, textAlign: 'center' },
 });

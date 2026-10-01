@@ -103,7 +103,13 @@ for the Wallet tab and the shared Home holdings. It checks 384 layouts:
 320/360/390/430px × Light/Dark × Red/Blue/Green/Red × font scale 1/1.5/2 ×
 General/Season × normal/long text × Home/Wallet. Visible glyph measurements
 cover long asset names, large local KRW/USD values, +123.45% and -99.12%.
-It also checks stale/unavailable rows, live palette changes, all 207 positions
+Holdings fixtures include 삼성전자 / Berkshire Hathaway Class B / Bitcoin and
+stock/crypto quantities rounded only for display to six decimal places, without
+trailing zeros. Rendered boxes and glyph edges verify the left identity and the
+right value → secondary quantity → return column, its typography, and equal
+Wallet history button widths/heights/padding/touch targets. Names wrap up to
+three lines with the complete accessible label; all numeric values remain
+untruncated. It also checks known quantities in stale/unavailable rows, live palette changes, all 207 positions
 across three API pages, and delayed outgoing responses on account switching.
 The navigation fixture uses installed React Navigation and production MainTabs,
 WalletStack, MyStack and RecordStack to exercise both five-tab modes, Home/Wallet

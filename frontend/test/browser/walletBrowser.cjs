@@ -41,7 +41,7 @@ async function run() {
   });
   const id = (value) => page.getByTestId(value);
   const open = async (screen, query = '') => {
-    await page.goto(`${base}/?screen=${screen}&holdings=1${query}`);
+    await page.goto(`${base}/?screen=${screen}&holdings=1&positionFixtures=hierarchy${query}`);
     await id('home-total-asset').waitFor();
     await id(`${screen === 'wallet' ? 'wallet-position' : 'home-position-item'}-${new URLSearchParams(query).get('account') ?? 'season'}-account-asset-0`).waitFor();
   };
@@ -55,20 +55,34 @@ async function run() {
             await theme.canvas(page, appearance);
             const prefix = `${screen === 'wallet' ? 'wallet-position' : 'home-position-item'}-${account}-account-asset-`;
             assert.equal(await page.locator(`[data-testid^="${prefix}"][role="button"]`).count(), screen === 'wallet' ? 7 : 5);
-            const positive = id(`${prefix}0-return`), negative = id(`${prefix}1-return`), neutral = id(`${prefix}2-return`);
+            const positive = id(`${prefix}1-return`), negative = id(`${prefix}2-return`), neutral = id(`${prefix}3-return`);
             const color = (locator) => locator.evaluate((el) => getComputedStyle(el).color);
             assert.equal(await color(positive), palette[appearance][preference][0]);
             assert.equal(await color(negative), palette[appearance][preference][1]);
             assert.equal(await neutral.textContent(), '0%');
             assert.equal(await positive.textContent(), '+123.45%'); assert.equal(await negative.textContent(), '-99.12%');
+            assert.equal(await id(`${prefix}0-return`).textContent(), '+4.82%');
+            for (const [index, quantity] of ['10주', '0.123456주', '0.000805 BTC'].entries()) {
+              assert.equal(await id(`${prefix}${index}-quantity`).textContent(), quantity);
+            }
+            if (!long) {
+              for (const [index, [name, amount]] of [
+                ['삼성전자', '1,120,000원'], ['Berkshire Hathaway Class B', '$123,456.78'], ['Bitcoin', '$123,456.78'],
+              ].entries()) {
+                assert.equal(await id(`${prefix}${index}-name`).textContent(), name);
+                assert.equal(await id(`${prefix}${index}-value`).textContent(), amount);
+              }
+            }
             const amountColor = await color(id(`${prefix}0-value`));
             assert.ok(!palette[appearance][preference].includes(amountColor));
             assert.ok(!palette[appearance][preference].includes(await color(neutral)));
             assert.match(await id(`${prefix}4`).textContent(), /이전 시세/);
+            assert.equal(await id(`${prefix}4-quantity`).textContent(), '0.123456주');
             if (screen === 'wallet') {
               await theme.background(id('wallet-composition'), appearance, 'surface');
               assert.equal(await id(`${prefix}5-value`).textContent(), '-');
               assert.equal(await id(`${prefix}5-return`).textContent(), '-');
+              assert.equal(await id(`${prefix}5-quantity`).textContent(), '0.000805 BTC');
             }
             const layout = await page.evaluate(({ prefix, screen }) => {
               const rows = [...document.querySelectorAll(`[data-testid^="${prefix}"][role="button"]`)];
@@ -83,23 +97,102 @@ async function run() {
                   for (let i = 0; i < node.textContent.length; i++) {
                     if (!node.textContent[i].trim()) continue;
                     const range = document.createRange(); range.setStart(node, i); range.setEnd(node, i + 1);
-                    for (const r of range.getClientRects()) if (r.width && (r.left < box.left - 1 || r.right > box.right + 1 || r.top < box.top - 1 || r.bottom > box.bottom + 1 || r.left < -1 || r.right > innerWidth + 1)) clipped.push({ text: node.textContent, glyph: node.textContent[i], textBox: { left: r.left, right: r.right, top: r.top, bottom: r.bottom }, boundary: { left: box.left, right: box.right, top: box.top, bottom: box.bottom } });
+                    const name = node.parentElement.closest('[data-testid$="-name"]');
+                    for (const r of range.getClientRects()) {
+                      // Asset identity intentionally uses a three-line ellipsis;
+                      // the complete name remains its accessible label. Amount,
+                      // quantity, return and notices must all render in full.
+                      if (name && r.top >= name.getBoundingClientRect().bottom) continue;
+                      if (r.width && (r.left < box.left - 1 || r.right > box.right + 1 || r.top < box.top - 1 || r.bottom > box.bottom + 1 || r.left < -1 || r.right > innerWidth + 1)) clipped.push({ text: node.textContent, glyph: node.textContent[i], textBox: { left: r.left, right: r.right, top: r.top, bottom: r.bottom }, boundary: { left: box.left, right: box.right, top: box.top, bottom: box.bottom } });
+                    }
                   }
                 }
               }
-              return { clipped, heights: rows.map((row) => row.getBoundingClientRect().height), documentWidth: document.documentElement.scrollWidth };
+              const rect = (el) => {
+                const r = el.getBoundingClientRect();
+                return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height };
+              };
+              const metrics = rows.map((row) => {
+                const part = (suffix) => row.querySelector(`[data-testid="${row.dataset.testid}-${suffix}"]`);
+                const style = (el) => {
+                  const css = getComputedStyle(el);
+                  return { fontSize: parseFloat(css.fontSize), fontWeight: css.fontWeight, color: css.color, textAlign: css.textAlign };
+                };
+                // Measure the visible glyph right edge as well as the element box.
+                const glyphRight = (el) => {
+                  const range = document.createRange(); range.selectNodeContents(el);
+                  return Math.max(...[...range.getClientRects()].filter((r) => r.width).map((r) => r.right));
+                };
+                return {
+                  name: { ...rect(part('name')), ...style(part('name')), label: part('name').getAttribute('aria-label'), text: part('name').textContent }, column: rect(part('values')),
+                  ...Object.fromEntries(['value', 'quantity', 'return'].map((suffix) => [suffix, {
+                    ...rect(part(suffix)), ...style(part(suffix)), glyphRight: glyphRight(part(suffix)),
+                  }])),
+                };
+              });
+              const history = screen === 'wallet' ? ['wallet-ledger', 'wallet-orders'].map((testID) => {
+                const el = document.querySelector(`[data-testid="${testID}"]`), css = getComputedStyle(el);
+                return { ...rect(el), padding: css.padding, alignItems: css.alignItems, justifyContent: css.justifyContent,
+                  textAlign: getComputedStyle(el.querySelector('[dir="auto"]')).textAlign };
+              }) : null;
+              return { clipped, metrics, history, heights: rows.map((row) => row.getBoundingClientRect().height), documentWidth: document.documentElement.scrollWidth };
             }, { prefix, screen });
             assert.deepEqual(layout.clipped, [], JSON.stringify({ appearance, preference, width, fontScale, account, long, screen, layout }));
             assert.ok(layout.documentWidth <= width, 'no horizontal overflow');
-            if (!long && fontScale === 1) assert.ok(Math.max(...layout.heights) <= 110, 'compact default rows');
+            for (const row of layout.metrics) {
+              assert.ok(row.name.left < row.column.left, 'identity stays left of the numeric column');
+              assert.ok(row.name.right + 11 <= row.column.left, 'name and numeric column never overlap');
+              assert.ok(row.column.right <= width, 'numeric column stays inside the screen');
+              assert.equal(row.name.fontSize, 16 * fontScale);
+              assert.equal(row.name.label, row.name.text, 'full identity remains accessible after a three-line wrap');
+              assert.ok(row.name.height <= 72 * fontScale + 1, 'long names do not make excessively tall rows');
+              for (const value of [row.value, row.quantity, row.return]) {
+                assert.ok(Math.abs(value.right - row.column.right) < 1, 'all numeric boxes share a right edge');
+                assert.ok(Math.abs(value.glyphRight - row.column.right) < 1, 'visible numeric glyphs share a right edge');
+                assert.equal(value.textAlign, 'right');
+              }
+              assert.ok(row.value.bottom <= row.quantity.top && row.quantity.bottom <= row.return.top, 'value/quantity/return lines never overlap');
+              assert.equal(row.value.fontSize, 18 * fontScale);
+              assert.equal(row.quantity.fontSize, 12 * fontScale);
+              assert.equal(row.return.fontSize, 14 * fontScale);
+              assert.ok(row.value.fontSize > row.return.fontSize && row.return.fontSize > row.quantity.fontSize);
+              assert.equal(row.quantity.fontWeight, '400');
+              assert.notEqual(row.quantity.color, row.value.color, 'quantity uses secondary text');
+              assert.ok(!palette[appearance][preference].includes(row.quantity.color), 'quantity has no financial direction color');
+            }
+            if (layout.history) {
+              const [ledger, orders] = layout.history;
+              assert.ok(Math.abs(ledger.width - orders.width) < 1, 'history buttons have equal rendered widths');
+              assert.equal(ledger.height, orders.height); assert.ok(ledger.height >= 44);
+              assert.equal(ledger.top, orders.top); assert.equal(ledger.padding, orders.padding);
+              for (const button of layout.history) {
+                assert.equal(button.alignItems, 'center'); assert.equal(button.justifyContent, 'center'); assert.equal(button.textAlign, 'center');
+              }
+            }
+            if (!long && fontScale === 1) assert.ok(Math.max(...layout.heights) <= 132, 'compact default rows including wrapped Berkshire identity');
             records.push({ appearance, preference, width, fontScale, account, long, screen, layout });
-            if (width === 390 && fontScale === 1 && account === 'general') await page.screenshot({ path: path.join(out, `${screen}-${appearance}-${preference}-${long}.png`) });
+            if (width === 390 && fontScale === 1 && account === 'general') {
+              await id(`${prefix}0`).evaluate((el) => el.scrollIntoView({ block: 'start' }));
+              await page.screenshot({ path: path.join(out, `${screen}-${appearance}-${preference}-${long}.png`) });
+              if (screen === 'wallet') {
+                await id('wallet-ledger').scrollIntoViewIfNeeded();
+                await page.screenshot({ path: path.join(out, `wallet-history-${appearance}-${preference}-${long}.png`) });
+              }
+            }
+            if (width === 320 && fontScale === 2 && account === 'general' && appearance === 'light' && preference === 'red_blue') {
+              await id(`${prefix}0`).evaluate((el) => el.scrollIntoView({ block: 'start' }));
+              await page.screenshot({ path: path.join(out, `${screen}-320-large-font-${long}.png`) });
+              if (screen === 'wallet') {
+                await id('wallet-ledger').scrollIntoViewIfNeeded();
+                await page.screenshot({ path: path.join(out, `wallet-history-320-large-font-${long}.png`) });
+              }
+            }
           }
 
       for (const screen of ['home', 'wallet']) {
         await page.emulateMedia({ colorScheme: 'light' });
         await open(screen, '&account=general&palette=red_blue');
-        const rate = id(`${screen === 'wallet' ? 'wallet-position' : 'home-position-item'}-general-account-asset-0-return`);
+        const rate = id(`${screen === 'wallet' ? 'wallet-position' : 'home-position-item'}-general-account-asset-1-return`);
         await page.evaluate(() => window.fixture.appearance.setFinancialPreference('green_red'));
         await page.waitForFunction((testID) => getComputedStyle(document.querySelector(`[data-testid="${testID}"]`)).color === 'rgb(22, 128, 58)', await rate.getAttribute('data-testid'));
         assert.equal(await rate.textContent(), '+123.45%');

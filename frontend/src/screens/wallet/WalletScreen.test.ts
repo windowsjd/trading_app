@@ -10,10 +10,12 @@ const find = (tree, testID) => elements(tree).find((node) => node.props.testID =
 
 describe('selected account Wallet and shared Home holdings', () => {
   for (const mode of ['general', 'season']) {
-    it(`${mode} shares the Hero, money/rate rows and preserves preview vs full holdings`, (t) => {
+    it(`${mode} shares the Hero and value/quantity/return rows and preserves preview vs full holdings`, (t) => {
       const h = createHomeHarness(mode); t.after(h.close);
       h.seed(h.account, { points: [] });
-      const positions = Array.from({ length: 7 }, (_, i) => holding(String(i)));
+      const positions = Array.from({ length: 7 }, (_, i) => holding(String(i), { quantity: '10.000000' }));
+      Object.assign(positions[1], { name: 'Apple', assetType: 'us_stock', symbol: 'AAPL', quantity: '0.125000' });
+      Object.assign(positions[2], { name: 'Bitcoin', assetType: 'crypto', market: 'BINANCE', symbol: 'BTCUSDT', quantity: '0.00080500' });
       h.client.setQueryData(QUERY_KEYS.tradingAccount.wallets(h.account.id), {
         tradingAccountId: h.account.id, wallets: [
           { currencyCode: 'KRW', balance: '9900000' }, { currencyCode: 'USD', balance: '50.39' },
@@ -24,11 +26,18 @@ describe('selected account Wallet and shared Home holdings', () => {
       const home = h.render().tree, wallet = h.renderWallet().tree;
       assert.equal(text(find(home, 'home-summary-card')), text(find(wallet, 'home-summary-card')));
       assert.equal(text(find(home, 'home-position-item-0')), text(find(wallet, 'wallet-position-0')));
+      for (const [index, quantity] of ['10주', '0.125주', '0.000805 BTC'].entries()) {
+        assert.equal(find(home, `home-position-item-${index}-quantity`).props.children, quantity);
+        assert.equal(find(wallet, `wallet-position-${index}-quantity`).props.children, quantity);
+        for (const part of ['name', 'value', 'quantity', 'return']) {
+          assert.equal(find(home, `home-position-item-${index}-${part}`).props.children, find(wallet, `wallet-position-${index}-${part}`).props.children);
+        }
+      }
       assert.equal(elements(home, 'Pressable').filter((row) => row.props.testID?.startsWith('home-position-item-')).length, 5);
       assert.equal(elements(wallet, 'Pressable').filter((row) => row.props.testID?.startsWith('wallet-position-')).length, 7);
       assert.match(text(wallet), /9,900,000원/); assert.match(text(wallet), /\$50.39/);
-      assert.doesNotMatch(text(home), /자산 구성|지갑 요약|보유 수량|평균 매입가|현재가/);
-      assert.doesNotMatch(text(wallet), /보유 수량|평균 매입가|현재가/);
+      assert.doesNotMatch(text(home), /자산 구성|지갑 요약|평균 매입가|현재가|987,654|80,000/);
+      assert.doesNotMatch(text(wallet), /평균 매입가|현재가|987,654|80,000/);
       const nodes = elements(wallet);
       assert.ok(nodes.indexOf(find(wallet, 'home-summary-card')) < nodes.indexOf(find(wallet, 'wallet-exchange')));
       assert.ok(nodes.indexOf(find(wallet, 'wallet-exchange')) < nodes.indexOf(find(wallet, 'wallet-composition')));
@@ -83,6 +92,8 @@ describe('selected account Wallet and shared Home holdings', () => {
     assert.match(text(find(tree, 'wallet-cash-USD')), /-/);
     assert.equal(find(tree, 'wallet-position-unavailable-value').props.children, '-');
     assert.equal(find(tree, 'wallet-position-unavailable-return').props.children, '-');
+    assert.equal(find(tree, 'wallet-position-unavailable-quantity').props.children, '0.123457주');
+    assert.equal(find(tree, 'wallet-position-stale-quantity').props.children, '0.123457주');
     assert.match(text(find(tree, 'wallet-position-stale')), /1,120,000원.*\+4.82%.*이전 시세/);
     assert.doesNotMatch(text(tree), /internal/);
   });

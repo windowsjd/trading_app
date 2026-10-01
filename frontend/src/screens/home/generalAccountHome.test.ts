@@ -24,7 +24,7 @@ describe('GeneralAccountHome independent financial reads', () => {
     assert.ok(!source.includes('positionsQuery.data?.positions ?? []'));
     assert.match(source, /!positions[\s\S]*보유 종목을 확인할 수 없습니다/u);
     assert.match(source, /<PositionAssetRow/u);
-    assert.doesNotMatch(source, /보유 수량|평균 매입가|현재가/u);
+    assert.doesNotMatch(source, /평균 매입가|현재가/u);
   });
 
   it('does not render raw portfolio exception messages', () => {

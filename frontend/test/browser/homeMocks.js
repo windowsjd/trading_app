@@ -88,14 +88,15 @@ export const apiClient = {
       const total = params.has('holdings') ? (params.has('many') ? 207 : 7) : 0;
       const positions = Array.from({ length: Math.min(limit, total - offset) }, (_, index) => {
         const i = offset + index, currency = i % 3 === 0 ? 'KRW' : 'USD';
+        const hierarchy = params.get('positionFixtures') === 'hierarchy';
         const available = { state: 'available', currentPrice: '1', priceCurrency: currency,
-          positionValue: long ? currency === 'KRW' ? '1234567890123456' : '1234567890123.45' : ['1120000', '530.25', '146.88'][i % 3],
-          positionValueKrw: '9999999', returnRate: ['123.45', '-99.12', '0'][i % 3],
+          positionValue: long ? currency === 'KRW' ? '1234567890123456' : '1234567890123.45' : hierarchy ? ['1120000', '123456.78', '123456.78'][i % 3] : ['1120000', '530.25', '146.88'][i % 3],
+          positionValueKrw: '9999999', returnRate: hierarchy ? ['4.82', '123.45', '-99.12', '0'][i % 4] : ['123.45', '-99.12', '0'][i % 3],
           unrealizedPnl: '10', unrealizedPnlKrw: '10', priceSource: null };
         return { positionId: `${account.id}-position-${i}`, assetId: `${account.id}-asset-${i}`, symbol: ['005930', 'AAPL', 'BTCUSDT'][i % 3],
-          name: long ? '대한민국 미래산업 우량주 투자기업 우선주 ABCDEFGHIJKLMNOPQRSTUVWXYZ' : ['삼성전자', 'Apple', 'Bitcoin'][i % 3],
+          name: long ? '대한민국 미래산업 우량주 투자기업 우선주 ABCDEFGHIJKLMNOPQRSTUVWXYZ' : hierarchy ? ['삼성전자', 'Berkshire Hathaway Class B', 'Bitcoin'][i % 3] : ['삼성전자', 'Apple', 'Bitcoin'][i % 3],
           assetType: ['domestic_stock', 'us_stock', 'crypto'][i % 3], market: ['KRX', 'NASDAQ', 'BINANCE'][i % 3],
-          currencyCode: currency, quantity: '0.00080500', averageCost: '999999',
+          currencyCode: currency, quantity: hierarchy ? ['10.000000', '0.12345600', '0.00080500'][i % 3] : '0.00080500', averageCost: '999999',
           valuation: i === 4 ? { ...available, state: 'stale_cache' } : i === 5 ? { state: 'unavailable', reason: 'ASSET_PRICE_UNAVAILABLE', message: 'internal' } : available };
       });
       return response({ state: 'available', tradingAccountId: account.id, positions,

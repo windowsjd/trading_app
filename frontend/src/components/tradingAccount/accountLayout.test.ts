@@ -187,10 +187,11 @@ describe('the styles long text depends on are present', () => {
     const hero = read('screens/home/HomeAssetHero.tsx');
     assert.match(hero, /total:\s*\{[^}]*flexShrink:\s*1/s);
     assert.match(hero, /total:\s*\{[^}]*lineHeight/s);
-    // The shared asset row gives identity and values separate lines.
+    // The shared asset row keeps identity beside a wrapping numeric column.
     assert.match(source, /<PositionAssetRow/);
     assert.match(read('components/tradingAccount/PositionAssetRow.tsx'), /value:\s*\{[^}]*minWidth:\s*0/s);
-    assert.match(read('components/tradingAccount/PositionAssetRow.tsx'), /flexWrap: 'wrap'/);
+    assert.match(read('components/tradingAccount/PositionAssetRow.tsx'), /columns:\s*\{[^}]*flexDirection:\s*'row'/s);
+    assert.match(read('components/tradingAccount/PositionAssetRow.tsx'), /values:\s*\{[^}]*flexShrink:\s*1/s);
     assert.ok(!/numberOfLines=\{/.test(source));
   });
 
@@ -207,7 +208,8 @@ describe('the styles long text depends on are present', () => {
     assert.match(source, /flex:\s*\{[^}]*minWidth:\s*0/s);
     assert.match(source, /<PositionAssetRow/);
     assert.match(read('components/tradingAccount/PositionAssetRow.tsx'), /value:\s*\{[^}]*minWidth:\s*0/s);
-    assert.match(read('components/tradingAccount/PositionAssetRow.tsx'), /flexWrap: 'wrap'/);
+    assert.match(read('components/tradingAccount/PositionAssetRow.tsx'), /columns:\s*\{[^}]*flexDirection:\s*'row'/s);
+    assert.match(read('components/tradingAccount/PositionAssetRow.tsx'), /values:\s*\{[^}]*flexShrink:\s*1/s);
     assert.ok(!/numberOfLines=\{/.test(source));
   });
 

@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { getPositionAssetDisplay } from './assetDisplay.ts';
 import { holding } from '../../../test/positionFixture.ts';
+import { HoldingsContractError } from '../tradingAccount/holdings.ts';
 
 describe('Home/Wallet holding value and unrealized return', () => {
   it('uses the complete local valuation and canonical return, regardless of quantity/cost/price', () => {
     assert.deepEqual(getPositionAssetDisplay(holding()), {
-      name: '삼성전자', value: '1,120,000원', returnRate: '+4.82%', direction: 'rise', notice: null,
+      name: '삼성전자', value: '1,120,000원', quantity: '0.123457주', returnRate: '+4.82%', direction: 'rise', notice: null,
     });
   });
   for (const assetType of ['us_stock', 'crypto', 'domestic_stock']) {
@@ -35,12 +36,56 @@ describe('Home/Wallet holding value and unrealized return', () => {
     const position = holding();
     Object.assign(position.valuation, { state: 'stale_cache', message: 'internal diagnostic' });
     assert.equal(getPositionAssetDisplay(position).value, '1,120,000원');
+    assert.equal(getPositionAssetDisplay(position).quantity, '0.123457주');
     assert.match(getPositionAssetDisplay(position).notice!, /이전 시세/);
     position.valuation = { state: 'unavailable', reason: 'ASSET_PRICE_UNAVAILABLE', message: 'internal diagnostic' };
     const display = getPositionAssetDisplay(position);
     assert.equal(display.value, '-');
     assert.equal(display.returnRate, '-');
+    assert.equal(display.quantity, '0.123457주');
     assert.equal(display.direction, 'neutral');
     assert.doesNotMatch(JSON.stringify(display), /internal diagnostic/);
   });
+
+  for (const assetType of ['domestic_stock', 'us_stock'] as const) {
+    for (const [quantity, expected] of [
+      ['10.000000', '10주'], ['3.500000', '3.5주'], ['0.125000', '0.125주'],
+      ['0.123456', '0.123456주'], ['0.12345678', '0.123457주'],
+      ['9.9999999', '10주'], ['12345678901234567890.1234567', '12345678901234567890.123457주'],
+    ]) {
+      it(`${assetType} formats ${quantity} for display without changing position facts`, () => {
+        const position = holding('quantity', { quantity, assetType });
+        const original = structuredClone(position);
+        assert.equal(getPositionAssetDisplay(position).quantity, expected);
+        assert.deepEqual(position, original);
+      });
+    }
+  }
+  for (const [symbol, quantity, expected] of [
+    ['BTCUSDT', '0.00080500', '0.000805 BTC'],
+    ['ETHUSDT', '1.25000000', '1.25 ETH'],
+    ['1INCHUSDT', '0.12345678', '0.123457 1INCH'],
+    ['币安人生USDT', '3.50000000', '3.5 币安人生'],
+    ['BTC', '0.00080500', '0.000805 BTC'],
+  ]) {
+    it(`derives the crypto quantity unit from ${symbol}`, () => {
+      const position = holding('crypto', { assetType: 'crypto', market: 'BINANCE', symbol, quantity });
+      assert.equal(getPositionAssetDisplay(position).quantity, expected);
+      assert.equal(position.quantity, quantity);
+    });
+  }
+  it('keeps non-Binance crypto symbols intact instead of inferring a trading pair', () => {
+    assert.equal(getPositionAssetDisplay(holding('crypto', {
+      assetType: 'crypto', market: 'OTHER', symbol: 'ETH', quantity: '1.25',
+    })).quantity, '1.25 ETH');
+  });
+  for (const state of ['available', 'stale_cache', 'unavailable']) {
+    it(`${state} does not turn malformed quantities into valid holdings`, () => {
+      for (const quantity of ['-1', 'NaN', 'Infinity', '1e-6', '', null, 'invalid']) {
+        const position = holding('invalid', { quantity });
+        Object.assign(position.valuation, { state });
+        assert.throws(() => getPositionAssetDisplay(position), HoldingsContractError);
+      }
+    });
+  }
 });
