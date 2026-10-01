@@ -7,8 +7,6 @@ import { stackTransition } from './transitionPolicy';
 import type { HomeStackParamList } from './types';
 import HomeScreen from '../../screens/home/HomeScreen';
 import PortfolioScreen from '../../screens/home/PortfolioScreen';
-import WalletTransactionsScreen from '../../screens/home/WalletTransactionsScreen';
-import WalletFxScreen from '../../screens/wallet/WalletFxScreen';
 
 const Stack = createNativeStackNavigator<HomeStackParamList>();
 
@@ -25,16 +23,6 @@ export default function HomeStack() {
         name="Portfolio"
         component={PortfolioScreen}
         options={{ title: '포트폴리오' }}
-      />
-      <Stack.Screen
-        name="WalletFx"
-        component={WalletFxScreen}
-        options={{ title: '지갑 / 환전' }}
-      />
-      <Stack.Screen
-        name="WalletTransactions"
-        component={WalletTransactionsScreen}
-        options={{ title: '지갑 원장' }}
       />
     </Stack.Navigator>
   );

@@ -14,7 +14,7 @@ test('native push has a short iOS duration, Android direction and reverse native
 });
 
 test('all stacks share push policy and chart keeps fullscreen modal presentation', () => {
-  for (const name of ['AuthStack', 'HomeStack', 'MarketStack', 'GuideStack', 'RankingStack', 'RecordStack', 'MyStack']) {
+  for (const name of ['AuthStack', 'HomeStack', 'MarketStack', 'GuideStack', 'RankingStack', 'RecordStack', 'WalletStack', 'MyStack']) {
     const source = readFileSync(resolve('src/app/navigation', `${name}.tsx`), 'utf8');
     assert.match(source, /stackTransition\(reducedMotion, Platform\.OS\)/);
   }

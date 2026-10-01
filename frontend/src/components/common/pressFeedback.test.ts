@@ -364,7 +364,7 @@ describe('touch coverage and exclusions', () => {
       'components/charts/ChartTimeframeSelector.tsx',
       'components/states/ErrorState.tsx', 'features/market/MarketAssetRow.tsx',
       'screens/auth/LoginScreen.tsx', 'screens/auth/SignupScreen.tsx',
-      'screens/home/GeneralAccountHome.tsx', 'screens/home/SeasonAccountHome.tsx',
+      'components/tradingAccount/PositionAssetRow.tsx', 'screens/wallet/WalletScreen.tsx',
       'screens/market/MarketScreen.tsx', 'screens/market/MarketSearchScreen.tsx',
       'screens/ranking/RankingScreen.tsx', 'screens/my/MyScreen.tsx',
       'screens/order/OrderPanel.tsx', 'screens/wallet/WalletFxScreen.tsx',

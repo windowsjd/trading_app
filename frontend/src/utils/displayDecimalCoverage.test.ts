@@ -33,13 +33,11 @@ describe('app-wide decimal display coverage', () => {
   });
 
   it('formats USD wallet balances and generic chart labels consistently', () => {
-    const generalHome = read('screens/home/GeneralAccountHome.tsx');
-    const seasonHome = read('screens/home/SeasonAccountHome.tsx');
+    const wallet = read('screens/wallet/WalletScreen.tsx');
     const lineChart = read('components/charts/LineChart.tsx');
     const donutChart = read('components/charts/DonutChart.tsx');
 
-    assert.match(generalHome, /formatUsd\(usdBalance\)/u);
-    assert.match(seasonHome, /formatUsd\(usdBalance\)/u);
+    assert.match(wallet, /formatMoney\(getKnownWalletBalanceAmount/u);
     assert.match(lineChart, /formatDisplayDecimal\(value\.toFixed\(2\)\)/u);
     assert.match(donutChart, /formatPercent\(percentage, 1\)/u);
   });

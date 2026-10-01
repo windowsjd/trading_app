@@ -97,3 +97,18 @@ closed/open/unknown/crypto sessions, missing change rates, Settings restore and 
 and instant repaint of memoized rows/candles, order sides and bid/ask accents.
 Artifacts go to `/tmp/trading-profile-financial-browser` (override
 `PROFILE_FINANCIAL_BROWSER_OUTPUT`). External requests remain blocked.
+
+Run `NODE_PATH=/path/to/browser-tools/node_modules node test/browser/walletBrowser.cjs`
+for the Wallet tab and the shared Home holdings. It checks 384 layouts:
+320/360/390/430px × Light/Dark × Red/Blue/Green/Red × font scale 1/1.5/2 ×
+General/Season × normal/long text × Home/Wallet. Visible glyph measurements
+cover long asset names, large local KRW/USD values, +123.45% and -99.12%.
+It also checks stale/unavailable rows, live palette changes, all 207 positions
+across three API pages, and delayed outgoing responses on account switching.
+The navigation fixture uses installed React Navigation and production MainTabs,
+WalletStack, MyStack and RecordStack to exercise both five-tab modes, Home/Wallet
+FX entry, ledger, Wallet orders, back paths, Overall → Record and every Record
+detail destination. Only transport and the root-navigation adapter are mocked.
+Use `--navigation-only` to debug those routes without repeating layouts.
+Artifacts go to `/tmp/trading-wallet-browser` (override `WALLET_BROWSER_OUTPUT`).
+All external requests are blocked; Android/iOS device checks remain separate.

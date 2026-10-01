@@ -4,6 +4,7 @@ import { Platform } from '../../theme/native';
 import { useReducedMotion } from '../../theme/useReducedMotion';
 import { stackTransition } from './transitionPolicy';
 
+import RecordStack from './RecordStack';
 import type { MyStackParamList } from './types';
 import OverallScreen from '../../screens/my/OverallScreen';
 import NoticesScreen from '../../screens/my/NoticesScreen';
@@ -24,6 +25,7 @@ export default function MyStack() {
         component={OverallScreen}
         options={{ title: '전체' }}
       />
+      <Stack.Screen name="Record" component={RecordStack} options={{ headerShown: false }} />
       <Stack.Screen
         name="Friends"
         component={FriendsScreen}

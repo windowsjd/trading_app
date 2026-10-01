@@ -38,8 +38,7 @@ describe('Home asset hierarchy and real portfolio/ranking/me sources', () => {
       assert.equal(total.props.children.join(''), '10,001,000원');
       assert.ok(total.props.style.fontSize > 26);
       assert.ok(texts(tree).includes('-2,345'));
-      assert.ok(texts(tree).includes('1,234'));
-      const detail = textNodes.find((node) => texts(node) === '자산 구성');
+      const detail = textNodes.find((node) => texts(node) === '보유 종목');
       assert.ok(textNodes.indexOf(total) < textNodes.indexOf(detail));
       const nickname = textNodes.find((node) => node.props.testID === TEST_IDS.home.nickname);
       const rank = textNodes.find((node) => node.props.testID === TEST_IDS.home.rank);
@@ -133,7 +132,7 @@ describe('home exchange shortcut', () => {
       const button = h.renderCta(actions[0]);
       assert.equal(button.props.disabled, false);
       button.props.onPress();
-      assert.deepEqual(h.navigation, [['WalletFx']]);
+      assert.deepEqual(h.navigation, [['MainTabs', { screen: 'WalletTab', params: { screen: 'WalletFx', initial: false } }]]);
 
       h.renderFx();
       const queries = h.fxQueries.filter(
@@ -191,15 +190,16 @@ describe('home exchange shortcut', () => {
         assert.ok(texts(tree).includes(
           getCapabilityBlockMessage(caps, caps.exchangeBlockReason),
         ));
+        const walletTree = h.renderWallet().tree;
         for (const label of ['원장 보기', '주문 내역 보기']) {
-          const button = elements(tree, 'Pressable').find(
+          const button = elements(walletTree, 'Pressable').find(
             (node) => texts(node) === label,
           );
           assert.ok(button);
           button.props.onPress();
         }
         assert.equal(h.navigation[0][0], 'WalletTransactions');
-        assert.equal(h.navigation[1][1].params.params.accountId, h.account.id);
+        assert.equal(h.navigation[1][1].params.params.params.accountId, h.account.id);
       });
     }
 
@@ -275,7 +275,7 @@ describe('home exchange shortcut', () => {
       );
       if (actions.length) {
         h.renderCta(actions[0]).props.onPress();
-        assert.deepEqual(h.navigation.at(-1), ['WalletFx']);
+        assert.deepEqual(h.navigation.at(-1), ['MainTabs', { screen: 'WalletTab', params: { screen: 'WalletFx', initial: false } }]);
         h.renderFx();
         const wallets = h.fxQueries.find(
           (query) => query.queryKey.includes('wallets'),
@@ -293,7 +293,7 @@ describe('home exchange shortcut', () => {
 
 describe('general/season home API, queries, rendering and navigation integration', () => {
   for (const mode of ['general', 'season']) {
-    it(`${mode} has both charts, wallet ledger, orders, positions and its unique features`, async () => {
+    it(`${mode} keeps both charts, positions and reachable wallet history and its unique features`, async () => {
       const h = createHomeHarness(mode);
       h.seed(h.account, fixture[mode].data);
       const { tree, chart, branch } = h.render();
@@ -301,9 +301,6 @@ describe('general/season home API, queries, rendering and navigation integration
       for (const label of [
         '자산 배분',
         '자산 추이',
-        '지갑 요약',
-        '원장 보기',
-        '주문 내역 보기',
         '보유 종목',
       ])
         assert.ok(text.includes(label), label);
@@ -342,22 +339,23 @@ describe('general/season home API, queries, rendering and navigation integration
         line.props.pointValueFormatter(line.props.points[1]),
         '10,001,000원',
       );
-      const button = elements(tree, 'Pressable').find(
+      const homeQueries = h.queries;
+      const button = elements(h.renderWallet().tree, 'Pressable').find(
         (node) => texts(node) === '주문 내역 보기',
       );
       button.props.onPress();
       assert.deepEqual(h.navigation.at(-1), [
         'MainTabs',
         {
-          screen: 'RecordTab',
-          params: {
-            screen: 'RecordOrderList',
+          screen: 'MyTab',
+          params: { screen: 'Record', initial: false, params: {
+            screen: 'RecordOrderList', initial: false,
             params: { accountId: h.account.id },
-          },
+          } },
         },
       ]);
       assert.equal(branch.key, h.account.id);
-      const query = h.queries.find((query) =>
+      const query = homeQueries.find((query) =>
         query.queryKey.includes('equity'),
       );
       h.response = fixture[mode];
@@ -403,11 +401,6 @@ describe('general/season home API, queries, rendering and navigation integration
         const next = h.render();
         assert.equal(next.chart, null);
         assert.equal(elements(next.tree, 'SectionSkeleton').length, 1);
-        next.branch.props.onOpenOrders();
-        assert.equal(
-          h.navigation.at(-1)[1].params.params.accountId,
-          h.account.id,
-        );
         assert.ok(
           h.queries
             .filter((query) => query.queryKey[0] === 'tradingAccount')
@@ -537,17 +530,17 @@ describe('general/season home API, queries, rendering and navigation integration
   }
 });
 
-describe('home button through destination RecordOrderList account lookup and API', () => {
+describe('wallet button through destination RecordOrderList account lookup and API', () => {
   for (const mode of ['general', 'season']) {
     it(`${mode} can actually load the explicitly selected account orders at the destination`, async () => {
       const h = createHomeHarness(mode);
       h.seed(h.account, fixture[mode].data);
-      const home = h.render();
-      const orderButton = elements(home.tree, 'Pressable').find(
+      const wallet = h.renderWallet();
+      const orderButton = elements(wallet.tree, 'Pressable').find(
         (node) => texts(node) === '주문 내역 보기',
       );
       orderButton.props.onPress();
-      const scope = h.navigation.at(-1)[1].params.params;
+      const scope = h.navigation.at(-1)[1].params.params.params;
       h.renderOrders(scope, [h.account, { ...h.account, id: 'other-account' }]);
       assert.equal(h.orderQuery.enabled, true);
       assert.ok(h.orderQuery.queryKey.includes(h.account.id));

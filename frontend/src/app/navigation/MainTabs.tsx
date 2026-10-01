@@ -14,7 +14,7 @@ import HomeStack from './HomeStack';
 import MarketStack from './MarketStack';
 import GuideStack from './GuideStack';
 import RankingStack from './RankingStack';
-import RecordStack from './RecordStack';
+import WalletStack from './WalletStack';
 import MyStack from './MyStack';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -100,12 +100,12 @@ export default function MainTabs() {
         />
       )}
       <Tab.Screen
-        name="RecordTab"
-        component={RecordStack}
+        name="WalletTab"
+        component={WalletStack}
         options={{
-          title: '전적',
+          title: '지갑',
           tabBarIcon: ({ color, size, focused }) => (
-            <TabBarIcon focused={focused} name="record" color={color} size={size} />
+            <TabBarIcon focused={focused} name="wallet" color={color} size={size} />
           ),
         }}
       />

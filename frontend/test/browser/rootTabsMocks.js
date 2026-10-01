@@ -5,6 +5,7 @@ export { navigation, transport };
 export const useRootNavigation = () => navigation;
 const params = new URLSearchParams(location.search);
 const long = params.get('long') === '1';
+if (params.has('navigation')) transport.accounts[0].season.seasonId = 'record-0';
 navigation.reset = (...args) => navigation.calls.push(['reset', ...args]);
 const response = (data) => ({ data: { success: true, data } });
 const pagination = (offset, limit, total) => ({
@@ -16,7 +17,7 @@ export const useMarketTickers = () => tickerSnapshot;
 
 export const apiClient = {
   async post() { return response({}); },
-  async get(path) {
+  async get(path, config) {
     const url = new URL(path, 'https://fixture.invalid');
     const offset = Number(url.searchParams.get('offset') ?? 0);
     const limit = Number(url.searchParams.get('limit') ?? 20);
@@ -58,6 +59,23 @@ export const apiClient = {
         finalTier: long ? 'Gold 대한민국 특별 경쟁 등급' : 'Gold', finalReturnRate: '4.82',
       })) });
     }
-    return homeClient.get(path);
+    if (params.has('navigation')) {
+      transport.requests.push(path);
+      if (url.pathname === '/records/me/seasons/record-0') return response({
+        state: 'available', season: { id: 'record-0', name: 'Season 1', status: 'active', startAt: '2026-09-01T00:00:00Z', endAt: '2099-01-01T00:00:00Z' },
+        participant: { finalRank: 2, finalTier: 'Silver' },
+        performance: { state: 'available', totalAssetKrw: '9648192', returnRate: '-3.52', maxDrawdown: '0' },
+        activitySummary: { orders: { total: 0, submitted: 0, executed: 0, canceled: 0, rejected: 0 }, exchanges: { total: 0 }, walletTransactions: { total: 0 }, positions: { open: 7 } },
+        profitAnalysis: { state: 'available', totalRealizedPnlKrw: '0', totalUnrealizedPnlKrw: '0', totalPnlKrw: '0', items: [], bestAsset: null, worstAsset: null, valuationErrors: [] },
+      });
+      if (url.pathname === '/records/me/seasons/record-0/equity') return response({ state: 'empty', seasonId: 'record-0', points: [], pagination: pagination(0, 500, 0) });
+      if (url.pathname === '/records/me/seasons/record-0/exchanges') return response({ items: [], pagination: pagination(0, 20, 0) });
+      if (/^\/trading-accounts\/[^/]+\/orders$/.test(path)) return response({ state: 'available', tradingAccountId: path.split('/')[2], orders: [], pagination: pagination(0, 20, 0) });
+      if (/^\/trading-accounts\/[^/]+\/wallet-transactions$/.test(path)) return response({ tradingAccountId: path.split('/')[2], filters: { currency: config?.params?.currency ?? null, direction: config?.params?.direction ?? null, txType: config?.params?.txType ?? null }, transactions: [], pagination: pagination(0, 20, 0) });
+      const account = transport.accounts.find((a) => path === `/trading-accounts/${a.id}`);
+      if (account) return response(account);
+      if (url.pathname === '/fx/rates/current') return response({ state: 'unavailable' });
+    }
+    return homeClient.get(path, config);
   },
 };

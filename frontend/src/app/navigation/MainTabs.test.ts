@@ -59,7 +59,7 @@ function renderTabs(mode: AccountMode | null, isLoading = false, appearance: 'li
       }),
     },
     ...Object.fromEntries(
-      ['Home', 'Market', 'Guide', 'Ranking', 'Record', 'My'].map((name) => [
+      ['Home', 'Market', 'Guide', 'Ranking', 'Wallet', 'My'].map((name) => [
         `./${name}Stack`,
         { default: `${name}Stack`, __esModule: true },
       ]),
@@ -91,7 +91,7 @@ describe('mode-aware bottom tabs', () => {
       ['HomeTab', 'HomeStack', '홈', 'home'],
       ['MarketTab', 'MarketStack', '마켓', 'market'],
       ['GuideTab', 'GuideStack', '가이드', 'guide'],
-      ['RecordTab', 'RecordStack', '전적', 'record'],
+      ['WalletTab', 'WalletStack', '지갑', 'wallet'],
       ['MyTab', 'MyStack', '전체', 'menu'],
     ]);
   });
@@ -101,7 +101,7 @@ describe('mode-aware bottom tabs', () => {
       ['HomeTab', 'HomeStack', '홈', 'home'],
       ['MarketTab', 'MarketStack', '마켓', 'market'],
       ['RankingTab', 'RankingStack', '랭킹', 'ranking'],
-      ['RecordTab', 'RecordStack', '전적', 'record'],
+      ['WalletTab', 'WalletStack', '지갑', 'wallet'],
       ['MyTab', 'MyStack', '전체', 'menu'],
     ]);
   });
@@ -151,7 +151,7 @@ describe('bottom tab icon contract', () => {
     assert.match(icons, /import Svg, \{ Circle, Path \} from 'react-native-svg'/);
     assert.deepEqual(
       [...new Set([...icons.matchAll(/case '(\w+)':/g)].map((match) => match[1]))],
-      ['home', 'market', 'guide', 'ranking', 'record', 'menu', 'profile'],
+      ['home', 'market', 'guide', 'ranking', 'wallet', 'record', 'menu', 'profile'],
     );
     assert.match(icons, /width=\{size\}\s+height=\{size\}/);
     assert.match(icons, /viewBox="0 0 24 24"/);
@@ -195,7 +195,7 @@ describe('bottom tab visual states', () => {
       'react-native': { View: 'View' },
       'react-native-svg': { default: 'Svg', Circle: 'Circle', Path: 'Path', __esModule: true },
     }).default;
-    for (const name of ['home', 'market', 'guide', 'ranking', 'record', 'menu']) {
+    for (const name of ['home', 'market', 'guide', 'ranking', 'wallet', 'record', 'menu']) {
       const active = elements(Icon({ name, color: '#ffffff', size: 25, focused: true }), 'Svg')[0];
       const inactive = elements(Icon({ name, color: '#aebbc8', size: 25, focused: false }), 'Svg')[0];
       assert.equal(active.props.fill, '#ffffff'); assert.equal(active.props.stroke, 'none');

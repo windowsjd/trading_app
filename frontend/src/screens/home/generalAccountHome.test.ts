@@ -9,29 +9,22 @@ const source = readFileSync(
 );
 
 describe('GeneralAccountHome independent financial reads', () => {
-  it('does not gate wallet or position queries on portfolio availability', () => {
+  it('does not gate position queries on portfolio availability', () => {
     assert.match(source, /getTradingAccountPortfolio\(accountId\)/u);
-    assert.match(source, /getTradingAccountWallets\(accountId\)/u);
     assert.match(source, /getTradingAccountPositions\(accountId/u);
     assert.ok(!source.includes('enabled: available'));
     assert.ok(!source.includes('enabled: portfolioAvailable'));
   });
 
-  it('renders loading and error branches before reading wallet amounts', () => {
-    assert.match(source, /walletsQuery\.isLoading[\s\S]*SectionSkeleton/u);
-    assert.match(
-      source,
-      /walletsQuery\.isError[\s\S]*지갑 요약을 불러오지 못했습니다/u,
-    );
-    assert.match(source, /getKnownWalletBalanceAmount/u);
-    assert.ok(!source.includes('getWalletBalanceAmount(walletsQuery.data'));
+  it('moves cash and history to Wallet instead of repeating its cards', () => {
+    assert.doesNotMatch(source, /walletsQuery|지갑 요약|자산 구성|onOpenLedger|onOpenOrders/u);
   });
 
   it('does not turn missing position query data into an empty list', () => {
     assert.ok(!source.includes('positionsQuery.data?.positions ?? []'));
     assert.match(source, /!positions[\s\S]*보유 종목을 확인할 수 없습니다/u);
-    assert.match(source, /getPositionDisplay\(position\)/u);
-    assert.match(source, /시세 조회 불가/u);
+    assert.match(source, /<PositionAssetRow/u);
+    assert.doesNotMatch(source, /보유 수량|평균 매입가|현재가/u);
   });
 
   it('does not render raw portfolio exception messages', () => {

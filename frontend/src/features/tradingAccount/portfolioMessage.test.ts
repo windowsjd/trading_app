@@ -38,7 +38,7 @@ describe('portfolio user message', () => {
     const serialized = JSON.stringify(notice);
 
     assert.equal(notice?.title, '일부 시세 조회 불가');
-    assert.match(notice?.message ?? '', /현금 잔액과 보유 수량/);
+    assert.match(notice?.message ?? '', /현금 잔액과 보유 종목/);
     assert.ok(!serialized.includes('Asset price snapshot'));
     assert.ok(!serialized.includes('f1bda54a'));
     assert.ok(!serialized.includes('effective_at_'));

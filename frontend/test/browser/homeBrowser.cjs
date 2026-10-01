@@ -188,14 +188,10 @@ async function run() {
     assert.equal(await id('home-total-asset').textContent(), '12,530,200원');
     assert.equal(await id('home-competition').count(), 0);
     assert.match(await id('home-summary-card').textContent(), /시간가중 수익률 4\.82%/);
-    await page.getByText('원장 보기', { exact: true }).click();
-    await page.getByText('주문 내역 보기', { exact: true }).click();
     await page.getByText('환전하기', { exact: true }).click();
     const calls = await page.evaluate(() => window.fixture.navigation.calls);
     assert.deepEqual(calls, [
-      ['WalletTransactions'],
-      ['MainTabs', { screen: 'RecordTab', params: { screen: 'RecordOrderList', params: { accountId: 'general-account' } } }],
-      ['WalletFx'],
+      ['MainTabs', { screen: 'WalletTab', params: { screen: 'WalletFx', initial: false } }],
     ]);
     await page.evaluate(() => window.fixture.appearance.setPreference('light'));
     await page.waitForFunction(() => document.documentElement.style.colorScheme === 'light');

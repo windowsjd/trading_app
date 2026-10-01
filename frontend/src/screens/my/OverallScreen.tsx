@@ -9,6 +9,7 @@ import ActionPressable from '../../components/common/ActionPressable';
 const menus = [
   { route: 'My', title: 'MY' },
   { route: 'Friends', title: '친구' },
+  { route: 'Record', title: '전적' },
   { route: 'Notices', title: '공지사항' },
   { route: 'Settings', title: '설정' },
 ] as const;

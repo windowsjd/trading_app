@@ -78,10 +78,10 @@ export default function HomeScreen({ navigation }: Props) {
     );
   }
 
-  const openOrders = () =>
+  const openFx = () =>
     rootNavigation.navigate('MainTabs', {
-      screen: 'RecordTab',
-      params: { screen: 'RecordOrderList', params: { accountId: selectedAccount.id } },
+      screen: 'WalletTab',
+      params: { screen: 'WalletFx', initial: false },
     });
 
   const openAsset = (assetId: string) =>
@@ -104,18 +104,15 @@ export default function HomeScreen({ navigation }: Props) {
             key={selectedAccount.id}
             account={selectedAccount}
             capabilities={capabilities}
-            onOpenLedger={() => navigation.navigate('WalletTransactions')}
-            onOpenOrders={openOrders}
-            onOpenFx={() => navigation.navigate('WalletFx')}
+            onOpenAsset={openAsset}
+            onOpenFx={openFx}
           />
         ) : (
           <SeasonAccountHome
             key={selectedAccount.id}
-            onOpenOrders={openOrders}
             account={selectedAccount}
             capabilities={capabilities}
-            onOpenLedger={() => navigation.navigate('WalletTransactions')}
-            onOpenFx={() => navigation.navigate('WalletFx')}
+            onOpenFx={openFx}
             onOpenReward={() =>
               rootNavigation.navigate('MainTabs', {
                 screen: 'MyTab',

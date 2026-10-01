@@ -41,7 +41,7 @@ function createHomeHarness(mode = 'general') {
         apiClient: {
           get: async (path, config) => {
             h.requests.push({ path, ...config });
-            return { data: h.response };
+            return { data: typeof h.response === 'function' ? h.response(path, config) : h.response };
           },
         },
       },
@@ -122,6 +122,22 @@ function createHomeHarness(mode = 'general') {
   };
   let observers = [];
   const hero = load(resolve(__dirname, '../src/screens/home/HomeAssetHero.tsx'), mocks).default;
+  const positionRow = load(resolve(__dirname, '../src/components/tradingAccount/PositionAssetRow.tsx'), mocks).default;
+  mocks['../../components/tradingAccount/PositionAssetRow'] = { default: positionRow, __esModule: true };
+  mocks['../home/HomeAssetHero'] = { default: hero, __esModule: true };
+  const wallet = load(resolve(__dirname, '../src/screens/wallet/WalletScreen.tsx'), mocks).default;
+  const expandDisplay = (node) => {
+    if (Array.isArray(node)) return node.map(expandDisplay);
+    if (!React.isValidElement(node)) return node;
+    if (node.type === hero || node.type === positionRow) return expandDisplay(node.type(node.props));
+    return React.cloneElement(node, {}, expandDisplay(node.props.children));
+  };
+  h.renderWallet = () => {
+    h.queries = [];
+    const outer = wallet({ navigation: root });
+    const branch = elements(outer).find((node) => typeof node.type === 'function');
+    return { tree: expandDisplay(branch.type(branch.props)), branch };
+  };
   mocks['./HomeAssetHero'] = { default: hero, __esModule: true };
   const charts = load(
     resolve(__dirname, '../src/screens/home/HomePortfolioCharts.tsx'),
@@ -187,13 +203,7 @@ function createHomeHarness(mode = 'general') {
     const screenTree = (h.account.mode === 'general' ? general : season)(
       branch.props,
     );
-    const expandHero = (node) => {
-      if (Array.isArray(node)) return node.map(expandHero);
-      if (!React.isValidElement(node)) return node;
-      if (node.type === hero) return hero(node.props);
-      return React.cloneElement(node, {}, expandHero(node.props.children));
-    };
-    const tree = expandHero(screenTree);
+    const tree = expandDisplay(screenTree);
     const chart = elements(tree).find((node) => node.type === charts);
     return { tree, chart: chart ? charts(chart.props) : null, branch };
   };
@@ -230,12 +240,13 @@ function createHomeHarness(mode = 'general') {
     client.setQueryData([...base, 'equity', '30d', 'daily'], equity);
     const keys = require('../src/constants/queryKeys.ts').QUERY_KEYS;
     client.setQueryData(keys.tradingAccount.wallets(account.id), {
-      wallets: [],
+      tradingAccountId: account.id, wallets: [],
     });
     client.setQueryData(
       keys.tradingAccount.positions(account.id, { limit: 5 }),
       { positions: [] },
     );
+    client.setQueryData(keys.tradingAccount.holdings(account.id), { tradingAccountId: account.id, positions: [] });
     client.setQueryData(keys.me, { id: 'user-1', nickname: '김재민' });
     if (account.season) client.setQueryData(keys.ranking.list({
       scope: 'all', seasonId: account.season.seasonId,

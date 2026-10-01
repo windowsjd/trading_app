@@ -624,7 +624,7 @@ export default function WalletFxScreen({ navigation }: Props) {
         }}
         onGoHome={() => {
           setSuccessData(null);
-          navigation.navigate('Home');
+          rootNavigation.navigate('MainTabs', { screen: 'HomeTab', params: { screen: 'Home' } });
         }}
       />
     </SafeAreaView>

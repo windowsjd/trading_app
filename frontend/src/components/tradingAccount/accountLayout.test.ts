@@ -180,16 +180,17 @@ describe('the styles long text depends on are present', () => {
     assert.ok(!/numberOfLines=\{/.test(source));
   });
 
-  it('GeneralAccountHome: amounts wrap and the asset row keeps both columns', () => {
+  it('GeneralAccountHome: amounts wrap through the shared asset row', () => {
     const source = read('screens/home/GeneralAccountHome.tsx');
 
     // A ten-plus digit total wraps instead of running off the screen.
     const hero = read('screens/home/HomeAssetHero.tsx');
     assert.match(hero, /total:\s*\{[^}]*flexShrink:\s*1/s);
     assert.match(hero, /total:\s*\{[^}]*lineHeight/s);
-    // A long asset name wraps; the amount keeps its own track.
-    assert.match(source, /positionName:\s*\{[^}]*minWidth:\s*0/s);
-    assert.match(source, /positionValue:\s*\{[^}]*flexShrink:\s*0/s);
+    // The shared asset row gives identity and values separate lines.
+    assert.match(source, /<PositionAssetRow/);
+    assert.match(read('components/tradingAccount/PositionAssetRow.tsx'), /value:\s*\{[^}]*minWidth:\s*0/s);
+    assert.match(read('components/tradingAccount/PositionAssetRow.tsx'), /flexWrap: 'wrap'/);
     assert.ok(!/numberOfLines=\{/.test(source));
   });
 
@@ -204,8 +205,9 @@ describe('the styles long text depends on are present', () => {
     // Rank and tier sit in a two-up row: each half must be allowed to wrap
     // inside itself instead of pushing the other card off screen.
     assert.match(source, /flex:\s*\{[^}]*minWidth:\s*0/s);
-    assert.match(source, /positionName:\s*\{[^}]*minWidth:\s*0/s);
-    assert.match(source, /positionValue:\s*\{[^}]*flexShrink:\s*0/s);
+    assert.match(source, /<PositionAssetRow/);
+    assert.match(read('components/tradingAccount/PositionAssetRow.tsx'), /value:\s*\{[^}]*minWidth:\s*0/s);
+    assert.match(read('components/tradingAccount/PositionAssetRow.tsx'), /flexWrap: 'wrap'/);
     assert.ok(!/numberOfLines=\{/.test(source));
   });
 

@@ -23,11 +23,11 @@ export const transport = {
     { ...base, id: 'general-account', mode: 'general', season: null },
   ],
 };
-export const navigation = { calls: [], navigate(...args) { this.calls.push(args); } };
+export const navigation = { calls: [], navigate(...args) { this.calls.push(args); if (window.fixture?.navigationRef?.isReady()) window.fixture.navigationRef.navigate(...args); } };
 export const useRootNavigation = () => navigation;
 const response = (data) => ({ data: { success: true, data } });
 export const apiClient = {
-  async get(path) {
+  async get(path, config) {
     transport.requests.push(path);
     if (path === '/me') return response({
       id: 'home-user', nickname: long ? '아주긴닉네임대한민국투자챔피언김재민ABCDEFGHIJKLMNOPQRSTUVWXYZ' : '김재민',
@@ -78,8 +78,29 @@ export const apiClient = {
       tradingAccountId: account.id, mode: account.mode, state: 'empty',
       range: '30d', granularity: 'daily', returnRateMethod, points: [],
     });
-    if (path.endsWith('/wallets')) return response({ tradingAccountId: account.id, wallets: [] });
-    if (path.endsWith('/positions')) return response({ tradingAccountId: account.id, positions: [] });
+    if (path.endsWith('/wallets')) return response({ tradingAccountId: account.id, wallets: params.has('holdings') ? [
+      { currencyCode: 'KRW', balance: long ? '1234567890123456' : account.mode === 'general' ? '9900000' : '8800000' },
+      { currencyCode: 'USD', balance: long ? '1234567890123.45' : '50.39' },
+    ] : [] });
+    if (path.endsWith('/positions')) {
+      const offset = config?.params?.offset ?? 0, limit = config?.params?.limit ?? 20;
+      if (transport.delay === `${account.id}:positions`) await new Promise((resolve) => transport.pending.push(resolve));
+      const total = params.has('holdings') ? (params.has('many') ? 207 : 7) : 0;
+      const positions = Array.from({ length: Math.min(limit, total - offset) }, (_, index) => {
+        const i = offset + index, currency = i % 3 === 0 ? 'KRW' : 'USD';
+        const available = { state: 'available', currentPrice: '1', priceCurrency: currency,
+          positionValue: long ? currency === 'KRW' ? '1234567890123456' : '1234567890123.45' : ['1120000', '530.25', '146.88'][i % 3],
+          positionValueKrw: '9999999', returnRate: ['123.45', '-99.12', '0'][i % 3],
+          unrealizedPnl: '10', unrealizedPnlKrw: '10', priceSource: null };
+        return { positionId: `${account.id}-position-${i}`, assetId: `${account.id}-asset-${i}`, symbol: ['005930', 'AAPL', 'BTCUSDT'][i % 3],
+          name: long ? '대한민국 미래산업 우량주 투자기업 우선주 ABCDEFGHIJKLMNOPQRSTUVWXYZ' : ['삼성전자', 'Apple', 'Bitcoin'][i % 3],
+          assetType: ['domestic_stock', 'us_stock', 'crypto'][i % 3], market: ['KRX', 'NASDAQ', 'BINANCE'][i % 3],
+          currencyCode: currency, quantity: '0.00080500', averageCost: '999999',
+          valuation: i === 4 ? { ...available, state: 'stale_cache' } : i === 5 ? { state: 'unavailable', reason: 'ASSET_PRICE_UNAVAILABLE', message: 'internal' } : available };
+      });
+      return response({ state: 'available', tradingAccountId: account.id, positions,
+        pagination: { offset, limit, total, returned: positions.length, nextOffset: offset + positions.length < total ? offset + positions.length : null } });
+    }
     throw new Error(`Unexpected fixture request: ${path}`);
   },
 };

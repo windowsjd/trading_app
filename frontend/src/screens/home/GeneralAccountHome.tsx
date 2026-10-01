@@ -2,7 +2,6 @@ import { semantic } from '../../theme/tokens';
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform } from '../../theme/native';
 import { getScreenContentStyle } from '../../theme/screenLayout';
-import ActionPressable from '../../components/common/ActionPressable';
 import { useQuery } from '@tanstack/react-query';
 
 import { QUERY_KEYS } from '../../constants/queryKeys';
@@ -11,7 +10,6 @@ import {
   getTradingAccountPortfolio,
   getTradingAccountEquity,
   getTradingAccountPositions,
-  getTradingAccountWallets,
   type TradingAccountDto,
 } from '../../features/tradingAccount/api';
 import {
@@ -20,14 +18,9 @@ import {
 } from '../../features/tradingAccount/accountIntegrityGate';
 import { getCapabilityBlockMessage } from '../../features/tradingAccount/capabilities';
 import type { TradingAccountCapabilities } from '../../features/tradingAccount/capabilities';
-import { getPositionDisplay } from '../../features/position/display';
+import PositionAssetRow from '../../components/tradingAccount/PositionAssetRow';
 import { getPortfolioNotice } from '../../features/tradingAccount/portfolioMessage';
-import { getKnownWalletBalanceAmount } from '../../features/wallet/mapper';
-import {
-  formatKrw,
-  formatUsd,
-  getAssetNameDisplay,
-} from '../../utils/format';
+import { formatKrw } from '../../utils/format';
 
 import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
@@ -58,9 +51,8 @@ import HomeAssetHero from './HomeAssetHero';
 type Props = {
   account: TradingAccountDto;
   capabilities: TradingAccountCapabilities | null;
-  onOpenLedger: () => void;
-  onOpenOrders: () => void;
   onOpenFx: () => void;
+  onOpenAsset: (assetId: string) => void;
 };
 
 const POSITIONS_PREVIEW_LIMIT = 5;
@@ -75,20 +67,14 @@ function formatUnknownKrw(value: string | null | undefined) {
 export default function GeneralAccountHome({
   account,
   capabilities,
-  onOpenLedger,
-  onOpenOrders,
   onOpenFx,
+  onOpenAsset,
 }: Props) {
   const accountId = account.id;
 
   const portfolioQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.portfolio(accountId),
     queryFn: () => getTradingAccountPortfolio(accountId),
-  });
-
-  const walletsQuery = useQuery({
-    queryKey: QUERY_KEYS.tradingAccount.wallets(accountId),
-    queryFn: () => getTradingAccountWallets(accountId),
   });
 
   const positionsQuery = useQuery({
@@ -107,16 +93,7 @@ export default function GeneralAccountHome({
     queryFn: () => getTradingAccountEquity(accountId, '30d', 'daily'),
   });
 
-  /**
-   * EVERY account-scoped query on this screen, not just the overview
-   * (작업 12 §3).
-   *
-   * A scope mismatch on the wallet or positions query used to fall through to
-   * "지갑 요약을 불러오지 못했습니다" / "보유 종목이 없습니다" — a grey box beside a
-   * confident 총 자산 figure. The server refusing to vouch for part of an
-   * account is not a partial outage of that part; it is a reason to stop
-   * presenting the account as readable at all.
-   */
+  // Fail closed on structural errors in every account-scoped section.
   const integrityFailure = findAccountIntegrityFailure([
     {
       section: '자산 추이',
@@ -129,12 +106,6 @@ export default function GeneralAccountHome({
       isError: portfolioQuery.isError,
       error: portfolioQuery.error,
       retry: () => void portfolioQuery.refetch(),
-    },
-    {
-      section: '지갑',
-      isError: walletsQuery.isError,
-      error: walletsQuery.error,
-      retry: () => void walletsQuery.refetch(),
     },
     {
       section: '보유 종목',
@@ -174,8 +145,6 @@ export default function GeneralAccountHome({
   const summary = portfolio.summary;
   const portfolioNotice = getPortfolioNotice(portfolio);
   const positions = positionsQuery.data?.positions;
-  const krwBalance = getKnownWalletBalanceAmount(walletsQuery.data, 'KRW');
-  const usdBalance = getKnownWalletBalanceAmount(walletsQuery.data, 'USD');
   const capabilityNotice = capabilities?.canExchange
     ? null
     : getCapabilityBlockMessage(
@@ -201,24 +170,6 @@ export default function GeneralAccountHome({
 
       {summary ? (
         <View style={styles.card}>
-          <Text style={styles.label}>자산 구성</Text>
-          <Text style={styles.helper}>
-            KRW 현금 {formatKrw(summary.krwCash)}
-          </Text>
-          <Text style={styles.helper}>
-            USD 환산 {formatKrw(summary.usdCashKrw)}
-          </Text>
-          <Text style={styles.helper}>
-            보유자산 {formatKrw(summary.assetValueKrw)}
-          </Text>
-          <Text style={styles.helper}>
-            실현 손익 {formatKrw(summary.realizedPnlKrw)}
-          </Text>
-        </View>
-      ) : null}
-
-      {summary ? (
-        <View style={styles.card}>
           <Text style={styles.label}>자금 구성</Text>
           <Text style={styles.helper}>
             최초 지급 자본 {formatUnknownKrw(summary.initialFundingKrw)}
@@ -240,30 +191,6 @@ export default function GeneralAccountHome({
           </Text>
         </View>
       ) : null}
-
-      <View style={styles.card}>
-        <Text style={styles.label}>지갑 요약</Text>
-        {walletsQuery.isLoading ? (
-          <SectionSkeleton lines={2} />
-        ) : walletsQuery.isError ? (
-          <InlineEmptyState message="지갑 요약을 불러오지 못했습니다." />
-        ) : (
-          <>
-            <Text style={styles.helper}>
-              KRW {krwBalance === null ? '-' : formatKrw(krwBalance)}
-            </Text>
-            <Text style={styles.helper}>
-              USD {usdBalance === null ? '-' : formatUsd(usdBalance)}
-            </Text>
-            <ActionPressable style={styles.retryButton} onPress={onOpenLedger}>
-              <Text style={styles.retryText}>원장 보기</Text>
-            </ActionPressable>
-            <ActionPressable style={styles.retryButton} onPress={onOpenOrders}>
-              <Text style={styles.retryText}>주문 내역 보기</Text>
-            </ActionPressable>
-          </>
-        )}
-      </View>
 
       <HomePortfolioCharts
         portfolio={portfolio}
@@ -287,44 +214,14 @@ export default function GeneralAccountHome({
             message="아직 매수한 종목이 없습니다."
           />
         ) : (
-          positions.map((position) => {
-            const nameDisplay = getAssetNameDisplay({
-              name: position.name,
-              symbol: position.symbol,
-            });
-            const display = getPositionDisplay(position);
-            return (
-              <View key={position.positionId} style={styles.positionCard}>
-                <View style={styles.positionRow}>
-                  <Text style={styles.positionName}>{nameDisplay.primary}</Text>
-                  <Text style={styles.positionValue}>
-                    {display.positionValueKrw}
-                  </Text>
-                </View>
-                {nameDisplay.secondary ? (
-                  <Text style={styles.positionMeta}>
-                    {nameDisplay.secondary}
-                  </Text>
-                ) : null}
-                <Text style={styles.positionMeta}>
-                  보유 수량 {display.quantity}주
-                </Text>
-                <Text style={styles.positionMeta}>
-                  평균 매입가 {display.averageCost}
-                </Text>
-                <Text style={styles.positionMeta}>
-                  현재가 {display.currentPrice ?? '시세 조회 불가'}
-                </Text>
-                <Text style={styles.positionMeta}>
-                  평가손익 {display.unrealizedPnlKrw} · 수익률{' '}
-                  {display.returnRate}
-                </Text>
-                {display.priceNotice ? (
-                  <Text style={styles.priceNotice}>{display.priceNotice}</Text>
-                ) : null}
-              </View>
-            );
-          })
+          positions.map((position) => (
+            <PositionAssetRow
+              key={position.positionId}
+              position={position}
+              testID={TEST_IDS.home.positionItem(position.assetId)}
+              onPress={() => onOpenAsset(position.assetId)}
+            />
+          ))
         )}
       </View>
 
@@ -372,28 +269,4 @@ const styles = StyleSheet.create({
   },
   warningTitle: { fontSize: 14, fontWeight: '700', color: semantic.warning },
   warningText: { fontSize: 13, color: semantic.warning, lineHeight: 19 },
-  positionRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  positionCard: { gap: 4, paddingVertical: 4 },
-  // A long Korean asset name wraps; the amount keeps its own track and is
-  // never pushed off the row.
-  positionName: { flex: 1, minWidth: 0, fontSize: 14, lineHeight: 20 },
-  positionValue: { flexShrink: 0, fontSize: 14, fontWeight: '600' },
-  positionMeta: { fontSize: 13, color: semantic.secondary, lineHeight: 19 },
-  priceNotice: { fontSize: 13, color: semantic.warning, lineHeight: 19 },
-  retryButton: {
-    marginTop: 8,
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: semantic.selected,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: semantic.raised,
-  },
-  retryText: { color: semantic.text, fontWeight: '600' },
 });

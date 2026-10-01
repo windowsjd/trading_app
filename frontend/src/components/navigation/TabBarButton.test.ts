@@ -46,7 +46,7 @@ function harness(platform: string, mode: 'general' | 'season' = 'general') {
     '../../features/tradingAccount/TradingAccountContext': {
       useTradingAccount: () => ({ selectedAccount: { id: 'account-1', mode }, isLoading: false }),
     },
-    ...Object.fromEntries(['Home', 'Market', 'Guide', 'Ranking', 'Record', 'My'].map((name) => [
+    ...Object.fromEntries(['Home', 'Market', 'Guide', 'Ranking', 'Wallet', 'My'].map((name) => [
       `./${name}Stack`, { default: `${name}Stack`, __esModule: true },
     ])),
   }).default;
@@ -64,7 +64,7 @@ describe('bottom tab touch feedback', () => {
           'HomeTab',
           'MarketTab',
           mode === 'general' ? 'GuideTab' : 'RankingTab',
-          'RecordTab',
+          'WalletTab',
           'MyTab',
         ]);
         for (const screen of screens) {

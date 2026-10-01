@@ -26,6 +26,14 @@ function assertCleanRateDisplay(h: any, tree: any) {
 }
 
 describe('FX screen information display', () => {
+  it('the success Home action still reaches Home after FX moves to WalletStack', () => {
+    const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
+    const success = elements(h.render(), 'FxSuccessBottomSheet')[0];
+    assert.ok(success);
+    success.props.onGoHome();
+    assert.deepEqual(h.navigation, [['MainTabs', { screen: 'HomeTab', params: { screen: 'Home' } }]]);
+  });
+
   it('keeps the current rate and captured timestamp with empty and filled inputs', () => {
     const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
     let tree = h.render();

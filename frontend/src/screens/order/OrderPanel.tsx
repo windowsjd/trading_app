@@ -1040,8 +1040,8 @@ export function OrderForm({
           label="USD 환전하러 가기"
           onPress={() =>
             rootNavigation.navigate('MainTabs', {
-              screen: 'HomeTab',
-              params: { screen: 'WalletFx' },
+              screen: 'WalletTab',
+              params: { screen: 'WalletFx', initial: false },
             })
           }
         />
@@ -1140,8 +1140,8 @@ export function OrderForm({
         onGoOrderHistory={() => {
           setSuccessState(clearOrderSuccess());
           rootNavigation.navigate('MainTabs', {
-            screen: 'RecordTab',
-            params: { screen: 'RecordSeasonList' },
+            screen: 'MyTab',
+            params: { screen: 'Record', initial: false, params: { screen: 'RecordSeasonList' } },
           });
         }}
         onGoHome={() => {

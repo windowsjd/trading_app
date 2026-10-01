@@ -18,6 +18,10 @@ export type AuthStackParamList = {
 export type HomeStackParamList = {
   Home: undefined;
   Portfolio: undefined;
+};
+
+export type WalletStackParamList = {
+  Wallet: undefined;
   WalletFx: undefined;
   WalletTransactions: { currencyCode?: 'KRW' | 'USD' } | undefined;
 };
@@ -70,6 +74,7 @@ export type RecordStackParamList = {
 
 export type MyStackParamList = {
   Overall: undefined;
+  Record: NavigatorScreenParams<RecordStackParamList> | undefined;
   Friends: undefined;
   Notices: undefined;
   UserSeasonSummary: { userId: string };
@@ -83,7 +88,7 @@ export type MainTabParamList = {
   MarketTab: NavigatorScreenParams<MarketStackParamList> | undefined;
   GuideTab: NavigatorScreenParams<GuideStackParamList> | undefined;
   RankingTab: NavigatorScreenParams<RankingStackParamList> | undefined;
-  RecordTab: NavigatorScreenParams<RecordStackParamList> | undefined;
+  WalletTab: NavigatorScreenParams<WalletStackParamList> | undefined;
   MyTab: NavigatorScreenParams<MyStackParamList> | undefined;
 };
 
@@ -141,14 +146,19 @@ export type PortfolioScreenProps = CompositeScreenProps<
   CompositeScreenProps<TabScreenProps<'HomeTab'>, RootScreenProps<'MainTabs'>>
 >;
 
+export type WalletScreenProps = CompositeScreenProps<
+  StackScreenProps<WalletStackParamList, 'Wallet'>,
+  CompositeScreenProps<TabScreenProps<'WalletTab'>, RootScreenProps<'MainTabs'>>
+>;
+
 export type WalletFxScreenProps = CompositeScreenProps<
-  StackScreenProps<HomeStackParamList, 'WalletFx'>,
-  CompositeScreenProps<TabScreenProps<'HomeTab'>, RootScreenProps<'MainTabs'>>
+  StackScreenProps<WalletStackParamList, 'WalletFx'>,
+  CompositeScreenProps<TabScreenProps<'WalletTab'>, RootScreenProps<'MainTabs'>>
 >;
 
 export type WalletTransactionsScreenProps = CompositeScreenProps<
-  StackScreenProps<HomeStackParamList, 'WalletTransactions'>,
-  CompositeScreenProps<TabScreenProps<'HomeTab'>, RootScreenProps<'MainTabs'>>
+  StackScreenProps<WalletStackParamList, 'WalletTransactions'>,
+  CompositeScreenProps<TabScreenProps<'WalletTab'>, RootScreenProps<'MainTabs'>>
 >;
 
 export type MarketScreenProps = CompositeScreenProps<
@@ -183,7 +193,10 @@ export type UserSeasonSummaryScreenProps = CompositeScreenProps<
 
 export type RecordSeasonListScreenProps = CompositeScreenProps<
   StackScreenProps<RecordStackParamList, 'RecordSeasonList'>,
-  CompositeScreenProps<TabScreenProps<'RecordTab'>, RootScreenProps<'MainTabs'>>
+  CompositeScreenProps<
+    StackScreenProps<MyStackParamList, 'Record'>,
+    CompositeScreenProps<TabScreenProps<'MyTab'>, RootScreenProps<'MainTabs'>>
+  >
 >;
 
 export type MyScreenProps = CompositeScreenProps<
