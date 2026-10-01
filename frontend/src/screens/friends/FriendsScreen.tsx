@@ -1,9 +1,9 @@
+import ProfileAvatar from '../../components/common/ProfileAvatar';
 import { semantic } from '../../theme/tokens';
 import React, { useCallback, useState } from 'react';
 import {
   Alert,
   FlatList,
-  Image,
   StyleSheet,
   Text,
   TextInput,
@@ -183,12 +183,7 @@ export default function FriendsScreen({ navigation }: Props) {
             }
             style={styles.profile}
           >
-            {item.profileImageUrl ? (
-              <Image
-                source={{ uri: item.profileImageUrl }}
-                style={styles.avatar}
-              />
-            ) : null}
+            <ProfileAvatar profileImageUrl={item.profileImageUrl} size={40} />
             <Text style={styles.nickname}>{item.nickname}</Text>
           </ActionPressable>
           {item.active === false ? (
@@ -305,5 +300,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   profile: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatar: { width: 40, height: 40, borderRadius: 20 },
 });

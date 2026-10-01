@@ -4,13 +4,14 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { AppearanceProvider } from '../../src/theme/appearance';
+import { AppearanceProvider, useAppearance } from '../../src/theme/appearance';
 import Detail from '../../src/screens/asset/AssetDetailScreen';
 import Order from '../../src/screens/order/OrderScreen';
 import Chart from '../../src/screens/asset/AssetChartScreen';
 import Market from '../../src/screens/market/MarketScreen';
 import Search from '../../src/screens/market/MarketSearchScreen';
 import Home from '../../src/screens/home/HomeScreen';
+import Settings from '../../src/screens/my/SettingsScreen';
 import { state, navigation } from './tradingMocks';
 const client = new QueryClient({
   defaultOptions: {
@@ -18,6 +19,11 @@ const client = new QueryClient({
     mutations: { retry: false },
   },
 });
+function PreferenceProbe() {
+  const appearance = useAppearance();
+  window.tradingAppearance = appearance;
+  return null;
+}
 function App() {
   const [screen, setScreen] = React.useState(
     new URLSearchParams(location.search).get('screen') ?? 'detail',
@@ -55,10 +61,12 @@ function App() {
     market: Market,
     search: Search,
     home: Home,
+    settings: Settings,
   }[screen];
   return (
     <QueryClientProvider client={client}>
       <AppearanceProvider>
+        <PreferenceProbe />
         <SafeAreaProvider
           initialMetrics={{
             frame: { x: 0, y: 0, width: 390, height: 800 },

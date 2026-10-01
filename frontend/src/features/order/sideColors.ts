@@ -1,5 +1,5 @@
-import { FINANCIAL_COLORS } from '../../theme/financialColors.ts';
+import { financial } from '../../theme/financialColors.ts';
 
-// Solid order actions keep white labels in both modes; separate from candle direction.
-export const BUY_COLOR = FINANCIAL_COLORS.buyAction;
-export const SELL_COLOR = FINANCIAL_COLORS.sellAction;
+// Order actions resolve through the device financial preference.
+export const BUY_COLOR = financial.buyAction;
+export const SELL_COLOR = financial.sellAction;

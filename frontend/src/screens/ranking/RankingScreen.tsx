@@ -39,6 +39,8 @@ import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import EmptyState from '../../components/states/EmptyState';
 import CTAButton from '../../components/common/CTAButton';
+import ProfileAvatar from '../../components/common/ProfileAvatar';
+import { getMe, type MeDto } from '../../features/me/api';
 
 type Props = RankingScreenProps;
 
@@ -64,6 +66,7 @@ function getRankTypeLabel(rankType?: RankingRankType) {
 export default function RankingScreen({ navigation }: Props) {
   const rootNavigation = useRootNavigation();
   const queryClient = useQueryClient();
+  const meQuery = useQuery({ queryKey: QUERY_KEYS.me, queryFn: getMe, staleTime: 60_000 });
   const [selectedTab, setSelectedTab] = React.useState<RankingScope>('all');
   const snapshotResetAttemptRef = React.useRef(0);
   const rankingLimit = selectedTab === 'top10' ? 10 : 50;
@@ -269,6 +272,7 @@ export default function RankingScreen({ navigation }: Props) {
         ListHeaderComponent={
           <>
             <MyRankingCard
+              me={meQuery.data}
               myRanking={myRanking}
               rankType={rankType}
               viewState={viewState}
@@ -298,6 +302,7 @@ export default function RankingScreen({ navigation }: Props) {
                       }
                     >
                       <Text style={styles.topRank}>#{item.rank}</Text>
+                      <ProfileAvatar profileImageUrl={item.profileImageUrl} size={32} testID={`ranking-top-avatar-${item.userId}`} />
                       <Text style={styles.topName}>{item.nickname}</Text>
                       <Text style={styles.helper}>{formatPercent(item.returnRate)}%</Text>
                     </ActionPressable>
@@ -371,11 +376,13 @@ export default function RankingScreen({ navigation }: Props) {
 }
 
 function MyRankingCard({
+  me,
   myRanking,
   rankType,
   viewState,
   onJoin,
 }: {
+  me?: MeDto;
   myRanking: MyRankingDto | null;
   rankType?: RankingRankType;
   viewState: string;
@@ -408,6 +415,12 @@ function MyRankingCard({
   return (
     <View style={styles.card}>
       <Text style={styles.label}>내 순위</Text>
+      {me ? (
+        <View style={styles.myIdentity}>
+          <ProfileAvatar profileImageUrl={me.profileImageUrl} size={36} testID="ranking-my-avatar" />
+          <Text style={styles.rankIdentity}>{me.nickname}</Text>
+        </View>
+      ) : null}
       <Text style={styles.big}>
         {availableRanking ? `#${availableRanking.rank}` : '-'}
       </Text>
@@ -440,6 +453,7 @@ function RankingRow({
       <View style={styles.rankLeft}>
         <Text style={styles.rankNumber}>#{item.rank}</Text>
         <View style={styles.rankIdentity}>
+          <ProfileAvatar profileImageUrl={item.profileImageUrl} size={28} testID={`ranking-avatar-${item.userId}`} />
           <Text style={styles.name}>{item.nickname}</Text>
           <Text style={styles.helper}>등급 {getRankingTier(item, rankType)}</Text>
           <Text style={styles.helper}>퍼센타일 {formatPercent(item.percentile)}%</Text>
@@ -511,6 +525,7 @@ const styles = StyleSheet.create({
   },
   rankLeft: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
     alignItems: 'center',
     flexGrow: 1,
@@ -518,8 +533,9 @@ const styles = StyleSheet.create({
     flexBasis: 160,
     minWidth: 0,
   },
-  rankIdentity: { flex: 1, minWidth: 0 },
-  rankNumber: { fontSize: 18, fontWeight: '700' },
+  myIdentity: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  rankIdentity: { flexGrow: 1, flexShrink: 1, flexBasis: 100, minWidth: 0, gap: 4 },
+  rankNumber: { maxWidth: '100%', fontSize: 18, fontWeight: '700' },
   name: { fontSize: 15, fontWeight: '700' },
   value: { fontSize: 15, fontWeight: '700' },
   alignEnd: { alignItems: 'flex-end', flexGrow: 1, flexShrink: 1, minWidth: 0 },

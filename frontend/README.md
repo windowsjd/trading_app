@@ -15,6 +15,17 @@ Tests run under Node's type-stripping test runner, so test-reachable modules
 must be free of React Native imports and their relative imports need explicit
 `.ts` extensions.
 
+## Display preferences
+
+`AppearanceProvider` stores appearance and financial colors separately on the device.
+Financial colors default to **Red/Blue** (rise/buy/up candle red, fall/sell/down candle blue).
+**Green/Red** uses green for rise/buy/up and red for fall/sell/down.
+Settings applies a preset immediately; AsyncStorage restores it across reload and logout/login.
+Use `financial` tokens with `theme/native`; SVG renderers use `useAppearance().financialColors`.
+Order-book accents and performance/change text follow the same roles. Cashflow credit/debit,
+error/warning/success, diagnostics, navigation and brand colors are independent.
+No financial calculation, API preference or server synchronization is involved.
+
 ## Trading accounts
 
 Every current financial screen and mutation is scoped to ONE trading account,

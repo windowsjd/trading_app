@@ -1,6 +1,6 @@
 import type { ColorValue, ImageStyle, StyleProp, TextStyle, ViewStyle } from 'react-native';
 import type { AppearanceMode, AppearancePalette } from './appearance';
-import { resolveFinancialColor } from './financialColors.ts';
+import { resolveFinancialColor, type FinancialColorPreference } from './financialColors.ts';
 
 /** Explicit roles use valid color sentinels for native/web StyleSheet validation.
  * Only these tokens resolve through the appearance palette; arbitrary hex stays as written. */
@@ -34,12 +34,12 @@ export const semantic = {
 
 type Role = keyof typeof semantic;
 const roleByValue = Object.fromEntries(Object.entries(semantic).map(([role, value]) => [value, role])) as Record<string, Role>;
-export function resolveSemanticColor(value: ColorValue | undefined, colors: AppearancePalette, mode: AppearanceMode) {
+export function resolveSemanticColor(value: ColorValue | undefined, colors: AppearancePalette, mode: AppearanceMode, financialPreference: FinancialColorPreference = 'red_blue') {
   const role = typeof value === 'string' ? roleByValue[value] : undefined;
-  return role ? colors[role] : typeof value === 'string' ? resolveFinancialColor(value, mode) : value;
+  return role ? colors[role] : typeof value === 'string' ? resolveFinancialColor(value, mode, financialPreference) : value;
 }
 
-export function resolveSemanticStyle<T extends ViewStyle | TextStyle | ImageStyle>(style: StyleProp<T>, colors: AppearancePalette, mode: AppearanceMode): StyleProp<T> {
+export function resolveSemanticStyle<T extends ViewStyle | TextStyle | ImageStyle>(style: StyleProp<T>, colors: AppearancePalette, mode: AppearanceMode, financialPreference: FinancialColorPreference = 'red_blue'): StyleProp<T> {
   if (!style) return style;
   const flatten = (entry: unknown): Record<string, unknown> => Array.isArray(entry)
     ? Object.assign({}, ...entry.map(flatten))
@@ -48,7 +48,7 @@ export function resolveSemanticStyle<T extends ViewStyle | TextStyle | ImageStyl
   const overrides: Record<string, string> = {};
   for (const [property, value] of Object.entries(flat)) {
     if (typeof value !== 'string') continue;
-    const resolved = resolveSemanticColor(value, colors, mode);
+    const resolved = resolveSemanticColor(value, colors, mode, financialPreference);
     if (resolved !== value && typeof resolved === 'string') overrides[property] = resolved;
   }
   return Object.keys(overrides).length ? [style, overrides as unknown as T] : style;

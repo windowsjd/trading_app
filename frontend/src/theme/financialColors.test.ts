@@ -1,37 +1,55 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { FINANCIAL_COLORS, financial, resolveFinancialColor } from './financialColors.ts';
+import { financial, getFinancialColors, parseFinancialColorPreference, resolveFinancialColor } from './financialColors.ts';
 import { BUY_COLOR, SELL_COLOR } from '../features/order/sideColors.ts';
 import { UP_COLOR, DOWN_COLOR } from '../components/charts/candleColors.ts';
 import { semantic } from './tokens.ts';
 
-const rgb = (hex: string) => [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16));
-const green = (hex: string) => { const [r, g, b] = rgb(hex); assert.ok(g > r && g > b, hex); };
-const red = (hex: string) => { const [r, g, b] = rgb(hex); assert.ok(r > g && r > b, hex); };
-const blue = (hex: string) => { const [r, g, b] = rgb(hex); assert.ok(b > g && b > r, hex); };
+function luminance(hex: string) {
+  const rgb = [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16) / 255)
+    .map((v) => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  return rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722;
+}
+const contrast = (a: string, b: string) => (Math.max(luminance(a), luminance(b)) + .05) / (Math.min(luminance(a), luminance(b)) + .05);
 
-test('single financial palette keeps side, rate, cashflow and candle meanings in both modes', () => {
-  for (const mode of ['light', 'dark'] as const) {
-    green(resolveFinancialColor(financial.buy, mode));
-    red(resolveFinancialColor(financial.sell, mode));
-    red(resolveFinancialColor(financial.rise, mode));
-    blue(resolveFinancialColor(financial.fall, mode));
-    green(resolveFinancialColor(financial.credit, mode));
-    red(resolveFinancialColor(financial.debit, mode));
-  }
-  green(BUY_COLOR); red(SELL_COLOR); green(UP_COLOR); red(DOWN_COLOR);
-  assert.equal(BUY_COLOR, FINANCIAL_COLORS.buyAction);
-  assert.equal(SELL_COLOR, FINANCIAL_COLORS.sellAction);
-  assert.equal(UP_COLOR, FINANCIAL_COLORS.candleUp);
-  assert.equal(DOWN_COLOR, FINANCIAL_COLORS.candleDown);
+test('new, invalid and missing preferences use Red/Blue; Green/Red is explicit', () => {
+  for (const value of [null, '', 'unknown', 'red_blue']) assert.equal(parseFinancialColorPreference(value), 'red_blue');
+  assert.equal(parseFinancialColorPreference('green_red'), 'green_red');
+  assert.equal(resolveFinancialColor(financial.buy, 'light'), '#a13e3b');
 });
 
-test('financial resolver only accepts its own explicit tokens, independent of neutral colors', () => {
+for (const mode of ['light', 'dark'] as const) for (const preference of ['red_blue', 'green_red'] as const) {
+  test(`${mode} ${preference}: all financial directions agree, with readable text and actions`, () => {
+    const colors = getFinancialColors(mode, preference);
+    const expected = mode === 'light'
+      ? preference === 'red_blue' ? ['#a13e3b', '#315f9b'] : ['#16803a', '#a13e3b']
+      : preference === 'red_blue' ? ['#ff8b86', '#8cbaff'] : ['#79d68b', '#ff8b86'];
+    for (const role of ['buy', 'rise', 'candleUp'] as const) assert.equal(colors[role], expected[0]);
+    for (const role of ['sell', 'fall', 'candleDown'] as const) assert.equal(colors[role], expected[1]);
+    assert.equal(resolveFinancialColor(BUY_COLOR, mode, preference), colors.buyAction);
+    assert.equal(resolveFinancialColor(SELL_COLOR, mode, preference), colors.sellAction);
+    assert.equal(resolveFinancialColor(UP_COLOR, mode, preference), colors.candleUp);
+    assert.equal(resolveFinancialColor(DOWN_COLOR, mode, preference), colors.candleDown);
+    for (const color of [colors.buy, colors.sell]) {
+      for (const bg of mode === 'light' ? ['#fcfcfd', '#ffffff', '#f7f8fa'] : ['#10151c', '#1b2530', '#273543']) {
+        assert.ok(contrast(color, bg) >= 4.5, `${color} on ${bg}`);
+      }
+    }
+    for (const side of ['buy', 'sell'] as const) {
+      assert.ok(contrast(colors[side], colors[`${side}Surface`]) >= 4.5);
+      assert.ok(contrast('#ffffff', colors[`${side}Action`]) >= 4.5);
+    }
+    assert.equal(colors.credit, getFinancialColors(mode).credit);
+    assert.equal(colors.debit, getFinancialColors(mode).debit);
+  });
+}
+
+test('only explicit financial tokens resolve; status, brand and cashflow retain their meanings', () => {
   assert.equal(new Set([...Object.values(semantic), ...Object.values(financial)]).size,
     Object.keys(semantic).length + Object.keys(financial).length);
-  for (const mode of ['light', 'dark'] as const) {
+  for (const preference of ['red_blue', 'green_red'] as const) for (const mode of ['light', 'dark'] as const) {
     for (const color of ['#16a34a', '#dc2626', '#fff', '#202a35', 'transparent', ...Object.values(semantic)]) {
-      assert.equal(resolveFinancialColor(color, mode), color);
+      assert.equal(resolveFinancialColor(color, mode, preference), color);
     }
   }
 });

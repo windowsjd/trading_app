@@ -2,8 +2,8 @@ import { semantic } from '../../theme/tokens';
 import { getScreenContentStyle } from '../../theme/screenLayout';
 import { buildWsUrl } from '../../constants/env';
 import { useMarketTickers } from '../../features/market/useMarketTickers';
-import { mergeMarketAssetTicker } from '../../features/market/mergeMarketAssetTicker';
-import React, { useMemo, useState } from 'react';
+import MarketAssetRow from '../../features/market/MarketAssetRow';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -26,14 +26,6 @@ import {
   type AssetType,
   type MarketAssetItemDto,
 } from '../../features/market/api';
-import { getAssetTradingWarning } from '../../features/asset/tradingUx';
-import {
-  formatPercent,
-  getAssetNameDisplay,
-  getAssetPriceText,
-  getAssetSymbolMarketDisplay,
-} from '../../utils/format';
-
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import EmptyState from '../../components/states/EmptyState';
@@ -48,16 +40,6 @@ const SEARCH_SCOPE: Array<{ key: SearchScope; label: string }> = [
   { key: 'us_stock', label: '미국' },
   { key: 'crypto', label: '암호화폐' },
 ];
-
-function getChangeRateText(item: MarketAssetItemDto) {
-  const warning = getAssetTradingWarning(item);
-  if (warning) return warning;
-  if (item.price?.state !== 'available' || !item.price.changeRate) {
-    return item.marketStatus;
-  }
-
-  return `${formatPercent(item.price.changeRate)}%`;
-}
 
 export default function MarketSearchScreen({ navigation, route }: Props) {
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
@@ -98,11 +80,16 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
     return Array.from(byId.values());
   }, [searchQuery.data]);
   const assetIds = useMemo(() => items.map((item) => item.id), [items]);
-  const { tickersByAssetId } = useMarketTickers({
+  const { tickersByAssetId, staleAssetIds } = useMarketTickers({
     assetIds,
     wsUrl: wsUrl ?? '',
     enabled: !!wsUrl,
   });
+
+  const openAsset = useCallback((assetId: string) => {
+    if (route.params?.returnToAsset) navigation.popTo('AssetDetail', { assetId });
+    else navigation.navigate('AssetDetail', { assetId });
+  }, [navigation, route.params?.returnToAsset]);
 
   const hasPriceErrors = useMemo(
     () =>
@@ -215,42 +202,10 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
             />
           )
         }
-        renderItem={({ item: baseline }) => {
-          const item = mergeMarketAssetTicker(
-            baseline,
-            tickersByAssetId.get(baseline.id),
-          );
-          const nameDisplay = getAssetNameDisplay(item);
-          const symbolMarketDisplay = getAssetSymbolMarketDisplay(item);
-
-          return (
-            <ActionPressable
-              testID={TEST_IDS.market.item(item.id)}
-              style={styles.itemRow}
-              onPress={() =>
-                route.params?.returnToAsset
-                  ? navigation.popTo('AssetDetail', { assetId: item.id })
-                  : navigation.navigate('AssetDetail', { assetId: item.id })
-              }
-            >
-              <View style={styles.itemIdentity}>
-                <Text style={styles.itemSymbol}>{nameDisplay.primary}</Text>
-                {symbolMarketDisplay ? (
-                  <Text style={styles.helper}>{symbolMarketDisplay}</Text>
-                ) : null}
-              </View>
-
-              <View style={styles.alignEnd}>
-                <Text style={styles.itemPrice}>{getAssetPriceText(item)}</Text>
-                <Text style={styles.helper}>{getChangeRateText(item)}</Text>
-                <Text style={styles.helper}>
-                  {item.marketStatus} ·{' '}
-                  {item.tradable ? '거래 가능' : '거래 제한'}
-                </Text>
-              </View>
-            </ActionPressable>
-          );
-        }}
+        renderItem={({ item }) => (
+          <MarketAssetRow item={item} ticker={tickersByAssetId.get(item.id)}
+            isStale={staleAssetIds.has(item.id)} onPress={openAsset} />
+        )}
         ListFooterComponent={
           searchQuery.isFetchingNextPage ? (
             <View style={styles.footerLoader}>
@@ -294,18 +249,6 @@ const styles = StyleSheet.create({
   },
   scopeChipText: { color: semantic.text, fontWeight: '600' },
   scopeChipTextActive: { color: semantic.onAccent, fontWeight: '600' },
-  itemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    borderTopColor: semantic.border,
-  },
-  itemIdentity: Platform.OS === 'web' ? { flex: 1, minWidth: 0 } : {},
-  itemSymbol: { fontSize: 16, fontWeight: '700' },
-  itemPrice: { fontSize: 15, fontWeight: '600' },
-  alignEnd: { alignItems: 'flex-end' },
-  helper: { fontSize: 14, color: semantic.secondary },
   inlineWarning: {
     borderWidth: 1,
     borderColor: semantic.border,

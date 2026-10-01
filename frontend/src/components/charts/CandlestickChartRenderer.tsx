@@ -1,6 +1,5 @@
 import React, { useId, useMemo } from 'react';
 import { StyleSheet, View } from '../../theme/native';
-import { UP_COLOR, DOWN_COLOR } from './candleColors';
 import { useAppearance } from '../../theme/appearance';
 import Svg, {
   ClipPath,
@@ -98,7 +97,7 @@ export default function CandlestickChartRenderer({
   firstVisibleTime,
   lastVisibleTime,
 }: CandlestickChartRendererProps) {
-  const { colors } = useAppearance();
+  const { colors, financialColors } = useAppearance();
   const gridColor = colors.border;
   const axisColor = colors.muted;
   const crosshairColor = colors.secondary;
@@ -140,7 +139,7 @@ export default function CandlestickChartRenderer({
           slotWidth,
           leadingEmptySlots + candle.index - startIndex,
         );
-        const color = candle.bullish ? UP_COLOR : DOWN_COLOR;
+        const color = candle.bullish ? financialColors.candleUp : financialColors.candleDown;
         const openY = yForPrice(candle.open);
         const closeY = yForPrice(candle.close);
         const bodyTop = Math.min(openY, closeY);
@@ -168,6 +167,7 @@ export default function CandlestickChartRenderer({
       }),
     [
       candles,
+      financialColors,
       padding.left,
       slotWidth,
       startIndex,
@@ -242,7 +242,7 @@ export default function CandlestickChartRenderer({
     currentPriceY !== null &&
     currentPriceY >= padding.top - 1 &&
     currentPriceY <= bottomY + 1;
-  const currentColor = currentBullish ? UP_COLOR : DOWN_COLOR;
+  const currentColor = currentBullish ? financialColors.candleUp : financialColors.candleDown;
   const currentPriceLabel = formatPrice(currentPrice);
   const crosshairPriceLabel = formatPrice(crosshairPrice);
   const firstTimeLabel = firstVisibleTime === null
@@ -308,7 +308,7 @@ export default function CandlestickChartRenderer({
               y={currentPriceY + 3}
               fontSize={chartLabelFontSize(currentPriceLabel, padding.right - 8)}
               fontWeight="bold"
-              fill="#ffffff"
+              fill={colors.screen}
             >
               {currentPriceLabel}
             </SvgText>

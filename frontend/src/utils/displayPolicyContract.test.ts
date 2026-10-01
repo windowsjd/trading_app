@@ -23,7 +23,7 @@ const walletFxScreen = read('screens/wallet/WalletFxScreen.tsx');
 describe('numeric asset symbol display contract', () => {
   it('uses shared helpers across market, detail, order and record surfaces', () => {
     assert.match(marketRow, /getAssetSymbolMarketDisplay\(displayItem\)/u);
-    assert.match(marketSearch, /getAssetSymbolMarketDisplay\(item\)/u);
+    assert.match(marketSearch, /<MarketAssetRow item=\{item\}/u);
     assert.match(assetChart, /getTradingPair\(asset\)/u);
     assert.match(read('features/asset/tradingHeader.ts'), /getAssetNameDisplay\(asset\)/u);
     assert.match(orderScreen, /label=\{side === 'buy' \? '매수' : '매도'\}/u);
@@ -52,8 +52,9 @@ describe('separate asset and account availability display contract', () => {
     assert.doesNotMatch(marketScreen, /accountMode|useTradingAccount/u);
     assert.doesNotMatch(marketRow, /accountMode/u);
     assert.doesNotMatch(marketSearch, /accountMode|useTradingAccount/u);
-    assert.match(marketRow, /getAssetTradingWarning\(/u);
-    assert.match(marketSearch, /getAssetTradingWarning\(/u);
+    assert.match(marketRow, /getMarketException\(displayItem\)/u);
+    assert.match(marketSearch, /<MarketAssetRow/u);
+    assert.match(read('features/market/marketPresentation.ts'), /getAssetTradingWarning\(item\)/u);
   });
 
   it('sanitizes asset reasons on detail and order surfaces', () => {

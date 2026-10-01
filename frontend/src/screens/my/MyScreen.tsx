@@ -5,7 +5,11 @@ import {
   Text,
   StyleSheet,
   SafeAreaView,
+  ScrollView,
+  Platform,
 } from '../../theme/native';
+import { getScreenContentStyle } from '../../theme/screenLayout';
+import ProfileAvatar from '../../components/common/ProfileAvatar';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useQuery } from '@tanstack/react-query';
 
@@ -177,9 +181,12 @@ export default function MyScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View testID={TEST_IDS.my.screen} style={styles.content}>
+      <ScrollView testID={TEST_IDS.my.screen} contentContainerStyle={styles.content}>
         <View style={styles.card}>
-          <Text style={styles.title}>{me.nickname}</Text>
+          <View style={styles.identity}>
+            <ProfileAvatar profileImageUrl={me.profileImageUrl} size={64} testID="my-profile-avatar" />
+            <Text style={styles.title}>{me.nickname}</Text>
+          </View>
           <Text style={styles.helper}>이메일 {me.email}</Text>
           {ranking ? (
             <>
@@ -213,14 +220,14 @@ export default function MyScreen({ navigation }: Props) {
             <Text style={styles.logoutText}>로그아웃</Text>
           </ActionPressable>
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: semantic.screen },
-  content: { padding: 16, gap: 12 },
+  content: { ...getScreenContentStyle(Platform.OS), padding: 16, gap: 12 },
   card: {
     borderWidth: 1,
     borderColor: semantic.border,
@@ -230,7 +237,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   // A long nickname or email wraps rather than running off the card.
-  title: { fontSize: 22, fontWeight: '700', lineHeight: 30 },
+  identity: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  title: { flex: 1, minWidth: 0, fontSize: 22, fontWeight: '700', lineHeight: 30 },
   helper: { fontSize: 14, color: semantic.secondary, lineHeight: 21 },
   menuRow: {
     paddingVertical: 14,

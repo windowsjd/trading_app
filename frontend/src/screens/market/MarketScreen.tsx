@@ -1,5 +1,6 @@
 import { semantic } from '../../theme/tokens';
 import { getScreenContentStyle } from '../../theme/screenLayout';
+import { getMarketSessionLabel } from '../../features/market/marketPresentation';
 import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
@@ -183,6 +184,10 @@ export default function MarketScreen({ navigation }: Props) {
               </Text>
             ) : null}
 
+            <Text testID="market-session-summary" style={styles.sessionSummary}>
+              {getMarketSessionLabel(selectedTab, items, tickersByAssetId)}
+            </Text>
+
             {/* One screen-level notice; rows never repeat a connection error. */}
             {isAdmin && showReconnectBanner ? (
               <View
@@ -282,5 +287,6 @@ const styles = StyleSheet.create({
   },
   inlineWarningText: { fontSize: 13, color: semantic.warning },
   priceBasisText: { fontSize: 13, color: semantic.secondary },
+  sessionSummary: { fontSize: 13, color: semantic.secondary, textAlign: 'right', marginTop: 4 },
   footerLoader: { paddingVertical: 16 },
 });

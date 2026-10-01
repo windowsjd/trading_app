@@ -1,3 +1,4 @@
+import { financial } from '../../theme/financialColors.ts';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
@@ -120,7 +121,7 @@ test('320px and large text keep both order actions flexible below the chart', as
   h.dimensions = { width: 320, height: 700, fontScale: 2 };
   await openDetail(h);
   t.after(h.close);
-  for (const [id, color] of [[TEST_IDS.assetDetail.openBuyOrder, '#16a34a'], [TEST_IDS.assetDetail.openSellOrder, '#dc2626']]) {
+  for (const [id, color] of [[TEST_IDS.assetDetail.openBuyOrder, financial.buyAction], [TEST_IDS.assetDetail.openSellOrder, financial.sellAction]]) {
     const action = h.node(id);
     assert.equal(action.props.style.flex, 1);
     assert.equal(action.props.style.minWidth, 0);

@@ -1,3 +1,4 @@
+import ProfileAvatar from '../../components/common/ProfileAvatar';
 import { semantic } from '../../theme/tokens';
 import React, { useCallback } from 'react';
 import {
@@ -5,7 +6,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Image,
   RefreshControl,
 } from '../../theme/native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -93,9 +93,7 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
       }
     >
       <View style={styles.card}>
-        {user.profileImageUrl ? (
-          <Image source={{ uri: user.profileImageUrl }} style={styles.avatar} />
-        ) : null}
+        <ProfileAvatar profileImageUrl={user.profileImageUrl} size={56} />
         <Text style={styles.title}>{user.nickname}</Text>
         <Text style={styles.helper}>
           {season?.name ?? '현재 시즌 정보가 없습니다.'}
@@ -231,5 +229,4 @@ const styles = StyleSheet.create({
   name: { flexShrink: 1, minWidth: 0 },
   symbol: { fontSize: 16, fontWeight: '600', flexShrink: 1 },
   historyRow: { gap: 6, paddingVertical: 8 },
-  avatar: { width: 56, height: 56, borderRadius: 28 },
 });

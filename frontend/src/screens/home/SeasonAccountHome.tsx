@@ -37,6 +37,7 @@ import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
 import HomePortfolioCharts from './HomePortfolioCharts';
 import HomeAssetHero from './HomeAssetHero';
+import ProfileAvatar from '../../components/common/ProfileAvatar';
 
 /**
  * Home for a SEASON account (작업 11 §10.1).
@@ -272,7 +273,10 @@ export default function SeasonAccountHome({
         ) : meQuery.isError || !meQuery.data ? (
           <InlineEmptyState message="사용자 정보를 불러오지 못했습니다." />
         ) : (
-          <Text testID={TEST_IDS.home.nickname} style={styles.nickname}>{meQuery.data.nickname}</Text>
+          <View style={styles.identity}>
+            <ProfileAvatar profileImageUrl={meQuery.data.profileImageUrl} size={36} testID="home-profile-avatar" />
+            <Text testID={TEST_IDS.home.nickname} style={styles.nickname}>{meQuery.data.nickname}</Text>
+          </View>
         )}
         <View style={styles.row}>
           <View style={[styles.flex, { flexBasis: 100 * fontScale }]}>
@@ -420,7 +424,8 @@ const styles = StyleSheet.create({
   // Each value can wrap within its track; narrow rows can stack the tracks.
   flex: { flexGrow: 1, minWidth: 0, gap: 4 },
   label: { fontSize: 13, color: semantic.secondary },
-  nickname: { fontSize: 15, fontWeight: '600', lineHeight: 23 },
+  identity: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  nickname: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: '600', lineHeight: 23 },
   medium: { fontSize: 20, fontWeight: '700', lineHeight: 28 },
   helper: { fontSize: 14, color: semantic.secondary, lineHeight: 21 },
   warningBox: {

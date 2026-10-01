@@ -113,7 +113,7 @@ export const apiClient = {
     if (path === '/me' && state.role === 'error')
       throw Error('role unavailable');
     if (path === '/me')
-      return response({ id: 'fixture-user', role: state.role });
+      return response({ id: 'fixture-user', role: state.role, nickname: '투자자', email: 'fixture@example.test', profileImageUrl: null, portfolioPublic: true });
     if (parts[1] === 'assets') {
       if (!parts[2]) {
         const filtered = assets.filter(
@@ -142,7 +142,7 @@ export const apiClient = {
             open: String(base * (0.9 + i * 0.0005)),
             high: String(base * (0.915 + i * 0.0005)),
             low: String(base * (0.885 + i * 0.0005)),
-            close: String(base * (0.905 + i * 0.0005)),
+            close: String(base * ((params.has('mixedCandles') && i % 2 ? 0.895 : 0.905) + i * 0.0005)),
             volume: '100',
           })),
         });

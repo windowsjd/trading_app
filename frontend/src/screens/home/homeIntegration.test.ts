@@ -31,6 +31,7 @@ describe('Home asset hierarchy and real portfolio/ranking/me sources', () => {
       const h = createHomeHarness(mode);
       t.after(h.close);
       h.seed(h.account, fixture[mode].data);
+      h.client.setQueryData(QUERY_KEYS.me, { id: 'user-1', nickname: '김재민', profileImageUrl: 'https://example.test/me.png' });
       const { tree } = h.render();
       const textNodes = elements(tree, 'Text');
       const total = textNodes.find((node) => node.props.testID === TEST_IDS.home.totalAsset);
@@ -45,6 +46,9 @@ describe('Home asset hierarchy and real portfolio/ranking/me sources', () => {
       const tier = textNodes.find((node) => node.props.testID === TEST_IDS.home.tier);
       if (mode === 'season') {
         assert.equal(texts(nickname), '김재민');
+        const avatar = elements(tree, 'ProfileAvatar')[0];
+        assert.equal(avatar.props.profileImageUrl, 'https://example.test/me.png');
+        assert.equal(avatar.props.size, 36);
         assert.equal(texts(rank), '#2');
         assert.equal(texts(tier), 'Silver');
         assert.ok(textNodes.indexOf(total) < textNodes.indexOf(nickname));
@@ -53,6 +57,7 @@ describe('Home asset hierarchy and real portfolio/ranking/me sources', () => {
         assert.ok(h.queries.some((query) => query.queryKey === QUERY_KEYS.me));
       } else {
         assert.equal(nickname, undefined);
+        assert.equal(elements(tree, 'ProfileAvatar').length, 0);
         assert.equal(rank, undefined);
         assert.equal(tier, undefined);
       }

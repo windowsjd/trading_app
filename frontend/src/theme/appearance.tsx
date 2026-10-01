@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Appearance, Platform, StatusBar, useColorScheme, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { FINANCIAL_COLOR_STORAGE_KEY, getFinancialColors, parseFinancialColorPreference, type FinancialColorPreference } from './financialColors';
 
 export type AppearancePreference = 'system' | 'light' | 'dark';
 export type AppearanceMode = 'light' | 'dark';
@@ -46,6 +47,9 @@ type AppearanceContextValue = {
   mode: AppearanceMode;
   colors: AppearancePalette;
   setPreference: (value: AppearancePreference) => void;
+  financialPreference: FinancialColorPreference;
+  financialColors: ReturnType<typeof getFinancialColors>;
+  setFinancialPreference: (value: FinancialColorPreference) => void;
 };
 const AppearanceContext = createContext<AppearanceContextValue | null>(null);
 
@@ -55,13 +59,19 @@ export function AppearanceProvider({ children }: { children: React.ReactNode }) 
   const [ready, setReady] = useState(false);
   const revision = useRef(0);
   const writes = useRef<Promise<unknown>>(Promise.resolve());
+  const [financialPreference, setFinancialPreferenceState] = useState<FinancialColorPreference>('red_blue');
+  const financialRevision = useRef(0);
+  const financialWrites = useRef<Promise<unknown>>(Promise.resolve());
 
   useEffect(() => {
     let active = true;
-    void AsyncStorage.getItem(STORAGE_KEY)
+    const appearanceRead = AsyncStorage.getItem(STORAGE_KEY)
       .then((value) => { if (active && revision.current === 0) setPreferenceState(parseAppearancePreference(value)); })
-      .catch(() => { if (active && revision.current === 0) setPreferenceState('system'); })
-      .finally(() => { if (active) setReady(true); });
+      .catch(() => { if (active && revision.current === 0) setPreferenceState('system'); });
+    const financialRead = AsyncStorage.getItem(FINANCIAL_COLOR_STORAGE_KEY)
+      .then((value) => { if (active && financialRevision.current === 0) setFinancialPreferenceState(parseFinancialColorPreference(value)); })
+      .catch(() => { if (active && financialRevision.current === 0) setFinancialPreferenceState('red_blue'); });
+    void Promise.all([appearanceRead, financialRead]).then(() => { if (active) setReady(true); });
     return () => { active = false; };
   }, []);
 
@@ -71,9 +81,17 @@ export function AppearanceProvider({ children }: { children: React.ReactNode }) 
     writes.current = writes.current.catch(() => undefined).then(() => AsyncStorage.setItem(STORAGE_KEY, value))
       .catch(() => { if (revision.current === current) setPreferenceState('system'); });
   };
+  const setFinancialPreference = (value: FinancialColorPreference) => {
+    const current = ++financialRevision.current;
+    setFinancialPreferenceState(value);
+    financialWrites.current = financialWrites.current.catch(() => undefined)
+      .then(() => AsyncStorage.setItem(FINANCIAL_COLOR_STORAGE_KEY, value))
+      .catch(() => { if (financialRevision.current === current) setFinancialPreferenceState('red_blue'); });
+  };
   const mode = resolveAppearance(preference, system);
   const colors = PALETTES[mode];
-  const context = useMemo(() => ({ preference, mode, colors, setPreference }), [preference, mode, colors]);
+  const financialColors = useMemo(() => getFinancialColors(mode, financialPreference), [mode, financialPreference]);
+  const context = useMemo(() => ({ preference, mode, colors, setPreference, financialPreference, financialColors, setFinancialPreference }), [preference, mode, colors, financialPreference, financialColors]);
 
   useEffect(() => {
     if (!ready) return;

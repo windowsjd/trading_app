@@ -32,7 +32,7 @@ export const apiClient = {
     if (path === '/me') return response({
       id: 'home-user', nickname: long ? '아주긴닉네임대한민국투자챔피언김재민ABCDEFGHIJKLMNOPQRSTUVWXYZ' : '김재민',
       role: 'user', status: 'active', email: 'home@example.invalid',
-      profileImageUrl: null, createdAt: base.createdAt, portfolioPublic: true,
+      profileImageUrl: params.get('profile') === 'valid' ? `${location.origin}/avatar.svg` : params.get('profile') === 'broken' ? `${location.origin}/missing-avatar.png` : null, createdAt: base.createdAt, portfolioPublic: true,
     });
     if (path === '/trading-accounts') return response({ accounts: transport.accounts });
     if (path === '/seasons/current') return response({

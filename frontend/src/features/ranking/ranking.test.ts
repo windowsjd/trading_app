@@ -126,7 +126,11 @@ const unavailable = {
 describe('ranking wire response rendering', () => {
   it('renders real flat ranking rows and available myRanking', () => {
     const h = createHarness();
+    h.queries.set('me', h.ready({ id: 'self', nickname: '내 닉네임', profileImageUrl: 'https://example.test/me.png' }));
     const html = h.render();
+    assert.match(html, /ranking-my-avatar-image/);
+    assert.match(html, /ranking-top-avatar-user-1-image/);
+    assert.match(html, /ranking-avatar-user-2-fallback/);
     assert.match(html, /trader-1/);
     assert.match(html, /trader-2/);
     assert.match(html, /#1/);

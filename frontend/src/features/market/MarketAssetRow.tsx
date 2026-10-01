@@ -1,17 +1,16 @@
 import { semantic } from '../../theme/tokens';
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, Platform } from '../../theme/native';
+import { View, Text, StyleSheet } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 
 import { TEST_IDS } from '../../constants/testIds';
 import {
-  formatPercent,
   getAssetNameDisplay,
   getAssetPriceText,
   getAssetSymbolMarketDisplay,
 } from '../../utils/format';
 import type { AssetTickerMessage } from '../asset/assetTickerPolicy';
-import { getAssetTradingWarning } from '../asset/tradingUx';
+import { getMarketChangeDisplay, getMarketException } from './marketPresentation';
 import type { AssetPriceErrorDto, MarketAssetItemDto } from './api';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import { mergeMarketAssetTicker } from './mergeMarketAssetTicker';
@@ -26,16 +25,6 @@ type Props = {
   priceError?: AssetPriceErrorDto;
   onPress: (assetId: string) => void;
 };
-
-function getChangeRateText(item: MarketAssetItemDto) {
-  const warning = getAssetTradingWarning(item);
-  if (warning) return warning;
-  if (item.price?.state !== 'available' || !item.price.changeRate) {
-    return item.marketStatus;
-  }
-
-  return `${formatPercent(item.price.changeRate)}%`;
-}
 
 /**
  * One market list row.
@@ -58,6 +47,8 @@ function MarketAssetRowComponent({
   );
   const nameDisplay = getAssetNameDisplay(displayItem);
   const symbolMarketDisplay = getAssetSymbolMarketDisplay(displayItem);
+  const change = getMarketChangeDisplay(displayItem);
+  const exception = getMarketException(displayItem);
 
   return (
     <View>
@@ -84,11 +75,8 @@ function MarketAssetRowComponent({
           >
             {getAssetPriceText(displayItem)}
           </Text>
-          <Text style={styles.helper}>{getChangeRateText(displayItem)}</Text>
-          <Text style={styles.helper}>
-            {displayItem.marketStatus} ·{' '}
-            {displayItem.tradable ? '거래 가능' : '거래 제한'}
-          </Text>
+          <Text testID={`market-change-${item.id}`} style={[styles.helper, { color: change.color }]}>{change.text}</Text>
+          {exception ? <Text style={styles.exception}>{exception}</Text> : null}
         </View>
       </ActionPressable>
       {priceError && displayItem.price?.state !== 'available' ? (
@@ -111,21 +99,24 @@ export const MarketAssetRow = React.memo(
 );
 
 const styles = StyleSheet.create({
-  identity: Platform.OS === 'web' ? { flex: 1, minWidth: 0 } : {},
+  identity: { flexGrow: 1, flexShrink: 1, flexBasis: 110, minWidth: 0 },
   itemRow: {
     paddingHorizontal: 12, marginBottom: 8, borderRadius: 12,
     backgroundColor: semantic.surface,
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
     justifyContent: 'space-between',
     paddingVertical: 14,
     borderWidth: 1,
     borderColor: semantic.border,
   },
   itemSymbol: { fontSize: 16, fontWeight: '700' },
-  itemPrice: { fontSize: 15, fontWeight: '600' },
+  itemPrice: { maxWidth: '100%', textAlign: 'right', fontSize: 15, fontWeight: '600' },
   itemPriceStale: { color: semantic.warning },
-  alignEnd: { alignItems: 'flex-end' },
+  alignEnd: { alignItems: 'flex-end', flexGrow: 1, flexShrink: 1, minWidth: 0, maxWidth: '100%' },
   helper: { fontSize: 14, color: semantic.secondary },
+  exception: { fontSize: 12, color: semantic.warning, textAlign: 'right' },
 });
 
 export default MarketAssetRow;

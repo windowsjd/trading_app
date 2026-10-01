@@ -85,3 +85,15 @@ strings. Each root must share a centered 1120px content cap with 16px horizontal
 padding and a full screen scroll viewport. The runner also exercises actual
 Market/Ranking/Record pagination and navigation. Reports and screenshots go to
 `/tmp/trading-root-tabs-browser` (override `ROOT_TABS_BROWSER_OUTPUT`).
+
+
+Run `NODE_PATH=/path/to/browser-tools/node_modules node test/browser/profileFinancialBrowser.cjs`
+for Home/Ranking/MY avatars, Market/Search presentation and the device financial preference.
+It reuses the root-tab and trading fixtures, actual AppearanceProvider, Settings,
+order/quote UI and SVG candle renderer. The 304 layouts cover 320/360/390/430px,
+Light/Dark × Red/Blue/Green/Red, and font scales 1/1.5/2 for identity/market/settings.
+It also checks image success/failure with a local image response, large ranks/prices,
+closed/open/unknown/crypto sessions, missing change rates, Settings restore and OS changes,
+and instant repaint of memoized rows/candles, order sides and bid/ask accents.
+Artifacts go to `/tmp/trading-profile-financial-browser` (override
+`PROFILE_FINANCIAL_BROWSER_OUTPUT`). External requests remain blocked.

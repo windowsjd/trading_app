@@ -442,11 +442,11 @@ describe('order panel side colors in the trading screen', () => {
     const color = (node: any) => (Array.isArray(node.props.style)
       ? Object.assign({}, ...node.props.style.filter(Boolean))
       : node.props.style).backgroundColor;
-    assert.equal(color(h.node(TEST_IDS.assetDetail.buyButton)), '#16a34a');
-    assert.equal(color(h.node(TEST_IDS.order.executeSubmit)), '#16a34a');
+    assert.equal(color(h.node(TEST_IDS.assetDetail.buyButton)), financial.buyAction);
+    assert.equal(color(h.node(TEST_IDS.order.executeSubmit)), financial.buyAction);
     await h.press(TEST_IDS.assetDetail.sellButton); await h.flush();
-    assert.equal(color(h.node(TEST_IDS.assetDetail.sellButton)), '#dc2626');
-    assert.equal(color(h.node(TEST_IDS.order.executeSubmit)), '#dc2626');
+    assert.equal(color(h.node(TEST_IDS.assetDetail.sellButton)), financial.sellAction);
+    assert.equal(color(h.node(TEST_IDS.order.executeSubmit)), financial.sellAction);
     assert.equal(h.node(TEST_IDS.order.executeSubmit).props.state, 'disabled');
   });
 });

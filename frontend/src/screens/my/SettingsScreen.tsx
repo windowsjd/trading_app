@@ -29,7 +29,7 @@ type Props = NativeStackScreenProps<MyStackParamList, 'Settings'>;
 
 export default function SettingsScreen({ navigation: _navigation }: Props) {
   const queryClient = useQueryClient();
-  const { preference, setPreference, colors } = useAppearance();
+  const { preference, setPreference, colors, financialPreference, setFinancialPreference } = useAppearance();
 
   const meQuery = useQuery({
     queryKey: QUERY_KEYS.me,
@@ -185,10 +185,28 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
             {([['system', '시스템'], ['light', '라이트'], ['dark', '다크']] as const).map(([value, label]) => (
               <ActionPressable key={value} testID={TEST_IDS.settings.appearance(value)}
                 accessibilityRole="radio" accessibilityLabel={label}
+                aria-checked={preference === value}
                 accessibilityState={{ selected: preference === value }}
                 style={[styles.modeChoice, preference === value && styles.modeSelected]}
                 onPress={() => setPreference(value)}>
                 <Text style={[styles.modeText, preference === value && styles.modeSelectedText]}>{label}</Text>
+              </ActionPressable>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>금융 색상</Text>
+          <Text style={styles.helper}>이 기기에만 저장됩니다.</Text>
+          <View style={styles.modeChoices} accessibilityRole="radiogroup" accessibilityLabel="금융 색상">
+            {([['red_blue', '빨강 · 파랑'], ['green_red', '초록 · 빨강']] as const).map(([value, label]) => (
+              <ActionPressable key={value} testID={`settings-financial-${value}`}
+                accessibilityRole="radio" accessibilityLabel={label}
+                aria-checked={financialPreference === value}
+                accessibilityState={{ selected: financialPreference === value }}
+                style={[styles.modeChoice, financialPreference === value && styles.modeSelected]}
+                onPress={() => setFinancialPreference(value)}>
+                <Text style={[styles.modeText, financialPreference === value && styles.modeSelectedText]}>{label}</Text>
               </ActionPressable>
             ))}
           </View>

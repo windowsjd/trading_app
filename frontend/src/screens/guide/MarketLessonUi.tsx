@@ -7,7 +7,6 @@ import Svg, {
   Rect,
   Text as SvgText,
 } from 'react-native-svg';
-import { UP_COLOR, DOWN_COLOR } from '../../components/charts/candleColors';
 import { useAppearance } from '../../theme/appearance';
 import { LessonAction, lessonStyles as s } from './LessonUi';
 import { won, type Ohlc } from './lessonCalculations';
@@ -181,7 +180,7 @@ export function CandleSeries({
   formatPrice?: (value: number) => string;
   timeline?: boolean;
 }) {
-  const { colors } = useAppearance();
+  const { colors, financialColors } = useAppearance();
   return (
     <View style={s.card} testID={id}>
       <Svg width="100%" height={210} viewBox="0 0 300 210" accessible={false}>
@@ -209,7 +208,7 @@ export function CandleSeries({
                 fill={colors.raised}
               />
             );
-          const color = candle.close >= candle.open ? UP_COLOR : DOWN_COLOR;
+          const color = candle.close >= candle.open ? financialColors.candleUp : financialColors.candleDown;
           return (
             <React.Fragment key={i}>
               <Line
@@ -250,8 +249,8 @@ export function CandleSeries({
           : null}
       </Svg>
       <Basis>
-        공통 가격축: {formatPrice(domain[0])}~{formatPrice(domain[1])} · 양봉
-        녹색 / 음봉 빨간색
+        공통 가격축: {formatPrice(domain[0])}~{formatPrice(domain[1])} · 양봉/음봉 색상은
+        설정의 금융 색상을 따릅니다.
       </Basis>
       {timeline ? (
         <Basis>

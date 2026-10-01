@@ -1,3 +1,4 @@
+import { financial, resolveFinancialColor } from '../../theme/financialColors.ts';
 import assert from 'node:assert/strict';
 import { URL } from 'node:url';
 import { createRequire } from 'node:module';
@@ -423,7 +424,7 @@ describe('new guide chapters preserve downward learning flow', () => {
     h.press('gap-open');
     const gap = h.text('gap-result');
     h.press('gap-close');
-    assert.equal(h.find('gap-candle-body-0')?.props.fill, DOWN_COLOR);
+    assert.equal(h.find('gap-candle-body-0')?.props.fill, resolveFinancialColor(DOWN_COLOR, 'light'));
     assert.match(h.text('gap-close-result'), /음봉.*\+6%/s);
     const result = h.text('gap-close-result');
     h.press('gap-scope-extended');
@@ -722,14 +723,14 @@ describe('new guide chapters preserve downward learning flow', () => {
       act(() => h.renderer.unmount());
     });
   it('shares existing real chart colors without changing the market chart policy', () => {
-    assert.equal(UP_COLOR, '#16a34a');
-    assert.equal(DOWN_COLOR, '#dc2626');
+    assert.equal(UP_COLOR, financial.candleUp);
+    assert.equal(DOWN_COLOR, financial.candleDown);
     const source = readFileSync(
       new URL('./MarketLessonUi.tsx', import.meta.url),
       'utf8',
     );
-    assert.match(source, /UP_COLOR/);
-    assert.match(source, /DOWN_COLOR/);
+    assert.match(source, /financialColors.candleUp/);
+    assert.match(source, /financialColors.candleDown/);
     for (const name of [
       'StockLessons',
       'CorporateLessons',

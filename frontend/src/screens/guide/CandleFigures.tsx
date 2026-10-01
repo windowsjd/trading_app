@@ -4,7 +4,7 @@ import { Text, View } from '../../theme/native';
 import Svg, { Line, Polyline, Rect } from 'react-native-svg';
 import { candleParts, won, type Ohlc } from './lessonCalculations';
 import { lessonStyles as s } from './LessonUi';
-import { UP_COLOR, DOWN_COLOR } from '../../components/charts/candleColors';
+import { UP_COLOR } from '../../components/charts/candleColors';
 import { useAppearance } from '../../theme/appearance';
 
 // All teaching candles share a price scale so their shapes are comparable.
@@ -154,9 +154,9 @@ export function CandleFigure({
   title: string;
   details?: boolean;
 }) {
-  const { colors } = useAppearance();
+  const { colors, financialColors } = useAppearance();
   const parts = candleParts(candle);
-  const color = candle.close >= candle.open ? UP_COLOR : DOWN_COLOR;
+  const color = candle.close >= candle.open ? financialColors.candleUp : financialColors.candleDown;
   const label = `${title}. ${parts.direction}. 시가 ${won(candle.open)}, 고가 ${won(candle.high)}, 저가 ${won(candle.low)}, 종가 ${won(candle.close)}.`;
   return (
     <View testID={id} style={s.card}>

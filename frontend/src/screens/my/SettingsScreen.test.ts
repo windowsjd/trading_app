@@ -76,7 +76,8 @@ function settingsHarness(portfolioPublic = true) {
     },
     '../../theme/appearance': { useAppearance: () => {
       const [preference, select] = React.useState('system');
-      return { preference, mode: preference === 'dark' ? 'dark' : 'light',
+      const [financialPreference, setFinancialPreference] = React.useState('red_blue');
+      return { preference, financialPreference, setFinancialPreference, mode: preference === 'dark' ? 'dark' : 'light',
         colors: { border: '#ddd', text: '#111' },
         setPreference: (value: string) => { h.appearanceChoices.push(value); select(value); } };
     } },
@@ -300,6 +301,20 @@ describe('Settings appearance preference', () => {
     await act(async () => x.node(TEST_IDS.settings.appearance('light')).props.onPress());
     assert.equal(x.node(TEST_IDS.settings.appearance('light')).props.accessibilityState.selected, true);
     assert.deepEqual(x.h.appearanceChoices, ['dark', 'light']);
+    assert.deepEqual(x.h.patches, []);
+  });
+});
+
+
+describe('Settings financial palette preference', () => {
+  it('offers exactly two presets, defaults to Red/Blue and never PATCHes a profile', async (t) => {
+    const x = settingsHarness(); t.after(x.close); await x.mount();
+    assert.equal(x.node('settings-financial-red_blue').props.accessibilityState.selected, true);
+    await act(async () => x.node('settings-financial-green_red').props.onPress());
+    assert.equal(x.node('settings-financial-green_red').props.accessibilityState.selected, true);
+    assert.equal(x.node('settings-financial-red_blue').props.accessibilityState.selected, false);
+    await act(async () => x.node('settings-financial-red_blue').props.onPress());
+    assert.equal(x.node('settings-financial-red_blue').props.accessibilityState.selected, true);
     assert.deepEqual(x.h.patches, []);
   });
 });

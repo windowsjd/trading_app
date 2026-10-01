@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 import { semantic, resolveSemanticColor, resolveSemanticStyle } from './tokens.ts';
-import { financial, FINANCIAL_COLORS } from './financialColors.ts';
+import { financial, getFinancialColors } from './financialColors.ts';
 
 const require = createRequire(import.meta.url);
 const { load } = require('../../test/ledgerTestHarness.cjs');
@@ -22,8 +22,8 @@ const native = {
   KeyboardAvoidingView: 'KeyboardAvoidingView', ActivityIndicator: 'ActivityIndicator',
   StyleSheet: { flatten },
 };
-function themed(mode: 'light' | 'dark') {
-  const appearance = { useAppearance: () => ({ mode, colors: PALETTES[mode] }) };
+function themed(mode: 'light' | 'dark', financialPreference: 'red_blue' | 'green_red' = 'red_blue') {
+  const appearance = { useAppearance: () => ({ mode, financialPreference, colors: PALETTES[mode] }) };
   return load(resolve('src/theme/native.tsx'), {
     react: React, 'react-native': native, './appearance': appearance,
     './tokens': require('./tokens.ts'),
@@ -38,8 +38,8 @@ test('explicit semantic tokens resolve in both modes; arbitrary hex is never inf
     assert.equal(flatten(card.props.style).borderColor, PALETTES[mode].border);
     const up = UI.Text.render({ style: { color: financial.rise }, children: '상승' }, null);
     const down = UI.Text.render({ style: { color: financial.buy }, children: '매수' }, null);
-    assert.equal(flatten(up.props.style).color, FINANCIAL_COLORS.rise[mode]);
-    assert.equal(flatten(down.props.style).color, FINANCIAL_COLORS.buy[mode]);
+    assert.equal(flatten(up.props.style).color, getFinancialColors(mode).rise);
+    assert.equal(flatten(down.props.style).color, getFinancialColors(mode).buy);
   }
   assert.equal(flatten(resolveSemanticStyle({ backgroundColor: '#fafafa' }, PALETTES.dark, 'dark')).backgroundColor, '#fafafa');
   assert.equal(resolveSemanticColor('#a13e3b', PALETTES.dark, 'dark'), '#a13e3b');
@@ -109,14 +109,14 @@ test('financial roles stay distinct from neutral roles in the actual palettes', 
   const { light, dark } = appearance.PALETTES;
   for (const mode of ['light', 'dark'] as const) {
     const colors = appearance.PALETTES[mode];
-    assert.match(FINANCIAL_COLORS.buy[mode], /^#/);
-    assert.match(FINANCIAL_COLORS.sell[mode], /^#/);
-    assert.notEqual(FINANCIAL_COLORS.buy[mode], FINANCIAL_COLORS.sell[mode]);
-    assert.notEqual(FINANCIAL_COLORS.rise[mode], FINANCIAL_COLORS.fall[mode]);
+    assert.match(getFinancialColors(mode).buy, /^#/);
+    assert.match(getFinancialColors(mode).sell, /^#/);
+    assert.notEqual(getFinancialColors(mode).buy, getFinancialColors(mode).sell);
+    assert.notEqual(getFinancialColors(mode).rise, getFinancialColors(mode).fall);
     for (const role of Object.keys(financial) as (keyof typeof financial)[]) {
       assert.equal(role in colors, false, `${role} must not live in PALETTES`);
       assert.equal(role in semantic, false, `${role} must not be a neutral token`);
-      assert.equal(resolveSemanticColor(financial[role], colors, mode), FINANCIAL_COLORS[role][mode]);
+      assert.equal(resolveSemanticColor(financial[role], colors, mode), getFinancialColors(mode)[role]);
     }
   }
   assert.notEqual(light.navigation, dark.navigation);
@@ -141,6 +141,22 @@ test('surface hierarchy matches white cards on a near-white canvas with inset co
     const UI = themed(mode);
     for (const role of ['screen', 'surface', 'raised'] as const) {
       assert.equal(flatten(UI.View.render({ style: { backgroundColor: semantic[role] } }, null).props.style).backgroundColor, colors[role]);
+    }
+  }
+});
+
+
+test('actual native wrappers resolve both financial presets while UI status colors remain unchanged', () => {
+  for (const mode of ['light', 'dark'] as const) for (const preference of ['red_blue', 'green_red'] as const) {
+    const UI = themed(mode, preference);
+    const palette = getFinancialColors(mode, preference);
+    for (const role of Object.keys(financial) as (keyof typeof financial)[]) {
+      const node = UI.Text.render({ style: { color: financial[role] } }, null);
+      assert.equal(flatten(node.props.style).color, palette[role]);
+    }
+    for (const role of ['error', 'warning', 'success', 'navigationActive', 'info'] as const) {
+      const node = UI.Text.render({ style: { color: semantic[role] } }, null);
+      assert.equal(flatten(node.props.style).color, PALETTES[mode][role]);
     }
   }
 });
