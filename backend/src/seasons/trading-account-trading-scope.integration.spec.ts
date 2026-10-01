@@ -80,6 +80,7 @@ function runDbIntegrationPrepare() {
 }
 
 const TRADING_SCOPE_DB_RUNNER = `
+import { tradingSessions } from './test/support/trading-session-fixture';
 import 'dotenv/config';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -104,8 +105,7 @@ import { preflightFxExecuteRequest } from './src/fx/fx-execute-request-policy';
 import { computeFxQuoteRequestHash, computeOrderQuoteRequestHash } from './src/providers/durable-quote.policy';
 import { OrdersService } from './src/orders/orders.service';
 import { OrderReservationService } from './src/orders/order-reservation.service';
-import { applyMarketSessionOverrideSnapshot, resetMarketSessionOverrideStoreForTest } from './src/orders/market-calendar/market-session-override.store';
-import { getZonedParts } from './src/providers/kis/candles/kis-candle-time';
+import { resetMarketSessionOverrideStoreForTest } from './src/orders/market-calendar/market-session-override.store';
 import { LimitOrderCreateService } from './src/orders/limit-order-create.service';
 import { LimitOrderCancelService } from './src/orders/limit-order-cancel.service';
 import { LimitOrderCandleEvidenceService } from './src/orders/limit-order-candle-evidence.service';
@@ -688,13 +688,7 @@ async function testLimitLifecycleAndFill() {
   // The execution service now revalidates Path A itself. Use eligible KRX
   // provider evidence, not the old KRW-crypto/admin fixture that bypassed it.
   await prisma.asset.update({ where: { id: asset.id }, data: { assetType: AssetType.domestic_stock, market: 'KRX' } });
-  const parts = getZonedParts(new Date(), 'Asia/Seoul');
-  const pad = (value) => String(value).padStart(2, '0');
-  applyMarketSessionOverrideSnapshot([{
-    market: 'KRX', localDate: parts.year + '-' + pad(parts.month) + '-' + pad(parts.day),
-    overrideType: 'custom', openTime: '000000', closeTime: '235959',
-    reason: 'deterministic eligible Path A scope fixture',
-  }], new Date());
+  tradingSessions.set(new Date());
   trackScope({
     userIds: [user.id, stranger.userId],
     seasonIds: [s.seasonId, s2.seasonId, stranger.seasonId],
@@ -1360,6 +1354,7 @@ async function main() {
     console.log('trading scope db integration ok');
   } finally {
     await cleanupAll();
+    tradingSessions.reset();
     resetMarketSessionOverrideStoreForTest();
     await prisma.$disconnect();
   }

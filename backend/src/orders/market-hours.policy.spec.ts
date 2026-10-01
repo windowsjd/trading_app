@@ -96,6 +96,30 @@ describe('market hours policy', () => {
       resetMarketSessionOverrideStoreForTest();
     });
 
+    it.each(['2026-07-11', '2026-07-12'])(
+      'keeps KRX closed on weekend %s even with an all-day custom override',
+      (localDate) => {
+        const now = new Date(`${localDate}T03:00:00Z`);
+        applyMarketSessionOverrideSnapshot(
+          [
+            {
+              market: 'KRX',
+              localDate,
+              overrideType: 'custom',
+              openTime: '000000',
+              closeTime: '235959',
+              reason: 'weekend regression',
+            },
+          ],
+          now,
+        );
+        expect(getAssetTradingStatus(krxAsset, now)).toMatchObject({
+          tradable: false,
+          reason: 'MARKET_CLOSED',
+        });
+      },
+    );
+
     it('rejects orders with MARKET_CLOSED on an override-closed regular day', () => {
       const midday = new Date('2026-07-13T03:00:00.000Z');
       expect(getAssetTradingStatus(krxAsset, midday).tradable).toBe(true);

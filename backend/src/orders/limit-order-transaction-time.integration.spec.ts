@@ -50,6 +50,7 @@ describe('Limit order post-lock transaction clock DB integration', () => {
 });
 
 const LIMIT_ORDER_TRANSACTION_TIME_RUNNER = `
+import { tradingSessions } from './test/support/trading-session-fixture';
 import 'dotenv/config';
 import assert from 'node:assert/strict';
 import { Client } from 'pg';
@@ -70,10 +71,8 @@ import { LimitOrderCancelService } from './src/orders/limit-order-cancel.service
 import { OrderReservationService } from './src/orders/order-reservation.service';
 import { computeOrderQuoteRequestHash } from './src/providers/durable-quote.policy';
 import {
-  applyMarketSessionOverrideSnapshot,
   resetMarketSessionOverrideStoreForTest,
 } from './src/orders/market-calendar/market-session-override.store';
-import { getZonedParts } from './src/providers/kis/candles/kis-candle-time';
 import { getAssetTradingStatus } from './src/orders/market-hours.policy';
 
 const prisma = new PrismaService();
@@ -95,6 +94,7 @@ async function main() {
     await run('stock market closed while create waited', testMarketClose);
     console.log('limit order transaction-time db integration ok');
   } finally {
+    tradingSessions.reset();
     resetMarketSessionOverrideStoreForTest();
     await prisma.$disconnect();
   }
@@ -349,29 +349,13 @@ async function testSeasonEnd() {
   }
 }
 
-function pad(value) {
-  return String(value).padStart(2, '0');
-}
-
 async function testMarketClose() {
   const now = await dbNow();
   // Keep the row-lock wait comfortably below Prisma's default five-second
   // interactive-transaction timeout while still crossing a real wall-clock
   // market boundary.
   const closeAt = new Date(now.getTime() + 2000);
-  const parts = getZonedParts(closeAt, 'Asia/Seoul');
-  const localDate = parts.year + '-' + pad(parts.month) + '-' + pad(parts.day);
-  applyMarketSessionOverrideSnapshot(
-    [{
-      market: 'KRX',
-      localDate,
-      overrideType: 'custom',
-      openTime: '000000',
-      closeTime: pad(parts.hour) + pad(parts.minute) + pad(parts.second),
-      reason: 'deterministic integration close barrier',
-    }],
-    now,
-  );
+  tradingSessions.set(now, closeAt);
   assert.deepEqual(
     getAssetTradingStatus(
       { assetType: AssetType.domestic_stock, market: 'KRX' },
@@ -401,6 +385,7 @@ async function testMarketClose() {
       },
     );
   } finally {
+    tradingSessions.reset();
     resetMarketSessionOverrideStoreForTest();
     await cleanup(scenario);
   }

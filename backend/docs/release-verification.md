@@ -36,6 +36,8 @@ cd backend
 pnpm install --frozen-lockfile
 pnpm exec prisma format && pnpm exec prisma validate
 pnpm exec prisma generate
+# src/generated/prisma is committed; regeneration must preserve the checkout.
+git status --porcelain --untracked-files=all -- src/generated/prisma
 pnpm exec prisma migrate deploy
 pnpm exec prisma migrate status
 pnpm exec prisma migrate diff \
@@ -52,6 +54,36 @@ included. Where a migration named an index explicitly, `schema.prisma` pins the
 same name with `map:` — otherwise Prisma computes a truncated default, the gate
 reports a rename against a database that is in fact correct, and a check that
 fails on every green build stops being read.
+
+`prisma/schema.prisma` is the canonical Prisma source. Commit the complete
+`src/generated/prisma` output whenever the schema (including comments), generator
+configuration, or pinned Prisma version changes. Backend quality checks this
+directory immediately after generation and fails on modified, staged, deleted,
+or untracked artifacts. Do not discard generation output in CI. Candle's
+clean-tree and commit-traceability checks remain a separate release gate.
+
+### Calendar fixtures for PostgreSQL order tests
+
+The tsx order runners import `test/support/trading-session-fixture.ts` before
+product services. It replaces only the two calendar session lookups used by
+orders, price eligibility, and candle evidence. Explicit session windows are
+relative to real PostgreSQL timestamps; no JS or DB execution clock is mocked.
+Close, quote TTL, price/rate freshness, season end and post-lock execution
+checks therefore still cross real time boundaries. Override-store readiness
+also remains fail-closed. These synthetic sessions do not alter the production
+weekend, holiday, US calendar or operator-override policy.
+
+`trading-session-fixture.spec.ts` verifies identical open/close/candle and
+unavailable behavior for Friday, Saturday and Sunday inputs, then restores the
+real calendar. `market-hours.policy.spec.ts` separately proves KRX remains
+closed on both weekend days even with an all-day custom operator override.
+Keep both contracts when adding a stock fixture; a custom override for today's
+date alone cannot open a production weekend.
+
+Ops lease fixtures must include the Path A snapshot's `effectiveAt` as well as
+its price and ID. Barrier waits must fail if the job completes before reaching
+the barrier; a successful child-process exit alone does not prove that the
+renewal, takeover, error and lifecycle scenarios executed.
 
 ### Core account DB integration
 
@@ -125,6 +157,7 @@ is an additive change that cannot fail the contract test.
 cd frontend
 npm ci
 npm run lint:accounts:check  # scoped ESLint; warnings fail, nothing is fixed
+npm run lint:guides:check
 npm run typecheck
 npm test                     # node --test
 npm run export:web           # production bundle; proves every module resolves
@@ -180,8 +213,8 @@ identifier audit, and the account integration suites before reopening writes.
 
 | Job | Gate |
 | --- | --- |
-| Backend quality | install, generate, candle lint/format, **trading-account lint**, typecheck, build, unit |
-| Frontend quality | `npm ci`, **account/auth lint**, typecheck, tests, **web export** |
+| Backend quality | install, generate + committed-artifact check, candle lint/format, **trading-account lint**, typecheck, build, unit |
+| Frontend quality | `npm ci`, **account/auth and guide lint**, typecheck, tests, **web export** |
 | Limit order PostgreSQL integration | migrations + drift + money-layer order/FX suites |
 | **Core account PostgreSQL integration** | migrations + drift + account/general/ranking/settlement suites + repair·audit dry-runs |
 | **Release-critical E2E** | `pnpm test:e2e`, no environment variables |
