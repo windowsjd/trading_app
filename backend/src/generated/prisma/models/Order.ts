@@ -28,6 +28,10 @@ export type AggregateOrder = {
 
 export type OrderAvgAggregateOutputType = {
   quantity: runtime.Decimal | null
+  executedQuantity: runtime.Decimal | null
+  canceledQuantity: runtime.Decimal | null
+  requestedAmount: runtime.Decimal | null
+  unspentAmount: runtime.Decimal | null
   limitPrice: runtime.Decimal | null
   executedPrice: runtime.Decimal | null
   grossAmount: runtime.Decimal | null
@@ -40,6 +44,10 @@ export type OrderAvgAggregateOutputType = {
 
 export type OrderSumAggregateOutputType = {
   quantity: runtime.Decimal | null
+  executedQuantity: runtime.Decimal | null
+  canceledQuantity: runtime.Decimal | null
+  requestedAmount: runtime.Decimal | null
+  unspentAmount: runtime.Decimal | null
   limitPrice: runtime.Decimal | null
   executedPrice: runtime.Decimal | null
   grossAmount: runtime.Decimal | null
@@ -59,6 +67,10 @@ export type OrderMinAggregateOutputType = {
   orderType: $Enums.OrderType | null
   status: $Enums.OrderStatus | null
   quantity: runtime.Decimal | null
+  executedQuantity: runtime.Decimal | null
+  canceledQuantity: runtime.Decimal | null
+  requestedAmount: runtime.Decimal | null
+  unspentAmount: runtime.Decimal | null
   limitPrice: runtime.Decimal | null
   executedPrice: runtime.Decimal | null
   currencyCode: $Enums.CurrencyCode | null
@@ -93,6 +105,10 @@ export type OrderMaxAggregateOutputType = {
   orderType: $Enums.OrderType | null
   status: $Enums.OrderStatus | null
   quantity: runtime.Decimal | null
+  executedQuantity: runtime.Decimal | null
+  canceledQuantity: runtime.Decimal | null
+  requestedAmount: runtime.Decimal | null
+  unspentAmount: runtime.Decimal | null
   limitPrice: runtime.Decimal | null
   executedPrice: runtime.Decimal | null
   currencyCode: $Enums.CurrencyCode | null
@@ -127,6 +143,11 @@ export type OrderCountAggregateOutputType = {
   orderType: number
   status: number
   quantity: number
+  executedQuantity: number
+  canceledQuantity: number
+  requestedAmount: number
+  unspentAmount: number
+  executionEvidence: number
   limitPrice: number
   executedPrice: number
   currencyCode: number
@@ -157,6 +178,10 @@ export type OrderCountAggregateOutputType = {
 
 export type OrderAvgAggregateInputType = {
   quantity?: true
+  executedQuantity?: true
+  canceledQuantity?: true
+  requestedAmount?: true
+  unspentAmount?: true
   limitPrice?: true
   executedPrice?: true
   grossAmount?: true
@@ -169,6 +194,10 @@ export type OrderAvgAggregateInputType = {
 
 export type OrderSumAggregateInputType = {
   quantity?: true
+  executedQuantity?: true
+  canceledQuantity?: true
+  requestedAmount?: true
+  unspentAmount?: true
   limitPrice?: true
   executedPrice?: true
   grossAmount?: true
@@ -188,6 +217,10 @@ export type OrderMinAggregateInputType = {
   orderType?: true
   status?: true
   quantity?: true
+  executedQuantity?: true
+  canceledQuantity?: true
+  requestedAmount?: true
+  unspentAmount?: true
   limitPrice?: true
   executedPrice?: true
   currencyCode?: true
@@ -222,6 +255,10 @@ export type OrderMaxAggregateInputType = {
   orderType?: true
   status?: true
   quantity?: true
+  executedQuantity?: true
+  canceledQuantity?: true
+  requestedAmount?: true
+  unspentAmount?: true
   limitPrice?: true
   executedPrice?: true
   currencyCode?: true
@@ -256,6 +293,11 @@ export type OrderCountAggregateInputType = {
   orderType?: true
   status?: true
   quantity?: true
+  executedQuantity?: true
+  canceledQuantity?: true
+  requestedAmount?: true
+  unspentAmount?: true
+  executionEvidence?: true
   limitPrice?: true
   executedPrice?: true
   currencyCode?: true
@@ -378,6 +420,11 @@ export type OrderGroupByOutputType = {
   orderType: $Enums.OrderType
   status: $Enums.OrderStatus
   quantity: runtime.Decimal
+  executedQuantity: runtime.Decimal | null
+  canceledQuantity: runtime.Decimal | null
+  requestedAmount: runtime.Decimal | null
+  unspentAmount: runtime.Decimal | null
+  executionEvidence: runtime.JsonValue | null
   limitPrice: runtime.Decimal | null
   executedPrice: runtime.Decimal | null
   currencyCode: $Enums.CurrencyCode
@@ -436,6 +483,11 @@ export type OrderWhereInput = {
   orderType?: Prisma.EnumOrderTypeFilter<"Order"> | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFilter<"Order"> | $Enums.OrderStatus
   quantity?: Prisma.DecimalFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.JsonNullableFilter<"Order">
   limitPrice?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFilter<"Order"> | $Enums.CurrencyCode
@@ -477,6 +529,11 @@ export type OrderOrderByWithRelationInput = {
   orderType?: Prisma.SortOrder
   status?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
+  executedQuantity?: Prisma.SortOrderInput | Prisma.SortOrder
+  canceledQuantity?: Prisma.SortOrderInput | Prisma.SortOrder
+  requestedAmount?: Prisma.SortOrderInput | Prisma.SortOrder
+  unspentAmount?: Prisma.SortOrderInput | Prisma.SortOrder
+  executionEvidence?: Prisma.SortOrderInput | Prisma.SortOrder
   limitPrice?: Prisma.SortOrderInput | Prisma.SortOrder
   executedPrice?: Prisma.SortOrderInput | Prisma.SortOrder
   currencyCode?: Prisma.SortOrder
@@ -522,6 +579,11 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   orderType?: Prisma.EnumOrderTypeFilter<"Order"> | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFilter<"Order"> | $Enums.OrderStatus
   quantity?: Prisma.DecimalFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.JsonNullableFilter<"Order">
   limitPrice?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFilter<"Order"> | $Enums.CurrencyCode
@@ -563,6 +625,11 @@ export type OrderOrderByWithAggregationInput = {
   orderType?: Prisma.SortOrder
   status?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
+  executedQuantity?: Prisma.SortOrderInput | Prisma.SortOrder
+  canceledQuantity?: Prisma.SortOrderInput | Prisma.SortOrder
+  requestedAmount?: Prisma.SortOrderInput | Prisma.SortOrder
+  unspentAmount?: Prisma.SortOrderInput | Prisma.SortOrder
+  executionEvidence?: Prisma.SortOrderInput | Prisma.SortOrder
   limitPrice?: Prisma.SortOrderInput | Prisma.SortOrder
   executedPrice?: Prisma.SortOrderInput | Prisma.SortOrder
   currencyCode?: Prisma.SortOrder
@@ -606,6 +673,11 @@ export type OrderScalarWhereWithAggregatesInput = {
   orderType?: Prisma.EnumOrderTypeWithAggregatesFilter<"Order"> | $Enums.OrderType
   status?: Prisma.EnumOrderStatusWithAggregatesFilter<"Order"> | $Enums.OrderStatus
   quantity?: Prisma.DecimalWithAggregatesFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.DecimalNullableWithAggregatesFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.DecimalNullableWithAggregatesFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.DecimalNullableWithAggregatesFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.DecimalNullableWithAggregatesFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.JsonNullableWithAggregatesFilter<"Order">
   limitPrice?: Prisma.DecimalNullableWithAggregatesFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.DecimalNullableWithAggregatesFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeWithAggregatesFilter<"Order"> | $Enums.CurrencyCode
@@ -638,6 +710,11 @@ export type OrderCreateInput = {
   orderType: $Enums.OrderType
   status?: $Enums.OrderStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
@@ -676,6 +753,11 @@ export type OrderUncheckedCreateInput = {
   orderType: $Enums.OrderType
   status?: $Enums.OrderStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
@@ -708,6 +790,11 @@ export type OrderUpdateInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -746,6 +833,11 @@ export type OrderUncheckedUpdateInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -781,6 +873,11 @@ export type OrderCreateManyInput = {
   orderType: $Enums.OrderType
   status?: $Enums.OrderStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
@@ -813,6 +910,11 @@ export type OrderUpdateManyMutationInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -845,6 +947,11 @@ export type OrderUncheckedUpdateManyInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -895,6 +1002,11 @@ export type OrderCountOrderByAggregateInput = {
   orderType?: Prisma.SortOrder
   status?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
+  executedQuantity?: Prisma.SortOrder
+  canceledQuantity?: Prisma.SortOrder
+  requestedAmount?: Prisma.SortOrder
+  unspentAmount?: Prisma.SortOrder
+  executionEvidence?: Prisma.SortOrder
   limitPrice?: Prisma.SortOrder
   executedPrice?: Prisma.SortOrder
   currencyCode?: Prisma.SortOrder
@@ -923,6 +1035,10 @@ export type OrderCountOrderByAggregateInput = {
 
 export type OrderAvgOrderByAggregateInput = {
   quantity?: Prisma.SortOrder
+  executedQuantity?: Prisma.SortOrder
+  canceledQuantity?: Prisma.SortOrder
+  requestedAmount?: Prisma.SortOrder
+  unspentAmount?: Prisma.SortOrder
   limitPrice?: Prisma.SortOrder
   executedPrice?: Prisma.SortOrder
   grossAmount?: Prisma.SortOrder
@@ -942,6 +1058,10 @@ export type OrderMaxOrderByAggregateInput = {
   orderType?: Prisma.SortOrder
   status?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
+  executedQuantity?: Prisma.SortOrder
+  canceledQuantity?: Prisma.SortOrder
+  requestedAmount?: Prisma.SortOrder
+  unspentAmount?: Prisma.SortOrder
   limitPrice?: Prisma.SortOrder
   executedPrice?: Prisma.SortOrder
   currencyCode?: Prisma.SortOrder
@@ -976,6 +1096,10 @@ export type OrderMinOrderByAggregateInput = {
   orderType?: Prisma.SortOrder
   status?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
+  executedQuantity?: Prisma.SortOrder
+  canceledQuantity?: Prisma.SortOrder
+  requestedAmount?: Prisma.SortOrder
+  unspentAmount?: Prisma.SortOrder
   limitPrice?: Prisma.SortOrder
   executedPrice?: Prisma.SortOrder
   currencyCode?: Prisma.SortOrder
@@ -1003,6 +1127,10 @@ export type OrderMinOrderByAggregateInput = {
 
 export type OrderSumOrderByAggregateInput = {
   quantity?: Prisma.SortOrder
+  executedQuantity?: Prisma.SortOrder
+  canceledQuantity?: Prisma.SortOrder
+  requestedAmount?: Prisma.SortOrder
+  unspentAmount?: Prisma.SortOrder
   limitPrice?: Prisma.SortOrder
   executedPrice?: Prisma.SortOrder
   grossAmount?: Prisma.SortOrder
@@ -1283,6 +1411,11 @@ export type OrderCreateWithoutTradingAccountInput = {
   orderType: $Enums.OrderType
   status?: $Enums.OrderStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
@@ -1319,6 +1452,11 @@ export type OrderUncheckedCreateWithoutTradingAccountInput = {
   orderType: $Enums.OrderType
   status?: $Enums.OrderStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
@@ -1383,6 +1521,11 @@ export type OrderScalarWhereInput = {
   orderType?: Prisma.EnumOrderTypeFilter<"Order"> | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFilter<"Order"> | $Enums.OrderStatus
   quantity?: Prisma.DecimalFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.JsonNullableFilter<"Order">
   limitPrice?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFilter<"Order"> | $Enums.CurrencyCode
@@ -1415,6 +1558,11 @@ export type OrderCreateWithoutAssetInput = {
   orderType: $Enums.OrderType
   status?: $Enums.OrderStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
@@ -1451,6 +1599,11 @@ export type OrderUncheckedCreateWithoutAssetInput = {
   orderType: $Enums.OrderType
   status?: $Enums.OrderStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
@@ -1509,6 +1662,11 @@ export type OrderCreateWithoutAssetPriceSnapshotInput = {
   orderType: $Enums.OrderType
   status?: $Enums.OrderStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
@@ -1546,6 +1704,11 @@ export type OrderUncheckedCreateWithoutAssetPriceSnapshotInput = {
   orderType: $Enums.OrderType
   status?: $Enums.OrderStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
@@ -1603,6 +1766,11 @@ export type OrderCreateWithoutFxRateSnapshotInput = {
   orderType: $Enums.OrderType
   status?: $Enums.OrderStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
@@ -1640,6 +1808,11 @@ export type OrderUncheckedCreateWithoutFxRateSnapshotInput = {
   orderType: $Enums.OrderType
   status?: $Enums.OrderStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
@@ -1697,6 +1870,11 @@ export type OrderCreateWithoutQuoteInput = {
   orderType: $Enums.OrderType
   status?: $Enums.OrderStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
@@ -1733,6 +1911,11 @@ export type OrderUncheckedCreateWithoutQuoteInput = {
   orderType: $Enums.OrderType
   status?: $Enums.OrderStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
@@ -1791,6 +1974,11 @@ export type OrderCreateWithoutCandleEvidenceInput = {
   orderType: $Enums.OrderType
   status?: $Enums.OrderStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
@@ -1828,6 +2016,11 @@ export type OrderUncheckedCreateWithoutCandleEvidenceInput = {
   orderType: $Enums.OrderType
   status?: $Enums.OrderStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
@@ -1887,6 +2080,11 @@ export type OrderCreateManyTradingAccountInput = {
   orderType: $Enums.OrderType
   status?: $Enums.OrderStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
@@ -1919,6 +2117,11 @@ export type OrderUpdateWithoutTradingAccountInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -1955,6 +2158,11 @@ export type OrderUncheckedUpdateWithoutTradingAccountInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -1989,6 +2197,11 @@ export type OrderUncheckedUpdateManyWithoutTradingAccountInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -2023,6 +2236,11 @@ export type OrderCreateManyAssetInput = {
   orderType: $Enums.OrderType
   status?: $Enums.OrderStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
@@ -2055,6 +2273,11 @@ export type OrderUpdateWithoutAssetInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -2091,6 +2314,11 @@ export type OrderUncheckedUpdateWithoutAssetInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -2125,6 +2353,11 @@ export type OrderUncheckedUpdateManyWithoutAssetInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -2160,6 +2393,11 @@ export type OrderCreateManyAssetPriceSnapshotInput = {
   orderType: $Enums.OrderType
   status?: $Enums.OrderStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
@@ -2191,6 +2429,11 @@ export type OrderUpdateWithoutAssetPriceSnapshotInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -2228,6 +2471,11 @@ export type OrderUncheckedUpdateWithoutAssetPriceSnapshotInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -2262,6 +2510,11 @@ export type OrderUncheckedUpdateManyWithoutAssetPriceSnapshotInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -2296,6 +2549,11 @@ export type OrderCreateManyFxRateSnapshotInput = {
   orderType: $Enums.OrderType
   status?: $Enums.OrderStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
@@ -2327,6 +2585,11 @@ export type OrderUpdateWithoutFxRateSnapshotInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -2364,6 +2627,11 @@ export type OrderUncheckedUpdateWithoutFxRateSnapshotInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -2398,6 +2666,11 @@ export type OrderUncheckedUpdateManyWithoutFxRateSnapshotInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -2431,6 +2704,11 @@ export type OrderCreateManyQuoteInput = {
   orderType: $Enums.OrderType
   status?: $Enums.OrderStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
@@ -2463,6 +2741,11 @@ export type OrderUpdateWithoutQuoteInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -2499,6 +2782,11 @@ export type OrderUncheckedUpdateWithoutQuoteInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -2533,6 +2821,11 @@ export type OrderUncheckedUpdateManyWithoutQuoteInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -2568,6 +2861,11 @@ export type OrderCreateManyCandleEvidenceInput = {
   orderType: $Enums.OrderType
   status?: $Enums.OrderStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
@@ -2599,6 +2897,11 @@ export type OrderUpdateWithoutCandleEvidenceInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -2636,6 +2939,11 @@ export type OrderUncheckedUpdateWithoutCandleEvidenceInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -2670,6 +2978,11 @@ export type OrderUncheckedUpdateManyWithoutCandleEvidenceInput = {
   orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
@@ -2706,6 +3019,11 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   orderType?: boolean
   status?: boolean
   quantity?: boolean
+  executedQuantity?: boolean
+  canceledQuantity?: boolean
+  requestedAmount?: boolean
+  unspentAmount?: boolean
+  executionEvidence?: boolean
   limitPrice?: boolean
   executedPrice?: boolean
   currencyCode?: boolean
@@ -2747,6 +3065,11 @@ export type OrderSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   orderType?: boolean
   status?: boolean
   quantity?: boolean
+  executedQuantity?: boolean
+  canceledQuantity?: boolean
+  requestedAmount?: boolean
+  unspentAmount?: boolean
+  executionEvidence?: boolean
   limitPrice?: boolean
   executedPrice?: boolean
   currencyCode?: boolean
@@ -2788,6 +3111,11 @@ export type OrderSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   orderType?: boolean
   status?: boolean
   quantity?: boolean
+  executedQuantity?: boolean
+  canceledQuantity?: boolean
+  requestedAmount?: boolean
+  unspentAmount?: boolean
+  executionEvidence?: boolean
   limitPrice?: boolean
   executedPrice?: boolean
   currencyCode?: boolean
@@ -2829,6 +3157,11 @@ export type OrderSelectScalar = {
   orderType?: boolean
   status?: boolean
   quantity?: boolean
+  executedQuantity?: boolean
+  canceledQuantity?: boolean
+  requestedAmount?: boolean
+  unspentAmount?: boolean
+  executionEvidence?: boolean
   limitPrice?: boolean
   executedPrice?: boolean
   currencyCode?: boolean
@@ -2855,7 +3188,7 @@ export type OrderSelectScalar = {
   updatedAt?: boolean
 }
 
-export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "tradingAccountId" | "assetId" | "quoteId" | "side" | "orderType" | "status" | "quantity" | "limitPrice" | "executedPrice" | "currencyCode" | "grossAmount" | "feeAmount" | "netAmount" | "assetPriceSnapshotId" | "fxRateSnapshotId" | "idempotencyKey" | "requestHash" | "responsePayloadJson" | "reservedAmount" | "reservedQuantity" | "reservationFeeRate" | "reservationReleasedAt" | "cancelReason" | "limitOrderCandleEvidenceId" | "submittedAt" | "executedAt" | "canceledAt" | "rejectedAt" | "rejectReason" | "createdAt" | "updatedAt", ExtArgs["result"]["order"]>
+export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "tradingAccountId" | "assetId" | "quoteId" | "side" | "orderType" | "status" | "quantity" | "executedQuantity" | "canceledQuantity" | "requestedAmount" | "unspentAmount" | "executionEvidence" | "limitPrice" | "executedPrice" | "currencyCode" | "grossAmount" | "feeAmount" | "netAmount" | "assetPriceSnapshotId" | "fxRateSnapshotId" | "idempotencyKey" | "requestHash" | "responsePayloadJson" | "reservedAmount" | "reservedQuantity" | "reservationFeeRate" | "reservationReleasedAt" | "cancelReason" | "limitOrderCandleEvidenceId" | "submittedAt" | "executedAt" | "canceledAt" | "rejectedAt" | "rejectReason" | "createdAt" | "updatedAt", ExtArgs["result"]["order"]>
 export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
@@ -2900,6 +3233,11 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     orderType: $Enums.OrderType
     status: $Enums.OrderStatus
     quantity: runtime.Decimal
+    executedQuantity: runtime.Decimal | null
+    canceledQuantity: runtime.Decimal | null
+    requestedAmount: runtime.Decimal | null
+    unspentAmount: runtime.Decimal | null
+    executionEvidence: runtime.JsonValue | null
     limitPrice: runtime.Decimal | null
     executedPrice: runtime.Decimal | null
     currencyCode: $Enums.CurrencyCode
@@ -3361,6 +3699,11 @@ export interface OrderFieldRefs {
   readonly orderType: Prisma.FieldRef<"Order", 'OrderType'>
   readonly status: Prisma.FieldRef<"Order", 'OrderStatus'>
   readonly quantity: Prisma.FieldRef<"Order", 'Decimal'>
+  readonly executedQuantity: Prisma.FieldRef<"Order", 'Decimal'>
+  readonly canceledQuantity: Prisma.FieldRef<"Order", 'Decimal'>
+  readonly requestedAmount: Prisma.FieldRef<"Order", 'Decimal'>
+  readonly unspentAmount: Prisma.FieldRef<"Order", 'Decimal'>
+  readonly executionEvidence: Prisma.FieldRef<"Order", 'Json'>
   readonly limitPrice: Prisma.FieldRef<"Order", 'Decimal'>
   readonly executedPrice: Prisma.FieldRef<"Order", 'Decimal'>
   readonly currencyCode: Prisma.FieldRef<"Order", 'CurrencyCode'>

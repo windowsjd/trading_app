@@ -1,3 +1,6 @@
+import { MarketExecutionEvidenceAdapter } from './market-execution-evidence.adapter';
+import { decideMarketExecution } from './market-execution.policy';
+import { MARKET_EXECUTION_SELECT } from './order-response.presenter';
 import {
   HttpException,
   HttpStatus,
@@ -395,6 +398,12 @@ type ExecuteOrderResponse = {
 };
 
 type OrderExecutionRecord = {
+  executedQuantity?: Prisma.Decimal | null;
+  canceledQuantity?: Prisma.Decimal | null;
+  requestedAmount?: Prisma.Decimal | null;
+  unspentAmount?: Prisma.Decimal | null;
+  cancelReason?: string | null;
+  responsePayloadJson?: Prisma.JsonValue | null;
   id: string;
   tradingAccountId: string;
   assetId: string;
@@ -465,6 +474,7 @@ type OrderExecutionRecord = {
 };
 
 type OrderExecutionPlan = {
+  marketExecution?: ReturnType<typeof decideMarketExecution>;
   quantity: Prisma.Decimal;
   executedAt: Date;
   executedPrice: Prisma.Decimal;
@@ -473,7 +483,7 @@ type OrderExecutionPlan = {
   grossAmount: Prisma.Decimal;
   feeAmount: Prisma.Decimal;
   netAmount: Prisma.Decimal;
-  assetPriceSnapshotId: string;
+  assetPriceSnapshotId: string | null;
   assetPriceSource: PublicSourceMetadata | null;
   fxRateSnapshotId: string | null;
   quotedRate: Prisma.Decimal | null;
@@ -508,6 +518,8 @@ const ORDER_CREATE_REQUEST_HASH_API_VERSION = 'order-create:v1';
 const ZERO_MONEY = '0.00000000';
 const quantityScale = 6;
 const ORDER_EXECUTION_SELECT = {
+  ...MARKET_EXECUTION_SELECT,
+  responsePayloadJson: true,
   id: true,
   tradingAccountId: true,
   assetId: true,
@@ -605,6 +617,7 @@ const ORDER_EXECUTION_SELECT = {
  * account-scoped race-recovery lookup so the two can never drift.
  */
 const IDEMPOTENT_CREATE_ORDER_SELECT = {
+  ...MARKET_EXECUTION_SELECT,
   id: true,
   quoteId: true,
   tradingAccountId: true,
@@ -655,6 +668,8 @@ export class OrdersService {
     private readonly tradingAccountAccessService?: TradingAccountAccessService,
     @Optional()
     private readonly generalPerformanceService?: GeneralAccountPerformanceService,
+    @Optional()
+    private readonly marketExecutionEvidenceAdapter?: MarketExecutionEvidenceAdapter,
   ) {}
 
   private requireTradingAccountAccessService(): TradingAccountAccessService {
@@ -1913,9 +1928,21 @@ export class OrdersService {
           transactionNow,
         );
 
-        return order.side === OrderSide.buy
-          ? this.executeBuyOrderInTransaction(tx, order, plan)
-          : this.executeSellOrderInTransaction(tx, order, plan);
+        const executionResult =
+          order.side === OrderSide.buy
+            ? await this.executeBuyOrderInTransaction(tx, order, plan)
+            : await this.executeSellOrderInTransaction(tx, order, plan);
+        if (plan.marketExecution) {
+          await tx.order.update({
+            where: { id: order.id },
+            data: {
+              responsePayloadJson: this.buildExecutedOrderResponse(
+                executionResult,
+              ) as unknown as Prisma.InputJsonValue,
+            },
+          });
+        }
+        return executionResult;
       });
 
       if (
@@ -2018,6 +2045,7 @@ export class OrdersService {
           side: true,
           orderType: true,
           status: true,
+          ...MARKET_EXECUTION_SELECT,
           quantity: true,
           limitPrice: true,
           executedPrice: true,
@@ -2181,6 +2209,7 @@ export class OrdersService {
           side: true,
           orderType: true,
           status: true,
+          ...MARKET_EXECUTION_SELECT,
           quantity: true,
           limitPrice: true,
           executedPrice: true,
@@ -2581,12 +2610,43 @@ export class OrdersService {
       order,
       executedAt,
     );
-    const priceContext = await this.resolveProviderExecutionPrice(
-      tx,
-      order,
-      quote,
-      executedAt,
+    const marketExecution = this.marketExecutionEvidenceAdapter
+      ? decideMarketExecution(
+          this.marketExecutionEvidenceAdapter,
+          {
+            assetId: order.assetId,
+            assetType: order.asset.assetType,
+            market: order.asset.market,
+            priceCurrency: this.getAssetPriceCurrency(order.asset),
+            quantityUnit:
+              order.asset.assetType === AssetType.crypto
+                ? 'base_asset'
+                : 'share',
+            side: order.side,
+            executedAt,
+          },
+          { quantity: order.quantity, amount: quote.sourceAmount },
+        )
+      : undefined;
+    const priceContext = marketExecution
+      ? {
+          price: marketExecution.price,
+          assetPriceSnapshotId: null,
+          assetPriceSource: null,
+        }
+      : await this.resolveProviderExecutionPrice(tx, order, quote, executedAt);
+    // Apply the existing quote-change guard to the FINAL price, including VWAP.
+    const priceChangeBps = calculateChangeBps(
+      quote.quotedPrice,
+      priceContext.price,
     );
+    if (priceChangeBps.gt(quote.maxChangeBps)) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'RATE_CHANGED_REQUOTE_REQUIRED',
+        'Order price changed; requote is required.',
+      );
+    }
     const tradeFeeRate = this.resolveMarketOrderFeeRate({
       mode: order.tradingAccount?.mode,
       quotedFeeRate: quote.quotedFeeRate,
@@ -2599,13 +2659,14 @@ export class OrdersService {
               'Season order has no fee source.',
             )),
     });
-    const quantity = quote.sourceAmount
-      ? quantityFromBuyAmount(quote.sourceAmount, priceContext.price)
-      : order.quantity;
-    const grossAmount = roundDecimalHalfUp(
-      quantity.mul(priceContext.price),
-      monetaryScale,
-    );
+    const quantity =
+      marketExecution?.quantity ??
+      (quote.sourceAmount
+        ? quantityFromBuyAmount(quote.sourceAmount, priceContext.price)
+        : order.quantity);
+    const grossAmount =
+      marketExecution?.grossAmount ??
+      roundDecimalHalfUp(quantity.mul(priceContext.price), monetaryScale);
     const feeAmount = roundDecimalHalfUp(
       grossAmount.mul(tradeFeeRate),
       monetaryScale,
@@ -2637,7 +2698,8 @@ export class OrdersService {
       executedAt,
       executedPrice: priceContext.price,
       quotedPrice: quote.quotedPrice,
-      priceChangeBps: priceContext.priceChangeBps,
+      priceChangeBps,
+      marketExecution,
       grossAmount,
       feeAmount,
       netAmount,
@@ -2823,7 +2885,6 @@ export class OrdersService {
   ): Promise<{
     price: Prisma.Decimal;
     assetPriceSnapshotId: string;
-    priceChangeBps: Prisma.Decimal | null;
     assetPriceSource: PublicSourceMetadata | null;
   }> {
     const providerEligibility = resolveAssetProviderEligibility({
@@ -2936,23 +2997,10 @@ export class OrdersService {
     }
 
     const price = roundDecimalHalfUp(selection.snapshot.price, monetaryScale);
-    let priceChangeBps: Prisma.Decimal | null = null;
-
-    if (order.orderType === OrderType.market) {
-      priceChangeBps = calculateChangeBps(quote.quotedPrice, price);
-      if (priceChangeBps.gt(quote.maxChangeBps)) {
-        this.throwApiError(
-          HttpStatus.CONFLICT,
-          'RATE_CHANGED_REQUOTE_REQUIRED',
-          'Order price changed; requote is required.',
-        );
-      }
-    }
 
     return {
       price,
       assetPriceSnapshotId: selection.snapshot.id,
-      priceChangeBps,
       assetPriceSource: presentSourceDecision(selection.decision),
     };
   }
@@ -3133,6 +3181,7 @@ export class OrdersService {
     order: OrderExecutionRecord,
     plan: OrderExecutionPlan,
   ): Promise<OrderExecutionTransactionResult> {
+    order = { ...order, quantity: plan.quantity };
     const tradingAccountId = this.requireOrderTradingScope(order);
     const participant = order.tradingAccount?.seasonParticipant ?? null;
     await this.consumeOrderQuoteInTransaction(tx, order, plan.executedAt);
@@ -4242,7 +4291,26 @@ export class OrdersService {
       },
       data: {
         status: OrderStatus.executed,
-        quantity: this.formatDecimal(plan.quantity, quantityScale),
+        // Keep quantity-order intent; amount orders retain resolved quantity.
+        ...(!plan.marketExecution || plan.marketExecution.requestedAmount
+          ? { quantity: this.formatDecimal(plan.quantity, quantityScale) }
+          : {}),
+        ...(plan.marketExecution
+          ? {
+              executedQuantity: this.formatDecimal(
+                plan.quantity,
+                quantityScale,
+              ),
+              canceledQuantity: plan.marketExecution.canceledQuantity,
+              requestedAmount: plan.marketExecution.requestedAmount,
+              unspentAmount: plan.marketExecution.unspentAmount,
+              cancelReason: plan.marketExecution.cancelReason,
+              canceledAt: plan.marketExecution.cancelReason
+                ? plan.executedAt
+                : null,
+              executionEvidence: plan.marketExecution.evidence,
+            }
+          : {}),
         executedPrice: this.formatDecimal(plan.executedPrice, monetaryScale),
         grossAmount: this.formatDecimal(plan.grossAmount, monetaryScale),
         feeAmount: this.formatDecimal(plan.feeAmount, monetaryScale),
@@ -4328,6 +4396,9 @@ export class OrdersService {
   private buildAlreadyExecutedOrderResponse(
     order: OrderExecutionRecord,
   ): ExecuteOrderResponse {
+    if (order.executedQuantity && order.responsePayloadJson) {
+      return order.responsePayloadJson as unknown as ExecuteOrderResponse;
+    }
     return {
       success: true,
       data: {

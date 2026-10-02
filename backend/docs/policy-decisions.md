@@ -375,3 +375,31 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
 - `repair-ranking-scope`는 기본 dry-run이며 `ranking.tradingAccountId`만 채운다. non-null mismatch·participant link null·general account·user/season 불일치는 보고만 하고 절대 고치지 않는다. 함께 출력되는 audit는 read-only이며 rank 재계산이나 재번호 매기기를 하지 않는다.
   근거: 추측으로 채운 scope는 잘못된 계정에 성적을 귀속시킨다. rank gap이나 tier 불일치는 스크립트가 아니라 해당 job 재실행으로 고쳐야 한다.
 - 랭킹 계산 정책·순위 방식(sequential 1,2,3,4)·티어 비율·시즌 초기자본 기준 수익률은 이번 작업에서 변경하지 않는다. reward 지급 gate는 계속 닫혀 있고, 실제 광고 provider는 계속 미연동이다.
+
+
+## Market one-shot partial execution (B2-1, 2026-10-02, current)
+
+- MARKET only: consume observed depth once, fill the positive executable part,
+  immediately cancel any liquidity remainder. No persistent open remainder,
+  multi-fill events, virtual shared book/depth decrement or liquidity reservation.
+- L2 uses observed asks/bids only; top-of-book needs the correct side AND size.
+  Missing/stale/ineligible/unchecked/invalid evidence and price-only/volume-only
+  evidence never authorize a fill or fallback. No price-volume calibration yet.
+- Keep `OrderStatus.executed` for one actual fill, plus explicit additive
+  marketExecution status/intent/executed/remainder fields. Quantity intent is
+  preserved. `insufficient_market_liquidity` distinguishes automatic remainder
+  cancellation from user cancellation. No extra fill count/ledger/ranking event.
+- Crypto amount BUY consumes maximum principal on actual asks, floors aggregate
+  executable quantity to 6 places and fees actual consumed gross. Precision dust
+  is disclosed separately and does not alone mean a liquidity partial fill.
+- All finance and responsePayloadJson commit atomically. Replay never re-evaluates
+  evidence. Final ERS VWAP passes the existing quote-change guard; 30bps remains
+  quote-to-execute protection, not an ERS impact limit. FX and valuation unchanged.
+- Result BottomSheet and history disclose partial execution and automatic
+  cancellation. No new push/email/notification system. Limit remains full-fill-only.
+- Production adapter registration is absent. Existing KIS/Twelve/display
+  AssetOrderBook data is not promoted to execution authority. B2-2 owns provider
+  eligibility/session/freshness/identity normalization and actual activation.
+
+Reason: a single terminal Order result fits the virtual-trading product and
+preserves financial atomicity without exchange-style fill event infrastructure.

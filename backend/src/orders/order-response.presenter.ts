@@ -1,3 +1,4 @@
+import { MARKET_REMAINDER_CANCEL_REASON } from './market-execution-evidence.adapter';
 import {
   CurrencyCode,
   OrderSide,
@@ -22,6 +23,10 @@ export type OrderResponseRecord = {
   orderType: OrderType;
   status: OrderStatus;
   quantity: Prisma.Decimal;
+  executedQuantity?: Prisma.Decimal | null;
+  canceledQuantity?: Prisma.Decimal | null;
+  requestedAmount?: Prisma.Decimal | null;
+  unspentAmount?: Prisma.Decimal | null;
   limitPrice: Prisma.Decimal | null;
   executedPrice: Prisma.Decimal | null;
   currencyCode: CurrencyCode;
@@ -61,6 +66,7 @@ export function formatOrderResponse(order: OrderResponseRecord) {
     orderType: order.orderType,
     status: order.status,
     quantity: formatDecimalScale(order.quantity, orderQuantityScale),
+    ...presentMarketExecution(order),
     limitPrice: formatNullableDecimal(order.limitPrice),
     executedPrice: formatNullableDecimal(order.executedPrice),
     currencyCode: order.currencyCode,
@@ -91,4 +97,51 @@ function formatNullableDecimal(value: Prisma.Decimal | null): string | null {
 
 function formatNullableDate(value: Date | null): string | null {
   return value ? value.toISOString() : null;
+}
+
+export const MARKET_EXECUTION_SELECT = {
+  executedQuantity: true,
+  canceledQuantity: true,
+  requestedAmount: true,
+  unspentAmount: true,
+} as const;
+
+type MarketExecutionRecord = Pick<
+  OrderResponseRecord,
+  | 'quantity'
+  | 'executedQuantity'
+  | 'canceledQuantity'
+  | 'requestedAmount'
+  | 'unspentAmount'
+  | 'cancelReason'
+  | 'canceledAt'
+>;
+
+/** Old rows deliberately omit the additive result; no historical backfill. */
+export function presentMarketExecution(order: MarketExecutionRecord) {
+  if (order.executedQuantity == null) return {};
+  return {
+    marketExecution: {
+      status:
+        order.cancelReason === MARKET_REMAINDER_CANCEL_REASON
+          ? ('partial' as const)
+          : ('full' as const),
+      requestedQuantity:
+        order.requestedAmount == null
+          ? formatDecimalScale(order.quantity, orderQuantityScale)
+          : null,
+      executedQuantity: formatDecimalScale(
+        order.executedQuantity,
+        orderQuantityScale,
+      ),
+      canceledQuantity:
+        order.canceledQuantity == null
+          ? null
+          : formatDecimalScale(order.canceledQuantity, orderQuantityScale),
+      requestedAmount: formatNullableDecimal(order.requestedAmount ?? null),
+      unspentAmount: formatNullableDecimal(order.unspentAmount ?? null),
+      remainderCancelReason: order.cancelReason ?? null,
+      remainderCanceledAt: formatNullableDate(order.canceledAt),
+    },
+  };
 }

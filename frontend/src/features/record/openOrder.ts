@@ -1,3 +1,4 @@
+import type { MarketExecutionDto } from '../order/api';
 // Pure order-status helpers for the order history list. Kept free of any
 // api-client import chain so they run under `node --test`.
 
@@ -49,7 +50,8 @@ export function hasNoExecutionResult(item: OrderStatusFields): boolean {
   );
 }
 
-export function getOrderStatusLabel(status?: string | null): string | null {
+export function getOrderStatusLabel(status?: string | null, execution?: MarketExecutionDto | null): string | null {
+  if (status === 'executed' && execution?.status === 'partial') return '부분체결 · 잔량 자동취소';
   if (!status) return null;
   return ORDER_STATUS_LABEL[status] ?? status;
 }

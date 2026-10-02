@@ -129,3 +129,11 @@ Artifacts go to `/tmp/trading-home-market-browser` (`HOME_MARKET_BROWSER_OUTPUT`
 Set `LD_LIBRARY_PATH` and `FONTCONFIG_FILE` when browser libraries/fonts live outside
 the system paths. Native-device screen readers and touch recognition remain a
 separate device check.
+
+
+Market partial-fill result/history verification:
+`NODE_PATH=/path/to/browser-tools/node_modules node test/browser/marketExecutionBrowser.cjs`.
+The 48 cases cover 320/360/390/430px × font scale 1/1.5 × quantity, amount, long
+numeric intent, legacy full fill, limit submitted, and history. It asserts
+horizontal text bounds, visible/clickable CTA, authoritative partial labels,
+and automatic-cancel copy. Artifacts default to `/tmp/b21-market-browser`.

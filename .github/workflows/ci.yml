@@ -158,6 +158,7 @@ jobs:
       # cancel-vs-fill, ended-season, and candle-evidence isolation.
       LIMIT_ORDER_MATCHING_DB_INTEGRATION: "1"
       ORDER_EXECUTE_DB_INTEGRATION: "1"
+      MARKET_EXECUTION_DB_INTEGRATION: "1"
       FX_EXECUTE_DB_INTEGRATION: "1"
       MVP_FLOW_DB_SMOKE: "1"
     defaults:
@@ -210,6 +211,7 @@ jobs:
           src/orders/limit-order-idempotent-replay.integration.spec.ts
           src/orders/limit-order-matching.integration.spec.ts
           src/orders/orders.execute.integration.spec.ts
+          src/orders/market-execution.integration.spec.ts
           src/fx/fx.execute.integration.spec.ts
           src/mvp-flow.integration.spec.ts
 

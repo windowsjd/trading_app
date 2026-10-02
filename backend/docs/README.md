@@ -42,6 +42,8 @@ Historical HANDOVER/investigation records and explicitly historical migration se
 
 [Execution Realism System](execution-realism-system.md) defines the internal,
 Provider-independent liquidity assessment contract and its B1/B2 boundary.
-B1 is assessment only and is not connected to production orders or the ledger.
+B1 remains pure assessment. B2-1 implements terminal market partial-fill
+persistence/API/UX and a tested financial seam. Production ERS remains inactive
+until B2-2 supplies and registers a trusted execution evidence adapter.
 
 Read-only/quote source metadata is exposed as backward-compatible optional fields such as `rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation `sourceSummary`. Daily snapshot batch results include public-safe aggregate `sourceSummary`/fallback information in `batch_job_runs.resultPayloadJson`. These fields contain public-safe source type/name/snapshot/timing/fallback reasons only; raw provider payloads and secrets remain excluded.

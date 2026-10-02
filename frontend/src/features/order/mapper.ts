@@ -16,6 +16,7 @@ import {
   formatKrw,
   getAssetNameDisplay,
 } from '../../utils/format.ts';
+import { formatExecutionMoney, getMarketExecutionDisplay } from './marketExecution.ts';
 
 function parseTimestamp(value?: string | null) {
   if (!value) return null;
@@ -197,6 +198,7 @@ export function getOrderSuccessDisplay(
   // a stale server field or a future screen must not be able to render an
   // unfilled order as if it had executed.
   const isSubmittedLimit = execution.state === 'submitted';
+  const money = order.marketExecution ? formatExecutionMoney : formatCurrency;
 
   const assetNameDisplay = asset ? getAssetNameDisplay(asset) : null;
 
@@ -209,27 +211,30 @@ export function getOrderSuccessDisplay(
         : assetNameDisplay.primary
       : displayValue(order.assetId ?? execution.assetId),
     side: order.side ?? execution.side,
-    quantity: formatDisplayDecimal(order.quantity ?? execution.quantity),
+    ...getMarketExecutionDisplay(order.marketExecution, currencyCode),
+    quantity: formatDisplayDecimal(order.marketExecution?.executedQuantity ?? order.quantity ?? execution.quantity),
     executedPrice: isSubmittedLimit
       ? displayValue(null)
-      : formatAssetPrice(
-          execution.executedPrice ?? execution.executePrice ?? order.price,
+      : order.marketExecution
+        ? formatExecutionMoney(order.executedPrice ?? execution.executePrice, currencyCode)
+        : formatAssetPrice(
+          execution.executedPrice ?? execution.executePrice ?? order.executedPrice ?? order.price,
           currencyCode,
           displayPriceDecimals,
         ),
     currencyCode: displayValue(currencyCode),
     grossAmount: isSubmittedLimit
       ? displayValue(null)
-      : formatCurrency(
+      : money(
           execution.grossAmount ?? order.grossAmount,
           currencyCode,
         ),
     feeAmount: isSubmittedLimit
       ? displayValue(null)
-      : formatCurrency(execution.feeAmount ?? order.feeAmount, currencyCode),
+      : money(execution.feeAmount ?? order.feeAmount, currencyCode),
     netAmount: isSubmittedLimit
       ? displayValue(null)
-      : formatCurrency(execution.netAmount ?? order.netAmount, currencyCode),
+      : money(execution.netAmount ?? order.netAmount, currencyCode),
     submittedAt: formatKstDateTime(
       execution.submittedAt ?? order.submittedAt,
     ),

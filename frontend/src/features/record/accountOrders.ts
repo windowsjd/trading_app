@@ -49,6 +49,7 @@ export function toRecordOrderItem(row: AccountOrderRow): RecordOrderItemDto {
     side: (str(row.side) ?? 'buy') as RecordOrderItemDto['side'],
     orderType: str(row.orderType),
     status: str(row.status),
+    marketExecution: row.marketExecution as RecordOrderItemDto['marketExecution'],
     quantity: str(row.quantity) ?? '0',
     limitPrice: strOrNull(row.limitPrice),
     executedPrice: str(row.executedPrice),

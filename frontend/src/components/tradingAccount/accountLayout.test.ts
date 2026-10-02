@@ -257,13 +257,16 @@ describe('the styles long text depends on are present', () => {
     assert.ok(!/numberOfLines=\{/.test(source));
   });
 
-  it('RecordOrderList: a long asset name wraps beside its amount, not through it', () => {
+  it('RecordOrderList: the amount moves below a readable asset name on narrow screens', () => {
     const source = read('screens/record/RecordOrderListScreen.tsx');
 
-    // The name column may wrap and give way; the amount column never shrinks.
+    // Keep enough width for the name; move the amount to another row when
+    // enlarged text cannot fit beside it. Neither column may leave the card.
+    assert.match(source, /rowBody:\s*\{[^}]*flexWrap:\s*'wrap'/s);
     assert.match(source, /rowNameColumn:\s*\{[^}]*flex:\s*1/s);
-    assert.match(source, /rowNameColumn:\s*\{[^}]*minWidth:\s*0/s);
+    assert.match(source, /rowNameColumn:\s*\{[^}]*minWidth:\s*100/s);
     assert.match(source, /alignEnd:\s*\{[^}]*flexShrink:\s*0/s);
+    assert.match(source, /alignEnd:\s*\{[^}]*maxWidth:\s*'100%'/s);
     // The season name doubles as this screen's heading.
     assert.match(source, /accountHeader:\s*\{[^}]*lineHeight/s);
     // 취소 중... and 주문 취소 are different lengths; the button wraps either.

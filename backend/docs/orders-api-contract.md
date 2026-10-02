@@ -57,7 +57,7 @@ Changing amount cannot reuse a quote or committed create key; numerically equal
 amounts replay the same stored result. Quote POST still creates a new durable
 quote on each call and does not introduce a quote idempotency key.
 
-Market execution keeps provider repricing and maxChangeBps, then recalculates
+The production snapshot market path keeps provider repricing and maxChangeBps, then recalculates
 quantity from durable amount and actual execution price. Order.quantity,
 Position and gross/fee/net wallet/ledger writes use that same final quantity
 atomically. Gross cannot exceed amount; rounding down may leave less than one
@@ -72,6 +72,72 @@ a display price or local fee preview. Server quote quantity takes precedence
 over indicative quantity. Crypto BUY ratios use available settlement cash and
 the existing account fee policy; stock BUY ratios still need a usable price.
 See [order-input-policy.md](order-input-policy.md) for intent and validation.
+
+
+## One-shot market execution result (B2-1, 2026-10-02)
+
+Production still uses its existing snapshot execution path. No trusted ERS
+adapter is registered yet. The optional internal seam and clients support a
+terminal one-shot partial fill, ready for separately reviewed provider adapters.
+There is no new route, request parameter, or environment activation switch.
+
+An ERS-backed order adds `marketExecution` to the order object on create,
+legacy execute/replay, order list/detail, and both records order surfaces:
+
+```json
+{
+  "status": "executed",
+  "quantity": "1000.000000",
+  "executedPrice": "100.08750000",
+  "grossAmount": "80070.00000000",
+  "feeAmount": "80.07000000",
+  "netAmount": "80150.07000000",
+  "cancelReason": "insufficient_market_liquidity",
+  "marketExecution": {
+    "status": "partial",
+    "requestedQuantity": "1000.000000",
+    "executedQuantity": "800.000000",
+    "canceledQuantity": "200.000000",
+    "requestedAmount": null,
+    "unspentAmount": null,
+    "remainderCancelReason": "insufficient_market_liquidity",
+    "remainderCanceledAt": "2026-10-02T01:00:00.000Z"
+  }
+}
+```
+
+- `Order.status=executed` means actual execution occurred, not necessarily that
+  the whole intent filled. `marketExecution.status=partial|full` is authoritative.
+  Partial orders are terminal; no matcher, subsequent snapshot, or user cancel
+  can execute/cancel that remainder again. They count as one fill, not a user cancel.
+- Quantity intent: `quantity=requestedQuantity`; executed + canceled = requested.
+  A full fill has canceledQuantity zero and no remainder cancel reason/time.
+- Crypto amount BUY: requestedQuantity/canceledQuantity are null; requestedAmount
+  is the original principal, executedQuantity is the resolved actual quantity,
+  and `unspentAmount=requestedAmount-grossAmount`. Order.quantity retains its
+  existing resolved-quantity meaning for amount BUY. The budget is consumed on
+  observed asks, not converted using a single last price. Positive precision
+  dust can remain on a budget-limited full fill without an automatic-cancel reason.
+- Existing executedPrice is actual VWAP; gross/fee/net are actual consumed
+  notional/pinned-fee/settlement. Financial writes use executedQuantity only.
+  Final VWAP still passes the original quote-change guard; ERS impact is not
+  a new rejection threshold. Existing USD/KRW checks remain in force.
+- Nullable columns preserve historical rows. `marketExecution` is omitted on
+  historical, snapshot-path and limit orders. No status enum or existing route
+  changes. Deploy the updated UI before any future ERS activation.
+- One transaction commits settlement, remainder metadata, safe provenance and
+  the first responsePayloadJson. An identical create retry returns that stored
+  response before evaluating evidence or mutable trading gates. New ERS legacy
+  execute results also persist/replay their first response atomically.
+- Known zero executable liquidity: 409 `ORDER_LIQUIDITY_UNAVAILABLE` (retry with
+  a new quote). Missing/stale/ineligible/unchecked/invalid/unknown-size/price-only
+  evidence: 503 `EXECUTION_EVIDENCE_UNAVAILABLE`. Neither case commits financial
+  writes or falls back to snapshot prices.
+
+UI: “일부 체결되었습니다”, separate intent/fill/remainder and actual amounts;
+history: “부분체결 · 잔량 자동취소”. Amount BUY discloses unused principal.
+See [execution-realism-system.md](execution-realism-system.md) for the trusted
+adapter boundary, rounding, source provenance and production activation limits.
 
 ## Lock order (current contract)
 

@@ -343,6 +343,10 @@ export function getErrorMessageFromCode(
       return '지원하지 않는 주문 유형입니다.';
     case ERROR_CODE.PRICE_STALE:
       return '가격 갱신 대기 중입니다.';
+    case 'ORDER_LIQUIDITY_UNAVAILABLE':
+      return '현재 체결 가능한 시장 유동성이 없습니다. 새 견적으로 다시 시도해주세요.';
+    case 'EXECUTION_EVIDENCE_UNAVAILABLE':
+      return '체결에 필요한 시장 정보를 확인할 수 없습니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.ASSET_PRICE_UNAVAILABLE:
       return '자산 가격을 확인할 수 없습니다.';
     case ERROR_CODE.INSUFFICIENT_BALANCE:

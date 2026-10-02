@@ -505,3 +505,14 @@ See [full policy and routes](friends-api-contract.md).
 - `INVALID_SEASON_ID`
 - `USER_NOT_FOUND`
 - `SEASON_NOT_FOUND`
+
+
+## Terminal partial market executions (B2-1)
+
+Both orders record surfaces include the optional `marketExecution` object from
+[the Orders contract](orders-api-contract.md#one-shot-market-execution-result-b2-1-2026-10-02).
+Such a row is status `executed` and counts once in executed/fill summaries. It
+is not an additional canceled order. Requested quantity, actual quantity,
+automatically canceled quantity (or requested/unused principal for amount BUY)
+remain available in history. Gross/fee/net and average price are actual results.
+Historical full fills and submitted/canceled limits omit the additive object.

@@ -39,8 +39,6 @@ describe('order completion display contract', () => {
       '종목',
       '주문 유형',
       '수량',
-      '체결 가격',
-      '총 주문 금액',
       '수수료',
       '체결 시각',
       '지정가',
@@ -50,6 +48,8 @@ describe('order completion display contract', () => {
     ]) {
       assert.ok(successSheet.includes(`label="${label}"`), label);
     }
+    assert.match(successSheet, /'체결 가격'/u);
+    assert.match(successSheet, /'총 주문 금액'/u);
     assert.match(successSheet, /예약금 \(미체결 예약\)/u);
     assert.match(successSheet, /예약 수량 \(미체결 예약\)/u);
     assert.match(successSheet, /이미 처리된 요청입니다/u);

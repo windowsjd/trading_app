@@ -35,6 +35,8 @@ class InvalidExecutionInput extends Error {
 export function assessExecutionRealism(input: {
   order: ExecutionRealismOrder;
   evidence: ExecutionMarketEvidence | null;
+  /** B2 settlement precision; B1 defaults to the evidence scale (8). */
+  quantityScale?: number;
 }): ExecutionAssessment {
   const { order, evidence } = input;
   const result: ExecutionAssessment = {
@@ -47,6 +49,8 @@ export function assessExecutionRealism(input: {
     referencePrice: null,
     referencePriceBasis: null,
     observedFillableQuantity: null,
+    observedGrossAmount: null,
+    unspentAmount: null,
     simulatedFillPrice: null,
     adversePriceImpactBps: null,
     levelsConsumed: 0,
@@ -59,7 +63,38 @@ export function assessExecutionRealism(input: {
     if (order.side !== 'buy' && order.side !== 'sell') {
       throw new InvalidExecutionInput('order.side');
     }
-    const requested = financialDecimal(order.quantity, 'order.quantity');
+    const amount =
+      order.amount === undefined
+        ? null
+        : financialDecimal(order.amount, 'order.amount');
+    if (amount && (order.side !== 'buy' || order.quantity !== undefined)) {
+      throw new InvalidExecutionInput('order.amount');
+    }
+    const requested =
+      amount ?? financialDecimal(order.quantity, 'order.quantity');
+    const quantityScale = input.quantityScale ?? monetaryScale;
+    if (
+      !Number.isInteger(quantityScale) ||
+      quantityScale < 0 ||
+      quantityScale > monetaryScale
+    ) {
+      throw new InvalidExecutionInput('order.quantityScale');
+    }
+    if (!amount && requested.decimalPlaces() > quantityScale) {
+      throw new InvalidExecutionInput('order.quantity');
+    }
+    const observe = (
+      levels: readonly ParsedLevel[],
+      reason: ExecutionAssessmentReason,
+    ) =>
+      observedResult(
+        result,
+        requested,
+        levels,
+        reason,
+        !!amount,
+        quantityScale,
+      );
     const limit =
       order.limitPrice === undefined
         ? null
@@ -95,7 +130,7 @@ export function assessExecutionRealism(input: {
       result.referencePrice = format(quote.price);
       result.referencePriceBasis = basis;
       if (!withinLimit(quote.price, limit, order.side)) {
-        return observedResult(result, requested, [], 'limit_price_boundary');
+        return observe([], 'limit_price_boundary');
       }
       if (quote.quantity === null) {
         return { ...result, reason: 'size_missing' };
@@ -146,16 +181,14 @@ export function assessExecutionRealism(input: {
     const blocked = validationReason(evidence);
     if (blocked) return { ...result, reason: blocked };
     if (levels.length === 0) {
-      return observedResult(result, requested, [], 'no_observed_liquidity');
+      return observe([], 'no_observed_liquidity');
     }
     result.referencePrice = format(levels[0].price);
     result.referencePriceBasis = basis;
     const eligibleLevels = levels.filter((level) =>
       withinLimit(level.price, limit, order.side),
     );
-    return observedResult(
-      result,
-      requested,
+    return observe(
       eligibleLevels,
       eligibleLevels.length < levels.length
         ? 'limit_price_boundary'
@@ -179,18 +212,45 @@ function observedResult(
   requested: Prisma.Decimal,
   levels: readonly ParsedLevel[],
   shortageReason: ExecutionAssessmentReason,
+  amountIntent: boolean,
+  quantityScale: number,
 ): ExecutionAssessment {
+  // Resolve a target from the SAME validated levels; amount is principal,
+  // never a quantity estimated from a last-price snapshot.
+  let availableQuantity = new D(0);
+  let budget = new D(requested);
+  for (const level of levels) {
+    const take =
+      amountIntent && budget.lt(level.price.mul(level.quantity))
+        ? budget.div(level.price)
+        : level.quantity;
+    availableQuantity = availableQuantity.add(take);
+    if (amountIntent) {
+      budget = take.lt(level.quantity)
+        ? new D(0)
+        : budget.sub(take.mul(level.price));
+      if (take.lt(level.quantity) || budget.lte(0)) break;
+    } else if (availableQuantity.gte(requested)) break;
+  }
+  const full = amountIntent ? budget.lte(0) : availableQuantity.gte(requested);
+  const target = (
+    amountIntent || availableQuantity.lt(requested)
+      ? availableQuantity
+      : requested
+  ).toDecimalPlaces(quantityScale, D.ROUND_DOWN);
+
   let filled = new D('0');
   let notional = new D('0');
   let consumed = 0;
   for (const level of levels) {
-    const quantity = level.quantity.lt(requested.sub(filled))
+    if (filled.gte(target)) break;
+    const quantity = level.quantity.lt(target.sub(filled))
       ? level.quantity
-      : requested.sub(filled);
+      : target.sub(filled);
     filled = filled.add(quantity);
     notional = notional.add(level.price.mul(quantity));
     consumed += 1;
-    if (filled.eq(requested)) break;
+    if (filled.eq(target)) break;
   }
   const weighted = filled.gt(0) ? notional.div(filled) : null;
   const reference =
@@ -206,13 +266,15 @@ function observedResult(
       : null;
   return {
     ...result,
-    state: filled.eq(requested)
-      ? 'full_observed_fill'
-      : filled.gt(0)
-        ? 'partial_observed_fill'
-        : 'no_observed_fill',
-    reason: filled.eq(requested) ? null : shortageReason,
+    state: filled.eq(0)
+      ? 'no_observed_fill'
+      : full
+        ? 'full_observed_fill'
+        : 'partial_observed_fill',
+    reason: full && filled.gt(0) ? null : shortageReason,
     observedFillableQuantity: format(filled),
+    observedGrossAmount: format(notional),
+    unspentAmount: amountIntent ? format(requested.sub(notional)) : null,
     simulatedFillPrice: weighted === null ? null : format(weighted),
     adversePriceImpactBps: adverse === null ? null : format(adverse),
     levelsConsumed: consumed,

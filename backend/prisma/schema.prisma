@@ -824,6 +824,13 @@ model Order {
   orderType                  OrderType    @map("order_type")
   status                     OrderStatus  @default(submitted)
   quantity                   Decimal      @db.Decimal(24, 8)
+  // One-shot ERS market result. Null on historical/snapshot/limit orders.
+  // quantity preserves quantity intent; amount BUY stores resolved quantity.
+  executedQuantity           Decimal?     @map("executed_quantity") @db.Decimal(24, 8)
+  canceledQuantity           Decimal?     @map("canceled_quantity") @db.Decimal(24, 8)
+  requestedAmount            Decimal?     @map("requested_amount") @db.Decimal(24, 8)
+  unspentAmount              Decimal?     @map("unspent_amount") @db.Decimal(24, 8)
+  executionEvidence          Json?        @map("execution_evidence")
   limitPrice                 Decimal?     @map("limit_price") @db.Decimal(24, 8)
   executedPrice              Decimal?     @map("executed_price") @db.Decimal(24, 8)
   currencyCode               CurrencyCode @map("currency_code")

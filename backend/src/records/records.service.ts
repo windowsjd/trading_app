@@ -1,4 +1,9 @@
 import {
+  MARKET_EXECUTION_SELECT,
+  presentMarketExecution,
+  type OrderResponsePayload,
+} from '../orders/order-response.presenter';
+import {
   readPortfolioAccess,
   type PortfolioAccess,
 } from '../friends/friendship.policy';
@@ -303,6 +308,7 @@ type RecordsResponse = {
         orderType: OrderType;
         status: OrderStatus;
         quantity: string;
+        marketExecution?: OrderResponsePayload['marketExecution'];
         limitPrice: string | null;
         executedPrice: string | null;
         currencyCode: CurrencyCode;
@@ -415,6 +421,7 @@ type MySeasonOrdersResponse = {
       orderType: OrderType;
       status: OrderStatus;
       quantity: string;
+      marketExecution?: OrderResponsePayload['marketExecution'];
       limitPrice: string | null;
       executedPrice: string | null;
       currencyCode: CurrencyCode;
@@ -1058,6 +1065,8 @@ export class RecordsService {
           orderType: true,
           status: true,
           quantity: true,
+          ...MARKET_EXECUTION_SELECT,
+          cancelReason: true,
           limitPrice: true,
           executedPrice: true,
           currencyCode: true,
@@ -1066,7 +1075,6 @@ export class RecordsService {
           netAmount: true,
           reservedAmount: true,
           reservationReleasedAt: true,
-          cancelReason: true,
           submittedAt: true,
           executedAt: true,
           canceledAt: true,
@@ -1105,6 +1113,7 @@ export class RecordsService {
           orderType: order.orderType,
           status: order.status,
           quantity: this.formatDecimal(order.quantity, 8),
+          ...presentMarketExecution(order),
           limitPrice: this.formatNullableDecimal(order.limitPrice, 8),
           executedPrice: this.formatNullableDecimal(order.executedPrice, 8),
           currencyCode: order.currencyCode,
@@ -2307,6 +2316,8 @@ export class RecordsService {
           orderType: true,
           status: true,
           quantity: true,
+          ...MARKET_EXECUTION_SELECT,
+          cancelReason: true,
           limitPrice: true,
           executedPrice: true,
           currencyCode: true,
@@ -2343,6 +2354,7 @@ export class RecordsService {
         orderType: record.orderType,
         status: record.status,
         quantity: this.formatDecimal(record.quantity, 8),
+        ...presentMarketExecution(record),
         limitPrice: this.formatNullableDecimal(record.limitPrice, 8),
         executedPrice: this.formatNullableDecimal(record.executedPrice, 8),
         currencyCode: record.currencyCode,

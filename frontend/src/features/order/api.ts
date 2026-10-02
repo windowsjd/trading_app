@@ -117,7 +117,20 @@ export type CreateOrderRequestDto = OrderQuoteRequestDto & {
   idempotencyKey: string;
 };
 
+/** One terminal market decision, supplied by the server. Null/absent on legacy rows. */
+export interface MarketExecutionDto {
+  status: 'full' | 'partial';
+  requestedQuantity: QuantityString | null;
+  executedQuantity: QuantityString;
+  canceledQuantity: QuantityString | null;
+  requestedAmount: MoneyString | null;
+  unspentAmount: MoneyString | null;
+  remainderCancelReason: string | null;
+  remainderCanceledAt: IsoDateTimeString | null;
+}
+
 export interface CreatedOrderDto {
+  marketExecution?: MarketExecutionDto | null;
   id?: string;
   orderId?: string;
   quoteId?: string;

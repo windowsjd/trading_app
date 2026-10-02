@@ -1,16 +1,18 @@
 import type { OrderSide } from '../generated/prisma/client';
 
-/** Hypothetical, already-resolved quantity; this is not a persisted Order. */
+/** Hypothetical quantity or maximum BUY principal; never a persisted Order. */
 export type ExecutionRealismOrder = {
   assetId: string;
   side: OrderSide;
-  quantity: string;
   /** Price currency per quantityUnit; no implicit currency/unit conversion. */
   priceCurrency: string;
   quantityUnit: string;
   /** Optional buy ceiling / sell floor for this assessment only. */
   limitPrice?: string;
-};
+} & (
+  | { quantity: string; amount?: never }
+  | { side: 'buy'; amount: string; quantity?: never }
+);
 
 export type ExecutionLiquidityLevel = {
   price: string;
@@ -98,6 +100,10 @@ export type ExecutionAssessment = {
   referencePriceBasis: 'ask' | 'bid' | 'reference' | null;
   /** null = unknown quantity; zero = known zero observable quantity. */
   observedFillableQuantity: string | null;
+  /** Rounded consumed notional; do not reconstruct it from rounded VWAP. */
+  observedGrossAmount: string | null;
+  /** Amount intents only; may include precision dust even on a full fill. */
+  unspentAmount: string | null;
   /** VWAP of the observed consumed quantity only, including partial results. */
   simulatedFillPrice: string | null;
   /** Positive = adverse to the order side, relative to referencePrice. */

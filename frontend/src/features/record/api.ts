@@ -1,3 +1,5 @@
+import type { MarketExecutionDto } from '../order/api';
+import { formatExecutionMoney, getMarketExecutionDisplay } from '../order/marketExecution';
 import { apiClient } from '../../services/api/client';
 import type {
   ApiSuccessResponse,
@@ -133,6 +135,7 @@ export interface RecordSeasonEquityDto {
 }
 
 export interface RecordOrderItemDto {
+  marketExecution?: MarketExecutionDto | null;
   orderId?: string;
   id?: string;
   executedAt?: IsoDateTimeString;
@@ -247,6 +250,7 @@ export function getRecordOrderDisplay(item: RecordOrderItemDto) {
   // amounts are suppressed here rather than trusted to arrive null — the
   // reservation figures are what such a row is allowed to show.
   const noExecutionResult = hasNoExecutionResult(item);
+  const money = item.marketExecution ? formatExecutionMoney : formatCurrency;
   const symbol = item.symbol
     ? getAssetSymbolDisplay(item.symbol)
     : item.assetId?.trim() || null;
@@ -263,7 +267,8 @@ export function getRecordOrderDisplay(item: RecordOrderItemDto) {
     side: item.side,
     // Side-aware limit badge input; market rows keep their historical look.
     isLimitOrder: item.orderType === 'limit',
-    statusLabel: getOrderStatusLabel(item.status),
+    ...getMarketExecutionDisplay(item.marketExecution, currencyCode),
+    statusLabel: getOrderStatusLabel(item.status, item.marketExecution),
     isOpenLimitBuy: isOpenLimitBuyOrder(item),
     limitPrice: item.limitPrice
       ? formatCurrency(item.limitPrice, currencyCode)
@@ -275,10 +280,12 @@ export function getRecordOrderDisplay(item: RecordOrderItemDto) {
       ? formatDisplayDecimal(item.reservedQuantity)
       : null,
     submittedAt: formatKstDateTime(item.submittedAt),
-    quantity: formatDisplayDecimal(item.quantity),
+    quantity: formatDisplayDecimal(item.marketExecution?.executedQuantity ?? item.quantity),
     price: noExecutionResult
       ? formatCurrency(item.limitPrice, currencyCode)
-      : formatCurrency(
+      : item.marketExecution
+        ? formatExecutionMoney(item.executedPrice, currencyCode)
+        : formatCurrency(
           item.price ?? item.executedPrice ?? item.fillPriceLocal,
           currencyCode,
         ),
@@ -286,13 +293,13 @@ export function getRecordOrderDisplay(item: RecordOrderItemDto) {
     hasNoExecutionResult: noExecutionResult,
     netAmount: noExecutionResult
       ? null
-      : formatCurrency(item.netAmount ?? item.netAmountLocal, currencyCode),
+      : money(item.netAmount ?? item.netAmountLocal, currencyCode),
     grossAmount: noExecutionResult
       ? null
-      : formatCurrency(item.grossAmount, currencyCode),
+      : money(item.grossAmount, currencyCode),
     feeAmount: noExecutionResult
       ? null
-      : formatCurrency(item.feeAmount, currencyCode),
+      : money(item.feeAmount, currencyCode),
   };
 }
 

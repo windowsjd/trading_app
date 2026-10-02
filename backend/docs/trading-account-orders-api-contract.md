@@ -5,6 +5,17 @@
 > 주식 소수 시장가는 유지하고 소수 지정가는 거절한다. 정수 지정가는 확정 CLOSED에도 등록하며 calendar unavailable은 거절한다.
 > 기존 account scope·replay·예약·fee pinning은 유지한다. 새 endpoint/migration은 없다.
 
+## B2-1 market execution extension (2026-10-02)
+
+Both account modes share the additive terminal `marketExecution` contract in
+[Orders API](orders-api-contract.md#one-shot-market-execution-result-b2-1-2026-10-02).
+For quantity orders, Order.quantity preserves intent and marketExecution carries
+actual executed/canceled quantities. Amount BUY carries requested/unused
+principal instead. Financial ownership, cache invalidation, replay-first lookup,
+fee pinning and limit reservations are unchanged. An additive nullable migration
+stores these facts; historical rows remain readable. Production ERS is inactive
+until a trusted execution evidence adapter is registered after provider review.
+
 ## Status
 
 Implemented for season and general accounts (작업 5, general trading expansion

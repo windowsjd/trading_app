@@ -79,6 +79,8 @@ describe('Execution realism assessment (no Provider or production caller)', () =
       referencePrice: '100.00000000',
       referencePriceBasis: 'ask',
       observedFillableQuantity: '250.00000000',
+      observedGrossAmount: '25200.00000000',
+      unspentAmount: null,
       simulatedFillPrice: '100.80000000',
       adversePriceImpactBps: '80.00000000',
       levelsConsumed: 3,

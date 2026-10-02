@@ -375,7 +375,7 @@ export default function RecordOrderListScreen({ route }: Props) {
               testID={TEST_IDS.record.orderItem(display.key)}
               style={styles.rowCard}
             >
-              <View style={styles.rowBody}>
+              <View style={[styles.rowBody, display.isPartialExecution && styles.partialBody]}>
                 <View style={styles.rowNameColumn}>
                   <Text style={styles.itemTitle}>{display.name}</Text>
                   {display.symbol ? (
@@ -399,9 +399,19 @@ export default function RecordOrderListScreen({ route }: Props) {
                 </View>
 
                 <View style={styles.alignEnd}>
-                  <Text style={styles.helper}>수량 {display.quantity}</Text>
+                  {display.isPartialExecution ? (
+                    <>
+                      <Text style={styles.helper}>
+                        {display.isAmountExecution ? `주문 금액 ${display.requestedAmount}` : `주문 수량 ${display.requestedQuantity}`}
+                      </Text>
+                      <Text style={styles.helper}>체결 수량 {display.quantity}</Text>
+                      <Text style={styles.helper}>
+                        {display.isAmountExecution ? `사용되지 않은 금액 ${display.unspentAmount}` : `자동취소 수량 ${display.canceledQuantity}`}
+                      </Text>
+                    </>
+                  ) : <Text style={styles.helper}>수량 {display.quantity}</Text>}
                   <Text style={styles.helper}>
-                    {display.hasNoExecutionResult ? '지정가' : '실제 체결가격'}{' '}
+                    {display.hasNoExecutionResult ? '지정가' : display.isPartialExecution ? '평균 체결가' : '실제 체결가격'}{' '}
                     {display.hasNoExecutionResult
                       ? (display.limitPrice ?? display.price)
                       : display.price}{' '}
@@ -438,7 +448,7 @@ export default function RecordOrderListScreen({ route }: Props) {
                         실제 수수료 {display.feeAmount}
                       </Text>
                       <Text style={styles.itemTitle}>
-                        실제 차감액 {display.netAmount}
+                        {display.side === 'sell' ? '실제 수령액' : '실제 차감액'} {display.netAmount}
                       </Text>
                     </>
                   )}
@@ -500,6 +510,7 @@ function FilterChip({
 }
 
 const styles = StyleSheet.create({
+  partialBody: { flexDirection: 'column', alignItems: 'stretch' },
   container: { flex: 1, backgroundColor: semantic.screen },
   accountHeader: {
     fontSize: 14,
@@ -532,13 +543,14 @@ const styles = StyleSheet.create({
   },
   rowBody: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 12,
   },
   // A long Korean asset name wraps inside its own column instead of pushing the
   // amount column off the screen (작업 12 §7).
-  rowNameColumn: { flex: 1, minWidth: 0 },
+  rowNameColumn: { flex: 1, minWidth: 100 },
   cancelButton: {
     borderWidth: 1,
     borderColor: semantic.error,
@@ -559,6 +571,6 @@ const styles = StyleSheet.create({
   itemTitle: { fontSize: 15, fontWeight: '700', lineHeight: 21 },
   helper: { fontSize: 14, color: semantic.secondary, lineHeight: 20 },
   // The amount column keeps its own track: it is the figure the row is about.
-  alignEnd: { alignItems: 'flex-end', flexShrink: 0 },
+  alignEnd: { alignItems: 'flex-end', flexShrink: 0, maxWidth: '100%' },
   footerLoader: { paddingVertical: 16 },
 });
