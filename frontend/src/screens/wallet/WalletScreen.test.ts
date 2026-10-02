@@ -10,7 +10,7 @@ const find = (tree, testID) => elements(tree).find((node) => node.props.testID =
 
 describe('selected account Wallet and shared Home holdings', () => {
   for (const mode of ['general', 'season']) {
-    it(`${mode} shares the Hero and value/quantity/return rows and preserves preview vs full holdings`, (t) => {
+    it(`${mode} shares the Hero and name/value/return rows and preserves preview vs full holdings`, (t) => {
       const h = createHomeHarness(mode); t.after(h.close);
       h.seed(h.account, { points: [] });
       const positions = Array.from({ length: 7 }, (_, i) => holding(String(i), { quantity: '10.000000' }));
@@ -30,9 +30,11 @@ describe('selected account Wallet and shared Home holdings', () => {
       assert.equal(text(find(home, 'home-summary-card')), text(find(wallet, 'home-summary-card')));
       assert.equal(text(find(home, 'home-position-item-0')), text(find(wallet, 'wallet-position-0')));
       for (const [index, quantity] of ['10주', '0.125주', '0.000805 BTC'].entries()) {
-        assert.equal(find(home, `home-position-item-${index}-quantity`).props.children, quantity);
-        assert.equal(find(wallet, `wallet-position-${index}-quantity`).props.children, quantity);
-        for (const part of ['name', 'value', 'quantity', 'return']) {
+        assert.equal(find(home, `home-position-item-${index}-quantity`), undefined);
+        assert.equal(find(wallet, `wallet-position-${index}-quantity`), undefined);
+        assert.ok(!text(find(home, `home-position-item-${index}`)).includes(quantity));
+        assert.ok(!text(find(wallet, `wallet-position-${index}`)).includes(quantity));
+        for (const part of ['name', 'value', 'return']) {
           assert.equal(find(home, `home-position-item-${index}-${part}`).props.children, find(wallet, `wallet-position-${index}-${part}`).props.children);
         }
       }
@@ -95,8 +97,8 @@ describe('selected account Wallet and shared Home holdings', () => {
     assert.match(text(find(tree, 'wallet-cash-USD')), /-/);
     assert.equal(find(tree, 'wallet-position-unavailable-value').props.children, '-');
     assert.equal(find(tree, 'wallet-position-unavailable-return').props.children, '-');
-    assert.equal(find(tree, 'wallet-position-unavailable-quantity').props.children, '0.123457주');
-    assert.equal(find(tree, 'wallet-position-stale-quantity').props.children, '0.123457주');
+    assert.equal(find(tree, 'wallet-position-unavailable-quantity'), undefined);
+    assert.equal(find(tree, 'wallet-position-stale-quantity'), undefined);
     assert.match(text(find(tree, 'wallet-position-stale')), /1,120,000원.*\+4.82%.*이전 시세/);
     assert.doesNotMatch(text(tree), /internal/);
   });

@@ -7,6 +7,7 @@ const { resolve } = require('node:path');
 const { load } = require('./ledgerTestHarness.cjs');
 const { recordDetail, recordEquity } = require('./recordFixtures.ts');
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+/** @param {import('../src/app/navigation/types').RootStackParamList['TradeHistory']} scope */
 function createRecordScreenHarness(screen = 'detail', scope = { seasonId: 'record-0' }) {
   const client = new query.QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity }, mutations: { retry: false } } });
   const accounts = [{ id: 'historical', mode: 'season', status: 'closed', season: { seasonId: 'record-0', seasonName: '시즌 1', seasonStatus: 'settled' } }, { id: 'current', mode: 'general', status: 'active' }];

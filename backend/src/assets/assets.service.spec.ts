@@ -57,6 +57,12 @@ import { KIS_DOMESTIC_PERIOD_SOURCE } from '../providers/kis/candles/kis-period-
 import { BINANCE_CANDLE_SOURCE } from '../providers/binance/binance-candle.types';
 import { DailyChangeRateService } from './daily-change-rate.service';
 import { MarketCandlesRepository } from './market-candles.repository';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { BinanceWebSocketIngestionService } from '../providers/binance/binance-websocket.ingestion.service';
+import { parseBinanceWebSocketMessage } from '../providers/binance/binance-websocket.parser';
+import type { ProviderConfigService } from '../providers/provider-config.service';
+import { buildProviderRawPayloadJson } from '../providers/provider-raw-payload';
 
 describe('AssetsService', () => {
   const priceAt = new Date('2026-05-07T00:00:00.000Z');
@@ -1885,6 +1891,105 @@ describe('AssetsService', () => {
     await service.getAssets('user-1');
 
     expectNoAssetWrites(prisma);
+  });
+  describe('Binance writer, selected price evidence and Crypto HOT contract', () => {
+    const contract = JSON.parse(readFileSync(
+      join(__dirname, 'fixtures/binance-crypto-hot-contract.json'), 'utf8',
+    )) as {
+      frames: { stream: string; data: { s: string; q?: string } }[];
+      assets: { id: string; name: string; turnover: string | null }[];
+    };
+
+    async function cryptoSetup(onlyTrio = false) {
+      const h = createService();
+      const frames = onlyTrio ? contract.frames.slice(0, 3) : contract.frames;
+      const assets = frames.map(frame => asset({
+        id: frame.data.s, symbol: frame.data.s,
+        name: contract.assets.find(a => a.id === frame.data.s)!.name,
+        assetType: AssetType.crypto, currencyCode: CurrencyCode.USD,
+      }));
+      h.prisma.asset.findMany.mockImplementation(async args =>
+        args.where.symbol?.in
+          ? assets.filter(a => args.where.symbol.in.includes(a.symbol))
+          : assets,
+      );
+      h.prisma.assetPriceSnapshot.findFirst.mockResolvedValue(null);
+      h.prisma.fxRateSnapshot.findFirst.mockResolvedValue(freshUsdKrwSnapshot());
+      const snapshots: ReturnType<typeof providerPriceSnapshot>[] = [];
+      h.prisma.assetPriceSnapshot.create.mockImplementation(async ({ data }) => {
+        const id = `ws-${data.assetId}`;
+        snapshots.push({ ...data, id, price: new Prisma.Decimal(data.price) });
+        return { id };
+      });
+      const ingestion = new BinanceWebSocketIngestionService(h.prisma as never, {
+        getConfig: () => ({
+          common: { providerIngestionEnabled: true, rawPayloadMaxBytes: 12000 },
+          binance: { enabled: true, usdtAsUsdEquivalent: true, wsSnapshotThrottleMs: 0 },
+        }),
+      } as unknown as ProviderConfigService);
+      for (const frame of frames) {
+        const result = await ingestion.ingestParsedMessage(parseBinanceWebSocketMessage({
+          frame: JSON.stringify(frame), receivedAt: new Date(testNow.getTime() - 1000),
+        }));
+        expect(result.created).toBe(1);
+      }
+      // A newer REST row must not override eligible WS evidence or fill missing q.
+      for (const a of assets) snapshots.push({
+        ...providerPriceSnapshot(`rest-${a.id}`, 'binance_public_rest_24hr_ticker', '999', CurrencyCode.USD),
+        assetId: a.id,
+        rawPayloadJson: buildProviderRawPayloadJson({
+          payload: { symbol: a.symbol, lastPrice: '999', quoteVolume: '777777', volume: '1' }, maxBytes: 12000,
+        }),
+      } as ReturnType<typeof providerPriceSnapshot>);
+      h.prisma.assetPriceSnapshot.findMany.mockImplementation(async ({ where }) =>
+        where.id ? snapshots.filter(s => where.id.in.includes(s.id))
+          : snapshots.filter(s => (s as typeof s & { assetId: string }).assetId === where.assetId),
+      );
+      return h;
+    }
+
+    it.each([
+      ['desc', ['ETHUSDT', 'SOLUSDT', 'BTCUSDT']],
+      ['asc', ['BTCUSDT', 'SOLUSDT', 'ETHUSDT']],
+    ] as const)('sorts real combined-frame turnover %s across crypto assets', async (sortOrder, expected) => {
+      const h = await cryptoSetup(true);
+      const response = await h.service.getAssets('user', { assetType: 'crypto', sortBy: 'turnover', sortOrder });
+      expect(response.data.assets.map(a => a.symbol)).toEqual(expected);
+      expect(response.data.assets.map(a => a.turnover)).toEqual(sortOrder === 'desc' ? ['5000', '2000', '1000'] : ['1000', '2000', '5000']);
+      for (const a of response.data.assets) {
+        expect(a.turnoverPeriod).toBe('rolling_24h');
+        expect(a.price).toMatchObject({ state: 'available', currentPrice: '100.00000000', assetPriceSnapshotId: `ws-${a.id}` });
+      }
+    });
+
+    it('validates the shared HOT fixture against writer output and Market TOP 5 at the same snapshot', async () => {
+      const h = await cryptoSetup();
+      const query = { assetType: 'crypto', sortBy: 'turnover', sortOrder: 'desc' };
+      const hot = (await h.service.getAssets('user', { ...query, limit: '5' })).data;
+      const market = (await h.service.getAssets('user', { ...query, limit: '20', sortSnapshot: hot.sortSnapshot })).data;
+      expect(hot.assets).toHaveLength(5);
+      expect(market.assets).toMatchObject(contract.assets);
+      expect(hot.assets).toEqual(market.assets.slice(0, 5));
+      expect(hot.sortSnapshot).toBe(market.sortSnapshot);
+      expect(market.assets.at(-1)).toMatchObject({ id: 'DOGEUSDT', turnover: null, turnoverPeriod: null });
+      expect(JSON.stringify(hot)).not.toContain('rawPayloadJson');
+      const writesBeforeRead = h.prisma.assetPriceSnapshot.create.mock.calls.length;
+      await h.service.getAssets('user', query);
+      expect(h.prisma.assetPriceSnapshot.create).toHaveBeenCalledTimes(writesBeforeRead);
+    });
+
+    it('uses selected REST quoteVolume when WS is ineligible, keeping missing REST evidence null', async () => {
+      const h = await cryptoSetup(true);
+      h.prisma.assetPriceSnapshot.findMany.mockImplementation(async ({ where }) =>
+        where.id ? where.id.in.map((id: string) => ({
+          id, sourceType: 'provider_api', sourceName: 'binance_public_rest_24hr_ticker',
+          rawPayloadJson: buildProviderRawPayloadJson({ payload: id === 'rest-BTCUSDT' ? { volume: '999' } : { quoteVolume: '777777' }, maxBytes: 12000 }),
+        })) : [providerPriceSnapshot(`rest-${where.assetId}`, 'binance_public_rest_24hr_ticker', '999', CurrencyCode.USD)],
+      );
+      const response = await h.service.getAssets('user', { assetType: 'crypto', sortBy: 'turnover', sortOrder: 'desc' });
+      expect(response.data.assets.map(a => a.turnover)).toEqual(['777777', '777777', null]);
+      for (const a of response.data.assets) expect(a.price).toMatchObject({ state: 'available', currentPrice: '999.00000000', assetPriceSnapshotId: `rest-${a.id}` });
+    });
   });
   describe('whole-universe sorting and stable snapshot pagination', () => {
     function sortedSetup(redis?: { get: jest.Mock; eval: jest.Mock }) {

@@ -27,6 +27,7 @@ import { Prisma } from '../../generated/prisma/client';
 import type { ProviderConfigService } from '../provider-config.service';
 import { parseBinanceWebSocketMessage } from './binance-websocket.parser';
 import { BinanceWebSocketIngestionService } from './binance-websocket.ingestion.service';
+import { readAssetListTurnover } from '../../assets/asset-list-turnover';
 
 describe('Binance WebSocket ingestion service', () => {
   const receivedAt = new Date('2026-06-19T03:00:30.000Z');
@@ -83,6 +84,33 @@ describe('Binance WebSocket ingestion service', () => {
         prisma.assetPriceSnapshot.create.mock.calls[0][0].data.rawPayloadJson,
       ),
     ).not.toMatch(/api[-_]?key|secret|signature/i);
+    const snapshot = prisma.assetPriceSnapshot.create.mock.calls[0][0].data;
+    expect(snapshot.rawPayloadJson).toEqual({
+      truncated: false,
+      payload: {
+        provider: 'binance',
+        messageType: 'spot_ws_ticker',
+        streamName: 'btcusdt@ticker',
+        payload: message.ticker.rawPayload,
+      },
+    });
+    expect(snapshot.rawPayloadJson.payload.payload.data.q).toBe('999');
+    expect(readAssetListTurnover(snapshot)).toEqual({
+      turnover: '999', turnoverPeriod: 'rolling_24h',
+    });
+  });
+
+  it('connects a direct ticker frame through the real parser and writer to turnover', async () => {
+    const prisma = createPrismaMock({ assets: [{ id: 'asset-btc', symbol: 'BTC' }] });
+    const message = parseBinanceWebSocketMessage({
+      frame: JSON.stringify({ e: '24hrTicker', E: receivedAt.getTime(), s: 'BTCUSDT', c: '100', v: '123', q: '999' }),
+      receivedAt,
+    });
+    await createService({ prisma }).ingestParsedMessage(message);
+    const snapshot = prisma.assetPriceSnapshot.create.mock.calls[0][0].data;
+    expect(snapshot.rawPayloadJson.payload.streamName).toBeNull();
+    expect(snapshot.rawPayloadJson.payload.payload.q).toBe('999');
+    expect(readAssetListTurnover(snapshot)).toEqual({ turnover: '999', turnoverPeriod: 'rolling_24h' });
   });
 
   it('skips DB writes when a recent snapshot is inside the throttle window', async () => {
@@ -159,6 +187,8 @@ function tickerMessage(input: {
         c: input.price,
         b: input.price,
         a: input.price,
+        v: '123',
+        q: '999',
       },
     }),
     receivedAt: input.receivedAt,

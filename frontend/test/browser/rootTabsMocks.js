@@ -1,4 +1,5 @@
 import { recordDetail, recordEquity } from '../recordFixtures';
+import cryptoContract from '../../../backend/src/assets/fixtures/binance-crypto-hot-contract.json';
 // The production screens, query observers and API mappers run unchanged.
 // REST/WebSocket transport and navigation are the browser fixture boundaries.
 import { apiClient as homeClient, navigation, transport } from './homeMocks';
@@ -24,6 +25,11 @@ export const apiClient = {
     const limit = Number(url.searchParams.get('limit') ?? 20);
     if (url.pathname === '/assets') {
       transport.requests.push(path);
+      if (params.has('cryptoContract') && url.searchParams.get('assetType') === 'crypto') {
+        return response({ sortSnapshot: 'crypto-writer-contract',
+          pagination: pagination(offset, limit, cryptoContract.assets.length),
+          assets: cryptoContract.assets.slice(offset, offset + limit) });
+      }
       const page = pagination(offset, limit, 44);
       return response({ sortSnapshot: url.searchParams.get('sortSnapshot') ?? `fixture-${url.searchParams.get('sortBy')}-${url.searchParams.get('sortOrder')}-${url.searchParams.get('assetType')}`, pagination: page, assets: Array.from({ length: page.returned }, (_, i) => ({
         id: `asset-${offset + i}`, assetType: url.searchParams.get('assetType') ?? 'domestic_stock',

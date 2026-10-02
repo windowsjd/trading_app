@@ -22,7 +22,6 @@ export default function PositionAssetRow({ position, onPress, testID }: Props) {
         </Text>
         <View testID={testID ? `${testID}-values` : undefined} style={styles.values}>
           <Text testID={testID ? `${testID}-value` : undefined} style={styles.value}>{display.value}</Text>
-          <Text testID={testID ? `${testID}-quantity` : undefined} style={styles.quantity}>{display.quantity}</Text>
           <Text
             testID={testID ? `${testID}-return` : undefined}
             accessibilityLabel={`매입가 대비 미실현 수익률 ${display.returnRate}`}
@@ -50,7 +49,6 @@ const styles = StyleSheet.create({
   // the right track, without truncation or shrinking accessibility text.
   values: { minWidth: 0, maxWidth: '70%', flexShrink: 1, alignItems: 'stretch', gap: 2 },
   value: { minWidth: 0, textAlign: 'right', fontSize: 18, lineHeight: 27, fontWeight: '500', fontVariant: ['tabular-nums'] },
-  quantity: { minWidth: 0, textAlign: 'right', fontSize: 12, lineHeight: 18, fontWeight: '400', color: semantic.secondary, fontVariant: ['tabular-nums'] },
   returnRate: { minWidth: 0, textAlign: 'right', fontSize: 14, lineHeight: 21, fontVariant: ['tabular-nums'] },
   notice: { fontSize: 12, lineHeight: 18, color: semantic.warning, textAlign: 'right' },
 });

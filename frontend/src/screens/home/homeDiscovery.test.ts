@@ -4,6 +4,9 @@ import { createRequire } from 'node:module';
 import { QUERY_KEYS } from '../../constants/queryKeys.ts';
 const require = createRequire(import.meta.url);
 const { setup, account, position, asset, flush, act } = require('../../../test/homeDiscoveryHarness.cjs');
+// AssetsService verifies this same fixture through the real Binance parser/writer,
+// selected snapshot and turnover reader before checking its API result.
+const cryptoContract = require('../../../../backend/src/assets/fixtures/binance-crypto-hot-contract.json');
 
 for (const mode of ['season', 'general']) {
   for (const count of [0, 1, 7, 207]) it(`${mode}: ${count} holdings use server order, lazy complete pagination and collapse`, async t => {
@@ -85,6 +88,19 @@ it('HOT omits unavailable, invalid and inactive turnover without refilling; zero
   h.markets.us_stock = []; await h.press('home-hot-tab-us_stock');
   assert.equal(h.hotRows().length, 0);
   assert.ok(h.renderer.root.findAllByType('InlineEmptyState').some(n => /거래대금/.test(n.props.message)));
+});
+
+it('Crypto HOT renders the five rows verified by the backend writer-to-Assets contract', async t => {
+  const h = setup(); t.after(h.close);
+  h.markets.crypto = cryptoContract.assets.slice(0, 5);
+  await flush(); await h.press('home-hot-tab-crypto');
+  assert.deepEqual(h.hotRows().map(node => node.props.testID),
+    ['ETHUSDT', 'ADAUSDT', 'XRPUSDT', 'SOLUSDT', 'BTCUSDT'].map(id => `home-hot-item-${id}`));
+  assert.equal(h.hotRows().length, 5);
+  assert.ok(!h.renderer.root.findAllByType('InlineEmptyState').some(node => /거래대금/.test(node.props.message)));
+  const query = h.client.getQueryCache().findAll().find(q => q.queryKey.includes('crypto'));
+  assert.equal(query.state.data.sortSnapshot, 'snapshot-crypto');
+  assert.deepEqual(query.state.data.assets, cryptoContract.assets.slice(0, 5));
 });
 
 it('category changes never relabel the previous response and late account reads cannot mix holdings or ranking', async t => {

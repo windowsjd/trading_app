@@ -465,6 +465,13 @@ provider price snapshot's stored, untruncated evidence:
 - Crypto: Binance REST 24hr ticker quoteVolume or WebSocket 24hr ticker q;
   rolling 24-hour USDT notional, following the existing USDT-as-USD policy.
   This is not a UTC calendar-day candle amount.
+  For `binance_spot_ws_ticker`, the stored provider wrapper has
+  `messageType=spot_ws_ticker`. Its inner `payload` preserves the original
+  frame: direct `24hrTicker` evidence uses `payload.q`, and a combined
+  `<symbol>@ticker` frame uses `payload.data.q`. Both require `e=24hrTicker`.
+  Readers unwrap only these known envelopes and use the selected price
+  snapshot's evidence; they never search recursively or mix WS price with
+  REST turnover.
 
 Closed stocks use the last eligible observation from the latest completed
 session under the existing price selector. The last observation is not guaranteed

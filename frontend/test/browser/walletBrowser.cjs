@@ -69,8 +69,9 @@ async function run() {
             assert.equal(await neutral.textContent(), '0%');
             assert.equal(await positive.textContent(), '+123.45%'); assert.equal(await negative.textContent(), '-99.12%');
             assert.equal(await id(`${prefix}0-return`).textContent(), '+4.82%');
-            for (const [index, quantity] of ['10주', '0.123456주', '0.000805 BTC'].entries()) {
-              assert.equal(await id(`${prefix}${index}-quantity`).textContent(), quantity);
+            for (let index = 0; index < 7; index++) {
+              assert.equal(await id(`${prefix}${index}-quantity`).count(), 0);
+              assert.doesNotMatch(await id(`${prefix}${index}`).textContent(), /10주|0\.123456주|0\.000805 BTC/);
             }
             if (!long) {
               for (const [index, [name, amount]] of [
@@ -84,12 +85,12 @@ async function run() {
             assert.ok(!palette[appearance][preference].includes(amountColor));
             assert.ok(!palette[appearance][preference].includes(await color(neutral)));
             assert.match(await id(`${prefix}4`).textContent(), /이전 시세/);
-            assert.equal(await id(`${prefix}4-quantity`).textContent(), '0.123456주');
+            assert.equal(await id(`${prefix}4-quantity`).count(), 0);
             if (screen === 'wallet') {
               await theme.background(id('wallet-composition'), appearance, 'surface');
               assert.equal(await id(`${prefix}5-value`).textContent(), '-');
               assert.equal(await id(`${prefix}5-return`).textContent(), '-');
-              assert.equal(await id(`${prefix}5-quantity`).textContent(), '0.000805 BTC');
+              assert.equal(await id(`${prefix}5-quantity`).count(), 0);
             }
             const layout = await page.evaluate(({ prefix, screen }) => {
               const rows = [...document.querySelectorAll(`[data-testid^="${prefix}"][role="button"]`)];
@@ -106,9 +107,8 @@ async function run() {
                     const range = document.createRange(); range.setStart(node, i); range.setEnd(node, i + 1);
                     const name = node.parentElement.closest('[data-testid$="-name"]');
                     for (const r of range.getClientRects()) {
-                      // Asset identity intentionally uses a three-line ellipsis;
-                      // the complete name remains its accessible label. Amount,
-                      // quantity, return and notices must all render in full.
+                      // The complete name remains accessible. Amount,
+                      // return and notices must all render in full.
                       if (name && r.top >= name.getBoundingClientRect().bottom) continue;
                       if (r.width && (r.left < box.left - 1 || r.right > box.right + 1 || r.top < box.top - 1 || r.bottom > box.bottom + 1 || r.left < -1 || r.right > innerWidth + 1)) clipped.push({ text: node.textContent, glyph: node.textContent[i], textBox: { left: r.left, right: r.right, top: r.top, bottom: r.bottom }, boundary: { left: box.left, right: box.right, top: box.top, bottom: box.bottom } });
                     }
@@ -132,7 +132,7 @@ async function run() {
                 };
                 return {
                   name: { ...rect(part('name')), ...style(part('name')), label: part('name').getAttribute('aria-label'), text: part('name').textContent }, column: rect(part('values')),
-                  ...Object.fromEntries(['value', 'quantity', 'return'].map((suffix) => [suffix, {
+                  ...Object.fromEntries(['value', 'return'].map((suffix) => [suffix, {
                     ...rect(part(suffix)), ...style(part(suffix)), glyphRight: glyphRight(part(suffix)),
                   }])),
                 };
@@ -153,19 +153,15 @@ async function run() {
               assert.equal(row.name.fontSize, 18 * fontScale);
               assert.equal(row.name.fontWeight, '700');
               assert.equal(row.name.label, row.name.text, 'full identity remains accessible');
-              for (const value of [row.value, row.quantity, row.return]) {
+              for (const value of [row.value, row.return]) {
                 assert.ok(Math.abs(value.right - row.column.right) < 1, 'all numeric boxes share a right edge');
                 assert.ok(Math.abs(value.glyphRight - row.column.right) < 1, 'visible numeric glyphs share a right edge');
                 assert.equal(value.textAlign, 'right');
               }
-              assert.ok(row.value.bottom <= row.quantity.top && row.quantity.bottom <= row.return.top, 'value/quantity/return lines never overlap');
+              assert.ok(row.value.bottom <= row.return.top, 'value/return lines never overlap');
               assert.equal(row.value.fontSize, 18 * fontScale);
-              assert.equal(row.quantity.fontSize, 12 * fontScale);
               assert.equal(row.return.fontSize, 14 * fontScale);
-              assert.ok(row.value.fontSize > row.return.fontSize && row.return.fontSize > row.quantity.fontSize);
-              assert.equal(row.quantity.fontWeight, '400');
-              assert.notEqual(row.quantity.color, row.value.color, 'quantity uses secondary text');
-              assert.ok(!palette[appearance][preference].includes(row.quantity.color), 'quantity has no financial direction color');
+              assert.ok(row.value.fontSize > row.return.fontSize);
             }
             if (layout.history) {
               const [ledger, orders] = layout.history;

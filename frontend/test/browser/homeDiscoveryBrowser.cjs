@@ -134,6 +134,22 @@ async function run() {
     await id('home-hot-item-asset-0').click();
     await page.waitForFunction(() => window.fixture.navigationRef.getCurrentRoute()?.name === 'AssetDetail');
     assert.equal(await page.evaluate(() => window.fixture.navigationRef.getCurrentRoute().params.assetId), 'asset-0');
+    // Shared fixture checked by AssetsService against actual ingestion output.
+    await page.goto(`${base}/navigation?navigation=1&holdings=1&cryptoContract=1`);
+    await id('home-hot-tab-crypto').click();
+    await id('home-hot-item-BTCUSDT').waitFor();
+    assert.deepEqual(await page.locator('[data-testid^="home-hot-item-"][role="button"]').evaluateAll(nodes => nodes.map(n => n.dataset.testid)),
+      ['ETHUSDT', 'ADAUSDT', 'XRPUSDT', 'SOLUSDT', 'BTCUSDT'].map(id => `home-hot-item-${id}`));
+    assert.ok(!(await id('home-hot').textContent()).includes('거래대금을 확인할 수 있는 종목이 없습니다.'));
+    await id('home-hot-market').click(); await id('market-sort-control').waitFor();
+    await page.waitForFunction(() => window.fixture.client.getQueryCache().findAll().some(q => q.isActive() && q.queryKey.includes('crypto') && q.queryKey.includes(20) && q.state.data));
+    const crypto = await page.evaluate(() => {
+      const queries = window.fixture.client.getQueryCache().findAll();
+      const hot = queries.find(q => q.queryKey.includes('crypto') && q.queryKey.includes('preview')).state.data;
+      const market = queries.find(q => q.queryKey.includes('crypto') && q.queryKey.includes(20)).state.data.pages[0];
+      return { hotToken: hot.sortSnapshot, marketToken: market.sortSnapshot, hot: hot.assets.map(a => a.id), market: market.assets.slice(0, 5).map(a => a.id) };
+    });
+    assert.equal(crypto.hotToken, crypto.marketToken); assert.deepEqual(crypto.hot, crypto.market);
     assert.deepEqual(errors, []);
     fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify({ status: 'PASS', layouts: records, interactions: ['207 holdings', 'account switch', 'all categories', 'repeat Market intent', 'AssetDetail'], errors }, null, 2));
     console.log(`PASS ${records.length} Home layouts, holdings pagination, palettes, account and real Market navigation`);

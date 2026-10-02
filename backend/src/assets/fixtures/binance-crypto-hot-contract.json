@@ -1,0 +1,222 @@
+{
+  "frames": [
+    {
+      "stream": "btcusdt@ticker",
+      "data": {
+        "e": "24hrTicker",
+        "E": 1784516399000,
+        "s": "BTCUSDT",
+        "P": "1.500",
+        "c": "100.00000000",
+        "b": "99.99000000",
+        "a": "100.01000000",
+        "v": "123.00000000",
+        "q": "1000"
+      }
+    },
+    {
+      "stream": "ethusdt@ticker",
+      "data": {
+        "e": "24hrTicker",
+        "E": 1784516399000,
+        "s": "ETHUSDT",
+        "P": "1.500",
+        "c": "100.00000000",
+        "b": "99.99000000",
+        "a": "100.01000000",
+        "v": "123.00000000",
+        "q": "5000"
+      }
+    },
+    {
+      "stream": "solusdt@ticker",
+      "data": {
+        "e": "24hrTicker",
+        "E": 1784516399000,
+        "s": "SOLUSDT",
+        "P": "1.500",
+        "c": "100.00000000",
+        "b": "99.99000000",
+        "a": "100.01000000",
+        "v": "123.00000000",
+        "q": "2000"
+      }
+    },
+    {
+      "stream": "xrpusdt@ticker",
+      "data": {
+        "e": "24hrTicker",
+        "E": 1784516399000,
+        "s": "XRPUSDT",
+        "P": "1.500",
+        "c": "100.00000000",
+        "b": "99.99000000",
+        "a": "100.01000000",
+        "v": "123.00000000",
+        "q": "3000"
+      }
+    },
+    {
+      "stream": "adausdt@ticker",
+      "data": {
+        "e": "24hrTicker",
+        "E": 1784516399000,
+        "s": "ADAUSDT",
+        "P": "1.500",
+        "c": "100.00000000",
+        "b": "99.99000000",
+        "a": "100.01000000",
+        "v": "123.00000000",
+        "q": "3000"
+      }
+    },
+    {
+      "stream": "bnbusdt@ticker",
+      "data": {
+        "e": "24hrTicker",
+        "E": 1784516399000,
+        "s": "BNBUSDT",
+        "P": "1.500",
+        "c": "100.00000000",
+        "b": "99.99000000",
+        "a": "100.01000000",
+        "v": "123.00000000",
+        "q": "100"
+      }
+    },
+    {
+      "stream": "dogeusdt@ticker",
+      "data": {
+        "e": "24hrTicker",
+        "E": 1784516399000,
+        "s": "DOGEUSDT",
+        "P": "1.500",
+        "c": "100.00000000",
+        "b": "99.99000000",
+        "a": "100.01000000",
+        "v": "123.00000000"
+      }
+    }
+  ],
+  "assets": [
+    {
+      "id": "ETHUSDT",
+      "symbol": "ETHUSDT",
+      "name": "Ethereum",
+      "market": "BINANCE",
+      "assetType": "crypto",
+      "isActive": true,
+      "priceCurrency": "USD",
+      "settlementCurrency": "USD",
+      "turnover": "5000",
+      "turnoverPeriod": "rolling_24h",
+      "price": {
+        "state": "available",
+        "currentPrice": "100.00000000",
+        "priceCurrency": "USD"
+      }
+    },
+    {
+      "id": "ADAUSDT",
+      "symbol": "ADAUSDT",
+      "name": "Cardano",
+      "market": "BINANCE",
+      "assetType": "crypto",
+      "isActive": true,
+      "priceCurrency": "USD",
+      "settlementCurrency": "USD",
+      "turnover": "3000",
+      "turnoverPeriod": "rolling_24h",
+      "price": {
+        "state": "available",
+        "currentPrice": "100.00000000",
+        "priceCurrency": "USD"
+      }
+    },
+    {
+      "id": "XRPUSDT",
+      "symbol": "XRPUSDT",
+      "name": "XRP",
+      "market": "BINANCE",
+      "assetType": "crypto",
+      "isActive": true,
+      "priceCurrency": "USD",
+      "settlementCurrency": "USD",
+      "turnover": "3000",
+      "turnoverPeriod": "rolling_24h",
+      "price": {
+        "state": "available",
+        "currentPrice": "100.00000000",
+        "priceCurrency": "USD"
+      }
+    },
+    {
+      "id": "SOLUSDT",
+      "symbol": "SOLUSDT",
+      "name": "Solana",
+      "market": "BINANCE",
+      "assetType": "crypto",
+      "isActive": true,
+      "priceCurrency": "USD",
+      "settlementCurrency": "USD",
+      "turnover": "2000",
+      "turnoverPeriod": "rolling_24h",
+      "price": {
+        "state": "available",
+        "currentPrice": "100.00000000",
+        "priceCurrency": "USD"
+      }
+    },
+    {
+      "id": "BTCUSDT",
+      "symbol": "BTCUSDT",
+      "name": "Bitcoin",
+      "market": "BINANCE",
+      "assetType": "crypto",
+      "isActive": true,
+      "priceCurrency": "USD",
+      "settlementCurrency": "USD",
+      "turnover": "1000",
+      "turnoverPeriod": "rolling_24h",
+      "price": {
+        "state": "available",
+        "currentPrice": "100.00000000",
+        "priceCurrency": "USD"
+      }
+    },
+    {
+      "id": "BNBUSDT",
+      "symbol": "BNBUSDT",
+      "name": "BNB",
+      "market": "BINANCE",
+      "assetType": "crypto",
+      "isActive": true,
+      "priceCurrency": "USD",
+      "settlementCurrency": "USD",
+      "turnover": "100",
+      "turnoverPeriod": "rolling_24h",
+      "price": {
+        "state": "available",
+        "currentPrice": "100.00000000",
+        "priceCurrency": "USD"
+      }
+    },
+    {
+      "id": "DOGEUSDT",
+      "symbol": "DOGEUSDT",
+      "name": "Dogecoin",
+      "market": "BINANCE",
+      "assetType": "crypto",
+      "isActive": true,
+      "priceCurrency": "USD",
+      "settlementCurrency": "USD",
+      "turnover": null,
+      "turnoverPeriod": null,
+      "price": {
+        "state": "available",
+        "currentPrice": "100.00000000",
+        "priceCurrency": "USD"
+      }
+    }
+  ]
+}

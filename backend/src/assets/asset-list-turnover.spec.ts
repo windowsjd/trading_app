@@ -96,7 +96,14 @@ describe('provider notional turnover evidence', () => {
     ],
     [
       'binance_spot_ws_ticker',
-      { messageType: 'spot_ws_ticker', payload: { v: '123', q: '999' } },
+      { provider: 'binance', messageType: 'spot_ws_ticker', streamName: null,
+        payload: { e: '24hrTicker', s: 'BTCUSDT', v: '123', q: '999' } },
+      'rolling_24h',
+    ],
+    [
+      'binance_spot_ws_ticker',
+      { provider: 'binance', messageType: 'spot_ws_ticker', streamName: 'btcusdt@ticker',
+        payload: { stream: 'btcusdt@ticker', data: { e: '24hrTicker', s: 'BTCUSDT', v: '123', q: '999' } } },
       'rolling_24h',
     ],
   ])('reads stored quote notional from %s', (source, payload, period) => {
@@ -115,6 +122,33 @@ describe('provider notional turnover evidence', () => {
       }).turnover,
     ).toBe('9007199254740993.12345678');
   });
+  it('reads only known ticker frames, without recursive q or base-volume fallback', () => {
+    for (const payload of [
+      { e: '24hrTicker', v: '999' },
+      { q: '999' },
+      { e: 'kline', q: '999' },
+      { stream: 'btcusdt@kline_1m', data: { e: '24hrTicker', q: '999' } },
+      { stream: 42, data: { e: '24hrTicker', q: '999' } },
+      { stream: 'btcusdt@ticker', data: { e: 'kline', q: '999' } },
+      { stream: 'btcusdt@ticker', data: { e: '24hrTicker', v: '999' }, q: '999' },
+      { stream: 'btcusdt@ticker', data: { e: '24hrTicker', nested: { q: '999' } } },
+    ]) {
+      expect(read('binance_spot_ws_ticker', { messageType: 'spot_ws_ticker', payload })).toEqual({
+        turnover: null, turnoverPeriod: null,
+      });
+    }
+    expect(read('binance_spot_ws_ticker', {
+      messageType: 'other', payload: { e: '24hrTicker', q: '999' },
+    }).turnover).toBeNull();
+  });
+  it.each(['0', '9007199254740993.12345678', '', '-1', 'NaN', '1e8', null, 42])(
+    'validates combined-stream q %s exactly as REST quoteVolume', (q) => {
+      expect(read('binance_spot_ws_ticker', {
+        messageType: 'spot_ws_ticker',
+        payload: { stream: 'btcusdt@ticker', data: { e: '24hrTicker', q, v: '999' } },
+      })).toEqual(read('binance_public_rest_24hr_ticker', { quoteVolume: q }));
+    },
+  );
   it('keeps absent/invalid/truncated/manual/quantity-only evidence unavailable', () => {
     for (const quoteVolume of [
       null,

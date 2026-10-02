@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import { createRecordScreenHarness, act } from '../../../test/recordScreenHarness.cjs';
+import type { RootStackParamList } from '../../app/navigation/types';
 
-for (const scope of [{ accountId: 'historical' }, { seasonId: 'record-0' }]) {
+const scopes: RootStackParamList['TradeHistory'][] = [{ accountId: 'historical' }, { seasonId: 'record-0' }];
+for (const scope of scopes) {
   it(`route ${JSON.stringify(scope)} pins read, filter, pagination, refresh and cancel across account switching`, async t => {
     const h = createRecordScreenHarness('history', scope); t.after(h.close); await h.settle();
     assert.ok(h.find('record-order-list-screen'));

@@ -57,7 +57,15 @@ export function readAssetListTurnover(
     snapshot.sourceName === 'binance_spot_ws_ticker' &&
     payload.messageType === 'spot_ws_ticker'
   ) {
-    value = record(payload.payload)?.q;
+    // Ingestion preserves the original frame, including combined-stream data.
+    const frame = record(payload.payload);
+    const ticker =
+      frame && ('stream' in frame || 'data' in frame)
+        ? typeof frame.stream === 'string' && frame.stream.endsWith('@ticker')
+          ? record(frame.data)
+          : null
+        : frame;
+    if (ticker?.e === '24hrTicker') value = ticker.q;
     period = 'rolling_24h';
   }
   if (typeof value !== 'string' || !/^\d+(\.\d+)?$/.test(value.trim()))
