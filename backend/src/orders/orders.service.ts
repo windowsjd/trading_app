@@ -103,6 +103,10 @@ import {
 } from './order-response.presenter';
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
 import {
+  closedMarketPriceScope,
+  findMarketAwareAssetPriceCandidates,
+} from '../providers/asset-price-snapshot-query';
+import {
   recordAdminDiagnosticEvent,
   setAdminDiagnosticContext,
 } from '../common/admin-diagnostics';
@@ -4020,38 +4024,20 @@ export class OrdersService {
     priceKrw: Prisma.Decimal | null;
     currencyCode: CurrencyCode;
   }> {
+    const priceRead = {
+      asset: { ...input, id: input.assetId },
+      workflow: 'live_portfolio_valuation' as const,
+      now: valuationAt,
+    };
+    const closedScope = closedMarketPriceScope(priceRead);
     const providerEligibility = resolveAssetProviderEligibility({
-      workflow: 'live_portfolio_valuation',
-      asset: {
-        id: input.assetId,
-        assetType: input.assetType,
-        market: input.market,
-        currencyCode: input.currencyCode,
-      },
+      workflow: priceRead.workflow,
+      asset: priceRead.asset,
     });
     const providerCandidates = providerEligibility.eligible
-      ? await tx.assetPriceSnapshot.findMany({
-          where: {
-            assetId: input.assetId,
-            currencyCode: input.currencyCode,
-            sourceType: AssetPriceSourceType.provider_api,
-          },
-          orderBy: [
-            { effectiveAt: 'desc' },
-            { capturedAt: 'desc' },
-            { createdAt: 'desc' },
-          ],
-          take: 10,
-          select: {
-            id: true,
-            price: true,
-            priceKrw: true,
-            currencyCode: true,
-            sourceType: true,
-            sourceName: true,
-            effectiveAt: true,
-            capturedAt: true,
-          },
+      ? await findMarketAwareAssetPriceCandidates(tx, {
+          ...priceRead,
+          sourceNames: providerEligibility.sourceNames,
         })
       : [];
     const providerSelection = providerEligibility.eligible
@@ -4099,6 +4085,7 @@ export class OrdersService {
         effectiveAt: {
           lte: valuationAt,
         },
+        ...closedScope?.where,
       },
       orderBy: [
         { effectiveAt: 'desc' },

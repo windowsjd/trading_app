@@ -5,6 +5,28 @@ const itDbIntegration = RUN_DB_INTEGRATION ? it : it.skip;
 
 describe('OrdersService.executeOrder DB integration', () => {
   itDbIntegration(
+    'keeps season market/limit post-execution prices aligned with live valuation and rolls back failed valuation',
+    () => {
+      const result = spawnSync(
+        'pnpm',
+        ['tsx', 'scripts/order-closed-price-parity-integration.ts'],
+        {
+          cwd: process.cwd(),
+          env: process.env,
+          encoding: 'utf8',
+          timeout: 120_000,
+        },
+      );
+      if (result.status !== 0) {
+        throw new Error(`${result.stdout}\n${result.stderr}`);
+      }
+      expect(result.stdout).toContain(
+        'order closed price parity integration ok: 10 scenarios',
+      );
+    },
+    130_000,
+  );
+  itDbIntegration(
     'verifies order execute write path, rollback, concurrency, and read visibility against PostgreSQL',
     () => {
       const result = spawnSync('pnpm', ['tsx', '-e', ORDER_EXECUTE_DB_RUNNER], {

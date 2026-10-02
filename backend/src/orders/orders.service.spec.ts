@@ -132,6 +132,12 @@ import { LimitOrderCancelService } from './limit-order-cancel.service';
 import { LimitOrderCreateService } from './limit-order-create.service';
 import { OrderReservationService } from './order-reservation.service';
 import { OrdersService } from './orders.service';
+import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
+import { PortfolioValuationError } from '../portfolio/portfolio-valuation.policy';
+import {
+  markMarketSessionOverrideStoreRequired,
+  resetMarketSessionOverrideStoreForTest,
+} from './market-calendar/market-session-override.store';
 
 describe('OrdersService', () => {
   const startAt = new Date('2026-05-01T00:00:00.000Z');
@@ -3042,6 +3048,246 @@ describe('OrdersService', () => {
         idempotencyKey: 'order-create-key-invalid-limit',
       }),
     ).rejects.toBeInstanceOf(HttpException);
+  });
+
+  describe('closed-stock post-execution valuation parity', () => {
+    const valuationAt = new Date('2026-07-10T09:00:00Z');
+    const sessionClose = new Date('2026-07-10T06:30:00Z');
+    const price = (
+      id: string,
+      value: string,
+      effectiveAt = sessionClose,
+      sourceType: AssetPriceSourceType = AssetPriceSourceType.provider_api,
+      sourceName = 'kis_krx_realtime_trade',
+    ) => ({
+      id,
+      assetId: 'asset-1',
+      price: new Prisma.Decimal(value),
+      priceKrw: null,
+      currencyCode: CurrencyCode.KRW,
+      sourceType,
+      sourceName,
+      effectiveAt,
+      capturedAt: new Date(effectiveAt.getTime() + 2000),
+      createdAt: valuationAt,
+    });
+    const manual = (id: string, value: string, at = sessionClose) =>
+      price(id, value, at, AssetPriceSourceType.admin_manual, 'operator');
+
+    function setup(rows: ReturnType<typeof price>[]) {
+      const tx = createPrisma();
+      const root = createPrisma();
+      const orders = new OrdersService(root as never);
+      const portfolio = new PortfolioValuationService(root as never);
+      const initialCapitalKrw = new Prisma.Decimal('2000000');
+      tx.tradingAccount.findUnique.mockResolvedValue({
+        id: 'trading-account-1',
+        userId: 'user-1',
+        mode: 'season',
+        initialCapitalKrw,
+        seasonParticipant: { id: 'sp-1', userId: 'user-1', initialCapitalKrw },
+        cashWallets: [
+          {
+            currencyCode: CurrencyCode.KRW,
+            balanceAmount: new Prisma.Decimal('1917000'),
+          },
+          {
+            currencyCode: CurrencyCode.USD,
+            balanceAmount: new Prisma.Decimal('0'),
+          },
+        ],
+        positions: [
+          {
+            id: 'position-1',
+            assetId: 'asset-1',
+            quantity: new Prisma.Decimal('2'),
+            averageCost: new Prisma.Decimal('100000'),
+            currencyCode: CurrencyCode.KRW,
+            realizedPnl: new Prisma.Decimal('0'),
+            realizedPnlKrw: new Prisma.Decimal('0'),
+            asset: {
+              id: 'asset-1',
+              assetType: AssetType.domestic_stock,
+              market: 'KRX',
+              currencyCode: CurrencyCode.KRW,
+              priceCurrency: CurrencyCode.KRW,
+              settlementCurrency: CurrencyCode.KRW,
+            },
+          },
+        ],
+      });
+      type Query = {
+        where: {
+          assetId: string;
+          currencyCode: CurrencyCode;
+          sourceType: AssetPriceSourceType;
+          sourceName?: string;
+          price?: { gt: number };
+          id?: { in: string[] };
+          effectiveAt?: { gte?: Date; lte: Date };
+        };
+        take?: number;
+      };
+      const queryRows = ({ where, take }: Query) =>
+        rows
+          .filter(
+            (row) =>
+              row.assetId === where.assetId &&
+              row.currencyCode === where.currencyCode &&
+              row.sourceType === where.sourceType &&
+              (!where.sourceName || row.sourceName === where.sourceName) &&
+              (!where.price || row.price.gt(where.price.gt)) &&
+              (!where.id || where.id.in.includes(row.id)) &&
+              (!where.effectiveAt ||
+                ((!where.effectiveAt.gte ||
+                  row.effectiveAt >= where.effectiveAt.gte) &&
+                  row.effectiveAt <= where.effectiveAt.lte)),
+          )
+          .sort(
+            (a, b) =>
+              b.effectiveAt.getTime() - a.effectiveAt.getTime() ||
+              b.capturedAt.getTime() - a.capturedAt.getTime(),
+          )
+          .slice(0, take);
+      tx.assetPriceSnapshot.findMany.mockImplementation((query: Query) =>
+        Promise.resolve(queryRows(query)),
+      );
+      tx.assetPriceSnapshot.findFirst.mockImplementation((query: Query) =>
+        Promise.resolve(queryRows(query)[0] ?? null),
+      );
+      tx.equitySnapshot.create.mockResolvedValue({ id: 'equity-order-1' });
+      tx.equitySnapshot.findMany.mockResolvedValue([]);
+      const record = () =>
+        orders.recordOrderExecutedPortfolioSnapshotInTransaction(
+          tx as never,
+          'sp-1',
+          valuationAt,
+          'trading-account-1',
+        );
+      const live = () =>
+        portfolio.calculateTradingAccountValuation(
+          'trading-account-1',
+          valuationAt,
+          'live_portfolio_valuation',
+          tx as never,
+        );
+      return { tx, root, record, live };
+    }
+
+    afterEach(() => resetMarketSessionOverrideStoreForTest());
+
+    it.each([0, 25])(
+      'uses the same completed-session provider with %i post-close observations',
+      async (noiseCount) => {
+        const { tx, root, record, live } = setup([
+          price('close', '248500'),
+          price('invalid', '0'),
+          price(
+            'wrong-source',
+            '999999',
+            sessionClose,
+            AssetPriceSourceType.provider_api,
+            'wrong_source',
+          ),
+          ...Array.from({ length: noiseCount }, (_, i) =>
+            price(
+              `noise-${i}`,
+              '999999',
+              new Date(sessionClose.getTime() + (i + 1) * 60000),
+            ),
+          ),
+          manual('old-fallback', '191500', new Date('2026-07-09T06:30:00Z')),
+        ]);
+        const common = await live();
+        await expect(record()).resolves.toBe('equity-order-1');
+        expect(common.totalAssetKrw).toBe('2414000.00000000');
+        expect(
+          common.assetPriceSourceDecisions[0].sourceDecision.selectedSnapshotId,
+        ).toBe('close');
+        expect(
+          (tx.position.update.mock.calls[0] as [Prisma.PositionUpdateArgs])[0],
+        ).toMatchObject({
+          data: {
+            currentPriceLocal: '248500.00000000',
+            marketValueKrw: '497000.00000000',
+          },
+        });
+        expect(
+          (
+            tx.equitySnapshot.create.mock.calls[0] as [
+              Prisma.EquitySnapshotCreateArgs,
+            ]
+          )[0],
+        ).toMatchObject({
+          data: {
+            totalAssetKrw: common.totalAssetKrw,
+            returnRate: common.returnRate,
+          },
+        });
+        expect(
+          (
+            tx.seasonParticipant.update.mock.calls[0] as [
+              Prisma.SeasonParticipantUpdateArgs,
+            ]
+          )[0],
+        ).toMatchObject({
+          data: {
+            totalAssetKrw: common.totalAssetKrw,
+            totalReturnRate: common.returnRate,
+          },
+        });
+        expect(tx.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
+        expect(root.assetPriceSnapshot.findMany).not.toHaveBeenCalled();
+        expect(root.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
+        expect(root.tradingAccount.findUnique).not.toHaveBeenCalled();
+      },
+    );
+
+    it('uses only positive admin fallback evidence inside the completed session', async () => {
+      const { tx, record, live } = setup([
+        price('outside-provider', '999999', valuationAt),
+        manual('prior-session', '191500', new Date('2026-07-09T06:30:00Z')),
+        manual(
+          'inside-session',
+          '248500',
+          new Date(sessionClose.getTime() - 1000),
+        ),
+        manual('invalid', '0'),
+        manual('post-close', '999999', valuationAt),
+      ]);
+      const common = await live();
+      await record();
+      expect(common.assetPriceSourceDecisions[0].sourceDecision).toMatchObject({
+        selectedSnapshotId: 'inside-session',
+        selectedSourceType: 'admin_manual',
+        fallbackUsed: true,
+      });
+      expect(
+        (
+          tx.equitySnapshot.create.mock.calls[0] as [
+            Prisma.EquitySnapshotCreateArgs,
+          ]
+        )[0],
+      ).toMatchObject({
+        data: { totalAssetKrw: common.totalAssetKrw },
+      });
+    });
+
+    it.each([false, true])(
+      'fails closed without an admissible session price (calendar unavailable: %s)',
+      async (unavailable) => {
+        if (unavailable) markMarketSessionOverrideStoreRequired();
+        const { tx, record, live } = setup([
+          ...(unavailable ? [manual('inside-session', '248500')] : []),
+          manual('prior-session', '191500', new Date('2026-07-09T06:30:00Z')),
+          manual('post-close', '999999', valuationAt),
+        ]);
+        await expect(live()).rejects.toBeInstanceOf(PortfolioValuationError);
+        await expectErrorCode(record(), 'ASSET_PRICE_UNAVAILABLE');
+        expect(tx.equitySnapshot.create).not.toHaveBeenCalled();
+        expect(tx.seasonParticipant.update).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe('executeOrder', () => {
