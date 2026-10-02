@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
+import type { Appearance } from 'react-native';
+
+type NativeColorScheme = Parameters<typeof Appearance.setColorScheme>[0];
 
 const require = createRequire(import.meta.url);
 const React = require('react');
@@ -14,7 +17,7 @@ function harness(saved: string | null = null, holdRead = false) {
   const values = new Map<string, string | null>([['trading-app:appearance', saved]]);
   let failRead = false;
   let failWrite = false;
-  const applied: Array<string | null> = [];
+  const applied: NativeColorScheme[] = [];
   let releaseRead = () => {};
   const readGate = new Promise<void>((resolve) => { releaseRead = resolve; });
   const storage = {
@@ -24,7 +27,10 @@ function harness(saved: string | null = null, holdRead = false) {
   const module = load(resolve('src/theme/appearance.tsx'), {
     react: React,
     'react-native': {
-      Appearance: { setColorScheme: (value: string | null) => applied.push(value) },
+      Appearance: { setColorScheme: (value: NativeColorScheme): void => {
+        assert.ok(value === 'light' || value === 'dark' || value === 'unspecified', 'native setColorScheme requires light, dark or unspecified; null is invalid');
+        applied.push(value);
+      } },
       Platform: { OS: 'android' }, StatusBar: 'StatusBar', View: 'View',
       useColorScheme: () => scheme,
     },
@@ -51,7 +57,7 @@ test('system follows OS changes; explicit light/dark override and persist on thi
   const h = harness(); t.after(h.close);
   await h.mount();
   assert.equal(h.current.preference, 'system'); assert.equal(h.current.mode, 'dark');
-  assert.equal(h.applied.at(-1), null);
+  assert.equal(h.applied.at(-1), 'unspecified');
   h.setScheme('light'); await h.rerender(); assert.equal(h.current.mode, 'light');
   await h.choose('dark'); assert.equal(h.current.mode, 'dark'); assert.equal(h.stored, 'dark');
   assert.equal(h.applied.at(-1), 'dark');
@@ -59,8 +65,32 @@ test('system follows OS changes; explicit light/dark override and persist on thi
   await h.choose('light'); assert.equal(h.current.mode, 'light'); assert.equal(h.applied.at(-1), 'light');
   await h.close(); await h.mount();
   assert.equal(h.current.preference, 'light'); assert.equal(h.current.mode, 'light');
-  await h.choose('system'); assert.equal(h.current.mode, 'dark'); assert.equal(h.applied.at(-1), null);
+  await h.choose('system'); assert.equal(h.current.mode, 'dark'); assert.equal(h.applied.at(-1), 'unspecified');
 });
+
+test('system → light → dark → system uses non-null native overrides and resumes OS appearance', async (t) => {
+  const h = harness('system'); t.after(h.close);
+  await h.mount(); assert.equal(h.current.mode, 'dark');
+  await h.choose('light'); assert.equal(h.current.mode, 'light'); assert.equal(h.stored, 'light');
+  await h.choose('dark'); assert.equal(h.current.mode, 'dark'); assert.equal(h.stored, 'dark');
+  await h.choose('system'); assert.equal(h.current.mode, 'dark'); assert.equal(h.stored, 'system');
+  assert.deepEqual(h.applied, ['unspecified', 'light', 'dark', 'unspecified']);
+  h.setScheme('light'); await h.rerender();
+  assert.equal(h.current.mode, 'light'); assert.equal(h.applied.at(-1), 'unspecified');
+});
+
+for (const preference of ['system', 'light', 'dark'] as const) {
+  test(`restores stored ${preference} before mounting children or applying native appearance`, async (t) => {
+    const h = harness(preference, true); t.after(h.close);
+    h.setScheme(preference === 'dark' ? 'light' : 'dark');
+    await h.mount(); assert.equal(h.current, undefined); assert.deepEqual(h.applied, []);
+    await act(async () => { h.releaseRead(); await Promise.resolve(); });
+    assert.equal(h.current.preference, preference);
+    assert.equal(h.current.mode, preference === 'system' ? 'dark' : preference);
+    assert.deepEqual(h.applied, [preference === 'system' ? 'unspecified' : preference]);
+    assert.equal(h.stored, preference);
+  });
+}
 
 test('invalid or failed device preference safely uses system', async (t) => {
   const invalid = harness('unexpected'); t.after(invalid.close);

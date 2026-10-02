@@ -101,7 +101,7 @@ export function AppearanceProvider({ children }: { children: React.ReactNode }) 
         document.documentElement.style.backgroundColor = colors.screen;
       }
     } else {
-      Appearance.setColorScheme(preference === 'system' ? null : mode);
+      Appearance.setColorScheme(preference === 'system' ? 'unspecified' : mode);
     }
   }, [ready, preference, mode, colors.screen]);
 
