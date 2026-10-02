@@ -142,7 +142,7 @@ describe('AssetsService', () => {
 
   const createService = (binanceSymbolMetadata?: {
     getDisplayPriceDecimals: jest.Mock;
-  }, redis?: { get: jest.Mock; setWithTtl: jest.Mock }) => {
+  }, redis?: { get: jest.Mock; eval: jest.Mock }) => {
     const prisma = createPrisma();
     const service = new AssetsService(
       prisma as never,
@@ -1887,7 +1887,7 @@ describe('AssetsService', () => {
     expectNoAssetWrites(prisma);
   });
   describe('whole-universe sorting and stable snapshot pagination', () => {
-    function sortedSetup(redis?: { get: jest.Mock; setWithTtl: jest.Mock }) {
+    function sortedSetup(redis?: { get: jest.Mock; eval: jest.Mock }) {
       const h = createService(undefined, redis);
       const values = ['-2', '8', null, '0', '-9', '3', '3'];
       h.prisma.asset.findMany.mockResolvedValue(
@@ -1959,7 +1959,9 @@ describe('AssetsService', () => {
         expect(ids).toEqual(expected);
         expect(new Set(ids).size).toBe(7);
         expect(h.prisma.asset.findMany).toHaveBeenCalledTimes(1);
-        const refresh = (await h.service.getAssets('user', query)).data;
+        const refresh = (
+          await h.service.getAssets('user', { ...query, sortRefresh: 'true' })
+        ).data;
         expect(refresh.assets).toEqual([]);
         expect(refresh.sortSnapshot).not.toBe(first.sortSnapshot);
         expectNoAssetWrites(h.prisma);
@@ -1971,25 +1973,443 @@ describe('AssetsService', () => {
       const store = new Map<string, string>();
       const redis = {
         get: jest.fn(async (key: string) => store.get(key) ?? null),
-        setWithTtl: jest.fn(async (key: string, value: string, _ttl?: number) => { store.set(key, value); }),
+        eval: jest.fn(
+          async (_script: string, keys: string[], args: string[]) => {
+            store.set(keys[0], args[2]);
+            store.set(keys[1], args[1]);
+          },
+        ),
       };
       try {
         const first = sortedSetup(redis);
         const query = { sortBy: 'volume', limit: '2' };
         const page = (await first.service.getAssets('user', query)).data;
         const other = createService(undefined, redis);
-        const next = (await other.service.getAssets('user', { ...query, offset: '2', sortSnapshot: page.sortSnapshot })).data;
-        expect(next.assets.map(a => a.id)).toEqual(['a4', 'a3']);
+        const next = (
+          await other.service.getAssets('user', {
+            ...query,
+            offset: '2',
+            sortSnapshot: page.sortSnapshot,
+          })
+        ).data;
+        expect(next.assets.map((a) => a.id)).toEqual(['a4', 'a3']);
         expect(other.prisma.asset.findMany).not.toHaveBeenCalled();
-        expect(redis.setWithTtl.mock.calls[0][2]).toBe(600);
+        expect(redis.eval.mock.calls[0][2][3]).toBe('600');
+        const shared = (await other.service.getAssets('another-user', query))
+          .data;
+        expect(shared.sortSnapshot).toBe(page.sortSnapshot);
+        expect(other.prisma.asset.findMany).not.toHaveBeenCalled();
+        expect(redis.eval).toHaveBeenCalledTimes(1);
         redis.get.mockRejectedValue(new Error('cache unavailable'));
-        await expectApiError(createService(undefined, redis).service.getAssets('user', { ...query, offset: '2', sortSnapshot: page.sortSnapshot }), 409, 'ASSET_SORT_SNAPSHOT_EXPIRED');
+        await expectApiError(
+          createService(undefined, redis).service.getAssets('user', {
+            ...query,
+            offset: '2',
+            sortSnapshot: page.sortSnapshot,
+          }),
+          409,
+          'ASSET_SORT_SNAPSHOT_EXPIRED',
+        );
       } finally {
         if (previous === undefined) delete process.env.REDIS_URL;
         else process.env.REDIS_URL = previous;
       }
     });
-    it('rejects invalid/expired/cross-user/mismatched continuations instead of changing page order', async () => {
+    it.each([false, true])(
+      'prices once for 100 users, concurrent=%s',
+      async (concurrent) => {
+        const h = sortedSetup();
+        const build = jest.spyOn(
+          h.service as unknown as {
+            buildAssetsWithPrices: () => Promise<unknown>;
+          },
+          'buildAssetsWithPrices',
+        );
+        const read = (i: number) =>
+          h.service.getAssets(`user-${i}`, {
+            sortBy: 'volume',
+            limit: String((i % 10) + 1),
+          });
+        const pages = concurrent
+          ? await Promise.all(Array.from({ length: 100 }, (_, i) => read(i)))
+          : [];
+        if (!concurrent)
+          for (let i = 0; i < 100; i++) pages.push(await read(i));
+        expect(new Set(pages.map((p) => p.data.sortSnapshot)).size).toBe(1);
+        expect(h.prisma.asset.findMany).toHaveBeenCalledTimes(1);
+        expect(build).toHaveBeenCalledTimes(1);
+        expect(h.prisma.assetPriceSnapshot.findMany).toHaveBeenCalledTimes(8);
+      },
+    );
+    it('clears failed coalescing state and allows retry', async () => {
+      const h = sortedSetup();
+      h.prisma.asset.findMany.mockRejectedValueOnce(new Error('DB failed'));
+      const results = await Promise.allSettled(
+        Array.from({ length: 10 }, () =>
+          h.service.getAssets('a', { sortBy: 'volume' }),
+        ),
+      );
+      expect(results.every((r) => r.status === 'rejected')).toBe(true);
+      expect(h.prisma.asset.findMany).toHaveBeenCalledTimes(1);
+      expect(
+        (await h.service.getAssets('b', { sortBy: 'volume' })).data.assets,
+      ).toHaveLength(7);
+      expect(h.prisma.asset.findMany).toHaveBeenCalledTimes(2);
+    });
+    it.each([
+      { assetType: 'crypto' },
+      { currencyCode: 'USD' },
+      { market: 'NAS' },
+      { search: 'SAM' },
+      { includeInactive: 'true' },
+      { sortBy: 'changeRate' },
+    ])('isolates filter %j', async (changed) => {
+      const h = sortedSetup();
+      const q = { sortBy: 'volume', assetType: 'domestic_stock' };
+      const first = (await h.service.getAssets('a', q)).data;
+      expect(
+        (await h.service.getAssets('b', { ...q, ...changed })).data
+          .sortSnapshot,
+      ).not.toBe(first.sortSnapshot);
+      expect(h.prisma.asset.findMany).toHaveBeenCalledTimes(2);
+      await expectApiError(
+        h.service.getAssets('a', {
+          ...q,
+          ...changed,
+          sortSnapshot: first.sortSnapshot,
+        }),
+        400,
+        'INVALID_SORT_SNAPSHOT',
+      );
+    });
+    it('normalizes defaults and trims, isolates sort direction, allows different page sizes', async () => {
+      const h = sortedSetup();
+      const q = { sortBy: 'changeRate', search: 'S' };
+      const first = (
+        await h.service.getAssets('a', { ...q, search: ' S ', limit: '2' })
+      ).data;
+      expect(
+        (
+          await h.service.getAssets('b', {
+            ...q,
+            sortOrder: 'desc',
+            includeInactive: 'false',
+            withPrice: 'true',
+            limit: '3',
+          })
+        ).data.sortSnapshot,
+      ).toBe(first.sortSnapshot);
+      const next = (
+        await h.service.getAssets('c', {
+          ...q,
+          offset: '2',
+          limit: '3',
+          sortSnapshot: first.sortSnapshot,
+        })
+      ).data;
+      expect(next.assets.map((a) => a.id)).toEqual(['a6', 'a3', 'a0']);
+      expect(
+        (await h.service.getAssets('a', { ...q, sortOrder: 'asc' })).data
+          .sortSnapshot,
+      ).not.toBe(first.sortSnapshot);
+      await expectApiError(
+        h.service.getAssets('a', {
+          ...q,
+          sortOrder: 'asc',
+          sortSnapshot: first.sortSnapshot,
+        }),
+        400,
+        'INVALID_SORT_SNAPSHOT',
+      );
+    });
+    it('refreshes immediately and after two seconds without perturbing older pages', async () => {
+      const h = sortedSetup();
+      const q = { sortBy: 'volume', limit: '2' };
+      const first = (await h.service.getAssets('a', q)).data;
+      h.prisma.asset.findMany.mockResolvedValue([]);
+      const fresh = (
+        await h.service.getAssets('b', { ...q, sortRefresh: 'true' })
+      ).data;
+      expect(fresh.sortSnapshot).not.toBe(first.sortSnapshot);
+      expect(fresh.assets).toEqual([]);
+      expect((await h.service.getAssets('c', q)).data.sortSnapshot).toBe(
+        fresh.sortSnapshot,
+      );
+      expect(
+        (
+          await h.service.getAssets('a', {
+            ...q,
+            offset: '2',
+            sortSnapshot: first.sortSnapshot,
+          })
+        ).data.assets.map((a) => a.id),
+      ).toEqual(['a4', 'a3']);
+      jest.setSystemTime(new Date(testNow.getTime() + 2001));
+      expect((await h.service.getAssets('a', q)).data.sortSnapshot).not.toBe(
+        fresh.sortSnapshot,
+      );
+      expect(h.prisma.asset.findMany).toHaveBeenCalledTimes(3);
+    });
+    it('bounds search cardinality and restarts evicted tokens', async () => {
+      const h = createService();
+      h.prisma.asset.findMany.mockResolvedValue([]);
+      const first = (
+        await h.service.getAssets('a', { sortBy: 'volume', search: 'S' })
+      ).data;
+      for (let i = 0; i < 210; i++)
+        await h.service.getAssets('a', {
+          sortBy: 'volume',
+          search: `prefix-${i}`,
+        });
+      const cache = (
+        h.service as unknown as { sortedSnapshots: Map<string, unknown> }
+      ).sortedSnapshots;
+      expect(cache.size).toBe(200);
+      await expectApiError(
+        h.service.getAssets('a', {
+          sortBy: 'volume',
+          search: 'S',
+          offset: '2',
+          sortSnapshot: first.sortSnapshot,
+        }),
+        409,
+        'ASSET_SORT_SNAPSHOT_EXPIRED',
+      );
+      jest.setSystemTime(new Date(testNow.getTime() + 600001));
+      await h.service.getAssets('a', { sortBy: 'volume' });
+      expect(cache.size).toBe(1);
+    });
+    it('retains local pages during Redis read/write outage; missing remote token restarts', async () => {
+      const previous = process.env.REDIS_URL;
+      process.env.REDIS_URL = 'redis://fixture.invalid';
+      const redis = {
+        get: jest.fn().mockRejectedValue(new Error('outage')),
+        eval: jest.fn().mockRejectedValue(new Error('outage')),
+      };
+      try {
+        const h = sortedSetup(redis);
+        const q = { sortBy: 'volume', limit: '2' };
+        const first = (await h.service.getAssets('a', q)).data;
+        expect(
+          (
+            await h.service.getAssets('b', {
+              ...q,
+              offset: '2',
+              sortSnapshot: first.sortSnapshot,
+            })
+          ).data.assets.map((a) => a.id),
+        ).toEqual(['a4', 'a3']);
+        expect((await h.service.getAssets('c', q)).data.sortSnapshot).toBe(
+          first.sortSnapshot,
+        );
+        await expectApiError(
+          createService(undefined, redis).service.getAssets('b', {
+            ...q,
+            offset: '2',
+            sortSnapshot: first.sortSnapshot,
+          }),
+          409,
+          'ASSET_SORT_SNAPSHOT_EXPIRED',
+        );
+      } finally {
+        if (previous === undefined) delete process.env.REDIS_URL;
+        else process.env.REDIS_URL = previous;
+      }
+    });
+    it.each([true, false])(
+      'isolates concurrent admin/user/operator diagnostics, adminFirst=%s',
+      async (adminFirst) => {
+        const h = createService();
+        h.prisma.asset.findMany.mockResolvedValue([asset({ id: 'failed' })]);
+        h.prisma.assetPriceSnapshot.findFirst.mockResolvedValue(null);
+        const read = (
+          role: 'admin' | 'user' | 'operator',
+          requestId: string,
+          sortSnapshot?: string,
+        ) => {
+          let pending!: ReturnType<AssetsService['getAssets']>;
+          adminDiagnosticRequestMiddleware(
+            {
+              method: 'GET',
+              originalUrl: '/api/v1/assets',
+              headers: { 'x-request-id': requestId },
+              user: { userId: role, role },
+            } as never,
+            { setHeader: jest.fn() } as never,
+            () => {
+              pending = h.service.getAssets(role, {
+                sortBy: 'volume',
+                sortSnapshot,
+              });
+            },
+          );
+          return pending;
+        };
+        const roles = adminFirst
+          ? (['admin', 'user', 'operator'] as const)
+          : (['user', 'operator', 'admin'] as const);
+        const results = await Promise.all(
+          roles.map((role) => read(role, `request-${role}`)),
+        );
+        expect(new Set(results.map((r) => r.data.sortSnapshot)).size).toBe(1);
+        for (let i = 0; i < roles.length; i++)
+          if (roles[i] === 'admin')
+            expect(results[i].data.priceErrors[0].diagnostic).toMatchObject({
+              requestId: 'request-admin',
+              operation: 'ASSET_PRICE_READ',
+            });
+          else
+            expect(results[i].data.priceErrors[0]).not.toHaveProperty(
+              'diagnostic',
+            );
+        const token = results[0].data.sortSnapshot;
+        expect(
+          (await read('admin', 'another-admin', token)).data.priceErrors[0]
+            .diagnostic?.requestId,
+        ).toBe('another-admin');
+        expect(
+          (await read('user', 'ordinary', token)).data.priceErrors[0],
+        ).not.toHaveProperty('diagnostic');
+        const cache = (
+          h.service as unknown as { sortedSnapshots: Map<string, unknown> }
+        ).sortedSnapshots;
+        expect(JSON.stringify([...cache.values()])).not.toMatch(
+          /diagnostic|request-admin|another-admin/,
+        );
+        expect(h.prisma.asset.findMany).toHaveBeenCalledTimes(1);
+      },
+    );
+    it('presents cached-failure diagnostic after a DB correction', async () => {
+      const h = createService();
+      h.prisma.asset.findMany.mockResolvedValue([asset({ id: 'corrected' })]);
+      h.prisma.assetPriceSnapshot.findFirst.mockResolvedValue(null);
+      const first = (await h.service.getAssets('user', { sortBy: 'volume' }))
+        .data;
+      h.prisma.assetPriceSnapshot.findFirst.mockResolvedValue(
+        priceSnapshot('correction', '100'),
+      );
+      let pending!: ReturnType<AssetsService['getAssets']>;
+      adminDiagnosticRequestMiddleware(
+        {
+          method: 'GET',
+          originalUrl: '/api/v1/assets',
+          headers: { 'x-request-id': 'corrected-request' },
+          user: { userId: 'admin', role: 'admin' },
+        } as never,
+        { setHeader: jest.fn() } as never,
+        () => {
+          pending = h.service.getAssets('admin', {
+            sortBy: 'volume',
+            sortSnapshot: first.sortSnapshot,
+          });
+        },
+      );
+      const result = await pending;
+      expect(result.data.assets).toEqual(first.assets);
+      expect(result.data.priceErrors[0].diagnostic).toMatchObject({
+        requestId: 'corrected-request',
+        evidence: { selectionResult: 'SNAPSHOT_PARTIAL_FAILURE' },
+      });
+    });
+
+    it('never serializes FX diagnostics and rebuilds them per page across instances', async () => {
+      const previous = process.env.REDIS_URL;
+      process.env.REDIS_URL = 'redis://fixture.invalid';
+      const store = new Map<string, string>();
+      const redis = {
+        get: jest.fn(async (key: string) => store.get(key) ?? null),
+        eval: jest.fn(
+          async (_script: string, keys: string[], args: string[]) => {
+            store.set(keys[0], args[2]);
+            store.set(keys[1], args[1]);
+          },
+        ),
+      };
+      const first = createService(undefined, redis);
+      const other = createService(undefined, redis);
+      const candidates = ['a', 'b'].map((id) =>
+        asset({
+          id,
+          symbol: id,
+          assetType: AssetType.us_stock,
+          currencyCode: CurrencyCode.USD,
+          market: 'NAS',
+        }),
+      );
+      for (const h of [first, other]) {
+        h.prisma.asset.findMany.mockResolvedValue(candidates);
+        h.prisma.assetPriceSnapshot.findFirst.mockResolvedValue(
+          priceSnapshot('usd-price', '100', CurrencyCode.USD),
+        );
+        h.prisma.fxRateSnapshot.findFirst.mockResolvedValue(null);
+      }
+      const read = (
+        h: typeof first,
+        role: 'admin' | 'user',
+        requestId: string,
+        token?: string,
+        offset = '0',
+      ) => {
+        let pending!: ReturnType<AssetsService['getAssets']>;
+        adminDiagnosticRequestMiddleware(
+          {
+            method: 'GET',
+            originalUrl: '/api/v1/assets',
+            headers: { 'x-request-id': requestId },
+            user: { userId: 'same-user', role },
+          } as never,
+          { setHeader: jest.fn() } as never,
+          () => {
+            pending = h.service.getAssets('same-user', {
+              sortBy: 'volume',
+              limit: '1',
+              sortSnapshot: token,
+              offset,
+            });
+          },
+        );
+        return pending;
+      };
+      try {
+        const page = (await read(first, 'admin', 'fx-admin-one')).data;
+        expect(page.priceErrors).toHaveLength(1);
+        expect(page.priceErrors[0].diagnostic).toMatchObject({
+          requestId: 'fx-admin-one',
+          operation: 'ASSET_PRICE_KRW_CONVERSION',
+          evidence: { selectionResult: 'REJECTED' },
+        });
+        expect(JSON.stringify([...store.values()])).not.toMatch(
+          /diagnostic|fx-admin-one|rawPayloadJson/,
+        );
+        const ordinary = (
+          await read(other, 'user', 'role-demoted', page.sortSnapshot, '1')
+        ).data;
+        expect(ordinary.priceErrors).toHaveLength(1);
+        expect(ordinary.priceErrors[0]).not.toHaveProperty('diagnostic');
+        const admin = (
+          await read(other, 'admin', 'fx-admin-next', page.sortSnapshot, '1')
+        ).data;
+        expect(admin.priceErrors[0].diagnostic).toMatchObject({
+          requestId: 'fx-admin-next',
+          entities: { assetId: 'b' },
+        });
+        expect(other.prisma.asset.findMany).not.toHaveBeenCalled();
+        store.set('assets:sort:public:v1:' + page.sortSnapshot, '{broken');
+        await expectApiError(
+          createService(undefined, redis).service.getAssets('user', {
+            sortBy: 'volume',
+            sortSnapshot: page.sortSnapshot,
+          }),
+          409,
+          'ASSET_SORT_SNAPSHOT_EXPIRED',
+        );
+      } finally {
+        if (previous === undefined) delete process.env.REDIS_URL;
+        else process.env.REDIS_URL = previous;
+      }
+    });
+
+    it('rejects invalid/expired/mismatched continuations instead of changing page order', async () => {
       const h = sortedSetup();
       const query = { sortBy: 'volume', sortOrder: 'desc' };
       const first = (await h.service.getAssets('user', query)).data;
@@ -1998,6 +2418,9 @@ describe('AssetsService', () => {
         { sortOrder: 'asc' },
         { withPrice: 'false' },
         { withPrice: ' false ' },
+        { sortRefresh: 'yes' },
+        { sortRefresh: 'true', offset: '2' },
+        { sortRefresh: 'true', sortSnapshot: first.sortSnapshot },
       ]) {
         await expectApiError(
           h.service.getAssets('user', { ...query, ...changed }),
@@ -2010,14 +2433,14 @@ describe('AssetsService', () => {
         400,
         'INVALID_SORT_SNAPSHOT',
       );
-      await expectApiError(
-        h.service.getAssets('other', {
-          ...query,
-          sortSnapshot: first.sortSnapshot,
-        }),
-        400,
-        'INVALID_SORT_SNAPSHOT',
-      );
+      expect(
+        (
+          await h.service.getAssets('other', {
+            ...query,
+            sortSnapshot: first.sortSnapshot,
+          })
+        ).data.sortSnapshot,
+      ).toBe(first.sortSnapshot);
       await expectApiError(
         h.service.getAssets('user', {
           ...query,

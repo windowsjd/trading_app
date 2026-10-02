@@ -221,6 +221,11 @@ export function isAdminDiagnosticRequest(): boolean {
   return requestDiagnostics.getStore()?.request.user?.role === 'admin';
 }
 
+/** Shared public computations must not inherit their first caller's context. */
+export function withoutAdminDiagnosticContext<T>(callback: () => T): T {
+  return requestDiagnostics.exit(callback);
+}
+
 export function buildAdminDiagnostic(
   exception: unknown,
   code: string,

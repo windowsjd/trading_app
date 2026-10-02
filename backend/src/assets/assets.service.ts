@@ -35,7 +35,7 @@ import { buildPagination, type Pagination } from '../common/pagination';
 import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
 import { DailyChangeRateService } from './daily-change-rate.service';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { RedisService } from '../redis/redis.service';
 import {
   compareAssetListMetric,
@@ -45,9 +45,18 @@ import {
 import {
   type AdminDiagnostic,
   buildAdminPartialFailureDiagnostic,
+  isAdminDiagnosticRequest,
   recordAdminDiagnosticEvent,
   setAdminDiagnosticContext,
+  withoutAdminDiagnosticContext,
 } from '../common/admin-diagnostics';
+import {
+  ASSET_SORT_CACHE_PREFIX,
+  ASSET_SORT_MAX_SNAPSHOTS,
+  ASSET_SORT_REUSE_SECONDS,
+  ASSET_SORT_TTL_SECONDS,
+  STORE_ASSET_SORT_SNAPSHOT,
+} from './asset-sort-snapshot-cache';
 
 export type AssetsQuery = {
   assetType?: string;
@@ -61,6 +70,7 @@ export type AssetsQuery = {
   sortBy?: string;
   sortOrder?: string;
   sortSnapshot?: string;
+  sortRefresh?: string;
 };
 
 type ParsedAssetsQuery = {
@@ -75,6 +85,7 @@ type ParsedAssetsQuery = {
   sortBy?: 'volume' | 'changeRate';
   sortOrder: 'asc' | 'desc';
   sortSnapshot?: string;
+  sortRefresh: boolean;
 };
 
 type AssetRecord = {
@@ -215,10 +226,13 @@ type AssetListItem = ReturnType<AssetsService['formatAssetMetadata']> & {
 } & Partial<AssetListVolume>;
 
 type SortedAssetSnapshot = {
+  token: string;
   key: string;
+  valuationAt: number;
+  createdAt: number;
   expiresAt: number;
   assets: AssetListItem[];
-  priceErrors: AssetPriceError[];
+  priceErrors: Omit<AssetPriceError, 'diagnostic'>[];
 };
 
 type AssetsListResponse = {
@@ -305,6 +319,10 @@ const REALTIME_FX_CACHE_TTL_MS = 2_000;
 @Injectable()
 export class AssetsService {
   private readonly sortedSnapshots = new Map<string, SortedAssetSnapshot>();
+  private readonly sortedSnapshotInFlight = new Map<
+    string,
+    Promise<SortedAssetSnapshot>
+  >();
   private realtimeUsdKrwCache: {
     selection: UsdKrwSelection;
     expiresAt: number;
@@ -336,7 +354,7 @@ export class AssetsService {
     }
 
     const parsedQuery = this.parseQuery(query);
-    if (parsedQuery.sortBy) return this.getSortedAssets(userId, parsedQuery);
+    if (parsedQuery.sortBy) return this.getSortedAssets(parsedQuery);
     const where = this.buildAssetWhere(parsedQuery);
     const [total, assets] = await Promise.all([
       this.prisma.asset.count({ where }),
@@ -374,33 +392,16 @@ export class AssetsService {
   }
 
   private async getSortedAssets(
-    userId: string,
     query: ParsedAssetsQuery,
   ): Promise<AssetsListResponse> {
-    const key = JSON.stringify([
-      userId,
-      this.formatFilters(query),
-      query.sortBy,
-      query.sortOrder,
-    ]);
-    let token = query.sortSnapshot;
+    const key = JSON.stringify(this.formatFilters(query));
+    this.pruneSortedSnapshots();
     let snapshot: SortedAssetSnapshot | undefined;
-    const now = Date.now();
-    // Bound local memory, including installations that do not configure Redis.
-    for (const [id, value] of this.sortedSnapshots) {
-      if (value.expiresAt <= now) this.sortedSnapshots.delete(id);
-    }
-    if (token) {
-      snapshot = this.sortedSnapshots.get(token);
-      if (!snapshot && this.redis && process.env.REDIS_URL) {
-        try {
-          const stored = await this.redis.get(`assets:sort:${token}`);
-          if (stored) snapshot = JSON.parse(stored) as SortedAssetSnapshot;
-        } catch {
-          /* A lost snapshot must never silently reorder later pages. */
-        }
-      }
-      if (!snapshot || snapshot.expiresAt <= now) {
+    if (query.sortSnapshot) {
+      snapshot =
+        this.sortedSnapshots.get(query.sortSnapshot) ??
+        (await this.readRedisSortedSnapshot(query.sortSnapshot));
+      if (!snapshot || snapshot.expiresAt <= Date.now()) {
         this.throwApiError(
           HttpStatus.CONFLICT,
           'ASSET_SORT_SNAPSHOT_EXPIRED',
@@ -414,6 +415,7 @@ export class AssetsService {
           'Sort snapshot does not match the requested filters.',
         );
       }
+      this.rememberSortedSnapshot(snapshot);
     } else {
       if (query.offset !== 0) {
         this.throwApiError(
@@ -422,87 +424,260 @@ export class AssetsService {
           'Sorted pagination requires sortSnapshot.',
         );
       }
-      const candidates = await this.prisma.asset.findMany({
-        where: this.buildAssetWhere(query),
-        orderBy: [{ symbol: 'asc' }, { id: 'asc' }],
-        select: this.assetSelect(),
-      });
-      const priced = await this.buildAssetsWithPrices(
-        candidates,
-        new Date(now),
-      );
-      const ids = priced.assets.flatMap((asset) =>
-        asset.price?.state === 'available'
-          ? [asset.price.assetPriceSnapshotId]
-          : [],
-      );
-      const evidence = ids.length
-        ? await this.prisma.assetPriceSnapshot.findMany({
-            where: { id: { in: ids } },
-            select: {
-              id: true,
-              sourceType: true,
-              sourceName: true,
-              rawPayloadJson: true,
-            },
-          })
-        : [];
-      const byId = new Map(evidence.map((row) => [row.id, row]));
-      const assets = priced.assets.map((asset) => ({
-        ...asset,
-        ...readAssetListVolume(
-          asset.price?.state === 'available'
-            ? byId.get(asset.price.assetPriceSnapshotId)
-            : undefined,
-        ),
-      }));
-      assets.sort((a, b) =>
-        compareAssetListMetric(a, b, query.sortBy!, query.sortOrder),
-      );
-      snapshot = {
-        key,
-        expiresAt: Date.now() + 600_000,
-        assets,
-        priceErrors: priced.priceErrors,
-      };
-      token = randomUUID();
-      while (this.sortedSnapshots.size >= 200)
-        this.sortedSnapshots.delete(this.sortedSnapshots.keys().next().value!);
-      this.sortedSnapshots.set(token, snapshot);
-      if (this.redis && process.env.REDIS_URL) {
-        try {
-          await this.redis.setWithTtl(
-            `assets:sort:${token}`,
-            JSON.stringify(snapshot),
-            600,
-          );
-        } catch {
-          /* Local continuity still works; other instances fail explicitly. */
-        }
+      const pendingKey = JSON.stringify([key, query.sortRefresh]);
+      let pending = this.sortedSnapshotInFlight.get(pendingKey);
+      if (!pending) {
+        pending = withoutAdminDiagnosticContext(() =>
+          this.loadOrBuildSortedSnapshot(key, query),
+        ).finally(() => this.sortedSnapshotInFlight.delete(pendingKey));
+        this.sortedSnapshotInFlight.set(pendingKey, pending);
       }
+      snapshot = await pending;
     }
     const assets = snapshot.assets.slice(
       query.offset,
       query.offset + query.limit,
     );
-    const pageIds = new Set(assets.map((asset) => asset.id));
     return {
       success: true,
       data: {
         state: 'available',
         filters: this.formatFilters(query),
-        sortSnapshot: token,
+        sortSnapshot: snapshot.token,
         pagination: this.pagination(
           query,
           snapshot.assets.length,
           assets.length,
         ),
         assets,
-        priceErrors: snapshot.priceErrors.filter((error) =>
-          pageIds.has(error.assetId),
-        ),
+        priceErrors: await this.presentSortedPriceErrors(snapshot, assets),
       },
     };
+  }
+
+  private async loadOrBuildSortedSnapshot(
+    key: string,
+    query: ParsedAssetsQuery,
+  ): Promise<SortedAssetSnapshot> {
+    if (!query.sortRefresh) {
+      const local = [...this.sortedSnapshots.values()]
+        .reverse()
+        .find(
+          (value) => value.key === key && this.canReuseSortedSnapshot(value),
+        );
+      if (local) return local;
+      if (this.redis && process.env.REDIS_URL) {
+        try {
+          const token = await this.redis.get(this.sortedLatestKey(key));
+          const stored = token
+            ? await this.readRedisSortedSnapshot(token)
+            : undefined;
+          if (stored?.key === key && this.canReuseSortedSnapshot(stored)) {
+            this.rememberSortedSnapshot(stored);
+            return stored;
+          }
+        } catch {
+          /* Cache miss: compute public data from the existing selectors. */
+        }
+      }
+    }
+    const valuationAt = Date.now();
+    const candidates = await this.prisma.asset.findMany({
+      where: this.buildAssetWhere(query),
+      orderBy: [{ symbol: 'asc' }, { id: 'asc' }],
+      select: this.assetSelect(),
+    });
+    const priced = await this.buildAssetsWithPrices(
+      candidates,
+      new Date(valuationAt),
+    );
+    const ids = priced.assets.flatMap((asset) =>
+      asset.price?.state === 'available'
+        ? [asset.price.assetPriceSnapshotId]
+        : [],
+    );
+    const evidence = ids.length
+      ? await this.prisma.assetPriceSnapshot.findMany({
+          where: { id: { in: ids } },
+          select: {
+            id: true,
+            sourceType: true,
+            sourceName: true,
+            rawPayloadJson: true,
+          },
+        })
+      : [];
+    const byId = new Map(evidence.map((row) => [row.id, row]));
+    const assets = priced.assets.map((asset) => ({
+      ...asset,
+      ...readAssetListVolume(
+        asset.price?.state === 'available'
+          ? byId.get(asset.price.assetPriceSnapshotId)
+          : undefined,
+      ),
+    }));
+    assets.sort((a, b) =>
+      compareAssetListMetric(a, b, query.sortBy!, query.sortOrder),
+    );
+    const createdAt = Date.now();
+    const snapshot: SortedAssetSnapshot = {
+      token: randomUUID(),
+      key,
+      valuationAt,
+      createdAt,
+      expiresAt: createdAt + ASSET_SORT_TTL_SECONDS * 1000,
+      assets,
+      // Explicit allowlist even though the computation has no request context.
+      priceErrors: priced.priceErrors.map(({ assetId, code, message }) => ({
+        assetId,
+        code,
+        message,
+      })),
+    };
+    this.rememberSortedSnapshot(snapshot);
+    if (this.redis && process.env.REDIS_URL) {
+      try {
+        await this.redis.eval(
+          STORE_ASSET_SORT_SNAPSHOT,
+          [
+            ASSET_SORT_CACHE_PREFIX + snapshot.token,
+            this.sortedLatestKey(key),
+            ASSET_SORT_CACHE_PREFIX + 'index',
+          ],
+          [
+            ASSET_SORT_CACHE_PREFIX,
+            snapshot.token,
+            JSON.stringify(snapshot),
+            String(ASSET_SORT_TTL_SECONDS),
+            String(ASSET_SORT_REUSE_SECONDS),
+            String(ASSET_SORT_MAX_SNAPSHOTS),
+            String(createdAt),
+          ],
+        );
+      } catch {
+        /* Local continuity works; other instances explicitly restart. */
+      }
+    }
+    return snapshot;
+  }
+
+  private sortedLatestKey(key: string): string {
+    return (
+      ASSET_SORT_CACHE_PREFIX +
+      'latest:' +
+      createHash('sha1').update(key).digest('hex')
+    );
+  }
+
+  private canReuseSortedSnapshot(snapshot: SortedAssetSnapshot): boolean {
+    return (
+      snapshot.createdAt + ASSET_SORT_REUSE_SECONDS * 1000 > Date.now() &&
+      snapshot.expiresAt > Date.now()
+    );
+  }
+
+  private pruneSortedSnapshots(): void {
+    for (const [token, value] of this.sortedSnapshots) {
+      if (value.expiresAt <= Date.now()) this.sortedSnapshots.delete(token);
+    }
+  }
+
+  private rememberSortedSnapshot(snapshot: SortedAssetSnapshot): void {
+    this.pruneSortedSnapshots();
+    if (this.sortedSnapshots.has(snapshot.token)) return;
+    while (this.sortedSnapshots.size >= ASSET_SORT_MAX_SNAPSHOTS) {
+      const oldest = [...this.sortedSnapshots.values()].reduce((a, b) =>
+        a.createdAt <= b.createdAt ? a : b,
+      );
+      this.sortedSnapshots.delete(oldest.token);
+    }
+    this.sortedSnapshots.set(snapshot.token, snapshot);
+  }
+
+  private async readRedisSortedSnapshot(
+    token: string,
+  ): Promise<SortedAssetSnapshot | undefined> {
+    if (!this.redis || !process.env.REDIS_URL) return undefined;
+    try {
+      const raw = await this.redis.get(ASSET_SORT_CACHE_PREFIX + token);
+      if (!raw) return undefined;
+      const snapshot = JSON.parse(raw) as SortedAssetSnapshot;
+      if (
+        snapshot.token !== token ||
+        typeof snapshot.key !== 'string' ||
+        !Number.isFinite(snapshot.valuationAt) ||
+        !Number.isFinite(snapshot.createdAt) ||
+        !Number.isFinite(snapshot.expiresAt) ||
+        !Array.isArray(snapshot.assets) ||
+        !Array.isArray(snapshot.priceErrors)
+      )
+        return undefined;
+      return {
+        ...snapshot,
+        priceErrors: snapshot.priceErrors.map(({ assetId, code, message }) => ({
+          assetId,
+          code,
+          message,
+        })),
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async presentSortedPriceErrors(
+    snapshot: SortedAssetSnapshot,
+    assets: AssetListItem[],
+  ): Promise<AssetPriceError[]> {
+    const pageIds = new Set(assets.map((asset) => asset.id));
+    const errors = snapshot.priceErrors.filter((error) =>
+      pageIds.has(error.assetId),
+    );
+    if (!isAdminDiagnosticRequest() || !errors.length) return errors;
+    // Only failed rows on this page need request-specific diagnostic evidence.
+    const failedIds = new Set(errors.map((error) => error.assetId));
+    const diagnosticAssets = assets.filter((asset) => failedIds.has(asset.id));
+    const current = await this.buildAssetsWithPrices(
+      diagnosticAssets,
+      new Date(snapshot.valuationAt),
+    );
+    return errors.map((error) => {
+      const asset = diagnosticAssets.find(
+        (asset) => asset.id === error.assetId,
+      )!;
+      const reproduced = current.priceErrors.find(
+        (value) => value.assetId === error.assetId && value.code === error.code,
+      );
+      const diagnostic =
+        reproduced?.diagnostic ??
+        buildAdminPartialFailureDiagnostic(
+          new Error(error.message),
+          error.code,
+          {
+            domain: 'MARKET_DATA',
+            operation:
+              error.code === 'ASSET_PRICE_UNAVAILABLE'
+                ? 'ASSET_PRICE_READ'
+                : 'ASSET_PRICE_KRW_CONVERSION',
+            failureStage:
+              error.code === 'ASSET_PRICE_UNAVAILABLE'
+                ? 'asset_price_selection'
+                : 'fx_rate_selection',
+            entities: { assetId: asset.id, symbol: asset.symbol },
+            evidence: {
+              sortSnapshot: snapshot.token,
+              valuationAt: new Date(snapshot.valuationAt),
+              cachedPrice: asset.price,
+              selectionResult: 'SNAPSHOT_PARTIAL_FAILURE',
+            },
+            nextInvestigation: [
+              'backend/src/assets/assets.service.ts',
+              'backend/src/providers/source-eligibility.policy.ts',
+            ],
+          },
+        );
+      return { ...error, ...(diagnostic ? { diagnostic } : {}) };
+    });
   }
 
   async getAsset(
@@ -1271,12 +1446,20 @@ export class AssetsService {
     const sortOrder =
       this.parseOptionalText(query.sortOrder) ?? (sortBy ? 'desc' : 'asc');
     const sortSnapshot = this.parseOptionalText(query.sortSnapshot);
+    const sortRefresh = this.parseBoolean(
+      query.sortRefresh,
+      false,
+      'INVALID_ASSET_SORT',
+      'sortRefresh',
+    );
     if (
       (sortBy && sortBy !== 'volume' && sortBy !== 'changeRate') ||
       (sortOrder !== 'asc' && sortOrder !== 'desc') ||
       (sortBy === 'volume' && sortOrder !== 'desc') ||
       (!sortBy && (query.sortOrder !== undefined || sortSnapshot)) ||
-      (sortSnapshot && !/^[0-9a-f-]{36}$/.test(sortSnapshot))
+      (sortSnapshot && !/^[0-9a-f-]{36}$/.test(sortSnapshot)) ||
+      (sortRefresh &&
+        (!sortBy || sortSnapshot || this.parseOffset(query.offset) !== 0))
     ) {
       this.throwApiError(
         HttpStatus.BAD_REQUEST,
@@ -1295,6 +1478,7 @@ export class AssetsService {
       sortBy: sortBy as ParsedAssetsQuery['sortBy'],
       sortOrder,
       sortSnapshot,
+      sortRefresh,
       assetType: this.parseAssetType(query.assetType),
       currencyCode: this.parseCurrencyCode(query.currencyCode),
       market: this.parseOptionalText(query.market),

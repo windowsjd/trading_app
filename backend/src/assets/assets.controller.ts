@@ -35,6 +35,7 @@ export class AssetsController {
         sortBy: 'INVALID_ASSET_SORT',
         sortOrder: 'INVALID_ASSET_SORT',
         sortSnapshot: 'INVALID_SORT_SNAPSHOT',
+        sortRefresh: 'INVALID_ASSET_SORT',
       } satisfies Record<keyof AssetsQuery, string>),
     )
     query: AssetsQuery,

@@ -4,7 +4,7 @@ import { semantic } from '../../theme/tokens';
 import { getScreenContentStyle } from '../../theme/screenLayout';
 import { getMarketSessionLabel } from '../../features/market/marketPresentation';
 import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -49,6 +49,7 @@ export default function MarketScreen({ navigation }: Props) {
   const [selectedTab, setSelectedTab] = useState<AssetType>('domestic_stock');
   const [sort, setSort] = useState<MarketSort>('volume_desc');
   const sortParams = marketSortParams(sort);
+  const refreshSort = useRef(false);
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
 
   const marketQuery = useInfiniteQuery({
@@ -63,6 +64,7 @@ export default function MarketScreen({ navigation }: Props) {
       getAssets({
         ...sortParams,
         sortSnapshot: pageParam.sortSnapshot,
+        sortRefresh: refreshSort.current && pageParam.offset === 0,
         assetType: selectedTab,
         withPrice: true,
         offset: pageParam.offset,
@@ -150,7 +152,12 @@ export default function MarketScreen({ navigation }: Props) {
         }}
         onEndReachedThreshold={0.4}
         refreshing={marketQuery.isRefetching}
-        onRefresh={() => void marketQuery.refetch()}
+        onRefresh={() => {
+          refreshSort.current = true;
+          void marketQuery.refetch().finally(() => {
+            refreshSort.current = false;
+          });
+        }}
         ListHeaderComponent={
           <View style={styles.headerSection}>
             <View style={styles.tabRow}>

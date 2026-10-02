@@ -70,6 +70,7 @@ export interface GetAssetsParams {
   sortBy?: 'volume' | 'changeRate';
   sortOrder?: 'asc' | 'desc';
   sortSnapshot?: string;
+  sortRefresh?: boolean;
   assetType?: AssetType;
   currencyCode?: CurrencyCode;
   market?: string;
@@ -101,6 +102,7 @@ export async function getAssets(params: GetAssetsParams) {
   if (params.sortBy) searchParams.set('sortBy', params.sortBy);
   if (params.sortOrder) searchParams.set('sortOrder', params.sortOrder);
   if (params.sortSnapshot) searchParams.set('sortSnapshot', params.sortSnapshot);
+  if (params.sortRefresh) searchParams.set('sortRefresh', 'true');
 
   if (params.assetType) searchParams.set('assetType', params.assetType);
   if (params.currencyCode) searchParams.set('currencyCode', params.currencyCode);

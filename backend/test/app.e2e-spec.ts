@@ -205,6 +205,7 @@ import {
 } from './../src/generated/prisma/client';
 import { PrismaService } from './../src/prisma/prisma.service';
 import { RedisService } from './../src/redis/redis.service';
+import { adminDiagnosticRequestMiddleware } from './../src/common/admin-diagnostics';
 import * as argon2 from 'argon2';
 import { createHash } from 'node:crypto';
 
@@ -672,6 +673,7 @@ describe('AppController (e2e)', () => {
         .get<string>('JWT_ACCESS_SECRET')
         ?.trim() ?? 'test-secret';
     app = moduleFixture.createNestApplication();
+    app.use(adminDiagnosticRequestMiddleware);
     app.useWebSocketAdapter(new WsAdapter(app));
     await app.init();
   });
@@ -4192,6 +4194,7 @@ describe('AppController (e2e)', () => {
       ['/assets', 'sortBy', 'INVALID_ASSET_SORT'],
       ['/assets', 'sortOrder', 'INVALID_ASSET_SORT'],
       ['/assets', 'sortSnapshot', 'INVALID_SORT_SNAPSHOT'],
+      ['/assets', 'sortRefresh', 'INVALID_ASSET_SORT'],
       ['/assets/asset-1/candles', 'limit', 'INVALID_CANDLE_LIMIT'],
       ['/assets/asset-1/candles', 'interval', 'ASSET_CANDLES_INVALID_INTERVAL'],
       ['/assets/asset-1/candles', 'range', 'ASSET_CANDLES_INVALID_RANGE'],
@@ -4385,6 +4388,94 @@ describe('AppController (e2e)', () => {
       expect(prisma.asset.count).not.toHaveBeenCalled();
     });
 
+    it('shares sorted pages across authenticated roles while isolating diagnostics and refresh', async () => {
+      const assets = ['B', 'A', 'C'].map((symbol, i) => ({
+        id: `sort-${i}`,
+        symbol,
+        name: symbol,
+        assetType: 'domestic_stock',
+        market: 'KRX',
+        currencyCode: 'KRW',
+        priceCurrency: 'KRW',
+        settlementCurrency: 'KRW',
+        isActive: true,
+      }));
+      prisma.asset.findMany.mockResolvedValue(assets);
+      prisma.assetPriceSnapshot.findMany.mockResolvedValue([]);
+      prisma.assetPriceSnapshot.findFirst.mockResolvedValue(null);
+      const path = '/api/v1/assets?sortBy=volume&limit=1';
+      const read = async (role: string, id: string, suffix = '') => {
+        mockActiveUser(id, role);
+        return request(app.getHttpServer())
+          .get(path + suffix)
+          .set('Authorization', `Bearer ${await createValidAccessToken(id)}`)
+          .set('x-request-id', id)
+          .expect(200);
+      };
+      const admin = await read('admin', 'admin-one');
+      expect(admin.body.data.assets.map((a: { id: string }) => a.id)).toEqual([
+        'sort-1',
+      ]);
+      expect(admin.body.data.priceErrors[0].diagnostic.requestId).toBe(
+        'admin-one',
+      );
+      const ordinary = await read('user', 'user-two');
+      expect(ordinary.body.data.sortSnapshot).toBe(
+        admin.body.data.sortSnapshot,
+      );
+      expect(ordinary.body.data.priceErrors[0]).not.toHaveProperty(
+        'diagnostic',
+      );
+      const operator = await read('operator', 'operator-three');
+      expect(operator.body.data.sortSnapshot).toBe(
+        admin.body.data.sortSnapshot,
+      );
+      expect(operator.body.data.priceErrors[0]).not.toHaveProperty(
+        'diagnostic',
+      );
+      expect(
+        prisma.asset.findMany.mock.calls.filter(
+          ([query]) => query.select?.settlementCurrency,
+        ),
+      ).toHaveLength(1);
+      prisma.asset.findMany.mockResolvedValue([]);
+      const next = await read(
+        'user',
+        'user-two',
+        `&offset=1&sortSnapshot=${admin.body.data.sortSnapshot}`,
+      );
+      expect(next.body.data.assets[0].id).toBe('sort-0');
+      const again = await read(
+        'admin',
+        'admin-next',
+        `&sortSnapshot=${admin.body.data.sortSnapshot}`,
+      );
+      expect(again.body.data.priceErrors[0].diagnostic.requestId).toBe(
+        'admin-next',
+      );
+      await request(app.getHttpServer()).get(path).expect(401);
+      await request(app.getHttpServer())
+        .get(path + `&market=NAS&sortSnapshot=${admin.body.data.sortSnapshot}`)
+        .set('Authorization', `Bearer ${await createValidAccessToken()}`)
+        .expect(400)
+        .expect(({ body }) =>
+          expect(body.error.code).toBe('INVALID_SORT_SNAPSHOT'),
+        );
+      await request(app.getHttpServer())
+        .get(path + '&sortSnapshot=00000000-0000-0000-0000-000000000000')
+        .set('Authorization', `Bearer ${await createValidAccessToken()}`)
+        .expect(409)
+        .expect(({ body }) =>
+          expect(body.error.code).toBe('ASSET_SORT_SNAPSHOT_EXPIRED'),
+        );
+      const refresh = await read('user', 'user-two', '&sortRefresh=true');
+      expect(refresh.body.data.assets).toEqual([]);
+      expect(refresh.body.data.sortSnapshot).not.toBe(
+        admin.body.data.sortSnapshot,
+      );
+      expectNoWriteMutationCalls();
+    });
+
     it.each([
       ['limit=0', 'INVALID_LIMIT'],
       ['withPrice=yes', 'INVALID_WITH_PRICE'],
@@ -4393,6 +4484,9 @@ describe('AppController (e2e)', () => {
       ['sortBy=changeRate&sortOrder=sideways', 'INVALID_ASSET_SORT'],
       ['sortBy=volume&withPrice=false', 'INVALID_ASSET_SORT'],
       ['sortBy=volume&offset=20', 'INVALID_SORT_SNAPSHOT'],
+      ['sortRefresh=true', 'INVALID_ASSET_SORT'],
+      ['sortBy=volume&sortRefresh=yes', 'INVALID_ASSET_SORT'],
+      ['sortBy=volume&sortRefresh=true&offset=2', 'INVALID_ASSET_SORT'],
       ['includeInactive=1', 'INVALID_INCLUDE_INACTIVE'],
       ['assetType=CRYPTO', 'INVALID_ASSET_TYPE'],
       ['currencyCode=EUR', 'INVALID_CURRENCY_CODE'],

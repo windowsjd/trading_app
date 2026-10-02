@@ -435,9 +435,24 @@ Sorted responses include `sortSnapshot`; pass it with subsequent offsets and the
 same filters. It identifies an immutable, ten-minute server result. Expired or
 mismatched snapshots return `ASSET_SORT_SNAPSHOT_EXPIRED` / `INVALID_SORT_SNAPSHOT`;
 restart at offset 0. Realtime overlays do not change this order. Refresh starts a
-new result. The existing Redis connection shares snapshots across instances when
-configured; a bounded process cache supports installations without Redis. A lost
-snapshot fails explicitly instead of silently mixing pages.
+new result with optional `sortRefresh=true` (only valid with sorting, offset 0,
+and no `sortSnapshot`). Ordinary first-page requests with the same public filters
+reuse a result for at most two seconds; this reuse window is separate from the
+ten-minute continuation lifetime. User ID, offset and limit are not result identity.
+Authentication still applies. The existing Redis connection shares snapshots
+across instances when configured; both Redis and the process cache retain at most
+200 results, with oldest-created eviction. Expiry or eviction can require a restart
+before ten minutes. Local copies preserve same-instance continuity during Redis
+outages; an instance without the token fails explicitly instead of mixing pages.
+
+Only public asset/price/source metadata and public price errors are cached.
+Admin diagnostics are assembled under the current request context for failed rows
+in the returned page, using the snapshot valuation time. If a later DB correction
+no longer reproduces a cached failure, the diagnostic identifies the cached
+baseline failure. No request ID, stack, raw provider evidence or account data is
+stored in a shared result. Operators receive the same public presentation as users.
+Concurrent identical misses coalesce per process; simultaneous misses on different
+instances can each build an immutable result without a distributed lock.
 
 Sorted list items expose nullable decimal-string `volume` and `volumePeriod`
 (`session` or `rolling_24h`). Volume comes only from the selected eligible provider

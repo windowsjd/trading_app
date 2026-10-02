@@ -5,7 +5,7 @@ import { getScreenContentStyle } from '../../theme/screenLayout';
 import { buildWsUrl } from '../../constants/env';
 import { useMarketTickers } from '../../features/market/useMarketTickers';
 import MarketAssetRow from '../../features/market/MarketAssetRow';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -46,6 +46,7 @@ const SEARCH_SCOPE: Array<{ key: SearchScope; label: string }> = [
 export default function MarketSearchScreen({ navigation, route }: Props) {
   const [sort, setSort] = useState<MarketSort>(route.params?.sort ?? 'volume_desc');
   const sortParams = marketSortParams(sort);
+  const refreshSort = useRef(false);
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
   const [assetType, setAssetType] = useState<SearchScope>('all');
   const [searchText, setSearchText] = useState('');
@@ -64,6 +65,7 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
       getAssets({
         ...sortParams,
         sortSnapshot: pageParam.sortSnapshot,
+        sortRefresh: refreshSort.current && pageParam.offset === 0,
         assetType: assetType === 'all' ? undefined : assetType,
         search: trimmedSearchText || undefined,
         withPrice: true,
@@ -148,7 +150,12 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
         }}
         onEndReachedThreshold={0.4}
         refreshing={searchQuery.isRefetching}
-        onRefresh={() => void searchQuery.refetch()}
+        onRefresh={() => {
+          refreshSort.current = true;
+          void searchQuery.refetch().finally(() => {
+            refreshSort.current = false;
+          });
+        }}
         ListHeaderComponent={
           <View style={styles.header}>
             <TextInput
