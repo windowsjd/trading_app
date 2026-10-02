@@ -67,10 +67,9 @@ async function run() {
         await id('home-trend-chart').locator('svg').waitFor();
         const toggle = await box('home-trend-toggle'), chart = await box('home-trend-chart'), holdings = await box('home-holdings');
         assert.ok(chart.y >= toggle.y + toggle.height && holdings.y >= chart.y + chart.height);
-        if (mode === 'season') {
-          const competition = await box('home-competition');
-          assert.ok(competition.y >= chart.y + chart.height && competition.y < holdings.y);
-        } else assert.equal(await id('home-competition').count(), 0);
+        assert.equal(await id('home-competition').count(), 0);
+        const context = await box('home-account-context'), hero = await box('home-summary-card');
+        assert.ok(context.y + context.height <= hero.y);
         for (const period of ['7d', '30d', '90d', '180d', '360d']) {
           await id(`home-trend-range-${period}`).click();
           await page.waitForFunction(range => window.fixture.transport.equityRequests.some(request => request.range === range), period);

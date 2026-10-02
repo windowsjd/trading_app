@@ -5,7 +5,7 @@ import { semantic } from '../../theme/tokens';
 import { getScreenContentStyle } from '../../theme/screenLayout';
 import { getMarketSessionLabel } from '../../features/market/marketPresentation';
 import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -43,9 +43,17 @@ const TABS: Array<{ key: AssetType; label: string }> = [
   { key: 'crypto', label: '암호화폐' },
 ];
 
-export default function MarketScreen({ navigation }: Props) {
+export default function MarketScreen({ navigation, route }: Props) {
   const isAdmin = useAdminDiagnostics();
-  const [selectedTab, setSelectedTab] = useState<AssetType>('domestic_stock');
+  const [selectedTab, setSelectedTab] = useState<AssetType>(route?.params?.assetType ?? 'domestic_stock');
+  // Consume each explicit navigation intent. Clearing it also lets a later
+  // visit request the same category after the user has changed tabs manually.
+  useEffect(() => {
+    if (route?.params?.assetType) {
+      setSelectedTab(route.params.assetType);
+      navigation.setParams({ assetType: undefined });
+    }
+  }, [route?.params?.assetType, navigation]);
   const [sort, setSort] = useState<MarketSort>('turnover_desc');
   const sortParams = marketSortParams(sort);
   const refreshSort = useRef(false);

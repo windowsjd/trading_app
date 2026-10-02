@@ -8,10 +8,12 @@ const source = readFileSync(
   'utf8',
 );
 
+const holdings = readFileSync(path.join(process.cwd(), 'src/screens/home/HomeHoldings.tsx'), 'utf8');
+
 describe('GeneralAccountHome independent financial reads', () => {
   it('does not gate position queries on portfolio availability', () => {
     assert.match(source, /getTradingAccountPortfolio\(accountId\)/u);
-    assert.match(source, /getTradingAccountPositions\(accountId/u);
+    assert.match(holdings, /getTradingAccountPositions\(accountId/u);
     assert.ok(!source.includes('enabled: available'));
     assert.ok(!source.includes('enabled: portfolioAvailable'));
   });
@@ -22,8 +24,8 @@ describe('GeneralAccountHome independent financial reads', () => {
 
   it('does not turn missing position query data into an empty list', () => {
     assert.ok(!source.includes('positionsQuery.data?.positions ?? []'));
-    assert.match(source, /!positions[\s\S]*보유 종목을 확인할 수 없습니다/u);
-    assert.match(source, /<PositionAssetRow/u);
+    assert.match(holdings, /!positions[\s\S]*보유 종목을 확인할 수 없습니다/u);
+    assert.match(holdings, /<PositionAssetRow/u);
     assert.doesNotMatch(source, /평균 매입가|현재가/u);
   });
 

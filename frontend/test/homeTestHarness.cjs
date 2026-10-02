@@ -98,6 +98,8 @@ function createHomeHarness(mode = 'general') {
       }).getRankingTier,
     },
     '../../features/me/api': { getMe: () => {} },
+    '../../features/market/api': { getAssets: () => {} },
+    '../../components/states/AdminDiagnosticPanel': { default: 'AdminDiagnosticPanel', __esModule: true },
     '../../components/charts': {
       DonutChart: 'DonutChart',
       LineChart: 'LineChart',
@@ -136,7 +138,7 @@ function createHomeHarness(mode = 'general') {
   const expandDisplay = (node) => {
     if (Array.isArray(node)) return node.map(expandDisplay);
     if (!React.isValidElement(node)) return node;
-    if (node.type === hero || node.type === positionRow || node.type === charts) return expandDisplay(node.type(node.props));
+    if (node.type === hero || node.type === positionRow || node.type === charts || homeComponents.includes(node.type)) return expandDisplay(node.type(node.props));
     return React.cloneElement(node, {}, expandDisplay(node.props.children));
   };
   h.renderWallet = () => {
@@ -145,6 +147,11 @@ function createHomeHarness(mode = 'general') {
     const branch = elements(outer).find((node) => typeof node.type === 'function');
     return { tree: expandDisplay(branch.type(branch.props)), branch };
   };
+  const homeComponents = ['HomeAccountContext', 'HomeHoldings', 'HomeHotMarket'].map(name => {
+    const module = load(resolve(__dirname, `../src/screens/home/${name}.tsx`), mocks);
+    mocks[`./${name}`] = { ...module, __esModule: true };
+    return module.default;
+  });
   mocks['./HomeAssetHero'] = { default: hero, __esModule: true };
   const charts = load(
     resolve(__dirname, '../src/screens/home/HomeAssetTrend.tsx'),
@@ -261,11 +268,12 @@ function createHomeHarness(mode = 'general') {
       tradingAccountId: account.id, wallets: [],
     });
     client.setQueryData(
-      keys.tradingAccount.positions(account.id, { limit: 5 }),
-      { positions: [] },
+      keys.tradingAccount.positions(account.id, { limit: 1 }),
+      { positions: [], pagination: { total: 0 } },
     );
-    client.setQueryData(keys.tradingAccount.holdings(account.id), { tradingAccountId: account.id, positions: [] });
+
     client.setQueryData(keys.me, { id: 'user-1', nickname: '김재민' });
+    client.setQueryData(keys.tradingAccount.holdings(account.id), { tradingAccountId: account.id, positions: [] }, { updatedAt: 1 });
     if (account.season) client.setQueryData(keys.ranking.list({
       scope: 'all', seasonId: account.season.seasonId,
       rankType: account.season.seasonStatus === 'settled' ? 'final' : 'daily',

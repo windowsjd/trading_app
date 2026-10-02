@@ -359,6 +359,8 @@ function prepareAccountScreens(h: ReturnType<typeof createHarness>) {
     season: { seasonId: 'season-1', seasonName: 'Season 1', seasonStatus: 'active', participantStatus: 'active' },
   };
   h.mockLocal('features/tradingAccount/TradingAccountContext', { useTradingAccount: () => ({ selectedAccount: account, isLoading: false }) });
+  h.mockLocal('components/tradingAccount/AccountSwitcher', { __esModule: true, default: ({ children }: any) => children });
+  h.mockLocal('components/tradingAccount/AccountSetupPanel', { __esModule: true, default: () => null });
   h.mockLocal('features/auth/useLogout', { useLogout: () => () => Promise.resolve() });
   h.mockLocal('components/charts', { DonutChart: () => null, LineChart: () => null });
   h.queries.set('me', h.ready({ nickname: 'trader-2', email: 'trader-2@example.com' }));
@@ -367,12 +369,12 @@ function prepareAccountScreens(h: ReturnType<typeof createHarness>) {
     pagination: { limit: 20, offset: 0, total: 0, returned: 0, nextOffset: null },
   }));
   h.queries.set('ranking', h.ready(h.page));
-  h.queries.set('tradingAccount', h.ready({ state: 'available', sectionErrors: [], summary: null, allocation: {}, wallets: [], positions: [], points: [] }));
+  h.queries.set('tradingAccount', h.ready({ state: 'available', sectionErrors: [], summary: null, allocation: {}, wallets: [], positions: [], pagination: { total: 0 }, points: [] }));
   return account;
 }
 
 describe('other ranking consumers', () => {
-  for (const screen of ['my/MyScreen', 'home/SeasonAccountHome']) {
+  for (const screen of ['my/MyScreen', 'home/HomeScreen']) {
     it(`${screen} preserves available/final/absent rank display and selected season requests`, async () => {
       const h = createHarness();
       const account = prepareAccountScreens(h);

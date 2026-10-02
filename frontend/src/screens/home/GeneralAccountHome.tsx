@@ -10,7 +10,6 @@ import { TEST_IDS } from '../../constants/testIds';
 import {
   getTradingAccountPortfolio,
   getTradingAccountEquity,
-  getTradingAccountPositions,
   type TradingAccountDto,
 } from '../../features/tradingAccount/api';
 import {
@@ -19,16 +18,18 @@ import {
 } from '../../features/tradingAccount/accountIntegrityGate';
 import { getCapabilityBlockMessage } from '../../features/tradingAccount/capabilities';
 import type { TradingAccountCapabilities } from '../../features/tradingAccount/capabilities';
-import PositionAssetRow from '../../components/tradingAccount/PositionAssetRow';
 import { getPortfolioNotice } from '../../features/tradingAccount/portfolioMessage';
 import { formatKrw } from '../../utils/format';
 
 import ErrorState from '../../components/states/ErrorState';
-import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
 import HomeAssetTrend, { type HomeEquityRange } from './HomeAssetTrend';
 import HomeAssetHero from './HomeAssetHero';
+import HomeHoldings, { useHomeHoldings } from './HomeHoldings';
+import HomeHotMarket, { type HomeHotMarketData } from './HomeHotMarket';
+import HomeAccountContext, { type HomeAccountContextData } from './HomeAccountContext';
+import type { AssetType } from '../../features/market/api';
 
 /**
  * Home for a GENERAL account (작업 10 §A-6).
@@ -54,9 +55,10 @@ type Props = {
   capabilities: TradingAccountCapabilities | null;
   onOpenFx: () => void;
   onOpenAsset: (assetId: string) => void;
+  onOpenMarket: (assetType: AssetType) => void;
+  accountContext: HomeAccountContextData;
+  hot: HomeHotMarketData;
 };
-
-const POSITIONS_PREVIEW_LIMIT = 5;
 
 /** Unknown is rendered as unknown. `0%` is a claim, and often a false one. */
 function formatUnknownKrw(value: string | null | undefined) {
@@ -70,6 +72,9 @@ export default function GeneralAccountHome({
   capabilities,
   onOpenFx,
   onOpenAsset,
+  onOpenMarket,
+  accountContext,
+  hot,
 }: Props) {
   const accountId = account.id;
   const [trendExpanded, setTrendExpanded] = useState(false);
@@ -80,16 +85,8 @@ export default function GeneralAccountHome({
     queryFn: () => getTradingAccountPortfolio(accountId),
   });
 
-  const positionsQuery = useQuery({
-    queryKey: QUERY_KEYS.tradingAccount.positions(accountId, {
-      limit: POSITIONS_PREVIEW_LIMIT,
-    }),
-    queryFn: () =>
-      getTradingAccountPositions(accountId, {
-        limit: POSITIONS_PREVIEW_LIMIT,
-        offset: 0,
-      }),
-  });
+  const holdings = useHomeHoldings(accountId);
+  const positionsQuery = holdings.previewQuery;
 
   const equityQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.portfolioEquity(accountId, equityRange, 'daily'),
@@ -99,11 +96,15 @@ export default function GeneralAccountHome({
   const refresh = usePullToRefresh([
     portfolioQuery,
     positionsQuery,
+    { ...holdings.fullQuery, enabled: holdings.expanded },
+    ...accountContext.refreshQueries,
+    hot.refreshQuery,
     { ...equityQuery, enabled: trendExpanded },
   ]);
 
   // Fail closed on structural errors in every account-scoped section.
   const integrityFailure = findAccountIntegrityFailure([
+    { section: '전체 보유 종목', isError: holdings.fullQuery.isError, error: holdings.fullQuery.error, retry: () => void holdings.fullQuery.refetch() },
     {
       section: '자산 추이',
       isError: equityQuery.isError,
@@ -124,8 +125,15 @@ export default function GeneralAccountHome({
     },
   ]);
 
+  const withContext = (content: React.ReactNode) => (
+    <ScrollView refreshControl={refresh.refreshControl} contentContainerStyle={styles.content}>
+      <HomeAccountContext context={accountContext} />
+      {content}
+    </ScrollView>
+  );
+
   if (integrityFailure) {
-    return (
+    return withContext(
       <View testID={TEST_IDS.tradingAccount.integrityError}>
         <ErrorState
           title={ACCOUNT_INTEGRITY_TITLE}
@@ -137,11 +145,11 @@ export default function GeneralAccountHome({
   }
 
   if (portfolioQuery.isLoading) {
-    return <SectionSkeleton lines={6} />;
+    return withContext(<SectionSkeleton lines={6} />);
   }
 
   if (!portfolioQuery.data) {
-    return (
+    return withContext(
       <ErrorState
         title="계정 정보를 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
@@ -153,7 +161,6 @@ export default function GeneralAccountHome({
   const portfolio = portfolioQuery.data;
   const summary = portfolio.summary;
   const portfolioNotice = getPortfolioNotice(portfolio);
-  const positions = positionsQuery.data?.positions;
   const capabilityNotice = capabilities?.canExchange
     ? null
     : getCapabilityBlockMessage(
@@ -167,6 +174,7 @@ export default function GeneralAccountHome({
       testID={TEST_IDS.tradingAccount.generalSummary}
       contentContainerStyle={styles.content}
     >
+      <HomeAccountContext context={accountContext} />
       {/* Section-level gaps arrive INSIDE a success envelope and stay
           section-level notices — they are not the same thing as damage. */}
       {portfolioNotice ? (
@@ -189,30 +197,8 @@ export default function GeneralAccountHome({
         general
       />
 
-      <View testID="home-holdings" style={[styles.card, styles.holdingsCard]}>
-        <Text accessibilityRole="header" style={styles.holdingsTitle}>보유 종목</Text>
-        {positionsQuery.isLoading ? (
-          <SectionSkeleton lines={3} />
-        ) : positionsQuery.isError && !positionsQuery.data ? (
-          <InlineEmptyState message="보유 종목을 불러오지 못했습니다." />
-        ) : !positions ? (
-          <InlineEmptyState message="보유 종목을 확인할 수 없습니다." />
-        ) : positions.length === 0 ? (
-          <InlineEmptyState
-            title="보유 종목이 없습니다."
-            message="아직 매수한 종목이 없습니다."
-          />
-        ) : (
-          positions.map((position) => (
-            <PositionAssetRow
-              key={position.positionId}
-              position={position}
-              testID={TEST_IDS.home.positionItem(position.assetId)}
-              onPress={() => onOpenAsset(position.assetId)}
-            />
-          ))
-        )}
-      </View>
+      <HomeHoldings holdings={holdings} onOpenAsset={onOpenAsset} />
+      <HomeHotMarket hot={hot} onOpenAsset={onOpenAsset} onOpenMarket={onOpenMarket} />
 
       {summary ? (
         <View style={styles.card}>
@@ -265,8 +251,6 @@ const styles = StyleSheet.create({
     backgroundColor: semantic.surface,
     gap: 8,
   },
-  holdingsCard: { paddingVertical: 10, gap: 4 },
-  holdingsTitle: { fontSize: 18, lineHeight: 27, fontWeight: '700', color: semantic.text },
   label: { fontSize: 13, color: semantic.secondary },
   helper: { fontSize: 14, color: semantic.secondary, lineHeight: 21 },
   note: { fontSize: 13, color: semantic.warning, lineHeight: 19 },

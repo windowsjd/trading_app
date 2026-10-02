@@ -1,13 +1,14 @@
 import { semantic } from '../../theme/tokens';
 import React from 'react';
-import { StyleSheet, SafeAreaView, View, Platform } from '../../theme/native';
-import { getScreenContentStyle } from '../../theme/screenLayout';
+import { StyleSheet, SafeAreaView, View } from '../../theme/native';
 
 import type { HomeScreenProps } from '../../app/navigation/types';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
 
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
-import AccountSwitcher from '../../components/tradingAccount/AccountSwitcher';
+import { useHomeAccountContext } from './HomeAccountContext';
+import { useHomeHotMarket } from './HomeHotMarket';
+import type { AssetType } from '../../features/market/api';
 import AccountSetupPanel from '../../components/tradingAccount/AccountSetupPanel';
 import GeneralAccountHome from './GeneralAccountHome';
 import SeasonAccountHome from './SeasonAccountHome';
@@ -18,7 +19,8 @@ import ErrorState from '../../components/states/ErrorState';
 type Props = HomeScreenProps;
 
 /**
- * Home is ABOUT THE SELECTED ACCOUNT — and nothing else (작업 11 §10).
+ * Home financial data belongs to the selected account (작업 11 §10).
+ * Market discovery is shared across accounts.
  *
  * This screen used to be the season dashboard with an account switcher bolted
  * on top: it called `/home`, which resolves the CURRENT season's participant on
@@ -48,6 +50,8 @@ export default function HomeScreen({ navigation }: Props) {
     isEmpty: noAccounts,
     refetchAccounts,
   } = useTradingAccount();
+  const accountContext = useHomeAccountContext(selectedAccount);
+  const hot = useHomeHotMarket(!!selectedAccount);
 
   if (accountsLoading) {
     return <FullPageLoading message="홈 정보를 불러오는 중입니다." />;
@@ -90,15 +94,14 @@ export default function HomeScreen({ navigation }: Props) {
       params: { screen: 'AssetDetail', params: { assetId } },
     });
 
+  const openMarket = (assetType: AssetType) =>
+    rootNavigation.navigate('MainTabs', {
+      screen: 'MarketTab', params: { screen: 'Market', params: { assetType } },
+    });
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.body}>
-        {/* Which account every number below belongs to — always on screen, and
-            on every state, so no blocked view is a dead end. */}
-        <View style={styles.switcherHeader}>
-          <AccountSwitcher home />
-        </View>
-
         {selectedAccount.mode === 'general' ? (
           <GeneralAccountHome
             key={selectedAccount.id}
@@ -106,6 +109,9 @@ export default function HomeScreen({ navigation }: Props) {
             capabilities={capabilities}
             onOpenAsset={openAsset}
             onOpenFx={openFx}
+            accountContext={accountContext}
+            hot={hot}
+            onOpenMarket={openMarket}
           />
         ) : (
           <SeasonAccountHome
@@ -113,6 +119,9 @@ export default function HomeScreen({ navigation }: Props) {
             account={selectedAccount}
             capabilities={capabilities}
             onOpenFx={openFx}
+            accountContext={accountContext}
+            hot={hot}
+            onOpenMarket={openMarket}
             onOpenReward={() =>
               rootNavigation.navigate('MainTabs', {
                 screen: 'MyTab',
@@ -130,5 +139,4 @@ export default function HomeScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: semantic.screen },
   body: { flex: 1 },
-  switcherHeader: { ...getScreenContentStyle(Platform.OS), paddingHorizontal: 16, paddingTop: 12 },
 });

@@ -62,7 +62,7 @@ async function run() {
         await theme.canvas(page, appearance);
         await theme.background(id('home-account-context'), appearance, 'surface');
         await theme.background(id('home-summary-card'), appearance, 'screen');
-        if (mode === 'season') await theme.background(id('home-competition'), appearance, 'surface');
+        assert.equal(await id('home-competition').count(), 0);
         const heroText = await id('home-summary-card').textContent();
         assert.doesNotMatch(heroText, /\(초기자본 대비\)/);
         assert.match(heroText, mode === 'season' ? /시즌 수익률 -3\.52%/ : /시간가중 수익률 4\.82%/);
@@ -126,11 +126,11 @@ async function run() {
         assert.ok(layout.total.y >= layout.context.bottom && layout.total.right <= width);
         assert.ok(layout.total.fontSize >= 36 * fontScale);
         assert.ok(!/진행 중|참가 중|운영 중|투자 계정/.test(layout.text));
-        assert.equal(!!layout.competition, mode === 'season');
+        assert.equal(layout.competition, null);
         if (layout.competition) assert.ok(layout.competition.y >= layout.total.bottom);
         if (!long && fontScale === 1) {
-          assert.ok(layout.context.height <= 80, 'normal context stays compact');
-          assert.ok(layout.total.bottom <= 230, 'assets appear near the top');
+          assert.ok(layout.context.height <= 190, 'normal context stays compact');
+          assert.ok(layout.total.bottom <= 350, 'assets appear near the top');
           await page.screenshot({ path: path.join(out, `${mode}-${appearance}-${width}.png`) });
         }
         if (long && width === 320 && fontScale === 2) await page.screenshot({
@@ -167,7 +167,7 @@ async function run() {
         }
       }
       await switchAccount('general-account');
-      assert.equal(await id('home-account-context').textContent(), '일반 투자변경');
+      assert.equal(await id('home-account-context').textContent(), '일반 투자변경김재민');
       records.push({ appearance, state });
     }
 

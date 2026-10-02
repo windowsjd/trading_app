@@ -71,7 +71,7 @@ async function run() {
             let viewport = screen === 'home' ? node('trading-account-season-summary') : anchor.parentElement;
             while (viewport && !/auto|scroll/.test(getComputedStyle(viewport).overflowY)) viewport = viewport.parentElement;
             const sections = [anchor];
-            if (screen === 'home') sections.push(node('home-summary-card'), node('home-competition'));
+            if (screen === 'home') sections.push(node('home-summary-card'), node('home-account-context'));
             if (screen === 'market') sections.push(node('market-tab-domestic').parentElement.parentElement);
             if (screen === 'search') sections.push(node('market-search-input').parentElement);
             if (screen === 'ranking') {

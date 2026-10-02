@@ -147,3 +147,43 @@ it('serializes an explicit fresh request through the existing Assets API', async
     'true',
   );
 });
+
+it('Market consumes repeated Home category intents and preserves subsequent manual tab choices', async () => {
+  const h = interactionHarness();
+  h.native.SafeAreaView = 'SafeAreaView';
+  h.native.FlatList = props => React.createElement('FlatList', props, props.ListHeaderComponent);
+  const categories: string[] = [];
+  const Screen = h.load('src/screens/market/MarketScreen.tsx', {
+    '@tanstack/react-query': { useInfiniteQuery: options => {
+      categories.push(options.queryKey[2]);
+      return { data: { pages: [] }, isLoading: false, isFetching: false, refetch: async () => {} };
+    } },
+    '../../features/market/api': { getAssets: async () => {} },
+    '../../features/market/MarketSortControl': { default: 'SortControl', __esModule: true },
+    '../../features/market/MarketAssetRow': { MarketAssetRow: 'AssetRow' },
+    '../../features/market/useMarketTickers': { useMarketTickers: () => ({ tickersByAssetId: new Map(), staleAssetIds: new Set() }) },
+    '../../features/auth/useAdminDiagnostics': { useAdminDiagnostics: () => false },
+    '../../constants/env': { buildWsUrl: () => null },
+    ...Object.fromEntries(['FullPageLoading', 'ErrorState', 'EmptyState', 'AdminDiagnosticPanel'].map(name => ['../../components/states/' + name, { default: name, __esModule: true }])),
+  }).default;
+  let navigateCategory;
+  let params;
+  function Fixture() {
+    const [routeParams, setRouteParams] = React.useState({ assetType: 'us_stock' });
+    params = routeParams;
+    navigateCategory = assetType => setRouteParams({ assetType });
+    const navigation = React.useMemo(() => ({ navigate() {}, setParams: change => setRouteParams(previous => ({ ...previous, ...change })) }), []);
+    return React.createElement(Screen, { navigation, route: { params: routeParams } });
+  }
+  const renderer = h.render(React.createElement(Fixture));
+  try {
+    assert.equal(categories.at(-1), 'us_stock'); assert.equal(params.assetType, undefined);
+    const tab = id => renderer.root.findAllByType('Pressable').find(n => n.props.testID === id);
+    act(() => tab('market-tab-crypto').props.onPress());
+    assert.equal(categories.at(-1), 'crypto');
+    act(() => navigateCategory('us_stock'));
+    assert.equal(categories.at(-1), 'us_stock'); assert.equal(params.assetType, undefined);
+    act(() => tab('market-tab-domestic').props.onPress());
+    assert.equal(categories.at(-1), 'domestic_stock');
+  } finally { act(() => renderer.unmount()); }
+});

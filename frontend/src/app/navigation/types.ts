@@ -27,7 +27,7 @@ export type WalletStackParamList = {
 };
 
 export type MarketStackParamList = {
-  Market: undefined;
+  Market: { assetType?: import('../../features/market/api').AssetType } | undefined;
   MarketSearch: { returnToAsset?: boolean; sort?: import('../../features/market/marketSort').MarketSort } | undefined;
   AssetDetail: { assetId: string };
   /**

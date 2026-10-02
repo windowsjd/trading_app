@@ -1,7 +1,7 @@
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { semantic } from '../../theme/tokens';
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, useWindowDimensions, Platform } from '../../theme/native';
+import { View, Text, StyleSheet, ScrollView, Platform } from '../../theme/native';
 import { getScreenContentStyle } from '../../theme/screenLayout';
 import { useQuery } from '@tanstack/react-query';
 
@@ -10,7 +10,6 @@ import { TEST_IDS } from '../../constants/testIds';
 import {
   getTradingAccountEquity,
   getTradingAccountPortfolio,
-  getTradingAccountPositions,
   type TradingAccountDto,
 } from '../../features/tradingAccount/api';
 import {
@@ -19,18 +18,17 @@ import {
 } from '../../features/tradingAccount/accountIntegrityGate';
 import { getCapabilityBlockMessage } from '../../features/tradingAccount/capabilities';
 import type { TradingAccountCapabilities } from '../../features/tradingAccount/capabilities';
-import { getRankings, getRankingTier } from '../../features/ranking/api';
-import { getMe } from '../../features/me/api';
-import PositionAssetRow from '../../components/tradingAccount/PositionAssetRow';
 import { getPortfolioNotice } from '../../features/tradingAccount/portfolioMessage';
 
 import ErrorState from '../../components/states/ErrorState';
-import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
 import HomeAssetTrend, { type HomeEquityRange } from './HomeAssetTrend';
 import HomeAssetHero from './HomeAssetHero';
-import ProfileAvatar from '../../components/common/ProfileAvatar';
+import HomeHoldings, { useHomeHoldings } from './HomeHoldings';
+import HomeHotMarket, { type HomeHotMarketData } from './HomeHotMarket';
+import HomeAccountContext, { type HomeAccountContextData } from './HomeAccountContext';
+import type { AssetType } from '../../features/market/api';
 
 /**
  * Home for a SEASON account (작업 11 §10.1).
@@ -62,9 +60,10 @@ type Props = {
   onOpenFx: () => void;
   onOpenReward: () => void;
   onOpenAsset: (assetId: string) => void;
+  onOpenMarket: (assetType: AssetType) => void;
+  accountContext: HomeAccountContextData;
+  hot: HomeHotMarketData;
 };
-
-const POSITIONS_PREVIEW_LIMIT = 5;
 
 export default function SeasonAccountHome({
   account,
@@ -72,40 +71,24 @@ export default function SeasonAccountHome({
   onOpenFx,
   onOpenReward,
   onOpenAsset,
+  onOpenMarket,
+  accountContext,
+  hot,
 }: Props) {
   const accountId = account.id;
   const [trendExpanded, setTrendExpanded] = useState(false);
   const [equityRange, setEquityRange] = useState<HomeEquityRange>('30d');
   const season = account.season;
-  const { fontScale } = useWindowDimensions();
-
-  // A settled season is ranked by its FINAL table; a running one by the daily
-  // snapshot. Asking for the wrong one returns an empty ranking, which would
-  // read as "you are unranked".
-  const rankType = season?.seasonStatus === 'settled' ? 'final' : 'daily';
   const isSettled = season?.seasonStatus === 'settled';
-
-  const meQuery = useQuery({
-    queryKey: QUERY_KEYS.me,
-    queryFn: getMe,
-    staleTime: 60_000,
-  });
+  const rankingQuery = accountContext.rankingQuery;
 
   const portfolioQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.portfolio(accountId),
     queryFn: () => getTradingAccountPortfolio(accountId),
   });
 
-  const positionsQuery = useQuery({
-    queryKey: QUERY_KEYS.tradingAccount.positions(accountId, {
-      limit: POSITIONS_PREVIEW_LIMIT,
-    }),
-    queryFn: () =>
-      getTradingAccountPositions(accountId, {
-        limit: POSITIONS_PREVIEW_LIMIT,
-        offset: 0,
-      }),
-  });
+  const holdings = useHomeHoldings(accountId);
+  const positionsQuery = holdings.previewQuery;
 
   const equityQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.portfolioEquity(
@@ -117,39 +100,18 @@ export default function SeasonAccountHome({
     enabled: trendExpanded,
   });
 
-  /**
-   * The leaderboard row for THIS account's season, named explicitly. `all&limit=1`
-   * is requested for its `myRanking`; the surrounding rows are the ranking
-   * tab's job, not Home's.
-   */
-  const rankingQuery = useQuery({
-    queryKey: QUERY_KEYS.ranking.list({
-      scope: 'all',
-      seasonId: season?.seasonId ?? null,
-      rankType,
-      limit: 1,
-      offset: 0,
-    }),
-    queryFn: () =>
-      getRankings({
-        scope: 'all',
-        seasonId: season?.seasonId,
-        rankType,
-        limit: 1,
-        offset: 0,
-      }),
-    enabled: !!season?.seasonId,
-  });
   const refresh = usePullToRefresh([
     portfolioQuery,
     positionsQuery,
-    meQuery,
+    { ...holdings.fullQuery, enabled: holdings.expanded },
+    ...accountContext.refreshQueries,
+    hot.refreshQuery,
     { ...equityQuery, enabled: trendExpanded },
-    { ...rankingQuery, enabled: !!season?.seasonId },
   ]);
 
   // Fail closed on structural errors in every account-scoped section.
   const integrityFailure = findAccountIntegrityFailure([
+    { section: '전체 보유 종목', isError: holdings.fullQuery.isError, error: holdings.fullQuery.error, retry: () => void holdings.fullQuery.refetch() },
     {
       section: '총 자산',
       isError: portfolioQuery.isError,
@@ -176,8 +138,15 @@ export default function SeasonAccountHome({
     },
   ]);
 
+  const withContext = (content: React.ReactNode) => (
+    <ScrollView refreshControl={refresh.refreshControl} contentContainerStyle={styles.content}>
+      <HomeAccountContext context={accountContext} />
+      {content}
+    </ScrollView>
+  );
+
   if (integrityFailure) {
-    return (
+    return withContext(
       <View testID={TEST_IDS.tradingAccount.integrityError}>
         <ErrorState
           title={ACCOUNT_INTEGRITY_TITLE}
@@ -189,11 +158,11 @@ export default function SeasonAccountHome({
   }
 
   if (portfolioQuery.isLoading) {
-    return <SectionSkeleton lines={6} />;
+    return withContext(<SectionSkeleton lines={6} />);
   }
 
   if (!portfolioQuery.data) {
-    return (
+    return withContext(
       <ErrorState
         title="계정 정보를 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
@@ -205,12 +174,6 @@ export default function SeasonAccountHome({
   const portfolio = portfolioQuery.data;
   const summary = portfolio.summary;
   const portfolioNotice = getPortfolioNotice(portfolio);
-  const positions = positionsQuery.data?.positions;
-  const myRanking = rankingQuery.data?.myRanking.state === 'available'
-    ? rankingQuery.data.myRanking
-    : null;
-  const rank = myRanking ? `#${myRanking.rank}` : '-';
-  const tier = getRankingTier(myRanking, rankType);
   const tradeNotice = capabilities?.canTrade
     ? null
     : getCapabilityBlockMessage(capabilities, capabilities?.tradeBlockReason);
@@ -221,6 +184,7 @@ export default function SeasonAccountHome({
       testID={TEST_IDS.tradingAccount.seasonSummary}
       contentContainerStyle={styles.content}
     >
+      <HomeAccountContext context={accountContext} />
       {portfolioNotice ? (
         <View style={styles.warningBox}>
           <Text style={styles.warningTitle}>{portfolioNotice.title}</Text>
@@ -255,69 +219,8 @@ export default function SeasonAccountHome({
         general={false}
       />
 
-      <View testID={TEST_IDS.home.competition} style={styles.card}>
-        {meQuery.isLoading ? (
-          <SectionSkeleton lines={1} />
-        ) : !meQuery.data ? (
-          <InlineEmptyState message="사용자 정보를 불러오지 못했습니다." />
-        ) : (
-          <View style={styles.identity}>
-            <ProfileAvatar profileImageUrl={meQuery.data.profileImageUrl} size={36} testID="home-profile-avatar" />
-            <Text testID={TEST_IDS.home.nickname} style={styles.nickname}>{meQuery.data.nickname}</Text>
-          </View>
-        )}
-        <View style={styles.row}>
-          <View style={[styles.flex, { flexBasis: 100 * fontScale }]}>
-            <Text style={styles.label}>
-              {isSettled ? '최종 순위' : '현재 순위'}
-            </Text>
-            {rankingQuery.isLoading ? (
-              <SectionSkeleton lines={1} />
-            ) : (
-              <Text testID={TEST_IDS.home.rank} style={styles.medium}>{rank}</Text>
-            )}
-          </View>
-          <View style={[styles.flex, { flexBasis: 100 * fontScale }]}>
-            <Text style={styles.label}>
-              {isSettled ? '최종 등급' : '현재 등급'}
-            </Text>
-            {rankingQuery.isLoading ? (
-              <SectionSkeleton lines={1} />
-            ) : (
-              <Text testID={TEST_IDS.home.tier} style={styles.medium}>{tier}</Text>
-            )}
-          </View>
-        </View>
-      </View>
-
-      {rankingQuery.isError && !rankingQuery.data ? (
-        <InlineEmptyState message="랭킹 정보를 불러오지 못했습니다. 자산 정보는 위에 표시된 값이 최신입니다." />
-      ) : null}
-
-      <View testID="home-holdings" style={[styles.card, styles.holdingsCard]}>
-        <Text accessibilityRole="header" style={styles.holdingsTitle}>보유 종목</Text>
-        {positionsQuery.isLoading ? (
-          <SectionSkeleton lines={3} />
-        ) : positionsQuery.isError && !positionsQuery.data ? (
-          <InlineEmptyState message="보유 종목을 불러오지 못했습니다." />
-        ) : !positions ? (
-          <InlineEmptyState message="보유 종목을 확인할 수 없습니다." />
-        ) : positions.length === 0 ? (
-          <InlineEmptyState
-            title="보유 종목이 없습니다."
-            message="아직 매수한 종목이 없습니다."
-          />
-        ) : (
-          positions.map((position) => (
-            <PositionAssetRow
-              key={position.positionId}
-              position={position}
-              testID={TEST_IDS.home.positionItem(position.assetId)}
-              onPress={() => onOpenAsset(position.assetId)}
-            />
-          ))
-        )}
-      </View>
+      <HomeHoldings holdings={holdings} onOpenAsset={onOpenAsset} />
+      <HomeHotMarket hot={hot} onOpenAsset={onOpenAsset} onOpenMarket={onOpenMarket} />
 
       {capabilities?.canExchange ? (
         <CTAButton label="환전하기" onPress={onOpenFx} />
@@ -332,23 +235,6 @@ export default function SeasonAccountHome({
 
 const styles = StyleSheet.create({
   content: { ...getScreenContentStyle(Platform.OS), padding: 16, gap: 12, paddingBottom: 24 },
-  card: {
-    borderWidth: 1,
-    borderColor: semantic.border,
-    borderRadius: 14,
-    padding: 16,
-    backgroundColor: semantic.surface,
-    gap: 8,
-  },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
-  // Each value can wrap within its track; narrow rows can stack the tracks.
-  flex: { flexGrow: 1, minWidth: 0, gap: 4 },
-  holdingsCard: { paddingVertical: 10, gap: 4 },
-  holdingsTitle: { fontSize: 18, lineHeight: 27, fontWeight: '700', color: semantic.text },
-  label: { fontSize: 13, color: semantic.secondary },
-  identity: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  nickname: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: '600', lineHeight: 23 },
-  medium: { fontSize: 20, fontWeight: '700', lineHeight: 28 },
   warningBox: {
     borderRadius: 12,
     padding: 12,

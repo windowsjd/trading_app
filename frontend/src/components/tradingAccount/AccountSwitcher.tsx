@@ -53,9 +53,10 @@ type Props = {
   compact?: boolean;
   /** Home context with a small change action; selection still uses this sheet. */
   home?: boolean;
+  children?: React.ReactNode;
 };
 
-export default function AccountSwitcher({ compact = false, home = false }: Props) {
+export default function AccountSwitcher({ compact = false, home = false, children }: Props) {
   const {
     accounts,
     selectedAccount,
@@ -168,6 +169,7 @@ export default function AccountSwitcher({ compact = false, home = false }: Props
               {display.subtitle ?? '시즌 정보를 확인할 수 없습니다.'}
             </Text>
           ) : null}
+          {children}
         </View>
       ) : (
         <ActionPressable

@@ -29,6 +29,19 @@ const response = (data) => ({ data: { success: true, data } });
 export const apiClient = {
   async get(path, config) {
     transport.requests.push(path);
+    if (path.startsWith('/assets?')) {
+      const query = new URL(path, location.origin).searchParams;
+      const type = query.get('assetType'), currency = type === 'domestic_stock' ? 'KRW' : 'USD';
+      const total = params.has('hotEmpty') ? 0 : params.has('hotPartial') ? 2 : 5;
+      return response({ sortSnapshot: `fixture-${type}`, pagination: { total, nextOffset: null },
+        assets: Array.from({ length: total }, (_, i) => ({
+          id: `${type}-${i}`, assetType: type, name: long ? '대한민국 미래산업 우량주 투자기업 ABCDEFGHIJKLMNOPQRSTUVWXYZ' : ['삼성전자', 'Apple', 'Bitcoin'][i % 3],
+          symbol: 'TEST', market: type === 'domestic_stock' ? 'KRX' : type === 'us_stock' ? 'NASDAQ' : 'BINANCE',
+          isActive: true, tradable: true, marketStatus: 'open', priceCurrency: currency, settlementCurrency: currency,
+          turnover: String(100000000 - i), turnoverPeriod: type === 'crypto' ? 'rolling_24h' : 'session',
+          price: { state: 'available', currentPrice: long ? '1234567890123456' : '1234.56', priceCurrency: currency, changeRate: ['1.25', '-3.52', '0', null][i % 4] },
+        })) });
+    }
     if (path === '/me') return response({
       id: 'home-user', nickname: long ? '아주긴닉네임대한민국투자챔피언김재민ABCDEFGHIJKLMNOPQRSTUVWXYZ' : '김재민',
       role: 'user', status: 'active', email: 'home@example.invalid',

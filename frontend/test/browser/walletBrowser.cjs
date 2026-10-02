@@ -44,6 +44,11 @@ async function run() {
     await page.goto(`${base}/?screen=${screen}&holdings=1&positionFixtures=hierarchy${query}`);
     await id('home-total-asset').waitFor();
     await id(`${screen === 'wallet' ? 'wallet-position' : 'home-position-item'}-${new URLSearchParams(query).get('account') ?? 'season'}-account-asset-0`).waitFor();
+    if (screen === 'home') {
+      assert.equal(await page.locator('[data-testid^="home-position-item-"][role="button"]').count(), 1);
+      await id('home-holdings-toggle').click();
+      await id(`home-position-item-${new URLSearchParams(query).get('account') ?? 'season'}-account-asset-6`).waitFor();
+    }
   };
   try {
     if (!process.argv.includes('--navigation-only')) {
@@ -54,7 +59,7 @@ async function run() {
             await open(screen, `&account=${account}&palette=${preference}&fontScale=${fontScale}&long=${long}`);
             await theme.canvas(page, appearance);
             const prefix = `${screen === 'wallet' ? 'wallet-position' : 'home-position-item'}-${account}-account-asset-`;
-            assert.equal(await page.locator(`[data-testid^="${prefix}"][role="button"]`).count(), screen === 'wallet' ? 7 : 5);
+            assert.equal(await page.locator(`[data-testid^="${prefix}"][role="button"]`).count(), 7);
             const positive = id(`${prefix}1-return`), negative = id(`${prefix}2-return`), neutral = id(`${prefix}3-return`);
             const color = (locator) => locator.evaluate((el) => getComputedStyle(el).color);
             assert.equal(await color(positive), palette[appearance][preference][0]);
@@ -220,7 +225,7 @@ async function run() {
     for (const account of ['general', 'season']) {
       await page.goto(`${base}/navigation?navigation=1&holdings=1&account=${account}`);
       await id('home-total-asset').waitFor();
-      const tabs = page.getByRole('tab');
+      const tabs = page.getByRole('tab', { name: /^(홈|마켓|가이드|랭킹|지갑|전체)$/ });
       assert.deepEqual(await tabs.allTextContents(), ['홈', '마켓', account === 'general' ? '가이드' : '랭킹', '지갑', '전체']);
       await page.getByText('환전하기', { exact: true }).click();
       await id('wallet-fx-screen').waitFor();

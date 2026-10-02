@@ -12,7 +12,7 @@ const expected = {
   light: { red_blue: ['rgb(161, 62, 59)', 'rgb(49, 95, 155)'], green_red: ['rgb(22, 128, 58)', 'rgb(161, 62, 59)'] },
   dark: { red_blue: ['rgb(255, 139, 134)', 'rgb(140, 186, 255)'], green_red: ['rgb(121, 214, 139)', 'rgb(255, 139, 134)'] },
 };
-const anchors = { home: 'home-competition', ranking: 'ranking-item-user-0', my: 'my-profile-avatar', market: 'market-item-asset-0', search: 'market-item-asset-0', settings: 'settings-financial-red_blue' };
+const anchors = { home: 'home-total-asset', ranking: 'ranking-item-user-0', my: 'my-profile-avatar', market: 'market-item-asset-0', search: 'market-item-asset-0', settings: 'settings-financial-red_blue' };
 async function run() {
   fs.mkdirSync(out, { recursive: true });
   for (const fixture of ['rootTabs', 'trading']) {
@@ -68,7 +68,7 @@ async function run() {
   };
   async function readable(screen) {
     const failures = await page.evaluate((screen) => {
-      const ids = { home: ['home-competition', 'home-summary-card'], ranking: ['ranking-item-user-0'], my: ['my-screen'], market: ['market-item-asset-0', 'market-session-summary'], search: ['market-item-asset-0'], settings: ['settings-screen'] }[screen];
+      const ids = { home: ['home-account-context', 'home-summary-card'], ranking: ['ranking-item-user-0'], my: ['my-screen'], market: ['market-item-asset-0', 'market-session-summary'], search: ['market-item-asset-0'], settings: ['settings-screen'] }[screen];
       const sections = ids.map((id) => document.querySelector(`[data-testid="${id}"]`)).filter(Boolean);
       if (screen === 'ranking') {
         const label = [...document.querySelectorAll('div')].find((el) => el.textContent === '상위 랭커');
@@ -111,7 +111,7 @@ async function run() {
             await id('home-profile-avatar-fallback').waitFor();
             await theme.background(id('home-profile-avatar'), appearance, 'raised');
             assert.equal(await color(id('home-profile-avatar-fallback').locator('div').first(), 'backgroundColor'), appearance === 'light' ? 'rgb(105, 117, 131)' : 'rgb(174, 187, 200)');
-            assert.equal(await color(page.getByText('-3.52%', { exact: true })), expected[appearance][palette][1]);
+            assert.equal(await color(id('home-summary-card').getByText('-3.52%', { exact: true })), expected[appearance][palette][1]);
           }
           records.push({ screen, appearance, palette, width, fontScale });
           if (width === 390 && fontScale === 1) await page.screenshot({ path: path.join(out, `${screen}-${appearance}-${palette}.png`) });
@@ -150,8 +150,8 @@ async function run() {
     await open('settings', '&palette=red_blue');
     await id('settings-financial-green_red').click();
     await page.waitForFunction(() => localStorage.getItem('trading-app:financial-colors') === 'green_red');
-    await page.evaluate(() => window.fixture.setScreen('home')); await id('home-competition').waitFor();
-    assert.equal(await color(page.getByText('-3.52%', { exact: true })), expected.dark.green_red[1]);
+    await page.evaluate(() => window.fixture.setScreen('home')); await id('home-total-asset').waitFor();
+    assert.equal(await color(id('home-summary-card').getByText('-3.52%', { exact: true })), expected.dark.green_red[1]);
     await page.goto(`${base}/rootTabs?screen=settings`); await id('settings-financial-green_red').waitFor();
     assert.equal(await id('settings-financial-green_red').getAttribute('aria-checked'), 'true');
     await page.emulateMedia({ colorScheme: 'light' });

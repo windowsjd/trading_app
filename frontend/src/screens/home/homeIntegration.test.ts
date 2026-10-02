@@ -54,13 +54,13 @@ describe('Home asset hierarchy and real portfolio/ranking/me sources', () => {
         assert.equal(avatar.props.size, 36);
         assert.equal(texts(rank), '#2');
         assert.equal(texts(tier), 'Silver');
-        assert.ok(textNodes.indexOf(total) < textNodes.indexOf(nickname));
+        assert.ok(textNodes.indexOf(nickname) < textNodes.indexOf(total));
         assert.ok(textNodes.indexOf(tier) < textNodes.indexOf(detail));
         assert.ok(total.props.style.fontSize > rank.props.style.fontSize);
         assert.ok(h.queries.some((query) => query.queryKey === QUERY_KEYS.me));
       } else {
-        assert.equal(nickname, undefined);
-        assert.equal(elements(tree, 'ProfileAvatar').length, 0);
+        assert.equal(texts(nickname), '김재민');
+        assert.equal(elements(tree, 'ProfileAvatar').length, 1);
         assert.equal(rank, undefined);
         assert.equal(tier, undefined);
       }
@@ -577,7 +577,8 @@ for (const mode of ['general', 'season']) it(`${mode} disclosure, ranges and acc
   assert.ok(at('home-summary-card') < at('home-trend-toggle'));
   assert.ok(at('home-trend-toggle') < at('home-trend-chart'));
   assert.ok(at('home-trend-chart') < at('home-holdings'));
-  if (mode === 'season') assert.ok(at('home-trend-chart') < at('home-competition') && at('home-competition') < at('home-holdings'));
+  assert.equal(at('home-competition'), -1);
+  assert.ok(at('home-holdings') < at('home-hot'));
   for (const range of ['7d', '30d', '90d', '180d', '360d']) {
     rendered = h.selectRange(range);
     const query = h.queries.find(query => query.queryKey.includes('equity'));

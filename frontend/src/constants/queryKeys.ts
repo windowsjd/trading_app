@@ -68,6 +68,14 @@ export const QUERY_KEYS = {
   },
 
   market: {
+    assetPreview: (params: {
+      assetType: string;
+      sortBy: 'turnover' | 'changeRate';
+      sortOrder: 'asc' | 'desc';
+      withPrice: boolean;
+      limit: number;
+      offset: number;
+    }) => [...QUERY_KEYS.market.assets(params), 'preview'] as const,
     assets: (params: {
       sortBy?: 'turnover' | 'changeRate';
       sortOrder?: 'asc' | 'desc';

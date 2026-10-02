@@ -28,6 +28,7 @@ export const apiClient = {
         id: `asset-${offset + i}`, assetType: url.searchParams.get('assetType') ?? 'domestic_stock',
         symbol: '005930', name: long ? '대한민국 미래산업 우량주 투자기업 우선주' : '삼성전자',
         market: 'KRX', priceCurrency: 'KRW', settlementCurrency: 'KRW',
+        turnover: String(1000000 - offset - i), turnoverPeriod: url.searchParams.get('assetType') === 'crypto' ? 'rolling_24h' : 'session',
         isActive: true, marketStatus: url.searchParams.get('assetType') === 'crypto' ? 'always_open' : params.get('session') ?? 'open',
         tradable: params.get('session') !== 'closed', tradeBlockedReason: params.get('session') === 'closed' ? 'MARKET_CLOSED' : null,
         price: { state: 'available', currentPrice: params.has('hugePrice') ? '1234567890123456' : '70000', priceCurrency: 'KRW', changeRate: ['1.25', '-3.52', '0', null][i % 4] },

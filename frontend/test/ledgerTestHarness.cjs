@@ -1,6 +1,6 @@
 // Execute the real screen/API modules in Node. Only native hosts, hook
 // scheduling, HTTP, account context and the query observer are replaced.
-const { readFileSync } = require('node:fs');
+const { readFileSync, existsSync } = require('node:fs');
 const { resolve, dirname } = require('node:path');
 const ts = require('typescript');
 const React = require('react');
@@ -21,7 +21,11 @@ function load(file, mocks) {
     // separate render tests. Keep screen/query/gesture tests focused on actions.
     if (name.endsWith('/ActionPressable')) return { default: 'Pressable', __esModule: true };
     if (name.endsWith('/hooks/usePullToRefresh')) return load(resolve(dirname(file), name + '.tsx'), mocks);
-    if (name.startsWith('.')) return require(resolve(dirname(file), name.endsWith('.ts') ? name : name + '.ts'));
+    if (name.startsWith('.')) {
+      const tsx = resolve(dirname(file), name + '.tsx');
+      if (existsSync(tsx)) return load(tsx, mocks);
+      return require(resolve(dirname(file), name.endsWith('.ts') ? name : name + '.ts'));
+    }
     return require(name);
   };
   new Function('require', 'module', 'exports', code)(localRequire, module, module.exports);
