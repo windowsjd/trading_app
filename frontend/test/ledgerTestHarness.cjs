@@ -20,6 +20,7 @@ function load(file, mocks) {
     // Interaction animation is a native boundary here; its real component has
     // separate render tests. Keep screen/query/gesture tests focused on actions.
     if (name.endsWith('/ActionPressable')) return { default: 'Pressable', __esModule: true };
+    if (name.endsWith('/hooks/usePullToRefresh')) return load(resolve(dirname(file), name + '.tsx'), mocks);
     if (name.startsWith('.')) return require(resolve(dirname(file), name.endsWith('.ts') ? name : name + '.ts'));
     return require(name);
   };
@@ -31,7 +32,7 @@ function load(file, mocks) {
 function createLedgerHarness({ data, currencyCode, mode = 'general', source } = {}) {
   const slots = [];
   let index = 0;
-  const query = { data: data ? { pages: [data] } : undefined, isLoading: false, isError: false, error: null, refetch: () => {}, fetchNextPage: () => {} };
+  const query = { data: data ? { pages: [data] } : undefined, isLoading: false, isFetching: false, isFetchingNextPage: false, isError: false, error: null, refetch: () => {}, fetchNextPage: () => {} };
   const account = { selectedAccountId: 'ta-1', selectedAccount: { mode }, isLoading: false, isEmpty: false };
   const api = load(resolve(__dirname, '../src/features/tradingAccount/api.ts'), {
     '../../services/api/client': { apiClient: { get: async (path, config) => {
@@ -41,12 +42,12 @@ function createLedgerHarness({ data, currencyCode, mode = 'general', source } = 
   });
   const result = { query, account, requests: [], response: { success: true, data }, options: null };
   const screen = load(source ?? resolve(__dirname, '../src/screens/home/WalletTransactionsScreen.tsx'), {
-    react: { ...React, useMemo: (fn) => fn(), useState: (initial) => {
+    react: { ...React, useRef: (value) => ({ current: value }), useEffect() {}, useMemo: (fn) => fn(), useState: (initial) => {
       const slot = index++;
       if (!(slot in slots)) slots[slot] = typeof initial === 'function' ? initial() : initial;
       return [slots[slot], (next) => { slots[slot] = typeof next === 'function' ? next(slots[slot]) : next; }];
     } },
-    'react-native': { View: 'View', Text: 'Text', SafeAreaView: 'SafeAreaView', FlatList: 'FlatList', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', StyleSheet: { create: (styles) => styles } },
+    'react-native': { RefreshControl: 'RefreshControl', View: 'View', Text: 'Text', SafeAreaView: 'SafeAreaView', FlatList: 'FlatList', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', StyleSheet: { create: (styles) => styles } },
     '@tanstack/react-query': { useInfiniteQuery: (options) => { result.options = options; return query; } },
     '../../features/tradingAccount/api': api,
     '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => account },

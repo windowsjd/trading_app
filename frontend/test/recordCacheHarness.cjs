@@ -38,11 +38,11 @@ function createRecordCacheHarness(total = 23) {
       ...options, _optimisticResults: 'optimistic',
     }));
   }
-  const native = Object.fromEntries(['View', 'Text', 'SafeAreaView', 'Pressable', 'FlatList'].map(n => [n, n]));
+  const native = Object.fromEntries(['View', 'Text', 'SafeAreaView', 'Pressable', 'FlatList', 'ScrollView', 'RefreshControl'].map(n => [n, n]));
   native.StyleSheet = { create: s => s };
   native.Platform = { OS: 'android' };
   const mocks = {
-    react: { ...React, useMemo: fn => fn() },
+    react: { ...React, useState: initial => [initial, () => {}], useRef: value => ({ current: value }), useEffect() {}, useMemo: fn => fn() },
     'react-native': native,
     '@tanstack/react-query': {
       useQuery: options => observe(QueryObserver, options),

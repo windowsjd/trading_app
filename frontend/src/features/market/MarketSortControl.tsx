@@ -1,62 +1,54 @@
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from '../../theme/native';
+import React from 'react';
+import { StyleSheet, Text, View } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import ActionPressable from '../../components/common/ActionPressable';
-import BottomSheetBackdrop from '../../components/common/BottomSheetBackdrop';
-import { MARKET_SORTS, type MarketSort } from './marketSort';
-import type { AssetType } from './api';
+import { marketSortParams, type MarketSort } from './marketSort';
 
-export default function MarketSortControl({ value, onChange, assetType }: {
+export default function MarketSortControl({ value, onChange }: {
   value: MarketSort;
   onChange: (value: MarketSort) => void;
-  assetType?: AssetType | 'all';
 }) {
-  const [open, setOpen] = useState(false);
-  const label = value === 'volume_desc'
-    ? `${assetType === 'crypto' ? '24h ' : ''}거래량 ↓`
-    : (MARKET_SORTS.find((sort) => sort.value === value) ?? MARKET_SORTS[0]).label;
+  const { sortBy, sortOrder } = marketSortParams(value);
+  const select = (criterion: 'turnover' | 'changeRate', direction: 'asc' | 'desc') =>
+    onChange(`${criterion === 'turnover' ? 'turnover' : 'change'}_${direction}`);
   return (
-    <View>
-      <ActionPressable testID="market-sort-trigger" accessibilityRole="button"
-        accessibilityLabel={`정렬: ${label}`} accessibilityState={{ expanded: open }}
-        aria-expanded={open}
-        onPress={() => setOpen(true)} style={styles.trigger}>
-        <Text style={styles.text}>{label} ▾</Text>
-      </ActionPressable>
-      <BottomSheetBackdrop visible={open} onClose={() => setOpen(false)}>
-        <ScrollView contentContainerStyle={styles.sheet}>
-          <Text accessibilityRole="header" style={styles.heading}>정렬</Text>
-          {MARKET_SORTS.map((sort) => (
-            <ActionPressable key={sort.value} testID={`market-sort-${sort.value}`}
-              accessibilityRole="radio" accessibilityState={{ checked: value === sort.value }}
-              aria-checked={value === sort.value}
-              onPress={() => { onChange(sort.value); setOpen(false); }}
-              style={[styles.option, value === sort.value && styles.selected]}>
-              <Text style={styles.text}>{sort.label}{value === sort.value ? ' ✓' : ''}</Text>
-            </ActionPressable>
-          ))}
-          <Text style={styles.note}>
-            {assetType === 'crypto'
-              ? '거래량은 최근 24시간 코인 수량입니다. 코인마다 단위가 달라 거래대금 순위와 다릅니다.'
-              : assetType === 'all' || !assetType
-                ? '주식은 거래 세션의 누적 주식 수, 암호화폐는 최근 24시간 코인 수량입니다. 상품마다 기간과 단위가 다릅니다.'
-                : '거래량은 거래 세션의 누적 주식 수입니다. 휴장 중에는 최근 완료 세션의 마지막 유효 값을 사용합니다.'}
-          </Text>
-          <Text style={styles.note}>확인할 수 없는 값은 마지막에 표시합니다. 새로고침하면 최신 기준으로 정렬합니다.</Text>
-          <ActionPressable accessibilityRole="button" onPress={() => setOpen(false)} style={styles.option}>
-            <Text style={styles.text}>닫기</Text>
+    <View testID="market-sort-control" style={styles.control}>
+      {(['turnover', 'changeRate'] as const).map((criterion) => {
+        const selected = sortBy === criterion;
+        return (
+          <ActionPressable key={criterion} testID={`market-sort-${criterion}`}
+            accessibilityRole="radio" accessibilityLabel={criterion === 'turnover' ? '거래대금 정렬' : '등락률 정렬'}
+            accessibilityState={{ checked: selected }} aria-checked={selected}
+            onPress={() => select(criterion, sortOrder)}
+            style={[styles.criterion, selected && styles.selected]}>
+            <Text style={[styles.text, selected && styles.selectedText]}>{criterion === 'turnover' ? '거래대금' : '등락률'}</Text>
           </ActionPressable>
-        </ScrollView>
-      </BottomSheetBackdrop>
+        );
+      })}
+      <View style={styles.arrows}>
+        {(['asc', 'desc'] as const).map((direction) => {
+          const selected = sortOrder === direction;
+          return (
+            <ActionPressable key={direction} testID={`market-sort-${direction}`}
+              accessibilityRole="radio" accessibilityLabel={direction === 'asc' ? '오름차순' : '내림차순'}
+              accessibilityState={{ checked: selected }} aria-checked={selected}
+              onPress={() => select(sortBy, direction)}
+              style={[styles.arrow, selected && styles.selected]}>
+              <Text style={[styles.arrowText, selected && styles.selectedText]}>{direction === 'asc' ? '▲' : '▼'}</Text>
+            </ActionPressable>
+          );
+        })}
+      </View>
     </View>
   );
 }
 const styles = StyleSheet.create({
-  trigger: { minHeight: 44, paddingHorizontal: 8, justifyContent: 'center', alignSelf: 'flex-end' },
-  text: { fontSize: 13, lineHeight: 20, fontWeight: '600', color: semantic.text },
-  heading: { fontSize: 18, lineHeight: 26, fontWeight: '700', color: semantic.text },
-  sheet: { gap: 8 },
-  option: { minHeight: 48, justifyContent: 'center', padding: 12, borderRadius: 8 },
-  selected: { backgroundColor: semantic.raised },
-  note: { fontSize: 12, lineHeight: 18, color: semantic.secondary },
+  control: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1, minWidth: 0, maxWidth: '100%' },
+  criterion: { minWidth: 0, flexShrink: 1, minHeight: 44, paddingHorizontal: 8, justifyContent: 'center', borderRadius: 8 },
+  text: { fontSize: 13, lineHeight: 20, fontWeight: '600', color: semantic.secondary },
+  arrows: { gap: 2, flexShrink: 0 },
+  arrow: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
+  arrowText: { fontSize: 12, lineHeight: 18, color: semantic.muted },
+  selected: { backgroundColor: semantic.selected },
+  selectedText: { color: semantic.onAccent },
 });

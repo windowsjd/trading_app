@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { semantic } from '../../theme/tokens';
 import { getScreenContentStyle } from '../../theme/screenLayout';
 import React, { useMemo } from 'react';
@@ -7,6 +8,7 @@ import {
   StyleSheet,
   SafeAreaView,
   FlatList,
+  ScrollView,
   ActivityIndicator,
   Platform,
 } from '../../theme/native';
@@ -126,6 +128,7 @@ export default function RankingScreen({ navigation }: Props) {
       return 60_000;
     },
   });
+  const refresh = usePullToRefresh([seasonQuery, rankingQuery, meQuery]);
 
   const firstPage = rankingQuery.data?.pages[0];
   const rankType = firstPage?.rankType;
@@ -183,7 +186,7 @@ export default function RankingScreen({ navigation }: Props) {
         : 'ranking_loading';
     }
 
-    if (seasonQuery.isError || !seasonQuery.data || rankingQuery.isError) {
+    if (!seasonQuery.data || (rankingQuery.isError && !rankingQuery.data)) {
       return 'ranking_error';
     }
 
@@ -200,10 +203,10 @@ export default function RankingScreen({ navigation }: Props) {
     return 'ranking_ready';
   }, [
     seasonQuery.isLoading,
-    seasonQuery.isError,
     seasonQuery.data,
     rankingQuery.isLoading,
     rankingQuery.isError,
+    rankingQuery.data,
     rankingQuery.isFetchingNextPage,
     rankingErrorCode,
     firstPage?.state,
@@ -245,12 +248,14 @@ export default function RankingScreen({ navigation }: Props) {
 
   if (viewState === 'ranking_unavailable') {
     return (
-      <EmptyState
-        title="랭킹 생성 대기 중입니다."
-        message="랭킹 스냅샷이 생성되면 이곳에 표시됩니다."
-        actionLabel={hasNotJoined ? '시즌 참가하기' : undefined}
-        onAction={hasNotJoined ? () => rootNavigation.navigate('SeasonJoin') : undefined}
-      />
+      <ScrollView refreshControl={refresh.refreshControl} style={styles.container} contentContainerStyle={styles.content}>
+        <EmptyState
+          title="랭킹 생성 대기 중입니다."
+          message="랭킹 스냅샷이 생성되면 이곳에 표시됩니다."
+          actionLabel={hasNotJoined ? '시즌 참가하기' : undefined}
+          onAction={hasNotJoined ? () => rootNavigation.navigate('SeasonJoin') : undefined}
+        />
+      </ScrollView>
     );
   }
 
@@ -259,12 +264,13 @@ export default function RankingScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
+        refreshControl={refresh.refreshControl}
         testID={TEST_IDS.ranking.screen}
         data={items}
         keyExtractor={getRankingItemKey}
         contentContainerStyle={styles.content}
         onEndReached={() => {
-          if (rankingQuery.hasNextPage && !rankingQuery.isFetchingNextPage) {
+          if (rankingQuery.hasNextPage && !rankingQuery.isFetching) {
             void rankingQuery.fetchNextPage();
           }
         }}

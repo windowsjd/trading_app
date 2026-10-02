@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { SafeAreaView, ScrollView, View, Text, StyleSheet, Platform } from '../../theme/native';
@@ -62,6 +63,8 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
     queryKey: QUERY_KEYS.tradingAccount.holdings(accountId),
     queryFn: () => getAccountHoldings(accountId, getTradingAccountPositions),
   });
+  const refresh = usePullToRefresh([portfolioQuery, walletsQuery, positionsQuery]);
+
   const integrityFailure = findAccountIntegrityFailure([
     { section: '총 자산', isError: portfolioQuery.isError, error: portfolioQuery.error, retry: () => void portfolioQuery.refetch() },
     { section: '현금', isError: walletsQuery.isError, error: walletsQuery.error, retry: () => void walletsQuery.refetch() },
@@ -74,7 +77,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
   const positions = positionsQuery.data?.positions;
 
   return (
-    <ScrollView testID="wallet-screen" contentContainerStyle={styles.content}>
+    <ScrollView refreshControl={refresh.refreshControl} testID="wallet-screen" contentContainerStyle={styles.content}>
       <AccountSwitcher home />
       {integrityFailure ? (
         <View testID={TEST_IDS.tradingAccount.integrityError}>
@@ -83,7 +86,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
       ) : (
         <>
           {portfolioQuery.isLoading ? <SectionSkeleton lines={3} />
-            : portfolioQuery.isError || !portfolio ? (
+            : !portfolio ? (
               <ErrorState title="총 자산을 불러오지 못했습니다." onRetry={() => void portfolioQuery.refetch()} />
             ) : (
               <HomeAssetHero summary={portfolio.summary} settled={account.season?.seasonStatus === 'settled'} unavailableMessage={notice?.message} />
@@ -95,7 +98,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
           <View testID="wallet-composition" style={styles.card}>
             <Text style={styles.title}>지갑 구성</Text>
             {walletsQuery.isLoading ? <SectionSkeleton lines={2} />
-              : walletsQuery.isError ? (
+              : walletsQuery.isError && !walletsQuery.data ? (
                 <ErrorState title="현금 잔액을 불러오지 못했습니다." onRetry={() => void walletsQuery.refetch()} />
               ) : (
                 (['KRW', 'USD'] as const).map((currency) => (
@@ -107,7 +110,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
               )}
             <View style={styles.holdings}>
               {positionsQuery.isLoading ? <SectionSkeleton lines={3} />
-                : positionsQuery.isError ? (
+                : positionsQuery.isError && !positionsQuery.data ? (
                   <ErrorState title="보유 종목을 불러오지 못했습니다." onRetry={() => void positionsQuery.refetch()} />
                 ) : !positions ? <InlineEmptyState message="보유 종목을 확인할 수 없습니다." />
                   : positions.length === 0 ? <InlineEmptyState message="보유 종목이 없습니다." />

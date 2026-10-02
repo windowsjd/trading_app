@@ -107,8 +107,8 @@ Holdings fixtures include 삼성전자 / Berkshire Hathaway Class B / Bitcoin an
 stock/crypto quantities rounded only for display to six decimal places, without
 trailing zeros. Rendered boxes and glyph edges verify the left identity and the
 right value → secondary quantity → return column, its typography, and equal
-Wallet history button widths/heights/padding/touch targets. Names wrap up to
-three lines with the complete accessible label; all numeric values remain
+Wallet history button widths/heights/padding/touch targets. Names wrap fully with
+the complete accessible label; all numeric values remain
 untruncated. It also checks known quantities in stale/unavailable rows, live palette changes, all 207 positions
 across three API pages, and delayed outgoing responses on account switching.
 The navigation fixture uses installed React Navigation and production MainTabs,
@@ -123,7 +123,8 @@ Run `NODE_PATH=/path/to/browser-tools/node_modules node test/browser/homeMarketB
 for the Home disclosure and Market sorting. It checks 320/360/390/430px × Light/Dark,
 Home at font scales 1/2 in both account modes, all five daily ranges, 16-digit KRW
 tooltips at first/middle/last points, glyph clipping, delayed account switches,
-Market sort choices, search and server snapshot pagination. Fixtures contain only
+Market turnover/changeRate criteria and ASC/DESC arrows, both financial palettes,
+search and server snapshot pagination. Fixtures contain only
 explicit actual-date test observations; they do not replace production data.
 Artifacts go to `/tmp/trading-home-market-browser` (`HOME_MARKET_BROWSER_OUTPUT`).
 Set `LD_LIBRARY_PATH` and `FONTCONFIG_FILE` when browser libraries/fonts live outside

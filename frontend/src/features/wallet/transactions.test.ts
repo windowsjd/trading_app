@@ -144,8 +144,12 @@ describe('wallet ledger contract and real screen integration', () => {
     listOf(h).props.onEndReached();
     assert.equal(fetched, 1);
     h.query.isFetchingNextPage = true;
+    h.query.isFetching = true;
     listOf(h).props.onEndReached();
     assert.equal(fetched, 1);
+    h.query.isFetchingNextPage = false;
+    listOf(h).props.onEndReached();
+    assert.equal(fetched, 1, 'refresh/background fetch also blocks another page request');
   });
 
   it('does not silently discard unknown/historical financial rows or mislabel ad funding as profit', () => {
@@ -202,6 +206,8 @@ describe('wallet ledger contract and real screen integration', () => {
       assert.equal(listOf(h).props.ListEmptyComponent.type, 'EmptyState');
       h.query.isError = true;
       h.query.error = new Error('offline');
+      assert.equal(listOf(h).props.data.length, 0, 'failed refresh retains the last good empty response');
+      h.query.data = undefined;
       assert.equal(h.render().type, 'ErrorState');
       h.query.error = { response: { status: 500, data: { error: { code: mode === 'general' ? 'GENERAL_ACCOUNT_INTEGRITY' : 'FINANCIAL_SCOPE_REPAIR_REQUIRED' } } } };
       assert.equal(h.render().props.title, '데이터를 안전하게 표시할 수 없습니다.');

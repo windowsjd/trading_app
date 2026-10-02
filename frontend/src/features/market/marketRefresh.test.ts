@@ -104,7 +104,7 @@ for (const screen of ['MarketScreen', 'MarketSearchScreen']) {
       act(() => list().props.onEndReached());
       await flush();
       assert.equal(requests[1].sortSnapshot, 'initial-order');
-      act(() => list().props.onRefresh());
+      act(() => { void list().props.refreshControl.props.onRefresh(); });
       await flush();
       assert.equal(requests[2].sortRefresh, true);
       assert.equal(requests[2].offset, 0);
@@ -141,7 +141,7 @@ it('serializes an explicit fresh request through the existing Assets API', async
       },
     },
   });
-  await api.getAssets({ sortBy: 'volume', sortRefresh: true, offset: 0 });
+  await api.getAssets({ sortBy: 'turnover', sortRefresh: true, offset: 0 });
   assert.equal(
     new URL(path, 'https://fixture.invalid').searchParams.get('sortRefresh'),
     'true',

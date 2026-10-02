@@ -16,8 +16,6 @@ export default function PositionAssetRow({ position, onPress, testID }: Props) {
         <Text
           testID={testID ? `${testID}-name` : undefined}
           accessibilityLabel={display.name}
-          numberOfLines={3}
-          ellipsizeMode="tail"
           style={styles.name}
         >
           {display.name}
@@ -45,9 +43,9 @@ const directionStyles = StyleSheet.create({
   neutral: { color: semantic.secondary },
 });
 const styles = StyleSheet.create({
-  row: { minWidth: 0, paddingVertical: 12, gap: 4 },
+  row: { minWidth: 0, paddingVertical: 6, gap: 4 },
   columns: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, minWidth: 0 },
-  name: { flex: 1, minWidth: 0, fontSize: 16, lineHeight: 24, fontWeight: '600' },
+  name: { flex: 1, minWidth: 0, fontSize: 18, lineHeight: 27, fontWeight: '700' },
   // Preserve both columns at large font scales. Full values can wrap inside
   // the right track, without truncation or shrinking accessibility text.
   values: { minWidth: 0, maxWidth: '70%', flexShrink: 1, alignItems: 'stretch', gap: 2 },

@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import React, { useMemo, useState } from 'react';
@@ -113,6 +114,7 @@ export default function WalletTransactionsScreen({ route }: Props) {
     initialPageParam: 0,
     enabled: hasAccount,
   });
+  const refresh = usePullToRefresh([{ ...transactionsQuery, enabled: hasAccount }]);
 
   const items = useMemo(
     () => mergeLedgerPages(transactionsQuery.data?.pages ?? []),
@@ -154,7 +156,7 @@ export default function WalletTransactionsScreen({ route }: Props) {
     );
   }
 
-  if (transactionsQuery.isError) {
+  if (transactionsQuery.isError && !transactionsQuery.data) {
     return (
       <ErrorState
         title="지갑 원장을 불러오지 못했습니다."
@@ -167,19 +169,15 @@ export default function WalletTransactionsScreen({ route }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
+        refreshControl={refresh.refreshControl}
         testID={TEST_IDS.walletTransactions.screen}
         data={items}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.content}
-        refreshing={
-          transactionsQuery.isRefetching &&
-          !transactionsQuery.isFetchingNextPage
-        }
-        onRefresh={() => void transactionsQuery.refetch()}
         onEndReached={() => {
           if (
             transactionsQuery.hasNextPage &&
-            !transactionsQuery.isFetchingNextPage
+            !transactionsQuery.isFetching
           ) {
             void transactionsQuery.fetchNextPage();
           }

@@ -65,9 +65,8 @@ export default function HomeAssetTrend({
               ))}
             </View>
           </View>
-          {loading ? <SectionSkeleton lines={4} /> : failed ? (
-            <InlineEmptyState message="자산 추이를 불러오지 못했습니다." />
-          ) : (
+          {failed ? <InlineEmptyState message="자산 추이를 불러오지 못했습니다." /> : null}
+          {loading ? <SectionSkeleton lines={4} /> : failed && !equity ? null : (
             <LineChart
               key={range}
               points={points}

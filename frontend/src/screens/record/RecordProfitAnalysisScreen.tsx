@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { semantic } from '../../theme/tokens';
 import React from 'react';
 import {
@@ -121,17 +122,18 @@ export default function RecordProfitAnalysisScreen({
         offset: 0,
       }),
   });
+  const refresh = usePullToRefresh([detailQuery, equityQuery]);
 
   if (detailQuery.isLoading) {
     return <FullPageLoading message="수익 분석을 불러오는 중입니다." />;
   }
 
-  if (detailQuery.isError || !detailQuery.data) {
+  if (!detailQuery.data) {
     return (
       <ErrorState
         title="수익 분석을 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
-        onRetry={() => detailQuery.refetch()}
+        onRetry={() => { void detailQuery.refetch(); }}
       />
     );
   }
@@ -142,6 +144,7 @@ export default function RecordProfitAnalysisScreen({
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
+        refreshControl={refresh.refreshControl}
         testID={TEST_IDS.record.profitAnalysisScreen}
         contentContainerStyle={styles.content}
       >
@@ -300,12 +303,12 @@ export default function RecordProfitAnalysisScreen({
           <Text style={styles.label}>수익 추이 차트</Text>
           {equityQuery.isLoading ? (
             <SectionSkeleton lines={5} />
-          ) : equityQuery.isError ? (
+          ) : equityQuery.isError && !equityQuery.data ? (
             <View style={styles.chartState}>
               <InlineEmptyState message="수익 추이를 불러오지 못했습니다." />
               <CTAButton
                 label="다시 시도"
-                onPress={() => equityQuery.refetch()}
+                onPress={() => { void equityQuery.refetch(); }}
               />
             </View>
           ) : equityQuery.data?.state === 'not_joined' ? (

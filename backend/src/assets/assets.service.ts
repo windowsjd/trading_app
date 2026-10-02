@@ -39,9 +39,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import { RedisService } from '../redis/redis.service';
 import {
   compareAssetListMetric,
-  readAssetListVolume,
-  type AssetListVolume,
-} from './asset-list-volume';
+  readAssetListTurnover,
+  type AssetListTurnover,
+} from './asset-list-turnover';
 import {
   type AdminDiagnostic,
   buildAdminPartialFailureDiagnostic,
@@ -82,7 +82,7 @@ type ParsedAssetsQuery = {
   withPrice: boolean;
   limit: number;
   offset: number;
-  sortBy?: 'volume' | 'changeRate';
+  sortBy?: 'turnover' | 'changeRate';
   sortOrder: 'asc' | 'desc';
   sortSnapshot?: string;
   sortRefresh: boolean;
@@ -223,7 +223,7 @@ export type RealtimePriceKrwConversion =
 
 type AssetListItem = ReturnType<AssetsService['formatAssetMetadata']> & {
   price?: AssetPricePayload;
-} & Partial<AssetListVolume>;
+} & Partial<AssetListTurnover>;
 
 type SortedAssetSnapshot = {
   token: string;
@@ -510,7 +510,7 @@ export class AssetsService {
     const byId = new Map(evidence.map((row) => [row.id, row]));
     const assets = priced.assets.map((asset) => ({
       ...asset,
-      ...readAssetListVolume(
+      ...readAssetListTurnover(
         asset.price?.state === 'available'
           ? byId.get(asset.price.assetPriceSnapshotId)
           : undefined,
@@ -1453,9 +1453,8 @@ export class AssetsService {
       'sortRefresh',
     );
     if (
-      (sortBy && sortBy !== 'volume' && sortBy !== 'changeRate') ||
+      (sortBy && sortBy !== 'turnover' && sortBy !== 'changeRate') ||
       (sortOrder !== 'asc' && sortOrder !== 'desc') ||
-      (sortBy === 'volume' && sortOrder !== 'desc') ||
       (!sortBy && (query.sortOrder !== undefined || sortSnapshot)) ||
       (sortSnapshot && !/^[0-9a-f-]{36}$/.test(sortSnapshot)) ||
       (sortRefresh &&

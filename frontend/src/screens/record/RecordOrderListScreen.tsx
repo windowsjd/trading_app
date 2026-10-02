@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { semantic } from '../../theme/tokens';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -182,6 +183,7 @@ export default function RecordOrderListScreen({ route }: Props) {
     },
     refetchIntervalInBackground: false,
   });
+  const refresh = usePullToRefresh([{ ...ordersQuery, enabled: hasAccount }]);
 
   /**
    * De-duplicated by orderId, like the portfolio and ledger lists (작업 10
@@ -232,13 +234,14 @@ export default function RecordOrderListScreen({ route }: Props) {
 
   const viewState = useMemo(() => {
     if (ordersQuery.isLoading) return 'record_orders_loading';
-    if (ordersQuery.isError) return 'record_orders_error';
+    if (ordersQuery.isError && !ordersQuery.data) return 'record_orders_error';
     if (!items.length) return 'record_orders_empty';
     if (ordersQuery.isFetchingNextPage) return 'record_orders_paginating';
     return 'record_orders_ready';
   }, [
     ordersQuery.isLoading,
     ordersQuery.isError,
+    ordersQuery.data,
     ordersQuery.isFetchingNextPage,
     items.length,
   ]);
@@ -317,12 +320,13 @@ export default function RecordOrderListScreen({ route }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
+        refreshControl={refresh.refreshControl}
         testID={TEST_IDS.record.orderListScreen}
         data={items}
         keyExtractor={(item) => getRecordOrderDisplay(item).key}
         contentContainerStyle={styles.content}
         onEndReached={() => {
-          if (ordersQuery.hasNextPage && !ordersQuery.isFetchingNextPage) {
+          if (ordersQuery.hasNextPage && !ordersQuery.isFetching) {
             void ordersQuery.fetchNextPage();
           }
         }}

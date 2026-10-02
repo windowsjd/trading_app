@@ -1,7 +1,8 @@
 import type { AssetsResponseDto } from './api';
 
 export const MARKET_SORTS = [
-  { value: 'volume_desc', label: '거래량 높은순', sortBy: 'volume', sortOrder: 'desc' },
+  { value: 'turnover_desc', label: '거래대금 내림차순', sortBy: 'turnover', sortOrder: 'desc' },
+  { value: 'turnover_asc', label: '거래대금 오름차순', sortBy: 'turnover', sortOrder: 'asc' },
   { value: 'change_desc', label: '등락률 높은순', sortBy: 'changeRate', sortOrder: 'desc' },
   { value: 'change_asc', label: '등락률 낮은순', sortBy: 'changeRate', sortOrder: 'asc' },
 ] as const;

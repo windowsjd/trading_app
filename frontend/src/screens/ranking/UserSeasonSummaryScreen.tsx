@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
 import { semantic } from '../../theme/tokens';
 import React, { useCallback } from 'react';
@@ -6,7 +7,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  RefreshControl,
 } from '../../theme/native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
@@ -36,6 +36,8 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
     staleTime: 0,
     refetchOnMount: 'always',
   });
+  const refresh = usePullToRefresh([query]);
+
   const { refetch } = query;
   useFocusEffect(
     useCallback(() => {
@@ -53,7 +55,7 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
         </Text>
       </View>
     );
-  if (query.isError || !query.data)
+  if (!query.data)
     return (
       <ErrorState
         title="유저 정보를 불러오지 못했습니다."
@@ -64,10 +66,11 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
   const { user, season, portfolioAccess, reason } = query.data;
   // Never paint cached sensitive sections while a fresh permission check runs.
   const portfolio =
-    !query.isFetching && portfolioAccess === 'available'
+    !query.isFetching && !query.isError && portfolioAccess === 'available'
       ? query.data.portfolio
       : null;
   const lockedMessage =
+    query.isError ? '공개 상태를 확인하지 못했습니다. 아래로 끌어 다시 시도해주세요.' :
     portfolioAccess === 'private'
       ? '이 사용자는 포트폴리오를 비공개로 설정했습니다.'
       : portfolioAccess === 'not_friend'
@@ -82,15 +85,10 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
               : '현재 시즌 포트폴리오를 이용할 수 없습니다.';
   return (
     <ScrollView
+      refreshControl={refresh.refreshControl}
       testID={TEST_IDS.userSummary.screen}
       style={styles.screen}
       contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={query.isRefetching}
-          onRefresh={() => void refetch()}
-        />
-      }
     >
       <View style={styles.card}>
         <ProfileAvatar profileImageUrl={user.profileImageUrl} size={56} />

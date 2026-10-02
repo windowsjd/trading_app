@@ -41,8 +41,8 @@ export interface MarketAssetItemDto {
   displayPriceDecimals?: number | null;
   changeRate?: PercentString | null;
   settlementCurrency: CurrencyCode;
-  volume?: string | null;
-  volumePeriod?: 'session' | 'rolling_24h' | null;
+  turnover?: string | null;
+  turnoverPeriod?: 'session' | 'rolling_24h' | null;
   isActive: boolean;
   marketStatus: string;
   tradable: boolean;
@@ -67,7 +67,7 @@ export interface AssetsResponseDto {
 }
 
 export interface GetAssetsParams {
-  sortBy?: 'volume' | 'changeRate';
+  sortBy?: 'turnover' | 'changeRate';
   sortOrder?: 'asc' | 'desc';
   sortSnapshot?: string;
   sortRefresh?: boolean;

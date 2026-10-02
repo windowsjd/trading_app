@@ -1,5 +1,6 @@
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import MarketSortControl from '../../features/market/MarketSortControl';
-import { marketSortParams, nextMarketPage, type MarketSort, type MarketPageParam } from '../../features/market/marketSort';
+import { marketSortParams, nextMarketPage, type MarketSort } from '../../features/market/marketSort';
 import { semantic } from '../../theme/tokens';
 import { getScreenContentStyle } from '../../theme/screenLayout';
 import { buildWsUrl } from '../../constants/env';
@@ -44,7 +45,7 @@ const SEARCH_SCOPE: Array<{ key: SearchScope; label: string }> = [
 ];
 
 export default function MarketSearchScreen({ navigation, route }: Props) {
-  const [sort, setSort] = useState<MarketSort>(route.params?.sort ?? 'volume_desc');
+  const [sort, setSort] = useState<MarketSort>(route.params?.sort ?? 'turnover_desc');
   const sortParams = marketSortParams(sort);
   const refreshSort = useRef(false);
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
@@ -73,9 +74,13 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
         limit: 20,
       }),
     getNextPageParam: nextMarketPage,
-    initialPageParam: { offset: 0 } as MarketPageParam,
+    initialPageParam: { offset: 0 },
     enabled: trimmedSearchText.length > 0,
   });
+
+  const refresh = usePullToRefresh([{ ...searchQuery, enabled: trimmedSearchText.length > 0 }],
+    () => { refreshSort.current = true; },
+    () => { refreshSort.current = false; });
 
   const items = useMemo(() => {
     const byId = new Map<string, MarketAssetItemDto>();
@@ -131,7 +136,7 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
       <ErrorState
         title="검색 결과를 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
-        onRetry={() => searchQuery.refetch()}
+        onRetry={() => { void searchQuery.refetch(); }}
         diagnosticError={searchQuery.error}
       />
     );
@@ -145,17 +150,11 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
         contentContainerStyle={styles.content}
         onEndReached={() => {
           if (searchQuery.hasNextPage && !searchQuery.isFetching && !searchQuery.isError) {
-            searchQuery.fetchNextPage();
+            void searchQuery.fetchNextPage();
           }
         }}
         onEndReachedThreshold={0.4}
-        refreshing={searchQuery.isRefetching}
-        onRefresh={() => {
-          refreshSort.current = true;
-          void searchQuery.refetch().finally(() => {
-            refreshSort.current = false;
-          });
-        }}
+        refreshControl={refresh.refreshControl}
         ListHeaderComponent={
           <View style={styles.header}>
             <TextInput
@@ -190,11 +189,8 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
               })}
             </View>
 
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
-              <ActionPressable accessibilityRole="button" onPress={() => void searchQuery.refetch()} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 }}>
-                <Text style={{ color: semantic.secondary, fontSize: 12 }}>새로고침</Text>
-              </ActionPressable>
-              <MarketSortControl value={sort} onChange={setSort} assetType={assetType} />
+            <View style={{ alignItems: 'flex-end' }}>
+              <MarketSortControl value={sort} onChange={setSort} />
             </View>
 
             {hasPriceErrors ? (

@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
@@ -95,6 +96,11 @@ export function AssetMarketChart({
       }),
     enabled: isFocused,
   });
+  const refresh = usePullToRefresh([
+    { ...detailQuery, enabled: isFocused && variant === 'detail' },
+    { ...candlesQuery, enabled: isFocused && variant === 'detail' },
+  ]);
+
   const { latestTicker } = useAssetTicker({
     assetId,
     wsUrl: wsUrl ?? '',
@@ -235,7 +241,7 @@ export function AssetMarketChart({
           />
         </View>
       ) : null}
-      {detailQuery.isError ? (
+      {detailQuery.isError && !detailQuery.data ? (
         <ActionPressable
           style={styles.retry}
           accessibilityRole="button"
@@ -247,7 +253,7 @@ export function AssetMarketChart({
           </Text>
         </ActionPressable>
       ) : null}
-      {detailQuery.isError ? (
+      {detailQuery.isError && !detailQuery.data ? (
         <AdminDiagnosticPanel error={detailQuery.error} />
       ) : null}
       {isAdmin && candleLiveEnabled && isCandleStale ? (
@@ -278,7 +284,7 @@ export function AssetMarketChart({
       >
         {candlesQuery.isLoading ? (
           <SectionSkeleton lines={8} />
-        ) : candlesQuery.isError ? (
+        ) : candlesQuery.isError && !candlesQuery.data ? (
           <ScrollView contentContainerStyle={styles.error}>
             <InlineEmptyState
               title={describeCandleError(candlesQuery.error).title}
@@ -321,7 +327,7 @@ export function AssetMarketChart({
     </>
   );
   return detailView ? (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.detailContent}
+    <ScrollView refreshControl={refresh.refreshControl} style={styles.screen} contentContainerStyle={styles.detailContent}
       nestedScrollEnabled testID={TEST_IDS.assetDetail.screen}>
       {chartBody}
     </ScrollView>

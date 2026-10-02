@@ -8,9 +8,9 @@ const { interactionHarness, React, act } = require('../../../test/interactionTes
 const { load } = require('../../../test/ledgerTestHarness.cjs');
 
 it('isolates every market/search sort query and carries the server snapshot across pages', () => {
-  const keys = (['volume_desc', 'change_desc', 'change_asc'] as const).flatMap(sort => ['crypto', 'us_stock', 'domestic_stock'].map(assetType =>
+  const keys = (['turnover_desc', 'turnover_asc', 'change_desc', 'change_asc'] as const).flatMap(sort => ['crypto', 'us_stock', 'domestic_stock'].map(assetType =>
     QUERY_KEYS.market.assets({ assetType, search: '삼성', withPrice: true, ...marketSortParams(sort) })));
-  assert.equal(new Set(keys.map(key => JSON.stringify(key))).size, 9);
+  assert.equal(new Set(keys.map(key => JSON.stringify(key))).size, 12);
   assert.deepEqual(nextMarketPage({ assets: [], pagination: { nextOffset: 20, limit: 20, offset: 0, returned: 20, total: 40 }, sortSnapshot: 'server-token' }), { offset: 20, sortSnapshot: 'server-token' });
   assert.equal(nextMarketPage({ assets: [], pagination: { nextOffset: null, limit: 20, offset: 20, returned: 20, total: 40 }, sortSnapshot: 'server-token' }), undefined);
 });
@@ -26,24 +26,32 @@ it('serializes sort and continuation without reordering returned rows', async ()
   assert.equal(url.searchParams.get('search'), '比特币');
   assert.deepEqual(result.assets.map(a => a.id), ['b', 'a']);
 });
-it('sort sheet exposes three choices, selected state, period and base-unit meaning', () => {
+it('offers two criteria and separate neutral ASC/DESC controls, preserving direction', () => {
   const h = interactionHarness('android');
-  const Control = h.load('src/features/market/MarketSortControl.tsx', {
-    '../../components/common/BottomSheetBackdrop': { __esModule: true, default: ({ visible, children }) => visible ? children : null },
-  }).default;
+  const Control = h.load('src/features/market/MarketSortControl.tsx').default;
   let choice;
-  const renderer = h.render(React.createElement(Control, { value: 'volume_desc', assetType: 'crypto', onChange: value => { choice = value; } }));
+  function Stateful() {
+    const [value, setValue] = React.useState('turnover_desc');
+    return React.createElement(Control, { value, onChange: (next) => { choice = next; setValue(next); } });
+  }
+  const renderer = h.render(React.createElement(Stateful));
   try {
-    let trigger = renderer.root.findByProps({ testID: 'market-sort-trigger' });
-    act(() => trigger.props.onPress());
-    const options = renderer.root.findAllByProps({ accessibilityRole: 'radio' });
-    // Composite and host nodes may both expose the role; inspect exact test id.
-    for (const id of ['volume_desc', 'change_desc', 'change_asc']) assert.ok(renderer.root.findByProps({ testID: `market-sort-${id}` }));
-    assert.ok(options.some(node => node.props.accessibilityState.checked));
-    assert.ok(renderer.root.findAllByType('Text').some(node => String(node.props.children).includes('코인마다 단위가 달라')));
-    act(() => renderer.root.findByProps({ testID: 'market-sort-change_asc' }).props.onPress());
+    const node = (id) => renderer.root.findByProps({ testID: `market-sort-${id}` });
+    assert.equal(node('turnover').props.accessibilityState.checked, true);
+    assert.equal(node('desc').props.accessibilityState.checked, true);
+    assert.equal(node('asc').props.accessibilityLabel, '오름차순');
+    assert.equal(node('desc').props.accessibilityLabel, '내림차순');
+    act(() => node('asc').props.onPress());
+    assert.equal(choice, 'turnover_asc');
+    act(() => node('changeRate').props.onPress());
     assert.equal(choice, 'change_asc');
-    trigger = renderer.root.findByProps({ testID: 'market-sort-trigger' });
-    assert.equal(trigger.props.accessibilityState.expanded, false);
+    act(() => node('desc').props.onPress());
+    assert.equal(choice, 'change_desc');
+    act(() => node('turnover').props.onPress());
+    assert.equal(choice, 'turnover_desc');
+    for (const direction of ['asc', 'desc']) {
+      assert.equal(node(direction).props.style[0].minHeight, 44);
+      assert.equal(node(direction).props.style[0].minWidth, 44);
+    }
   } finally { act(() => renderer.unmount()); }
 });

@@ -53,6 +53,7 @@ async function run() {
     assert.deepEqual(clipped, [], `${name} glyph clipping`);
   };
   try {
+    if (!process.argv.includes('--market-only')) {
     for (const appearance of ['light', 'dark']) for (const width of [320, 360, 390, 430])
       for (const fontScale of [1, 2]) for (const mode of ['general', 'season']) {
         await page.setViewportSize({ width, height: 1100 });
@@ -76,6 +77,11 @@ async function run() {
           await id('home-trend-chart').locator('svg').waitFor();
           assert.equal(await id(`home-trend-range-${period}`).getAttribute('aria-selected'), 'true');
           await page.waitForFunction(id => document.querySelector(`[data-testid="${id}"]`).getBoundingClientRect().height >= 43.99, `home-trend-range-${period}`);
+          await page.waitForFunction(() => ['7d', '30d', '90d', '180d', '360d'].every(period => {
+            const element = document.querySelector(`[data-testid="home-trend-range-${period}"]`);
+            const transform = getComputedStyle(element).transform;
+            return transform === 'none' || transform === 'matrix(1, 0, 0, 1, 0, 0)';
+          }));
           for (const p of ['7d', '30d', '90d', '180d', '360d']) {
             const b = await box(`home-trend-range-${p}`);
             assert.ok(b.x >= 0 && b.x + b.width <= width && b.height >= 43.99, JSON.stringify({ p, b, width, fontScale }));
@@ -118,44 +124,58 @@ async function run() {
     await id('home-trend-toggle').click();
     await id('home-trend-chart').locator('svg').waitFor();
     assert.equal(await id('home-trend-range-30d').getAttribute('aria-selected'), 'true');
-    for (const appearance of ['light', 'dark']) for (const width of [320, 360, 390, 430]) {
+    }
+    for (const appearance of ['light', 'dark']) for (const width of [320, 360, 390, 430])
+      for (const fontScale of [1, 2]) for (const financialPreference of ['red_blue', 'green_red']) {
       await page.setViewportSize({ width, height: 844 }); await page.emulateMedia({ colorScheme: appearance });
-      await page.goto(`${base}/?screen=market`);
-      await id('market-sort-trigger').waitFor();
-      assert.match(await id('market-sort-trigger').textContent(), /거래량/);
-      for (const sort of ['change_desc', 'change_asc', 'volume_desc']) {
-        await id('market-sort-trigger').click(); await id(`market-sort-${sort}`).click();
-        await id('market-sort-trigger').waitFor();
-        const urls = await page.evaluate(() => window.fixture.transport.requests.filter(p => p.startsWith('/assets?')));
-        assert.ok(urls.some(url => {
-          const request = new URL(url, base);
-          return request.searchParams.get('sortBy') === (sort === 'volume_desc' ? 'volume' : 'changeRate') &&
-            request.searchParams.get('sortOrder') === (sort === 'change_asc' ? 'asc' : 'desc');
-        }));
-        assert.match(await id('market-sort-trigger').textContent(), sort === 'volume_desc' ? /거래량/ : sort === 'change_asc' ? /낮은순/ : /높은순/);
+      await page.goto(`${base}/?screen=market&session=closed&long=1&fontScale=${fontScale}`);
+      await id('market-sort-control').waitFor();
+      await page.evaluate(preference => window.fixture.appearance.setFinancialPreference(preference), financialPreference);
+      assert.equal(await id('market-sort-turnover').getAttribute('aria-checked'), 'true');
+      assert.equal(await id('market-sort-desc').getAttribute('aria-checked'), 'true');
+      assert.equal(await page.getByText('새로고침', { exact: true }).count(), 0);
+      for (const [criterion, direction] of [['turnover', 'asc'], ['changeRate', 'asc'], ['changeRate', 'desc'], ['turnover', 'desc']]) {
+        await id(`market-sort-${criterion}`).click(); await id(`market-sort-${direction}`).click();
+        await page.waitForFunction(({ criterion, direction }) => window.fixture.transport.requests.some(url => {
+          const p = new URL(url, location.origin).searchParams;
+          return p.get('sortBy') === criterion && p.get('sortOrder') === direction;
+        }), { criterion, direction });
+        assert.equal(await id(`market-sort-${criterion}`).getAttribute('aria-checked'), 'true');
+        assert.equal(await id(`market-sort-${direction}`).getAttribute('aria-checked'), 'true');
       }
-      await id('market-tab-crypto').click(); await id('market-sort-trigger').waitFor();
-      assert.match(await id('market-sort-trigger').textContent(), /24h/);
-      await id('market-sort-trigger').click();
-      await page.getByText(/코인마다 단위가 달라/).waitFor();
-      await page.screenshot({ path: path.join(out, `sort-${appearance}-${width}.png`) });
-      await page.getByText('닫기', { exact: true }).click();
+      await assertGlyphBounds('market-sort-control'); await assertGlyphBounds('market-session-summary');
+      for (const direction of ['asc', 'desc']) {
+        await page.waitForFunction(name => document.querySelector(`[data-testid="${name}"]`).getBoundingClientRect().height >= 43.99, `market-sort-${direction}`);
+        const b = await box(`market-sort-${direction}`);
+        assert.ok(b.x >= 0 && b.x + b.width <= width + 1 && b.height >= 43.99 && b.width >= 43.99, JSON.stringify({ b, width, fontScale, appearance, financialPreference }));
+      }
+      assert.equal(await id('market-sort-desc').locator('div').last().evaluate(el => getComputedStyle(el).color), 'rgb(255, 255, 255)');
+      for (const [assetType, tabId] of [['domestic_stock', 'domestic'], ['us_stock', 'us'], ['crypto', 'crypto']]) {
+        await id(`market-tab-${tabId}`).click();
+        await page.waitForFunction(type => window.fixture.transport.requests.some(url => new URL(url, location.origin).searchParams.get('assetType') === type), assetType);
+        await id('market-item-asset-0').waitFor();
+        await assertGlyphBounds('market-session-summary');
+        await assertGlyphBounds('market-sort-control');
+        await assertGlyphBounds('market-item-asset-0');
+        assert.match(await id('market-session-summary').textContent(), assetType === 'crypto' ? /24시간 거래/ : /휴장 · 거래 종료/);
+      }
+      assert.equal(await page.getByText(/가격 기준/).count(), 0);
+      assert.match(await id('market-session-summary').textContent(), /24시간 거래/);
+      if (fontScale === 1) await page.screenshot({ path: path.join(out, `sort-${appearance}-${width}-${financialPreference}.png`) });
       await page.evaluate(() => {
         const q = window.fixture.client.getQueryCache().findAll().find(q => q.queryKey[0] === 'market' && q.queryKey.includes('crypto'));
-        const page = q.state.data.pages[0];
-        window.fixture.firstSortSnapshot = page.sortSnapshot;
+        window.fixture.firstSortSnapshot = q.state.data.pages[0].sortSnapshot;
       });
-      await id('market-item-asset-19').scrollIntoViewIfNeeded();
-      await id('market-item-asset-20').waitFor();
+      await id('market-item-asset-19').scrollIntoViewIfNeeded(); await id('market-item-asset-20').waitFor();
       const next = await page.evaluate(() => window.fixture.transport.requests.find(p => p.includes('assetType=crypto') && p.includes('offset=20')));
       assert.equal(new URL(next, base).searchParams.get('sortSnapshot'), await page.evaluate(() => window.fixture.firstSortSnapshot));
       await theme.canvas(page, appearance);
-      records.push({ screen: 'market', appearance, width, sorts: 3, pagination: true });
+      records.push({ screen: 'market', appearance, width, fontScale, financialPreference, markets: ['domestic_stock', 'us_stock', 'crypto'], sorts: 4, pagination: true });
     }
     await page.goto(`${base}/?screen=search`);
-    await id('market-search-input').fill('삼성'); await id('market-sort-trigger').waitFor();
-    await id('market-sort-trigger').click(); await id('market-sort-change_asc').click();
-    await id('market-sort-trigger').waitFor();
+    await id('market-search-input').fill('삼성'); await id('market-sort-control').waitFor();
+    await id('market-sort-changeRate').click(); await id('market-sort-asc').click();
+    await page.waitForFunction(() => window.fixture.transport.requests.some(p => p.includes('sortBy=changeRate') && p.includes('sortOrder=asc')));
     const search = await page.evaluate(() => window.fixture.transport.requests.filter(p => p.includes('sortBy=changeRate')).at(-1));
     assert.equal(new URL(search, base).searchParams.get('search'), '삼성');
     assert.equal(new URL(search, base).searchParams.get('sortOrder'), 'asc');

@@ -143,9 +143,9 @@ async function run() {
               assert.ok(row.name.left < row.column.left, 'identity stays left of the numeric column');
               assert.ok(row.name.right + 11 <= row.column.left, 'name and numeric column never overlap');
               assert.ok(row.column.right <= width, 'numeric column stays inside the screen');
-              assert.equal(row.name.fontSize, 16 * fontScale);
-              assert.equal(row.name.label, row.name.text, 'full identity remains accessible after a three-line wrap');
-              assert.ok(row.name.height <= 72 * fontScale + 1, 'long names do not make excessively tall rows');
+              assert.equal(row.name.fontSize, 18 * fontScale);
+              assert.equal(row.name.fontWeight, '700');
+              assert.equal(row.name.label, row.name.text, 'full identity remains accessible');
               for (const value of [row.value, row.quantity, row.return]) {
                 assert.ok(Math.abs(value.right - row.column.right) < 1, 'all numeric boxes share a right edge');
                 assert.ok(Math.abs(value.glyphRight - row.column.right) < 1, 'visible numeric glyphs share a right edge');

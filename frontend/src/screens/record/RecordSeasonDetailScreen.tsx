@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { semantic } from '../../theme/tokens';
 import React, { useMemo } from 'react';
 import {
@@ -41,6 +42,7 @@ export default function RecordSeasonDetailScreen({ route, navigation }: Props) {
     queryKey: QUERY_KEYS.record.seasonDetail(seasonId),
     queryFn: () => getMySeasonRecordDetail(seasonId),
   });
+  const refresh = usePullToRefresh([detailQuery]);
 
   const viewState = useMemo(() => {
     if (detailQuery.isLoading) return 'record_detail_loading';
@@ -72,7 +74,7 @@ export default function RecordSeasonDetailScreen({ route, navigation }: Props) {
       <ErrorState
         title="시즌 전적을 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
-        onRetry={() => detailQuery.refetch()}
+        onRetry={() => { void detailQuery.refetch(); }}
       />
     );
   }
@@ -95,6 +97,7 @@ export default function RecordSeasonDetailScreen({ route, navigation }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
+        refreshControl={refresh.refreshControl}
         testID={TEST_IDS.record.seasonDetailScreen}
         contentContainerStyle={styles.content}
       >

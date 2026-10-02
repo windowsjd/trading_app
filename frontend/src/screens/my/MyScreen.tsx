@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { semantic } from '../../theme/tokens';
 import React, { useMemo } from 'react';
 import {
@@ -81,6 +82,11 @@ export default function MyScreen({ navigation }: Props) {
     queryKey: QUERY_KEYS.record.seasons({ limit: 20, offset: 0 }),
     queryFn: () => getMySeasonRecords({ limit: 20, offset: 0 }),
   });
+  const refresh = usePullToRefresh([
+    meQuery,
+    recordsQuery,
+    { ...rankingQuery, enabled: !accountsLoading && showsSeasonUi },
+  ]);
 
   const viewState = useMemo(() => {
     if (
@@ -181,7 +187,7 @@ export default function MyScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView testID={TEST_IDS.my.screen} contentContainerStyle={styles.content}>
+      <ScrollView refreshControl={refresh.refreshControl} testID={TEST_IDS.my.screen} contentContainerStyle={styles.content}>
         <View style={styles.card}>
           <View style={styles.identity}>
             <ProfileAvatar profileImageUrl={me.profileImageUrl} size={64} testID="my-profile-avatar" />

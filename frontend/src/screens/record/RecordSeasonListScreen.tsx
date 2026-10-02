@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { semantic } from '../../theme/tokens';
 import { getScreenContentStyle } from '../../theme/screenLayout';
 import React, { useMemo } from 'react';
@@ -7,6 +8,7 @@ import {
   StyleSheet,
   SafeAreaView,
   FlatList,
+  ScrollView,
   Platform,
 } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
@@ -53,6 +55,7 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
     getNextPageParam: (lastPage) => lastPage.pagination.nextOffset ?? undefined,
     initialPageParam: 0,
   });
+  const refresh = usePullToRefresh([seasonQuery, recordsQuery]);
 
   const items = useMemo(
     () => recordsQuery.data?.pages.flatMap((page) => page.items) ?? [],
@@ -92,13 +95,14 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
 
   const viewState = useMemo(() => {
     if (recordsQuery.isLoading) return 'record_list_loading';
-    if (recordsQuery.isError) return 'record_list_error';
+    if (recordsQuery.isError && !recordsQuery.data) return 'record_list_error';
     if (!items.length) return 'record_list_empty';
     if (recordsQuery.isFetchingNextPage) return 'record_list_paginating';
     return 'record_list_ready';
   }, [
     recordsQuery.isLoading,
     recordsQuery.isError,
+    recordsQuery.data,
     recordsQuery.isFetchingNextPage,
     items.length,
   ]);
@@ -127,30 +131,33 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
 
   if (viewState === 'record_list_empty') {
     return (
-      <EmptyState
-        title="아직 참여한 시즌이 없습니다."
-        message="현재 시즌에 참가하면 전적이 쌓이기 시작합니다."
-        actionLabel={
-          shouldShowJoinSeasonCta ? '현재 시즌 참가하기' : undefined
-        }
-        onAction={
-          shouldShowJoinSeasonCta
-            ? () => rootNavigation.navigate('SeasonJoin')
-            : undefined
-        }
-      />
+      <ScrollView refreshControl={refresh.refreshControl} style={styles.container} contentContainerStyle={styles.content}>
+        <EmptyState
+          title="아직 참여한 시즌이 없습니다."
+          message="현재 시즌에 참가하면 전적이 쌓이기 시작합니다."
+          actionLabel={
+            shouldShowJoinSeasonCta ? '현재 시즌 참가하기' : undefined
+          }
+          onAction={
+            shouldShowJoinSeasonCta
+              ? () => rootNavigation.navigate('SeasonJoin')
+              : undefined
+          }
+        />
+      </ScrollView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
+        refreshControl={refresh.refreshControl}
         testID={TEST_IDS.record.seasonListScreen}
         data={items}
         keyExtractor={(item) => item.seasonId}
         contentContainerStyle={styles.content}
         onEndReached={() => {
-          if (recordsQuery.hasNextPage && !recordsQuery.isFetchingNextPage) {
+          if (recordsQuery.hasNextPage && !recordsQuery.isFetching) {
             void recordsQuery.fetchNextPage();
           }
         }}

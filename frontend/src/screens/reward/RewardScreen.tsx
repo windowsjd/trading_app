@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { semantic } from '../../theme/tokens';
 import React, { useMemo } from 'react';
 import {
@@ -6,6 +7,7 @@ import {
   StyleSheet,
   SafeAreaView,
   FlatList,
+  ScrollView,
 } from '../../theme/native';
 import { useQuery } from '@tanstack/react-query';
 
@@ -35,13 +37,14 @@ export default function RewardScreen() {
     queryKey: QUERY_KEYS.reward.badges,
     queryFn: getMyBadges,
   });
+  const refresh = usePullToRefresh([rewardsQuery, badgesQuery]);
 
   const viewState = useMemo<RewardViewState>(() => {
     if (rewardsQuery.isLoading || badgesQuery.isLoading) {
       return 'reward_loading';
     }
 
-    if (rewardsQuery.isError || badgesQuery.isError || !rewardsQuery.data || !badgesQuery.data) {
+    if (!rewardsQuery.data || !badgesQuery.data) {
       return 'reward_error';
     }
 
@@ -68,15 +71,13 @@ export default function RewardScreen() {
   }, [
     rewardsQuery.isLoading,
     badgesQuery.isLoading,
-    rewardsQuery.isError,
-    badgesQuery.isError,
     rewardsQuery.data,
     badgesQuery.data,
   ]);
 
   const retryAll = () => {
-    rewardsQuery.refetch();
-    badgesQuery.refetch();
+    void rewardsQuery.refetch();
+    void badgesQuery.refetch();
   };
 
   if (viewState === 'reward_loading') {
@@ -105,10 +106,12 @@ export default function RewardScreen() {
 
   if (viewState === 'reward_pending') {
     return (
-      <EmptyState
-        title="보상 지급 대기 중입니다."
-        message="시즌 결과와 지급 상태가 확정되면 보상과 뱃지가 표시됩니다."
-      />
+      <ScrollView refreshControl={refresh.refreshControl} style={styles.container} contentContainerStyle={styles.content}>
+        <EmptyState
+          title="보상 지급 대기 중입니다."
+          message="시즌 결과와 지급 상태가 확정되면 보상과 뱃지가 표시됩니다."
+        />
+      </ScrollView>
     );
   }
 
@@ -118,10 +121,12 @@ export default function RewardScreen() {
     !badgesQuery.data
   ) {
     return (
-      <EmptyState
-        title="아직 획득한 보상이 없습니다."
-        message="시즌 종료와 정산 후 보상과 뱃지가 여기에 표시됩니다."
-      />
+      <ScrollView refreshControl={refresh.refreshControl} style={styles.container} contentContainerStyle={styles.content}>
+        <EmptyState
+          title="아직 획득한 보상이 없습니다."
+          message="시즌 종료와 정산 후 보상과 뱃지가 여기에 표시됩니다."
+        />
+      </ScrollView>
     );
   }
 
@@ -131,6 +136,7 @@ export default function RewardScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
+        refreshControl={refresh.refreshControl}
         testID={TEST_IDS.reward.screen}
         data={rewardItems}
         keyExtractor={(item) => `${item.seasonId}-${item.rewardCode}`}

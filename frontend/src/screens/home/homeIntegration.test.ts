@@ -40,6 +40,10 @@ describe('Home asset hierarchy and real portfolio/ranking/me sources', () => {
       assert.ok(texts(tree).includes('-2,345'));
       const detail = textNodes.find((node) => texts(node) === '보유 종목');
       assert.ok(textNodes.indexOf(total) < textNodes.indexOf(detail));
+      assert.equal(detail.props.style.fontSize, 18);
+      assert.equal(detail.props.style.lineHeight, 27);
+      assert.equal(detail.props.style.fontWeight, '700');
+      assert.equal(detail.props.accessibilityRole, 'header');
       const nickname = textNodes.find((node) => node.props.testID === TEST_IDS.home.nickname);
       const rank = textNodes.find((node) => node.props.testID === TEST_IDS.home.rank);
       const tier = textNodes.find((node) => node.props.testID === TEST_IDS.home.tier);

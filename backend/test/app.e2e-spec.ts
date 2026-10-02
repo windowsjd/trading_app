@@ -4403,7 +4403,7 @@ describe('AppController (e2e)', () => {
       prisma.asset.findMany.mockResolvedValue(assets);
       prisma.assetPriceSnapshot.findMany.mockResolvedValue([]);
       prisma.assetPriceSnapshot.findFirst.mockResolvedValue(null);
-      const path = '/api/v1/assets?sortBy=volume&limit=1';
+      const path = '/api/v1/assets?sortBy=turnover&limit=1';
       const read = async (role: string, id: string, suffix = '') => {
         mockActiveUser(id, role);
         return request(app.getHttpServer())
@@ -4480,13 +4480,13 @@ describe('AppController (e2e)', () => {
       ['limit=0', 'INVALID_LIMIT'],
       ['withPrice=yes', 'INVALID_WITH_PRICE'],
       ['sortBy=amount', 'INVALID_ASSET_SORT'],
-      ['sortBy=volume&sortOrder=asc', 'INVALID_ASSET_SORT'],
+      ['sortBy=volume', 'INVALID_ASSET_SORT'],
       ['sortBy=changeRate&sortOrder=sideways', 'INVALID_ASSET_SORT'],
-      ['sortBy=volume&withPrice=false', 'INVALID_ASSET_SORT'],
-      ['sortBy=volume&offset=20', 'INVALID_SORT_SNAPSHOT'],
+      ['sortBy=turnover&withPrice=false', 'INVALID_ASSET_SORT'],
+      ['sortBy=turnover&offset=20', 'INVALID_SORT_SNAPSHOT'],
       ['sortRefresh=true', 'INVALID_ASSET_SORT'],
-      ['sortBy=volume&sortRefresh=yes', 'INVALID_ASSET_SORT'],
-      ['sortBy=volume&sortRefresh=true&offset=2', 'INVALID_ASSET_SORT'],
+      ['sortBy=turnover&sortRefresh=yes', 'INVALID_ASSET_SORT'],
+      ['sortBy=turnover&sortRefresh=true&offset=2', 'INVALID_ASSET_SORT'],
       ['includeInactive=1', 'INVALID_INCLUDE_INACTIVE'],
       ['assetType=CRYPTO', 'INVALID_ASSET_TYPE'],
       ['currencyCode=EUR', 'INVALID_CURRENCY_CODE'],

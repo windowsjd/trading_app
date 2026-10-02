@@ -106,7 +106,9 @@ describe('selected account Wallet and shared Home holdings', () => {
     });
   }
   it('fails closed on integrity errors while transient failures stay local and retryable', (t) => {
-    const h = createHomeHarness(); t.after(h.close); h.seed(h.account, { points: [] }); h.renderWallet();
+    const h = createHomeHarness(); t.after(h.close); h.seed(h.account, { points: [] });
+    h.client.setQueryData(QUERY_KEYS.tradingAccount.holdings(h.account.id), { tradingAccountId: h.account.id, positions: [holding('0')] });
+    h.renderWallet();
     const query = h.client.getQueryCache().find({ queryKey: QUERY_KEYS.tradingAccount.holdings(h.account.id) });
     query.setState({ status: 'error', error: new HoldingsContractError() });
     const failed = h.renderWallet().tree;
@@ -115,6 +117,8 @@ describe('selected account Wallet and shared Home holdings', () => {
     query.setState({ status: 'error', error: new Error('offline') });
     const transient = h.renderWallet().tree;
     assert.ok(find(transient, 'home-summary-card'));
-    assert.ok(elements(transient, 'ErrorState').some((node) => node.props.title === '보유 종목을 불러오지 못했습니다.' && node.props.onRetry));
+    assert.ok(find(transient, 'wallet-composition'));
+    assert.equal(elements(transient, 'ErrorState').length, 0, 'ordinary refresh failure retains last good holdings');
+    assert.ok(find(transient, 'wallet-position-0'));
   });
 });

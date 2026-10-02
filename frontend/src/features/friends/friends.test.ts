@@ -15,7 +15,7 @@ function screenHarness() {
   const query: any = { data: { pages: [{ users: [user], pagination: { nextOffset: null } }] }, refetch: async () => {}, hasNextPage: false };
   const h: any = { mutations, navigations, alerts, query, option: null, mutationOption: null };
   const Screen = load(resolve('src/screens/friends/FriendsScreen.tsx'), {
-    react: { ...React, useCallback: (fn: any) => fn, useState: (initial: any) => { const i = index++; if (!(i in slots)) slots[i] = initial; return [slots[i], (value: any) => { slots[i] = value; }]; } },
+    react: { ...React, useRef: (value: any) => ({ current: value }), useEffect() {}, useCallback: (fn: any) => fn, useState: (initial: any) => { const i = index++; if (!(i in slots)) slots[i] = initial; return [slots[i], (value: any) => { slots[i] = value; }]; } },
     'react-native': { FlatList: 'FlatList', View: 'View', Text: 'Text', Image: 'Image', TextInput: 'TextInput', StyleSheet: { create: (value: any) => value }, Alert: { alert: (...args: any[]) => alerts.push(args) } },
     '@react-navigation/native': { useFocusEffect: () => {} },
     '@tanstack/react-query': { useQueryClient: () => ({}), useInfiniteQuery: (option: any) => { h.option = option; return query; }, useMutation: (option: any) => { h.mutationOption = option; return { mutate: (value: any) => mutations.push(value) }; } },

@@ -185,6 +185,7 @@ function inlineTradingHarness() {
         'Text',
         'SafeAreaView',
         'ScrollView',
+        'RefreshControl',
         'TextInput',
         'KeyboardAvoidingView',
         'Pressable',
@@ -195,6 +196,7 @@ function inlineTradingHarness() {
     AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
     useWindowDimensions: () => h.dimensions,
   };
+  native.ScrollView = ({ refreshControl, children, ...props }) => React.createElement('ScrollView', props, refreshControl, children);
   const nav = {
     navigate: (...args) => h.navigation.push(args),
     goBack: () => h.navigation.push(['back']),

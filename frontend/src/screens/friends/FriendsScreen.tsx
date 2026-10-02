@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
 import { semantic } from '../../theme/tokens';
 import React, { useCallback, useState } from 'react';
@@ -53,6 +54,8 @@ export default function FriendsScreen({ navigation }: Props) {
     getNextPageParam: (page) => page.pagination.nextOffset ?? undefined,
     enabled: tab !== 'search' || search.length > 0,
   });
+  const refresh = usePullToRefresh([{ ...query, enabled: tab !== 'search' || search.length > 0 }]);
+
   const { refetch } = query;
   useFocusEffect(
     useCallback(() => {
@@ -96,14 +99,11 @@ export default function FriendsScreen({ navigation }: Props) {
   };
   return (
     <FlatList
+      refreshControl={refresh.refreshControl}
       style={styles.screen}
       contentContainerStyle={styles.content}
       data={rows}
       keyExtractor={(user) => user.userId}
-      refreshing={query.isRefetching}
-      onRefresh={() => {
-        if (tab !== 'search' || search) void refetch();
-      }}
       ListHeaderComponent={
         <View style={[styles.header, styles.headerCard]}>
           <View style={styles.actions}>

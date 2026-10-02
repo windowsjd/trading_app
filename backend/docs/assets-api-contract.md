@@ -425,8 +425,8 @@ Trading note policy:
 - Binance authenticated API.
 ## Market list sorting (2026-10-02)
 
-`GET /api/v1/assets` accepts additive `sortBy=volume|changeRate` and
-`sortOrder=asc|desc` (volume supports desc). Omitted sorting keeps symbol/id ASC.
+`GET /api/v1/assets` accepts additive `sortBy=turnover|changeRate` and
+`sortOrder=asc|desc` (both criteria support asc and desc). Omitted sorting keeps symbol/id ASC.
 Explicit sorting requires `withPrice=true`. All matching assets, including search
 results, are priced using the existing selector, sorted with Decimal comparisons,
 then paginated. Null metrics sort last in both directions; ties use symbol/id ASC.
@@ -454,12 +454,28 @@ stored in a shared result. Operators receive the same public presentation as use
 Concurrent identical misses coalesce per process; simultaneous misses on different
 instances can each build an immutable result without a distributed lock.
 
-Sorted list items expose nullable decimal-string `volume` and `volumePeriod`
-(`session` or `rolling_24h`). Volume comes only from the selected eligible provider
-price snapshot: KIS domestic ACML_VOL / exact-date daily-close acml_vol, KIS US TVOL (REST current-price acml_vol / tvol),
-Binance REST volume / WebSocket ticker v. Stocks mean cumulative shares in the selected session
-(latest completed session when closed), crypto means rolling 24-hour base units.
-These are quantity, never quoteVolume/amount. Across crypto symbols the base units
-differ; all-market search mixes periods, so the UI explicitly describes the basis.
-Missing, truncated, invalid or manual-source evidence yields null, never zero or a
-fabricated candle aggregation. No price/source/calendar/return calculation changes.
+Sorted list items expose nullable decimal-string `turnover` and `turnoverPeriod`
+(`session` or `rolling_24h`). Turnover comes only from the selected eligible
+provider price snapshot's stored, untruncated evidence:
+
+- KRX: WebSocket ACML_TR_PBMN, REST current-price acml_tr_pbmn, or exact-date
+  session-close acml_tr_pbmn; cumulative session notional in KRW.
+- US: WebSocket TAMT or REST current-price tamt; cumulative session notional in
+  USD, with the existing delayed-feed semantics.
+- Crypto: Binance REST 24hr ticker quoteVolume or WebSocket 24hr ticker q;
+  rolling 24-hour USDT notional, following the existing USDT-as-USD policy.
+  This is not a UTC calendar-day candle amount.
+
+Closed stocks use the last eligible observation from the latest completed
+session under the existing price selector. The last observation is not guaranteed
+to be the final full-session aggregate. Missing, truncated, invalid, unsupported
+or manual evidence yields null, never zero. Quantity/volume, price-times-volume
+and candle aggregations are not turnover fallbacks. No FX conversion is introduced
+for sorting. All-market search keeps the existing name/symbol filter and sorts its
+matches by the chosen native metric; it does not introduce relevance ranking or
+cross-currency conversion. The removed volume sort is rejected rather than aliased.
+
+Provider field references: [KIS domestic current price](https://github.com/koreainvestment/open-trading-api/blob/main/examples_llm/domestic_stock/inquire_price/chk_inquire_price.py),
+[KIS overseas current price](https://github.com/koreainvestment/open-trading-api/blob/main/examples_llm/overseas_stock/price/chk_price.py),
+[Binance REST](https://github.com/binance/binance-spot-api-docs/blob/master/rest-api.md),
+[Binance streams](https://github.com/binance/binance-spot-api-docs/blob/master/web-socket-streams.md).

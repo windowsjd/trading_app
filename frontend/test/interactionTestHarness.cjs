@@ -30,7 +30,7 @@ function interactionHarness(platform = 'android') {
     }, typeof children === 'function' ? children({ pressed }) : children);
   }
   h.native = {
-    Pressable, View: 'View', Text: 'Text', Modal: 'Modal', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator',
+    RefreshControl: 'RefreshControl', Pressable, View: 'View', Text: 'Text', Modal: 'Modal', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator',
     StyleSheet: { create: (s) => s, flatten, absoluteFillObject: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 } },
     Platform: { OS: platform }, Easing: { out: (fn) => fn, quad: (n) => n * n },
     processColor: (color) => {

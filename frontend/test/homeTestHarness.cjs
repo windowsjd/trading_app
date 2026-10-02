@@ -48,7 +48,7 @@ function createHomeHarness(mode = 'general') {
     },
   );
   const native = Object.fromEntries(
-    ['View', 'Text', 'Pressable', 'ScrollView', 'SafeAreaView'].map((name) => [
+    ['View', 'Text', 'Pressable', 'ScrollView', 'SafeAreaView', 'RefreshControl'].map((name) => [
       name,
       name,
     ]),
@@ -61,7 +61,7 @@ function createHomeHarness(mode = 'general') {
   let stateAccount = h.account.id;
   let states = [];
   const mocks = {
-    react: { ...React, useMemo: (fn) => fn(), useState: (initial) => {
+    react: { ...React, useRef: (value) => ({ current: value }), useEffect() {}, useMemo: (fn) => fn(), useState: (initial) => {
       const index = stateIndex++;
       if (!(index in states)) states[index] = typeof initial === 'function' ? initial() : initial;
       return [states[index], (value) => { states[index] = typeof value === 'function' ? value(states[index]) : value; }];

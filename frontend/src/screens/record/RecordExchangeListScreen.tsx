@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { semantic } from '../../theme/tokens';
 import React, { useMemo } from 'react';
 import {
@@ -39,6 +40,7 @@ export default function RecordExchangeListScreen({ route }: Props) {
     getNextPageParam: (lastPage) => lastPage.pagination.nextOffset ?? undefined,
     initialPageParam: 0,
   });
+  const refresh = usePullToRefresh([exchangesQuery]);
 
   const items = useMemo(
     () => exchangesQuery.data?.pages.flatMap((page) => page.items) ?? [],
@@ -47,13 +49,14 @@ export default function RecordExchangeListScreen({ route }: Props) {
 
   const viewState = useMemo(() => {
     if (exchangesQuery.isLoading) return 'record_exchanges_loading';
-    if (exchangesQuery.isError) return 'record_exchanges_error';
+    if (exchangesQuery.isError && !exchangesQuery.data) return 'record_exchanges_error';
     if (!items.length) return 'record_exchanges_empty';
     if (exchangesQuery.isFetchingNextPage) return 'record_exchanges_paginating';
     return 'record_exchanges_ready';
   }, [
     exchangesQuery.isLoading,
     exchangesQuery.isError,
+    exchangesQuery.data,
     exchangesQuery.isFetchingNextPage,
     items.length,
   ]);
@@ -67,7 +70,7 @@ export default function RecordExchangeListScreen({ route }: Props) {
       <ErrorState
         title="환전 내역을 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
-        onRetry={() => exchangesQuery.refetch()}
+        onRetry={() => { void exchangesQuery.refetch(); }}
       />
     );
   }
@@ -75,13 +78,14 @@ export default function RecordExchangeListScreen({ route }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
+        refreshControl={refresh.refreshControl}
         testID={TEST_IDS.record.exchangeListScreen}
         data={items}
         keyExtractor={(item) => getRecordExchangeDisplay(item).key}
         contentContainerStyle={styles.content}
         onEndReached={() => {
-          if (exchangesQuery.hasNextPage && !exchangesQuery.isFetchingNextPage) {
-            exchangesQuery.fetchNextPage();
+          if (exchangesQuery.hasNextPage && !exchangesQuery.isFetching) {
+            void exchangesQuery.fetchNextPage();
           }
         }}
         onEndReachedThreshold={0.4}

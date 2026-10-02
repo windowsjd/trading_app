@@ -1903,7 +1903,10 @@ describe('AssetsService', () => {
               truncated: false,
               payload: {
                 messageType: 'websocket_trade',
-                rawFields: { ACML_VOL: i === 2 ? '' : String(i * 100) },
+                rawFields: {
+                  ACML_VOL: String(1000 - i),
+                  ACML_TR_PBMN: i === 2 ? '' : String(i * 100),
+                },
               },
             },
           }));
@@ -1923,7 +1926,8 @@ describe('AssetsService', () => {
     it.each([
       ['changeRate', 'desc', ['a1', 'a5', 'a6', 'a3', 'a0', 'a4', 'a2']],
       ['changeRate', 'asc', ['a4', 'a0', 'a3', 'a5', 'a6', 'a1', 'a2']],
-      ['volume', 'desc', ['a6', 'a5', 'a4', 'a3', 'a1', 'a0', 'a2']],
+      ['turnover', 'desc', ['a6', 'a5', 'a4', 'a3', 'a1', 'a0', 'a2']],
+      ['turnover', 'asc', ['a0', 'a1', 'a3', 'a4', 'a5', 'a6', 'a2']],
     ])(
       '%s %s sorts before pagination, with unavailable last and stable ties',
       async (sortBy, sortOrder, expected) => {
@@ -1982,7 +1986,7 @@ describe('AssetsService', () => {
       };
       try {
         const first = sortedSetup(redis);
-        const query = { sortBy: 'volume', limit: '2' };
+        const query = { sortBy: 'turnover', limit: '2' };
         const page = (await first.service.getAssets('user', query)).data;
         const other = createService(undefined, redis);
         const next = (
@@ -2027,7 +2031,7 @@ describe('AssetsService', () => {
         );
         const read = (i: number) =>
           h.service.getAssets(`user-${i}`, {
-            sortBy: 'volume',
+            sortBy: 'turnover',
             limit: String((i % 10) + 1),
           });
         const pages = concurrent
@@ -2046,13 +2050,13 @@ describe('AssetsService', () => {
       h.prisma.asset.findMany.mockRejectedValueOnce(new Error('DB failed'));
       const results = await Promise.allSettled(
         Array.from({ length: 10 }, () =>
-          h.service.getAssets('a', { sortBy: 'volume' }),
+          h.service.getAssets('a', { sortBy: 'turnover' }),
         ),
       );
       expect(results.every((r) => r.status === 'rejected')).toBe(true);
       expect(h.prisma.asset.findMany).toHaveBeenCalledTimes(1);
       expect(
-        (await h.service.getAssets('b', { sortBy: 'volume' })).data.assets,
+        (await h.service.getAssets('b', { sortBy: 'turnover' })).data.assets,
       ).toHaveLength(7);
       expect(h.prisma.asset.findMany).toHaveBeenCalledTimes(2);
     });
@@ -2065,7 +2069,7 @@ describe('AssetsService', () => {
       { sortBy: 'changeRate' },
     ])('isolates filter %j', async (changed) => {
       const h = sortedSetup();
-      const q = { sortBy: 'volume', assetType: 'domestic_stock' };
+      const q = { sortBy: 'turnover', assetType: 'domestic_stock' };
       const first = (await h.service.getAssets('a', q)).data;
       expect(
         (await h.service.getAssets('b', { ...q, ...changed })).data
@@ -2124,7 +2128,7 @@ describe('AssetsService', () => {
     });
     it('refreshes immediately and after two seconds without perturbing older pages', async () => {
       const h = sortedSetup();
-      const q = { sortBy: 'volume', limit: '2' };
+      const q = { sortBy: 'turnover', limit: '2' };
       const first = (await h.service.getAssets('a', q)).data;
       h.prisma.asset.findMany.mockResolvedValue([]);
       const fresh = (
@@ -2154,11 +2158,11 @@ describe('AssetsService', () => {
       const h = createService();
       h.prisma.asset.findMany.mockResolvedValue([]);
       const first = (
-        await h.service.getAssets('a', { sortBy: 'volume', search: 'S' })
+        await h.service.getAssets('a', { sortBy: 'turnover', search: 'S' })
       ).data;
       for (let i = 0; i < 210; i++)
         await h.service.getAssets('a', {
-          sortBy: 'volume',
+          sortBy: 'turnover',
           search: `prefix-${i}`,
         });
       const cache = (
@@ -2167,7 +2171,7 @@ describe('AssetsService', () => {
       expect(cache.size).toBe(200);
       await expectApiError(
         h.service.getAssets('a', {
-          sortBy: 'volume',
+          sortBy: 'turnover',
           search: 'S',
           offset: '2',
           sortSnapshot: first.sortSnapshot,
@@ -2176,7 +2180,7 @@ describe('AssetsService', () => {
         'ASSET_SORT_SNAPSHOT_EXPIRED',
       );
       jest.setSystemTime(new Date(testNow.getTime() + 600001));
-      await h.service.getAssets('a', { sortBy: 'volume' });
+      await h.service.getAssets('a', { sortBy: 'turnover' });
       expect(cache.size).toBe(1);
     });
     it('retains local pages during Redis read/write outage; missing remote token restarts', async () => {
@@ -2188,7 +2192,7 @@ describe('AssetsService', () => {
       };
       try {
         const h = sortedSetup(redis);
-        const q = { sortBy: 'volume', limit: '2' };
+        const q = { sortBy: 'turnover', limit: '2' };
         const first = (await h.service.getAssets('a', q)).data;
         expect(
           (
@@ -2238,7 +2242,7 @@ describe('AssetsService', () => {
             { setHeader: jest.fn() } as never,
             () => {
               pending = h.service.getAssets(role, {
-                sortBy: 'volume',
+                sortBy: 'turnover',
                 sortSnapshot,
               });
             },
@@ -2283,7 +2287,7 @@ describe('AssetsService', () => {
       const h = createService();
       h.prisma.asset.findMany.mockResolvedValue([asset({ id: 'corrected' })]);
       h.prisma.assetPriceSnapshot.findFirst.mockResolvedValue(null);
-      const first = (await h.service.getAssets('user', { sortBy: 'volume' }))
+      const first = (await h.service.getAssets('user', { sortBy: 'turnover' }))
         .data;
       h.prisma.assetPriceSnapshot.findFirst.mockResolvedValue(
         priceSnapshot('correction', '100'),
@@ -2299,7 +2303,7 @@ describe('AssetsService', () => {
         { setHeader: jest.fn() } as never,
         () => {
           pending = h.service.getAssets('admin', {
-            sortBy: 'volume',
+            sortBy: 'turnover',
             sortSnapshot: first.sortSnapshot,
           });
         },
@@ -2361,7 +2365,7 @@ describe('AssetsService', () => {
           { setHeader: jest.fn() } as never,
           () => {
             pending = h.service.getAssets('same-user', {
-              sortBy: 'volume',
+              sortBy: 'turnover',
               limit: '1',
               sortSnapshot: token,
               offset,
@@ -2397,7 +2401,7 @@ describe('AssetsService', () => {
         store.set('assets:sort:public:v1:' + page.sortSnapshot, '{broken');
         await expectApiError(
           createService(undefined, redis).service.getAssets('user', {
-            sortBy: 'volume',
+            sortBy: 'turnover',
             sortSnapshot: page.sortSnapshot,
           }),
           409,
@@ -2411,11 +2415,11 @@ describe('AssetsService', () => {
 
     it('rejects invalid/expired/mismatched continuations instead of changing page order', async () => {
       const h = sortedSetup();
-      const query = { sortBy: 'volume', sortOrder: 'desc' };
+      const query = { sortBy: 'turnover', sortOrder: 'desc' };
       const first = (await h.service.getAssets('user', query)).data;
       for (const changed of [
         { sortBy: 'other' },
-        { sortOrder: 'asc' },
+        { sortBy: 'volume' },
         { withPrice: 'false' },
         { withPrice: ' false ' },
         { sortRefresh: 'yes' },

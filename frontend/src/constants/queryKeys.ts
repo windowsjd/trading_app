@@ -69,7 +69,7 @@ export const QUERY_KEYS = {
 
   market: {
     assets: (params: {
-      sortBy?: 'volume' | 'changeRate';
+      sortBy?: 'turnover' | 'changeRate';
       sortOrder?: 'asc' | 'desc';
       assetType?: string;
       search?: string;

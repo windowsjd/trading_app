@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { semantic } from '../../theme/tokens';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform } from '../../theme/native';
@@ -95,6 +96,11 @@ export default function GeneralAccountHome({
     queryFn: () => getTradingAccountEquity(accountId, equityRange, 'daily'),
     enabled: trendExpanded,
   });
+  const refresh = usePullToRefresh([
+    portfolioQuery,
+    positionsQuery,
+    { ...equityQuery, enabled: trendExpanded },
+  ]);
 
   // Fail closed on structural errors in every account-scoped section.
   const integrityFailure = findAccountIntegrityFailure([
@@ -134,7 +140,7 @@ export default function GeneralAccountHome({
     return <SectionSkeleton lines={6} />;
   }
 
-  if (portfolioQuery.isError || !portfolioQuery.data) {
+  if (!portfolioQuery.data) {
     return (
       <ErrorState
         title="계정 정보를 불러오지 못했습니다."
@@ -157,6 +163,7 @@ export default function GeneralAccountHome({
 
   return (
     <ScrollView
+      refreshControl={refresh.refreshControl}
       testID={TEST_IDS.tradingAccount.generalSummary}
       contentContainerStyle={styles.content}
     >
@@ -182,11 +189,11 @@ export default function GeneralAccountHome({
         general
       />
 
-      <View testID="home-holdings" style={styles.card}>
-        <Text style={styles.label}>보유 종목</Text>
+      <View testID="home-holdings" style={[styles.card, styles.holdingsCard]}>
+        <Text accessibilityRole="header" style={styles.holdingsTitle}>보유 종목</Text>
         {positionsQuery.isLoading ? (
           <SectionSkeleton lines={3} />
-        ) : positionsQuery.isError ? (
+        ) : positionsQuery.isError && !positionsQuery.data ? (
           <InlineEmptyState message="보유 종목을 불러오지 못했습니다." />
         ) : !positions ? (
           <InlineEmptyState message="보유 종목을 확인할 수 없습니다." />
@@ -258,6 +265,8 @@ const styles = StyleSheet.create({
     backgroundColor: semantic.surface,
     gap: 8,
   },
+  holdingsCard: { paddingVertical: 10, gap: 4 },
+  holdingsTitle: { fontSize: 18, lineHeight: 27, fontWeight: '700', color: semantic.text },
   label: { fontSize: 13, color: semantic.secondary },
   helper: { fontSize: 14, color: semantic.secondary, lineHeight: 21 },
   note: { fontSize: 13, color: semantic.warning, lineHeight: 19 },

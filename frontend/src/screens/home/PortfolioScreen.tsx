@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { semantic } from '../../theme/tokens';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -176,6 +177,11 @@ export default function PortfolioScreen({ navigation }: Props) {
     queryFn: () => getTradingAccountEquity(accountId, range),
     enabled: hasAccount && isPortfolioAvailable,
   });
+  const refresh = usePullToRefresh([
+    { ...overviewQuery, enabled: hasAccount },
+    { ...positionsQuery, enabled: hasAccount },
+    { ...equityQuery, enabled: hasAccount && isPortfolioAvailable },
+  ]);
 
   // A selected account the server no longer recognises as ours (unknown id, or
   // another user's) is not an error screen: refresh the owned list and let the
@@ -220,7 +226,7 @@ export default function PortfolioScreen({ navigation }: Props) {
       return 'portfolio_loading';
     }
 
-    if (overviewQuery.isError || !overviewQuery.data) {
+    if (!overviewQuery.data) {
       return 'portfolio_error';
     }
 
@@ -238,7 +244,6 @@ export default function PortfolioScreen({ navigation }: Props) {
     return 'portfolio_ready';
   }, [
     overviewQuery.isLoading,
-    overviewQuery.isError,
     overviewQuery.data,
     isPortfolioAvailable,
     positionsQuery.isError,
@@ -344,6 +349,7 @@ export default function PortfolioScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
+        refreshControl={refresh.refreshControl}
         testID={TEST_IDS.portfolio.screen}
         data={positions}
         keyExtractor={(item) => item.positionId}
@@ -351,7 +357,7 @@ export default function PortfolioScreen({ navigation }: Props) {
         onEndReached={() => {
           if (
             positionsQuery.hasNextPage &&
-            !positionsQuery.isFetchingNextPage
+            !positionsQuery.isFetching
           ) {
             void positionsQuery.fetchNextPage();
           }
@@ -435,7 +441,7 @@ export default function PortfolioScreen({ navigation }: Props) {
 
                 {equityQuery.isLoading ? (
                   <SectionSkeleton lines={5} />
-                ) : equityQuery.isError ? (
+                ) : equityQuery.isError && !equityQuery.data ? (
                   <View style={styles.sectionFallback}>
                     <InlineEmptyState
                       title="자산 추이를 불러오지 못했습니다."
@@ -487,7 +493,7 @@ export default function PortfolioScreen({ navigation }: Props) {
         ListEmptyComponent={
           positionsQuery.isLoading ? (
             <SectionSkeleton lines={4} />
-          ) : positionsQuery.isError ? (
+          ) : positionsQuery.isError && !positionsQuery.data ? (
             <View style={styles.sectionFallback}>
               <InlineEmptyState
                 title="보유 포지션을 불러오지 못했습니다."

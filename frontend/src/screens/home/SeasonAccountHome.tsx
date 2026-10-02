@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { semantic } from '../../theme/tokens';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, useWindowDimensions, Platform } from '../../theme/native';
@@ -139,6 +140,13 @@ export default function SeasonAccountHome({
       }),
     enabled: !!season?.seasonId,
   });
+  const refresh = usePullToRefresh([
+    portfolioQuery,
+    positionsQuery,
+    meQuery,
+    { ...equityQuery, enabled: trendExpanded },
+    { ...rankingQuery, enabled: !!season?.seasonId },
+  ]);
 
   // Fail closed on structural errors in every account-scoped section.
   const integrityFailure = findAccountIntegrityFailure([
@@ -184,7 +192,7 @@ export default function SeasonAccountHome({
     return <SectionSkeleton lines={6} />;
   }
 
-  if (portfolioQuery.isError || !portfolioQuery.data) {
+  if (!portfolioQuery.data) {
     return (
       <ErrorState
         title="계정 정보를 불러오지 못했습니다."
@@ -209,6 +217,7 @@ export default function SeasonAccountHome({
 
   return (
     <ScrollView
+      refreshControl={refresh.refreshControl}
       testID={TEST_IDS.tradingAccount.seasonSummary}
       contentContainerStyle={styles.content}
     >
@@ -249,7 +258,7 @@ export default function SeasonAccountHome({
       <View testID={TEST_IDS.home.competition} style={styles.card}>
         {meQuery.isLoading ? (
           <SectionSkeleton lines={1} />
-        ) : meQuery.isError || !meQuery.data ? (
+        ) : !meQuery.data ? (
           <InlineEmptyState message="사용자 정보를 불러오지 못했습니다." />
         ) : (
           <View style={styles.identity}>
@@ -281,15 +290,15 @@ export default function SeasonAccountHome({
         </View>
       </View>
 
-      {rankingQuery.isError ? (
+      {rankingQuery.isError && !rankingQuery.data ? (
         <InlineEmptyState message="랭킹 정보를 불러오지 못했습니다. 자산 정보는 위에 표시된 값이 최신입니다." />
       ) : null}
 
-      <View testID="home-holdings" style={styles.card}>
-        <Text style={styles.label}>보유 종목</Text>
+      <View testID="home-holdings" style={[styles.card, styles.holdingsCard]}>
+        <Text accessibilityRole="header" style={styles.holdingsTitle}>보유 종목</Text>
         {positionsQuery.isLoading ? (
           <SectionSkeleton lines={3} />
-        ) : positionsQuery.isError ? (
+        ) : positionsQuery.isError && !positionsQuery.data ? (
           <InlineEmptyState message="보유 종목을 불러오지 못했습니다." />
         ) : !positions ? (
           <InlineEmptyState message="보유 종목을 확인할 수 없습니다." />
@@ -334,6 +343,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
   // Each value can wrap within its track; narrow rows can stack the tracks.
   flex: { flexGrow: 1, minWidth: 0, gap: 4 },
+  holdingsCard: { paddingVertical: 10, gap: 4 },
+  holdingsTitle: { fontSize: 18, lineHeight: 27, fontWeight: '700', color: semantic.text },
   label: { fontSize: 13, color: semantic.secondary },
   identity: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   nickname: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: '600', lineHeight: 23 },

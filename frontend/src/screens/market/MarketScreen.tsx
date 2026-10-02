@@ -1,5 +1,6 @@
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import MarketSortControl from '../../features/market/MarketSortControl';
-import { marketSortParams, nextMarketPage, type MarketSort, type MarketPageParam } from '../../features/market/marketSort';
+import { marketSortParams, nextMarketPage, type MarketSort } from '../../features/market/marketSort';
 import { semantic } from '../../theme/tokens';
 import { getScreenContentStyle } from '../../theme/screenLayout';
 import { getMarketSessionLabel } from '../../features/market/marketPresentation';
@@ -42,12 +43,10 @@ const TABS: Array<{ key: AssetType; label: string }> = [
   { key: 'crypto', label: '암호화폐' },
 ];
 
-const CRYPTO_PRICE_BASIS_TEXT = '가격 기준: Binance Spot 최근 체결가';
-
 export default function MarketScreen({ navigation }: Props) {
   const isAdmin = useAdminDiagnostics();
   const [selectedTab, setSelectedTab] = useState<AssetType>('domestic_stock');
-  const [sort, setSort] = useState<MarketSort>('volume_desc');
+  const [sort, setSort] = useState<MarketSort>('turnover_desc');
   const sortParams = marketSortParams(sort);
   const refreshSort = useRef(false);
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
@@ -71,8 +70,12 @@ export default function MarketScreen({ navigation }: Props) {
         limit: 20,
       }),
     getNextPageParam: nextMarketPage,
-    initialPageParam: { offset: 0 } as MarketPageParam,
+    initialPageParam: { offset: 0 },
   });
+
+  const refresh = usePullToRefresh([marketQuery],
+    () => { refreshSort.current = true; },
+    () => { refreshSort.current = false; });
 
   // REST is the baseline and stays untouched: rows receive their ticker as a
   // separate prop and merge it themselves, so one asset's tick never rebuilds
@@ -151,13 +154,7 @@ export default function MarketScreen({ navigation }: Props) {
           }
         }}
         onEndReachedThreshold={0.4}
-        refreshing={marketQuery.isRefetching}
-        onRefresh={() => {
-          refreshSort.current = true;
-          void marketQuery.refetch().finally(() => {
-            refreshSort.current = false;
-          });
-        }}
+        refreshControl={refresh.refreshControl}
         ListHeaderComponent={
           <View style={styles.headerSection}>
             <View style={styles.tabRow}>
@@ -194,21 +191,11 @@ export default function MarketScreen({ navigation }: Props) {
               <Text style={styles.searchEntryText}>종목명 또는 심볼 검색</Text>
             </ActionPressable>
 
-            {selectedTab === 'crypto' ? (
-              <Text style={styles.priceBasisText}>
-                {CRYPTO_PRICE_BASIS_TEXT}
+            <View style={styles.toolbar}>
+              <Text testID="market-session-summary" style={styles.sessionSummary}>
+                {getMarketSessionLabel(selectedTab, items, tickersByAssetId)}
               </Text>
-            ) : null}
-
-            <Text testID="market-session-summary" style={styles.sessionSummary}>
-              {getMarketSessionLabel(selectedTab, items, tickersByAssetId)}
-            </Text>
-
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
-              <ActionPressable accessibilityRole="button" onPress={() => void marketQuery.refetch()} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 }}>
-                <Text style={{ color: semantic.secondary, fontSize: 12 }}>새로고침</Text>
-              </ActionPressable>
-              <MarketSortControl value={sort} onChange={setSort} assetType={selectedTab} />
+              <MarketSortControl value={sort} onChange={setSort} />
             </View>
 
             {/* One screen-level notice; rows never repeat a connection error. */}
@@ -265,14 +252,14 @@ const styles = StyleSheet.create({
   content: { ...getScreenContentStyle(Platform.OS), padding: 16, paddingBottom: 24 },
   headerSection: {
     padding: 12, borderRadius: 14,
-    backgroundColor: semantic.surface, gap: 12, marginBottom: 12 },
+    backgroundColor: semantic.surface, gap: 6, marginBottom: 4 },
   tabRow: { flexDirection: 'row', gap: 8 },
   tabButton: {
     flex: 1,
     borderWidth: 1,
     borderColor: semantic.border,
     borderRadius: 10,
-    paddingVertical: 12,
+    paddingVertical: 10,
     alignItems: 'center',
     backgroundColor: semantic.raised,
   },
@@ -286,7 +273,7 @@ const styles = StyleSheet.create({
     borderColor: semantic.border,
     borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingVertical: 10,
     backgroundColor: semantic.raised,
   },
   searchEntryText: {
@@ -313,7 +300,7 @@ const styles = StyleSheet.create({
     backgroundColor: semantic.warningSurface,
   },
   inlineWarningText: { fontSize: 13, color: semantic.warning },
-  priceBasisText: { fontSize: 13, color: semantic.secondary },
-  sessionSummary: { fontSize: 13, color: semantic.secondary, textAlign: 'right', marginTop: 4 },
+  toolbar: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', columnGap: 8, rowGap: 0 },
+  sessionSummary: { flexGrow: 1, flexShrink: 1, minWidth: 0, fontSize: 12, lineHeight: 18, color: semantic.secondary },
   footerLoader: { paddingVertical: 16 },
 });

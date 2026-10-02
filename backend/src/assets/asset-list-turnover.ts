@@ -5,14 +5,14 @@ const record = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
-export type AssetListVolume = {
-  volume: string | null;
-  volumePeriod: 'session' | 'rolling_24h' | null;
+export type AssetListTurnover = {
+  turnover: string | null;
+  turnoverPeriod: 'session' | 'rolling_24h' | null;
 };
 
 /** Only evidence attached to the price selected by the existing read policy.
- * Never use trade quantity, quote volume, a manual price or truncated payload. */
-export function readAssetListVolume(
+ * Never synthesize notional from quantity/price or use manual/truncated evidence. */
+export function readAssetListTurnover(
   snapshot:
     | {
         sourceType: string;
@@ -20,48 +20,51 @@ export function readAssetListVolume(
         rawPayloadJson: unknown;
       }
     | undefined,
-): AssetListVolume {
-  const unavailable: AssetListVolume = { volume: null, volumePeriod: null };
+): AssetListTurnover {
+  const unavailable: AssetListTurnover = {
+    turnover: null,
+    turnoverPeriod: null,
+  };
   if (!snapshot || snapshot.sourceType !== 'provider_api') return unavailable;
   const raw = record(snapshot.rawPayloadJson);
   if (raw?.truncated !== false) return unavailable;
   const payload = record(raw.payload);
   if (!payload) return unavailable;
   let value: unknown;
-  let period: AssetListVolume['volumePeriod'] = null;
+  let period: AssetListTurnover['turnoverPeriod'] = null;
   if (snapshot.sourceName === 'kis_krx_realtime_trade') {
     if (payload.messageType === 'websocket_trade') {
-      value = record(payload.rawFields)?.ACML_VOL;
+      value = record(payload.rawFields)?.ACML_TR_PBMN;
     } else if (payload.messageType === 'rest_current_price') {
       const response = record(payload.response);
-      value = record(response?.output ?? response?.output1)?.acml_vol;
+      value = record(response?.output ?? response?.output1)?.acml_tr_pbmn;
     } else if (payload.messageType === 'rest_session_close') {
-      value = record(record(payload.evidence)?.row)?.acml_vol;
+      value = record(record(payload.evidence)?.row)?.acml_tr_pbmn;
     }
     period = 'session';
   } else if (snapshot.sourceName === 'kis_us_delayed_trade') {
     if (payload.messageType === 'websocket_trade')
-      value = record(payload.rawFields)?.TVOL;
+      value = record(payload.rawFields)?.TAMT;
     else if (payload.messageType === 'rest_current_price') {
       const response = record(payload.response);
-      value = record(response?.output ?? response?.output1)?.tvol;
+      value = record(response?.output ?? response?.output1)?.tamt;
     }
     period = 'session';
   } else if (snapshot.sourceName === 'binance_public_rest_24hr_ticker') {
-    value = payload.volume;
+    value = payload.quoteVolume;
     period = 'rolling_24h';
   } else if (
     snapshot.sourceName === 'binance_spot_ws_ticker' &&
     payload.messageType === 'spot_ws_ticker'
   ) {
-    value = record(payload.payload)?.v;
+    value = record(payload.payload)?.q;
     period = 'rolling_24h';
   }
   if (typeof value !== 'string' || !/^\d+(\.\d+)?$/.test(value.trim()))
     return unavailable;
-  const volume = new Prisma.Decimal(value.trim());
-  return volume.isFinite() && volume.gte(0)
-    ? { volume: volume.toFixed(), volumePeriod: period }
+  const turnover = new Prisma.Decimal(value.trim());
+  return turnover.isFinite() && turnover.gte(0)
+    ? { turnover: turnover.toFixed(), turnoverPeriod: period }
     : unavailable;
 }
 
@@ -69,16 +72,16 @@ export function compareAssetListMetric(
   a: {
     id: string;
     symbol: string;
-    volume?: string | null;
+    turnover?: string | null;
     changeRate: string | null;
   },
   b: {
     id: string;
     symbol: string;
-    volume?: string | null;
+    turnover?: string | null;
     changeRate: string | null;
   },
-  sortBy: 'volume' | 'changeRate',
+  sortBy: 'turnover' | 'changeRate',
   sortOrder: 'asc' | 'desc',
 ): number {
   const left = a[sortBy];
