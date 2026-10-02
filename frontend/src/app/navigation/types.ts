@@ -1,4 +1,5 @@
 import type { GuideChapter } from '../../screens/guide/guideTopics';
+import type { RecordOrderAccountScope } from '../../features/record/seasonAccountLookup';
 import type {
   CompositeScreenProps,
   NavigatorScreenParams,
@@ -66,10 +67,6 @@ export type RecordStackParamList = {
   RecordSeasonList: undefined;
   RecordSeasonDetail: { seasonId: string };
   RecordProfitAnalysis: { seasonId: string };
-  RecordOrderList:
-    | { seasonId: string; accountId?: never }
-    | { accountId: string; seasonId?: never };
-  RecordExchangeList: { seasonId: string };
 };
 
 export type MyStackParamList = {
@@ -93,6 +90,7 @@ export type MainTabParamList = {
 };
 
 export type RootStackParamList = {
+  TradeHistory: RecordOrderAccountScope;
   AssetChart: { assetId: string };
   Splash: undefined;
   AuthStack: NavigatorScreenParams<AuthStackParamList> | undefined;
@@ -197,6 +195,16 @@ export type RecordSeasonListScreenProps = CompositeScreenProps<
     StackScreenProps<MyStackParamList, 'Record'>,
     CompositeScreenProps<TabScreenProps<'MyTab'>, RootScreenProps<'MainTabs'>>
   >
+>;
+
+export type RecordSeasonDetailScreenProps = CompositeScreenProps<
+  StackScreenProps<RecordStackParamList, 'RecordSeasonDetail'>,
+  RootScreenProps<'MainTabs'>
+>;
+
+export type RecordProfitAnalysisScreenProps = CompositeScreenProps<
+  StackScreenProps<RecordStackParamList, 'RecordProfitAnalysis'>,
+  RootScreenProps<'MainTabs'>
 >;
 
 export type MyScreenProps = CompositeScreenProps<

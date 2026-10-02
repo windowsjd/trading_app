@@ -16,7 +16,7 @@ const tradingScreen = read('screens/order/OrderScreen.tsx');
 const orderScreen = read('screens/order/OrderPanel.tsx');
 const orderMapper = read('features/order/mapper.ts');
 const recordMapper = read('features/record/api.ts');
-const recordOrderList = read('screens/record/RecordOrderListScreen.tsx');
+const recordOrderList = read('screens/history/TradeHistoryScreen.tsx');
 const generalAccountHome = read('screens/home/GeneralAccountHome.tsx');
 const walletFxScreen = read('screens/wallet/WalletFxScreen.tsx');
 
@@ -82,7 +82,6 @@ const datetimeSources = [
   'screens/home/PortfolioScreen.tsx',
   'features/wallet/transactions.ts',
   'screens/ranking/RankingScreen.tsx',
-  'screens/record/RecordProfitAnalysisScreen.tsx',
   'screens/record/RecordSeasonDetailScreen.tsx',
   'screens/record/RecordSeasonListScreen.tsx',
   'screens/season/SeasonJoinScreen.tsx',

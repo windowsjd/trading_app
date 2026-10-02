@@ -51,7 +51,7 @@ function harness() {
     '../../theme/useReducedMotion': { useReducedMotion: () => false },
   };
   for (const name of ['./AuthStack', './MainTabs', '../../screens/auth/SplashScreen',
-    '../../screens/asset/AssetChartScreen', '../../screens/entry/ModeSelectionScreen', '../../screens/season/SeasonJoinScreen']) {
+    '../../screens/history/TradeHistoryScreen', '../../screens/asset/AssetChartScreen', '../../screens/entry/ModeSelectionScreen', '../../screens/season/SeasonJoinScreen']) {
     rootMocks[name] = { default: name, __esModule: true };
   }
   const Root = load(resolve('src/app/navigation/RootNavigator.tsx'), rootMocks).default;

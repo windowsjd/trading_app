@@ -302,7 +302,7 @@ function createHomeHarness(mode = 'general') {
     const recordApi = load(resolve(__dirname, '../src/features/record/api.ts'), {
       '../../services/api/client': { apiClient: {} },
     });
-    const screen = load(resolve(__dirname, '../src/screens/record/RecordOrderListScreen.tsx'), {
+    const screen = load(resolve(__dirname, '../src/screens/history/TradeHistoryScreen.tsx'), {
       ...mocks,
       react: { ...React, useMemo: (fn) => fn(), useEffect: () => {}, useRef: (value) => ({ current: value }), useState: (value) => [value, () => {}] },
       'react-native': { ...native, AppState: { currentState: 'active' } },

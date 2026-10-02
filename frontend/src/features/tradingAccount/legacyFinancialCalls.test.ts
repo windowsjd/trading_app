@@ -164,7 +164,7 @@ describe('current financial screens never call a legacy implicit-account API', (
       'screens/order/OrderPanel.tsx',
       'screens/asset/AssetDetailScreen.tsx',
       'screens/asset/AccountHoldings.tsx',
-      'screens/record/RecordOrderListScreen.tsx',
+      'screens/history/TradeHistoryScreen.tsx',
     ];
 
     for (const screen of FINANCIAL_SCREENS) {

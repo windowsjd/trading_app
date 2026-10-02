@@ -23,7 +23,7 @@ for (const mode of ['light', 'dark'] as const) {
       '../../components/states/ScreenErrorBoundary': { default: 'ScreenErrorBoundary', __esModule: true },
     };
     for (const name of ['./AuthStack', './MainTabs', '../../screens/auth/SplashScreen',
-      '../../screens/asset/AssetChartScreen', '../../screens/entry/ModeSelectionScreen', '../../screens/season/SeasonJoinScreen']) {
+      '../../screens/history/TradeHistoryScreen', '../../screens/asset/AssetChartScreen', '../../screens/entry/ModeSelectionScreen', '../../screens/season/SeasonJoinScreen']) {
       mocks[name] = { default: name, __esModule: true };
     }
     const Root = load(resolve('src/app/navigation/RootNavigator.tsx'), mocks).default;

@@ -130,10 +130,8 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
         <ActionPressable testID="wallet-ledger" style={styles.historyAction} onPress={() => navigation.navigate('WalletTransactions')}>
           <Text style={styles.historyLabel}>원장 보기</Text>
         </ActionPressable>
-        <ActionPressable testID="wallet-orders" style={styles.historyAction} onPress={() => rootNavigation.navigate('MainTabs', {
-          screen: 'MyTab', params: { screen: 'Record', initial: false, params: { screen: 'RecordOrderList', initial: false, params: { accountId } } },
-        })}>
-          <Text style={styles.historyLabel}>주문 내역 보기</Text>
+        <ActionPressable testID="wallet-orders" style={styles.historyAction} onPress={() => rootNavigation.navigate('TradeHistory', { accountId })}>
+          <Text style={styles.historyLabel}>거래 내역 보기</Text>
         </ActionPressable>
       </View>
     </ScrollView>

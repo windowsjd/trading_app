@@ -149,7 +149,6 @@ export const TEST_IDS = {
     profitAnalysisScreen: 'record-profit-analysis-screen',
     seasonDetailProfitAnalysisCta: 'record-season-detail-profit-analysis-cta',
     seasonDetailOrdersCta: 'record-season-detail-orders-cta',
-    seasonDetailExchangesCta: 'record-season-detail-exchanges-cta',
 
     orderListScreen: 'record-order-list-screen',
     orderListRetry: 'record-order-list-retry',
@@ -159,9 +158,7 @@ export const TEST_IDS = {
     orderItem: (key: string) => `record-order-item-${key}`,
     orderCancel: (key: string) => `record-order-cancel-${key}`,
 
-    exchangeListScreen: 'record-exchange-list-screen',
     exchangeListRetry: 'record-exchange-list-retry',
-    exchangeItem: (key: string) => `record-exchange-item-${key}`,
   },
 
   my: {

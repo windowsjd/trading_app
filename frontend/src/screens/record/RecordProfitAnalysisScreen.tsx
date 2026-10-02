@@ -1,345 +1,106 @@
+import React from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Platform } from '../../theme/native';
+import { useQuery } from '@tanstack/react-query';
+import type { RecordProfitAnalysisScreenProps } from '../../app/navigation/types';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { semantic } from '../../theme/tokens';
-import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-} from '../../theme/native';
-import { useQuery } from '@tanstack/react-query';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-
-import type { RecordStackParamList } from '../../app/navigation/types';
+import { getScreenContentStyle } from '../../theme/screenLayout';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
-import {
-  getMySeasonRecordDetail,
-  getMySeasonEquity,
-  type ProfitAnalysisItemDto,
-  type RecordSeasonEquityPointDto,
-} from '../../features/record/api';
-
+import { getMySeasonRecordDetail, getMySeasonEquity, type ProfitAnalysisItemDto } from '../../features/record/api';
+import { getRecordFinancialDisplay } from '../../features/record/financialDisplay';
+import { formatKrwDecimal, getAssetNameDisplay } from '../../utils/format';
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
-import { LineChart, type LineChartPoint } from '../../components/charts';
-import {
-  formatKrw,
-  formatKstDateTime,
-  formatPercent,
-  getAssetNameDisplay,
-} from '../../utils/format';
+import { LineChart } from '../../components/charts';
+import RecordMetric from './RecordMetric';
 
-type Props = NativeStackScreenProps<
-  RecordStackParamList,
-  'RecordProfitAnalysis'
->;
-
-function displayValue(value?: string | number | null) {
-  if (value === null || value === undefined || value === '') return '-';
-  return String(value);
-}
-
-function displayRank(value?: number | null) {
-  return value === null || value === undefined ? '-' : `#${value}`;
-}
-
-function displayPercent(value?: string | null) {
-  return value ? `${formatPercent(value)}%` : '-';
-}
-
-function getEquityChartPoints(
-  points: RecordSeasonEquityPointDto[],
-): LineChartPoint[] {
-  return points.map((point) => ({
-    x: point.time,
-    y: point.totalAssetKrw,
-    label: formatKstDateTime(point.time),
-  }));
-}
-
-function formatKrwChartValue(value: number) {
-  return `${formatKrw(value)}원`;
-}
-
-function ProfitAssetSummary({
-  label,
-  asset,
-}: {
-  label: string;
-  asset: ProfitAnalysisItemDto | null;
-}) {
-  const nameDisplay = asset ? getAssetNameDisplay(asset) : null;
-
+function ProfitAsset({ asset, label, testID }: { asset: ProfitAnalysisItemDto | null; label?: string; testID: string }) {
+  const name = asset ? getAssetNameDisplay(asset) : null;
+  // Failed valuation totals retain realized PnL but do not represent complete
+  // profit/loss. Keep the canonical asset identity and leave that total blank.
+  const pnl = getRecordFinancialDisplay(asset?.valuationState === 'available' ? asset.totalPnlKrw : null);
+  const rate = getRecordFinancialDisplay(asset?.valuationState === 'available' && asset.returnRateState === 'available' ? asset.returnRate : null, 'rate');
   return (
-    <View style={styles.assetSummaryRow}>
-      <Text style={styles.itemTitle}>{label}</Text>
-      {asset && nameDisplay ? (
-        <>
-          <Text style={styles.helper}>
-            {nameDisplay.primary}
-            {nameDisplay.secondary ? ` · ${nameDisplay.secondary}` : ''}
-          </Text>
-          <Text style={styles.helper}>
-            손익 {formatKrw(asset.totalPnlKrw)}원
-          </Text>
-          <Text style={styles.helper}>
-            수익률 {displayPercent(asset.returnRate)}
-          </Text>
-        </>
-      ) : (
-        <Text style={styles.helper}>-</Text>
-      )}
+    <View testID={testID} style={styles.assetRow}>
+      <View style={styles.assetName}>
+        {label ? <Text style={styles.label}>{label}</Text> : null}
+        <Text style={styles.itemTitle}>{name?.primary ?? '-'}</Text>
+        {name?.secondary ? <Text style={styles.helper}>{name.secondary}</Text> : null}
+      </View>
+      <View style={styles.assetValues}>
+        <Text testID={`${testID}-pnl`} style={[styles.assetPnl, { color: pnl.color }]}>{pnl.text}</Text>
+        <Text testID={`${testID}-return`} style={[styles.assetRate, { color: rate.color }]}>{rate.text}</Text>
+      </View>
     </View>
   );
 }
 
-export default function RecordProfitAnalysisScreen({
-  route,
-  navigation,
-}: Props) {
+export default function RecordProfitAnalysisScreen({ route, navigation }: RecordProfitAnalysisScreenProps) {
   const { seasonId } = route.params;
-
   const detailQuery = useQuery({
     queryKey: QUERY_KEYS.record.seasonDetail(seasonId),
     queryFn: () => getMySeasonRecordDetail(seasonId),
   });
-
   const equityQuery = useQuery({
-    queryKey: QUERY_KEYS.record.seasonEquity({
-      seasonId,
-      limit: 500,
-      offset: 0,
-    }),
-    queryFn: () =>
-      getMySeasonEquity({
-        seasonId,
-        limit: 500,
-        offset: 0,
-      }),
+    queryKey: QUERY_KEYS.record.seasonEquity({ seasonId, limit: 500, offset: 0 }),
+    queryFn: () => getMySeasonEquity({ seasonId, limit: 500, offset: 0 }),
   });
   const refresh = usePullToRefresh([detailQuery, equityQuery]);
+  if (detailQuery.isLoading) return <FullPageLoading message="수익 분석을 불러오는 중입니다." />;
+  if (!detailQuery.data) return <ErrorState title="수익 분석을 불러오지 못했습니다." message="잠시 후 다시 시도해주세요." onRetry={() => { void detailQuery.refetch(); }} />;
 
-  if (detailQuery.isLoading) {
-    return <FullPageLoading message="수익 분석을 불러오는 중입니다." />;
-  }
-
-  if (!detailQuery.data) {
-    return (
-      <ErrorState
-        title="수익 분석을 불러오지 못했습니다."
-        message="잠시 후 다시 시도해주세요."
-        onRetry={() => { void detailQuery.refetch(); }}
-      />
-    );
-  }
-
-  const { season, participant, performance, activitySummary, profitAnalysis } =
-    detailQuery.data;
+  const { season, performance, profitAnalysis } = detailQuery.data;
+  const available = profitAnalysis.state === 'available';
+  const hasAnalysis = profitAnalysis.state !== 'unavailable';
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
-        refreshControl={refresh.refreshControl}
-        testID={TEST_IDS.record.profitAnalysisScreen}
-        contentContainerStyle={styles.content}
-      >
+      <ScrollView refreshControl={refresh.refreshControl} testID={TEST_IDS.record.profitAnalysisScreen} contentContainerStyle={styles.content}>
+        <Text accessibilityRole="header" style={styles.title}>{season.name}</Text>
         <View style={styles.card}>
-          <Text style={styles.title}>{season.name}</Text>
-          <Text style={styles.helper}>
-            {formatKstDateTime(season.startAt)} ~{' '}
-            {formatKstDateTime(season.endAt)}
-          </Text>
-          <Text style={styles.helper}>시즌 상태 {season.status}</Text>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.label}>시즌 요약</Text>
-          <Text style={styles.helper}>
-            최종/현재 순위 {displayRank(participant?.finalRank)}
-          </Text>
-          <Text style={styles.helper}>
-            등급 {displayValue(participant?.finalTier)}
-          </Text>
-          <Text style={styles.helper}>
-            총자산 {formatKrw(performance.totalAssetKrw)}원
-          </Text>
-          <Text style={styles.helper}>
-            수익률 {displayPercent(performance.returnRate)}
-          </Text>
-          <Text style={styles.helper}>
-            MDD {displayPercent(performance.maxDrawdown)}
-          </Text>
-          <Text style={styles.helper}>
-            스냅샷 일자 {displayValue(performance.snapshotDate)}
-          </Text>
-          <Text style={styles.helper}>
-            수집 시각 {formatKstDateTime(performance.capturedAt)}
-          </Text>
-          {performance.state === 'unavailable' ? (
-            <InlineEmptyState
-              message={performance.message ?? '성과 데이터가 아직 없습니다.'}
-            />
-          ) : null}
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.label}>손익 요약</Text>
-          <Text style={styles.helper}>상태 {profitAnalysis.state}</Text>
-          <Text style={styles.helper}>
-            실현 손익 {formatKrw(profitAnalysis.totalRealizedPnlKrw)}원
-          </Text>
-          <Text style={styles.helper}>
-            평가 손익 {formatKrw(profitAnalysis.totalUnrealizedPnlKrw)}원
-          </Text>
-          <Text style={styles.helper}>
-            총 손익 {formatKrw(profitAnalysis.totalPnlKrw)}원
-          </Text>
-          {profitAnalysis.state === 'partial_unavailable' ? (
-            <Text style={styles.warningText}>
-              일부 자산 평가 데이터가 없어 손익 분석이 부분 표시됩니다.
-            </Text>
-          ) : null}
-          {profitAnalysis.state === 'unavailable' ? (
-            <Text style={styles.warningText}>
-              손익 분석 데이터를 사용할 수 없습니다.
-            </Text>
-          ) : null}
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.label}>최고/최악 자산</Text>
-          <ProfitAssetSummary
-            label="최고 수익"
-            asset={profitAnalysis.bestAsset}
-          />
-          <ProfitAssetSummary
-            label="최대 손실"
-            asset={profitAnalysis.worstAsset}
-          />
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.label}>자산별 손익</Text>
-          {profitAnalysis.items.length === 0 ? (
-            <InlineEmptyState message="표시할 자산별 손익 데이터가 없습니다." />
-          ) : (
-            profitAnalysis.items.map((item) => {
-              const nameDisplay = getAssetNameDisplay(item);
-
-              return (
-                <View key={item.assetId} style={styles.assetRow}>
-                  <Text style={styles.itemTitle}>{nameDisplay.primary}</Text>
-                  {nameDisplay.secondary ? (
-                    <Text style={styles.helper}>{nameDisplay.secondary}</Text>
-                  ) : null}
-                  <Text style={styles.helper}>
-                    {item.assetType} · {item.positionState} · {item.valuationState}
-                  </Text>
-                  <Text style={styles.helper}>
-                    실현 {formatKrw(item.realizedPnlKrw)}원
-                  </Text>
-                  <Text style={styles.helper}>
-                    평가 {formatKrw(item.unrealizedPnlKrw)}원
-                  </Text>
-                  <Text style={styles.helper}>
-                    총 손익 {formatKrw(item.totalPnlKrw)}원
-                  </Text>
-                  <Text style={styles.helper}>
-                    수익률 {displayPercent(item.returnRate)}
-                  </Text>
-                </View>
-              );
-            })
-          )}
-        </View>
-
-        {profitAnalysis.valuationErrors.length > 0 ? (
-          <View style={styles.card}>
-            <Text style={styles.label}>평가 오류</Text>
-            {profitAnalysis.valuationErrors.map((error) => (
-              <View key={`${error.assetId}-${error.code}`} style={styles.errorRow}>
-                <Text style={styles.itemTitle}>{error.assetId}</Text>
-                <Text style={styles.helper}>{error.code}</Text>
-                <Text style={styles.warningText}>{error.message}</Text>
-              </View>
-            ))}
+          <Text style={styles.heading}>손익 요약</Text>
+          <RecordMetric label="총 손익" value={available ? profitAnalysis.totalPnlKrw : null} prominent testID="record-profit-total" />
+          <View style={styles.metrics}>
+            <View style={styles.cell}><RecordMetric label="수익률" value={performance.state === 'available' ? performance.returnRate : null} kind="rate" testID="record-profit-return" /></View>
+            <View style={styles.cell}><RecordMetric label="실현 손익" value={hasAnalysis ? profitAnalysis.totalRealizedPnlKrw : null} testID="record-profit-realized" /></View>
+            <View style={styles.cell}><RecordMetric label="평가 손익" value={available ? profitAnalysis.totalUnrealizedPnlKrw : null} testID="record-profit-unrealized" /></View>
           </View>
-        ) : null}
-
+          {profitAnalysis.state === 'partial_unavailable' ? <Text style={styles.notice}>일부 자산의 평가 데이터를 확인할 수 없어 일부 분석이 표시되지 않습니다.</Text> : null}
+          {!hasAnalysis ? <Text style={styles.notice}>수익 분석 데이터를 확인할 수 없습니다.</Text> : null}
+        </View>
         <View style={styles.card}>
-          <Text style={styles.label}>거래 요약</Text>
-          <Text style={styles.helper}>
-            총 주문 {displayValue(activitySummary.orders.total)}
-          </Text>
-          <Text style={styles.helper}>
-            체결 {displayValue(activitySummary.orders.executed)}
-          </Text>
-          <Text style={styles.helper}>
-            제출 {displayValue(activitySummary.orders.submitted)}
-          </Text>
-          <Text style={styles.helper}>
-            취소 {displayValue(activitySummary.orders.canceled)}
-          </Text>
-          <Text style={styles.helper}>
-            거절 {displayValue(activitySummary.orders.rejected)}
-          </Text>
-          <Text style={styles.helper}>
-            환전 {displayValue(activitySummary.exchanges.total)}
-          </Text>
-          <Text style={styles.helper}>
-            지갑 원장 {displayValue(activitySummary.walletTransactions.total)}
-          </Text>
-          <Text style={styles.helper}>
-            오픈 포지션 {displayValue(activitySummary.positions.open)}
-          </Text>
+          <Text style={styles.heading}>자산 추이</Text>
+          {equityQuery.isLoading ? <SectionSkeleton lines={5} />
+            : equityQuery.isError && !equityQuery.data ? (
+              <View style={styles.chartState}>
+                <InlineEmptyState message="자산 추이를 불러오지 못했습니다." />
+                <CTAButton label="다시 시도" onPress={() => { void equityQuery.refetch(); }} />
+              </View>
+            ) : equityQuery.data?.state === 'not_joined' ? <InlineEmptyState message="시즌 참가 기록이 없어 자산 추이를 표시할 수 없습니다." />
+              : !equityQuery.data || equityQuery.data.state === 'empty' || equityQuery.data.points.length < 2 ? <InlineEmptyState message="자산 추이를 표시하려면 데이터가 더 필요합니다." />
+                : <LineChart
+                  points={equityQuery.data.points.map(point => ({ x: point.time, label: point.time, y: point.totalAssetKrw }))}
+                  xScale="time"
+                  selectionDisplay="tooltip"
+                  pointValueFormatter={point => `${formatKrwDecimal(point.y)}원`}
+                  emptyMessage="자산 추이를 표시하려면 데이터가 더 필요합니다."
+                />}
         </View>
-
         <View style={styles.card}>
-          <Text style={styles.label}>수익 추이 차트</Text>
-          {equityQuery.isLoading ? (
-            <SectionSkeleton lines={5} />
-          ) : equityQuery.isError && !equityQuery.data ? (
-            <View style={styles.chartState}>
-              <InlineEmptyState message="수익 추이를 불러오지 못했습니다." />
-              <CTAButton
-                label="다시 시도"
-                onPress={() => { void equityQuery.refetch(); }}
-              />
-            </View>
-          ) : equityQuery.data?.state === 'not_joined' ? (
-            <InlineEmptyState message="시즌 참가 기록이 없어 수익 추이를 표시할 수 없습니다." />
-          ) : equityQuery.data?.state === 'empty' ? (
-            <InlineEmptyState message="수익 추이 데이터가 아직 없습니다." />
-          ) : !equityQuery.data || equityQuery.data.points.length < 2 ? (
-            <InlineEmptyState message="수익 추이를 표시하려면 데이터가 더 필요합니다." />
-          ) : (
-            <LineChart
-              points={getEquityChartPoints(equityQuery.data.points)}
-              valueFormatter={formatKrwChartValue}
-              emptyMessage="수익 추이를 표시하려면 데이터가 더 필요합니다."
-            />
-          )}
+          <Text style={styles.heading}>대표 손익</Text>
+          <ProfitAsset label="최고 수익" asset={hasAnalysis ? profitAnalysis.bestAsset : null} testID="record-profit-best" />
+          <ProfitAsset label="최대 손실" asset={hasAnalysis ? profitAnalysis.worstAsset : null} testID="record-profit-worst" />
         </View>
-
-        <View style={styles.row}>
-          <CTAButton
-            label="주문 내역"
-            onPress={() => navigation.navigate('RecordOrderList', { seasonId })}
-            style={styles.flex}
-          />
-          <CTAButton
-            label="환전 내역"
-            onPress={() =>
-              navigation.navigate('RecordExchangeList', { seasonId })
-            }
-            style={styles.flex}
-          />
+        <View style={styles.card}>
+          <Text style={styles.heading}>자산별 손익</Text>
+          {!hasAnalysis || profitAnalysis.items.length === 0 ? <InlineEmptyState message="표시할 자산별 손익 데이터가 없습니다." />
+            : profitAnalysis.items.map(item => <ProfitAsset key={item.assetId} asset={item} testID={`record-profit-asset-${item.assetId}`} />)}
         </View>
+        <CTAButton testID="record-profit-orders-cta" label="거래 내역 보기" onPress={() => navigation.navigate('TradeHistory', { seasonId })} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -347,39 +108,20 @@ export default function RecordProfitAnalysisScreen({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: semantic.screen },
-  content: { padding: 16, gap: 12, paddingBottom: 24 },
-  row: { flexDirection: 'row', gap: 10 },
-  flex: { flex: 1 },
-  card: {
-    borderWidth: 1,
-    borderColor: semantic.border,
-    borderRadius: 14,
-    padding: 16,
-    backgroundColor: semantic.surface,
-    gap: 8,
-  },
-  title: { fontSize: 22, fontWeight: '700' },
-  label: { fontSize: 13, color: semantic.secondary },
-  itemTitle: { fontSize: 15, fontWeight: '700' },
-  helper: { fontSize: 14, color: semantic.secondary },
-  warningText: { fontSize: 13, color: semantic.warning },
+  content: { ...getScreenContentStyle(Platform.OS), padding: 16, gap: 16, paddingBottom: 24 },
+  card: { borderWidth: 1, borderColor: semantic.border, borderRadius: 14, padding: 16, backgroundColor: semantic.surface, gap: 12, minWidth: 0 },
+  title: { fontSize: 22, lineHeight: 32, fontWeight: '700' },
+  heading: { fontSize: 18, lineHeight: 26, fontWeight: '700' },
+  label: { fontSize: 13, lineHeight: 20, color: semantic.secondary },
+  helper: { fontSize: 13, lineHeight: 20, color: semantic.secondary },
+  notice: { fontSize: 13, lineHeight: 20, color: semantic.secondary },
+  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
+  cell: { flexBasis: 140, flexGrow: 1, flexShrink: 1, minWidth: 0 },
   chartState: { gap: 8 },
-  assetSummaryRow: {
-    borderTopWidth: 1,
-    borderTopColor: semantic.border,
-    paddingTop: 10,
-    gap: 4,
-  },
-  assetRow: {
-    borderTopWidth: 1,
-    borderTopColor: semantic.border,
-    paddingTop: 10,
-    gap: 4,
-  },
-  errorRow: {
-    borderTopWidth: 1,
-    borderTopColor: semantic.errorSurface,
-    paddingTop: 10,
-    gap: 4,
-  },
+  assetRow: { flexDirection: 'row', flexWrap: 'wrap', borderTopWidth: 1, borderTopColor: semantic.border, paddingTop: 12, columnGap: 12, rowGap: 8, minWidth: 0 },
+  assetName: { flexBasis: 140, flexGrow: 1, flexShrink: 1, minWidth: 0, gap: 4 },
+  itemTitle: { fontSize: 15, lineHeight: 23, fontWeight: '600' },
+  assetValues: { flexBasis: 140, flexGrow: 1, flexShrink: 1, minWidth: 0, alignItems: 'stretch', gap: 4 },
+  assetPnl: { fontSize: 18, lineHeight: 26, fontWeight: '700', textAlign: 'right', fontVariant: ['tabular-nums'] },
+  assetRate: { fontSize: 13, lineHeight: 20, textAlign: 'right' },
 });

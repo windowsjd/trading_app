@@ -1,3 +1,4 @@
+import { recordDetail, recordEquity } from '../recordFixtures';
 // The production screens, query observers and API mappers run unchanged.
 // REST/WebSocket transport and navigation are the browser fixture boundaries.
 import { apiClient as homeClient, navigation, transport } from './homeMocks';
@@ -62,15 +63,8 @@ export const apiClient = {
     }
     if (params.has('navigation')) {
       transport.requests.push(path);
-      if (url.pathname === '/records/me/seasons/record-0') return response({
-        state: 'available', season: { id: 'record-0', name: 'Season 1', status: 'active', startAt: '2026-09-01T00:00:00Z', endAt: '2099-01-01T00:00:00Z' },
-        participant: { finalRank: 2, finalTier: 'Silver' },
-        performance: { state: 'available', totalAssetKrw: '9648192', returnRate: '-3.52', maxDrawdown: '0' },
-        activitySummary: { orders: { total: 0, submitted: 0, executed: 0, canceled: 0, rejected: 0 }, exchanges: { total: 0 }, walletTransactions: { total: 0 }, positions: { open: 7 } },
-        profitAnalysis: { state: 'available', totalRealizedPnlKrw: '0', totalUnrealizedPnlKrw: '0', totalPnlKrw: '0', items: [], bestAsset: null, worstAsset: null, valuationErrors: [] },
-      });
-      if (url.pathname === '/records/me/seasons/record-0/equity') return response({ state: 'empty', seasonId: 'record-0', points: [], pagination: pagination(0, 500, 0) });
-      if (url.pathname === '/records/me/seasons/record-0/exchanges') return response({ items: [], pagination: pagination(0, 20, 0) });
+      if (url.pathname === '/records/me/seasons/record-0') return response(recordDetail({ state: params.get('recordState') ?? 'available', status: params.get('recordStatus') ?? 'settled', long }));
+      if (url.pathname === '/records/me/seasons/record-0/equity') return response(recordEquity);
       if (/^\/trading-accounts\/[^/]+\/orders$/.test(path)) return response({ state: 'available', tradingAccountId: path.split('/')[2], orders: [], pagination: pagination(0, 20, 0) });
       if (/^\/trading-accounts\/[^/]+\/wallet-transactions$/.test(path)) return response({ tradingAccountId: path.split('/')[2], filters: { currency: config?.params?.currency ?? null, direction: config?.params?.direction ?? null, txType: config?.params?.txType ?? null }, transactions: [], pagination: pagination(0, 20, 0) });
       const account = transport.accounts.find((a) => path === `/trading-accounts/${a.id}`);
@@ -80,3 +74,5 @@ export const apiClient = {
     return homeClient.get(path, config);
   },
 };
+
+export const getRequestGeneration = () => 0;

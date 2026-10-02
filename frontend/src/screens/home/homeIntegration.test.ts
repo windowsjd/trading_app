@@ -195,7 +195,7 @@ describe('home exchange shortcut', () => {
           getCapabilityBlockMessage(caps, caps.exchangeBlockReason),
         ));
         const walletTree = h.renderWallet().tree;
-        for (const label of ['원장 보기', '주문 내역 보기']) {
+        for (const label of ['원장 보기', '거래 내역 보기']) {
           const button = elements(walletTree, 'Pressable').find(
             (node) => texts(node) === label,
           );
@@ -203,7 +203,7 @@ describe('home exchange shortcut', () => {
           button.props.onPress();
         }
         assert.equal(h.navigation[0][0], 'WalletTransactions');
-        assert.equal(h.navigation[1][1].params.params.params.accountId, h.account.id);
+        assert.equal(h.navigation[1][1].accountId, h.account.id);
       });
     }
 
@@ -338,19 +338,10 @@ describe('general/season home API, queries, rendering and navigation integration
       );
       const homeQueries = h.queries;
       const button = elements(h.renderWallet().tree, 'Pressable').find(
-        (node) => texts(node) === '주문 내역 보기',
+        (node) => texts(node) === '거래 내역 보기',
       );
       button.props.onPress();
-      assert.deepEqual(h.navigation.at(-1), [
-        'MainTabs',
-        {
-          screen: 'MyTab',
-          params: { screen: 'Record', initial: false, params: {
-            screen: 'RecordOrderList', initial: false,
-            params: { accountId: h.account.id },
-          } },
-        },
-      ]);
+      assert.deepEqual(h.navigation.at(-1), ['TradeHistory', { accountId: h.account.id }]);
       assert.equal(branch.key, h.account.id);
       const query = homeQueries.find((query) =>
         query.queryKey.includes('equity'),
@@ -527,17 +518,17 @@ describe('general/season home API, queries, rendering and navigation integration
   }
 });
 
-describe('wallet button through destination RecordOrderList account lookup and API', () => {
+describe('wallet button through destination TradeHistory account lookup and API', () => {
   for (const mode of ['general', 'season']) {
     it(`${mode} can actually load the explicitly selected account orders at the destination`, async () => {
       const h = createHomeHarness(mode);
       h.seed(h.account, fixture[mode].data);
       const wallet = h.renderWallet();
       const orderButton = elements(wallet.tree, 'Pressable').find(
-        (node) => texts(node) === '주문 내역 보기',
+        (node) => texts(node) === '거래 내역 보기',
       );
       orderButton.props.onPress();
-      const scope = h.navigation.at(-1)[1].params.params.params;
+      const scope = h.navigation.at(-1)[1];
       h.renderOrders(scope, [h.account, { ...h.account, id: 'other-account' }]);
       assert.equal(h.orderQuery.enabled, true);
       assert.ok(h.orderQuery.queryKey.includes(h.account.id));

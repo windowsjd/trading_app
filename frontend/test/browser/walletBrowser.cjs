@@ -18,7 +18,9 @@ async function run() {
     define: { global: 'globalThis', 'process.env.NODE_ENV': '"production"', __DEV__: 'false' }, loader: { '.png': 'dataurl' },
     plugins: [{ name: 'wallet-fixtures', setup(b) {
       b.onResolve({ filter: /^react-native$/ }, () => ({ path: path.join(__dirname, 'nativeWeb.jsx') }));
-      b.onResolve({ filter: /(services\/api\/client|navigationHooks|useMarketTickers)$/ }, () => ({ path: path.join(__dirname, 'rootTabsMocks.js') }));
+      b.onResolve({ filter: /(services\/api\/client|useMarketTickers)$/ }, () => ({ path: path.join(__dirname, 'rootTabsMocks.js') }));
+      if (fixture === 'rootTabs') b.onResolve({ filter: /navigationHooks$/ }, () => ({ path: path.join(__dirname, 'rootTabsMocks.js') }));
+      if (fixture === 'walletNavigation') b.onResolve({ filter: /screens\/auth\/SplashScreen$/ }, () => ({ path: path.join(__dirname, 'navigationBootstrap.jsx') }));
     } }], logLevel: 'warning',
   });
   const server = http.createServer((req, res) => {
@@ -240,22 +242,28 @@ async function run() {
       await page.evaluate(() => window.fixture.navigationRef.goBack());
       await id('wallet-composition').waitFor();
       await id('wallet-orders').click(); await id('record-order-list-screen').waitFor();
+      assert.equal(await page.evaluate(() => window.fixture.navigationRef.getRootState().routes.at(-1).name), 'TradeHistory');
       assert.ok(await page.evaluate((account) => window.fixture.transport.requests.includes(`/trading-accounts/${account}-account/orders`), account));
       await page.evaluate(() => window.fixture.navigationRef.goBack());
-      await id('record-season-item-record-0').waitFor();
-      await page.evaluate(() => window.fixture.navigationRef.goBack());
+      await id('wallet-composition').waitFor();
+      assert.equal(await page.getByRole('tab', { name: '지갑' }).getAttribute('aria-selected'), 'true');
+      await page.getByRole('tab', { name: '전체' }).click();
       await id('overall-Record').waitFor();
       await id('overall-Record').click(); await id('record-season-item-record-0').click();
       await id('record-season-detail-screen').waitFor();
       for (const [button, destination] of [
         ['record-season-detail-profit-analysis-cta', 'record-profit-analysis-screen'],
         ['record-season-detail-orders-cta', 'record-order-list-screen'],
-        ['record-season-detail-exchanges-cta', 'record-exchange-list-screen'],
       ]) {
         await id(button).click(); await id(destination).waitFor();
         await page.evaluate(() => window.fixture.navigationRef.goBack());
         await id('record-season-detail-screen').waitFor();
       }
+      await id('record-season-detail-profit-analysis-cta').click();
+      await id('record-profit-orders-cta').click(); await id('record-order-list-screen').waitFor();
+      await page.evaluate(() => window.fixture.navigationRef.goBack());
+      await id('record-profit-analysis-screen').waitFor();
+      assert.equal(await id('record-profit-orders-cta').count(), 1);
     }
     assert.deepEqual(errors, []);
     const result = {

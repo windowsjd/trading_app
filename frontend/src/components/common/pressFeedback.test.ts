@@ -357,7 +357,7 @@ describe('touch coverage and exclusions', () => {
     }
     assert.deepEqual(excluded.sort(), [
       'components/common/BottomSheetBackdrop.tsx',
-      'screens/record/RecordOrderListScreen.tsx',
+      'screens/history/TradeHistoryScreen.tsx',
     ]);
     for (const file of [
       'components/common/CTAButton.tsx', 'components/tradingAccount/AccountSwitcher.tsx',

@@ -8,6 +8,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { RootStackParamList } from './types';
 import { rootNavigationRef } from './navigationRef';
 import AssetChartScreen from '../../screens/asset/AssetChartScreen';
+import TradeHistoryScreen from '../../screens/history/TradeHistoryScreen';
 import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
 import SplashScreen from '../../screens/auth/SplashScreen';
@@ -47,6 +48,12 @@ export default function RootNavigator() {
         <Stack.Screen name="AuthStack" component={AuthStack} />
         <Stack.Screen name="ModeSelection" component={ModeSelectionScreen} />
         <Stack.Screen name="MainTabs" component={MainTabs} />
+        <Stack.Screen name="TradeHistory" component={TradeHistoryScreen} options={{
+          headerShown: true,
+          title: '거래 내역',
+          headerStyle: { backgroundColor: colors.surface },
+          headerTintColor: colors.text,
+        }} />
         <Stack.Screen name="SeasonJoin" component={SeasonJoinScreen} />
         <Stack.Screen name="AssetChart" component={AssetChartScreen} options={{ presentation: 'fullScreenModal', animation: reducedMotion ? 'none' : 'fade' }} />
       </Stack.Navigator>

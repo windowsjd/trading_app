@@ -8,8 +8,6 @@ import type { RecordStackParamList } from './types';
 import RecordSeasonListScreen from '../../screens/record/RecordSeasonListScreen';
 import RecordSeasonDetailScreen from '../../screens/record/RecordSeasonDetailScreen';
 import RecordProfitAnalysisScreen from '../../screens/record/RecordProfitAnalysisScreen';
-import RecordOrderListScreen from '../../screens/record/RecordOrderListScreen';
-import RecordExchangeListScreen from '../../screens/record/RecordExchangeListScreen';
 
 const Stack = createNativeStackNavigator<RecordStackParamList>();
 
@@ -31,16 +29,6 @@ export default function RecordStack() {
         name="RecordProfitAnalysis"
         component={RecordProfitAnalysisScreen}
         options={{ title: '수익 분석' }}
-      />
-      <Stack.Screen
-        name="RecordOrderList"
-        component={RecordOrderListScreen}
-        options={{ title: '거래 내역' }}
-      />
-      <Stack.Screen
-        name="RecordExchangeList"
-        component={RecordExchangeListScreen}
-        options={{ title: '환전 내역' }}
       />
     </Stack.Navigator>
   );

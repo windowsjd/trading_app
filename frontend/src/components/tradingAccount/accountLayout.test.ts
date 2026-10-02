@@ -258,7 +258,7 @@ describe('the styles long text depends on are present', () => {
   });
 
   it('RecordOrderList: the amount moves below a readable asset name on narrow screens', () => {
-    const source = read('screens/record/RecordOrderListScreen.tsx');
+    const source = read('screens/history/TradeHistoryScreen.tsx');
 
     // Keep enough width for the name; move the amount to another row when
     // enlarged text cannot fit beside it. Neither column may leave the card.

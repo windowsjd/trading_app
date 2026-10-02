@@ -21,8 +21,7 @@ export const ROUTES = {
 
   RECORD_SEASON_LIST: 'RecordSeasonList',
   RECORD_SEASON_DETAIL: 'RecordSeasonDetail',
-  RECORD_ORDER_LIST: 'RecordOrderList',
-  RECORD_EXCHANGE_LIST: 'RecordExchangeList',
+  TRADE_HISTORY: 'TradeHistory',
 
   REWARD: 'Reward',
 

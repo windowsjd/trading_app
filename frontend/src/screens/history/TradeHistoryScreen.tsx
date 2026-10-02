@@ -22,7 +22,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useIsFocused } from '@react-navigation/native';
 
-import type { RecordStackParamList } from '../../app/navigation/types';
+import type { RootStackParamList } from '../../app/navigation/types';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 import {
@@ -62,10 +62,10 @@ import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import EmptyState from '../../components/states/EmptyState';
 
-type Props = NativeStackScreenProps<RecordStackParamList, 'RecordOrderList'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'TradeHistory'>;
 type Filter = 'all' | 'buy' | 'sell';
 
-export default function RecordOrderListScreen({ route }: Props) {
+export default function TradeHistoryScreen({ route }: Props) {
   const recordScope = route.params;
   const isAccountScope = 'accountId' in recordScope;
   const [filter, setFilter] = useState<Filter>('all');
