@@ -423,3 +423,28 @@ Trading note policy:
 - Crypto candle DB persistence.
 - Binance Futures API.
 - Binance authenticated API.
+## Market list sorting (2026-10-02)
+
+`GET /api/v1/assets` accepts additive `sortBy=volume|changeRate` and
+`sortOrder=asc|desc` (volume supports desc). Omitted sorting keeps symbol/id ASC.
+Explicit sorting requires `withPrice=true`. All matching assets, including search
+results, are priced using the existing selector, sorted with Decimal comparisons,
+then paginated. Null metrics sort last in both directions; ties use symbol/id ASC.
+
+Sorted responses include `sortSnapshot`; pass it with subsequent offsets and the
+same filters. It identifies an immutable, ten-minute server result. Expired or
+mismatched snapshots return `ASSET_SORT_SNAPSHOT_EXPIRED` / `INVALID_SORT_SNAPSHOT`;
+restart at offset 0. Realtime overlays do not change this order. Refresh starts a
+new result. The existing Redis connection shares snapshots across instances when
+configured; a bounded process cache supports installations without Redis. A lost
+snapshot fails explicitly instead of silently mixing pages.
+
+Sorted list items expose nullable decimal-string `volume` and `volumePeriod`
+(`session` or `rolling_24h`). Volume comes only from the selected eligible provider
+price snapshot: KIS domestic ACML_VOL / exact-date daily-close acml_vol, KIS US TVOL (REST current-price acml_vol / tvol),
+Binance REST volume / WebSocket ticker v. Stocks mean cumulative shares in the selected session
+(latest completed session when closed), crypto means rolling 24-hour base units.
+These are quantity, never quoteVolume/amount. Across crypto symbols the base units
+differ; all-market search mixes periods, so the UI explicitly describes the basis.
+Missing, truncated, invalid or manual-source evidence yields null, never zero or a
+fabricated candle aggregation. No price/source/calendar/return calculation changes.

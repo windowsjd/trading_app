@@ -24,7 +24,7 @@ export const apiClient = {
     if (url.pathname === '/assets') {
       transport.requests.push(path);
       const page = pagination(offset, limit, 44);
-      return response({ pagination: page, assets: Array.from({ length: page.returned }, (_, i) => ({
+      return response({ sortSnapshot: url.searchParams.get('sortSnapshot') ?? `fixture-${url.searchParams.get('sortBy')}-${url.searchParams.get('sortOrder')}-${url.searchParams.get('assetType')}`, pagination: page, assets: Array.from({ length: page.returned }, (_, i) => ({
         id: `asset-${offset + i}`, assetType: url.searchParams.get('assetType') ?? 'domestic_stock',
         symbol: '005930', name: long ? '대한민국 미래산업 우량주 투자기업 우선주' : '삼성전자',
         market: 'KRX', priceCurrency: 'KRW', settlementCurrency: 'KRW',

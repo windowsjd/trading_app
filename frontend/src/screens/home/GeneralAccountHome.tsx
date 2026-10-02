@@ -1,5 +1,5 @@
 import { semantic } from '../../theme/tokens';
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform } from '../../theme/native';
 import { getScreenContentStyle } from '../../theme/screenLayout';
 import { useQuery } from '@tanstack/react-query';
@@ -26,7 +26,7 @@ import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
-import HomePortfolioCharts from './HomePortfolioCharts';
+import HomeAssetTrend, { type HomeEquityRange } from './HomeAssetTrend';
 import HomeAssetHero from './HomeAssetHero';
 
 /**
@@ -71,6 +71,8 @@ export default function GeneralAccountHome({
   onOpenAsset,
 }: Props) {
   const accountId = account.id;
+  const [trendExpanded, setTrendExpanded] = useState(false);
+  const [equityRange, setEquityRange] = useState<HomeEquityRange>('30d');
 
   const portfolioQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.portfolio(accountId),
@@ -89,8 +91,9 @@ export default function GeneralAccountHome({
   });
 
   const equityQuery = useQuery({
-    queryKey: QUERY_KEYS.tradingAccount.portfolioEquity(accountId, '30d', 'daily'),
-    queryFn: () => getTradingAccountEquity(accountId, '30d', 'daily'),
+    queryKey: QUERY_KEYS.tradingAccount.portfolioEquity(accountId, equityRange, 'daily'),
+    queryFn: () => getTradingAccountEquity(accountId, equityRange, 'daily'),
+    enabled: trendExpanded,
   });
 
   // Fail closed on structural errors in every account-scoped section.
@@ -168,39 +171,18 @@ export default function GeneralAccountHome({
 
       <HomeAssetHero summary={summary} unavailableMessage={portfolioNotice?.message} />
 
-      {summary ? (
-        <View style={styles.card}>
-          <Text style={styles.label}>자금 구성</Text>
-          <Text style={styles.helper}>
-            최초 지급 자본 {formatUnknownKrw(summary.initialFundingKrw)}
-          </Text>
-          <Text style={styles.helper}>
-            누적 외부 자금 유입{' '}
-            {formatUnknownKrw(summary.cumulativeExternalFundingKrw)}
-          </Text>
-          <Text style={styles.helper}>
-            누적 광고 보상 {formatUnknownKrw(summary.cumulativeAdRewardKrw)}
-          </Text>
-          <Text style={styles.helper}>
-            투자 손익 {formatUnknownKrw(summary.investmentPnlKrw)}
-          </Text>
-          {/* Said plainly, because the distinction is the point of TWR. */}
-          <Text style={styles.note}>
-            외부 자금 유입(광고 보상 포함)은 투자 수익이 아닙니다. 위 수익률은
-            유입 시점의 영향을 제외한 시간가중 수익률입니다.
-          </Text>
-        </View>
-      ) : null}
-
-      <HomePortfolioCharts
-        portfolio={portfolio}
+      <HomeAssetTrend
+        expanded={trendExpanded}
+        onToggle={() => setTrendExpanded((value) => !value)}
+        range={equityRange}
+        onRangeChange={setEquityRange}
         equity={equityQuery.data}
         loading={equityQuery.isLoading}
         failed={equityQuery.isError}
         general
       />
 
-      <View style={styles.card}>
+      <View testID="home-holdings" style={styles.card}>
         <Text style={styles.label}>보유 종목</Text>
         {positionsQuery.isLoading ? (
           <SectionSkeleton lines={3} />
@@ -224,6 +206,30 @@ export default function GeneralAccountHome({
           ))
         )}
       </View>
+
+      {summary ? (
+        <View style={styles.card}>
+          <Text style={styles.label}>자금 구성</Text>
+          <Text style={styles.helper}>
+            최초 지급 자본 {formatUnknownKrw(summary.initialFundingKrw)}
+          </Text>
+          <Text style={styles.helper}>
+            누적 외부 자금 유입{' '}
+            {formatUnknownKrw(summary.cumulativeExternalFundingKrw)}
+          </Text>
+          <Text style={styles.helper}>
+            누적 광고 보상 {formatUnknownKrw(summary.cumulativeAdRewardKrw)}
+          </Text>
+          <Text style={styles.helper}>
+            투자 손익 {formatUnknownKrw(summary.investmentPnlKrw)}
+          </Text>
+          {/* Said plainly, because the distinction is the point of TWR. */}
+          <Text style={styles.note}>
+            외부 자금 유입(광고 보상 포함)은 투자 수익이 아닙니다. 위 수익률은
+            유입 시점의 영향을 제외한 시간가중 수익률입니다.
+          </Text>
+        </View>
+      ) : null}
 
       {capabilities?.canExchange ? (
         <CTAButton label="환전하기" onPress={onOpenFx} />

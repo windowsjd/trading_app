@@ -298,3 +298,11 @@ diagnosis explains a 0-row result, it never relaxes the guard.
   full-fill quantity, serialized to eight decimal places in the existing batch
   metadata read. Invalid/missing order metadata fails closed. No financial writes
   or initial-grant visibility, currency, filter or pagination changes.
+## Home daily range extension (2026-10-02)
+
+The account portfolio equity endpoint additionally accepts `90d`, `180d`, `360d`.
+With `granularity=daily`, ranges cover N calendar dates including today in
+Asia/Seoul, using `snapshotDate` and only real DailyPortfolioSnapshot rows. Missing
+dates remain missing and short histories remain short. Existing `1d`, `7d`, `30d`,
+`all` and omitted-granularity source/fallback behavior remain compatible. GET does
+not create snapshots; account scope, TWR and initial-capital meanings are unchanged.

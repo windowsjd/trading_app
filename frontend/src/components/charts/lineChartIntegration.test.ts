@@ -227,3 +227,36 @@ describe('home chart money and allocation boundaries', () => {
     }
   });
 });
+
+it('Home time scale preserves real gaps and unifies selection into one bounded tooltip', () => {
+  const data = [
+    { x: '2026-09-01', y: '9007199254740993' },
+    { x: '2026-09-02', y: '9007199254740900' },
+    { x: '2026-09-20', y: '9007199254740930' },
+  ];
+  for (const width of [254, 294, 324, 364]) {
+    const h = setup({ points: data, xScale: 'time', selectionDisplay: 'tooltip', pointValueFormatter: p => `${formatKrwDecimal(p.y)}원` });
+    h.render().props.onLayout({ nativeEvent: { layout: { width } } });
+    assert.ok(!/최신 값|선택 값/.test(h.text()));
+    const select = elements(h.render()).find(node => node.props.onSelect)!.props.onSelect;
+    for (const [x, date] of [[12, '2026-09-01'], [12 + (width - 24) / 19, '2026-09-02'], [width - 12, '2026-09-20']]) {
+      select(x);
+      const tooltip = elements(h.render()).find(node => node.props.testID === 'line-chart-tooltip')!;
+      assert.ok(tooltip);
+      const content = elements(tooltip, 'Text').map(node => node.props.children).join(' ');
+      assert.ok(content.includes(date));
+      assert.ok(content.includes('원'));
+      assert.equal(elements(h.render()).filter(node => node.props.testID === 'line-chart-tooltip').length, 1);
+      assert.equal(h.guides().length, 1);
+      assert.equal(h.guides()[0].props.x1, h.dot().cx);
+      assert.equal(h.dot().cx, x);
+      tooltip.props.onLayout({ nativeEvent: { layout: { height: 82 } } });
+      const position = elements(h.render()).find(node => node.props.testID === 'line-chart-tooltip')!.props.style[1];
+      assert.ok(position.left >= 0 && position.left + position.width <= width);
+      assert.ok(position.top >= 0 && position.top + 82 <= 180);
+      assert.ok(!/최신 값|선택 값/.test(h.text()));
+    }
+    select(null);
+    assert.equal(elements(h.render()).filter(node => node.props.testID === 'line-chart-tooltip').length, 0);
+  }
+});

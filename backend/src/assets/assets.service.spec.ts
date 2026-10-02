@@ -142,12 +142,13 @@ describe('AssetsService', () => {
 
   const createService = (binanceSymbolMetadata?: {
     getDisplayPriceDecimals: jest.Mock;
-  }) => {
+  }, redis?: { get: jest.Mock; setWithTtl: jest.Mock }) => {
     const prisma = createPrisma();
     const service = new AssetsService(
       prisma as never,
       binanceSymbolMetadata as never,
       new DailyChangeRateService(new MarketCandlesRepository(prisma as never)),
+      redis as never,
     );
 
     return { prisma, service, binanceSymbolMetadata };
@@ -1884,5 +1885,157 @@ describe('AssetsService', () => {
     await service.getAssets('user-1');
 
     expectNoAssetWrites(prisma);
+  });
+  describe('whole-universe sorting and stable snapshot pagination', () => {
+    function sortedSetup(redis?: { get: jest.Mock; setWithTtl: jest.Mock }) {
+      const h = createService(undefined, redis);
+      const values = ['-2', '8', null, '0', '-9', '3', '3'];
+      h.prisma.asset.findMany.mockResolvedValue(
+        values.map((_, i) => asset({ id: `a${i}`, symbol: `S${i}` })),
+      );
+      h.prisma.assetPriceSnapshot.findMany.mockImplementation(async (args) => {
+        if (args.select.rawPayloadJson)
+          return values.map((_, i) => ({
+            id: `p${i}`,
+            sourceType: 'provider_api',
+            sourceName: 'kis_krx_realtime_trade',
+            rawPayloadJson: {
+              truncated: false,
+              payload: {
+                messageType: 'websocket_trade',
+                rawFields: { ACML_VOL: i === 2 ? '' : String(i * 100) },
+              },
+            },
+          }));
+        return [
+          providerPriceSnapshot(
+            `p${args.where.assetId.slice(1)}`,
+            'kis_krx_realtime_trade',
+            '100',
+          ),
+        ];
+      });
+      jest
+        .spyOn(h.service, 'calculateChangeRate')
+        .mockImplementation(async (asset) => values[Number(asset.id.slice(1))]);
+      return h;
+    }
+    it.each([
+      ['changeRate', 'desc', ['a1', 'a5', 'a6', 'a3', 'a0', 'a4', 'a2']],
+      ['changeRate', 'asc', ['a4', 'a0', 'a3', 'a5', 'a6', 'a1', 'a2']],
+      ['volume', 'desc', ['a6', 'a5', 'a4', 'a3', 'a1', 'a0', 'a2']],
+    ])(
+      '%s %s sorts before pagination, with unavailable last and stable ties',
+      async (sortBy, sortOrder, expected) => {
+        const h = sortedSetup();
+        const query = {
+          sortBy: sortBy as string,
+          sortOrder: sortOrder as string,
+          limit: '2',
+          search: 'S',
+        };
+        const first = (await h.service.getAssets('user', query)).data;
+        expect(first.assets.map((a) => a.id)).toEqual(expected.slice(0, 2));
+        expect(h.prisma.asset.findMany.mock.calls[0][0]).not.toHaveProperty(
+          'take',
+        );
+        expect(h.prisma.asset.findMany.mock.calls[0][0].where).toHaveProperty(
+          'OR',
+        );
+        // New values/candidates must not perturb a sequence already being read.
+        h.prisma.asset.findMany.mockResolvedValue([]);
+        const ids = first.assets.map((a) => a.id);
+        for (let offset = 2; offset < 7; offset += 2) {
+          const page = (
+            await h.service.getAssets('user', {
+              ...query,
+              offset: String(offset),
+              sortSnapshot: first.sortSnapshot,
+            })
+          ).data;
+          ids.push(...page.assets.map((a) => a.id));
+          expect(page.pagination.total).toBe(7);
+        }
+        expect(ids).toEqual(expected);
+        expect(new Set(ids).size).toBe(7);
+        expect(h.prisma.asset.findMany).toHaveBeenCalledTimes(1);
+        const refresh = (await h.service.getAssets('user', query)).data;
+        expect(refresh.assets).toEqual([]);
+        expect(refresh.sortSnapshot).not.toBe(first.sortSnapshot);
+        expectNoAssetWrites(h.prisma);
+      },
+    );
+    it('shares immutable pages across instances through the existing Redis connection', async () => {
+      const previous = process.env.REDIS_URL;
+      process.env.REDIS_URL = 'redis://fixture.invalid';
+      const store = new Map<string, string>();
+      const redis = {
+        get: jest.fn(async (key: string) => store.get(key) ?? null),
+        setWithTtl: jest.fn(async (key: string, value: string, _ttl?: number) => { store.set(key, value); }),
+      };
+      try {
+        const first = sortedSetup(redis);
+        const query = { sortBy: 'volume', limit: '2' };
+        const page = (await first.service.getAssets('user', query)).data;
+        const other = createService(undefined, redis);
+        const next = (await other.service.getAssets('user', { ...query, offset: '2', sortSnapshot: page.sortSnapshot })).data;
+        expect(next.assets.map(a => a.id)).toEqual(['a4', 'a3']);
+        expect(other.prisma.asset.findMany).not.toHaveBeenCalled();
+        expect(redis.setWithTtl.mock.calls[0][2]).toBe(600);
+        redis.get.mockRejectedValue(new Error('cache unavailable'));
+        await expectApiError(createService(undefined, redis).service.getAssets('user', { ...query, offset: '2', sortSnapshot: page.sortSnapshot }), 409, 'ASSET_SORT_SNAPSHOT_EXPIRED');
+      } finally {
+        if (previous === undefined) delete process.env.REDIS_URL;
+        else process.env.REDIS_URL = previous;
+      }
+    });
+    it('rejects invalid/expired/cross-user/mismatched continuations instead of changing page order', async () => {
+      const h = sortedSetup();
+      const query = { sortBy: 'volume', sortOrder: 'desc' };
+      const first = (await h.service.getAssets('user', query)).data;
+      for (const changed of [
+        { sortBy: 'other' },
+        { sortOrder: 'asc' },
+        { withPrice: 'false' },
+        { withPrice: ' false ' },
+      ]) {
+        await expectApiError(
+          h.service.getAssets('user', { ...query, ...changed }),
+          400,
+          'INVALID_ASSET_SORT',
+        );
+      }
+      await expectApiError(
+        h.service.getAssets('user', { ...query, offset: '2' }),
+        400,
+        'INVALID_SORT_SNAPSHOT',
+      );
+      await expectApiError(
+        h.service.getAssets('other', {
+          ...query,
+          sortSnapshot: first.sortSnapshot,
+        }),
+        400,
+        'INVALID_SORT_SNAPSHOT',
+      );
+      await expectApiError(
+        h.service.getAssets('user', {
+          ...query,
+          search: 'new',
+          sortSnapshot: first.sortSnapshot,
+        }),
+        400,
+        'INVALID_SORT_SNAPSHOT',
+      );
+      jest.setSystemTime(new Date(testNow.getTime() + 600_001));
+      await expectApiError(
+        h.service.getAssets('user', {
+          ...query,
+          sortSnapshot: first.sortSnapshot,
+        }),
+        409,
+        'ASSET_SORT_SNAPSHOT_EXPIRED',
+      );
+    });
   });
 });

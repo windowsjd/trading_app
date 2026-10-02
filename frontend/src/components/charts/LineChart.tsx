@@ -20,6 +20,9 @@ export type LineChartProps = {
   pointValueFormatter?: (point: LineChartPoint) => string;
   labelFormatter?: (point: LineChartPoint) => string;
   emptyMessage?: string;
+  /** Opt in for real dated observations; never inserts missing observations. */
+  xScale?: 'index' | 'time';
+  selectionDisplay?: 'legacy' | 'tooltip';
 };
 const PADDING = 12;
 
@@ -40,12 +43,16 @@ export default function LineChart({
   pointValueFormatter,
   labelFormatter,
   emptyMessage = '차트 데이터가 충분하지 않습니다.',
+  xScale = 'index',
+  selectionDisplay = 'legacy',
 }: LineChartProps) {
   const { colors } = useAppearance();
   const gridColor = colors.border;
   const markerColor = colors.surface;
   const crosshairColor = colors.secondary;
   const [width, setWidth] = useState(320);
+  const [tooltipHeight, setTooltipHeight] = useState(68);
+  const tooltip = selectionDisplay === 'tooltip';
   // Bind selection to the dataset and layout. Account/range changes cannot
   // momentarily show the old point, even before an effect gets to run.
   const [selection, setSelection] = useState<{
@@ -57,7 +64,10 @@ export default function LineChart({
   const coordinates = useMemo(() => {
     const valid = points.flatMap((point) => {
       const value = Number(point.y);
-      return Number.isFinite(value) ? [{ point, value }] : [];
+      const time = point.x instanceof Date ? point.x.getTime()
+        : typeof point.x === 'number' ? point.x : Date.parse(point.x ?? '');
+      return Number.isFinite(value) && (xScale !== 'time' || Number.isFinite(time))
+        ? [{ point, value, time }] : [];
     });
     if (valid.length === 0) return [];
     const min = valid.reduce(
@@ -70,18 +80,22 @@ export default function LineChart({
     );
     const innerWidth = Math.max(width - 2 * PADDING, 1);
     const innerHeight = Math.max(height - 2 * PADDING, 1);
+    const firstTime = Math.min(...valid.map((row) => row.time));
+    const lastTime = Math.max(...valid.map((row) => row.time));
     // All actual points remain selectable. Numbers are only SVG geometry;
     // labels can always use the unmodified source string.
     return valid.map((row, index) => ({
       ...row,
       x:
         PADDING +
-        (valid.length === 1 ? 0.5 : index / (valid.length - 1)) * innerWidth,
+        (valid.length === 1 ? 0.5 : xScale === 'time'
+          ? (lastTime === firstTime ? 0.5 : (row.time - firstTime) / (lastTime - firstTime))
+          : index / (valid.length - 1)) * innerWidth,
       y:
         PADDING +
         (max === min ? 0.5 : 1 - (row.value - min) / (max - min)) * innerHeight,
     }));
-  }, [points, width, height]);
+  }, [points, width, height, xScale]);
   const path = useMemo(
     () =>
       coordinates
@@ -120,6 +134,10 @@ export default function LineChart({
     labelFormatter?.(coordinate.point) ?? getPointLabel(coordinate.point);
   const value =
     pointValueFormatter?.(coordinate.point) ?? valueFormatter(coordinate.value);
+  const tooltipWidth = Math.max(1, Math.min(240, width - 16));
+  const tooltipTop = coordinate.y - tooltipHeight - 12 >= 0
+    ? coordinate.y - tooltipHeight - 12
+    : Math.min(coordinate.y + 12, Math.max(0, height - tooltipHeight));
   return (
     <View
       onLayout={onLayout}
@@ -128,9 +146,9 @@ export default function LineChart({
       accessibilityRole="image"
       accessibilityLabel={`차트. ${selected ? '선택' : '마지막'} 값 ${label}, ${value}`}
     >
-      <Text style={styles.value}>
+      {!tooltip ? <Text style={styles.value}>
         {selected ? '선택 값' : '최신 값'} {value}
-      </Text>
+      </Text> : null}
       <LineChartGestures onSelect={onSelect}>
         <Svg width="100%" height={height}>
           {[0, 0.5, 1].map((ratio) => (
@@ -146,21 +164,21 @@ export default function LineChart({
           <Path
             d={path}
             fill="none"
-            stroke="#2563eb"
+            stroke={colors.info}
             strokeWidth={3}
             strokeLinecap="round"
             strokeLinejoin="round"
           />
           {selected ? (
             <>
-              <SvgLine
+              {!tooltip ? <SvgLine
                 x1={PADDING}
                 x2={width - PADDING}
                 y1={coordinate.y}
                 y2={coordinate.y}
                 stroke={crosshairColor}
                 strokeDasharray="4 4"
-              />
+              /> : null}
               <SvgLine
                 x1={coordinate.x}
                 x2={coordinate.x}
@@ -168,6 +186,7 @@ export default function LineChart({
                 y2={height - PADDING}
                 stroke={crosshairColor}
                 strokeDasharray="4 4"
+                strokeOpacity={tooltip ? 0.35 : 1}
               />
             </>
           ) : null}
@@ -175,12 +194,26 @@ export default function LineChart({
             cx={coordinate.x}
             cy={coordinate.y}
             r={4}
-            fill={selected ? '#2563eb' : markerColor}
-            stroke={selected ? '#fff' : '#2563eb'}
+            fill={selected ? colors.info : markerColor}
+            stroke={selected ? colors.surface : colors.info}
             strokeWidth={2}
           />
         </Svg>
-        {selected ? (
+        {selected && tooltip ? (
+          <View
+            testID="line-chart-tooltip"
+            pointerEvents="none"
+            onLayout={(event) => setTooltipHeight(event.nativeEvent.layout.height)}
+            style={[styles.tooltip, {
+              width: tooltipWidth,
+              left: Math.max(8, Math.min(coordinate.x - tooltipWidth / 2, width - tooltipWidth - 8)),
+              top: tooltipTop,
+            }]}
+          >
+            <Text style={styles.tooltipDate}>{label}</Text>
+            <Text style={styles.tooltipValue}>{value}</Text>
+          </View>
+        ) : selected ? (
           <View
             pointerEvents="none"
             style={[
@@ -197,12 +230,21 @@ export default function LineChart({
           </View>
         ) : null}
       </LineChartGestures>
-      <Text style={styles.date}>{label || '마지막 값'}</Text>
+      {tooltip ? (
+        <View style={styles.axis}>
+          <Text style={styles.date}>{getPointLabel(coordinates[0].point)}</Text>
+          {coordinates.length > 1 ? <Text style={styles.date}>{getPointLabel(coordinates[coordinates.length - 1].point)}</Text> : null}
+        </View>
+      ) : <Text style={styles.date}>{label || '마지막 값'}</Text>}
     </View>
   );
 }
 const styles = StyleSheet.create({
   container: { minHeight: 128, gap: 6, minWidth: 0 },
+  axis: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 },
+  tooltip: { position: 'absolute', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: semantic.border, backgroundColor: semantic.raised, gap: 2 },
+  tooltipDate: { fontSize: 12, lineHeight: 18, color: semantic.secondary },
+  tooltipValue: { fontSize: 13, lineHeight: 20, fontWeight: '700', color: semantic.text, flexShrink: 1 },
   value: {
     color: semantic.text,
     fontSize: 14,

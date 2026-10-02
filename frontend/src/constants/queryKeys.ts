@@ -69,6 +69,8 @@ export const QUERY_KEYS = {
 
   market: {
     assets: (params: {
+      sortBy?: 'volume' | 'changeRate';
+      sortOrder?: 'asc' | 'desc';
       assetType?: string;
       search?: string;
       market?: string;
@@ -87,6 +89,7 @@ export const QUERY_KEYS = {
         params.withPrice ?? false,
         params.limit ?? null,
         params.offset ?? 0,
+        ...(params.sortBy ? [params.sortBy, params.sortOrder ?? 'desc'] : []),
       ] as const,
   },
 

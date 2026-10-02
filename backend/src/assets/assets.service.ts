@@ -35,6 +35,13 @@ import { buildPagination, type Pagination } from '../common/pagination';
 import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
 import { DailyChangeRateService } from './daily-change-rate.service';
+import { randomUUID } from 'node:crypto';
+import { RedisService } from '../redis/redis.service';
+import {
+  compareAssetListMetric,
+  readAssetListVolume,
+  type AssetListVolume,
+} from './asset-list-volume';
 import {
   type AdminDiagnostic,
   buildAdminPartialFailureDiagnostic,
@@ -51,6 +58,9 @@ export type AssetsQuery = {
   withPrice?: string;
   limit?: string;
   offset?: string;
+  sortBy?: string;
+  sortOrder?: string;
+  sortSnapshot?: string;
 };
 
 type ParsedAssetsQuery = {
@@ -62,6 +72,9 @@ type ParsedAssetsQuery = {
   withPrice: boolean;
   limit: number;
   offset: number;
+  sortBy?: 'volume' | 'changeRate';
+  sortOrder: 'asc' | 'desc';
+  sortSnapshot?: string;
 };
 
 type AssetRecord = {
@@ -199,6 +212,13 @@ export type RealtimePriceKrwConversion =
 
 type AssetListItem = ReturnType<AssetsService['formatAssetMetadata']> & {
   price?: AssetPricePayload;
+} & Partial<AssetListVolume>;
+
+type SortedAssetSnapshot = {
+  key: string;
+  expiresAt: number;
+  assets: AssetListItem[];
+  priceErrors: AssetPriceError[];
 };
 
 type AssetsListResponse = {
@@ -209,6 +229,7 @@ type AssetsListResponse = {
     pagination: Pagination;
     assets: AssetListItem[];
     priceErrors: AssetPriceError[];
+    sortSnapshot?: string;
   };
 };
 
@@ -283,6 +304,7 @@ const MAX_LIMIT = 100;
 const REALTIME_FX_CACHE_TTL_MS = 2_000;
 @Injectable()
 export class AssetsService {
+  private readonly sortedSnapshots = new Map<string, SortedAssetSnapshot>();
   private realtimeUsdKrwCache: {
     selection: UsdKrwSelection;
     expiresAt: number;
@@ -298,6 +320,7 @@ export class AssetsService {
     private readonly binanceSymbolMetadata?: BinanceSymbolMetadataService,
     @Optional()
     private readonly dailyChangeRate?: DailyChangeRateService,
+    @Optional() private readonly redis?: RedisService,
   ) {}
 
   async getAssets(
@@ -313,6 +336,7 @@ export class AssetsService {
     }
 
     const parsedQuery = this.parseQuery(query);
+    if (parsedQuery.sortBy) return this.getSortedAssets(userId, parsedQuery);
     const where = this.buildAssetWhere(parsedQuery);
     const [total, assets] = await Promise.all([
       this.prisma.asset.count({ where }),
@@ -345,6 +369,138 @@ export class AssetsService {
         pagination: this.pagination(parsedQuery, total, assets.length),
         assets: pricedAssets.assets,
         priceErrors: pricedAssets.priceErrors,
+      },
+    };
+  }
+
+  private async getSortedAssets(
+    userId: string,
+    query: ParsedAssetsQuery,
+  ): Promise<AssetsListResponse> {
+    const key = JSON.stringify([
+      userId,
+      this.formatFilters(query),
+      query.sortBy,
+      query.sortOrder,
+    ]);
+    let token = query.sortSnapshot;
+    let snapshot: SortedAssetSnapshot | undefined;
+    const now = Date.now();
+    // Bound local memory, including installations that do not configure Redis.
+    for (const [id, value] of this.sortedSnapshots) {
+      if (value.expiresAt <= now) this.sortedSnapshots.delete(id);
+    }
+    if (token) {
+      snapshot = this.sortedSnapshots.get(token);
+      if (!snapshot && this.redis && process.env.REDIS_URL) {
+        try {
+          const stored = await this.redis.get(`assets:sort:${token}`);
+          if (stored) snapshot = JSON.parse(stored) as SortedAssetSnapshot;
+        } catch {
+          /* A lost snapshot must never silently reorder later pages. */
+        }
+      }
+      if (!snapshot || snapshot.expiresAt <= now) {
+        this.throwApiError(
+          HttpStatus.CONFLICT,
+          'ASSET_SORT_SNAPSHOT_EXPIRED',
+          'Refresh the list from the first page.',
+        );
+      }
+      if (snapshot.key !== key) {
+        this.throwApiError(
+          HttpStatus.BAD_REQUEST,
+          'INVALID_SORT_SNAPSHOT',
+          'Sort snapshot does not match the requested filters.',
+        );
+      }
+    } else {
+      if (query.offset !== 0) {
+        this.throwApiError(
+          HttpStatus.BAD_REQUEST,
+          'INVALID_SORT_SNAPSHOT',
+          'Sorted pagination requires sortSnapshot.',
+        );
+      }
+      const candidates = await this.prisma.asset.findMany({
+        where: this.buildAssetWhere(query),
+        orderBy: [{ symbol: 'asc' }, { id: 'asc' }],
+        select: this.assetSelect(),
+      });
+      const priced = await this.buildAssetsWithPrices(
+        candidates,
+        new Date(now),
+      );
+      const ids = priced.assets.flatMap((asset) =>
+        asset.price?.state === 'available'
+          ? [asset.price.assetPriceSnapshotId]
+          : [],
+      );
+      const evidence = ids.length
+        ? await this.prisma.assetPriceSnapshot.findMany({
+            where: { id: { in: ids } },
+            select: {
+              id: true,
+              sourceType: true,
+              sourceName: true,
+              rawPayloadJson: true,
+            },
+          })
+        : [];
+      const byId = new Map(evidence.map((row) => [row.id, row]));
+      const assets = priced.assets.map((asset) => ({
+        ...asset,
+        ...readAssetListVolume(
+          asset.price?.state === 'available'
+            ? byId.get(asset.price.assetPriceSnapshotId)
+            : undefined,
+        ),
+      }));
+      assets.sort((a, b) =>
+        compareAssetListMetric(a, b, query.sortBy!, query.sortOrder),
+      );
+      snapshot = {
+        key,
+        expiresAt: Date.now() + 600_000,
+        assets,
+        priceErrors: priced.priceErrors,
+      };
+      token = randomUUID();
+      while (this.sortedSnapshots.size >= 200)
+        this.sortedSnapshots.delete(this.sortedSnapshots.keys().next().value!);
+      this.sortedSnapshots.set(token, snapshot);
+      if (this.redis && process.env.REDIS_URL) {
+        try {
+          await this.redis.setWithTtl(
+            `assets:sort:${token}`,
+            JSON.stringify(snapshot),
+            600,
+          );
+        } catch {
+          /* Local continuity still works; other instances fail explicitly. */
+        }
+      }
+    }
+    const assets = snapshot.assets.slice(
+      query.offset,
+      query.offset + query.limit,
+    );
+    const pageIds = new Set(assets.map((asset) => asset.id));
+    return {
+      success: true,
+      data: {
+        state: 'available',
+        filters: this.formatFilters(query),
+        sortSnapshot: token,
+        pagination: this.pagination(
+          query,
+          snapshot.assets.length,
+          assets.length,
+        ),
+        assets,
+        priceErrors: snapshot.priceErrors.filter((error) =>
+          pageIds.has(error.assetId),
+        ),
       },
     };
   }
@@ -1111,7 +1267,34 @@ export class AssetsService {
   }
 
   private parseQuery(query: AssetsQuery): ParsedAssetsQuery {
+    const sortBy = this.parseOptionalText(query.sortBy);
+    const sortOrder =
+      this.parseOptionalText(query.sortOrder) ?? (sortBy ? 'desc' : 'asc');
+    const sortSnapshot = this.parseOptionalText(query.sortSnapshot);
+    if (
+      (sortBy && sortBy !== 'volume' && sortBy !== 'changeRate') ||
+      (sortOrder !== 'asc' && sortOrder !== 'desc') ||
+      (sortBy === 'volume' && sortOrder !== 'desc') ||
+      (!sortBy && (query.sortOrder !== undefined || sortSnapshot)) ||
+      (sortSnapshot && !/^[0-9a-f-]{36}$/.test(sortSnapshot))
+    ) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'INVALID_ASSET_SORT',
+        'Invalid asset sort parameters.',
+      );
+    }
+    if (sortBy && this.parseOptionalText(query.withPrice) === 'false') {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'INVALID_ASSET_SORT',
+        'Sorting requires withPrice=true.',
+      );
+    }
     return {
+      sortBy: sortBy as ParsedAssetsQuery['sortBy'],
+      sortOrder,
+      sortSnapshot,
       assetType: this.parseAssetType(query.assetType),
       currencyCode: this.parseCurrencyCode(query.currencyCode),
       market: this.parseOptionalText(query.market),
@@ -1306,6 +1489,9 @@ export class AssetsService {
       search: query.search ?? null,
       includeInactive: query.includeInactive,
       withPrice: query.withPrice,
+      ...(query.sortBy
+        ? { sortBy: query.sortBy, sortOrder: query.sortOrder }
+        : {}),
     };
   }
 

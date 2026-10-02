@@ -1,5 +1,5 @@
 import { semantic } from '../../theme/tokens';
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, useWindowDimensions, Platform } from '../../theme/native';
 import { getScreenContentStyle } from '../../theme/screenLayout';
 import { useQuery } from '@tanstack/react-query';
@@ -27,7 +27,7 @@ import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
-import HomePortfolioCharts from './HomePortfolioCharts';
+import HomeAssetTrend, { type HomeEquityRange } from './HomeAssetTrend';
 import HomeAssetHero from './HomeAssetHero';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
 
@@ -64,7 +64,6 @@ type Props = {
 };
 
 const POSITIONS_PREVIEW_LIMIT = 5;
-const EQUITY_RANGE = '30d' as const;
 
 export default function SeasonAccountHome({
   account,
@@ -74,6 +73,8 @@ export default function SeasonAccountHome({
   onOpenAsset,
 }: Props) {
   const accountId = account.id;
+  const [trendExpanded, setTrendExpanded] = useState(false);
+  const [equityRange, setEquityRange] = useState<HomeEquityRange>('30d');
   const season = account.season;
   const { fontScale } = useWindowDimensions();
 
@@ -108,10 +109,11 @@ export default function SeasonAccountHome({
   const equityQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.portfolioEquity(
       accountId,
-      EQUITY_RANGE,
+      equityRange,
       'daily',
     ),
-    queryFn: () => getTradingAccountEquity(accountId, EQUITY_RANGE, 'daily'),
+    queryFn: () => getTradingAccountEquity(accountId, equityRange, 'daily'),
+    enabled: trendExpanded,
   });
 
   /**
@@ -233,6 +235,17 @@ export default function SeasonAccountHome({
         unavailableMessage={portfolioNotice?.message}
       />
 
+      <HomeAssetTrend
+        expanded={trendExpanded}
+        onToggle={() => setTrendExpanded((value) => !value)}
+        range={equityRange}
+        onRangeChange={setEquityRange}
+        equity={equityQuery.data}
+        loading={equityQuery.isLoading}
+        failed={equityQuery.isError}
+        general={false}
+      />
+
       <View testID={TEST_IDS.home.competition} style={styles.card}>
         {meQuery.isLoading ? (
           <SectionSkeleton lines={1} />
@@ -272,15 +285,7 @@ export default function SeasonAccountHome({
         <InlineEmptyState message="랭킹 정보를 불러오지 못했습니다. 자산 정보는 위에 표시된 값이 최신입니다." />
       ) : null}
 
-      <HomePortfolioCharts
-        portfolio={portfolio}
-        equity={equityQuery.data}
-        loading={equityQuery.isLoading}
-        failed={equityQuery.isError}
-        general={false}
-      />
-
-      <View style={styles.card}>
+      <View testID="home-holdings" style={styles.card}>
         <Text style={styles.label}>보유 종목</Text>
         {positionsQuery.isLoading ? (
           <SectionSkeleton lines={3} />

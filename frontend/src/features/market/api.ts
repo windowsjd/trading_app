@@ -41,6 +41,8 @@ export interface MarketAssetItemDto {
   displayPriceDecimals?: number | null;
   changeRate?: PercentString | null;
   settlementCurrency: CurrencyCode;
+  volume?: string | null;
+  volumePeriod?: 'session' | 'rolling_24h' | null;
   isActive: boolean;
   marketStatus: string;
   tradable: boolean;
@@ -56,6 +58,7 @@ export interface AssetPriceErrorDto {
 }
 
 export interface AssetsResponseDto {
+  sortSnapshot?: string;
   state?: SectionState;
   filters?: Record<string, unknown>;
   pagination: OffsetPagination;
@@ -64,6 +67,9 @@ export interface AssetsResponseDto {
 }
 
 export interface GetAssetsParams {
+  sortBy?: 'volume' | 'changeRate';
+  sortOrder?: 'asc' | 'desc';
+  sortSnapshot?: string;
   assetType?: AssetType;
   currencyCode?: CurrencyCode;
   market?: string;
@@ -92,6 +98,9 @@ export async function getAssets(params: GetAssetsParams) {
   const limit = params.limit ?? 20;
   const offset = params.offset ?? 0;
   const searchParams = new URLSearchParams();
+  if (params.sortBy) searchParams.set('sortBy', params.sortBy);
+  if (params.sortOrder) searchParams.set('sortOrder', params.sortOrder);
+  if (params.sortSnapshot) searchParams.set('sortSnapshot', params.sortSnapshot);
 
   if (params.assetType) searchParams.set('assetType', params.assetType);
   if (params.currencyCode) searchParams.set('currencyCode', params.currencyCode);

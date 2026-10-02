@@ -118,3 +118,14 @@ detail destination. Only transport and the root-navigation adapter are mocked.
 Use `--navigation-only` to debug those routes without repeating layouts.
 Artifacts go to `/tmp/trading-wallet-browser` (override `WALLET_BROWSER_OUTPUT`).
 All external requests are blocked; Android/iOS device checks remain separate.
+
+Run `NODE_PATH=/path/to/browser-tools/node_modules node test/browser/homeMarketBrowser.cjs`
+for the Home disclosure and Market sorting. It checks 320/360/390/430px × Light/Dark,
+Home at font scales 1/2 in both account modes, all five daily ranges, 16-digit KRW
+tooltips at first/middle/last points, glyph clipping, delayed account switches,
+Market sort choices, search and server snapshot pagination. Fixtures contain only
+explicit actual-date test observations; they do not replace production data.
+Artifacts go to `/tmp/trading-home-market-browser` (`HOME_MARKET_BROWSER_OUTPUT`).
+Set `LD_LIBRARY_PATH` and `FONTCONFIG_FILE` when browser libraries/fonts live outside
+the system paths. Native-device screen readers and touch recognition remain a
+separate device check.

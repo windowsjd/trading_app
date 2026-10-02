@@ -53,7 +53,7 @@ export type TradingAccountEquityQuery = {
   granularity?: string;
 };
 
-type EquityRange = '1d' | '7d' | '30d' | 'all';
+type EquityRange = '1d' | '7d' | '30d' | '90d' | '180d' | '360d' | 'all';
 
 type EquityHistoryPoint = {
   time: string;
@@ -445,7 +445,7 @@ export class TradingAccountPortfolioService {
         day: '2-digit',
       }).format(date);
     const end = new Date(`${dateKey(now)}T00:00:00.000Z`);
-    const days = range === '1d' ? 1 : range === '7d' ? 7 : 30;
+    const days = range === 'all' ? 0 : Number.parseInt(range, 10);
     const start =
       range === 'all'
         ? new Date(`${dateKey(account.openedAt)}T00:00:00.000Z`)
@@ -677,7 +677,10 @@ export class TradingAccountPortfolioService {
       case '7d':
         return new Date(now - 7 * 24 * 60 * 60 * 1000);
       case '30d':
-        return new Date(now - 30 * 24 * 60 * 60 * 1000);
+      case '90d':
+      case '180d':
+      case '360d':
+        return new Date(now - Number.parseInt(range, 10) * 86_400_000);
       case 'all':
       default:
         // For a general account "all" means everything since it opened.
@@ -688,7 +691,14 @@ export class TradingAccountPortfolioService {
   private parseRange(value: string | undefined): EquityRange {
     const text = typeof value === 'string' ? value.trim() : '';
     if (text === '' || text === '1d') return '1d';
-    if (text === '7d' || text === '30d' || text === 'all') {
+    if (
+      text === '7d' ||
+      text === '30d' ||
+      text === '90d' ||
+      text === '180d' ||
+      text === '360d' ||
+      text === 'all'
+    ) {
       return text;
     }
 
@@ -697,7 +707,7 @@ export class TradingAccountPortfolioService {
         success: false,
         error: {
           code: 'INVALID_RANGE',
-          message: 'range must be one of 1d, 7d, 30d, all.',
+          message: 'range must be one of 1d, 7d, 30d, 90d, 180d, 360d, all.',
         },
       },
       HttpStatus.BAD_REQUEST,

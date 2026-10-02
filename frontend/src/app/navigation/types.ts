@@ -28,7 +28,7 @@ export type WalletStackParamList = {
 
 export type MarketStackParamList = {
   Market: undefined;
-  MarketSearch: { returnToAsset?: boolean } | undefined;
+  MarketSearch: { returnToAsset?: boolean; sort?: import('../../features/market/marketSort').MarketSort } | undefined;
   AssetDetail: { assetId: string };
   /**
    * `accountId` is REQUIRED, not optional (작업 10 §A-2).

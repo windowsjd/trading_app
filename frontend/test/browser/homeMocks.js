@@ -74,10 +74,24 @@ export const apiClient = {
         allocation: { state: 'available', cashKrwValue: '2000000', domesticStockValueKrw: '7648192', usStockValueKrw: '0', cryptoValueKrw: '0' },
       });
     }
-    if (path.endsWith('/portfolio/equity')) return response({
-      tradingAccountId: account.id, mode: account.mode, state: 'empty',
-      range: '30d', granularity: 'daily', returnRateMethod, points: [],
-    });
+    if (path.endsWith('/portfolio/equity')) {
+      const range = config?.params?.range ?? '30d';
+      transport.equityRequests ??= [];
+      transport.equityRequests.push({ accountId: account.id, range, granularity: config?.params?.granularity });
+      if (transport.trendDelay === account.id) await new Promise(resolve => transport.pending.push(resolve));
+      const end = Date.parse('2026-10-02T00:00:00Z');
+      const points = params.has('trend') ? Array.from({ length: Math.min(200, parseInt(range)) }, (_, i) => i)
+        .filter(i => i !== 2 && i !== 3).reverse().map((i) => ({
+          snapshotDate: new Date(end - i * 86400000).toISOString().slice(0, 10),
+          time: new Date(end - i * 86400000 + 3600000).toISOString(),
+          totalAssetKrw: long ? String(1234567890123400 + (i % 7)) : String((account.mode === 'season' ? 10000000 : 20000000) + (i % 7) * 1000),
+          returnRate: '0', returnRateMethod, snapshotReason: 'scheduled', externalFundingAmountKrw: null,
+          cumulativeExternalFundingKrw: account.mode === 'general' ? '10000000' : null,
+          investmentPnlKrw: account.mode === 'general' ? '0' : null,
+        })) : [];
+      return response({ tradingAccountId: account.id, mode: account.mode,
+        state: points.length ? 'available' : 'empty', range, granularity: 'daily', returnRateMethod, points });
+    }
     if (path.endsWith('/wallets')) return response({ tradingAccountId: account.id, wallets: params.has('holdings') ? [
       { currencyCode: 'KRW', balance: long ? '1234567890123456' : account.mode === 'general' ? '9900000' : '8800000' },
       { currencyCode: 'USD', balance: long ? '1234567890123.45' : '50.39' },

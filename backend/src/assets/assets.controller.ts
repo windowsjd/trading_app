@@ -32,6 +32,9 @@ export class AssetsController {
         withPrice: 'INVALID_WITH_PRICE',
         limit: 'INVALID_LIMIT',
         offset: 'INVALID_OFFSET',
+        sortBy: 'INVALID_ASSET_SORT',
+        sortOrder: 'INVALID_ASSET_SORT',
+        sortSnapshot: 'INVALID_SORT_SNAPSHOT',
       } satisfies Record<keyof AssetsQuery, string>),
     )
     query: AssetsQuery,

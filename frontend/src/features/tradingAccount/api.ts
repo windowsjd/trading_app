@@ -135,7 +135,7 @@ export interface TradingAccountPortfolioDto {
   message?: string;
 }
 
-export type TradingAccountEquityRange = '1d' | '7d' | '30d' | 'all';
+export type TradingAccountEquityRange = '1d' | '7d' | '30d' | '90d' | '180d' | '360d' | 'all';
 
 export interface TradingAccountEquityPointDto {
   time: string;

@@ -1,3 +1,5 @@
+import MarketSortControl from '../../features/market/MarketSortControl';
+import { marketSortParams, nextMarketPage, type MarketSort, type MarketPageParam } from '../../features/market/marketSort';
 import { semantic } from '../../theme/tokens';
 import { getScreenContentStyle } from '../../theme/screenLayout';
 import { getMarketSessionLabel } from '../../features/market/marketPresentation';
@@ -45,10 +47,13 @@ const CRYPTO_PRICE_BASIS_TEXT = '가격 기준: Binance Spot 최근 체결가';
 export default function MarketScreen({ navigation }: Props) {
   const isAdmin = useAdminDiagnostics();
   const [selectedTab, setSelectedTab] = useState<AssetType>('domestic_stock');
+  const [sort, setSort] = useState<MarketSort>('volume_desc');
+  const sortParams = marketSortParams(sort);
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
 
   const marketQuery = useInfiniteQuery({
     queryKey: QUERY_KEYS.market.assets({
+      ...sortParams,
       assetType: selectedTab,
       withPrice: true,
       limit: 20,
@@ -56,13 +61,15 @@ export default function MarketScreen({ navigation }: Props) {
     }),
     queryFn: ({ pageParam }) =>
       getAssets({
+        ...sortParams,
+        sortSnapshot: pageParam.sortSnapshot,
         assetType: selectedTab,
         withPrice: true,
-        offset: pageParam,
+        offset: pageParam.offset,
         limit: 20,
       }),
-    getNextPageParam: (lastPage) => lastPage.pagination.nextOffset ?? undefined,
-    initialPageParam: 0,
+    getNextPageParam: nextMarketPage,
+    initialPageParam: { offset: 0 } as MarketPageParam,
   });
 
   // REST is the baseline and stays untouched: rows receive their ticker as a
@@ -107,10 +114,10 @@ export default function MarketScreen({ navigation }: Props) {
 
   const viewState = useMemo(() => {
     if (marketQuery.isLoading) return 'market_loading';
-    if (marketQuery.isError) return 'market_error';
+    if (marketQuery.isError && !marketQuery.data) return 'market_error';
     if (!items.length) return 'market_empty';
     return 'market_ready';
-  }, [marketQuery.isLoading, marketQuery.isError, items.length]);
+  }, [marketQuery.isLoading, marketQuery.isError, marketQuery.data, items.length]);
 
   if (viewState === 'market_loading') {
     return <FullPageLoading message="종목 목록을 불러오는 중입니다." />;
@@ -137,11 +144,13 @@ export default function MarketScreen({ navigation }: Props) {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.content}
         onEndReached={() => {
-          if (marketQuery.hasNextPage && !marketQuery.isFetchingNextPage) {
+          if (marketQuery.hasNextPage && !marketQuery.isFetching && !marketQuery.isError) {
             void marketQuery.fetchNextPage();
           }
         }}
         onEndReachedThreshold={0.4}
+        refreshing={marketQuery.isRefetching}
+        onRefresh={() => void marketQuery.refetch()}
         ListHeaderComponent={
           <View style={styles.headerSection}>
             <View style={styles.tabRow}>
@@ -173,7 +182,7 @@ export default function MarketScreen({ navigation }: Props) {
 
             <ActionPressable
               style={styles.searchEntry}
-              onPress={() => navigation.navigate('MarketSearch')}
+              onPress={() => navigation.navigate('MarketSearch', { sort })}
             >
               <Text style={styles.searchEntryText}>종목명 또는 심볼 검색</Text>
             </ActionPressable>
@@ -187,6 +196,13 @@ export default function MarketScreen({ navigation }: Props) {
             <Text testID="market-session-summary" style={styles.sessionSummary}>
               {getMarketSessionLabel(selectedTab, items, tickersByAssetId)}
             </Text>
+
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
+              <ActionPressable accessibilityRole="button" onPress={() => void marketQuery.refetch()} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 }}>
+                <Text style={{ color: semantic.secondary, fontSize: 12 }}>새로고침</Text>
+              </ActionPressable>
+              <MarketSortControl value={sort} onChange={setSort} assetType={selectedTab} />
+            </View>
 
             {/* One screen-level notice; rows never repeat a connection error. */}
             {isAdmin && showReconnectBanner ? (
@@ -222,7 +238,11 @@ export default function MarketScreen({ navigation }: Props) {
           />
         )}
         ListFooterComponent={
-          marketQuery.isFetchingNextPage ? (
+          marketQuery.isFetchNextPageError ? (
+            <ActionPressable accessibilityRole="button" onPress={() => void marketQuery.refetch()} style={{ minHeight: 48, justifyContent: 'center' }}>
+              <Text>목록을 새로고침해 계속 보기</Text>
+            </ActionPressable>
+          ) : marketQuery.isFetchingNextPage ? (
             <View style={styles.footerLoader}>
               <ActivityIndicator />
             </View>

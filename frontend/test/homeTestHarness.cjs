@@ -57,8 +57,15 @@ function createHomeHarness(mode = 'general') {
   native.Platform = { OS: 'android' };
   native.useWindowDimensions = () => ({ width: 390, height: 844, fontScale: 1 });
   const root = { navigate: (...args) => h.navigation.push(args) };
+  let stateIndex = 0;
+  let stateAccount = h.account.id;
+  let states = [];
   const mocks = {
-    react: { ...React, useMemo: (fn) => fn() },
+    react: { ...React, useMemo: (fn) => fn(), useState: (initial) => {
+      const index = stateIndex++;
+      if (!(index in states)) states[index] = typeof initial === 'function' ? initial() : initial;
+      return [states[index], (value) => { states[index] = typeof value === 'function' ? value(states[index]) : value; }];
+    } },
     'react-native': native,
     '@tanstack/react-query': {
       useQuery: (options) => {
@@ -129,7 +136,7 @@ function createHomeHarness(mode = 'general') {
   const expandDisplay = (node) => {
     if (Array.isArray(node)) return node.map(expandDisplay);
     if (!React.isValidElement(node)) return node;
-    if (node.type === hero || node.type === positionRow) return expandDisplay(node.type(node.props));
+    if (node.type === hero || node.type === positionRow || node.type === charts) return expandDisplay(node.type(node.props));
     return React.cloneElement(node, {}, expandDisplay(node.props.children));
   };
   h.renderWallet = () => {
@@ -140,10 +147,10 @@ function createHomeHarness(mode = 'general') {
   };
   mocks['./HomeAssetHero'] = { default: hero, __esModule: true };
   const charts = load(
-    resolve(__dirname, '../src/screens/home/HomePortfolioCharts.tsx'),
+    resolve(__dirname, '../src/screens/home/HomeAssetTrend.tsx'),
     mocks,
   ).default;
-  mocks['./HomePortfolioCharts'] = { default: charts, __esModule: true };
+  mocks['./HomeAssetTrend'] = { default: charts, __esModule: true };
   const home = load(
     resolve(__dirname, '../src/screens/home/HomeScreen.tsx'),
     mocks,
@@ -192,6 +199,8 @@ function createHomeHarness(mode = 'general') {
   };
   h.home = () => home({ navigation: root });
   h.render = () => {
+    if (stateAccount !== h.account.id) { states = []; stateAccount = h.account.id; }
+    stateIndex = 0;
     h.queries = [];
     const branch = elements(h.home()).find(
       (node) =>
@@ -204,8 +213,17 @@ function createHomeHarness(mode = 'general') {
       branch.props,
     );
     const tree = expandDisplay(screenTree);
-    const chart = elements(tree).find((node) => node.type === charts);
+    const chart = elements(screenTree).find((node) => node.type === charts);
     return { tree, chart: chart ? charts(chart.props) : null, branch };
+  };
+  h.openTrend = () => {
+    const rendered = h.render();
+    elements(rendered.chart, 'Pressable').find((node) => node.props.testID === 'home-trend-toggle').props.onPress();
+    return h.render();
+  };
+  h.selectRange = (range) => {
+    elements(h.render().chart, 'Pressable').find((node) => node.props.testID === `home-trend-range-${range}`).props.onPress();
+    return h.render();
   };
   h.seed = (account, equity) => {
     const base = ['tradingAccount', 'portfolio', account.id];

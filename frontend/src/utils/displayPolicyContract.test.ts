@@ -97,7 +97,7 @@ describe('KST timestamp display contract', () => {
   });
 
   it('keeps date-only fields out of the datetime formatter', () => {
-    const homeCharts = read('screens/home/HomePortfolioCharts.tsx');
+    const homeCharts = read('screens/home/HomeAssetTrend.tsx');
     assert.match(homeCharts, /label: point\.snapshotDate/u);
     assert.doesNotMatch(homeCharts, /formatKstDateTime/u);
     const ranking = read('screens/ranking/RankingScreen.tsx');

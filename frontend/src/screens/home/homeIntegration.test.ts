@@ -293,13 +293,12 @@ describe('home exchange shortcut', () => {
 
 describe('general/season home API, queries, rendering and navigation integration', () => {
   for (const mode of ['general', 'season']) {
-    it(`${mode} keeps both charts, positions and reachable wallet history and its unique features`, async () => {
+    it(`${mode} opens daily trend above positions and reachable wallet history and its unique features`, async () => {
       const h = createHomeHarness(mode);
       h.seed(h.account, fixture[mode].data);
-      const { tree, chart, branch } = h.render();
+      const { tree, chart, branch } = h.openTrend();
       const text = texts(tree) + texts(chart);
       for (const label of [
-        '자산 배분',
         '자산 추이',
         '보유 종목',
       ])
@@ -320,12 +319,6 @@ describe('general/season home API, queries, rendering and navigation integration
           assert.ok(text.includes(label));
         assert.ok(!text.includes('자금 구성'));
       }
-      const donut = elements(chart, 'DonutChart')[0];
-      assert.deepEqual(
-        donut.props.segments.map((s) => s.value),
-        ['10000', '1000', '9900000', '90000'],
-      );
-      assert.equal(donut.props.totalLabel, '10,001,000원');
       const line = elements(chart, 'LineChart')[0];
       assert.deepEqual(
         line.props.points.map((p) => p.y),
@@ -380,7 +373,7 @@ describe('general/season home API, queries, rendering and navigation integration
       assert.equal(elements(failed.tree, 'ErrorState').length, 1);
       assert.equal(failed.chart, null);
       h.failEquity(new Error('network unavailable'));
-      const transient = h.render();
+      const transient = h.openTrend();
       assert.ok(texts(transient.tree).includes('총 자산'));
       assert.ok(
         elements(transient.chart, 'InlineEmptyState').some(
@@ -562,4 +555,39 @@ describe('wallet button through destination RecordOrderList account lookup and A
       h.close();
     });
   }
+});
+
+for (const mode of ['general', 'season']) it(`${mode} disclosure, ranges and account switches keep adjacent scoped daily content`, (t) => {
+  const h = createHomeHarness(mode);
+  t.after(h.close);
+  h.seed(h.account, fixture[mode].data);
+  let rendered = h.render();
+  const toggle = () => elements(rendered.tree, 'Pressable').find(node => node.props.testID === 'home-trend-toggle')!;
+  assert.equal(toggle().props.accessibilityState.expanded, false);
+  assert.equal(elements(rendered.tree, 'LineChart').length, 0);
+  assert.equal(h.queries.find(query => query.queryKey.includes('equity')).enabled, false);
+  rendered = h.openTrend();
+  assert.equal(toggle().props.accessibilityState.expanded, true);
+  const nodes = elements(rendered.tree);
+  const at = id => nodes.findIndex(node => node.props.testID === id);
+  assert.ok(at('home-summary-card') < at('home-trend-toggle'));
+  assert.ok(at('home-trend-toggle') < at('home-trend-chart'));
+  assert.ok(at('home-trend-chart') < at('home-holdings'));
+  if (mode === 'season') assert.ok(at('home-trend-chart') < at('home-competition') && at('home-competition') < at('home-holdings'));
+  for (const range of ['7d', '30d', '90d', '180d', '360d']) {
+    rendered = h.selectRange(range);
+    const query = h.queries.find(query => query.queryKey.includes('equity'));
+    assert.deepEqual(query.queryKey, QUERY_KEYS.tradingAccount.portfolioEquity(h.account.id, range, 'daily'));
+    assert.equal(query.enabled, true);
+    if (range !== '30d') assert.equal(elements(rendered.tree, 'LineChart').length, 0, 'no previous range data while loading');
+  }
+  const oldId = h.account.id;
+  h.account = { ...h.account, id: 'next-account' };
+  h.seed(h.account, { ...fixture[mode].data, tradingAccountId: h.account.id });
+  rendered = h.render();
+  assert.equal(toggle().props.accessibilityState.expanded, false);
+  assert.equal(elements(rendered.tree, 'LineChart').length, 0);
+  const query = h.queries.find(query => query.queryKey.includes('equity'));
+  assert.ok(!query.queryKey.includes(oldId));
+  assert.ok(query.queryKey.includes('30d'));
 });

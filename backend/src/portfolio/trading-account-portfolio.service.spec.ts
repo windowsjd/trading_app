@@ -277,3 +277,69 @@ describe('canonical daily date range boundaries', () => {
     },
   );
 });
+
+describe('extended Home calendar ranges', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-10-01T15:00:01Z'));
+  });
+  afterEach(() => jest.useRealTimers());
+  it.each(['general', 'season'] as const)(
+    '%s selects only actual rows across every calendar range',
+    async (mode) => {
+      for (const days of [7, 30, 90, 180, 360]) {
+        const h = setup(mode);
+        const end = new Date('2026-10-02T00:00:00Z');
+        const start = new Date(end.getTime() - (days - 1) * 86400000);
+        // 200 calendar dates of account history with real missing days.
+        const history = Array.from({ length: 200 }, (_, i) => ({
+          ...h.rows[0],
+          id: `d${i}`,
+          snapshotDate: new Date(end.getTime() - i * 86400000),
+        }))
+          .filter((_, i) => i !== 2 && i !== 3)
+          .reverse();
+        h.client.dailyPortfolioSnapshot.findMany.mockImplementation(
+          async ({ where }) =>
+            history.filter(
+              (r) =>
+                r.snapshotDate >= where.snapshotDate.gte &&
+                r.snapshotDate <= where.snapshotDate.lte,
+            ),
+        );
+        const response = await h.service.getEquity('user', h.account.id, {
+          range: `${days}d`,
+          granularity: 'daily',
+        });
+        expect(response.data.range).toBe(`${days}d`);
+        expect(response.data.points.map((p) => p.snapshotDate)).toEqual(
+          history
+            .filter((r) => r.snapshotDate >= start)
+            .map((r) => r.snapshotDate.toISOString().slice(0, 10)),
+        );
+        expect(
+          h.client.dailyPortfolioSnapshot.findMany.mock.calls[0][0].where
+            .snapshotDate,
+        ).toEqual({ gte: start, lte: end });
+        expect(h.client.equitySnapshot.findMany).not.toHaveBeenCalled();
+      }
+    },
+  );
+  it('returns all 23 actual days for a younger account in a 90-day range', async () => {
+    const h = setup('season');
+    h.client.dailyPortfolioSnapshot.findMany.mockResolvedValue(
+      Array.from({ length: 23 }, (_, i) => ({
+        ...h.rows[0],
+        snapshotDate: new Date(Date.UTC(2026, 8, 10 + i)),
+      })),
+    );
+    expect(
+      (
+        await h.service.getEquity('user', h.account.id, {
+          range: '90d',
+          granularity: 'daily',
+        })
+      ).data.points,
+    ).toHaveLength(23);
+  });
+});

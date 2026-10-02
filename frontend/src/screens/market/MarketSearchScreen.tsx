@@ -1,3 +1,5 @@
+import MarketSortControl from '../../features/market/MarketSortControl';
+import { marketSortParams, nextMarketPage, type MarketSort, type MarketPageParam } from '../../features/market/marketSort';
 import { semantic } from '../../theme/tokens';
 import { getScreenContentStyle } from '../../theme/screenLayout';
 import { buildWsUrl } from '../../constants/env';
@@ -42,6 +44,8 @@ const SEARCH_SCOPE: Array<{ key: SearchScope; label: string }> = [
 ];
 
 export default function MarketSearchScreen({ navigation, route }: Props) {
+  const [sort, setSort] = useState<MarketSort>(route.params?.sort ?? 'volume_desc');
+  const sortParams = marketSortParams(sort);
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
   const [assetType, setAssetType] = useState<SearchScope>('all');
   const [searchText, setSearchText] = useState('');
@@ -49,6 +53,7 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
 
   const searchQuery = useInfiniteQuery({
     queryKey: QUERY_KEYS.market.assets({
+      ...sortParams,
       assetType: assetType === 'all' ? undefined : assetType,
       search: trimmedSearchText,
       withPrice: true,
@@ -57,14 +62,16 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
     }),
     queryFn: ({ pageParam }) =>
       getAssets({
+        ...sortParams,
+        sortSnapshot: pageParam.sortSnapshot,
         assetType: assetType === 'all' ? undefined : assetType,
         search: trimmedSearchText || undefined,
         withPrice: true,
-        offset: pageParam,
+        offset: pageParam.offset,
         limit: 20,
       }),
-    getNextPageParam: (lastPage) => lastPage.pagination.nextOffset ?? undefined,
-    initialPageParam: 0,
+    getNextPageParam: nextMarketPage,
+    initialPageParam: { offset: 0 } as MarketPageParam,
     enabled: trimmedSearchText.length > 0,
   });
 
@@ -102,13 +109,14 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
   const viewState = useMemo(() => {
     if (!trimmedSearchText) return 'market_search_idle';
     if (searchQuery.isLoading) return 'market_search_loading';
-    if (searchQuery.isError) return 'market_search_error';
+    if (searchQuery.isError && !searchQuery.data) return 'market_search_error';
     if (!items.length) return 'market_search_empty';
     return 'market_search_ready';
   }, [
     trimmedSearchText,
     searchQuery.isLoading,
     searchQuery.isError,
+    searchQuery.data,
     items.length,
   ]);
 
@@ -134,11 +142,13 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.content}
         onEndReached={() => {
-          if (searchQuery.hasNextPage && !searchQuery.isFetchingNextPage) {
+          if (searchQuery.hasNextPage && !searchQuery.isFetching && !searchQuery.isError) {
             searchQuery.fetchNextPage();
           }
         }}
         onEndReachedThreshold={0.4}
+        refreshing={searchQuery.isRefetching}
+        onRefresh={() => void searchQuery.refetch()}
         ListHeaderComponent={
           <View style={styles.header}>
             <TextInput
@@ -171,6 +181,13 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
                   </ActionPressable>
                 );
               })}
+            </View>
+
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
+              <ActionPressable accessibilityRole="button" onPress={() => void searchQuery.refetch()} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 }}>
+                <Text style={{ color: semantic.secondary, fontSize: 12 }}>새로고침</Text>
+              </ActionPressable>
+              <MarketSortControl value={sort} onChange={setSort} assetType={assetType} />
             </View>
 
             {hasPriceErrors ? (
@@ -207,7 +224,11 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
             isStale={staleAssetIds.has(item.id)} onPress={openAsset} />
         )}
         ListFooterComponent={
-          searchQuery.isFetchingNextPage ? (
+          searchQuery.isFetchNextPageError ? (
+            <ActionPressable accessibilityRole="button" onPress={() => void searchQuery.refetch()} style={{ minHeight: 48, justifyContent: 'center' }}>
+              <Text>목록을 새로고침해 계속 보기</Text>
+            </ActionPressable>
+          ) : searchQuery.isFetchingNextPage ? (
             <View style={styles.footerLoader}>
               <ActivityIndicator />
             </View>
