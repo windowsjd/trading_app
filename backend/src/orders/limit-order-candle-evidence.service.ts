@@ -10,6 +10,11 @@ import {
   firstEligibleCandleOpen,
   isCandleWithinLookback,
 } from './limit-order-candle-policy';
+import {
+  countReason,
+  type CandleExclusionReason,
+  type CandleOrderExclusionReason,
+} from './limit-order-matching-diagnostics';
 
 const CANDLE_INTERVAL = '5m';
 const EXECUTION_PRICE_POLICY = 'limit_price';
@@ -41,6 +46,13 @@ export type CandleTriggerOrder = {
   seasonEndAt: Date | null;
 };
 
+export type ClosedCandleEvaluation = {
+  candles: EligibleClosedCandle[];
+  calendarUnavailable: boolean;
+  rowsRead: number;
+  exclusions: Partial<Record<CandleExclusionReason, number>>;
+};
+
 /**
  * Path-B closed-candle evidence: it decides which closed 5m candle (if any)
  * proves an order's limit was touched, and persists ONE shared evidence row
@@ -63,12 +75,30 @@ export class LimitOrderCandleEvidenceService {
     now: Date,
     lookbackMs: number,
   ): Promise<EligibleClosedCandle[]> {
+    return (await this.evaluateClosedCandlesForAsset(asset, now, lookbackMs))
+      .candles;
+  }
+
+  /** Same read/filter policy, retaining only bounded metadata from that read. */
+  async evaluateClosedCandlesForAsset(
+    asset: MarketCalendarAsset & { id: string },
+    now: Date,
+    lookbackMs: number,
+  ): Promise<ClosedCandleEvaluation> {
+    const evaluation: ClosedCandleEvaluation = {
+      candles: [],
+      calendarUnavailable: false,
+      rowsRead: 0,
+      exclusions: {},
+    };
     if (
       asset.assetType !== AssetType.crypto &&
       resolveStockMarketSessionState(asset, now)?.state ===
         'calendar_unavailable'
-    )
-      return [];
+    ) {
+      evaluation.calendarUnavailable = true;
+      return evaluation;
+    }
     const lookbackFloor = new Date(now.getTime() - lookbackMs);
     const rows = await this.prisma.marketCandle.findMany({
       where: {
@@ -94,24 +124,35 @@ export class LimitOrderCandleEvidenceService {
       asset.assetType === AssetType.domestic_stock ||
       asset.assetType === AssetType.us_stock;
 
-    const eligible: EligibleClosedCandle[] = [];
+    evaluation.rowsRead = rows.length;
+    const eligible = evaluation.candles;
     for (const row of rows) {
-      if (!isCandleWithinLookback(row.openTime, now, lookbackMs)) continue;
+      if (!isCandleWithinLookback(row.openTime, now, lookbackMs)) {
+        countReason(evaluation.exclusions, 'outside_lookback');
+        continue;
+      }
       if (
         row.closeTime > now ||
         row.sourceUpdatedAt > now ||
-        row.updatedAt > now ||
-        row.closeTime.getTime() !== row.openTime.getTime() + 300_000
-      )
+        row.updatedAt > now
+      ) {
+        countReason(evaluation.exclusions, 'future_evidence');
         continue;
+      }
+      if (row.closeTime.getTime() !== row.openTime.getTime() + 300_000) {
+        countReason(evaluation.exclusions, 'malformed_window');
+        continue;
+      }
 
       if (isStock) {
         // The whole window must lie inside one valid session. A candle whose
         // open is outside a session (holiday, pre/post market, uncovered
         // calendar) or whose close spills past the session close is not used.
         const session = resolveRegularSessionForEvent(asset, row.openTime);
-        if (!session) continue;
-        if (row.closeTime.getTime() > session.closeTime.getTime()) continue;
+        if (!session || row.closeTime.getTime() > session.closeTime.getTime()) {
+          countReason(evaluation.exclusions, 'session_invalid');
+          continue;
+        }
       }
 
       eligible.push({
@@ -125,7 +166,7 @@ export class LimitOrderCandleEvidenceService {
         finalizedAt: row.updatedAt,
       });
     }
-    return eligible;
+    return evaluation;
   }
 
   /**
@@ -140,28 +181,52 @@ export class LimitOrderCandleEvidenceService {
     candles: readonly EligibleClosedCandle[],
     order: CandleTriggerOrder,
   ): EligibleClosedCandle | null {
+    return this.evaluateTriggerCandleForOrder(candles, order).candle;
+  }
+
+  evaluateTriggerCandleForOrder(
+    candles: readonly EligibleClosedCandle[],
+    order: CandleTriggerOrder,
+  ) {
+    const exclusions: Partial<Record<CandleOrderExclusionReason, number>> = {};
+    let orderEligible = 0;
     const firstEligibleOpenMs = firstEligibleCandleOpen(
       order.submittedAt,
     ).getTime();
     for (const candle of candles) {
-      if (candle.openTime.getTime() < firstEligibleOpenMs) continue;
+      if (candle.openTime.getTime() < firstEligibleOpenMs) {
+        countReason(exclusions, 'before_first_boundary');
+        continue;
+      }
       // §17: no candle that closes after the season end may fill.
       if (
         order.seasonEndAt &&
         candle.closeTime.getTime() > order.seasonEndAt.getTime()
       ) {
+        countReason(exclusions, 'after_season_end');
         continue;
       }
+      orderEligible += 1;
       if (
         ((order.side ?? OrderSide.buy) === OrderSide.buy &&
           candle.low.lte(order.limitPrice)) ||
         (order.side === OrderSide.sell &&
           candle.high?.gte(order.limitPrice) === true)
       ) {
-        return candle;
+        return { candle, reason: 'trigger_found' as const, exclusions };
       }
+      countReason(exclusions, 'limit_not_touched');
     }
-    return null;
+    return {
+      candle: null,
+      reason:
+        candles.length === 0
+          ? ('no_eligible_candle' as const)
+          : orderEligible === 0
+            ? ('no_order_eligible_candle' as const)
+            : ('no_limit_touch' as const),
+      exclusions,
+    };
   }
 
   /**

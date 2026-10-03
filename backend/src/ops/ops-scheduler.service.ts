@@ -36,6 +36,7 @@ import {
   type MarketSessionWindow,
 } from '../orders/market-calendar.policy';
 import { LimitOrderMatchingService } from '../orders/limit-order-matching.service';
+import { classifyFailureCause } from '../common/safe-failure-cause';
 
 @Injectable()
 export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
@@ -162,7 +163,7 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
       });
     } catch (error) {
       console.warn('Limit-order matching tick failed.', {
-        error: error instanceof Error ? error.message : 'Unknown error',
+        cause: classifyFailureCause(error),
       });
     } finally {
       this.limitOrderMatchingRunning = false;

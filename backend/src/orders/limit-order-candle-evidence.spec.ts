@@ -17,7 +17,7 @@ jest.mock('../generated/prisma/client', () => {
   };
 });
 
-import { OrderSide, Prisma } from '../generated/prisma/client';
+import { AssetType, OrderSide, Prisma } from '../generated/prisma/client';
 import { LimitOrderCandleEvidenceService } from './limit-order-candle-evidence.service';
 import type { EligibleClosedCandle } from './limit-order-candle-evidence.service';
 
@@ -133,5 +133,121 @@ describe('LimitOrderCandleEvidenceService.selectTriggerCandleForOrder', () => {
       },
     );
     expect(match?.openTime.toISOString()).toBe('2026-07-22T12:05:00.000Z');
+  });
+});
+
+describe('closed candle evaluation metadata from the existing read', () => {
+  const now = new Date('2026-09-22T01:15:00.000Z');
+  const base = () => ({
+    id: 'row',
+    openTime: new Date('2026-09-22T01:05:00.000Z'),
+    closeTime: new Date('2026-09-22T01:10:00.000Z'),
+    low: d(876543),
+    high: d(987654),
+    sourceProvider: 'fixture',
+    sourceUpdatedAt: now,
+    updatedAt: now,
+  });
+  const crypto = {
+    id: 'crypto',
+    assetType: AssetType.crypto,
+    market: 'BINANCE',
+  };
+  const stock = {
+    id: 'stock',
+    assetType: AssetType.domestic_stock,
+    market: 'KRX',
+  };
+
+  it('keeps one exclusion per rejected row with no additional reads', async () => {
+    const rows = [
+      base(),
+      { ...base(), openTime: new Date('2026-09-22T00:50:00.000Z') },
+      { ...base(), closeTime: new Date(now.getTime() + 1) },
+      { ...base(), sourceUpdatedAt: new Date(now.getTime() + 1) },
+      { ...base(), updatedAt: new Date(now.getTime() + 1) },
+      { ...base(), closeTime: new Date('2026-09-22T01:09:59.999Z') },
+    ];
+    const prisma = {
+      marketCandle: { findMany: jest.fn().mockResolvedValue(rows) },
+    };
+    const service = new LimitOrderCandleEvidenceService(prisma as never);
+    const evaluation = await service.evaluateClosedCandlesForAsset(
+      crypto,
+      now,
+      900_000,
+    );
+    expect(evaluation).toMatchObject({
+      rowsRead: 6,
+      calendarUnavailable: false,
+      exclusions: {
+        outside_lookback: 1,
+        future_evidence: 3,
+        malformed_window: 1,
+      },
+    });
+    expect(evaluation.candles).toHaveLength(1);
+    expect(prisma.marketCandle.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.marketCandle.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          assetId: 'crypto',
+          interval: '5m',
+          isClosed: true,
+          openTime: { gte: new Date('2026-09-22T01:00:00.000Z'), lte: now },
+        },
+        orderBy: [{ openTime: 'asc' }],
+      }),
+    );
+    expect(JSON.stringify(evaluation.exclusions)).not.toMatch(/876543|987654/);
+  });
+
+  it('excludes stock session-invalid rows and windows spilling past session close', async () => {
+    const prisma = {
+      marketCandle: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            ...base(),
+            openTime: new Date('2026-09-22T06:29:00.000Z'),
+            closeTime: new Date('2026-09-22T06:34:00.000Z'),
+          },
+          {
+            ...base(),
+            openTime: new Date('2026-09-22T06:30:00.000Z'),
+            closeTime: new Date('2026-09-22T06:35:00.000Z'),
+          },
+        ]),
+      },
+    };
+    const service = new LimitOrderCandleEvidenceService(prisma as never);
+    expect(
+      await service.evaluateClosedCandlesForAsset(
+        stock,
+        new Date('2026-09-22T07:00:00.000Z'),
+        3_600_000,
+      ),
+    ).toMatchObject({
+      candles: [],
+      rowsRead: 2,
+      exclusions: { session_invalid: 2 },
+    });
+  });
+
+  it('reports calendar-unavailable without querying or inferring missing candles', async () => {
+    const prisma = { marketCandle: { findMany: jest.fn() } };
+    const service = new LimitOrderCandleEvidenceService(prisma as never);
+    expect(
+      await service.evaluateClosedCandlesForAsset(
+        stock,
+        new Date('2040-09-22T01:15:00.000Z'),
+        900_000,
+      ),
+    ).toEqual({
+      candles: [],
+      rowsRead: 0,
+      calendarUnavailable: true,
+      exclusions: {},
+    });
+    expect(prisma.marketCandle.findMany).not.toHaveBeenCalled();
   });
 });

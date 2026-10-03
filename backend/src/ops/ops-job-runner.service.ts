@@ -57,6 +57,7 @@ import {
 } from '../assets/market-candle-reconciliation.service';
 import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
 import { LimitOrderMatchingService } from '../orders/limit-order-matching.service';
+import { classifyFailureCause } from '../common/safe-failure-cause';
 
 export type LimitOrderMatchingOpsJobInput = OpsJobRunnerInput & {
   now?: string | null;
@@ -194,12 +195,34 @@ export class OpsJobRunnerService {
       OpsJobName.limit_order_matching,
       input,
       'limit_order_matching:current',
-      async (context) =>
-        service.matchDueLimitOrders({
-          now,
-          batchSize: input.batchSize,
-          isLockOwned: context.isLockOwned,
-        }),
+      async (context) => {
+        try {
+          return await service.matchDueLimitOrders({
+            now,
+            batchSize: input.batchSize,
+            isLockOwned: context.isLockOwned,
+          });
+        } catch (error) {
+          // Query/evidence failures still fail the cycle. Project only safe
+          // cause metadata before the generic runner persists a failure.
+          throw new HttpException(
+            {
+              success: false,
+              error: {
+                code: 'OPS_JOB_FAILED',
+                message: 'Limit-order matching failed.',
+              },
+              data: {
+                resultPayloadJson: {
+                  phase: 'cycle',
+                  cause: classifyFailureCause(error),
+                },
+              },
+            },
+            500,
+          );
+        }
+      },
       { renewLock: true },
     );
   }

@@ -969,6 +969,18 @@ it cannot affect current price / valuation / ranking.
 
 ## Limit-create replay ordering and operational errors
 
+Automatic matcher diagnostics are internal bounded `OpsJobRun.resultJson`
+summaries (see `scheduler-ops-foundation.md`). They distinguish Path A selection
+failure / before-submission / limit-not-crossed from Path B eligibility / order
+boundary / season horizon / no-touch, then execution skip from safe execution
+error. Path A retains priority and snapshot execution price; Path B retains the
+earliest eligible closed 5m touch and order limit execution price. Financial,
+reservation, cancellation and transaction-clock policies are unchanged. Only
+already-read evidence is observed; candidate prefilter exclusions and upstream
+runtime causes are outside this diagnostic boundary. No raw financial/price or
+error payload is saved and no HTTP AdminDiagnostic context is created for the
+background job. This adds no public API or schema contract.
+
 For either limit side, `POST /api/v1/orders` runs in exactly this order:
 
 1. authenticate the caller;

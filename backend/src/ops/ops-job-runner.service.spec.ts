@@ -18,6 +18,7 @@ jest.mock('../generated/prisma/client', () => ({
     market_candle_reconciliation: 'market_candle_reconciliation',
     limit_order_matcher: 'limit_order_matcher',
     limit_order_candle_reconciliation: 'limit_order_candle_reconciliation',
+    limit_order_matching: 'limit_order_matching',
   },
   OpsJobRunStatus: {
     running: 'running',
@@ -101,6 +102,7 @@ import {
   OpsJobTrigger,
 } from '../generated/prisma/client';
 import { OpsJobRunnerService } from './ops-job-runner.service';
+import { createLimitMatchingDiagnostics } from '../orders/limit-order-matching-diagnostics';
 
 describe('OpsJobRunnerService', () => {
   const startedAt = new Date('2026-06-08T00:00:00.000Z');
@@ -249,6 +251,91 @@ describe('OpsJobRunnerService', () => {
       ),
     };
   };
+
+  it('forwards the complete bounded limit matcher summary to Ops persistence', async () => {
+    const f = createService();
+    const run = { id: 'limit-run', startedAt };
+    f.lockService.acquireLock.mockResolvedValue({
+      acquired: true,
+      lockKey: 'limit_order_matching:current',
+      ownerId: 'owner',
+    });
+    f.runService.createRunning.mockResolvedValue(run);
+    f.runService.recordSucceeded.mockResolvedValue({
+      serialized: serializedRun(),
+    });
+    const diagnostics = createLimitMatchingDiagnostics();
+    diagnostics.planning.noPlan = 3;
+    diagnostics.planning.pathA.limit_not_crossed = 3;
+    diagnostics.planning.pathB.no_limit_touch = 3;
+    diagnostics.execution.skipReasons.fx_evidence_unavailable = 1;
+    diagnostics.execution.errorReasons.ORDER_RESERVATION_INCONSISTENT = 1;
+    const summary = {
+      assetsScanned: 1,
+      candidatesScanned: 5,
+      ordersConsidered: 2,
+      filledPathA: 0,
+      filledPathB: 0,
+      skipped: 1,
+      errors: 1,
+      scanExhausted: false,
+      batchExhausted: false,
+      diagnostics,
+    };
+    f.limitOrderMatchingService.matchDueLimitOrders.mockResolvedValue(summary);
+    const result = await f.service.runLimitOrderMatchingJob({
+      now: startedAt.toISOString(),
+    });
+    expect(result.success).toBe(true);
+    expect(f.runService.recordSucceeded).toHaveBeenCalledWith(run, {
+      resultJson: summary,
+    });
+    expect(f.runService.createRunning).toHaveBeenCalledWith(
+      expect.objectContaining({ jobName: OpsJobName.limit_order_matching }),
+    );
+    expect(
+      f.limitOrderMatchingService.matchDueLimitOrders,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({ isLockOwned: expect.any(Function) }),
+    );
+  });
+
+  it('persists only safe cause metadata when a limit matcher cycle query fails', async () => {
+    const f = createService();
+    const run = { id: 'limit-run', startedAt };
+    f.lockService.acquireLock.mockResolvedValue({
+      acquired: true,
+      lockKey: 'limit_order_matching:current',
+      ownerId: 'owner',
+    });
+    f.runService.createRunning.mockResolvedValue(run);
+    f.runService.recordFailed.mockResolvedValue({
+      serialized: serializedRun({ status: OpsJobRunStatus.failed }),
+    });
+    f.limitOrderMatchingService.matchDueLimitOrders.mockRejectedValue(
+      Object.assign(new Error('RAW_POISON SELECT price wallet 987654'), {
+        code: 'P1001',
+      }),
+    );
+    const result = await f.service.runLimitOrderMatchingJob();
+    expect(result.success).toBe(false);
+    expect(f.runService.recordFailed).toHaveBeenCalledWith(run, {
+      errorCode: 'OPS_JOB_FAILED',
+      errorMessage: 'Limit-order matching failed.',
+      resultJson: {
+        phase: 'cycle',
+        cause: {
+          category: 'db_connection_failed',
+          errorType: 'Error',
+          code: 'P1001',
+        },
+      },
+    });
+    expect(
+      JSON.stringify([result, f.runService.recordFailed.mock.calls]),
+    ).not.toMatch(/RAW_POISON|SELECT price|987654/);
+    expect(f.runService.recordSucceeded).not.toHaveBeenCalled();
+  });
 
   describe('scheduled daily history', () => {
     const originalEnv = { ...process.env };

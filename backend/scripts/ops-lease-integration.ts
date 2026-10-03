@@ -110,8 +110,13 @@ function matcherWithPausedFirstFill(
     ) => Promise.resolve(cursor ? [] : rows),
   };
   const candles = {
-    findEligibleClosedCandlesForAsset: () => Promise.resolve([]),
-    selectTriggerCandleForOrder: () => null,
+    evaluateClosedCandlesForAsset: () =>
+      Promise.resolve({
+        candles: [],
+        calendarUnavailable: false,
+        rowsRead: 0,
+        exclusions: {},
+      }),
   };
   const execution = {
     fillLimitOrder: async ({ orderId }: { orderId: string }) => {
@@ -140,9 +145,12 @@ function matcherWithPausedFirstFill(
     matcher as never as { resolvePathASnapshot: () => Promise<unknown> }
   ).resolvePathASnapshot = () =>
     Promise.resolve({
-      id: 'lease-test-snapshot',
-      price: new Prisma.Decimal(100),
-      effectiveAt: new Date(),
+      snapshot: {
+        id: 'lease-test-snapshot',
+        price: new Prisma.Decimal(100),
+        effectiveAt: new Date(),
+      },
+      reason: 'selected',
     });
   return matcher;
 }

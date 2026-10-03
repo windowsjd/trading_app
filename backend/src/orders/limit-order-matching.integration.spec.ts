@@ -50,6 +50,7 @@ describe('Limit order scheduler matching DB integration', () => {
         'a canceled order is skipped by the matcher',
         'an ended season is not filled',
         'candle evidence never becomes a price snapshot',
+        'matcher preserves reservation error stage and rollback',
       ]) {
         expect(result.stdout).toContain(`ok ${name}`);
       }

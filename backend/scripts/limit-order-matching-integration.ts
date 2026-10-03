@@ -18,6 +18,8 @@ import {
   OrderSide,
   OrderStatus,
   OrderType,
+  OpsJobName,
+  OpsJobTrigger,
   ParticipantStatus,
   Prisma,
   SeasonStatus,
@@ -38,6 +40,7 @@ import {
   type LimitFillPlan,
 } from '../src/orders/limit-order-execution.service';
 import { LimitOrderMatchingService } from '../src/orders/limit-order-matching.service';
+import { OpsJobRunService } from '../src/ops/ops-job-run.service';
 
 const RUN = process.env.LIMIT_ORDER_MATCHING_DB_INTEGRATION;
 if (RUN !== '1') {
@@ -83,6 +86,7 @@ const createdUserIds: string[] = [];
 const createdSeasonIds: string[] = [];
 const createdAssetIds: string[] = [];
 const createdFxSnapshotIds: string[] = [];
+const createdOpsRunIds: string[] = [];
 
 async function main(): Promise<void> {
   assert.ok(process.env.DATABASE_URL, 'DATABASE_URL must be configured.');
@@ -136,6 +140,10 @@ async function main(): Promise<void> {
     await run(
       'candle evidence never becomes a price snapshot',
       testEvidenceIsolation,
+    );
+    await run(
+      'matcher preserves reservation error stage and rollback',
+      testMatcherReservationError,
     );
     console.log('limit order matching integration ok');
   } finally {
@@ -460,6 +468,12 @@ async function testR04StaleCandidate(
       batchSize: 2,
     });
     skipped += summary.skipped;
+    if (summary.skipped > 0) {
+      assert.equal(
+        summary.diagnostics.execution.skipReasons.not_submitted_limit,
+        summary.skipped,
+      );
+    }
   }
   assert.ok(targetAttempted, 'the target must reach locked execution');
   return { scenario: s, orderId: order.id, skipped };
@@ -529,6 +543,8 @@ async function testPathAImprovement(): Promise<void> {
   const summary = await matching.matchDueLimitOrders({ now: s.now });
   assert.equal(summary.filledPathA, 1, 'exactly one path-A fill');
   assert.equal(summary.filledPathB, 0);
+  assert.ok(summary.diagnostics.planning.pathA.trigger_found! >= 1);
+  assert.ok(summary.diagnostics.execution.attempts.snapshot >= 1);
 
   const filled = await readOrder(order.id);
   assert.equal(filled.status, OrderStatus.executed);
@@ -602,6 +618,8 @@ async function testPathBFillAtLimit(): Promise<void> {
   const summary = await matching.matchDueLimitOrders({ now: s.now });
   assert.equal(summary.filledPathB, 1, 'exactly one path-B fill');
   assert.equal(summary.filledPathA, 0);
+  assert.ok(summary.diagnostics.planning.pathA.limit_not_crossed! >= 1);
+  assert.ok(summary.diagnostics.planning.pathB.trigger_found! >= 1);
 
   const filled = await readOrder(order.id);
   assert.equal(filled.status, OrderStatus.executed);
@@ -646,6 +664,31 @@ async function testPathBPartialCandleExcluded(): Promise<void> {
 
   const summary = await matching.matchDueLimitOrders({ now: s.now });
   assert.equal(summary.filledPathB, 0, 'partial submit candle must not fill');
+  assert.ok(summary.diagnostics.planning.noPlan >= 1);
+  assert.ok(
+    summary.diagnostics.planning.candleOrderExclusions.before_first_boundary! >=
+      1,
+  );
+
+  // Actual Ops JSON persistence, with the same sanitizer used by the runner.
+  const ops = new OpsJobRunService(prisma);
+  const run = await ops.createRunning({
+    jobName: OpsJobName.limit_order_matching,
+    trigger: OpsJobTrigger.test,
+  });
+  createdOpsRunIds.push(run.id);
+  await ops.recordSucceeded(run, { resultJson: summary });
+  const saved = await prisma.opsJobRun.findUniqueOrThrow({
+    where: { id: run.id },
+  });
+  assert.deepEqual(saved.resultJson, summary);
+  assert.ok(summary.diagnostics.samples.length <= 10);
+  const json = JSON.stringify(saved.resultJson);
+  assert.ok(Buffer.byteLength(json) < 16 * 1024);
+  assert.doesNotMatch(
+    json,
+    /limitPrice|executedPrice|reservedAmount|quantity|triggerLowPrice|sourceProvider|stack|message/,
+  );
 
   const still = await readOrder(order.id);
   assert.equal(still.status, OrderStatus.submitted);
@@ -751,6 +794,47 @@ async function testEvidenceIsolation(): Promise<void> {
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
+
+async function testMatcherReservationError(): Promise<void> {
+  const s = await createScenario('diagnostic-reservation-error');
+  const order = await createSubmittedLimitOrder(s, {
+    limitPrice: '100.00000000',
+    quantity: '1.000000',
+    reservedAmount: '100.10000000',
+  });
+  await createAssetPriceSnapshot(s, '90.00000000', s.now);
+  await createFreshFxSnapshot(s.now);
+  // Keep the existing candidate predicate valid; locked execution detects the
+  // existing invariant failure. A financial rollback must still be complete.
+  await prisma.cashWallet.update({
+    where: { id: s.walletId },
+    data: { reservedAmount: ZERO },
+  });
+  const before = await readWallet(s);
+  const matcher = new LimitOrderMatchingService(
+    prisma,
+    candidateRepo,
+    candleEvidence,
+    execution,
+  );
+  const summary = await matcher.matchDueLimitOrders({ now: s.now });
+  assert.ok(summary.errors >= 1);
+  assert.ok(
+    summary.diagnostics.execution.errorReasons.ORDER_RESERVATION_INCONSISTENT >=
+      1,
+  );
+  assert.ok(summary.diagnostics.execution.errorStages.wallet_settlement! >= 1);
+  assert.equal((await readOrder(order.id)).status, OrderStatus.submitted);
+  assert.deepEqual(await readWallet(s), before);
+  assert.equal(
+    await prisma.walletTransaction.count({ where: { referenceId: order.id } }),
+    0,
+  );
+  assert.doesNotMatch(
+    JSON.stringify(summary),
+    /balanceAmount|reservedAmount|executedPrice|stack|message/,
+  );
+}
 
 type Scenario = {
   userId: string;
@@ -1024,6 +1108,9 @@ async function readPosition(s: Scenario) {
 }
 
 async function cleanup(): Promise<void> {
+  await prisma.opsJobRun.deleteMany({
+    where: { id: { in: createdOpsRunIds } },
+  });
   const tradingAccountIds = (
     await prisma.tradingAccount.findMany({
       where: { userId: { in: createdUserIds } },

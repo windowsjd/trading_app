@@ -374,6 +374,23 @@ Ops job `limit_order_matching`, added additively to `OpsJobName`. Default
   failure fails the run.
 - `resultJson` carries `assetsScanned / candidatesScanned / ordersConsidered /
   filledPathA / filledPathB / skipped / errors / batchExhausted / scanExhausted`.
+  Additive matcher diagnostics preserve candidate narrowing failures, per-order
+  Path A / Path B planning reasons, per-asset source-selection/candle exclusions,
+  execution attempts by path, execution skip reasons, and safe error category /
+  actual execution stage. No-plan, execution skip and execution error are separate.
+  Reason vocabularies are fixed (unknown values become `not_observed` or
+  `unexpected_error`); failure samples are capped at 10 with a truncation flag,
+  and internal sample IDs at 128 characters. Prices, balances, quantities,
+  provider bodies and raw exception messages/stacks are never projected.
+  The existing runner and `OpsJobRunService.sanitizeOpsJson` persistence path
+  remains authoritative; HTTP request `AdminDiagnostic` is a separate surface.
+  Diagnostics use only existing reads/outcomes, add no DB/Provider/Redis/history
+  I/O, and cannot explain arbitrary orders excluded by the candidate WHERE.
+  Lease renewal/loss remains visible through the existing Ops run status and
+  `OPS_JOB_LOCK_LOST`; an interrupted cycle does not persist a success summary.
+  Cycle-level query/evidence failures still fail the run with `OPS_JOB_FAILED`,
+  a fixed message and safe cause metadata; the idle-probe failure log also uses
+  safe classification. No raw DB exception is copied through that matcher path.
 - Startup validation caps the interval at half the 10s provider execute
   freshness, and warns (not fails) if matching is enabled while
   `LIMIT_ORDER_ENABLED=false` (a legitimate "drain existing orders" state).
@@ -381,3 +398,27 @@ Ops job `limit_order_matching`, added additively to `OpsJobName`. Default
 Full matching semantics (fill price, first-eligible candle, lookback, season
 endAt, lock order, evidence isolation) are in `docs/policy-decisions.md`
 (“Limit Order Scheduler Matching”) and `docs/orders-api-contract.md`.
+
+Matcher diagnostic field units:
+
+| Field under `diagnostics` | Meaning |
+| --- | --- |
+| `candidateRejections.candidate_shape_invalid` | Scanned rows rejected by defensive narrowing; cursor still advances. |
+| `planning.noPlan` | Valid scanned candidates with neither execution plan. |
+| `planning.pathA` | Per-order `snapshot_selection_failed`, `before_submission`, `limit_not_crossed`, or `trigger_found`. |
+| `planning.snapshotSelections` | Once per asset: the existing selector/eligibility reason (e.g. `provider_missing`, `source_name_mismatch`, `captured_at_stale`, `market_closed`, `market_calendar_unavailable`) or `selected`. No policy re-evaluation or source-name dump. |
+| `planning.pathB` | Per-order `not_evaluated_path_a_selected`, `calendar_unavailable`, `no_closed_candle_rows`, `all_candle_rows_excluded`, `no_order_eligible_candle`, `no_limit_touch`, or `trigger_found`. |
+| `planning.candleEvidence` | Once per asset: calendar-unavailable assets, observed rows and eligible candles, plus `outside_lookback` / `future_evidence` / `malformed_window` / `session_invalid` exclusions. Each rejected row counts under its first failed guard. |
+| `planning.candleOrderExclusions` | Per-order candle checks: `before_first_boundary`, `after_season_end`, `limit_not_touched`. Evaluation stops at the first trigger; these are inspected candle/order pairs, not distinct DB rows. |
+| `execution.attempts` | Actual transaction attempts by `snapshot` / `candle`; planning reasons alone do not imply execution started. |
+| `execution.skipReasons` | Exact existing execution reasons, including uppercase market codes and `fx_evidence_unavailable`; unknown strings become `not_observed`. |
+| `execution.errorReasons`, `errorStages`, `errorsByPath` | Allowlisted structured error codes or the existing safe cause category, actual callback stage (or `transaction` for begin/commit), and error path counts. Unobserved stages remain `not_observed`. |
+| `samples`, `samplesTruncated` | First 10 candidate/no-plan/skip/error failures in scan order, without success payloads; later failures remain in counts. No-plan samples retain both path decisions and selection reason. |
+
+The legacy top-level counters keep their original semantics. In particular,
+`ordersConsidered` counts execution attempts, `skipped` counts execution skips,
+and `noPlan` / defensive narrowing do not consume the attempt budget. A filtered
+query miss does not prove an upstream row never existed. General and season
+orders share this summary contract; per-order transaction validation remains
+the authority. Internal diagnostics are visible only through the existing Ops
+authorization boundary, never through ordinary order responses.

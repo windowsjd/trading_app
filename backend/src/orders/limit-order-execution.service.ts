@@ -59,6 +59,11 @@ import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snaps
 import { resolveRegularSessionForEvent } from './market-calendar.policy';
 import { getAssetTradingStatus } from './market-hours.policy';
 
+import {
+  rememberLimitExecutionStage,
+  type LimitExecutionStage,
+} from './limit-order-matching-diagnostics';
+
 const ZERO_MONEY = '0.00000000';
 
 /**
@@ -175,13 +180,20 @@ export class LimitOrderExecutionService {
     plan: LimitFillPlan;
   }): Promise<LimitFillOutcome> {
     const { orderId, plan } = input;
-    return this.prisma.$transaction(async (tx) => {
+    let stage: LimitExecutionStage = 'authorization_lock';
+    let callbackFailure: unknown;
+    const executeInTransaction = async (
+      tx: ExecTx,
+    ): Promise<LimitFillOutcome> => {
       const prelock = await tx.order.findUnique({
         where: { id: orderId },
         select: {
           tradingAccountId: true,
           tradingAccount: {
-            select: { mode: true, seasonParticipant: { select: { id: true } } },
+            select: {
+              mode: true,
+              seasonParticipant: { select: { id: true } },
+            },
           },
         },
       });
@@ -212,6 +224,7 @@ export class LimitOrderExecutionService {
           );
       }
       // 1) Authorization → Order → CashWallet/Position. Cancel locks only Order.
+      stage = 'order_lock';
       const locked = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT "id" FROM "orders" WHERE "id" = ${orderId} FOR UPDATE
       `;
@@ -219,6 +232,7 @@ export class LimitOrderExecutionService {
         return { state: 'skipped', orderId, reason: 'order_not_found' };
       }
 
+      stage = 'order_validation';
       const order = await tx.order.findUnique({
         where: { id: orderId },
         select: EXEC_ORDER_SELECT,
@@ -250,9 +264,11 @@ export class LimitOrderExecutionService {
         );
       }
 
+      stage = 'transaction_clock';
       const transactionNow = await this.readTransactionWallClock(tx);
 
       // 3) Re-validate season / participant / asset (§17: no fill at/after endAt).
+      stage = 'scope_validation';
       const account = order.tradingAccount;
       if (!order.tradingAccountId || !account) {
         this.throwTradingScopeError(
@@ -341,6 +357,7 @@ export class LimitOrderExecutionService {
 
       // Confirmed CLOSED permits historical regular-session candles, but a
       // missing current calendar cannot authorize either evidence path.
+      stage = 'market_validation';
       const marketStatus = getAssetTradingStatus(order.asset, transactionNow);
       if (!marketStatus.tradable && marketStatus.reason !== 'MARKET_CLOSED') {
         return { state: 'skipped', orderId, reason: marketStatus.reason };
@@ -350,6 +367,7 @@ export class LimitOrderExecutionService {
       // still be fresh and in the current stock session. Never refresh over
       // the network or silently substitute a different price in this fill.
       if (plan.path === 'snapshot') {
+        stage = 'snapshot_validation';
         const market = getAssetTradingStatus(order.asset, transactionNow);
         if (!market.tradable)
           return { state: 'skipped', orderId, reason: 'market_not_open' };
@@ -393,6 +411,7 @@ export class LimitOrderExecutionService {
       } else {
         // Path B is historical touch evidence. Its close is evidenceAt, not
         // the execution time: no current 10-second price freshness/session gate.
+        stage = 'candle_validation';
         const evidenceAt = plan.candle.closeTime;
         const session =
           order.asset.assetType === AssetType.crypto
@@ -421,6 +440,7 @@ export class LimitOrderExecutionService {
         }
       }
 
+      stage = 'amounts_validation';
       // 4) Re-verify the price basis reaches the limit (§19 step 12).
       if (
         (order.side === OrderSide.buy &&
@@ -464,6 +484,7 @@ export class LimitOrderExecutionService {
       // provider USD/KRW snapshot the fill defers to a later cycle (an
       // automatic fill has no user to requote, so it cannot proceed on stale
       // FX). KRW-settled assets need no FX.
+      stage = 'fx_evidence';
       let fxRateSnapshotId: string | null = null;
       let fxRate: Prisma.Decimal | null = null;
       if (order.currencyCode === CurrencyCode.USD) {
@@ -494,6 +515,7 @@ export class LimitOrderExecutionService {
       // in one guarded statement (balance still covers all other reservations).
       // The wallet must carry the ORDER's verified account scope — null or
       // foreign scope rolls the whole fill back before any money moves.
+      stage = 'wallet_settlement';
       const wallet = await tx.cashWallet.findUnique({
         where: {
           tradingAccountId_currencyCode: {
@@ -549,6 +571,7 @@ export class LimitOrderExecutionService {
         }
       }
 
+      stage = 'candle_evidence_persistence';
       // 8) Evidence link. Path A → snapshot; path B → shared candle evidence.
       let assetPriceSnapshotId: string | null = null;
       let limitOrderCandleEvidenceId: string | null = null;
@@ -563,6 +586,7 @@ export class LimitOrderExecutionService {
           );
       }
 
+      stage = 'position_settlement';
       // 9) Position (same average-cost policy as market buy), scoped to the
       // order's verified account.
       if (order.side === OrderSide.buy) {
@@ -582,6 +606,7 @@ export class LimitOrderExecutionService {
           netAmount: amounts.netAmount,
           fxRate,
         });
+        stage = 'wallet_credit';
         const credited = await tx.cashWallet.updateMany({
           where: {
             id: wallet.id,
@@ -598,6 +623,7 @@ export class LimitOrderExecutionService {
         }
       }
 
+      stage = 'ledger_order_finalization';
       // 10) Ledger row + order finalization.
       const walletAfter = await tx.cashWallet.findUniqueOrThrow({
         where: { id: wallet.id },
@@ -659,6 +685,7 @@ export class LimitOrderExecutionService {
         );
       }
 
+      stage = 'portfolio_snapshot';
       // 11) Equity snapshot — reuse the market path's exact valuation so a
       // limit fill and a market fill leave identical portfolio state.
       await this.ordersService.recordOrderExecutedPortfolioSnapshotInTransaction(
@@ -678,7 +705,22 @@ export class LimitOrderExecutionService {
         executedPrice: executedPriceText,
         netAmount: netAmountText,
       };
-    });
+    };
+    return this.prisma
+      .$transaction((tx) =>
+        executeInTransaction(tx).catch((error: unknown) => {
+          callbackFailure = error;
+          rememberLimitExecutionStage(error, stage);
+          throw error;
+        }),
+      )
+      .catch((error: unknown) => {
+        // Begin/commit failures occur outside the callback. Keep callback stages
+        // when present, without wrapping or changing the thrown exception.
+        if (error !== callbackFailure)
+          rememberLimitExecutionStage(error, 'transaction');
+        throw error;
+      });
   }
 
   /** Backward-compatible name retained for existing callers/tests. */

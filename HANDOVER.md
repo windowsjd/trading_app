@@ -12,6 +12,93 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 관리자 진단 개선 2-C — 자동 지정가 matcher Ops 원인 보존 (2026-10-03)
+
+시작 전 clean `git status`, local HEAD, `git fetch origin main`과 origin/main을
+확인했다. 기준은 `0cfc30897adf7941c33fbd9dc4430b78b9a12168`이다. 2-B 완료
+`337181d5` 이후 `c2ed303e`(UI개편8-1), `0cfc3089`(UI8 navigation/browser
+regression)의 34개 변경 파일은 모두 frontend였으며 보존했다.
+
+자동 지정가 matcher의 정책을 변경하지 않고, 기존 candidate/price/candle/
+execution 결과에서 이미 관측되는 판단을 bounded Ops summary로 보존해
+no-plan, execution skip, execution error의 직접 원인을 운영자가 구분하도록 했다.
+
+- 기존 summary 9필드를 유지하고 `diagnostics`를 additive하게 추가했다.
+  `candidate_shape_invalid`, Path A/B 판단, per-asset snapshot selection reason /
+  candle eligibility exclusions, per-order candle boundary·season end·no-touch
+  exclusions, execution path attempts·skip reasons·safe error reasons/stages를
+  집계한다. Snapshot selection은 기존 `selection.decision`을 직접 사용한다.
+  2-A의 matrix 재평가가 필요하지 않으며 policy를 복제하지 않는다.
+- `samples`는 scan 순서의 최초 실패 10건, ID는 128자 상한이다. 이후 실패는
+  count에 보존하고 `samplesTruncated=true`다. 가격·잔고·예약액·수량·평균원가·
+  PnL·raw provider/DB/error message/stack을 투영하지 않는다. 1,000 no-plan
+  stress test와 실제 DB 저장 결과가 16 KiB 미만임을 검증했다.
+- 기존 `runLockedOpsJob → recordSucceeded → sanitizeOpsJson → resultJson`을
+  재사용한다. HTTP AdminDiagnostic ALS를 만들지 않는다. 1단계의 safe cause
+  classifier만 request-neutral 파일로 추출했고 함수 body AST가 동일하다.
+  Execution은 원래 exception을 그대로 throw하며 WeakMap에 고정 stage만
+  연결한다. 2-B wallet failure-only classifier/읽기/공개 오류 매핑은 그대로다.
+- 저장 경로 조사에서 발견한 추가 사항: cycle query/evidence failure도 기존
+  generic Ops runner가 raw message로 저장할 수 있었다. Limit matching handler만
+  고정 `OPS_JOB_FAILED` 문구와 safe cause로 projection하고, idle probe 실패 및
+  post-commit ranking refresh 로그도 원문 대신 safe classification을 사용한다.
+  Lease loss는 기존 `OPS_JOB_LOCK_LOST`가 최종 authority이고 부분 성공 summary를
+  기록하지 않는다. Lease 검사 위치/횟수·renewal·ranking refresh semantics는 유지한다.
+- AST 자기검토: matcher 1개, candle service 2개, execution 15개의 DB query/
+  mutation/SQL 호출과 인자가 기준 HEAD와 동일했다. Candidate WHERE/cursor,
+  config·5m boundary policy·source selector, atomic wallet/position SQL,
+  Ops lock/persistence/sanitizer 및 schema/generated artifacts는 변경하지 않았다.
+  Provider/Redis/history 조회 추가도 없다. Path A snapshot price 우선,
+  Path B earliest eligible candle / order limit price, full-fill-only, 금융·
+  reservation·cancel race·General/Season·DB clock을 보존했다.
+- 검증: 전체 unit 219 suites / 3,520 tests 통과(비활성 DB integration 48 suites /
+  53 tests skip), 이후 추가 boundary/ID/exception 재사용 stage 검증을 포함한
+  최종 diagnostic unit 49 tests 통과. API E2E 362 tests 통과.
+  실제 PostgreSQL 12 suites / 14 tests 검증 완료
+  (lease evidence mock을 새 내부 반환형에 맞춘 뒤 lease suite 재실행 PASS).
+  N+1·equal timestamp·removed cursor·new insertion·restart·1,001 backlog·budget·
+  lease loss / committed ranking refresh를 기존 테스트 그대로 검증했다.
+  실제 DB에서 rollback 중 reservation error의 `wallet_settlement` stage와
+  bounded summary의 Ops 저장을 추가 검증했다.
+- CI-equivalent: backend typecheck/build, candle lint/format, account lint,
+  Prisma generate 및 generated diff 없음, 변경 핵심 production 6파일 lint,
+  변경 TS 15파일 format, `git diff --check` 통과. Ops runner/scheduler 확장 lint
+  2건은 HEAD 복사본에서도 동일한 기존 오류였다(unsafe assignment /
+  unsafe member access); 필수 gate 범위는 넓히지 않았다.
+- DB 검증은 기존 `/tmp` PostgreSQL 16.15 바이너리로 새 data directory와
+  격리 DB `trading_diag_2c`, localhost:55433, DB/process UTC에서 기존 migrations만
+  적용했다. Unit/E2E의 초기 sandbox socket EPERM은 소켓 사용이 가능한 실행에서
+  동일 command로 재검증했다. 운영·개발 DB에는 연결하지 않았다.
+- Intentional boundary: candidate prefilter로 제외된 임의 order, DB query에
+  들어오지 않은 provider/candle row, 첫 10건 밖의 개별 실패 context, loss로
+  중단된 cycle의 partial counts는 설명하지 않는다. Ingestion lag, provider/
+  WebSocket connection·reconnect/backpressure·scheduler runtime causes는 3단계다.
+
+검증 명령 (backend 기준):
+
+```sh
+pnpm exec jest --runInBand
+pnpm exec jest --config ./test/jest-e2e.json --runInBand
+pnpm run typecheck
+pnpm run build
+pnpm run lint:accounts:check
+pnpm run lint:candles:check
+pnpm run format:candles:check
+TZ=UTC DATABASE_URL='postgresql://trading_diag@127.0.0.1:55433/trading_diag_2c?schema=public' LIMIT_ORDER_RESERVATION_DB_INTEGRATION=1 ORDER_EXECUTE_DB_INTEGRATION=1 LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION=1 LIMIT_ORDER_MATCHING_DB_INTEGRATION=1 MARKET_EXECUTION_DB_INTEGRATION=1 GENERAL_TRADING_DB_INTEGRATION=1 OPS_JOB_LOCK_DB_SMOKE=1 pnpm exec jest --runInBand \
+  src/orders/orders.execute.integration.spec.ts \
+  src/orders/limit-order-reservation.integration.spec.ts \
+  src/orders/limit-order-create-race.integration.spec.ts \
+  src/orders/limit-order-transaction-time.integration.spec.ts \
+  src/orders/trading-transaction-time.integration.spec.ts \
+  src/orders/limit-order-idempotent-replay.integration.spec.ts \
+  src/orders/limit-order-matching.integration.spec.ts \
+  src/orders/limit-order-create-no-redis.integration.spec.ts \
+  src/orders/market-execution.integration.spec.ts \
+  src/orders/trading-fee-pinning.integration.spec.ts \
+  src/orders/general-account-trading.integration.spec.ts \
+  src/ops/ops-job-lock.integration.spec.ts
+```
+
 ### 작업 단위: 관리자 진단 개선 2-B — 금융 guard 실패 원인 보존 (2026-10-03)
 
 시작 전 `git status`와 `git fetch origin main`을 확인했다. HEAD = origin/main =

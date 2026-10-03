@@ -220,9 +220,12 @@ function fixture(initial: Row[]) {
     rankingRefresh as unknown as RankingRefreshService,
   );
   const price = jest.fn(async () => ({
-    id: 'snapshot',
-    price: new Prisma.Decimal(100),
-    effectiveAt: NOW,
+    snapshot: {
+      id: 'snapshot',
+      price: new Prisma.Decimal(100),
+      effectiveAt: NOW,
+    },
+    reason: 'selected',
   }));
   (
     matcher as unknown as { resolvePathASnapshot: typeof price }
@@ -405,8 +408,12 @@ describe('limit matcher candidate progress', () => {
     });
     const b = fixture([order('buy', 0, OrderSide.buy, 'season', 'A', 95)]);
     b.price.mockResolvedValue({
-      id: 'snapshot',
-      price: new Prisma.Decimal(120),
+      snapshot: {
+        id: 'snapshot',
+        price: new Prisma.Decimal(120),
+        effectiveAt: NOW,
+      },
+      reason: 'selected',
     });
     expect(
       await b.matcher.matchDueLimitOrders({ now: NOW, batchSize: 2 }),
@@ -473,8 +480,12 @@ describe('limit matcher candidate progress', () => {
       order('3', 2, OrderSide.buy, 'season', 'A', 95),
     ]);
     h.price.mockResolvedValue({
-      id: 'snapshot',
-      price: new Prisma.Decimal(120),
+      snapshot: {
+        id: 'snapshot',
+        price: new Prisma.Decimal(120),
+        effectiveAt: NOW,
+      },
+      reason: 'selected',
     });
     for (let i = 0; i < 3; i++)
       await h.matcher.matchDueLimitOrders({

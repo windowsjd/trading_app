@@ -20,11 +20,28 @@ import {
   type LimitMatchCandidate,
   type LimitMatchCursor,
 } from './limit-order-candidate.repository';
-import { LimitOrderCandleEvidenceService } from './limit-order-candle-evidence.service';
+import {
+  LimitOrderCandleEvidenceService,
+  type ClosedCandleEvaluation,
+} from './limit-order-candle-evidence.service';
 import {
   LimitOrderExecutionService,
   type LimitFillPlan,
 } from './limit-order-execution.service';
+import {
+  addLimitMatchingSample,
+  boundLimitMatchingSample,
+  classifyLimitExecutionError,
+  countReason,
+  createLimitMatchingDiagnostics,
+  EXECUTION_SKIP_REASONS,
+  observedReason,
+  SNAPSHOT_SELECTION_REASONS,
+  type CandleOrderExclusionReason,
+  type PathAReason,
+  type PathBReason,
+  type SnapshotSelectionReason,
+} from './limit-order-matching-diagnostics';
 
 /** Bound DB reads independently of the number of fill attempts. */
 const SCANS_PER_ATTEMPT = 4;
@@ -41,6 +58,18 @@ export type LimitMatchingSummary = {
   errors: number;
   batchExhausted: boolean;
   scanExhausted: boolean;
+  diagnostics: ReturnType<typeof createLimitMatchingDiagnostics>;
+};
+
+type PathASnapshotEvaluation = {
+  snapshot: { id: string; price: Prisma.Decimal; effectiveAt: Date } | null;
+  reason: SnapshotSelectionReason;
+};
+type FillPlanDecision = {
+  plan: LimitFillPlan | null;
+  pathA: PathAReason;
+  pathB: PathBReason;
+  candleOrderExclusions: Partial<Record<CandleOrderExclusionReason, number>>;
 };
 
 /**
@@ -104,7 +133,9 @@ export class LimitOrderMatchingService {
       errors: 0,
       batchExhausted: false,
       scanExhausted: false,
+      diagnostics: createLimitMatchingDiagnostics(),
     };
+    const diagnostics = summary.diagnostics;
 
     // Deduped set of participants whose rankings need a refresh after commit.
     const rankingTargets = new Map<
@@ -125,16 +156,8 @@ export class LimitOrderMatchingService {
     const assetEvidence = new Map<
       string,
       {
-        snapshot: {
-          id: string;
-          price: Prisma.Decimal;
-          effectiveAt: Date;
-        } | null;
-        candles: Awaited<
-          ReturnType<
-            LimitOrderCandleEvidenceService['findEligibleClosedCandlesForAsset']
-          >
-        >;
+        snapshot: PathASnapshotEvaluation;
+        candles: ClosedCandleEvaluation;
       }
     >();
 
@@ -161,7 +184,19 @@ export class LimitOrderMatchingService {
         summary.candidatesScanned += 1;
         scansRemaining -= 1;
         const candidate = row.candidate;
-        if (!candidate) continue;
+        if (!candidate) {
+          countReason(
+            diagnostics.candidateRejections,
+            'candidate_shape_invalid',
+          );
+          addLimitMatchingSample(diagnostics, {
+            orderId: row.cursor.id,
+            assetId: row.assetId,
+            phase: 'candidate',
+            reason: 'candidate_shape_invalid',
+          });
+          continue;
+        }
 
         let evidence = assetEvidence.get(row.assetId);
         if (!evidence) {
@@ -170,33 +205,75 @@ export class LimitOrderMatchingService {
               candidate.asset,
               cycleNow,
             ),
-            candles:
-              await this.candleEvidence.findEligibleClosedCandlesForAsset(
-                {
-                  assetType: candidate.asset.assetType,
-                  market: candidate.asset.market,
-                  id: candidate.asset.id,
-                },
-                cycleNow,
-                candleLookbackMs,
-              ),
+            candles: await this.candleEvidence.evaluateClosedCandlesForAsset(
+              {
+                assetType: candidate.asset.assetType,
+                market: candidate.asset.market,
+                id: candidate.asset.id,
+              },
+              cycleNow,
+              candleLookbackMs,
+            ),
           };
           assetEvidence.set(row.assetId, evidence);
           summary.assetsScanned += 1;
+          countReason(
+            diagnostics.planning.snapshotSelections,
+            evidence.snapshot.reason,
+          );
+          const candleCounts = diagnostics.planning.candleEvidence;
+          candleCounts.calendarUnavailableAssets += Number(
+            evidence.candles.calendarUnavailable,
+          );
+          candleCounts.rowsRead += evidence.candles.rowsRead;
+          candleCounts.eligible += evidence.candles.candles.length;
+          for (const [reason, count] of Object.entries(
+            evidence.candles.exclusions,
+          )) {
+            countReason(
+              candleCounts.exclusions,
+              reason as keyof typeof candleCounts.exclusions,
+              count,
+            );
+          }
         }
 
-        const plan = this.buildFillPlan(
+        const decision = this.buildFillPlan(
           candidate,
           evidence.snapshot,
           evidence.candles,
         );
-        if (!plan) continue;
+        countReason(diagnostics.planning.pathA, decision.pathA);
+        countReason(diagnostics.planning.pathB, decision.pathB);
+        for (const [reason, count] of Object.entries(
+          decision.candleOrderExclusions,
+        )) {
+          countReason(
+            diagnostics.planning.candleOrderExclusions,
+            reason as CandleOrderExclusionReason,
+            count,
+          );
+        }
+        const plan = decision.plan;
+        if (!plan) {
+          diagnostics.planning.noPlan += 1;
+          addLimitMatchingSample(diagnostics, {
+            orderId: candidate.id,
+            assetId: row.assetId,
+            phase: 'no_plan',
+            pathA: decision.pathA,
+            sourceSelectionReason: evidence.snapshot.reason,
+            pathB: decision.pathB,
+          });
+          continue;
+        }
         if (input.isLockOwned && !input.isLockOwned()) {
           refreshRankingsAfterCommittedFills();
           throw new Error('Ops job lock ownership was lost.');
         }
         summary.ordersConsidered += 1;
         attemptsRemaining -= 1;
+        diagnostics.execution.attempts[plan.path] += 1;
         try {
           const outcome = await this.execution.fillLimitOrder({
             orderId: candidate.id,
@@ -216,18 +293,39 @@ export class LimitOrderMatchingService {
             }
           } else {
             summary.skipped += 1;
+            const reason = observedReason(
+              outcome.reason,
+              EXECUTION_SKIP_REASONS,
+            );
+            countReason(diagnostics.execution.skipReasons, reason);
+            addLimitMatchingSample(diagnostics, {
+              orderId: candidate.id,
+              assetId: row.assetId,
+              phase: 'execution_skip',
+              path: plan.path,
+              reason,
+            });
           }
         } catch (error) {
           // Per-order isolation: one order's failure never aborts the rest of
           // the cycle. Transient failures are retried on the next cycle.
           summary.errors += 1;
+          const failure = classifyLimitExecutionError(error);
+          countReason(diagnostics.execution.errorReasons, failure.reason);
+          countReason(diagnostics.execution.errorStages, failure.stage);
+          diagnostics.execution.errorsByPath[plan.path] += 1;
+          const sample = {
+            orderId: candidate.id,
+            assetId: row.assetId,
+            phase: 'execution_error' as const,
+            path: plan.path,
+            ...failure,
+          };
+          addLimitMatchingSample(diagnostics, sample);
           this.logger.error(
             JSON.stringify({
               event: 'limit_order_fill_failed',
-              orderId: candidate.id,
-              assetId: row.assetId,
-              path: plan.path,
-              error: error instanceof Error ? error.message : 'Unknown error',
+              ...boundLimitMatchingSample(sample),
             }),
           );
         }
@@ -257,17 +355,10 @@ export class LimitOrderMatchingService {
    */
   private buildFillPlan(
     candidate: LimitMatchCandidate,
-    pathASnapshot: {
-      id: string;
-      price: Prisma.Decimal;
-      effectiveAt: Date;
-    } | null,
-    eligibleCandles: Awaited<
-      ReturnType<
-        LimitOrderCandleEvidenceService['findEligibleClosedCandlesForAsset']
-      >
-    >,
-  ): LimitFillPlan | null {
+    snapshotEvaluation: PathASnapshotEvaluation,
+    candleEvaluation: ClosedCandleEvaluation,
+  ): FillPlanDecision {
+    const pathASnapshot = snapshotEvaluation.snapshot;
     const side = candidate.side ?? OrderSide.buy;
     if (
       pathASnapshot &&
@@ -278,14 +369,24 @@ export class LimitOrderMatchingService {
           pathASnapshot.price.gte(candidate.limitPrice)))
     ) {
       return {
-        path: 'snapshot',
-        executedPrice: pathASnapshot.price,
-        assetPriceSnapshotId: pathASnapshot.id,
+        plan: {
+          path: 'snapshot',
+          executedPrice: pathASnapshot.price,
+          assetPriceSnapshotId: pathASnapshot.id,
+        },
+        pathA: 'trigger_found',
+        pathB: 'not_evaluated_path_a_selected',
+        candleOrderExclusions: {},
       };
     }
+    const pathA: PathAReason = !pathASnapshot
+      ? 'snapshot_selection_failed'
+      : pathASnapshot.effectiveAt < candidate.submittedAt
+        ? 'before_submission'
+        : 'limit_not_crossed';
 
-    const candle = this.candleEvidence.selectTriggerCandleForOrder(
-      eligibleCandles,
+    const trigger = this.candleEvidence.evaluateTriggerCandleForOrder(
+      candleEvaluation.candles,
       {
         submittedAt: candidate.submittedAt,
         limitPrice: candidate.limitPrice,
@@ -293,14 +394,31 @@ export class LimitOrderMatchingService {
         seasonEndAt: candidate.seasonEndAt,
       },
     );
+    const candle = trigger.candle;
     if (candle) {
       return {
-        path: 'candle',
-        executedPrice: candidate.limitPrice,
-        candle,
+        plan: {
+          path: 'candle',
+          executedPrice: candidate.limitPrice,
+          candle,
+        },
+        pathA,
+        pathB: 'trigger_found',
+        candleOrderExclusions: trigger.exclusions,
       };
     }
-    return null;
+    return {
+      plan: null,
+      pathA,
+      pathB: candleEvaluation.calendarUnavailable
+        ? 'calendar_unavailable'
+        : candleEvaluation.rowsRead === 0
+          ? 'no_closed_candle_rows'
+          : candleEvaluation.candles.length === 0
+            ? 'all_candle_rows_excluded'
+            : trigger.reason,
+      candleOrderExclusions: trigger.exclusions,
+    };
   }
 
   /**
@@ -311,7 +429,7 @@ export class LimitOrderMatchingService {
   private async resolvePathASnapshot(
     asset: LimitMatchCandidate['asset'],
     now: Date,
-  ): Promise<{ id: string; price: Prisma.Decimal; effectiveAt: Date } | null> {
+  ): Promise<PathASnapshotEvaluation> {
     const eligibility = resolveAssetProviderEligibility({
       workflow: 'orders_execute',
       asset: {
@@ -321,7 +439,11 @@ export class LimitOrderMatchingService {
         currencyCode: asset.currencyCode,
       },
     });
-    if (!eligibility.eligible) return null;
+    if (!eligibility.eligible)
+      return {
+        snapshot: null,
+        reason: observedReason(eligibility.reason, SNAPSHOT_SELECTION_REASONS),
+      };
 
     const priceCurrency = asset.priceCurrency ?? asset.currencyCode;
     const candidates = await this.prisma.assetPriceSnapshot.findMany({
@@ -356,13 +478,24 @@ export class LimitOrderMatchingService {
       isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
     });
 
-    return selection.state === 'selected'
-      ? {
-          id: selection.snapshot.id,
-          price: selection.snapshot.price,
-          effectiveAt: selection.snapshot.effectiveAt,
-        }
-      : null;
+    return {
+      snapshot:
+        selection.state === 'selected'
+          ? {
+              id: selection.snapshot.id,
+              price: selection.snapshot.price,
+              effectiveAt: selection.snapshot.effectiveAt,
+            }
+          : null,
+      reason:
+        selection.state === 'selected'
+          ? 'selected'
+          : observedReason(
+              selection.decision.rejectedProviderReason ??
+                selection.decision.fallbackReason,
+              SNAPSHOT_SELECTION_REASONS,
+            ),
+    };
   }
 
   private refreshRankingAfterFill(
@@ -381,7 +514,7 @@ export class LimitOrderMatchingService {
             event: 'limit_order_fill_ranking_refresh_failed',
             seasonId,
             seasonParticipantId,
-            error: error instanceof Error ? error.message : 'Unknown error',
+            ...classifyLimitExecutionError(error),
           }),
         );
       });
