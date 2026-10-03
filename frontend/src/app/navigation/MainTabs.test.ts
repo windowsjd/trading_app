@@ -70,9 +70,15 @@ function renderTabs(mode: AccountMode | null, isLoading = false, appearance: 'li
   return MainTabs();
 }
 
+function screenOptions(screen: any, route = {}) {
+  return typeof screen.props.options === 'function'
+    ? screen.props.options({ route })
+    : screen.props.options;
+}
+
 function tabContract(tree: unknown) {
   return elements(tree, 'Screen').map((screen: any) => {
-    const options = typeof screen.props.options === 'function' ? screen.props.options({ route: {} }) : screen.props.options;
+    const options = screenOptions(screen);
     const icon = options.tabBarIcon({
       color: '#123456',
       size: 25,
@@ -81,7 +87,7 @@ function tabContract(tree: unknown) {
     return [
       screen.props.name,
       screen.props.component,
-      screen.props.options.title,
+      options.title,
       icon.props.name,
     ];
   });
@@ -107,6 +113,32 @@ describe('mode-aware bottom tabs', () => {
       ['MyTab', 'MyStack', '전체', 'menu'],
     ]);
   });
+
+  for (const mode of ['general', 'season'] as const) {
+    it(`${mode}: hides the tab bar only for AssetDetail and restores it on Market routes`, () => {
+      const tree = renderTabs(mode);
+      const screens = elements(tree, 'Screen');
+      const market = screens.find((screen: any) => screen.props.name === 'MarketTab');
+      const defaultStyle = tree.props.screenOptions.tabBarStyle;
+
+      // Nested screen params are available before the child navigator mounts.
+      for (const name of [undefined, 'Market', 'MarketSearch', 'AssetDetail', 'MarketSearch', 'Market']) {
+        const route = { name: 'MarketTab', params: name ? { screen: name } : undefined };
+        const options = screenOptions(market, route);
+        assert.equal(options.title, '마켓');
+        if (name === 'AssetDetail') {
+          assert.deepEqual(options.tabBarStyle, { display: 'none' });
+        } else {
+          assert.equal(options.tabBarStyle, undefined, 'inherits the navigator tab bar style');
+          assert.equal(defaultStyle.display, undefined);
+          assert.equal(defaultStyle.backgroundColor, '#ffffff');
+        }
+      }
+      for (const screen of screens.filter((screen: any) => screen !== market)) {
+        assert.equal(screenOptions(screen).tabBarStyle, undefined, screen.props.name);
+      }
+    });
+  }
 
   it('remounts at Home when account mode changes, dropping the removed tab state', () => {
     const general = renderTabs('general');

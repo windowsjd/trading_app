@@ -37,6 +37,7 @@ function harness(platform: string, mode: 'general' | 'season' = 'general') {
   const MainTabs = load(resolve('src/app/navigation/MainTabs.tsx'), {
     'react-native': { useWindowDimensions: () => dimensions },
     'react-native-safe-area-context': { useSafeAreaInsets: () => insets },
+    '@react-navigation/native': { getFocusedRouteNameFromRoute: route => route.params?.screen },
     '@react-navigation/bottom-tabs': { createBottomTabNavigator: () => ({ Navigator: 'Navigator', Screen: 'Screen' }) },
     '../../theme/appearance': { useAppearance: () => ({ colors: { navigation: '#ffffff', navigationActive: '#202a35', navigationInactive: '#697583', border: '#dfe4e9' } }) },
     '../../theme/useReducedMotion': { useReducedMotion: () => false },
@@ -68,8 +69,11 @@ describe('bottom tab touch feedback', () => {
           'MyTab',
         ]);
         for (const screen of screens) {
+          const options = typeof screen.props.options === 'function'
+            ? screen.props.options({ route: { name: screen.props.name, params: { screen: 'Market' } } })
+            : screen.props.options;
           for (const selected of [false, true]) {
-            const icon = screen.props.options.tabBarIcon({ color: selected ? '#fff' : '#aaa', size: 25, focused: selected });
+            const icon = options.tabBarIcon({ color: selected ? '#fff' : '#aaa', size: 25, focused: selected });
             assert.equal(icon.props.color, selected ? '#fff' : '#aaa');
             assert.equal(icon.props.size, 25);
             assert.equal(icon.props.focused, selected);
@@ -79,7 +83,7 @@ describe('bottom tab touch feedback', () => {
               onPressIn: () => calls.push('in'), onPressOut: () => calls.push('out'),
               style: [{ flex: 1, padding: 5 }], children: icon, href: `/${screen.props.name}`,
               role: platform === 'ios' ? 'button' : 'tab',
-              'aria-label': screen.props.options.title, 'aria-selected': selected,
+              'aria-label': options.title, 'aria-selected': selected,
               testID: screen.props.name, accessibilityState: { selected },
               android_ripple: { borderless: true }, pressOpacity: 1,
             };

@@ -144,7 +144,7 @@ async function run() {
     }
     await open('market');
     await page.getByText('종목명 또는 심볼 검색', { exact: true }).click();
-    assert.deepEqual(await page.evaluate(() => window.fixture.navigation.calls.at(-1)), ['MarketSearch']);
+    assert.deepEqual(await page.evaluate(() => window.fixture.navigation.calls.at(-1)), ['MarketSearch', { sort: 'turnover_desc' }]);
     await open('overall');
     await id('overall-Settings').click();
     assert.deepEqual(await page.evaluate(() => window.fixture.navigation.calls.at(-1)), ['Settings']);

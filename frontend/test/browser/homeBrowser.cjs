@@ -104,7 +104,10 @@ async function run() {
             return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
           });
           return {
-            context: box('home-account-context'), total: box('home-total-asset'),
+            context: { ...box('home-account-context'),
+              minHeight: parseFloat(getComputedStyle(node('home-account-context')).minHeight),
+              gap: parseFloat(getComputedStyle(node('home-account-context')).rowGap) },
+            total: box('home-total-asset'),
             trigger: box('trading-account-switcher-trigger'),
             competition: node('home-competition') ? box('home-competition') : null,
             text: node('home-account-context').textContent, clipped, titleTextRight, contrasts,
@@ -114,9 +117,11 @@ async function run() {
         const contentWidth = Math.min(width, 1120) - 32;
         assert.ok(Math.abs(layout.context.width - contentWidth) <= 1, 'Home uses the shared desktop content width');
         assert.ok(Math.abs(layout.context.x - (width - contentWidth) / 2) <= 1, 'content stays centered');
-        assert.ok(layout.context.height >= 72 && layout.trigger.height >= 44);
+        assert.equal(layout.context.minHeight, 96);
+        assert.equal(layout.context.gap, 16);
+        assert.ok(layout.context.height >= 96 && layout.trigger.height >= 44);
         assert.ok(layout.trigger.width >= 44);
-        assert.ok(layout.context.paddingHorizontal >= 16 && layout.context.paddingVertical >= 12);
+        assert.ok(layout.context.paddingHorizontal >= 16 && layout.context.paddingVertical >= 20);
         assert.equal(layout.context.borderWidth, 1);
         assert.equal(layout.context.borderColor, appearance === 'light' ? 'rgb(229, 232, 235)' : 'rgb(67, 83, 100)');
         assert.notEqual(layout.context.background, theme.palettes[appearance].screen);
@@ -129,7 +134,8 @@ async function run() {
         assert.equal(layout.competition, null);
         if (layout.competition) assert.ok(layout.competition.y >= layout.total.bottom);
         if (!long && fontScale === 1) {
-          assert.ok(layout.context.height <= 190, 'normal context stays compact');
+          // UI8 adds 8px on each vertical edge and 8px between the two rows.
+          assert.ok(layout.context.height <= 214, 'enlarged context stays within its content budget');
           assert.ok(layout.total.bottom <= 350, 'assets appear near the top');
           await page.screenshot({ path: path.join(out, `${mode}-${appearance}-${width}.png`) });
         }
