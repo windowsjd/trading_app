@@ -76,21 +76,23 @@ export default function RecordProfitAnalysisScreen({ route, navigation }: Record
         </View>
         <View style={styles.card}>
           <Text style={styles.heading}>자산 추이</Text>
-          {equityQuery.isLoading ? <SectionSkeleton lines={5} />
-            : equityQuery.isError && !equityQuery.data ? (
-              <View style={styles.chartState}>
-                <InlineEmptyState message="자산 추이를 불러오지 못했습니다." />
-                <CTAButton label="다시 시도" onPress={() => { void equityQuery.refetch(); }} />
-              </View>
-            ) : equityQuery.data?.state === 'not_joined' ? <InlineEmptyState message="시즌 참가 기록이 없어 자산 추이를 표시할 수 없습니다." />
-              : !equityQuery.data || equityQuery.data.state === 'empty' || equityQuery.data.points.length < 2 ? <InlineEmptyState message="자산 추이를 표시하려면 데이터가 더 필요합니다." />
-                : <LineChart
-                  points={equityQuery.data.points.map(point => ({ x: point.time, label: point.time, y: point.totalAssetKrw }))}
-                  xScale="time"
-                  selectionDisplay="tooltip"
-                  pointValueFormatter={point => `${formatKrwDecimal(point.y)}원`}
-                  emptyMessage="자산 추이를 표시하려면 데이터가 더 필요합니다."
-                />}
+          <View style={styles.chartViewport}>
+            {equityQuery.isLoading ? <SectionSkeleton lines={5} />
+              : equityQuery.isError && !equityQuery.data ? (
+                <View style={styles.chartState}>
+                  <InlineEmptyState message="자산 추이를 불러오지 못했습니다." />
+                  <CTAButton label="다시 시도" onPress={() => { void equityQuery.refetch(); }} />
+                </View>
+              ) : equityQuery.data?.state === 'not_joined' ? <InlineEmptyState message="시즌 참가 기록이 없어 자산 추이를 표시할 수 없습니다." />
+                : !equityQuery.data || equityQuery.data.state === 'empty' || equityQuery.data.points.length < 2 ? <InlineEmptyState message="자산 추이를 표시하려면 데이터가 더 필요합니다." />
+                  : <LineChart
+                    points={equityQuery.data.points.map(point => ({ x: point.time, label: point.time, y: point.totalAssetKrw }))}
+                    xScale="time"
+                    selectionDisplay="tooltip"
+                    pointValueFormatter={point => `${formatKrwDecimal(point.y)}원`}
+                    emptyMessage="자산 추이를 표시하려면 데이터가 더 필요합니다."
+                  />}
+          </View>
         </View>
         <View style={styles.card}>
           <Text style={styles.heading}>대표 손익</Text>
@@ -120,6 +122,9 @@ const styles = StyleSheet.create({
   metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
   cell: { flexBasis: 140, flexGrow: 1, flexShrink: 1, minWidth: 0 },
   chartState: { gap: 8 },
+  // Default LineChart: 180 px plot + 6 px gap + 18 px axis. minHeight
+  // reserves arrival geometry while allowing large text/errors to grow.
+  chartViewport: { minHeight: 204 },
   assetRow: { flexDirection: 'row', flexWrap: 'wrap', borderTopWidth: 1, borderTopColor: semantic.border, paddingTop: 12, columnGap: 12, rowGap: 8, minWidth: 0 },
   assetName: { flexBasis: 140, flexGrow: 1, flexShrink: 1, minWidth: 0, gap: 4 },
   itemTitle: { fontSize: 15, lineHeight: 23, fontWeight: '600' },

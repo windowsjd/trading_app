@@ -181,7 +181,12 @@ export function AssetMarketChart({
                 <Text testID="asset-detail-secondary-price" style={styles.secondaryPrice} selectable>
                   {useKrw ? usdPrice : krwPrice}
                 </Text>
-              ) : null}
+              ) : (
+                // Reserve the optional conversion line before currency data
+                // arrives; keep the chart anchored for KRW and USD alike.
+                <Text style={styles.secondaryPrice} accessible={false}
+                  accessibilityElementsHidden importantForAccessibility="no-hide-descendants">{' '}</Text>
+              )}
             </View>
             {usdAsset ? (
               <View style={styles.currencyToggle} accessibilityRole="radiogroup">

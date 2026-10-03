@@ -44,6 +44,7 @@ function harness() {
     } },
   }).default;
   const rootMocks: any = {
+    'react-native': { Platform: { OS: 'android' } },
     '@react-navigation/native': { NavigationContainer: 'NavigationContainer', DefaultTheme: { colors: {} }, DarkTheme: { colors: {} } },
     '@react-navigation/native-stack': { createNativeStackNavigator: () => ({ Navigator: 'Navigator', Screen: 'Screen' }) },
     './navigationRef': { rootNavigationRef: {} },

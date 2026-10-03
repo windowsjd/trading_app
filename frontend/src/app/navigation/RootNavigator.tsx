@@ -2,7 +2,8 @@ import React from 'react';
 import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { useAppearance } from '../../theme/appearance';
 import { useReducedMotion } from '../../theme/useReducedMotion';
-import { rootTransition } from './transitionPolicy';
+import { chartTransition, rootTransition, stackTransition } from './transitionPolicy';
+import { Platform } from '../../theme/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import type { RootStackParamList } from './types';
@@ -49,13 +50,14 @@ export default function RootNavigator() {
         <Stack.Screen name="ModeSelection" component={ModeSelectionScreen} />
         <Stack.Screen name="MainTabs" component={MainTabs} />
         <Stack.Screen name="TradeHistory" component={TradeHistoryScreen} options={{
+          ...stackTransition(reducedMotion, Platform.OS),
           headerShown: true,
           title: '거래 내역',
           headerStyle: { backgroundColor: colors.surface },
           headerTintColor: colors.text,
         }} />
-        <Stack.Screen name="SeasonJoin" component={SeasonJoinScreen} />
-        <Stack.Screen name="AssetChart" component={AssetChartScreen} options={{ presentation: 'fullScreenModal', animation: reducedMotion ? 'none' : 'fade' }} />
+        <Stack.Screen name="SeasonJoin" component={SeasonJoinScreen} options={stackTransition(reducedMotion, Platform.OS)} />
+        <Stack.Screen name="AssetChart" component={AssetChartScreen} options={chartTransition(reducedMotion)} />
       </Stack.Navigator>
     </NavigationContainer>
   );

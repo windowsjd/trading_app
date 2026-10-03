@@ -5,6 +5,7 @@ import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppearance } from '../../theme/appearance';
 import { useReducedMotion } from '../../theme/useReducedMotion';
+import { tabTransition } from './transitionPolicy';
 
 import TabBarIcon from '../../components/navigation/TabBarIcon';
 import TabBarButton from '../../components/navigation/TabBarButton';
@@ -43,12 +44,11 @@ export default function MainTabs() {
       initialRouteName="HomeTab"
       screenOptions={{
         headerShown: false,
-        tabBarButton: (props) => <TabBarButton {...props} />,
+        tabBarButton: (props) => <TabBarButton {...props} reducedMotion={reducedMotion} />,
         tabBarLabelPosition: 'below-icon',
         tabBarActiveTintColor: colors.navigationActive,
         tabBarInactiveTintColor: colors.navigationInactive,
-        animation: reducedMotion ? 'none' : 'fade',
-        transitionSpec: { animation: 'timing', config: { duration: 130 } },
+        ...tabTransition(reducedMotion),
         tabBarStyle: {
           backgroundColor: colors.navigation,
           borderTopColor: colors.border,

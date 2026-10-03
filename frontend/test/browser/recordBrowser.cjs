@@ -19,7 +19,7 @@ async function run() {
   await page.addInitScript(() => { const p = new URLSearchParams(location.search); localStorage.setItem('selectedTradingAccountId:home-user', 'general-account'); localStorage.setItem('trading-app:appearance', 'system'); localStorage.setItem('trading-app:financial-colors', p.get('palette') ?? 'red_blue'); });
   const id = value => page.getByTestId(value), color = locator => locator.evaluate(el => getComputedStyle(el).color);
   try {
-    for (const width of [320, 360, 390, 430]) for (const appearance of ['light', 'dark']) for (const preference of ['red_blue', 'green_red']) for (const fontScale of [1, 2]) for (const long of [0, 1]) for (const screen of ['detail', 'profit', 'history']) {
+    for (const width of [320, 360, 390, 430]) for (const appearance of ['light', 'dark']) for (const preference of ['red_blue', 'green_red']) for (const fontScale of [1, 2]) for (const long of [0, 1]) for (const screen of (process.env.RECORD_BROWSER_SCREENS?.split(',') ?? ['detail', 'profit', 'history'])) {
       await page.setViewportSize({ width, height: 844 }); await page.emulateMedia({ colorScheme: appearance });
       await page.goto(`${base}/?record=${screen}&navigation=1&palette=${preference}&fontScale=${fontScale}&long=${long}`);
       await id(screen === 'detail' ? 'record-detail-return' : screen === 'profit' ? 'record-profit-total' : 'record-order-item-order-1').waitFor();
@@ -51,11 +51,15 @@ async function run() {
       });
       assert.deepEqual(clipping, [], JSON.stringify({ width, appearance, preference, fontScale, long, screen, clipping: clipping.slice(0, 5) }));
       if (screen === 'profit' && fontScale === 1) {
-        await id('line-chart-plot').scrollIntoViewIfNeeded();
-        const box = await id('line-chart-plot').boundingBox();
-        await page.mouse.click(box.x + box.width - 12, box.y + box.height / 2);
+        const plot = page.locator('[role="img"][aria-label^="차트."] svg');
+        await plot.scrollIntoViewIfNeeded();
+        const box = await plot.boundingBox();
+        await page.mouse.move(box.x + box.width - 12, box.y + box.height / 2);
+        await page.mouse.down();
         await id('line-chart-tooltip').waitFor();
         assert.match(await id('line-chart-tooltip').textContent(), /2026-09-30.*11,234,000원/);
+        await page.mouse.up();
+        await id('line-chart-tooltip').waitFor({ state: 'hidden' });
       }
       if (width === 320 && long && fontScale === 1 && preference === 'red_blue') await page.screenshot({ path: path.join(out, `${screen}-${appearance}.png`), fullPage: true });
       records.push({ width, appearance, preference, fontScale, long, screen });

@@ -166,7 +166,8 @@ describe('guide home and market basics lesson', () => {
     assert.equal(h.renderer.root.findAllByType('Text').filter((node: any) => node.props.children === '준비 중').length, 0);
     assert.equal(h.renderer.root.findAllByType('Text').filter((node: any) => node.props.children === '가이드').length, 0);
     act(() => buttons[0].props.onPressIn({ nativeEvent: { pageX: 120, pageY: 210 } }));
-    assert.ok(h.renderer.root.findAllByType('AnimatedView').length > 0, 'available card keeps the shared ripple');
+    assert.ok(h.renderer.root.findAllByType('View').some((node: any) =>
+      node.props.pointerEvents === 'none' && flatten(node.props.style).opacity > 0), 'available card keeps the shared pressed surface');
   });
 
   it('shows the resting book, visibly executes each price level in order, then fully resets', (t) => {

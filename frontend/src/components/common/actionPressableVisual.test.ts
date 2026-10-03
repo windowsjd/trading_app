@@ -81,11 +81,7 @@ describe('ActionPressable real React Native Web visual contract', () => {
         const actual = rootStyle(ActionPressable, style, pressed);
         assert.ok(Object.keys(expected).length > 0);
         for (const [key, value] of Object.entries(expected)) {
-          if (key === 'transform') {
-            assert.ok(actual[key]?.startsWith(value), 'caller transforms stay in order');
-          } else {
-            assert.equal(actual[key], value, `root ${key}`);
-          }
+          assert.equal(actual[key], value, `root ${key}`);
         }
       });
     }
@@ -97,26 +93,23 @@ describe('ActionPressable real React Native Web visual contract', () => {
         t.after(() => act(() => renderer.unmount()));
         const button = () => renderer.root.findByType('Pressable');
         const event = { nativeEvent: { pageX: 130, pageY: 215 } };
-        const check = (pressed: boolean, scale: number) => {
+        const check = (pressed: boolean) => {
           const expected = flatten(typeof style === 'function' ? style({ pressed }) : style);
           const actual = flatten(button().props.style);
           for (const [key, value] of Object.entries(expected)) {
             if (key !== 'transform') assert.deepEqual(actual[key], value, key);
           }
-          assert.deepEqual(actual.transform, typeof expected.transform === 'string'
-            ? `${expected.transform} scale(${scale})`
-            : [...(expected.transform ?? []), { scale }]);
+          assert.deepEqual(actual.transform, expected.transform, 'touch never changes caller geometry');
         };
-        check(false, 1);
+        check(false);
         act(() => button().props.onPressIn(event));
-        check(true, 0.995);
-        act(() => h.animations.find((a: any) => a.options.toValue === 0.985).finish());
-        check(true, 0.985);
+        check(true);
+        assert.equal(h.animations.length, 0);
         // Pressable also sends pressOut when a gesture leaves/cancels; no action.
         act(() => button().props.onPressOut(event));
-        check(false, 0.985);
+        check(false);
         h.finish();
-        check(false, 1);
+        check(false);
       });
     }
   }

@@ -11,6 +11,7 @@ for (const mode of ['light', 'dark'] as const) {
       ? { screen: '#10151c', surface: '#1b2530', text: '#f2f5f7', border: '#435364' }
       : { screen: '#fcfcfd', surface: '#ffffff', text: '#202a35', border: '#e5e8eb' };
     const mocks: Record<string, unknown> = {
+      'react-native': { Platform: { OS: 'ios' } },
       '@react-navigation/native': {
         NavigationContainer: 'NavigationContainer',
         DefaultTheme: { dark: false, colors: { background: '#fff' } },
@@ -35,5 +36,12 @@ for (const mode of ['light', 'dark'] as const) {
     assert.equal(tree.props.theme.colors.border, colors.border);
     const stack = elements(tree, 'Navigator')[0];
     assert.equal(stack.props.screenOptions.contentStyle.backgroundColor, colors.screen);
+    const screens = elements(tree, 'Screen');
+    for (const name of ['TradeHistory', 'SeasonJoin']) {
+      assert.equal(screens.find((s: any) => s.props.name === name).props.options.animation, 'simple_push');
+    }
+    const chart = screens.find((s: any) => s.props.name === 'AssetChart');
+    assert.equal(chart.props.options.presentation, 'fullScreenModal');
+    assert.equal(chart.props.options.animation, 'fade');
   });
 }

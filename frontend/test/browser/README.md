@@ -1,5 +1,32 @@
 # Trading UI browser regression
 
+Interaction motion diagnostics use the same external tools:
+
+```sh
+NODE_PATH=/path/to/browser-tools/node_modules node test/browser/motionBrowser.cjs
+```
+
+`MOTION_BROWSER_OUTPUT` selects the artifact directory (default
+`/tmp/trading-motion-browser`). It runs real navigators/screens/React Query with
+immediate fixture responses, 600 ms delayed responses and a fresh cached revisit,
+plus the season Ranking tab and live Reduced Motion changes. Mutations and
+external network requests are blocked. Production React profiling and test-bundle
+instrumentation record pointer-down, handler/click, route state, visible shell/data
+markers, request start/response, commits, RAF intervals and layout-shift sources.
+The 35 ms simulated hold is intentional; these are **web observations, not native
+T1/T3/T4, physical touch latency or native FPS**. Order's input and Profit's summary
+markers can appear before other section data; request timestamps remain separate.
+`MOTION_CONDITIONS=delayed` narrows diagnosis. `MOTION_REUSE_BUNDLE=1` reruns a
+previously preserved `motion.js` in the output directory for a before comparison;
+omit it for current-source validation. Baseline bundle provenance must be recorded.
+Run timing comparisons after builds and other browser suites finish; shared host
+CPU contention changes the observed latency. These samples have no FPS pass gate.
+
+The existing `recordBrowser.cjs` can target the changed chart screens with
+`RECORD_BROWSER_SCREENS=detail,profit`; its default still checks history as well.
+The motion handover records the pre-existing 320px/2×-font history amount overflow
+found by that broader run, including reproduction against the starting HEAD.
+
 `tradingBrowser.cjs` bundles the current chart-first detail and separate Order route, React Query cache,
 account-bound API wrappers, quote/create flow, shared SVG renderer and web
 pointer adapter. Only transport, authentication/account inputs and navigation

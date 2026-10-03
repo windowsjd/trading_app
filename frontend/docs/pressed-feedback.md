@@ -1,4 +1,125 @@
-# 일반 ripple·시간봉 selector 구현 및 검증
+# 공통 Press·Navigation Motion 인수인계
+
+2026-10-03~04 Interaction Motion 진단/개선. 아래 최신 정책이 과거 ripple 기록보다 우선한다.
+
+- 시작 직전 `git fetch origin main` 성공. 시작 HEAD/origin/main 및 종료 HEAD는
+  `955912752d56d1d7fd6269ac59f6af89c9592409` (`관리자용 계정강화4`). 시작 working tree는 clean,
+  종료는 frontend 변경만 있는 미커밋 상태다.
+- **확인된 문제:** scale + ripple + wash 중첩, `useNativeDriver: false` scale listener의
+  프레임별 React state 갱신, Reduced Motion에서도 버튼 animation 지속. 실제 네이티브
+  체감/30fps 영상의 정확한 시간은 확인하지 못했다. 영상 파일은 이번 첨부에 포함되지 않았다.
+- **의도:** Pressable의 즉각적인 pressed 상태를 한 개 배경으로 표현하고, 버튼 자체의
+  이동·크기 변화·효과 종료 대기를 없앤다. 금융 실행은 기존 loading/server confirmation을 유지한다.
+
+| 계층 | 최종 정책 |
+| --- | --- |
+| ActionPressable / CTA / 계정·목록 행 | 정적 wash 하나. 밝은 면은 검정 5%, 나머지는 흰색 4.5%. root scale/ripple/추가 release timer 없음. 원래 Pressable 이벤트·취소·ref·style callback 유지 |
+| 일반 stack | 기존 iOS `simple_push` 210ms, Android `ios_from_right` 유지. 숫자 튜닝은 native 비교 전 보류 |
+| root context (Auth/Entry/MainTabs) | 기존 fade 170ms 유지 (duration 옵션은 iOS용) |
+| TradeHistory / SeasonJoin | root fade에서 공통 stack push/pop으로 변경. route/back stack 자체는 동일 |
+| AssetChart | fullScreenModal + fade 유지, policy 함수로 중앙화 |
+| Bottom Tabs | 기존 fade 130ms 유지, `transitionPolicy.ts`로 이동. 일반 TabBarButton은 설치된 PlatformPressable 유지 |
+| Reduced Motion | stack/root/chart/tab `none`, tab duration 0. tab ripple 투명/opacity 1, 실행 중 opacity도 style로 억제. 일반 버튼은 OS 설정 조회 전에도 움직이는 효과 자체가 없음 |
+| 예외 | Market 초소형 정렬 화살표 `feedback="none"`, 기존 sheet/backdrop/차트 gesture 유지 |
+
+`animationDuration`의 Android 제어를 추가하지 않았다. 설치된 native-stack 7.14.12와
+screens 4.23.0 타입, [React Navigation 문서](https://reactnavigation.org/docs/native-stack-navigator/#animationduration)를 확인했다.
+새 animation dependency, backend/API 경로, telemetry/production timing log는 없다.
+
+**원인 분리와 측정 범위**
+
+`test/browser/motionBrowser.cjs`는 실제 RootNavigator/화면/React Query와 production React
+profiling을 실행한다. HTTP·WS와 인증 bootstrap은 fixture다. mutation/외부 요청은 차단한다.
+동일 Chromium 390×844에서 즉시 fixture, 모든 새 요청 600ms 지연, fresh cache 재방문을 비교한다.
+T0는 주입된 pointerdown, T2는 실제 ActionPressable handler 앞의 test-only 기록이다.
+Tab/Back은 click-capture를 대신 쓴다. 35ms hold는 테스트가 의도적으로 넣은 값이다.
+`route-state`는 navigation 상태 반영이며 **native T3가 아니다**. shell/data는 visible DOM
+marker다. native T1/T3/T4, T0→T3/T3→T4/T4→T6 및 실제 서버 비교는 **NOT_VERIFIED**다.
+주문 입력 marker는 이미 캐시된 종목을 사용하며, 수익 분석 요약은 equity보다 먼저 표시된다.
+환율은 unavailable, 거래 내역은 empty fixture이므로 해당 주요 데이터 T6는 측정하지 않았다.
+요청 시작/응답, 전체 React subtree commit, RAF, layout-shift source는 별도로 저장한다.
+
+단위 ms, **handler/click → route-state**. 지연 조건의 shell/data도 같은 기준이다.
+
+| Flow | 즉시 fixture | 600ms 지연 | cache | 지연 shell / data marker |
+| --- | ---: | ---: | ---: | --- |
+| Home → Market tab | 6.9 | 4.9 | 2.8 | 11.1 / 610.2 |
+| Market → AssetDetail | 11.0 | 7.3 | 6.5 | 8.8 / 613.1 |
+| AssetDetail → Order | 18.1 | 14.0 | 15.2 | 15.4 / 15.5 |
+| Order → Back | 20.7 | 18.1 | 19.9 | 18.9 / 19.0 |
+| Market → Guide tab | 10.6 | 4.9 | 2.6 | 11.9 / 11.9 |
+| Guide → Wallet tab | 8.8 | 6.2 | 2.5 | 12.2 / 12.2 |
+| Wallet → FX | 8.9 | 4.9 | 5.9 | 5.8 / 미측정 |
+| Wallet → TradeHistory | 4.1 | 2.5 | 3.2 | 3.4 / 미측정 |
+| Wallet → Overall tab | 6.4 | 4.7 | 3.4 | 12.5 / 12.5 |
+| Overall → Record | 6.6 | 4.9 | 7.8 | 5.5 / 608.6 |
+| Record → SeasonDetail | 6.0 | 4.6 | 5.2 | 5.5 / 606.4 |
+| SeasonDetail → ProfitAnalysis | 7.3 | 6.8 | 7.4 | 7.7 / 7.7 |
+| Overall → Home tab | 3.3 | 3.2 | 2.8 | 12.6 / 12.6 |
+| Home → AssetDetail | 7.7 | 7.1 | 9.2 | 13.1 / 612.4 |
+
+위 값은 한 번의 controlled browser sample이며 기기 latency 기준/개선율이 아니다.
+지연 조건에서 새 요청이 있는 모든 flow는 응답 전에 route state가 반영되었고, fresh cache
+재방문은 새 요청이 0개다. Home↔Market↔Guide↔Wallet↔Overall, 시즌 Ranking 및 live Reduced
+Motion 변경까지 총 44개 interaction을 전후 실행했다.
+
+- **Server 판정: NOT_VERIFIED.** 실제 로그인 API/서버·cold start 비교를 실행하지 않았다.
+  대표 화면을 여는 handler에는 `await`, fetch/refetch/mutation success 대기가 없다.
+  코드와 지연 fixture에서는 network-before-navigation을 발견하지 않았다.
+  로그인/복원, 계정 개설, 시즌 참가에는 identity/account integrity를 위한 대기가 있고,
+  주문·환전 quote/create와 성공 후 계정 범위 invalidation은 그대로 유지한다.
+- **Client 판정:** 고립된 버튼 short tap의 React commit은 일반/Reduced Motion 모두
+  **35→3회**였다. 이는 web subtree 측정이며 native frame drop 감소율이 아니다.
+  AssetDetail은 detail/candles, Order는 detail/fee/wallet/positions/holdings, Record는
+  detail/equity observer가 화면 mount 후 동작한다. observer 수와 commit 기록만으로 폭발이나
+  native 병목을 단정하지 않았다. navigation이 전체 cache를 invalidate하는 경로는 발견하지 않았다.
+  화면 memoization, query 정책, provider 수명/계정 전환 시 mode별 remount는 바꾸지 않았다.
+- **Arrival 측정 및 수정:** USD 보조 가격줄 삽입으로 차트가 21px 내려가던 경로에 접근성에서
+  제외한 동일 Text 공간을 확보했다. 수익 분석은 154px skeleton 뒤 204px 차트가 와서 다음
+  카드가 50px 내려갔다. 기존 skeleton을 유지하고 plot+gap+axis의 204px 최소 공간을 확보했다.
+  `minHeight`이므로 큰 글꼴/error 내용은 늘어날 수 있다. 동일 지연 fixture에서 두 수직 이동은
+  사라졌다. 이름 길이에 따른 작은 가로 이동은 남으며, 임의 길이 데이터 전체의 CLS=0을 주장하지 않는다.
+- **남은 layout 사항:** 지갑 cold holdings의 가변 행 수에 따른 확장, 큰 글꼴에서 차트 축
+  label wrap에 따른 높이 변화는 남는다. 임의 row 수를 가정하는 placeholder나 새 skeleton
+  framework를 도입하지 않았다.
+
+**검증과 한계**
+
+| 검사 | 결과 |
+| --- | --- |
+| `npm run check` | PASS: 두 lint gate, typecheck, 116개 테스트 파일; skip 0 |
+| Press/ActionPressable/실제 RN Web style/TabBarButton/Reduced Motion/route tests | PASS. 이전 ripple/scale assertions는 최종 pressed 정책 검사로 교체. disabled/loading/blocked, 즉시 handler, 취소/rapid tap, 금융 중복 제출·계정 scope 기존 테스트 유지 |
+| Motion browser | PASS: 전후 각 44개 interaction, 일반/Reduced Motion press probe |
+| 기존 Trading browser | PASS: 138개 시나리오 |
+| Record detail/profit browser | PASS: 128개 레이아웃, Light/Dark·금융 색상·큰 글꼴·긴 값·tooltip/해제·unavailable |
+| 전체 Record browser | FAIL: history 320px/fontScale 2/긴 금액의 글자 x=-29.75px. 시작 HEAD의 ActionPressable/pressFeedback/Record 화면으로도 동일 재현. 이번 변경으로 생긴 회귀가 아님; 실패를 skip 처리하지 않음 |
+| `npm run export:web` | PASS |
+| Android Expo export | PASS: Hermes 번들만 검증, APK/실기기 실행 결과 아님 |
+| Android / iOS 실제 motion | NOT_RUN: adb/emulator/xcrun 및 연결된 실행 환경 없음 |
+| 실제 API·cache·fixture의 native before/after | NOT_VERIFIED |
+| `git diff --check` / 자체 검토 | PASS; 금융 mutation, 계정 선택, API `/api/v1`, pull-to-refresh, financial color, disabled/accessibility/Market arrow 예외 유지 |
+
+소스 변경은 공통 press 2개, navigation policy/MainTabs/Root/TabBarButton, 측정된 두 도착 화면에
+한정했다. 나머지는 테스트/하니스/이 문서다. 예전 Record browser의 사라진 `line-chart-plot`
+selector를 실제 접근성 SVG로 바꾸고, 현행 gesture의 pointer-up 해제도 검증한다.
+`RECORD_BROWSER_SCREENS=detail,profit`은 변경 화면을 선택할 수 있으며, 기본 전체 검사는 history도 계속 검사한다.
+
+원본 trace/보존된 before 번들: `/tmp/trading-motion-before/`, 최종 trace:
+`/tmp/trading-motion-final/`; 단계별 layout source 비교: `/tmp/trading-motion-layout/`.
+검사 로그: `/tmp/trading-motion-{check,web-export,android-export,trading,record-charts}.log`.
+기존 history 실패 비교: `/tmp/trading-motion-record.log`, `/tmp/trading-motion-record-baseline.log`.
+실행 방법과 환경 변수는 [browser README](../test/browser/README.md)에 있다.
+
+**완료 상태:** 코드 개선/자동 검증까지 진행. 사용자가 요구한 native push/pop 정착감과
+실제 touch latency의 최종 승인 조건은 미충족이다. 동일 Android 기기에서 보존한 HEAD와 수정본을
+설치해 Market→Detail→Order→Back, Home→Market, Wallet→FX를 OS frame profiler/영상 및
+T0~T6·request trace로 비교해야 한다. iOS는 별도 확인하며 210/130ms 튜닝은 이 증거 이후에 한다.
+원인 비중을 숫자로 배분할 근거는 없다. 확인한 개선 대상은 중첩 press의 렌더 작업과 두 도착
+layout 변화이고, 서버·native transition 성능은 미검증이다.
+
+---
+
+# 2026-09-17 일반 ripple·시간봉 selector 기록 (이전 정책)
 
 2026-09-17 작업. 시작 시 작업 트리는 깨끗했고 HEAD는 `7c1eeb55`였다. 과거 작업 상태 대신 이 HEAD의 전체 사용처와 테스트를 조사했다.
 

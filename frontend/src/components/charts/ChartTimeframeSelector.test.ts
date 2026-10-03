@@ -87,7 +87,8 @@ describe('chart timeframe selector', () => {
     for (const id of ['asset-timeframe-selector', ...ASSET_CHART_TIMEFRAMES.map((item) => `asset-timeframe-option-${item.interval}`)]) {
       const button = h.button(id);
       act(() => button.props.onPressIn({ nativeEvent: { pageX: 125, pageY: 220 } }));
-      assert.ok(h.renderer.root.findAllByType('AnimatedView').some((node: any) => node.props.style.width > 0));
+      assert.ok(h.renderer.root.findAllByType('View').some((node: any) =>
+        node.props.pointerEvents === 'none' && flatten(node.props.style).opacity > 0));
       act(() => button.props.onPressOut({ nativeEvent: {} }));
       h.finish();
     }

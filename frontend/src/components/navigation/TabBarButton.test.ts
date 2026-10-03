@@ -7,7 +7,7 @@ const require = createRequire(import.meta.url);
 const React = require('react');
 const { load, elements } = require('../../../test/ledgerTestHarness.cjs');
 
-function harness(platform: string, mode: 'general' | 'season' = 'general') {
+function harness(platform: string, mode: 'general' | 'season' = 'general', reducedMotion = false) {
   const animations: any[] = [];
   const native = {
     Platform: { OS: platform, Version: 35 },
@@ -40,7 +40,7 @@ function harness(platform: string, mode: 'general' | 'season' = 'general') {
     '@react-navigation/native': { getFocusedRouteNameFromRoute: route => route.params?.screen },
     '@react-navigation/bottom-tabs': { createBottomTabNavigator: () => ({ Navigator: 'Navigator', Screen: 'Screen' }) },
     '../../theme/appearance': { useAppearance: () => ({ colors: { navigation: '#ffffff', navigationActive: '#202a35', navigationInactive: '#697583', border: '#dfe4e9' } }) },
-    '../../theme/useReducedMotion': { useReducedMotion: () => false },
+    '../../theme/useReducedMotion': { useReducedMotion: () => reducedMotion },
     '../../components/navigation/TabBarButton': { default: Button, __esModule: true },
     '../../components/navigation/TabBarIcon': { default: 'TabBarIcon', __esModule: true },
     '../../components/states/FullPageLoading': { default: 'FullPageLoading', __esModule: true },
@@ -129,4 +129,26 @@ describe('bottom tab touch feedback', () => {
     assert.equal(options.tabBarLabelPosition, 'below-icon');
     assert.deepEqual(options.tabBarStyle, { backgroundColor: '#ffffff', borderTopColor: '#dfe4e9', height: 49 + Math.ceil(14 * 1.4) + h.insets.bottom });
   });
+
+  for (const platform of ['android', 'ios', 'web']) {
+    it(`${platform}: Reduced Motion suppresses both tab fade and visible press animation`, () => {
+      const h = harness(platform, 'general', true);
+      const options = h.MainTabs().props.screenOptions;
+      assert.equal(options.animation, 'none');
+      assert.equal(options.transitionSpec.config.duration, 0);
+      let calls = 0;
+      const element = options.tabBarButton({ onPress: () => calls++, style: { flex: 1 }, android_ripple: { color: '#ff0000' } });
+      const button = element.type(element.props);
+      assert.equal(button.props.pressOpacity, 1);
+      assert.equal(button.props.pressColor, 'transparent');
+      assert.deepEqual(button.props.style, [{ flex: 1 }, { opacity: 1 }]);
+      const host = button.type.render(button.props, null);
+      host.props.onPressIn({});
+      host.props.onPress({ preventDefault() {}, button: 0 });
+      host.props.onPressOut({});
+      assert.equal(calls, 1);
+      if (platform === 'android') assert.equal(host.props.android_ripple.color, 'transparent');
+      else assert.ok(h.animations.every((animation: any) => animation.toValue === 1));
+    });
+  }
 });

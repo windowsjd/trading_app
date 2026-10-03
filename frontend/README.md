@@ -15,6 +15,10 @@ Tests run under Node's type-stripping test runner, so test-reachable modules
 must be free of React Native imports and their relative imports need explicit
 `.ts` extensions.
 
+Press feedback, native stack/root/tab policy, Reduced Motion, browser timing
+evidence and remaining device checks are recorded in
+[the motion handover](docs/pressed-feedback.md).
+
 ## Display preferences
 
 `AppearanceProvider` stores appearance and financial colors separately on the device.
