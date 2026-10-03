@@ -14,11 +14,11 @@ export function rootTransition(reducedMotion: boolean): NativeStackNavigationOpt
   return reducedMotion ? { animation: 'none' } : { animation: 'fade', animationDuration: 170 };
 }
 
-/** Peer destinations have no horizontal depth; keep the existing short fade. */
+/** Peer destinations have no horizontal depth; allow a brief settling fade. */
 export function tabTransition(reducedMotion: boolean): BottomTabNavigationOptions {
   return {
     animation: reducedMotion ? 'none' : 'fade',
-    transitionSpec: { animation: 'timing', config: { duration: reducedMotion ? 0 : 130 } },
+    transitionSpec: { animation: 'timing', config: { duration: reducedMotion ? 0 : 170 } },
   };
 }
 

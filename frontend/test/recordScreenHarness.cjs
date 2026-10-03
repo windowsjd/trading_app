@@ -39,6 +39,7 @@ function createRecordScreenHarness(screen = 'detail', scope = { seasonId: 'recor
   const native = Object.fromEntries(['View', 'Text', 'SafeAreaView', 'ScrollView', 'Pressable', 'ActivityIndicator', 'RefreshControl'].map(name => [name, name]));
   native.StyleSheet = { create: s => s };
   native.Platform = { OS: 'android' };
+  native.useWindowDimensions = () => ({ width: 390, height: 844, fontScale: 1 });
   native.AppState = { currentState: 'active', addEventListener: (_event, callback) => { h.appState = callback; return { remove() {} }; } };
   native.Alert = { alert: (...args) => h.alerts.push(args) };
   native.FlatList = ({ data, renderItem, ListHeaderComponent, ListFooterComponent, ...props }) => React.createElement('FlatList', props, ListHeaderComponent, ...data.map((item, index) => React.cloneElement(renderItem({ item, index }), { key: item.id })), ListFooterComponent);

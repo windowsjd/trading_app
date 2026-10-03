@@ -25,6 +25,22 @@ function assertCleanRateDisplay(h: any, tree: any) {
   }
 }
 
+it('retains the measured loading rate space after arrival without limiting larger text', () => {
+  for (const height of [96, 218]) {
+    const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
+    const rate = h.rateQuery.data;
+    h.rateQuery = { data: undefined, isLoading: true, isError: false };
+    const status = () => elements(h.render(), 'View').find((node: any) => node.props.testID === 'fx-rate-status');
+    status().props.onLayout({ nativeEvent: { layout: { height } } });
+    h.rateQuery = { data: rate, isLoading: false, isError: false };
+    const ready = status();
+    assert.equal(ready.props.style[1].minHeight, height);
+    assert.equal(ready.props.onLayout, undefined);
+    assert.equal(ready.props.style[1].height, undefined, 'content may grow');
+    assertCleanRateDisplay(h, h.render());
+  }
+});
+
 describe('FX screen information display', () => {
   it('the success Market action reaches MarketTab / Market', () => {
     const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');

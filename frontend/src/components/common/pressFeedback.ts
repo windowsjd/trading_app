@@ -7,6 +7,6 @@ export function getFeedbackPalette(color: number | null) {
   const nearWhite = brightness >= 235;
   return {
     washColor: nearWhite ? '#000' : '#fff',
-    washOpacity: nearWhite ? 0.05 : 0.045,
+    washOpacity: nearWhite ? 0.065 : 0.055,
   };
 }

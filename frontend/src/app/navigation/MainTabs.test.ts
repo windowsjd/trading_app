@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { URL } from 'node:url';
+import { tabTransition } from './transitionPolicy.ts';
 
 const require = createRequire(import.meta.url);
 const { elements, load } = require('../../../test/ledgerTestHarness.cjs');
@@ -245,7 +246,7 @@ describe('bottom tab visual states', () => {
     assert.equal(dark.props.screenOptions.tabBarInactiveTintColor, '#9aa8b6');
     assert.equal(dark.props.screenOptions.tabBarStyle.backgroundColor, '#080a0d');
     assert.equal(tree.props.screenOptions.animation, 'fade');
-    assert.equal(tree.props.screenOptions.transitionSpec.config.duration, 130);
+    assert.deepEqual(tree.props.screenOptions.transitionSpec, tabTransition(false).transitionSpec);
     assert.equal(renderTabs('general', false, 'light', true).props.screenOptions.animation, 'none');
   });
 });

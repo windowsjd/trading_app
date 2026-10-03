@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { describe, it } from 'node:test';
+import { tabTransition } from '../../app/navigation/transitionPolicy.ts';
 
 const require = createRequire(import.meta.url);
 const React = require('react');
@@ -60,6 +61,9 @@ describe('bottom tab touch feedback', () => {
       it(`${platform}/${mode}: connects all five tabs while preserving events, icons and accessibility`, () => {
         const h = harness(platform, mode);
         const tree = h.MainTabs();
+        const policy = tabTransition(false);
+        assert.equal(tree.props.screenOptions.animation, policy.animation);
+        assert.deepEqual(tree.props.screenOptions.transitionSpec, policy.transitionSpec);
         const screens = elements(tree, 'Screen');
         assert.deepEqual(screens.map((node: any) => node.props.name), [
           'HomeTab',

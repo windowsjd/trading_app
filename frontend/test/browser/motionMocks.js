@@ -17,6 +17,8 @@ export const apiClient = {
       const mapped = path.replace(`/assets/${encodeURIComponent(id)}`, '/assets/BTC');
       result = await tradingClient.get(original ? path : mapped, config);
       if (result.data.data.asset && !original) result = response({ asset: { ...result.data.data.asset, id } });
+    } else if (path.startsWith('/fx/rates/current') && new URLSearchParams(location.search).get('fxState') === 'available') {
+      result = response({ state: 'available', pair: 'USD/KRW', baseCurrency: 'USD', quoteCurrency: 'KRW', rate: '1350', capturedAt: new Date().toISOString(), validUntil: new Date(Date.now() + 60000).toISOString(), fallbackUsed: false });
     } else if (/^\/trading-accounts\/[^/]+$/.test(path)) {
       result = response({ ...transport.accounts.find(a => a.id === path.split('/')[2]), feePolicy: { tradeFeeRate: '0.001', fxFeeRate: '0.001' } });
     } else result = await rootClient.get(path, config);

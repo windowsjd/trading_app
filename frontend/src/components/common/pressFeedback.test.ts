@@ -12,11 +12,11 @@ const { interactionHarness } = require('../../../test/interactionTestHarness.cjs
 const native = { ...interactionHarness().native, Pressable: 'Pressable' };
 
 it('uses a subtle neutral wash in light/dark without changing financial colors', () => {
-  for (const color of [0xff111111, 0xff0066cc, 0xffcccccc]) {
-    assert.deepEqual(getFeedbackPalette(color), { washOpacity: 0.045, washColor: '#fff' });
+  for (const color of [0xff111111, 0xff1b2530, 0xff0066cc, 0xffcccccc, 0xffa13e3b, 0xff315f9b, 0xff16803a]) {
+    assert.deepEqual(getFeedbackPalette(color), { washOpacity: 0.055, washColor: '#fff' });
   }
   for (const color of [0xfffafafa, 0xffffffff, null]) {
-    assert.deepEqual(getFeedbackPalette(color), { washOpacity: 0.05, washColor: '#000' });
+    assert.deepEqual(getFeedbackPalette(color), { washOpacity: 0.065, washColor: '#000' });
   }
 });
 

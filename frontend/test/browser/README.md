@@ -22,6 +22,20 @@ omit it for current-source validation. Baseline bundle provenance must be record
 Run timing comparisons after builds and other browser suites finish; shared host
 CPU contention changes the observed latency. These samples have no FPS pass gate.
 
+`MOTION_WIDTH=320` and `MOTION_FONT_SCALE=2` use the existing RN Web scale
+adapter for arrival checks (also run 360/390/430 and scale 1). Geometry snapshots
+record the observed major section positions and heights on RAF, separately from
+the layout-shift observer. The original AssetDetail/Profit reservation assertion
+applies to its measured 390px/default-font case; large-font text/axis wrapping is
+recorded, not hidden by an arbitrary fixed height. `MOTION_FX_STATE=available`
+adds a valid read-only FX fixture and checks that delayed rate arrival retains
+the direction/input/CTA positions. Default FX remains unavailable, history empty.
+The probe also saves held-press screenshots and computed colors for light/dark,
+red/blue and green/red palettes. Its ScrollView recognizer observation window
+does not define a production animation duration. Immediate press/release behavior
+is covered by the component tests. `MOTION_REUSE_BUNDLE` skips current-source
+geometry assertions and is only for a documented baseline comparison.
+
 The existing `recordBrowser.cjs` can target the changed chart screens with
 `RECORD_BROWSER_SCREENS=detail,profit`; its default still checks history as well.
 The motion handover records the pre-existing 320px/2×-font history amount overflow

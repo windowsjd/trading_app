@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Platform } from '../../theme/native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Platform, useWindowDimensions } from '../../theme/native';
 import { useQuery } from '@tanstack/react-query';
 import type { RecordProfitAnalysisScreenProps } from '../../app/navigation/types';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
@@ -41,6 +41,7 @@ function ProfitAsset({ asset, label, testID }: { asset: ProfitAnalysisItemDto | 
 }
 
 export default function RecordProfitAnalysisScreen({ route, navigation }: RecordProfitAnalysisScreenProps) {
+  const { fontScale } = useWindowDimensions();
   const { seasonId } = route.params;
   const detailQuery = useQuery({
     queryKey: QUERY_KEYS.record.seasonDetail(seasonId),
@@ -76,7 +77,7 @@ export default function RecordProfitAnalysisScreen({ route, navigation }: Record
         </View>
         <View style={styles.card}>
           <Text style={styles.heading}>자산 추이</Text>
-          <View style={styles.chartViewport}>
+          <View style={[styles.chartViewport, { minHeight: 204 + 18 * Math.max(0, fontScale - 1) }]}>
             {equityQuery.isLoading ? <SectionSkeleton lines={5} />
               : equityQuery.isError && !equityQuery.data ? (
                 <View style={styles.chartState}>
@@ -122,8 +123,8 @@ const styles = StyleSheet.create({
   metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
   cell: { flexBasis: 140, flexGrow: 1, flexShrink: 1, minWidth: 0 },
   chartState: { gap: 8 },
-  // Default LineChart: 180 px plot + 6 px gap + 18 px axis. minHeight
-  // reserves arrival geometry while allowing large text/errors to grow.
+  // Default LineChart: 180 px plot + 6 px gap + 18 px axis (scaled above).
+  // minHeight reserves arrival geometry while allowing text/errors to grow.
   chartViewport: { minHeight: 204 },
   assetRow: { flexDirection: 'row', flexWrap: 'wrap', borderTopWidth: 1, borderTopColor: semantic.border, paddingTop: 12, columnGap: 12, rowGap: 8, minWidth: 0 },
   assetName: { flexBasis: 140, flexGrow: 1, flexShrink: 1, minWidth: 0, gap: 4 },

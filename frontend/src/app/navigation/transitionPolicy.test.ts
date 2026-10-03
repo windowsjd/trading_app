@@ -11,7 +11,7 @@ test('native push has a short iOS duration, Android direction and reverse native
   assert.deepEqual(stackTransition(true, 'android'), { animation: 'none' });
   assert.deepEqual(rootTransition(false), { animation: 'fade', animationDuration: 170 });
   assert.deepEqual(rootTransition(true), { animation: 'none' });
-  assert.deepEqual(tabTransition(false), { animation: 'fade', transitionSpec: { animation: 'timing', config: { duration: 130 } } });
+  assert.deepEqual(tabTransition(false), { animation: 'fade', transitionSpec: { animation: 'timing', config: { duration: 170 } } });
   assert.deepEqual(tabTransition(true), { animation: 'none', transitionSpec: { animation: 'timing', config: { duration: 0 } } });
   assert.deepEqual(chartTransition(false), { ...rootTransition(false), presentation: 'fullScreenModal' });
   assert.deepEqual(chartTransition(true), { animation: 'none', presentation: 'fullScreenModal' });

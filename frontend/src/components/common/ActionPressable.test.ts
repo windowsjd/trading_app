@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { describe, it } from 'node:test';
+import { getFeedbackPalette } from './pressFeedback.ts';
 
 const require = createRequire(import.meta.url);
 const { interactionHarness, React, act, flatten } = require('../../../test/interactionTestHarness.cjs');
@@ -27,10 +28,11 @@ describe('ActionPressable immediate feedback', () => {
       assert.deepEqual(flatten(button().props.style), style);
       assert.equal(button().props.hitSlop, 8);
       assert.equal(button().props.accessibilityLabel, '주문');
+      assert.equal(button().props.android_ripple, undefined);
       assert.equal(flatten(wash(renderer).props.style).opacity, 0);
       act(() => button().props.onPressIn(event));
       const overlay = wash(renderer);
-      assert.equal(flatten(overlay.props.style).opacity, 0.045);
+      assert.equal(flatten(overlay.props.style).opacity, getFeedbackPalette(0xff111111).washOpacity);
       assert.equal(flatten(overlay.props.style).backgroundColor, '#fff');
       assert.equal(flatten(overlay.props.style).borderRadius, 12);
       assert.equal(flatten(overlay.props.style).overflow, 'hidden');
@@ -70,7 +72,7 @@ describe('ActionPressable immediate feedback', () => {
     t.after(() => act(() => renderer.unmount()));
     assert.equal(renderer.root.findByType('Text').props.numberOfLines, undefined);
     act(() => renderer.root.findByType('Pressable').props.onPressIn(event));
-    assert.equal(flatten(wash(renderer).props.style).opacity, 0.045);
+    assert.equal(flatten(wash(renderer).props.style).opacity, getFeedbackPalette(0xff111111).washOpacity);
     for (const state of ['disabled', 'loading', 'blocked']) {
       act(() => renderer.update(React.createElement(CTA, { label: '환전하기', state, onPress })));
       const button = renderer.root.findByType('Pressable');
@@ -95,7 +97,7 @@ describe('ActionPressable immediate feedback', () => {
     const button = () => renderer.root.findByType('Pressable');
     for (let tap = 0; tap < 5; tap++) {
       act(() => button().props.onPressIn({ nativeEvent: {} }));
-      assert.equal(flatten(wash(renderer).props.style).opacity, 0.05);
+      assert.equal(flatten(wash(renderer).props.style).opacity, getFeedbackPalette(null).washOpacity);
       act(() => button().props.onPressOut(event));
       assert.equal(flatten(wash(renderer).props.style).opacity, 0);
     }

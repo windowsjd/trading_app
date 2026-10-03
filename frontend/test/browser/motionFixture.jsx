@@ -7,7 +7,9 @@ import RootNavigator from '../../src/app/navigation/RootNavigator';
 import { AppearanceProvider } from '../../src/theme/appearance';
 import { TradingAccountProvider } from '../../src/features/tradingAccount/TradingAccountContext';
 import ActionPressable from '../../src/components/common/ActionPressable';
-import { Text } from 'react-native';
+import { ScrollView, Text } from '../../src/theme/native';
+import { semantic } from '../../src/theme/tokens';
+import { financial } from '../../src/theme/financialColors';
 import { timing } from './motionMocks';
 
 const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 60000 } } });
@@ -20,9 +22,16 @@ createRoot(document.getElementById('root')).render(
     <SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: innerWidth, height: innerHeight }, insets: { top: 0, right: 0, bottom: 0, left: 0 } }}>
       <QueryClientProvider client={client}>
         <AppearanceProvider>
-          {probe ? <ActionPressable testID="motion-probe" onPress={() => {}} style={{ backgroundColor: '#111', borderRadius: 12, padding: 20, margin: 40 }}>
-            <Text style={{ color: '#fff' }}>터치 피드백</Text>
-          </ActionPressable> : <TradingAccountProvider><RootNavigator /></TradingAccountProvider>}
+          {probe ? <ScrollView contentContainerStyle={{ padding: 24, gap: 16, backgroundColor: semantic.screen }}>
+            {[
+              ['motion-probe', semantic.selected, semantic.onAccent, '선택 버튼'],
+              ['motion-surface', semantic.surface, semantic.text, '밝은/어두운 표면'],
+              ['motion-buy', financial.buyAction, semantic.onAccent, '구매하기'],
+              ['motion-sell', financial.sellAction, semantic.onAccent, '판매하기'],
+            ].map(([testID, backgroundColor, color, label]) => <ActionPressable key={testID} testID={testID} onPress={() => {}} style={{ backgroundColor, borderRadius: 12, padding: 20 }}>
+              <Text style={{ color }}>{label}</Text>
+            </ActionPressable>)}
+          </ScrollView> : <TradingAccountProvider><RootNavigator /></TradingAccountProvider>}
         </AppearanceProvider>
       </QueryClientProvider>
     </SafeAreaProvider>

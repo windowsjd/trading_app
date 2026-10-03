@@ -9,6 +9,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  useWindowDimensions,
 } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -117,6 +118,7 @@ function getFxDomainErrorMessage(
 }
 
 export default function WalletFxScreen({ navigation }: Props) {
+  const { fontScale } = useWindowDimensions();
   const queryClient = useQueryClient();
   const rootNavigation = useRootNavigation();
   const {
@@ -176,6 +178,7 @@ export default function WalletFxScreen({ navigation }: Props) {
   const [diagnosticError, setDiagnosticError] = useState<unknown>(null);
   const [fxDomainState, setFxDomainState] = useState<FxDomainState | null>(null);
   const [successData, setSuccessData] = useState<FxExecuteDto | null>(null);
+  const [rateStatusMinHeight, setRateStatusMinHeight] = useState(0);
   const [, setPreviewClock] = useState(0);
   useStaleRecheck(true, () => setPreviewClock((value) => value + 1));
   const mountedRef = useRef(true);
@@ -473,44 +476,56 @@ export default function WalletFxScreen({ navigation }: Props) {
           </Text>
           <Text style={styles.value}>KRW Wallet {formatKrw(krwWallet)}</Text>
           <Text style={styles.value}>USD Wallet {formatUsd(usdWallet)}</Text>
-          <Text style={styles.helper}>
-            USD 환산 KRW {usdBalanceKrw === null ? '-' : formatKrw(usdBalanceKrw)}
-          </Text>
-          {availableRate ? (
-            <>
-              <Text style={styles.helper}>
-                환율 {formatDisplayDecimal(availableRate.rate)}
-              </Text>
-              <Text style={styles.helper}>
-                수집 시각 {formatKstDateTime(availableRate.capturedAt)}
-              </Text>
-              {availableRate.fallbackUsed ? (
+          <View style={[styles.convertedBalance, fontScale > 1 && { flexDirection: 'column' }]}>
+            <Text style={styles.helper}>USD 환산 KRW </Text>
+            <Text style={styles.helper}>{usdBalanceKrw === null ? '-' : formatKrw(usdBalanceKrw)}</Text>
+          </View>
+          <View
+            testID="fx-rate-status"
+            style={[styles.rateStatus, { minHeight: rateStatusMinHeight }]}
+            // Keep the measured loading status space when the shorter rate
+            // arrives. Text may still grow with wrapping or accessibility size.
+            onLayout={rateQuery.isLoading ? (event) => {
+              const height = event.nativeEvent.layout.height;
+              setRateStatusMinHeight(previous => Math.max(previous, height));
+            } : undefined}
+          >
+            {availableRate ? (
+              <>
                 <Text style={styles.helper}>
-                  대체 환율 소스가 적용되었습니다.
+                  환율 {formatDisplayDecimal(availableRate.rate)}
                 </Text>
-              ) : null}
-            </>
-          ) : (
-            <>
-              <Text style={styles.errorText}>
-                현재 환율을 사용할 수 없어 환전 기능이 잠시 중단되었습니다.
-              </Text>
-              <CTAButton
-                label={rateQuery.isLoading ? '환율 불러오는 중' : '환율 다시 불러오기'}
-                state={rateQuery.isLoading ? 'loading' : 'enabled'}
-                onPress={() => void rateQuery.refetch()}
-              />
-              <AdminDiagnosticPanel
-                error={rateQuery.error}
-                runtime={!rateQuery.isError && rateQuery.data?.state === 'available' ? {
-                  rateState: rateQuery.data.state,
-                  capturedAt: rateQuery.data.capturedAt,
-                  validUntil: rateQuery.data.validUntil,
-                  previewRateAvailable: false,
-                } : null}
-              />
-            </>
-          )}
+                <Text style={styles.helper}>
+                  수집 시각 {formatKstDateTime(availableRate.capturedAt)}
+                </Text>
+                {availableRate.fallbackUsed ? (
+                  <Text style={styles.helper}>
+                    대체 환율 소스가 적용되었습니다.
+                  </Text>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <Text style={styles.errorText}>
+                  현재 환율을 사용할 수 없어 환전 기능이 잠시 중단되었습니다.
+                </Text>
+                <CTAButton
+                  label={rateQuery.isLoading ? '환율 불러오는 중' : '환율 다시 불러오기'}
+                  state={rateQuery.isLoading ? 'loading' : 'enabled'}
+                  onPress={() => void rateQuery.refetch()}
+                />
+                <AdminDiagnosticPanel
+                  error={rateQuery.error}
+                  runtime={!rateQuery.isError && rateQuery.data?.state === 'available' ? {
+                    rateState: rateQuery.data.state,
+                    capturedAt: rateQuery.data.capturedAt,
+                    validUntil: rateQuery.data.validUntil,
+                    previewRateAvailable: false,
+                  } : null}
+                />
+              </>
+            )}
+          </View>
         </View>
 
         <View style={styles.card}>
@@ -644,6 +659,9 @@ const styles = StyleSheet.create({
     backgroundColor: semantic.surface,
     gap: 10,
   },
+  rateStatus: { gap: 10 },
+  // Large text starts with a separate value line, even before the rate arrives.
+  convertedBalance: { flexDirection: 'row', flexWrap: 'wrap' },
   label: { fontSize: 13, color: semantic.secondary },
   value: { fontSize: 16, fontWeight: '700', lineHeight: 24, flexShrink: 1 },
   helper: { fontSize: 14, color: semantic.secondary, lineHeight: 21, flexShrink: 1 },

@@ -1,6 +1,165 @@
 # 공통 Press·Navigation Motion 인수인계
 
-2026-10-03~04 Interaction Motion 진단/개선. 아래 최신 정책이 과거 ripple 기록보다 우선한다.
+## 2차 기록: 2026-10-04 모션 폴리시
+
+1. **시작 / 종료 HEAD:** 작업 시작 전에 `git fetch origin main` 성공.
+   HEAD와 최신 origin/main은 모두 `8238a7e4f616bc407a2d666f160ddec7120d0948`
+   (`UI개편3보완작업`), 시작 working tree는 clean. 종료 HEAD도 동일하며 아래 변경은
+   frontend에만 있는 미커밋 상태다. 1차 모션 변경은 이미 `fec57928`로 커밋돼 있다.
+2. **최신 repository:** `fec57928` 이후 지갑 구성/보유 종목/quick action 보완이 추가됐다.
+   실제 최신 소스를 기준으로 조사했고 이 변경을 유지했다. 기존 native-stack, Query,
+   DTO, 계정 선택, 금융 mutation, API `/api/v1`, refresh 계약은 변경하지 않았다.
+3. **기존 Bottom Tab:** 중앙 `tabTransition()`의 fade 130ms. Android soft ripple,
+   iOS/web opacity 0.82와 원래 PlatformPressable 이벤트/접근성 계약이 이미 적용돼 있었다.
+4. **최종 Bottom Tab:** fade **170ms**. 후보 160~190ms 안에서 기존보다 40ms만 늘린
+   보수적인 조정이다. 설치된 Navigation의 기존 timing config와 fade interpolation을
+   사용하고 별도 easing을 추가하지 않았다. browser에서 route state가 지연 응답보다 먼저
+   반영되고 fresh cache 재방문 요청은 0개였다. native에서 가장 자연스러운 값인지의
+   최종 체감 비교는 NOT_VERIFIED이며 web timing을 native duration으로 해석하지 않는다.
+5. **Stack:** iOS `simple_push` **210ms**, Android `ios_from_right` 그대로.
+   새 native hitch/abrupt stop 증거가 없으므로 튜닝하지 않았다. native back gesture,
+   TradeHistory/SeasonJoin push/pop, hierarchy, AssetChart fullScreenModal 의미도 유지한다.
+6. **기존 wash:** near-white 검정 0.05, 나머지 흰색 0.045.
+7. **최종 wash:** near-white 검정 **0.065**, 나머지 흰색 **0.055**. 실제 themed
+   Light/Dark 표면과 두 금융 palette의 held-press 렌더를 비교했다. 밝은 표면 눌림이
+   더 식별되며 어두운 표면/금융 액션은 작은 중립색 wash로 유지된다. 값은
+   `pressFeedback.ts` 한 곳에서 관리하고 brightness/alpha 판정은 그대로다.
+8. **ripple/scale:** ActionPressable 소스는 변경하지 않았다. static wash 한 개,
+   pressed 동안만 표시, release/cancel 즉시 복원. animation/timer/measure 없음.
+   component tests에서 ref, 원래 event, functional style/children, disabled/loading/blocked,
+   rapid tap, keyboard, accessibility, 단일 action 및 animation/measure 0을 확인했다.
+9. **Market arrow:** ▲/▼의 `feedback="none"` 유지. TabBarButton, backdrop,
+   sheet, chart gesture는 기존 정책이며 새로운 feedback variant가 없다.
+10. **대표 flow arrival 조사:** immediate / 600ms delayed / fresh cache를 재사용했다.
+    아래 위치는 390px/fontScale 1의 delayed 조건에서 data arrival 전후 비교다.
+
+    | Flow | 조사 결과 / 처리 |
+    | --- | --- |
+    | Home → Market | root y=64 유지. 첫 row는 응답 후 y=252에 생성. route가 응답을 기다리지 않음; 가변 list row 예약 없음 |
+    | Market → AssetDetail | 기본 폭에서 chart y=255, timeframe y=724, footer y=775 유지. 보조 가격줄 예약 유지. 작은 폭/큰 글꼴 줄바꿈은 아래 별도 기록 |
+    | AssetDetail → Order | quantity y=383, slider y=513, CTA y=653 유지. fee/wallet/positions/holdings 요청 관찰. holdings top y=774 유지, 가변 내용 높이 189→1858은 예약하지 않음 |
+    | Order → Back | 기존 native back 계약 유지. cached detail의 footer/selector 위치 유지, 추가 요청 0 |
+    | Wallet → FX | available 환율의 늦은 도착으로 form/CTA가 44px 위로 이동하던 경로 발견 및 수정. unavailable도 별도 재실행 |
+    | Wallet → TradeHistory | loading shell 뒤 empty history 교체. root y=64 유지. 가변 행 placeholder 추가 없음 |
+    | Overall → Record | 기존 full loading shell 뒤 list 표시. 첫 시즌 row y=252 유지 |
+    | Record → SeasonDetail | 기존 full loading shell 뒤 summary/CTA 표시. assets y=291, profit CTA y=428 유지 |
+    | SeasonDetail → ProfitAnalysis | 기본 chartViewport 204px 유지. fontScale 2의 axis 높이 증가 18px를 추가 반영해 후속 card/CTA 위치 안정화 |
+
+11. **발견된 shift:** FX 390px/1× form **-44px**. FX 320px/2×에서는 환산 값
+    줄바꿈 +42px와 rate status 축소가 함께 발생해 기존 net **-32px**였다.
+    Profit 2×는 viewport **204→222px**, 대표 손익 card/CTA **+18px**였다.
+    별도로 AssetDetail은 placeholder 이름/가격이 실제 문자열로 바뀌면서 작은 폭에서
+    가격·이름이 더 많은 줄을 사용했다. chart top 이동은 아래 표와 같다.
+12. **수정한 shift:** FX는 로딩 rate status의 실제 `onLayout` 높이만 최소 공간으로
+    보존한다. 높이 상수를 추측하지 않으며 큰 내용은 계속 늘어날 수 있다.
+    큰 글꼴의 USD 환산 라벨/값은 loading부터 두 줄 구조로 시작한다. unknown 값은
+    기존 `-`를 유지한다. 최종 available FX의 방향/input/CTA y 이동은 8개 조합 모두 0이다.
+    Profit은 기존 204px 최소 공간을 유지하고 18px axis의 fontScale 증가분만 반영한다.
+    2× 최소 공간은 222px이며 후속 card/CTA 이동은 8개 조합 모두 0이다.
+13. **수정하지 않은 영역:** AssetDetail의 임의 이름/가격 길이에 따른 줄바꿈은 남는다.
+    추정 가격 길이로 고정 높이를 예약하거나 큰 글꼴을 줄여 숨기지 않았다. 이번 결과를
+    모든 화면 CLS=0으로 판정하지 않는다. Wallet/Market/history/Order holdings의 가변
+    item 수, error/긴 텍스트 확장, FX unavailable spinner→label의 약 1px 차이도 유지한다.
+    AssetDetail의 별도 responsive header 검토가 후속 과제다.
+14. **Reduced Motion:** PASS. stack/root/chart `none`, tab `none`/0ms,
+    tab press ripple transparent/opacity 1 및 실행 중 opacity 억제 유지. 일반 wash는
+    moving animation 자체가 없다. unit tests와 live browser media 변경으로 확인했다.
+15. **Light/Dark:** PASS (RN Web). 실제 themed surface/selected/action 버튼 held-press
+    screenshot과 computed styles를 확인했다. 텍스트 투명도와 clipping shape는 그대로다.
+16. **금융 palette:** PASS (RN Web). Red/Blue와 Green/Red의 buy/sell 및 Record
+    금융 색상 검증. 색 role/원래 background/text는 유지하고 중립 wash만 소폭 강화했다.
+17. **폭:** 320/360/390/430 × fontScale 1/2를 실행했다. 최종 delayed y 이동(px):
+
+    | 폭 / scale | AssetDetail chart (미수정) | FX input (수정) | Profit 후속 card (수정) |
+    | --- | ---: | ---: | ---: |
+    | 320 / 1 | +46 | 0 | 0 |
+    | 320 / 2 | +218 | 0 | 0 |
+    | 360 / 1 | 0 | 0 | 0 |
+    | 360 / 2 | +91 | 0 | 0 |
+    | 390 / 1 | 0 | 0 | 0 |
+    | 390 / 2 | +91 | 0 | 0 |
+    | 430 / 1 | 0 | 0 | 0 |
+    | 430 / 2 | +91 | 0 | 0 |
+
+18. **fontScale:** 1.0/2.0 PASS: 수정한 FX/Profit의 arrival 위치 gate와 Record
+    detail/profit 128개 glyph clipping 검사. 기존 nativeWeb adapter의 시뮬레이션이며
+    native 글꼴/접근성 실측은 아니다. 큰 글꼴 error/내용을 제한하는 고정 height나
+    numberOfLines를 추가하지 않았다. 기존 Record history 실패는 23번에 별도 기록한다.
+19. **Motion Browser:** 최종 matrix **172 interactions PASS**, pageerror 0.
+    기본 44개(immediate/delayed/cache + season Ranking/live Reduced Motion), 추가 7개
+    폭/글꼴 조합 각 16개, unavailable 조건 16개. 시작 HEAD 번들의 44개 및 layout 수정
+    전 320px/2× 번들도 별도로 재사용했다. route/commit/request/geometry만 측정하며
+    native FPS, 실제 touch latency, 실제 native transition timing은 NOT_VERIFIED.
+    기존 390px/1× reservation gate를 유지하고 FX/Profit 위치 gate를 모든 조합으로
+    확장했다. 다른 문자열 wrap 이동은 trace에 기록해 없어진 것처럼 처리하지 않았다.
+    Reduced Motion held-press 캡처의 ScrollView observation 시간 보정 후 추가 16개
+    interaction도 PASS (합계 188개). 이는 production press duration 변경이 아니다.
+20. **Android 실제 검증:** NOT_RUN. adb/emulator/연결된 실행 환경 없음.
+21. **iOS 실제 검증:** NOT_RUN. xcrun/simulator/연결된 실행 환경 없음.
+22. **CI / frontend quality:** local `npm run check` PASS (두 lint gate, typecheck,
+    전체 **116개 테스트 파일**, skip 0); transitionPolicy/MainTabs/ActionPressable/
+    pressFeedback/TabBarButton/Reduced Motion 포함. `npm run export:web` PASS.
+    Trading browser **138 scenarios PASS**, Record detail/profit **128 layouts PASS**.
+    hosted CI는 NOT_RUN. 수정 중 발견한 기존 130ms assertion과 새 dimensions hook의
+    test-host mock은 최종 정책에 맞게 보완했고 최종 검사를 다시 통과했다.
+23. **기존 Record overflow:** 전체 Record browser **FAIL**. 320px/2×/긴 금액의
+    `실제 차감액`/`실제 수령액` glyph x=-29.75px. 1차 기록의 실패와 동일한 수치다.
+    history 소스/geometry는 이번 diff에 없고 wash는 absolute overlay이므로 악화 없음.
+    해당 실패를 skip으로 숨기거나 이 작업에 묶어 수정하지 않았다.
+24. **변경 파일 및 이유:** 아래 16개, 모두 frontend. production 변경은 4개다.
+
+    | 파일 (`frontend/` 기준) | 이유 |
+    | --- | --- |
+    | `src/app/navigation/transitionPolicy.ts` | tab fade 170ms 중앙 정책 |
+    | `src/components/common/pressFeedback.ts` | static wash 6.5%/5.5% |
+    | `src/screens/wallet/WalletFxScreen.tsx` | measured rate status 예약 및 큰 글꼴 환산 line 안정화 |
+    | `src/screens/record/RecordProfitAnalysisScreen.tsx` | 기존 viewport에 axis fontScale 증가분만 반영 |
+    | `src/app/navigation/transitionPolicy.test.ts` | 최종 중앙 duration 검증 |
+    | `src/app/navigation/MainTabs.test.ts` | duration 중복 literal 제거, 중앙 policy 계약 비교 |
+    | `src/components/common/pressFeedback.test.ts` | 최종 wash 및 dark/금융 action 표면 검사 |
+    | `src/components/common/ActionPressable.test.ts` | 중앙 wash와 즉시 상태, native ripple 없음 검사 |
+    | `src/components/navigation/TabBarButton.test.ts` | 정상 tab도 중앙 policy 연결 검증 |
+    | `src/features/wallet/fxUiDisplay.test.ts` | loading 측정 공간을 도착 후 유지하고 height 제한 없음 검사 |
+    | `test/recordScreenHarness.cjs` | 새 dimensions 사용에 기존 native boundary 제공 |
+    | `test/browser/motionBrowser.cjs` | 기존 harness에 geometry/폭/font/press 관찰과 최소 위치 gate 추가 |
+    | `test/browser/motionFixture.jsx` | 실제 Light/Dark·금융 버튼 probe |
+    | `test/browser/motionMocks.js` | valid FX available fixture; mutation/외부 요청 차단 유지 |
+    | `test/browser/README.md` | 기존 harness 실행/관찰 범위와 한계 |
+    | `docs/pressed-feedback.md` | 최신 HEAD/정책/증거/남은 실패 기록; 1차 역사 보존 |
+
+25. **전체 diff 자체 검토:** PASS. fade/짧은 timing/중앙화 유지. Stack 210ms와
+    Android preset 변경 없음. ActionPressable 본체·Market arrow·TabBarButton 변경 없음.
+    최소 geometry 수정 외 금융/query/account/refresh 변경 없음. 새 dependency, backend,
+    DB, animation framework, production profiling, 임의 row reservation 없음.
+    `git diff --check` PASS.
+26. **판정:** PASS = local quality/motion gates/web export/변경 화면 Record/Trading.
+    FAIL = 전체 Record의 기존 history overflow. NOT_RUN = Android/iOS/hosted CI.
+    NOT_VERIFIED = **Server**, native timing/FPS/touch latency/최종 체감.
+    전체 앱 arrival 무이동은 달성했다고 주장하지 않는다.
+27. **남은 사용감 / 후속:** 동일 native 기기에서 Home→Market fade, Light/Dark press,
+    Market→Detail→Order→Back, Wallet→FX 확인 필요. 작은 폭/큰 글꼴 AssetDetail header
+    줄바꿈, 기존 Record overflow는 별도 검토 대상이다. native evidence 없이 Stack을
+    느리게 만들거나 content entrance animation을 추가하지 않는다.
+
+원본 증거 (모두 `/tmp/`, 앱 번들에 포함되지 않음):
+
+- 시작 HEAD + 확장한 test-only 관찰: `/tmp/trading-motion2-baseline/` (130ms/5%/4.5%).
+- 도착 수정 전: `/tmp/trading-motion2-arrival-before/`, `/tmp/trading-motion2-large-before/`.
+  이 두 번들은 후보 tab/wash 조정 이후, FX/Profit layout 수정 이전 소스다.
+- 최종: `/tmp/trading-motion2-final/`, `/tmp/trading-motion2-matrix-{폭}-{scale}/`,
+  `/tmp/trading-motion2-unavailable/`; results.json에 request/route/geometry/색상 기록.
+- Reduced Motion held-press 캡처 재확인: `/tmp/trading-motion2-press-final/`.
+- Record/Trading: `/tmp/trading-motion2-record-charts/`, `/tmp/trading-motion2-record-full/`,
+  `/tmp/trading-motion2-trading/`와 각 `.log`.
+- quality/export: `/tmp/trading-motion2-check-final.log`, `/tmp/trading-motion2-web-export.log`.
+
+---
+
+## 1차 기록: 2026-10-03~04 Interaction Motion 진단/개선
+
+아래 내용은 당시 작업 기록이다. 이 변경은 이후 `fec57928f4395ecd1cb077d655ac84ceeea8ef1d`
+(`앱 모션 개선`)로 커밋됐다. 아래 `95591275` 종료 HEAD/미커밋 표현은 그 커밋 직전의 상태를
+뜻하며, 현재 최신 repository 상태가 아니다. 현재 정책/검증은 위 2차 기록을 기준으로 한다.
 
 - 시작 직전 `git fetch origin main` 성공. 시작 HEAD/origin/main 및 종료 HEAD는
   `955912752d56d1d7fd6269ac59f6af89c9592409` (`관리자용 계정강화4`). 시작 working tree는 clean,
