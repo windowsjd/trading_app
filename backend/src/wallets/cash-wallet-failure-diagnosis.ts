@@ -1,4 +1,5 @@
 import { Prisma } from '../generated/prisma/client';
+import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
 import {
   assertCashWalletTradingAccountScope,
   throwCashWalletScopeMismatch,
@@ -28,10 +29,10 @@ import {
  *                                              'insufficient_reserved'
  *   6. scope AND amounts fine                → 'conflict' (real concurrency)
  *
- * Steps 2–5 are structural server-side corruption and are thrown here as the
+ * Steps 2–4 are structural server-side corruption and are thrown here as the
  * SAME structured 500s the pre-check guard uses
  * (FINANCIAL_SCOPE_REPAIR_REQUIRED / FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH)
- * so every caller reports them identically. Steps 1, 6, 7 are returned so each
+ * so every caller reports them identically. Steps 1, 5, 6 are returned so each
  * caller can keep its own historical error code (INSUFFICIENT_BALANCE,
  * INSUFFICIENT_AVAILABLE_BALANCE, ORDER_RESERVATION_INCONSISTENT,
  * SOURCE_WALLET_NOT_FOUND, …).
@@ -49,7 +50,7 @@ export type CashWalletFailureReason =
   | 'insufficient_balance'
   /** reserved_amount did not cover the reservation being released/settled. */
   | 'insufficient_reserved'
-  /** Scope and amounts all check out — a genuine concurrent update. */
+  /** Observed scope/amounts hold; concurrency is inferred, not writer attribution. */
   | 'conflict';
 
 export type CashWalletAmountRequirement = {
@@ -73,6 +74,12 @@ export async function diagnoseCashWalletMutationFailure(
     };
     /** Amount guards that were part of the failed UPDATE's WHERE. */
     requires?: CashWalletAmountRequirement;
+    /** Opt in at the order call site; other financial workflows are unchanged. */
+    diagnostic?: {
+      financialOperation: string;
+      failureStage: string;
+      mutationAffected: number;
+    };
   },
 ): Promise<CashWalletFailureReason> {
   // BY ID ONLY — re-applying the scope columns here is exactly what hid the
@@ -88,8 +95,70 @@ export async function diagnoseCashWalletMutationFailure(
     },
   });
 
+  const requires = input.requires ?? {};
+  const reserved = wallet?.reservedAmount ?? new Prisma.Decimal(0);
+  const scopeValid = wallet
+    ? wallet.tradingAccountId === input.expected.tradingAccountId
+    : undefined;
+  const currencyMatched = wallet
+    ? wallet.currencyCode === input.expected.currencyCode
+    : undefined;
+  const validWallet = wallet && scopeValid && currencyMatched ? wallet : null;
+  const balanceRequirement = requires.balance ?? requires.available;
+  const evidence = {
+    walletFound: !!wallet,
+    scopeValid,
+    currencyMatched,
+    availableSufficient:
+      validWallet && requires.available !== undefined
+        ? validWallet.balanceAmount.sub(reserved).gte(requires.available)
+        : undefined,
+    balanceSufficient:
+      validWallet && balanceRequirement !== undefined
+        ? validWallet.balanceAmount.gte(balanceRequirement)
+        : undefined,
+    reservedSufficient:
+      validWallet && requires.reserved !== undefined
+        ? reserved.gte(requires.reserved)
+        : undefined,
+    reservedCashPresent: validWallet ? reserved.gt(0) : undefined,
+  };
+  const recordReason = (failureReason: string) => {
+    if (!input.diagnostic) return;
+    setAdminDiagnosticContext({
+      failureStage: input.diagnostic.failureStage,
+      evidence: {
+        financialGuard: {
+          financialOperation: input.diagnostic.financialOperation,
+          guardName:
+            requires.available !== undefined
+              ? 'available_cash'
+              : requires.reserved !== undefined
+                ? 'reserved_cash'
+                : requires.balance !== undefined
+                  ? 'cash_balance'
+                  : 'wallet_scope',
+          mutationResult: 'rejected',
+          mutationAffected: input.diagnostic.mutationAffected,
+          observation: 'failure_read',
+          failureReason,
+          ...evidence,
+        },
+      },
+    });
+  };
+
   if (!wallet) {
+    recordReason('wallet_not_found');
     return 'wallet_not_found';
+  }
+
+  if (!scopeValid) {
+    recordReason(
+      wallet.tradingAccountId == null ? 'null_scope' : 'account_scope_mismatch',
+    );
+  } else if (!currencyMatched) {
+    recordReason('currency_mismatch');
   }
 
   // Throws FINANCIAL_SCOPE_REPAIR_REQUIRED (null scope) or
@@ -106,15 +175,13 @@ export async function diagnoseCashWalletMutationFailure(
     );
   }
 
-  const requires = input.requires ?? {};
-  const reserved = wallet.reservedAmount ?? new Prisma.Decimal(0);
-
   if (
     requires.available !== undefined &&
     wallet.balanceAmount
       .sub(reserved)
       .lt(new Prisma.Decimal(requires.available))
   ) {
+    recordReason('insufficient_available');
     return 'insufficient_available';
   }
 
@@ -122,6 +189,7 @@ export async function diagnoseCashWalletMutationFailure(
     requires.balance !== undefined &&
     wallet.balanceAmount.lt(new Prisma.Decimal(requires.balance))
   ) {
+    recordReason('insufficient_balance');
     return 'insufficient_balance';
   }
 
@@ -129,8 +197,10 @@ export async function diagnoseCashWalletMutationFailure(
     requires.reserved !== undefined &&
     reserved.lt(new Prisma.Decimal(requires.reserved))
   ) {
+    recordReason('insufficient_reserved');
     return 'insufficient_reserved';
   }
 
+  recordReason('conflict');
   return 'conflict';
 }

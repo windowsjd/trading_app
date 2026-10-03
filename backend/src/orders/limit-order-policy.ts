@@ -98,7 +98,7 @@ export type QuotedLimitReservationBasis = {
 
 export type QuotedLimitReservationBasisResult =
   | { ok: true; basis: QuotedLimitReservationBasis }
-  | { ok: false; reason: string };
+  | { ok: false; reason: string; predicates?: Record<string, boolean> };
 
 /**
  * Validates the reservation basis read back from a durable quote before it is
@@ -133,13 +133,23 @@ export function validateQuotedLimitReservationBasis(input: {
   ) {
     return {
       ok: false,
+      predicates: {
+        feeRatePresent: !!quotedFeeRate,
+        grossPresent: !!quotedGrossAmount,
+        feePresent: !!quotedFeeAmount,
+        reservedPresent: !!quotedReservedAmount,
+      },
       reason:
         'Quote is missing the pinned reservation basis (fee rate, gross, fee, reserved).',
     };
   }
 
   if (quotedFeeRate.lt(0) || quotedFeeRate.gt(MAX_QUOTED_FEE_RATE)) {
-    return { ok: false, reason: 'Quoted fee rate is out of the valid range.' };
+    return {
+      ok: false,
+      reason: 'Quoted fee rate is out of the valid range.',
+      predicates: { feeRateInRange: false },
+    };
   }
 
   if (
@@ -147,11 +157,23 @@ export function validateQuotedLimitReservationBasis(input: {
     quotedFeeAmount.lt(0) ||
     quotedReservedAmount.lt(0)
   ) {
-    return { ok: false, reason: 'Quoted reservation amounts are negative.' };
+    return {
+      ok: false,
+      reason: 'Quoted reservation amounts are negative.',
+      predicates: {
+        grossNonNegative: !quotedGrossAmount.lt(0),
+        feeNonNegative: !quotedFeeAmount.lt(0),
+        reservedNonNegative: !quotedReservedAmount.lt(0),
+      },
+    };
   }
 
   if (quotedReservedAmount.lte(0)) {
-    return { ok: false, reason: 'Quoted reserved amount must be positive.' };
+    return {
+      ok: false,
+      reason: 'Quoted reserved amount must be positive.',
+      predicates: { reservedPositive: false },
+    };
   }
 
   const recomputed = calculateLimitBuyReservation({
@@ -167,6 +189,11 @@ export function validateQuotedLimitReservationBasis(input: {
   ) {
     return {
       ok: false,
+      predicates: {
+        grossMatched: recomputed.grossAmount.eq(quotedGrossAmount),
+        feeMatched: recomputed.feeAmount.eq(quotedFeeAmount),
+        reservedMatched: recomputed.reservedAmount.eq(quotedReservedAmount),
+      },
       reason:
         'Quoted reservation amounts do not match the canonical rounding chain.',
     };

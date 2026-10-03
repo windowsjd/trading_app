@@ -45,6 +45,37 @@ function inRequest<T>(
 }
 
 describe('admin request diagnostics', () => {
+  it('pins the active financial failure step when preserving a generic wrapper cause', () => {
+    const diagnostic = inRequest('admin', 'req-financial-cause', () => {
+      setAdminDiagnosticContext({ failureStage: 'position_create' });
+      const exception = preserveAdminFailureCause(
+        new HttpException(
+          {
+            success: false,
+            error: {
+              code: 'ORDER_EXECUTION_TRANSACTION_FAILED',
+              message: 'Order execution transaction failed.',
+            },
+          },
+          500,
+        ),
+        Object.assign(new Error('private DB detail'), { code: 'P2002' }),
+      );
+      setAdminDiagnosticContext({ failureStage: 'later_step' });
+      return buildAdminDiagnostic(
+        exception,
+        'ORDER_EXECUTION_TRANSACTION_FAILED',
+        500,
+      );
+    });
+    expect(diagnostic).toMatchObject({
+      failureStage: 'position_create',
+      evidence: {
+        safeCause: { category: 'db_unique_constraint', code: 'P2002' },
+      },
+    });
+    expect(JSON.stringify(diagnostic)).not.toContain('private DB detail');
+  });
   it('redacts multiline private key material before splitting exception stack frames', () => {
     const error = new Error(
       '-----BEGIN PRIVATE KEY-----\nsynthetic-pem-material\n-----END PRIVATE KEY-----',

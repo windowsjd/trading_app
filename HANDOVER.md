@@ -12,6 +12,43 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 관리자 진단 개선 2-B — 금융 guard 실패 원인 보존 (2026-10-03)
+
+시작 전 `git status`와 `git fetch origin main`을 확인했다. HEAD = origin/main =
+`b2945b949b072d4ded7f8b3ce4aaa5b1446b636d`(`관리자용 계정강화2`), clean tree였다.
+시장가 주문과 지정가 quote/예약/취소에서 wallet·position atomic guard 실패를
+관리자가 missing / insufficiency / 예약 invariant / scope / observed conflict로
+좁히도록 기존 AdminDiagnostic에 safe evidence를 보존했다.
+
+- `evidence.financialGuard`는 operation/guard/reason/affected와 boolean predicate만 담는다. 잔고·예약액·수량·원금·평균원가·PnL 및 foreign entity ID를 복사하지 않는다. `financialScope`/`quoteGuard`/`orderGuard`는 관련 scope·quote·idempotency 경계만 식별한다. 기존 sanitizer, admin 현재 DB role, user/operator 비노출 및 24 KiB bound를 유지했다.
+- Cash classifier의 reason·공개 매핑과 기존 failure read를 그대로 재사용한다. Position preview는 기존 읽기값만 사용한다. Market SELL은 기존 실패 read 1회를 ID-only 분류로 대체했고, limit SELL reserve/release에는 rejected mutation 뒤 최대 1회의 read만 추가했다. Repair/lock/retry/write는 없다. Scope 불일치 행의 금융 predicate는 진단에 넣지 않는다.
+- 기존 SELL 공개 계약에는 reserved-only 부족 시 market `CONFLICT`, limit reserve `INSUFFICIENT_QUANTITY`, limit release `ORDER_RESERVATION_INCONSISTENT`가 포함된다. 이를 유지하고 admin reason만 구분했다. Failure-read conflict는 관찰한 guard가 충족되어 추론한 분류이며 특정 concurrent writer의 증명이 아니다. Scoped wallet post-read 실패는 missing/scope-change를 단정하지 않는다.
+- BUY basis는 기존 helper reason에 predicate를 추가했고 SELL은 이미 계산한 fee/gross/net 일치 여부를 보존했다. Generic market execute wrapper는 기존 safe cause allowlist와 실제 실패 step을 보존한다. 성공 query/mutation, 금융 계산/정책·ledger·quote consume·transaction/lock/rollback은 유지한다. AST 비교에서 4개 서비스의 금융 mutation 호출·인자 27개가 HEAD와 동일했고 atomic SQL/자동 limit execution/matcher 파일도 동일했다. Matcher Path A/B 진단은 2-C다.
+- 검증: 전체 unit 218 suites / 3,469 tests 통과(미활성 integration 48 suites / 53 tests skip), mock API E2E 362 tests 통과. 아래 실제 PostgreSQL integration 10 suites / 11 tests 통과. Backend typecheck/build, 계정 lint, 변경 production 9파일 lint/format 및 diff whitespace 검사 통과. Frontend/schema/migration/Provider/Redis/Ops 로직 변경은 없다.
+- 실제 DB 검증은 `/tmp`에 추출한 PostgreSQL 16.15와 새 격리 DB에서 기존 migration을 적용해 실행했다. 첫 timezone 오설정 실행의 fixture를 배제하고 DB/process 모두 CI와 같은 UTC로 검증했다. 운영·개발 DB에는 연결하지 않았다.
+
+Backend 검증 명령:
+
+```sh
+pnpm exec jest --runInBand
+pnpm exec jest --config ./test/jest-e2e.json --runInBand
+pnpm run typecheck
+pnpm run build
+pnpm run lint:accounts:check
+pnpm exec eslint --no-fix --max-warnings=0 src/common/admin-diagnostics.ts src/orders/{orders.service,order-reservation.service,limit-order-create.service,limit-order-cancel.service,limit-order-policy,position-failure-diagnosis}.ts src/wallets/{cash-wallet-failure-diagnosis,cash-wallet-scope}.ts
+TZ=UTC DATABASE_URL='postgresql://trading_diag@127.0.0.1:55432/trading_diag_2b_utc?schema=public' LIMIT_ORDER_RESERVATION_DB_INTEGRATION=1 ORDER_EXECUTE_DB_INTEGRATION=1 LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION=1 LIMIT_ORDER_MATCHING_DB_INTEGRATION=1 MARKET_EXECUTION_DB_INTEGRATION=1 pnpm exec jest --runInBand \
+  src/orders/orders.execute.integration.spec.ts \
+  src/orders/limit-order-reservation.integration.spec.ts \
+  src/orders/limit-order-create-race.integration.spec.ts \
+  src/orders/limit-order-transaction-time.integration.spec.ts \
+  src/orders/trading-transaction-time.integration.spec.ts \
+  src/orders/limit-order-idempotent-replay.integration.spec.ts \
+  src/orders/limit-order-matching.integration.spec.ts \
+  src/orders/limit-order-create-no-redis.integration.spec.ts \
+  src/orders/market-execution.integration.spec.ts \
+  src/orders/trading-fee-pinning.integration.spec.ts
+```
+
 ### 작업 단위: 관리자 진단 개선 2단계 — Asset/FX source selection (2026-10-03)
 
 기준은 로컬 `main`/`origin/main`/GitHub `main` 모두 `18aaf9929e500e23bfb43c586e8fc826b14fded6`(`관리자용 계정강화1`)였다.

@@ -278,6 +278,18 @@ Applied to every 0-row path, not a subset:
 The `tradingAccountId` in each atomic UPDATE's WHERE is unchanged — the
 diagnosis explains a 0-row result, it never relaxes the guard.
 
+Order financial admin evidence (2-B) preserves these classifier reasons via
+the existing AdminDiagnostic sanitizer and 24 KiB bound. It records existence,
+scope and amount/quantity sufficiency **booleans**, without copying wallet
+balances, reserved cash, exact position/reserved quantities, order amounts,
+cost or PnL. Scope failures identify the entity/check/step without foreign IDs.
+Market SELL reuses its one failure read; limit SELL reserve/release add at most
+one ID-only read after rejection to distinguish missing, scope/asset/currency,
+total/available/reserved shortage and observed conflict. Successful query and
+mutation counts, locks, rollback and public errors remain unchanged, including
+historical generic SELL codes. These reads classify; they do not repair or
+retry. Automatic limit settlement/matcher Path A/B diagnostics are outside 2-B.
+
 ## Home daily equity and ledger trade metadata (2026-09-09)
 
 - Existing `/api/v1/trading-accounts/:accountId/portfolio/equity` accepts optional

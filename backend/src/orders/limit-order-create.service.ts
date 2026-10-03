@@ -1,3 +1,8 @@
+import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
+import {
+  diagnosePositionMutationFailure,
+  positionAvailabilityEvidence,
+} from './position-failure-diagnosis';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import {
   CurrencyCode,
@@ -188,6 +193,15 @@ export class LimitOrderCreateService {
     quantity: Prisma.Decimal;
     tradeFeeRate: Prisma.Decimal;
   }): Promise<LimitBuyQuotePreview> {
+    setAdminDiagnosticContext({
+      failureStage: 'quote_cash_availability',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'limit_buy_quote',
+          guardName: 'available_cash',
+        },
+      },
+    });
     const amounts = calculateLimitBuyReservation({
       limitPrice: input.limitPrice,
       quantity: input.quantity,
@@ -241,6 +255,28 @@ export class LimitOrderCreateService {
     );
 
     if (!wallet || walletAvailableBefore.lt(amounts.reservedAmount)) {
+      setAdminDiagnosticContext({
+        failureStage: 'quote_cash_availability',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'limit_buy_quote',
+            guardName: 'available_cash',
+            walletFound: !!wallet,
+            scopeValid: wallet ? true : undefined,
+            failureReason: wallet
+              ? 'insufficient_available'
+              : 'wallet_not_found',
+            availableSufficient: wallet ? false : undefined,
+            balanceSufficient: wallet
+              ? walletBalanceBefore.gte(amounts.reservedAmount)
+              : undefined,
+            reservedCashPresent: wallet
+              ? walletReservedBefore.gt(0)
+              : undefined,
+          },
+        },
+      });
+
       this.throwLimitOrderError(
         limitOrderErrorCodes.INSUFFICIENT_AVAILABLE_BALANCE,
         'Available cash balance is insufficient for the limit order reservation.',
@@ -249,6 +285,18 @@ export class LimitOrderCreateService {
 
     const positionQuantityBefore = position?.quantity ?? new Prisma.Decimal(0);
     if (position && position.tradingAccountId !== input.tradingAccountId) {
+      setAdminDiagnosticContext({
+        failureStage: 'quote_position_scope',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'limit_buy_quote',
+            guardName: 'position_scope',
+            positionFound: true,
+            scopeValid: false,
+            failureReason: 'account_scope_mismatch',
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.INTERNAL_SERVER_ERROR,
         'TRADING_ACCOUNT_SCOPE_MISMATCH',
@@ -281,6 +329,15 @@ export class LimitOrderCreateService {
     quantity: Prisma.Decimal;
     tradeFeeRate: Prisma.Decimal;
   }): Promise<LimitSellQuotePreview> {
+    setAdminDiagnosticContext({
+      failureStage: 'quote_position_availability',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'limit_sell_quote',
+          guardName: 'available_position_quantity',
+        },
+      },
+    });
     const amounts = calculateLimitSellQuote({
       limitPrice: input.limitPrice,
       quantity: input.quantity,
@@ -320,6 +377,18 @@ export class LimitOrderCreateService {
       });
     }
     if (position && position.tradingAccountId !== input.tradingAccountId) {
+      setAdminDiagnosticContext({
+        failureStage: 'quote_position_scope',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'limit_sell_quote',
+            guardName: 'position_scope',
+            positionFound: true,
+            scopeValid: false,
+            failureReason: 'account_scope_mismatch',
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.INTERNAL_SERVER_ERROR,
         'TRADING_ACCOUNT_SCOPE_MISMATCH',
@@ -332,6 +401,18 @@ export class LimitOrderCreateService {
       ? position.quantity.sub(reservedQuantity)
       : new Prisma.Decimal(0);
     if (!position || available.lt(input.quantity)) {
+      setAdminDiagnosticContext({
+        failureStage: 'quote_position_availability',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'limit_sell_quote',
+            guardName: 'available_position_quantity',
+            scopeValid: position ? true : undefined,
+            ...positionAvailabilityEvidence(position, input.quantity),
+          },
+        },
+      });
+
       this.throwApiError(
         HttpStatus.CONFLICT,
         'INSUFFICIENT_QUANTITY',
@@ -482,6 +563,15 @@ export class LimitOrderCreateService {
       autoExecutionEnabled?: boolean;
     },
   ): Promise<LimitOrderCreateResponse> {
+    setAdminDiagnosticContext({
+      failureStage: 'quote_reservation_basis',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'limit_buy_reservation',
+          guardName: 'quote_reservation_basis',
+        },
+      },
+    });
     const currencyCode =
       input.quote.asset.settlementCurrency ?? input.quote.asset.currencyCode;
     const basis = this.requireQuotedReservationBasis({
@@ -511,6 +601,15 @@ export class LimitOrderCreateService {
     // exists. The unfilled order's monetary story lives
     // in reservedAmount + reservationFeeRate (and, for the pre-submit preview,
     // the quote's pinned quoted* amounts).
+    setAdminDiagnosticContext({
+      failureStage: 'order_create',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'limit_buy_reservation',
+          guardName: 'order_create',
+        },
+      },
+    });
     const created = await tx.order.create({
       data: {
         tradingAccountId: input.tradingAccountId,
@@ -543,6 +642,15 @@ export class LimitOrderCreateService {
     });
 
     // 3) Consume the quote inside the same transaction and account scope.
+    setAdminDiagnosticContext({
+      failureStage: 'quote_consume',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'limit_buy_reservation',
+          guardName: 'active_quote_in_account',
+        },
+      },
+    });
     const consumeCount = (
       await tx.quote.updateMany({
         where: {
@@ -558,6 +666,19 @@ export class LimitOrderCreateService {
     ).count;
 
     if (consumeCount !== 1) {
+      setAdminDiagnosticContext({
+        failureStage: 'quote_consume',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'limit_buy_reservation',
+            guardName: 'active_quote_in_account',
+            mutationAffected: consumeCount,
+            mutationResult: 'rejected',
+            failureReason: 'quote_consume_guard_rejected',
+          },
+        },
+      });
+
       throw new HttpException(
         {
           success: false,
@@ -570,12 +691,32 @@ export class LimitOrderCreateService {
       );
     }
 
+    setAdminDiagnosticContext({
+      failureStage: 'order_read_back',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'limit_buy_reservation',
+          guardName: 'order_read_back',
+        },
+      },
+    });
     const order = await tx.order.findUnique({
       where: { id: created.id },
       select: LIMIT_ORDER_PAYLOAD_SELECT,
     });
 
     if (!order) {
+      setAdminDiagnosticContext({
+        failureStage: 'order_read_back',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'limit_buy_reservation',
+            guardName: 'order_read_back',
+            failureReason: 'order_read_back_failed',
+          },
+        },
+      });
+
       this.throwLimitOrderError(
         limitOrderErrorCodes.ORDER_RESERVATION_CONFLICT,
         'Created limit order could not be read back.',
@@ -602,6 +743,15 @@ export class LimitOrderCreateService {
     };
 
     // 4) Persist the payload for idempotent replays of the same request.
+    setAdminDiagnosticContext({
+      failureStage: 'order_replay_payload_write',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'limit_buy_reservation',
+          guardName: 'order_replay_payload',
+        },
+      },
+    });
     await tx.order.update({
       where: { id: created.id },
       data: {
@@ -637,6 +787,15 @@ export class LimitOrderCreateService {
       autoExecutionEnabled?: boolean;
     },
   ): Promise<LimitOrderCreateResponse> {
+    setAdminDiagnosticContext({
+      failureStage: 'quote_reservation_basis',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'limit_sell_reservation',
+          guardName: 'quote_fee_basis',
+        },
+      },
+    });
     const currencyCode =
       input.quote.asset.settlementCurrency ?? input.quote.asset.currencyCode;
     if (
@@ -645,6 +804,20 @@ export class LimitOrderCreateService {
       !input.quote.quotedFeeAmount ||
       !input.quote.quotedNetAmount
     ) {
+      setAdminDiagnosticContext({
+        failureStage: 'quote_reservation_basis',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'limit_sell_reservation',
+            guardName: 'quote_fee_basis',
+            failureReason: 'missing_fee_basis',
+            feeRatePresent: !!input.quote.quotedFeeRate,
+            grossPresent: !!input.quote.quotedGrossAmount,
+            feePresent: !!input.quote.quotedFeeAmount,
+            netPresent: !!input.quote.quotedNetAmount,
+          },
+        },
+      });
       this.throwLimitOrderError(
         limitOrderErrorCodes.QUOTE_RESERVATION_BASIS_INVALID,
         'Limit sell quote is missing its pinned fee basis.',
@@ -662,12 +835,39 @@ export class LimitOrderCreateService {
       !recomputed.feeAmount.eq(input.quote.quotedFeeAmount) ||
       !recomputed.netAmount.eq(input.quote.quotedNetAmount)
     ) {
+      setAdminDiagnosticContext({
+        failureStage: 'quote_reservation_basis',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'limit_sell_reservation',
+            guardName: 'quote_fee_basis',
+            failureReason: 'fee_basis_inconsistent',
+            feeRateInRange:
+              !input.quote.quotedFeeRate.lt(0) &&
+              !input.quote.quotedFeeRate.gt(1),
+            grossMatched: recomputed.grossAmount.eq(
+              input.quote.quotedGrossAmount,
+            ),
+            feeMatched: recomputed.feeAmount.eq(input.quote.quotedFeeAmount),
+            netMatched: recomputed.netAmount.eq(input.quote.quotedNetAmount),
+          },
+        },
+      });
       this.throwLimitOrderError(
         limitOrderErrorCodes.QUOTE_RESERVATION_BASIS_INVALID,
         'Limit sell quote fee basis is inconsistent.',
       );
     }
 
+    setAdminDiagnosticContext({
+      failureStage: 'position_reservation_lookup',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'limit_sell_reservation',
+          guardName: 'position_scope',
+        },
+      },
+    });
     const position = await tx.position.findUnique({
       where: {
         tradingAccountId_assetId: {
@@ -682,6 +882,21 @@ export class LimitOrderCreateService {
       },
     });
     if (!position || position.currencyCode !== currencyCode) {
+      setAdminDiagnosticContext({
+        failureStage: 'position_reservation_lookup',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'limit_sell_reservation',
+            guardName: 'position_scope',
+            positionFound: !!position,
+            currencyMatched: position ? false : undefined,
+            failureReason: position
+              ? 'currency_mismatch'
+              : 'position_not_found',
+          },
+        },
+      });
+
       this.throwApiError(
         HttpStatus.CONFLICT,
         'INSUFFICIENT_QUANTITY',
@@ -689,6 +904,22 @@ export class LimitOrderCreateService {
       );
     }
     if (position.tradingAccountId !== input.tradingAccountId) {
+      setAdminDiagnosticContext({
+        failureStage: 'position_reservation_scope',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'limit_sell_reservation',
+            guardName: 'position_scope',
+            positionFound: true,
+            scopeValid: false,
+            failureReason:
+              position.tradingAccountId == null
+                ? 'null_scope'
+                : 'account_scope_mismatch',
+          },
+        },
+      });
+
       this.throwApiError(
         HttpStatus.INTERNAL_SERVER_ERROR,
         'TRADING_ACCOUNT_SCOPE_MISMATCH',
@@ -696,6 +927,18 @@ export class LimitOrderCreateService {
       );
     }
     const quantityText = formatDecimalScale(input.quantity, orderQuantityScale);
+    setAdminDiagnosticContext({
+      failureStage: 'position_reservation',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'limit_sell_reservation',
+          guardName: 'available_position_quantity',
+          positionFound: true,
+          scopeValid: true,
+          currencyMatched: true,
+        },
+      },
+    });
     const reserved = await reserveAvailablePositionQuantity(tx, {
       positionId: position.id,
       tradingAccountId: input.tradingAccountId,
@@ -703,6 +946,17 @@ export class LimitOrderCreateService {
       quantity: quantityText,
     });
     if (reserved !== 1) {
+      await diagnosePositionMutationFailure(tx, {
+        positionId: position.id,
+        tradingAccountId: input.tradingAccountId,
+        assetId: input.quote.asset.id,
+        currencyCode,
+        quantity: input.quantity,
+        guard: 'available_position_quantity',
+        financialOperation: 'limit_sell_reservation',
+        failureStage: 'position_reservation',
+        mutationAffected: reserved,
+      });
       this.throwApiError(
         HttpStatus.CONFLICT,
         'INSUFFICIENT_QUANTITY',
@@ -714,6 +968,15 @@ export class LimitOrderCreateService {
       input.quote.quotedFeeRate,
       feeRateScale,
     );
+    setAdminDiagnosticContext({
+      failureStage: 'order_create',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'limit_sell_reservation',
+          guardName: 'order_create',
+        },
+      },
+    });
     const created = await tx.order.create({
       data: {
         tradingAccountId: input.tradingAccountId,
@@ -743,6 +1006,15 @@ export class LimitOrderCreateService {
       },
       select: { id: true },
     });
+    setAdminDiagnosticContext({
+      failureStage: 'quote_consume',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'limit_sell_reservation',
+          guardName: 'active_quote_in_account',
+        },
+      },
+    });
     const consumedCount = (
       await tx.quote.updateMany({
         where: {
@@ -757,17 +1029,50 @@ export class LimitOrderCreateService {
       })
     ).count;
     if (consumedCount !== 1) {
+      setAdminDiagnosticContext({
+        failureStage: 'quote_consume',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'limit_sell_reservation',
+            guardName: 'active_quote_in_account',
+            mutationAffected: consumedCount,
+            mutationResult: 'rejected',
+            failureReason: 'quote_consume_guard_rejected',
+          },
+        },
+      });
+
       this.throwApiError(
         HttpStatus.CONFLICT,
         'QUOTE_NOT_ACTIVE',
         'Quote is not active.',
       );
     }
+    setAdminDiagnosticContext({
+      failureStage: 'order_read_back',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'limit_sell_reservation',
+          guardName: 'order_read_back',
+        },
+      },
+    });
     const order = await tx.order.findUnique({
       where: { id: created.id },
       select: LIMIT_ORDER_PAYLOAD_SELECT,
     });
     if (!order) {
+      setAdminDiagnosticContext({
+        failureStage: 'order_read_back',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'limit_sell_reservation',
+            guardName: 'order_read_back',
+            failureReason: 'order_read_back_failed',
+          },
+        },
+      });
+
       this.throwLimitOrderError(
         limitOrderErrorCodes.ORDER_RESERVATION_CONFLICT,
         'Created limit sell could not be read back.',
@@ -791,6 +1096,15 @@ export class LimitOrderCreateService {
         }),
       },
     };
+    setAdminDiagnosticContext({
+      failureStage: 'order_replay_payload_write',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'limit_sell_reservation',
+          guardName: 'order_replay_payload',
+        },
+      },
+    });
     await tx.order.update({
       where: { id: created.id },
       data: {
@@ -828,6 +1142,18 @@ export class LimitOrderCreateService {
     });
 
     if (!result.ok) {
+      setAdminDiagnosticContext({
+        failureStage: 'quote_reservation_basis',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'limit_buy_reservation',
+            guardName: 'quote_reservation_basis',
+            failureReason: result.reason,
+            predicates: result.predicates,
+          },
+        },
+      });
+
       this.throwLimitOrderError(
         limitOrderErrorCodes.QUOTE_RESERVATION_BASIS_INVALID,
         result.reason,

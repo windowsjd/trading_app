@@ -1,3 +1,5 @@
+import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
+import { diagnosePositionMutationFailure } from './position-failure-diagnosis';
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import {
   CurrencyCode,
@@ -212,6 +214,18 @@ export class LimitOrderCancelService {
       }
 
       if (order.status !== OrderStatus.submitted) {
+        setAdminDiagnosticContext({
+          failureStage: 'cancel_order_state',
+          evidence: {
+            financialGuard: {
+              financialOperation: 'limit_cancel',
+              guardName: 'submitted_order',
+              status: order.status,
+              failureReason: 'order_not_submitted',
+            },
+          },
+        });
+
         this.throwLimitOrderError(
           limitOrderErrorCodes.ORDER_NOT_CANCELABLE,
           'Only submitted limit orders can be canceled.',
@@ -230,12 +244,32 @@ export class LimitOrderCancelService {
         canceledAt: input.canceledAt,
       });
 
+      setAdminDiagnosticContext({
+        failureStage: 'cancel_read_back',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'limit_cancel',
+            guardName: 'order_read_back',
+          },
+        },
+      });
       const canceledOrder = await tx.order.findUnique({
         where: { id: order.id },
         select: CANCEL_ORDER_SELECT,
       });
 
       if (!canceledOrder) {
+        setAdminDiagnosticContext({
+          failureStage: 'cancel_read_back',
+          evidence: {
+            financialGuard: {
+              financialOperation: 'limit_cancel',
+              guardName: 'order_read_back',
+              failureReason: 'order_read_back_failed',
+            },
+          },
+        });
+
         this.throwLimitOrderError(
           limitOrderErrorCodes.ORDER_CANCEL_CONFLICT,
           'Canceled order could not be read back.',
@@ -504,10 +538,33 @@ export class LimitOrderCancelService {
     reservedAmount: string | null;
     reservedQuantity: string | null;
   }> {
+    setAdminDiagnosticContext({
+      failureStage: 'order_reservation_validation',
+      evidence: {
+        financialGuard: {
+          financialOperation:
+            input.side === OrderSide.buy
+              ? 'limit_buy_release'
+              : 'limit_sell_release',
+          guardName: 'recorded_order_reservation',
+        },
+      },
+    });
     if (
       input.side === OrderSide.buy &&
       (!input.reservedAmount || input.reservedAmount.lte(0))
     ) {
+      setAdminDiagnosticContext({
+        failureStage: 'order_reservation_validation',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'limit_buy_release',
+            guardName: 'recorded_order_reservation',
+            reservationPresent: false,
+            failureReason: 'order_reservation_missing_or_non_positive',
+          },
+        },
+      });
       this.throwLimitOrderError(
         limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
         'Submitted limit order has no recorded reservation.',
@@ -517,6 +574,17 @@ export class LimitOrderCancelService {
       input.side === OrderSide.sell &&
       (!input.reservedQuantity || input.reservedQuantity.lte(0))
     ) {
+      setAdminDiagnosticContext({
+        failureStage: 'order_reservation_validation',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'limit_sell_release',
+            guardName: 'recorded_order_reservation',
+            reservationPresent: false,
+            failureReason: 'order_reservation_missing_or_non_positive',
+          },
+        },
+      });
       this.throwLimitOrderError(
         limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
         'Submitted limit sell has no recorded quantity reservation.',
@@ -526,6 +594,16 @@ export class LimitOrderCancelService {
     let releasedAmountText: string | null = null;
     let releasedQuantityText: string | null = null;
     if (input.side === OrderSide.buy) {
+      setAdminDiagnosticContext({
+        failureStage: 'wallet_release_lookup',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'limit_buy_release',
+            guardName: 'wallet_scope',
+            reservationPresent: true,
+          },
+        },
+      });
       const wallet = await tx.cashWallet.findUnique({
         where: {
           tradingAccountId_currencyCode: {
@@ -537,6 +615,18 @@ export class LimitOrderCancelService {
       });
 
       if (!wallet) {
+        setAdminDiagnosticContext({
+          failureStage: 'wallet_release_lookup',
+          evidence: {
+            financialGuard: {
+              financialOperation: 'limit_buy_release',
+              guardName: 'wallet_scope',
+              reservationPresent: true,
+              walletFound: false,
+              failureReason: 'wallet_not_found',
+            },
+          },
+        });
         this.throwLimitOrderError(
           limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
           'Cash wallet for the order reservation was not found.',
@@ -562,6 +652,16 @@ export class LimitOrderCancelService {
         amount: releasedAmountText,
       });
     } else {
+      setAdminDiagnosticContext({
+        failureStage: 'position_release_lookup',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'limit_sell_release',
+            guardName: 'position_scope',
+            reservationPresent: true,
+          },
+        },
+      });
       const position = await tx.position.findUnique({
         where: {
           tradingAccountId_assetId: {
@@ -575,6 +675,24 @@ export class LimitOrderCancelService {
         },
       });
       if (!position || position.tradingAccountId !== input.tradingAccountId) {
+        setAdminDiagnosticContext({
+          failureStage: 'position_release_lookup',
+          evidence: {
+            financialGuard: {
+              financialOperation: 'limit_sell_release',
+              guardName: 'position_scope',
+              reservationPresent: true,
+              positionFound: !!position,
+              scopeValid: position ? false : undefined,
+              failureReason: !position
+                ? 'position_not_found'
+                : position.tradingAccountId == null
+                  ? 'null_scope'
+                  : 'account_scope_mismatch',
+            },
+          },
+        });
+
         this.throwLimitOrderError(
           limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
           'Position for the order reservation was not found or mis-scoped.',
@@ -584,6 +702,18 @@ export class LimitOrderCancelService {
         input.reservedQuantity as Prisma.Decimal,
         monetaryScale,
       );
+      setAdminDiagnosticContext({
+        failureStage: 'position_reservation_release',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'limit_sell_release',
+            guardName: 'reserved_position_quantity',
+            reservationPresent: true,
+            positionFound: true,
+            scopeValid: true,
+          },
+        },
+      });
       const released = await releaseReservedPositionQuantity(tx, {
         positionId: position.id,
         tradingAccountId: input.tradingAccountId,
@@ -591,6 +721,17 @@ export class LimitOrderCancelService {
         quantity: releasedQuantityText,
       });
       if (released !== 1) {
+        await diagnosePositionMutationFailure(tx, {
+          positionId: position.id,
+          tradingAccountId: input.tradingAccountId,
+          assetId: input.assetId,
+          currencyCode: input.currencyCode,
+          quantity: input.reservedQuantity as Prisma.Decimal,
+          guard: 'reserved_position_quantity',
+          financialOperation: 'limit_sell_release',
+          failureStage: 'position_reservation_release',
+          mutationAffected: released,
+        });
         this.throwLimitOrderError(
           limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
           'Position reservation does not cover the order quantity.',
@@ -598,6 +739,15 @@ export class LimitOrderCancelService {
       }
     }
 
+    setAdminDiagnosticContext({
+      failureStage: 'cancel_order_finalization',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'limit_cancel',
+          guardName: 'submitted_order_in_account',
+        },
+      },
+    });
     const flipped = await tx.order.updateMany({
       where: {
         id: input.orderId,
@@ -613,6 +763,19 @@ export class LimitOrderCancelService {
     });
 
     if (flipped.count !== 1) {
+      setAdminDiagnosticContext({
+        failureStage: 'cancel_order_finalization',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'limit_cancel',
+            guardName: 'submitted_order_in_account',
+            mutationAffected: flipped.count,
+            mutationResult: 'rejected',
+            failureReason: 'order_cancel_guard_rejected',
+          },
+        },
+      });
+
       this.throwLimitOrderError(
         limitOrderErrorCodes.ORDER_CANCEL_CONFLICT,
         'Order state changed while canceling.',
@@ -673,6 +836,17 @@ export class LimitOrderCancelService {
   }
 
   private throwScopeIntegrity(code: string, message: string): never {
+    setAdminDiagnosticContext({
+      failureStage: 'cancel_order_scope_validation',
+      evidence: {
+        financialScope: {
+          entityType: 'order',
+          check: 'canonical_account_relation',
+          scopeValid: false,
+          failureReason: code,
+        },
+      },
+    });
     throw new HttpException(
       {
         success: false,

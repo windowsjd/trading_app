@@ -119,7 +119,12 @@ import {
 import {
   recordAdminDiagnosticEvent,
   setAdminDiagnosticContext,
+  preserveAdminFailureCause,
 } from '../common/admin-diagnostics';
+import {
+  diagnosePositionMutationFailure,
+  positionAvailabilityEvidence,
+} from './position-failure-diagnosis';
 import {
   resolveCalendarMarket,
   resolveStockMarketSessionState,
@@ -1922,6 +1927,16 @@ export class OrdersService {
         this.assertExecutableSeasonAndAsset(order, transactionNow);
 
         if (order.status !== OrderStatus.submitted) {
+          setAdminDiagnosticContext({
+            failureStage: 'order_state_validation',
+            evidence: {
+              orderGuard: {
+                status: order.status,
+                submitted: false,
+                failureReason: 'order_not_submitted',
+              },
+            },
+          });
           this.throwApiError(
             HttpStatus.CONFLICT,
             'ORDER_NOT_EXECUTABLE',
@@ -1981,6 +1996,7 @@ export class OrdersService {
         HttpStatus.INTERNAL_SERVER_ERROR,
         'ORDER_EXECUTION_TRANSACTION_FAILED',
         'Order execution transaction failed.',
+        error,
       );
     }
   }
@@ -2767,8 +2783,21 @@ export class OrdersService {
       quotedPrice: Prisma.Decimal;
     }
   > {
+    setAdminDiagnosticContext({
+      failureStage: 'quote_validation',
+      evidence: { quoteGuard: { guardName: 'execution_quote' } },
+    });
     const quote = order.quote;
     if (!order.quoteId || !quote) {
+      setAdminDiagnosticContext({
+        evidence: {
+          quoteGuard: {
+            quotePresent: !!quote,
+            quoteIdPresent: !!order.quoteId,
+            failureReason: 'quote_required',
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.BAD_REQUEST,
         'QUOTE_REQUIRED',
@@ -2777,6 +2806,15 @@ export class OrdersService {
     }
 
     if (quote.status !== QuoteStatus.active) {
+      setAdminDiagnosticContext({
+        evidence: {
+          quoteGuard: {
+            status: quote.status,
+            active: false,
+            failureReason: 'quote_not_active',
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.CONFLICT,
         'QUOTE_NOT_ACTIVE',
@@ -2842,6 +2880,14 @@ export class OrdersService {
     // Account isolation: a quote minted under a different canonical account
     // is never executable, even for the same user.
     if (quote.tradingAccountId !== this.requireOrderTradingScope(order)) {
+      setAdminDiagnosticContext({
+        evidence: {
+          quoteGuard: {
+            scopeValid: false,
+            failureReason: 'account_scope_mismatch',
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.CONFLICT,
         'QUOTE_MISMATCH',
@@ -2869,6 +2915,27 @@ export class OrdersService {
           ))) ||
       !quote.quotedPrice
     ) {
+      setAdminDiagnosticContext({
+        evidence: {
+          quoteGuard: {
+            failureReason: 'quote_order_predicate_mismatch',
+            assetMatched: quote.assetId === order.assetId,
+            sideMatched: quote.side === order.side,
+            orderTypeMatched: quote.orderType === order.orderType,
+            quantityPresent: !!quote.quantity,
+            quantityMatched:
+              !!quote.quantity &&
+              this.formatDecimal(quote.quantity, monetaryScale) ===
+                this.formatDecimal(order.quantity, monetaryScale),
+            limitPriceMatched:
+              this.formatNullableDecimal(quote.limitPrice, monetaryScale) ===
+              this.formatNullableDecimal(order.limitPrice, monetaryScale),
+            currencyMatched: quote.currencyCode === order.currencyCode,
+            requestHashMatched: quote.requestHash === expectedHash,
+            quotedPricePresent: !!quote.quotedPrice,
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.CONFLICT,
         'QUOTE_MISMATCH',
@@ -3148,14 +3215,35 @@ export class OrdersService {
     const tradingAccountId = this.requireOrderTradingScope(order);
     const participant = order.tradingAccount?.seasonParticipant ?? null;
     await this.consumeOrderQuoteInTransaction(tx, order, plan.executedAt);
+    setAdminDiagnosticContext({
+      failureStage: 'wallet_lookup',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'market_buy_debit',
+          guardName: 'wallet_scope',
+        },
+      },
+    });
     const wallet = await this.findCashWalletForExecution(
       tx,
       order.currencyCode,
       tradingAccountId,
+      'market_buy_debit',
     );
     const netAmount = this.formatDecimal(plan.netAmount, monetaryScale);
     // Atomic available-balance debit: cash reserved by submitted limit-buy
     // orders is never spendable by a market buy, even under concurrency.
+    setAdminDiagnosticContext({
+      failureStage: 'wallet_debit',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'market_buy_debit',
+          guardName: 'available_cash',
+          walletFound: true,
+          scopeValid: true,
+        },
+      },
+    });
     const debitCount = await debitAvailableCash(tx, {
       walletId: wallet.id,
       tradingAccountId,
@@ -3169,6 +3257,7 @@ export class OrdersService {
         tradingAccountId,
         currencyCode: order.currencyCode,
         amount: plan.netAmount,
+        mutationAffected: debitCount,
       });
     }
 
@@ -3176,6 +3265,7 @@ export class OrdersService {
       walletId: wallet.id,
       tradingAccountId,
       currencyCode: order.currencyCode,
+      financialOperation: 'market_buy_debit',
     });
     const positionId = await this.createOrUpdateBuyPosition(
       tx,
@@ -3183,6 +3273,10 @@ export class OrdersService {
       plan,
       tradingAccountId,
     );
+    setAdminDiagnosticContext({
+      failureStage: 'wallet_ledger_write',
+      evidence: { financialGuard: { guardName: 'wallet_ledger_write' } },
+    });
     const walletTransaction = await tx.walletTransaction.create({
       data: {
         tradingAccountId,
@@ -3204,6 +3298,10 @@ export class OrdersService {
       },
     });
     const finalizedOrder = await this.finalizeExecutedOrder(tx, order, plan);
+    setAdminDiagnosticContext({
+      failureStage: 'order_portfolio_snapshot',
+      evidence: { financialGuard: { guardName: 'portfolio_snapshot' } },
+    });
     const equitySnapshotId = await this.recordOrderExecutedPortfolioSnapshot(
       tx,
       participant?.id ?? null,
@@ -3235,6 +3333,15 @@ export class OrdersService {
     const tradingAccountId = this.requireOrderTradingScope(order);
     const participant = order.tradingAccount?.seasonParticipant ?? null;
     await this.consumeOrderQuoteInTransaction(tx, order, plan.executedAt);
+    setAdminDiagnosticContext({
+      failureStage: 'position_lookup',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'market_sell_position_decrement',
+          guardName: 'position_scope',
+        },
+      },
+    });
     const position = await tx.position.findUnique({
       where: {
         tradingAccountId_assetId: {
@@ -3253,6 +3360,17 @@ export class OrdersService {
     });
 
     if (!position) {
+      setAdminDiagnosticContext({
+        failureStage: 'position_lookup',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'market_sell_position_decrement',
+            guardName: 'position_scope',
+            positionFound: false,
+            failureReason: 'position_not_found',
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.CONFLICT,
         'INSUFFICIENT_QUANTITY',
@@ -3267,6 +3385,19 @@ export class OrdersService {
     });
 
     if (position.currencyCode !== order.currencyCode) {
+      setAdminDiagnosticContext({
+        failureStage: 'position_scope_validation',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'market_sell_position_decrement',
+            guardName: 'position_currency',
+            positionFound: true,
+            scopeValid: true,
+            currencyMatched: false,
+            failureReason: 'currency_mismatch',
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.INTERNAL_SERVER_ERROR,
         'ORDER_EXECUTION_TRANSACTION_FAILED',
@@ -3287,6 +3418,18 @@ export class OrdersService {
       order.currencyCode,
       plan,
     );
+    setAdminDiagnosticContext({
+      failureStage: 'position_decrement',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'market_sell_position_decrement',
+          guardName: 'available_position_quantity',
+          positionFound: true,
+          scopeValid: true,
+          currencyMatched: true,
+        },
+      },
+    });
     const positionUpdateResult = await tx.position.updateMany({
       where: {
         id: position.id,
@@ -3315,15 +3458,38 @@ export class OrdersService {
         tradingAccountId,
         assetId: order.assetId,
         quantity: order.quantity,
+        currencyCode: order.currencyCode,
+        mutationAffected: positionUpdateResult.count,
       });
     }
 
+    setAdminDiagnosticContext({
+      failureStage: 'wallet_lookup',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'market_sell_credit',
+          guardName: 'wallet_scope',
+        },
+      },
+    });
     const wallet = await this.findCashWalletForExecution(
       tx,
       order.currencyCode,
       tradingAccountId,
+      'market_sell_credit',
     );
     const netAmount = this.formatDecimal(plan.netAmount, monetaryScale);
+    setAdminDiagnosticContext({
+      failureStage: 'wallet_credit',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'market_sell_credit',
+          guardName: 'wallet_scope',
+          walletFound: true,
+          scopeValid: true,
+        },
+      },
+    });
     const creditResult = await tx.cashWallet.updateMany({
       where: {
         id: wallet.id,
@@ -3342,6 +3508,7 @@ export class OrdersService {
         walletId: wallet.id,
         tradingAccountId,
         currencyCode: order.currencyCode,
+        mutationAffected: creditResult.count,
       });
     }
 
@@ -3349,6 +3516,11 @@ export class OrdersService {
       walletId: wallet.id,
       tradingAccountId,
       currencyCode: order.currencyCode,
+      financialOperation: 'market_sell_credit',
+    });
+    setAdminDiagnosticContext({
+      failureStage: 'wallet_ledger_write',
+      evidence: { financialGuard: { guardName: 'wallet_ledger_write' } },
     });
     const walletTransaction = await tx.walletTransaction.create({
       data: {
@@ -3371,6 +3543,10 @@ export class OrdersService {
       },
     });
     const finalizedOrder = await this.finalizeExecutedOrder(tx, order, plan);
+    setAdminDiagnosticContext({
+      failureStage: 'order_portfolio_snapshot',
+      evidence: { financialGuard: { guardName: 'portfolio_snapshot' } },
+    });
     const equitySnapshotId = await this.recordOrderExecutedPortfolioSnapshot(
       tx,
       participant?.id ?? null,
@@ -3408,6 +3584,10 @@ export class OrdersService {
 
     // Account-conditioned consume: only this account's active quote flips.
     const tradingAccountId = this.requireOrderTradingScope(order);
+    setAdminDiagnosticContext({
+      failureStage: 'quote_consume',
+      evidence: { financialGuard: { guardName: 'active_quote_in_account' } },
+    });
     const consumedCount = (
       await tx.quote.updateMany({
         where: {
@@ -3423,6 +3603,15 @@ export class OrdersService {
     ).count;
 
     if (consumedCount !== 1) {
+      setAdminDiagnosticContext({
+        evidence: {
+          financialGuard: {
+            guardName: 'active_quote_in_account',
+            failureReason: 'quote_consume_guard_rejected',
+            mutationAffected: consumedCount,
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.CONFLICT,
         'QUOTE_NOT_ACTIVE',
@@ -3435,6 +3624,7 @@ export class OrdersService {
     tx: OrderExecuteTransactionClient,
     currencyCode: CurrencyCode,
     tradingAccountId: string,
+    financialOperation: string,
   ) {
     const wallet = await tx.cashWallet.findUnique({
       where: {
@@ -3452,6 +3642,16 @@ export class OrdersService {
     });
 
     if (!wallet) {
+      setAdminDiagnosticContext({
+        evidence: {
+          financialGuard: {
+            financialOperation,
+            guardName: 'wallet_scope',
+            walletFound: false,
+            failureReason: 'wallet_not_found',
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.CONFLICT,
         'INSUFFICIENT_BALANCE',
@@ -3469,11 +3669,22 @@ export class OrdersService {
   private async findCashWalletAfterUpdateOrThrow(
     tx: OrderExecuteTransactionClient,
     input: {
+      financialOperation: string;
       walletId: string;
       tradingAccountId: string;
       currencyCode: CurrencyCode;
     },
   ) {
+    setAdminDiagnosticContext({
+      failureStage: 'wallet_post_read',
+      evidence: {
+        financialGuard: {
+          financialOperation: input.financialOperation,
+          guardName: 'wallet_post_read',
+          mutationResult: 'applied',
+        },
+      },
+    });
     const wallet = await tx.cashWallet.findFirst({
       where: {
         id: input.walletId,
@@ -3488,6 +3699,18 @@ export class OrdersService {
     });
 
     if (!wallet) {
+      // The scoped post-read cannot distinguish missing from a scope change.
+      setAdminDiagnosticContext({
+        evidence: {
+          financialGuard: {
+            financialOperation: input.financialOperation,
+            guardName: 'wallet_post_read',
+            mutationResult: 'applied',
+            failureReason: 'wallet_post_read_failed',
+            scopeMatchedRead: false,
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.CONFLICT,
         'INSUFFICIENT_BALANCE',
@@ -3506,6 +3729,7 @@ export class OrdersService {
   private async throwCashDebitFailure(
     tx: OrderExecuteTransactionClient,
     input: {
+      mutationAffected: number;
       walletId: string;
       tradingAccountId: string;
       currencyCode: CurrencyCode;
@@ -3519,6 +3743,11 @@ export class OrdersService {
         currencyCode: input.currencyCode,
       },
       requires: { available: input.amount },
+      diagnostic: {
+        financialOperation: 'market_buy_debit',
+        failureStage: 'wallet_debit',
+        mutationAffected: input.mutationAffected,
+      },
     });
 
     if (reason === 'wallet_not_found') {
@@ -3548,6 +3777,7 @@ export class OrdersService {
   private async throwCashCreditFailure(
     tx: OrderExecuteTransactionClient,
     input: {
+      mutationAffected: number;
       walletId: string;
       tradingAccountId: string;
       currencyCode: CurrencyCode;
@@ -3558,6 +3788,11 @@ export class OrdersService {
       expected: {
         tradingAccountId: input.tradingAccountId,
         currencyCode: input.currencyCode,
+      },
+      diagnostic: {
+        financialOperation: 'market_sell_credit',
+        failureStage: 'wallet_credit',
+        mutationAffected: input.mutationAffected,
       },
       // A credit has no amount guard: only scope can fail it.
     });
@@ -3583,6 +3818,15 @@ export class OrdersService {
     plan: OrderExecutionPlan,
     tradingAccountId: string,
   ): Promise<string> {
+    setAdminDiagnosticContext({
+      failureStage: 'position_lookup',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'market_buy_position_update',
+          guardName: 'position_scope',
+        },
+      },
+    });
     const position = await tx.position.findUnique({
       where: {
         tradingAccountId_assetId: {
@@ -3604,6 +3848,16 @@ export class OrdersService {
         plan.netAmount.div(order.quantity),
         monetaryScale,
       );
+      setAdminDiagnosticContext({
+        failureStage: 'position_create',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'market_buy_position_create',
+            guardName: 'position_create',
+            positionFound: false,
+          },
+        },
+      });
       const created = await tx.position.create({
         data: {
           tradingAccountId,
@@ -3630,6 +3884,19 @@ export class OrdersService {
     });
 
     if (position.currencyCode !== order.currencyCode) {
+      setAdminDiagnosticContext({
+        failureStage: 'position_scope_validation',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'market_buy_position_update',
+            guardName: 'position_currency',
+            positionFound: true,
+            scopeValid: true,
+            currencyMatched: false,
+            failureReason: 'currency_mismatch',
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.INTERNAL_SERVER_ERROR,
         'ORDER_EXECUTION_TRANSACTION_FAILED',
@@ -3646,6 +3913,18 @@ export class OrdersService {
       oldCostBasis.add(plan.netAmount).div(newQuantity),
       monetaryScale,
     );
+    setAdminDiagnosticContext({
+      failureStage: 'position_update',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'market_buy_position_update',
+          guardName: 'position_optimistic_update',
+          positionFound: true,
+          scopeValid: true,
+          currencyMatched: true,
+        },
+      },
+    });
     const updateResult = await tx.position.updateMany({
       where: {
         id: position.id,
@@ -3661,6 +3940,20 @@ export class OrdersService {
     });
 
     if (updateResult.count !== 1) {
+      setAdminDiagnosticContext({
+        failureStage: 'position_update',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'market_buy_position_update',
+            guardName: 'position_optimistic_update',
+            mutationResult: 'rejected',
+            mutationAffected: updateResult.count,
+            failureReason: 'conflict',
+            observation: 'optimistic_guard_rejection',
+          },
+        },
+      });
+
       this.throwApiError(
         HttpStatus.CONFLICT,
         'CONFLICT',
@@ -4357,28 +4650,30 @@ export class OrdersService {
       tradingAccountId: string;
       assetId: string;
       quantity: Prisma.Decimal;
+      currencyCode: CurrencyCode;
+      mutationAffected: number;
     },
   ): Promise<never> {
-    const position = await tx.position.findFirst({
-      where: {
-        id: input.positionId,
-        tradingAccountId: input.tradingAccountId,
-        assetId: input.assetId,
-      },
-      select: {
-        quantity: true,
-      },
+    const diagnosis = await diagnosePositionMutationFailure(tx, {
+      ...input,
+      guard: 'available_position_quantity',
+      financialOperation: 'market_sell_position_decrement',
+      failureStage: 'position_decrement',
     });
-
-    if (!position) {
+    // Keep the historical scoped-read public mapping, including CONFLICT for
+    // reserved-only shortage. Admin evidence contains the more precise reason.
+    if (
+      !diagnosis.positionFound ||
+      !diagnosis.scopeValid ||
+      !diagnosis.assetMatched
+    ) {
       this.throwApiError(
         HttpStatus.CONFLICT,
         'INSUFFICIENT_QUANTITY',
         'Order position was not found.',
       );
     }
-
-    if (position.quantity.lt(input.quantity)) {
+    if (!diagnosis.totalQuantitySufficient) {
       this.throwApiError(
         HttpStatus.CONFLICT,
         'INSUFFICIENT_QUANTITY',
@@ -4398,6 +4693,10 @@ export class OrdersService {
     order: OrderExecutionRecord,
     plan: OrderExecutionPlan,
   ): Promise<OrderExecutionRecord> {
+    setAdminDiagnosticContext({
+      failureStage: 'order_finalization',
+      evidence: { financialGuard: { guardName: 'submitted_order_in_account' } },
+    });
     const finalizationResult = await tx.order.updateMany({
       where: {
         id: order.id,
@@ -4437,6 +4736,15 @@ export class OrdersService {
     });
 
     if (finalizationResult.count !== 1) {
+      setAdminDiagnosticContext({
+        evidence: {
+          financialGuard: {
+            guardName: 'submitted_order_in_account',
+            failureReason: 'order_finalization_guard_rejected',
+            mutationAffected: finalizationResult.count,
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.CONFLICT,
         'ORDER_EXECUTION_CONFLICT',
@@ -4444,6 +4752,10 @@ export class OrdersService {
       );
     }
 
+    setAdminDiagnosticContext({
+      failureStage: 'order_finalization_read_back',
+      evidence: { financialGuard: { guardName: 'order_read_back' } },
+    });
     const finalizedOrder = await tx.order.findUnique({
       where: {
         id: order.id,
@@ -4452,6 +4764,14 @@ export class OrdersService {
     });
 
     if (!finalizedOrder) {
+      setAdminDiagnosticContext({
+        evidence: {
+          financialGuard: {
+            guardName: 'order_read_back',
+            failureReason: 'order_read_back_failed',
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.CONFLICT,
         'ORDER_EXECUTION_CONFLICT',
@@ -4903,6 +5223,10 @@ export class OrdersService {
       now: Date;
     },
   ): Promise<DurableOrderQuoteForCreate> {
+    setAdminDiagnosticContext({
+      failureStage: 'quote_validation',
+      evidence: { quoteGuard: { guardName: 'create_quote' } },
+    });
     const quote = await tx.quote.findFirst({
       where: {
         id: input.quoteId,
@@ -4947,6 +5271,11 @@ export class OrdersService {
     });
 
     if (!quote) {
+      setAdminDiagnosticContext({
+        evidence: {
+          quoteGuard: { quoteFound: false, failureReason: 'quote_not_found' },
+        },
+      });
       this.throwApiError(
         HttpStatus.NOT_FOUND,
         'QUOTE_NOT_FOUND',
@@ -4957,6 +5286,14 @@ export class OrdersService {
     // Account isolation: a quote minted under a different canonical account
     // cannot back an order create on this account.
     if (quote.tradingAccountId !== input.tradingAccountId) {
+      setAdminDiagnosticContext({
+        evidence: {
+          quoteGuard: {
+            scopeValid: false,
+            failureReason: 'account_scope_mismatch',
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.CONFLICT,
         'QUOTE_MISMATCH',
@@ -4965,6 +5302,15 @@ export class OrdersService {
     }
 
     if (quote.status !== QuoteStatus.active) {
+      setAdminDiagnosticContext({
+        evidence: {
+          quoteGuard: {
+            status: quote.status,
+            active: false,
+            failureReason: 'quote_not_active',
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.CONFLICT,
         'QUOTE_NOT_ACTIVE',
@@ -4982,6 +5328,15 @@ export class OrdersService {
           status: QuoteStatus.expired,
         },
       });
+      setAdminDiagnosticContext({
+        failureStage: 'quote_expiry_validation',
+        evidence: {
+          quoteGuard: {
+            expired: true,
+            failureReason: 'execution_after_quote_expiry',
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.CONFLICT,
         'QUOTE_EXPIRED',
@@ -4990,6 +5345,14 @@ export class OrdersService {
     }
 
     if (!quote.asset) {
+      setAdminDiagnosticContext({
+        evidence: {
+          quoteGuard: {
+            assetFound: false,
+            failureReason: 'quote_asset_missing',
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.CONFLICT,
         'QUOTE_MISMATCH',
@@ -5043,6 +5406,29 @@ export class OrdersService {
       !quote.quotedPrice ||
       !quote.asset.isActive
     ) {
+      setAdminDiagnosticContext({
+        evidence: {
+          quoteGuard: {
+            failureReason: 'quote_request_predicate_mismatch',
+            assetMatched: quote.assetId === input.request.assetId,
+            sideMatched: quote.side === input.request.side,
+            orderTypeMatched: quote.orderType === input.request.orderType,
+            quantityPresent: !!quote.quantity,
+            quantityMatched:
+              !!quote.quantity &&
+              !!canonicalQuantity &&
+              this.formatDecimal(quote.quantity, quantityScale) ===
+                this.formatDecimal(canonicalQuantity, quantityScale),
+            limitPriceMatched: quoteLimitPriceText === requestLimitPriceText,
+            currencyMatched:
+              quote.currencyCode ===
+              this.getAssetSettlementCurrency(quote.asset),
+            requestHashMatched: quote.requestHash === expectedRequestHash,
+            quotedPricePresent: !!quote.quotedPrice,
+            assetActive: quote.asset.isActive,
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.CONFLICT,
         'QUOTE_MISMATCH',
@@ -5298,6 +5684,17 @@ export class OrdersService {
       order.orderType !== input.expectedOrderType ||
       order.idempotencyKey !== input.idempotencyKey
     ) {
+      setAdminDiagnosticContext({
+        failureStage: 'idempotency_validation',
+        evidence: {
+          orderGuard: {
+            orderTypeMatched: order.orderType === input.expectedOrderType,
+            idempotencyKeyMatched:
+              order.idempotencyKey === input.idempotencyKey,
+            failureReason: 'quote_already_used_by_different_request',
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.CONFLICT,
         'ORDER_IDEMPOTENCY_CONFLICT',
@@ -5338,6 +5735,15 @@ export class OrdersService {
     idempotency: OrderCreateIdempotency,
   ): CreateOrderResponse | LimitOrderCreateResponse {
     if (order.requestHash !== idempotency.requestHash) {
+      setAdminDiagnosticContext({
+        failureStage: 'idempotency_validation',
+        evidence: {
+          orderGuard: {
+            requestHashMatched: false,
+            failureReason: 'idempotency_request_mismatch',
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.CONFLICT,
         'ORDER_IDEMPOTENCY_CONFLICT',
@@ -5928,6 +6334,15 @@ export class OrdersService {
     positionQuantityBefore: Prisma.Decimal;
   }> {
     if (input.side === OrderSide.buy) {
+      setAdminDiagnosticContext({
+        failureStage: 'quote_cash_availability',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'market_buy_quote',
+            guardName: 'available_cash',
+          },
+        },
+      });
       const wallet = await this.prisma.cashWallet.findUnique({
         where: {
           tradingAccountId_currencyCode: {
@@ -5961,6 +6376,26 @@ export class OrdersService {
           .sub(wallet.reservedAmount ?? new Prisma.Decimal(0))
           .lt(input.netAmount)
       ) {
+        setAdminDiagnosticContext({
+          evidence: {
+            financialGuard: {
+              financialOperation: 'market_buy_quote',
+              guardName: 'available_cash',
+              walletFound: !!wallet,
+              scopeValid: wallet ? true : undefined,
+              failureReason: wallet
+                ? 'insufficient_available'
+                : 'wallet_not_found',
+              availableSufficient: wallet ? false : undefined,
+              balanceSufficient: wallet
+                ? wallet.balanceAmount.gte(input.netAmount)
+                : undefined,
+              reservedCashPresent: wallet
+                ? (wallet.reservedAmount ?? new Prisma.Decimal(0)).gt(0)
+                : undefined,
+            },
+          },
+        });
         this.throwApiError(
           HttpStatus.CONFLICT,
           'INSUFFICIENT_BALANCE',
@@ -5993,6 +6428,15 @@ export class OrdersService {
       };
     }
 
+    setAdminDiagnosticContext({
+      failureStage: 'quote_position_availability',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'market_sell_quote',
+          guardName: 'available_position_quantity',
+        },
+      },
+    });
     const position = await this.prisma.position.findUnique({
       where: {
         tradingAccountId_assetId: {
@@ -6019,6 +6463,16 @@ export class OrdersService {
         .sub(position.reservedQuantity ?? new Prisma.Decimal(0))
         .lt(input.quantity)
     ) {
+      setAdminDiagnosticContext({
+        evidence: {
+          financialGuard: {
+            financialOperation: 'market_sell_quote',
+            guardName: 'available_position_quantity',
+            scopeValid: position ? true : undefined,
+            ...positionAvailabilityEvidence(position, input.quantity),
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.CONFLICT,
         'INSUFFICIENT_QUANTITY',
@@ -6516,6 +6970,16 @@ export class OrdersService {
     } | null;
   }): string {
     if (!order.tradingAccountId) {
+      setAdminDiagnosticContext({
+        failureStage: 'order_scope_validation',
+        evidence: {
+          financialScope: {
+            entityType: 'order',
+            check: 'canonical_account_relation',
+            scopeValid: false,
+          },
+        },
+      });
       this.throwTradingScopeIntegrityError(
         'TRADING_SCOPE_REPAIR_REQUIRED',
         'Order has no canonical trading account scope.',
@@ -6526,6 +6990,16 @@ export class OrdersService {
       !order.tradingAccount ||
       order.tradingAccount.id !== order.tradingAccountId
     ) {
+      setAdminDiagnosticContext({
+        failureStage: 'order_scope_validation',
+        evidence: {
+          financialScope: {
+            entityType: 'order',
+            check: 'canonical_account_relation',
+            scopeValid: false,
+          },
+        },
+      });
       this.throwTradingScopeIntegrityError(
         'TRADING_ACCOUNT_SCOPE_MISMATCH',
         'Order trading-account relation does not match its account scope.',
@@ -6534,6 +7008,16 @@ export class OrdersService {
 
     if (order.tradingAccount.mode === TradingAccountMode.general) {
       if (order.tradingAccount.seasonParticipant !== null) {
+        setAdminDiagnosticContext({
+          failureStage: 'order_scope_validation',
+          evidence: {
+            financialScope: {
+              entityType: 'order',
+              check: 'canonical_account_relation',
+              scopeValid: false,
+            },
+          },
+        });
         this.throwTradingScopeIntegrityError(
           'TRADING_ACCOUNT_SCOPE_MISMATCH',
           'General order carries a season participant link.',
@@ -6545,6 +7029,16 @@ export class OrdersService {
     const participantAccountId =
       order.tradingAccount.seasonParticipant?.tradingAccountId;
     if (!participantAccountId) {
+      setAdminDiagnosticContext({
+        failureStage: 'order_scope_validation',
+        evidence: {
+          financialScope: {
+            entityType: 'order',
+            check: 'participant_account_link',
+            scopeValid: false,
+          },
+        },
+      });
       this.throwApiError(
         HttpStatus.INTERNAL_SERVER_ERROR,
         'TRADING_ACCOUNT_LINK_INTEGRITY',
@@ -6553,6 +7047,16 @@ export class OrdersService {
     }
 
     if (order.tradingAccountId !== participantAccountId) {
+      setAdminDiagnosticContext({
+        failureStage: 'order_scope_validation',
+        evidence: {
+          financialScope: {
+            entityType: 'order',
+            check: 'canonical_account_relation',
+            scopeValid: false,
+          },
+        },
+      });
       this.throwTradingScopeIntegrityError(
         'TRADING_ACCOUNT_SCOPE_MISMATCH',
         'Season order account and participant link do not agree.',
@@ -6575,6 +7079,16 @@ export class OrdersService {
     },
   ): void {
     if (position.tradingAccountId == null) {
+      setAdminDiagnosticContext({
+        evidence: {
+          financialScope: {
+            entityType: 'position',
+            check: 'canonical_account_present',
+            scopeValid: false,
+            failureReason: 'null_scope',
+          },
+        },
+      });
       this.throwTradingScopeIntegrityError(
         'TRADING_SCOPE_REPAIR_REQUIRED',
         'Position has no canonical trading account scope.',
@@ -6582,6 +7096,16 @@ export class OrdersService {
     }
 
     if (position.tradingAccountId !== expected.tradingAccountId) {
+      setAdminDiagnosticContext({
+        evidence: {
+          financialScope: {
+            entityType: 'position',
+            check: 'account_matches',
+            scopeValid: false,
+            failureReason: 'account_scope_mismatch',
+          },
+        },
+      });
       this.throwTradingScopeIntegrityError(
         'TRADING_ACCOUNT_SCOPE_MISMATCH',
         'Position belongs to a different trading account.',
@@ -6600,6 +7124,7 @@ export class OrdersService {
     status: HttpStatus,
     code: string,
     message: string,
+    cause?: unknown,
   ): never {
     recordAdminDiagnosticEvent(
       status >= HttpStatus.INTERNAL_SERVER_ERROR ? 'error' : 'warn',
@@ -6607,7 +7132,13 @@ export class OrdersService {
       `${code}: ${message}`,
       { httpStatus: status },
     );
-    throw new HttpException(this.createErrorBody(code, message), status);
+    const exception = new HttpException(
+      this.createErrorBody(code, message),
+      status,
+    );
+    throw cause === undefined
+      ? exception
+      : preserveAdminFailureCause(exception, cause);
   }
 
   private refreshRankingAfterParticipantChange(

@@ -1,4 +1,5 @@
 import { HttpException, Injectable } from '@nestjs/common';
+import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
 import { CurrencyCode, Prisma } from '../generated/prisma/client';
 import {
   releaseReservedCash,
@@ -42,6 +43,15 @@ export class OrderReservationService {
       amount: string;
     },
   ): Promise<{ walletId: string }> {
+    setAdminDiagnosticContext({
+      failureStage: 'wallet_reservation_lookup',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'limit_buy_reservation',
+          guardName: 'wallet_scope',
+        },
+      },
+    });
     const wallet = await tx.cashWallet.findUnique({
       where: {
         tradingAccountId_currencyCode: {
@@ -53,6 +63,16 @@ export class OrderReservationService {
     });
 
     if (!wallet) {
+      setAdminDiagnosticContext({
+        evidence: {
+          financialGuard: {
+            financialOperation: 'limit_buy_reservation',
+            guardName: 'wallet_scope',
+            walletFound: false,
+            failureReason: 'wallet_not_found',
+          },
+        },
+      });
       this.throwLimitOrderError(
         limitOrderErrorCodes.INSUFFICIENT_AVAILABLE_BALANCE,
         'Cash wallet was not found.',
@@ -66,6 +86,17 @@ export class OrderReservationService {
       tradingAccountId: input.tradingAccountId,
     });
 
+    setAdminDiagnosticContext({
+      failureStage: 'wallet_reservation',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'limit_buy_reservation',
+          guardName: 'available_cash',
+          walletFound: true,
+          scopeValid: true,
+        },
+      },
+    });
     const reservedCount = await reserveAvailableCash(tx, {
       walletId: wallet.id,
       tradingAccountId: input.tradingAccountId,
@@ -79,6 +110,7 @@ export class OrderReservationService {
         tradingAccountId: input.tradingAccountId,
         currencyCode: input.currencyCode,
         amount: input.amount,
+        mutationAffected: reservedCount,
       });
     }
 
@@ -104,6 +136,15 @@ export class OrderReservationService {
       amount: string;
     },
   ): Promise<void> {
+    setAdminDiagnosticContext({
+      failureStage: 'wallet_reservation_release',
+      evidence: {
+        financialGuard: {
+          financialOperation: 'limit_buy_release',
+          guardName: 'reserved_cash',
+        },
+      },
+    });
     const releasedCount = await releaseReservedCash(tx, input);
     if (releasedCount !== 1) {
       // 작업 5 보완 3: a failed release used to be reported as a flat
@@ -117,6 +158,11 @@ export class OrderReservationService {
           currencyCode: input.currencyCode,
         },
         requires: { reserved: input.amount },
+        diagnostic: {
+          financialOperation: 'limit_buy_release',
+          failureStage: 'wallet_reservation_release',
+          mutationAffected: releasedCount,
+        },
       });
 
       this.throwLimitOrderError(
@@ -137,6 +183,7 @@ export class OrderReservationService {
       tradingAccountId: string;
       currencyCode: CurrencyCode;
       amount: string;
+      mutationAffected: number;
     },
   ): Promise<never> {
     const reason = await diagnoseCashWalletMutationFailure(tx, {
@@ -146,6 +193,11 @@ export class OrderReservationService {
         currencyCode: input.currencyCode,
       },
       requires: { available: input.amount },
+      diagnostic: {
+        financialOperation: 'limit_buy_reservation',
+        failureStage: 'wallet_reservation',
+        mutationAffected: input.mutationAffected,
+      },
     });
 
     if (reason === 'wallet_not_found') {

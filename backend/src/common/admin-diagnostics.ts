@@ -27,10 +27,13 @@ const wrappedFailures = new WeakMap<
 export function preserveAdminFailureCause<T extends Error>(
   wrapper: T,
   cause: unknown,
-  failedStep: string,
+  failedStep?: string,
 ): T {
   wrappedFailures.set(wrapper, {
-    failedStep,
+    failedStep:
+      failedStep ??
+      requestDiagnostics.getStore()?.failureStage ??
+      'backend_execution',
     cause: classifyFailureCause(cause),
   });
   return wrapper;

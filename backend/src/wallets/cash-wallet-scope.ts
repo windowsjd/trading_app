@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
+import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
 
 /**
  * Shared trading-account scope guard for every CashWallet mutation and for
@@ -57,6 +58,16 @@ export function assertCashWalletTradingAccountScope<
   T extends CashWalletScopeCandidate,
 >(wallet: T, expected: ExpectedCashWalletScope): ScopeVerifiedCashWallet<T> {
   if (wallet.tradingAccountId == null) {
+    setAdminDiagnosticContext({
+      evidence: {
+        financialScope: {
+          entityType: 'cash_wallet',
+          check: 'canonical_account_present',
+          scopeValid: false,
+          failureReason: 'null_scope',
+        },
+      },
+    });
     throwScopeError(
       cashWalletScopeErrorCodes.FINANCIAL_SCOPE_REPAIR_REQUIRED,
       'Cash wallet has no canonical trading account scope.',
@@ -64,6 +75,16 @@ export function assertCashWalletTradingAccountScope<
   }
 
   if (wallet.tradingAccountId !== expected.tradingAccountId) {
+    setAdminDiagnosticContext({
+      evidence: {
+        financialScope: {
+          entityType: 'cash_wallet',
+          check: 'account_matches',
+          scopeValid: false,
+          failureReason: 'account_scope_mismatch',
+        },
+      },
+    });
     throwScopeError(
       cashWalletScopeErrorCodes.FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH,
       'Cash wallet belongs to a different trading account.',

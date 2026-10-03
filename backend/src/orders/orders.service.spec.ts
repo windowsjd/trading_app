@@ -1,4 +1,8 @@
 import {
+  captureFinancialFailure,
+  expectSafeFinancialDiagnostic,
+} from '../../test/support/financial-diagnostics';
+import {
   adminDiagnosticRequestMiddleware,
   buildAdminDiagnostic,
 } from '../common/admin-diagnostics';
@@ -3406,6 +3410,26 @@ describe('OrdersService', () => {
       });
       expect(prisma.fxRateSnapshot.findMany).not.toHaveBeenCalled();
       expectNoForbiddenExecuteSideEffects(prisma);
+
+      expect(prisma.cashWallet.findUnique).toHaveBeenCalledTimes(1);
+      expect(prisma.cashWallet.findFirst).toHaveBeenCalledTimes(1);
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+      expect(prisma.position.findUnique).toHaveBeenCalledTimes(1);
+      expect(prisma.position.create).toHaveBeenCalledTimes(1);
+      expect(prisma.walletTransaction.create).toHaveBeenCalledTimes(1);
+      expect(prisma.quote.updateMany).toHaveBeenCalledTimes(1);
+      expect(prisma.order.updateMany).toHaveBeenCalledTimes(1);
+      const financialSteps = [
+        prisma.quote.updateMany,
+        prisma.cashWallet.findUnique,
+        prisma.$executeRaw,
+        prisma.cashWallet.findFirst,
+        prisma.position.findUnique,
+        prisma.position.create,
+        prisma.walletTransaction.create,
+        prisma.order.updateMany,
+      ].map((fn) => fn.mock.invocationCallOrder[0]);
+      expect(financialSteps).toEqual([...financialSteps].sort((a, b) => a - b));
     });
 
     it('executes Binance crypto USD buys with USD wallet debit, USD position, and FX snapshot audit', async () => {
@@ -4018,6 +4042,24 @@ describe('OrdersService', () => {
         }),
       );
       expectNoForbiddenExecuteSideEffects(prisma);
+
+      expect(prisma.position.findUnique).toHaveBeenCalledTimes(1);
+      expect(prisma.position.updateMany).toHaveBeenCalledTimes(1);
+      expect(prisma.cashWallet.findUnique).toHaveBeenCalledTimes(1);
+      expect(prisma.cashWallet.updateMany).toHaveBeenCalledTimes(1);
+      expect(prisma.walletTransaction.create).toHaveBeenCalledTimes(1);
+      expect(prisma.order.updateMany).toHaveBeenCalledTimes(1);
+      const financialSteps = [
+        prisma.quote.updateMany,
+        prisma.position.findUnique,
+        prisma.position.updateMany,
+        prisma.cashWallet.findUnique,
+        prisma.cashWallet.updateMany,
+        prisma.cashWallet.findFirst,
+        prisma.walletTransaction.create,
+        prisma.order.updateMany,
+      ].map((fn) => fn.mock.invocationCallOrder[0]);
+      expect(financialSteps).toEqual([...financialSteps].sort((a, b) => a - b));
     });
 
     it('records negative realizedPnlKrw for loss sells', async () => {
@@ -4463,8 +4505,12 @@ describe('OrdersService', () => {
       insufficient.prisma.position.updateMany.mockResolvedValueOnce({
         count: 0,
       });
-      insufficient.prisma.position.findFirst.mockResolvedValueOnce({
+      insufficient.prisma.position.findUnique.mockResolvedValueOnce({
+        tradingAccountId: 'trading-account-1',
+        assetId: 'asset-1',
+        currencyCode: CurrencyCode.KRW,
         quantity: new Prisma.Decimal('1.00000000'),
+        reservedQuantity: new Prisma.Decimal(0),
       });
 
       await expectErrorCode(
@@ -4554,6 +4600,414 @@ describe('OrdersService', () => {
       expectNoForbiddenExecuteSideEffects(prisma);
     });
   });
+
+  describe('financial guard admin diagnostics', () => {
+    beforeEach(() => jest.useFakeTimers().setSystemTime(executedAt));
+    afterEach(() => jest.useRealTimers());
+    const wallet = (overrides: Record<string, unknown> = {}) => ({
+      id: 'wallet-1',
+      tradingAccountId: 'trading-account-1',
+      currencyCode: CurrencyCode.KRW,
+      balanceAmount: new Prisma.Decimal('1000'),
+      reservedAmount: new Prisma.Decimal(0),
+      ...overrides,
+    });
+    const position = (overrides: Record<string, unknown> = {}) => ({
+      id: 'position-1',
+      tradingAccountId: 'trading-account-1',
+      assetId: 'asset-1',
+      currencyCode: CurrencyCode.KRW,
+      quantity: new Prisma.Decimal('10'),
+      reservedQuantity: new Prisma.Decimal(0),
+      averageCost: new Prisma.Decimal('80'),
+      ...overrides,
+    });
+    const setup = (side = OrderSide.buy) => {
+      const fixture = createService();
+      fixture.prisma.order.findFirst.mockResolvedValue(
+        orderExecutionRecord({ side }),
+      );
+      mockExecutionPrice(fixture.prisma);
+      return fixture;
+    };
+    it.each([
+      ['missing', null, 'wallet_not_found', 'INSUFFICIENT_BALANCE', undefined],
+      [
+        'reserved cash shortage',
+        wallet({ reservedAmount: new Prisma.Decimal('900') }),
+        'insufficient_available',
+        'INSUFFICIENT_BALANCE',
+        true,
+      ],
+      [
+        'total balance shortage',
+        wallet({ balanceAmount: new Prisma.Decimal('100') }),
+        'insufficient_available',
+        'INSUFFICIENT_BALANCE',
+        false,
+      ],
+      ['concurrency', wallet(), 'conflict', 'CONFLICT', true],
+      [
+        'null scope',
+        wallet({ tradingAccountId: null }),
+        'null_scope',
+        'FINANCIAL_SCOPE_REPAIR_REQUIRED',
+        undefined,
+      ],
+      [
+        'foreign scope',
+        wallet({ tradingAccountId: 'foreign-account' }),
+        'account_scope_mismatch',
+        'FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH',
+        undefined,
+      ],
+      [
+        'currency',
+        wallet({ currencyCode: CurrencyCode.USD }),
+        'currency_mismatch',
+        'FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH',
+        undefined,
+      ],
+    ])(
+      'market BUY retains %s after one rejected debit',
+      async (_label, row, reason, code, balanceSufficient) => {
+        const { prisma, service } = setup();
+        prisma.cashWallet.findUnique
+          .mockResolvedValueOnce(wallet())
+          .mockResolvedValueOnce(row);
+        prisma.$executeRaw.mockResolvedValueOnce(0);
+        const { error, diagnostic } = await captureFinancialFailure(() =>
+          service.executeOrder('user-1', 'order-execute-1'),
+        );
+        expect(error.getResponse()).toMatchObject({ error: { code } });
+        expect(diagnostic).toMatchObject({
+          failureStage: 'wallet_debit',
+          evidence: {
+            financialGuard: { failureReason: reason, mutationAffected: 0 },
+          },
+        });
+        if (balanceSufficient !== undefined)
+          expect(diagnostic?.evidence?.financialGuard).toMatchObject({
+            balanceSufficient,
+          });
+        expectSafeFinancialDiagnostic(diagnostic);
+        expect(prisma.cashWallet.findUnique).toHaveBeenCalledTimes(2);
+        expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+        expect(prisma.position.create).not.toHaveBeenCalled();
+        expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+        expect(prisma.order.updateMany).not.toHaveBeenCalled();
+      },
+    );
+    it.each(['admin', 'user', 'operator'])(
+      'exposes financial evidence only to admin (%s)',
+      async (role) => {
+        const { prisma, service } = setup();
+        prisma.cashWallet.findUnique
+          .mockResolvedValueOnce(wallet())
+          .mockResolvedValueOnce(
+            wallet({ reservedAmount: new Prisma.Decimal('900') }),
+          );
+        prisma.$executeRaw.mockResolvedValueOnce(0);
+        const { diagnostic } = await captureFinancialFailure(
+          () => service.executeOrder('user-1', 'order-execute-1'),
+          role,
+        );
+        if (role === 'admin') expectSafeFinancialDiagnostic(diagnostic);
+        else expect(diagnostic).toBeUndefined();
+      },
+    );
+    it.each([
+      ['missing', null, 'financialGuard', 'wallet_not_found'],
+      [
+        'null scope',
+        wallet({ tradingAccountId: null }),
+        'financialScope',
+        'null_scope',
+      ],
+      [
+        'foreign scope',
+        wallet({ tradingAccountId: 'foreign-account' }),
+        'financialScope',
+        'account_scope_mismatch',
+      ],
+    ])(
+      'market BUY identifies lookup %s without debit',
+      async (_label, row, key, reason) => {
+        const { prisma, service } = setup();
+        prisma.cashWallet.findUnique.mockResolvedValueOnce(row);
+        const { diagnostic } = await captureFinancialFailure(() =>
+          service.executeOrder('user-1', 'order-execute-1'),
+        );
+        expect(diagnostic?.evidence?.[key]).toMatchObject({
+          failureReason: reason,
+        });
+        expectSafeFinancialDiagnostic(diagnostic);
+        expect(prisma.$executeRaw).not.toHaveBeenCalled();
+        expect(prisma.cashWallet.findUnique).toHaveBeenCalledTimes(1);
+      },
+    );
+    it.each([
+      [
+        'total shortage',
+        position({ quantity: new Prisma.Decimal('1') }),
+        'insufficient_quantity',
+        'INSUFFICIENT_QUANTITY',
+        false,
+        false,
+      ],
+      [
+        'reserved shortage',
+        position({ reservedQuantity: new Prisma.Decimal('9') }),
+        'insufficient_available_quantity',
+        'CONFLICT',
+        true,
+        false,
+      ],
+      ['concurrency', position(), 'conflict', 'CONFLICT', true, true],
+      [
+        'missing',
+        null,
+        'position_not_found',
+        'INSUFFICIENT_QUANTITY',
+        undefined,
+        undefined,
+      ],
+      [
+        'foreign scope',
+        position({ tradingAccountId: 'foreign-account' }),
+        'account_scope_mismatch',
+        'INSUFFICIENT_QUANTITY',
+        undefined,
+        undefined,
+      ],
+    ])(
+      'market SELL identifies %s without changing its historical public code',
+      async (_label, row, reason, code, total, available) => {
+        const { prisma, service } = setup(OrderSide.sell);
+        prisma.position.findUnique
+          .mockResolvedValueOnce(position())
+          .mockResolvedValueOnce(row);
+        prisma.position.updateMany.mockResolvedValueOnce({ count: 0 });
+        const { error, diagnostic } = await captureFinancialFailure(() =>
+          service.executeOrder('user-1', 'order-execute-1'),
+        );
+        expect(error.getResponse()).toMatchObject({ error: { code } });
+        expect(diagnostic).toMatchObject({
+          failureStage: 'position_decrement',
+          evidence: {
+            financialGuard: { failureReason: reason, mutationAffected: 0 },
+          },
+        });
+        if (total !== undefined)
+          expect(diagnostic?.evidence?.financialGuard).toMatchObject({
+            totalQuantitySufficient: total,
+            availableQuantitySufficient: available,
+          });
+        expectSafeFinancialDiagnostic(diagnostic);
+        expect(prisma.position.findUnique).toHaveBeenCalledTimes(2);
+        expect(prisma.position.findUnique).toHaveBeenLastCalledWith(
+          expect.objectContaining({ where: { id: 'position-1' } }),
+        );
+        expect(prisma.position.updateMany).toHaveBeenCalledTimes(1);
+        expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+        expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+      },
+    );
+    it.each([
+      ['missing', null, 'position_not_found', 'INSUFFICIENT_QUANTITY'],
+      [
+        'scope',
+        position({ tradingAccountId: 'foreign-account' }),
+        'account_scope_mismatch',
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+      ],
+      [
+        'currency',
+        position({ currencyCode: CurrencyCode.USD }),
+        'currency_mismatch',
+        'ORDER_EXECUTION_TRANSACTION_FAILED',
+      ],
+    ])(
+      'market SELL identifies initial %s without mutation',
+      async (_label, row, reason, code) => {
+        const { prisma, service } = setup(OrderSide.sell);
+        prisma.position.findUnique.mockResolvedValueOnce(row);
+        const { error, diagnostic } = await captureFinancialFailure(() =>
+          service.executeOrder('user-1', 'order-execute-1'),
+        );
+        expect(error.getResponse()).toMatchObject({ error: { code } });
+        expect([
+          diagnostic?.evidence?.financialGuard,
+          diagnostic?.evidence?.financialScope,
+        ]).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ failureReason: reason }),
+          ]),
+        );
+        expect(prisma.position.updateMany).not.toHaveBeenCalled();
+        expectSafeFinancialDiagnostic(diagnostic);
+      },
+    );
+    it.each([
+      ['missing', null, 'wallet_not_found', 'INSUFFICIENT_BALANCE'],
+      ['concurrency', wallet(), 'conflict', 'CONFLICT'],
+    ])(
+      'market SELL credit identifies %s',
+      async (_label, row, reason, code) => {
+        const { prisma, service } = setup(OrderSide.sell);
+        prisma.position.findUnique.mockResolvedValueOnce(position());
+        prisma.position.updateMany.mockResolvedValueOnce({ count: 1 });
+        prisma.cashWallet.findUnique
+          .mockResolvedValueOnce(wallet())
+          .mockResolvedValueOnce(row);
+        prisma.cashWallet.updateMany.mockResolvedValueOnce({ count: 0 });
+        const { error, diagnostic } = await captureFinancialFailure(() =>
+          service.executeOrder('user-1', 'order-execute-1'),
+        );
+        expect(error.getResponse()).toMatchObject({ error: { code } });
+        expect(diagnostic).toMatchObject({
+          failureStage: 'wallet_credit',
+          evidence: { financialGuard: { failureReason: reason } },
+        });
+        expect(prisma.cashWallet.updateMany).toHaveBeenCalledTimes(1);
+        expect(prisma.position.findUnique).toHaveBeenCalledTimes(1);
+        expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+        expectSafeFinancialDiagnostic(diagnostic);
+      },
+    );
+
+    it.each([
+      ['status', { status: 'consumed' }, 'QUOTE_NOT_ACTIVE', { active: false }],
+      [
+        'account',
+        { tradingAccountId: 'foreign-account' },
+        'QUOTE_MISMATCH',
+        { scopeValid: false },
+      ],
+      [
+        'currency',
+        { currencyCode: CurrencyCode.USD },
+        'QUOTE_MISMATCH',
+        { currencyMatched: false },
+      ],
+      [
+        'quantity',
+        { quantity: new Prisma.Decimal('1') },
+        'QUOTE_MISMATCH',
+        { quantityMatched: false },
+      ],
+    ])(
+      'preserves market quote %s predicate before financial writes',
+      async (_label, overrides, code, predicates) => {
+        const { prisma, service } = setup();
+        const order = orderExecutionRecord();
+        prisma.order.findFirst.mockResolvedValue({
+          ...order,
+          quote: { ...order.quote, ...overrides },
+        });
+        const { error, diagnostic } = await captureFinancialFailure(() =>
+          service.executeOrder('user-1', 'order-execute-1'),
+        );
+        expect(error.getResponse()).toMatchObject({ error: { code } });
+        expect(diagnostic).toMatchObject({
+          failureStage: 'quote_validation',
+          evidence: { quoteGuard: predicates },
+        });
+        expect(prisma.cashWallet.findUnique).not.toHaveBeenCalled();
+        expect(prisma.position.findUnique).not.toHaveBeenCalled();
+        expect(prisma.$executeRaw).not.toHaveBeenCalled();
+        expectSafeFinancialDiagnostic(diagnostic);
+      },
+    );
+    it('distinguishes post-wallet read failure after an applied debit', async () => {
+      const { prisma, service } = setup();
+      mockExecutionWallet(prisma);
+      prisma.cashWallet.findFirst.mockReset().mockResolvedValue(null);
+      const { diagnostic } = await captureFinancialFailure(() =>
+        service.executeOrder('user-1', 'order-execute-1'),
+      );
+      expect(diagnostic).toMatchObject({
+        failureStage: 'wallet_post_read',
+        evidence: {
+          financialGuard: {
+            failureReason: 'wallet_post_read_failed',
+            scopeMatchedRead: false,
+          },
+        },
+      });
+      expect(prisma.cashWallet.findUnique).toHaveBeenCalledTimes(1);
+      expect(prisma.position.create).not.toHaveBeenCalled();
+    });
+    it('identifies position create failure and keeps its structured public wrapper', async () => {
+      const { prisma, service } = setup();
+      mockExecutionWallet(prisma);
+      prisma.position.findUnique.mockResolvedValue(null);
+      prisma.position.create.mockRejectedValue(
+        Object.assign(new Error('synthetic DB failure'), { code: 'P2002' }),
+      );
+      const { error, diagnostic } = await captureFinancialFailure(() =>
+        service.executeOrder('user-1', 'order-execute-1'),
+      );
+      expect(error.getResponse()).toMatchObject({
+        error: { code: 'ORDER_EXECUTION_TRANSACTION_FAILED' },
+      });
+      expect(diagnostic?.failureStage).toBe('position_create');
+      expect(diagnostic?.evidence?.safeCause).toMatchObject({
+        category: 'db_unique_constraint',
+        code: 'P2002',
+      });
+      expect(JSON.stringify(diagnostic)).not.toContain('synthetic DB failure');
+      expectSafeFinancialDiagnostic(diagnostic);
+      expect(prisma.position.create).toHaveBeenCalledTimes(1);
+      expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+    });
+    it('identifies existing BUY position optimistic update rejection without a new read', async () => {
+      const { prisma, service } = setup();
+      mockExecutionWallet(prisma);
+      prisma.position.findUnique.mockResolvedValue(position());
+      prisma.position.updateMany.mockResolvedValue({ count: 0 });
+      const { diagnostic } = await captureFinancialFailure(() =>
+        service.executeOrder('user-1', 'order-execute-1'),
+      );
+      expect(diagnostic).toMatchObject({
+        failureStage: 'position_update',
+        evidence: {
+          financialGuard: {
+            failureReason: 'conflict',
+            observation: 'optimistic_guard_rejection',
+          },
+        },
+      });
+      expect(prisma.position.findUnique).toHaveBeenCalledTimes(1);
+      expectSafeFinancialDiagnostic(diagnostic);
+    });
+    it('identifies order finalization rejection after financial writes', async () => {
+      const { prisma, service } = setup();
+      mockExecutionWallet(prisma);
+      prisma.position.findUnique.mockResolvedValue(null);
+      prisma.position.create.mockResolvedValue({ id: 'position-1' });
+      prisma.walletTransaction.create.mockResolvedValue({ id: 'ledger-1' });
+      prisma.order.updateMany.mockResolvedValue({ count: 0 });
+      const { error, diagnostic } = await captureFinancialFailure(() =>
+        service.executeOrder('user-1', 'order-execute-1'),
+      );
+      expect(error.getResponse()).toMatchObject({
+        error: { code: 'ORDER_EXECUTION_CONFLICT' },
+      });
+      expect(diagnostic).toMatchObject({
+        failureStage: 'order_finalization',
+        evidence: {
+          financialGuard: {
+            failureReason: 'order_finalization_guard_rejected',
+            mutationAffected: 0,
+          },
+        },
+      });
+      expect(prisma.order.updateMany).toHaveBeenCalledTimes(1);
+      expectSafeFinancialDiagnostic(diagnostic);
+    });
+  });
+
   describe('source selection admin diagnostics', () => {
     function capture(
       action: () => Promise<unknown>,

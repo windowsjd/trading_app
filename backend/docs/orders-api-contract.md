@@ -1,5 +1,18 @@
 # Orders API Contract
 
+Admin financial guard diagnostics (2-B): market execution and limit quote,
+reservation/create/cancel preserve read-only cash/position failure reasons in
+admin-only `diagnostic.evidence.financialGuard`. Evidence uses existence,
+scope/currency/asset checks and sufficiency predicates, never raw balances,
+reservation amounts, quantities, costs or PnL. Public codes, financial policy,
+atomic guards and transaction/lock order remain unchanged. Classification is
+not repair. Cash failure reads are reused; position reserve/release may read
+once after a rejected mutation, with no successful-path query added. A
+failure read describes the observed state; concurrency is inferred when the
+observed guards hold, not proof of a particular competing writer. Market SELL
+retains its historical `CONFLICT` for reserved-only shortfalls while admin
+evidence distinguishes them. Matcher Path A/B diagnostics belong to 2-C.
+
 > 작업 5 (2026-08-03): the same order surface is also exposed account-scoped
 > under `/api/v1/trading-accounts/:accountId/orders[...]`, sharing this
 > service core (fees, quote consumption, wallet/ledger/position writes,
