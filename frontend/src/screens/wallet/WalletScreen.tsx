@@ -1,7 +1,9 @@
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
+import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView, ScrollView, View, Text, StyleSheet, Platform } from '../../theme/native';
+import { useAppearance } from '../../theme/appearance';
 import { semantic } from '../../theme/tokens';
 import { getScreenContentStyle } from '../../theme/screenLayout';
 import type { WalletScreenProps } from '../../app/navigation/types';
@@ -20,7 +22,6 @@ import { getPortfolioNotice } from '../../features/tradingAccount/portfolioMessa
 import { getKnownWalletBalanceAmount } from '../../features/wallet/mapper';
 import { formatMoney } from '../../utils/format';
 import PositionAssetRow from '../../components/tradingAccount/PositionAssetRow';
-import CTAButton from '../../components/common/CTAButton';
 import ActionPressable from '../../components/common/ActionPressable';
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -50,6 +51,7 @@ type AccountWalletProps = {
 function AccountWallet({ account, capabilities, navigation }: AccountWalletProps) {
   const accountId = account.id;
   const rootNavigation = useRootNavigation();
+  const { colors } = useAppearance();
   const portfolioQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.portfolio(accountId),
     queryFn: () => getTradingAccountPortfolio(accountId),
@@ -74,6 +76,32 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
   const blockMessage = capabilities?.canExchange ? null
     : getCapabilityBlockMessage(capabilities, capabilities?.exchangeBlockReason);
   const positions = positionsQuery.data?.positions;
+  const quickActions = [
+    {
+      testID: 'wallet-exchange',
+      label: '환전하기',
+      iconPath: 'M4 7h16m-4-4 4 4-4 4 M20 17H4m4-4-4 4 4 4',
+      disabled: !capabilities?.canExchange,
+      hidden: !!integrityFailure,
+      onPress: () => navigation.navigate('WalletFx'),
+    },
+    {
+      testID: 'wallet-ledger',
+      label: '원장 보기',
+      iconPath: 'M6 3h14v18H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z M8 3v18 M11 8h6 M11 12h6 M11 16h4',
+      disabled: false,
+      hidden: false,
+      onPress: () => navigation.navigate('WalletTransactions'),
+    },
+    {
+      testID: 'wallet-orders',
+      label: '주문 내역 보기',
+      iconPath: 'M5 3h14v18l-3-2-4 2-4-2-3 2V3Z M8 7h8 M8 11h8 M8 15l2 2 5-4',
+      disabled: false,
+      hidden: false,
+      onPress: () => rootNavigation.navigate('TradeHistory', { accountId }),
+    },
+  ];
 
   return (
     <ScrollView refreshControl={refresh.refreshControl} testID="wallet-screen" contentContainerStyle={styles.content}>
@@ -89,8 +117,6 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
             ) : (
               <HomeAssetHero summary={portfolio.summary} settled={account.season?.seasonStatus === 'settled'} unavailableMessage={notice?.message} />
             )}
-          <CTAButton testID="wallet-exchange" label="환전하기" state={capabilities?.canExchange ? 'enabled' : 'blocked'} onPress={() => navigation.navigate('WalletFx')} />
-          {blockMessage ? <Text testID={TEST_IDS.tradingAccount.capabilityNotice} style={styles.notice}>{blockMessage}</Text> : null}
           {notice ? <Text style={styles.notice}>{notice.message}</Text> : null}
 
           <View testID="wallet-composition" style={styles.card}>
@@ -124,14 +150,45 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
           </View>
         </>
       )}
-      <View style={styles.history}>
-        <ActionPressable testID="wallet-ledger" style={styles.historyAction} onPress={() => navigation.navigate('WalletTransactions')}>
-          <Text style={styles.historyLabel}>원장 보기</Text>
-        </ActionPressable>
-        <ActionPressable testID="wallet-orders" style={styles.historyAction} onPress={() => rootNavigation.navigate('TradeHistory', { accountId })}>
-          <Text style={styles.historyLabel}>거래 내역 보기</Text>
-        </ActionPressable>
+      <View style={styles.quickActions}>
+        {quickActions.filter((action) => !action.hidden).map((action) => (
+          <ActionPressable
+            key={action.testID}
+            testID={action.testID}
+            accessibilityRole="button"
+            accessibilityLabel={action.label}
+            accessibilityState={{ disabled: action.disabled }}
+            disabled={action.disabled}
+            style={[styles.quickAction, action.disabled && styles.quickActionDisabled]}
+            onPress={action.onPress}
+          >
+            <View
+              accessible={false}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              aria-hidden
+              pointerEvents="none"
+            >
+              <Svg
+                width={32}
+                height={32}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={colors.onAccent}
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                focusable={false}
+                aria-hidden
+              >
+                <Path d={action.iconPath} />
+              </Svg>
+            </View>
+            <Text style={styles.quickActionLabel}>{action.label}</Text>
+          </ActionPressable>
+        ))}
       </View>
+      {!integrityFailure && blockMessage ? <Text testID={TEST_IDS.tradingAccount.capabilityNotice} style={styles.notice}>{blockMessage}</Text> : null}
     </ScrollView>
   );
 }
@@ -146,7 +203,8 @@ const styles = StyleSheet.create({
   cashValue: { flexGrow: 1, flexShrink: 1, minWidth: 0, textAlign: 'right', fontSize: 16, lineHeight: 24, fontVariant: ['tabular-nums'] },
   holdings: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: semantic.border },
   notice: { fontSize: 13, lineHeight: 20, color: semantic.warning },
-  history: { flexDirection: 'row', alignItems: 'stretch', gap: 8 },
-  historyAction: { flex: 1, minWidth: 0, padding: 12, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  historyLabel: { fontSize: 13, lineHeight: 20, color: semantic.secondary, textAlign: 'center' },
+  quickActions: { flexDirection: 'row', alignItems: 'stretch', gap: 8 },
+  quickAction: { flex: 1, minWidth: 0, minHeight: 112, paddingVertical: 16, paddingHorizontal: 8, gap: 8, borderRadius: 12, backgroundColor: semantic.selected, alignItems: 'center', justifyContent: 'flex-start' },
+  quickActionDisabled: { opacity: 0.45 },
+  quickActionLabel: { alignSelf: 'stretch', fontSize: 13, fontWeight: '700', lineHeight: 20, color: semantic.onAccent, textAlign: 'center' },
 });

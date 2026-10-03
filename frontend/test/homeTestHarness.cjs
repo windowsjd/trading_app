@@ -67,6 +67,7 @@ function createHomeHarness(mode = 'general') {
       return [states[index], (value) => { states[index] = typeof value === 'function' ? value(states[index]) : value; }];
     } },
     'react-native': native,
+    'react-native-svg': { default: 'Svg', Path: 'Path', __esModule: true },
     '@tanstack/react-query': {
       useQuery: (options) => {
         const i = h.queries.length;

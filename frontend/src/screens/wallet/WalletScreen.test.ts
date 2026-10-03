@@ -47,10 +47,15 @@ describe('selected account Wallet and shared Home holdings', () => {
       assert.equal(elements(wallet, 'AccountSwitcher').length, 0);
       assert.equal(find(wallet, 'trading-account-switcher-trigger'), undefined);
       assert.ok(nodes.indexOf(find(wallet, 'home-summary-card')) < nodes.indexOf(find(wallet, 'wallet-exchange')));
-      assert.ok(nodes.indexOf(find(wallet, 'wallet-exchange')) < nodes.indexOf(find(wallet, 'wallet-composition')));
-      assert.ok(nodes.indexOf(find(wallet, 'wallet-composition')) < nodes.indexOf(find(wallet, 'wallet-orders')));
+      assert.ok(nodes.indexOf(find(wallet, 'wallet-composition')) < nodes.indexOf(find(wallet, 'wallet-exchange')));
+      assert.ok(nodes.indexOf(find(wallet, 'wallet-exchange')) < nodes.indexOf(find(wallet, 'wallet-ledger')));
+      assert.ok(nodes.indexOf(find(wallet, 'wallet-ledger')) < nodes.indexOf(find(wallet, 'wallet-orders')));
+      find(wallet, 'wallet-exchange').props.onPress();
+      assert.deepEqual(h.navigation.at(-1), ['WalletFx']);
       find(wallet, 'wallet-ledger').props.onPress();
       assert.deepEqual(h.navigation.at(-1), ['WalletTransactions']);
+      find(wallet, 'wallet-orders').props.onPress();
+      assert.deepEqual(h.navigation.at(-1), ['TradeHistory', { accountId: h.account.id }]);
       find(wallet, 'wallet-position-0').props.onPress();
       assert.deepEqual(h.navigation.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'AssetDetail', params: { assetId: '0' } } }]);
     });
@@ -108,7 +113,7 @@ describe('selected account Wallet and shared Home holdings', () => {
     it(`${status} disables exchange while preserving readable holdings and history`, (t) => {
       const h = createHomeHarness(); t.after(h.close); h.account.status = status; h.seed(h.account, { points: [] });
       const { tree } = h.renderWallet();
-      assert.equal(h.renderCta(find(tree, 'wallet-exchange')).props.disabled, true);
+      assert.equal(find(tree, 'wallet-exchange').props.disabled, true);
       assert.ok(find(tree, 'wallet-ledger')); assert.ok(find(tree, 'wallet-orders'));
     });
   }

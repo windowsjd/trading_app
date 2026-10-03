@@ -195,7 +195,7 @@ describe('home exchange shortcut', () => {
           getCapabilityBlockMessage(caps, caps.exchangeBlockReason),
         ));
         const walletTree = h.renderWallet().tree;
-        for (const label of ['원장 보기', '거래 내역 보기']) {
+        for (const label of ['원장 보기', '주문 내역 보기']) {
           const button = elements(walletTree, 'Pressable').find(
             (node) => texts(node) === label,
           );
@@ -338,7 +338,7 @@ describe('general/season home API, queries, rendering and navigation integration
       );
       const homeQueries = h.queries;
       const button = elements(h.renderWallet().tree, 'Pressable').find(
-        (node) => texts(node) === '거래 내역 보기',
+        (node) => texts(node) === '주문 내역 보기',
       );
       button.props.onPress();
       assert.deepEqual(h.navigation.at(-1), ['TradeHistory', { accountId: h.account.id }]);
@@ -525,7 +525,7 @@ describe('wallet button through destination TradeHistory account lookup and API'
       h.seed(h.account, fixture[mode].data);
       const wallet = h.renderWallet();
       const orderButton = elements(wallet.tree, 'Pressable').find(
-        (node) => texts(node) === '거래 내역 보기',
+        (node) => texts(node) === '주문 내역 보기',
       );
       orderButton.props.onPress();
       const scope = h.navigation.at(-1)[1];

@@ -95,7 +95,7 @@ async function run() {
             }
             const layout = await page.evaluate(({ prefix, screen }) => {
               const rows = [...document.querySelectorAll(`[data-testid^="${prefix}"][role="button"]`)];
-              const boundaries = [...rows, ...['home-summary-card', ...(screen === 'wallet' ? ['wallet-cash-KRW', 'wallet-cash-USD'] : [])].map((name) => document.querySelector(`[data-testid="${name}"]`))];
+              const boundaries = [...rows, ...['home-summary-card', ...(screen === 'wallet' ? ['wallet-cash-KRW', 'wallet-cash-USD', 'wallet-exchange', 'wallet-ledger', 'wallet-orders'] : [])].map((name) => document.querySelector(`[data-testid="${name}"]`))];
               const clipped = [];
               for (const row of boundaries) {
                 const box = row.getBoundingClientRect(), walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
@@ -138,12 +138,14 @@ async function run() {
                   }])),
                 };
               });
-              const history = screen === 'wallet' ? ['wallet-ledger', 'wallet-orders'].map((testID) => {
+              const quickActions = screen === 'wallet' ? ['wallet-exchange', 'wallet-ledger', 'wallet-orders'].map((testID) => {
                 const el = document.querySelector(`[data-testid="${testID}"]`), css = getComputedStyle(el);
-                return { ...rect(el), padding: css.padding, alignItems: css.alignItems, justifyContent: css.justifyContent,
-                  textAlign: getComputedStyle(el.querySelector('[dir="auto"]')).textAlign };
+                const icon = el.querySelector('svg'), label = el.querySelector('[dir="auto"]');
+                return { ...rect(el), padding: css.padding, background: css.backgroundColor, radius: css.borderRadius,
+                  alignItems: css.alignItems, justifyContent: css.justifyContent, icon: rect(icon), label: rect(label),
+                  textAlign: getComputedStyle(label).textAlign };
               }) : null;
-              return { clipped, metrics, history, heights: rows.map((row) => row.getBoundingClientRect().height), documentWidth: document.documentElement.scrollWidth };
+              return { clipped, metrics, quickActions, heights: rows.map((row) => row.getBoundingClientRect().height), documentWidth: document.documentElement.scrollWidth };
             }, { prefix, screen });
             assert.deepEqual(layout.clipped, [], JSON.stringify({ appearance, preference, width, fontScale, account, long, screen, layout }));
             assert.ok(layout.documentWidth <= width, 'no horizontal overflow');
@@ -164,13 +166,20 @@ async function run() {
               assert.equal(row.return.fontSize, 14 * fontScale);
               assert.ok(row.value.fontSize > row.return.fontSize);
             }
-            if (layout.history) {
-              const [ledger, orders] = layout.history;
-              assert.ok(Math.abs(ledger.width - orders.width) < 1, 'history buttons have equal rendered widths');
-              assert.equal(ledger.height, orders.height); assert.ok(ledger.height >= 44);
-              assert.equal(ledger.top, orders.top); assert.equal(ledger.padding, orders.padding);
-              for (const button of layout.history) {
-                assert.equal(button.alignItems, 'center'); assert.equal(button.justifyContent, 'center'); assert.equal(button.textAlign, 'center');
+            if (layout.quickActions) {
+              const [exchange, ledger, orders] = layout.quickActions;
+              assert.equal(exchange.background, appearance === 'light' ? 'rgb(32, 42, 53)' : 'rgb(52, 70, 87)', 'quick actions use the exchange CTA palette');
+              for (const button of [ledger, orders]) {
+                assert.ok(Math.abs(exchange.width - button.width) < 1, 'quick actions have equal rendered widths');
+                for (const property of ['height', 'top', 'padding', 'background', 'radius']) assert.equal(button[property], exchange[property]);
+                assert.equal(button.icon.top, exchange.icon.top, 'icons align across the row even when labels wrap');
+              }
+              for (const button of layout.quickActions) {
+                assert.ok(button.height >= 112);
+                assert.equal(button.alignItems, 'center'); assert.equal(button.justifyContent, 'flex-start'); assert.equal(button.textAlign, 'center');
+                assert.equal(button.icon.width, 32); assert.equal(button.icon.height, 32);
+                assert.ok(button.icon.bottom < button.label.top, 'each label sits below its icon');
+                assert.ok(Math.abs((button.icon.left + button.icon.right) / 2 - (button.left + button.right) / 2) < 1, 'icons are centered');
               }
             }
             if (!long && fontScale === 1) assert.ok(Math.max(...layout.heights) <= 132, 'compact default rows including wrapped Berkshire identity');
