@@ -118,77 +118,88 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
               <HomeAssetHero summary={portfolio.summary} settled={account.season?.seasonStatus === 'settled'} unavailableMessage={notice?.message} />
             )}
           {notice ? <Text style={styles.notice}>{notice.message}</Text> : null}
-
-          <View testID="wallet-composition" style={styles.card}>
-            <Text style={styles.title}>지갑 구성</Text>
-            {walletsQuery.isLoading ? <SectionSkeleton lines={2} />
-              : walletsQuery.isError && !walletsQuery.data ? (
-                <ErrorState title="현금 잔액을 불러오지 못했습니다." onRetry={() => void walletsQuery.refetch()} />
-              ) : (
-                (['KRW', 'USD'] as const).map((currency) => (
-                  <View key={currency} testID={`wallet-cash-${currency}`} style={styles.cashRow}>
-                    <Text style={styles.cashLabel}>{currency}</Text>
-                    <Text style={styles.cashValue}>{formatMoney(getKnownWalletBalanceAmount(walletsQuery.data, currency), currency)}</Text>
-                  </View>
-                ))
-              )}
-            <View style={styles.holdings}>
-              {positionsQuery.isLoading ? <SectionSkeleton lines={3} />
-                : positionsQuery.isError && !positionsQuery.data ? (
-                  <ErrorState title="보유 종목을 불러오지 못했습니다." onRetry={() => void positionsQuery.refetch()} />
-                ) : !positions ? <InlineEmptyState message="보유 종목을 확인할 수 없습니다." />
-                  : positions.length === 0 ? <InlineEmptyState message="보유 종목이 없습니다." />
-                    : positions.map((position) => (
-                      <PositionAssetRow
-                        key={position.positionId}
-                        testID={`wallet-position-${position.assetId}`}
-                        position={position}
-                        onPress={() => rootNavigation.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'AssetDetail', params: { assetId: position.assetId } } })}
-                      />
-                    ))}
-            </View>
-          </View>
         </>
       )}
-      <View style={styles.quickActions}>
+      <View testID="wallet-quick-actions" style={styles.quickActions}>
         {quickActions.filter((action) => !action.hidden).map((action) => (
-          <ActionPressable
-            key={action.testID}
-            testID={action.testID}
-            accessibilityRole="button"
-            accessibilityLabel={action.label}
-            accessibilityState={{ disabled: action.disabled }}
-            disabled={action.disabled}
-            style={[styles.quickAction, action.disabled && styles.quickActionDisabled]}
-            onPress={action.onPress}
-          >
-            <View
+          <View key={action.testID} testID={`${action.testID}-item`} style={styles.quickActionItem}>
+            <ActionPressable
+              testID={action.testID}
+              accessibilityRole="button"
+              accessibilityLabel={action.label}
+              accessibilityState={{ disabled: action.disabled }}
+              disabled={action.disabled}
+              style={[styles.quickAction, action.disabled && styles.quickActionDisabled]}
+              onPress={action.onPress}
+            >
+              <View
+                accessible={false}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                aria-hidden
+                pointerEvents="none"
+              >
+                <Svg
+                  width={24}
+                  height={24}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={colors.onAccent}
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  focusable={false}
+                  aria-hidden
+                >
+                  <Path d={action.iconPath} />
+                </Svg>
+              </View>
+            </ActionPressable>
+            <Text
+              testID={`${action.testID}-label`}
               accessible={false}
               accessibilityElementsHidden
               importantForAccessibility="no-hide-descendants"
               aria-hidden
-              pointerEvents="none"
+              style={[styles.quickActionLabel, action.disabled && styles.quickActionDisabled]}
             >
-              <Svg
-                width={32}
-                height={32}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke={colors.onAccent}
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                focusable={false}
-                aria-hidden
-              >
-                <Path d={action.iconPath} />
-              </Svg>
-            </View>
-            <Text style={styles.quickActionLabel}>{action.label}</Text>
-          </ActionPressable>
+              {action.label}
+            </Text>
+          </View>
         ))}
       </View>
       {!integrityFailure && blockMessage ? <Text testID={TEST_IDS.tradingAccount.capabilityNotice} style={styles.notice}>{blockMessage}</Text> : null}
+      {!integrityFailure ? (
+        <View testID="wallet-composition" style={styles.card}>
+          <Text style={styles.title}>지갑 구성</Text>
+          {walletsQuery.isLoading ? <SectionSkeleton lines={2} />
+            : walletsQuery.isError && !walletsQuery.data ? (
+              <ErrorState title="현금 잔액을 불러오지 못했습니다." onRetry={() => void walletsQuery.refetch()} />
+            ) : (
+              (['KRW', 'USD'] as const).map((currency) => (
+                <View key={currency} testID={`wallet-cash-${currency}`} style={styles.cashRow}>
+                  <Text style={styles.cashLabel}>{currency}</Text>
+                  <Text style={styles.cashValue}>{formatMoney(getKnownWalletBalanceAmount(walletsQuery.data, currency), currency)}</Text>
+                </View>
+              ))
+            )}
+          <View style={styles.holdings}>
+            {positionsQuery.isLoading ? <SectionSkeleton lines={3} />
+              : positionsQuery.isError && !positionsQuery.data ? (
+                <ErrorState title="보유 종목을 불러오지 못했습니다." onRetry={() => void positionsQuery.refetch()} />
+              ) : !positions ? <InlineEmptyState message="보유 종목을 확인할 수 없습니다." />
+                : positions.length === 0 ? <InlineEmptyState message="보유 종목이 없습니다." />
+                  : positions.map((position) => (
+                    <PositionAssetRow
+                      key={position.positionId}
+                      testID={`wallet-position-${position.assetId}`}
+                      position={position}
+                      onPress={() => rootNavigation.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'AssetDetail', params: { assetId: position.assetId } } })}
+                    />
+                  ))}
+          </View>
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
@@ -203,8 +214,9 @@ const styles = StyleSheet.create({
   cashValue: { flexGrow: 1, flexShrink: 1, minWidth: 0, textAlign: 'right', fontSize: 16, lineHeight: 24, fontVariant: ['tabular-nums'] },
   holdings: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: semantic.border },
   notice: { fontSize: 13, lineHeight: 20, color: semantic.warning },
-  quickActions: { flexDirection: 'row', alignItems: 'stretch', gap: 8 },
-  quickAction: { flex: 1, minWidth: 0, minHeight: 112, paddingVertical: 16, paddingHorizontal: 8, gap: 8, borderRadius: 12, backgroundColor: semantic.selected, alignItems: 'center', justifyContent: 'flex-start' },
+  quickActions: { width: '100%', maxWidth: 360, alignSelf: 'center', flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 8 },
+  quickActionItem: { flex: 1, minWidth: 0, alignItems: 'center', gap: 8 },
+  quickAction: { width: 52, height: 52, borderRadius: 12, backgroundColor: semantic.selected, alignItems: 'center', justifyContent: 'center' },
   quickActionDisabled: { opacity: 0.45 },
-  quickActionLabel: { alignSelf: 'stretch', fontSize: 13, fontWeight: '700', lineHeight: 20, color: semantic.onAccent, textAlign: 'center' },
+  quickActionLabel: { alignSelf: 'stretch', fontSize: 13, fontWeight: '500', lineHeight: 20, color: semantic.secondary, textAlign: 'center' },
 });

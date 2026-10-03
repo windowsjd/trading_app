@@ -95,7 +95,7 @@ async function run() {
             }
             const layout = await page.evaluate(({ prefix, screen }) => {
               const rows = [...document.querySelectorAll(`[data-testid^="${prefix}"][role="button"]`)];
-              const boundaries = [...rows, ...['home-summary-card', ...(screen === 'wallet' ? ['wallet-cash-KRW', 'wallet-cash-USD', 'wallet-exchange', 'wallet-ledger', 'wallet-orders'] : [])].map((name) => document.querySelector(`[data-testid="${name}"]`))];
+              const boundaries = [...rows, ...['home-summary-card', ...(screen === 'wallet' ? ['wallet-cash-KRW', 'wallet-cash-USD', 'wallet-quick-actions', 'wallet-exchange-item', 'wallet-ledger-item', 'wallet-orders-item'] : [])].map((name) => document.querySelector(`[data-testid="${name}"]`))];
               const clipped = [];
               for (const row of boundaries) {
                 const box = row.getBoundingClientRect(), walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
@@ -140,12 +140,25 @@ async function run() {
               });
               const quickActions = screen === 'wallet' ? ['wallet-exchange', 'wallet-ledger', 'wallet-orders'].map((testID) => {
                 const el = document.querySelector(`[data-testid="${testID}"]`), css = getComputedStyle(el);
-                const icon = el.querySelector('svg'), label = el.querySelector('[dir="auto"]');
+                const item = document.querySelector(`[data-testid="${testID}-item"]`);
+                const icon = el.querySelector('svg'), label = document.querySelector(`[data-testid="${testID}-label"]`);
+                const labelCss = getComputedStyle(label);
                 return { ...rect(el), padding: css.padding, background: css.backgroundColor, radius: css.borderRadius,
                   alignItems: css.alignItems, justifyContent: css.justifyContent, icon: rect(icon), label: rect(label),
-                  textAlign: getComputedStyle(label).textAlign };
+                  item: rect(item), separateLabel: el.parentElement === item && label.parentElement === item && el.nextElementSibling === label,
+                  buttonText: el.textContent.trim(), labelText: label.textContent, accessibleName: el.getAttribute('aria-label'),
+                  textAlign: labelCss.textAlign, fontSize: parseFloat(labelCss.fontSize), lineHeight: parseFloat(labelCss.lineHeight),
+                  fontWeight: labelCss.fontWeight, labelColor: labelCss.color };
               }) : null;
-              return { clipped, metrics, quickActions, heights: rows.map((row) => row.getBoundingClientRect().height), documentWidth: document.documentElement.scrollWidth };
+              const quickActionOrder = screen === 'wallet' ? (() => {
+                const hero = document.querySelector('[data-testid="home-summary-card"]');
+                const group = document.querySelector('[data-testid="wallet-quick-actions"]');
+                const composition = document.querySelector('[data-testid="wallet-composition"]');
+                return { hero: rect(hero), group: rect(group), composition: rect(composition),
+                  followsHero: !!(hero.compareDocumentPosition(group) & Node.DOCUMENT_POSITION_FOLLOWING),
+                  precedesComposition: !!(group.compareDocumentPosition(composition) & Node.DOCUMENT_POSITION_FOLLOWING) };
+              })() : null;
+              return { clipped, metrics, quickActions, quickActionOrder, heights: rows.map((row) => row.getBoundingClientRect().height), documentWidth: document.documentElement.scrollWidth };
             }, { prefix, screen });
             assert.deepEqual(layout.clipped, [], JSON.stringify({ appearance, preference, width, fontScale, account, long, screen, layout }));
             assert.ok(layout.documentWidth <= width, 'no horizontal overflow');
@@ -168,22 +181,44 @@ async function run() {
             }
             if (layout.quickActions) {
               const [exchange, ledger, orders] = layout.quickActions;
+              const order = layout.quickActionOrder;
+              assert.ok(order.followsHero && order.precedesComposition, 'DOM order is Hero → quick actions → composition');
+              assert.ok(order.hero.bottom <= order.group.top && order.group.bottom <= order.composition.top, 'the whole quick action group renders between Hero and composition');
+              assert.ok(order.group.left >= 0 && order.group.right <= width, 'the group stays inside the viewport');
+              assert.ok(Math.abs(order.group.left + order.group.right - width) < 1, 'the group is centered');
               assert.equal(exchange.background, appearance === 'light' ? 'rgb(32, 42, 53)' : 'rgb(52, 70, 87)', 'quick actions use the exchange CTA palette');
               for (const button of [ledger, orders]) {
                 assert.ok(Math.abs(exchange.width - button.width) < 1, 'quick actions have equal rendered widths');
                 for (const property of ['height', 'top', 'padding', 'background', 'radius']) assert.equal(button[property], exchange[property]);
                 assert.equal(button.icon.top, exchange.icon.top, 'icons align across the row even when labels wrap');
+                assert.ok(Math.abs(button.item.width - exchange.item.width) < 1, 'action items reserve equal label widths');
+                for (const property of ['fontSize', 'lineHeight', 'fontWeight', 'labelColor']) assert.equal(button[property], exchange[property], 'labels share one typography');
               }
-              for (const button of layout.quickActions) {
-                assert.ok(button.height >= 112);
-                assert.equal(button.alignItems, 'center'); assert.equal(button.justifyContent, 'flex-start'); assert.equal(button.textAlign, 'center');
-                assert.equal(button.icon.width, 32); assert.equal(button.icon.height, 32);
-                assert.ok(button.icon.bottom < button.label.top, 'each label sits below its icon');
+              assert.ok(Math.abs((ledger.left - exchange.right) - (orders.left - ledger.right)) < 1, 'visible button gaps are equal');
+              assert.ok(Math.abs((ledger.item.left - exchange.item.right) - (orders.item.left - ledger.item.right)) < 1, 'action item gaps are equal');
+              for (const [index, button] of layout.quickActions.entries()) {
+                assert.ok(button.width >= 48 && button.width <= 56 && button.height === button.width, 'compact square buttons keep the minimum touch target at every font scale');
+                assert.equal(button.separateLabel, true, 'label is a sibling outside its icon button');
+                assert.equal(button.buttonText, '', 'icon-only button contains no text');
+                assert.equal(button.labelText, ['환전하기', '원장 보기', '주문 내역 보기'][index]);
+                assert.equal(button.accessibleName, button.labelText, 'button remains named for assistive technology');
+                assert.equal(button.alignItems, 'center'); assert.equal(button.justifyContent, 'center'); assert.equal(button.textAlign, 'center');
+                assert.equal(button.fontSize, 13 * fontScale); assert.equal(button.lineHeight, 20 * fontScale);
+                assert.equal(button.icon.width, 24); assert.equal(button.icon.height, 24);
+                assert.ok(button.label.top >= button.bottom + 7.9, 'label sits below the entire button with a consistent gap');
+                assert.ok(button.label.bottom <= order.group.bottom, 'wrapped labels expand the group without overlapping composition');
+                assert.ok(Math.abs(button.label.top - exchange.label.top) < 1, 'all labels start on the same row');
                 assert.ok(Math.abs((button.icon.left + button.icon.right) / 2 - (button.left + button.right) / 2) < 1, 'icons are centered');
+                assert.ok(Math.abs((button.icon.top + button.icon.bottom) / 2 - (button.top + button.bottom) / 2) < 1, 'icons are vertically centered');
+                assert.ok(Math.abs((button.label.left + button.label.right) / 2 - (button.left + button.right) / 2) < 1, 'label is centered below its button');
               }
             }
             if (!long && fontScale === 1) assert.ok(Math.max(...layout.heights) <= 132, 'compact default rows including wrapped Berkshire identity');
             records.push({ appearance, preference, width, fontScale, account, long, screen, layout });
+            if (screen === 'wallet' && preference === 'red_blue' && account === 'general' && !long && [1, 2].includes(fontScale)) {
+              await id('home-summary-card').evaluate((el) => el.scrollIntoView({ block: 'start' }));
+              await page.screenshot({ path: path.join(out, `wallet-quick-actions-${appearance}-${width}-font-${fontScale}.png`) });
+            }
             if (width === 390 && fontScale === 1 && account === 'general') {
               await id(`${prefix}0`).evaluate((el) => el.scrollIntoView({ block: 'start' }));
               await page.screenshot({ path: path.join(out, `${screen}-${appearance}-${preference}-${long}.png`) });
@@ -229,6 +264,9 @@ async function run() {
       await open('wallet', '&state=settled');
       assert.match(await id('home-summary-card').textContent(), /최종 자산/);
       assert.equal(await id('wallet-exchange').getAttribute('aria-disabled'), 'true');
+      for (const action of ['wallet-ledger', 'wallet-orders']) {
+        assert.notEqual(await id(action).getAttribute('aria-disabled'), 'true', 'read-only history stays enabled when exchange is disabled');
+      }
 
     }
     // Installed React Navigation: real tabs, MyStack → RecordStack and back paths.

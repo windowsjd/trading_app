@@ -46,10 +46,23 @@ describe('selected account Wallet and shared Home holdings', () => {
       const nodes = elements(wallet);
       assert.equal(elements(wallet, 'AccountSwitcher').length, 0);
       assert.equal(find(wallet, 'trading-account-switcher-trigger'), undefined);
-      assert.ok(nodes.indexOf(find(wallet, 'home-summary-card')) < nodes.indexOf(find(wallet, 'wallet-exchange')));
-      assert.ok(nodes.indexOf(find(wallet, 'wallet-composition')) < nodes.indexOf(find(wallet, 'wallet-exchange')));
+      const group = find(wallet, 'wallet-quick-actions');
+      assert.ok(nodes.indexOf(find(wallet, 'home-summary-card')) < nodes.indexOf(group));
+      assert.ok(nodes.indexOf(group) < nodes.indexOf(find(wallet, 'wallet-composition')));
       assert.ok(nodes.indexOf(find(wallet, 'wallet-exchange')) < nodes.indexOf(find(wallet, 'wallet-ledger')));
       assert.ok(nodes.indexOf(find(wallet, 'wallet-ledger')) < nodes.indexOf(find(wallet, 'wallet-orders')));
+      for (const [testID, label] of [
+        ['wallet-exchange', '환전하기'], ['wallet-ledger', '원장 보기'], ['wallet-orders', '주문 내역 보기'],
+      ]) {
+        const item = find(group, `${testID}-item`);
+        const button = find(item, testID), caption = find(item, `${testID}-label`);
+        assert.deepEqual(item.props.children, [button, caption], 'icon button and label are separate siblings');
+        assert.equal(elements(button, 'Svg').length, 1);
+        assert.equal(elements(button, 'Text').length, 0, 'no text remains inside the icon button');
+        assert.equal(caption.props.children, label);
+        assert.equal(button.props.accessibilityLabel, label, 'icon-only buttons retain accessible names');
+      }
+      assert.ok(nodes.indexOf(find(wallet, 'wallet-orders-label')) < nodes.indexOf(find(wallet, 'wallet-composition')));
       find(wallet, 'wallet-exchange').props.onPress();
       assert.deepEqual(h.navigation.at(-1), ['WalletFx']);
       find(wallet, 'wallet-ledger').props.onPress();
@@ -114,7 +127,13 @@ describe('selected account Wallet and shared Home holdings', () => {
       const h = createHomeHarness(); t.after(h.close); h.account.status = status; h.seed(h.account, { points: [] });
       const { tree } = h.renderWallet();
       assert.equal(find(tree, 'wallet-exchange').props.disabled, true);
-      assert.ok(find(tree, 'wallet-ledger')); assert.ok(find(tree, 'wallet-orders'));
+      assert.equal(find(tree, 'wallet-exchange').props.accessibilityState.disabled, true);
+      assert.equal(find(tree, 'wallet-ledger').props.disabled, false);
+      assert.equal(find(tree, 'wallet-orders').props.disabled, false);
+      find(tree, 'wallet-ledger').props.onPress();
+      assert.deepEqual(h.navigation.at(-1), ['WalletTransactions']);
+      find(tree, 'wallet-orders').props.onPress();
+      assert.deepEqual(h.navigation.at(-1), ['TradeHistory', { accountId: h.account.id }]);
     });
   }
   it('fails closed on integrity errors while transient failures stay local and retryable', (t) => {
@@ -126,6 +145,9 @@ describe('selected account Wallet and shared Home holdings', () => {
     const failed = h.renderWallet().tree;
     assert.equal(find(failed, 'home-summary-card'), undefined);
     assert.equal(find(failed, 'wallet-composition'), undefined);
+    assert.equal(find(failed, 'wallet-exchange-item'), undefined);
+    assert.ok(find(failed, 'wallet-ledger'));
+    assert.ok(find(failed, 'wallet-orders'));
     query.setState({ status: 'error', error: new Error('offline') });
     const transient = h.renderWallet().tree;
     assert.ok(find(transient, 'home-summary-card'));
