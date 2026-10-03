@@ -70,3 +70,28 @@ it('all displayed signs use semantic financial roles; zero/missing and assets ar
   assert.equal(getRecordFinancialDisplay('11234000', 'money', false).color, semantic.text);
   assert.equal(getRecordFinancialDisplay('0').text, '0원');
 });
+
+for (const role of ['admin', 'user', 'operator']) {
+  it(`profit analysis forwards selection diagnostics through the existing ${role} role gate`, async t => {
+    const detail = recordDetail({ state: 'partial_unavailable' });
+    const failure = { assetId: 'missing', code: 'FX_RATE_UNAVAILABLE', message: 'FX unavailable', diagnostic: {
+      version: 1 as const, timestamp: '2026-07-20T00:00:00Z', truncated: false, code: 'FX_RATE_UNAVAILABLE', httpStatus: 200, requestId: 'selection-test', domain: 'RECORDS', operation: 'PROFIT_ANALYSIS', failureStage: 'fx_rate_selection',
+      evidence: { workflow: 'positions_live_valuation', freshnessThresholdSeconds: 7200, providerCandidates: [{ sourceName: 'korea_exim_exchange_rate', reason: 'captured_at_stale' }] },
+      exception: { type: 'RecordsValuationError', truncated: false, message: 'FX unavailable', stack: [], applicationStack: [] },
+      diagnosticEvents: { events: [], truncated: false }, serverLogs: { entries: [], truncated: false }, nextInvestigation: [],
+    } };
+    detail.profitAnalysis.valuationErrors = [failure];
+    const h = createRecordScreenHarness('profit', undefined, { detail, role }); t.after(h.close); await h.settle();
+    // The diagnostic enables /me only after the record response has rendered.
+    await h.settle();
+    if (role === 'admin') {
+      assert.ok(h.find('admin-diagnostic-toggle'));
+      await h.press('admin-diagnostic-toggle');
+      assert.match(h.text(), /captured_at_stale/);
+      assert.match(h.text(), /positions_live_valuation/);
+    } else {
+      assert.equal(h.find('admin-diagnostic-toggle'), undefined);
+      assert.doesNotMatch(h.text(), /captured_at_stale|positions_live_valuation/);
+    }
+  });
+}

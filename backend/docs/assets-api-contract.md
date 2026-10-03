@@ -492,3 +492,15 @@ Provider field references: [KIS domestic current price](https://github.com/korea
 [KIS overseas current price](https://github.com/koreainvestment/open-trading-api/blob/main/examples_llm/overseas_stock/price/chk_price.py),
 [Binance REST](https://github.com/binance/binance-spot-api-docs/blob/master/rest-api.md),
 [Binance streams](https://github.com/binance/binance-spot-api-docs/blob/master/web-socket-streams.md).
+
+### Admin selection evidence
+
+For current-DB-role admin only, `priceErrors[].diagnostic.evidence` includes
+source-by-source observed candidate counts/rejection reasons, evaluation time,
+resolved workflow freshness, market session and filtered manual fallback result.
+USD-to-KRW conversion failures carry the local FX selection evidence. Raw
+price/rate values are excluded from this diagnostic projection. HTTP status,
+ordinary error codes/messages and successful price/source payloads are unchanged.
+Each row explicitly supplies its own evidence; request/shared cache context is not
+inherited. The source observation boundaries are documented in
+[provider selection diagnostics](provider-ingestion-foundation.md#admin-selection-failure-evidence).

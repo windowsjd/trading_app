@@ -1,4 +1,13 @@
-import { closedMarketPriceScope, findMarketAwareAssetPriceCandidates } from '../providers/asset-price-snapshot-query';
+import {
+  buildSelectionFailureEvidence,
+  describeManualFallback,
+} from '../providers/source-selection-diagnostics';
+import { fxExecuteSnapshotFreshnessThresholdMs } from '../fx/fx-execute-snapshot-policy';
+import type { PortfolioValuationDiagnosticContext } from '../portfolio/portfolio-valuation.policy';
+import {
+  closedMarketPriceScope,
+  findMarketAwareAssetPriceCandidates,
+} from '../providers/asset-price-snapshot-query';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import {
   AssetPriceSourceType,
@@ -852,7 +861,13 @@ export class HomeService {
         ? await this.findLatestEligibleUsdKrwSnapshot(valuationAt)
         : null;
       const usdKrwRate = usdKrwSnapshot
-        ? this.selectUsableUsdKrwRate(usdKrwSnapshot, valuationAt)
+        ? this.selectUsableUsdKrwRate(
+            usdKrwSnapshot,
+            valuationAt,
+            'diagnosticContext' in usdKrwSnapshot
+              ? usdKrwSnapshot.diagnosticContext
+              : undefined,
+          )
         : null;
 
       const itemsWithSortValue = await Promise.all(
@@ -1163,6 +1178,16 @@ export class HomeService {
       };
     }
 
+    const providerFailureEvidence = buildSelectionFailureEvidence({
+      workflow: 'home_live_valuation',
+      evaluationAt: valuationAt,
+      eligibility: providerEligibility,
+      candidates: providerCandidates,
+      selection: providerSelection,
+      asset,
+      isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
+    });
+
     const snapshot = await this.prisma.assetPriceSnapshot.findFirst({
       where: {
         assetId: asset.id,
@@ -1195,6 +1220,23 @@ export class HomeService {
       throw new PortfolioValuationError(
         'ASSET_PRICE_UNAVAILABLE',
         `Asset price snapshot is unavailable for asset ${asset.id}.`,
+        {
+          failureStage: 'asset_price_selection',
+          entities: { assetId: asset.id },
+          evidence: {
+            ...providerFailureEvidence,
+            manualFallback: describeManualFallback({
+              snapshot: null,
+              evaluationAt: valuationAt,
+              queryChecks: [
+                'source_type_admin_manual',
+                'positive_value',
+                'effective_at_lte_evaluation',
+                ...(closedScope ? ['last_completed_session'] : []),
+              ],
+            }),
+          },
+        },
       );
     }
 
@@ -1255,6 +1297,15 @@ export class HomeService {
       };
     }
 
+    const providerFailureEvidence = buildSelectionFailureEvidence({
+      workflow: 'home_live_valuation',
+      evaluationAt: valuationAt,
+      eligibility: providerEligibility,
+      candidates: providerCandidates,
+      selection: providerSelection,
+      isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+    });
+
     const snapshot = await this.prisma.fxRateSnapshot.findFirst({
       where: {
         baseCurrency: CurrencyCode.USD,
@@ -1286,10 +1337,34 @@ export class HomeService {
       },
     });
 
+    const diagnosticContext: PortfolioValuationDiagnosticContext = {
+      failureStage: 'fx_rate_selection',
+      evidence: {
+        ...providerFailureEvidence,
+        manualFallback: describeManualFallback({
+          snapshot,
+          evaluationAt: valuationAt,
+          queryChecks: [
+            'source_type_admin_manual',
+            'approved',
+            'positive_value',
+            'effective_at_lte_evaluation',
+          ],
+          reason: snapshot ? 'candidate_returned_for_validation' : undefined,
+          freshnessThresholdSeconds:
+            fxExecuteSnapshotFreshnessThresholdMs / 1000,
+          positiveValue: snapshot
+            ? isPositiveDecimal(snapshot.rate)
+            : undefined,
+        }),
+      },
+    };
+
     if (!snapshot) {
       throw new PortfolioValuationError(
         'FX_RATE_UNAVAILABLE',
         'USD/KRW FX rate snapshot is unavailable.',
+        diagnosticContext,
       );
     }
 
@@ -1302,6 +1377,7 @@ export class HomeService {
     });
 
     return {
+      diagnosticContext,
       ...snapshot,
       sourceDecision,
     };
@@ -1315,6 +1391,7 @@ export class HomeService {
       approvedByUserId: string | null;
     },
     valuationAt: Date,
+    diagnosticContext?: PortfolioValuationDiagnosticContext,
   ) {
     if (snapshot.sourceType === FxRateSourceType.provider_api) {
       return snapshot.rate;
@@ -1324,6 +1401,19 @@ export class HomeService {
       throw new PortfolioValuationError(
         'FX_RATE_UNAVAILABLE',
         'No approved admin_manual USD/KRW FX rate snapshot is available.',
+        {
+          ...diagnosticContext,
+          evidence: {
+            ...diagnosticContext?.evidence,
+            manualFallback: {
+              ...(diagnosticContext?.evidence?.manualFallback as
+                | Record<string, unknown>
+                | undefined),
+              result: 'rejected',
+              reason: 'manual_approval_ineligible',
+            },
+          },
+        },
       );
     }
 
@@ -1333,6 +1423,19 @@ export class HomeService {
       throw new PortfolioValuationError(
         'FX_RATE_STALE',
         'USD/KRW FX rate snapshot is stale.',
+        {
+          ...diagnosticContext,
+          evidence: {
+            ...diagnosticContext?.evidence,
+            manualFallback: {
+              ...(diagnosticContext?.evidence?.manualFallback as
+                | Record<string, unknown>
+                | undefined),
+              result: 'rejected',
+              reason: 'effective_at_stale',
+            },
+          },
+        },
       );
     }
 

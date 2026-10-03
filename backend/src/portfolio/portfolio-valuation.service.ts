@@ -1,4 +1,12 @@
-import { closedMarketPriceScope, findMarketAwareAssetPriceCandidates } from '../providers/asset-price-snapshot-query';
+import {
+  buildSelectionFailureEvidence,
+  describeManualFallback,
+} from '../providers/source-selection-diagnostics';
+import { fxExecuteSnapshotFreshnessThresholdMs } from '../fx/fx-execute-snapshot-policy';
+import {
+  closedMarketPriceScope,
+  findMarketAwareAssetPriceCandidates,
+} from '../providers/asset-price-snapshot-query';
 import { Injectable } from '@nestjs/common';
 import {
   AssetPriceSourceType,
@@ -469,6 +477,17 @@ export class PortfolioValuationService {
       };
     }
 
+    const providerFailureEvidence = buildSelectionFailureEvidence({
+      workflow: sourceEligibilityWorkflow,
+      evaluationAt: valuationAt,
+      eligibility: providerEligibility,
+      candidates: providerCandidates,
+      selection: providerSelection,
+      asset,
+      atOrBefore: useSettlementPricePolicy,
+      isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
+    });
+
     const fallbackSnapshot = await client.assetPriceSnapshot.findFirst({
       where: {
         assetId: asset.id,
@@ -512,28 +531,17 @@ export class PortfolioValuationService {
             snapshotId: latestCandidate?.id,
           },
           evidence: {
-            marketSession: closedScope?.marketState ?? null,
-            workflow: sourceEligibilityWorkflow,
-            market: asset.market,
-            valuationAt,
-            freshnessThresholdSeconds: providerEligibility.eligible
-              ? providerEligibility.freshnessThresholdSeconds
-              : null,
-            expectedSourceNames: providerEligibility.eligible
-              ? providerEligibility.sourceNames
-              : [],
-            providerDecision: providerSelection.decision,
-            latestRejectedCandidate: latestCandidate
-              ? {
-                  id: latestCandidate.id,
-                  sourceType: latestCandidate.sourceType,
-                  sourceName: latestCandidate.sourceName,
-                  effectiveAt: latestCandidate.effectiveAt,
-                  capturedAt: latestCandidate.capturedAt,
-                }
-              : null,
-            fallbackSnapshotFound: false,
-            selectionResult: 'REJECTED',
+            ...providerFailureEvidence,
+            manualFallback: describeManualFallback({
+              snapshot: null,
+              evaluationAt: valuationAt,
+              queryChecks: [
+                'source_type_admin_manual',
+                'positive_value',
+                'effective_at_lte_evaluation',
+                ...(closedScope ? ['last_completed_session'] : []),
+              ],
+            }),
           },
         },
       };
@@ -614,6 +622,16 @@ export class PortfolioValuationService {
       };
     }
 
+    const providerFailureEvidence = buildSelectionFailureEvidence({
+      workflow: sourceEligibilityWorkflow,
+      evaluationAt: valuationAt,
+      eligibility: providerEligibility,
+      candidates: providerCandidates,
+      selection: providerSelection,
+      atOrBefore: useSettlementPricePolicy,
+      isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+    });
+
     const fallbackSnapshot = await client.fxRateSnapshot.findFirst({
       where: {
         baseCurrency: CurrencyCode.USD,
@@ -652,8 +670,38 @@ export class PortfolioValuationService {
       },
     });
 
+    const diagnosticContext: PortfolioValuationDiagnosticContext = {
+      failureStage: 'fx_rate_selection',
+      entities: {
+        snapshotId: fallbackSnapshot?.id ?? providerCandidates[0]?.id,
+      },
+      evidence: {
+        ...providerFailureEvidence,
+        manualFallback: describeManualFallback({
+          snapshot: fallbackSnapshot,
+          evaluationAt: valuationAt,
+          queryChecks: [
+            'source_type_admin_manual',
+            'approved',
+            'effective_at_lte_evaluation',
+            ...(useSettlementPricePolicy ? ['positive_value'] : []),
+          ],
+          reason: fallbackSnapshot
+            ? 'candidate_returned_for_validation'
+            : undefined,
+          freshnessThresholdSeconds: useSettlementPricePolicy
+            ? undefined
+            : fxExecuteSnapshotFreshnessThresholdMs / 1000,
+          positiveValue: fallbackSnapshot
+            ? isPositiveDecimal(fallbackSnapshot.rate)
+            : undefined,
+        }),
+      },
+    };
+
     if (fallbackSnapshot) {
       return {
+        diagnosticContext,
         snapshot: {
           ...fallbackSnapshot,
           sourceDecision: buildAdminManualFallbackDecision({
@@ -667,37 +715,7 @@ export class PortfolioValuationService {
       };
     }
 
-    const latestCandidate = providerCandidates[0];
-    return {
-      snapshot: null,
-      diagnosticContext: {
-        failureStage: 'fx_rate_selection',
-        entities: { snapshotId: latestCandidate?.id },
-        evidence: {
-          pair: 'USD/KRW',
-          workflow: sourceEligibilityWorkflow,
-          valuationAt,
-          freshnessThresholdSeconds: providerEligibility.eligible
-            ? providerEligibility.freshnessThresholdSeconds
-            : null,
-          expectedSourceNames: providerEligibility.eligible
-            ? providerEligibility.sourceNames
-            : [],
-          providerDecision: providerSelection.decision,
-          latestRejectedCandidate: latestCandidate
-            ? {
-                id: latestCandidate.id,
-                sourceType: latestCandidate.sourceType,
-                sourceName: latestCandidate.sourceName,
-                effectiveAt: latestCandidate.effectiveAt,
-                capturedAt: latestCandidate.capturedAt,
-              }
-            : null,
-          fallbackSnapshotFound: false,
-          selectionResult: 'REJECTED',
-        },
-      },
-    };
+    return { snapshot: null, diagnosticContext };
   }
 
   private getAssetPriceCurrency(

@@ -1,3 +1,7 @@
+import {
+  buildSelectionFailureEvidence,
+  describeManualFallback,
+} from '../providers/source-selection-diagnostics';
 import { MarketExecutionEvidenceAdapter } from './market-execution-evidence.adapter';
 import { decideMarketExecution } from './market-execution.policy';
 import { MARKET_EXECUTION_SELECT } from './order-response.presenter';
@@ -35,7 +39,10 @@ import {
   parsePositiveDecimalString,
   roundDecimalHalfUp,
 } from '../fx/fx-decimal-policy';
-import { isFxSnapshotStale } from '../fx/fx-execute-snapshot-policy';
+import {
+  isFxSnapshotStale,
+  fxExecuteSnapshotFreshnessThresholdMs,
+} from '../fx/fx-execute-snapshot-policy';
 import { isFxSnapshotStaleForPortfolioValuation } from '../portfolio/portfolio-valuation.policy';
 import { GeneralAccountPerformanceService } from '../portfolio/general-account-performance.service';
 import { lockSeasonTradingContext } from '../seasons/season-trading-lock';
@@ -2898,6 +2905,22 @@ export class OrdersService {
     });
 
     if (!providerEligibility.eligible) {
+      setAdminDiagnosticContext({
+        failureStage: 'execution_price_selection',
+        evidence: buildSelectionFailureEvidence({
+          workflow: 'orders_execute',
+          evaluationAt: executedAt,
+          eligibility: providerEligibility,
+          candidates: [],
+          selection: null,
+          isPositiveValue: () => false,
+          manualFallback: {
+            lookupPerformed: false,
+            result: 'not_allowed',
+            reason: 'provider_only_workflow',
+          },
+        }),
+      });
       this.throwApiError(
         HttpStatus.SERVICE_UNAVAILABLE,
         'EXECUTION_SOURCE_INELIGIBLE',
@@ -2947,25 +2970,20 @@ export class OrdersService {
           quoteId: quote.id,
           snapshotId: latestCandidate?.id,
         },
-        evidence: {
+        evidence: buildSelectionFailureEvidence({
           workflow: 'orders_execute',
-          requestTime: executedAt,
-          providerPriority: providerEligibility.sourceNames,
-          freshnessThresholdSeconds:
-            providerEligibility.freshnessThresholdSeconds,
-          selectionResult: 'REJECTED',
-          selectionDecision: selection.decision,
-          latestRejectedCandidate: latestCandidate
-            ? {
-                id: latestCandidate.id,
-                sourceType: latestCandidate.sourceType,
-                sourceName: latestCandidate.sourceName,
-                effectiveAt: latestCandidate.effectiveAt,
-                capturedAt: latestCandidate.capturedAt,
-                price: latestCandidate.price.toFixed(monetaryScale),
-              }
-            : null,
-        },
+          evaluationAt: executedAt,
+          eligibility: providerEligibility,
+          candidates,
+          selection,
+          asset: order.asset,
+          isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
+          manualFallback: {
+            lookupPerformed: false,
+            result: 'not_allowed',
+            reason: 'provider_only_workflow',
+          },
+        }),
         nextInvestigation: [
           'backend/src/providers/source-eligibility.policy.ts',
           'backend/src/orders/orders.service.ts',
@@ -3022,6 +3040,22 @@ export class OrdersService {
     });
 
     if (!providerEligibility.eligible) {
+      setAdminDiagnosticContext({
+        failureStage: 'execution_rate_selection',
+        evidence: buildSelectionFailureEvidence({
+          workflow: 'orders_execute',
+          evaluationAt: executedAt,
+          eligibility: providerEligibility,
+          candidates: [],
+          selection: null,
+          isPositiveValue: () => false,
+          manualFallback: {
+            lookupPerformed: false,
+            result: 'not_allowed',
+            reason: 'provider_only_workflow',
+          },
+        }),
+      });
       this.throwApiError(
         HttpStatus.SERVICE_UNAVAILABLE,
         'EXECUTION_SOURCE_INELIGIBLE',
@@ -3042,6 +3076,22 @@ export class OrdersService {
     });
 
     if (selection.state !== 'selected') {
+      setAdminDiagnosticContext({
+        failureStage: 'execution_rate_selection',
+        evidence: buildSelectionFailureEvidence({
+          workflow: 'orders_execute',
+          evaluationAt: executedAt,
+          eligibility: providerEligibility,
+          candidates,
+          selection,
+          isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+          manualFallback: {
+            lookupPerformed: false,
+            result: 'not_allowed',
+            reason: 'provider_only_workflow',
+          },
+        }),
+      });
       if (selection.decision.rejectedProviderReason === 'captured_at_stale') {
         this.throwApiError(
           HttpStatus.SERVICE_UNAVAILABLE,
@@ -3985,6 +4035,15 @@ export class OrdersService {
       return providerSelection.snapshot.rate;
     }
 
+    const providerFailureEvidence = buildSelectionFailureEvidence({
+      workflow: 'live_portfolio_valuation',
+      evaluationAt: valuationAt,
+      eligibility: providerEligibility,
+      candidates: providerCandidates,
+      selection: providerSelection,
+      isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+    });
+
     const snapshot = await tx.fxRateSnapshot.findFirst({
       where: {
         baseCurrency: CurrencyCode.USD,
@@ -4016,7 +4075,28 @@ export class OrdersService {
       },
     });
 
+    const failureEvidence = (reason?: string) => ({
+      ...providerFailureEvidence,
+      manualFallback: describeManualFallback({
+        snapshot,
+        evaluationAt: valuationAt,
+        reason,
+        queryChecks: [
+          'source_type_admin_manual',
+          'effective_at_lte_evaluation',
+          'positive_value',
+          'approved',
+        ],
+        freshnessThresholdSeconds: fxExecuteSnapshotFreshnessThresholdMs / 1000,
+        positiveValue: snapshot ? isPositiveDecimal(snapshot.rate) : undefined,
+      }),
+    });
+
     if (!snapshot) {
+      setAdminDiagnosticContext({
+        failureStage: 'fx_rate_selection',
+        evidence: failureEvidence(),
+      });
       if (
         providerSelection.decision.rejectedProviderReason ===
         'captured_at_stale'
@@ -4039,6 +4119,10 @@ export class OrdersService {
       snapshot.sourceType !== FxRateSourceType.admin_manual ||
       !snapshot.approvedByUserId
     ) {
+      setAdminDiagnosticContext({
+        failureStage: 'fx_rate_selection',
+        evidence: failureEvidence('manual_source_or_approval_ineligible'),
+      });
       this.throwApiError(
         HttpStatus.SERVICE_UNAVAILABLE,
         'FX_RATE_UNAVAILABLE',
@@ -4049,6 +4133,10 @@ export class OrdersService {
     if (
       isFxSnapshotStaleForPortfolioValuation(snapshot.effectiveAt, valuationAt)
     ) {
+      setAdminDiagnosticContext({
+        failureStage: 'fx_rate_freshness_validation',
+        evidence: failureEvidence('effective_at_stale'),
+      });
       this.throwApiError(
         HttpStatus.SERVICE_UNAVAILABLE,
         'FX_RATE_STALE',
@@ -4123,6 +4211,16 @@ export class OrdersService {
       };
     }
 
+    const providerFailureEvidence = buildSelectionFailureEvidence({
+      workflow: 'live_portfolio_valuation',
+      evaluationAt: valuationAt,
+      eligibility: providerEligibility,
+      candidates: providerCandidates,
+      selection: providerSelection,
+      asset: input,
+      isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
+    });
+
     const snapshot = await tx.assetPriceSnapshot.findFirst({
       where: {
         assetId: input.assetId,
@@ -4153,6 +4251,23 @@ export class OrdersService {
     });
 
     if (!snapshot) {
+      setAdminDiagnosticContext({
+        failureStage: 'asset_price_selection',
+        entities: { assetId: input.assetId },
+        evidence: {
+          ...providerFailureEvidence,
+          manualFallback: describeManualFallback({
+            snapshot,
+            evaluationAt: valuationAt,
+            queryChecks: [
+              'source_type_admin_manual',
+              'effective_at_lte_evaluation',
+              'positive_value',
+              ...(closedScope ? ['last_completed_session'] : []),
+            ],
+          }),
+        },
+      });
       if (
         providerSelection.decision.rejectedProviderReason ===
           'captured_at_stale' ||
@@ -5540,6 +5655,16 @@ export class OrdersService {
       };
     }
 
+    const providerFailureEvidence = buildSelectionFailureEvidence({
+      workflow: sourceWorkflow,
+      evaluationAt: quoteAt,
+      eligibility: providerEligibility,
+      candidates: providerCandidates,
+      selection: providerSelection,
+      asset,
+      isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
+    });
+
     const snapshot = await this.prisma.assetPriceSnapshot.findFirst({
       where: {
         assetId: asset.id,
@@ -5567,6 +5692,22 @@ export class OrdersService {
     });
 
     if (!snapshot) {
+      setAdminDiagnosticContext({
+        failureStage: 'asset_price_selection',
+        entities: { assetId: asset.id },
+        evidence: {
+          ...providerFailureEvidence,
+          manualFallback: describeManualFallback({
+            snapshot,
+            evaluationAt: quoteAt,
+            queryChecks: [
+              'source_type_admin_manual',
+              'effective_at_lte_evaluation',
+              'positive_value',
+            ],
+          }),
+        },
+      });
       this.throwApiError(
         HttpStatus.SERVICE_UNAVAILABLE,
         'ASSET_PRICE_UNAVAILABLE',
@@ -5640,6 +5781,15 @@ export class OrdersService {
       };
     }
 
+    const providerFailureEvidence = buildSelectionFailureEvidence({
+      workflow: sourceWorkflow,
+      evaluationAt: quoteAt,
+      eligibility: providerEligibility,
+      candidates: providerCandidates,
+      selection: providerSelection,
+      isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+    });
+
     const snapshot = await this.prisma.fxRateSnapshot.findFirst({
       where: {
         baseCurrency: CurrencyCode.USD,
@@ -5669,7 +5819,28 @@ export class OrdersService {
       },
     });
 
+    const failureEvidence = (reason?: string) => ({
+      ...providerFailureEvidence,
+      manualFallback: describeManualFallback({
+        snapshot,
+        evaluationAt: quoteAt,
+        reason,
+        queryChecks: [
+          'source_type_admin_manual',
+          'effective_at_lte_evaluation',
+          'positive_value',
+          'approved',
+        ],
+        freshnessThresholdSeconds: fxExecuteSnapshotFreshnessThresholdMs / 1000,
+        positiveValue: snapshot ? isPositiveDecimal(snapshot.rate) : undefined,
+      }),
+    });
+
     if (!snapshot) {
+      setAdminDiagnosticContext({
+        failureStage: 'fx_rate_selection',
+        evidence: failureEvidence(),
+      });
       this.throwApiError(
         HttpStatus.SERVICE_UNAVAILABLE,
         'FX_RATE_UNAVAILABLE',
@@ -5678,6 +5849,10 @@ export class OrdersService {
     }
 
     if (isFxSnapshotStale(snapshot.effectiveAt, quoteAt)) {
+      setAdminDiagnosticContext({
+        failureStage: 'fx_rate_freshness_validation',
+        evidence: failureEvidence('effective_at_stale'),
+      });
       this.throwApiError(
         HttpStatus.SERVICE_UNAVAILABLE,
         'FX_RATE_STALE',

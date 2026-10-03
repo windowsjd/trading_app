@@ -1,4 +1,14 @@
 import {
+  buildSelectionFailureEvidence,
+  describeManualFallback,
+} from '../providers/source-selection-diagnostics';
+import { fxExecuteSnapshotFreshnessThresholdMs } from '../fx/fx-execute-snapshot-policy';
+import {
+  buildAdminPartialFailureDiagnostic,
+  type AdminDiagnostic,
+  type DiagnosticContextUpdate,
+} from '../common/admin-diagnostics';
+import {
   MARKET_EXECUTION_SELECT,
   presentMarketExecution,
   type OrderResponsePayload,
@@ -211,6 +221,7 @@ type UsdKrwForRecords =
       state: 'unavailable';
       code: 'FX_RATE_UNAVAILABLE' | 'FX_RATE_STALE';
       message: string;
+      diagnosticContext?: DiagnosticContextUpdate;
     };
 
 type ProfitAnalysisItem = {
@@ -243,6 +254,7 @@ type ProfitAnalysis = {
     assetId: string;
     code: ValuationErrorCode;
     message: string;
+    diagnostic?: AdminDiagnostic;
   }>;
 };
 
@@ -560,6 +572,7 @@ class RecordsValuationError extends Error {
   constructor(
     readonly code: ValuationErrorCode,
     message: string,
+    readonly diagnosticContext?: DiagnosticContextUpdate,
   ) {
     super(message);
   }
@@ -1610,6 +1623,9 @@ export class RecordsService {
             assetId: position.assetId,
             code: result.error.code,
             message: result.error.message,
+            ...(result.error.diagnostic
+              ? { diagnostic: result.error.diagnostic }
+              : {}),
           });
         }
 
@@ -1666,13 +1682,21 @@ export class RecordsService {
     item: ProfitAnalysisItem;
     unrealizedPnlKrw: Prisma.Decimal;
     totalPnlKrw: Prisma.Decimal;
-    error: { code: ValuationErrorCode; message: string } | null;
+    error: {
+      code: ValuationErrorCode;
+      message: string;
+      diagnostic?: AdminDiagnostic;
+    } | null;
   }> {
     let unrealizedPnlLocal = new Prisma.Decimal(0);
     let unrealizedPnlKrw = new Prisma.Decimal(0);
     let returnRate: Prisma.Decimal | null = null;
     let valuationState: ProfitAnalysisItem['valuationState'] = 'available';
-    let error: { code: ValuationErrorCode; message: string } | null = null;
+    let error: {
+      code: ValuationErrorCode;
+      message: string;
+      diagnostic?: AdminDiagnostic;
+    } | null = null;
 
     if (!position.quantity.eq(0)) {
       try {
@@ -1690,6 +1714,7 @@ export class RecordsService {
           throw new RecordsValuationError(
             usdKrwSelection.code,
             usdKrwSelection.message,
+            usdKrwSelection.diagnosticContext,
           );
         }
 
@@ -1721,10 +1746,26 @@ export class RecordsService {
                 'ASSET_PRICE_UNAVAILABLE',
                 `Asset valuation is unavailable for asset ${position.assetId}.`,
               );
+        const diagnostic = valuationError.diagnosticContext
+          ? buildAdminPartialFailureDiagnostic(
+              valuationError,
+              valuationError.code,
+              {
+                ...valuationError.diagnosticContext,
+                domain: 'RECORDS',
+                operation: 'PROFIT_ANALYSIS',
+                entities: {
+                  ...valuationError.diagnosticContext.entities,
+                  assetId: position.assetId,
+                },
+              },
+            )
+          : undefined;
         valuationState = 'unavailable';
         error = {
           code: valuationError.code,
           message: valuationError.message,
+          ...(diagnostic ? { diagnostic } : {}),
         };
       }
     }
@@ -1997,6 +2038,16 @@ export class RecordsService {
       return providerSelection.snapshot;
     }
 
+    const providerFailureEvidence = buildSelectionFailureEvidence({
+      workflow: 'positions_live_valuation',
+      evaluationAt: valuationAt,
+      eligibility: providerEligibility,
+      candidates: providerCandidates,
+      selection: providerSelection,
+      asset,
+      isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
+    });
+
     const fallbackSnapshot = await this.prisma.assetPriceSnapshot.findFirst({
       where: {
         assetId: asset.id,
@@ -2030,18 +2081,38 @@ export class RecordsService {
       return fallbackSnapshot;
     }
 
+    const diagnosticContext: DiagnosticContextUpdate = {
+      failureStage: 'asset_price_selection',
+      entities: { assetId: asset.id },
+      evidence: {
+        ...providerFailureEvidence,
+        manualFallback: describeManualFallback({
+          snapshot: null,
+          evaluationAt: valuationAt,
+          queryChecks: [
+            'source_type_admin_manual',
+            'positive_value',
+            'effective_at_lte_evaluation',
+            ...(closedScope ? ['last_completed_session'] : []),
+          ],
+        }),
+      },
+    };
+
     if (
       providerSelection?.decision.rejectedProviderReason === 'captured_at_stale'
     ) {
       throw new RecordsValuationError(
         'PRICE_STALE',
         `Provider asset price is stale for asset ${asset.id}.`,
+        diagnosticContext,
       );
     }
 
     throw new RecordsValuationError(
       'ASSET_PRICE_UNAVAILABLE',
       `Asset price snapshot is unavailable for asset ${asset.id}.`,
+      diagnosticContext,
     );
   }
 
@@ -2082,6 +2153,15 @@ export class RecordsService {
       };
     }
 
+    const providerFailureEvidence = buildSelectionFailureEvidence({
+      workflow: 'positions_live_valuation',
+      evaluationAt: valuationAt,
+      eligibility: providerEligibility,
+      candidates: providerCandidates,
+      selection: providerSelection,
+      isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+    });
+
     const fallbackSnapshot = await this.prisma.fxRateSnapshot.findFirst({
       where: {
         baseCurrency: CurrencyCode.USD,
@@ -2113,9 +2193,33 @@ export class RecordsService {
       },
     });
 
+    const diagnosticContext = (reason?: string): DiagnosticContextUpdate => ({
+      failureStage: 'fx_rate_selection',
+      evidence: {
+        ...providerFailureEvidence,
+        manualFallback: describeManualFallback({
+          snapshot: fallbackSnapshot,
+          evaluationAt: valuationAt,
+          reason,
+          queryChecks: [
+            'source_type_admin_manual',
+            'approved',
+            'positive_value',
+            'effective_at_lte_evaluation',
+          ],
+          freshnessThresholdSeconds:
+            fxExecuteSnapshotFreshnessThresholdMs / 1000,
+          positiveValue: fallbackSnapshot
+            ? isPositiveDecimal(fallbackSnapshot.rate)
+            : undefined,
+        }),
+      },
+    });
+
     if (!fallbackSnapshot) {
       return {
         state: 'unavailable',
+        diagnosticContext: diagnosticContext(),
         code:
           providerSelection?.decision.rejectedProviderReason ===
           'captured_at_stale'
@@ -2137,6 +2241,7 @@ export class RecordsService {
     ) {
       return {
         state: 'unavailable',
+        diagnosticContext: diagnosticContext('effective_at_stale'),
         code: 'FX_RATE_STALE',
         message: 'USD/KRW FX rate snapshot is stale.',
       };

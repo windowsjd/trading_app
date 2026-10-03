@@ -1459,6 +1459,53 @@ describe('AssetsService', () => {
     expectNoAssetWrites(prisma);
   });
 
+  it('preserves the observed provider session decision across the manual fallback await', async () => {
+    const { prisma, service } = createService();
+    const row = asset({
+      id: 'krx-observation',
+      market: 'KRX',
+      assetType: AssetType.domestic_stock,
+      currencyCode: CurrencyCode.KRW,
+    });
+    prisma.assetPriceSnapshot.findMany.mockResolvedValue([
+      providerPriceSnapshot(
+        'stale-krx',
+        'kis_krx_realtime_trade',
+        '12345.87654321',
+        CurrencyCode.KRW,
+        new Date(Date.now() - 3600000),
+      ),
+    ]);
+    prisma.assetPriceSnapshot.findFirst.mockImplementation(async () => {
+      // An operator/cache state transition after selection must not rewrite
+      // the already-observed failure into market_calendar_unavailable.
+      markMarketSessionOverrideStoreRequired();
+      return null;
+    });
+    try {
+      const result = await service['findLatestEligibleAssetPriceSnapshot'](
+        row,
+        new Date(),
+      );
+      expect(result.failureContext).toMatchObject({
+        evidence: {
+          marketSession: { state: 'open' },
+          providerDecision: { rejectedProviderReason: 'captured_at_stale' },
+          providerCandidates: [
+            { reason: 'captured_at_stale', ageSeconds: 3600 },
+          ],
+        },
+      });
+      expect(prisma.assetPriceSnapshot.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.assetPriceSnapshot.findFirst).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify(result.failureContext)).not.toContain(
+        '12345.87654321',
+      );
+    } finally {
+      resetMarketSessionOverrideStoreForTest();
+    }
+  });
+
   it('forwards already computed selection evidence independently for two concurrent failed rows', async () => {
     const { prisma, service } = createService();
     const rows = ['a', 'b'].map((id) =>
@@ -1511,13 +1558,18 @@ describe('AssetsService', () => {
         entities: { assetId: id, snapshotId: `snapshot-${id}` },
         evidence: {
           workflow: 'assets_with_price',
-          selectionResult: 'REJECTED',
-          fallbackSnapshotFound: false,
+          finalSelectionResult: 'NO_ELIGIBLE_SNAPSHOT',
+          manualFallback: { eligibleQueryCandidateFound: false },
           providerDecision: { rejectedProviderReason: 'captured_at_stale' },
-          latestRejectedCandidate: {
-            id: `snapshot-${id}`,
-            positivePrice: true,
-          },
+          providerCandidates: [
+            { candidateFound: false },
+            {
+              snapshotId: `snapshot-${id}`,
+              positiveValue: true,
+              reason: 'captured_at_stale',
+              ageSeconds: id === 'a' ? 3600 : 7200,
+            },
+          ],
         },
       });
       expect(row.diagnostic?.evidence?.freshnessThresholdSeconds).toEqual(
@@ -2508,7 +2560,11 @@ describe('AssetsService', () => {
       expect(result.data.assets).toEqual(first.assets);
       expect(result.data.priceErrors[0].diagnostic).toMatchObject({
         requestId: 'corrected-request',
-        evidence: { selectionResult: 'SNAPSHOT_PARTIAL_FAILURE' },
+        evidence: {
+          selectionResult: 'SNAPSHOT_PARTIAL_FAILURE',
+          originalSelectionEvidence: 'not_retained_in_shared_cache',
+          reproductionResult: 'original_failure_not_reproduced',
+        },
       });
     });
 
@@ -2576,10 +2632,22 @@ describe('AssetsService', () => {
         expect(page.priceErrors[0].diagnostic).toMatchObject({
           requestId: 'fx-admin-one',
           operation: 'ASSET_PRICE_KRW_CONVERSION',
-          evidence: { selectionResult: 'REJECTED' },
+          evidence: {
+            selectionResult: 'REJECTED',
+            workflow: 'assets_with_price',
+            providerCandidates: [
+              { candidateFound: false },
+              { candidateFound: false },
+            ],
+            manualFallback: { eligibleQueryCandidateFound: false },
+            cachedFailureObservation: { sortSnapshot: page.sortSnapshot },
+          },
         });
         expect(JSON.stringify([...store.values()])).not.toMatch(
           /diagnostic|fx-admin-one|rawPayloadJson/,
+        );
+        expect(JSON.stringify(page.priceErrors[0].diagnostic)).not.toMatch(
+          /"price":|"currentPrice":|rawPayloadJson/,
         );
         const ordinary = (
           await read(other, 'user', 'role-demoted', page.sortSnapshot, '1')

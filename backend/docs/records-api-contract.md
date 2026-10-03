@@ -516,3 +516,12 @@ is not an additional canceled order. Requested quantity, actual quantity,
 automatically canceled quantity (or requested/unused principal for amount BUY)
 remain available in history. Gross/fee/net and average price are actual results.
 Historical full fills and submitted/canceled limits omit the additive object.
+
+### Admin selection diagnostics
+
+`profitAnalysis.valuationErrors[].diagnostic` is an optional admin-only detail for live Asset/FX source
+selection failures. It uses the existing current DB role gate and bounded redaction.
+Rows explicitly pass local selection evidence; user/operator responses and existing
+valuation/fallback policies are unchanged. No raw price/rate is added to evidence.
+See [selection evidence](provider-ingestion-foundation.md#admin-selection-failure-evidence)
+for observed-candidate and upstream Ops boundaries.

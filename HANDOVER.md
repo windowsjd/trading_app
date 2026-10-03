@@ -12,6 +12,17 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 관리자 진단 개선 2단계 — Asset/FX source selection (2026-10-03)
+
+기준은 로컬 `main`/`origin/main`/GitHub `main` 모두 `18aaf9929e500e23bfb43c586e8fc826b14fded6`(`관리자용 계정강화1`)였다.
+기능 구현 의도: 가격·환율 선택 실패 시 어떤 source가 어떤 freshness/source/세션 조건에서 탈락했는지 관리자 화면에서 식별하도록, 기존 selector와 이미 읽은 후보 metadata를 안전한 evidence로 보존했다. 금융 선택 정책과 Provider 호출/DB 조회 수는 변경하지 않았다.
+
+- source별 존재/age/탈락 사유와 실제 workflow threshold, manual 조회 필터·결과를 기존 evidence에 추가했다. raw price/rate/payload를 복사하지 않으며 upstream scheduler/ingestion 원인은 기존 Ops 조사 범위로 남긴다.
+- provider 판단은 manual 조회 await 전에 지역 값으로 보존해 캘린더 상태 전환이 이미 관찰한 사유를 바꾸지 않게 했다. FX refresh 후에는 실제 최종 평가 시각을 기록하고 execute DB-only/Provider-only 정책을 유지했다.
+- Assets/Portfolio/Home/Positions/Records partial은 local context를 명시적으로 전달한다. Positions/Records의 누락된 partial 전달과 기존 관리자 패널 연결만 보완했고 공통 UI/schema/권한 경계는 유지했다.
+- Orders Create의 quote 소비·execute 호출 흐름, source priority/freshness/manual eligibility/closed-market/금융 계산/lock/mutation은 그대로다. selector/query helper와 migration/env/Provider ingestion 코드는 변경하지 않았다.
+- 검증: backend unit 214 suites / 3,356 tests, mock API E2E 362 tests, frontend 1,430 tests 통과. Backend typecheck/build·계정 lint, frontend typecheck·계정 lint·web export, 신규 공통 helper 및 변경 핵심 5파일 lint, diff whitespace 검사 통과. 확장 lint의 기존 오류 47건(FX 1, Home 2, Portfolio valuation 42, Positions 2)은 HEAD와 대조했다. PostgreSQL 서버/Docker 실행 환경이 없어 실제 DB integration은 실행하지 않았으며 운영 DB에는 연결하지 않았다.
+
 ### 작업 단위: 관리자 진단 개선 1단계 — 안전성·원인 보존·partial 전달 (2026-10-03)
 
 기준은 로컬/GitHub `main` 모두 `5a4523ccd3523bc7b1e1028eae4d869701b8332c`(`UI개편7-3`)였다.

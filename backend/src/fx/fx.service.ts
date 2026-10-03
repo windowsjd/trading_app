@@ -1,4 +1,8 @@
 import {
+  buildSelectionFailureEvidence,
+  describeManualFallback,
+} from '../providers/source-selection-diagnostics';
+import {
   HttpException,
   HttpStatus,
   Injectable,
@@ -397,6 +401,7 @@ export class FxService {
       });
       if (refreshEligibility.eligible) {
         const selection = await this.selectFreshProviderUsdKrwSnapshot({
+          workflow: 'fx_quote',
           now,
           freshnessThresholdSeconds:
             refreshEligibility.freshnessThresholdSeconds,
@@ -411,17 +416,17 @@ export class FxService {
       now = new Date();
     }
 
-    const snapshot =
-      refreshedProviderSnapshot ??
-      (await this.findCurrentUsdKrwRateSnapshot(now));
+    const currentSelection = refreshedProviderSnapshot
+      ? { snapshot: refreshedProviderSnapshot }
+      : await this.findCurrentUsdKrwRateSnapshot(now);
+    const snapshot = currentSelection.snapshot;
     if (!snapshot) {
       setAdminDiagnosticContext({
         failureStage: 'display_rate_selection',
         evidence: {
+          ...currentSelection.failureEvidence,
           pair: 'USD/KRW',
           requestTime: now,
-          freshnessThresholdSeconds:
-            getProviderFreshnessThresholdsSeconds().fxUsdKrwDisplay,
           providerPriority: FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
           refreshRequested: request.refresh,
           refreshProducedSnapshot: Boolean(refreshedProviderSnapshot),
@@ -1098,6 +1103,7 @@ export class FxService {
     });
     if (executeEligibility.eligible) {
       await this.selectFreshProviderUsdKrwSnapshot({
+        workflow: 'fx_execute',
         now: executeRefreshAt,
         freshnessThresholdSeconds: executeEligibility.freshnessThresholdSeconds,
         expectedSourceNames: executeEligibility.sourceNames,
@@ -1381,6 +1387,7 @@ export class FxService {
     });
     const providerSelection = providerEligibility.eligible
       ? await this.selectFreshProviderUsdKrwSnapshot({
+          workflow: 'fx_quote',
           now: quoteAt,
           freshnessThresholdSeconds:
             providerEligibility.freshnessThresholdSeconds,
@@ -1436,22 +1443,34 @@ export class FxService {
       },
     });
 
+    const failureEvidence = (reason?: string) => ({
+      ...('failureEvidence' in providerSelection
+        ? providerSelection.failureEvidence
+        : {
+            workflow: 'fx_quote',
+            evaluationAt: quoteAt,
+            eligibilityReason: providerSelection.decision.fallbackReason,
+          }),
+      manualFallback: describeManualFallback({
+        snapshot: fallbackSnapshot,
+        evaluationAt: quoteAt,
+        reason,
+        queryChecks: [
+          'source_type_admin_manual',
+          'approved',
+          'effective_at_lte_evaluation',
+        ],
+        freshnessThresholdSeconds: FX_RATE_STALE_THRESHOLD_MS / 1000,
+        positiveValue: fallbackSnapshot
+          ? isPositiveDecimal(fallbackSnapshot.rate)
+          : undefined,
+      }),
+    });
+
     if (!fallbackSnapshot) {
       setAdminDiagnosticContext({
         failureStage: 'quote_rate_selection',
-        evidence: {
-          pair: 'USD/KRW',
-          quoteTime: quoteAt,
-          freshnessThresholdSeconds: providerEligibility.eligible
-            ? providerEligibility.freshnessThresholdSeconds
-            : null,
-          providerPriority: providerEligibility.eligible
-            ? providerEligibility.sourceNames
-            : [],
-          providerDecision: providerSelection.decision,
-          fallbackSnapshotFound: false,
-          selectionResult: 'REJECTED',
-        },
+        evidence: failureEvidence(),
         nextInvestigation: [
           'backend/src/fx/fx.service.ts',
           'backend/src/providers/source-eligibility.policy.ts',
@@ -1462,6 +1481,16 @@ export class FxService {
         'FX_RATE_UNAVAILABLE',
         'FX rate is unavailable',
       );
+    }
+
+    if (
+      fallbackSnapshot.sourceType !== FxRateSourceType.provider_api &&
+      quoteAt.getTime() - fallbackSnapshot.effectiveAt.getTime() >
+        FX_RATE_STALE_THRESHOLD_MS
+    ) {
+      setAdminDiagnosticContext({
+        evidence: failureEvidence('effective_at_stale'),
+      });
     }
 
     return {
@@ -1643,9 +1672,26 @@ export class FxService {
       quoteCurrency: CurrencyCode.KRW,
     });
     if (!providerEligibility.eligible) {
+      setAdminDiagnosticContext({
+        failureStage: 'execution_rate_selection',
+        evidence: buildSelectionFailureEvidence({
+          workflow: 'fx_execute',
+          evaluationAt: executeNow,
+          eligibility: providerEligibility,
+          candidates: [],
+          selection: null,
+          isPositiveValue: () => false,
+          manualFallback: {
+            lookupPerformed: false,
+            result: 'not_allowed',
+            reason: 'provider_only_workflow',
+          },
+        }),
+      });
       this.throwFxExecuteError(fxExecuteErrorCodes.PROVIDER_RATE_UNAVAILABLE);
     }
     const selection = await this.selectFreshProviderUsdKrwSnapshot({
+      workflow: 'fx_execute',
       now: executeNow,
       freshnessThresholdSeconds: providerEligibility.freshnessThresholdSeconds,
       expectedSourceNames: providerEligibility.sourceNames,
@@ -1664,13 +1710,13 @@ export class FxService {
     setAdminDiagnosticContext({
       failureStage: 'execution_rate_selection',
       evidence: {
-        pair: 'USD/KRW',
-        executionTime: executeNow,
-        providerPriority: providerEligibility.sourceNames,
-        freshnessThresholdSeconds:
-          providerEligibility.freshnessThresholdSeconds,
-        selectionDecision: selection.decision,
-        selectionResult: 'REJECTED',
+        ...selection.failureEvidence,
+        manualFallback: {
+          lookupPerformed: false,
+          result: 'not_allowed',
+          reason: 'provider_only_workflow',
+        },
+        selectionMode: allowRefresh ? 'refresh_allowed' : 'transaction_db_only',
       },
       nextInvestigation: [
         'backend/src/fx/fx.service.ts',
@@ -1692,6 +1738,7 @@ export class FxService {
   }
 
   private async selectFreshProviderUsdKrwSnapshot(input: {
+    workflow: 'fx_quote' | 'fx_execute';
     now: Date;
     freshnessThresholdSeconds: number;
     expectedSourceNames: readonly string[];
@@ -1737,7 +1784,23 @@ export class FxService {
       }
     }
 
-    return selection;
+    if (selection.state === 'selected') return selection;
+    return {
+      ...selection,
+      failureEvidence: buildSelectionFailureEvidence({
+        workflow: input.workflow,
+        evaluationAt: selectionNow,
+        eligibility: {
+          eligible: true,
+          sourceNames: input.expectedSourceNames,
+          freshnessThresholdSeconds: input.freshnessThresholdSeconds,
+        },
+        candidates,
+        selection,
+        isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+        manualFallback: { lookupPerformed: false, result: 'not_evaluated' },
+      }),
+    };
   }
 
   private findProviderUsdKrwSnapshotCandidates(
@@ -1817,25 +1880,27 @@ export class FxService {
     }
   }
 
-  private async findCurrentUsdKrwRateSnapshot(
-    now: Date,
-  ): Promise<FxProviderRateSnapshot | null> {
+  private async findCurrentUsdKrwRateSnapshot(now: Date): Promise<{
+    snapshot: FxProviderRateSnapshot | null;
+    failureEvidence?: Record<string, unknown>;
+  }> {
     const providerCandidates =
       await this.findProviderUsdKrwSnapshotCandidates(20);
+    const freshnessThresholdSeconds =
+      getProviderFreshnessThresholdsSeconds().fxUsdKrwDisplay;
     const providerSelection = selectFreshProviderSnapshotBySourcePriority({
       candidates: providerCandidates,
       expectedSourceNames: FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
       now,
-      freshnessThresholdSeconds:
-        getProviderFreshnessThresholdsSeconds().fxUsdKrwDisplay,
+      freshnessThresholdSeconds,
       isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
     });
 
     if (providerSelection.state === 'selected') {
-      return providerSelection.snapshot;
+      return { snapshot: providerSelection.snapshot };
     }
 
-    return this.prisma.fxRateSnapshot.findFirst({
+    const snapshot = await this.prisma.fxRateSnapshot.findFirst({
       where: {
         baseCurrency: CurrencyCode.USD,
         quoteCurrency: CurrencyCode.KRW,
@@ -1867,6 +1932,36 @@ export class FxService {
         capturedAt: true,
       },
     });
+    return {
+      snapshot,
+      ...(!snapshot
+        ? {
+            failureEvidence: buildSelectionFailureEvidence({
+              workflow: 'fx_current',
+              evaluationAt: now,
+              eligibility: {
+                eligible: true,
+                sourceNames: FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
+                freshnessThresholdSeconds,
+              },
+              candidates: providerCandidates,
+              selection: providerSelection,
+              isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+              manualFallback: describeManualFallback({
+                snapshot: null,
+                evaluationAt: now,
+                queryChecks: [
+                  'source_type_admin_manual',
+                  'approved',
+                  'positive_value',
+                  'effective_at_lte_evaluation',
+                  'captured_at_lte_evaluation',
+                ],
+              }),
+            }),
+          }
+        : {}),
+    };
   }
 
   private resolveProviderPriority(sourceName: string | null): number | null {

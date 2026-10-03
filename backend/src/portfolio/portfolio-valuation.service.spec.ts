@@ -364,6 +364,70 @@ describe('PortfolioValuationService source eligibility', () => {
     );
   });
 
+  it('carries the provider matrix through a manual FX stale rejection in valuation', async () => {
+    const prisma = createPrismaMock();
+    prisma.seasonParticipant.findUnique.mockResolvedValue(
+      canonicalParticipant({
+        id: 'sp-1',
+        initialCapitalKrw: new Prisma.Decimal('1000000'),
+        cashWallets: [
+          {
+            currencyCode: CurrencyCode.KRW,
+            balanceAmount: new Prisma.Decimal(1),
+          },
+          {
+            currencyCode: CurrencyCode.USD,
+            balanceAmount: new Prisma.Decimal(1),
+          },
+        ],
+        positions: [],
+      }),
+    );
+    prisma.fxRateSnapshot.findMany.mockResolvedValue([]);
+    prisma.fxRateSnapshot.findFirst.mockResolvedValue({
+      id: 'manual-stale',
+      baseCurrency: CurrencyCode.USD,
+      quoteCurrency: CurrencyCode.KRW,
+      sourceType: FxRateSourceType.admin_manual,
+      sourceName: 'manual',
+      approvedByUserId: 'admin-1',
+      rate: new Prisma.Decimal('1379.12345678'),
+      effectiveAt: new Date(valuationAt.getTime() - 61000),
+      capturedAt: valuationAt,
+      createdAt: valuationAt,
+    });
+    const service = new PortfolioValuationService(prisma as never);
+    const error = await service
+      .calculateSeasonParticipantValuation(
+        'sp-1',
+        valuationAt,
+        'live_portfolio_valuation',
+      )
+      .catch((error: unknown) => error);
+    expect(error).toMatchObject({
+      code: 'FX_RATE_STALE',
+      diagnosticContext: {
+        evidence: {
+          workflow: 'live_portfolio_valuation',
+          freshnessThresholdSeconds: 7200,
+          providerCandidates: [
+            { candidateFound: false },
+            { candidateFound: false },
+          ],
+          manualFallback: {
+            snapshotId: 'manual-stale',
+            reason: 'effective_at_stale',
+            ageSeconds: 61,
+            freshnessThresholdSeconds: 60,
+          },
+        },
+      },
+    });
+    expect(JSON.stringify(error)).not.toContain('1379.12345678');
+    expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalledTimes(3);
+    expect(prisma.fxRateSnapshot.findFirst).toHaveBeenCalledTimes(1);
+  });
+
   it('falls back to admin_manual when daily snapshot provider USD/KRW is stale', async () => {
     const prisma = createPrismaMock();
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
@@ -562,10 +626,12 @@ describe('PortfolioValuationService source eligibility', () => {
           snapshotId: 'snapshot-a',
         },
         evidence: {
-          latestRejectedCandidate: {
-            id: 'snapshot-a',
-            sourceName: 'kis_krx_realtime_trade',
-          },
+          providerCandidates: [
+            {
+              snapshotId: 'snapshot-a',
+              sourceName: 'kis_krx_realtime_trade',
+            },
+          ],
           selectionResult: 'REJECTED',
         },
       },

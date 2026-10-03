@@ -2,6 +2,7 @@ import type { MarketExecutionDto } from '../order/api';
 import { formatExecutionMoney, getMarketExecutionDisplay } from '../order/marketExecution';
 import { apiClient } from '../../services/api/client';
 import type {
+  AdminDiagnosticDto,
   ApiSuccessResponse,
   IsoDateTimeString,
   MoneyString,
@@ -112,6 +113,7 @@ export interface RecordSeasonDetailDto {
       assetId: string;
       code: string;
       message: string;
+      diagnostic?: AdminDiagnosticDto;
     }>;
   };
   reason?: string;

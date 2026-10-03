@@ -1,3 +1,7 @@
+import {
+  adminDiagnosticRequestMiddleware,
+  setAdminDiagnosticContext,
+} from '../common/admin-diagnostics';
 jest.mock('../generated/prisma/client', () => {
   const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
 
@@ -1112,4 +1116,54 @@ describe('PositionsService', () => {
     ]);
     expectNoPositionWrites(prisma);
   });
+  it.each(['admin', 'user', 'operator', undefined])(
+    'keeps selection evidence local for parallel positions failures with role=%s',
+    async (role) => {
+      const { prisma, service } = createService();
+      mockCurrentSeason(prisma);
+      mockJoined(prisma);
+      prisma.position.findMany.mockResolvedValue(
+        ['a', 'b'].map((id) =>
+          position({ id, assetId: id, quantity: '1', averageCost: '2' }),
+        ),
+      );
+      prisma.assetPriceSnapshot.findMany.mockResolvedValue([]);
+      prisma.assetPriceSnapshot.findFirst.mockResolvedValue(null);
+      let pending!: ReturnType<PositionsService['getPositions']>;
+      adminDiagnosticRequestMiddleware(
+        {
+          method: 'GET',
+          originalUrl: '/api/v1/positions',
+          headers: {},
+          user: role ? { userId: 'user-1', role } : undefined,
+        } as never,
+        { setHeader: jest.fn() } as never,
+        () => {
+          setAdminDiagnosticContext({
+            evidence: { shared: 'shared-other-row' },
+          });
+          pending = service.getPositions('user-1');
+        },
+      );
+      const errors = (await pending).data.valuationErrors;
+      expect(errors).toHaveLength(2);
+      for (const [i, error] of errors.entries()) {
+        if (role === 'admin') {
+          expect(error.diagnostic).toMatchObject({
+            failureStage: 'asset_price_selection',
+            evidence: {
+              workflow: 'positions_live_valuation',
+              providerCandidates: [{ candidateFound: false }],
+              manualFallback: { eligibleQueryCandidateFound: false },
+            },
+          });
+          expect(JSON.stringify(error.diagnostic)).not.toContain(
+            'shared-other-row',
+          );
+          expect(error.diagnostic?.entities?.assetId).toBe(i === 0 ? 'a' : 'b');
+        } else expect(error).not.toHaveProperty('diagnostic');
+      }
+      expect(prisma.assetPriceSnapshot.findFirst).toHaveBeenCalledTimes(2);
+    },
+  );
 });

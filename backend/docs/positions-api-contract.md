@@ -212,3 +212,12 @@ Pagination is applied after sorting.
 - Settlement/reward integration.
 - Position mutation.
 - Fake/static/sample business price fallback.
+
+### Admin selection diagnostics
+
+`valuationErrors[].diagnostic` is an optional admin-only detail for live Asset/FX source
+selection failures. It uses the existing current DB role gate and bounded redaction.
+Rows explicitly pass local selection evidence; user/operator responses and existing
+valuation/fallback policies are unchanged. No raw price/rate is added to evidence.
+See [selection evidence](provider-ingestion-foundation.md#admin-selection-failure-evidence)
+for observed-candidate and upstream Ops boundaries.

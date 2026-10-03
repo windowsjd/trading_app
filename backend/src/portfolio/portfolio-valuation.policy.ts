@@ -382,6 +382,26 @@ function selectUsableUsdKrwRate(
   enforceAdminManualFxFreshness = true,
   selectionDiagnosticContext?: PortfolioValuationDiagnosticContext,
 ): Prisma.Decimal {
+  const failureContext = (
+    reason: string,
+  ): PortfolioValuationDiagnosticContext => ({
+    ...selectionDiagnosticContext,
+    evidence: {
+      ...selectionDiagnosticContext?.evidence,
+      rejectedReason: reason,
+      ...(snapshot?.sourceType === FxRateSourceType.admin_manual
+        ? {
+            manualFallback: {
+              ...(selectionDiagnosticContext?.evidence?.manualFallback as
+                | Record<string, unknown>
+                | undefined),
+              result: 'rejected',
+              reason,
+            },
+          }
+        : {}),
+    },
+  });
   if (!snapshot) {
     throw new PortfolioValuationError(
       'FX_RATE_UNAVAILABLE',
@@ -411,6 +431,7 @@ function selectUsableUsdKrwRate(
     throw new PortfolioValuationError(
       'FX_RATE_UNAVAILABLE',
       'No eligible USD/KRW FX rate snapshot is available.',
+      failureContext('source_or_pair_ineligible'),
     );
   }
 
@@ -419,6 +440,7 @@ function selectUsableUsdKrwRate(
       throw new PortfolioValuationError(
         'FX_RATE_UNAVAILABLE',
         'No approved admin_manual USD/KRW FX rate snapshot is available.',
+        failureContext('manual_approval_ineligible'),
       );
     }
 
@@ -433,6 +455,7 @@ function selectUsableUsdKrwRate(
           failureStage: 'fx_rate_freshness_validation',
           entities: { snapshotId: snapshot.id },
           evidence: {
+            ...failureContext('effective_at_stale').evidence,
             pair: 'USD/KRW',
             sourceType: snapshot.sourceType,
             sourceName: snapshot.sourceName,
@@ -461,6 +484,7 @@ function selectUsableUsdKrwRate(
     throw new PortfolioValuationError(
       'FX_RATE_UNAVAILABLE',
       'No eligible USD/KRW FX rate snapshot is available.',
+      failureContext('source_or_pair_ineligible'),
     );
   }
 
@@ -468,6 +492,7 @@ function selectUsableUsdKrwRate(
     throw new PortfolioValuationError(
       'FX_RATE_UNAVAILABLE',
       'USD/KRW FX rate snapshot is not yet effective.',
+      failureContext('effective_at_in_future'),
     );
   }
 
@@ -476,6 +501,7 @@ function selectUsableUsdKrwRate(
     throw new PortfolioValuationError(
       'FX_RATE_UNAVAILABLE',
       'USD/KRW FX rate must be greater than 0.',
+      failureContext('non_positive_value'),
     );
   }
 

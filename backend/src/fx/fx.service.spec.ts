@@ -2475,10 +2475,44 @@ describe('FxService', () => {
         ],
       });
 
-      await expectExecuteErrorCode(
-        service.execute('user-1', validExecuteBody),
-        'PROVIDER_RATE_STALE',
+      let pending!: Promise<ReturnType<typeof buildAdminDiagnostic>>;
+      adminDiagnosticRequestMiddleware(
+        {
+          method: 'POST',
+          originalUrl: '/api/v1/fx/execute',
+          headers: {},
+          user: { userId: 'user-1', role: 'admin' },
+        } as never,
+        { setHeader: jest.fn() } as never,
+        () => {
+          pending = service.execute('user-1', validExecuteBody).then(
+            () => {
+              throw new Error('Expected failure');
+            },
+            (error: HttpException) => {
+              expect(error.getResponse()).toMatchObject({
+                error: { code: 'PROVIDER_RATE_STALE' },
+              });
+              return buildAdminDiagnostic(
+                error,
+                'PROVIDER_RATE_STALE',
+                error.getStatus(),
+              );
+            },
+          );
+        },
       );
+      expect(await pending).toMatchObject({
+        failureStage: 'execution_rate_selection',
+        evidence: {
+          workflow: 'fx_execute',
+          freshnessThresholdSeconds: 60,
+          selectionMode: 'transaction_db_only',
+          providerCandidates: expect.arrayContaining([
+            expect.objectContaining({ reason: 'captured_at_stale' }),
+          ]),
+        },
+      });
       expectExecutePlanReads(prisma);
       expectNoExecuteWrites(prisma);
     });
@@ -3304,6 +3338,157 @@ describe('FxService', () => {
         },
       });
       expectNoExecuteWrites(prisma);
+    });
+  });
+  describe('selection failure details', () => {
+    function capture(action: () => Promise<unknown>) {
+      let pending!: Promise<ReturnType<typeof buildAdminDiagnostic>>;
+      adminDiagnosticRequestMiddleware(
+        {
+          method: 'POST',
+          originalUrl: '/api/v1/fx/quote',
+          headers: {},
+          user: { userId: 'user-1', role: 'admin' },
+        } as never,
+        { setHeader: jest.fn() } as never,
+        () => {
+          pending = action().then(
+            () => {
+              throw new Error('Expected failure');
+            },
+            (error: HttpException) =>
+              buildAdminDiagnostic(
+                error,
+                (error.getResponse() as { error: { code: string } }).error.code,
+                error.getStatus(),
+              ),
+          );
+        },
+      );
+      return pending;
+    }
+    it('keeps current display and quote thresholds distinct and reports manual filtered misses', async () => {
+      const { prisma, service } = createService();
+      prisma.fxRateSnapshot.findFirst.mockResolvedValue(null);
+      expect(await capture(() => service.currentRate())).toMatchObject({
+        evidence: {
+          workflow: 'fx_current',
+          freshnessThresholdSeconds: 7200,
+          providerCandidates: [
+            { candidateFound: false },
+            { candidateFound: false },
+          ],
+          manualFallback: {
+            queryChecks: expect.arrayContaining([
+              'positive_value',
+              'captured_at_lte_evaluation',
+            ]),
+            freshnessThresholdSeconds: null,
+          },
+        },
+      });
+      prisma.fxRateSnapshot.findMany.mockClear();
+      expect(
+        await capture(() => service['findFxQuoteRateSnapshot'](new Date())),
+      ).toMatchObject({
+        evidence: {
+          workflow: 'fx_quote',
+          freshnessThresholdSeconds: 300,
+          manualFallback: {
+            freshnessThresholdSeconds: 60,
+            eligibleQueryCandidateFound: false,
+          },
+        },
+      });
+      expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalledTimes(3); // first page + existing 2-source supplements
+    });
+    it('uses post-refresh observation time and never refreshes in transaction DB-only selection', async () => {
+      const refresh = {
+        ensureFreshUsdKrwSnapshot: jest.fn().mockImplementation(async () => {
+          jest.setSystemTime(new Date(now.getTime() + 5000));
+        }),
+      };
+      const { prisma, service } = createService(refresh);
+      const rows = [
+        {
+          id: 'exim-old',
+          sourceType: 'provider_api',
+          sourceName: 'korea_exim_exchange_rate',
+          rate: new Prisma.Decimal('1379.12345678'),
+          effectiveAt: new Date(now.getTime() - 301000),
+          capturedAt: new Date(now.getTime() - 301000),
+        },
+      ];
+      prisma.fxRateSnapshot.findMany.mockImplementation(async ({ where }) =>
+        typeof where.sourceName === 'string' ? [] : rows,
+      );
+      prisma.fxRateSnapshot.findFirst.mockResolvedValue(null);
+      expect(
+        await capture(() => service['findFxQuoteRateSnapshot'](now)),
+      ).toMatchObject({
+        evidence: {
+          evaluationAt: new Date(now.getTime() + 5000).toISOString(),
+          providerCandidates: [{ ageSeconds: 306 }, { candidateFound: false }],
+        },
+      });
+      expect(refresh.ensureFreshUsdKrwSnapshot).toHaveBeenCalledTimes(1);
+      expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalledTimes(4);
+      refresh.ensureFreshUsdKrwSnapshot.mockClear();
+      prisma.fxRateSnapshot.findMany.mockClear();
+      prisma.fxRateSnapshot.findFirst.mockClear();
+      const diagnostic = await capture(() =>
+        service['findProviderFxExecuteSnapshot'](
+          new Date(),
+          prisma as never,
+          false,
+        ),
+      );
+      expect(diagnostic).toMatchObject({
+        failureStage: 'execution_rate_selection',
+        evidence: {
+          workflow: 'fx_execute',
+          freshnessThresholdSeconds: 60,
+          selectionMode: 'transaction_db_only',
+          manualFallback: { result: 'not_allowed', lookupPerformed: false },
+        },
+      });
+      expect(refresh.ensureFreshUsdKrwSnapshot).not.toHaveBeenCalled();
+      expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalledTimes(2);
+      expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+      expect(JSON.stringify(diagnostic)).not.toContain('1379.12345678');
+    });
+    it('keeps provider matrix when quote rejects a stale manual fallback', async () => {
+      const { prisma, service } = createService();
+      mockActiveSeason(prisma);
+      mockJoinedParticipant(prisma);
+      mockQuoteSourceWallet(prisma, CurrencyCode.KRW, '10000');
+      mockApprovedRateSnapshot(prisma, new Date(now.getTime() - 61000));
+      const diagnostic = await capture(() =>
+        service.quote('user-1', {
+          fromCurrency: 'KRW',
+          toCurrency: 'USD',
+          sourceAmount: '1000',
+        }),
+      );
+      expect(diagnostic).toMatchObject({
+        code: 'FX_RATE_STALE',
+        failureStage: 'quote_rate_freshness_validation',
+        evidence: {
+          workflow: 'fx_quote',
+          freshnessThresholdSeconds: 300,
+          providerCandidates: [
+            { candidateFound: false },
+            { candidateFound: false },
+          ],
+          manualFallback: {
+            snapshotId: 'fx-admin-1',
+            reason: 'effective_at_stale',
+            ageSeconds: 61,
+            freshnessThresholdSeconds: 60,
+          },
+        },
+      });
+      expect(prisma.quote.create).not.toHaveBeenCalled();
     });
   });
 });

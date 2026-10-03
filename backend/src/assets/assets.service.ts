@@ -1,3 +1,8 @@
+import { fxExecuteSnapshotFreshnessThresholdMs } from '../fx/fx-execute-snapshot-policy';
+import {
+  buildSelectionFailureEvidence,
+  describeManualFallback,
+} from '../providers/source-selection-diagnostics';
 import {
   closedMarketPriceScope,
   findMarketAwareAssetPriceCandidates,
@@ -150,6 +155,7 @@ type UsdKrwSelection =
       code: 'FX_RATE_UNAVAILABLE' | 'FX_RATE_STALE';
       message: string;
       sourceDecision?: SourceDecision;
+      failureEvidence?: Record<string, unknown>;
     };
 
 export type AssetPricePayload =
@@ -224,6 +230,8 @@ export type RealtimePriceKrwConversion =
 type AssetListItem = ReturnType<AssetsService['formatAssetMetadata']> & {
   price?: AssetPricePayload;
 } & Partial<AssetListTurnover>;
+
+type CachedFailureObservation = { sortSnapshot: string; observedAt: Date };
 
 type SortedAssetSnapshot = {
   token: string;
@@ -640,6 +648,7 @@ export class AssetsService {
     const current = await this.buildAssetsWithPrices(
       diagnosticAssets,
       new Date(snapshot.valuationAt),
+      { sortSnapshot: snapshot.token, observedAt: new Date() },
     );
     return errors.map((error) => {
       const asset = diagnosticAssets.find(
@@ -667,7 +676,9 @@ export class AssetsService {
             evidence: {
               sortSnapshot: snapshot.token,
               valuationAt: new Date(snapshot.valuationAt),
-              cachedPrice: asset.price,
+              cachedPriceState: asset.price?.state,
+              originalSelectionEvidence: 'not_retained_in_shared_cache',
+              reproductionResult: 'original_failure_not_reproduced',
               selectionResult: 'SNAPSHOT_PARTIAL_FAILURE',
             },
             nextInvestigation: [
@@ -950,6 +961,7 @@ export class AssetsService {
   private async buildAssetsWithPrices(
     assets: readonly AssetRecord[],
     valuationAt = new Date(),
+    cachedFailureObservation?: CachedFailureObservation,
   ): Promise<{
     assets: AssetListItem[];
     priceErrors: AssetPriceError[];
@@ -972,6 +984,7 @@ export class AssetsService {
           asset,
           valuationAt,
           usdKrwSelection,
+          cachedFailureObservation,
         );
 
         return {
@@ -999,6 +1012,7 @@ export class AssetsService {
     asset: AssetRecord,
     valuationAt: Date,
     usdKrwSelection: UsdKrwSelection | null,
+    cachedFailureObservation?: CachedFailureObservation,
   ): Promise<{
     payload: AssetPricePayload;
     error?: AssetPriceError;
@@ -1013,6 +1027,10 @@ export class AssetsService {
         'ASSET_PRICE_UNAVAILABLE',
         {
           ...failureContext,
+          evidence: {
+            ...failureContext?.evidence,
+            ...(cachedFailureObservation ? { cachedFailureObservation } : {}),
+          },
           domain: 'MARKET_DATA',
           operation: 'ASSET_PRICE_READ',
           failureStage: 'asset_price_selection',
@@ -1111,10 +1129,10 @@ export class AssetsService {
         },
         evidence: {
           priceCurrency: snapshot.currencyCode,
-          price: snapshot.price.toFixed(8),
+          ...('failureEvidence' in error ? error.failureEvidence : {}),
+          ...(cachedFailureObservation ? { cachedFailureObservation } : {}),
           priceSnapshotCapturedAt: snapshot.capturedAt,
           valuationAt,
-          fxSelection: error,
           selectionResult: 'REJECTED',
         },
         nextInvestigation: [
@@ -1212,6 +1230,16 @@ export class AssetsService {
       };
     }
 
+    const providerFailureEvidence = buildSelectionFailureEvidence({
+      workflow: 'assets_with_price',
+      evaluationAt: valuationAt,
+      eligibility: providerEligibility,
+      candidates: providerCandidates,
+      selection: providerSelection,
+      asset,
+      isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
+    });
+
     const fallbackSnapshot = await this.prisma.assetPriceSnapshot.findFirst({
       where: {
         assetId: asset.id,
@@ -1252,28 +1280,17 @@ export class AssetsService {
           snapshotId: latestCandidate?.id,
         },
         evidence: {
-          marketSession: closedScope?.marketState ?? null,
-          workflow: 'assets_with_price',
-          market: asset.market,
-          valuationAt,
-          freshnessThresholdSeconds: providerEligibility.eligible
-            ? providerEligibility.freshnessThresholdSeconds
-            : null,
-          expectedSourceNames: providerEligibility.eligible
-            ? providerEligibility.sourceNames
-            : [],
-          providerDecision: providerSelection.decision,
-          latestRejectedCandidate: latestCandidate
-            ? {
-                id: latestCandidate.id,
-                sourceName: latestCandidate.sourceName,
-                effectiveAt: latestCandidate.effectiveAt,
-                capturedAt: latestCandidate.capturedAt,
-                positivePrice: isPositiveDecimal(latestCandidate.price),
-              }
-            : null,
-          fallbackSnapshotFound: false,
-          selectionResult: 'REJECTED',
+          ...providerFailureEvidence,
+          manualFallback: describeManualFallback({
+            snapshot: null,
+            evaluationAt: valuationAt,
+            queryChecks: [
+              'source_type_admin_manual',
+              'positive_value',
+              'effective_at_lte_evaluation',
+              ...(closedScope ? ['last_completed_session'] : []),
+            ],
+          }),
         },
       };
       recordAdminDiagnosticEvent(
@@ -1345,6 +1362,15 @@ export class AssetsService {
       };
     }
 
+    const providerFailureEvidence = buildSelectionFailureEvidence({
+      workflow: 'assets_with_price',
+      evaluationAt: valuationAt,
+      eligibility: providerEligibility,
+      candidates: providerCandidates,
+      selection: providerSelection,
+      isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+    });
+
     const snapshot = await this.prisma.fxRateSnapshot.findFirst({
       where: {
         baseCurrency: CurrencyCode.USD,
@@ -1376,12 +1402,30 @@ export class AssetsService {
       },
     });
 
+    const failureEvidence = (reason?: string) => ({
+      ...providerFailureEvidence,
+      manualFallback: describeManualFallback({
+        snapshot,
+        evaluationAt: valuationAt,
+        reason,
+        queryChecks: [
+          'source_type_admin_manual',
+          'approved',
+          'positive_value',
+          'effective_at_lte_evaluation',
+        ],
+        freshnessThresholdSeconds: fxExecuteSnapshotFreshnessThresholdMs / 1000,
+        positiveValue: snapshot ? isPositiveDecimal(snapshot.rate) : undefined,
+      }),
+    });
+
     if (!snapshot) {
       return {
         state: 'unavailable',
         code: 'FX_RATE_UNAVAILABLE',
         message: 'USD/KRW FX rate snapshot is unavailable.',
         sourceDecision: providerSelection.decision,
+        failureEvidence: failureEvidence(),
       };
     }
 
@@ -1403,6 +1447,9 @@ export class AssetsService {
         message:
           'No approved admin_manual USD/KRW FX rate snapshot is available.',
         sourceDecision,
+        failureEvidence: failureEvidence(
+          'manual_source_or_approval_ineligible',
+        ),
       };
     }
 
@@ -1414,6 +1461,7 @@ export class AssetsService {
         code: 'FX_RATE_STALE',
         message: 'USD/KRW FX rate snapshot is stale.',
         sourceDecision,
+        failureEvidence: failureEvidence('effective_at_stale'),
       };
     }
 

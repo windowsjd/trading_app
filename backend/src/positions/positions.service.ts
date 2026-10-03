@@ -1,4 +1,17 @@
-import { closedMarketPriceScope, findMarketAwareAssetPriceCandidates } from '../providers/asset-price-snapshot-query';
+import {
+  buildSelectionFailureEvidence,
+  describeManualFallback,
+} from '../providers/source-selection-diagnostics';
+import { fxExecuteSnapshotFreshnessThresholdMs } from '../fx/fx-execute-snapshot-policy';
+import {
+  buildAdminPartialFailureDiagnostic,
+  type AdminDiagnostic,
+  type DiagnosticContextUpdate,
+} from '../common/admin-diagnostics';
+import {
+  closedMarketPriceScope,
+  findMarketAwareAssetPriceCandidates,
+} from '../providers/asset-price-snapshot-query';
 import {
   HttpException,
   HttpStatus,
@@ -123,6 +136,7 @@ type UsdKrwSelection =
       state: 'unavailable';
       code: 'FX_RATE_UNAVAILABLE' | 'FX_RATE_STALE';
       message: string;
+      diagnosticContext?: DiagnosticContextUpdate;
       sourceDecision?: SourceDecision;
     };
 
@@ -176,6 +190,7 @@ type PositionValuation =
           | 'FX_RATE_UNAVAILABLE'
           | 'FX_RATE_STALE';
         message: string;
+        diagnostic?: AdminDiagnostic;
       };
       payload: {
         state: 'unavailable';
@@ -226,6 +241,7 @@ type PositionsResponse = {
       assetId: string;
       code: string;
       message: string;
+      diagnostic?: AdminDiagnostic;
     }>;
     reason?: string;
     message?: string;
@@ -240,6 +256,7 @@ class PositionValuationError extends Error {
       | 'FX_RATE_STALE',
     message: string,
     readonly sourceDecision?: SourceDecision,
+    readonly diagnosticContext?: DiagnosticContextUpdate,
   ) {
     super(message);
   }
@@ -491,6 +508,7 @@ export class PositionsService {
           usdKrwSelection.code,
           usdKrwSelection.message,
           usdKrwSelection.sourceDecision,
+          usdKrwSelection.diagnosticContext,
         );
       }
 
@@ -554,12 +572,28 @@ export class PositionsService {
         return cachedValuation;
       }
 
+      const diagnostic = valuationError.diagnosticContext
+        ? buildAdminPartialFailureDiagnostic(
+            valuationError,
+            valuationError.code,
+            {
+              ...valuationError.diagnosticContext,
+              domain: 'PORTFOLIO',
+              operation: 'POSITION_VALUATION',
+              entities: {
+                ...valuationError.diagnosticContext.entities,
+                assetId: position.assetId,
+              },
+            },
+          )
+        : undefined;
       return {
         state: 'unavailable',
         sortValueKrw: null,
         error: {
           code: valuationError.code,
           message: valuationError.message,
+          ...(diagnostic ? { diagnostic } : {}),
         },
         payload: {
           state: 'unavailable',
@@ -674,6 +708,16 @@ export class PositionsService {
       };
     }
 
+    const providerFailureEvidence = buildSelectionFailureEvidence({
+      workflow: 'positions_live_valuation',
+      evaluationAt: valuationAt,
+      eligibility: providerEligibility,
+      candidates: providerCandidates,
+      selection: providerSelection,
+      asset,
+      isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
+    });
+
     const snapshot = await this.prisma.assetPriceSnapshot.findFirst({
       where: {
         assetId: asset.id,
@@ -708,6 +752,24 @@ export class PositionsService {
       throw new PositionValuationError(
         'ASSET_PRICE_UNAVAILABLE',
         `Asset price snapshot is unavailable for asset ${asset.id}.`,
+        undefined,
+        {
+          failureStage: 'asset_price_selection',
+          entities: { assetId: asset.id },
+          evidence: {
+            ...providerFailureEvidence,
+            manualFallback: describeManualFallback({
+              snapshot: null,
+              evaluationAt: valuationAt,
+              queryChecks: [
+                'source_type_admin_manual',
+                'positive_value',
+                'effective_at_lte_evaluation',
+                ...(closedScope ? ['last_completed_session'] : []),
+              ],
+            }),
+          },
+        },
       );
     }
 
@@ -779,6 +841,15 @@ export class PositionsService {
       };
     }
 
+    const providerFailureEvidence = buildSelectionFailureEvidence({
+      workflow: 'positions_live_valuation',
+      evaluationAt: valuationAt,
+      eligibility: providerEligibility,
+      candidates: providerCandidates,
+      selection: providerSelection,
+      isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+    });
+
     const snapshot = await this.prisma.fxRateSnapshot.findFirst({
       where: {
         baseCurrency: CurrencyCode.USD,
@@ -810,9 +881,33 @@ export class PositionsService {
       },
     });
 
+    const diagnosticContext = (reason?: string): DiagnosticContextUpdate => ({
+      failureStage: 'fx_rate_selection',
+      evidence: {
+        ...providerFailureEvidence,
+        manualFallback: describeManualFallback({
+          snapshot,
+          evaluationAt: valuationAt,
+          reason,
+          queryChecks: [
+            'source_type_admin_manual',
+            'approved',
+            'positive_value',
+            'effective_at_lte_evaluation',
+          ],
+          freshnessThresholdSeconds:
+            fxExecuteSnapshotFreshnessThresholdMs / 1000,
+          positiveValue: snapshot
+            ? isPositiveDecimal(snapshot.rate)
+            : undefined,
+        }),
+      },
+    });
+
     if (!snapshot) {
       return {
         state: 'unavailable',
+        diagnosticContext: diagnosticContext(),
         code: 'FX_RATE_UNAVAILABLE',
         message: 'USD/KRW FX rate snapshot is unavailable.',
         sourceDecision: providerSelection.decision,
@@ -833,6 +928,9 @@ export class PositionsService {
     ) {
       return {
         state: 'unavailable',
+        diagnosticContext: diagnosticContext(
+          'manual_source_or_approval_ineligible',
+        ),
         code: 'FX_RATE_UNAVAILABLE',
         message:
           'No approved admin_manual USD/KRW FX rate snapshot is available.',
@@ -845,6 +943,7 @@ export class PositionsService {
     ) {
       return {
         state: 'unavailable',
+        diagnosticContext: diagnosticContext('effective_at_stale'),
         code: 'FX_RATE_STALE',
         message: 'USD/KRW FX rate snapshot is stale.',
         sourceDecision,
@@ -947,6 +1046,9 @@ export class PositionsService {
         assetId: item.assetId,
         code: item.valuation.error.code,
         message: item.valuation.error.message,
+        ...(item.valuation.error.diagnostic
+          ? { diagnostic: item.valuation.error.diagnostic }
+          : {}),
       }));
   }
 

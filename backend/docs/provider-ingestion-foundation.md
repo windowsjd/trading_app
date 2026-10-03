@@ -253,3 +253,50 @@ All scripts and HTTP triggers are explicit operator actions. Scheduler-owned pro
 - KIS REST hoga/orderbook ingestion can create `asset_orderbook_snapshots` rows for mapped domestic/US assets.
 - KIS order, account, balance, fill, deposit, withdrawal, and real trading APIs are not implemented.
 - `CurrencyCode.USDT` is not added.
+
+## Admin selection failure evidence
+
+The existing `AdminDiagnostic.evidence` summarizes source selection failures in
+Assets, Orders, FX, shared Portfolio valuation, Home top positions, Positions and
+Records live profit analysis. Source policy and source priority are unchanged.
+
+- `workflow`, `evaluationAt`, `freshnessThresholdSeconds`, `freshnessBasis` and
+  `expectedSourceNames` describe the actual resolver/selector invocation. Current
+  FX uses display policy; FX refresh retains its existing quote/execute policy.
+  Settlement uses the historical effectiveAt cutoff; closed stock reads use the
+  latest completed session, not a capturedAt age rejection. A null freshness basis
+  means selection stopped before that check (for example workflow/calendar gates).
+- `providerCandidates` is a bounded **per-source** projection of the already-read
+  candidates: observed count, first observed snapshot metadata/positive-value
+  verdict, representative reason, aggregate source reason and distinct rejection
+  reasons. `candidateFound=false` is scoped to those bounded/filtered reads; it
+  does not claim the source has never produced a row. No raw price, rate, credential
+  or payload is copied. Expected sources remain in priority order; unexpected
+  observed source names are included within the bound.
+- Provider evidence is captured synchronously immediately after selection, before
+  awaiting the existing manual read. Reusing the policy on source subsets does not
+  change the selected result or add I/O. The evidence stays local and request-neutral.
+- `manualFallback` records whether the lookup ran, its actual query predicates,
+  whether a qualifying row was returned, and any subsequent rejection with age and
+  the **manual** threshold. A filtered miss cannot distinguish absent/unapproved/
+  future/non-positive rows. Provider-only execute paths explicitly record that
+  manual fallback was not allowed. Current FX manual reads do not have the quote's
+  effectiveAt freshness guard; diagnostics do not invent that guard.
+- Only the existing current-DB-role admin gate builds/exposes the diagnostic.
+  Partial rows explicitly pass their local evidence; caches never receive an
+  AdminDiagnostic or request ID. Successful fallback/selection adds no failure
+  diagnostic. Positions' existing successful stale-cache fallback is unchanged.
+
+This change adds no diagnostic-purpose DB/Provider/Redis/Ops query. Existing FX refresh
+remains outside the execute transaction; the transaction selection is DB-only.
+Request evidence explains snapshot rejection, not why ingestion stopped. For stale
+or missing observations inspect the existing provider ingestion/OpsJobRun/scheduler
+configuration separately. WebSocket runtime, matcher A/B, ingestion and Ops health
+surfaces keep their existing behavior. Order Create retains quote consumption and
+its existing execute path; it does not gain a new `orders_create` selection pass.
+
+The pre-existing Assets sorted-page admin failure reselection is retained (no new
+reads). `cachedFailureObservation` identifies evidence rebuilt for a cached error,
+not a preserved historical candidate set. When the original error can no longer be
+reproduced, evidence explicitly says the original selection facts were not retained
+in the shared cache; cached price/rate values are not dumped into the diagnostic.

@@ -393,6 +393,10 @@ export default function PortfolioScreen({ navigation }: Props) {
               </View>
             ) : null}
 
+            {positionsQuery.data?.pages.flatMap(page => page.valuationErrors ?? []).map((error, index) => (
+              <AdminDiagnosticPanel key={`position-diagnostic-${index}`} diagnostic={error.diagnostic} />
+            ))}
+
             <View style={styles.card}>
               <Text style={styles.label}>자산 비중</Text>
               <DonutChart

@@ -725,3 +725,19 @@ Not possible without a separate reward automation gate:
 - External payment, point, coupon, gifticon, delivery, or cash-out fulfillment.
 
 Never create fake/static/sample business prices to make a test or local flow pass.
+
+### Asset/FX selection failure evidence
+
+Selection diagnostics use only candidates already read by the business path and
+the same source/freshness/market-session policy. Source summaries preserve priority,
+missing observations, rejection reasons, timestamps and ages, without raw price/rate
+values. A filtered manual fallback miss means no eligible candidate was observed;
+it does not prove that an unapproved or future row exists. Closed-session reads
+identify the last-completed-session rule separately from capturedAt freshness.
+
+Whole-request failures use the existing admin context; partial failures explicitly
+pass local evidence through the existing admin-only gate. No diagnostic query or
+provider call is added; existing sorted-page failure reselection remains labeled
+as a later observation. Scheduler/ingestion causes remain an Ops investigation;
+request evidence ends at snapshot selection. Public errors and financial policies
+are unchanged.

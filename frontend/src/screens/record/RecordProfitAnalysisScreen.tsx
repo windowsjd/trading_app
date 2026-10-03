@@ -12,6 +12,7 @@ import { getRecordFinancialDisplay } from '../../features/record/financialDispla
 import { formatKrwDecimal, getAssetNameDisplay } from '../../utils/format';
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
+import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
@@ -71,6 +72,7 @@ export default function RecordProfitAnalysisScreen({ route, navigation }: Record
           </View>
           {profitAnalysis.state === 'partial_unavailable' ? <Text style={styles.notice}>일부 자산의 평가 데이터를 확인할 수 없어 일부 분석이 표시되지 않습니다.</Text> : null}
           {!hasAnalysis ? <Text style={styles.notice}>수익 분석 데이터를 확인할 수 없습니다.</Text> : null}
+          {profitAnalysis.valuationErrors.map(error => <AdminDiagnosticPanel key={error.assetId} diagnostic={error.diagnostic} />)}
         </View>
         <View style={styles.card}>
           <Text style={styles.heading}>자산 추이</Text>

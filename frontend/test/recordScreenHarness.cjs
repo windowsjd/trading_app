@@ -8,7 +8,7 @@ const { load } = require('./ledgerTestHarness.cjs');
 const { recordDetail, recordEquity } = require('./recordFixtures.ts');
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 /** @param {import('../src/app/navigation/types').RootStackParamList['TradeHistory']} scope */
-function createRecordScreenHarness(screen = 'detail', scope = { seasonId: 'record-0' }, { detail = recordDetail() } = {}) {
+function createRecordScreenHarness(screen = 'detail', scope = { seasonId: 'record-0' }, { detail = recordDetail(), role = 'user' } = {}) {
   const client = new query.QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity }, mutations: { retry: false } } });
   const accounts = [{ id: 'historical', mode: 'season', status: 'closed', season: { seasonId: 'record-0', seasonName: '시즌 1', seasonStatus: 'settled' } }, { id: 'current', mode: 'general', status: 'active' }];
   const h = { client, accounts, selectedAccount: accounts[0], requests: [], navigation: [], detail, equity: recordEquity, orderOptions: null, alerts: [], orders: [
@@ -48,7 +48,7 @@ function createRecordScreenHarness(screen = 'detail', scope = { seasonId: 'recor
     'react-native': native,
     '@react-navigation/native': { useIsFocused: () => h.focused !== false },
     '@tanstack/react-query': { ...query, useInfiniteQuery: options => { h.orderOptions = options; return query.useInfiniteQuery(options); } },
-    '../../features/me/api': { getMe: async () => ({ role: 'user' }) },
+    '../../features/me/api': { getMe: async () => ({ role }) },
     '../../features/record/api': recordApi,
     '../../features/tradingAccount/api': accountApi,
     '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({ accounts: h.accounts, selectedAccount: h.selectedAccount, isLoading: false, isError: false }) },

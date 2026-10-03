@@ -1,3 +1,7 @@
+import {
+  adminDiagnosticRequestMiddleware,
+  setAdminDiagnosticContext,
+} from '../common/admin-diagnostics';
 jest.mock('../generated/prisma/client', () => {
   const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
 
@@ -2047,4 +2051,63 @@ describe('RecordsService', () => {
       service.getUserCurrentSeasonSummary(undefined, 'user-2'),
     ).rejects.toBeInstanceOf(HttpException);
   });
+  it.each(['admin', 'user', 'operator', undefined])(
+    'keeps selection evidence local for parallel records failures with role=%s',
+    async (role) => {
+      const { prisma, service } = createService();
+
+      prisma.assetPriceSnapshot.findMany.mockResolvedValue([]);
+      prisma.assetPriceSnapshot.findFirst.mockResolvedValue(null);
+      let pending!: Promise<
+        Array<Awaited<ReturnType<RecordsService['buildProfitAnalysisItem']>>>
+      >;
+      adminDiagnosticRequestMiddleware(
+        {
+          method: 'GET',
+          originalUrl: '/api/v1/records',
+          headers: {},
+          user: role ? { userId: 'user-1', role } : undefined,
+        } as never,
+        { setHeader: jest.fn() } as never,
+        () => {
+          setAdminDiagnosticContext({
+            evidence: { shared: 'shared-other-row' },
+          });
+          pending = Promise.all(
+            ['a', 'b'].map((id) =>
+              service['buildProfitAnalysisItem'](
+                profitPosition({
+                  assetId: id,
+                  symbol: id,
+                  quantity: '1',
+                  averageCost: '2',
+                }),
+                new Date('2026-07-20T03:00:00Z'),
+                null,
+              ),
+            ),
+          );
+        },
+      );
+      const errors = (await pending).map((row) => row.error!);
+      expect(errors).toHaveLength(2);
+      for (const [i, error] of errors.entries()) {
+        if (role === 'admin') {
+          expect(error.diagnostic).toMatchObject({
+            failureStage: 'asset_price_selection',
+            evidence: {
+              workflow: 'positions_live_valuation',
+              providerCandidates: [{ candidateFound: false }],
+              manualFallback: { eligibleQueryCandidateFound: false },
+            },
+          });
+          expect(JSON.stringify(error.diagnostic)).not.toContain(
+            'shared-other-row',
+          );
+          expect(error.diagnostic?.entities?.assetId).toBe(i === 0 ? 'a' : 'b');
+        } else expect(error).not.toHaveProperty('diagnostic');
+      }
+      expect(prisma.assetPriceSnapshot.findFirst).toHaveBeenCalledTimes(2);
+    },
+  );
 });
