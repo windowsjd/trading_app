@@ -37,7 +37,7 @@ for (const screen of ['detail', 'profit']) {
   });
   for (const state of ['unavailable', 'partial_unavailable']) {
     it(`${screen}: ${state} hides incomplete totals and technical errors`, async t => {
-      const h = createRecordScreenHarness(screen); t.after(h.close); h.detail = recordDetail({ state }); await h.settle();
+      const h = createRecordScreenHarness(screen, undefined, { detail: recordDetail({ state }) }); t.after(h.close); await h.settle();
       assert.equal(h.text(h.find(screen === 'detail' ? 'record-detail-pnl' : 'record-profit-total')), '-');
       assert.doesNotMatch(h.text(), /RAW_|partial_unavailable|valuationState/);
       if (screen === 'profit') {
@@ -57,7 +57,7 @@ for (const screen of ['detail', 'profit']) {
 }
 it('active/ended seasons never label rank/tier or performance as final', async t => {
   for (const status of ['active', 'ended']) {
-    const h = createRecordScreenHarness(); t.after(h.close); h.detail = recordDetail({ status }); await h.settle();
+    const h = createRecordScreenHarness('detail', undefined, { detail: recordDetail({ status }) }); t.after(h.close); await h.settle();
     assert.doesNotMatch(h.text(), /최종|#100000|Gold/);
     assert.equal(h.text(h.find('record-detail-rank')), '-');
     assert.equal(h.text(h.find('record-detail-tier')), '-');

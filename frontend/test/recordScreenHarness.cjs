@@ -8,10 +8,10 @@ const { load } = require('./ledgerTestHarness.cjs');
 const { recordDetail, recordEquity } = require('./recordFixtures.ts');
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 /** @param {import('../src/app/navigation/types').RootStackParamList['TradeHistory']} scope */
-function createRecordScreenHarness(screen = 'detail', scope = { seasonId: 'record-0' }) {
+function createRecordScreenHarness(screen = 'detail', scope = { seasonId: 'record-0' }, { detail = recordDetail() } = {}) {
   const client = new query.QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity }, mutations: { retry: false } } });
   const accounts = [{ id: 'historical', mode: 'season', status: 'closed', season: { seasonId: 'record-0', seasonName: '시즌 1', seasonStatus: 'settled' } }, { id: 'current', mode: 'general', status: 'active' }];
-  const h = { client, accounts, selectedAccount: accounts[0], requests: [], navigation: [], detail: recordDetail(), equity: recordEquity, orderOptions: null, alerts: [], orders: [
+  const h = { client, accounts, selectedAccount: accounts[0], requests: [], navigation: [], detail, equity: recordEquity, orderOptions: null, alerts: [], orders: [
     { id: 'limit-1', assetId: 'asset-1', asset: { name: '삼성전자', symbol: '005930' }, side: 'buy', orderType: 'limit', status: 'submitted', quantity: '2', limitPrice: '50000', reservedAmount: '100000', currencyCode: 'KRW', submittedAt: '2026-09-01T00:00:00Z' },
     { id: 'sell-1', assetId: 'asset-2', side: 'sell', orderType: 'market', status: 'executed', quantity: '1', executedPrice: '70000', grossAmount: '70000', feeAmount: '70', netAmount: '69930', currencyCode: 'KRW', submittedAt: '2026-09-01T00:00:00Z' },
   ], pageLimit: 1 };
@@ -19,10 +19,16 @@ function createRecordScreenHarness(screen = 'detail', scope = { seasonId: 'recor
     get: async (path, config) => {
       h.requests.push({ path, params: config?.params });
       if (h.failure) throw h.failure;
-      if (path.startsWith('/records/me/seasons/')) return { data: { success: true, data: path.includes('/equity') ? h.equity : h.detail } };
-      const all = h.orders.filter(row => !config.params.side || row.side === config.params.side);
-      const offset = config.params.offset, orders = all.slice(offset, offset + h.pageLimit);
-      return { data: { success: true, data: { tradingAccountId: path.split('/')[2], orders, pagination: { nextOffset: offset + orders.length < all.length ? offset + orders.length : null } } } };
+      let data;
+      if (path.startsWith('/records/me/seasons/')) {
+        data = path.includes('/equity') ? h.equity : h.detail;
+      } else {
+        const all = h.orders.filter(row => !config.params.side || row.side === config.params.side);
+        const offset = config.params.offset, orders = all.slice(offset, offset + h.pageLimit);
+        data = { tradingAccountId: path.split('/')[2], orders, pagination: { nextOffset: offset + orders.length < all.length ? offset + orders.length : null } };
+      }
+      // JSON HTTP responses own their nested objects, independently of mutable server fixtures.
+      return { data: JSON.parse(JSON.stringify({ success: true, data })) };
     },
     post: async (path) => {
       h.requests.push({ path, method: 'POST' });

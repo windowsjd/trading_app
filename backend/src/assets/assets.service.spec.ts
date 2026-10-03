@@ -44,6 +44,7 @@ import {
   FxRateSourceType,
   Prisma,
   SeasonStatus,
+  type AssetPriceSnapshot,
 } from '../generated/prisma/client';
 import {
   applyMarketSessionOverrideSnapshot,
@@ -1900,7 +1901,7 @@ describe('AssetsService', () => {
       assets: { id: string; name: string; turnover: string | null }[];
     };
 
-    async function cryptoSetup(onlyTrio = false) {
+    async function cryptoSetup(onlyTrio = false, wsEligible = true, missingRestAssetId?: string) {
       const h = createService();
       const frames = onlyTrio ? contract.frames.slice(0, 3) : contract.frames;
       const assets = frames.map(frame => asset({
@@ -1915,10 +1916,15 @@ describe('AssetsService', () => {
       );
       h.prisma.assetPriceSnapshot.findFirst.mockResolvedValue(null);
       h.prisma.fxRateSnapshot.findFirst.mockResolvedValue(freshUsdKrwSnapshot());
-      const snapshots: ReturnType<typeof providerPriceSnapshot>[] = [];
+      const snapshots: AssetPriceSnapshot[] = [];
       h.prisma.assetPriceSnapshot.create.mockImplementation(async ({ data }) => {
         const id = `ws-${data.assetId}`;
-        snapshots.push({ ...data, id, price: new Prisma.Decimal(data.price) });
+        // Prisma accepts decimal strings on writes but returns Decimal fields on reads.
+        snapshots.push({
+          ...data, id, createdAt: new Date(testNow),
+          price: new Prisma.Decimal(data.price),
+          priceKrw: data.priceKrw == null ? null : new Prisma.Decimal(data.priceKrw),
+        });
         return { id };
       });
       const ingestion = new BinanceWebSocketIngestionService(h.prisma as never, {
@@ -1936,14 +1942,17 @@ describe('AssetsService', () => {
       // A newer REST row must not override eligible WS evidence or fill missing q.
       for (const a of assets) snapshots.push({
         ...providerPriceSnapshot(`rest-${a.id}`, 'binance_public_rest_24hr_ticker', '999', CurrencyCode.USD),
-        assetId: a.id,
+        assetId: a.id, priceKrw: null, sourceTimestamp: null, createdAt: new Date(testNow), note: null,
         rawPayloadJson: buildProviderRawPayloadJson({
-          payload: { symbol: a.symbol, lastPrice: '999', quoteVolume: '777777', volume: '1' }, maxBytes: 12000,
+          payload: {
+            symbol: a.symbol, lastPrice: '999', volume: '1',
+            ...(a.id === missingRestAssetId ? {} : { quoteVolume: '777777' }),
+          }, maxBytes: 12000,
         }),
-      } as ReturnType<typeof providerPriceSnapshot>);
+      });
       h.prisma.assetPriceSnapshot.findMany.mockImplementation(async ({ where }) =>
         where.id ? snapshots.filter(s => where.id.in.includes(s.id))
-          : snapshots.filter(s => (s as typeof s & { assetId: string }).assetId === where.assetId),
+          : snapshots.filter(s => s.assetId === where.assetId && (wsEligible || s.sourceName !== 'binance_spot_ws_ticker')),
       );
       return h;
     }
@@ -1958,7 +1967,7 @@ describe('AssetsService', () => {
       expect(response.data.assets.map(a => a.turnover)).toEqual(sortOrder === 'desc' ? ['5000', '2000', '1000'] : ['1000', '2000', '5000']);
       for (const a of response.data.assets) {
         expect(a.turnoverPeriod).toBe('rolling_24h');
-        expect(a.price).toMatchObject({ state: 'available', currentPrice: '100.00000000', assetPriceSnapshotId: `ws-${a.id}` });
+        expect(a.price).toMatchObject({ state: 'available', currentPrice: '100.00000000', priceKrw: '140000.00000000', assetPriceSnapshotId: `ws-${a.id}` });
       }
     });
 
@@ -1978,17 +1987,18 @@ describe('AssetsService', () => {
       expect(h.prisma.assetPriceSnapshot.create).toHaveBeenCalledTimes(writesBeforeRead);
     });
 
-    it('uses selected REST quoteVolume when WS is ineligible, keeping missing REST evidence null', async () => {
-      const h = await cryptoSetup(true);
-      h.prisma.assetPriceSnapshot.findMany.mockImplementation(async ({ where }) =>
-        where.id ? where.id.in.map((id: string) => ({
-          id, sourceType: 'provider_api', sourceName: 'binance_public_rest_24hr_ticker',
-          rawPayloadJson: buildProviderRawPayloadJson({ payload: id === 'rest-BTCUSDT' ? { volume: '999' } : { quoteVolume: '777777' }, maxBytes: 12000 }),
-        })) : [providerPriceSnapshot(`rest-${where.assetId}`, 'binance_public_rest_24hr_ticker', '999', CurrencyCode.USD)],
-      );
-      const response = await h.service.getAssets('user', { assetType: 'crypto', sortBy: 'turnover', sortOrder: 'desc' });
-      expect(response.data.assets.map(a => a.turnover)).toEqual(['777777', '777777', null]);
-      for (const a of response.data.assets) expect(a.price).toMatchObject({ state: 'available', currentPrice: '999.00000000', assetPriceSnapshotId: `rest-${a.id}` });
+    it.each(['asc', 'desc'] as const)('uses selected REST quoteVolume when WS is ineligible, keeping missing REST evidence last (%s)', async sortOrder => {
+      const h = await cryptoSetup(false, false, 'BTCUSDT');
+      const response = await h.service.getAssets('user', { assetType: 'crypto', sortBy: 'turnover', sortOrder });
+      expect(response.data.assets).toHaveLength(contract.assets.length);
+      expect(response.data.assets.map(a => a.turnover)).toEqual([...contract.assets.slice(1).map(() => '777777'), null]);
+      expect(response.data.assets.map(a => a.symbol)).toEqual([
+        ...contract.assets.map(a => a.id).filter(id => id !== 'BTCUSDT').sort(), 'BTCUSDT',
+      ]);
+      for (const a of response.data.assets) {
+        expect(a.turnoverPeriod).toBe(a.id === 'BTCUSDT' ? null : 'rolling_24h');
+        expect(a.price).toMatchObject({ state: 'available', currentPrice: '999.00000000', priceKrw: '1398600.00000000', assetPriceSnapshotId: `rest-${a.id}` });
+      }
     });
   });
   describe('whole-universe sorting and stable snapshot pagination', () => {
