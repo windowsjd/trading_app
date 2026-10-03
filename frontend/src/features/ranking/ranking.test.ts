@@ -32,6 +32,7 @@ function createHarness(scope?: string) {
   });
   const season: any = ready({ ...page.season, joined: true });
   const ranking: any = { ...ready({ pages: [page] }), isFetchingNextPage: false };
+  const top = ready(page);
   const queries = new Map<string, any>();
   const navigation = { navigate: (...args: any[]) => navigations.push(args) };
   const mockLocal = (file: string, value: any) => mocks.set(path.join(src, file), value);
@@ -54,6 +55,7 @@ function createHarness(scope?: string) {
     useQuery: (options: any) => {
       queryOptions.push(options);
       if (options.queryKey[0] === 'season') return season;
+      if (options.queryKey[0] === 'ranking' && options.queryKey[7] === 3) return top;
       return queries.get(options.queryKey.slice(0, 3).join('/'))
         ?? queries.get(options.queryKey[0]) ?? ready(undefined);
     },
@@ -106,7 +108,7 @@ function createHarness(scope?: string) {
     return renderToStaticMarkup(React.createElement(Screen, { navigation, ...props }));
   }
 
-  return { page, season, ranking, queries, ready, render, load, mockLocal,
+  return { page, season, ranking, top, queries, ready, render, load, mockLocal,
     presses, lists, queryOptions, navigations, requests };
 }
 
@@ -145,7 +147,7 @@ describe('ranking wire response rendering', () => {
     const h = createHarness();
     h.render();
     const { TEST_IDS } = h.load(path.join(src, 'constants/testIds'));
-    const podium = h.presses.filter((p) => !p.testID);
+    const podium = h.presses.filter((p) => p.testID?.startsWith('ranking-top-user-'));
     assert.equal(podium.length, 2);
     for (const [index, item] of h.page.rankings.entries()) {
       podium[index].onPress();
@@ -216,11 +218,11 @@ describe('ranking wire response rendering', () => {
 
   it('shows ErrorState and retries both queries on request failure', () => {
     const h = createHarness();
-    h.ranking.isError = true;
-    h.ranking.error = apiError();
-    h.ranking.data = undefined;
+    h.top.isError = true;
+    h.top.error = apiError();
+    h.top.data = undefined;
     let retries = 0;
-    h.ranking.refetch = h.season.refetch = () => { retries += 1; };
+    h.top.refetch = h.season.refetch = async () => { retries += 1; };
     assert.match(h.render(), /랭킹을 불러오지 못했습니다/);
     h.presses[0].onPress();
     assert.equal(retries, 2);
@@ -228,9 +230,9 @@ describe('ranking wire response rendering', () => {
 
   it('keeps the existing loading and missing/current-season error states', () => {
     const h = createHarness();
-    h.ranking.isLoading = true;
+    h.top.isLoading = true;
     assert.match(h.render(), /랭킹을 불러오는 중입니다/);
-    h.ranking.isLoading = false;
+    h.top.isLoading = false;
     h.season.data = undefined;
     assert.match(h.render(), /랭킹을 불러오지 못했습니다/);
     h.season.isError = true;
@@ -261,6 +263,43 @@ describe('ranking wire response rendering', () => {
 });
 
 describe('ranking API and query contract', () => {
+  for (const scope of ['all', 'friends', 'top10']) {
+    it(`${scope} keeps the canonical TOP3 independently of the scoped list`, async () => {
+      const h = createHarness(scope);
+      const friend = { ...h.page.rankings[0], userId: 'friend-outside-top3', seasonParticipantId: 'friend-sp', rank: 42, nickname: '친구42' };
+      h.ranking.data = { pages: [{ ...h.page, rankings: [friend] }] };
+      const html = h.render();
+      assert.match(html, /ranking-top-user-1/);
+      assert.doesNotMatch(html, /ranking-top-friend-outside-top3/);
+      assert.match(html, /ranking-item-friend-outside-top3/);
+      const list = h.queryOptions.find(q => q.getNextPageParam);
+      await list.queryFn({ pageParam: list.initialPageParam });
+      const params = new URL(h.requests.at(-1)!, 'https://fixture.invalid').searchParams;
+      for (const [key, value] of Object.entries({ scope, seasonId: h.page.season!.id, rankType: h.page.rankType,
+        rankingDate: h.page.rankingDate, capturedAt: h.page.capturedAt })) assert.equal(params.get(key), value);
+      h.ranking.data = undefined;
+      h.ranking.isLoading = true;
+      assert.match(h.render(), /ranking-top-user-1/, 'TOP3 remains during tab loading');
+      h.ranking.isLoading = false;
+      h.ranking.isError = true;
+      assert.match(h.render(), /ranking-top-user-1/, 'TOP3 remains on a scoped list failure');
+    });
+  }
+
+  it('requests the settled season final publication explicitly', async () => {
+    const h = createHarness('friends');
+    h.season.data.status = 'settled';
+    h.page.rankType = 'final';
+    h.render();
+    const top = h.queryOptions.find(q => q.queryKey[7] === 3);
+    await top.queryFn();
+    const params = new URL(h.requests.at(-1)!, 'https://fixture.invalid').searchParams;
+    assert.equal(params.get('scope'), 'all');
+    assert.equal(params.get('limit'), '3');
+    assert.equal(params.get('rankType'), 'final');
+    assert.equal(params.get('seasonId'), h.page.season!.id);
+  });
+
   it('returns the wire payload directly and preserves default scope limits', async () => {
     const h = createHarness();
     const { getRankings } = h.load(path.join(src, 'features/ranking/api'));
@@ -295,13 +334,13 @@ describe('ranking API and query contract', () => {
   it('retains daily polling and disables it for final or settled rankings', () => {
     const h = createHarness();
     h.render();
-    const options = h.queryOptions.find((q) => q.getNextPageParam);
-    assert.equal(options.refetchInterval({ state: { data: h.ranking.data } }), 60_000);
+    const options = h.queryOptions.find((q) => q.queryKey[7] === 3);
+    assert.equal(options.refetchInterval({ state: { data: h.page } }), 60_000);
     h.page.rankType = 'final';
-    assert.equal(options.refetchInterval({ state: { data: h.ranking.data } }), false);
+    assert.equal(options.refetchInterval({ state: { data: h.page } }), false);
     h.page.rankType = 'daily';
     h.season.data.status = 'settled';
-    assert.equal(options.refetchInterval({ state: { data: h.ranking.data } }), false);
+    assert.equal(options.refetchInterval({ state: { data: h.page } }), false);
   });
 
   it('passes API failures to React Query without inventing an empty response', async () => {

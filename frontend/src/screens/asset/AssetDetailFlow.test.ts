@@ -21,7 +21,7 @@ test('market asset opens chart-first detail with price, change and no trading se
   await openDetail(h);
   t.after(h.close);
   const screen = text(h);
-  assert.match(screen, /BNB \/ USD/);
+  assert.match(h.node('asset-name-selector').props.accessibilityLabel, /현재 BNB/);
   assert.match(screen, /763\.79/);
   assert.match(screen, /전일대비 \+0\.33%/);
   assert.ok(h.node(TEST_IDS.assetDetail.screen));
@@ -61,7 +61,7 @@ test('pair switch does not show a previous ticker or live candle', async (t) => 
   h.candlesByKey = { 'btc:5m': [{ time: '2026-09-20T00:00:00Z', open: '10', high: '20', low: '5', close: '12', volume: '2' }] };
   h.candle = { assetId: 'bnb', interval: '5m', candle: { close: '999' } };
   await h.update();
-  assert.match(text(h), /BTC \/ USD/);
+  assert.match(h.node('asset-name-selector').props.accessibilityLabel, /현재 BTC/);
   assert.match(text(h), /98,765/);
   assert.doesNotMatch(text(h), /900/);
   assert.equal(chart(h).viewportResetKey, 'btc:5m');
@@ -158,12 +158,14 @@ test('detail header keeps name, symbol, paired prices, change, chart and actions
   const name = h.node('asset-detail-name');
   assert.equal(name.props.children, h.assets.bnb.name);
   assert.equal(name.props.numberOfLines, undefined);
-  assert.match(screen, /\"BNB\",\" ▾\"/);
+  assert.equal(h.node('asset-change-pair'), undefined);
+  await h.press('asset-name-selector');
+  assert.deepEqual(h.navigation, [['MarketSearch', { returnToAsset: true }]]);
   assert.match(h.node('asset-detail-primary-price').props.children, /\$763\.79/);
   assert.equal(h.node('asset-detail-secondary-price').props.children, '1,054,259원');
   assert.match(h.node('asset-change-rate').props.children, /전일대비 \+0\.33%/);
   for (const [before, after] of [
-    ['asset-detail-name', 'asset-change-pair'], ['asset-change-pair', 'asset-detail-primary-price'],
+    ['asset-name-selector', 'asset-detail-name'], ['asset-detail-name', 'asset-detail-primary-price'],
     ['asset-detail-primary-price', 'asset-change-rate'], ['asset-change-rate', 'CandlestickChart'],
     ['CandlestickChart', 'ChartTimeframeSelector'], ['ChartTimeframeSelector', 'asset-order-actions'],
   ]) assert.ok(screen.indexOf(before) < screen.indexOf(after), `${before} before ${after}`);
@@ -201,7 +203,7 @@ test('domestic KRW stock has no invented USD conversion', async (t) => {
   const h = inlineTradingHarness(); h.assetId = 'samsung';
   await openDetail(h); t.after(h.close);
   assert.equal(h.node('asset-detail-name').props.children, 'Samsung Electronics');
-  assert.match(text(h), /\"005930\",\" ▾\"/);
+  assert.match(h.node('asset-name-selector').props.accessibilityLabel, /현재 Samsung Electronics/);
   assert.match(h.node('asset-detail-primary-price').props.children, /70,000/);
   assert.equal(h.node('asset-currency-usd'), undefined);
   assert.equal(h.node('asset-currency-krw'), undefined);
@@ -233,7 +235,9 @@ test('domestic asset shows KRW and a long name wraps beside the badge', async (t
   await openDetail(h); t.after(h.close);
   assert.equal(h.node('asset-settlement-currency').children.join(''), 'KRW');
   assert.equal(h.node('asset-detail-name').children.join(''), h.assets.samsung.name);
-  const row = h.node('asset-detail-name').parent;
-  assert.equal(row.props.style.flexWrap, 'wrap');
-  assert.equal(row.props.style.flexDirection, 'row');
+  const selector = h.node('asset-name-selector');
+  assert.equal(selector.props.style.maxWidth, '100%');
+  assert.equal(selector.props.style.flexDirection, 'row');
+  assert.equal(h.node('asset-detail-name').props.style.flexShrink, 1);
+  assert.equal(h.node('asset-detail-name').props.numberOfLines, undefined);
 });

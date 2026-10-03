@@ -184,20 +184,22 @@ export default function GeneralAccountHome({
         </View>
       ) : null}
 
-      <HomeAssetHero summary={summary} unavailableMessage={portfolioNotice?.message} />
+      <View style={styles.assetOverview}>
+        <HomeAssetHero compactBottom summary={summary} unavailableMessage={portfolioNotice?.message} />
 
-      <HomeAssetTrend
-        expanded={trendExpanded}
-        onToggle={() => setTrendExpanded((value) => !value)}
-        range={equityRange}
-        onRangeChange={setEquityRange}
-        equity={equityQuery.data}
-        loading={equityQuery.isLoading}
-        failed={equityQuery.isError}
-        general
-      />
+        <HomeAssetTrend
+          expanded={trendExpanded}
+          onToggle={() => setTrendExpanded((value) => !value)}
+          range={equityRange}
+          onRangeChange={setEquityRange}
+          equity={equityQuery.data}
+          loading={equityQuery.isLoading}
+          failed={equityQuery.isError}
+          general
+        />
 
-      <HomeHoldings holdings={holdings} onOpenAsset={onOpenAsset} />
+        <HomeHoldings holdings={holdings} onOpenAsset={onOpenAsset} />
+      </View>
       <HomeHotMarket hot={hot} onOpenAsset={onOpenAsset} onOpenMarket={onOpenMarket} />
 
       {summary ? (
@@ -242,6 +244,7 @@ export default function GeneralAccountHome({
 }
 
 const styles = StyleSheet.create({
+  assetOverview: { gap: 4, minWidth: 0 },
   content: { ...getScreenContentStyle(Platform.OS), padding: 16, gap: 12, paddingBottom: 24 },
   card: {
     borderWidth: 1,

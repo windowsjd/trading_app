@@ -63,11 +63,11 @@ export default function HomeAccountContext({ context }: { context: HomeAccountCo
 }
 
 const styles = StyleSheet.create({
-  details: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12 },
+  details: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 16 },
   identity: { flexDirection: 'row', alignItems: 'center', gap: 10, flexGrow: 1, flexShrink: 1, minWidth: 0 },
   nickname: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: '600', lineHeight: 23 },
-  ranking: { flexDirection: 'row', flexGrow: 1, flexShrink: 1, minWidth: 0, gap: 12 },
-  metric: { flex: 1, minWidth: 0, gap: 2 },
+  ranking: { flexDirection: 'row', flexGrow: 1, flexShrink: 1, minWidth: 0, gap: 16 },
+  metric: { flex: 1, minWidth: 0, gap: 6 },
   label: { fontSize: 12, lineHeight: 18, color: semantic.secondary },
   value: { fontSize: 18, lineHeight: 27, fontWeight: '700' },
   notice: { fontSize: 13, lineHeight: 20, color: semantic.warning },

@@ -30,6 +30,7 @@ function renderTabs(mode: AccountMode | null, isLoading = false, appearance: 'li
     'react-native-safe-area-context': {
       useSafeAreaInsets: () => ({ bottom: 0 }),
     },
+    '@react-navigation/native': { getFocusedRouteNameFromRoute: route => route.params?.screen },
     '@react-navigation/bottom-tabs': {
       createBottomTabNavigator: () => ({
         Navigator: 'Navigator',
@@ -71,7 +72,8 @@ function renderTabs(mode: AccountMode | null, isLoading = false, appearance: 'li
 
 function tabContract(tree: unknown) {
   return elements(tree, 'Screen').map((screen: any) => {
-    const icon = screen.props.options.tabBarIcon({
+    const options = typeof screen.props.options === 'function' ? screen.props.options({ route: {} }) : screen.props.options;
+    const icon = options.tabBarIcon({
       color: '#123456',
       size: 25,
     });

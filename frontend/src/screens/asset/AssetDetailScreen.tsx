@@ -30,19 +30,18 @@ export function AssetDetailContent({
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.screen}>
-      <AssetMarketChart
-        assetId={assetId}
-        variant="detail"
-        onChangePair={() =>
-          navigation.navigate('MarketSearch', { returnToAsset: true })
-        }
-      />
-      {!isLoading && !accountId ? (
-        <InlineEmptyState
-          title="계정이 없습니다."
-          message="계정을 개설하면 주문할 수 있습니다."
+      <View style={styles.content}>
+        <AssetMarketChart
+          assetId={assetId}
+          variant="detail"
+          onChangePair={() =>
+            navigation.navigate('MarketSearch', { returnToAsset: true })
+          }
+          footerContent={!isLoading && !accountId ? (
+            <InlineEmptyState title="계정이 없습니다." message="계정을 개설하면 주문할 수 있습니다." />
+          ) : null}
         />
-      ) : null}
+      </View>
       <View style={styles.footer} testID="asset-order-actions">
         <CTAButton
           testID={TEST_IDS.assetDetail.openSellOrder}
@@ -64,8 +63,10 @@ export function AssetDetailContent({
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: semantic.screen },
+  screen: { flex: 1, minHeight: 0, backgroundColor: semantic.screen },
+  content: { flex: 1, minHeight: 0 },
   footer: {
+    flexShrink: 0,
     flexDirection: 'row',
     gap: 10,
     paddingHorizontal: 12,

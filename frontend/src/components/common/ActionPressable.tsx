@@ -40,7 +40,14 @@ const animationOptions = {
 };
 
 /** One local interaction; the original Pressable still owns layout and actions. */
-export default function ActionPressable({
+export default function ActionPressable({ feedback = 'default', ...props }: Props & {
+  /** Reserved for the compact Market sort directions. */
+  feedback?: 'default' | 'none';
+}) {
+  return feedback === 'none' ? <Pressable {...props} /> : <FeedbackActionPressable {...props} />;
+}
+
+function FeedbackActionPressable({
   children,
   style,
   disabled,

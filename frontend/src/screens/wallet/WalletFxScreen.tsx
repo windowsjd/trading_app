@@ -622,9 +622,9 @@ export default function WalletFxScreen({ navigation }: Props) {
           setSuccessData(null);
           navigation.goBack();
         }}
-        onGoHome={() => {
+        onGoMarket={() => {
           setSuccessData(null);
-          rootNavigation.navigate('MainTabs', { screen: 'HomeTab', params: { screen: 'Home' } });
+          rootNavigation.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Market' } });
         }}
       />
     </SafeAreaView>

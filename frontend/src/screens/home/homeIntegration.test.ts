@@ -558,11 +558,20 @@ for (const mode of ['general', 'season']) it(`${mode} disclosure, ranges and acc
   h.seed(h.account, fixture[mode].data);
   let rendered = h.render();
   const toggle = () => elements(rendered.tree, 'Pressable').find(node => node.props.testID === 'home-trend-toggle')!;
+  const icon = () => {
+    const element = elements(rendered.tree).find(node => node.props.testID === 'home-trend-disclosure')!;
+    return element.type(element.props);
+  };
+  assert.equal(icon().props.style.borderTopWidth, 7);
   assert.equal(toggle().props.accessibilityState.expanded, false);
   assert.equal(elements(rendered.tree, 'LineChart').length, 0);
   assert.equal(h.queries.find(query => query.queryKey.includes('equity')).enabled, false);
   rendered = h.openTrend();
   assert.equal(toggle().props.accessibilityState.expanded, true);
+  assert.equal(icon().props.style.borderBottomWidth, 7);
+  toggle().props.onPress(); rendered = h.render();
+  assert.equal(icon().props.style.borderTopWidth, 7);
+  rendered = h.openTrend();
   const nodes = elements(rendered.tree);
   const at = id => nodes.findIndex(node => node.props.testID === id);
   assert.ok(at('home-summary-card') < at('home-trend-toggle'));

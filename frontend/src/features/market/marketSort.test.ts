@@ -4,7 +4,7 @@ import { it } from 'node:test';
 import { marketSortParams, nextMarketPage } from './marketSort.ts';
 import { QUERY_KEYS } from '../../constants/queryKeys.ts';
 const require = createRequire(import.meta.url);
-const { interactionHarness, React, act } = require('../../../test/interactionTestHarness.cjs');
+const { interactionHarness, React, act, flatten } = require('../../../test/interactionTestHarness.cjs');
 const { load } = require('../../../test/ledgerTestHarness.cjs');
 
 it('isolates every market/search sort query and carries the server snapshot across pages', () => {
@@ -28,7 +28,9 @@ it('serializes sort and continuation without reordering returned rows', async ()
 });
 it('offers two criteria and separate neutral ASC/DESC controls, preserving direction', () => {
   const h = interactionHarness('android');
-  const Control = h.load('src/features/market/MarketSortControl.tsx').default;
+  const Control = h.load('src/features/market/MarketSortControl.tsx', {
+    '../../components/common/ActionPressable': { default: h.ActionPressable, __esModule: true },
+  }).default;
   let choice;
   function Stateful() {
     const [value, setValue] = React.useState('turnover_desc');
@@ -50,8 +52,21 @@ it('offers two criteria and separate neutral ASC/DESC controls, preserving direc
     act(() => node('turnover').props.onPress());
     assert.equal(choice, 'turnover_desc');
     for (const direction of ['asc', 'desc']) {
-      assert.equal(node(direction).props.style[0].minHeight, 44);
-      assert.equal(node(direction).props.style[0].minWidth, 44);
+      const button = renderer.root.findAllByType('Pressable').find(n => n.props.testID === `market-sort-${direction}`);
+      assert.equal(node(direction).props.feedback, 'none');
+      const style = flatten(button.props.style);
+      assert.equal(style.height, 24);
+      assert.equal(style.width, 44);
+      for (const key of ['backgroundColor', 'borderWidth', 'borderRadius', 'transform']) assert.equal(style[key], undefined);
+      const before = h.animations.length;
+      act(() => button.props.onPressIn({ nativeEvent: { pageX: 10, pageY: 10 } }));
+      act(() => button.props.onPressOut({ nativeEvent: {} }));
+      assert.equal(h.animations.length, before, 'direction presses never animate');
+      assert.equal(button.findAllByType('AnimatedView').length, 0);
+      const triangle = flatten(renderer.root.findAllByType('View').find(n => n.props.testID === `market-sort-${direction}-triangle`).props.style);
+      assert.equal(triangle.borderLeftWidth + triangle.borderRightWidth, 10);
+      assert.equal(triangle.borderTopWidth ?? triangle.borderBottomWidth, 7);
+      assert.equal(triangle.backgroundColor, undefined);
     }
   } finally { act(() => renderer.unmount()); }
 });

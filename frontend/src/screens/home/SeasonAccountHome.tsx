@@ -202,24 +202,26 @@ export default function SeasonAccountHome({
         </View>
       ) : null}
 
-      <HomeAssetHero
-        summary={summary}
-        settled={isSettled}
-        unavailableMessage={portfolioNotice?.message}
-      />
+      <View style={styles.assetOverview}>
+        <HomeAssetHero compactBottom
+          summary={summary}
+          settled={isSettled}
+          unavailableMessage={portfolioNotice?.message}
+        />
 
-      <HomeAssetTrend
-        expanded={trendExpanded}
-        onToggle={() => setTrendExpanded((value) => !value)}
-        range={equityRange}
-        onRangeChange={setEquityRange}
-        equity={equityQuery.data}
-        loading={equityQuery.isLoading}
-        failed={equityQuery.isError}
-        general={false}
-      />
+        <HomeAssetTrend
+          expanded={trendExpanded}
+          onToggle={() => setTrendExpanded((value) => !value)}
+          range={equityRange}
+          onRangeChange={setEquityRange}
+          equity={equityQuery.data}
+          loading={equityQuery.isLoading}
+          failed={equityQuery.isError}
+          general={false}
+        />
 
-      <HomeHoldings holdings={holdings} onOpenAsset={onOpenAsset} />
+        <HomeHoldings holdings={holdings} onOpenAsset={onOpenAsset} />
+      </View>
       <HomeHotMarket hot={hot} onOpenAsset={onOpenAsset} onOpenMarket={onOpenMarket} />
 
       {capabilities?.canExchange ? (
@@ -234,6 +236,7 @@ export default function SeasonAccountHome({
 }
 
 const styles = StyleSheet.create({
+  assetOverview: { gap: 4, minWidth: 0 },
   content: { ...getScreenContentStyle(Platform.OS), padding: 16, gap: 12, paddingBottom: 24 },
   warningBox: {
     borderRadius: 12,

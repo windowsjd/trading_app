@@ -55,7 +55,7 @@ async function run() {
   try {
     if (!process.argv.includes('--market-only')) {
     for (const appearance of ['light', 'dark']) for (const width of [320, 360, 390, 430])
-      for (const fontScale of [1, 2]) for (const mode of ['general', 'season']) {
+      for (const fontScale of [1, 1.5, 2]) for (const mode of ['general', 'season']) {
         await page.setViewportSize({ width, height: 1100 });
         await page.emulateMedia({ colorScheme: appearance });
         await page.goto(`${base}/?screen=home&trend=1&long=1&mode=${mode}&fontScale=${fontScale}`);
@@ -63,7 +63,13 @@ async function run() {
         assert.equal(await id('home-trend-chart').count(), 0);
         assert.equal(await id('home-trend-toggle').getAttribute('aria-expanded'), 'false');
         assert.equal(await page.evaluate(() => window.fixture.transport.equityRequests?.length ?? 0), 0);
+        const icon = id('home-trend-disclosure');
+        assert.equal(await icon.evaluate(el => getComputedStyle(el).borderTopWidth), '7px');
+        const beforeToggle = await box('home-trend-toggle'), beforeHero = await box('home-summary-card'), beforeHoldings = await box('home-holdings');
+        assert.ok(beforeToggle.y - beforeHero.y - beforeHero.height <= 5, 'Hero joins disclosure without section gap');
+        assert.ok(beforeHoldings.y - beforeToggle.y - beforeToggle.height <= 5, 'compact disclosure joins holdings');
         await id('home-trend-toggle').click();
+        assert.equal(await icon.evaluate(el => getComputedStyle(el).borderBottomWidth), '7px');
         await id('home-trend-chart').locator('svg').waitFor();
         const toggle = await box('home-trend-toggle'), chart = await box('home-trend-chart'), holdings = await box('home-holdings');
         assert.ok(chart.y >= toggle.y + toggle.height && holdings.y >= chart.y + chart.height);
@@ -108,6 +114,7 @@ async function run() {
         await page.mouse.move(0, 0);
         await id('home-trend-toggle').click();
         assert.equal(await id('home-trend-chart').count(), 0);
+        assert.equal(await icon.evaluate(el => getComputedStyle(el).borderTopWidth), '7px');
         records.push({ screen: 'home', mode, appearance, width, fontScale, periods: 5, tooltipPositions: 3 });
       }
     // Active range request for the outgoing account cannot appear in the incoming account.
@@ -125,7 +132,7 @@ async function run() {
     assert.equal(await id('home-trend-range-30d').getAttribute('aria-selected'), 'true');
     }
     for (const appearance of ['light', 'dark']) for (const width of [320, 360, 390, 430])
-      for (const fontScale of [1, 2]) for (const financialPreference of ['red_blue', 'green_red']) {
+      for (const fontScale of [1, 1.5, 2]) for (const financialPreference of ['red_blue', 'green_red']) {
       await page.setViewportSize({ width, height: 844 }); await page.emulateMedia({ colorScheme: appearance });
       await page.goto(`${base}/?screen=market&session=closed&long=1&fontScale=${fontScale}`);
       await id('market-sort-control').waitFor();
@@ -143,12 +150,36 @@ async function run() {
         assert.equal(await id(`market-sort-${direction}`).getAttribute('aria-checked'), 'true');
       }
       await assertGlyphBounds('market-sort-control'); await assertGlyphBounds('market-session-summary');
-      for (const direction of ['asc', 'desc']) {
-        await page.waitForFunction(name => document.querySelector(`[data-testid="${name}"]`).getBoundingClientRect().height >= 43.99, `market-sort-${direction}`);
-        const b = await box(`market-sort-${direction}`);
-        assert.ok(b.x >= 0 && b.x + b.width <= width + 1 && b.height >= 43.99 && b.width >= 43.99, JSON.stringify({ b, width, fontScale, appearance, financialPreference }));
+      const asc = await box('market-sort-asc'), desc = await box('market-sort-desc');
+      assert.ok(Math.abs(asc.y + asc.height - desc.y) < 0.1, 'direction targets share only a boundary');
+      const visualUp = await box('market-sort-asc-triangle'), visualDown = await box('market-sort-desc-triangle');
+      assert.ok(Math.abs(visualDown.y - visualUp.y - visualUp.height - 2) < 0.1);
+      for (const direction of ['asc', 'desc', 'asc', 'desc']) {
+        const button = id(`market-sort-${direction}`), b = await box(`market-sort-${direction}`);
+        const visual = await box(`market-sort-${direction}-triangle`);
+        assert.equal(visual.width, 10); assert.equal(visual.height, 7);
+        assert.equal(b.width, 44); assert.equal(b.height, 24);
+        await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+        await page.mouse.down(); await page.waitForTimeout(130);
+        const held = await button.evaluate(el => {
+          const s = getComputedStyle(el);
+          return { background: s.backgroundColor, border: s.borderTopWidth, transform: s.transform,
+            children: el.children.length };
+        });
+        assert.deepEqual(held, { background: 'rgba(0, 0, 0, 0)', border: '0px', transform: 'none', children: 1 });
+        await page.mouse.up();
+        assert.equal(await button.getAttribute('aria-checked'), 'true');
       }
-      assert.equal(await id('market-sort-desc').locator('div').last().evaluate(el => getComputedStyle(el).color), 'rgb(255, 255, 255)');
+      const borderColor = direction => id(`market-sort-${direction}-triangle`).evaluate((el, direction) =>
+        getComputedStyle(el)[direction === 'asc' ? 'borderBottomColor' : 'borderTopColor'], direction);
+      assert.notEqual(await borderColor('asc'), await borderColor('desc'));
+      const originalColors = [await borderColor('asc'), await borderColor('desc')];
+      await page.evaluate(preference => window.fixture.appearance.setFinancialPreference(preference === 'red_blue' ? 'green_red' : 'red_blue'), financialPreference);
+      assert.deepEqual([await borderColor('asc'), await borderColor('desc')], originalColors, 'sort directions ignore financial colors');
+      await page.evaluate(preference => window.fixture.appearance.setFinancialPreference(preference), financialPreference);
+      await id('market-sort-asc').focus(); await page.keyboard.press('Enter');
+      assert.equal(await id('market-sort-asc').getAttribute('aria-checked'), 'true');
+      await id('market-sort-desc').click();
       for (const [assetType, tabId] of [['domestic_stock', 'domestic'], ['us_stock', 'us'], ['crypto', 'crypto']]) {
         await id(`market-tab-${tabId}`).click();
         await page.waitForFunction(type => window.fixture.transport.requests.some(url => new URL(url, location.origin).searchParams.get('assetType') === type), assetType);

@@ -11,6 +11,7 @@ import InlineEmptyState from '../../components/states/InlineEmptyState';
 type Props = {
   summary: TradingAccountPortfolioSummaryDto | null;
   settled?: boolean;
+  compactBottom?: boolean;
   unavailableMessage?: string;
 };
 
@@ -21,9 +22,9 @@ function performanceStyle(value: string | null | undefined) {
   return amount > 0 ? styles.up : styles.down;
 }
 
-export default function HomeAssetHero({ summary, settled = false, unavailableMessage }: Props) {
+export default function HomeAssetHero({ summary, settled = false, compactBottom = false, unavailableMessage }: Props) {
   return (
-    <View testID={TEST_IDS.home.summaryCard} style={styles.hero}>
+    <View testID={TEST_IDS.home.summaryCard} style={[styles.hero, compactBottom && styles.compactBottom]}>
       <Text style={styles.label}>{settled ? '최종 자산' : '총 자산'}</Text>
       {summary ? (
         <>
@@ -62,6 +63,7 @@ export default function HomeAssetHero({ summary, settled = false, unavailableMes
 
 const styles = StyleSheet.create({
   hero: { paddingVertical: 12, gap: 8, minWidth: 0 },
+  compactBottom: { paddingBottom: 0 },
   label: { fontSize: 14, lineHeight: 21, color: semantic.secondary },
   total: { fontSize: 36, fontWeight: '700', lineHeight: 46, flexShrink: 1, fontVariant: ['tabular-nums'] },
   performance: { gap: 4, marginTop: 4 },

@@ -353,14 +353,14 @@ const BADGE_TEXT_TONE = StyleSheet.create({
 
 const styles = StyleSheet.create({
   homeContext: {
-    minHeight: 72,
+    minHeight: 96,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 20,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: semantic.border,
     backgroundColor: semantic.surface,
-    gap: 8,
+    gap: 16,
   },
   homeContextRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   homeTitle: { flex: 1, minWidth: 0, fontSize: 20, fontWeight: '700', lineHeight: 28 },

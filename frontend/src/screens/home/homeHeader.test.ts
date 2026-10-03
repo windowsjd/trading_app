@@ -43,8 +43,8 @@ it('Home context is spacious, quiet and opens the existing account selection she
     assert.equal(h.text(), 'Season 1 변경');
     const context = h.renderer.root.findByProps({ testID: TEST_IDS.home.accountContext });
     const style = flatten(context.props.style);
-    assert.ok(style.minHeight >= 64 && style.minHeight <= 80);
-    assert.ok(style.paddingHorizontal >= 16 && style.paddingVertical >= 12);
+    assert.ok(style.minHeight >= 96 && style.height === undefined);
+    assert.ok(style.paddingHorizontal >= 16 && style.paddingVertical >= 20);
     const button = h.renderer.root.findByType('Pressable');
     assert.ok(flatten(button.props.style).minHeight >= 44);
     assert.match(button.props.accessibilityLabel, /Season 1/);

@@ -137,7 +137,7 @@ export const apiClient = {
         return response({
           range: u.searchParams.get('range'),
           interval: u.searchParams.get('interval'),
-          candles: Array.from({ length: 240 }, (_, i) => ({
+          candles: Array.from({ length: params.has('emptyCandles') ? 0 : 240 }, (_, i) => ({
             time: new Date(Date.UTC(2026, 8, 1, 0, i * 5)).toISOString(),
             open: String(base * (0.9 + i * 0.0005)),
             high: String(base * (0.915 + i * 0.0005)),

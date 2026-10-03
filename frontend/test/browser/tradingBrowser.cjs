@@ -69,7 +69,7 @@ async function build() {
   });
   fs.writeFileSync(
     path.join(out, 'index.html'),
-    '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body,#root{height:100%;margin:0}body{font-family:sans-serif}</style><div id="root"></div><script src="/bundle.js"></script>',
+    '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body,#root{height:100%;margin:0}#root{display:flex;flex-direction:column}body{font-family:sans-serif}</style><div id="root"></div><script src="/bundle.js"></script>',
   );
 }
 async function run() {
@@ -129,6 +129,38 @@ async function run() {
       'holdings-filter-all',
       'holdings-filter-current',
     ];
+    for (const appearance of ['light', 'dark']) for (const width of [320, 360, 390, 430])
+      for (const fontScale of [1, 1.5, 2]) for (const empty of [false, true]) {
+        const height = empty ? 568 : 844;
+        await page.setViewportSize({ width, height });
+        await page.emulateMedia({ colorScheme: appearance });
+        await open(`screen=detail&asset=SUI&longName=1&fontScale=${fontScale}${empty ? '&emptyCandles=1' : ''}`);
+        await id('asset-name-selector').waitFor();
+        await page.waitForFunction(() => document.querySelector('[data-testid="asset-detail-name"]').textContent.includes('Extended'));
+        assert.equal(await id('asset-change-pair').count(), 0);
+        const footer = await id('asset-order-actions').boundingBox();
+        assert.ok(Math.abs(footer.y + footer.height - height) <= 1, 'order actions touch the viewport bottom');
+        const clipped = await id('asset-name-selector').evaluate(el => {
+          const box = el.getBoundingClientRect();
+          const text = el.querySelector('[data-testid="asset-detail-name"]');
+          const range = document.createRange(); range.selectNodeContents(text);
+          return [...range.getClientRects()].filter(r => r.width && (r.left < box.left - 1 || r.right > box.right + 1 || r.top < box.top - 1 || r.bottom > box.bottom + 1)).length;
+        });
+        assert.equal(clipped, 0, 'complete long asset name remains inside its selector');
+        await id('asset-timeframe-selector').scrollIntoViewIfNeeded();
+        const timeframe = await id('asset-timeframe-selector').boundingBox();
+        assert.ok(timeframe.y + timeframe.height <= footer.y + 1, 'last content is visible above the actions');
+        const after = await id('asset-order-actions').boundingBox();
+        assert.ok(Math.abs(after.y - footer.y) <= 1, 'actions stay fixed while content scrolls');
+        if (fontScale === 1 && !empty) await page.screenshot({ path: path.join(out, `asset-bottom-${appearance}-${width}.png`) });
+        await id('asset-name-selector').click();
+        await page.getByPlaceholder('종목명 또는 심볼 검색').fill('BTC');
+        await page.getByText('Bitcoin', { exact: true }).first().click();
+        await id('asset-name-selector').waitFor();
+        await page.waitForFunction(() => document.querySelector('[data-testid="asset-detail-name"]')?.textContent === 'Bitcoin');
+        records.push({ kind: 'detail-bottom-selector', appearance, width, fontScale, empty, height });
+      }
+    await page.emulateMedia({ colorScheme: 'light' });
     for (const width of [320, 360, 390, 430])
       for (const fontScale of [1, 1.5])
         for (const asset of ['BTC', 'BNB', 'PEPE', 'SUI', '币安人生']) {

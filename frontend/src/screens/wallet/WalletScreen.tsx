@@ -19,7 +19,6 @@ import { getCapabilityBlockMessage, type TradingAccountCapabilities } from '../.
 import { getPortfolioNotice } from '../../features/tradingAccount/portfolioMessage';
 import { getKnownWalletBalanceAmount } from '../../features/wallet/mapper';
 import { formatMoney } from '../../utils/format';
-import AccountSwitcher from '../../components/tradingAccount/AccountSwitcher';
 import PositionAssetRow from '../../components/tradingAccount/PositionAssetRow';
 import CTAButton from '../../components/common/CTAButton';
 import ActionPressable from '../../components/common/ActionPressable';
@@ -78,7 +77,6 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
 
   return (
     <ScrollView refreshControl={refresh.refreshControl} testID="wallet-screen" contentContainerStyle={styles.content}>
-      <AccountSwitcher home />
       {integrityFailure ? (
         <View testID={TEST_IDS.tradingAccount.integrityError}>
           <ErrorState title={ACCOUNT_INTEGRITY_TITLE} message={integrityFailure.message} onRetry={integrityFailure.retry} />

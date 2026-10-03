@@ -127,6 +127,21 @@ async function run() {
       const call = await page.evaluate(() => window.fixture.navigation.calls.at(-1));
       assert.equal(call[0], { market: 'AssetDetail', ranking: 'UserSeasonSummary', record: 'RecordSeasonDetail' }[screen]);
     }
+    for (const state of ['active', 'settled']) {
+      await open('ranking', `&separateScopes=1&state=${state}`);
+      const podium = await id('ranking-top3').textContent();
+      for (const scope of ['friends', 'top10', 'all']) {
+        await id(`ranking-tab-${scope}`).click();
+        await id(scope === 'friends' ? 'ranking-item-user-40' : 'ranking-item-user-0').waitFor();
+        assert.equal(await id('ranking-top3').textContent(), podium);
+        assert.equal(await id('ranking-top-user-40').count(), 0);
+        const request = await page.evaluate(scope => window.fixture.transport.requests.filter(p => p.includes('/ranking?') && new URL(p, location.origin).searchParams.get('scope') === scope).at(-1), scope);
+        const params = new URL(request, base).searchParams;
+        assert.equal(params.get('rankType'), state === 'settled' ? 'final' : 'daily');
+        assert.equal(params.get('capturedAt'), '2026-09-01T00:00:00Z');
+        assert.equal(params.get('seasonId'), 'season-1');
+      }
+    }
     await open('market');
     await page.getByText('종목명 또는 심볼 검색', { exact: true }).click();
     assert.deepEqual(await page.evaluate(() => window.fixture.navigation.calls.at(-1)), ['MarketSearch']);

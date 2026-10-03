@@ -340,6 +340,10 @@ describe('touch coverage and exclusions', () => {
             return init && ts.isJsxExpression(init) ? init.expression : undefined;
           };
           const style = expression('style');
+          if (attr('feedback')) {
+            assert.equal(file, 'features/market/MarketSortControl.tsx', 'only sort directions may opt out');
+            assert.equal(attr('feedback')?.initializer?.getText(source), '"none"');
+          }
           if (file === 'components/common/ActionPressable.tsx') return;
           if (file === 'components/common/BottomSheetBackdrop.tsx' || !attr('onPress')) {
             excluded.push(file);

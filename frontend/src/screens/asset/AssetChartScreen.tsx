@@ -23,7 +23,6 @@ import { mergeAssetCandleSnapshot } from '../../features/asset/liveCandle';
 import { describeCandleError } from '../../features/asset/candleErrors';
 import {
   getStockMarketStatus,
-  getTradingAssetName,
   getTradingPair,
 } from '../../features/asset/tradingHeader';
 import {
@@ -39,6 +38,7 @@ import { buildWsUrl } from '../../constants/env';
 import { CandlestickChart } from '../../components/charts';
 import ChartTimeframeSelector from '../../components/charts/ChartTimeframeSelector';
 import ActionPressable from '../../components/common/ActionPressable';
+import DisclosureTriangle from '../../components/common/DisclosureTriangle';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
@@ -62,6 +62,7 @@ type AssetMarketChartProps = {
   variant?: 'fullscreen' | 'detail';
   onBack?: () => void;
   onChangePair?: () => void;
+  footerContent?: React.ReactNode;
 };
 
 export function AssetMarketChart({
@@ -69,6 +70,7 @@ export function AssetMarketChart({
   variant = 'fullscreen',
   onBack,
   onChangePair,
+  footerContent,
 }: AssetMarketChartProps) {
   const isFocused = useIsFocused();
   const isAdmin = useAdminDiagnostics();
@@ -155,24 +157,19 @@ export function AssetMarketChart({
       {detailView ? (
         <View style={styles.detailHeader}>
           <View style={styles.assetNameRow}>
-            <Text testID="asset-detail-name" style={styles.assetName}>
-              {asset ? getAssetNameDisplay(asset).primary : '종목'}
-            </Text>
+            <ActionPressable testID="asset-name-selector" style={styles.nameSelector}
+              accessibilityRole="button"
+              accessibilityLabel={`종목 변경, 현재 ${asset ? getAssetNameDisplay(asset).primary : '종목'}`}
+              onPress={onChangePair}>
+              <Text testID="asset-detail-name" style={styles.assetName}>
+                {asset ? getAssetNameDisplay(asset).primary : '종목'}
+              </Text>
+              <DisclosureTriangle direction="down" />
+            </ActionPressable>
             {asset ? <Text testID="asset-settlement-currency" style={styles.settlementBadge}>
               {asset.settlementCurrency}
             </Text> : null}
           </View>
-          <ActionPressable
-            testID="asset-change-pair"
-            style={styles.symbolButton}
-            accessibilityRole="button"
-            accessibilityLabel={`종목 변경, ${asset ? getTradingPair(asset) : '종목'}`}
-            onPress={onChangePair}
-          >
-            <Text style={styles.symbolText}>
-              {asset ? (asset.assetType === 'crypto' ? getTradingAssetName(asset) : asset.symbol) : '종목 변경'} ▾
-            </Text>
-          </ActionPressable>
           <View style={styles.detailPriceRow}>
             <View style={styles.detailPriceStack}>
               <Text testID="asset-detail-primary-price" style={styles.detailPrice} selectable>
@@ -330,6 +327,7 @@ export function AssetMarketChart({
     <ScrollView refreshControl={refresh.refreshControl} style={styles.screen} contentContainerStyle={styles.detailContent}
       nestedScrollEnabled testID={TEST_IDS.assetDetail.screen}>
       {chartBody}
+      {footerContent}
     </ScrollView>
   ) : (
     <SafeAreaView style={styles.screen} testID="asset-chart-screen">
@@ -338,7 +336,7 @@ export function AssetMarketChart({
   );
 }
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: semantic.screen },
+  screen: { flex: 1, minHeight: 0, backgroundColor: semantic.screen },
   detailContent: {
     margin: 8, borderRadius: 14,
     backgroundColor: semantic.surface, flexGrow: 1 },
@@ -347,9 +345,8 @@ const styles = StyleSheet.create({
   assetNameRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8, rowGap: 4 },
   settlementBadge: { fontSize: 11, fontWeight: '700', color: semantic.secondary, backgroundColor: semantic.raised, overflow: 'hidden', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 4 },
   assetName: { minWidth: 0, fontSize: 28, fontWeight: '800', color: semantic.text, flexShrink: 1 },
-  symbolButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center',
-    backgroundColor: semantic.raised, borderRadius: 8, paddingHorizontal: 10 },
-  symbolText: { fontSize: 13, fontWeight: '600', color: semantic.secondary },
+  nameSelector: { flexDirection: 'row', alignItems: 'center', gap: 6,
+    minHeight: 44, minWidth: 0, maxWidth: '100%', flexShrink: 1 },
   detailPriceRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center',
     gap: 10, paddingTop: 8 },
   detailPriceStack: { flex: 1, minWidth: 0, gap: 2 },

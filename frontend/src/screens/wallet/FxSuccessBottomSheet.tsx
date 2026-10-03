@@ -11,7 +11,7 @@ interface FxSuccessBottomSheetProps {
   visible: boolean;
   onClose: () => void;
   onGoWallet: () => void;
-  onGoHome: () => void;
+  onGoMarket: () => void;
   payload: FxExecuteDto | null;
 }
 
@@ -19,7 +19,7 @@ export default function FxSuccessBottomSheet({
   visible,
   onClose,
   onGoWallet,
-  onGoHome,
+  onGoMarket,
   payload,
 }: FxSuccessBottomSheetProps) {
   const { height } = useWindowDimensions();
@@ -52,7 +52,7 @@ export default function FxSuccessBottomSheet({
 
         <View style={styles.buttonRow}>
           <CTAButton label="지갑으로 돌아가기" onPress={onGoWallet} style={styles.flex} />
-          <CTAButton label="홈으로 가기" onPress={onGoHome} style={styles.flex} />
+          <CTAButton label="마켓으로 가기" onPress={onGoMarket} style={styles.flex} />
         </View>
       </ScrollView>
     </BottomSheetBackdrop>

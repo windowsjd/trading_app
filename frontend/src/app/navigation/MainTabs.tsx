@@ -1,6 +1,7 @@
 import React from 'react';
 import { useWindowDimensions } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppearance } from '../../theme/appearance';
 import { useReducedMotion } from '../../theme/useReducedMotion';
@@ -69,12 +70,16 @@ export default function MainTabs() {
       <Tab.Screen
         name="MarketTab"
         component={MarketStack}
-        options={{
+        options={({ route }) => ({
           title: '마켓',
+          // Detail owns the bottom safe area and its persistent order actions.
+          ...(getFocusedRouteNameFromRoute(route) === 'AssetDetail'
+            ? { tabBarStyle: { display: 'none' } }
+            : {}),
           tabBarIcon: ({ color, size, focused }) => (
             <TabBarIcon focused={focused} name="market" color={color} size={size} />
           ),
-        }}
+        })}
       />
       {mode === 'general' ? (
         <Tab.Screen

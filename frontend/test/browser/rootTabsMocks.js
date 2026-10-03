@@ -43,19 +43,22 @@ export const apiClient = {
     }
     if (url.pathname === '/ranking' && limit > 1) {
       transport.requests.push(path);
-      const page = pagination(offset, limit, 53);
+      const friendScope = params.has('separateScopes') && url.searchParams.get('scope') === 'friends';
+      const rankOffset = friendScope ? 40 : offset;
+      const page = pagination(offset, limit, friendScope ? 2 : url.searchParams.get('scope') === 'top10' ? 10 : 53);
       const rankings = Array.from({ length: page.returned }, (_, i) => ({
-        seasonParticipantId: `participant-${offset + i}`, userId: `user-${offset + i}`,
+        seasonParticipantId: `participant-${rankOffset + i}`, userId: `user-${rankOffset + i}`,
         profileImageUrl: params.get('profile') === 'valid' ? `${location.origin}/avatar.svg` : params.get('profile') === 'broken' ? `${location.origin}/missing-avatar.png` : null,
-        rank: params.has('hugeRank') ? 123456789 : offset + i + 1, nickname: long ? '아주긴닉네임대한민국투자챔피언ABCDEFGHIJKLMNOPQRSTUVWXYZ' : `투자자 ${offset + i + 1}`,
+        rank: params.has('hugeRank') ? 123456789 : rankOffset + i + 1, nickname: long ? '아주긴닉네임대한민국투자챔피언ABCDEFGHIJKLMNOPQRSTUVWXYZ' : `투자자 ${offset + i + 1}`,
         provisionalTier: long ? 'Silver 대한민국 특별 경쟁 등급' : 'Silver', finalTier: 'Gold',
         returnRate: '4.82', percentile: '99.5', totalAssetKrw: '10482000',
         maxDrawdown: '0', totalFillCount: 3, capturedAt: '2026-09-01T00:00:00Z',
       }));
       return response({
         state: 'available', pagination: page, rankings,
+        season: { id: 'season-1', status: params.get('state') === 'settled' ? 'settled' : 'active' },
         myRanking: { ...rankings[0], state: 'available' },
-        rankType: 'daily', rankingDate: '2026-09-01', capturedAt: '2026-09-01T00:00:00Z',
+        rankType: url.searchParams.get('rankType') ?? 'daily', rankingDate: '2026-09-01', capturedAt: '2026-09-01T00:00:00Z',
       });
     }
     if (url.pathname === '/records/me/seasons') {

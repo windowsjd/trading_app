@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import { LineChart } from '../../components/charts';
+import DisclosureTriangle from '../../components/common/DisclosureTriangle';
 import ActionPressable from '../../components/common/ActionPressable';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
@@ -40,7 +41,8 @@ export default function HomeAssetTrend({
         onPress={onToggle}
         style={styles.toggle}
       >
-        <Text style={styles.toggleText}>자산추이 보기 {expanded ? '▲' : '▼'}</Text>
+        <Text style={styles.toggleText}>자산추이 보기</Text>
+        <DisclosureTriangle testID="home-trend-disclosure" direction={expanded ? 'up' : 'down'} />
       </ActionPressable>
       {expanded ? (
         <View testID="home-trend-chart" style={styles.card}>
@@ -90,8 +92,8 @@ export default function HomeAssetTrend({
 
 const styles = StyleSheet.create({
   container: { minWidth: 0 },
-  toggle: { minHeight: 44, alignSelf: 'flex-start', justifyContent: 'center', paddingHorizontal: 8 },
-  toggleText: { fontSize: 13, lineHeight: 20, color: semantic.secondary, fontWeight: '600' },
+  toggle: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', justifyContent: 'center', paddingHorizontal: 8 },
+  toggleText: { flexShrink: 1, fontSize: 13, lineHeight: 20, color: semantic.secondary, fontWeight: '600' },
   card: { borderWidth: 1, borderColor: semantic.border, borderRadius: 14, padding: 16, backgroundColor: semantic.surface, gap: 12 },
   header: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   heading: { fontSize: 18, lineHeight: 26, fontWeight: '700', color: semantic.text },

@@ -44,6 +44,8 @@ describe('selected account Wallet and shared Home holdings', () => {
       assert.doesNotMatch(text(home), /자산 구성|지갑 요약|평균 매입가|현재가|987,654|80,000/);
       assert.doesNotMatch(text(wallet), /평균 매입가|현재가|987,654|80,000/);
       const nodes = elements(wallet);
+      assert.equal(elements(wallet, 'AccountSwitcher').length, 0);
+      assert.equal(find(wallet, 'trading-account-switcher-trigger'), undefined);
       assert.ok(nodes.indexOf(find(wallet, 'home-summary-card')) < nodes.indexOf(find(wallet, 'wallet-exchange')));
       assert.ok(nodes.indexOf(find(wallet, 'wallet-exchange')) < nodes.indexOf(find(wallet, 'wallet-composition')));
       assert.ok(nodes.indexOf(find(wallet, 'wallet-composition')) < nodes.indexOf(find(wallet, 'wallet-orders')));

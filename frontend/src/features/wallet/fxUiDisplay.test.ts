@@ -26,12 +26,15 @@ function assertCleanRateDisplay(h: any, tree: any) {
 }
 
 describe('FX screen information display', () => {
-  it('the success Home action still reaches Home after FX moves to WalletStack', () => {
+  it('the success Market action reaches MarketTab / Market', () => {
     const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
     const success = elements(h.render(), 'FxSuccessBottomSheet')[0];
     assert.ok(success);
-    success.props.onGoHome();
-    assert.deepEqual(h.navigation, [['MainTabs', { screen: 'HomeTab', params: { screen: 'Home' } }]]);
+    success.props.onGoMarket();
+    assert.deepEqual(h.navigation, [['MainTabs', { screen: 'MarketTab', params: { screen: 'Market' } }]]);
+    assert.equal(success.props.onGoHome, undefined);
+    const tree = sheet({ visible: true, onClose() {}, onGoWallet() {}, onGoMarket() {}, payload: null });
+    assert.deepEqual(elements(tree, 'CTAButton').map(node => node.props.label), ['지갑으로 돌아가기', '마켓으로 가기']);
   });
 
   it('keeps the current rate and captured timestamp with empty and filled inputs', () => {
@@ -108,7 +111,7 @@ describe('FX completion sheet rows', () => {
   for (const fromCurrency of ['KRW', 'USD']) {
     it(`renders exactly the eight requested rows for ${fromCurrency} on a short viewport`, () => {
       const toCurrency = fromCurrency === 'KRW' ? 'USD' : 'KRW';
-      const tree = sheet({ visible: true, onClose: () => {}, onGoWallet: () => {}, onGoHome: () => {},
+      const tree = sheet({ visible: true, onClose: () => {}, onGoWallet: () => {}, onGoMarket: () => {},
         payload: { fromCurrency, toCurrency,
           sourceAmount: fromCurrency === 'KRW' ? '100000' : '10.5',
           netTargetAmount: toCurrency === 'USD' ? '73.82' : '14029.70625',

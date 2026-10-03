@@ -87,6 +87,7 @@ async function run() {
             assert.match(await id(`${prefix}4`).textContent(), /이전 시세/);
             assert.equal(await id(`${prefix}4-quantity`).count(), 0);
             if (screen === 'wallet') {
+              assert.equal(await id('trading-account-switcher-trigger').count(), 0);
               await theme.background(id('wallet-composition'), appearance, 'surface');
               assert.equal(await id(`${prefix}5-value`).textContent(), '-');
               assert.equal(await id(`${prefix}5-return`).textContent(), '-');
@@ -208,7 +209,10 @@ async function run() {
         void window.fixture.client.resetQueries({ queryKey: ['tradingAccount', 'positions', 'general-account', 'holdings'] });
       });
       await id('wallet-position-general-account-asset-0').waitFor({ state: 'hidden' });
+      assert.equal(await id('trading-account-switcher-trigger').count(), 0);
+      await page.evaluate(() => window.fixture.setScreen('home'));
       await id('trading-account-switcher-trigger').click(); await id('trading-account-switcher-option-season-account').click();
+      await page.evaluate(() => window.fixture.setScreen('wallet'));
       await id('wallet-position-season-account-asset-0').waitFor();
       assert.equal(await id('home-total-asset').textContent(), '9,648,192원');
       await page.evaluate(() => { window.fixture.transport.delay = null; window.fixture.transport.release(); });
@@ -234,6 +238,17 @@ async function run() {
       await page.evaluate(() => window.fixture.navigationRef.goBack());
       await page.getByRole('tab', { name: '지갑' }).click();
       await id('wallet-position-' + account + '-account-asset-6').waitFor();
+      await id('wallet-position-' + account + '-account-asset-0').click();
+      await id('asset-order-actions').waitFor();
+      await page.waitForFunction(() => {
+        const footer = document.querySelector('[data-testid="asset-order-actions"]').getBoundingClientRect();
+        return Math.abs(footer.bottom - innerHeight) <= 1;
+      });
+      assert.equal(await page.getByRole('tab', { name: '마켓' }).count(), 0, 'detail owns the bottom safe area');
+      await page.evaluate(() => window.fixture.navigationRef.goBack());
+      await page.getByRole('tab', { name: '지갑' }).click();
+      await id('wallet-composition').waitFor();
+
       await id('wallet-ledger').click(); await id('wallet-transactions-screen').waitFor();
       await page.evaluate(() => window.fixture.navigationRef.goBack());
       await id('wallet-composition').waitFor();
