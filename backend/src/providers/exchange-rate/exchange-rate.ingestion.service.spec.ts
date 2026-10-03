@@ -28,6 +28,35 @@ import {
 } from './exchange-rate.ingestion.service';
 
 describe('ExchangeRate ingestion', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('passes safe real HTTP failure classification into ingestion results without body or credentials', async () => {
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        text: async () => 'unlabeled-synthetic-ingestion-body',
+      } as Response);
+    const prisma = createPrismaMock();
+    const config = configServiceFor('synthetic-provider-credential');
+    const client = new ExchangeRateClient(config, new ProviderHttpClient());
+    const result = await new ExchangeRateIngestionService(
+      prisma as never,
+      config,
+      client,
+    ).ingestUsdKrw();
+    expect(result).toMatchObject({
+      success: false,
+      provider: 'exchange_rate_api',
+      errorCode: 'PROVIDER_HTTP_ERROR',
+      errorMessage: 'exchange_rate_api HTTP 503 (PROVIDER_HTTP_ERROR).',
+    });
+    expect(JSON.stringify(result)).not.toMatch(
+      /unlabeled-synthetic-ingestion-body|synthetic-provider-credential/,
+    );
+    expect(prisma.fxRateSnapshot.create).not.toHaveBeenCalled();
+  });
   const receivedAt = new Date('2026-05-26T00:00:10.000Z');
   const response = {
     result: 'success',

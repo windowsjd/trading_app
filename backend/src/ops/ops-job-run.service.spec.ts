@@ -34,8 +34,10 @@ import {
   OpsJobTrigger,
 } from '../generated/prisma/client';
 import { OpsJobRunService } from './ops-job-run.service';
+import { ProviderHttpClient } from '../providers/provider-http.client';
 
 describe('OpsJobRunService', () => {
+  afterEach(() => jest.restoreAllMocks());
   const startedAt = new Date('2026-06-08T00:00:00.000Z');
   const finishedAt = new Date('2026-06-08T00:00:02.500Z');
 
@@ -55,6 +57,56 @@ describe('OpsJobRunService', () => {
       service: new OpsJobRunService(prisma as never),
     };
   };
+
+  it('persists safe provider failures and redacts free-form and structured metadata', async () => {
+    const { prisma, service } = createService();
+    const text = jest.fn().mockResolvedValue('unlabeled-synthetic-body');
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue({
+        ok: false,
+        status: 503,
+        text,
+      } as unknown as Response);
+    const error = (await new ProviderHttpClient()
+      .getJson('https://synthetic-private.test?authkey=fake-key', {
+        provider: 'exchange_rate_api',
+        timeoutMs: 1000,
+      })
+      .catch((failure: unknown) => failure)) as {
+      code: string;
+      message: string;
+    };
+    const run = { id: 'run-safe', startedAt: new Date() };
+    await service.recordFailed(run as never, {
+      errorCode: error.code,
+      errorMessage: error.message,
+      resultJson: {
+        provider: 'exchange_rate_api',
+        errorMessage: error.message,
+        privateKey: 'synthetic-private-key',
+        rawPayload: 'synthetic-payload',
+        note: '{"refreshToken":"synthetic-token"}',
+      },
+    });
+    const data = prisma.opsJobRun.update.mock.calls[0][0].data;
+    expect(data).toMatchObject({
+      errorCode: 'PROVIDER_HTTP_ERROR',
+      errorMessage: 'exchange_rate_api HTTP 503 (PROVIDER_HTTP_ERROR).',
+      resultJson: { privateKey: '[REDACTED]', rawPayload: '[REDACTED]' },
+    });
+    expect(JSON.stringify(data)).not.toMatch(
+      /unlabeled-synthetic-body|synthetic-private|synthetic-payload|synthetic-token|fake-key/,
+    );
+    await service.recordFailed(run as never, {
+      errorCode: 'OPS_JOB_FAILED',
+      errorMessage: 'Error: {"apiKey":"synthetic-text-secret"}',
+    });
+    expect(JSON.stringify(prisma.opsJobRun.update.mock.calls)).not.toContain(
+      'synthetic-text-secret',
+    );
+    expect(text).not.toHaveBeenCalled();
+  });
 
   it('creates a running run with redacted metadata', async () => {
     const { prisma, service } = createService();

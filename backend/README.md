@@ -15,6 +15,23 @@ reservation, command/exchange/ledger, and performance integrity read-only.
 
 ## Current MVP Scope
 
+Admin diagnostics retain the v1 envelope and are generated only for an authenticated
+request whose DB-resolved current role is `admin`; operators and ordinary users do
+not receive them. Public domain error codes/messages/status remain independent of
+admin-only evidence. Sensitive keys are normalized across casing/separators, and
+secret assignments in text are redacted.
+Escaped nested JSON secret fields and ambiguous raw payload text are conservatively
+redacted as whole strings; ordinary safe prose and business keys are preserved.
+Provider HTTP errors must contain only provider, safe failure category and HTTP
+status, never response bodies or URLs.
+Opted-in wrapped failures (currently the shared FX execute transaction) preserve
+a safe cause category and failed step without retaining raw DB/provider messages.
+Home/Portfolio unexpected partial errors use public generic messages, with
+sanitized internal details confined to admin diagnostics. Typed domain messages
+are preserved. HTTP 200 partial diagnostics explicitly receive each
+row/section's local evidence and never inherit shared request evidence. Existing
+request ID, query exclusion, collection/depth/string and 24 KiB limits remain.
+
 - Access token + refresh token auth: signup, login, refresh, logout, logout-all, and `GET /api/v1/me`.
 - Admin/operator authorization and account management: `UserRole`, DB-current-role access context, `GET /api/v1/operator/me`, admin-only user list/get, admin-only role change, admin-only user status/restore, and internal operator audit log service/model.
 - Internal reward fulfillment foundation: operator/admin managed request queue/status APIs, idempotent internal reward requests, fulfillment into `SeasonReward`, and fulfilled-only user reward visibility. This does not call or implement external cash, point, coupon, gifticon, payment, or delivery APIs.

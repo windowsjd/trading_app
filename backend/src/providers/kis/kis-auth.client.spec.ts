@@ -313,7 +313,7 @@ describe('KIS auth client skeleton', () => {
 
     await expect(client.requestConfiguredRestToken()).rejects.toMatchObject({
       code: 'PROVIDER_HTTP_ERROR',
-      message: expect.stringContaining('EGW00133'),
+      message: expect.stringContaining('rate limit'),
     });
   });
 
@@ -422,8 +422,37 @@ describe('KIS auth client skeleton', () => {
       client.requestConfiguredWebSocketApprovalKey(),
     ).rejects.toMatchObject({
       code: 'PROVIDER_HTTP_ERROR',
-      message: expect.stringContaining('EGW00133'),
+      message: expect.stringContaining('rate limit'),
     });
+  });
+
+  it('discards raw auth error bodies while retaining safe rate-limit classification', async () => {
+    const body =
+      'EGW00133 unlabeled-synthetic-auth-body apiKey=fake-auth-secret';
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        text: async () => body,
+      } as Response);
+    const client = new KisAuthClient(
+      configServiceFor({ restBaseUrl: 'https://kis.example.test' }),
+    );
+    const error = await client
+      .requestConfiguredRestToken()
+      .catch((failure: unknown) => failure);
+    expect(error).toMatchObject({
+      provider: 'kis',
+      code: 'PROVIDER_HTTP_ERROR',
+      message: 'KIS HTTP 403 (PROVIDER_HTTP_ERROR; rate limit).',
+    });
+    expect(JSON.stringify(error)).not.toMatch(
+      /unlabeled-synthetic-auth-body|fake-auth-secret|EGW00133/,
+    );
+    expect((error as Error).stack).not.toMatch(
+      /unlabeled-synthetic-auth-body|fake-auth-secret/,
+    );
   });
 
   it('redacts KIS app key, app secret, token, and approval_key fields', () => {

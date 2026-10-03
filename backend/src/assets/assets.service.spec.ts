@@ -52,7 +52,10 @@ import {
   resetMarketSessionOverrideStoreForTest,
 } from '../orders/market-calendar/market-session-override.store';
 import { AssetsService } from './assets.service';
-import { adminDiagnosticRequestMiddleware } from '../common/admin-diagnostics';
+import {
+  adminDiagnosticRequestMiddleware,
+  setAdminDiagnosticContext,
+} from '../common/admin-diagnostics';
 import { AssetTickerGateway } from '../realtime/asset-ticker.gateway';
 import { KIS_DOMESTIC_PERIOD_SOURCE } from '../providers/kis/candles/kis-period-candle.types';
 import { BINANCE_CANDLE_SOURCE } from '../providers/binance/binance-candle.types';
@@ -1453,6 +1456,84 @@ describe('AssetsService', () => {
     expect(response.data.asset.tradingNote.message).toContain(
       'Crypto is USD-settled',
     );
+    expectNoAssetWrites(prisma);
+  });
+
+  it('forwards already computed selection evidence independently for two concurrent failed rows', async () => {
+    const { prisma, service } = createService();
+    const rows = ['a', 'b'].map((id) =>
+      asset({
+        id,
+        assetType: AssetType.crypto,
+        currencyCode: CurrencyCode.USD,
+      }),
+    );
+    prisma.asset.count.mockResolvedValue(2);
+    prisma.asset.findMany.mockResolvedValue(rows);
+    prisma.fxRateSnapshot.findFirst.mockResolvedValue(null);
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValue(null);
+    prisma.assetPriceSnapshot.findMany.mockImplementation(async ({ where }) => {
+      const id = where.assetId;
+      // Distinct failures overlap inside the same request.
+      await Promise.resolve();
+      return [
+        providerPriceSnapshot(
+          `snapshot-${id}`,
+          'binance_public_rest_24hr_ticker',
+          '100',
+          CurrencyCode.USD,
+          new Date(Date.now() - (id === 'a' ? 3600000 : 7200000)),
+        ),
+      ];
+    });
+    let pending!: ReturnType<AssetsService['getAssets']>;
+    adminDiagnosticRequestMiddleware(
+      {
+        method: 'GET',
+        originalUrl: '/api/v1/assets?withPrice=true',
+        headers: {},
+        user: { userId: 'admin', role: 'admin' },
+      } as never,
+      { setHeader: jest.fn() } as never,
+      () => {
+        setAdminDiagnosticContext({
+          evidence: { unrelated: 'shared-row-shadow' },
+          entities: { assetId: 'shadow' },
+        });
+        pending = service.getAssets('admin');
+      },
+    );
+    const response = await pending;
+    expect(response.data.priceErrors).toHaveLength(2);
+    for (const row of response.data.priceErrors) {
+      const id = row.assetId;
+      expect(row.diagnostic).toMatchObject({
+        entities: { assetId: id, snapshotId: `snapshot-${id}` },
+        evidence: {
+          workflow: 'assets_with_price',
+          selectionResult: 'REJECTED',
+          fallbackSnapshotFound: false,
+          providerDecision: { rejectedProviderReason: 'captured_at_stale' },
+          latestRejectedCandidate: {
+            id: `snapshot-${id}`,
+            positivePrice: true,
+          },
+        },
+      });
+      expect(row.diagnostic?.evidence?.freshnessThresholdSeconds).toEqual(
+        expect.any(Number),
+      );
+      expect(JSON.stringify(row.diagnostic)).not.toMatch(
+        /shared-row-shadow|"assetId":"shadow"/,
+      );
+      expect(JSON.stringify(row.diagnostic)).not.toContain(
+        `snapshot-${id === 'a' ? 'b' : 'a'}`,
+      );
+      expect(
+        row.diagnostic?.diagnosticEvents.events.map((event) => event.event),
+      ).toEqual(['HTTP_REQUEST_RECEIVED', 'PARTIAL_FAILURE_RECORDED']);
+    }
+    expect(prisma.assetPriceSnapshot.findMany).toHaveBeenCalledTimes(2);
     expectNoAssetWrites(prisma);
   });
 

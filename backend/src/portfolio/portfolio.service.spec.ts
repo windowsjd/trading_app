@@ -43,6 +43,7 @@ import {
   SeasonStatus,
 } from '../generated/prisma/client';
 import { PortfolioService } from './portfolio.service';
+import { adminDiagnosticRequestMiddleware } from '../common/admin-diagnostics';
 
 describe('PortfolioService', () => {
   const startAt = new Date('2026-05-01T00:00:00.000Z');
@@ -126,6 +127,50 @@ describe('PortfolioService', () => {
   const mockJoined = (prisma: ReturnType<typeof createPrisma>) => {
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
   };
+
+  it.each(['admin', 'user', 'operator'] as const)(
+    'hides unexpected raw partial messages from %s public fields',
+    async (role) => {
+      const { prisma, portfolioValuationService, service } = createService();
+      mockCurrentSeason(prisma);
+      mockJoined(prisma);
+      portfolioValuationService.calculateTradingAccountValuation.mockRejectedValueOnce(
+        new Error(
+          'synthetic-portfolio-internal refreshToken=fake-portfolio-secret',
+        ),
+      );
+      let pending!: ReturnType<PortfolioService['getPortfolio']>;
+      adminDiagnosticRequestMiddleware(
+        {
+          method: 'GET',
+          originalUrl: '/api/v1/portfolio',
+          headers: {},
+          user: { userId: 'user-1', role },
+        } as never,
+        { setHeader: jest.fn() } as never,
+        () => {
+          pending = service.getPortfolio('user-1');
+        },
+      );
+      const response = await pending;
+      const sectionError = response.data.sectionErrors[0];
+      expect(sectionError).toMatchObject({
+        code: 'VALUATION_UNAVAILABLE',
+        message: 'Portfolio is unavailable.',
+      });
+      if (role === 'admin') {
+        expect(sectionError.diagnostic?.exception.message).toContain(
+          'synthetic-portfolio-internal',
+        );
+        expect(JSON.stringify(sectionError.diagnostic)).not.toContain(
+          'fake-portfolio-secret',
+        );
+      } else
+        expect(JSON.stringify(response)).not.toMatch(
+          /synthetic-portfolio-internal|fake-portfolio-secret|diagnostic/,
+        );
+    },
+  );
 
   it('returns current portfolio summary from the shared valuation service', async () => {
     const { portfolioValuationService, prisma, service } = createService();

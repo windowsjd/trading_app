@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { redactText } from './provider-secret-redaction';
 import { ProviderHttpError, type ProviderId } from './provider.types';
 
 export type ProviderHttpJsonResult<T> = {
@@ -31,19 +30,17 @@ export class ProviderHttpClient {
         signal: controller.signal,
       });
       const receivedAt = new Date();
-      const bodyText = await response.text();
-
       if (!response.ok) {
+        // Release the fetch stream without reading or retaining the error body.
+        await response.body?.cancel().catch(() => undefined);
         throw new ProviderHttpError(
           options.provider,
           'PROVIDER_HTTP_ERROR',
-          `${options.provider} HTTP ${response.status} from ${redactText(url, {
-            secrets: options.secrets,
-          })}: ${redactText(bodyText.slice(0, 500), {
-            secrets: options.secrets,
-          })}`,
+          `${options.provider} HTTP ${response.status} (PROVIDER_HTTP_ERROR).`,
         );
       }
+
+      const bodyText = await response.text();
 
       try {
         return {
@@ -55,9 +52,7 @@ export class ProviderHttpClient {
         throw new ProviderHttpError(
           options.provider,
           'PROVIDER_JSON_PARSE_ERROR',
-          `${options.provider} returned invalid JSON from ${redactText(url, {
-            secrets: options.secrets,
-          })}.`,
+          `${options.provider} returned invalid JSON (PROVIDER_JSON_PARSE_ERROR).`,
         );
       }
     } catch (error) {
@@ -72,9 +67,7 @@ export class ProviderHttpClient {
       throw new ProviderHttpError(
         options.provider,
         code,
-        `${options.provider} request failed for ${redactText(url, {
-          secrets: options.secrets,
-        })}.`,
+        `${options.provider} request failed (${code}).`,
       );
     } finally {
       clearTimeout(timeout);

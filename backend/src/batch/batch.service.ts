@@ -6,6 +6,8 @@ import {
 } from '../generated/prisma/client';
 import { buildPagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
+import { sanitizeOpsJson } from '../ops/ops-redaction';
+import { redactStoredText } from '../common/sensitive-data';
 import {
   BatchGetJobRunResponse,
   BatchJobRunListQuery,
@@ -97,8 +99,8 @@ export class BatchService {
         data: {
           status: BatchJobStatus.failed,
           finishedAt: new Date(),
-          errorCode: failure.errorCode,
-          errorMessage: failure.errorMessage,
+          errorCode: redactStoredText(failure.errorCode),
+          errorMessage: redactStoredText(failure.errorMessage),
           ...(failure.resultPayload === undefined
             ? {}
             : {
@@ -380,7 +382,7 @@ export class BatchService {
       return Prisma.JsonNull;
     }
 
-    return value as Prisma.InputJsonValue;
+    return sanitizeOpsJson(value) as Prisma.InputJsonValue;
   }
 
   private isUniqueConstraintError(error: unknown) {
@@ -483,7 +485,9 @@ export class BatchService {
       return undefined;
     }
 
-    const value = response.error[fieldName];
+    const value: unknown = (response.error as Record<string, unknown>)[
+      fieldName
+    ];
     if (typeof value !== 'string' || value.trim() === '') {
       return undefined;
     }

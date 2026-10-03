@@ -59,6 +59,15 @@ Price snapshots, stored candles, and live candle events already have internal no
 
 ### KIS
 
+Provider HTTP failures expose only provider, HTTP status and a fixed safe failure
+category. The shared HTTP client and KIS quote/auth clients do not put endpoint
+URLs or raw error response bodies into error messages, logs, diagnostics or Ops/
+Batch results. Unused HTTP/quote error response streams are cancelled. KIS auth
+observes its existing bounded body excerpt locally only
+to preserve the rate-limit cache fallback; only the fixed `rate limit` category
+escapes, and the body is discarded. Successful business response parsing and
+credential-redacted snapshot raw metadata retain their existing purpose.
+
 - Adds appkey/appsecret config parsing and secret redaction.
 - Adds REST token response parsing and WebSocket approval key response parsing foundation.
 - Adds WebSocket approval key convenience request using `POST /oauth2/Approval` with `grant_type=client_credentials`, `appkey`, and `secretkey`.

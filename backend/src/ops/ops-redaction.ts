@@ -1,34 +1,9 @@
-const REDACTED = '[REDACTED]';
+import {
+  isSensitiveDiagnosticKey,
+  REDACTED,
+  redactStoredText,
+} from '../common/sensitive-data';
 const UNSUPPORTED_VALUE = '[UNSUPPORTED_METADATA_VALUE]';
-
-const SENSITIVE_KEY_PATTERNS = [
-  'access_token',
-  'accesstoken',
-  'api_key',
-  'apikey',
-  'app_key',
-  'appkey',
-  'app_secret',
-  'appsecret',
-  'approval_key',
-  'approvalkey',
-  'authorization',
-  'database_url',
-  'databaseurl',
-  'password',
-  'private_key',
-  'privatekey',
-  'provider_payload',
-  'providerpayload',
-  'raw_payload',
-  'rawpayload',
-  'raw_provider_payload',
-  'rawproviderpayload',
-  'refresh_token',
-  'refreshtoken',
-  'secret',
-  'token',
-];
 
 export function sanitizeOpsJson(value: unknown): unknown {
   if (value === undefined) {
@@ -44,7 +19,7 @@ function sanitizeJsonValue(value: unknown): unknown {
   }
 
   if (typeof value === 'string') {
-    return isSensitiveString(value) ? REDACTED : value;
+    return redactStoredText(value);
   }
 
   if (typeof value === 'number' || typeof value === 'boolean') {
@@ -69,7 +44,7 @@ function sanitizeJsonValue(value: unknown): unknown {
         .filter(([, item]) => item !== undefined)
         .map(([key, item]) => [
           key,
-          isSensitiveKey(key) ? REDACTED : sanitizeJsonValue(item),
+          isSensitiveDiagnosticKey(key) ? REDACTED : sanitizeJsonValue(item),
         ]),
     );
   }
@@ -78,20 +53,6 @@ function sanitizeJsonValue(value: unknown): unknown {
 }
 
 function isPlainObject(value: object) {
-  const prototype = Object.getPrototypeOf(value);
+  const prototype: unknown = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
-}
-
-function isSensitiveKey(key: string) {
-  const normalized = key.replace(/[\s.-]/g, '_').toLowerCase();
-  return SENSITIVE_KEY_PATTERNS.some((pattern) => normalized.includes(pattern));
-}
-
-function isSensitiveString(value: string) {
-  return (
-    /^bearer\s+/i.test(value.trim()) ||
-    /postgres(?:ql)?:\/\//i.test(value) ||
-    /mysql:\/\//i.test(value) ||
-    /mongodb(?:\+srv)?:\/\//i.test(value)
-  );
 }

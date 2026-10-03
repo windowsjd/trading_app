@@ -5,6 +5,52 @@ import { Test } from '@nestjs/testing';
 describe('KisQuoteClient rate-limit integration', () => {
   afterEach(() => jest.restoreAllMocks());
 
+  it('discards raw quote error bodies and retains provider/status/category', async () => {
+    const text = jest
+      .fn()
+      .mockResolvedValue(
+        'unlabeled-synthetic-quote-body appSecret=fake-quote-secret',
+      );
+    const cancel = jest.fn().mockResolvedValue(undefined);
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 502,
+      text,
+      body: { cancel },
+    } as unknown as Response);
+    const configService = {
+      getConfig: () => ({
+        common: { httpTimeoutMs: 5000 },
+        kis: {
+          enabled: true,
+          appKey: 'fake-key',
+          appSecret: 'fake-secret',
+          restBaseUrl: 'https://kis.example.test',
+        },
+      }),
+    };
+    const client = new KisQuoteClient(
+      configService as never,
+      { acquire: jest.fn().mockResolvedValue(undefined) } as never,
+    );
+    const error = await client
+      .getMarketDataByExplicitPath({
+        path: '/quote',
+        query: { authorization: 'fake-query-secret' },
+      })
+      .catch((failure: unknown) => failure);
+    expect(error).toMatchObject({
+      provider: 'kis',
+      code: 'PROVIDER_HTTP_ERROR',
+      message: 'KIS HTTP 502 (PROVIDER_HTTP_ERROR).',
+    });
+    expect((error as Error).stack).not.toMatch(
+      /unlabeled-synthetic|fake-quote-secret|fake-query-secret/,
+    );
+    expect(text).not.toHaveBeenCalled();
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
   it('acquires a rest slot immediately before each physical quote request', async () => {
     const config = {
       common: { httpTimeoutMs: 5000 },

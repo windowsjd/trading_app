@@ -8,6 +8,7 @@ import {
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { sanitizeOpsJson } from './ops-redaction';
+import { redactStoredText } from '../common/sensitive-data';
 
 export type SerializedOpsJobRun = {
   id: string;
@@ -114,8 +115,12 @@ export class OpsJobRunService {
         status: OpsJobRunStatus.failed,
         finishedAt,
         durationMs: this.durationMs(run.startedAt, finishedAt),
-        errorCode: this.requiredString(input.errorCode, 'errorCode'),
-        errorMessage: this.requiredString(input.errorMessage, 'errorMessage'),
+        errorCode: redactStoredText(
+          this.requiredString(input.errorCode, 'errorCode'),
+        ),
+        errorMessage: redactStoredText(
+          this.requiredString(input.errorMessage, 'errorMessage'),
+        ),
         ...(input.resultJson === undefined
           ? {}
           : {

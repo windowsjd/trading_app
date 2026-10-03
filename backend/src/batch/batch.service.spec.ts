@@ -15,6 +15,7 @@ jest.mock('../generated/prisma/client', () => ({
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { BatchJobStatus } from '../generated/prisma/client';
 import { BatchService } from './batch.service';
+import { ProviderHttpClient } from '../providers/provider-http.client';
 
 type PrismaMock = {
   batchJobRun: {
@@ -43,6 +44,79 @@ describe('BatchService', () => {
   beforeEach(() => {
     prisma = createPrismaMock();
     service = new BatchService(prisma as never);
+  });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('persists provider category/status without raw body and scrubs request/result/error text', async () => {
+    prisma.batchJobRun.create.mockResolvedValue(
+      makeRun({ status: BatchJobStatus.running }),
+    );
+    prisma.batchJobRun.update.mockImplementation(async ({ data }) =>
+      makeRun(data),
+    );
+    const text = jest
+      .fn()
+      .mockResolvedValue('unlabeled-synthetic-batch-provider-body');
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue({
+        ok: false,
+        status: 502,
+        text,
+      } as unknown as Response);
+    const failure = await service
+      .runJob({
+        jobName: 'provider-test',
+        idempotencyKey: 'safe-key',
+        requestPayload: { apiKey: 'synthetic-request-secret' },
+        handler: () =>
+          new ProviderHttpClient().getJson(
+            'https://synthetic-private.test?key=fake-key',
+            { provider: 'binance', timeoutMs: 1000 },
+          ),
+      })
+      .catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(HttpException);
+    expect(prisma.batchJobRun.update.mock.calls[0][0].data).toMatchObject({
+      errorCode: 'PROVIDER_HTTP_ERROR',
+      errorMessage: 'binance HTTP 502 (PROVIDER_HTTP_ERROR).',
+    });
+    expect(JSON.stringify(prisma.batchJobRun.create.mock.calls)).not.toContain(
+      'synthetic-request-secret',
+    );
+    expect(JSON.stringify(prisma.batchJobRun.update.mock.calls)).not.toMatch(
+      /unlabeled-synthetic|synthetic-private|fake-key/,
+    );
+    expect(
+      JSON.stringify((failure as HttpException).getResponse()),
+    ).not.toMatch(/unlabeled-synthetic|synthetic-private|fake-key/);
+
+    await service.runJob({
+      jobName: 'safe-result',
+      idempotencyKey: 'safe-result-key',
+      handler: () => ({
+        rawPayload: 'synthetic-payload',
+        note: '{"privateKey":"synthetic-text-secret"}',
+        count: 1,
+      }),
+    });
+    expect(
+      prisma.batchJobRun.update.mock.calls[1][0].data.resultPayloadJson,
+    ).toMatchObject({ rawPayload: '[REDACTED]', count: 1 });
+    await service
+      .runJob({
+        jobName: 'safe-error',
+        idempotencyKey: 'safe-error-key',
+        handler: () => {
+          throw new Error('Error: apiKey=synthetic-error-secret');
+        },
+      })
+      .catch(() => {});
+    expect(JSON.stringify(prisma.batchJobRun.update.mock.calls)).not.toMatch(
+      /synthetic-payload|synthetic-text-secret|synthetic-error-secret/,
+    );
+    expect(text).not.toHaveBeenCalled();
   });
 
   it('creates a BatchJobRun and marks it succeeded with handler result', async () => {

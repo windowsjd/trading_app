@@ -44,10 +44,10 @@ import {
 } from './asset-list-turnover';
 import {
   type AdminDiagnostic,
+  type DiagnosticContextUpdate,
   buildAdminPartialFailureDiagnostic,
   isAdminDiagnosticRequest,
   recordAdminDiagnosticEvent,
-  setAdminDiagnosticContext,
   withoutAdminDiagnosticContext,
 } from '../common/admin-diagnostics';
 import {
@@ -1003,10 +1003,8 @@ export class AssetsService {
     payload: AssetPricePayload;
     error?: AssetPriceError;
   }> {
-    const snapshot = await this.findLatestEligibleAssetPriceSnapshot(
-      asset,
-      valuationAt,
-    );
+    const { snapshot, failureContext } =
+      await this.findLatestEligibleAssetPriceSnapshot(asset, valuationAt);
 
     if (!snapshot) {
       const message = `Asset price snapshot is unavailable for asset ${asset.id}.`;
@@ -1014,10 +1012,15 @@ export class AssetsService {
         new Error(message),
         'ASSET_PRICE_UNAVAILABLE',
         {
+          ...failureContext,
           domain: 'MARKET_DATA',
           operation: 'ASSET_PRICE_READ',
           failureStage: 'asset_price_selection',
-          entities: { assetId: asset.id, symbol: asset.symbol },
+          entities: {
+            ...failureContext?.entities,
+            assetId: asset.id,
+            symbol: asset.symbol,
+          },
           nextInvestigation: [
             'backend/src/assets/assets.service.ts',
             'backend/src/providers/source-eligibility.policy.ts',
@@ -1149,7 +1152,10 @@ export class AssetsService {
   private async findLatestEligibleAssetPriceSnapshot(
     asset: AssetRecord,
     valuationAt: Date,
-  ): Promise<AssetPriceSnapshotRecord | null> {
+  ): Promise<{
+    snapshot: AssetPriceSnapshotRecord | null;
+    failureContext?: DiagnosticContextUpdate;
+  }> {
     const providerEligibility = resolveAssetProviderEligibility({
       workflow: 'assets_with_price',
       asset: {
@@ -1199,8 +1205,10 @@ export class AssetsService {
 
     if (providerSelection.state === 'selected') {
       return {
-        ...providerSelection.snapshot,
-        sourceDecision: providerSelection.decision,
+        snapshot: {
+          ...providerSelection.snapshot,
+          sourceDecision: providerSelection.decision,
+        },
       };
     }
 
@@ -1236,7 +1244,7 @@ export class AssetsService {
 
     if (!fallbackSnapshot) {
       const latestCandidate = providerCandidates[0];
-      setAdminDiagnosticContext({
+      const failureContext: DiagnosticContextUpdate = {
         failureStage: 'asset_price_selection',
         entities: {
           assetId: asset.id,
@@ -1261,31 +1269,33 @@ export class AssetsService {
                 sourceName: latestCandidate.sourceName,
                 effectiveAt: latestCandidate.effectiveAt,
                 capturedAt: latestCandidate.capturedAt,
-                price: latestCandidate.price.toFixed(8),
+                positivePrice: isPositiveDecimal(latestCandidate.price),
               }
             : null,
           fallbackSnapshotFound: false,
           selectionResult: 'REJECTED',
         },
-      });
+      };
       recordAdminDiagnosticEvent(
         'warn',
         'ASSET_PRICE_SELECTION_REJECTED',
         `No eligible price snapshot was selected for asset ${asset.id}.`,
         { rejectedReason: providerSelection.decision.rejectedProviderReason },
       );
-      return null;
+      return { snapshot: null, failureContext };
     }
 
     return {
-      ...fallbackSnapshot,
-      sourceDecision: buildAdminManualFallbackDecision({
-        selectedSnapshotId: fallbackSnapshot.id,
-        selectedSourceName: fallbackSnapshot.sourceName,
-        selectedEffectiveAt: fallbackSnapshot.effectiveAt,
-        selectedCapturedAt: fallbackSnapshot.capturedAt,
-        providerDecision: providerSelection.decision,
-      }),
+      snapshot: {
+        ...fallbackSnapshot,
+        sourceDecision: buildAdminManualFallbackDecision({
+          selectedSnapshotId: fallbackSnapshot.id,
+          selectedSourceName: fallbackSnapshot.sourceName,
+          selectedEffectiveAt: fallbackSnapshot.effectiveAt,
+          selectedCapturedAt: fallbackSnapshot.capturedAt,
+          providerDecision: providerSelection.decision,
+        }),
+      },
     };
   }
 

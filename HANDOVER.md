@@ -12,6 +12,20 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 관리자 진단 개선 1단계 — 안전성·원인 보존·partial 전달 (2026-10-03)
+
+기준은 로컬/GitHub `main` 모두 `5a4523ccd3523bc7b1e1028eae4d869701b8332c`(`UI개편7-3`)였다.
+기능 구현 의도: 관리자 진단을 상세화하기 전에 민감정보 유입 경로와 원인 소실 지점을 먼저 정비해,
+이후 FX/주문/실시간 진단을 안전하게 확장할 수 있도록 공통 기반을 강화했다.
+
+- key 표기 정규화와 text secret assignment redaction을 공통화했다. 관리자 진단, Nest logger, Provider credential redaction, Ops/Batch 및 operator audit가 해당 정책을 재사용한다.
+- 공통 Provider HTTP/KIS 인증·시세 오류에서 raw body와 URL을 제거했다. KIS rate-limit 캐시 fallback은 본문을 로컬에서 분류한 고정 문구로 유지한다.
+- 구조화된 HttpException의 안전한 domain message를 관리자 exception에 보존하고 malformed response를 방어했다. FX 공통 execute transaction의 generic wrapper에는 실패 단계와 allowlist 기반 cause 분류만 남긴다. 원본 DB message/cause는 저장하지 않는다.
+- 자산 가격 partial에는 이미 계산한 local selection evidence를 명시적으로 전달한다. shared evidence 자동 상속·shared cache 진단 저장은 하지 않는다. Home/Portfolio unexpected partial message는 공개 기본 문구로 바꾸고 admin diagnostic으로 분리했다.
+- admin 현재 DB role 경계, v1 공개 domain error 계약, request ID·query 제외·24 KiB 및 기존 세부 bound를 유지한다. 금융 계산/정책, Provider 호출 수, DB 조회/mutation 수, schema/frontend UI는 변경하지 않았다.
+- 검증: 전체 unit 213 suites / 3,320 tests 통과(DB·외부 Provider integration 제외). Backend typecheck, 변경 핵심 소스 13개 lint, `lint:accounts:check`, `git diff --check` 통과. 기존 fixture의 tsx IPC 제한은 제한 밖 재실행으로 확인했다. FX 1건·Home 3건의 기존 lint 오류는 HEAD 원문과 대조해 유지했다.
+- 다음 단계의 provider candidate matrix/FX·가격·주문 reason 확장 및 WebSocket runtime 상태 보존은 이번 범위 밖이다. 기존 DB/로그의 과거 오류 기록은 소급 변경하지 않았다.
+
 ### 작업 단위: 주문 화면 경고·중복 라벨 후속 정리 (2026-09-30)
 
 기준 커밋은 `808c25fe`(`ui변경`)이며, 시작 전 `origin/main`과 일치하는 clean tree를 확인했다. Backend 동작은 변경하지 않았다.

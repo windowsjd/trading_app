@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { ProviderConfigService } from '../provider-config.service';
-import { redactText } from '../provider-secret-redaction';
 import { ProviderConfigError, ProviderHttpError } from '../provider.types';
 import type {
   KisApprovalKeyResponse,
@@ -298,15 +297,16 @@ export class KisAuthClient {
       });
       const receivedAt = new Date();
       const bodyText = await response.text();
-      const secrets = [config.kis.appKey, config.kis.appSecret];
-
       if (!response.ok) {
+        // Existing token/approval cache fallback depends on this classification.
+        // Observe the body locally, then discard it; only the fixed category escapes.
+        const rateLimited = /egw00133|rate limit|too many/iu.test(
+          bodyText.slice(0, 500),
+        );
         throw new ProviderHttpError(
           'kis',
           'PROVIDER_HTTP_ERROR',
-          `KIS HTTP ${response.status} from ${redactText(url, {
-            secrets,
-          })}: ${redactText(bodyText.slice(0, 500), { secrets })}`,
+          `KIS HTTP ${response.status} (PROVIDER_HTTP_ERROR${rateLimited ? '; rate limit' : ''}).`,
         );
       }
 
@@ -320,7 +320,7 @@ export class KisAuthClient {
         throw new ProviderHttpError(
           'kis',
           'PROVIDER_JSON_PARSE_ERROR',
-          `KIS returned invalid JSON from ${redactText(url, { secrets })}.`,
+          'KIS returned invalid JSON (PROVIDER_JSON_PARSE_ERROR).',
         );
       }
     } catch (error) {

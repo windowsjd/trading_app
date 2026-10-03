@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { HttpException } from '@nestjs/common';
+import {
+  isSensitiveDiagnosticKey,
+  redactSensitiveText,
+} from './sensitive-data';
 import type { NextFunction, Response } from 'express';
 import type { AuthenticatedRequest } from '../auth/auth.types';
 
@@ -11,6 +16,75 @@ const MAX_STRING_LENGTH = 1_000;
 const MAX_COLLECTION_ITEMS = 30;
 const MAX_OBJECT_DEPTH = 5;
 const MAX_DIAGNOSTIC_BYTES = 24 * 1024;
+
+type SafeFailureCause = { category: string; errorType: string; code?: string };
+const wrappedFailures = new WeakMap<
+  Error,
+  { failedStep: string; cause: SafeFailureCause }
+>();
+
+/** Keep only classification, never the original message, stack or payload. */
+export function preserveAdminFailureCause<T extends Error>(
+  wrapper: T,
+  cause: unknown,
+  failedStep: string,
+): T {
+  wrappedFailures.set(wrapper, {
+    failedStep,
+    cause: classifyFailureCause(cause),
+  });
+  return wrapper;
+}
+
+function classifyFailureCause(cause: unknown): SafeFailureCause {
+  const categories: Record<string, string> = {
+    P2002: 'db_unique_constraint',
+    P2003: 'db_foreign_key_constraint',
+    P2025: 'db_record_not_found',
+    P2034: 'db_transaction_conflict',
+    P1001: 'db_connection_failed',
+    P1002: 'db_timeout',
+    '23505': 'db_unique_constraint',
+    '23503': 'db_foreign_key_constraint',
+    '40001': 'db_transaction_conflict',
+    '40P01': 'db_deadlock',
+    PROVIDER_HTTP_ERROR: 'provider_http_error',
+    PROVIDER_TIMEOUT: 'provider_timeout',
+    PROVIDER_REQUEST_FAILED: 'provider_request_failed',
+    PROVIDER_JSON_PARSE_ERROR: 'provider_parse_error',
+  };
+  const code =
+    cause &&
+    typeof cause === 'object' &&
+    'code' in cause &&
+    typeof cause.code === 'string'
+      ? cause.code
+      : undefined;
+  const knownType =
+    cause instanceof Error &&
+    [
+      'Error',
+      'TypeError',
+      'RangeError',
+      'SyntaxError',
+      'PrismaClientKnownRequestError',
+      'PrismaClientUnknownRequestError',
+      'PrismaClientInitializationError',
+      'PrismaClientValidationError',
+    ].includes(cause.name)
+      ? cause.name
+      : cause instanceof Error
+        ? 'Error'
+        : 'NonError';
+  return {
+    category:
+      code && Object.hasOwn(categories, code)
+        ? categories[code]
+        : 'unexpected_error',
+    errorType: knownType,
+    ...(code && Object.hasOwn(categories, code) ? { code } : {}),
+  };
+}
 
 type DiagnosticScalar = string | number | boolean | null;
 type DiagnosticValue =
@@ -263,13 +337,25 @@ function buildAdminDiagnosticInternal(
   const operation = isolateFailure
     ? (update?.operation ?? context.operation)
     : context.operation;
-  const failureStage = isolateFailure
-    ? (update?.failureStage ?? inferFailureStage(code))
-    : context.failureStage;
+  const wrappedFailure =
+    exception instanceof Error ? wrappedFailures.get(exception) : undefined;
+  const failureStage =
+    wrappedFailure?.failedStep ??
+    (isolateFailure
+      ? (update?.failureStage ?? inferFailureStage(code))
+      : context.failureStage);
   const entities = isolateFailure
     ? { ...context.requestEntities, ...update?.entities }
     : context.entities;
-  const evidence = isolateFailure ? (update?.evidence ?? {}) : context.evidence;
+  const evidence = {
+    ...(isolateFailure ? (update?.evidence ?? {}) : context.evidence),
+    ...(wrappedFailure
+      ? {
+          failedStep: wrappedFailure.failedStep,
+          safeCause: wrappedFailure.cause,
+        }
+      : {}),
+  };
   const nextInvestigation = isolateFailure
     ? unique([
         ...context.requestNextInvestigation,
@@ -478,18 +564,33 @@ function decodeSegment(value: string): string {
 
 function describeException(exception: unknown): AdminDiagnostic['exception'] {
   const error = exception instanceof Error ? exception : null;
-  const rawMessage = error?.message ?? 'Non-Error exception';
-  const stack = error?.stack?.split('\n').map((line) => line.trim()) ?? [];
+  const rawMessage =
+    httpExceptionMessage(exception) ??
+    (typeof error?.message === 'string'
+      ? error.message
+      : 'Non-Error exception');
+  const stack =
+    typeof error?.stack === 'string'
+      ? redactSensitiveText(error.stack)
+          .split('\n')
+          .map((line) => line.trim())
+      : [];
   const applicationStack = stack.filter((line) =>
     /(?:backend[\\/](?:src|dist)|[\\/](?:src|dist)[\\/](?:orders|fx|portfolio|assets|providers|common))[\\/]/u.test(
       line,
     ),
   );
-  const cause =
-    error && 'cause' in error ? describeCause(error.cause) : undefined;
+  const wrapped = error ? wrappedFailures.get(error) : undefined;
+  const cause = wrapped
+    ? `${wrapped.cause.errorType}: ${wrapped.cause.category}${wrapped.cause.code ? ` (${wrapped.cause.code})` : ''}`
+    : error && 'cause' in error
+      ? describeCause(error.cause)
+      : undefined;
 
   return {
-    type: sanitizeString(error?.name ?? typeof exception),
+    type: sanitizeString(
+      typeof error?.name === 'string' ? error.name : typeof exception,
+    ),
     message: sanitizeString(rawMessage),
     ...(cause ? { cause } : {}),
     applicationStack: applicationStack
@@ -502,6 +603,36 @@ function describeException(exception: unknown): AdminDiagnostic['exception'] {
       applicationStack.length > MAX_APPLICATION_STACK_FRAMES ||
       stack.some((line) => line.length > MAX_STRING_LENGTH),
   };
+}
+
+function httpExceptionMessage(exception: unknown): string | undefined {
+  if (!(exception instanceof HttpException)) return undefined;
+  try {
+    const response: unknown = exception.getResponse();
+    if (typeof response === 'string') return response;
+    if (!response || typeof response !== 'object' || Array.isArray(response))
+      return undefined;
+    const body = response as Record<string, unknown>;
+    if (
+      body.success === false &&
+      body.error &&
+      typeof body.error === 'object'
+    ) {
+      const message: unknown = (body.error as Record<string, unknown>).message;
+      if (typeof message === 'string' && message.trim()) return message;
+    }
+    if (typeof body.message === 'string' && body.message.trim())
+      return body.message;
+    if (
+      Array.isArray(body.message) &&
+      body.message.every((item) => typeof item === 'string')
+    ) {
+      return body.message.slice(0, MAX_COLLECTION_ITEMS).join('; ');
+    }
+  } catch {
+    /* Malformed responses must not break diagnostics. */
+  }
+  return undefined;
 }
 
 function describeCause(value: unknown): string | undefined {
@@ -538,7 +669,9 @@ function sanitizeValue(value: unknown, depth: number): DiagnosticValue {
     return Object.fromEntries(
       entries.map(([key, item]) => [
         sanitizeString(key),
-        isSensitiveKey(key) ? '[REDACTED]' : sanitizeValue(item, depth + 1),
+        isSensitiveDiagnosticKey(key)
+          ? '[REDACTED]'
+          : sanitizeValue(item, depth + 1),
       ]),
     );
   }
@@ -548,16 +681,7 @@ function sanitizeValue(value: unknown, depth: number): DiagnosticValue {
 }
 
 function sanitizeString(value: string): string {
-  const redacted = value
-    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/giu, 'Bearer [REDACTED]')
-    .replace(
-      /(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?):\/\/[^\s'"}]+/giu,
-      '[REDACTED_DATABASE_URL]',
-    )
-    .replace(
-      /\b(access[_-]?token|refresh[_-]?token|password|authorization|cookie|secret|api[_-]?key|app[_-]?key|app[_-]?secret|approval[_-]?key)\b\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;}]+)/giu,
-      '$1=[REDACTED]',
-    );
+  const redacted = redactSensitiveText(value);
   return redacted.length <= MAX_STRING_LENGTH
     ? redacted
     : `${redacted.slice(0, MAX_STRING_LENGTH - 3)}...`;
@@ -574,6 +698,14 @@ function sanitizeLogMessage(value: unknown): string {
   } catch {
     return '[UNSERIALIZABLE_LOG_MESSAGE]';
   }
+}
+
+/** Scrub console output too; retain original inputs for diagnostic bound accounting. */
+export function sanitizeAdminLogArgument(value: unknown): unknown {
+  if (value === undefined) return undefined;
+  return value instanceof Error
+    ? sanitizeLogMessage(value)
+    : sanitizeValue(value, 0);
 }
 
 function selectFailureRelatedServerLogs(
@@ -637,13 +769,6 @@ function hasSanitizationLoss(
         key.length > MAX_STRING_LENGTH ||
         hasSanitizationLoss(item, depth + 1, seen),
     )
-  );
-}
-
-function isSensitiveKey(key: string): boolean {
-  const normalized = key.replace(/[\s.-]/gu, '_').toLowerCase();
-  return /(?:password|authorization|cookie|credential|database_url|token|secret|api_key|apikey|app_key|appkey|private_key|raw_payload|provider_payload)/u.test(
-    normalized,
   );
 }
 

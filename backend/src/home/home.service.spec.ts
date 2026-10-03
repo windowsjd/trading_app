@@ -53,6 +53,10 @@ jest.mock('../generated/prisma/client', () => {
 
 import { HttpException } from '@nestjs/common';
 import {
+  adminDiagnosticRequestMiddleware,
+  setAdminDiagnosticContext,
+} from '../common/admin-diagnostics';
+import {
   AssetPriceSourceType,
   AssetType,
   CurrencyCode,
@@ -636,6 +640,61 @@ describe('HomeService', () => {
     ).toHaveBeenCalledTimes(1);
     expectNoHomeWrites(prisma);
   });
+
+  it.each(['admin', 'user', 'operator', undefined] as const)(
+    'keeps unexpected partial error text out of public sections with role=%s',
+    async (role) => {
+      const { prisma, valuationService, service } = createService();
+      mockActiveSeason(prisma);
+      prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
+      prisma.dailyPortfolioSnapshot.findFirst.mockResolvedValueOnce(null);
+      prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
+      valuationService.calculateTradingAccountValuation.mockRejectedValueOnce(
+        new Error('synthetic-internal-detail apiKey=fake-home-secret'),
+      );
+      let pending!: ReturnType<HomeService['getHome']>;
+      adminDiagnosticRequestMiddleware(
+        {
+          method: 'GET',
+          originalUrl: '/api/v1/home',
+          headers: {},
+          user: role ? { userId: 'user-1', role } : undefined,
+        } as never,
+        { setHeader: jest.fn() } as never,
+        () => {
+          setAdminDiagnosticContext({
+            evidence: { unrelated: 'shared-section-shadow' },
+          });
+          pending = service.getHome('user-1');
+        },
+      );
+      const response = await pending;
+      expect(response.data.sectionErrors).toHaveLength(2);
+      for (const sectionError of response.data.sectionErrors) {
+        expect(sectionError.message).not.toMatch(
+          /synthetic-internal|fake-home-secret/,
+        );
+        if (role === 'admin') {
+          expect(sectionError.diagnostic).toMatchObject({
+            domain: 'HOME',
+            httpStatus: 200,
+            evidence: { section: sectionError.section },
+          });
+          expect(sectionError.diagnostic?.exception.message).toContain(
+            'synthetic-internal-detail',
+          );
+          expect(JSON.stringify(sectionError.diagnostic)).not.toMatch(
+            /fake-home-secret|shared-section-shadow/,
+          );
+        } else expect(sectionError).not.toHaveProperty('diagnostic');
+      }
+      if (role !== 'admin')
+        expect(JSON.stringify(response)).not.toMatch(
+          /synthetic-internal|fake-home-secret/,
+        );
+      expectNoHomeWrites(prisma);
+    },
+  );
 
   it('returns valuation unavailable without fake summary values', async () => {
     const { prisma, valuationService, service } = createService();

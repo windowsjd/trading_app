@@ -82,6 +82,7 @@ describe('GlobalHttpExceptionFilter', () => {
 
   it.each([
     ['user', false],
+    ['operator', false],
     ['admin', true],
   ] as const)(
     'emits diagnostics according to the current DB-backed %s role',
@@ -112,11 +113,24 @@ describe('GlobalHttpExceptionFilter', () => {
       );
 
       const body = getJsonBody() as {
-        error: { diagnostic?: { requestId: string } };
+        success: boolean;
+        error: {
+          code: string;
+          message: string;
+          diagnostic?: { requestId: string; exception: { message: string } };
+        };
       };
+      expect(body).toMatchObject({
+        success: false,
+        error: { code: 'PRICE_STALE', message: 'Price is stale.' },
+      });
+      expect(response.status).toHaveBeenCalledWith(503);
       expect(Boolean(body.error.diagnostic)).toBe(expectedDiagnostic);
       if (expectedDiagnostic) {
         expect(body.error.diagnostic?.requestId).toBe(`req-${role}`);
+        expect(body.error.diagnostic?.exception.message).toBe(
+          'Price is stale.',
+        );
       }
     },
   );

@@ -130,6 +130,11 @@ limit-order matching layer; it is vestigial and no current job records it.
 `resultJson` and `metadataJson` pass through ops redaction before storage. Secret-like keys, authorization values, database URLs, raw provider payload keys, approval keys, access tokens, refresh tokens, app keys, app secrets, and token-like fields are redacted.
 
 Raw provider payloads and secret env values must not be stored in ops audit rows.
+Scalar `errorCode`/`errorMessage` also redact secret assignments in free-form text.
+Batch request/result JSON and persisted errors use the same key/text policy.
+Key casing and separators (snake/kebab/dotted/spaced/camel/Pascal) do not change
+redaction. This storage boundary is independent of the admin-only HTTP diagnostic
+gate; it does not grant operators access to admin diagnostics.
 
 ## Lock Policy
 

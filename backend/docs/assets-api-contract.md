@@ -451,6 +451,12 @@ in the returned page, using the snapshot valuation time. If a later DB correctio
 no longer reproduces a cached failure, the diagnostic identifies the cached
 baseline failure. No request ID, stack, raw provider evidence or account data is
 stored in a shared result. Operators receive the same public presentation as users.
+
+Failed row diagnostics explicitly receive the selector's local evidence (workflow,
+threshold, decision, rejected candidate timestamps and fallback presence). They
+never inherit shared request evidence or other rows' mutable context. Candidate
+price evidence uses a positive-value check rather than an unnecessary exact amount.
+
 Concurrent identical misses coalesce per process; simultaneous misses on different
 instances can each build an immutable result without a distributed lock.
 

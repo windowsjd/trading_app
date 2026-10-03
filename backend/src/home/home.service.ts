@@ -18,6 +18,10 @@ import {
 import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  buildAdminPartialFailureDiagnostic,
+  type AdminDiagnostic,
+} from '../common/admin-diagnostics';
+import {
   assertSeasonRankingScope,
   SEASON_RANKING_SCOPE_SELECT,
 } from '../ranking/season-ranking-scope';
@@ -72,6 +76,7 @@ type SectionError = {
   section: string;
   code: string;
   message: string;
+  diagnostic?: AdminDiagnostic;
 };
 
 type JoinedParticipant = {
@@ -685,14 +690,15 @@ export class HomeService {
           ? error.code
           : 'VALUATION_UNAVAILABLE';
       const message =
-        error instanceof Error
+        error instanceof PortfolioValuationError
           ? error.message
           : 'Portfolio valuation is unavailable.';
-
+      const diagnostic = this.partialDiagnostic(error, code, 'summary');
       sectionErrors.push({
         section: 'summary',
         code,
         message,
+        ...(diagnostic ? { diagnostic } : {}),
       });
 
       return {
@@ -1363,17 +1369,32 @@ export class HomeService {
         ? input.error.code
         : `${input.section.toUpperCase()}_UNAVAILABLE`;
     const message =
-      input.error instanceof Error
+      input.error instanceof PortfolioValuationError
         ? input.error.message
         : input.fallbackMessage;
-
+    const diagnostic = this.partialDiagnostic(input.error, code, input.section);
     input.sectionErrors.push({
       section: input.section,
       code,
       message,
+      ...(diagnostic ? { diagnostic } : {}),
     });
 
     return this.fallback('unavailable', code, input.fallbackMessage);
+  }
+
+  private partialDiagnostic(error: unknown, code: string, section: string) {
+    const local =
+      error instanceof PortfolioValuationError
+        ? error.diagnosticContext
+        : undefined;
+    return buildAdminPartialFailureDiagnostic(error, code, {
+      ...local,
+      domain: 'HOME',
+      operation: 'HOME_READ',
+      failureStage: local?.failureStage ?? 'home_section_read',
+      evidence: { ...local?.evidence, section },
+    });
   }
 
   private async findCurrentSeason(): Promise<CurrentSeasonRecord | null> {

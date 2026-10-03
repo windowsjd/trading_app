@@ -93,6 +93,7 @@ import { readGeneralFxFeeRate } from './general-fx.config';
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
 import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
 import {
+  preserveAdminFailureCause,
   recordAdminDiagnosticEvent,
   setAdminDiagnosticContext,
 } from '../common/admin-diagnostics';
@@ -1104,11 +1105,14 @@ export class FxService {
       });
     }
 
+    let failedStep = 'fx_execute_transaction_start';
     try {
       let didExecute = false;
       const response = await this.prisma.$transaction(async (tx) => {
+        failedStep = 'fx_execute_quote_lock';
         const quoteId = this.parseQuoteId(body.quoteId);
         await tx.$queryRaw`SELECT "id" FROM "quotes" WHERE "id" = ${quoteId} FOR UPDATE`;
+        failedStep = 'fx_execute_idempotency_read';
         const racedCommand = await this.findFxExecuteCommandForIdempotency(
           {
             tradingAccountId: context.account.id,
@@ -1126,6 +1130,7 @@ export class FxService {
           }) as FxExecuteSuccessResponse;
         }
 
+        failedStep = 'fx_execute_account_lock';
         const lockedSeason =
           context.mode === TradingAccountMode.season
             ? await lockSeasonTradingContext(tx, {
@@ -1159,6 +1164,7 @@ export class FxService {
             transactionNow,
           );
         }
+        failedStep = 'fx_execute_quote_validation';
         const quote = await this.findActiveFxQuoteOrThrow(
           {
             mode: context.mode,
@@ -1170,6 +1176,7 @@ export class FxService {
           },
           tx,
         );
+        failedStep = 'fx_execute_wallet_and_rate_read';
         const [sourceWallet, targetWallet, providerSnapshot] =
           await Promise.all([
             this.findFxExecuteWalletCandidate(
@@ -1193,6 +1200,7 @@ export class FxService {
           }
         }
 
+        failedStep = 'fx_execute_plan_validation';
         const plan = this.buildProviderFxExecutePlan({
           normalizedRequest,
           quote,
@@ -1203,6 +1211,7 @@ export class FxService {
           executeNow: transactionNow,
         });
 
+        failedStep = 'fx_execute_financial_write';
         const result = await this.executeFxWritePathInTransaction(tx, {
           normalizedRequest,
           plan,
@@ -1211,6 +1220,7 @@ export class FxService {
           mode: context.mode,
           generalAccount: lockedAccount,
         });
+        failedStep = 'fx_execute_transaction_commit';
         didExecute = true;
         return result;
       });
@@ -1237,7 +1247,10 @@ export class FxService {
             executeNow: new Date(),
           });
       }
-      this.throwFxExecuteError(fxExecuteErrorCodes.EXECUTE_TRANSACTION_FAILED);
+      this.throwFxExecuteError(fxExecuteErrorCodes.EXECUTE_TRANSACTION_FAILED, {
+        cause: error,
+        failedStep,
+      });
     }
   }
 
@@ -3181,7 +3194,10 @@ export class FxService {
     throw new HttpException(this.createErrorBody(code, message), status);
   }
 
-  private throwFxExecuteError(code: FxExecuteErrorCode): never {
+  private throwFxExecuteError(
+    code: FxExecuteErrorCode,
+    failure?: { cause: unknown; failedStep: string },
+  ): never {
     const metadata = fxExecuteErrorMetadata[code];
 
     recordAdminDiagnosticEvent(
@@ -3191,10 +3207,13 @@ export class FxService {
       { httpStatus: metadata.httpStatus },
     );
 
-    throw new HttpException(
+    const exception = new HttpException(
       buildFxExecuteErrorEnvelope(code),
       metadata.httpStatus,
     );
+    throw failure
+      ? preserveAdminFailureCause(exception, failure.cause, failure.failedStep)
+      : exception;
   }
 
   private requireTradingAccountAccessService(): TradingAccountAccessService {

@@ -530,7 +530,9 @@ export class PortfolioService {
       section: 'portfolio',
       code,
       message:
-        error instanceof Error ? error.message : 'Portfolio is unavailable.',
+        error instanceof PortfolioValuationError
+          ? error.message
+          : 'Portfolio is unavailable.',
       ...(diagnostic ? { diagnostic } : {}),
     };
   }

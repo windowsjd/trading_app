@@ -1,7 +1,8 @@
-const REDACTED = '[REDACTED]';
-
-const SECRET_KEY_PATTERN =
-  /(api[_-]?key|app[_-]?key|app[_-]?secret|secret|token|authorization|approval[_-]?key|access[_-]?token)/i;
+import {
+  isSecretKey,
+  REDACTED,
+  redactSensitiveText,
+} from '../common/sensitive-data';
 
 export type RedactionOptions = {
   secrets?: readonly (string | undefined | null)[];
@@ -28,7 +29,7 @@ export function redactText(
     result = result.split(secret).join(REDACTED);
   }
 
-  return result;
+  return redactSensitiveText(result);
 }
 
 export function redactJsonValue<T>(
@@ -54,9 +55,7 @@ function redactJsonValueInternal(
     return Object.fromEntries(
       Object.entries(value).map(([key, item]) => [
         key,
-        SECRET_KEY_PATTERN.test(key)
-          ? REDACTED
-          : redactJsonValueInternal(item, secrets),
+        isSecretKey(key) ? REDACTED : redactJsonValueInternal(item, secrets),
       ]),
     );
   }

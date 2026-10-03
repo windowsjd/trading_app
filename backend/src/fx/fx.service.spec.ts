@@ -102,6 +102,11 @@ jest.mock('../generated/prisma/client', () => {
 
 import { HttpException } from '@nestjs/common';
 import {
+  adminDiagnosticRequestMiddleware,
+  buildAdminDiagnostic,
+  type AdminDiagnostic,
+} from '../common/admin-diagnostics';
+import {
   CurrencyCode,
   FxExecuteRequestStatus,
   FxRateSourceType,
@@ -2754,6 +2759,89 @@ describe('FxService', () => {
       expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
       expectNoCommittedSuccess(prisma);
     });
+
+    it.each(['admin', 'user', 'operator', undefined] as const)(
+      'preserves safe cause/step for a real transaction failure with role=%s',
+      async (role) => {
+        const { prisma, service } = createService();
+        mockActiveSeason(prisma);
+        mockJoinedParticipant(prisma);
+        mockExecuteReadCandidates(prisma);
+        prisma.fxExecuteRequest.create.mockResolvedValueOnce({
+          id: 'command-1',
+        });
+        prisma.$executeRaw.mockResolvedValueOnce(1);
+        prisma.cashWallet.updateMany.mockRejectedValueOnce(
+          Object.assign(new Error('unlabeled-synthetic-db-private-message'), {
+            code: 'P2003',
+          }),
+        );
+        prisma.cashWallet.findFirst.mockResolvedValueOnce(
+          sourceWalletAfterDebit,
+        );
+        let result!: Promise<{
+          exception: HttpException;
+          diagnostic?: AdminDiagnostic;
+        }>;
+        adminDiagnosticRequestMiddleware(
+          {
+            method: 'POST',
+            originalUrl: '/api/v1/fx/execute',
+            headers: {},
+            user: role ? { userId: 'user-1', role } : undefined,
+          } as never,
+          { setHeader: jest.fn() } as never,
+          () => {
+            result = service.execute('user-1', validExecuteBody).then(
+              () => {
+                throw new Error('Expected failure');
+              },
+              (exception: HttpException) => ({
+                exception,
+                diagnostic: buildAdminDiagnostic(
+                  exception,
+                  'EXECUTE_TRANSACTION_FAILED',
+                  exception.getStatus(),
+                ),
+              }),
+            );
+          },
+        );
+        const { exception, diagnostic } = await result;
+        expect(exception.getResponse()).toMatchObject({
+          success: false,
+          error: {
+            code: 'EXECUTE_TRANSACTION_FAILED',
+            message:
+              fxExecuteErrorMetadata.EXECUTE_TRANSACTION_FAILED.defaultMessage,
+          },
+        });
+        expect(exception.getStatus()).toBe(
+          fxExecuteErrorMetadata.EXECUTE_TRANSACTION_FAILED.httpStatus,
+        );
+        expect(JSON.stringify(exception.getResponse())).not.toContain(
+          'unlabeled-synthetic',
+        );
+        if (role === 'admin') {
+          expect(diagnostic).toMatchObject({
+            failureStage: 'fx_execute_financial_write',
+            evidence: {
+              failedStep: 'fx_execute_financial_write',
+              safeCause: {
+                category: 'db_foreign_key_constraint',
+                code: 'P2003',
+              },
+            },
+          });
+          expect(JSON.stringify(diagnostic)).not.toContain(
+            'unlabeled-synthetic',
+          );
+        } else expect(diagnostic).toBeUndefined();
+        expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
+        expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+        expectNoCommittedSuccess(prisma);
+      },
+    );
 
     it('returns EXECUTE_TRANSACTION_FAILED when target credit fails after source debit', async () => {
       const { prisma, service } = createService();

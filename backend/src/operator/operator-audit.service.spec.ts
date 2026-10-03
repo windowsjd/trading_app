@@ -99,6 +99,9 @@ describe('OperatorAuditService', () => {
       actorRole: UserRole.operator,
       action: 'operator.audit.test',
       metadataJson: {
+        'Private.Key': 'synthetic-private',
+        providerCredential: 'synthetic-credential',
+        diagnosticNote: 'Error: {"apiKey":"synthetic-embedded"}',
         dryRun: true,
         idempotencyKey: 'safe-business-key',
         nested: {
@@ -111,6 +114,9 @@ describe('OperatorAuditService', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           metadataJson: {
+            'Private.Key': '[REDACTED]',
+            providerCredential: '[REDACTED]',
+            diagnosticNote: 'Error: {"apiKey":"[REDACTED]"}',
             dryRun: true,
             idempotencyKey: 'safe-business-key',
             nested: {

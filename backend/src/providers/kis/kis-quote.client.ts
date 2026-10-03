@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { ProviderConfigService } from '../provider-config.service';
-import { redactText } from '../provider-secret-redaction';
 import { ProviderConfigError, ProviderHttpError } from '../provider.types';
 import type {
   KisLowLevelCallResult,
@@ -84,7 +83,6 @@ export class KisQuoteClient {
       () => controller.abort(),
       config.common.httpTimeoutMs,
     );
-    const secrets = [config.kis.appKey, config.kis.appSecret];
 
     try {
       const response = await fetch(url, {
@@ -99,17 +97,16 @@ export class KisQuoteClient {
           : controller.signal,
       });
       const receivedAt = new Date();
-      const bodyText = await response.text();
-
       if (!response.ok) {
+        await response.body?.cancel().catch(() => undefined);
         throw new ProviderHttpError(
           'kis',
           'PROVIDER_HTTP_ERROR',
-          `KIS HTTP ${response.status} from ${redactText(url.toString(), {
-            secrets,
-          })}: ${redactText(bodyText.slice(0, 500), { secrets })}`,
+          `KIS HTTP ${response.status} (PROVIDER_HTTP_ERROR).`,
         );
       }
+
+      const bodyText = await response.text();
 
       try {
         const responseHeaders: Record<string, string> = {};
@@ -127,9 +124,7 @@ export class KisQuoteClient {
         throw new ProviderHttpError(
           'kis',
           'PROVIDER_JSON_PARSE_ERROR',
-          `KIS returned invalid JSON from ${redactText(url.toString(), {
-            secrets,
-          })}.`,
+          'KIS returned invalid JSON (PROVIDER_JSON_PARSE_ERROR).',
         );
       }
     } catch (error) {

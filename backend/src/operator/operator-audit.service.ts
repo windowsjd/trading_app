@@ -5,35 +5,12 @@ import {
   UserRole,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-
-const REDACTED = '[REDACTED]';
+import {
+  isSensitiveDiagnosticKey,
+  REDACTED,
+  redactStoredText,
+} from '../common/sensitive-data';
 const UNSUPPORTED_VALUE = '[UNSUPPORTED_METADATA_VALUE]';
-const SENSITIVE_KEY_PATTERNS = [
-  'access_token',
-  'accesstoken',
-  'api_key',
-  'apikey',
-  'app_key',
-  'appkey',
-  'app_secret',
-  'appsecret',
-  'approval_key',
-  'approvalkey',
-  'authorization',
-  'database_url',
-  'databaseurl',
-  'password',
-  'private_key',
-  'privatekey',
-  'provider_payload',
-  'providerpayload',
-  'raw_payload',
-  'rawpayload',
-  'refresh_token',
-  'refreshtoken',
-  'secret',
-  'token',
-];
 
 export type OperatorAuditLogInput = {
   actorUserId: string;
@@ -138,7 +115,7 @@ export class OperatorAuditService {
     }
 
     if (typeof value === 'string') {
-      return this.isSensitiveString(value) ? REDACTED : value;
+      return redactStoredText(value);
     }
 
     if (typeof value === 'number' || typeof value === 'boolean') {
@@ -159,7 +136,9 @@ export class OperatorAuditService {
           .filter(([, item]) => item !== undefined)
           .map(([key, item]) => [
             key,
-            this.isSensitiveKey(key) ? REDACTED : this.sanitizeJsonValue(item),
+            isSensitiveDiagnosticKey(key)
+              ? REDACTED
+              : this.sanitizeJsonValue(item),
           ]),
       );
     }
@@ -168,23 +147,7 @@ export class OperatorAuditService {
   }
 
   private isPlainObject(value: object) {
-    const prototype = Object.getPrototypeOf(value);
+    const prototype: unknown = Object.getPrototypeOf(value);
     return prototype === Object.prototype || prototype === null;
-  }
-
-  private isSensitiveKey(key: string) {
-    const normalized = key.replace(/[\s.-]/g, '_').toLowerCase();
-    return SENSITIVE_KEY_PATTERNS.some((pattern) =>
-      normalized.includes(pattern),
-    );
-  }
-
-  private isSensitiveString(value: string) {
-    return (
-      /^bearer\s+/i.test(value.trim()) ||
-      /postgres(?:ql)?:\/\//i.test(value) ||
-      /mysql:\/\//i.test(value) ||
-      /mongodb(?:\+srv)?:\/\//i.test(value)
-    );
   }
 }

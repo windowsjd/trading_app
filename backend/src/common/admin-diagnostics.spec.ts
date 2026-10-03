@@ -4,7 +4,13 @@ import {
   buildAdminPartialFailureDiagnostic,
   recordAdminDiagnosticEvent,
   setAdminDiagnosticContext,
+  preserveAdminFailureCause,
 } from './admin-diagnostics';
+import {
+  BadRequestException,
+  ConsoleLogger,
+  HttpException,
+} from '@nestjs/common';
 import { AdminDiagnosticLogger } from './admin-diagnostic.logger';
 
 type Role = 'user' | 'operator' | 'admin';
@@ -39,6 +45,268 @@ function inRequest<T>(
 }
 
 describe('admin request diagnostics', () => {
+  it('redacts multiline private key material before splitting exception stack frames', () => {
+    const error = new Error(
+      '-----BEGIN PRIVATE KEY-----\nsynthetic-pem-material\n-----END PRIVATE KEY-----',
+    );
+    const diagnostic = inRequest('admin', 'req-pem', () =>
+      buildAdminDiagnostic(error, 'INTERNAL_ERROR', 500),
+    );
+    expect(JSON.stringify(diagnostic)).not.toContain('synthetic-pem-material');
+    expect(diagnostic?.exception.applicationStack.length).toBeGreaterThan(0);
+  });
+  it('redacts escaped JSON messages in errors and actual application logs', () => {
+    const text = JSON.stringify({
+      event: 'provider_error',
+      message: JSON.stringify({ apiKey: 'synthetic-escaped-secret' }),
+    });
+    const diagnostic = inRequest('admin', 'req-escaped', () => {
+      applicationLogger.warn(text, 'ProviderService');
+      return buildAdminDiagnostic(new Error(text), 'INTERNAL_ERROR', 500);
+    });
+    expect(JSON.stringify(diagnostic)).not.toContain(
+      'synthetic-escaped-secret',
+    );
+    expect(diagnostic?.exception.message).toBe('[REDACTED]');
+    expect(diagnostic?.serverLogs.entries[0].message).toBe('[REDACTED]');
+  });
+  it('redacts normalized keys, embedded JSON and console arguments end to end', () => {
+    const consoleSpy = jest
+      .spyOn(ConsoleLogger.prototype, 'warn')
+      .mockImplementation(() => {});
+    try {
+      const diagnostic = inRequest('admin', 'req-expanded-redaction', () => {
+        setAdminDiagnosticContext({
+          evidence: {
+            privateKey: 'fake-private',
+            RawPayload: { data: 'fake-body' },
+            'provider.payload': 'fake-provider-body',
+            databaseUrl: 'fake-db-url',
+            'kis app key': 'fake-app-key',
+            idempotencyKey: 'safe-command',
+          },
+        });
+        const text =
+          '{"apiKey":"fake-api-key","refreshToken":"fake-refresh","authorization":"Bearer fake-auth","jwtSecret":"fake-jwt"}';
+        applicationLogger.warn(
+          text,
+          { providerPayload: 'fake-logger-body' },
+          'TestService',
+        );
+        recordAdminDiagnosticEvent('warn', 'TEST', text);
+        return buildAdminDiagnostic(new Error(text), 'INTERNAL_ERROR', 500);
+      });
+      const serialized = JSON.stringify(diagnostic);
+      for (const secret of [
+        'fake-private',
+        'fake-body',
+        'fake-provider-body',
+        'fake-db-url',
+        'fake-app-key',
+        'fake-api-key',
+        'fake-refresh',
+        'fake-auth',
+        'fake-jwt',
+        'fake-logger-body',
+      ]) {
+        expect(serialized).not.toContain(secret);
+        expect(JSON.stringify(consoleSpy.mock.calls)).not.toContain(secret);
+      }
+      expect(diagnostic?.evidence?.idempotencyKey).toBe('safe-command');
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+
+  it.each([
+    ['Domain message', 'Domain message'],
+    [{ message: 'Nest message' }, 'Nest message'],
+    [
+      {
+        success: false,
+        error: { code: 'DOMAIN', message: 'Safe domain message' },
+      },
+      'Safe domain message',
+    ],
+    [
+      { message: ['First validation', 'Second validation'] },
+      'First validation; Second validation',
+    ],
+  ])('preserves structured HTTP messages (%j)', (response, expected) => {
+    const exception = new HttpException(response, 400);
+    const original = exception.getResponse();
+    const diagnostic = inRequest('admin', 'req-http-message', () =>
+      buildAdminDiagnostic(exception, 'DOMAIN', 400),
+    );
+    expect(diagnostic?.exception.message).toBe(expected);
+    expect(exception.getResponse()).toBe(original);
+    expect(exception.getStatus()).toBe(400);
+  });
+
+  it.each([
+    null,
+    42,
+    [],
+    { message: { unexpected: true } },
+    { success: false, error: null },
+    { message: [1, null] },
+  ])('fails safely for malformed HTTP responses (%j)', (response) => {
+    const exception = new BadRequestException();
+    jest.spyOn(exception, 'getResponse').mockReturnValue(response as never);
+    expect(() =>
+      inRequest('admin', 'req-malformed', () =>
+        buildAdminDiagnostic(exception, 'INVALID', 400),
+      ),
+    ).not.toThrow();
+  });
+
+  it('handles an unreadable HTTP response and non-string stack', () => {
+    const exception = new BadRequestException();
+    jest.spyOn(exception, 'getResponse').mockImplementation(() => {
+      throw new Error('malformed getter');
+    });
+    Object.defineProperty(exception, 'stack', { value: 123 });
+    const diagnostic = inRequest('admin', 'req-unreadable', () =>
+      buildAdminDiagnostic(exception, 'INVALID', 400),
+    );
+    expect(diagnostic?.exception.message).toBe('Bad Request');
+    expect(diagnostic?.exception.stack).toEqual([]);
+  });
+
+  it('preserves only whitelisted cause classification and never the raw wrapped message', () => {
+    const cause = Object.assign(
+      new Error('fake-db-message with unlabeled fake-private-value'),
+      { code: 'P2034' },
+    );
+    const wrapper = preserveAdminFailureCause(
+      new HttpException(
+        {
+          success: false,
+          error: {
+            code: 'EXECUTE_TRANSACTION_FAILED',
+            message: 'Transaction failed.',
+          },
+        },
+        500,
+      ),
+      cause,
+      'fx_execute_financial_write',
+    );
+    const diagnostic = inRequest('admin', 'req-wrapped', () =>
+      buildAdminDiagnostic(wrapper, 'EXECUTE_TRANSACTION_FAILED', 500),
+    );
+    expect(diagnostic).toMatchObject({
+      failureStage: 'fx_execute_financial_write',
+      evidence: {
+        failedStep: 'fx_execute_financial_write',
+        safeCause: {
+          category: 'db_transaction_conflict',
+          code: 'P2034',
+          errorType: 'Error',
+        },
+      },
+      exception: {
+        message: 'Transaction failed.',
+        cause: 'Error: db_transaction_conflict (P2034)',
+      },
+    });
+    expect(JSON.stringify(diagnostic)).not.toMatch(
+      /fake-db-message|fake-private-value/,
+    );
+    expect(wrapper).not.toHaveProperty('cause');
+  });
+
+  it('does not retain unknown cause codes or custom error names', () => {
+    const cause = Object.assign(new Error('unlabeled-secret'), {
+      name: 'secret-name',
+      code: 'constructor',
+    });
+    const wrapper = preserveAdminFailureCause(
+      new Error('Internal failure'),
+      cause,
+      'safe_step',
+    );
+    const diagnostic = inRequest('admin', 'req-unknown-cause', () =>
+      buildAdminDiagnostic(wrapper, 'INTERNAL_ERROR', 500),
+    );
+    expect(diagnostic?.evidence?.safeCause).toEqual({
+      category: 'unexpected_error',
+      errorType: 'Error',
+    });
+    expect(JSON.stringify(diagnostic)).not.toMatch(
+      /unlabeled-secret|secret-name|constructor/,
+    );
+  });
+
+  it('never infers admin access before authentication resolves the DB role', () => {
+    const request = {
+      method: 'GET',
+      originalUrl: '/api/v1/assets?authorization=fake-secret',
+      headers: {},
+      user: undefined,
+    };
+    adminDiagnosticRequestMiddleware(
+      request as never,
+      { setHeader: jest.fn() } as never,
+      () => {
+        expect(
+          buildAdminDiagnostic(new Error('failure'), 'INTERNAL_ERROR', 500),
+        ).toBeUndefined();
+        expect(
+          buildAdminPartialFailureDiagnostic(
+            new Error('failure'),
+            'INTERNAL_ERROR',
+            { evidence: { local: true } },
+          ),
+        ).toBeUndefined();
+      },
+    );
+    expect(
+      buildAdminDiagnostic(new Error('failure'), 'INTERNAL_ERROR', 500),
+    ).toBeUndefined();
+  });
+
+  it('isolates two concurrent partial failures with explicit local evidence and retains bounds', async () => {
+    const diagnostics = await inRequest('admin', 'req-parallel-partial', () => {
+      setAdminDiagnosticContext({
+        evidence: { unrelated: 'shared-request-data' },
+        entities: { assetId: 'shadow' },
+      });
+      return Promise.all(
+        ['a', 'b'].map(async (row) => {
+          await Promise.resolve();
+          return buildAdminPartialFailureDiagnostic(
+            new Error(`row-${row}`),
+            'ASSET_PRICE_UNAVAILABLE',
+            {
+              entities: { assetId: row },
+              evidence: {
+                row,
+                provider: `provider-${row}`,
+                privateKey: `secret-${row}`,
+                nested: { a: { b: { c: { d: { e: 'deep' } } } } },
+                values: Array.from({ length: 60 }, () => 'x'.repeat(100)),
+              },
+            },
+          );
+        }),
+      );
+    });
+    for (const [index, row] of ['a', 'b'].entries()) {
+      const diagnostic = diagnostics[index];
+      expect(diagnostic?.evidence?.row).toBe(row);
+      expect(JSON.stringify(diagnostic)).not.toMatch(
+        /shared-request-data|shadow|secret-|deep/,
+      );
+      expect(JSON.stringify(diagnostic)).not.toContain(
+        `provider-${row === 'a' ? 'b' : 'a'}`,
+      );
+      expect(
+        Buffer.byteLength(JSON.stringify(diagnostic), 'utf8'),
+      ).toBeLessThanOrEqual(24 * 1024);
+      expect(diagnostic?.truncated).toBe(true);
+    }
+  });
   it.each(['user', 'operator'] as const)(
     'does not build a diagnostic payload for %s',
     (role) => {
