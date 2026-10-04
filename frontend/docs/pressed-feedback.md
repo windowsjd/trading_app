@@ -1,5 +1,70 @@
 # 공통 Press·Navigation Motion 인수인계
 
+## 2026-10-04 일반 Primary CTA 브랜드 배경
+
+의도: **일반 주요 행동에 브랜드 정체성을 부여하면서 금융 의미색과 선택 상태를 구분하고, 버튼 크기에 관계없이 공통 그라데이션 정책으로 통일감을 유지하기 위한 변경.**
+
+- 조사: `CTAButton`, 인증/저장 버튼과 탭·필터가 `semantic.selected`를 공유했다.
+  가설은 확인됐지만 일반 주요 행동이 모두 CTAButton에 모여 있지는 않았다.
+  학습의 공통 `LessonAction`도 선택·보조·매수/매도 연습과 일반 진행에 함께 쓰였다.
+  기존 그라데이션은 없었으며 `react-native-svg` 15.15.5는 이미 설치돼 있었다.
+- 기준: **#326FE5 → #7447D8**, 왼쪽 0% → 오른쪽 100%, y=50%의 수평 선형,
+  두 stop opacity=1, 글씨/로딩 표시 #FFFFFF. 라이트·다크는 같은 기준을 쓴다.
+  `theme/tokens.ts`의 `primaryGradient`와 공통 SVG 배경에서 관리한다.
+- 크기: SVG/Rect는 실제 버튼의 100% 너비·높이, gradientUnits는
+  `objectBoundingBox`다. 고정 픽셀 길이, 중간 stop, 폭별 보정은 없다.
+  원래 padding/radius/font/label/layout/border를 유지하고 배경만 원래 모서리로 clip한다.
+- 적용: 시즌 참가/투자 계정 시작·계속, 환전, 일반 확인·진행, 주요 결과/내역 이동,
+  로그인·회원가입, 닉네임 저장, 일반 학습 진행 버튼.
+  설정 화면의 저장은 일반 확인 행동이며 설정 메뉴·모드 선택은 대상이 아니다.
+- 제외: 명시적 backgroundColor 재정의(현재 매수·매도), 오류 재시도, 뒤로가기,
+  삭제/위험, 보조/텍스트/아이콘/설정 이동, 탭·필터·정렬·계정 선택,
+  금융 표시와 방향별 금융 연습. CTA 예외는 `variant="neutral"`,
+  학습 선택/보조와 금융 연습은 primary를 적용하지 않는다. selected/금융 토큰은 그대로다.
+- 상태: disabled/blocked는 기존 배경과 opacity 0.45, 학습은 기존 opacity 0.6을
+  유지한다. loading도 기존 배경·흰 spinner/진행 문구·터치 차단을 유지한다.
+  활성 배경은 기존 static wash 아래에 놓이며 wash 0.055/0.065, 이벤트 시점,
+  Reduced Motion, ref/접근성 계약에는 새 모션을 넣지 않았다.
+  배경은 pointerEvents=none이고 접근성 트리에서 숨긴다. 서버 확인과 mutation 로직은 수정하지 않았다.
+
+| 변경 파일 (`frontend/` 기준) | 이유 |
+| --- | --- |
+| `src/theme/tokens.ts`, `src/components/common/PrimaryButtonBackground.tsx` | 공통 브랜드 값과 크기에 맞는 배경 |
+| `src/components/common/ActionPressable.tsx`, `CTAButton.tsx` | 기존 wash 아래 배경 opt-in, 명시적 색상과 neutral 역할 보존 |
+| `src/screens/auth/LoginScreen.tsx`, `SignupScreen.tsx`, `src/screens/my/SettingsScreen.tsx`, `src/screens/guide/LessonUi.tsx` | 별도로 구현된 일반 주요 행동 연결 |
+| `src/screens/guide/LiquidityScreen.tsx`, `OrderTypesScreen.tsx` | 방향별 금융 연습 제외 |
+| `src/screens/entry/ModeSelectionScreen.tsx`, `src/screens/home/PortfolioScreen.tsx`, `src/screens/order/OrderPanel.tsx`, `OrderSuccessBottomSheet.tsx`, `src/screens/record/RecordProfitAnalysisScreen.tsx`, `src/screens/wallet/WalletFxScreen.tsx`, `FxSuccessBottomSheet.tsx` | 기존 CTA의 오류·뒤로가기 역할 제외 |
+| `src/components/common/ActionPressable.test.ts`, `actionPressableVisual.test.ts`, `src/features/ranking/ranking.test.ts`, `test/interactionTestHarness.cjs` | 배경/누름 순서·상태·이벤트 검증과 Node의 SVG native host 경계 |
+| `test/browser/motionFixture.jsx`, `primaryButtonBrowser.cjs`, `test/browser/README.md` | 실제 렌더, 변경 전 비교, 픽셀·반응형·화면 검증 |
+| `package.json` | 새 배경 파일만 기존 lint gate에 추가; 의존성/lockfile 변경 없음 |
+
+검증 (baseline HEAD `865551cda6b46aa36f404c709330be5c1308d2a8`):
+
+- **PASS:** `npm run check` (accounts/guide lint, typecheck, 116개 테스트 파일, skip 0),
+  `npm run export:web`, `git diff --check`와 전체 변경 자체 검토.
+- **PASS, RN Web fixture:** `primaryButtonBrowser.cjs` **296개 렌더 검사**, pageerror 0.
+  320/390/768px × fontScale 1/2 × Light/Dark; 두 금융 palette;
+  같은 mounted 버튼을 430/360px로 resize; 넓은/좁은 버튼 크기를 baseline과 비교.
+  실제 캡처 좌우 픽셀과 SVG stop/방향, 흰 글씨·줄바꿈·clip, 제외 대상 배경,
+  한 개의 기존 wash, keyboard, loading 중 추가 클릭 차단, Reduced Motion을 확인했다.
+- **실제 화면 확인:** 시즌 참가, FX, Record의 좁은 두 CTA, 로그인/회원가입의
+  버튼 및 전체 화면, 긴 문구와 loading 캡처를 눈으로 확인했다.
+  실제 컴포넌트/내비게이터와 결정적인 API fixture이며 운영 서버 실행 검증은 아니다.
+  검증용 한글 폰트와 Chromium 라이브러리는 `/tmp`에서만 사용했다. 앱 폰트는 변경하지 않았다.
+- **FAIL, 기존 모션 gate:** 한글 폰트 환경의 delayed Market→AssetDetail에서
+  y=247→251px 이동. 변경 전 소스를 같은 환경에서 다시 빌드해 동일한 실패를 재현했다.
+  이번 배경 변경의 회귀가 아니며 AssetDetail header/layout는 변경하지 않았다.
+  이 실행은 두 flow 뒤 중단됐으므로 나머지 모션 flow를 PASS로 간주하지 않는다.
+- **NOT_RUN:** Android/iOS 실제 기기·시뮬레이터(실행 도구 없음), 운영 서버/hosted CI.
+  native의 SVG clip/실제 글꼴·터치 최종 확인이 남는다.
+- **미리보기 이미지 비교 NOT_VERIFIED:** 이미지가 전달되지 않았다.
+  확정 수치 기준과 실제 웹 캡처는 검증했으며 원본 이미지와 비교했다고 주장하지 않는다.
+
+증거: `/tmp/trading-primary-browser/results.json` 및 PNG,
+`/tmp/trading-primary-check.log`, `/tmp/trading-primary-export.log`,
+`/tmp/trading-primary-motion/failure.json`, `/tmp/trading-primary-motion-baseline/failure.json`.
+작업 중 별도로 나타난 `brandGradientAuditBrowser.cjs`/`brandGradientAuditFixture.jsx`는 수정하지 않았다.
+
 ## 2차 기록: 2026-10-04 모션 폴리시
 
 1. **시작 / 종료 HEAD:** 작업 시작 전에 `git fetch origin main` 성공.

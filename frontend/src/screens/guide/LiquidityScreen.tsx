@@ -62,6 +62,7 @@ function LiquidityLesson() {
           비교합니다.
         </Body>
         <LessonAction
+          primary={false}
           id="liquidity-compare-run"
           label="두 시장에서 20주 매수 실행"
           disabled={compare.started}
@@ -110,6 +111,7 @@ function LiquidityLesson() {
         <Section title="실습 2 · 호가 변화와 실제 체결은 다르다" id="liquidity-cancel">
           <Body>다른 시장 참여자가 10,010원에 대기 중이던 매도 주문을 취소하는 상황을 살펴봅니다. 호가창과 현재가의 변화를 비교하세요.</Body>
           <LessonAction
+            primary={false}
             id="liquidity-cancel-run"
             label="대기 중인 매도 주문이 취소되는 상황 보기"
             onPress={cancel.start}
@@ -128,6 +130,7 @@ function LiquidityLesson() {
               <Section title="이어서 · 실제 체결 발생">
                 <Body>취소 이후 남은 매도호가인 10,020원에서 1주를 실제로 체결해봅니다.</Body>
                 <LessonAction
+                  primary={false}
                   id="liquidity-trade-run"
                   label="10,020원에서 1주 매수 실행"
                   onPress={trade.start}

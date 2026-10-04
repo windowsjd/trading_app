@@ -796,7 +796,7 @@ export function OrderForm({
             ? '선택한 계정이 변경되었습니다.'
             : '주문 계정을 확인할 수 없습니다.'}
         </Text>
-        <CTAButton label="종목으로 돌아가기" onPress={onReturnToAsset} />
+        <CTAButton variant="neutral" label="종목으로 돌아가기" onPress={onReturnToAsset} />
       </View>
     );
   if (assetQuery.isError || !asset)
@@ -804,7 +804,7 @@ export function OrderForm({
       <View style={styles.group}>
         <Text style={styles.errorText}>주문 정보를 불러오지 못했습니다.</Text>
         <CTAButton
-          label="다시 시도"
+          variant="neutral" label="다시 시도"
           onPress={() => void assetQuery.refetch()}
         />
         <AdminDiagnosticPanel error={assetQuery.error} />
@@ -1104,13 +1104,13 @@ export function OrderForm({
                   ) : null}
                   {orderType === 'market' && !previewPriceAvailable ? (
                     <CTAButton
-                      label="시세 다시 불러오기"
+                      variant="neutral" label="시세 다시 불러오기"
                       onPress={() => void assetQuery.refetch()}
                     />
                   ) : null}
                   {feeQuery.isError ? (
                     <CTAButton
-                      label="수수료 다시 불러오기"
+                      variant="neutral" label="수수료 다시 불러오기"
                       onPress={() => void feeQuery.refetch()}
                     />
                   ) : null}

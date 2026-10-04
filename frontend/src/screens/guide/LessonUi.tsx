@@ -174,6 +174,7 @@ export function LessonAction({
   disabled = false,
   secondary = false,
   selected,
+  primary = true,
 }: {
   label: string;
   onPress: () => void;
@@ -181,9 +182,11 @@ export function LessonAction({
   disabled?: boolean;
   secondary?: boolean;
   selected?: boolean;
+  primary?: boolean;
 }) {
   return (
     <ActionPressable
+      primary={primary && !secondary && selected === undefined}
       testID={id}
       accessibilityRole="button"
       accessibilityLabel={label}

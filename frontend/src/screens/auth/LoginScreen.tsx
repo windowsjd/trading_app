@@ -179,6 +179,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
 
         <ActionPressable
           testID={TEST_IDS.auth.loginSubmit}
+          primary
           style={styles.primaryButton}
           onPress={onSubmit}
           disabled={loginMutation.isPending}

@@ -453,7 +453,7 @@ export default function PortfolioScreen({ navigation }: Props) {
                     />
                     <AdminDiagnosticPanel error={equityQuery.error} />
                     <CTAButton
-                      label="자산 추이 다시 불러오기"
+                      variant="neutral" label="자산 추이 다시 불러오기"
                       onPress={() => void equityQuery.refetch()}
                     />
                   </View>
@@ -505,7 +505,7 @@ export default function PortfolioScreen({ navigation }: Props) {
               />
               <AdminDiagnosticPanel error={positionsQuery.error} />
               <CTAButton
-                label="포지션 다시 불러오기"
+                variant="neutral" label="포지션 다시 불러오기"
                 onPress={() => void positionsQuery.refetch()}
               />
             </View>
@@ -577,7 +577,7 @@ export default function PortfolioScreen({ navigation }: Props) {
                 })
               }
             />
-            <CTAButton label="뒤로가기" onPress={() => navigation.goBack()} />
+            <CTAButton variant="neutral" label="뒤로가기" onPress={() => navigation.goBack()} />
           </View>
         }
       />

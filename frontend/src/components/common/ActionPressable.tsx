@@ -1,5 +1,5 @@
 import React from 'react';
-import { resolveSemanticColor } from '../../theme/tokens';
+import { primaryGradient, resolveSemanticColor } from '../../theme/tokens';
 import { useAppearance } from '../../theme/appearance';
 import {
   Pressable,
@@ -10,19 +10,30 @@ import {
   type ViewStyle,
 } from '../../theme/native';
 import { getFeedbackPalette } from './pressFeedback';
+import PrimaryButtonBackground from './PrimaryButtonBackground';
 
-type Props = Omit<PressableProps, 'android_ripple'> & { ref?: React.Ref<View> };
+type Props = Omit<PressableProps, 'android_ripple'> & {
+  ref?: React.Ref<View>;
+  /** Opt in only for general primary actions; disabled surfaces stay unchanged. */
+  primary?: boolean;
+};
 
 /** One immediate pressed surface; no motion clock or delayed action. */
-export default function ActionPressable({ feedback = 'default', ...props }: Props & {
+export default function ActionPressable({ feedback = 'default', primary = false, ...props }: Props & {
   /** Reserved for the compact Market sort directions. */
   feedback?: 'default' | 'none';
 }) {
-  return feedback === 'none' ? <Pressable {...props} /> : <FeedbackActionPressable {...props} />;
+  return feedback === 'none' ? <Pressable {...props} /> : <FeedbackActionPressable {...props} primary={primary} />;
 }
 
-function FeedbackActionPressable({ children, style, disabled, onPress, ...props }: Props) {
+function FeedbackActionPressable({ children, style, disabled, onPress, primary = false, ...props }: Props) {
   const { colors, mode, financialPreference } = useAppearance();
+  const showPrimary = primary && !disabled && !props['aria-disabled'] && !props.accessibilityState?.disabled;
+  const surfaceStyle: PressableProps['style'] = showPrimary
+    ? typeof style === 'function'
+      ? (state: Parameters<typeof style>[0]) => [style(state), styles.primary]
+      : [style, styles.primary]
+    : style;
   const enabled =
     !disabled &&
     !props['aria-disabled'] &&
@@ -30,9 +41,9 @@ function FeedbackActionPressable({ children, style, disabled, onPress, ...props 
     !!onPress;
 
   return (
-    <Pressable {...props} style={style} disabled={disabled} onPress={onPress}>
+    <Pressable {...props} style={surfaceStyle} disabled={disabled} onPress={onPress}>
       {(state) => {
-        const base = StyleSheet.flatten(typeof style === 'function' ? style(state) : style) ?? {};
+        const base = StyleSheet.flatten(typeof surfaceStyle === 'function' ? surfaceStyle(state) : surfaceStyle) ?? {};
         const color = processColor(resolveSemanticColor(base.backgroundColor, colors, mode, financialPreference) ?? colors.screen);
         const palette = getFeedbackPalette(typeof color === 'number' ? color : null);
         // Copy only the clip shape; never clip the root's border/shadow/content.
@@ -50,6 +61,7 @@ function FeedbackActionPressable({ children, style, disabled, onPress, ...props 
         };
         return (
           <>
+            {showPrimary ? <PrimaryButtonBackground shape={shape} /> : null}
             {enabled ? (
               <View
                 pointerEvents="none"
@@ -78,5 +90,6 @@ function FeedbackActionPressable({ children, style, disabled, onPress, ...props 
 }
 
 const styles = StyleSheet.create({
+  primary: { backgroundColor: primaryGradient.colors[0] },
   clip: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
 });

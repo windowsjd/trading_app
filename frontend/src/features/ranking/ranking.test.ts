@@ -51,6 +51,8 @@ function createHarness(scope?: string) {
     },
   });
   mocks.set('@react-navigation/native', { useFocusEffect: () => {} });
+  // SVG is a native host boundary; browser tests exercise its actual renderer.
+  mocks.set('react-native-svg', { default: 'svg', Defs: 'defs', LinearGradient: 'linearGradient', Rect: 'rect', Stop: 'stop', __esModule: true });
   mocks.set('@tanstack/react-query', {
     useQuery: (options: any) => {
       queryOptions.push(options);

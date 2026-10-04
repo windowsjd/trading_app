@@ -9,6 +9,63 @@ const event = { nativeEvent: { pageX: 130, pageY: 215 } };
 const wash = (renderer: any) => renderer.root.findAllByType('View').find((n: any) => n.props.pointerEvents === 'none');
 
 describe('ActionPressable immediate feedback', () => {
+  it('primary decoration is behind the existing wash, ignores touch and preserves geometry and immediate actions', (t) => {
+    const h = interactionHarness();
+    let calls = 0;
+    const style = { borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16, width: 180 };
+    const renderer = h.render(React.createElement(h.ActionPressable, {
+      primary: true, style, onPress: () => calls++, accessibilityLabel: '시즌 참가하기',
+    }, React.createElement('Text', null, '시즌 참가하기')));
+    t.after(() => act(() => renderer.unmount()));
+    const button = renderer.root.findByType('Pressable');
+    const gradient = renderer.root.findByType('Svg');
+    const decorations = renderer.root.findAllByType('View');
+    assert.equal(gradient.props.width, '100%');
+    assert.equal(gradient.props.height, '100%');
+    assert.equal(decorations.length, 2, 'one gradient clip and the original wash');
+    for (const decoration of decorations) {
+      assert.equal(decoration.props.pointerEvents, 'none');
+      assert.equal(decoration.props.accessibilityElementsHidden, true);
+      assert.equal(flatten(decoration.props.style).borderRadius, style.borderRadius);
+    }
+    assert.ok(decorations[0].findByType('Svg'));
+    assert.equal(flatten(decorations[1].props.style).opacity, 0);
+    const root = flatten(button.props.style);
+    for (const [key, value] of Object.entries(style)) assert.equal(root[key], value);
+    act(() => button.props.onPressIn(event));
+    assert.ok(flatten(renderer.root.findAllByType('View')[1].props.style).opacity > 0);
+    button.props.onPress(event);
+    assert.equal(calls, 1);
+    act(() => button.props.onPressOut(event));
+    assert.equal(flatten(renderer.root.findAllByType('View')[1].props.style).opacity, 0);
+    assert.equal(h.animations.length, 0);
+    assert.equal(h.measures.length, 0);
+  });
+
+  it('CTA keeps neutral/explicit-color roles and all disabled/loading surfaces unchanged', (t) => {
+    const h = interactionHarness();
+    const CTA = h.load('src/components/common/CTAButton.tsx', { './ActionPressable': { default: h.ActionPressable, __esModule: true } }).default;
+    const onPress = () => {};
+    const renderer = h.render(React.createElement(CTA, { label: '환전하기', onPress }));
+    t.after(() => act(() => renderer.unmount()));
+    assert.equal(renderer.root.findAllByType('Svg').length, 1);
+    for (const props of [{ variant: 'neutral' }, { style: { backgroundColor: '#a13e3b' } }]) {
+      act(() => renderer.update(React.createElement(CTA, { label: '확인', onPress, ...props })));
+      assert.equal(renderer.root.findAllByType('Svg').length, 0);
+      if ('style' in props) assert.equal(flatten(renderer.root.findByType('Pressable').props.style).backgroundColor, props.style.backgroundColor);
+    }
+    for (const state of ['disabled', 'loading', 'blocked']) {
+      act(() => renderer.update(React.createElement(CTA, { label: '환전하기', onPress, state })));
+      const button = renderer.root.findByType('Pressable');
+      assert.equal(renderer.root.findAllByType('Svg').length, 0);
+      assert.equal(renderer.root.findAllByType('View').length, 0);
+      assert.equal(button.props.disabled, true);
+      assert.equal(button.props.onPress, undefined);
+      assert.equal(flatten(button.props.style).opacity, state === 'loading' ? undefined : 0.45);
+      assert.equal(renderer.root.findAllByType('ActivityIndicator').length, state === 'loading' ? 1 : 0);
+    }
+  });
+
   for (const platform of ['android', 'ios', 'web']) {
     it(`${platform}: one static wash, immediate single action and no release work`, (t) => {
       const h = interactionHarness(platform);

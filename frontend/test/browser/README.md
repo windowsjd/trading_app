@@ -1,5 +1,31 @@
 # Trading UI browser regression
 
+Primary button colors and role exclusions use the same external browser tools:
+
+```sh
+NODE_PATH=/path/to/browser-tools/node_modules node test/browser/primaryButtonBrowser.cjs
+```
+
+`PRIMARY_BROWSER_OUTPUT` selects the artifacts (default `/tmp/trading-primary-browser`).
+The suite checks the actual SVG rendering and screenshot pixels, two appearance
+modes, both financial palettes, 320/390/768px widths and font scales 1/2,
+resize without remounting, white text, clipping, exclusions, loading/duplicate
+clicks, keyboard input and Reduced Motion. It also visits the real SeasonJoin,
+FX, Record, Login and Signup screens with local transport fixtures. External
+requests are blocked; no financial mutations are submitted.
+
+Use a host font with Korean coverage for visual checks. If the host needs local
+Chromium libraries or fonts, pass `LD_LIBRARY_PATH`/`FONTCONFIG_FILE`; these are
+test-environment inputs and do not change app typography. Our temporary font came
+from [Noto CJK's Korean fonts](https://github.com/notofonts/noto-cjk/tree/main/Sans/OTF/Korean).
+An optional `PRIMARY_BASELINE_SOURCE` points to the **frontend directory** of
+a read-only extracted baseline (`git archive HEAD frontend/src` from the repo
+root). With `PRIMARY_BASELINE_HEAD`, this records provenance and compares sizes
+and excluded colors against that source. Without it, baseline checks are omitted.
+These are web observations; Android/iOS execution remains separate. The current
+handover records the existing AssetDetail arrival shift reproduced under the
+same Korean font on the baseline as well as the changed source.
+
 Interaction motion diagnostics use the same external tools:
 
 ```sh

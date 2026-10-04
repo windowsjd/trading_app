@@ -1,4 +1,4 @@
-import { semantic } from '../../theme/tokens';
+import { primaryGradient, semantic } from '../../theme/tokens';
 import React from 'react';
 import {
   Text,
@@ -16,6 +16,8 @@ interface CTAButtonProps {
   onPress?: () => void;
   style?: ViewStyle;
   testID?: string;
+  /** Back, secondary and error recovery actions keep their existing surface. */
+  variant?: 'primary' | 'neutral';
 }
 
 export default function CTAButton({
@@ -24,11 +26,13 @@ export default function CTAButton({
   onPress,
   style,
   testID,
+  variant = 'primary',
 }: CTAButtonProps) {
   const disabled = state === 'disabled' || state === 'loading' || state === 'blocked';
 
   return (
     <ActionPressable
+      primary={variant === 'primary' && style?.backgroundColor === undefined}
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -43,7 +47,7 @@ export default function CTAButton({
       disabled={disabled}
     >
       {state === 'loading' ? (
-        <ActivityIndicator color={semantic.onAccent} />
+        <ActivityIndicator color={primaryGradient.foreground} />
       ) : (
         <Text style={styles.text}>{label}</Text>
       )}
@@ -69,7 +73,7 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   text: {
-    color: semantic.onAccent,
+    color: primaryGradient.foreground,
     fontWeight: '700',
     textAlign: 'center',
     lineHeight: 21,

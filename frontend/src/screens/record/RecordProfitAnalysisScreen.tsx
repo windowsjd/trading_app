@@ -82,7 +82,7 @@ export default function RecordProfitAnalysisScreen({ route, navigation }: Record
               : equityQuery.isError && !equityQuery.data ? (
                 <View style={styles.chartState}>
                   <InlineEmptyState message="자산 추이를 불러오지 못했습니다." />
-                  <CTAButton label="다시 시도" onPress={() => { void equityQuery.refetch(); }} />
+                  <CTAButton variant="neutral" label="다시 시도" onPress={() => { void equityQuery.refetch(); }} />
                 </View>
               ) : equityQuery.data?.state === 'not_joined' ? <InlineEmptyState message="시즌 참가 기록이 없어 자산 추이를 표시할 수 없습니다." />
                 : !equityQuery.data || equityQuery.data.state === 'empty' || equityQuery.data.points.length < 2 ? <InlineEmptyState message="자산 추이를 표시하려면 데이터가 더 필요합니다." />

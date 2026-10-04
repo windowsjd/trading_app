@@ -13,6 +13,7 @@ const { load } = require('../../../test/ledgerTestHarness.cjs');
 const { interactionHarness, flatten, act } = require('../../../test/interactionTestHarness.cjs');
 const ActionPressable = load(resolve('src/components/common/ActionPressable.tsx'), {
   'react-native': web,
+  './PrimaryButtonBackground': { default: 'PrimaryButtonBackground', __esModule: true },
 }).default;
 
 function rootMarkup(Component: unknown, style: unknown, pressed = false) {

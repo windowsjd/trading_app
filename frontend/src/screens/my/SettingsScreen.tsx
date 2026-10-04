@@ -168,6 +168,7 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
 
           <ActionPressable
             testID={TEST_IDS.settings.saveNickname}
+            primary
             style={styles.primaryButton}
             onPress={onSaveNickname}
             disabled={updateMutation.isPending}

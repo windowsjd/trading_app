@@ -2,6 +2,16 @@ import type { ColorValue, ImageStyle, StyleProp, TextStyle, ViewStyle } from 're
 import type { AppearanceMode, AppearancePalette } from './appearance';
 import { resolveFinancialColor, type FinancialColorPreference } from './financialColors.ts';
 
+/** Brand actions are independent of selection and financial colors, in both modes. */
+export const primaryGradient = {
+  colors: ['#326FE5', '#7447D8'],
+  foreground: '#FFFFFF',
+  start: { x: '0%', y: '50%' },
+  end: { x: '100%', y: '50%' },
+  locations: ['0%', '100%'],
+  opacity: 1,
+} as const;
+
 /** Explicit roles use valid color sentinels for native/web StyleSheet validation.
  * Only these tokens resolve through the appearance palette; arbitrary hex stays as written. */
 export const semantic = {

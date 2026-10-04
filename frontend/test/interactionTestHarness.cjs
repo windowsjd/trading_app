@@ -51,7 +51,11 @@ function interactionHarness(platform = 'android') {
   };
   h.dimensions = { width: 320, height: 568, fontScale: 2 };
   h.insets = { top: 24, bottom: 34 };
-  h.load = (file, mocks = {}) => load(resolve(file), { 'react-native': h.native, ...mocks });
+  h.load = (file, mocks = {}) => load(resolve(file), {
+    'react-native': h.native,
+    'react-native-svg': { default: 'Svg', Defs: 'Defs', LinearGradient: 'LinearGradient', Rect: 'Rect', Stop: 'Stop', __esModule: true },
+    ...mocks,
+  });
   h.ActionPressable = h.load('src/components/common/ActionPressable.tsx').default;
   h.render = (element) => {
     let renderer;

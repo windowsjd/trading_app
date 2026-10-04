@@ -221,6 +221,7 @@ export default function OrderSuccessBottomSheet({
           />
         ) : (
           <CTAButton
+            variant="neutral"
             label={
               display?.isPartialExecution ? '종목 상세' : '종목 상세로 돌아가기'
             }

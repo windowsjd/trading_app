@@ -200,7 +200,7 @@ export default function ModeSelectionScreen({
               있습니다.
             </Text>
             <CTAButton
-              label="시즌 정보 다시 확인"
+              variant="neutral" label="시즌 정보 다시 확인"
               onPress={() => void seasonQuery.refetch()}
             />
           </View>

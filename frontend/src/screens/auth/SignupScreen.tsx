@@ -211,6 +211,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
 
         <ActionPressable
           testID={TEST_IDS.auth.signupSubmit}
+          primary
           style={styles.primaryButton}
           onPress={onSubmit}
           disabled={signupMutation.isPending}

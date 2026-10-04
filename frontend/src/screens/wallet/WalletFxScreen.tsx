@@ -510,6 +510,7 @@ export default function WalletFxScreen({ navigation }: Props) {
                   현재 환율을 사용할 수 없어 환전 기능이 잠시 중단되었습니다.
                 </Text>
                 <CTAButton
+                  variant="neutral"
                   label={rateQuery.isLoading ? '환율 불러오는 중' : '환율 다시 불러오기'}
                   state={rateQuery.isLoading ? 'loading' : 'enabled'}
                   onPress={() => void rateQuery.refetch()}
@@ -619,7 +620,7 @@ export default function WalletFxScreen({ navigation }: Props) {
               {feeQuery.isError ? (
                 <AdminDiagnosticPanel error={feeQuery.error} />
               ) : null}
-              {feeQuery.isError ? <CTAButton label="수수료 다시 불러오기" onPress={() => void feeQuery.refetch()} /> : null}
+              {feeQuery.isError ? <CTAButton variant="neutral" label="수수료 다시 불러오기" onPress={() => void feeQuery.refetch()} /> : null}
             </>}
           </View>
         ) : null}
