@@ -90,6 +90,13 @@ async function run() {
             assert.equal(await tab.locator('[dir="auto"]').evaluate(el => getComputedStyle(el).color), category === type
               ? appearance === 'light' ? 'rgb(40, 91, 133)' : 'rgb(185, 221, 252)' : theme.palettes[appearance].secondary);
           }
+          const market = id('home-hot-market');
+          assert.equal(await color(market.locator('[dir="auto"]')), 'rgb(255, 255, 255)');
+          assert.deepEqual(await market.locator('linearGradient stop').evaluateAll(nodes => nodes.map(node => node.getAttribute('stop-color'))), ['#326FE5', '#7447D8']);
+          assert.deepEqual(await market.locator('linearGradient').evaluate(el => ['x1', 'y1', 'x2', 'y2'].map(key => el.getAttribute(key))), ['0%', '50%', '100%', '50%']);
+          assert.deepEqual(await market.evaluate(el => {
+            const css = getComputedStyle(el); return [css.minHeight, css.paddingTop, css.paddingBottom];
+          }), ['44px', '8px', '8px']);
           const request = await page.evaluate(type => window.fixture.transport.requests.filter(url => url.startsWith('/assets?') && new URL(url, location.origin).searchParams.get('assetType') === type).at(-1), type);
           const p = new URL(request, base).searchParams;
           assert.equal(p.get('sortBy'), 'turnover'); assert.equal(p.get('sortOrder'), 'desc'); assert.equal(p.get('limit'), '5');

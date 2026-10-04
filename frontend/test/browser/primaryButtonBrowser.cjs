@@ -55,7 +55,9 @@ async function run() {
         });
         const gradient = el.querySelector('linearGradient'), g = svg?.getBoundingClientRect();
         return { width: root.width, height: root.height, radius: style.borderRadius, opacity: style.opacity, background: style.backgroundColor,
-          disabled: el.getAttribute('aria-disabled'), busy: el.getAttribute('aria-busy'), texts, svg: g ? { width: g.width, height: g.height } : null,
+          disabled: el.getAttribute('aria-disabled'), busy: el.getAttribute('aria-busy'), texts,
+          icons: [...el.querySelectorAll('svg[stroke]')].map(icon => icon.getAttribute('stroke')),
+          svg: g ? { width: g.width, height: g.height } : null,
           gradient: gradient ? { units: gradient.getAttribute('gradientUnits'), points: ['x1','y1','x2','y2'].map(a => gradient.getAttribute(a)),
             stops: [...gradient.querySelectorAll('stop')].map(s => [s.getAttribute('offset'), s.getAttribute('stop-color'), s.getAttribute('stop-opacity')]),
             clipRadius: getComputedStyle(svg.parentElement).borderRadius, clipOverflow: getComputedStyle(svg.parentElement).overflow,
@@ -68,19 +70,27 @@ async function run() {
         assert.equal(actual.gradient.units, 'objectBoundingBox'); assert.equal(actual.gradient.clipRadius, actual.radius);
         assert.equal(actual.gradient.clipOverflow, 'hidden'); assert.equal(actual.gradient.pointerEvents, 'none');
         assert.ok(Math.abs(actual.svg.width - actual.width) <= 2 && Math.abs(actual.svg.height - actual.height) <= 2, name);
-        assert.ok(actual.texts.length > 0 && actual.texts.every(t => t.color === 'rgb(255, 255, 255)' && t.inside), `${name}: readable text`);
+        assert.ok(actual.texts.length > 0 || actual.icons.length > 0, `${name}: visible foreground`);
+        assert.ok(actual.texts.every(t => t.color === 'rgb(255, 255, 255)' && t.inside), `${name}: readable text`);
+        assert.ok(actual.icons.every(color => color === '#FFFFFF'), `${name}: white icons`);
         if (raster) {
           const shot = await locator.screenshot({ path: path.join(out, `${name}.png`) });
           const pixels = await page.evaluate(async encoded => {
             const picture = new Image(); picture.src = `data:image/png;base64,${encoded}`; await picture.decode();
             const canvas = document.createElement('canvas'); canvas.width = picture.width; canvas.height = picture.height;
             const ctx = canvas.getContext('2d'); ctx.drawImage(picture, 0, 0);
-            return [1, picture.width - 2].map(x => ({ x, width: picture.width, rgba: [...ctx.getImageData(x, Math.floor(picture.height / 2), 1, 1).data] }));
+            const rgba = ctx.getImageData(0, 0, picture.width, picture.height).data;
+            let foregroundPixels = 0;
+            for (let i = 0; i < rgba.length; i += 4) {
+              if (rgba[i] >= 245 && rgba[i + 1] >= 245 && rgba[i + 2] >= 245 && rgba[i + 3] >= 250) foregroundPixels++;
+            }
+            return { foregroundPixels, edges: [1, picture.width - 2].map(x => ({ x, width: picture.width, rgba: [...ctx.getImageData(x, Math.floor(picture.height / 2), 1, 1).data] })) };
           }, shot.toString('base64'));
-          for (const pixel of pixels) {
+          for (const pixel of pixels.edges) {
             const t = (pixel.x + 0.5) / pixel.width, expected = [50 + 66*t, 111 - 40*t, 229 - 13*t];
             assert.ok(expected.every((channel, i) => Math.abs(pixel.rgba[i] - channel) <= 2), `${name}: raster ${JSON.stringify(pixel)}`);
           }
+          assert.ok(pixels.foregroundPixels > 0, `${name}: foreground is painted above the gradient`);
           actual.raster = pixels;
         }
       }
@@ -167,6 +177,21 @@ async function run() {
     for (const mode of ['light', 'dark']) {
       await page.setViewportSize({ width: 390, height: 900 }); await page.emulateMedia({ colorScheme: mode });
       await page.goto(`${base}/?account=season&holdings=1&navigation=1&fxState=available`); await id('home-total-asset').waitFor();
+      await visual(id('home-hot-market'), `${mode}-hot-market`, true, true);
+      await page.evaluate(() => window.fixture.navigationRef.navigate('MainTabs', { screen: 'WalletTab', params: { screen: 'Wallet' } }));
+      await id('wallet-composition').waitFor();
+      for (const action of ['wallet-exchange', 'wallet-ledger', 'wallet-orders']) {
+        const surface = await visual(id(`${action}-surface`), `${mode}-${action}-compact`, true, true);
+        assert.deepEqual([surface.width, surface.height, surface.radius], [52, 52, '12px']);
+      }
+      await page.screenshot({ path: path.join(out, `${mode}-wallet-screen.png`) });
+      await page.evaluate(() => window.fixture.navigationRef.navigate('MainTabs', { screen: 'HomeTab', params: { screen: 'Portfolio' } }));
+      const portfolioMarket = page.getByRole('button', { name: '마켓으로 이동', exact: true }).filter({ visible: true }).first();
+      await visual(portfolioMarket, `${mode}-portfolio-market`, true, true);
+      assert.equal(await page.evaluate(() => window.fixture.navigationRef.getCurrentRoute().name), 'Portfolio');
+      await page.screenshot({ path: path.join(out, `${mode}-portfolio-screen.png`) });
+      await portfolioMarket.click();
+      await page.waitForFunction(() => window.fixture.navigationRef.getCurrentRoute().name === 'Market');
       await page.evaluate(() => window.fixture.navigationRef.navigate('SeasonJoin'));
       await page.waitForFunction(() => window.fixture.client.getQueryData(['season', 'current']));
       await page.evaluate(() => window.fixture.client.setQueryData(['season','current'], current => ({ ...current, joined: false })));

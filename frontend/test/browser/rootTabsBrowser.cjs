@@ -37,20 +37,39 @@ async function run() {
   }).listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
-  const page = await browser.newPage();
+  const page = await browser.newPage({ hasTouch: true });
   const base = `http://127.0.0.1:${server.address().port}`;
-  const errors = [], records = [];
+  const errors = [], records = [], rankingSelections = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.route('**/*', (route) => route.request().url().startsWith(base) ? route.continue() : route.abort());
   await page.addInitScript(() => {
     localStorage.setItem('selectedTradingAccountId:home-user', 'season-account');
     localStorage.setItem('trading-app:appearance', 'system');
+    localStorage.setItem('trading-app:financial-colors', new URLSearchParams(location.search).get('palette') ?? 'red_blue');
   });
   const id = (name) => page.getByTestId(name);
   const open = async (screen, query = '') => {
     await page.goto(`${base}/?screen=${screen}${query}`);
     if (screen === 'search') await id('market-search-input').fill('삼성');
     await id(screens[screen]).waitFor();
+  };
+  const rankingTabs = async (scope, appearance) => {
+    for (const [key, label] of [['all', '전체'], ['friends', '친구'], ['top10', 'TOP10']]) {
+      const tab = id(`ranking-tab-${key}`), selected = key === scope;
+      assert.equal(await tab.getAttribute('role'), 'tab');
+      assert.equal(await tab.getAttribute('aria-label'), label);
+      assert.equal(await tab.getAttribute('aria-selected'), String(selected));
+      assert.equal(await tab.evaluate(el => getComputedStyle(el).backgroundColor), selected
+        ? appearance === 'light' ? 'rgb(234, 244, 252)' : 'rgb(28, 48, 66)' : theme.palettes[appearance].raised);
+      assert.equal(await tab.locator('[dir="auto"]').evaluate(el => getComputedStyle(el).color), selected
+        ? appearance === 'light' ? 'rgb(40, 91, 133)' : 'rgb(185, 221, 252)' : theme.palettes[appearance].text);
+      assert.equal(await tab.locator('linearGradient').count(), 0);
+      assert.equal(await tab.locator('[dir="auto"]').evaluate(el => getComputedStyle(el).fontWeight), '600');
+      assert.equal(await tab.evaluate(el => {
+        const bounds = el.getBoundingClientRect(), range = document.createRange(); range.selectNodeContents(el);
+        return [...range.getClientRects()].every(r => r.left >= bounds.left - 1 && r.right <= bounds.right + 1 && r.top >= bounds.top - 1 && r.bottom <= bounds.bottom + 1);
+      }), true, `${key}: complete tab text stays inside its original geometry`);
+    }
   };
   try {
     for (const appearance of ['light', 'dark']) for (const width of [320, 360, 390, 430, 768, 1024, 1280, 1440, 1920])
@@ -60,6 +79,7 @@ async function run() {
         const bounds = [];
         for (const screen of Object.keys(screens)) {
           await open(screen, `&fontScale=${fontScale}&long=${long}`);
+          if (screen === 'ranking') await rankingTabs('all', appearance);
           await theme.canvas(page, appearance);
           const layout = await page.evaluate(({ screen, anchorId }) => {
             const node = (name) => document.querySelector(`[data-testid="${name}"]`);
@@ -127,12 +147,17 @@ async function run() {
       const call = await page.evaluate(() => window.fixture.navigation.calls.at(-1));
       assert.equal(call[0], { market: 'AssetDetail', ranking: 'UserSeasonSummary', record: 'RecordSeasonDetail' }[screen]);
     }
-    for (const state of ['active', 'settled']) {
-      await open('ranking', `&separateScopes=1&state=${state}`);
+    for (const appearance of ['light', 'dark']) for (const width of [320, 360, 390, 430])
+      for (const fontScale of [1, 1.5, 2]) for (const preference of ['red_blue', 'green_red']) for (const state of ['active', 'settled']) {
+      await page.setViewportSize({ width, height: 844 }); await page.emulateMedia({ colorScheme: appearance });
+      await open('ranking', `&separateScopes=1&state=${state}&fontScale=${fontScale}&palette=${preference}`);
       const podium = await id('ranking-top3').textContent();
       for (const scope of ['friends', 'top10', 'all']) {
-        await id(`ranking-tab-${scope}`).click();
+        if (preference === 'red_blue') {
+          await id(`ranking-tab-${scope}`).focus(); await page.keyboard.press('Enter');
+        } else await id(`ranking-tab-${scope}`).tap();
         await id(scope === 'friends' ? 'ranking-item-user-40' : 'ranking-item-user-0').waitFor();
+        await rankingTabs(scope, appearance);
         assert.equal(await id('ranking-top3').textContent(), podium);
         assert.equal(await id('ranking-top-user-40').count(), 0);
         const request = await page.evaluate(scope => window.fixture.transport.requests.filter(p => p.includes('/ranking?') && new URL(p, location.origin).searchParams.get('scope') === scope).at(-1), scope);
@@ -140,7 +165,29 @@ async function run() {
         assert.equal(params.get('rankType'), state === 'settled' ? 'final' : 'daily');
         assert.equal(params.get('capturedAt'), '2026-09-01T00:00:00Z');
         assert.equal(params.get('seasonId'), 'season-1');
+        assert.equal(params.get('rankingDate'), '2026-09-01');
+        assert.equal(params.get('limit'), scope === 'top10' ? '10' : '50');
+        if (width === 390 && fontScale === 1 && preference === 'red_blue') {
+          await id(`ranking-tab-${scope}`).scrollIntoViewIfNeeded();
+          await page.screenshot({ path: path.join(out, `ranking-${appearance}-${state}-${scope}.png`) });
+        }
       }
+      await id('ranking-item-user-0').evaluate(anchor => {
+        let viewport = anchor.parentElement;
+        while (viewport && !/auto|scroll/.test(getComputedStyle(viewport).overflowY)) viewport = viewport.parentElement;
+        viewport.scrollTo(0, viewport.scrollHeight);
+      });
+      await page.waitForFunction(() => window.fixture.transport.requests.some(path => {
+        const p = new URL(path, location.origin).searchParams;
+        return p.get('scope') === 'all' && p.get('offset') === '50';
+      }));
+      const next = await page.evaluate(() => window.fixture.transport.requests.filter(path => new URL(path, location.origin).searchParams.get('offset') === '50').at(-1));
+      const p = new URL(next, base).searchParams;
+      assert.equal(p.get('capturedAt'), '2026-09-01T00:00:00Z');
+      assert.equal(p.get('rankingDate'), '2026-09-01');
+      assert.equal(p.get('rankType'), state === 'settled' ? 'final' : 'daily');
+      assert.equal(await id('ranking-top3').textContent(), podium);
+      rankingSelections.push({ appearance, width, fontScale, preference, state, scopes: ['all', 'friends', 'top10'], pagination: true });
     }
     await open('market');
     await page.getByText('종목명 또는 심볼 검색', { exact: true }).click();
@@ -152,9 +199,9 @@ async function run() {
     await id('guide-market-basics-card').click();
     assert.deepEqual(await page.evaluate(() => window.fixture.navigation.calls.at(-1)), ['MarketBasics']);
     assert.deepEqual(errors, []);
-    fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify({ records, crossTabBounds: 'passed', scrollViewports: 'passed', pagination: 'passed', navigation: 'passed', errors }, null, 2));
+    fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify({ records, rankingSelections, crossTabBounds: 'passed', scrollViewports: 'passed', pagination: 'passed', navigation: 'passed', errors }, null, 2));
     for (const name of ['failure.json', 'failure.png']) fs.rmSync(path.join(out, name), { force: true });
-    console.log(`ROOT_TABS_BROWSER_PASSED ${records.length} layouts + shared bounds, full screen scroll viewports, pagination and navigation`);
+    console.log(`ROOT_TABS_BROWSER_PASSED ${records.length} layouts + ${rankingSelections.length} Ranking selection/publication flows, shared bounds, pagination and navigation`);
   } catch (error) {
     fs.writeFileSync(path.join(out, 'failure.json'), JSON.stringify({ records, errors, message: error.message }, null, 2));
     await page.screenshot({ path: path.join(out, 'failure.png'), fullPage: true });

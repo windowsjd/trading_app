@@ -17,6 +17,9 @@ Secondary probes verify exact Light/Dark solid colors, disabled/blocked/loading
 states and the actual OrderSuccessBottomSheet for submitted limit, partial and
 legacy full execution. History stays secondary, home stays primary and the
 fallback asset action stays neutral; callback destinations and label bounds are checked.
+Wallet's three compact surfaces, the HOT market action and the existing Portfolio
+market CTA also have exact horizontal stops and raster checks. White foreground
+pixels must be visible above the gradient, including Wallet SVG icons.
 
 Use a host font with Korean coverage for visual checks. If the host needs local
 Chromium libraries or fonts, pass `LD_LIBRARY_PATH`/`FONTCONFIG_FILE`; these are
@@ -154,7 +157,11 @@ touch and screen-reader behavior still require device verification.
 Run `NODE_PATH=/path/to/browser-tools/node_modules node test/browser/rootTabsBrowser.cjs`
 to compare Home, Market, MarketSearch, Ranking, RecordSeasonList, Overall and Guide.
 The 756 layouts use the same widths, appearances, font scales and normal/long
-strings. Each root must share a centered 1120px content cap with 16px horizontal
+strings. Ranking tabs also check selected/neutral palettes and tab semantics.
+An additional 96 Ranking flows cover 320/360/390/430px, font scales 1/1.5/2,
+Light/Dark and both financial palettes, for Active/Settled publications. Keyboard
+and touch selection preserve canonical overall TOP3, friends/top10 scope and
+pagination publication tokens. Each root must share a centered 1120px content cap with 16px horizontal
 padding and a full screen scroll viewport. The runner also exercises actual
 Market/Ranking/Record pagination and navigation. Reports and screenshots go to
 `/tmp/trading-root-tabs-browser` (override `ROOT_TABS_BROWSER_OUTPUT`).
@@ -180,8 +187,10 @@ Holdings fixtures include 삼성전자 / Berkshire Hathaway Class B / Bitcoin an
 stock/crypto quantities rounded only for display to six decimal places, without
 trailing zeros. Rendered boxes and glyph edges verify the left identity and the
 right value → secondary quantity → return column, its typography, and equal
-compact Wallet icon geometry and whole-item touch targets. Names wrap fully with
-the complete accessible label; all numeric values remain
+compact Wallet icon geometry and whole-item touch targets.
+Each 52x52 surface must contain one horizontal brand gradient and a white icon;
+the outer target and neutral caption stay transparent.
+Names wrap fully with the complete accessible label; all numeric values remain
 untruncated. It also checks known quantities in stale/unavailable rows, live palette changes, all 207 positions
 across three API pages, and delayed outgoing responses on account switching.
 The navigation fixture uses installed React Navigation and production MainTabs,
@@ -198,7 +207,9 @@ All external requests are blocked; Android/iOS device checks remain separate.
 
 `homeDiscoveryBrowser.cjs` verifies Home HOT selected/unselected palettes and tab
 semantics at 320/360/390/430px and font scales 1/1.5/2, alongside unchanged TOP 5
-queries and real Home → Market category intent. `homeMarketBrowser.cjs --market-only`
+queries and real Home → Market category intent. The HOT market button stays in
+its original geometry with a horizontal Primary gradient and white text.
+`homeMarketBrowser.cjs --market-only`
 checks the same Market selection policy with server sorting and pagination.
 
 Run `NODE_PATH=/path/to/browser-tools/node_modules node test/browser/homeMarketBrowser.cjs`

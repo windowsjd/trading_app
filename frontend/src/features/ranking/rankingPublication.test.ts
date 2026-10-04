@@ -3,17 +3,20 @@ import { createRequire } from 'node:module';
 import { it } from 'node:test';
 import { availableRankings } from './fixtures.ts';
 import { QUERY_KEYS } from '../../constants/queryKeys.ts';
+import { semantic } from '../../theme/tokens.ts';
 
 const require = createRequire(import.meta.url);
-const { interactionHarness, React, act } = require('../../../test/interactionTestHarness.cjs');
+const { interactionHarness, React, act, flatten } = require('../../../test/interactionTestHarness.cjs');
 const query = require('@tanstack/react-query');
 
-async function setup(t, conflict = false) {
+async function setup(t, conflict = false, state = 'active') {
   const native = interactionHarness();
   const calls = [];
   let generation = 1;
   const client = new query.QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
-  const publication = () => ({ ...structuredClone(availableRankings), capturedAt: `2026-09-01T00:0${generation}:00.000Z` });
+  const publication = () => ({ ...structuredClone(availableRankings),
+    season: { ...availableRankings.season, status: state }, rankType: state === 'settled' ? 'final' : 'daily',
+    capturedAt: `2026-09-01T00:0${generation}:00.000Z` });
   const api = {
     getRankingTier: () => 'Silver',
     getRankings: async params => {
@@ -37,7 +40,7 @@ async function setup(t, conflict = false) {
     },
     '@tanstack/react-query': query,
     '../../features/ranking/api': api,
-    '../../features/season/api': { getCurrentSeason: async () => ({ ...availableRankings.season, joined: true }) },
+    '../../features/season/api': { getCurrentSeason: async () => ({ ...publication().season, joined: true }) },
     '../../features/me/api': { getMe: async () => ({ nickname: 'me' }) },
     '../../app/navigation/navigationHooks': { useRootNavigation: () => ({ navigate() {} }) },
   }).default;
@@ -80,4 +83,32 @@ it('a publication race recovers by refetching canonical TOP3 before the scoped l
   assert.equal(topCalls.length, 2);
   assert.equal(h.calls.at(-1).capturedAt, '2026-09-01T00:02:00.000Z');
   assert.ok(h.calls.length <= 5, 'bounded snapshot recovery');
+});
+
+for (const state of ['active', 'settled']) it(`${state}: secondary tab state preserves canonical TOP3 and scoped publication`, async t => {
+  const h = await setup(t, false, state);
+  const podium = () => h.node('ranking-top3').findAllByType('Pressable').map(n => n.props.testID);
+  const initial = podium();
+  for (const scope of ['all', 'friends', 'top10']) {
+    act(() => h.node(`ranking-tab-${scope}`).props.onPress());
+    await h.flush();
+    for (const [key, label] of [['all', '전체'], ['friends', '친구'], ['top10', 'TOP10']]) {
+      const tab = h.node(`ranking-tab-${key}`), selected = key === scope;
+      assert.equal(tab.props.accessibilityRole, 'tab');
+      assert.equal(tab.props.accessibilityLabel, label);
+      assert.equal(tab.props.accessibilityState.selected, selected);
+      assert.equal(tab.props['aria-selected'], selected);
+      assert.equal(flatten(tab.props.style).backgroundColor, selected ? semantic.secondaryActionSurface : semantic.raised);
+      assert.equal(flatten(tab.findByType('Text').props.style).color, selected ? semantic.secondaryActionForeground : semantic.text);
+    }
+    assert.deepEqual(podium(), initial);
+    const list = h.calls.filter(p => p.scope === scope && p.limit !== 3).at(-1);
+    assert.equal(list.limit, scope === 'top10' ? 10 : 50);
+    assert.equal(list.rankType, state === 'settled' ? 'final' : 'daily');
+    assert.equal(list.capturedAt, '2026-09-01T00:01:00.000Z');
+    assert.equal(list.rankingDate, availableRankings.rankingDate);
+    assert.equal(list.seasonId, availableRankings.season.id);
+    if (scope === 'friends') assert.ok(h.node('ranking-item-friend-42'));
+  }
+  assert.ok(h.calls.filter(p => p.limit === 3).every(p => p.scope === 'all'));
 });

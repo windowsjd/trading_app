@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import { createRequire } from 'node:module';
 import { QUERY_KEYS } from '../../constants/queryKeys.ts';
-import { semantic } from '../../theme/tokens.ts';
+import { primaryGradient, semantic } from '../../theme/tokens.ts';
 const require = createRequire(import.meta.url);
 const { setup, account, position, asset, flush, act } = require('../../../test/homeDiscoveryHarness.cjs');
 // AssetsService verifies this same fixture through the real Binance parser/writer,
@@ -80,6 +80,9 @@ it('HOT uses the Market turnover DESC result and stable order for each category,
     await h.press(`home-hot-item-${type}-0`);
     assert.deepEqual(h.navigation.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'AssetDetail', params: { assetId: `${type}-0` } } }]);
     await h.press('home-hot-market');
+    const market = h.node('home-hot-market');
+    assert.equal(market.props.primary, true);
+    assert.equal(market.findByType('Text').props.style.color, primaryGradient.foreground);
     assert.deepEqual(h.navigation.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'Market', params: { assetType: type } } }]);
   }
   const keys = h.client.getQueryCache().findAll().filter(q => q.queryKey[0] === 'market').map(q => q.queryKey);

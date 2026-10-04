@@ -3,8 +3,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView, ScrollView, View, Text, StyleSheet, Platform } from '../../theme/native';
-import { useAppearance } from '../../theme/appearance';
-import { semantic } from '../../theme/tokens';
+import { primaryGradient, semantic } from '../../theme/tokens';
 import { getScreenContentStyle } from '../../theme/screenLayout';
 import type { WalletScreenProps } from '../../app/navigation/types';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
@@ -23,6 +22,7 @@ import { getKnownWalletBalanceAmount } from '../../features/wallet/mapper';
 import { formatMoney } from '../../utils/format';
 import PositionAssetRow from '../../components/tradingAccount/PositionAssetRow';
 import ActionPressable from '../../components/common/ActionPressable';
+import PrimaryButtonBackground from '../../components/common/PrimaryButtonBackground';
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
@@ -51,7 +51,6 @@ type AccountWalletProps = {
 function AccountWallet({ account, capabilities, navigation }: AccountWalletProps) {
   const accountId = account.id;
   const rootNavigation = useRootNavigation();
-  const { colors } = useAppearance();
   const portfolioQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.portfolio(accountId),
     queryFn: () => getTradingAccountPortfolio(accountId),
@@ -88,7 +87,6 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
     {
       testID: 'wallet-ledger',
       label: '원장 보기',
-      secondary: true,
       iconPath: 'M6 3h14v18H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z M8 3v18 M11 8h6 M11 12h6 M11 16h4',
       disabled: false,
       hidden: false,
@@ -97,7 +95,6 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
     {
       testID: 'wallet-orders',
       label: '주문 내역 보기',
-      secondary: true,
       iconPath: 'M5 3h14v18l-3-2-4 2-4-2-3 2V3Z M8 7h8 M8 11h8 M8 15l2 2 5-4',
       disabled: false,
       hidden: false,
@@ -132,24 +129,26 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
               accessibilityState={{ disabled: action.disabled }}
               disabled={action.disabled}
               style={styles.quickActionTarget}
-              feedbackStyle={[styles.quickAction, action.secondary && styles.quickActionSecondary, styles.quickActionFeedback]}
+              feedbackStyle={[styles.quickAction, styles.quickActionFeedback]}
               onPress={action.onPress}
             >
               <View
                 testID={`${action.testID}-surface`}
-                style={[styles.quickAction, action.secondary && styles.quickActionSecondary, action.disabled && styles.quickActionDisabled]}
+                style={[styles.quickAction, action.disabled && styles.quickActionDisabled]}
                 accessible={false}
                 accessibilityElementsHidden
                 importantForAccessibility="no-hide-descendants"
                 aria-hidden
                 pointerEvents="none"
               >
+                <PrimaryButtonBackground shape={{ borderRadius: styles.quickAction.borderRadius }} />
                 <Svg
+                  style={styles.quickActionIcon}
                   width={24}
                   height={24}
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke={action.secondary ? colors.secondaryActionForeground : colors.onAccent}
+                  stroke={primaryGradient.foreground}
                   strokeWidth={2}
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -222,8 +221,8 @@ const styles = StyleSheet.create({
   quickActions: { width: '100%', maxWidth: 360, alignSelf: 'center', flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 8 },
   quickActionItem: { flex: 1, minWidth: 0, alignItems: 'center', gap: 8 },
   quickActionTarget: { alignSelf: 'stretch', alignItems: 'center', gap: 8 },
-  quickAction: { width: 52, height: 52, borderRadius: 12, backgroundColor: semantic.selected, alignItems: 'center', justifyContent: 'center' },
-  quickActionSecondary: { backgroundColor: semantic.secondaryActionSurface },
+  quickAction: { width: 52, height: 52, borderRadius: 12, backgroundColor: primaryGradient.colors[0], alignItems: 'center', justifyContent: 'center' },
+  quickActionIcon: { position: 'relative' },
   quickActionFeedback: { top: 0, alignSelf: 'center', zIndex: 1 },
   quickActionDisabled: { opacity: 0.45 },
   quickActionLabel: { alignSelf: 'stretch', fontSize: 13, fontWeight: '500', lineHeight: 20, color: semantic.secondary, textAlign: 'center' },

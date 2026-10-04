@@ -12,6 +12,37 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: Wallet/HOT Primary 범위 + Ranking Secondary 선택 (2026-10-04)
+
+시작 시 최신 `origin/main` fetch, clean working tree와 HEAD
+`3701336489916c23dcfef9268af4cbc21d8bee5f`를 확인했다.
+
+- Wallet 환전·원장·주문 세 quick action은 공통 `primaryGradient`와
+  `PrimaryButtonBackground`를 재사용해 52×52 아이콘 표면만 수평
+  `#326FE5 → #7447D8` Gradient, 아이콘 `#FFFFFF`로 통일한다.
+  outer target와 caption 배경은 투명하다. icon + gap + label의 단일 터치/접근성
+  버튼, 아이콘에만 표시되는 즉각적인 wash, disabled opacity와 명시적 accountId는 유지한다.
+- Home HOT의 `마켓으로 이동 ›`는 기존 ActionPressable geometry에 Primary를 적용한다.
+  선택 assetType navigation을 유지하며, Portfolio의 기존 Primary market CTA는 변경하지 않는다.
+- Ranking 전체·친구·TOP10 중 selected만 공통 Secondary를 사용한다.
+  Light `#EAF4FC / #285B85`, Dark `#1C3042 / #B9DDFC`; 비선택 neutral은 유지한다.
+  role/tab selected 상태를 명시하고, Web의 큰 글꼴 TOP10 넘침은 기존 Market처럼
+  텍스트 maxWidth로 줄바꿈한다. 탭 width/padding/radius/gap 설정은 유지하고,
+  큰 글꼴에서 줄바꿈 시 자동 높이는 자연스럽게 확장된다.
+- Ranking TOP3는 항상 canonical overall이며 friends/top10 목록 scope, publication,
+  pagination/refresh/query는 변경하지 않는다. Home HOT/Market 선택, Record/Profit/Order
+  내역 CTA의 Secondary도 유지한다. 공통 selected·금융색·motion·Backend/API 변경은 없다.
+  Home 환전 진입점은 계속 없으며 WalletFx 기능은 유지한다.
+- 검증: `npm run check`(gated lint/typecheck/116개 테스트 파일), web export와
+  `git diff --check` PASS. 브라우저는 Wallet/Home 384, Home HOT 96, root 756 layout +
+  Ranking 96 선택/publication 흐름, Market 48, Record detail/profit 192 layout,
+  Primary/Secondary 858개 버튼 검증 PASS. 그라데이션 stop/방향과 실제 흰색 아이콘
+  픽셀, 320/360/390/430px × fontScale 1/1.5/2, Light/Dark·두 금융색을 확인했다.
+  캡처·결과는 `/tmp/primary-scope-*-browser`에 남겼다. Web PASS,
+  Android/iOS 실기기 NOT_RUN, 실제 VoiceOver/TalkBack 읽기 NOT_VERIFIED.
+  별도 Ranking 단일 파일 lint는 기존 `useMemo` 불필요 의존성 오류로 FAIL이며
+  시작 HEAD에서도 동일하게 재현했다. 지정 lint 범위를 넓히거나 query 로직을 수정하지 않았다.
+
 ### 작업 단위: Secondary 조회/선택 스타일 + Wallet quick action 터치 영역 (2026-10-04)
 
 시작 시 `git fetch origin main`, clean working tree와 HEAD

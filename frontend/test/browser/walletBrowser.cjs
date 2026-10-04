@@ -142,12 +142,17 @@ async function run() {
                 const el = document.querySelector(`[data-testid="${testID}"]`);
                 const surface = document.querySelector(`[data-testid="${testID}-surface"]`), css = getComputedStyle(surface);
                 const item = document.querySelector(`[data-testid="${testID}-item"]`);
-                const icon = el.querySelector('svg'), label = document.querySelector(`[data-testid="${testID}-label"]`);
+                const icon = surface.querySelector('svg[stroke]'), gradient = surface.querySelector('linearGradient');
+                const label = document.querySelector(`[data-testid="${testID}-label"]`);
                 const labelCss = getComputedStyle(label);
                 return { ...rect(surface), target: rect(el), padding: css.padding, background: css.backgroundColor, radius: css.borderRadius,
                   alignItems: css.alignItems, justifyContent: css.justifyContent, icon: rect(icon), label: rect(label),
                   item: rect(item), separateLabel: surface.parentElement === el && label.parentElement === el && surface.nextElementSibling === label,
                   accessibleButtons: item.querySelectorAll('[role="button"]').length, iconStroke: icon.getAttribute('stroke'),
+                  rootBackground: getComputedStyle(el).backgroundColor, labelBackground: labelCss.backgroundColor,
+                  gradientCount: el.querySelectorAll('linearGradient').length, gradientSurface: gradient && rect(gradient.closest('svg')),
+                  gradient: gradient && { points: ['x1', 'y1', 'x2', 'y2'].map(key => gradient.getAttribute(key)),
+                    stops: [...gradient.querySelectorAll('stop')].map(stop => [stop.getAttribute('offset'), stop.getAttribute('stop-color')]) },
                   buttonText: el.textContent.trim(), labelText: label.textContent, accessibleName: el.getAttribute('aria-label'),
                   textAlign: labelCss.textAlign, fontSize: parseFloat(labelCss.fontSize), lineHeight: parseFloat(labelCss.lineHeight),
                   fontWeight: labelCss.fontWeight, labelColor: labelCss.color };
@@ -188,11 +193,7 @@ async function run() {
               assert.ok(order.hero.bottom <= order.group.top && order.group.bottom <= order.composition.top, 'the whole quick action group renders between Hero and composition');
               assert.ok(order.group.left >= 0 && order.group.right <= width, 'the group stays inside the viewport');
               assert.ok(Math.abs(order.group.left + order.group.right - width) < 1, 'the group is centered');
-              assert.equal(exchange.background, appearance === 'light' ? 'rgb(32, 42, 53)' : 'rgb(52, 70, 87)', 'quick actions use the exchange CTA palette');
-              assert.equal(exchange.iconStroke, '#ffffff');
               for (const button of [ledger, orders]) {
-                assert.equal(button.background, appearance === 'light' ? 'rgb(234, 244, 252)' : 'rgb(28, 48, 66)');
-                assert.equal(button.iconStroke, appearance === 'light' ? '#285B85' : '#B9DDFC');
                 assert.ok(Math.abs(exchange.width - button.width) < 1, 'quick actions have equal rendered widths');
                 for (const property of ['height', 'top', 'padding', 'radius']) assert.equal(button[property], exchange[property]);
                 assert.equal(button.icon.top, exchange.icon.top, 'icons align across the row even when labels wrap');
@@ -202,7 +203,16 @@ async function run() {
               assert.ok(Math.abs((ledger.left - exchange.right) - (orders.left - ledger.right)) < 1, 'visible button gaps are equal');
               assert.ok(Math.abs((ledger.item.left - exchange.item.right) - (orders.item.left - ledger.item.right)) < 1, 'action item gaps are equal');
               for (const [index, button] of layout.quickActions.entries()) {
-                assert.ok(button.width >= 48 && button.width <= 56 && button.height === button.width, 'compact square buttons keep the minimum touch target at every font scale');
+                assert.equal(button.width, 52); assert.equal(button.height, 52);
+                assert.equal(button.background, 'rgb(50, 111, 229)');
+                assert.equal(button.iconStroke, '#FFFFFF');
+                assert.equal(button.rootBackground, 'rgba(0, 0, 0, 0)');
+                assert.equal(button.labelBackground, 'rgba(0, 0, 0, 0)');
+                assert.equal(button.labelColor, theme.palettes[appearance].secondary);
+                assert.equal(button.gradientCount, 1, 'one gradient confined to the compact surface');
+                assert.deepEqual(button.gradient.points, ['0%', '50%', '100%', '50%']);
+                assert.deepEqual(button.gradient.stops, [['0%', '#326FE5'], ['100%', '#7447D8']]);
+                for (const key of ['left', 'top', 'width', 'height']) assert.equal(button.gradientSurface[key], button[key]);
                 assert.equal(button.separateLabel, true, 'surface and label are siblings inside one button');
                 assert.equal(button.accessibleButtons, 1, 'one accessible action without nested buttons');
                 assert.equal(button.buttonText, button.labelText);
@@ -389,6 +399,9 @@ async function run() {
     await page.getByRole('tab', { name: '지갑' }).click();
     await id('wallet-composition').waitFor();
     assert.equal(await id('wallet-exchange').getAttribute('aria-disabled'), 'true');
+    assert.equal(await id('wallet-exchange-surface').evaluate(el => getComputedStyle(el).opacity), '0.45');
+    assert.equal(await id('wallet-exchange-label').evaluate(el => getComputedStyle(el).opacity), '0.45');
+    assert.deepEqual(await id('wallet-exchange-surface').locator('linearGradient stop').evaluateAll(nodes => nodes.map(node => node.getAttribute('stop-color'))), ['#326FE5', '#7447D8']);
     for (const area of ['surface', 'label', 'gap']) {
       await id('wallet-exchange').scrollIntoViewIfNeeded();
       const surface = await id('wallet-exchange-surface').boundingBox(), label = await id('wallet-exchange-label').boundingBox();

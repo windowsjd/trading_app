@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { View, Text, StyleSheet } from '../../theme/native';
-import { semantic } from '../../theme/tokens';
+import { primaryGradient, semantic } from '../../theme/tokens';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { getAssets, type AssetType } from '../../features/market/api';
 import { marketSortParams } from '../../features/market/marketSort';
@@ -93,7 +93,7 @@ export default function HomeHotMarket({ hot, onOpenAsset, onOpenMarket }: {
           {priceError && item.price?.state !== 'available' ? <AdminDiagnosticPanel diagnostic={priceError.diagnostic} /> : null}
         </View>;
       })}
-      <ActionPressable testID="home-hot-market" style={styles.marketAction} accessibilityRole="button"
+      <ActionPressable primary testID="home-hot-market" style={styles.marketAction} accessibilityRole="button"
         accessibilityLabel={`${category.label} 마켓으로 이동`} onPress={() => onOpenMarket(assetType)}>
         <Text style={styles.actionText}>마켓으로 이동 ›</Text>
       </ActionPressable>
@@ -120,5 +120,5 @@ const styles = StyleSheet.create({
   change: { fontSize: 13, lineHeight: 20, textAlign: 'right', fontVariant: ['tabular-nums'] },
   exception: { fontSize: 12, lineHeight: 18, textAlign: 'right', color: semantic.warning },
   marketAction: { minHeight: 44, paddingVertical: 8, alignItems: 'center', justifyContent: 'center' },
-  actionText: { fontSize: 13, lineHeight: 20, color: semantic.secondary, fontWeight: '600' },
+  actionText: { fontSize: 13, lineHeight: 20, color: primaryGradient.foreground, fontWeight: '600' },
 });

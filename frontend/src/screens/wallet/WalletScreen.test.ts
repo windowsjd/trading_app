@@ -4,7 +4,7 @@ import { QUERY_KEYS } from '../../constants/queryKeys.ts';
 import { createHomeHarness, elements } from '../../../test/homeTestHarness.cjs';
 import { holding } from '../../../test/positionFixture.ts';
 import { HoldingsContractError } from '../../features/tradingAccount/holdings.ts';
-import { semantic } from '../../theme/tokens.ts';
+import { primaryGradient, semantic } from '../../theme/tokens.ts';
 
 const text = (tree) => elements(tree, 'Text').flatMap((node) => node.props.children).join(' ');
 const find = (tree, testID) => elements(tree).find((node) => node.props.testID === testID);
@@ -61,9 +61,17 @@ describe('selected account Wallet and shared Home holdings', () => {
         assert.equal(item.props.children, button);
         assert.deepEqual(button.props.children, [surface, caption], 'one button contains the icon surface, gap and label');
         assert.equal(elements(item, 'Pressable').length, 1, 'one accessible action per item');
-        assert.equal(Object.assign({}, ...surface.props.style.filter(Boolean)).backgroundColor,
-          testID === 'wallet-exchange' ? semantic.selected : semantic.secondaryActionSurface);
+        const visual = Object.assign({}, ...surface.props.style.filter(Boolean));
+        assert.equal(visual.backgroundColor, primaryGradient.colors[0]);
+        assert.deepEqual([visual.width, visual.height, visual.borderRadius], [52, 52, 12]);
+        const background = elements(surface).find(node => typeof node.type === 'function');
+        assert.equal(background.type.name, 'PrimaryButtonBackground');
+        assert.deepEqual(background.props.shape, { borderRadius: 12 });
+        assert.equal(button.props.primary, undefined, 'gradient is confined to the inner surface');
+        assert.equal(button.props.style.backgroundColor, undefined);
+        assert.equal(caption.props.style[0].color, semantic.secondary);
         assert.equal(elements(button, 'Svg').length, 1);
+        assert.equal(elements(button, 'Svg')[0].props.stroke, primaryGradient.foreground);
         assert.equal(elements(surface, 'Text').length, 0, 'compact icon surface remains text-free');
         assert.equal(caption.props.children, label);
         assert.equal(button.props.accessibilityLabel, label);
