@@ -32,10 +32,15 @@ test('secondary action roles resolve exact appearance colors independently of fi
     assert.equal(flatten(UI.Pressable.render({ style: { backgroundColor: semantic.secondaryActionSurface } }, null).props.style).backgroundColor, expected[0]);
     assert.equal(flatten(UI.Text.render({ style: { color: semantic.secondaryActionForeground } }, null).props.style).color, expected[1]);
     assert.equal(PALETTES[mode].selected, mode === 'light' ? '#202a35' : '#344657');
+    for (const color of [...primaryGradient.colors, primaryGradient.foreground]) {
+      assert.equal(resolveSemanticColor(color, PALETTES[mode], mode, preference), color);
+    }
   }
-  assert.deepEqual(primaryGradient.colors, ['#326FE5', '#7447D8']);
+  assert.deepEqual(primaryGradient.colors, ['#326FE5', '#4C32E5']);
   assert.equal(primaryGradient.foreground, '#FFFFFF');
   assert.deepEqual([primaryGradient.start, primaryGradient.end], [{ x: '0%', y: '50%' }, { x: '100%', y: '50%' }]);
+  assert.deepEqual(primaryGradient.locations, ['0%', '100%']);
+  assert.equal(primaryGradient.opacity, 1);
 });
 function themed(mode: 'light' | 'dark', financialPreference: 'red_blue' | 'green_red' = 'red_blue') {
   const appearance = { useAppearance: () => ({ mode, financialPreference, colors: PALETTES[mode] }) };

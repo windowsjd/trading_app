@@ -30,7 +30,7 @@ async function run() {
         assert.equal(await history.locator('linearGradient').count(), 0);
         if (screen === 'detail') {
           const stops = await id('record-season-detail-profit-analysis-cta').locator('linearGradient stop').evaluateAll(nodes => nodes.map(node => node.getAttribute('stop-color')));
-          assert.deepEqual(stops, ['#326FE5', '#7447D8']);
+          assert.deepEqual(stops, ['#326FE5', '#4C32E5']);
         }
         const positive = screen === 'detail' ? ['record-detail-return', 'record-detail-pnl'] : ['record-profit-total', 'record-profit-return', 'record-profit-realized', 'record-profit-best-pnl', 'record-profit-best-return'];
         for (const metric of positive) assert.equal(await color(id(metric)), palette[appearance][preference][0], metric);

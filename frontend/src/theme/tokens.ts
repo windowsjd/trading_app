@@ -4,7 +4,7 @@ import { resolveFinancialColor, type FinancialColorPreference } from './financia
 
 /** Brand actions are independent of selection and financial colors, in both modes. */
 export const primaryGradient = {
-  colors: ['#326FE5', '#7447D8'],
+  colors: ['#326FE5', '#4C32E5'],
   foreground: '#FFFFFF',
   start: { x: '0%', y: '50%' },
   end: { x: '100%', y: '50%' },

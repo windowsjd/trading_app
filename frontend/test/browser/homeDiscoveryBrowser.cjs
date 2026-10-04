@@ -92,7 +92,7 @@ async function run() {
           }
           const market = id('home-hot-market');
           assert.equal(await color(market.locator('[dir="auto"]')), 'rgb(255, 255, 255)');
-          assert.deepEqual(await market.locator('linearGradient stop').evaluateAll(nodes => nodes.map(node => node.getAttribute('stop-color'))), ['#326FE5', '#7447D8']);
+          assert.deepEqual(await market.locator('linearGradient stop').evaluateAll(nodes => nodes.map(node => node.getAttribute('stop-color'))), ['#326FE5', '#4C32E5']);
           assert.deepEqual(await market.locator('linearGradient').evaluate(el => ['x1', 'y1', 'x2', 'y2'].map(key => el.getAttribute(key))), ['0%', '50%', '100%', '50%']);
           assert.deepEqual(await market.evaluate(el => {
             const css = getComputedStyle(el); return [css.minHeight, css.paddingTop, css.paddingBottom];

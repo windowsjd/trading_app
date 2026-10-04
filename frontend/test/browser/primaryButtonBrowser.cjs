@@ -65,7 +65,7 @@ async function run() {
       });
       assert.equal(!!actual.gradient, expectedGradient, `${name}: role`);
       if (expectedGradient) {
-        assert.deepEqual(actual.gradient.stops, [['0%', '#326FE5', '1'], ['100%', '#7447D8', '1']], name);
+        assert.deepEqual(actual.gradient.stops, [['0%', '#326FE5', '1'], ['100%', '#4C32E5', '1']], name);
         assert.deepEqual(actual.gradient.points, ['0%', '50%', '100%', '50%'], name);
         assert.equal(actual.gradient.units, 'objectBoundingBox'); assert.equal(actual.gradient.clipRadius, actual.radius);
         assert.equal(actual.gradient.clipOverflow, 'hidden'); assert.equal(actual.gradient.pointerEvents, 'none');
@@ -87,7 +87,7 @@ async function run() {
             return { foregroundPixels, edges: [1, picture.width - 2].map(x => ({ x, width: picture.width, rgba: [...ctx.getImageData(x, Math.floor(picture.height / 2), 1, 1).data] })) };
           }, shot.toString('base64'));
           for (const pixel of pixels.edges) {
-            const t = (pixel.x + 0.5) / pixel.width, expected = [50 + 66*t, 111 - 40*t, 229 - 13*t];
+            const t = (pixel.x + 0.5) / pixel.width, expected = [50 + 26*t, 111 - 61*t, 229];
             assert.ok(expected.every((channel, i) => Math.abs(pixel.rgba[i] - channel) <= 2), `${name}: raster ${JSON.stringify(pixel)}`);
           }
           assert.ok(pixels.foregroundPixels > 0, `${name}: foreground is painted above the gradient`);

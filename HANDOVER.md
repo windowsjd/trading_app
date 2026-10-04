@@ -12,6 +12,34 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: Primary Gradient 끝색 Blue–Indigo 보완 (2026-10-05)
+
+의도: 기존 Primary Blue `#326FE5`의 밝기와 브랜드 인상을 유지하면서,
+Gradient 끝색을 `#4C32E5`로 조정해 색 변화 폭을 줄이고 기존보다 더 일관된
+Blue–Indigo 계열의 Primary Action을 만든다.
+
+- 시작 시 clean working tree와 `git fetch origin main` 성공을 확인했다.
+  시작/종료 HEAD는 `fe8155e4494346246af33295f1d3a62f38b63e62`이며 fetch한 `origin/main`과 같다. 커밋하지 않았다.
+- 실제 구현은 `frontend/src/theme/tokens.ts`의 끝색 한 곳만
+  `#7447D8 → #4C32E5`로 변경했다. 시작색/흰 foreground/수평 방향/두 stop/opacity 1,
+  SVG 구조/geometry/press feedback, 하단 탭 `#326FE5`, Secondary/금융색은 유지한다.
+  Home HOT·Portfolio의 마켓 이동, 일반 CTAButton, 로그인/회원가입/닉네임 저장,
+  일반 학습 진행, 시즌/계정/FX/확인 CTA와 Wallet 세 Quick Action 표면에 자동 적용된다.
+- 기존 끝색 검색 결과: 실제 앱 1곳, 테스트 기대값 7곳(6개 파일), 현재 기준 문서 1곳을 갱신했다.
+  별도 디자인 색은 없었고 HANDOVER의 과거 기록 3곳은 이력으로 보존했다.
+- 관련 theme/button/MainTabs/Home/Wallet 12개 테스트 파일과 `npm run check`
+  (lint/typecheck/119개 테스트 파일), 별도 `npm run typecheck`, `npm run export:web`, `git diff --check` PASS.
+- 실제 RN Web: `primaryButtonBrowser.cjs` 858개 렌더 검사, Gradient audit 20조합,
+  하단 탭 선택 80회, Wallet 실제 navigation/FX/원장/Record/disabled Quick Action PASS.
+  Light/Dark의 Home 마켓 이동·로그인·일반 CTA·Wallet Gradient 캡처를 시각 검토했다.
+  실제 stop/픽셀/방향/흰 글씨·아이콘/loading/disabled/clip/radius/keyboard/중복 방지/Reduced Motion을 확인했다.
+  Native 기기 실행은 미검증이다. 전체 diff를 검토했으며 의존성·backend 변경은 없다.
+- 변경 파일 9개: `frontend/src/theme/{tokens.ts,native.test.ts}`,
+  `frontend/test/browser/{primaryButtonBrowser,brandGradientAuditBrowser,homeDiscoveryBrowser,recordBrowser,walletBrowser}.cjs`,
+  `frontend/docs/pressed-feedback.md`, 이 문서. 현재 색상 기준 문서에 새 Gradient를 반영했다.
+  결과/캡처: `/tmp/primary-indigo-{browser,audit,tabs-browser,wallet}`;
+  command 로그: `/tmp/primary-indigo-{related-tests,check,typecheck,export,browser,audit,tabs,wallet}.log`.
+
 ### 작업 단위: 하단 탭 선택색 Primary Blue (2026-10-05)
 
 의도: Primary CTA Gradient의 시작색 `#326FE5`를 하단 Navigation의 선택 상태에도

@@ -7,8 +7,8 @@ const esbuild = require('esbuild');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../..');
 const out = process.env.BRAND_GRADIENT_AUDIT_OUTPUT ?? '/tmp/trading-brand-gradient-audit';
-const expectedColors = ['#326FE5', '#7447D8'];
-const start = [50, 111, 229], end = [116, 71, 216];
+const expectedColors = ['#326FE5', '#4C32E5'];
+const start = [50, 111, 229], end = [76, 50, 229];
 
 async function run() {
   fs.mkdirSync(out, { recursive: true });

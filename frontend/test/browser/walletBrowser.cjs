@@ -211,7 +211,7 @@ async function run() {
                 assert.equal(button.labelColor, theme.palettes[appearance].secondary);
                 assert.equal(button.gradientCount, 1, 'one gradient confined to the compact surface');
                 assert.deepEqual(button.gradient.points, ['0%', '50%', '100%', '50%']);
-                assert.deepEqual(button.gradient.stops, [['0%', '#326FE5'], ['100%', '#7447D8']]);
+                assert.deepEqual(button.gradient.stops, [['0%', '#326FE5'], ['100%', '#4C32E5']]);
                 for (const key of ['left', 'top', 'width', 'height']) assert.equal(button.gradientSurface[key], button[key]);
                 assert.equal(button.separateLabel, true, 'surface and label are siblings inside one button');
                 assert.equal(button.accessibleButtons, 1, 'one accessible action without nested buttons');
@@ -401,7 +401,7 @@ async function run() {
     assert.equal(await id('wallet-exchange').getAttribute('aria-disabled'), 'true');
     assert.equal(await id('wallet-exchange-surface').evaluate(el => getComputedStyle(el).opacity), '0.45');
     assert.equal(await id('wallet-exchange-label').evaluate(el => getComputedStyle(el).opacity), '0.45');
-    assert.deepEqual(await id('wallet-exchange-surface').locator('linearGradient stop').evaluateAll(nodes => nodes.map(node => node.getAttribute('stop-color'))), ['#326FE5', '#7447D8']);
+    assert.deepEqual(await id('wallet-exchange-surface').locator('linearGradient stop').evaluateAll(nodes => nodes.map(node => node.getAttribute('stop-color'))), ['#326FE5', '#4C32E5']);
     for (const area of ['surface', 'label', 'gap']) {
       await id('wallet-exchange').scrollIntoViewIfNeeded();
       const surface = await id('wallet-exchange-surface').boundingBox(), label = await id('wallet-exchange-label').boundingBox();
