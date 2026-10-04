@@ -218,14 +218,14 @@ describe('bottom tab icon contract', () => {
       /fontScale > 1\s*\? \{ height: 49 \+ Math\.ceil\(14 \* \(fontScale - 1\)\) \+ insets\.bottom \}\s*: \{\}/,
     );
     assert.doesNotMatch(tabs, /tabBarAllowFontScaling:\s*false/);
-    assert.match(tabs, /tabBarActiveTintColor: colors.secondaryActionForeground/);
+    assert.match(tabs, /tabBarActiveTintColor: primaryGradient.colors\[0\]/);
     assert.match(tabs, /tabBarInactiveTintColor: colors.navigationInactive/);
     assert.match(tabs, /backgroundColor: colors.navigation/);
   });
 });
 
 describe('bottom tab visual states', () => {
-  it('uses Secondary for active tabs and preserves outline inactive icons', () => {
+  it('preserves filled active icons and outline inactive icons', () => {
     const Icon = load(resolve('src/components/navigation/TabBarIcon.tsx'), {
       'react-native': { View: 'View' },
       'react-native-svg': { default: 'Svg', Circle: 'Circle', Path: 'Path', __esModule: true },
@@ -237,16 +237,41 @@ describe('bottom tab visual states', () => {
       assert.equal(inactive.props.fill, 'none'); assert.equal(inactive.props.stroke, '#aebbc8');
       assert.equal(active.props.width, 25); assert.equal(inactive.props.width, 25);
     }
-    const tree = renderTabs('general');
-    assert.equal(tree.props.screenOptions.tabBarActiveTintColor, '#285B85');
-    assert.equal(tree.props.screenOptions.tabBarInactiveTintColor, '#697583');
-    assert.equal(tree.props.screenOptions.tabBarStyle.backgroundColor, '#ffffff');
-    const dark = renderTabs('general', false, 'dark');
-    assert.equal(dark.props.screenOptions.tabBarActiveTintColor, '#B9DDFC');
-    assert.equal(dark.props.screenOptions.tabBarInactiveTintColor, '#9aa8b6');
-    assert.equal(dark.props.screenOptions.tabBarStyle.backgroundColor, '#080a0d');
-    assert.equal(tree.props.screenOptions.animation, 'fade');
-    assert.deepEqual(tree.props.screenOptions.transitionSpec, tabTransition(false).transitionSpec);
-    assert.equal(renderTabs('general', false, 'light', true).props.screenOptions.animation, 'none');
   });
+
+  for (const mode of ['general', 'season'] as const) {
+    for (const appearance of ['light', 'dark'] as const) {
+      it(`${mode}/${appearance}: uses Primary Blue for every active tab and keeps inactive colors and motion`, () => {
+        const tree = renderTabs(mode, false, appearance);
+        const options = tree.props.screenOptions;
+        assert.equal(options.tabBarActiveTintColor, '#326FE5');
+        assert.equal(options.tabBarInactiveTintColor, appearance === 'light' ? '#697583' : '#9aa8b6');
+        assert.equal(options.tabBarStyle.backgroundColor, appearance === 'light' ? '#ffffff' : '#080a0d');
+
+        // Let Navigation apply the same tint to its default label and each icon.
+        assert.equal(options.tabBarLabel, undefined);
+        assert.equal(options.tabBarLabelStyle?.color, undefined);
+        for (const screen of elements(tree, 'Screen')) {
+          const tab = screenOptions(screen);
+          assert.equal(tab.tabBarActiveTintColor, undefined);
+          assert.equal(tab.tabBarInactiveTintColor, undefined);
+          assert.equal(tab.tabBarLabel, undefined);
+          assert.equal(tab.tabBarLabelStyle?.color, undefined);
+          for (const focused of [true, false]) {
+            const color = focused ? options.tabBarActiveTintColor : options.tabBarInactiveTintColor;
+            const icon = tab.tabBarIcon({ color, size: 25, focused });
+            assert.equal(icon.props.color, color, screen.props.name);
+            assert.equal(icon.props.focused, focused, screen.props.name);
+          }
+        }
+
+        assert.equal(options.animation, 'fade');
+        assert.deepEqual(options.transitionSpec, tabTransition(false).transitionSpec);
+        const reduced = renderTabs(mode, false, appearance, true).props.screenOptions;
+        assert.equal(reduced.animation, 'none');
+        assert.deepEqual(reduced.transitionSpec, tabTransition(true).transitionSpec);
+        assert.equal(reduced.tabBarActiveTintColor, '#326FE5');
+      });
+    }
+  }
 });

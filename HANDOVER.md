@@ -12,6 +12,27 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 하단 탭 선택색 Primary Blue (2026-10-05)
+
+의도: Primary CTA Gradient의 시작색 `#326FE5`를 하단 Navigation의 선택 상태에도
+사용해 앱의 브랜드 강조색을 통일한다. `MainTabs`의 active tint만 기존
+`primaryGradient.colors[0]`에 연결했으며 General/Season, Light/Dark의 선택된
+아이콘과 기본 label에 동일하게 적용한다. 비선택 `navigationInactive`, 다른
+Secondary UI의 기존 하늘색 정책, Primary Gradient, 금융 의미색과 navigation 동작은 유지한다.
+
+- 기존 MainTabs 테스트를 새 정책에 맞춰 갱신하고 두 계정 모드 × 두 테마에서
+  모든 icon의 focused/tint 전달, label 기본색 상속, inactive 색상과 transition/Reduced Motion을 확인했다.
+- 관련 MainTabs/navigation/TabBarButton 테스트, `npm run check` (lint/typecheck/119개 테스트 파일),
+  별도 `npm run typecheck`, `npm run export:web`, `git diff --check` PASS.
+- 기존 `walletNavigationFixture.jsx`를 사용한 실제 RN Web browser에서 두 계정 모드 ×
+  두 테마 × 두 금융색 설정 × Reduced Motion on/off의 80회 탭 선택 PASS.
+  icon/label의 정확한 active/inactive 색상, 탭 구성, 선택 상태와 keyboard Enter를 확인했다.
+  Light/Dark 캡처를 시각 검토했고 Dark 배경 `#080A0D` 대비는 약 4.29:1이다.
+  Native 기기 및 TalkBack/VoiceOver 실행은 미검증이다.
+- 전체 diff 검토 완료. 변경은 `MainTabs.tsx`, `MainTabs.test.ts`, 이 문서뿐이다.
+  결과/캡처: `/tmp/main-tabs-browser`; 임시 재현 runner: `/tmp/main-tabs-browser.cjs`;
+  command 로그: `/tmp/main-tabs-{check,typecheck,export,browser}.log`.
+
 ### 작업 단위: UI 문구·간격·선택색·조회 UX + Wallet 자산추이·Keyboard·계정 선택 (2026-10-05)
 
 최신 `origin/main`을 fetch하고 clean working tree, 시작 HEAD

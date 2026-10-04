@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppearance } from '../../theme/appearance';
+import { primaryGradient } from '../../theme/tokens';
 import { useReducedMotion } from '../../theme/useReducedMotion';
 import { tabTransition } from './transitionPolicy';
 
@@ -46,7 +47,7 @@ export default function MainTabs() {
         headerShown: false,
         tabBarButton: (props) => <TabBarButton {...props} reducedMotion={reducedMotion} />,
         tabBarLabelPosition: 'below-icon',
-        tabBarActiveTintColor: colors.secondaryActionForeground,
+        tabBarActiveTintColor: primaryGradient.colors[0],
         tabBarInactiveTintColor: colors.navigationInactive,
         ...tabTransition(reducedMotion),
         tabBarStyle: {
