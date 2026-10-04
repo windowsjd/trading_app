@@ -1,5 +1,7 @@
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
+import Svg, { Circle, Path } from 'react-native-svg';
+import { useAppearance } from '../../theme/appearance';
 import { semantic } from '../../theme/tokens';
 import React, { useCallback, useState } from 'react';
 import {
@@ -37,6 +39,7 @@ const tabs = [
   { key: 'search', label: '친구 찾기' },
 ] as const;
 export default function FriendsScreen({ navigation }: Props) {
+  const { colors } = useAppearance();
   const [tab, setTab] = useState<'list' | 'requests' | 'search'>('list');
   const [input, setInput] = useState('');
   const [search, setSearch] = useState('');
@@ -97,6 +100,9 @@ export default function FriendsScreen({ navigation }: Props) {
       ]);
     else mutation.mutate({ action, user });
   };
+  const submitSearch = () => {
+    if (input.trim()) setSearch(input.trim());
+  };
   return (
     <FlatList
       refreshControl={refresh.refreshControl}
@@ -111,35 +117,41 @@ export default function FriendsScreen({ navigation }: Props) {
               <ActionPressable
                 key={item.key}
                 accessibilityRole="tab"
+                accessibilityLabel={item.label}
                 accessibilityState={{ selected: tab === item.key }}
+                aria-selected={tab === item.key}
                 style={[styles.button, tab === item.key && styles.selected]}
                 onPress={() => setTab(item.key)}
               >
-                <Text style={styles.buttonText}>{item.label}</Text>
+                <Text style={[styles.buttonText, tab === item.key && styles.selectedText]}>{item.label}</Text>
               </ActionPressable>
             ))}
           </View>
           {tab === 'search' ? (
-            <View style={styles.header}>
+            <View style={styles.searchField}>
               <TextInput
                 accessibilityLabel="친구 닉네임"
                 placeholder="닉네임으로 검색"
                 maxLength={30}
                 value={input}
                 onChangeText={setInput}
-                onSubmitEditing={() => setSearch(input.trim())}
+                onSubmitEditing={submitSearch}
+                returnKeyType="search"
                 style={styles.input}
               />
               <ActionPressable
-                style={styles.button}
+                accessibilityRole="button"
+                accessibilityLabel="친구 검색"
+                style={styles.searchButton}
                 disabled={!input.trim()}
-                onPress={() => setSearch(input.trim())}
+                onPress={submitSearch}
               >
-                <Text>검색</Text>
+                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={colors.secondary}
+                  strokeWidth={2} strokeLinecap="round" focusable={false} aria-hidden>
+                  <Circle cx={10} cy={10} r={6} />
+                  <Path d="m15 15 5 5" />
+                </Svg>
               </ActionPressable>
-              <Text style={styles.helper}>
-                닉네임의 시작 부분을 입력해주세요. 내 계정은 검색되지 않습니다.
-              </Text>
             </View>
           ) : null}
           {query.isError ? (
@@ -153,7 +165,7 @@ export default function FriendsScreen({ navigation }: Props) {
         </View>
       }
       ListEmptyComponent={
-        query.isError ? null : (
+        query.isError || (tab === 'search' && !search) ? null : (
           <InlineEmptyState
             title={
               query.isLoading
@@ -162,9 +174,7 @@ export default function FriendsScreen({ navigation }: Props) {
                   ? '아직 친구가 없습니다.'
                   : tab === 'requests'
                     ? '받은 친구 요청이 없습니다.'
-                    : search
-                      ? '검색 결과가 없습니다.'
-                      : '친구를 찾아보세요.'
+                    : '검색 결과가 없습니다.'
             }
             message={
               tab === 'list'
@@ -287,16 +297,26 @@ const styles = StyleSheet.create({
     backgroundColor: semantic.raised,
     flexShrink: 1,
   },
-  selected: { backgroundColor: semantic.infoSurface, borderColor: semantic.info },
+  selected: { backgroundColor: semantic.secondaryActionSurface, borderColor: semantic.secondaryActionSurface },
+  selectedText: { color: semantic.secondaryActionForeground },
   buttonText: { fontSize: 15, flexShrink: 1 },
   nickname: { fontSize: 18, fontWeight: '700', flex: 1, minWidth: 0 },
   helper: { fontSize: 14, color: semantic.secondary, flexShrink: 1 },
-  input: {
+  searchField: {
     backgroundColor: semantic.input,
     borderWidth: 1,
     borderColor: semantic.border,
-    padding: 14,
     borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  searchButton: { minWidth: 44, minHeight: 44, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
+  input: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 14,
+    paddingLeft: 14,
+    paddingRight: 8,
     fontSize: 16,
   },
   profile: { flexDirection: 'row', alignItems: 'center', gap: 12 },

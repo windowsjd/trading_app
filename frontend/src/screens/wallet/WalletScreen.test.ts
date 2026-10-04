@@ -11,6 +11,40 @@ const find = (tree, testID) => elements(tree).find((node) => node.props.testID =
 
 describe('selected account Wallet and shared Home holdings', () => {
   for (const mode of ['general', 'season']) {
+    it(`${mode} lazily loads daily equity and resets its selected range on account switch`, async (t) => {
+      const h = createHomeHarness(mode); t.after(h.close);
+      h.seed(h.account, { points: [] });
+      const equityOptions = () => h.queries.find(q => q.queryKey.includes('equity'));
+      let tree = h.renderWallet().tree;
+      assert.equal(find(tree, 'home-trend-toggle').props.accessibilityState.expanded, false);
+      assert.equal(find(tree, 'home-trend-chart'), undefined);
+      assert.equal(equityOptions().enabled, false);
+      assert.deepEqual(equityOptions().queryKey, QUERY_KEYS.tradingAccount.portfolioEquity(h.account.id, '30d', 'daily'));
+      find(tree, 'home-trend-toggle').props.onPress();
+      for (const range of ['7d', '30d', '90d', '180d', '360d']) {
+        tree = h.renderWallet().tree;
+        find(tree, `home-trend-range-${range}`).props.onPress();
+        tree = h.renderWallet().tree;
+        const options = equityOptions();
+        assert.equal(options.enabled, true);
+        assert.deepEqual(options.queryKey, QUERY_KEYS.tradingAccount.portfolioEquity(h.account.id, range, 'daily'));
+        h.response = { success: true, data: {
+          tradingAccountId: h.account.id, mode, state: 'empty', range, granularity: 'daily', points: [],
+          returnRateMethod: mode === 'general' ? 'time_weighted' : 'initial_capital',
+        } };
+        await options.queryFn();
+        assert.equal(h.requests.at(-1).path, `/trading-accounts/${h.account.id}/portfolio/equity`);
+        assert.deepEqual(h.requests.at(-1).params, { range, granularity: 'daily' });
+      }
+      h.account = { ...h.account, id: `${mode}-next` };
+      h.seed(h.account, { points: [] });
+      tree = h.renderWallet().tree;
+      assert.equal(find(tree, 'home-trend-toggle').props.accessibilityState.expanded, false);
+      assert.equal(equityOptions().enabled, false);
+      assert.deepEqual(equityOptions().queryKey, QUERY_KEYS.tradingAccount.portfolioEquity(h.account.id, '30d', 'daily'));
+    });
+  }
+  for (const mode of ['general', 'season']) {
     it(`${mode} shares the Hero and name/value/return rows and preserves preview vs full holdings`, (t) => {
       const h = createHomeHarness(mode); t.after(h.close);
       h.seed(h.account, { points: [] });

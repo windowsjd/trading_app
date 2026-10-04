@@ -147,7 +147,8 @@ async function run() {
         assert.equal(layout.competition, null);
         assert.ok(layout.sectionGaps.every((gap) => Math.abs(gap - layout.gap) <= 1), 'Home sections retain only their normal gaps');
         assert.ok(Math.abs(layout.trailingSpace - layout.paddingBottom) <= 1, 'no empty exchange area remains after the last section');
-        assert.match(layout.lastSectionText, mode === 'general' ? /자금 구성/ : /HOT 🔥/);
+        assert.match(layout.lastSectionText, /HOT 🔥/);
+        assert.doesNotMatch(await page.locator('#root').textContent(), /자금 구성|최초 지급 자본|누적 외부 자금 유입/);
         if (layout.competition) assert.ok(layout.competition.y >= layout.total.bottom);
         if (!long && fontScale === 1) {
           // UI8 adds 8px on each vertical edge and 8px between the two rows.

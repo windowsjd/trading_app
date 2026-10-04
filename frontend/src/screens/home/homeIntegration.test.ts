@@ -320,14 +320,10 @@ describe('general/season home API, queries, rendering and navigation integration
       if (mode === 'general') {
         for (const label of [
           '시간가중 수익률',
-          '자금 구성',
-          '최초 지급 자본',
-          '누적 외부 자금 유입',
-          '누적 광고 보상',
-          '투자 손익',
         ])
           assert.ok(text.includes(label));
         assert.ok(!text.includes('현재 순위'));
+        assert.doesNotMatch(text, /자금 구성|최초 지급 자본|누적 외부 자금 유입|누적 광고 보상|투자 손익/);
       } else {
         for (const label of ['김재민', '현재 순위', '현재 등급'])
           assert.ok(text.includes(label));

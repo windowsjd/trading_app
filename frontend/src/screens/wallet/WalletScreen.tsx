@@ -1,10 +1,11 @@
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Svg, { Path } from 'react-native-svg';
-import { SafeAreaView, ScrollView, View, Text, StyleSheet, Platform } from '../../theme/native';
+import { ScrollView, View, Text, StyleSheet, Platform } from '../../theme/native';
+import { SafeAreaView } from '../../theme/safeArea';
 import { primaryGradient, semantic } from '../../theme/tokens';
-import { getScreenContentStyle } from '../../theme/screenLayout';
+import { getHeaderScreenContentStyle } from '../../theme/screenLayout';
 import type { WalletScreenProps } from '../../app/navigation/types';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
 import { QUERY_KEYS } from '../../constants/queryKeys';
@@ -12,6 +13,7 @@ import { TEST_IDS } from '../../constants/testIds';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import {
   getTradingAccountPortfolio, getTradingAccountWallets, getTradingAccountPositions,
+  getTradingAccountEquity,
   type TradingAccountDto,
 } from '../../features/tradingAccount/api';
 import { getAccountHoldings } from '../../features/tradingAccount/holdings';
@@ -28,6 +30,7 @@ import ErrorState from '../../components/states/ErrorState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import HomeAssetHero from '../home/HomeAssetHero';
+import HomeAssetTrend, { type HomeEquityRange } from '../home/HomeAssetTrend';
 
 export default function WalletScreen({ navigation }: WalletScreenProps) {
   const { selectedAccount, capabilities, isLoading, isError, refetchAccounts } = useTradingAccount();
@@ -36,7 +39,7 @@ export default function WalletScreen({ navigation }: WalletScreenProps) {
     return <ErrorState title="계정 정보를 불러오지 못했습니다." onRetry={() => void refetchAccounts()} />;
   }
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView edges={['left', 'right']} style={styles.screen}>
       <AccountWallet key={selectedAccount.id} account={selectedAccount} capabilities={capabilities} navigation={navigation} />
     </SafeAreaView>
   );
@@ -51,6 +54,8 @@ type AccountWalletProps = {
 function AccountWallet({ account, capabilities, navigation }: AccountWalletProps) {
   const accountId = account.id;
   const rootNavigation = useRootNavigation();
+  const [trendExpanded, setTrendExpanded] = useState(false);
+  const [equityRange, setEquityRange] = useState<HomeEquityRange>('30d');
   const portfolioQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.portfolio(accountId),
     queryFn: () => getTradingAccountPortfolio(accountId),
@@ -63,12 +68,21 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
     queryKey: QUERY_KEYS.tradingAccount.holdings(accountId),
     queryFn: () => getAccountHoldings(accountId, getTradingAccountPositions),
   });
-  const refresh = usePullToRefresh([portfolioQuery, walletsQuery, positionsQuery]);
+  const equityQuery = useQuery({
+    queryKey: QUERY_KEYS.tradingAccount.portfolioEquity(accountId, equityRange, 'daily'),
+    queryFn: () => getTradingAccountEquity(accountId, equityRange, 'daily'),
+    enabled: trendExpanded,
+  });
+  const refresh = usePullToRefresh([
+    portfolioQuery, walletsQuery, positionsQuery,
+    { ...equityQuery, enabled: trendExpanded },
+  ]);
 
   const integrityFailure = findAccountIntegrityFailure([
     { section: '총 자산', isError: portfolioQuery.isError, error: portfolioQuery.error, retry: () => void portfolioQuery.refetch() },
     { section: '현금', isError: walletsQuery.isError, error: walletsQuery.error, retry: () => void walletsQuery.refetch() },
     { section: '보유 종목', isError: positionsQuery.isError, error: positionsQuery.error, retry: () => void positionsQuery.refetch() },
+    { section: '자산 추이', isError: equityQuery.isError, error: equityQuery.error, retry: () => void equityQuery.refetch() },
   ]);
   const portfolio = portfolioQuery.data;
   const notice = portfolio ? getPortfolioNotice(portfolio) : null;
@@ -114,9 +128,19 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
             : !portfolio ? (
               <ErrorState title="총 자산을 불러오지 못했습니다." onRetry={() => void portfolioQuery.refetch()} />
             ) : (
-              <HomeAssetHero summary={portfolio.summary} settled={account.season?.seasonStatus === 'settled'} unavailableMessage={notice?.message} />
+              <HomeAssetHero compactTop compactBottom summary={portfolio.summary} settled={account.season?.seasonStatus === 'settled'} unavailableMessage={notice?.message} />
             )}
           {notice ? <Text style={styles.notice}>{notice.message}</Text> : null}
+          <HomeAssetTrend
+            expanded={trendExpanded}
+            onToggle={() => setTrendExpanded(value => !value)}
+            range={equityRange}
+            onRangeChange={setEquityRange}
+            equity={equityQuery.data}
+            loading={equityQuery.isLoading}
+            failed={equityQuery.isError}
+            general={account.mode === 'general'}
+          />
         </>
       )}
       <View testID="wallet-quick-actions" style={styles.quickActions}>
@@ -210,7 +234,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: semantic.screen },
-  content: { ...getScreenContentStyle(Platform.OS), padding: 16, paddingBottom: 24, gap: 12 },
+  content: getHeaderScreenContentStyle(Platform.OS),
   card: { padding: 16, borderWidth: 1, borderColor: semantic.border, borderRadius: 14, backgroundColor: semantic.surface },
   title: { fontSize: 14, fontWeight: '600', lineHeight: 21, color: semantic.secondary, marginBottom: 8 },
   cashRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 12, rowGap: 4, paddingVertical: 12 },
@@ -218,12 +242,12 @@ const styles = StyleSheet.create({
   cashValue: { flexGrow: 1, flexShrink: 1, minWidth: 0, textAlign: 'right', fontSize: 16, lineHeight: 24, fontVariant: ['tabular-nums'] },
   holdings: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: semantic.border },
   notice: { fontSize: 13, lineHeight: 20, color: semantic.warning },
-  quickActions: { width: '100%', maxWidth: 360, alignSelf: 'center', flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 8 },
+  quickActions: { width: '100%', maxWidth: 360, alignSelf: 'center', flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   quickActionItem: { flex: 1, minWidth: 0, alignItems: 'center', gap: 8 },
   quickActionTarget: { alignSelf: 'stretch', alignItems: 'center', gap: 8 },
   quickAction: { width: 52, height: 52, borderRadius: 12, backgroundColor: primaryGradient.colors[0], alignItems: 'center', justifyContent: 'center' },
   quickActionIcon: { position: 'relative' },
   quickActionFeedback: { top: 0, alignSelf: 'center', zIndex: 1 },
   quickActionDisabled: { opacity: 0.45 },
-  quickActionLabel: { alignSelf: 'stretch', fontSize: 13, fontWeight: '500', lineHeight: 20, color: semantic.secondary, textAlign: 'center' },
+  quickActionLabel: { alignSelf: 'stretch', fontSize: 13, fontWeight: '600', lineHeight: 20, color: semantic.secondary, textAlign: 'center' },
 });

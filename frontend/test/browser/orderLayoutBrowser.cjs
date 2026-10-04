@@ -49,10 +49,12 @@ async function run() {
       await theme.canvas(page, appearance);
       await theme.background(page.getByTestId('trading-account-general-summary'), appearance, 'screen');
       await theme.background(page.getByText('총 자산', { exact: true }), appearance, 'screen');
-      for (const label of ['자금 구성', '지갑 요약', '자산 배분', '자산 추이']) {
+      await page.getByTestId('home-trend-toggle').click();
+      await page.getByTestId('home-trend-chart').waitFor();
+      assert.equal(await page.getByText('자금 구성', { exact: true }).count(), 0);
+      for (const label of ['보유 종목', 'HOT 🔥', '자산 추이']) {
         await theme.background(page.getByText(label, { exact: true }), appearance, 'surface');
       }
-      await theme.background(page.getByText('원장 보기', { exact: true }), appearance, 'raised');
       await page.screenshot({ path: path.join(out, `home-${appearance}.png`), fullPage: true });
       await page.goto(`${base}/?screen=market`);
       await page.getByTestId('market-item-SUI').waitFor();

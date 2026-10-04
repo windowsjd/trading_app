@@ -123,13 +123,7 @@ export default function ModeSelectionScreen({
         contentContainerStyle={styles.content}
         testID={TEST_IDS.modeSelection.screen}
       >
-        <Text style={styles.title}>투자 방식을 선택하세요</Text>
-        <Text style={styles.subtitle}>
-          계정마다 지갑, 보유 종목, 주문, 수익률이 완전히 분리되어 있습니다.
-          선택한 계정은 앱 사용 중 홈에서 언제든지 변경할 수 있습니다.
-        </Text>
-
-        <Text style={styles.sectionLabel}>일반 투자</Text>
+        <Text style={styles.title}>계정 선택하기</Text>
         {generalOption.kind === 'existing' ? (
           <GeneralExistingCard
             account={generalOption.account}
@@ -137,21 +131,13 @@ export default function ModeSelectionScreen({
           />
         ) : (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>새 일반 투자 계정</Text>
-            <Text style={styles.cardBody}>
-              시즌과 무관하게 계속 유지되는 투자 계정입니다. 초기 자금
-              10,000,000원으로 시작하고, 성과는 시간가중 수익률로 측정합니다.
-            </Text>
-            <Text style={styles.cardNotice}>
-              국내·미국·가상자산 매매와 KRW↔USD 환전을 지원합니다. USD 결제
-              자산은 보유 USD 잔액 안에서 주문할 수 있습니다.
-            </Text>
+            <Text style={styles.cardTitle}>일반모드</Text>
             <CTAButton
               testID={TEST_IDS.modeSelection.generalStart}
               label={
                 openGeneral.isPending
                   ? '계정을 여는 중입니다...'
-                  : '일반 투자 계정 시작하기'
+                  : '일반모드'
               }
               state={openGeneral.isPending ? 'loading' : 'enabled'}
               onPress={openGeneral.start}
@@ -167,20 +153,17 @@ export default function ModeSelectionScreen({
           </View>
         )}
 
-        <Text style={styles.sectionLabel}>시즌 투자</Text>
         {model.seasonContinue.map((account) => {
-          const display = getAccountDisplay(account);
-
           return (
             <View key={account.id} style={styles.card}>
-              <Text style={styles.cardTitle}>{display.title}</Text>
-              {display.subtitle ? (
-                <Text style={styles.cardBody}>{display.subtitle}</Text>
-              ) : null}
-              <Text style={styles.cardNotice}>{display.returnRateLabel}</Text>
+              <View style={styles.cardHeaderRow}>
+                <Text style={[styles.cardTitle, styles.cardHeaderTitle]}>시즌모드</Text>
+                <View style={styles.badge}><Text style={styles.badgeText}>참가중</Text></View>
+              </View>
+              <Text style={styles.cardBody}>{account.season?.seasonName}</Text>
               <CTAButton
                 testID={TEST_IDS.modeSelection.seasonContinue(account.id)}
-                label="시즌 투자 계속하기"
+                label="시즌모드"
                 onPress={() => startWithAccount(account)}
               />
             </View>
@@ -206,14 +189,8 @@ export default function ModeSelectionScreen({
           </View>
         ) : model.seasonJoin.kind === 'available' ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>{model.seasonJoin.seasonName}</Text>
-            <Text style={styles.cardBody}>
-              현재 진행 중인 시즌입니다. 아직 참가하지 않았습니다.
-            </Text>
-            <Text style={styles.cardNotice}>
-              참가하면 시즌 전용 계정이 새로 열리고, 성과는 시즌 초기자본 대비
-              수익률로 측정됩니다.
-            </Text>
+            <Text style={styles.cardTitle}>시즌모드</Text>
+            <Text style={styles.cardBody}>{model.seasonJoin.seasonName}</Text>
             <CTAButton
               testID={TEST_IDS.modeSelection.seasonJoin}
               label="시즌 참가하기"
@@ -276,19 +253,15 @@ function GeneralExistingCard({
     <View style={styles.card}>
       <View style={styles.cardHeaderRow}>
         <Text style={[styles.cardTitle, styles.cardHeaderTitle]}>
-          {display.title}
+          일반모드
         </Text>
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{display.statusLabel}</Text>
         </View>
       </View>
-      {display.subtitle ? (
-        <Text style={styles.cardBody}>{display.subtitle}</Text>
-      ) : null}
-      <Text style={styles.cardNotice}>{display.returnRateLabel}</Text>
       <CTAButton
         testID={TEST_IDS.modeSelection.generalUse}
-        label="일반 투자로 시작"
+        label="일반모드"
         onPress={onStart}
       />
     </View>
@@ -306,7 +279,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: semantic.screen },
   content: { flexGrow: 1, padding: 20, gap: 10, justifyContent: 'center' },
   title: { fontSize: 24, fontWeight: '700', lineHeight: 32 },
-  subtitle: { fontSize: 13, color: semantic.secondary, lineHeight: 19, marginBottom: 6 },
   sectionLabel: {
     fontSize: 13,
     fontWeight: '700',
@@ -323,13 +295,13 @@ const styles = StyleSheet.create({
   },
   cardHeaderRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'flex-start',
     gap: 12,
   },
   cardHeaderTitle: { flex: 1, flexShrink: 1, minWidth: 0 },
   cardTitle: { fontSize: 17, fontWeight: '700', color: semantic.text, lineHeight: 24 },
   cardBody: { fontSize: 14, color: semantic.secondary, lineHeight: 21 },
-  cardNotice: { fontSize: 12, color: semantic.muted, lineHeight: 18 },
   errorText: { fontSize: 13, color: semantic.error, lineHeight: 20 },
   badge: {
     flexShrink: 0,
@@ -338,7 +310,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: semantic.infoSurface,
   },
-  badgeText: { fontSize: 11, fontWeight: '700', color: semantic.info },
+  badgeText: { fontSize: 11, lineHeight: 17, fontWeight: '700', color: semantic.info },
   pastRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',

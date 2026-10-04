@@ -119,6 +119,6 @@ const styles = StyleSheet.create({
   price: { fontSize: 15, lineHeight: 23, fontWeight: '600', textAlign: 'right', fontVariant: ['tabular-nums'] },
   change: { fontSize: 13, lineHeight: 20, textAlign: 'right', fontVariant: ['tabular-nums'] },
   exception: { fontSize: 12, lineHeight: 18, textAlign: 'right', color: semantic.warning },
-  marketAction: { minHeight: 44, paddingVertical: 8, alignItems: 'center', justifyContent: 'center' },
+  marketAction: { minHeight: 44, paddingVertical: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
   actionText: { fontSize: 13, lineHeight: 20, color: primaryGradient.foreground, fontWeight: '600' },
 });

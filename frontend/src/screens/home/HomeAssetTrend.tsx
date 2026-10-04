@@ -42,7 +42,7 @@ export default function HomeAssetTrend({
         style={styles.toggle}
       >
         <Text style={styles.toggleText}>자산추이 보기</Text>
-        <DisclosureTriangle testID="home-trend-disclosure" direction={expanded ? 'up' : 'down'} />
+        <DisclosureTriangle testID="home-trend-disclosure" direction={expanded ? 'up' : 'down'} color={semantic.secondaryActionForeground} />
       </ActionPressable>
       {expanded ? (
         <View testID="home-trend-chart" style={styles.card}>
@@ -93,7 +93,7 @@ export default function HomeAssetTrend({
 const styles = StyleSheet.create({
   container: { minWidth: 0 },
   toggle: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', justifyContent: 'center', paddingHorizontal: 8 },
-  toggleText: { flexShrink: 1, fontSize: 13, lineHeight: 20, color: semantic.secondary, fontWeight: '600' },
+  toggleText: { flexShrink: 1, fontSize: 13, lineHeight: 20, color: semantic.secondaryActionForeground, fontWeight: '600' },
   card: { borderWidth: 1, borderColor: semantic.border, borderRadius: 14, padding: 16, backgroundColor: semantic.surface, gap: 12 },
   header: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   heading: { fontSize: 18, lineHeight: 26, fontWeight: '700', color: semantic.text },

@@ -12,6 +12,113 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: UI 문구·간격·선택색·조회 UX + Wallet 자산추이·Keyboard·계정 선택 (2026-10-05)
+
+최신 `origin/main`을 fetch하고 clean working tree, 시작 HEAD
+`7664eb655ec9754c2ef9df231934b01d4bf6aebd` (`UI개편 11`)와 일치를 확인했다.
+커밋하지 않았으며 종료 HEAD도 같다.
+
+의도: 정보 밀도와 화면 간격을 정리하고, Secondary 색상 정책을 주요 선택 상태에
+일관되게 적용하며, 사용 빈도가 낮은 설명/요약 UI를 제거해 핵심 정보와 행동을
+더 빠르게 인지하도록 한다. 또한 모바일 금액 입력 시 키보드가 입력/실행 영역을
+가리지 않도록 interaction을 개선한다.
+
+- Market/Wallet: header와 tab navigator가 vertical safe area를 담당하고 화면은
+  좌우 safe area를 유지한다. 공통 header-screen content padding/section gap 12px,
+  Market header 내부 vertical padding과 Wallet Hero/quick-action 중복 padding을 정리했다.
+  시작 HEAD와 실제 RN Web navigator를 비교해 네 폭 모두 header 이후 첫 콘텐츠
+  28→12px, Market category→search→toolbar 12px, Wallet Hero→trend→quick→composition
+  외부 간격 각 12px를 확인했다. horizontal padding, list-row spacing과 desktop max-width는 유지한다.
+- Settings: 지정한 설명 3개만 제거하고 공개/알림을 동일 compact Switch로 표시한다.
+  ON track/thumb은 기존 Secondary, OFF는 neutral. RN Web의 별도 `activeThumbColor`도
+  같은 정책을 사용한다. 공개 `updateMe`/optimistic/rollback/중복 방지와 알림 local state는 유지한다.
+- Secondary: MainTabs active icon/label에만 적용하며 global navigationActive는 그대로다.
+  Friends selected tab, Home/Wallet trend text/triangle, Home holdings toggle,
+  Market selected criterion text/arrow에 재사용했다. Light `#EAF4FC / #285B85`,
+  Dark `#1C3042 / #B9DDFC`; Primary `#326FE5 → #7447D8`, 금융색과 motion 정책은 유지한다.
+- UI 제거: Record 누적 요약과 frontend aggregate, Ranking publication metadata box와
+  전용 formatter, General Home 자금 구성과 전용 formatter/style. Record 목록,
+  Ranking daily/final publication·canonical TOP3·pagination consistency·snapshot recovery,
+  funding/TWR/성과 DTO·계산을 유지한다. 기존 trend 안의 외부자금/TWR 안내는 카드와 별개로 유지한다.
+- Friends: 기존 SVG 돋보기(20px)/44px 이상 touch target을 Input 오른쪽 sibling으로 배치한다.
+  icon과 keyboard Search는 같은 trim/blank guard를 사용한다. 검색 전 empty/helper만 제거하고
+  검색 결과 없음·친구/요청 empty·pagination·mutation은 유지한다.
+- 총/최종 자산 제목: 공유 Hero 18px/700/lineHeight 27; 금액 36px 유지.
+  Home HOT Primary는 Login과 같은 radius 12, Wallet caption은 500→600이다.
+- Wallet trend: `HomeAssetTrend`/기존 equity API 재사용, Wallet accountId/range/daily query key,
+  접힘/30D 기본, 7/30/90/180/360D. 기존 account-keyed AccountWallet로 계정 변경 시 초기화한다.
+  펼칠 때만 조회하고 해당 equity를 scoped pull-to-refresh에 포함한다. global invalidate 없음.
+  structural equity error도 기존 account integrity gate에 포함한다.
+- ModeSelection: 제목 `계정 선택하기`, 정상 카드 `일반모드`/실제 상태 badge/동명 CTA,
+  `시즌모드`/실제 seasonName/실제 seasonContinue만 `참가중`/동명 CTA.
+  신규 시즌 `시즌 참가하기`, explicit general POST·selection·SeasonJoin·loading/error/retry·past는 유지한다.
+- Keyboard 조사: Android manifest에는 이미 adjustResize가 있었고 Expo 설정은 명시되지 않았다.
+  두 화면은 Android KAV height도 사용했다. Order는 iOS header offset이 있었고 FX에는 없었다.
+  focused field/submit을 함께 측정해 scroll하는 처리는 없었다. 실제 Native 문제 원인은
+  이 환경에서 재현하지 못했으며 Android 중복 보정 가능성은 코드에 근거한 추정이다.
+- Keyboard 구현: Expo resize를 명시하고 Android는 OS resize, iOS는 measured headerHeight +
+  KAV padding. 공유 `useFocusedInputScroll`은 실제 scroll viewport/input/CTA를 focus·layout·
+  content-size·keyboard 이벤트 후 측정한다. 함께 들어가면 input~CTA를 표시하고 짧은 viewport는
+  input을 우선하며 CTA로 직접 scroll할 수 있다. `handled` taps/`none` dismiss로 키보드를
+  닫지 않고 CTA를 누를 수 있게 한다. RAF/listener/blur/unmount/late-callback 정리와 FX account reset 포함.
+  문자열/Decimal/quote/validation/idempotency/submit lock/input semantics는 변경하지 않았다.
+
+검증:
+
+- `npm run check`: gated lint + guides lint + typecheck + 119개 테스트 파일 PASS.
+  별도 `npm run typecheck`, `npm run export:web`, `git diff --check` PASS.
+  export와 typecheck를 동시에 실행했을 때 ignored dist가 재생성되어 TS6053이 한 번 발생했다.
+  export 완료 후 순차 typecheck/check 재실행은 PASS이며 설정 변경은 하지 않았다.
+- 기존 browser: Wallet/Home 384 layouts + full holdings/account switch/실제 tab/FX·ledger·Record 이동,
+  Home/Market 96 layouts + 5 ranges/tooltip/server sort/search/pagination,
+  Home 244 layouts/states + stale response/storage/navigation,
+  Friends 60 layouts + privacy/locked, Order Light/Dark 320/360/390 입력·caret·quote/create PASS.
+- 추가 `uiCleanupBrowser.cjs`: Light/Dark × 320/360/390/430 × fontScale 1/1.5/2의
+  24조합에서 Friends/Settings/ModeSelection/Wallet trend/quick labels glyph bounds PASS.
+  entry 4종, baseline geometry 16건, 실제 탭 account-scoped equity 5범위·전환 초기화 PASS.
+  Order amount/limit·FX amount Web viewport shrink/CTA scroll/input 문자열 유지·회전 PASS.
+  Home/Market와 Wallet 기존 harness는 두 금융색과 긴 이름/금액도 포함한다.
+- Web PASS는 fixture transport를 사용하는 실제 RN Web 컴포넌트/Query/navigation 검증이다.
+  Android SDK/adb와 iOS runtime이 없어 두 Native 실행은 NOT_RUN.
+  실제 software keyboard input visibility/CTA 접근/scroll/dismiss/Back/회전과
+  TalkBack/VoiceOver 읽기는 NOT_VERIFIED. Web resize를 Native PASS로 간주하지 않는다.
+- 전체 tracked diff와 신규 파일을 끝까지 검토했다. Backend 0줄, DB 0줄,
+  Migration 0개, API contract 0개; `/api/v1` 유지, 새로운 package 없음.
+
+변경 파일과 이유 (아래 파일은 `frontend/` 기준, 이 문서만 repository root):
+
+| 파일 | 이유 |
+| --- | --- |
+| `app.json`, `src/hooks/useFocusedInputScroll.ts`, `src/screens/order/OrderScreen.tsx`, `OrderPanel.tsx`, `src/screens/wallet/WalletFxScreen.tsx` | OS별 keyboard policy, 실제 focused field/CTA 측정·scroll 연결 |
+| `src/theme/screenLayout.ts`, `src/screens/market/MarketScreen.tsx`, `src/screens/wallet/WalletScreen.tsx` | header/section rhythm, account-scoped lazy trend·refresh |
+| `src/screens/home/HomeAssetHero.tsx`, `HomeAssetTrend.tsx`, `HomeHoldings.tsx`, `HomeHotMarket.tsx`, `GeneralAccountHome.tsx` | 제목·Secondary·Primary shape와 funding UI 제거 |
+| `src/screens/my/SettingsScreen.tsx`, `src/screens/friends/FriendsScreen.tsx`, `src/screens/entry/ModeSelectionScreen.tsx`, `src/app/navigation/MainTabs.tsx`, `src/features/market/MarketSortControl.tsx` | Switch/검색/선택색/계정 선택 presentation |
+| `src/screens/ranking/RankingScreen.tsx`, `src/screens/record/RecordSeasonListScreen.tsx` | metadata/aggregate UI와 dead code만 제거 |
+| `package.json` | 새 keyboard hook만 기존 check-only lint gate에 추가 |
+| `src/hooks/useFocusedInputScroll.test.ts`, `src/screens/entry/ModeSelectionScreen.test.ts`, `src/screens/wallet/walletRefresh.test.ts`, `WalletScreen.test.ts` | scroll geometry/lifecycle, entry 필수 상태, lazy/range/refresh/stale 계정 회귀 |
+| `src/app/navigation/MainTabs.test.ts`, `src/features/friends/friends.test.ts`, `src/screens/my/SettingsScreen.test.ts`, `src/screens/home/homeIntegration.test.ts`, `src/utils/displayPolicyContract.test.ts` | 변경된 UI 기대값, trim/blank search, local Switch/서버 privacy 분리 |
+| `test/browser/uiCleanupBrowser.cjs`, `friendsBrowser.cjs`, `homeBrowser.cjs`, `orderLayoutBrowser.cjs` | 실제 geometry/color/glyphs/input 검사와 제거 UI 기대값 갱신 |
+| `test/browser/friendsMocks.js`, `homeMocks.js`, `rootTabsFixture.jsx` | 실제 no-result/entry 시나리오, safe-area provider fixture |
+| `test/homeDiscoveryHarness.cjs`, `homeTestHarness.cjs`, `inlineTradingHarness.cjs`, `interactionTestHarness.cjs`, `ledgerTestHarness.cjs`, `tradingUiHarness.cjs` | 공통 hook·Wallet trend를 실제 기존 harness에서 검증하도록 native/React stub 갱신 |
+| `HANDOVER.md` | 구현 의도·전체 파일·검증 근거·Native 미검증 범위 |
+
+결과/캡처: `/tmp/ui-cleanup-{browser,wallet,home-market,home,friends,order}`;
+필수 command 로그 `/tmp/ui-cleanup-{check,typecheck,export}.log`.
+Browser 재현은 `frontend/`에서 아래 환경과 해당 `test/browser/*Browser.cjs`를 사용한다.
+Baseline 비교는 `/tmp/ui-cleanup-baseline/frontend` (시작 HEAD archive, local node_modules link).
+
+```sh
+NODE_PATH=/tmp/home-fx-browser-tools/node_modules \
+LD_LIBRARY_PATH=/tmp/home-fx-browser-libs/usr/lib/x86_64-linux-gnu \
+FONTCONFIG_FILE=/tmp/home-fx-browser-fonts.conf \
+UI_CLEANUP_BROWSER_OUTPUT=/tmp/ui-cleanup-browser \
+UI_CLEANUP_BASELINE=/tmp/ui-cleanup-baseline/frontend \
+node test/browser/uiCleanupBrowser.cjs
+```
+
+후속: 실제 Android/iOS keyboard·header/safe-area 조건에서 주문 금액/수량/지정가와
+FX 금액→CTA를 확인한다. 실제 CTA tap, keyboard dismiss/Back/rotation은 별도 Native 검증이 필요하다.
+
 ### 작업 단위: Wallet/HOT Primary 범위 + Ranking Secondary 선택 (2026-10-04)
 
 시작 시 최신 `origin/main` fetch, clean working tree와 HEAD
@@ -3118,6 +3225,17 @@ cd frontend && npm run typecheck && npm test
 ---
 
 ## 2. 최신 작업 시간순 기록
+
+### 2026-10-05 — UI 문구·간격·선택색·조회 UX + Wallet 자산추이·Keyboard·계정 선택
+
+Market/Wallet header 이후 간격 28→12px와 section rhythm, Settings compact Secondary
+Switch, active tabs/조회 action/sort 색상을 정리했다. Record 요약·Ranking metadata·
+General funding UI를 제거하고 Friends 검색과 ModeSelection 정상 presentation을 단순화했다.
+Wallet은 기존 Home trend/equity를 lazy account scope로 재사용하고 expanded refresh를 포함한다.
+Order/FX는 OS resize/padding + focused field/CTA 실측 scroll을 적용했다.
+금융/계정/서버/API 정책은 유지한다. check(119 files)/typecheck/export/diff와 Web 회귀 PASS,
+Android/iOS NOT_RUN·실제 Native keyboard NOT_VERIFIED. 상세 변경·재현·후속은 위 작업 단위 참조.
+시작/종료 HEAD `7664eb655ec9754c2ef9df231934b01d4bf6aebd`, 미커밋.
 
 ### 2026-08-18 — 일반계정 KRW↔USD FX 공통 코어 활성화 (GENERAL-ACCOUNT-FX-V1)
 

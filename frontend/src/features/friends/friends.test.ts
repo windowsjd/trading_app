@@ -17,6 +17,7 @@ function screenHarness() {
   const Screen = load(resolve('src/screens/friends/FriendsScreen.tsx'), {
     react: { ...React, useRef: (value: any) => ({ current: value }), useEffect() {}, useCallback: (fn: any) => fn, useState: (initial: any) => { const i = index++; if (!(i in slots)) slots[i] = initial; return [slots[i], (value: any) => { slots[i] = value; }]; } },
     'react-native': { FlatList: 'FlatList', View: 'View', Text: 'Text', Image: 'Image', TextInput: 'TextInput', StyleSheet: { create: (value: any) => value }, Alert: { alert: (...args: any[]) => alerts.push(args) } },
+    'react-native-svg': { default: 'Svg', Circle: 'Circle', Path: 'Path', __esModule: true },
     '@react-navigation/native': { useFocusEffect: () => {} },
     '@tanstack/react-query': { useQueryClient: () => ({}), useInfiniteQuery: (option: any) => { h.option = option; return query; }, useMutation: (option: any) => { h.mutationOption = option; return { mutate: (value: any) => mutations.push(value) }; } },
     '../../features/friends/api': { getFriends: (...args: any[]) => args, changeFriendship: () => {} },
@@ -36,10 +37,33 @@ describe('friends user flow', () => {
     pressText(tree.props.ListHeaderComponent, '친구 찾기'); tree = h.render();
     assert.equal(h.option.enabled, false);
     elements(tree.props.ListHeaderComponent, 'TextInput')[0].props.onChangeText('  친구  ');
-    tree = h.render(); pressText(tree.props.ListHeaderComponent, '검색'); tree = h.render();
+    tree = h.render();
+    elements(tree.props.ListHeaderComponent, 'Pressable').find(node => node.props.accessibilityLabel === '친구 검색').props.onPress();
+    tree = h.render();
     assert.deepEqual(h.option.queryKey, QUERY_KEYS.friends.search('친구'));
     assert.deepEqual(h.option.queryFn({ pageParam: 30 }), ['search', '친구', 30, undefined]);
     assert.equal(h.option.getNextPageParam({ pagination: { nextOffset: 60 } }), 60);
+  });
+  it('shares trimmed keyboard/icon search, ignores blanks and hides only the search-before empty state', () => {
+    const h = screenHarness();
+    pressText(h.render().props.ListHeaderComponent, '친구 찾기');
+    let tree = h.render();
+    assert.equal(tree.props.ListEmptyComponent, null);
+    const input = () => elements(tree.props.ListHeaderComponent, 'TextInput')[0];
+    const search = () => elements(tree.props.ListHeaderComponent, 'Pressable').find(node => node.props.accessibilityLabel === '친구 검색');
+    assert.equal(input().props.returnKeyType, 'search');
+    assert.equal(search().props.disabled, true);
+    input().props.onChangeText('   '); tree = h.render(); input().props.onSubmitEditing(); tree = h.render();
+    assert.equal(h.option.enabled, false);
+    input().props.onChangeText('  검색어  '); tree = h.render(); input().props.onSubmitEditing(); tree = h.render();
+    assert.deepEqual(h.option.queryKey, QUERY_KEYS.friends.search('검색어'));
+    assert.equal(tree.props.ListEmptyComponent.props.title, '검색 결과가 없습니다.');
+    input().props.onChangeText(''); tree = h.render(); input().props.onSubmitEditing(); tree = h.render();
+    assert.deepEqual(h.option.queryKey, QUERY_KEYS.friends.search('검색어'), 'blank submit keeps the previous search');
+    const tabs = elements(tree.props.ListHeaderComponent, 'Pressable').filter(node => node.props.accessibilityRole === 'tab');
+    assert.deepEqual(tabs.map(node => node.props['aria-selected']), [false, false, true]);
+    pressText(tree.props.ListHeaderComponent, '친구 목록'); tree = h.render();
+    assert.equal(tree.props.ListEmptyComponent.props.title, '아직 친구가 없습니다.');
   });
   it('sends requests, accepts/rejects incoming requests and disables pending requests', () => {
     const h = screenHarness(), tree = h.render();
@@ -118,7 +142,7 @@ describe('overall menu and server privacy setting', () => {
     let cached = data;
     const Screen = load(resolve('src/screens/my/SettingsScreen.tsx'), {
       react: { ...React, useState: (value: any) => [value, () => {}], useEffect: () => {}, useRef: (value: any) => ({ current: value }) },
-      'react-native': { View: 'View', Text: 'Text', SafeAreaView: 'SafeAreaView', ScrollView: 'ScrollView', Switch: 'Switch', TextInput: 'TextInput', Alert: { alert: () => {} }, StyleSheet: { create: (value: any) => value } },
+      'react-native': { View: 'View', Text: 'Text', SafeAreaView: 'SafeAreaView', ScrollView: 'ScrollView', Switch: 'Switch', Platform: { OS: 'android' }, TextInput: 'TextInput', Alert: { alert: () => {} }, StyleSheet: { create: (value: any) => value } },
       '@tanstack/react-query': {
         useQuery: () => ({ data }),
         useQueryClient: () => ({

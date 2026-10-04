@@ -21,7 +21,7 @@ export default function MarketSortControl({ value, onChange }: {
             accessibilityRole="radio" accessibilityLabel={criterion === 'turnover' ? '거래대금 정렬' : '등락률 정렬'}
             accessibilityState={{ checked: selected }} aria-checked={selected}
             onPress={() => select(criterion, sortOrder)}
-            style={[styles.criterion, selected && styles.selected]}>
+            style={styles.criterion}>
             <Text style={[styles.text, selected && styles.selectedText]}>{criterion === 'turnover' ? '거래대금' : '등락률'}</Text>
           </ActionPressable>
         );
@@ -38,7 +38,7 @@ export default function MarketSortControl({ value, onChange }: {
               style={[styles.arrow, direction === 'asc' ? styles.asc : styles.desc]}>
               <DisclosureTriangle testID={`market-sort-${direction}-triangle`}
                 direction={direction === 'asc' ? 'up' : 'down'}
-                color={selected ? semantic.text : semantic.muted} />
+                color={selected ? semantic.secondaryActionForeground : semantic.muted} />
             </ActionPressable>
           );
         })}
@@ -56,6 +56,5 @@ const styles = StyleSheet.create({
   arrow: { width: 44, height: 24, alignItems: 'center' },
   asc: { justifyContent: 'flex-end', paddingBottom: 1 },
   desc: { justifyContent: 'flex-start', paddingTop: 1 },
-  selected: { backgroundColor: semantic.selected },
-  selectedText: { color: semantic.onAccent },
+  selectedText: { color: semantic.secondaryActionForeground },
 });

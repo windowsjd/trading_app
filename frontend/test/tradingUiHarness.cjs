@@ -42,6 +42,7 @@ function createTradingUiHarness(screenName) {
       'Pressable', 'KeyboardAvoidingView'].map(name => [name, name])),
     StyleSheet: { create: styles => styles }, Platform: { OS: 'web' },
     useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
+    Keyboard: { addListener: () => ({ remove() {} }) },
   };
   const mocks = {
     './QuantityRatioSlider': load(resolve(__dirname, '../src/screens/order/QuantityRatioSlider.web.tsx'), {}),
@@ -52,6 +53,11 @@ function createTradingUiHarness(screenName) {
     '../../features/auth/useAdminDiagnostics': { useAdminDiagnostics: () => h.role === 'admin' },
     '@react-navigation/native': { useIsFocused: () => h.isFocused ?? true },
     react: { ...React,
+      useCallback: (fn, deps) => {
+        const slot = index++;
+        if (!slots[slot] || deps.some((dep, i) => !Object.is(dep, slots[slot].deps[i]))) slots[slot] = { fn, deps };
+        return slots[slot].fn;
+      },
       useMemo: fn => fn(),
       useState: initial => {
         const slot = index++;

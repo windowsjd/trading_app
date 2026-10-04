@@ -81,7 +81,6 @@ const datetimeSources = [
   'features/wallet/mapper.ts',
   'screens/home/PortfolioScreen.tsx',
   'features/wallet/transactions.ts',
-  'screens/ranking/RankingScreen.tsx',
   'screens/record/RecordSeasonDetailScreen.tsx',
   'screens/record/RecordSeasonListScreen.tsx',
   'screens/season/SeasonJoinScreen.tsx',

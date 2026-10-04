@@ -64,7 +64,7 @@ export const apiClient = {
     if (path === '/me') return response({ ...me });
     if (path.includes('season-summary')) return response(summary);
     const users = path.includes('/search')
-      ? [{ ...user, relationship: relation }]
+      ? new URL(path, location.origin).searchParams.get('nickname') === '없는친구' ? [] : [{ ...user, relationship: relation }]
       : path.includes('/requests')
         ? [{ ...user, relationship: 'received' }]
         : [user];

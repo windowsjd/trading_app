@@ -62,37 +62,6 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
     [recordsQuery.data],
   );
 
-  const aggregate = useMemo(() => {
-    if (!items.length) {
-      return {
-        seasonCount: 0,
-        bestRank: '-',
-        bestReturnRate: '-',
-        avgReturnRate: '-',
-      };
-    }
-
-    const ranks = items
-      .map((item) => item.finalRank ?? item.rank)
-      .filter((rank): rank is number => typeof rank === 'number');
-    const returns = items
-      .map((item) => Number(getReturnRate(item)))
-      .filter((value) => Number.isFinite(value));
-    const bestRank = ranks.length ? Math.min(...ranks) : null;
-    const bestReturn = returns.length ? Math.max(...returns) : null;
-    const avgReturn =
-      returns.length > 0
-        ? returns.reduce((acc, value) => acc + value, 0) / returns.length
-        : null;
-
-    return {
-      seasonCount: items.length,
-      bestRank: displayValue(bestRank),
-      bestReturnRate: formatPercent(bestReturn),
-      avgReturnRate: formatPercent(avgReturn),
-    };
-  }, [items]);
-
   const viewState = useMemo(() => {
     if (recordsQuery.isLoading) return 'record_list_loading';
     if (recordsQuery.isError && !recordsQuery.data) return 'record_list_error';
@@ -162,15 +131,6 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
           }
         }}
         onEndReachedThreshold={0.4}
-        ListHeaderComponent={
-          <View style={styles.card}>
-            <Text style={styles.label}>누적 요약</Text>
-            <Text style={styles.helper}>참여 시즌 수 {aggregate.seasonCount}</Text>
-            <Text style={styles.helper}>최고 순위 {aggregate.bestRank}</Text>
-            <Text style={styles.helper}>최고 수익률 {aggregate.bestReturnRate}%</Text>
-            <Text style={styles.helper}>평균 수익률 {aggregate.avgReturnRate}%</Text>
-          </View>
-        }
         renderItem={({ item }) => (
           <ActionPressable
             testID={TEST_IDS.record.seasonItem(item.seasonId)}
@@ -212,15 +172,6 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: semantic.screen },
   content: { ...getScreenContentStyle(Platform.OS), padding: 16, paddingBottom: 24 },
-  card: {
-    borderWidth: 1,
-    borderColor: semantic.border,
-    borderRadius: 14,
-    padding: 16,
-    backgroundColor: semantic.surface,
-    gap: 8,
-    marginBottom: 12,
-  },
   rowCard: {
     borderWidth: 1,
     borderColor: semantic.border,
@@ -231,7 +182,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 10,
   },
-  label: { fontSize: 13, color: semantic.secondary },
   itemTitle: { fontSize: 15, fontWeight: '700' },
   identity: Platform.OS === 'web' ? { flex: 1, minWidth: 0 } : {},
   helper: { fontSize: 14, color: semantic.secondary },

@@ -97,6 +97,9 @@ type Props = {
   enabled?: boolean;
   showAssetPriceDiagnostic?: boolean;
   onReturnToAsset: () => void;
+  onInputFocus?: (input: View | null) => void;
+  onInputBlur?: () => void;
+  submitRef?: React.RefObject<View | null>;
 };
 
 /** One flow per asset/account/side. Unmounting invalidates pending callbacks. */
@@ -211,6 +214,9 @@ export function OrderForm({
   enabled = true,
   showAssetPriceDiagnostic = true,
   onReturnToAsset,
+  onInputFocus,
+  onInputBlur,
+  submitRef,
 }: Props & { side: 'buy' | 'sell' }) {
   // accountId is immutable for this mounted form, supplied by the route or
   // the keyed inline panel. Selection changes never retarget a pending request.
@@ -872,6 +878,8 @@ export function OrderForm({
             onChangeText={(value) => resetInput(() => setLimitPrice(value))}
             keyboardType="decimal-pad"
             placeholder="지정가 입력"
+            onFieldFocus={onInputFocus}
+            onBlur={onInputBlur}
           />
         ) : (
           <Text style={styles.marketPrice}>시장가</Text>
@@ -892,6 +900,8 @@ export function OrderForm({
           onChangeText={(value) => resetInput(() => setOrderInput(value))}
           keyboardType="decimal-pad"
           placeholder={isAmountBuy ? '매수 금액 입력' : '수량 입력'}
+          onFieldFocus={onInputFocus}
+          onBlur={onInputBlur}
         />
       </View>
       {isAmountBuy ? (
@@ -1120,13 +1130,15 @@ export function OrderForm({
           ) : null}
         </>
       ) : null}
-      <CTAButton
-        testID={TEST_IDS.order.executeSubmit}
-        label={side === 'buy' ? '매수' : '매도'}
-        style={side === 'buy' ? styles.buyActive : styles.sellActive}
-        state={pending ? 'loading' : canExecute ? 'enabled' : 'disabled'}
-        onPress={submitOrder}
-      />
+      <View ref={submitRef} collapsable={false}>
+        <CTAButton
+          testID={TEST_IDS.order.executeSubmit}
+          label={side === 'buy' ? '매수' : '매도'}
+          style={side === 'buy' ? styles.buyActive : styles.sellActive}
+          state={pending ? 'loading' : canExecute ? 'enabled' : 'disabled'}
+          onPress={submitOrder}
+        />
+      </View>
       <OrderSuccessBottomSheet
         visible={!!successData}
         payload={successData}
@@ -1162,17 +1174,20 @@ export function OrderForm({
 }
 
 /** Keep the native caret and horizontal scrolling in the actual input. */
-function OrderNumberInput(props: TextInputProps) {
+function OrderNumberInput({ onFieldFocus, ...props }: TextInputProps & { onFieldFocus?: (input: View | null) => void }) {
+  const fieldRef = useRef<View>(null);
   const { fontScale } = useWindowDimensions();
   const [width, setWidth] = useState(0);
   const showFullValue =
     width > 0 && (props.value?.length ?? 0) * 9.6 * fontScale > width - 16;
   return (
     <View
+      ref={fieldRef}
+      collapsable={false}
       style={styles.group}
       onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
     >
-      <TextInput {...props} style={[props.style, styles.compactInput,
+      <TextInput {...props} onFocus={(event) => { props.onFocus?.(event); onFieldFocus?.(fieldRef.current); }} style={[props.style, styles.compactInput,
         fontScale > 1 && { minHeight: Math.ceil(22 * fontScale + 24), lineHeight: Math.ceil(22 * fontScale) }]} />
       {showFullValue ? (
         <Text

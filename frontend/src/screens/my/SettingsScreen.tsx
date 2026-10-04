@@ -9,6 +9,7 @@ import {
   Alert,
   ScrollView,
   Switch,
+  Platform,
 } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -40,6 +41,9 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
 
   const [nickname, setNickname] = useState('');
   const [notificationEnabled, setNotificationEnabled] = useState(true);
+  const switchTrackColor = { false: colors.border, true: colors.secondaryActionSurface };
+  // RN Web selects the active thumb through a separate prop; native uses thumbColor.
+  const activeSwitchColor = Platform.OS === 'web' ? { activeThumbColor: colors.secondaryActionForeground } : {};
   const privacyRequestInFlight = useRef(false);
 
   useEffect(() => {
@@ -181,7 +185,6 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>화면 모드</Text>
-          <Text style={styles.helper}>이 기기에만 저장됩니다.</Text>
           <View style={styles.modeChoices} accessibilityRole="radiogroup">
             {([['system', '시스템'], ['light', '라이트'], ['dark', '다크']] as const).map(([value, label]) => (
               <ActionPressable key={value} testID={TEST_IDS.settings.appearance(value)}
@@ -198,7 +201,6 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>금융 색상</Text>
-          <Text style={styles.helper}>이 기기에만 저장됩니다.</Text>
           <View style={styles.modeChoices} accessibilityRole="radiogroup" accessibilityLabel="금융 색상">
             {([['red_blue', '빨강 · 파랑'], ['green_red', '초록 · 빨강']] as const).map(([value, label]) => (
               <ActionPressable key={value} testID={`settings-financial-${value}`}
@@ -214,22 +216,23 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>친구에게 포트폴리오 공개</Text>
-          <Text style={styles.helper}>
-            친구가 내 현재 시즌 포트폴리오를 볼 수 있습니다.
-          </Text>
-          <Switch
-            trackColor={{ false: colors.border, true: colors.success }}
-            thumbColor={colors.text}
-            accessibilityLabel="친구에게 포트폴리오 공개"
-            testID="settings-portfolio-public"
-            value={meQuery.data.portfolioPublic === true}
-            disabled={
-              privacyMutation.isPending ||
-              typeof meQuery.data.portfolioPublic !== 'boolean'
-            }
-            onValueChange={onChangePortfolioPublic}
-          />
+          <View style={styles.switchRow}>
+            <Text style={[styles.sectionTitle, styles.switchLabel]}>친구에게 포트폴리오 공개</Text>
+            <Switch
+              {...activeSwitchColor}
+              trackColor={switchTrackColor}
+              thumbColor={meQuery.data.portfolioPublic === true ? colors.secondaryActionForeground : colors.text}
+              ios_backgroundColor={colors.border}
+              accessibilityLabel="친구에게 포트폴리오 공개"
+              testID="settings-portfolio-public"
+              value={meQuery.data.portfolioPublic === true}
+              disabled={
+                privacyMutation.isPending ||
+                typeof meQuery.data.portfolioPublic !== 'boolean'
+              }
+              onValueChange={onChangePortfolioPublic}
+            />
+          </View>
           <Text style={styles.helper}>
             {typeof meQuery.data.portfolioPublic !== 'boolean'
               ? '공개 설정 확인 중...'
@@ -240,16 +243,19 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>알림 설정</Text>
-
-          <ActionPressable
-            style={styles.menuRow}
-            onPress={() => setNotificationEnabled((prev) => !prev)}
-          >
-            <Text style={styles.menuText}>
-              {notificationEnabled ? '알림 켜짐' : '알림 꺼짐'}
-            </Text>
-          </ActionPressable>
+          <View style={styles.switchRow}>
+            <Text style={[styles.sectionTitle, styles.switchLabel]}>알림 설정</Text>
+            <Switch
+              {...activeSwitchColor}
+              testID="settings-notifications"
+              accessibilityLabel="알림 설정"
+              trackColor={switchTrackColor}
+              thumbColor={notificationEnabled ? colors.secondaryActionForeground : colors.text}
+              ios_backgroundColor={colors.border}
+              value={notificationEnabled}
+              onValueChange={setNotificationEnabled}
+            />
+          </View>
 
           <Text style={styles.helper}>
             현재 문서 기준으로 서버 연동 알림 설정 API는 아직 명시되지
@@ -302,13 +308,8 @@ const styles = StyleSheet.create({
   modeSelected: { backgroundColor: semantic.selected, borderColor: semantic.selected },
   modeText: { fontSize: 14, fontWeight: '600', color: semantic.secondary },
   modeSelectedText: { color: semantic.onAccent },
-  menuRow: {
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: semantic.raised,
-    paddingHorizontal: 14,
-  },
-  menuText: { fontSize: 16, fontWeight: '600' },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  switchLabel: { flex: 1, minWidth: 0, lineHeight: 27 },
   helper: { fontSize: 14, color: semantic.secondary, lineHeight: 20 },
   primaryButton: {
     backgroundColor: semantic.selected,

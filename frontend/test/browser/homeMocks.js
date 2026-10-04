@@ -24,6 +24,13 @@ export const transport = {
   ],
 };
 export const navigation = { calls: [], navigate(...args) { this.calls.push(args); if (window.fixture?.navigationRef?.isReady()) window.fixture.navigationRef.navigate(...args); } };
+// Entry scenarios are explicit fixture inputs; production selection stays real.
+if (params.has('accountSet')) {
+  const set = params.get('accountSet');
+  transport.accounts = set === 'none' ? [] : set === 'general' ? transport.accounts.filter(a => a.mode === 'general')
+    : set === 'season' || set === 'past' ? transport.accounts.filter(a => a.mode === 'season') : transport.accounts;
+  if (set === 'past') transport.accounts.forEach(a => { a.status = 'closed'; a.season = { ...a.season, seasonId: 'past-season', seasonStatus: 'settled' }; });
+}
 export const useRootNavigation = () => navigation;
 const response = (data) => ({ data: { success: true, data } });
 export const apiClient = {
@@ -50,7 +57,7 @@ export const apiClient = {
     if (path === '/trading-accounts') return response({ accounts: transport.accounts });
     if (path === '/seasons/current') return response({
       id: season.seasonId, name: season.seasonName, status: season.seasonStatus,
-      startAt: season.startAt, endAt: season.endAt, joined: true,
+      startAt: season.startAt, endAt: season.endAt, joined: !params.has('unjoined'),
     });
     if (path.startsWith('/ranking?')) {
       if (variant === 'ranking-error' || variant === 'ranking-integrity') throw {

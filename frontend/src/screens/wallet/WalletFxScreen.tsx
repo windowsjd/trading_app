@@ -4,13 +4,15 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TextInput,
   KeyboardAvoidingView,
   Platform,
   useWindowDimensions,
 } from '../../theme/native';
+import { SafeAreaView } from '../../theme/safeArea';
+import { useHeaderHeight } from '@react-navigation/elements';
+import { useFocusedInputScroll } from '../../hooks/useFocusedInputScroll';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -118,6 +120,10 @@ function getFxDomainErrorMessage(
 }
 
 export default function WalletFxScreen({ navigation }: Props) {
+  const headerHeight = useHeaderHeight();
+  const inputScroll = useFocusedInputScroll();
+  const { onInputBlur: clearInputFocus } = inputScroll;
+  const amountRef = useRef<View>(null);
   const { fontScale } = useWindowDimensions();
   const queryClient = useQueryClient();
   const rootNavigation = useRootNavigation();
@@ -302,6 +308,7 @@ export default function WalletFxScreen({ navigation }: Props) {
   );
 
   useEffect(() => {
+    clearInputFocus();
     setAmount('');
     setFieldError(null);
     setDomainError(null);
@@ -309,7 +316,7 @@ export default function WalletFxScreen({ navigation }: Props) {
     setFxDomainState(null);
     setSuccessData(null);
     actionRef.current = null;
-  }, [accountId]);
+  }, [accountId, clearInputFocus]);
 
   const pending = executeMutation.isPending;
   const viewState: WalletFxViewState = walletLookupState !== 'wallet_ready'
@@ -461,10 +468,19 @@ export default function WalletFxScreen({ navigation }: Props) {
     : null;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
+      <KeyboardAvoidingView style={styles.flex}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
+        ref={inputScroll.scrollRef}
+        style={styles.flex}
+        onLayout={inputScroll.revealFocusedInput}
+        onContentSizeChange={inputScroll.revealFocusedInput}
+        onScroll={inputScroll.onScroll}
+        scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="none"
         testID={TEST_IDS.walletFx.screen}
         contentContainerStyle={styles.content}
       >
@@ -582,19 +598,23 @@ export default function WalletFxScreen({ navigation }: Props) {
             </ActionPressable>
           </View>
 
-          <TextInput
-            testID={TEST_IDS.walletFx.amountInput}
-            editable={!pending}
-            style={styles.input}
-            value={amount}
-            onChangeText={(value) => {
-              if (submitLockRef.current) return;
-              setAmount(value);
-              resetFxActionState();
-            }}
-            keyboardType="decimal-pad"
-            placeholder="환전 금액"
-          />
+          <View ref={amountRef} collapsable={false}>
+            <TextInput
+              testID={TEST_IDS.walletFx.amountInput}
+              editable={!pending}
+              style={styles.input}
+              value={amount}
+              onChangeText={(value) => {
+                if (submitLockRef.current) return;
+                setAmount(value);
+                resetFxActionState();
+              }}
+              keyboardType="decimal-pad"
+              placeholder="환전 금액"
+              onFocus={() => inputScroll.onInputFocus(amountRef.current)}
+              onBlur={inputScroll.onInputBlur}
+            />
+          </View>
 
           {inputErrorMessage ? (
             <Text style={styles.errorText}>{inputErrorMessage}</Text>
@@ -624,9 +644,11 @@ export default function WalletFxScreen({ navigation }: Props) {
             </>}
           </View>
         ) : null}
-        <CTAButton testID={TEST_IDS.walletFx.executeSubmit} label="환전하기"
-          state={pending ? 'loading' : canExecute ? 'enabled' : 'disabled'}
-          onPress={executeQuote} />
+        <View ref={inputScroll.submitRef} collapsable={false}>
+          <CTAButton testID={TEST_IDS.walletFx.executeSubmit} label="환전하기"
+            state={pending ? 'loading' : canExecute ? 'enabled' : 'disabled'}
+            onPress={executeQuote} />
+        </View>
       </ScrollView>
       </KeyboardAvoidingView>
 

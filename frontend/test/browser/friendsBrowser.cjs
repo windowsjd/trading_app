@@ -158,7 +158,7 @@ async function main() {
     await page.emulateMedia({ colorScheme: 'light' });
     await page.waitForFunction(() => document.documentElement.style.colorScheme === 'light');
     await theme.canvas(page, 'light');
-    const toggle = page.getByRole('switch');
+    const toggle = page.getByRole('switch', { name: '친구에게 포트폴리오 공개', exact: true });
     await toggle.waitFor();
     assert.equal(await toggle.isChecked(), true);
     await toggle.click();

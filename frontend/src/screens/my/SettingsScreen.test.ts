@@ -59,6 +59,7 @@ function settingsHarness(portfolioPublic = true) {
       SafeAreaView: 'SafeAreaView',
       ScrollView: 'ScrollView',
       Switch: 'Switch',
+      Platform: { OS: 'web' },
       TextInput: 'TextInput',
       Alert: { alert: (...args: string[]) => h.alerts.push(args) },
       StyleSheet: { create: (value: unknown) => value },
@@ -78,7 +79,7 @@ function settingsHarness(portfolioPublic = true) {
       const [preference, select] = React.useState('system');
       const [financialPreference, setFinancialPreference] = React.useState('red_blue');
       return { preference, financialPreference, setFinancialPreference, mode: preference === 'dark' ? 'dark' : 'light',
-        colors: { border: '#ddd', text: '#111' },
+        colors: { border: '#ddd', text: '#111', secondaryActionSurface: preference === 'dark' ? '#1C3042' : '#EAF4FC', secondaryActionForeground: preference === 'dark' ? '#B9DDFC' : '#285B85' },
         setPreference: (value: string) => { h.appearanceChoices.push(value); select(value); } };
     } },
     '../../features/auth/useLogout': { useLogout: () => async () => {} },
@@ -128,6 +129,24 @@ function settingsHarness(portfolioPublic = true) {
 }
 
 describe('Settings portfolio privacy switch', () => {
+  it('uses matching compact Secondary switches while notifications remain local', async t => {
+    const x = settingsHarness(true); t.after(x.close); await x.mount();
+    assert.doesNotMatch(x.text(), /이 기기에만 저장됩니다|친구가 내 현재 시즌 포트폴리오를 볼 수 있습니다|알림 켜짐/);
+    for (const mode of ['light', 'dark'] as const) {
+      await act(async () => x.node(TEST_IDS.settings.appearance(mode)).props.onPress()); await x.flush();
+      const privacy = x.node('settings-portfolio-public').props, notifications = x.node('settings-notifications').props;
+      assert.deepEqual(privacy.trackColor, notifications.trackColor);
+      assert.equal(privacy.thumbColor, notifications.thumbColor);
+      assert.equal(privacy.activeThumbColor, notifications.activeThumbColor);
+      assert.equal(privacy.trackColor.true, mode === 'light' ? '#EAF4FC' : '#1C3042');
+      assert.equal(privacy.thumbColor, mode === 'light' ? '#285B85' : '#B9DDFC');
+    }
+    await act(async () => x.node('settings-notifications').props.onValueChange(false));
+    assert.equal(x.node('settings-notifications').props.value, false);
+    assert.equal(x.node('settings-notifications').props.trackColor.false, '#ddd');
+    assert.deepEqual(x.h.patches, []);
+  });
+
   it('shows GET /me true and immediately changes true to false without saving copy', async (t) => {
     const x = settingsHarness(true);
     t.after(x.close);

@@ -67,6 +67,6 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, borderColor: semantic.border, borderRadius: 14, paddingHorizontal: 16,
     paddingVertical: 10, backgroundColor: semantic.surface, gap: 4 },
   title: { fontSize: 18, lineHeight: 27, fontWeight: '700', color: semantic.text },
-  toggle: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 },
-  action: { fontSize: 13, lineHeight: 20, color: semantic.secondary, fontWeight: '600' },
+  toggle: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingVertical: 8, backgroundColor: semantic.secondaryActionSurface },
+  action: { fontSize: 13, lineHeight: 20, color: semantic.secondaryActionForeground, fontWeight: '600' },
 });

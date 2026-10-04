@@ -21,6 +21,7 @@ function load(file, mocks) {
     // separate render tests. Keep screen/query/gesture tests focused on actions.
     if (name.endsWith('/ActionPressable')) return { default: 'Pressable', __esModule: true };
     if (name.endsWith('/hooks/usePullToRefresh')) return load(resolve(dirname(file), name + '.tsx'), mocks);
+    if (name.endsWith('/hooks/useFocusedInputScroll')) return load(resolve(dirname(file), name + '.ts'), mocks);
     if (name.startsWith('.')) {
       const tsx = resolve(dirname(file), name + '.tsx');
       if (existsSync(tsx)) return load(tsx, mocks);

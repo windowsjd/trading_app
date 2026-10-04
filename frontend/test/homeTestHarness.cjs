@@ -55,13 +55,21 @@ function createHomeHarness(mode = 'general') {
   );
   native.StyleSheet = { create: (styles) => styles };
   native.Platform = { OS: 'android' };
+  native.Keyboard = { addListener: () => ({ remove() {} }) };
   native.useWindowDimensions = () => ({ width: 390, height: 844, fontScale: 1 });
   const root = { navigate: (...args) => h.navigation.push(args) };
   let stateIndex = 0;
   let stateAccount = h.account.id;
   let states = [];
+  let homeStates = [];
+  let walletStates = [];
+  const beginRender = (screen) => {
+    if (stateAccount !== h.account.id) { homeStates = []; walletStates = []; stateAccount = h.account.id; }
+    states = screen === "wallet" ? walletStates : homeStates;
+    stateIndex = 0; h.queries = [];
+  };
   const mocks = {
-    react: { ...React, useRef: (value) => ({ current: value }), useEffect() {}, useMemo: (fn) => fn(), useState: (initial) => {
+    react: { ...React, useCallback: (fn) => fn, useRef: (value) => ({ current: value }), useEffect() {}, useMemo: (fn) => fn(), useState: (initial) => {
       const index = stateIndex++;
       if (!(index in states)) states[index] = typeof initial === 'function' ? initial() : initial;
       return [states[index], (value) => { states[index] = typeof value === 'function' ? value(states[index]) : value; }];
@@ -135,7 +143,6 @@ function createHomeHarness(mode = 'general') {
   const positionRow = load(resolve(__dirname, '../src/components/tradingAccount/PositionAssetRow.tsx'), mocks).default;
   mocks['../../components/tradingAccount/PositionAssetRow'] = { default: positionRow, __esModule: true };
   mocks['../home/HomeAssetHero'] = { default: hero, __esModule: true };
-  const wallet = load(resolve(__dirname, '../src/screens/wallet/WalletScreen.tsx'), mocks).default;
   const expandDisplay = (node) => {
     if (Array.isArray(node)) return node.map(expandDisplay);
     if (!React.isValidElement(node)) return node;
@@ -143,7 +150,7 @@ function createHomeHarness(mode = 'general') {
     return React.cloneElement(node, {}, expandDisplay(node.props.children));
   };
   h.renderWallet = () => {
-    h.queries = [];
+    beginRender('wallet');
     const outer = wallet({ navigation: root });
     const branch = elements(outer).find((node) => typeof node.type === 'function');
     return { tree: expandDisplay(branch.type(branch.props)), branch };
@@ -159,6 +166,8 @@ function createHomeHarness(mode = 'general') {
     mocks,
   ).default;
   mocks['./HomeAssetTrend'] = { default: charts, __esModule: true };
+  mocks['../home/HomeAssetTrend'] = { default: charts, __esModule: true };
+  const wallet = load(resolve(__dirname, '../src/screens/wallet/WalletScreen.tsx'), mocks).default;
   const home = load(
     resolve(__dirname, '../src/screens/home/HomeScreen.tsx'),
     mocks,
@@ -182,11 +191,13 @@ function createHomeHarness(mode = 'general') {
       ...mocks,
       react: {
         ...React,
+        useCallback: (fn) => fn,
         useMemo: (fn) => fn(),
         useEffect: () => {},
         useRef: (value) => ({ current: value }),
         useState: (value) => [value, () => {}],
       },
+      '@react-navigation/elements': { useHeaderHeight: () => 48 },
       '@tanstack/react-query': {
         useQueryClient: () => client,
         useMutation: () => ({}),
@@ -207,9 +218,7 @@ function createHomeHarness(mode = 'general') {
   };
   h.home = () => home({ navigation: root });
   h.render = () => {
-    if (stateAccount !== h.account.id) { states = []; stateAccount = h.account.id; }
-    stateIndex = 0;
-    h.queries = [];
+    beginRender('home');
     const branch = elements(h.home()).find(
       (node) =>
         node.type ===

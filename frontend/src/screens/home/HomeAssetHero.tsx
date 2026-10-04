@@ -12,6 +12,7 @@ type Props = {
   summary: TradingAccountPortfolioSummaryDto | null;
   settled?: boolean;
   compactBottom?: boolean;
+  compactTop?: boolean;
   unavailableMessage?: string;
 };
 
@@ -22,9 +23,9 @@ function performanceStyle(value: string | null | undefined) {
   return amount > 0 ? styles.up : styles.down;
 }
 
-export default function HomeAssetHero({ summary, settled = false, compactBottom = false, unavailableMessage }: Props) {
+export default function HomeAssetHero({ summary, settled = false, compactBottom = false, compactTop = false, unavailableMessage }: Props) {
   return (
-    <View testID={TEST_IDS.home.summaryCard} style={[styles.hero, compactBottom && styles.compactBottom]}>
+    <View testID={TEST_IDS.home.summaryCard} style={[styles.hero, compactBottom && styles.compactBottom, compactTop && styles.compactTop]}>
       <Text style={styles.label}>{settled ? '최종 자산' : '총 자산'}</Text>
       {summary ? (
         <>
@@ -64,7 +65,8 @@ export default function HomeAssetHero({ summary, settled = false, compactBottom 
 const styles = StyleSheet.create({
   hero: { paddingVertical: 12, gap: 8, minWidth: 0 },
   compactBottom: { paddingBottom: 0 },
-  label: { fontSize: 14, lineHeight: 21, color: semantic.secondary },
+  compactTop: { paddingTop: 0 },
+  label: { fontSize: 18, fontWeight: '700', lineHeight: 27, color: semantic.secondary },
   total: { fontSize: 36, fontWeight: '700', lineHeight: 46, flexShrink: 1, fontVariant: ['tabular-nums'] },
   performance: { gap: 4, marginTop: 4 },
   metric: { fontSize: 14, lineHeight: 22, color: semantic.secondary },

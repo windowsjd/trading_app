@@ -18,7 +18,7 @@ const asset = (i, type) => ({
   isActive: true, marketStatus: 'open', tradable: true,
   price: { state: 'available', priceCurrency: 'KRW', currentPrice: '100', changeRate: ['1', '-1', '0', null][i % 4] },
 });
-function setup(mode = 'season', count = 7) {
+function setup(mode = 'season', count = 7, screen = 'home') {
   const h = interactionHarness();
   h.native.SafeAreaView = 'SafeAreaView';
   h.account = account(mode); h.requests = []; h.navigation = []; h.positions = {};
@@ -36,7 +36,8 @@ function setup(mode = 'season', count = 7) {
         const all = h.positions[id] ?? [], rows = all.slice(params.offset, params.offset + params.limit);
         return { tradingAccountId: id, positions: rows, pagination: { total: all.length, offset: params.offset, limit: params.limit, returned: rows.length, nextOffset: params.offset + rows.length < all.length ? params.offset + rows.length : null } };
       },
-      getTradingAccountEquity: async (id, range) => { await read('equity', { account: id, range }); return { points: [] }; },
+      getTradingAccountEquity: async (id, range, granularity) => { await read('equity', { account: id, range, granularity }); return { points: [] }; },
+      getTradingAccountWallets: async id => { await read('wallets', { account: id }); return { tradingAccountId: id, wallets: [] }; },
     },
     '../../features/me/api': { getMe: async () => { await read('me'); return { nickname: 'mycroft' }; } },
     '../../features/ranking/api': {
@@ -46,13 +47,15 @@ function setup(mode = 'season', count = 7) {
     '../../features/market/api': { getAssets: async params => { await read('hot', params); return { sortSnapshot: `snapshot-${params.assetType}`, assets: h.markets[params.assetType], pagination: { nextOffset: null } }; } },
     './HomeAssetHero': { __esModule: true, default: 'Hero' },
     './HomeAssetTrend': { __esModule: true, default: 'Trend' },
+    '../home/HomeAssetHero': { __esModule: true, default: 'Hero' },
+    '../home/HomeAssetTrend': { __esModule: true, default: 'Trend' },
     '../../components/common/CTAButton': { __esModule: true, default: 'CTA' },
     '../../components/tradingAccount/AccountSwitcher': { __esModule: true, default: ({ children }) => React.createElement('AccountSwitcher', {}, children) },
     '../../components/tradingAccount/AccountSetupPanel': { __esModule: true, default: 'AccountSetupPanel' },
     '../../components/states/FullPageLoading': { __esModule: true, default: 'FullPageLoading' },
     ...Object.fromEntries(['ErrorState', 'InlineEmptyState', 'SectionSkeleton', 'AdminDiagnosticPanel'].map(name => ['../../components/states/' + name, { __esModule: true, default: name }])),
   };
-  const Screen = h.load('src/screens/home/HomeScreen.tsx', mocks).default;
+  const Screen = h.load(screen === 'wallet' ? 'src/screens/wallet/WalletScreen.tsx' : 'src/screens/home/HomeScreen.tsx', mocks).default;
   h.client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity, gcTime: Infinity } } });
   const tree = () => React.createElement(QueryClientProvider, { client: h.client }, React.createElement(Screen, { navigation: { navigate() {} } }));
   h.renderer = h.render(tree());

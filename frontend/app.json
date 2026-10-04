@@ -1,6 +1,7 @@
 {
   "android": {
-    "package": "com.anonymous.leagueoftrading"
+    "package": "com.anonymous.leagueoftrading",
+    "softwareKeyboardLayoutMode": "resize"
   },
   "extra": {
     "eas": {

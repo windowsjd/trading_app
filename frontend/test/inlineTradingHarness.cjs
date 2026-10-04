@@ -194,6 +194,7 @@ function inlineTradingHarness() {
     StyleSheet: { create: (value) => value },
     Platform: { OS: 'android' },
     AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
+    Keyboard: { addListener: () => ({ remove() {} }) },
     useWindowDimensions: () => h.dimensions,
   };
   native.ScrollView = ({ refreshControl, children, ...props }) => React.createElement('ScrollView', props, refreshControl, children);

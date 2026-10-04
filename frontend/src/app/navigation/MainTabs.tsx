@@ -46,7 +46,7 @@ export default function MainTabs() {
         headerShown: false,
         tabBarButton: (props) => <TabBarButton {...props} reducedMotion={reducedMotion} />,
         tabBarLabelPosition: 'below-icon',
-        tabBarActiveTintColor: colors.navigationActive,
+        tabBarActiveTintColor: colors.secondaryActionForeground,
         tabBarInactiveTintColor: colors.navigationInactive,
         ...tabTransition(reducedMotion),
         tabBarStyle: {

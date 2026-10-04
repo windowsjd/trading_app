@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { it } from 'node:test';
+const require = createRequire(import.meta.url);
+const { setup, account, flush, act } = require('../../../test/homeDiscoveryHarness.cjs');
+
+for (const mode of ['general', 'season']) it(`${mode}: Wallet refresh includes only expanded account equity and drops delayed outgoing data`, async t => {
+  const h = setup(mode, 0, 'wallet'); t.after(h.close); await flush();
+  const trend = () => h.renderer.root.findByType('Trend');
+  assert.equal(trend().props.expanded, false); assert.equal(trend().props.range, '30d');
+  assert.equal(h.requests.some(request => request.section === 'equity'), false);
+  h.requests.length = 0; await h.refresh();
+  assert.deepEqual(h.requests.map(request => request.section).sort(), ['portfolio', 'positions', 'wallets']);
+  act(() => trend().props.onToggle()); await flush();
+  act(() => trend().props.onRangeChange('90d')); await flush();
+  h.requests.length = 0; await h.refresh();
+  assert.deepEqual(h.requests.map(request => request.section).sort(), ['equity', 'portfolio', 'positions', 'wallets']);
+  assert.deepEqual(h.requests.find(request => request.section === 'equity'), { section: 'equity', account: mode, range: '90d', granularity: 'daily' });
+  assert.equal(h.client.getQueryCache().getAll().some(query => query.state.isInvalidated), false);
+  h.beforeRead = async () => { throw new Error('offline'); };
+  await h.refresh();
+  assert.equal(trend().props.expanded, true); assert.equal(trend().props.range, '90d');
+  assert.equal(h.renderer.root.findByType('Hero').props.summary.totalAssetKrw, mode);
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  h.beforeRead = async request => { if (request.account === mode) await gate; };
+  await h.refresh();
+  await h.switch(account(mode, 'next'));
+  assert.equal(trend().props.expanded, false); assert.equal(trend().props.range, '30d');
+  assert.equal(h.renderer.root.findByType('Hero').props.summary.totalAssetKrw, 'next');
+  await act(async () => release()); await flush();
+  assert.equal(h.renderer.root.findByType('Hero').props.summary.totalAssetKrw, 'next');
+  assert.equal(trend().props.expanded, false);
+});

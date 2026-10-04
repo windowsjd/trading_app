@@ -47,6 +47,7 @@ import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import OrderPanel from './OrderPanel';
+import { useFocusedInputScroll } from '../../hooks/useFocusedInputScroll';
 
 export default function OrderScreen(props: OrderScreenProps) {
   const { assetId, accountId, side } = props.route.params;
@@ -62,6 +63,7 @@ export function OrderTradingScreen({
   const isFocused = useIsFocused();
   const isAdmin = useAdminDiagnostics();
   const headerHeight = useHeaderHeight();
+  const inputScroll = useFocusedInputScroll();
   const { width } = useWindowDimensions();
   const { colors } = useAppearance();
   const compact = width < 600;
@@ -164,12 +166,19 @@ export function OrderTradingScreen({
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
       <KeyboardAvoidingView
         style={styles.container}
-        keyboardVerticalOffset={headerHeight}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
+          ref={inputScroll.scrollRef}
+          style={styles.scroll}
+          onLayout={inputScroll.revealFocusedInput}
+          onContentSizeChange={inputScroll.revealFocusedInput}
+          onScroll={inputScroll.onScroll}
+          scrollEventThrottle={16}
           testID={TEST_IDS.order.screen}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="none"
           contentContainerStyle={styles.content}
         >
           <View style={styles.header}>
@@ -296,6 +305,9 @@ export function OrderTradingScreen({
                   initialSide={side}
                   enabled={isFocused}
                   showAssetPriceDiagnostic={false}
+                  onInputFocus={inputScroll.onInputFocus}
+                  onInputBlur={inputScroll.onInputBlur}
+                  submitRef={inputScroll.submitRef}
                   onReturnToAsset={() => navigation.goBack()}
                 />
               ) : (
@@ -335,6 +347,7 @@ export function OrderTradingScreen({
 }
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: semantic.screen },
+  scroll: { flex: 1 },
   content: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 32, gap: 12 },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   pairGroup: {

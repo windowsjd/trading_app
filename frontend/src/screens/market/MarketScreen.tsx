@@ -2,7 +2,8 @@ import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import MarketSortControl from '../../features/market/MarketSortControl';
 import { marketSortParams, nextMarketPage, type MarketSort } from '../../features/market/marketSort';
 import { semantic } from '../../theme/tokens';
-import { getScreenContentStyle } from '../../theme/screenLayout';
+import { getHeaderScreenContentStyle, SCREEN_SECTION_GAP } from '../../theme/screenLayout';
+import { SafeAreaView } from '../../theme/safeArea';
 import { getMarketSessionLabel } from '../../features/market/marketPresentation';
 import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -10,7 +11,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   ActivityIndicator,
   Platform,
@@ -150,7 +150,7 @@ export default function MarketScreen({ navigation, route }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right']} style={styles.container}>
       <FlatList
         testID={TEST_IDS.market.screen}
         data={items}
@@ -261,10 +261,11 @@ export default function MarketScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: semantic.screen },
-  content: { ...getScreenContentStyle(Platform.OS), padding: 16, paddingBottom: 24 },
+  // FlatList rows keep their existing spacing; the header owns section gaps.
+  content: { ...getHeaderScreenContentStyle(Platform.OS), gap: 0 },
   headerSection: {
-    padding: 12, borderRadius: 14,
-    backgroundColor: semantic.surface, gap: 6, marginBottom: 4 },
+    paddingHorizontal: 12, borderRadius: 14,
+    backgroundColor: semantic.surface, gap: SCREEN_SECTION_GAP, marginBottom: SCREEN_SECTION_GAP },
   tabRow: { flexDirection: 'row', gap: 8 },
   tabButton: {
     flex: 1,

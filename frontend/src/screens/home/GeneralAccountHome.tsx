@@ -17,7 +17,6 @@ import {
   findAccountIntegrityFailure,
 } from '../../features/tradingAccount/accountIntegrityGate';
 import { getPortfolioNotice } from '../../features/tradingAccount/portfolioMessage';
-import { formatKrw } from '../../utils/format';
 
 import ErrorState from '../../components/states/ErrorState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
@@ -41,10 +40,6 @@ import type { AssetType } from '../../features/market/api';
  * must agree; if they ever disagree the response is the fact, and mislabelling
  * a TWR as an initial-capital return would misstate what the number measures.
  *
- * Ad-funded and other external inflows are shown as INFLOW, on their own lines,
- * with an explicit note that they are not investment profit. That separation is
- * the whole reason the backend computes TWR for this mode: money the user was
- * given is not money the user earned.
  */
 
 type Props = {
@@ -54,13 +49,6 @@ type Props = {
   accountContext: HomeAccountContextData;
   hot: HomeHotMarketData;
 };
-
-/** Unknown is rendered as unknown. `0%` is a claim, and often a false one. */
-function formatUnknownKrw(value: string | null | undefined) {
-  if (value === null || value === undefined || value === '')
-    return '알 수 없음';
-  return formatKrw(value);
-}
 
 export default function GeneralAccountHome({
   account,
@@ -189,29 +177,6 @@ export default function GeneralAccountHome({
       </View>
       <HomeHotMarket hot={hot} onOpenAsset={onOpenAsset} onOpenMarket={onOpenMarket} />
 
-      {summary ? (
-        <View style={styles.card}>
-          <Text style={styles.label}>자금 구성</Text>
-          <Text style={styles.helper}>
-            최초 지급 자본 {formatUnknownKrw(summary.initialFundingKrw)}
-          </Text>
-          <Text style={styles.helper}>
-            누적 외부 자금 유입{' '}
-            {formatUnknownKrw(summary.cumulativeExternalFundingKrw)}
-          </Text>
-          <Text style={styles.helper}>
-            누적 광고 보상 {formatUnknownKrw(summary.cumulativeAdRewardKrw)}
-          </Text>
-          <Text style={styles.helper}>
-            투자 손익 {formatUnknownKrw(summary.investmentPnlKrw)}
-          </Text>
-          {/* Said plainly, because the distinction is the point of TWR. */}
-          <Text style={styles.note}>
-            외부 자금 유입(광고 보상 포함)은 투자 수익이 아닙니다. 위 수익률은
-            유입 시점의 영향을 제외한 시간가중 수익률입니다.
-          </Text>
-        </View>
-      ) : null}
     </ScrollView>
   );
 }
@@ -219,17 +184,6 @@ export default function GeneralAccountHome({
 const styles = StyleSheet.create({
   assetOverview: { gap: 4, minWidth: 0 },
   content: { ...getScreenContentStyle(Platform.OS), padding: 16, gap: 12, paddingBottom: 24 },
-  card: {
-    borderWidth: 1,
-    borderColor: semantic.border,
-    borderRadius: 14,
-    padding: 16,
-    backgroundColor: semantic.surface,
-    gap: 8,
-  },
-  label: { fontSize: 13, color: semantic.secondary },
-  helper: { fontSize: 14, color: semantic.secondary, lineHeight: 21 },
-  note: { fontSize: 13, color: semantic.warning, lineHeight: 19 },
   warningBox: {
     borderRadius: 12,
     padding: 12,

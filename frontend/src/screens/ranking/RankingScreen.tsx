@@ -34,7 +34,6 @@ import { ERROR_CODE } from '../../models/enums/errorCode';
 import { getApiErrorCode } from '../../services/api/errorMapper';
 import {
   formatKrw,
-  formatKstDateTime,
   formatPercent,
 } from '../../utils/format';
 
@@ -53,17 +52,8 @@ const TABS: Array<{ key: RankingScope; label: string }> = [
   { key: 'top10', label: 'TOP10' },
 ];
 
-function displayValue(value?: string | number | null) {
-  if (value === null || value === undefined || value === '') return '-';
-  return String(value);
-}
-
 function getRankingItemKey(item: RankingItemDto) {
   return item.seasonParticipantId;
-}
-
-function getRankTypeLabel(rankType?: RankingRankType) {
-  return rankType === 'final' ? '최종 랭킹' : '일간 랭킹';
 }
 
 export default function RankingScreen({ navigation }: Props) {
@@ -276,14 +266,6 @@ export default function RankingScreen({ navigation }: Props) {
               viewState={viewState}
               onJoin={() => rootNavigation.navigate('SeasonJoin')}
             />
-
-            <View style={styles.card}>
-              <Text style={styles.label}>{getRankTypeLabel(rankType)}</Text>
-              <Text style={styles.helper}>
-                기준일 {displayValue(publication?.rankingDate)} · 캡처{' '}
-                {formatKstDateTime(publication?.capturedAt)}
-              </Text>
-            </View>
 
             <View style={styles.card} testID="ranking-top3">
               <Text style={styles.label}>상위 랭커</Text>
