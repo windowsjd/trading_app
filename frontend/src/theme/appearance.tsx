@@ -20,6 +20,7 @@ export const PALETTES = {
     success: '#166534', error: '#b32d2d', warning: '#725400',
     warningSurface: '#fff8e1', info: '#245b76', infoSurface: '#e3f2fd',
     onAccent: '#ffffff', infoAction: '#245b76',
+    secondaryActionSurface: '#EAF4FC', secondaryActionForeground: '#285B85',
   },
   dark: {
     screen: '#10151c', surface: '#1b2530', raised: '#273543',
@@ -31,6 +32,7 @@ export const PALETTES = {
     success: '#79d68b', error: '#ff8585', warning: '#e8bf69',
     warningSurface: '#3a3020', info: '#9acbe2', infoSurface: '#1c3045',
     onAccent: '#ffffff', infoAction: '#245b76',
+    secondaryActionSurface: '#1C3042', secondaryActionForeground: '#B9DDFC',
   },
 } as const;
 

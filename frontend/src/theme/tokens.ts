@@ -40,6 +40,8 @@ export const semantic = {
   infoSurface: '#0f0019',
   onAccent: '#0f001a',
   infoAction: '#0f001b',
+  secondaryActionSurface: '#0f001c',
+  secondaryActionForeground: '#0f001d',
 } as const;
 
 type Role = keyof typeof semantic;

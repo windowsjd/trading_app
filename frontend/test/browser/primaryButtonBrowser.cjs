@@ -89,7 +89,11 @@ async function run() {
       }
       records.push({ name, ...actual }); return actual;
     }
-    for (const width of [320, 390, 768]) for (const scale of [1, 2]) for (const mode of ['light', 'dark']) {
+    const assertSecondary = (actual, mode) => {
+      assert.equal(actual.background, mode === 'light' ? 'rgb(234, 244, 252)' : 'rgb(28, 48, 66)');
+      assert.ok(actual.texts.every(text => text.color === (mode === 'light' ? 'rgb(40, 91, 133)' : 'rgb(185, 221, 252)') && text.inside));
+    };
+    for (const width of [320, 360, 390, 430, 768]) for (const scale of [1, 1.5, 2]) for (const mode of ['light', 'dark']) {
       const palette = mode === 'light' ? 'red_blue' : 'green_red', name = `${width}-${scale}-${mode}`;
       await page.setViewportSize({ width, height: 900 }); await page.emulateMedia({ colorScheme: mode });
       const before = {};
@@ -107,6 +111,16 @@ async function run() {
       for (const marker of ['primary-disabled','primary-blocked','primary-loading','primary-neutral','primary-buy','primary-sell','primary-selected','primary-lesson-selected','primary-lesson-secondary','primary-lesson-financial']) {
         const after = await visual(id(marker), `${name}-${marker}`, false);
         if (before[marker]) for (const key of ['width','height','background','opacity','disabled','busy']) assert.equal(after[key], before[marker][key], `${marker}: preserved ${key}`);
+      }
+      for (const state of ['enabled', 'disabled', 'blocked', 'loading']) {
+        const actual = await visual(id(`secondary-${state}`), `${name}-secondary-${state}`, false);
+        assertSecondary(actual, mode);
+        if (state !== 'enabled') assert.equal(actual.disabled, 'true');
+        if (state === 'disabled' || state === 'blocked') assert.equal(actual.opacity, '0.45');
+        if (state === 'loading') {
+          assert.equal(actual.busy, await id('primary-loading').getAttribute('aria-busy'), 'existing RN Web loading semantics are shared');
+          assert.equal(await id('secondary-loading').getByRole('progressbar').count(), 1);
+        }
       }
       if (width === 390 && scale === 1) {
         const primary = id('primary-wide'); await primary.scrollIntoViewIfNeeded();
@@ -131,6 +145,25 @@ async function run() {
       await visual(id('primary-wide'), `resize-${width}-wide`, true, true);
       await visual(id('primary-narrow'), `resize-${width}-narrow`, true, true);
     }
+    for (const width of [320, 360, 390, 430]) for (const scale of [1, 1.5, 2])
+      for (const mode of ['light', 'dark']) for (const preference of ['red_blue', 'green_red']) for (const kind of ['quantity', 'limit', 'full']) {
+        await page.setViewportSize({ width, height: 900 }); await page.emulateMedia({ colorScheme: mode });
+        await page.goto(`${base}/?orderProbe=${kind}&fontScale=${scale}&palette=${preference}`);
+        const history = page.getByRole('button', { name: '주문내역 보기', exact: true });
+        if (kind !== 'full') {
+          assertSecondary(await visual(history, `${mode}-${width}-${scale}-${preference}-${kind}-history`, false), mode);
+          await history.click();
+          assert.equal(await page.evaluate(() => window.fixture.orderAction), 'history');
+        } else {
+          assert.equal(await history.count(), 0);
+          await visual(page.getByRole('button', { name: '종목 상세로 돌아가기', exact: true }), `${mode}-${width}-${scale}-${preference}-full-neutral`, false);
+        }
+        const home = page.getByRole('button', { name: '홈으로 가기', exact: true });
+        await visual(home, `${mode}-${width}-${scale}-${preference}-${kind}-home`);
+        await home.click();
+        assert.equal(await page.evaluate(() => window.fixture.orderAction), 'home');
+        if (width === 320 && scale === 2 && preference === 'red_blue') await page.screenshot({ path: path.join(out, `${mode}-${kind}-order-large-font.png`) });
+      }
     for (const mode of ['light', 'dark']) {
       await page.setViewportSize({ width: 390, height: 900 }); await page.emulateMedia({ colorScheme: mode });
       await page.goto(`${base}/?account=season&holdings=1&navigation=1&fxState=available`); await id('home-total-asset').waitFor();

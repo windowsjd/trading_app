@@ -57,7 +57,7 @@ async function run() {
   };
   try {
     for (const appearance of ['light', 'dark']) for (const width of [320, 360, 390, 430])
-      for (const fontScale of [1, 2]) for (const mode of ['general', 'season']) for (const preference of ['red_blue', 'green_red']) {
+      for (const fontScale of [1, 1.5, 2]) for (const mode of ['general', 'season']) for (const preference of ['red_blue', 'green_red']) {
         await page.setViewportSize({ width, height: 1000 }); await page.emulateMedia({ colorScheme: appearance });
         await page.goto(`${base}/?screen=home&mode=${mode}&holdings=1&long=1&hugePrice=1&fontScale=${fontScale}&palette=${preference}`);
         await id('home-total-asset').waitFor(); await id('home-hot-item-asset-4').waitFor();
@@ -81,6 +81,15 @@ async function run() {
           await id(`home-hot-tab-${type}`).click();
           await page.waitForFunction(type => window.fixture.transport.requests.some(url => url.startsWith('/assets?') && new URL(url, location.origin).searchParams.get('assetType') === type), type);
           assert.equal(await id(`home-hot-tab-${type}`).getAttribute('aria-selected'), 'true');
+          for (const category of ['domestic_stock', 'us_stock', 'crypto']) {
+            const tab = id(`home-hot-tab-${category}`);
+            assert.equal(await tab.getAttribute('role'), 'tab');
+            assert.equal(await tab.getAttribute('aria-selected'), String(category === type));
+            assert.equal(await tab.evaluate(el => getComputedStyle(el).backgroundColor), category === type
+              ? appearance === 'light' ? 'rgb(234, 244, 252)' : 'rgb(28, 48, 66)' : 'rgba(0, 0, 0, 0)');
+            assert.equal(await tab.locator('[dir="auto"]').evaluate(el => getComputedStyle(el).color), category === type
+              ? appearance === 'light' ? 'rgb(40, 91, 133)' : 'rgb(185, 221, 252)' : theme.palettes[appearance].secondary);
+          }
           const request = await page.evaluate(type => window.fixture.transport.requests.filter(url => url.startsWith('/assets?') && new URL(url, location.origin).searchParams.get('assetType') === type).at(-1), type);
           const p = new URL(request, base).searchParams;
           assert.equal(p.get('sortBy'), 'turnover'); assert.equal(p.get('sortOrder'), 'desc'); assert.equal(p.get('limit'), '5');

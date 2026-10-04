@@ -4,6 +4,7 @@ import { QUERY_KEYS } from '../../constants/queryKeys.ts';
 import { createHomeHarness, elements } from '../../../test/homeTestHarness.cjs';
 import { holding } from '../../../test/positionFixture.ts';
 import { HoldingsContractError } from '../../features/tradingAccount/holdings.ts';
+import { semantic } from '../../theme/tokens.ts';
 
 const text = (tree) => elements(tree, 'Text').flatMap((node) => node.props.children).join(' ');
 const find = (tree, testID) => elements(tree).find((node) => node.props.testID === testID);
@@ -56,11 +57,18 @@ describe('selected account Wallet and shared Home holdings', () => {
       ]) {
         const item = find(group, `${testID}-item`);
         const button = find(item, testID), caption = find(item, `${testID}-label`);
-        assert.deepEqual(item.props.children, [button, caption], 'icon button and label are separate siblings');
+        const surface = find(button, `${testID}-surface`);
+        assert.equal(item.props.children, button);
+        assert.deepEqual(button.props.children, [surface, caption], 'one button contains the icon surface, gap and label');
+        assert.equal(elements(item, 'Pressable').length, 1, 'one accessible action per item');
+        assert.equal(Object.assign({}, ...surface.props.style.filter(Boolean)).backgroundColor,
+          testID === 'wallet-exchange' ? semantic.selected : semantic.secondaryActionSurface);
         assert.equal(elements(button, 'Svg').length, 1);
-        assert.equal(elements(button, 'Text').length, 0, 'no text remains inside the icon button');
+        assert.equal(elements(surface, 'Text').length, 0, 'compact icon surface remains text-free');
         assert.equal(caption.props.children, label);
-        assert.equal(button.props.accessibilityLabel, label, 'icon-only buttons retain accessible names');
+        assert.equal(button.props.accessibilityLabel, label);
+        assert.equal(caption.props.accessible, false);
+        assert.equal(surface.props.accessible, false);
       }
       assert.ok(nodes.indexOf(find(wallet, 'wallet-orders-label')) < nodes.indexOf(find(wallet, 'wallet-composition')));
       find(wallet, 'wallet-exchange').props.onPress();
@@ -100,6 +108,9 @@ describe('selected account Wallet and shared Home holdings', () => {
       assert.doesNotMatch(text(tree), /10,001,000/);
       assert.equal(elements(tree, 'SectionSkeleton').length, 3);
       assert.ok(h.queries.every((q) => q.queryKey.includes(h.account.id)));
+      h.seed(h.account, { points: [] });
+      find(h.renderWallet().tree, 'wallet-orders').props.onPress();
+      assert.deepEqual(h.navigation.at(-1), ['TradeHistory', { accountId: h.account.id }]);
     }
   });
   it('an unavailable total preserves independently known cash and stale/unavailable holdings', (t) => {

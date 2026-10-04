@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import { createRequire } from 'node:module';
 import { QUERY_KEYS } from '../../constants/queryKeys.ts';
+import { semantic } from '../../theme/tokens.ts';
 const require = createRequire(import.meta.url);
 const { setup, account, position, asset, flush, act } = require('../../../test/homeDiscoveryHarness.cjs');
 // AssetsService verifies this same fixture through the real Binance parser/writer,
@@ -68,6 +69,13 @@ it('HOT uses the Market turnover DESC result and stable order for each category,
     assert.equal(request.sortBy, 'turnover'); assert.equal(request.sortOrder, 'desc');
     assert.equal(request.limit, 5); assert.equal(request.offset, 0); assert.equal(request.withPrice, true);
     assert.equal(h.node(`home-hot-tab-${type}`).props.accessibilityState.selected, true);
+    for (const category of ['domestic_stock', 'us_stock', 'crypto']) {
+      const tab = h.node(`home-hot-tab-${category}`);
+      assert.equal(tab.props.accessibilityRole, 'tab');
+      assert.equal(tab.props['aria-selected'], category === type);
+      assert.equal(Object.assign({}, ...tab.props.style.filter(Boolean)).backgroundColor,
+        category === type ? semantic.secondaryActionSurface : undefined);
+    }
     assert.deepEqual(h.hotRows().map(n => n.props.testID), h.markets[type].map(a => `home-hot-item-${a.id}`));
     await h.press(`home-hot-item-${type}-0`);
     assert.deepEqual(h.navigation.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'AssetDetail', params: { assetId: `${type}-0` } } }]);

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
-import { semantic, resolveSemanticColor, resolveSemanticStyle } from './tokens.ts';
+import { primaryGradient, semantic, resolveSemanticColor, resolveSemanticStyle } from './tokens.ts';
 import { financial, getFinancialColors } from './financialColors.ts';
 
 const require = createRequire(import.meta.url);
@@ -22,6 +22,21 @@ const native = {
   KeyboardAvoidingView: 'KeyboardAvoidingView', ActivityIndicator: 'ActivityIndicator',
   StyleSheet: { flatten },
 };
+
+test('secondary action roles resolve exact appearance colors independently of financial and global selection roles', () => {
+  for (const mode of ['light', 'dark'] as const) for (const preference of ['red_blue', 'green_red'] as const) {
+    const expected = mode === 'light' ? ['#EAF4FC', '#285B85'] : ['#1C3042', '#B9DDFC'];
+    assert.equal(resolveSemanticColor(semantic.secondaryActionSurface, PALETTES[mode], mode, preference), expected[0]);
+    assert.equal(resolveSemanticColor(semantic.secondaryActionForeground, PALETTES[mode], mode, preference), expected[1]);
+    const UI = themed(mode, preference);
+    assert.equal(flatten(UI.Pressable.render({ style: { backgroundColor: semantic.secondaryActionSurface } }, null).props.style).backgroundColor, expected[0]);
+    assert.equal(flatten(UI.Text.render({ style: { color: semantic.secondaryActionForeground } }, null).props.style).color, expected[1]);
+    assert.equal(PALETTES[mode].selected, mode === 'light' ? '#202a35' : '#344657');
+  }
+  assert.deepEqual(primaryGradient.colors, ['#326FE5', '#7447D8']);
+  assert.equal(primaryGradient.foreground, '#FFFFFF');
+  assert.deepEqual([primaryGradient.start, primaryGradient.end], [{ x: '0%', y: '50%' }, { x: '100%', y: '50%' }]);
+});
 function themed(mode: 'light' | 'dark', financialPreference: 'red_blue' | 'green_red' = 'red_blue') {
   const appearance = { useAppearance: () => ({ mode, financialPreference, colors: PALETTES[mode] }) };
   return load(resolve('src/theme/native.tsx'), {

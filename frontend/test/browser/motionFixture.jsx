@@ -13,6 +13,8 @@ import { ScrollView, Text } from '../../src/theme/native';
 import { semantic } from '../../src/theme/tokens';
 import { financial } from '../../src/theme/financialColors';
 import { timing } from './motionMocks';
+import OrderSuccessBottomSheet from '../../src/screens/order/OrderSuccessBottomSheet';
+import { marketResult } from './marketExecutionFixtures';
 
 const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 60000 } } });
 window.fixture = { client, timing, navigationRef };
@@ -20,6 +22,7 @@ navigationRef.addListener('state', () => window.motion.events.push({ stage: 'rou
 const onRender = (_id, phase, duration) => window.motion.commits.push({ phase, duration, time: performance.now() });
 const probe = new URLSearchParams(location.search).has('probe');
 const primaryProbe = new URLSearchParams(location.search).has('primaryProbe');
+const orderProbe = new URLSearchParams(location.search).get('orderProbe');
 function PrimaryProbes() {
   const [state, setState] = React.useState('enabled');
   const submit = () => { window.fixture.primaryCalls = (window.fixture.primaryCalls ?? 0) + 1; setState('loading'); };
@@ -32,6 +35,10 @@ function PrimaryProbes() {
     <CTAButton testID="primary-blocked" label="진행 불가" state="blocked" onPress={submit} />
     <CTAButton testID="primary-loading" label="처리 중" state="loading" onPress={submit} />
     <CTAButton testID="primary-neutral" label="뒤로가기" variant="neutral" onPress={() => {}} />
+    <CTAButton testID="secondary-enabled" label="거래 내역 보기" variant="secondary" onPress={() => {}} />
+    <CTAButton testID="secondary-disabled" label="거래 내역 보기" variant="secondary" state="disabled" onPress={() => {}} />
+    <CTAButton testID="secondary-blocked" label="거래 내역 보기" variant="secondary" state="blocked" onPress={() => {}} />
+    <CTAButton testID="secondary-loading" label="조회 중" variant="secondary" state="loading" onPress={() => {}} />
     <CTAButton testID="primary-buy" label="매수" style={{ backgroundColor: financial.buyAction }} onPress={() => {}} />
     <CTAButton testID="primary-sell" label="매도" style={{ backgroundColor: financial.sellAction }} onPress={() => {}} />
     <ActionPressable testID="primary-selected" accessibilityRole="tab" accessibilityState={{ selected: true }}
@@ -49,7 +56,10 @@ createRoot(document.getElementById('root')).render(
     <SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: innerWidth, height: innerHeight }, insets: { top: 0, right: 0, bottom: 0, left: 0 } }}>
       <QueryClientProvider client={client}>
         <AppearanceProvider>
-          {primaryProbe ? <PrimaryProbes /> : probe ? <ScrollView contentContainerStyle={{ padding: 24, gap: 16, backgroundColor: semantic.screen }}>
+          {orderProbe ? <OrderSuccessBottomSheet visible payload={marketResult(orderProbe)} onClose={() => {}}
+            onGoAssetDetail={() => { window.fixture.orderAction = 'asset'; }}
+            onGoOrderHistory={() => { window.fixture.orderAction = 'history'; }}
+            onGoHome={() => { window.fixture.orderAction = 'home'; }} /> : primaryProbe ? <PrimaryProbes /> : probe ? <ScrollView contentContainerStyle={{ padding: 24, gap: 16, backgroundColor: semantic.screen }}>
             {[
               ['motion-probe', semantic.selected, semantic.onAccent, '선택 버튼'],
               ['motion-surface', semantic.surface, semantic.text, '밝은/어두운 표면'],

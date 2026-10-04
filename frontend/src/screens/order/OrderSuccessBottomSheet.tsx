@@ -216,6 +216,7 @@ export default function OrderSuccessBottomSheet({
         onGoOrderHistory ? (
           <CTAButton
             label="주문내역 보기"
+            variant="secondary"
             onPress={onGoOrderHistory}
             style={styles.flex}
           />

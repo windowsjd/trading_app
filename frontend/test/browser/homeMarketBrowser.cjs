@@ -184,6 +184,16 @@ async function run() {
         await id(`market-tab-${tabId}`).click();
         await page.waitForFunction(type => window.fixture.transport.requests.some(url => new URL(url, location.origin).searchParams.get('assetType') === type), assetType);
         await id('market-item-asset-0').waitFor();
+        for (const category of ['domestic', 'us', 'crypto']) {
+          const tab = id(`market-tab-${category}`), selected = category === tabId;
+          assert.equal(await tab.getAttribute('role'), 'tab');
+          assert.equal(await tab.getAttribute('aria-selected'), String(selected));
+          assert.equal(await tab.evaluate(el => getComputedStyle(el).backgroundColor), selected
+            ? appearance === 'light' ? 'rgb(234, 244, 252)' : 'rgb(28, 48, 66)' : theme.palettes[appearance].raised);
+          assert.equal(await tab.locator('[dir="auto"]').evaluate(el => getComputedStyle(el).color), selected
+            ? appearance === 'light' ? 'rgb(40, 91, 133)' : 'rgb(185, 221, 252)' : theme.palettes[appearance].text);
+          await assertGlyphBounds(`market-tab-${category}`);
+        }
         await assertGlyphBounds('market-session-summary');
         await assertGlyphBounds('market-sort-control');
         await assertGlyphBounds('market-item-asset-0');

@@ -9,6 +9,12 @@ import { getRecordFinancialDisplay } from '../../features/record/financialDispla
 for (const screen of ['detail', 'profit']) {
   it(`${screen}: canonical results, lean information and scoped history CTA`, async t => {
     const h = createRecordScreenHarness(screen); t.after(h.close); await h.settle();
+    const history = h.find(screen === 'detail' ? 'record-season-detail-orders-cta' : 'record-profit-orders-cta');
+    assert.equal(Object.assign({}, ...history.props.style.filter(Boolean)).backgroundColor, semantic.secondaryActionSurface);
+    if (screen === 'detail') {
+      const profit = h.find('record-season-detail-profit-analysis-cta');
+      assert.equal(Object.assign({}, ...profit.props.style.filter(Boolean)).backgroundColor, semantic.selected);
+    }
     assert.doesNotMatch(h.text(), /MDD|private snapshot|private timestamp|RAW_|domestic_stock|open|available|총 주문|거래 요약|환전 내역/);
     if (screen === 'detail') {
       assert.equal(h.text(h.find('record-detail-return')), '+12.34%');

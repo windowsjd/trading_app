@@ -139,13 +139,15 @@ async function run() {
                 };
               });
               const quickActions = screen === 'wallet' ? ['wallet-exchange', 'wallet-ledger', 'wallet-orders'].map((testID) => {
-                const el = document.querySelector(`[data-testid="${testID}"]`), css = getComputedStyle(el);
+                const el = document.querySelector(`[data-testid="${testID}"]`);
+                const surface = document.querySelector(`[data-testid="${testID}-surface"]`), css = getComputedStyle(surface);
                 const item = document.querySelector(`[data-testid="${testID}-item"]`);
                 const icon = el.querySelector('svg'), label = document.querySelector(`[data-testid="${testID}-label"]`);
                 const labelCss = getComputedStyle(label);
-                return { ...rect(el), padding: css.padding, background: css.backgroundColor, radius: css.borderRadius,
+                return { ...rect(surface), target: rect(el), padding: css.padding, background: css.backgroundColor, radius: css.borderRadius,
                   alignItems: css.alignItems, justifyContent: css.justifyContent, icon: rect(icon), label: rect(label),
-                  item: rect(item), separateLabel: el.parentElement === item && label.parentElement === item && el.nextElementSibling === label,
+                  item: rect(item), separateLabel: surface.parentElement === el && label.parentElement === el && surface.nextElementSibling === label,
+                  accessibleButtons: item.querySelectorAll('[role="button"]').length, iconStroke: icon.getAttribute('stroke'),
                   buttonText: el.textContent.trim(), labelText: label.textContent, accessibleName: el.getAttribute('aria-label'),
                   textAlign: labelCss.textAlign, fontSize: parseFloat(labelCss.fontSize), lineHeight: parseFloat(labelCss.lineHeight),
                   fontWeight: labelCss.fontWeight, labelColor: labelCss.color };
@@ -187,9 +189,12 @@ async function run() {
               assert.ok(order.group.left >= 0 && order.group.right <= width, 'the group stays inside the viewport');
               assert.ok(Math.abs(order.group.left + order.group.right - width) < 1, 'the group is centered');
               assert.equal(exchange.background, appearance === 'light' ? 'rgb(32, 42, 53)' : 'rgb(52, 70, 87)', 'quick actions use the exchange CTA palette');
+              assert.equal(exchange.iconStroke, '#ffffff');
               for (const button of [ledger, orders]) {
+                assert.equal(button.background, appearance === 'light' ? 'rgb(234, 244, 252)' : 'rgb(28, 48, 66)');
+                assert.equal(button.iconStroke, appearance === 'light' ? '#285B85' : '#B9DDFC');
                 assert.ok(Math.abs(exchange.width - button.width) < 1, 'quick actions have equal rendered widths');
-                for (const property of ['height', 'top', 'padding', 'background', 'radius']) assert.equal(button[property], exchange[property]);
+                for (const property of ['height', 'top', 'padding', 'radius']) assert.equal(button[property], exchange[property]);
                 assert.equal(button.icon.top, exchange.icon.top, 'icons align across the row even when labels wrap');
                 assert.ok(Math.abs(button.item.width - exchange.item.width) < 1, 'action items reserve equal label widths');
                 for (const property of ['fontSize', 'lineHeight', 'fontWeight', 'labelColor']) assert.equal(button[property], exchange[property], 'labels share one typography');
@@ -198,8 +203,10 @@ async function run() {
               assert.ok(Math.abs((ledger.item.left - exchange.item.right) - (orders.item.left - ledger.item.right)) < 1, 'action item gaps are equal');
               for (const [index, button] of layout.quickActions.entries()) {
                 assert.ok(button.width >= 48 && button.width <= 56 && button.height === button.width, 'compact square buttons keep the minimum touch target at every font scale');
-                assert.equal(button.separateLabel, true, 'label is a sibling outside its icon button');
-                assert.equal(button.buttonText, '', 'icon-only button contains no text');
+                assert.equal(button.separateLabel, true, 'surface and label are siblings inside one button');
+                assert.equal(button.accessibleButtons, 1, 'one accessible action without nested buttons');
+                assert.equal(button.buttonText, button.labelText);
+                assert.ok(button.target.top <= button.top && button.target.bottom >= button.label.bottom, 'hit target includes surface, gap and label');
                 assert.equal(button.labelText, ['환전하기', '원장 보기', '주문 내역 보기'][index]);
                 assert.equal(button.accessibleName, button.labelText, 'button remains named for assistive technology');
                 assert.equal(button.alignItems, 'center'); assert.equal(button.justifyContent, 'center'); assert.equal(button.textAlign, 'center');
@@ -212,6 +219,33 @@ async function run() {
                 assert.ok(Math.abs((button.icon.top + button.icon.bottom) / 2 - (button.top + button.bottom) / 2) < 1, 'icons are vertically centered');
                 assert.ok(Math.abs((button.label.left + button.label.right) / 2 - (button.left + button.right) / 2) < 1, 'label is centered below its button');
               }
+            }
+            if (screen === 'wallet' && account === 'general' && !long && fontScale === 1 && preference === 'red_blue') {
+              await page.emulateMedia({ reducedMotion: 'reduce' });
+              for (const action of ['wallet-exchange', 'wallet-ledger', 'wallet-orders']) {
+                await id(action).scrollIntoViewIfNeeded();
+                const label = await id(`${action}-label`).boundingBox();
+                await page.mouse.move(label.x + label.width / 2, label.y + label.height / 2);
+                await page.mouse.down();
+                await page.waitForFunction(action => Number(getComputedStyle(document.querySelector(`[data-testid="${action}"]`).firstElementChild).opacity) > 0, action);
+                const feedback = await id(action).evaluate(el => {
+                  const wash = el.firstElementChild, surface = el.querySelector('[data-testid$="-surface"]'), caption = el.querySelector('[data-testid$="-label"]');
+                  const box = node => { const r = node.getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; };
+                  return { wash: box(wash), surface: box(surface), pointerEvents: getComputedStyle(wash).pointerEvents,
+                    rootBackground: getComputedStyle(el).backgroundColor, labelBackground: getComputedStyle(caption).backgroundColor,
+                    labelOpacity: getComputedStyle(caption).opacity, animations: el.getAnimations({ subtree: true }).length };
+                });
+                assert.deepEqual(feedback.wash, feedback.surface, 'pressing the label paints only the compact icon surface');
+                assert.equal(feedback.rootBackground, 'rgba(0, 0, 0, 0)');
+                assert.equal(feedback.labelBackground, 'rgba(0, 0, 0, 0)');
+                assert.equal(feedback.labelOpacity, '1');
+                assert.equal(feedback.pointerEvents, 'none');
+                assert.equal(feedback.animations, 0, 'Reduced Motion keeps immediate static feedback');
+                if (width === 390) await page.screenshot({ path: path.join(out, `quick-action-${appearance}-${action}-pressed.png`) });
+                await page.mouse.move(0, 0); await page.mouse.up();
+                assert.ok(await id('wallet-composition').count());
+              }
+              await page.emulateMedia({ reducedMotion: 'no-preference' });
             }
             if (!long && fontScale === 1) assert.ok(Math.max(...layout.heights) <= 132, 'compact default rows including wrapped Berkshire identity');
             records.push({ appearance, preference, width, fontScale, account, long, screen, layout });
@@ -281,11 +315,26 @@ async function run() {
       await id('wallet-composition').waitFor();
       assert.equal(await id('wallet-exchange-label').textContent(), '환전하기');
       assert.notEqual(await id('wallet-exchange').getAttribute('aria-disabled'), 'true');
-      await id('wallet-exchange').click();
-      await id('wallet-fx-screen').waitFor();
-      await page.evaluate(() => window.fixture.navigationRef.goBack());
-      await id('wallet-composition').waitFor();
-      assert.equal(await page.getByRole('tab', { name: '지갑' }).getAttribute('aria-selected'), 'true');
+      for (const [action, destination, marker] of [
+        ['wallet-exchange', 'WalletFx', 'wallet-fx-screen'],
+        ['wallet-ledger', 'WalletTransactions', 'wallet-transactions-screen'],
+        ['wallet-orders', 'TradeHistory', 'record-order-list-screen'],
+      ]) for (const area of ['surface', 'label', 'gap']) {
+        await id(action).scrollIntoViewIfNeeded();
+        const surface = await id(`${action}-surface`).boundingBox(), label = await id(`${action}-label`).boundingBox();
+        const point = area === 'surface' ? { x: surface.x + surface.width / 2, y: surface.y + surface.height / 2 }
+          : area === 'label' ? { x: label.x + label.width / 2, y: label.y + label.height / 2 }
+            : { x: surface.x + surface.width / 2, y: (surface.y + surface.height + label.y) / 2 };
+        assert.equal(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y).closest('[role="button"]').dataset.testid, point), action, 'hit area never overlaps a neighboring action');
+        await page.mouse.click(point.x, point.y);
+        await id(marker).waitFor();
+        const route = await page.evaluate(() => window.fixture.navigationRef.getCurrentRoute());
+        assert.equal(route.name, destination, `${account}: ${action} ${area}`);
+        if (action === 'wallet-orders') assert.equal(route.params.accountId, `${account}-account`);
+        await page.evaluate(() => window.fixture.navigationRef.goBack());
+        await id('wallet-composition').waitFor();
+        assert.equal(await page.getByRole('tab', { name: '지갑' }).getAttribute('aria-selected'), 'true');
+      }
       await page.getByRole('tab', { name: '지갑' }).click();
       await id('wallet-position-' + account + '-account-asset-6').waitFor();
       await id('wallet-position-' + account + '-account-asset-0').click();
@@ -325,6 +374,28 @@ async function run() {
       await page.evaluate(() => window.fixture.navigationRef.goBack());
       await id('record-profit-analysis-screen').waitFor();
       assert.equal(await id('record-profit-orders-cta').count(), 1);
+    }
+    await page.goto(`${base}/navigation?navigation=1&holdings=1&account=general`);
+    await id('home-total-asset').waitFor();
+    await id('trading-account-switcher-trigger').click();
+    await id('trading-account-switcher-option-season-account').click();
+    await page.getByRole('tab', { name: '지갑' }).click();
+    await id('wallet-composition').waitFor();
+    await id('wallet-orders-label').click();
+    await id('record-order-list-screen').waitFor();
+    assert.equal(await page.evaluate(() => window.fixture.navigationRef.getCurrentRoute().params.accountId), 'season-account', 'history captures the Wallet account after switching');
+    await page.goto(`${base}/navigation?navigation=1&holdings=1&account=season&state=settled`);
+    await id('home-total-asset').waitFor();
+    await page.getByRole('tab', { name: '지갑' }).click();
+    await id('wallet-composition').waitFor();
+    assert.equal(await id('wallet-exchange').getAttribute('aria-disabled'), 'true');
+    for (const area of ['surface', 'label', 'gap']) {
+      await id('wallet-exchange').scrollIntoViewIfNeeded();
+      const surface = await id('wallet-exchange-surface').boundingBox(), label = await id('wallet-exchange-label').boundingBox();
+      const y = area === 'surface' ? surface.y + surface.height / 2 : area === 'label' ? label.y + label.height / 2 : (surface.y + surface.height + label.y) / 2;
+      await page.mouse.click(surface.x + surface.width / 2, y);
+      assert.equal(await page.evaluate(() => window.fixture.navigationRef.getCurrentRoute().name), 'Wallet');
+      assert.equal(await id('wallet-fx-screen').count(), 0);
     }
     assert.deepEqual(errors, []);
     const result = {

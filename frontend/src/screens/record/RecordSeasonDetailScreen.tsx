@@ -70,7 +70,7 @@ export default function RecordSeasonDetailScreen({ route, navigation }: RecordSe
         </View>
         <View style={styles.actions}>
           <CTAButton testID={TEST_IDS.record.seasonDetailProfitAnalysisCta} label="수익 분석" onPress={() => navigation.navigate('RecordProfitAnalysis', { seasonId })} style={styles.action} />
-          <CTAButton testID={TEST_IDS.record.seasonDetailOrdersCta} label="거래 내역 보기" onPress={() => navigation.navigate('TradeHistory', { seasonId })} style={styles.action} />
+          <CTAButton variant="secondary" testID={TEST_IDS.record.seasonDetailOrdersCta} label="거래 내역 보기" onPress={() => navigation.navigate('TradeHistory', { seasonId })} style={styles.action} />
         </View>
       </ScrollView>
     </SafeAreaView>

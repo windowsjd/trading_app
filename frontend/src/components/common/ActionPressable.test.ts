@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { describe, it } from 'node:test';
 import { getFeedbackPalette } from './pressFeedback.ts';
+import { semantic } from '../../theme/tokens.ts';
 
 const require = createRequire(import.meta.url);
 const { interactionHarness, React, act, flatten } = require('../../../test/interactionTestHarness.cjs');
@@ -9,6 +10,64 @@ const event = { nativeEvent: { pageX: 130, pageY: 215 } };
 const wash = (renderer: any) => renderer.root.findAllByType('View').find((n: any) => n.props.pointerEvents === 'none');
 
 describe('ActionPressable immediate feedback', () => {
+  it('secondary CTA keeps geometry, solid colors, loading and disabled policies', (t) => {
+    const h = interactionHarness();
+    const CTA = h.load('src/components/common/CTAButton.tsx', { './ActionPressable': { default: h.ActionPressable, __esModule: true } }).default;
+    let calls = 0;
+    const props = { label: '거래 내역 보기', onPress: () => calls++, style: { flex: 1 } };
+    const renderer = h.render(React.createElement(CTA, props));
+    t.after(() => act(() => renderer.unmount()));
+    const geometry = flatten(renderer.root.findByType('Pressable').props.style);
+    act(() => renderer.update(React.createElement(CTA, { ...props, variant: 'secondary' })));
+    assert.equal(renderer.root.findAllByType('Svg').length, 0);
+    assert.deepEqual(flatten(renderer.root.findByType('Pressable').props.style), { ...geometry, backgroundColor: semantic.secondaryActionSurface });
+    assert.equal(flatten(renderer.root.findByType('Text').props.style).color, semantic.secondaryActionForeground);
+    const button = renderer.root.findByType('Pressable');
+    act(() => button.props.onPressIn(event));
+    assert.ok(flatten(wash(renderer).props.style).opacity > 0);
+    button.props.onPress();
+    assert.equal(calls, 1);
+    for (const state of ['disabled', 'loading', 'blocked']) {
+      act(() => renderer.update(React.createElement(CTA, { ...props, variant: 'secondary', state })));
+      const disabled = renderer.root.findByType('Pressable');
+      assert.equal(disabled.props.disabled, true);
+      assert.equal(disabled.props.onPress, undefined);
+      assert.equal(disabled.props.accessibilityState.busy, state === 'loading');
+      assert.equal(wash(renderer), undefined);
+      assert.equal(flatten(disabled.props.style).opacity, state === 'loading' ? undefined : 0.45);
+      if (state === 'loading') assert.equal(renderer.root.findByType('ActivityIndicator').props.color, semantic.secondaryActionForeground);
+    }
+    assert.equal(h.animations.length, 0);
+  });
+
+  it('one full item target places immediate feedback only on its compact icon surface', (t) => {
+    const h = interactionHarness();
+    let calls = 0;
+    const targetStyle = { alignSelf: 'stretch', alignItems: 'center', gap: 8 };
+    const feedbackStyle = { width: 52, height: 52, borderRadius: 12, top: 0, alignSelf: 'center', backgroundColor: '#EAF4FC', zIndex: 1 };
+    const props = { style: targetStyle, feedbackStyle, accessibilityRole: 'button', accessibilityLabel: '원장 보기', onPress: () => calls++ };
+    const renderer = h.render(React.createElement(h.ActionPressable, props,
+      React.createElement('View', { style: feedbackStyle, accessible: false }), React.createElement('Text', { accessible: false }, '원장 보기')));
+    t.after(() => act(() => renderer.unmount()));
+    const buttons = renderer.root.findAllByType('Pressable');
+    assert.equal(buttons.length, 1);
+    assert.equal(buttons[0].findByType('Text').props.children, '원장 보기');
+    act(() => buttons[0].props.onPressIn(event));
+    const overlay = flatten(wash(renderer).props.style);
+    for (const key of ['width', 'height', 'borderRadius', 'top', 'alignSelf', 'zIndex']) assert.equal(overlay[key], feedbackStyle[key]);
+    assert.ok(overlay.opacity > 0);
+    assert.equal(overlay.right, undefined);
+    assert.deepEqual(flatten(buttons[0].props.style), targetStyle);
+    buttons[0].props.onPress();
+    assert.equal(calls, 1);
+    act(() => buttons[0].props.onPressOut(event));
+    assert.equal(flatten(wash(renderer).props.style).opacity, 0);
+    act(() => renderer.update(React.createElement(h.ActionPressable, { ...props, disabled: true })));
+    assert.equal(renderer.root.findByType('Pressable').props.onPress, undefined);
+    assert.equal(wash(renderer), undefined);
+    assert.equal(h.animations.length, 0);
+  });
+
   it('primary decoration is behind the existing wash, ignores touch and preserves geometry and immediate actions', (t) => {
     const h = interactionHarness();
     let calls = 0;

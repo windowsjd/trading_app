@@ -19,11 +19,19 @@ async function run() {
   await page.addInitScript(() => { const p = new URLSearchParams(location.search); localStorage.setItem('selectedTradingAccountId:home-user', 'general-account'); localStorage.setItem('trading-app:appearance', 'system'); localStorage.setItem('trading-app:financial-colors', p.get('palette') ?? 'red_blue'); });
   const id = value => page.getByTestId(value), color = locator => locator.evaluate(el => getComputedStyle(el).color);
   try {
-    for (const width of [320, 360, 390, 430]) for (const appearance of ['light', 'dark']) for (const preference of ['red_blue', 'green_red']) for (const fontScale of [1, 2]) for (const long of [0, 1]) for (const screen of (process.env.RECORD_BROWSER_SCREENS?.split(',') ?? ['detail', 'profit', 'history'])) {
+    for (const width of [320, 360, 390, 430]) for (const appearance of ['light', 'dark']) for (const preference of ['red_blue', 'green_red']) for (const fontScale of [1, 1.5, 2]) for (const long of [0, 1]) for (const screen of (process.env.RECORD_BROWSER_SCREENS?.split(',') ?? ['detail', 'profit', 'history'])) {
       await page.setViewportSize({ width, height: 844 }); await page.emulateMedia({ colorScheme: appearance });
       await page.goto(`${base}/?record=${screen}&navigation=1&palette=${preference}&fontScale=${fontScale}&long=${long}`);
       await id(screen === 'detail' ? 'record-detail-return' : screen === 'profit' ? 'record-profit-total' : 'record-order-item-order-1').waitFor();
       if (screen !== 'history') {
+        const history = id(screen === 'detail' ? 'record-season-detail-orders-cta' : 'record-profit-orders-cta');
+        assert.equal(await history.evaluate(el => getComputedStyle(el).backgroundColor), appearance === 'light' ? 'rgb(234, 244, 252)' : 'rgb(28, 48, 66)');
+        assert.equal(await color(history.locator('[dir="auto"]')), appearance === 'light' ? 'rgb(40, 91, 133)' : 'rgb(185, 221, 252)');
+        assert.equal(await history.locator('linearGradient').count(), 0);
+        if (screen === 'detail') {
+          const stops = await id('record-season-detail-profit-analysis-cta').locator('linearGradient stop').evaluateAll(nodes => nodes.map(node => node.getAttribute('stop-color')));
+          assert.deepEqual(stops, ['#326FE5', '#7447D8']);
+        }
         const positive = screen === 'detail' ? ['record-detail-return', 'record-detail-pnl'] : ['record-profit-total', 'record-profit-return', 'record-profit-realized', 'record-profit-best-pnl', 'record-profit-best-return'];
         for (const metric of positive) assert.equal(await color(id(metric)), palette[appearance][preference][0], metric);
         if (screen === 'profit') for (const metric of ['record-profit-unrealized', 'record-profit-worst-pnl', 'record-profit-worst-return']) assert.equal(await color(id(metric)), palette[appearance][preference][1], metric);

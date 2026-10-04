@@ -179,6 +179,10 @@ export default function MarketScreen({ navigation, route }: Props) {
                   <ActionPressable
                     key={tab.key}
                     testID={testID}
+                    accessibilityRole="tab"
+                    accessibilityLabel={tab.label}
+                    accessibilityState={{ selected: active }}
+                    aria-selected={active}
                     style={[styles.tabButton, active && styles.tabButtonActive]}
                     onPress={() => setSelectedTab(tab.key)}
                   >
@@ -271,10 +275,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: semantic.raised,
   },
-  tabButtonActive: { backgroundColor: semantic.selected, borderColor: semantic.selected },
+  tabButtonActive: { backgroundColor: semantic.secondaryActionSurface, borderColor: semantic.secondaryActionSurface },
   tabText: { color: semantic.text, fontWeight: '600', fontSize: 14,
     ...(Platform.OS === 'web' ? { maxWidth: '100%', textAlign: 'center' } as const : {}) },
-  tabTextActive: { color: semantic.onAccent, fontWeight: '600',
+  tabTextActive: { color: semantic.secondaryActionForeground, fontWeight: '600',
     ...(Platform.OS === 'web' ? { maxWidth: '100%', textAlign: 'center' } as const : {}) },
   searchEntry: {
     borderWidth: 1,

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, it } from 'node:test';
+import { createRequire } from 'node:module';
 
 function read(sourcePath: string) {
   return readFileSync(path.join(process.cwd(), 'src', sourcePath), 'utf8');
@@ -18,8 +19,34 @@ const successSheet = stripComments(
 );
 const orderScreen = stripComments(read('screens/order/OrderPanel.tsx'));
 const orderApi = stripComments(read('features/order/api.ts'));
+const require = createRequire(import.meta.url);
+const { interactionHarness } = require('../../../test/interactionTestHarness.cjs');
+const { elements } = require('../../../test/ledgerTestHarness.cjs');
+const { marketResult } = require('../../../test/browser/marketExecutionFixtures.js');
 
 describe('order completion display contract', () => {
+  it('history stays conditional and secondary; home remains primary and asset return remains neutral', () => {
+    const h = interactionHarness();
+    const Sheet = h.load('src/screens/order/OrderSuccessBottomSheet.tsx', {
+      '../../components/common/CTAButton': { default: 'CTAButton', __esModule: true },
+      '../../components/common/BottomSheetBackdrop': { default: 'BottomSheetBackdrop', __esModule: true },
+    }).default;
+    for (const kind of ['quantity', 'limit', 'full']) for (const historyAvailable of [true, false]) {
+      const calls: string[] = [];
+      const tree = Sheet({ visible: true, payload: marketResult(kind), onClose() {},
+        onGoHome: () => calls.push('home'), onGoAssetDetail: () => calls.push('asset'),
+        onGoOrderHistory: historyAvailable ? () => calls.push('history') : undefined });
+      const [first, home] = elements(tree, 'CTAButton');
+      const history = historyAvailable && kind !== 'full';
+      assert.equal(first.props.variant, history ? 'secondary' : 'neutral');
+      assert.equal(first.props.label === '주문내역 보기', history);
+      assert.equal(home.props.label, '홈으로 가기');
+      assert.equal(home.props.variant, undefined, 'default primary');
+      first.props.onPress(); home.props.onPress();
+      assert.deepEqual(calls, [history ? 'history' : 'asset', 'home']);
+    }
+  });
+
   it('hides identifiers, net amount, submission time and FX execution details', () => {
     for (const label of [
       '주문 ID',

@@ -8,11 +8,15 @@ NODE_PATH=/path/to/browser-tools/node_modules node test/browser/primaryButtonBro
 
 `PRIMARY_BROWSER_OUTPUT` selects the artifacts (default `/tmp/trading-primary-browser`).
 The suite checks the actual SVG rendering and screenshot pixels, two appearance
-modes, both financial palettes, 320/390/768px widths and font scales 1/2,
+modes, both financial palettes, 320/360/390/430/768px widths and font scales 1/1.5/2,
 resize without remounting, white text, clipping, exclusions, loading/duplicate
 clicks, keyboard input and Reduced Motion. It also visits the real SeasonJoin,
 FX, Record, Login and Signup screens with local transport fixtures. External
 requests are blocked; no financial mutations are submitted.
+Secondary probes verify exact Light/Dark solid colors, disabled/blocked/loading
+states and the actual OrderSuccessBottomSheet for submitted limit, partial and
+legacy full execution. History stays secondary, home stays primary and the
+fallback asset action stays neutral; callback destinations and label bounds are checked.
 
 Use a host font with Korean coverage for visual checks. If the host needs local
 Chromium libraries or fonts, pass `LD_LIBRARY_PATH`/`FONTCONFIG_FILE`; these are
@@ -64,6 +68,8 @@ geometry assertions and is only for a documented baseline comparison.
 
 The existing `recordBrowser.cjs` can target the changed chart screens with
 `RECORD_BROWSER_SCREENS=detail,profit`; its default still checks history as well.
+It checks the secondary history CTAs and primary profit CTA at font scales 1/1.5/2
+in both appearances and financial palettes.
 The motion handover records the pre-existing 320px/2×-font history amount overflow
 found by that broader run, including reproduction against the starting HEAD.
 
@@ -174,7 +180,7 @@ Holdings fixtures include 삼성전자 / Berkshire Hathaway Class B / Bitcoin an
 stock/crypto quantities rounded only for display to six decimal places, without
 trailing zeros. Rendered boxes and glyph edges verify the left identity and the
 right value → secondary quantity → return column, its typography, and equal
-Wallet history button widths/heights/padding/touch targets. Names wrap fully with
+compact Wallet icon geometry and whole-item touch targets. Names wrap fully with
 the complete accessible label; all numeric values remain
 untruncated. It also checks known quantities in stale/unavailable rows, live palette changes, all 207 positions
 across three API pages, and delayed outgoing responses on account switching.
@@ -182,9 +188,18 @@ The navigation fixture uses installed React Navigation and production MainTabs,
 WalletStack, MyStack and RecordStack to exercise both five-tab modes, no Home
 exchange entry, Wallet FX entry, ledger, Wallet orders, back paths, Overall → Record
 and every Record detail destination. Only transport and the root-navigation adapter are mocked.
+Icon, label and the intervening gap each navigate through the same target;
+history receives the Wallet accountId after switching, and disabled exchange cannot
+navigate from any area. Held label presses verify that
+the static wash covers only the icon surface, including under Reduced Motion.
 Use `--navigation-only` to debug those routes without repeating layouts.
 Artifacts go to `/tmp/trading-wallet-browser` (override `WALLET_BROWSER_OUTPUT`).
 All external requests are blocked; Android/iOS device checks remain separate.
+
+`homeDiscoveryBrowser.cjs` verifies Home HOT selected/unselected palettes and tab
+semantics at 320/360/390/430px and font scales 1/1.5/2, alongside unchanged TOP 5
+queries and real Home → Market category intent. `homeMarketBrowser.cjs --market-only`
+checks the same Market selection policy with server sorting and pagination.
 
 Run `NODE_PATH=/path/to/browser-tools/node_modules node test/browser/homeMarketBrowser.cjs`
 for the Home disclosure and Market sorting. It checks 320/360/390/430px × Light/Dark,

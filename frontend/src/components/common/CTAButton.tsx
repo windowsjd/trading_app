@@ -16,8 +16,8 @@ interface CTAButtonProps {
   onPress?: () => void;
   style?: ViewStyle;
   testID?: string;
-  /** Back, secondary and error recovery actions keep their existing surface. */
-  variant?: 'primary' | 'neutral';
+  /** History entry uses secondary; back and recovery actions keep neutral. */
+  variant?: 'primary' | 'secondary' | 'neutral';
 }
 
 export default function CTAButton({
@@ -39,6 +39,7 @@ export default function CTAButton({
       accessibilityState={{ disabled, busy: state === 'loading' }}
       style={[
         styles.button,
+        variant === 'secondary' && styles.secondary,
         state === 'blocked' && styles.blocked,
         state === 'disabled' && styles.disabled,
         style,
@@ -47,9 +48,9 @@ export default function CTAButton({
       disabled={disabled}
     >
       {state === 'loading' ? (
-        <ActivityIndicator color={primaryGradient.foreground} />
+        <ActivityIndicator color={variant === 'secondary' ? semantic.secondaryActionForeground : primaryGradient.foreground} />
       ) : (
-        <Text style={styles.text}>{label}</Text>
+        <Text style={variant === 'secondary' ? [styles.text, styles.secondaryText] : styles.text}>{label}</Text>
       )}
     </ActionPressable>
   );
@@ -69,6 +70,8 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.45,
   },
+  secondary: { backgroundColor: semantic.secondaryActionSurface },
+  secondaryText: { color: semantic.secondaryActionForeground },
   blocked: {
     opacity: 0.45,
   },

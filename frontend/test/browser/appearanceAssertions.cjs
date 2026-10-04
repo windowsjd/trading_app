@@ -1,8 +1,8 @@
 const assert = require('node:assert/strict');
 // Product hierarchy contract, deliberately independent of the implementation palette.
 const palettes = {
-  light: { screen: 'rgb(252, 252, 253)', surface: 'rgb(255, 255, 255)', raised: 'rgb(247, 248, 250)' },
-  dark: { screen: 'rgb(16, 21, 28)', surface: 'rgb(27, 37, 48)', raised: 'rgb(39, 53, 67)' },
+  light: { screen: 'rgb(252, 252, 253)', surface: 'rgb(255, 255, 255)', raised: 'rgb(247, 248, 250)', text: 'rgb(32, 42, 53)', secondary: 'rgb(83, 97, 112)' },
+  dark: { screen: 'rgb(16, 21, 28)', surface: 'rgb(27, 37, 48)', raised: 'rgb(39, 53, 67)', text: 'rgb(242, 245, 247)', secondary: 'rgb(197, 208, 218)' },
 };
 async function background(locator, mode, role) {
   // Find the painted background behind text/transparent list wrappers.

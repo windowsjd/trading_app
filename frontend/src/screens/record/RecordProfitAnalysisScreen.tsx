@@ -105,7 +105,7 @@ export default function RecordProfitAnalysisScreen({ route, navigation }: Record
           {!hasAnalysis || profitAnalysis.items.length === 0 ? <InlineEmptyState message="표시할 자산별 손익 데이터가 없습니다." />
             : profitAnalysis.items.map(item => <ProfitAsset key={item.assetId} asset={item} testID={`record-profit-asset-${item.assetId}`} />)}
         </View>
-        <CTAButton testID="record-profit-orders-cta" label="거래 내역 보기" onPress={() => navigation.navigate('TradeHistory', { seasonId })} />
+        <CTAButton variant="secondary" testID="record-profit-orders-cta" label="거래 내역 보기" onPress={() => navigation.navigate('TradeHistory', { seasonId })} />
       </ScrollView>
     </SafeAreaView>
   );

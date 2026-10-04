@@ -88,6 +88,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
     {
       testID: 'wallet-ledger',
       label: '원장 보기',
+      secondary: true,
       iconPath: 'M6 3h14v18H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z M8 3v18 M11 8h6 M11 12h6 M11 16h4',
       disabled: false,
       hidden: false,
@@ -96,6 +97,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
     {
       testID: 'wallet-orders',
       label: '주문 내역 보기',
+      secondary: true,
       iconPath: 'M5 3h14v18l-3-2-4 2-4-2-3 2V3Z M8 7h8 M8 11h8 M8 15l2 2 5-4',
       disabled: false,
       hidden: false,
@@ -129,10 +131,13 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
               accessibilityLabel={action.label}
               accessibilityState={{ disabled: action.disabled }}
               disabled={action.disabled}
-              style={[styles.quickAction, action.disabled && styles.quickActionDisabled]}
+              style={styles.quickActionTarget}
+              feedbackStyle={[styles.quickAction, action.secondary && styles.quickActionSecondary, styles.quickActionFeedback]}
               onPress={action.onPress}
             >
               <View
+                testID={`${action.testID}-surface`}
+                style={[styles.quickAction, action.secondary && styles.quickActionSecondary, action.disabled && styles.quickActionDisabled]}
                 accessible={false}
                 accessibilityElementsHidden
                 importantForAccessibility="no-hide-descendants"
@@ -144,7 +149,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
                   height={24}
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke={colors.onAccent}
+                  stroke={action.secondary ? colors.secondaryActionForeground : colors.onAccent}
                   strokeWidth={2}
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -154,17 +159,17 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
                   <Path d={action.iconPath} />
                 </Svg>
               </View>
+              <Text
+                testID={`${action.testID}-label`}
+                accessible={false}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                aria-hidden
+                style={[styles.quickActionLabel, action.disabled && styles.quickActionDisabled]}
+              >
+                {action.label}
+              </Text>
             </ActionPressable>
-            <Text
-              testID={`${action.testID}-label`}
-              accessible={false}
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants"
-              aria-hidden
-              style={[styles.quickActionLabel, action.disabled && styles.quickActionDisabled]}
-            >
-              {action.label}
-            </Text>
           </View>
         ))}
       </View>
@@ -216,7 +221,10 @@ const styles = StyleSheet.create({
   notice: { fontSize: 13, lineHeight: 20, color: semantic.warning },
   quickActions: { width: '100%', maxWidth: 360, alignSelf: 'center', flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 8 },
   quickActionItem: { flex: 1, minWidth: 0, alignItems: 'center', gap: 8 },
+  quickActionTarget: { alignSelf: 'stretch', alignItems: 'center', gap: 8 },
   quickAction: { width: 52, height: 52, borderRadius: 12, backgroundColor: semantic.selected, alignItems: 'center', justifyContent: 'center' },
+  quickActionSecondary: { backgroundColor: semantic.secondaryActionSurface },
+  quickActionFeedback: { top: 0, alignSelf: 'center', zIndex: 1 },
   quickActionDisabled: { opacity: 0.45 },
   quickActionLabel: { alignSelf: 'stretch', fontSize: 13, fontWeight: '500', lineHeight: 20, color: semantic.secondary, textAlign: 'center' },
 });

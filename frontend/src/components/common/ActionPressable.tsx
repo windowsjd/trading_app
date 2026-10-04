@@ -7,6 +7,7 @@ import {
   StyleSheet,
   View,
   type PressableProps,
+  type StyleProp,
   type ViewStyle,
 } from '../../theme/native';
 import { getFeedbackPalette } from './pressFeedback';
@@ -16,6 +17,8 @@ type Props = Omit<PressableProps, 'android_ripple'> & {
   ref?: React.Ref<View>;
   /** Opt in only for general primary actions; disabled surfaces stay unchanged. */
   primary?: boolean;
+  /** Place the decorative wash on a smaller surface inside the hit target. */
+  feedbackStyle?: StyleProp<ViewStyle>;
 };
 
 /** One immediate pressed surface; no motion clock or delayed action. */
@@ -26,7 +29,7 @@ export default function ActionPressable({ feedback = 'default', primary = false,
   return feedback === 'none' ? <Pressable {...props} /> : <FeedbackActionPressable {...props} primary={primary} />;
 }
 
-function FeedbackActionPressable({ children, style, disabled, onPress, primary = false, ...props }: Props) {
+function FeedbackActionPressable({ children, style, disabled, onPress, primary = false, feedbackStyle, ...props }: Props) {
   const { colors, mode, financialPreference } = useAppearance();
   const showPrimary = primary && !disabled && !props['aria-disabled'] && !props.accessibilityState?.disabled;
   const surfaceStyle: PressableProps['style'] = showPrimary
@@ -43,7 +46,7 @@ function FeedbackActionPressable({ children, style, disabled, onPress, primary =
   return (
     <Pressable {...props} style={surfaceStyle} disabled={disabled} onPress={onPress}>
       {(state) => {
-        const base = StyleSheet.flatten(typeof surfaceStyle === 'function' ? surfaceStyle(state) : surfaceStyle) ?? {};
+        const base = StyleSheet.flatten(feedbackStyle ?? (typeof surfaceStyle === 'function' ? surfaceStyle(state) : surfaceStyle)) ?? {};
         const color = processColor(resolveSemanticColor(base.backgroundColor, colors, mode, financialPreference) ?? colors.screen);
         const palette = getFeedbackPalette(typeof color === 'number' ? color : null);
         // Copy only the clip shape; never clip the root's border/shadow/content.
@@ -69,8 +72,9 @@ function FeedbackActionPressable({ children, style, disabled, onPress, primary =
                 accessibilityElementsHidden
                 importantForAccessibility="no-hide-descendants"
                 style={[
-                  styles.clip,
+                  feedbackStyle ? styles.target : styles.clip,
                   shape,
+                  feedbackStyle,
                   {
                     backgroundColor: palette.washColor,
                     // Static feedback also respects Reduced Motion, including
@@ -92,4 +96,5 @@ function FeedbackActionPressable({ children, style, disabled, onPress, primary =
 const styles = StyleSheet.create({
   primary: { backgroundColor: primaryGradient.colors[0] },
   clip: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
+  target: { position: 'absolute', overflow: 'hidden' },
 });

@@ -12,6 +12,37 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: Secondary 조회/선택 스타일 + Wallet quick action 터치 영역 (2026-10-04)
+
+시작 시 `git fetch origin main`, clean working tree와 HEAD
+`18ea9666a4db0da201185fe7a43d398ec2b1804b`를 확인했다.
+
+주요 행동의 브랜드 강조를 유지하면서 조회 행동과 지정된 자산군 선택에는
+가벼운 보조색을 사용해 과도한 강조를 줄이고 선택 상태를 명확히 구분한다.
+
+- `secondaryActionSurface` / `secondaryActionForeground` semantic 역할을 추가했다.
+  Light는 `#EAF4FC` / `#285B85`, Dark는 `#1C3042` / `#B9DDFC` 단색이다.
+  `semantic.selected`, 금융 의미색과 Primary `#326FE5 → #7447D8` 수평 Gradient는 유지한다.
+- 적용: Wallet 원장·주문 내역 아이콘, 시즌 전적 상세·수익 분석의 거래 내역 CTA,
+  주문 완료의 조건부 주문내역 CTA, Home HOT·Market의 선택 자산군.
+  비선택 상태, 시즌 전적의 수익 분석, 홈 이동, neutral CTA 정책은 유지한다.
+- Wallet 아이콘과 라벨 전체를 하나의 logical touch target으로 만들되 compact
+  52×52 아이콘 visual은 유지했다. 중첩 Pressable 없이 항목당 하나의 접근성 버튼이며,
+  ActionPressable의 `feedbackStyle`로 즉각적인 pressed wash를 아이콘에만 표시한다.
+  환전은 전체 target에 disabled를 적용하고 기존 색·WalletFx 목적지를 유지한다.
+- Wallet 주문 내역은 explicit `{ accountId }`, Record 내역은 `{ seasonId }`를 유지한다.
+  주문 완료의 실제 history callback은 기존 Record 시즌 목록 목적지를 유지한다.
+  Home 환전 버튼은 계속 없으며, 환전 진입점은 Wallet이다.
+- Market query·pagination·sortSnapshot·ticker, Home TOP 5/서버 정렬, backend/API/금융 계산은 변경하지 않았다.
+- 검증: `npm run check`(gated lint + typecheck + 116개 테스트 파일), Market/OrderSuccess
+  추가 lint, `npm run export:web`, `git diff --check` PASS. 브라우저는 Wallet/Home
+  384개, Home HOT 96개, Market 48개, Record detail/profit 192개 layout과 848개 버튼 검증 PASS.
+  Wallet 세 액션의 icon/label/gap 목적지, 전환 후 accountId, disabled 전 영역과
+  Reduced Motion의 아이콘 전용 wash를 확인했다. 320/360/390/430px, fontScale 1/1.5/2,
+  Light/Dark와 두 금융색 설정을 검증하고 `/tmp/trading-*-browser`에 캡처·결과를 남겼다.
+  Web PASS, Android/iOS 실기기 NOT_RUN, VoiceOver/TalkBack 실제 읽기 NOT_VERIFIED.
+  전체 diff를 검토했으며 커밋하지 않아 종료 HEAD는 시작 HEAD와 동일하다.
+
 ### 작업 단위: 관리자 진단 개선 2-C — 자동 지정가 matcher Ops 원인 보존 (2026-10-03)
 
 시작 전 clean `git status`, local HEAD, `git fetch origin main`과 origin/main을
