@@ -57,7 +57,6 @@ import type { AssetType } from '../../features/market/api';
 type Props = {
   account: TradingAccountDto;
   capabilities: TradingAccountCapabilities | null;
-  onOpenFx: () => void;
   onOpenReward: () => void;
   onOpenAsset: (assetId: string) => void;
   onOpenMarket: (assetType: AssetType) => void;
@@ -68,7 +67,6 @@ type Props = {
 export default function SeasonAccountHome({
   account,
   capabilities,
-  onOpenFx,
   onOpenReward,
   onOpenAsset,
   onOpenMarket,
@@ -223,10 +221,6 @@ export default function SeasonAccountHome({
         <HomeHoldings holdings={holdings} onOpenAsset={onOpenAsset} />
       </View>
       <HomeHotMarket hot={hot} onOpenAsset={onOpenAsset} onOpenMarket={onOpenMarket} />
-
-      {capabilities?.canExchange ? (
-        <CTAButton label="환전하기" onPress={onOpenFx} />
-      ) : null}
 
       {isSettled ? (
         <CTAButton label="보상 확인" onPress={onOpenReward} />

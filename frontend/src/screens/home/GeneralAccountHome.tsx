@@ -16,14 +16,11 @@ import {
   ACCOUNT_INTEGRITY_TITLE,
   findAccountIntegrityFailure,
 } from '../../features/tradingAccount/accountIntegrityGate';
-import { getCapabilityBlockMessage } from '../../features/tradingAccount/capabilities';
-import type { TradingAccountCapabilities } from '../../features/tradingAccount/capabilities';
 import { getPortfolioNotice } from '../../features/tradingAccount/portfolioMessage';
 import { formatKrw } from '../../utils/format';
 
 import ErrorState from '../../components/states/ErrorState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
-import CTAButton from '../../components/common/CTAButton';
 import HomeAssetTrend, { type HomeEquityRange } from './HomeAssetTrend';
 import HomeAssetHero from './HomeAssetHero';
 import HomeHoldings, { useHomeHoldings } from './HomeHoldings';
@@ -52,8 +49,6 @@ import type { AssetType } from '../../features/market/api';
 
 type Props = {
   account: TradingAccountDto;
-  capabilities: TradingAccountCapabilities | null;
-  onOpenFx: () => void;
   onOpenAsset: (assetId: string) => void;
   onOpenMarket: (assetType: AssetType) => void;
   accountContext: HomeAccountContextData;
@@ -69,8 +64,6 @@ function formatUnknownKrw(value: string | null | undefined) {
 
 export default function GeneralAccountHome({
   account,
-  capabilities,
-  onOpenFx,
   onOpenAsset,
   onOpenMarket,
   accountContext,
@@ -161,12 +154,6 @@ export default function GeneralAccountHome({
   const portfolio = portfolioQuery.data;
   const summary = portfolio.summary;
   const portfolioNotice = getPortfolioNotice(portfolio);
-  const capabilityNotice = capabilities?.canExchange
-    ? null
-    : getCapabilityBlockMessage(
-        capabilities,
-        capabilities?.exchangeBlockReason,
-      );
 
   return (
     <ScrollView
@@ -225,20 +212,6 @@ export default function GeneralAccountHome({
           </Text>
         </View>
       ) : null}
-
-      {capabilities?.canExchange ? (
-        <CTAButton label="환전하기" onPress={onOpenFx} />
-      ) : null}
-
-      {capabilityNotice ? (
-        <View
-          testID={TEST_IDS.tradingAccount.capabilityNotice}
-          style={styles.noticeBox}
-        >
-          <Text style={styles.warningTitle}>환전 안내</Text>
-          <Text style={styles.warningText}>{capabilityNotice}</Text>
-        </View>
-      ) : null}
     </ScrollView>
   );
 }
@@ -261,12 +234,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     backgroundColor: semantic.warningSurface,
-    gap: 4,
-  },
-  noticeBox: {
-    borderRadius: 12,
-    padding: 12,
-    backgroundColor: semantic.infoSurface,
     gap: 4,
   },
   warningTitle: { fontSize: 14, fontWeight: '700', color: semantic.warning },

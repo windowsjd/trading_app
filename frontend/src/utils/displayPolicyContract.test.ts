@@ -17,7 +17,7 @@ const orderScreen = read('screens/order/OrderPanel.tsx');
 const orderMapper = read('features/order/mapper.ts');
 const recordMapper = read('features/record/api.ts');
 const recordOrderList = read('screens/history/TradeHistoryScreen.tsx');
-const generalAccountHome = read('screens/home/GeneralAccountHome.tsx');
+const seasonAccountHome = read('screens/home/SeasonAccountHome.tsx');
 const walletFxScreen = read('screens/wallet/WalletFxScreen.tsx');
 
 describe('numeric asset symbol display contract', () => {
@@ -66,10 +66,10 @@ describe('separate asset and account availability display contract', () => {
   });
 
   it('uses account-aware capability and API-error messages', () => {
-    assert.match(generalAccountHome, /getCapabilityBlockMessage\(/u);
+    assert.match(seasonAccountHome, /getCapabilityBlockMessage\(/u);
     assert.match(orderScreen, /!action.request.seasonUi/u);
     assert.match(walletFxScreen, /capabilities\?\.isGeneral === true/u);
-    assert.doesNotMatch(generalAccountHome, /CAPABILITY_BLOCK_MESSAGE\[/u);
+    assert.doesNotMatch(seasonAccountHome, /CAPABILITY_BLOCK_MESSAGE\[/u);
   });
 });
 

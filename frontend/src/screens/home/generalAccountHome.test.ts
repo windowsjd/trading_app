@@ -35,9 +35,7 @@ describe('GeneralAccountHome independent financial reads', () => {
     assert.match(source, /getPortfolioNotice\(portfolio\)/u);
   });
 
-  it('never renders a season-only capability reason', () => {
-    assert.match(source, /getCapabilityBlockMessage\(/u);
-    assert.ok(!source.includes('CAPABILITY_BLOCK_MESSAGE['));
-    assert.doesNotMatch(source, /season_not_active/iu);
+  it('has no exchange-only capability notice or wiring', () => {
+    assert.doesNotMatch(source, /환전하기|환전 안내|onOpenFx|capabilities|CTAButton/u);
   });
 });

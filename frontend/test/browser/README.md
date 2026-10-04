@@ -140,8 +140,8 @@ both modes × normal/long content (216 layouts), plus 28 exception states. Text
 range measurements detect clipping of Korean, long nicknames/tier names, large
 rank numbers and 16-digit assets. It also checks the context's padding/height,
 asset hierarchy, delayed outgoing responses, account/appearance restoration,
-system theme changes and ledger/orders/FX/reward navigation. Reports and
-screenshots go to `/tmp/trading-home-browser` (override `HOME_BROWSER_OUTPUT`).
+system theme changes, no Home FX entry or empty CTA space, and reward navigation.
+Reports and screenshots go to `/tmp/trading-home-browser` (override `HOME_BROWSER_OUTPUT`).
 This validates RN Web rendering; Android/iOS font measurement, safe areas,
 touch and screen-reader behavior still require device verification.
 
@@ -179,9 +179,9 @@ the complete accessible label; all numeric values remain
 untruncated. It also checks known quantities in stale/unavailable rows, live palette changes, all 207 positions
 across three API pages, and delayed outgoing responses on account switching.
 The navigation fixture uses installed React Navigation and production MainTabs,
-WalletStack, MyStack and RecordStack to exercise both five-tab modes, Home/Wallet
-FX entry, ledger, Wallet orders, back paths, Overall → Record and every Record
-detail destination. Only transport and the root-navigation adapter are mocked.
+WalletStack, MyStack and RecordStack to exercise both five-tab modes, no Home
+exchange entry, Wallet FX entry, ledger, Wallet orders, back paths, Overall → Record
+and every Record detail destination. Only transport and the root-navigation adapter are mocked.
 Use `--navigation-only` to debug those routes without repeating layouts.
 Artifacts go to `/tmp/trading-wallet-browser` (override `WALLET_BROWSER_OUTPUT`).
 All external requests are blocked; Android/iOS device checks remain separate.

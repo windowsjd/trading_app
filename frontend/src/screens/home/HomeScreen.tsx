@@ -82,12 +82,6 @@ export default function HomeScreen({ navigation }: Props) {
     );
   }
 
-  const openFx = () =>
-    rootNavigation.navigate('MainTabs', {
-      screen: 'WalletTab',
-      params: { screen: 'WalletFx', initial: false },
-    });
-
   const openAsset = (assetId: string) =>
     rootNavigation.navigate('MainTabs', {
       screen: 'MarketTab',
@@ -106,9 +100,7 @@ export default function HomeScreen({ navigation }: Props) {
           <GeneralAccountHome
             key={selectedAccount.id}
             account={selectedAccount}
-            capabilities={capabilities}
             onOpenAsset={openAsset}
-            onOpenFx={openFx}
             accountContext={accountContext}
             hot={hot}
             onOpenMarket={openMarket}
@@ -118,7 +110,6 @@ export default function HomeScreen({ navigation }: Props) {
             key={selectedAccount.id}
             account={selectedAccount}
             capabilities={capabilities}
-            onOpenFx={openFx}
             accountContext={accountContext}
             hot={hot}
             onOpenMarket={openMarket}

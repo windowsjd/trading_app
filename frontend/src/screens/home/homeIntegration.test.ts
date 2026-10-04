@@ -124,19 +124,23 @@ describe('Home asset hierarchy and real portfolio/ranking/me sources', () => {
   });
 });
 
-describe('home exchange shortcut', () => {
+describe('Home keeps exchange entry in Wallet', () => {
   for (const mode of ['general', 'season']) {
-    it(`${mode} offers only exchange and opens WalletFx for the selected account`, async (t) => {
+    it(`${mode} has no Home exchange and Wallet opens WalletFx for the selected account`, async (t) => {
       const h = createHomeHarness(mode);
       t.after(h.close);
       h.seed(h.account, fixture[mode].data);
       const { tree } = h.render();
-      const actions = elements(tree, 'CTAButton');
-      assert.deepEqual(actions.map((node) => node.props.label), ['환전하기']);
-      const button = h.renderCta(actions[0]);
+      assert.deepEqual(elements(tree, 'CTAButton'), []);
+      assert.doesNotMatch(texts(tree), /환전하기|환전 안내/);
+      const button = elements(h.renderWallet().tree, 'Pressable').find(
+        (node) => node.props.testID === 'wallet-exchange',
+      );
+      assert.ok(button);
+      assert.equal(button.props.accessibilityLabel, '환전하기');
       assert.equal(button.props.disabled, false);
       button.props.onPress();
-      assert.deepEqual(h.navigation, [['MainTabs', { screen: 'WalletTab', params: { screen: 'WalletFx', initial: false } }]]);
+      assert.deepEqual(h.navigation, [['WalletFx']]);
 
       h.renderFx();
       const queries = h.fxQueries.filter(
@@ -158,43 +162,30 @@ describe('home exchange shortcut', () => {
       ]);
     });
 
-    it(`${mode} keeps exchange full width in scroll content with unrestricted label growth`, (t) => {
-      const h = createHomeHarness(mode);
-      t.after(h.close);
-      h.seed(h.account, fixture[mode].data);
-      const { tree } = h.render();
-      const action = elements(tree, 'CTAButton')[0];
-      assert.equal(tree.type, 'ScrollView');
-      assert.ok(tree.props.children.includes(action));
-      const button = h.renderCta(action);
-      const style = Object.assign({}, ...button.props.style.filter(Boolean));
-      // ActionPressable animates only its internal layers (tested separately).
-      assert.equal(style.opacity, undefined);
-      const label = elements(button, 'Text')[0];
-      assert.equal(texts(button), '환전하기');
-      for (const key of ['width', 'height', 'maxWidth', 'maxHeight', 'flex']) {
-        assert.equal(style[key], undefined, key);
-      }
-      assert.notEqual(tree.props.contentContainerStyle.alignItems, 'center');
-      assert.ok(tree.props.contentContainerStyle.paddingBottom > 0);
-      assert.equal(label.props.numberOfLines, undefined);
-      assert.notEqual(label.props.allowFontScaling, false);
-      assert.equal(label.props.style.textAlign, 'center');
-    });
-
     for (const status of ['suspended', 'closed']) {
-      it(`${mode} ${status} keeps the exchange gate, notice and read actions`, (t) => {
+      it(`${mode} ${status} keeps trade restrictions and Wallet exchange gating/history`, (t) => {
         const h = createHomeHarness(mode);
         t.after(h.close);
         h.account = { ...h.account, status };
         h.seed(h.account, fixture[mode].data);
         const { tree } = h.render();
         assert.deepEqual(elements(tree, 'CTAButton'), []);
+        assert.doesNotMatch(texts(tree), /환전하기|환전 안내/);
         const caps = h.getCapabilities();
-        assert.ok(texts(tree).includes(
-          getCapabilityBlockMessage(caps, caps.exchangeBlockReason),
-        ));
+        const notice = elements(tree).find(
+          (node) => node.props.testID === TEST_IDS.tradingAccount.capabilityNotice,
+        );
+        if (mode === 'season') {
+          assert.ok(notice);
+          assert.ok(texts(notice).includes('거래 제한'));
+          assert.ok(texts(notice).includes(getCapabilityBlockMessage(caps, caps.tradeBlockReason)));
+        } else {
+          assert.equal(notice, undefined);
+        }
         const walletTree = h.renderWallet().tree;
+        assert.equal(elements(walletTree, 'Pressable').find(
+          (node) => node.props.testID === 'wallet-exchange',
+        ).props.disabled, true);
         for (const label of ['원장 보기', '주문 내역 보기']) {
           const button = elements(walletTree, 'Pressable').find(
             (node) => node.props.accessibilityLabel === label,
@@ -212,20 +203,36 @@ describe('home exchange shortcut', () => {
       t.after(h.close);
       h.seed(h.account, fixture[mode].data);
       h.capabilities = null;
-      assert.deepEqual(elements(h.render().tree, 'CTAButton'), []);
+      const { tree } = h.render();
+      assert.deepEqual(elements(tree, 'CTAButton'), []);
+      assert.doesNotMatch(texts(tree), /환전하기|환전 안내/);
+      assert.equal(elements(tree).find(
+        (node) => node.props.testID === TEST_IDS.tradingAccount.capabilityNotice,
+      ), undefined);
     });
 
-    it(`${mode} gates the shortcut on canExchange independently of canTrade`, (t) => {
+    it(`${mode} shows only relevant trade notices, independently of exchange capability`, (t) => {
       const h = createHomeHarness(mode);
       t.after(h.close);
       h.seed(h.account, fixture[mode].data);
-      h.capabilities = { ...h.getCapabilities(), canExchange: false, canTrade: true };
-      assert.deepEqual(elements(h.render().tree, 'CTAButton'), []);
-      h.capabilities = { ...h.getCapabilities(), canExchange: true, canTrade: false };
-      assert.deepEqual(
-        elements(h.render().tree, 'CTAButton').map((node) => node.props.label),
-        ['환전하기'],
-      );
+      for (const canExchange of [false, true]) for (const canTrade of [false, true]) {
+        h.capabilities = {
+          ...h.getCapabilities(), canExchange, canTrade,
+          exchangeBlockReason: canExchange ? null : 'account_suspended',
+          tradeBlockReason: canTrade ? null : 'account_suspended',
+        };
+        const { tree } = h.render();
+        assert.deepEqual(elements(tree, 'CTAButton'), []);
+        assert.doesNotMatch(texts(tree), /환전하기|환전 안내/);
+        const notice = elements(tree).find(
+          (node) => node.props.testID === TEST_IDS.tradingAccount.capabilityNotice,
+        );
+        assert.equal(!!notice, mode === 'season' && !canTrade);
+        if (notice) {
+          assert.ok(texts(notice).includes('거래 제한'));
+          assert.ok(texts(notice).includes(getCapabilityBlockMessage(h.capabilities, h.capabilities.tradeBlockReason)));
+        }
+      }
     });
   }
 
@@ -236,7 +243,7 @@ describe('home exchange shortcut', () => {
     { participantStatus: 'finished' },
     { endAt: '2026-09-09T00:00:00Z' },
   ]) {
-    it(`season restrictions still gate exchange: ${JSON.stringify(change)}`, (t) => {
+    it(`season trade restrictions and reward entry remain: ${JSON.stringify(change)}`, (t) => {
       const h = createHomeHarness('season');
       t.after(h.close);
       h.account.season = { ...h.account.season, ...change };
@@ -248,8 +255,10 @@ describe('home exchange shortcut', () => {
         change.seasonStatus === 'settled' ? ['보상 확인'] : [],
       );
       const caps = h.getCapabilities();
+      assert.doesNotMatch(texts(tree), /환전하기|환전 안내/);
+      assert.ok(texts(tree).includes('거래 제한'));
       assert.ok(texts(tree).includes(
-        getCapabilityBlockMessage(caps, caps.exchangeBlockReason),
+        getCapabilityBlockMessage(caps, caps.tradeBlockReason),
       ));
       if (change.seasonStatus === 'settled') {
         h.renderCta(actions[0]).props.onPress();
@@ -260,7 +269,7 @@ describe('home exchange shortcut', () => {
     });
   }
 
-  it('general ↔ season switches immediately render the current capability and FX account', async (t) => {
+  it('general ↔ season switches keep Home free of exchange and Wallet FX scoped to the selected account', async (t) => {
     const h = createHomeHarness('season');
     t.after(h.close);
     const season = h.account;
@@ -272,14 +281,15 @@ describe('home exchange shortcut', () => {
       h.seed(account, fixture[account.mode].data);
       const { tree, branch } = h.render();
       assert.equal(branch.key, account.id);
-      const actions = elements(tree, 'CTAButton');
-      assert.deepEqual(
-        actions.map((node) => node.props.label),
-        account.status === 'active' ? ['환전하기'] : [],
+      assert.deepEqual(elements(tree, 'CTAButton'), []);
+      assert.doesNotMatch(texts(tree), /환전하기|환전 안내/);
+      const exchange = elements(h.renderWallet().tree, 'Pressable').find(
+        (node) => node.props.testID === 'wallet-exchange',
       );
-      if (actions.length) {
-        h.renderCta(actions[0]).props.onPress();
-        assert.deepEqual(h.navigation.at(-1), ['MainTabs', { screen: 'WalletTab', params: { screen: 'WalletFx', initial: false } }]);
+      assert.equal(exchange.props.disabled, account.status !== 'active');
+      if (!exchange.props.disabled) {
+        exchange.props.onPress();
+        assert.deepEqual(h.navigation.at(-1), ['WalletFx']);
         h.renderFx();
         const wallets = h.fxQueries.find(
           (query) => query.queryKey.includes('wallets'),

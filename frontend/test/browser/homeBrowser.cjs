@@ -59,6 +59,8 @@ async function run() {
         await page.goto(`${base}/?mode=${mode}&fontScale=${fontScale}&long=${long}`);
         await id('home-total-asset').waitFor();
         if (mode === 'season') await id('home-nickname').waitFor();
+        assert.equal(await page.getByText('환전하기', { exact: true }).count(), 0);
+        assert.equal(await page.getByText('환전 안내', { exact: true }).count(), 0);
         await theme.canvas(page, appearance);
         await theme.background(id('home-account-context'), appearance, 'surface');
         await theme.background(id('home-summary-card'), appearance, 'screen');
@@ -103,6 +105,11 @@ async function run() {
             const fg = luminance(css.color), bg = luminance(getComputedStyle(document.documentElement).backgroundColor);
             return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
           });
+          const content = node('home-account-context').parentElement;
+          const sections = [...content.children];
+          const contentStyle = getComputedStyle(content);
+          const contentBox = content.getBoundingClientRect();
+          const lastSection = sections.at(-1).getBoundingClientRect();
           return {
             context: { ...box('home-account-context'),
               minHeight: parseFloat(getComputedStyle(node('home-account-context')).minHeight),
@@ -111,6 +118,12 @@ async function run() {
             trigger: box('trading-account-switcher-trigger'),
             competition: node('home-competition') ? box('home-competition') : null,
             text: node('home-account-context').textContent, clipped, titleTextRight, contrasts,
+            sectionGaps: sections.slice(1).map((el, i) =>
+              el.getBoundingClientRect().top - sections[i].getBoundingClientRect().bottom),
+            gap: parseFloat(contentStyle.rowGap),
+            trailingSpace: contentBox.bottom - lastSection.bottom,
+            paddingBottom: parseFloat(contentStyle.paddingBottom),
+            lastSectionText: sections.at(-1).textContent,
           };
         });
         assert.deepEqual(layout.clipped, [], JSON.stringify({ appearance, width, fontScale, mode, long }));
@@ -132,6 +145,9 @@ async function run() {
         assert.ok(layout.total.fontSize >= 36 * fontScale);
         assert.ok(!/진행 중|참가 중|운영 중|투자 계정/.test(layout.text));
         assert.equal(layout.competition, null);
+        assert.ok(layout.sectionGaps.every((gap) => Math.abs(gap - layout.gap) <= 1), 'Home sections retain only their normal gaps');
+        assert.ok(Math.abs(layout.trailingSpace - layout.paddingBottom) <= 1, 'no empty exchange area remains after the last section');
+        assert.match(layout.lastSectionText, mode === 'general' ? /자금 구성/ : /HOT 🔥/);
         if (layout.competition) assert.ok(layout.competition.y >= layout.total.bottom);
         if (!long && fontScale === 1) {
           // UI8 adds 8px on each vertical edge and 8px between the two rows.
@@ -153,6 +169,8 @@ async function run() {
       await page.emulateMedia({ colorScheme: appearance });
       await page.goto(`${base}/?state=${state}`);
       await id('home-account-context').waitFor();
+      assert.equal(await page.getByText('환전하기', { exact: true }).count(), 0);
+      assert.equal(await page.getByText('환전 안내', { exact: true }).count(), 0);
       await theme.canvas(page, appearance);
       if (state === 'portfolio-error') await page.getByText('계정 정보를 불러오지 못했습니다.', { exact: true }).waitFor();
       else if (state === 'empty-summary') await page.getByText('수익률을 계산할 수 없습니다.', { exact: true }).waitFor();
@@ -164,7 +182,7 @@ async function run() {
         else if (state === 'unranked') assert.equal(await id('home-rank').textContent(), '-');
         else {
           await id('trading-account-capability-notice').waitFor();
-          assert.equal(await page.getByText('환전하기', { exact: true }).count(), 0);
+          assert.match(await id('trading-account-capability-notice').textContent(), /거래 제한/);
           if (state === 'settled') {
             assert.equal(await id('home-tier').textContent(), 'Gold');
             await page.getByText('보상 확인', { exact: true }).click();
@@ -174,6 +192,8 @@ async function run() {
       }
       await switchAccount('general-account');
       assert.equal(await id('home-account-context').textContent(), '일반 투자변경김재민');
+      assert.equal(await page.getByText('환전하기', { exact: true }).count(), 0);
+      assert.equal(await id('trading-account-capability-notice').count(), 0);
       records.push({ appearance, state });
     }
 
@@ -194,11 +214,8 @@ async function run() {
     assert.equal(await id('home-total-asset').textContent(), '12,530,200원');
     assert.equal(await id('home-competition').count(), 0);
     assert.match(await id('home-summary-card').textContent(), /시간가중 수익률 4\.82%/);
-    await page.getByText('환전하기', { exact: true }).click();
-    const calls = await page.evaluate(() => window.fixture.navigation.calls);
-    assert.deepEqual(calls, [
-      ['MainTabs', { screen: 'WalletTab', params: { screen: 'WalletFx', initial: false } }],
-    ]);
+    assert.equal(await page.getByText('환전하기', { exact: true }).count(), 0);
+    assert.deepEqual(await page.evaluate(() => window.fixture.navigation.calls), []);
     await page.evaluate(() => window.fixture.appearance.setPreference('light'));
     await page.waitForFunction(() => document.documentElement.style.colorScheme === 'light');
     await theme.canvas(page, 'light');
@@ -219,6 +236,7 @@ async function run() {
     await switchAccount('season-account');
     assert.equal(await id('home-total-asset').textContent(), '9,648,192원');
     assert.equal(await id('home-nickname').textContent(), '김재민');
+    assert.equal(await page.getByText('환전하기', { exact: true }).count(), 0);
     const seasonHeroText = await id('home-summary-card').textContent();
     assert.match(seasonHeroText, /시즌 수익률 -3\.52%/);
     assert.doesNotMatch(seasonHeroText, /\(초기자본 대비\)/);
