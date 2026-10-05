@@ -75,14 +75,14 @@ export function OrderTradingScreen({
     queryKey: QUERY_KEYS.asset.detail(assetId),
     queryFn: () => getAssetDetail(assetId),
   });
-  const { latestTicker, connectionState, showReconnectBanner, isStale } =
+  const { latestTicker, connectionState, showReconnectBanner, isStale, runtime: tickerRuntime } =
     useAssetTicker({
       assetId,
       wsUrl: wsUrl ?? '',
       enabled: isFocused && !!wsUrl,
     });
   const liveOrderBookEnabled = supportsLiveOrderBook(detailQuery.data?.asset);
-  const { latestOrderBook, statusMessage } = useAssetOrderBook({
+  const { latestOrderBook, statusMessage, runtime: orderBookRuntime } = useAssetOrderBook({
     assetId,
     wsUrl: wsUrl ?? '',
     enabled: liveOrderBookEnabled && isFocused,
@@ -148,10 +148,10 @@ export function OrderTradingScreen({
             displayPrice.basis === 'snapshot'
               ? {
                   assetId,
+                  ...tickerRuntime,
                   connectionState,
                   tickerPriceAvailable: ticker?.priceLocal != null,
                   tickerReason: ticker?.reason,
-                  tickerMessage: ticker?.message,
                   priceKrwState: displayPrice.priceKrwState,
                   priceKrwReason: displayPrice.priceKrwReason,
                   priceCapturedAt: displayPrice.priceCapturedAt,
@@ -272,12 +272,7 @@ export function OrderTradingScreen({
           ) : null}
           {isAdmin && showReconnectBanner ? (
             <AdminDiagnosticPanel
-              runtime={{
-                assetId,
-                connectionState,
-                reconnecting: showReconnectBanner,
-                tickerCapturedAt: ticker?.priceCapturedAt,
-              }}
+              runtime={tickerRuntime}
             />
           ) : null}
           {isAdmin && isStale ? (
@@ -287,12 +282,7 @@ export function OrderTradingScreen({
           ) : null}
           {isAdmin && isStale ? (
             <AdminDiagnosticPanel
-              runtime={{
-                assetId,
-                connectionState,
-                tickerStale: isStale,
-                tickerCapturedAt: ticker?.priceCapturedAt,
-              }}
+              runtime={tickerRuntime}
             />
           ) : null}
           <View style={[styles.tradingRow, compact && styles.compactTradingRow]} testID="asset-trading-columns">
@@ -319,15 +309,16 @@ export function OrderTradingScreen({
             </View>
             <View style={styles.priceColumn} testID="asset-price-column">
               {liveOrderBookEnabled ? (
-                <AssetOrderLadder
-                  book={
-                    latestOrderBook?.assetId === assetId
-                      ? latestOrderBook
-                      : null
-                  }
-                  statusMessage={statusMessage}
-                  currentPrice={currentPrice}
-                />
+                <>
+                  <AssetOrderLadder
+                    book={latestOrderBook?.assetId === assetId ? latestOrderBook : null}
+                    statusMessage={statusMessage}
+                    currentPrice={currentPrice}
+                  />
+                  {isAdmin && statusMessage ? (
+                    <AdminDiagnosticPanel runtime={orderBookRuntime} />
+                  ) : null}
+                </>
               ) : (
                 <View style={styles.stockPrice}>{currentPrice}</View>
               )}

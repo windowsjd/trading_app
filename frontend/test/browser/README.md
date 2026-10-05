@@ -231,3 +231,22 @@ The 48 cases cover 320/360/390/430px × font scale 1/1.5 × quantity, amount, lo
 numeric intent, legacy full fill, limit submitted, and history. It asserts
 horizontal text bounds, visible/clickable CTA, authoritative partial labels,
 and automatic-cancel copy. Artifacts default to `/tmp/b21-market-browser`.
+
+Runtime diagnostics use the actual shared socket manager, channel hooks, screens
+and `/me` cache with local REST/auth and WebSocket fixtures:
+
+```sh
+NODE_PATH=/path/to/browser-tools/node_modules node test/browser/realtimeBrowser.cjs
+```
+
+`REALTIME_BROWSER_OUTPUT` defaults to `/tmp/trading-realtime-browser`. The 72 cases
+cover Market, Chart, Order and FX; admin/user/operator/unresolved/failed role
+lookups; Light/Dark, 320/390/768px and font scales 1/2. Text range measurements
+check expanded diagnostic glyph bounds, and frame assertions reject duplicate
+subscriptions or extra sockets. Four clock-driven flows also cover OrderBook
+ACK/timeout/recovery/stale, candle server control and delayed receipt freshness,
+FX ACK/update REST resync, and a different market row’s subscription error.
+External requests are blocked. Optional
+`LD_LIBRARY_PATH`/`FONTCONFIG_FILE` supply local Chromium libraries/Korean fonts.
+iOS/Android component tests cover the role gate, unrestricted line wrapping and
+font scaling; physical-device text measurement is a separate check.

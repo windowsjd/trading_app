@@ -8,7 +8,7 @@ import { applyTicker, toAssetTickerAcceptState } from '../../features/asset/asse
 const { inlineTradingHarness, deferred } = createRequire(import.meta.url)(
   '../../../test/inlineTradingHarness.cjs',
 );
-const visibleText = (h: any) => JSON.stringify(h.renderer.toJSON());
+const visibleText = (h: any) => JSON.stringify(h.renderer.toJSON()).replace(/\u200b/g, '');
 const diagnostic: AdminDiagnosticDto = {
   version: 1,
   code: 'ASSET_PRICE_UNAVAILABLE',

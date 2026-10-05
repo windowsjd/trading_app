@@ -73,6 +73,14 @@ The existing authenticated `/api/v1/ws` supports:
 
 Intervals are `5m`, `15m`, `30m`, `1h`, and `4h`. Messages contain a full current candle snapshot plus revision, global sequence, provisional/complete/final, delayed, and source update time. Controls are `subscribed`, `unsubscribed`, `subscription_error`, `candle_stale`, and `resync_required`. Authentication, active-asset validation, an idempotent socket subscription map, a per-client limit, disconnect cleanup, room filtering, global-sequence dedupe, and latest-snapshot-only backpressure are enforced. `asset_ticker` remains an independent channel: the sole provider owner sends validated prices over a separate Redis topic so every gateway retains the old ticker fanout without opening duplicate provider sockets. KIS US ticker events are marked `delayed=true` and never `realtime=true`.
 
+Candle controls may include an optional safe `code`: `CANDLE_OVERLAY_READ_FAILED`
+when the existing initial overlay read throws, `CANDLE_PUBSUB_UNAVAILABLE` when
+the gateway observes unavailable Pub/Sub, and `CANDLE_PUBSUB_RECOVERED` on the
+existing unavailable → connected resync. Types, routing and frame counts remain
+unchanged. Clients must accept controls without a code and ignore unknown codes.
+These constants describe gateway observations, not inferred provider failures;
+no exception text or extra diagnostic I/O is included.
+
 `AssetDetailScreen` loads HTTP first. It replaces an equal open time, appends a newer open time, sorts ascending, and trims to the query limit. Interval change tears down the old subscription and triggers a separate HTTP query. Reconnect and `resync_required` refetch HTTP before continuing. A prolonged outage shows the stale banner and does not manufacture price animation. `1d`/`1w` stay HTTP-only. KIS US delayed snapshots display an explicit delayed-feed banner.
 
 ## REST reconciliation and scheduler

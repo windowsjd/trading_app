@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { getRealtimeSocketManager } from '../../services/ws/sharedRealtimeSocket';
 import type { RealtimeSubscriptionEvent } from '../../services/ws/realtimeSocketManager';
+import { realtimeRuntimeFacts, runtimeTime, safeRuntimeCode, type RealtimeRuntimeSnapshot } from '../../services/ws/runtimeDiagnostics';
 import type { AssetOrderBook } from './orderBook';
-import { isOrderBookStale, ORDER_BOOK_FIRST_SNAPSHOT_TIMEOUT_MS, parseAssetOrderBook } from './assetOrderBookPolicy';
+import { isOrderBookStale, ORDER_BOOK_STALE_MS, ORDER_BOOK_FIRST_SNAPSHOT_TIMEOUT_MS, parseAssetOrderBook } from './assetOrderBookPolicy';
 import { useStaleRecheck } from './useStaleRecheck';
 
 type ConnectionState = 'connecting' | 'subscribing' | 'subscribed' | 'reconnecting' |
@@ -15,10 +16,16 @@ type BookState = {
   subscribedAt: number | null;
   connectionState: ConnectionState;
   errorCode: string | null;
+  realtime: RealtimeRuntimeSnapshot | null;
+  lastAckAt: number | null;
+  firstSnapshotReceivedAt: number | null;
+  lastSnapshotReceivedAt: number | null;
+  lastRejectionReason: string | null;
 };
 
 function initial(assetId: string, wsUrl: string): BookState {
-  return { assetId, wsUrl, book: null, receivedAt: null, subscribedAt: null, connectionState: 'connecting', errorCode: null };
+  return { assetId, wsUrl, book: null, receivedAt: null, subscribedAt: null, connectionState: 'connecting', errorCode: null, realtime: null, lastAckAt: null,
+    firstSnapshotReceivedAt: null, lastSnapshotReceivedAt: null, lastRejectionReason: null };
 }
 
 /** Reference-counted market display subscription; no query/financial cache. */
@@ -35,6 +42,10 @@ export function useAssetOrderBook({ assetId, wsUrl, enabled = true }: {
     let mounted = true;
     const onEvent = (event: RealtimeSubscriptionEvent) => {
       if (!mounted) return;
+      if (event.kind === 'runtime') {
+        setState((current) => ({ ...current, realtime: event.runtime }));
+        return;
+      }
       if (event.kind === 'status') {
         const connectionState: ConnectionState = event.status === 'connected' ? 'subscribing' :
           event.status === 'idle' ? 'disconnected' : event.status;
@@ -43,18 +54,24 @@ export function useAssetOrderBook({ assetId, wsUrl, enabled = true }: {
       }
       if (event.kind === 'restored') return;
       const payload = event.payload;
+      const receivedAt = Date.now();
+      const matchingSnapshot = payload.type === 'asset_order_book' && payload.assetId === assetId;
       const book = parseAssetOrderBook(payload, assetId);
+      if (matchingSnapshot && !book) {
+        setState((current) => ({ ...current, lastSnapshotReceivedAt: receivedAt, lastRejectionReason: 'invalid_snapshot' }));
+      }
       if (book) {
-        const receivedAt = Date.now();
         setNow(receivedAt);
         setState((current) => current.book && Date.parse(current.book.capturedAt) > Date.parse(book.capturedAt)
-          ? current : { assetId, wsUrl, book, receivedAt, subscribedAt: null, connectionState: 'subscribed', errorCode: null });
+          ? { ...current, lastSnapshotReceivedAt: receivedAt, lastRejectionReason: 'older_snapshot' }
+          : { ...current, assetId, wsUrl, book, receivedAt, subscribedAt: null, connectionState: 'subscribed', errorCode: null,
+            lastSnapshotReceivedAt: receivedAt, firstSnapshotReceivedAt: current.firstSnapshotReceivedAt ?? receivedAt });
         return;
       }
       if (payload.channel !== 'asset_order_book' || payload.assetId !== assetId) return;
       if (payload.type === 'subscribed') {
         const acknowledgedAt = Date.now();
-        setState((current) => ({ ...current, connectionState: 'subscribed', errorCode: null,
+        setState((current) => ({ ...current, connectionState: 'subscribed', errorCode: null, lastAckAt: acknowledgedAt,
           // A repeated ACK must not extend the first-snapshot wait.
           subscribedAt: current.book ? null : current.subscribedAt ?? acknowledgedAt }));
       } else if (payload.type === 'subscription_error' || payload.type === 'error') {
@@ -81,5 +98,23 @@ export function useAssetOrderBook({ assetId, wsUrl, enabled = true }: {
     isStale ? '호가 정보가 지연되고 있습니다.' :
     !current.book ? '호가 정보를 불러오는 중입니다.' : null;
 
-  return { latestOrderBook: current.book, connectionState, isStale, isUnavailable, errorCode: current.errorCode, statusMessage };
+  const unavailableReason = connectionState === 'auth_failed' ? 'auth_failed' :
+    connectionState === 'subscription_error' ? 'subscription_error' :
+    connectionState === 'reconnecting' || connectionState === 'disconnected' ? `socket_${connectionState}` :
+    isUnavailable ? 'first_snapshot_timeout' : !current.book ?
+      current.subscribedAt !== null ? 'awaiting_first_snapshot' : 'awaiting_subscription_ack' : null;
+  return { latestOrderBook: current.book, connectionState, isStale, isUnavailable, errorCode: current.errorCode, statusMessage,
+    runtime: {
+      ...realtimeRuntimeFacts(current.realtime), assetId, channel: 'asset_order_book', connectionState,
+      lastAckReceivedAt: runtimeTime(current.lastAckAt), subscribedAt: runtimeTime(current.subscribedAt),
+      firstSnapshotReceivedAt: runtimeTime(current.firstSnapshotReceivedAt),
+      lastSnapshotReceivedAt: runtimeTime(current.lastSnapshotReceivedAt),
+      lastSnapshotAcceptedAt: runtimeTime(current.receivedAt), lastBookCapturedAt: current.book?.capturedAt,
+      lastRejectionReason: current.lastRejectionReason,
+      subscriptionErrorCode: current.realtime?.subscription.lastSubscriptionErrorCode ??
+        (current.errorCode ? safeRuntimeCode(current.errorCode) ?? 'not_observed' : null), firstSnapshotTimeoutMs: ORDER_BOOK_FIRST_SNAPSHOT_TIMEOUT_MS,
+      firstSnapshotTimedOut: isUnavailable, staleThresholdMs: ORDER_BOOK_STALE_MS,
+      freshnessBasis: 'client_receipt', isStale, staleReason: isStale ? 'freshness_timeout' : null, unavailableReason,
+    },
+  };
 }

@@ -263,3 +263,39 @@ describe('useAssetOrderBook shared subscription and states', () => {
     h.unmount();
   });
 });
+
+describe('order book runtime distinguishes ACK and data receipt', () => {
+  it('separates awaiting ACK, ACK-only timeout, accepted receipt, rejected receipt and stale', t => {
+    t.mock.timers.enable({ apis: ['Date', 'setInterval'], now: 10000 });
+    const h = setup(); h.emit({ kind: 'status', status: 'connected' });
+    assert.equal(h.result().runtime.unavailableReason, 'awaiting_subscription_ack');
+    assert.equal(h.result().runtime.firstSnapshotTimedOut, false);
+    h.emit(acknowledged());
+    assert.equal(h.result().runtime.lastAckReceivedAt, new Date(10000).toISOString());
+    assert.equal(h.result().runtime.unavailableReason, 'awaiting_first_snapshot');
+    act(() => t.mock.timers.tick(10000));
+    assert.equal(h.result().runtime.unavailableReason, 'first_snapshot_timeout');
+    assert.equal(h.result().runtime.firstSnapshotReceivedAt, null);
+    h.emit(message());
+    const first = h.result().runtime.firstSnapshotReceivedAt;
+    assert.equal(first, new Date(20000).toISOString());
+    act(() => t.mock.timers.tick(5250));
+    assert.equal(h.result().runtime.staleReason, 'freshness_timeout');
+    h.emit(message('btc', 'BTC', new Date(10000).toISOString()));
+    assert.equal(h.result().runtime.lastSnapshotAcceptedAt, first);
+    assert.notEqual(h.result().runtime.lastSnapshotReceivedAt, first);
+    assert.equal(h.result().runtime.lastRejectionReason, 'older_snapshot');
+    h.emit({ kind: 'status', status: 'disconnected' });
+    assert.equal(h.result().runtime.unavailableReason, 'socket_disconnected');
+    h.emit({ kind: 'status', status: 'reconnecting' });
+    assert.equal(h.result().runtime.unavailableReason, 'socket_reconnecting');
+    h.emit({ kind: 'status', status: 'auth_failed' });
+    assert.equal(h.result().runtime.unavailableReason, 'auth_failed');
+    h.emit({ kind: 'message', payload: { type: 'subscription_error', channel: 'asset_order_book', assetId: 'btc', code: 'ORDER_BOOK_UNAVAILABLE' } });
+    assert.equal(h.result().runtime.subscriptionErrorCode, 'ORDER_BOOK_UNAVAILABLE');
+    h.update({ assetId: 'eth' });
+    assert.equal(h.result().runtime.firstSnapshotReceivedAt, null);
+    assert.equal(h.result().runtime.lastSnapshotAcceptedAt, null);
+    h.unmount();
+  });
+});

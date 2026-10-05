@@ -9,7 +9,7 @@ const { inlineTradingHarness } = createRequire(import.meta.url)(
 const text = (node: any): string =>
   typeof node === 'string' ? node : (node?.children ?? []).map(text).join('');
 const panel = (h: any) => h.node(TEST_IDS.order.screen);
-const panelText = (h: any) => text(panel(h));
+const panelText = (h: any) => text(panel(h)).replace(/\u200b/g, '');
 
 function stockHarness(type: 'domestic_stock' | 'us_stock' = 'domestic_stock') {
   const h = inlineTradingHarness();
@@ -33,9 +33,9 @@ describe('order screen warning meaning', () => {
     assert.doesNotMatch(panelText(h), /현재 화면 시세가 없어|현재가가 없어/);
     assert.ok(h.node('admin-diagnostic-toggle'));
     await h.press('admin-diagnostic-toggle');
-    assert.match(panelText(h), /"displayedPriceBasis": "rest"/);
-    assert.match(panelText(h), /"displayedPriceAvailable": true/);
-    assert.match(panelText(h), /"previewPriceAvailable": false/);
+    assert.match(panelText(h), /displayedPriceBasisrest/);
+    assert.match(panelText(h), /displayedPriceAvailabletrue/);
+    assert.match(panelText(h), /previewPriceAvailablefalse/);
     assert.doesNotMatch(panelText(h), /Backend Exception|Request ID/);
     await h.press(TEST_IDS.order.executeSubmit); await h.flush();
     assert.equal(h.requests[0].url.endsWith('/quote'), true);

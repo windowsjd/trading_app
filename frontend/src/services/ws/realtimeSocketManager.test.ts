@@ -370,3 +370,127 @@ describe("RealtimeSocketManager", () => {
     );
   });
 });
+
+// Diagnostic updates are memory notifications, never additional WS frames.
+describe('shared runtime evidence', () => {
+  const spec = { channel: 'asset_ticker', assetId: 'a1' } as const;
+  it('records connect, close, backoff, restore/re-ACK and last-subscriber teardown', async (t) => {
+    t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 10000 });
+    FakeSocket.instances = [];
+    const manager = new RealtimeSocketManager('wss://app/api/v1/ws', {
+      createSocket: url => new FakeSocket(url), getToken: async () => 'secret-token', reconnectDelaysMs: [1000, 2000],
+    });
+    const observed = collect();
+    const off = manager.subscribe(spec, observed.listener);
+    assert.equal(manager.getRuntimeSnapshot().lastTransitionReason, 'initial_connect');
+    assert.equal(manager.getStatus(), 'connecting');
+    await Promise.resolve();
+    const first = FakeSocket.instances[0]; first.open();
+    assert.equal(manager.getRuntimeSnapshot().lastConnectedAt, 10000);
+    assert.equal(manager.getSubscriptionRuntime(spec)?.subscription.subscriptionSent, true);
+    assert.equal(manager.getSubscriptionRuntime(spec)?.subscription.subscriptionAcked, false);
+    first.receive({ type: 'subscribed', ...spec });
+    const ack = manager.getSubscriptionRuntime(spec)!;
+    assert.equal(ack.subscription.acknowledgedAt, 10000);
+    t.mock.timers.tick(100);
+    const late = collect(); const offLate = manager.subscribe(spec, late.listener);
+    assert.equal(manager.getSubscriptionRuntime(spec)?.subscription.acknowledgedAt, 10000, 'replay is not a new ACK');
+    assert.equal(first.sent.length, 1);
+    first.drop(1006);
+    const disconnected = manager.getRuntimeSnapshot();
+    assert.equal(disconnected.currentStatus, 'disconnected');
+    assert.equal(disconnected.lastTransitionReason, 'socket_closed');
+    assert.equal(disconnected.lastCloseCode, 1006);
+    assert.equal(disconnected.lastDisconnectedAt, 10100);
+    assert.equal(disconnected.reconnectAttempt, 1);
+    assert.equal(disconnected.nextReconnectDelayMs, 1000);
+    assert.equal(manager.getSubscriptionRuntime(spec)?.subscription.subscriptionAcked, false);
+    assert.equal(manager.getSubscriptionRuntime(spec)?.subscription.acknowledgedAt, 10000, 'last good ACK retained');
+    t.mock.timers.tick(1000); await Promise.resolve();
+    assert.equal(manager.getRuntimeSnapshot().lastTransitionReason, 'reconnect_started');
+    const second = FakeSocket.instances[1]; second.open();
+    assert.equal(second.sent.length, 1);
+    assert.equal(manager.getSubscriptionRuntime(spec)?.subscription.lastRestoredAt, 11100);
+    assert.equal(manager.getRuntimeSnapshot().reconnectAttempt, 0);
+    second.receive({ type: 'subscribed', ...spec });
+    assert.equal(manager.getSubscriptionRuntime(spec)?.subscription.acknowledgedAt, 11100);
+    assert.ok(observed.events.some(e => e.kind === 'restored'));
+    off(); assert.equal(second.sent.length, 1);
+    offLate(); assert.equal(second.sent.length, 2);
+    assert.equal(manager.getStatus(), 'idle');
+    assert.equal(manager.getRuntimeSnapshot().lastTransitionReason, 'no_subscribers_teardown');
+    assert.equal(manager.getRuntimeSnapshot().activeSubscriptionCount, 0);
+    assert.equal(manager.getSubscriptionRuntime(spec), null);
+    assert.doesNotMatch(JSON.stringify(observed.events.filter(e => e.kind === 'runtime')), /secret-token|wss:|token=/);
+  });
+
+  for (const source of ['close', 'auth_failed', 'UNAUTHORIZED']) {
+    it(`records ${source} auth failure and stops reconnect`, async (t) => {
+      t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 10000 });
+      const manager = createManager(); const off = manager.subscribe(spec, () => {});
+      await Promise.resolve(); const socket = FakeSocket.instances[0]; socket.open();
+      if (source === 'close') socket.drop(1008);
+      else socket.receive({ type: source === 'UNAUTHORIZED' ? 'error' : source, code: source, message: 'secret raw reason' });
+      const runtime = manager.getRuntimeSnapshot();
+      assert.equal(runtime.currentStatus, 'auth_failed');
+      assert.equal(runtime.lastTransitionReason, source === 'close' ? 'auth_failed_close' : 'auth_failed_control');
+      assert.equal(runtime.authFailureSource, source === 'close' ? 'close_1008' : source === 'UNAUTHORIZED' ? 'unauthorized_control' : 'auth_failed_control');
+      assert.equal(runtime.nextReconnectDelayMs, null);
+      t.mock.timers.tick(30000); await Promise.resolve();
+      assert.equal(FakeSocket.instances.length, 1);
+      assert.doesNotMatch(JSON.stringify(runtime), /secret raw/);
+      off();
+    });
+  }
+
+  it('preserves token-loader fallback and socket-create retry with safe reasons', async (t) => {
+    t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 10000 });
+    const runtimes: unknown[] = []; let creates = 0;
+    const manager = new RealtimeSocketManager('wss://app/api/v1/ws', {
+      getToken: async () => { throw new Error('private credential'); },
+      createSocket: url => { creates++; if (creates === 1) throw new Error('private URL'); return new FakeSocket(url); },
+      reconnectDelaysMs: [1000, 2000],
+    });
+    const off = manager.subscribe(spec, event => { if (event.kind === 'runtime') runtimes.push(event.runtime); });
+    await Promise.resolve();
+    assert.equal(manager.getRuntimeSnapshot().lastTransitionReason, 'socket_create_failed');
+    assert.equal(manager.getRuntimeSnapshot().lastTokenLoadFailedAt, 10000);
+    assert.equal(manager.getRuntimeSnapshot().reconnectAttempt, 1);
+    assert.ok(JSON.stringify(runtimes).includes('token_load_failed'));
+    assert.doesNotMatch(JSON.stringify(runtimes), /private credential|private URL|wss:/);
+    t.mock.timers.tick(1000); await Promise.resolve();
+    assert.equal(creates, 2);
+    off();
+  });
+
+  it('records scoped/unknown subscription errors without secrets or new frames, and isolates throwing listeners', async () => {
+    const manager = createManager();
+    const badOff = manager.subscribe(spec, () => { throw new Error('bad listener'); });
+    const good = collect(); const off = manager.subscribe(spec, good.listener);
+    await Promise.resolve(); const socket = FakeSocket.instances[0]; socket.open();
+    socket.receive({ type: 'subscription_error', ...spec, code: 'SUBSCRIPTION_LIMIT', message: 'private error' });
+    assert.equal(manager.getSubscriptionRuntime(spec)?.subscription.lastSubscriptionErrorCode, 'SUBSCRIPTION_LIMIT');
+    assert.equal(manager.getSubscriptionRuntime(spec)?.subscription.lastSubscriptionErrorScope, 'subscription');
+    socket.receive({ type: 'error', code: 'SECRET_CREDENTIAL' });
+    assert.equal(manager.getSubscriptionRuntime(spec)?.subscription.lastSubscriptionErrorCode, 'not_observed');
+    assert.equal(manager.getSubscriptionRuntime(spec)?.subscription.lastSubscriptionErrorScope, 'unscoped_control');
+    assert.ok(good.events.some(e => e.kind === 'message'));
+    assert.equal(socket.sent.length, 1);
+    const copy = manager.getSubscriptionRuntime(spec)!; copy.subscription.subscriptionSent = false;
+    assert.equal(manager.getSubscriptionRuntime(spec)?.subscription.subscriptionSent, true);
+    badOff(); off();
+  });
+
+  it('keeps manual fresh-token restoration and records its cause before opening', async () => {
+    const manager = createManager(); const events = collect(); const off = manager.subscribe(spec, events.listener);
+    await Promise.resolve(); const first = FakeSocket.instances[0]; first.open();
+    manager.reconnectWithFreshToken();
+    assert.equal(manager.getRuntimeSnapshot().lastTransitionReason, 'manual_token_refresh');
+    assert.ok(manager.getRuntimeSnapshot().lastDisconnectedAt);
+    await Promise.resolve(); const second = FakeSocket.instances[1]; second.open();
+    assert.equal(second.sent.length, 1);
+    assert.ok(events.events.some(e => e.kind === 'restored'));
+    assert.equal(first.closed.length, 1);
+    off();
+  });
+});

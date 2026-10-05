@@ -37,6 +37,7 @@ export interface AssetTickerMessage {
   freshnessAgeSeconds?: number | null;
   priceSource?: { sourceType?: string; sourceName?: string } | null;
   reason?: string;
+  snapshotReason?: string;
   message?: string;
 }
 
@@ -121,10 +122,18 @@ export function isTickerStaleAt(
  *    (it cannot be ordered), while an unavailable event still gets through so
  *    the screen learns the price went away.
  */
-export function shouldAcceptTicker(
+export type TickerRejectionReason =
+  | 'older_market_assessment'
+  | 'closed_market_without_assessment'
+  | 'unchanged_closed_snapshot'
+  | 'duplicate_snapshot'
+  | 'unorderable_priced_event'
+  | 'older_event';
+
+export function tickerRejectionReason(
   current: AssetTickerAcceptState | null | undefined,
   next: AssetTickerMessage,
-): boolean {
+): TickerRejectionReason | null {
   const nextAssessment = parseTickerTimestamp(next.marketEvaluatedAt);
   const currentAssessment = parseTickerTimestamp(
     current?.ticker.marketEvaluatedAt,
@@ -134,39 +143,51 @@ export function shouldAcceptTicker(
     currentAssessment !== null &&
     nextAssessment < currentAssessment
   )
-    return false;
+    return 'older_market_assessment';
   // A server session transition replaces even a newer cached live price.
   if (
     nextAssessment !== null &&
     next.marketStatus !== current?.ticker.marketStatus
   )
-    return true;
+    return null;
   if (isClosedMarketSnapshot(current?.ticker) && !next.marketStatus)
-    return false;
+    return 'closed_market_without_assessment';
   if (isClosedMarketSnapshot(next)) {
-    return (
-      next.assetPriceSnapshotId !== current?.snapshotId ||
+    return next.assetPriceSnapshotId !== current?.snapshotId ||
       next.priceLocal !== current?.ticker.priceLocal ||
       next.changeRate !== current?.ticker.changeRate
-    );
+      ? null
+      : 'unchanged_closed_snapshot';
   }
   const snapshotId = next.assetPriceSnapshotId ?? null;
   if (
-    snapshotId && current && snapshotId === current.snapshotId &&
+    snapshotId &&
+    current &&
+    snapshotId === current.snapshotId &&
     next.changeRate === current.ticker.changeRate
-  ) return false;
+  )
+    return 'duplicate_snapshot';
 
   const nextTimestamp = getTickerTimestamp(next);
   if (nextTimestamp === null) {
-    return !current || isUnavailableTicker(next);
+    return !current || isUnavailableTicker(next)
+      ? null
+      : 'unorderable_priced_event';
   }
 
   const currentTimestamp = current?.timestamp ?? null;
   if (currentTimestamp !== null && nextTimestamp < currentTimestamp) {
-    return false;
+    return 'older_event';
   }
 
-  return true;
+  return null;
+}
+
+export function shouldAcceptTicker(
+  current: AssetTickerAcceptState | null | undefined,
+  next: AssetTickerMessage,
+): boolean {
+  return tickerRejectionReason(current, next) === null;
 }
 
 export function isClosedMarketSnapshot(
@@ -248,6 +269,17 @@ export function applyTicker(
   current: AssetTickerAcceptState | null,
   next: AssetTickerMessage,
 ): AssetTickerAcceptState | null {
-  if (!shouldAcceptTicker(current, next)) return current;
-  return toAssetTickerAcceptState(next);
+  return applyTickerWithEvidence(current, next).state;
+}
+
+/** The acceptance decision and its evidence come from the same evaluation. */
+export function applyTickerWithEvidence(
+  current: AssetTickerAcceptState | null,
+  next: AssetTickerMessage,
+) {
+  const rejectionReason = tickerRejectionReason(current, next);
+  return {
+    state: rejectionReason === null ? toAssetTickerAcceptState(next) : current,
+    rejectionReason,
+  };
 }

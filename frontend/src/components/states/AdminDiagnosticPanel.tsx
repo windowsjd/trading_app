@@ -9,12 +9,13 @@ import { getMe } from '../../features/me/api';
 import { shouldShowAdminDiagnostic } from '../../features/auth/adminDiagnostics';
 import type { AdminDiagnosticDto } from '../../models/dto/common';
 import { getApiErrorDiagnostic } from '../../services/api/errorMapper';
+import type { RuntimeFacts } from '../../services/ws/runtimeDiagnostics';
 
 type Props = {
   diagnostic?: AdminDiagnosticDto | null;
   error?: unknown;
   /** Observed client state only; never represents a backend failure. */
-  runtime?: Record<string, string | number | boolean | null | undefined> | null;
+  runtime?: RuntimeFacts | null;
 };
 
 export default function AdminDiagnosticPanel({
@@ -155,7 +156,12 @@ export default function AdminDiagnosticPanel({
             </>
           ) : (
             <Section title="Client runtime 상태">
-              <CodeText>{JSON.stringify(runtimeFacts, null, 2)}</CodeText>
+              {Object.entries(runtimeFacts ?? {}).map(([label, value]) => (
+                <View key={label} style={styles.section}>
+                  <Text accessibilityLabel={label} style={styles.runtimeLabel}>{wrapRuntimeText(label)}</Text>
+                  <CodeText accessibilityLabel={String(value)}>{wrapRuntimeText(String(value))}</CodeText>
+                </View>
+              ))}
             </Section>
           )}
         </View>
@@ -187,9 +193,9 @@ function Line({ label, value }: { label: string; value: string }) {
   );
 }
 
-function CodeText({ children }: React.PropsWithChildren) {
+function CodeText({ children, accessibilityLabel }: React.PropsWithChildren<{ accessibilityLabel?: string }>) {
   return (
-    <Text selectable style={styles.code}>
+    <Text selectable accessibilityLabel={accessibilityLabel} style={styles.code}>
       {children}
     </Text>
   );
@@ -204,6 +210,12 @@ function formatJson(value: unknown): string | null {
   } catch {
     return '[표시할 수 없는 진단 값]';
   }
+}
+
+// Native and Web both need break opportunities for protocol identifiers and
+// ISO times at large font scales. Evidence values remain unchanged in memory.
+function wrapRuntimeText(value: string): string {
+  return value.replace(/(.{6})/gu, '$1\u200b');
 }
 
 const styles = StyleSheet.create({
@@ -227,6 +239,7 @@ const styles = StyleSheet.create({
   },
   section: { gap: 6, minWidth: 0 },
   sectionTitle: { color: semantic.warning, fontWeight: '700', fontSize: 13 },
+  runtimeLabel: { minWidth: 0, flexShrink: 1, color: semantic.warning, fontSize: 12 },
   line: {
     flexDirection: 'row',
     flexWrap: 'wrap',

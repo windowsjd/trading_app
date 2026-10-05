@@ -197,6 +197,7 @@ describe('FX rate notifications', () => {
     let initialAborted = false;
     let latest: string | undefined;
     let deadline: string | undefined;
+    let runtime: any;
     function Screen() {
       const query = useQuery({
         queryKey: key,
@@ -212,7 +213,7 @@ describe('FX rate notifications', () => {
         },
       });
       latest = query.data;
-      hook(key, deadline);
+      runtime = hook(key, deadline);
       return null;
     }
     let renderer: any;
@@ -233,12 +234,17 @@ describe('FX rate notifications', () => {
       });
       assert.equal(initialAborted, true);
       assert.equal(latest, '1400');
+      assert.equal(runtime.lastResyncTrigger, 'subscription_ack');
+      assert.ok(runtime.lastResyncCompletedAt);
+      assert.equal(runtime.fallbackIntervalMs, 300000);
       const afterAck = reads;
       await act(async () => {
         foreground('active');
         await flush();
       });
       assert.equal(reads, afterAck + 1);
+      assert.equal(runtime.lastResyncTrigger, 'foreground');
+      assert.ok(runtime.lastForegroundResyncCompletedAt);
       deadline = new Date(Date.now() + 50).toISOString();
       await act(async () => {
         renderer.update(
@@ -257,10 +263,51 @@ describe('FX rate notifications', () => {
         await new Promise((r) => setTimeout(r, 1050));
       });
       assert.equal(reads, afterAck + 2);
+      assert.equal(runtime.lastResyncTrigger, 'valid_until');
+      assert.ok(runtime.lastValidityResyncCompletedAt);
     } finally {
       await act(async () => renderer?.unmount());
       client.clear();
     }
     assert.equal(foregroundRemoved, true);
+  });
+});
+
+describe('FX runtime observations stay separate from canonical REST values', () => {
+  it('records ACK/update, coalesced resync, disconnect/auth/error, and ignores payload rates', async () => {
+    let receive: (event: RealtimeSubscriptionEvent) => void = () => {};
+    let last: Record<string, unknown> = {};
+    let finish: () => void = () => {};
+    let reads = 0;
+    const off = subscribeFxRateUpdates({ subscribe: (_, cb) => { receive = cb; return () => {}; } }, async () => {
+      reads++;
+      if (reads === 1) await new Promise<void>(resolve => { finish = resolve; });
+    }, facts => { last = facts; });
+    receive({ kind: 'status', status: 'connected' });
+    receive({ kind: 'message', payload: { type: 'subscribed', channel: 'fx_rate', pair: 'USD/KRW' } });
+    assert.equal(last.socketStatus, 'connected');
+    assert.equal(last.subscriptionAcked, true);
+    assert.equal(last.lastResyncTrigger, 'subscription_ack');
+    assert.equal(last.resyncInFlight, true);
+    assert.ok(last.lastAckAt);
+    for (let i = 0; i < 3; i++) receive({ kind: 'message', payload: {
+      type: 'fx_rate_updated', channel: 'fx_rate', pair: 'USD/KRW', rate: '99999', token: 'private-token',
+    } });
+    assert.equal(reads, 1);
+    assert.equal(last.lastResyncTrigger, 'fx_rate_updated');
+    assert.ok(last.lastFxUpdateReceivedAt);
+    finish(); await flush();
+    assert.equal(reads, 2);
+    assert.equal(last.resyncInFlight, false);
+    assert.equal(last.lastResyncOutcome, 'settled');
+    assert.ok(last.lastResyncCompletedAt);
+    receive({ kind: 'status', status: 'disconnected' });
+    assert.equal(last.socketStatus, 'disconnected');
+    receive({ kind: 'status', status: 'auth_failed' });
+    assert.equal(last.socketStatus, 'auth_failed');
+    receive({ kind: 'message', payload: { type: 'subscription_error', channel: 'fx_rate', pair: 'USD/KRW', code: 'SUBSCRIPTION_LIMIT' } });
+    assert.equal(last.lastSubscriptionErrorCode, 'SUBSCRIPTION_LIMIT');
+    assert.doesNotMatch(JSON.stringify(last), /99999|private-token/);
+    off();
   });
 });

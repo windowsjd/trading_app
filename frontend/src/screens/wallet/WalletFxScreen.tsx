@@ -224,7 +224,7 @@ export default function WalletFxScreen({ navigation }: Props) {
         FX_RATE_PARAMS.refresh,
       ),
   });
-  useFxRateUpdates(FX_RATE_QUERY_KEY, rateQuery.data?.validUntil);
+  const fxRuntime = useFxRateUpdates(FX_RATE_QUERY_KEY, rateQuery.data?.validUntil);
   const availableRate = !rateQuery.isError && isPreviewFxAvailable(rateQuery.data, Date.now())
     ? rateQuery.data : null;
 
@@ -533,15 +533,22 @@ export default function WalletFxScreen({ navigation }: Props) {
                 />
                 <AdminDiagnosticPanel
                   error={rateQuery.error}
-                  runtime={!rateQuery.isError && rateQuery.data?.state === 'available' ? {
-                    rateState: rateQuery.data.state,
-                    capturedAt: rateQuery.data.capturedAt,
-                    validUntil: rateQuery.data.validUntil,
+                  runtime={{
+                    ...fxRuntime,
+                    rateState: rateQuery.data?.state,
+                    capturedAt: rateQuery.data?.capturedAt,
+                    validUntil: rateQuery.data?.validUntil,
                     previewRateAvailable: false,
-                  } : null}
+                    fallbackIntervalMs: FX_RATE_FALLBACK_INTERVAL_MS,
+                    lastRestDataUpdatedAt: rateQuery.dataUpdatedAt,
+                  }}
                 />
               </>
             )}
+            {availableRate && (fxRuntime?.socketStatus === 'disconnected' || fxRuntime?.socketStatus === 'reconnecting' ||
+              fxRuntime?.socketStatus === 'auth_failed' || fxRuntime?.subscriptionError === true) ? (
+              <AdminDiagnosticPanel runtime={fxRuntime} />
+            ) : null}
           </View>
         </View>
 

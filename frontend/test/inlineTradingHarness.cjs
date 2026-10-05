@@ -318,7 +318,7 @@ function inlineTradingHarness() {
     },
     '../../features/asset/api': timeframes,
     '../../features/asset/useAssetTicker': {
-      useAssetTicker: () => ({ latestTicker: h.ticker, connectionState: h.connectionState, isStale: h.tickerStale, showReconnectBanner: h.reconnect }),
+      useAssetTicker: () => ({ latestTicker: h.ticker, connectionState: h.connectionState, isStale: h.tickerStale, showReconnectBanner: h.reconnect, runtime: { assetId: h.assetId, socketStatus: h.connectionState, tickerStale: h.tickerStale } }),
     },
     '../../features/asset/useAssetOrderBook': {
       useAssetOrderBook: (options) => {
@@ -335,7 +335,7 @@ function inlineTradingHarness() {
         return {
           latestCandle: h.candle,
           isStale: h.candleStale,
-          resyncVersion: h.resync,
+          resyncVersion: h.resync, runtime: { assetId: h.assetId, candleStale: h.candleStale, staleReason: h.candleStale ? 'freshness_timeout' : null },
           liveEnabled: options.enabled,
         };
       },

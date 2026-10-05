@@ -1,5 +1,5 @@
 import {
-  applyTicker,
+  applyTickerWithEvidence,
   isTickerStaleAt,
   type AssetTickerAcceptState,
   type AssetTickerMessage,
@@ -10,6 +10,20 @@ import type {
   RealtimeSubscriptionListener,
   RealtimeSubscriptionSpec,
 } from '../../services/ws/realtimeSocketManager.ts';
+
+import {
+  runtimeTime,
+  socketRuntimeFacts,
+  type RealtimeRuntimeSnapshot,
+  type RuntimeFacts,
+  type SocketRuntime,
+} from '../../services/ws/runtimeDiagnostics.ts';
+import {
+  EMPTY_TICKER_RECEIPT,
+  recordTickerReceipt,
+  tickerRuntimeFacts,
+  type TickerReceipt,
+} from '../asset/tickerRuntime.ts';
 
 /**
  * Market-list realtime state, kept OUTSIDE React so it can be unit tested and
@@ -37,10 +51,12 @@ export type MarketTickerSnapshot = {
   staleAssetIds: ReadonlySet<string>;
   /** AssetIds the server refused to subscribe (invalid/unknown asset). */
   subscriptionErrorAssetIds: ReadonlySet<string>;
+  runtime: RuntimeFacts;
 };
 
 /** Minimal surface of RealtimeSocketManager this store depends on. */
 export interface MarketTickerSocketManager {
+  getRuntimeSnapshot?(): SocketRuntime;
   subscribe(
     spec: RealtimeSubscriptionSpec,
     listener: RealtimeSubscriptionListener,
@@ -53,6 +69,7 @@ const EMPTY_SNAPSHOT: MarketTickerSnapshot = {
   showReconnectBanner: false,
   staleAssetIds: new Set(),
   subscriptionErrorAssetIds: new Set(),
+  runtime: {},
 };
 
 type ControlMessage = {
@@ -80,6 +97,7 @@ function toConnectionState(
 export class MarketTickerStore {
   private readonly manager: MarketTickerSocketManager;
   private readonly onChange: () => void;
+  private readonly onRuntimeChange: () => void;
   private readonly subscriptions = new Map<string, () => void>();
   private readonly accepted = new Map<string, AssetTickerAcceptState>();
   private readonly stale = new Set<string>();
@@ -87,10 +105,23 @@ export class MarketTickerStore {
   private connectionState: MarketTickerConnectionState = 'idle';
   private snapshot: MarketTickerSnapshot = EMPTY_SNAPSHOT;
   private disposed = false;
+  private realtime: RealtimeRuntimeSnapshot | null = null;
+  private readonly subscriptionRuntime = new Map<
+    string,
+    RealtimeRuntimeSnapshot
+  >();
+  private readonly receipts = new Map<string, TickerReceipt>();
+  private lastTickerAssetId: string | null = null;
+  private lastSubscriptionAssetId: string | null = null;
 
-  constructor(manager: MarketTickerSocketManager, onChange: () => void) {
+  constructor(
+    manager: MarketTickerSocketManager,
+    onChange: () => void,
+    onRuntimeChange: () => void = () => {},
+  ) {
     this.manager = manager;
     this.onChange = onChange;
+    this.onRuntimeChange = onRuntimeChange;
   }
 
   /**
@@ -126,6 +157,11 @@ export class MarketTickerStore {
       this.accepted.delete(assetId);
       this.stale.delete(assetId);
       this.subscriptionErrors.delete(assetId);
+      this.subscriptionRuntime.delete(assetId);
+      this.receipts.delete(assetId);
+      if (this.lastTickerAssetId === assetId) this.lastTickerAssetId = null;
+      if (this.lastSubscriptionAssetId === assetId)
+        this.lastSubscriptionAssetId = null;
       changed = true;
     }
 
@@ -175,12 +211,16 @@ export class MarketTickerStore {
     this.subscriptions.clear();
   }
 
-  private handleEvent(
-    assetId: string,
-    event: RealtimeSubscriptionEvent,
-  ): void {
+  private handleEvent(assetId: string, event: RealtimeSubscriptionEvent): void {
     if (this.disposed) return;
 
+    if (event.kind === 'runtime') {
+      this.realtime = event.runtime;
+      this.lastSubscriptionAssetId = assetId;
+      this.subscriptionRuntime.set(assetId, event.runtime);
+      this.publishRuntime();
+      return;
+    }
     if (event.kind === 'status') {
       const nextState = toConnectionState(event.status);
       if (nextState === this.connectionState) return;
@@ -216,8 +256,24 @@ export class MarketTickerStore {
     if (payload.assetId !== assetId) return;
 
     const current = this.accepted.get(assetId) ?? null;
-    const next = applyTicker(current, payload);
-    if (next === current || !next) return;
+    const { state: next, rejectionReason } = applyTickerWithEvidence(
+      current,
+      payload,
+    );
+    this.receipts.set(
+      assetId,
+      recordTickerReceipt(
+        this.receipts.get(assetId) ?? EMPTY_TICKER_RECEIPT,
+        payload,
+        rejectionReason,
+        Date.now(),
+      ),
+    );
+    this.lastTickerAssetId = assetId;
+    if (next === current || !next) {
+      this.publishRuntime();
+      return;
+    }
 
     this.accepted.set(assetId, next);
     if (isTickerStaleAt(next.ticker, Date.now())) {
@@ -226,6 +282,73 @@ export class MarketTickerStore {
       this.stale.delete(assetId);
     }
     this.publish();
+  }
+
+  private publishRuntime(): void {
+    this.snapshot = { ...this.snapshot, runtime: this.getRuntimeFacts() };
+    this.onRuntimeChange();
+  }
+
+  private getRuntimeFacts(): RuntimeFacts {
+    const subscriptionAssetId =
+      this.lastTickerAssetId ?? this.lastSubscriptionAssetId;
+    const subscription = subscriptionAssetId
+      ? this.subscriptionRuntime.get(subscriptionAssetId)
+      : null;
+    // The last listener is removed before teardown emits runtime. Read the
+    // manager directly so diagnostics cannot retain the released socket state.
+    const socket =
+      this.manager.getRuntimeSnapshot?.() ?? this.realtime?.socket;
+    const realtime =
+      socket && subscription
+        ? {
+            socket,
+            subscription: subscription.subscription,
+          }
+        : null;
+    const entries = [...this.subscriptionRuntime.entries()];
+    const lastError = entries.reduce<(typeof entries)[number] | null>(
+      (latest, entry) => {
+        const at = entry[1].subscription.lastSubscriptionErrorAt;
+        return at !== null &&
+          (latest === null ||
+            at >= (latest[1].subscription.lastSubscriptionErrorAt ?? 0))
+          ? entry
+          : latest;
+      },
+      null,
+    );
+    return {
+      ...tickerRuntimeFacts(
+        this.lastTickerAssetId
+          ? (this.accepted.get(this.lastTickerAssetId)?.ticker ?? null)
+          : null,
+        this.lastTickerAssetId
+          ? (this.receipts.get(this.lastTickerAssetId) ?? EMPTY_TICKER_RECEIPT)
+          : EMPTY_TICKER_RECEIPT,
+        realtime,
+        Date.now(),
+      ),
+      ...socketRuntimeFacts(socket),
+      subscriptionRuntimeAssetId: subscriptionAssetId,
+      lastTickerAssetId: this.lastTickerAssetId,
+      subscribedAssetCount: this.subscriptions.size,
+      subscriptionAckedAssetCount: entries.filter(
+        ([, value]) => value.subscription.subscriptionAcked,
+      ).length,
+      subscriptionErrorAssetCount: entries.filter(
+        ([, value]) => value.subscription.subscriptionError,
+      ).length,
+      lastMarketSubscriptionErrorAssetId: lastError?.[0],
+      lastMarketSubscriptionErrorCode:
+        lastError?.[1].subscription.lastSubscriptionErrorCode,
+      lastMarketSubscriptionErrorAt: runtimeTime(
+        lastError?.[1].subscription.lastSubscriptionErrorAt,
+      ),
+      lastMarketSubscriptionErrorScope:
+        lastError?.[1].subscription.lastSubscriptionErrorScope,
+      staleAssetCount: this.stale.size,
+    };
   }
 
   private publish(): void {
@@ -243,6 +366,7 @@ export class MarketTickerStore {
         this.connectionState === 'auth_failed',
       staleAssetIds: new Set(this.stale),
       subscriptionErrorAssetIds: new Set(this.subscriptionErrors),
+      runtime: this.getRuntimeFacts(),
     };
     this.onChange();
   }

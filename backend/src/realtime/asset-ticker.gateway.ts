@@ -589,6 +589,7 @@ export class AssetTickerGateway
     } catch {
       this.sendJson(client, {
         type: 'candle_stale',
+        code: 'CANDLE_OVERLAY_READ_FAILED',
         channel: 'asset_candle',
         assetId,
         interval,
@@ -898,6 +899,11 @@ export class AssetTickerGateway
               ? 'resync_required'
               : 'candle_stale',
           channel: 'asset_candle',
+          ...(status === 'unavailable'
+            ? { code: 'CANDLE_PUBSUB_UNAVAILABLE' }
+            : status === 'connected' && previous === 'unavailable'
+              ? { code: 'CANDLE_PUBSUB_RECOVERED' }
+              : {}),
           assetId,
           interval,
         });

@@ -3,11 +3,17 @@ import { useEffect, useRef, useState } from 'react';
 import { getRealtimeSocketManager } from '../../services/ws/sharedRealtimeSocket';
 import type { RealtimeSubscriptionEvent } from '../../services/ws/realtimeSocketManager';
 import {
-  applyTicker,
+  applyTickerWithEvidence,
   isTickerStaleAt,
   type AssetTickerAcceptState,
   type AssetTickerMessage,
 } from './assetTickerPolicy';
+import type { RealtimeRuntimeSnapshot } from '../../services/ws/runtimeDiagnostics';
+import {
+  EMPTY_TICKER_RECEIPT,
+  recordTickerReceipt,
+  tickerRuntimeFacts,
+} from './tickerRuntime';
 import { useStaleRecheck } from './useStaleRecheck';
 
 interface UseAssetTickerParams {
@@ -68,13 +74,21 @@ export function useAssetTicker({
 }: UseAssetTickerParams) {
   const acceptStateRef = useRef<AssetTickerAcceptState | null>(null);
 
-  const [latestTicker, setLatestTicker] = useState<AssetTickerMessage | null>(null);
+  const [latestTicker, setLatestTicker] = useState<AssetTickerMessage | null>(
+    null,
+  );
   const [connectionState, setConnectionState] =
     useState<AssetTickerConnectionState>('disconnected');
   const [showReconnectBanner, setShowReconnectBanner] = useState(false);
   const [isStale, setIsStale] = useState(false);
+  const [realtime, setRealtime] = useState<RealtimeRuntimeSnapshot | null>(
+    null,
+  );
+  const [receipt, setReceipt] = useState(EMPTY_TICKER_RECEIPT);
 
   useEffect(() => {
+    setRealtime(null);
+    setReceipt(EMPTY_TICKER_RECEIPT);
     if (!enabled || !assetId || !wsUrl) {
       setConnectionState('disconnected');
       setShowReconnectBanner(false);
@@ -87,7 +101,13 @@ export function useAssetTicker({
       if (payload.assetId !== assetId) return;
 
       const current = acceptStateRef.current;
-      const next = applyTicker(current, payload);
+      const { state: next, rejectionReason } = applyTickerWithEvidence(
+        current,
+        payload,
+      );
+      setReceipt((previous) =>
+        recordTickerReceipt(previous, payload, rejectionReason, Date.now()),
+      );
       // Rejected by the shared policy (duplicate snapshot / older timestamp /
       // unorderable priced event): keep the last accepted ticker as-is.
       if (next === current) return;
@@ -100,6 +120,10 @@ export function useAssetTicker({
     const onEvent = (event: RealtimeSubscriptionEvent) => {
       if (!isMounted) return;
 
+      if (event.kind === 'runtime') {
+        setRealtime(event.runtime);
+        return;
+      }
       if (event.kind === 'status') {
         switch (event.status) {
           case 'connecting':
@@ -142,10 +166,10 @@ export function useAssetTicker({
 
       if (payload.type === 'error') {
         if (
-          (payload as AssetTickerControlMessage).code === 'INVALID_SUBSCRIPTION' ||
-          isRelevantAssetTickerError(payload as AssetTickerControlMessage, assetId)
+          payload.code === 'INVALID_SUBSCRIPTION' ||
+          isRelevantAssetTickerError(payload, assetId)
         ) {
-          if (!isRelevantAssetTickerError(payload as AssetTickerControlMessage, assetId)) return;
+          if (!isRelevantAssetTickerError(payload, assetId)) return;
           setConnectionState('subscription_error');
           setShowReconnectBanner(true);
           return;
@@ -153,21 +177,21 @@ export function useAssetTicker({
       }
 
       if (payload.type === 'subscription_error') {
-        if (!isCurrentAssetTickerControlMessage(payload as AssetTickerControlMessage, assetId)) return;
+        if (!isCurrentAssetTickerControlMessage(payload, assetId)) return;
         setConnectionState('subscription_error');
         setShowReconnectBanner(true);
         return;
       }
 
       if (payload.type === 'subscribed') {
-        if (!isCurrentAssetTickerControlMessage(payload as AssetTickerControlMessage, assetId)) return;
+        if (!isCurrentAssetTickerControlMessage(payload, assetId)) return;
         setConnectionState('subscribed');
         setShowReconnectBanner(false);
         return;
       }
 
       if (payload.type === 'unsubscribed') {
-        if (!isCurrentAssetTickerControlMessage(payload as AssetTickerControlMessage, assetId)) return;
+        if (!isCurrentAssetTickerControlMessage(payload, assetId)) return;
         setConnectionState('unsubscribed');
         setShowReconnectBanner(false);
       }
@@ -190,7 +214,9 @@ export function useAssetTicker({
   // ticker (and the app is foregrounded) the last accepted one is re-judged
   // on an interval, so a feed that simply stops still turns stale.
   useStaleRecheck(!!latestTicker, () => {
-    setIsStale(isTickerStaleAt(acceptStateRef.current?.ticker ?? null, Date.now()));
+    setIsStale(
+      isTickerStaleAt(acceptStateRef.current?.ticker ?? null, Date.now()),
+    );
   });
 
   return {
@@ -198,5 +224,15 @@ export function useAssetTicker({
     latestTicker,
     showReconnectBanner,
     isStale,
+    runtime: {
+      assetId,
+      connectionState,
+      ...tickerRuntimeFacts(
+        receipt.lastAcceptedAt === null ? null : latestTicker,
+        receipt,
+        realtime,
+        Date.now(),
+      ),
+    },
   };
 }

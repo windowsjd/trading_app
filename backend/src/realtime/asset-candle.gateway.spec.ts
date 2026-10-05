@@ -128,16 +128,60 @@ describe('AssetTickerGateway asset_candle channel', () => {
     expect(clientCount(gateway)).toBe(0);
   });
 
+  it('adds a safe code to the existing initial overlay failure without another query or frame', async () => {
+    const { gateway, overlay, prisma } = setup();
+    overlay.getCurrentSnapshot.mockRejectedValue(
+      new Error('private provider payload'),
+    );
+    const client = fakeClient();
+    register(gateway, client);
+    await handle(gateway, client, subscription('asset-1', '5m'));
+    expect(messages(client)).toEqual([
+      {
+        type: 'subscribed',
+        channel: 'asset_candle',
+        assetId: 'asset-1',
+        interval: '5m',
+      },
+      {
+        type: 'candle_stale',
+        channel: 'asset_candle',
+        assetId: 'asset-1',
+        interval: '5m',
+        code: 'CANDLE_OVERLAY_READ_FAILED',
+      },
+    ]);
+    expect(overlay.getCurrentSnapshot).toHaveBeenCalledTimes(1);
+    expect(prisma.asset.findUnique).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(messages(client))).not.toContain(
+      'private provider payload',
+    );
+  });
+
   it('signals stale on Pub/Sub failure and resync after recovery', () => {
     const { gateway } = setup();
     const client = fakeClient();
     register(gateway, client, '5m');
     status(gateway, 'unavailable');
     status(gateway, 'connected');
-    expect(messages(client).map((message) => message.type)).toEqual([
-      'candle_stale',
-      'resync_required',
+    expect(messages(client)).toEqual([
+      {
+        type: 'candle_stale',
+        channel: 'asset_candle',
+        assetId: 'asset-1',
+        interval: '5m',
+        code: 'CANDLE_PUBSUB_UNAVAILABLE',
+      },
+      {
+        type: 'resync_required',
+        channel: 'asset_candle',
+        assetId: 'asset-1',
+        interval: '5m',
+        code: 'CANDLE_PUBSUB_RECOVERED',
+      },
     ]);
+    status(gateway, 'connected');
+    expect(messages(client)).toHaveLength(2);
   });
 });
 

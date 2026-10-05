@@ -113,7 +113,7 @@ export default function MarketScreen({ navigation, route }: Props) {
   // Live overlay: the currently loaded rows subscribe on the app's shared
   // socket. Changing tab releases the previous tab's rows; loading another page
   // only adds the new ids.
-  const { tickersByAssetId, showReconnectBanner, staleAssetIds } =
+  const { tickersByAssetId, showReconnectBanner, staleAssetIds, subscriptionErrorAssetIds, runtime: tickerRuntime } =
     useMarketTickers({
       assetIds,
       wsUrl: wsUrl ?? '',
@@ -220,11 +220,11 @@ export default function MarketScreen({ navigation, route }: Props) {
                   실시간 연결이 불안정합니다. 마지막 수신 가격을 표시하고
                   있습니다.
                 </Text>
-                <AdminDiagnosticPanel runtime={{
-                  reconnecting: showReconnectBanner,
-                  subscribedAssetCount: assetIds.length,
-                }} />
+                <AdminDiagnosticPanel runtime={tickerRuntime} />
               </View>
+            ) : null}
+            {isAdmin && !showReconnectBanner && (staleAssetIds.size > 0 || subscriptionErrorAssetIds?.size > 0) ? (
+              <AdminDiagnosticPanel runtime={tickerRuntime} />
             ) : null}
           </View>
         }

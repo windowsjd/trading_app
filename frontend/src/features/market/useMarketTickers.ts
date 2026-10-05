@@ -45,8 +45,11 @@ export function useMarketTickers({
       return undefined;
     }
 
-    const store = new MarketTickerStore(getRealtimeSocketManager(wsUrl), () =>
-      setSnapshot(store.getSnapshot()),
+    const publish = () => setSnapshot(store.getSnapshot());
+    const store = new MarketTickerStore(
+      getRealtimeSocketManager(wsUrl),
+      publish,
+      publish,
     );
     storeRef.current = store;
 

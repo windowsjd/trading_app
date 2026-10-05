@@ -1,3 +1,11 @@
+import {
+  safeRuntimeCode,
+  type RealtimeRuntimeSnapshot,
+  type SocketRuntime,
+  type SubscriptionRuntime,
+  type TransportTransitionReason,
+} from './runtimeDiagnostics.ts';
+
 /**
  * App-wide shared authenticated WebSocket for /api/v1/ws.
  *
@@ -10,7 +18,11 @@
  * reconnectWithFreshToken() call.
  */
 
-export type RealtimeChannel = 'asset_ticker' | 'asset_candle' | 'asset_order_book' | 'fx_rate';
+export type RealtimeChannel =
+  | 'asset_ticker'
+  | 'asset_candle'
+  | 'asset_order_book'
+  | 'fx_rate';
 
 export type RealtimeSubscriptionSpec =
   | {
@@ -36,6 +48,8 @@ export type RealtimeSocketStatus =
 
 export type RealtimeSubscriptionEvent =
   | { kind: 'status'; status: RealtimeSocketStatus }
+  // Diagnostic-only updates must not re-run status-driven timers or resyncs.
+  | { kind: 'runtime'; runtime: RealtimeRuntimeSnapshot }
   // The subscription was re-sent on a NEW socket after a reconnect; consumers
   // should resync their baselines (e.g. HTTP refetch for candles).
   | { kind: 'restored' }
@@ -77,6 +91,7 @@ type SubscriptionEntry = {
   listeners: Set<RealtimeSubscriptionListener>;
   sent: boolean;
   acked: boolean;
+  runtime: Omit<SubscriptionRuntime, 'subscriptionSent' | 'subscriptionAcked'>;
 };
 
 function subscriptionKey(spec: RealtimeSubscriptionSpec): string {
@@ -93,6 +108,20 @@ export class RealtimeSocketManager {
   private readonly subscriptions = new Map<string, SubscriptionEntry>();
   private socket: WebSocketLike | null = null;
   private status: RealtimeSocketStatus = 'idle';
+  private runtime: Omit<
+    SocketRuntime,
+    'currentStatus' | 'reconnectAttempt' | 'activeSubscriptionCount'
+  > = {
+    lastTransitionReason: null,
+    lastTransitionAt: null,
+    lastConnectedAt: null,
+    lastDisconnectedAt: null,
+    lastCloseCode: null,
+    nextReconnectDelayMs: null,
+    reconnectScheduledAt: null,
+    authFailureSource: null,
+    lastTokenLoadFailedAt: null,
+  };
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private hasConnectedBefore = false;
@@ -119,7 +148,21 @@ export class RealtimeSocketManager {
     const key = subscriptionKey(spec);
     let entry = this.subscriptions.get(key);
     if (!entry) {
-      entry = { spec, listeners: new Set(), sent: false, acked: false };
+      entry = {
+        spec,
+        listeners: new Set(),
+        sent: false,
+        acked: false,
+        runtime: {
+          subscriptionSentAt: null,
+          acknowledgedAt: null,
+          lastRestoredAt: null,
+          subscriptionError: false,
+          lastSubscriptionErrorCode: null,
+          lastSubscriptionErrorAt: null,
+          lastSubscriptionErrorScope: null,
+        },
+      };
       this.subscriptions.set(key, entry);
     }
     entry.listeners.add(listener);
@@ -133,10 +176,11 @@ export class RealtimeSocketManager {
 
     // Late joiners immediately learn the current socket status, and replay
     // the ack when the shared subscription is already established.
-    listener({ kind: 'status', status: this.status });
+    this.emitToListener(listener, { kind: 'status', status: this.status });
+    this.emitRuntime();
     if (this.status === 'connected') {
       if (entry.acked) {
-        listener({
+        this.emitToListener(listener, {
           kind: 'message',
           payload: {
             type: 'subscribed',
@@ -159,9 +203,11 @@ export class RealtimeSocketManager {
   /** Force-closes and reconnects with a freshly loaded token. */
   reconnectWithFreshToken(): void {
     this.authFailed = false;
+    this.runtime.authFailureSource = null;
     this.reconnectAttempt = 0;
     if (this.socket) {
       const socket = this.socket;
+      this.runtime.lastDisconnectedAt = Date.now();
       this.detachSocket();
       try {
         socket.close(1000, 'token refresh');
@@ -170,11 +216,27 @@ export class RealtimeSocketManager {
       }
     }
     this.clearReconnectTimer();
-    if (this.subscriptions.size > 0) void this.connect();
+    if (this.subscriptions.size > 0) void this.connect('manual_token_refresh');
   }
 
   getStatus(): RealtimeSocketStatus {
     return this.status;
+  }
+
+  getRuntimeSnapshot(): SocketRuntime {
+    return {
+      ...this.runtime,
+      currentStatus: this.status,
+      reconnectAttempt: this.reconnectAttempt,
+      activeSubscriptionCount: this.subscriptions.size,
+    };
+  }
+
+  getSubscriptionRuntime(
+    spec: RealtimeSubscriptionSpec,
+  ): RealtimeRuntimeSnapshot | null {
+    const entry = this.subscriptions.get(subscriptionKey(spec));
+    return entry ? this.snapshotFor(entry) : null;
   }
 
   hasOpenSocket(): boolean {
@@ -199,6 +261,7 @@ export class RealtimeSocketManager {
       this.sendSubscription(entry, 'unsubscribe');
     }
     if (this.subscriptions.size === 0) this.teardown();
+    else this.emitRuntime();
   }
 
   private ensureConnected(): void {
@@ -207,26 +270,40 @@ export class RealtimeSocketManager {
     void this.connect();
   }
 
-  private async connect(): Promise<void> {
+  private async connect(reason?: TransportTransitionReason): Promise<void> {
     if (this.socket || this.authFailed) return;
     const sequence = (this.connectSequence += 1);
-    this.setStatus(this.hasConnectedBefore ? 'reconnecting' : 'connecting');
+    this.setStatus(
+      this.hasConnectedBefore ? 'reconnecting' : 'connecting',
+      reason ??
+        (this.hasConnectedBefore ? 'reconnect_started' : 'initial_connect'),
+    );
+    let tokenLoadFailed = false;
 
     let token: string | null = null;
     try {
       token = await this.deps.getToken();
     } catch {
       token = null;
+      tokenLoadFailed = true;
     }
     // The manager may have been torn down or superseded while awaiting.
     if (sequence !== this.connectSequence || this.subscriptions.size === 0) {
       return;
     }
 
+    if (tokenLoadFailed) {
+      this.runtime.lastTokenLoadFailedAt = Date.now();
+      this.recordTransition('token_load_failed');
+      this.emitRuntime();
+    }
+
     let socket: WebSocketLike;
     try {
       socket = this.deps.createSocket(appendToken(this.wsUrl, token));
     } catch {
+      this.recordTransition('socket_create_failed');
+      this.emitRuntime();
       this.scheduleReconnect();
       return;
     }
@@ -237,9 +314,12 @@ export class RealtimeSocketManager {
       const wasReconnect = this.hasConnectedBefore;
       this.hasConnectedBefore = true;
       this.reconnectAttempt = 0;
-      this.setStatus('connected');
+      this.runtime.lastConnectedAt = Date.now();
+      this.runtime.authFailureSource = null;
+      this.setStatus('connected', 'socket_open');
       for (const entry of this.subscriptions.values()) {
         entry.acked = false;
+        if (wasReconnect) entry.runtime.lastRestoredAt = Date.now();
         this.sendSubscription(entry, 'subscribe');
         if (wasReconnect) {
           this.emitToEntry(entry, { kind: 'restored' });
@@ -264,12 +344,16 @@ export class RealtimeSocketManager {
 
     socket.onclose = (event) => {
       if (this.socket !== socket) return;
+      this.runtime.lastDisconnectedAt = Date.now();
+      this.runtime.lastCloseCode = Number.isInteger(event?.code)
+        ? event.code
+        : null;
       this.detachSocket();
       if (event?.code === 1008) {
-        this.failAuth();
+        this.failAuth('close_1008');
         return;
       }
-      this.setStatus('disconnected');
+      this.setStatus('disconnected', 'socket_closed');
       this.scheduleReconnect();
     };
   }
@@ -281,7 +365,12 @@ export class RealtimeSocketManager {
     ) {
       const socket = this.socket;
       this.detachSocket();
-      this.failAuth();
+      this.runtime.lastDisconnectedAt = Date.now();
+      this.failAuth(
+        payload.type === 'auth_failed'
+          ? 'auth_failed_control'
+          : 'unauthorized_control',
+      );
       try {
         socket?.close();
       } catch {
@@ -292,7 +381,12 @@ export class RealtimeSocketManager {
 
     if (payload.type === 'subscribed' && typeof payload.channel === 'string') {
       const entry = this.findEntry(payload);
-      if (entry) entry.acked = true;
+      if (entry) {
+        entry.acked = true;
+        entry.runtime.acknowledgedAt = Date.now();
+        entry.runtime.subscriptionError = false;
+        this.emitEntryRuntime(entry);
+      }
     }
 
     if (payload.type === 'asset_ticker') {
@@ -326,6 +420,7 @@ export class RealtimeSocketManager {
     // subscription apply its own relevance rules (matches previous per-hook
     // behavior for e.g. INVALID_SUBSCRIPTION).
     for (const entry of this.subscriptions.values()) {
+      this.recordSubscriptionError(entry, payload);
       this.emitToEntry(entry, { kind: 'message', payload });
     }
   }
@@ -362,7 +457,61 @@ export class RealtimeSocketManager {
       ) {
         continue;
       }
+      this.recordSubscriptionError(entry, payload);
       this.emitToEntry(entry, { kind: 'message', payload });
+    }
+  }
+
+  private snapshotFor(entry: SubscriptionEntry): RealtimeRuntimeSnapshot {
+    return {
+      socket: this.getRuntimeSnapshot(),
+      subscription: {
+        ...entry.runtime,
+        subscriptionSent: entry.sent,
+        subscriptionAcked: entry.acked,
+      },
+    };
+  }
+
+  private emitEntryRuntime(entry: SubscriptionEntry): void {
+    this.emitToEntry(entry, {
+      kind: 'runtime',
+      runtime: this.snapshotFor(entry),
+    });
+  }
+
+  private emitRuntime(): void {
+    for (const entry of this.subscriptions.values())
+      this.emitEntryRuntime(entry);
+  }
+
+  private recordSubscriptionError(
+    entry: SubscriptionEntry,
+    payload: RoutedPayload,
+  ): void {
+    if (payload.type !== 'subscription_error' && payload.type !== 'error')
+      return;
+    if (payload.assetId && payload.assetId !== entry.spec.assetId) return;
+    if (payload.interval && payload.interval !== entry.spec.interval) return;
+    if (payload.pair && payload.pair !== entry.spec.pair) return;
+    entry.runtime.subscriptionError = true;
+    entry.runtime.lastSubscriptionErrorCode =
+      safeRuntimeCode(payload.code) ?? 'not_observed';
+    entry.runtime.lastSubscriptionErrorAt = Date.now();
+    entry.runtime.lastSubscriptionErrorScope = payload.channel
+      ? 'subscription'
+      : 'unscoped_control';
+    this.emitEntryRuntime(entry);
+  }
+
+  private emitToListener(
+    listener: RealtimeSubscriptionListener,
+    event: RealtimeSubscriptionEvent,
+  ): void {
+    try {
+      listener(event);
+    } catch {
+      // One listener throwing must not break routing to the others.
     }
   }
 
@@ -370,13 +519,8 @@ export class RealtimeSocketManager {
     entry: SubscriptionEntry,
     event: RealtimeSubscriptionEvent,
   ): void {
-    for (const listener of entry.listeners) {
-      try {
-        listener(event);
-      } catch {
-        // One listener throwing must not break routing to the others.
-      }
-    }
+    for (const listener of entry.listeners)
+      this.emitToListener(listener, event);
   }
 
   private sendSubscription(
@@ -397,15 +541,26 @@ export class RealtimeSocketManager {
       );
       entry.sent = type === 'subscribe';
       if (type === 'unsubscribe') entry.acked = false;
+      else {
+        entry.runtime.subscriptionSentAt = Date.now();
+        entry.runtime.subscriptionError = false;
+        this.emitEntryRuntime(entry);
+      }
     } catch {
       // Best-effort; a reconnect re-sends active subscriptions.
     }
   }
 
-  private failAuth(): void {
+  private failAuth(
+    source: NonNullable<SocketRuntime['authFailureSource']>,
+  ): void {
     this.authFailed = true;
     this.clearReconnectTimer();
-    this.setStatus('auth_failed');
+    this.runtime.authFailureSource = source;
+    this.setStatus(
+      'auth_failed',
+      source === 'close_1008' ? 'auth_failed_close' : 'auth_failed_control',
+    );
   }
 
   private scheduleReconnect(): void {
@@ -416,11 +571,15 @@ export class RealtimeSocketManager {
         Math.min(this.reconnectAttempt, this.reconnectDelaysMs.length - 1)
       ];
     this.reconnectAttempt += 1;
+    this.runtime.nextReconnectDelayMs = delay;
+    this.runtime.reconnectScheduledAt = Date.now();
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      this.setStatus('reconnecting');
+      this.runtime.nextReconnectDelayMs = null;
+      this.setStatus('reconnecting', 'reconnect_started');
       void this.connect();
     }, delay);
+    this.emitRuntime();
   }
 
   private detachSocket(): void {
@@ -448,7 +607,9 @@ export class RealtimeSocketManager {
         // Already closed.
       }
     }
+    if (socket) this.runtime.lastDisconnectedAt = Date.now();
     this.status = 'idle';
+    this.recordTransition('no_subscribers_teardown');
     this.reconnectAttempt = 0;
     this.hasConnectedBefore = false;
     this.authFailed = false;
@@ -459,13 +620,24 @@ export class RealtimeSocketManager {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+    this.runtime.nextReconnectDelayMs = null;
   }
 
-  private setStatus(status: RealtimeSocketStatus): void {
+  private recordTransition(reason: TransportTransitionReason): void {
+    this.runtime.lastTransitionReason = reason;
+    this.runtime.lastTransitionAt = Date.now();
+  }
+
+  private setStatus(
+    status: RealtimeSocketStatus,
+    reason: TransportTransitionReason,
+  ): void {
     this.status = status;
+    this.recordTransition(reason);
     for (const entry of this.subscriptions.values()) {
       this.emitToEntry(entry, { kind: 'status', status });
     }
+    this.emitRuntime();
   }
 }
 

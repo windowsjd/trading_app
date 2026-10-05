@@ -103,7 +103,7 @@ export function AssetMarketChart({
     { ...candlesQuery, enabled: isFocused && variant === 'detail' },
   ]);
 
-  const { latestTicker } = useAssetTicker({
+  const { latestTicker, showReconnectBanner, isStale: isTickerStale, runtime: tickerRuntime } = useAssetTicker({
     assetId,
     wsUrl: wsUrl ?? '',
     enabled: isFocused && !!wsUrl,
@@ -113,6 +113,7 @@ export function AssetMarketChart({
     isStale: isCandleStale,
     resyncVersion: candleResyncVersion,
     liveEnabled: candleLiveEnabled,
+    runtime: candleRuntime,
   } = useAssetCandle({
     assetId,
     interval: selectedTimeframe.interval,
@@ -265,13 +266,12 @@ export function AssetMarketChart({
       ) : null}
       {isAdmin && candleLiveEnabled && isCandleStale ? (
         <AdminDiagnosticPanel
-          runtime={{
-            assetId,
-            candleInterval: selectedTimeframe.interval,
-            candleStale: isCandleStale,
-            sourceUpdatedAt: latestCandle?.sourceUpdatedAt,
-          }}
+          runtime={{ ...candleRuntime, candleBaselineFetching: candlesQuery.isFetching,
+            candleBaselineError: candlesQuery.isError, candleBaselineDataUpdatedAt: candlesQuery.dataUpdatedAt }}
         />
+      ) : null}
+      {isAdmin && (showReconnectBanner || isTickerStale) ? (
+        <AdminDiagnosticPanel runtime={tickerRuntime} />
       ) : null}
       {candleLiveEnabled && latestCandle?.delayed ? (
         <Text style={styles.notice}>

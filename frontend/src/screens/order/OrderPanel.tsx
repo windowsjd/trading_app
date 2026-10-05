@@ -302,7 +302,7 @@ export function OrderForm({
     enabled: accountKnown && side === 'buy',
   });
   const tickerUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
-  const { latestTicker, connectionState, showReconnectBanner, isStale } = useAssetTicker({
+  const { latestTicker, runtime: tickerRuntime } = useAssetTicker({
     assetId,
     wsUrl: tickerUrl ?? '',
     enabled: enabled && side === 'buy' && !!tickerUrl,
@@ -1020,9 +1020,7 @@ export function OrderForm({
                 displayPrice.basis === 'realtime' ||
                 displayPrice.basis === 'snapshot' ? {
                 assetId,
-                connectionState,
-                reconnecting: showReconnectBanner,
-                tickerStale: isStale,
+                ...tickerRuntime,
                 displayedPriceBasis: displayPrice.basis,
                 displayedPriceAvailable: displayPrice.priceLocal !== null,
                 priceCapturedAt: displayPrice.priceCapturedAt,
@@ -1102,6 +1100,7 @@ export function OrderForm({
                         displayPrice.basis === 'realtime' ||
                         displayPrice.basis === 'snapshot' ? {
                         assetId,
+                        ...tickerRuntime,
                         displayedPriceBasis: displayPrice.basis,
                         displayedPriceAvailable: displayPrice.priceLocal !== null,
                         priceCapturedAt: displayPrice.priceCapturedAt,
