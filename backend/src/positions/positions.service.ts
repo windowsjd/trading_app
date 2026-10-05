@@ -28,7 +28,10 @@ import {
   SeasonStatus,
   TradingAccountMode,
 } from '../generated/prisma/client';
-import { isFxSnapshotStaleForPortfolioValuation } from '../portfolio/portfolio-valuation.policy';
+import {
+  calculatePositionValuation,
+  isFxSnapshotStaleForPortfolioValuation,
+} from '../portfolio/portfolio-valuation.policy';
 import { PrismaService } from '../prisma/prisma.service';
 import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
 import {
@@ -511,27 +514,32 @@ export class PositionsService {
           usdKrwSelection.diagnosticContext,
         );
       }
+      if (
+        position.currencyCode === CurrencyCode.USD &&
+        usdKrwSelection?.state !== 'available'
+      ) {
+        throw new PositionValuationError(
+          'FX_RATE_UNAVAILABLE',
+          'USD/KRW FX rate snapshot is required for USD conversion.',
+        );
+      }
 
-      const quantity = position.quantity;
-      const averageCost = position.averageCost;
       const currentPrice = priceSnapshot.price;
-      const positionValue = quantity.mul(currentPrice);
-      const positionValueKrw = priceSnapshot.priceKrw
-        ? quantity.mul(priceSnapshot.priceKrw)
-        : this.convertToKrw(
-            positionValue,
-            position.currencyCode,
-            usdKrwSelection,
-          );
-      const unrealizedPnl = currentPrice.sub(averageCost).mul(quantity);
-      const unrealizedPnlKrw = this.convertToKrw(
-        unrealizedPnl,
-        position.currencyCode,
-        usdKrwSelection,
-      );
-      const returnRate = averageCost.eq(0)
-        ? new Prisma.Decimal(0)
-        : currentPrice.sub(averageCost).div(averageCost).mul(100);
+      const values = calculatePositionValuation({
+        quantity: position.quantity,
+        averageCost: position.averageCost,
+        currentPrice,
+        currencyCode: position.currencyCode,
+        usdKrwRate:
+          usdKrwSelection?.state === 'available' ? usdKrwSelection.rate : null,
+      });
+      const {
+        marketValueLocal: positionValue,
+        marketValueKrw: positionValueKrw,
+        unrealizedPnlLocal: unrealizedPnl,
+        unrealizedPnlKrw,
+        returnRate,
+      } = values;
 
       return {
         state: 'available',
@@ -670,10 +678,17 @@ export class PositionsService {
         currencyCode: this.getAssetPriceCurrency(asset),
       },
     });
-    const priceRead = { asset: { ...asset, currencyCode: currencyCode }, workflow: 'positions_live_valuation' as const, now: valuationAt };
+    const priceRead = {
+      asset: { ...asset, currencyCode: currencyCode },
+      workflow: 'positions_live_valuation' as const,
+      now: valuationAt,
+    };
     const closedScope = closedMarketPriceScope(priceRead);
     const providerCandidates = providerEligibility.eligible
-      ? await findMarketAwareAssetPriceCandidates(this.prisma, { ...priceRead, sourceNames: providerEligibility.sourceNames })
+      ? await findMarketAwareAssetPriceCandidates(this.prisma, {
+          ...priceRead,
+          sourceNames: providerEligibility.sourceNames,
+        })
       : [];
     const providerSelection = providerEligibility.eligible
       ? selectMarketAwareAssetPriceSnapshotBySourcePriority({
@@ -955,25 +970,6 @@ export class PositionsService {
       rate: snapshot.rate,
       sourceDecision,
     };
-  }
-
-  private convertToKrw(
-    amount: Prisma.Decimal,
-    currencyCode: CurrencyCode,
-    usdKrwSelection: UsdKrwSelection | null,
-  ): Prisma.Decimal {
-    if (currencyCode === CurrencyCode.KRW) {
-      return amount;
-    }
-
-    if (usdKrwSelection?.state !== 'available') {
-      throw new PositionValuationError(
-        'FX_RATE_UNAVAILABLE',
-        'USD/KRW FX rate snapshot is required for USD conversion.',
-      );
-    }
-
-    return amount.mul(usdKrwSelection.rate);
   }
 
   private comparePositionItems(

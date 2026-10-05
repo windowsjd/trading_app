@@ -63,6 +63,7 @@ type PositionAssetForSourceSelection = {
   market: string;
   currencyCode: CurrencyCode;
   priceCurrency: CurrencyCode;
+  settlementCurrency: CurrencyCode;
 };
 
 @Injectable()
@@ -113,6 +114,7 @@ export class PortfolioValuationService {
                     market: true,
                     currencyCode: true,
                     priceCurrency: true,
+                    settlementCurrency: true,
                   },
                 },
               },
@@ -160,7 +162,7 @@ export class PortfolioValuationService {
   /**
    * Account-scoped valuation (작업 7). Same holdings → same numbers as the
    * season path: both funnel into calculateValuationForHoldings and the
-   * unchanged pure `calculatePortfolioValuation`. Only the LOOKUP differs —
+   * shared pure `calculatePortfolioValuation`. Only the LOOKUP differs —
    * wallets and positions are selected by their own `tradingAccountId`
    * instead of through a participant.
    *
@@ -209,6 +211,7 @@ export class PortfolioValuationService {
                 market: true,
                 currencyCode: true,
                 priceCurrency: true,
+                settlementCurrency: true,
               },
             },
           },
@@ -317,6 +320,9 @@ export class PortfolioValuationService {
           quantity: position.quantity,
           averageCost: position.averageCost,
           currencyCode: position.currencyCode,
+          priceCurrency: this.getAssetPriceCurrency(position.asset),
+          settlementCurrency:
+            position.asset.settlementCurrency ?? position.asset.currencyCode,
           realizedPnl: position.realizedPnl,
           realizedPnlKrw: position.realizedPnlKrw,
           latestPriceSnapshot: priceSelection.snapshot,
@@ -389,51 +395,60 @@ export class PortfolioValuationService {
         currencyCode: this.getAssetPriceCurrency(asset),
       },
     });
-    const priceRead = { asset: { ...asset, currencyCode: this.getAssetPriceCurrency(asset) }, workflow: sourceEligibilityWorkflow, now: valuationAt };
-    const closedScope = useSettlementPricePolicy ? null : closedMarketPriceScope(priceRead);
+    const priceRead = {
+      asset: { ...asset, currencyCode: this.getAssetPriceCurrency(asset) },
+      workflow: sourceEligibilityWorkflow,
+      now: valuationAt,
+    };
+    const closedScope = useSettlementPricePolicy
+      ? null
+      : closedMarketPriceScope(priceRead);
     const providerCandidates = providerEligibility.eligible
       ? useSettlementPricePolicy
         ? ((await client.assetPriceSnapshot.findMany({
-          where: {
-            assetId: asset.id,
-            currencyCode: this.getAssetPriceCurrency(asset),
-            sourceType: AssetPriceSourceType.provider_api,
-            ...(useSettlementPricePolicy
-              ? {
-                  sourceName: {
-                    in: [...providerEligibility.sourceNames],
-                  },
-                  effectiveAt: {
-                    lte: valuationAt,
-                  },
-                  price: {
-                    gt: 0,
-                  },
-                }
-              : {}),
-          },
-          orderBy: [
-            { effectiveAt: 'desc' },
-            { capturedAt: 'desc' },
-            { createdAt: 'desc' },
-          ],
-          take: useSettlementPricePolicy
-            ? providerEligibility.sourceNames.length * 10
-            : 10,
-          select: {
-            id: true,
-            assetId: true,
-            price: true,
-            priceKrw: true,
-            currencyCode: true,
-            sourceType: true,
-            sourceName: true,
-            effectiveAt: true,
-            capturedAt: true,
-            createdAt: true,
-          },
-        })) ?? [])
-        : await findMarketAwareAssetPriceCandidates(client, { ...priceRead, sourceNames: providerEligibility.sourceNames })
+            where: {
+              assetId: asset.id,
+              currencyCode: this.getAssetPriceCurrency(asset),
+              sourceType: AssetPriceSourceType.provider_api,
+              ...(useSettlementPricePolicy
+                ? {
+                    sourceName: {
+                      in: [...providerEligibility.sourceNames],
+                    },
+                    effectiveAt: {
+                      lte: valuationAt,
+                    },
+                    price: {
+                      gt: 0,
+                    },
+                  }
+                : {}),
+            },
+            orderBy: [
+              { effectiveAt: 'desc' },
+              { capturedAt: 'desc' },
+              { createdAt: 'desc' },
+            ],
+            take: useSettlementPricePolicy
+              ? providerEligibility.sourceNames.length * 10
+              : 10,
+            select: {
+              id: true,
+              assetId: true,
+              price: true,
+              priceKrw: true,
+              currencyCode: true,
+              sourceType: true,
+              sourceName: true,
+              effectiveAt: true,
+              capturedAt: true,
+              createdAt: true,
+            },
+          })) ?? [])
+        : await findMarketAwareAssetPriceCandidates(client, {
+            ...priceRead,
+            sourceNames: providerEligibility.sourceNames,
+          })
       : [];
     const providerSelection = providerEligibility.eligible
       ? useSettlementPricePolicy

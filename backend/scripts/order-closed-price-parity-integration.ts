@@ -6,6 +6,9 @@ import { HttpException } from '@nestjs/common';
 import { Prisma } from '../src/generated/prisma/client';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { PortfolioValuationService } from '../src/portfolio/portfolio-valuation.service';
+import { PositionsService } from '../src/positions/positions.service';
+import { HomeService } from '../src/home/home.service';
+import { FxService } from '../src/fx/fx.service';
 import { OrdersService } from '../src/orders/orders.service';
 import { OrderReservationService } from '../src/orders/order-reservation.service';
 import { LimitOrderCreateService } from '../src/orders/limit-order-create.service';
@@ -13,6 +16,10 @@ import { LimitOrderExecutionService } from '../src/orders/limit-order-execution.
 import { LimitOrderCandleEvidenceService } from '../src/orders/limit-order-candle-evidence.service';
 import { TradingAccountAccessService } from '../src/trading-accounts/trading-account-access.service';
 import { resolveStockMarketSessionState } from '../src/orders/market-calendar.policy';
+import {
+  resolveAssetProviderEligibility,
+  selectMarketAwareAssetPriceSnapshotBySourcePriority,
+} from '../src/providers/source-eligibility.policy';
 import {
   applyMarketSessionOverrideSnapshot,
   markMarketSessionOverrideStoreRequired,
@@ -183,8 +190,8 @@ async function fixture() {
       rate: '1000',
       sourceType: 'provider_api',
       sourceName: 'korea_exim_exchange_rate',
-      effectiveAt: now,
-      capturedAt: now,
+      effectiveAt: new Date(now.getTime() - 1000),
+      capturedAt: new Date(now.getTime() - 1000),
     },
   });
   fxIds.push(rate.id);
@@ -195,8 +202,8 @@ async function fixture() {
       currencyCode: 'USD',
       sourceType: 'provider_api',
       sourceName: 'binance_spot_ws_ticker',
-      effectiveAt: now,
-      capturedAt: now,
+      effectiveAt: new Date(now.getTime() - 1000),
+      capturedAt: new Date(now.getTime() - 1000),
     },
   });
   return {
@@ -339,6 +346,9 @@ async function runScenario(
       request,
     );
     orderId = created.data.order.orderId;
+    // Snapshot eligibility is strictly after submission; millisecond DB columns
+    // can otherwise collapse the two fixture instants on a fast local server.
+    await prisma.$queryRaw`SELECT 1 AS waited FROM pg_sleep(0.005)`;
     const now = await dbNow();
     fillPriceId = (
       await prisma.assetPriceSnapshot.create({
@@ -353,6 +363,7 @@ async function runScenario(
         },
       })
     ).id;
+    await prisma.$queryRaw`SELECT 1 AS waited FROM pg_sleep(0.005)`;
   }
   if (policy === 'calendar') {
     resetMarketSessionOverrideStoreForTest();
@@ -411,7 +422,40 @@ async function runScenario(
     }
   } else {
     const result = await perform();
-    if ('state' in result) assert.equal(result.state, 'filled');
+    if ('state' in result && result.state !== 'filled') {
+      const evidence = await prisma.assetPriceSnapshot.findUniqueOrThrow({
+        where: { id: fillPriceId },
+      });
+      const order = await prisma.order.findUniqueOrThrow({
+        where: { id: orderId },
+        include: { asset: true },
+      });
+      const now = await dbNow();
+      const eligibility = resolveAssetProviderEligibility({
+        workflow: 'orders_execute',
+        asset: order.asset,
+      });
+      const selection = eligibility.eligible
+        ? selectMarketAwareAssetPriceSnapshotBySourcePriority({
+            asset: order.asset,
+            workflow: 'orders_execute',
+            candidates: [evidence],
+            expectedSourceNames: eligibility.sourceNames,
+            now,
+            freshnessThresholdSeconds: eligibility.freshnessThresholdSeconds,
+            isPositiveValue: (row) => row.price.gt(0),
+          })
+        : eligibility;
+      assert.fail(
+        JSON.stringify({
+          result,
+          submittedAt: order.submittedAt,
+          evidence,
+          now,
+          selection,
+        }),
+      );
+    }
     const order = await prisma.order.findUniqueOrThrow({
       where: {
         tradingAccountId_idempotencyKey: {
@@ -513,6 +557,8 @@ async function cleanup() {
   });
   const where = { tradingAccountId: { in: accounts.map((row) => row.id) } };
   await prisma.walletTransaction.deleteMany({ where });
+  await prisma.fxExecuteRequest.deleteMany({ where });
+  await prisma.exchangeTransaction.deleteMany({ where });
   await prisma.order.deleteMany({ where });
   await prisma.quote.deleteMany({ where });
   await prisma.position.deleteMany({ where });
@@ -531,6 +577,256 @@ async function cleanup() {
   await prisma.user.deleteMany({ where: { id: { in: users } } });
 }
 
+/** Reuse the H1 transaction fixture for B's mixed/fractional financial parity. */
+async function runSemanticScenario(kind: 'market' | 'limit') {
+  const s = await fixture();
+  await stockPrice(s, '248500', s.session.closeTime, 'provider_api');
+  await prisma.fxRateSnapshot.update({
+    where: { id: fxIds[fxIds.length - 1] },
+    data: { rate: '1400' },
+  });
+  await prisma.assetPriceSnapshot.updateMany({
+    where: { assetId: s.cryptoId },
+    data: { priceKrw: '130000' },
+  });
+  const usState = resolveStockMarketSessionState(
+    { assetType: 'us_stock', market: 'NAS' },
+    s.now,
+  );
+  assert.ok(usState && usState.state !== 'calendar_unavailable');
+  const usEffectiveAt =
+    usState.state === 'open'
+      ? s.now
+      : usState.latestCompletedSession!.closeTime;
+  for (const [label, type, price, quantity, effectiveAt] of [
+    ['us', 'us_stock', '100', '2', usEffectiveAt],
+    ['fraction-a', 'crypto', '0.33333333', '0.00000001', s.now],
+    ['fraction-b', 'crypto', '0.33333333', '0.00000001', s.now],
+  ] as const) {
+    const asset = await prisma.asset.create({
+      data: {
+        symbol: `${label}-${randomUUID()}`,
+        name: label,
+        assetType: type,
+        market: type === 'us_stock' ? 'NAS' : 'BINANCE',
+        currencyCode: 'USD',
+        priceCurrency: 'USD',
+        settlementCurrency: 'USD',
+      },
+    });
+    assets.push(asset.id);
+    await prisma.position.create({
+      data: {
+        tradingAccountId: s.accountId,
+        assetId: asset.id,
+        currencyCode: 'USD',
+        quantity,
+        averageCost: type === 'us_stock' ? '80' : '0.2',
+      },
+    });
+    await prisma.assetPriceSnapshot.create({
+      data: {
+        assetId: asset.id,
+        price,
+        priceKrw: type === 'us_stock' ? '130000' : null,
+        currencyCode: 'USD',
+        sourceType: 'provider_api',
+        sourceName:
+          type === 'us_stock'
+            ? 'kis_us_delayed_trade'
+            : 'binance_spot_ws_ticker',
+        effectiveAt,
+        capturedAt: s.now,
+      },
+    });
+  }
+  const body = {
+    assetId: s.cryptoId,
+    side: 'buy',
+    orderType: kind,
+    amount: '200',
+    ...(kind === 'limit' ? { limitPrice: '100' } : {}),
+  };
+  const quote = await orders.quoteOrderForTradingAccount(
+    s.userId,
+    s.accountId,
+    body,
+  );
+  const created = await orders.createOrderForTradingAccount(
+    s.userId,
+    s.accountId,
+    { ...body, quoteId: quote.data.quoteId!, idempotencyKey: randomUUID() },
+  );
+  const orderId = created.data.order.orderId;
+  if (kind === 'limit') {
+    await prisma.$queryRaw`SELECT 1 AS waited FROM pg_sleep(0.005)`;
+    const now = await dbNow();
+    const price = await prisma.assetPriceSnapshot.create({
+      data: {
+        assetId: s.cryptoId,
+        price: '100',
+        priceKrw: '130000',
+        currencyCode: 'USD',
+        sourceType: 'provider_api',
+        sourceName: 'binance_spot_ws_ticker',
+        effectiveAt: now,
+        capturedAt: now,
+      },
+    });
+    await prisma.$queryRaw`SELECT 1 AS waited FROM pg_sleep(0.005)`;
+    const result = await execution.fillLimitOrder({
+      orderId,
+      plan: {
+        path: 'snapshot',
+        executedPrice: new Prisma.Decimal('100'),
+        assetPriceSnapshotId: price.id,
+      },
+    });
+    assert.equal(result.state, 'filled');
+  }
+  const order = await prisma.order.findUniqueOrThrow({
+    where: { id: orderId },
+  });
+  assert.ok(order.executedAt);
+  assert.equal(order.grossAmount?.toFixed(8), '200.00000000');
+  assert.equal(order.feeAmount?.toFixed(8), '0.20000000');
+  assert.equal(order.netAmount?.toFixed(8), '200.20000000');
+  const common = await valuation.calculateTradingAccountValuation(
+    s.accountId,
+    order.executedAt,
+    'live_portfolio_valuation',
+  );
+  const snapshot = await prisma.equitySnapshot.findFirstOrThrow({
+    where: { tradingAccountId: s.accountId, snapshotReason: 'order_executed' },
+  });
+  assert.equal(common.totalAssetKrw, '3093720.00000933');
+  assert.equal(snapshot.totalAssetKrw.toFixed(8), common.totalAssetKrw);
+  assert.equal(snapshot.returnRate.toFixed(8), common.returnRate);
+  assert.equal(common.usStockValueKrw, '280000.00000000');
+  assert.equal(common.cryptoValueKrw, '280000.00000933');
+  const caches = await prisma.position.findMany({
+    where: { tradingAccountId: s.accountId },
+  });
+  const cacheSum = caches.reduce(
+    (sum, p) => sum.add(p.marketValueKrw!),
+    new Prisma.Decimal(0),
+  );
+  assert.equal(cacheSum.toFixed(8), '1057000.00000934');
+  assert.equal(common.assetValueKrw, '1057000.00000933');
+  const crypto = caches.find((p) => p.assetId === s.cryptoId)!;
+  assert.equal(crypto.currentPriceKrw?.toFixed(8), '140000.00000000');
+  assert.equal(crypto.marketValueKrw?.toFixed(8), '280000.00000000');
+  assert.equal(crypto.unrealizedPnlKrw?.toFixed(8), '-280.00000000');
+
+  const positions = await new PositionsService(prisma).getPositions(s.userId, {
+    seasonId: seasons[seasons.length - 1],
+  });
+  assert.equal(
+    positions.data.summary.totalPositionValueKrw,
+    common.assetValueKrw,
+  );
+  const values = new Map(
+    common.positionValues.map((p) => [p.assetId, p.valueKrw]),
+  );
+  for (const p of positions.data.positions) {
+    assert.equal(p.valuation.state, 'available');
+    assert.ok('positionValueKrw' in p.valuation);
+    assert.equal(p.valuation.positionValueKrw, values.get(p.assetId));
+  }
+  const home = await new HomeService(prisma, valuation).getHome(s.userId);
+  const summary = home.data.summary as {
+    state: string;
+    totalAssetKrw?: string;
+  };
+  const top = home.data.topPositions as {
+    state: string;
+    items?: Array<{ assetId: string; positionValueKrw: string }>;
+  };
+  assert.equal(summary.state, 'available');
+  assert.equal(summary.totalAssetKrw, common.totalAssetKrw);
+  assert.equal(top.state, 'available');
+  assert.ok(top.items);
+  for (const p of top.items)
+    assert.equal(p.positionValueKrw, values.get(p.assetId));
+  await prisma.assetPriceSnapshot.updateMany({
+    where: {
+      assetId: { in: caches.map((p) => p.assetId) },
+      currencyCode: 'USD',
+    },
+    data: { priceKrw: null },
+  });
+  const withoutStoredKrw = await valuation.calculateTradingAccountValuation(
+    s.accountId,
+    order.executedAt,
+    'live_portfolio_valuation',
+  );
+  assert.equal(withoutStoredKrw.totalAssetKrw, common.totalAssetKrw);
+
+  const fx = new FxService(
+    prisma,
+    undefined,
+    undefined,
+    new TradingAccountAccessService(prisma),
+    undefined,
+    undefined,
+    valuation,
+  );
+  const fxQuote = await fx.quoteForTradingAccount(s.userId, s.accountId, {
+    fromCurrency: 'KRW',
+    toCurrency: 'USD',
+    sourceAmount: '14000',
+  });
+  await fx.executeForTradingAccount(s.userId, s.accountId, {
+    quoteId: fxQuote.data.quoteId!,
+    fromCurrency: 'KRW',
+    toCurrency: 'USD',
+    sourceAmount: '14000',
+    idempotencyKey: randomUUID(),
+  });
+  const exchange = await prisma.equitySnapshot.findFirstOrThrow({
+    where: {
+      tradingAccountId: s.accountId,
+      snapshotReason: 'exchange_executed',
+    },
+  });
+  const postFx = await valuation.calculateTradingAccountValuation(
+    s.accountId,
+    exchange.capturedAt,
+    'live_portfolio_valuation',
+  );
+  assert.equal(exchange.totalAssetKrw.toFixed(8), postFx.totalAssetKrw);
+  assert.equal(postFx.totalAssetKrw, '3093706.00000933');
+  assert.equal(exchange.returnRate.toFixed(8), postFx.returnRate);
+  const later = new Date(exchange.capturedAt.getTime() + 1000);
+  const newerFx = await prisma.fxRateSnapshot.create({
+    data: {
+      baseCurrency: 'USD',
+      quoteCurrency: 'KRW',
+      rate: '1500',
+      sourceType: 'provider_api',
+      sourceName: 'korea_exim_exchange_rate',
+      effectiveAt: later,
+      capturedAt: later,
+    },
+  });
+  fxIds.push(newerFx.id);
+  const settled = await valuation.calculateTradingAccountValuation(
+    s.accountId,
+    exchange.capturedAt,
+    'season_settlement',
+  );
+  assert.equal(settled.totalAssetKrw, postFx.totalAssetKrw);
+  const newer = await valuation.calculateTradingAccountValuation(
+    s.accountId,
+    later,
+    'live_portfolio_valuation',
+  );
+  assert.notEqual(newer.totalAssetKrw, settled.totalAssetKrw);
+  console.log(
+    `passed semantic ${kind}: mixed, stored/null KRW, fractional cache, Home/Positions, FX, settlement cutoff`,
+  );
+}
+
 async function main() {
   try {
     await prisma.$connect();
@@ -546,6 +842,9 @@ async function main() {
       }
     }
     console.log('order closed price parity integration ok: 10 scenarios');
+    for (const kind of ['market', 'limit'] as const)
+      await runSemanticScenario(kind);
+    console.log('valuation semantic parity integration ok: 2 mixed flows');
   } finally {
     resetMarketSessionOverrideStoreForTest();
     await cleanup();

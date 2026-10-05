@@ -913,6 +913,9 @@ describe('OrdersService', () => {
     capturedAt?: Date;
   }) => ({
     id: input.id,
+    baseCurrency: CurrencyCode.USD,
+    quoteCurrency: CurrencyCode.KRW,
+    createdAt: input.capturedAt ?? executedAt,
     rate: new Prisma.Decimal(input.rate),
     sourceType: FxRateSourceType.provider_api,
     sourceName: input.sourceName ?? 'exchange_rate_api',
@@ -928,6 +931,9 @@ describe('OrdersService', () => {
     capturedAt?: Date;
   }) => ({
     id: input.id,
+    baseCurrency: CurrencyCode.USD,
+    quoteCurrency: CurrencyCode.KRW,
+    createdAt: input.capturedAt ?? executedAt,
     rate: new Prisma.Decimal(input.rate),
     sourceType: FxRateSourceType.admin_manual,
     sourceName: 'manual-fx',
@@ -984,11 +990,18 @@ describe('OrdersService', () => {
           : 'KRX');
 
     prisma.tradingAccount.findUnique.mockResolvedValueOnce({
+      userId: 'user-1',
       mode: 'season',
       initialCapitalKrw: new Prisma.Decimal(
         input.initialCapitalKrw ?? '1000000.00000000',
       ),
-      seasonParticipant: { id: 'sp-1' },
+      seasonParticipant: {
+        id: 'sp-1',
+        userId: 'user-1',
+        initialCapitalKrw: new Prisma.Decimal(
+          input.initialCapitalKrw ?? '1000000.00000000',
+        ),
+      },
       cashWallets: [
         {
           currencyCode: CurrencyCode.KRW,
@@ -1036,19 +1049,21 @@ describe('OrdersService', () => {
     }
 
     prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce(
-      input.assetProviderCandidates ?? [
-        providerAssetSnapshot({
-          id: 'aps-portfolio-1',
-          price: '100.00000000',
-          currencyCode,
-          sourceName:
-            assetType === AssetType.crypto
-              ? 'binance_public_rest_24hr_ticker'
-              : currencyCode === CurrencyCode.USD
-                ? 'kis_us_delayed_trade'
-                : 'kis_krx_realtime_trade',
-        }),
-      ],
+      (
+        input.assetProviderCandidates ?? [
+          providerAssetSnapshot({
+            id: 'aps-portfolio-1',
+            price: '100.00000000',
+            currencyCode,
+            sourceName:
+              assetType === AssetType.crypto
+                ? 'binance_public_rest_24hr_ticker'
+                : currencyCode === CurrencyCode.USD
+                  ? 'kis_us_delayed_trade'
+                  : 'kis_krx_realtime_trade',
+          }),
+        ]
+      ).map((snapshot) => ({ ...snapshot, assetId, createdAt: executedAt })),
     );
     if (Object.prototype.hasOwnProperty.call(input, 'assetAdminSnapshot')) {
       const snapshot = input.assetAdminSnapshot;
@@ -1056,6 +1071,9 @@ describe('OrdersService', () => {
         snapshot
           ? {
               id: snapshot.id,
+              assetId,
+              sourceType: AssetPriceSourceType.admin_manual,
+              createdAt: snapshot.capturedAt ?? executedAt,
               price: new Prisma.Decimal(snapshot.price),
               priceKrw: null,
               currencyCode: snapshot.currencyCode ?? currencyCode,

@@ -37,6 +37,8 @@ export type PortfolioPositionInput = {
   averageCost: DecimalInput;
   currencyCode: CurrencyCode;
   realizedPnl: DecimalInput;
+  priceCurrency?: CurrencyCode;
+  settlementCurrency?: CurrencyCode;
   realizedPnlKrw?: DecimalInput;
   latestPriceSnapshot?: PortfolioAssetPriceSnapshotInput | null;
   priceSelectionDiagnosticContext?: PortfolioValuationDiagnosticContext;
@@ -46,6 +48,7 @@ export type PortfolioAssetPriceSnapshotInput = {
   id?: string;
   assetId: string;
   price: DecimalInput;
+  /** Display/ingestion compatibility only; never a financial valuation input. */
   priceKrw?: DecimalInput | null;
   currencyCode: CurrencyCode;
   sourceType: AssetPriceSourceType;
@@ -152,6 +155,9 @@ export function calculatePortfolioValuation(
   }
 
   assertRequiredWallets(input.cashWallets);
+  for (const position of input.positions) {
+    assertPortfolioPosition(position);
+  }
 
   const krwCash = sumWallets(input.cashWallets, CurrencyCode.KRW);
   const usdCash = sumWallets(input.cashWallets, CurrencyCode.USD);
@@ -242,14 +248,14 @@ export function calculatePortfolioValuation(
       });
     }
 
-    const currentPrice = toDecimal(priceSnapshot.price, 'assetPrice.price');
-    const positionValue = quantity.mul(currentPrice);
-    const unrealizedPnl = currentPrice.sub(averageCost).mul(quantity);
-    const conversionRate =
-      priceSnapshot.currencyCode === CurrencyCode.USD ? usdKrwRate : null;
-    const positionValueKrw = priceSnapshot.priceKrw
-      ? quantity.mul(toDecimal(priceSnapshot.priceKrw, 'assetPrice.priceKrw'))
-      : convertToKrw(positionValue, priceSnapshot.currencyCode, conversionRate);
+    const values = calculatePositionValuation({
+      quantity,
+      averageCost,
+      currentPrice: toDecimal(priceSnapshot.price, 'assetPrice.price'),
+      currencyCode: priceSnapshot.currencyCode,
+      usdKrwRate,
+    });
+    const positionValueKrw = values.marketValueKrw;
 
     positionValues.push({
       assetId: position.assetId,
@@ -267,9 +273,7 @@ export function calculatePortfolioValuation(
         cryptoValueKrw = cryptoValueKrw.add(positionValueKrw);
         break;
     }
-    unrealizedPnlKrw = unrealizedPnlKrw.add(
-      convertToKrw(unrealizedPnl, position.currencyCode, usdKrwRate),
-    );
+    unrealizedPnlKrw = unrealizedPnlKrw.add(values.unrealizedPnlKrw);
   }
 
   const totalAssetKrw = krwCash.add(usdCashKrw).add(assetValueKrw);
@@ -354,6 +358,73 @@ function assertRequiredWallets(wallets: readonly PortfolioCashWalletInput[]) {
       'KRW and USD cash wallets are required for portfolio valuation.',
     );
   }
+
+  if (
+    wallets.length !== 2 ||
+    wallets.some((wallet) =>
+      toDecimal(wallet.balanceAmount, 'balanceAmount').lt(0),
+    )
+  ) {
+    throw new PortfolioValuationError(
+      'CASH_WALLET_INVALID',
+      'Exactly one non-negative KRW and USD cash wallet is required.',
+    );
+  }
+}
+
+function assertPortfolioPosition(position: PortfolioPositionInput) {
+  if (
+    toDecimal(position.quantity, 'position.quantity').lt(0) ||
+    toDecimal(position.averageCost, 'position.averageCost').lt(0)
+  ) {
+    throw new PortfolioValuationError(
+      'POSITION_INVALID',
+      `Position quantity and average cost must be non-negative for ${position.assetId}.`,
+    );
+  }
+  const priceCurrency = position.priceCurrency ?? position.currencyCode;
+  const settlementCurrency =
+    position.settlementCurrency ?? position.currencyCode;
+  if (priceCurrency !== settlementCurrency) {
+    throw new PortfolioValuationError(
+      'ORDER_PRICE_SETTLEMENT_CURRENCY_NOT_SUPPORTED',
+      'Separate price and settlement currencies are not supported for portfolio valuation yet.',
+    );
+  }
+  if (settlementCurrency !== position.currencyCode) {
+    throw new PortfolioValuationError(
+      'ASSET_PRICE_UNAVAILABLE',
+      `Position currency mismatch for asset ${position.assetId}.`,
+    );
+  }
+}
+
+/** Raw financial arithmetic. Callers format only at response/cache boundaries. */
+export function calculatePositionValuation(input: {
+  quantity: Prisma.Decimal;
+  averageCost: Prisma.Decimal;
+  currentPrice: Prisma.Decimal;
+  currencyCode: CurrencyCode;
+  usdKrwRate: Prisma.Decimal | null;
+}) {
+  const { quantity, averageCost, currentPrice, currencyCode, usdKrwRate } =
+    input;
+  const marketValueLocal = quantity.mul(currentPrice);
+  const unrealizedPnlLocal = currentPrice.sub(averageCost).mul(quantity);
+  return {
+    currentPriceKrw: convertToKrw(currentPrice, currencyCode, usdKrwRate),
+    marketValueLocal,
+    marketValueKrw: convertToKrw(marketValueLocal, currencyCode, usdKrwRate),
+    unrealizedPnlLocal,
+    unrealizedPnlKrw: convertToKrw(
+      unrealizedPnlLocal,
+      currencyCode,
+      usdKrwRate,
+    ),
+    returnRate: averageCost.eq(0)
+      ? new Prisma.Decimal(0)
+      : currentPrice.sub(averageCost).div(averageCost).mul(100),
+  };
 }
 
 function sumWallets(

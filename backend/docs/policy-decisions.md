@@ -6,6 +6,15 @@
 > `tradingAccountId` 하나다. 아래 작업 7·8의 nullable scope와 dual-write 설명은
 > 당시 rolling migration 결정 이력이며, 현행 계약으로 해석하지 않는다.
 
+## 금융 valuation 의미 (2026-10-05, current)
+
+- PostgreSQL TradingAccount/CashWallet/Position의 원본 보유 상태와 선택된 AssetPriceSnapshot/FxRateSnapshot이 금융 평가 근거다. USD cash와 USD position은 같은 valuationAt/workflow에서 선택한 USD/KRW evidence로 평가하며, USD position KRW 금액은 `quantity × local price × selected FX`다. stored `AssetPriceSnapshot.priceKrw`는 금융 입력으로 사용하지 않고 기존 display/cache/ingestion 계약과 column은 유지한다.
+  근거: 저장 단가의 별도 환율이 같은 평가의 현금·자산·화면 총액을 갈라놓으면 안 된다.
+- valuation의 곱셈·손익·합산은 raw Decimal로 수행하고 공개 결과/DB 저장 경계에서 half-up 8자리로 반올림한다. Position cache를 반올림해 저장해도 그 값을 canonical total 계산에 다시 넣지 않는다. 주문 gross/fee/net, quote, 예약, 실행 settlement의 기존 round8 chain은 유지한다.
+  근거: cache 저장 단위와 거래 arithmetic을 보존하면서 동일 근거의 valuation 중간 반올림 차이를 제거한다.
+- live/daily/settlement/historical workflow의 valuationAt, source eligibility, freshness 및 cutoff 정책은 유지한다. 정산 USD 환산은 정산에서 선택한 cutoff FX를 사용한다.
+  근거: 금융 계산 의미의 공용화는 근거 선택 시점을 바꾸는 작업이 아니다.
+
 ## 주문 입력·장외 지정가 (2026-09-29, current)
 
 - 국내/미국 주식의 소수 수량은 시장가만 허용한다. 지정가는 Decimal 정수 판정으로 거절하여 `1.000000`은 허용한다. 소수 수량의 즉시 거래와 예약 주문의 정수 계약을 구분하기 위한 제품 정책이다.

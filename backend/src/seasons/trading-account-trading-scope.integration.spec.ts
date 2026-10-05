@@ -225,7 +225,7 @@ async function createKrwCryptoAsset(label) {
 }
 
 // Full trading-capable scenario: user + season + linked account +
-// participant + scoped KRW wallet (+ optional USD wallet for FX).
+// participant + both canonical wallets (zero USD needs no valuation FX).
 async function createScenario(label, options = {}) {
   const user = options.userId ? { id: options.userId } : await createUser(label);
   const season = await createSeason(label, options.seasonStartOffsetMs);
@@ -263,19 +263,16 @@ async function createScenario(label, options = {}) {
     },
     select: { id: true },
   });
-  let usdWalletId = null;
-  if (options.withUsdWallet) {
-    const usdWallet = await prisma.cashWallet.create({
-      data: {
-        tradingAccountId: account.id,
-        currencyCode: CurrencyCode.USD,
-        balanceAmount: ZERO,
-        reservedAmount: ZERO,
-      },
-      select: { id: true },
-    });
-    usdWalletId = usdWallet.id;
-  }
+  const usdWallet = await prisma.cashWallet.create({
+    data: {
+      tradingAccountId: account.id,
+      currencyCode: CurrencyCode.USD,
+      balanceAmount: ZERO,
+      reservedAmount: ZERO,
+    },
+    select: { id: true },
+  });
+  const usdWalletId = usdWallet.id;
 
   return {
     userId: user.id,

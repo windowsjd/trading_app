@@ -37,7 +37,7 @@ it means rather than relying on the implicit current one.
 - Season ended and settled states block trading and exchange.
 - Final evaluation is based on total assets in KRW.
 - MVP crypto is Binance-based USD-settled crypto and uses the USD Wallet.
-- Crypto KRW valuation is crypto USD price x quantity x USD/KRW rate.
+- USD stock/crypto KRW valuation is local USD price x quantity x the workflow's selected USD/KRW rate, shared in meaning with USD cash conversion. Stored `AssetPriceSnapshot.priceKrw` does not determine financial values. Summary and top positions use raw Decimal arithmetic until response formatting (half-up, scale 8).
 - `cryptoValueKrw` means KRW-converted value of crypto positions; `totalAssetKrw` and `returnRate` remain KRW-based.
 - Active live valuation and `topPositions` may use fresh eligible `provider_api` rows first, then existing `admin_manual` fallback rows.
 - Open stock markets use capturedAt age <= 60 seconds plus current-session effective time; closed KRX/US assets use only their latest completed session price. Crypto and provider USD/KRW keep their existing continuous freshness rules.

@@ -21,6 +21,7 @@ import {
 } from '../generated/prisma/client';
 import {
   isFxSnapshotStaleForPortfolioValuation,
+  calculatePositionValuation,
   PortfolioValuationError,
   PortfolioValuationResult,
 } from '../portfolio/portfolio-valuation.policy';
@@ -892,21 +893,17 @@ export class HomeService {
           const quantity = position.quantity;
           const averageCost = position.averageCost;
           const currentPrice = priceSnapshot.price;
-          const positionValue = quantity.mul(currentPrice);
-          const positionValueKrw = this.convertToKrw(
-            positionValue,
-            position.currencyCode,
+          const {
+            marketValueKrw: positionValueKrw,
+            unrealizedPnlKrw,
+            returnRate,
+          } = calculatePositionValuation({
+            quantity,
+            averageCost,
+            currentPrice,
+            currencyCode: position.currencyCode,
             usdKrwRate,
-          );
-          const unrealizedPnl = currentPrice.sub(averageCost).mul(quantity);
-          const unrealizedPnlKrw = this.convertToKrw(
-            unrealizedPnl,
-            position.currencyCode,
-            usdKrwRate,
-          );
-          const returnRate = averageCost.eq(0)
-            ? new Prisma.Decimal(0)
-            : currentPrice.sub(averageCost).div(averageCost).mul(100);
+          });
 
           return {
             sortValueKrw: positionValueKrw,
@@ -1140,10 +1137,17 @@ export class HomeService {
       workflow: 'home_live_valuation',
       asset,
     });
-    const priceRead = { asset: { ...asset, currencyCode: currencyCode }, workflow: 'home_live_valuation' as const, now: valuationAt };
+    const priceRead = {
+      asset: { ...asset, currencyCode: currencyCode },
+      workflow: 'home_live_valuation' as const,
+      now: valuationAt,
+    };
     const closedScope = closedMarketPriceScope(priceRead);
     const providerCandidates = providerEligibility.eligible
-      ? await findMarketAwareAssetPriceCandidates(this.prisma, { ...priceRead, sourceNames: providerEligibility.sourceNames })
+      ? await findMarketAwareAssetPriceCandidates(this.prisma, {
+          ...priceRead,
+          sourceNames: providerEligibility.sourceNames,
+        })
       : [];
     const providerSelection = providerEligibility.eligible
       ? selectMarketAwareAssetPriceSnapshotBySourcePriority({
@@ -1440,25 +1444,6 @@ export class HomeService {
     }
 
     return snapshot.rate;
-  }
-
-  private convertToKrw(
-    amount: Prisma.Decimal,
-    currencyCode: CurrencyCode,
-    usdKrwRate: Prisma.Decimal | null,
-  ) {
-    if (currencyCode === CurrencyCode.KRW) {
-      return amount;
-    }
-
-    if (!usdKrwRate) {
-      throw new PortfolioValuationError(
-        'FX_RATE_UNAVAILABLE',
-        'USD/KRW FX rate snapshot is required for USD conversion.',
-      );
-    }
-
-    return amount.mul(usdKrwRate);
   }
 
   private sectionUnavailableFromError(input: {

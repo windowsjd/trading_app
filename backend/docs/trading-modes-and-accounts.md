@@ -238,6 +238,12 @@
 
 ## 2. 계산규칙·ERD (02 계산규칙서·DB ERD 대응)
 
+금융 평가의 USD 자산은 local price × quantity × 해당 valuationAt/workflow의
+selected USD/KRW FX로 계산한다. USD 현금도 같은 평가의 FX를 사용한다.
+AssetPriceSnapshot.priceKrw와 Position valuation cache는 canonical 금융 입력이
+아니다. 평가 계산은 raw Decimal을 유지하고 결과/저장 경계에서 half-up8을
+적용한다. 일반 TWR와 시즌 settlement cutoff 및 거래 round8 chain은 유지한다.
+
 ### 2.1 일반모드 자금·손익 정의
 
 일반모드에서는 다음 값을 구분한다.

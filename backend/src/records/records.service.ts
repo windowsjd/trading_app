@@ -44,6 +44,7 @@ import {
 import { buildPagination, type Pagination } from '../common/pagination';
 import { isFxSnapshotStaleForPortfolioValuation } from '../portfolio/portfolio-valuation.policy';
 import {
+  calculatePositionValuation,
   PortfolioValuationError,
   type PortfolioValuationResult,
 } from '../portfolio/portfolio-valuation.policy';
@@ -1717,27 +1718,34 @@ export class RecordsService {
             usdKrwSelection.diagnosticContext,
           );
         }
+        if (
+          position.currencyCode === CurrencyCode.USD &&
+          usdKrwSelection?.state !== 'available'
+        ) {
+          throw new RecordsValuationError(
+            'FX_RATE_UNAVAILABLE',
+            'USD/KRW FX rate snapshot is required for USD conversion.',
+          );
+        }
 
         const priceSnapshot = await this.findLatestEligibleAssetPriceSnapshot(
           position.asset,
           position.currencyCode,
           valuationAt,
         );
-        const currentPrice = priceSnapshot.price;
-        unrealizedPnlLocal = currentPrice
-          .sub(position.averageCost)
-          .mul(position.quantity);
-        unrealizedPnlKrw = this.convertToKrwForRecords(
-          unrealizedPnlLocal,
-          position.currencyCode,
-          usdKrwSelection,
-        );
-        if (!position.averageCost.eq(0)) {
-          returnRate = currentPrice
-            .sub(position.averageCost)
-            .div(position.averageCost)
-            .mul(100);
-        }
+        const values = calculatePositionValuation({
+          currentPrice: priceSnapshot.price,
+          quantity: position.quantity,
+          averageCost: position.averageCost,
+          currencyCode: position.currencyCode,
+          usdKrwRate:
+            usdKrwSelection?.state === 'available'
+              ? usdKrwSelection.rate
+              : null,
+        });
+        unrealizedPnlLocal = values.unrealizedPnlLocal;
+        unrealizedPnlKrw = values.unrealizedPnlKrw;
+        if (!position.averageCost.eq(0)) returnRate = values.returnRate;
       } catch (caught) {
         const valuationError =
           caught instanceof RecordsValuationError
@@ -2251,25 +2259,6 @@ export class RecordsService {
       state: 'available',
       rate: fallbackSnapshot.rate,
     };
-  }
-
-  private convertToKrwForRecords(
-    amount: Prisma.Decimal,
-    currencyCode: CurrencyCode,
-    usdKrwSelection: UsdKrwForRecords | null,
-  ): Prisma.Decimal {
-    if (currencyCode === CurrencyCode.KRW) {
-      return amount;
-    }
-
-    if (usdKrwSelection?.state !== 'available') {
-      throw new RecordsValuationError(
-        'FX_RATE_UNAVAILABLE',
-        'USD/KRW FX rate snapshot is required for USD conversion.',
-      );
-    }
-
-    return amount.mul(usdKrwSelection.rate);
   }
 
   private unavailableProfitAnalysis(): ProfitAnalysis {

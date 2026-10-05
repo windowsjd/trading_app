@@ -23,6 +23,9 @@ describe('OrdersService.executeOrder DB integration', () => {
       expect(result.stdout).toContain(
         'order closed price parity integration ok: 10 scenarios',
       );
+      expect(result.stdout).toContain(
+        'valuation semantic parity integration ok: 2 mixed flows',
+      );
     },
     130_000,
   );

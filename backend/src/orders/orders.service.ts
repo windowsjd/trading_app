@@ -43,7 +43,14 @@ import {
   isFxSnapshotStale,
   fxExecuteSnapshotFreshnessThresholdMs,
 } from '../fx/fx-execute-snapshot-policy';
-import { isFxSnapshotStaleForPortfolioValuation } from '../portfolio/portfolio-valuation.policy';
+import {
+  calculatePortfolioValuation,
+  calculatePositionValuation,
+  isFxSnapshotStaleForPortfolioValuation,
+  PortfolioValuationError,
+  type PortfolioAssetPriceSnapshotInput,
+  type PortfolioFxRateSnapshotInput,
+} from '../portfolio/portfolio-valuation.policy';
 import { GeneralAccountPerformanceService } from '../portfolio/general-account-performance.service';
 import { lockSeasonTradingContext } from '../seasons/season-trading-lock';
 import { PrismaService } from '../prisma/prisma.service';
@@ -4098,10 +4105,11 @@ export class OrdersService {
         id: tradingAccountId,
       },
       select: {
+        userId: true,
         mode: true,
         initialCapitalKrw: true,
         seasonParticipant: {
-          select: { id: true },
+          select: { id: true, userId: true, initialCapitalKrw: true },
         },
         cashWallets: {
           select: {
@@ -4110,17 +4118,14 @@ export class OrdersService {
           },
         },
         positions: {
-          where: {
-            quantity: {
-              gt: ZERO_MONEY,
-            },
-          },
           select: {
             id: true,
             assetId: true,
             quantity: true,
             averageCost: true,
             currencyCode: true,
+            realizedPnl: true,
+            realizedPnlKrw: true,
             asset: {
               select: {
                 id: true,
@@ -4148,147 +4153,128 @@ export class OrdersService {
       );
     }
 
-    const usdKrwRate =
+    if (
+      account.seasonParticipant.userId !== account.userId ||
+      !account.seasonParticipant.initialCapitalKrw.eq(account.initialCapitalKrw)
+    ) {
+      this.throwTradingScopeIntegrityError(
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+        'Season participant does not match its canonical account owner/capital.',
+      );
+    }
+
+    const usdKrwSnapshot =
       account.cashWallets.some(
         (wallet) =>
           wallet.currencyCode === CurrencyCode.USD &&
           !wallet.balanceAmount.eq(0),
       ) ||
       account.positions.some(
-        (position) => position.currencyCode === CurrencyCode.USD,
+        (position) =>
+          position.currencyCode === CurrencyCode.USD &&
+          !position.quantity.eq(0),
       )
         ? await this.findLatestUsdKrwRateForPortfolio(tx, valuationAt)
         : null;
-    const krwCash = account.cashWallets
-      .filter((wallet) => wallet.currencyCode === CurrencyCode.KRW)
-      .reduce(
-        (sum, wallet) => sum.add(wallet.balanceAmount),
-        new Prisma.Decimal(0),
-      );
-    const usdCash = account.cashWallets
-      .filter((wallet) => wallet.currencyCode === CurrencyCode.USD)
-      .reduce(
-        (sum, wallet) => sum.add(wallet.balanceAmount),
-        new Prisma.Decimal(0),
-      );
-    const usdCashKrw = usdCash.eq(0)
-      ? new Prisma.Decimal(0)
-      : this.convertToKrwForPortfolio(usdCash, CurrencyCode.USD, usdKrwRate);
-    let domesticStockValueKrw = new Prisma.Decimal(0);
-    let usStockValueKrw = new Prisma.Decimal(0);
-    let cryptoValueKrw = new Prisma.Decimal(0);
+    const positions = await Promise.all(
+      account.positions.map(async (position) => ({
+        ...position,
+        assetType: position.asset.assetType,
+        priceCurrency: this.getAssetPriceCurrency(position.asset),
+        settlementCurrency: this.getAssetSettlementCurrency(position.asset),
+        latestPriceSnapshot: position.quantity.eq(0)
+          ? null
+          : await this.findLatestAssetPriceForPortfolio(
+              tx,
+              {
+                assetId: position.assetId,
+                assetType: position.asset.assetType,
+                market: position.asset.market,
+                currencyCode: this.getAssetPriceCurrency(position.asset),
+              },
+              valuationAt,
+            ),
+      })),
+    );
 
-    for (const position of account.positions) {
-      if (
-        this.getAssetPriceCurrency(position.asset) !==
-        this.getAssetSettlementCurrency(position.asset)
-      ) {
-        this.throwApiError(
-          HttpStatus.BAD_REQUEST,
-          'ORDER_PRICE_SETTLEMENT_CURRENCY_NOT_SUPPORTED',
-          'Separate price and settlement currencies are not supported for portfolio valuation yet.',
-        );
-      }
-
-      const priceSnapshot = await this.findLatestAssetPriceForPortfolio(
-        tx,
-        {
-          assetId: position.assetId,
-          assetType: position.asset.assetType,
-          market: position.asset.market,
-          currencyCode: this.getAssetPriceCurrency(position.asset),
-        },
+    try {
+      const valuation = calculatePortfolioValuation({
+        seasonParticipantId,
+        tradingAccountId,
+        initialCapitalKrw: account.initialCapitalKrw,
+        cashWallets: account.cashWallets,
+        positions,
+        usdKrwSnapshot,
         valuationAt,
-      );
-      const marketValueLocal = roundDecimalHalfUp(
-        position.quantity.mul(priceSnapshot.price),
-        monetaryScale,
-      );
-      const priceKrw =
-        priceSnapshot.priceKrw ??
-        this.convertToKrwForPortfolio(
-          priceSnapshot.price,
-          priceSnapshot.currencyCode,
-          usdKrwRate,
-        );
-      const marketValueKrw = roundDecimalHalfUp(
-        position.quantity.mul(priceKrw),
-        monetaryScale,
-      );
-      const unrealizedPnlLocal = roundDecimalHalfUp(
-        priceSnapshot.price.sub(position.averageCost).mul(position.quantity),
-        monetaryScale,
-      );
-      const unrealizedPnlKrw = this.convertToKrwForPortfolio(
-        unrealizedPnlLocal,
-        position.currencyCode,
-        usdKrwRate,
-      );
-
-      await tx.position.update({
-        where: {
-          id: position.id,
-        },
-        data: {
-          currentPriceLocal: this.formatDecimal(
-            priceSnapshot.price,
-            monetaryScale,
-          ),
-          currentPriceKrw: this.formatDecimal(priceKrw, monetaryScale),
-          marketValueLocal: this.formatDecimal(marketValueLocal, monetaryScale),
-          marketValueKrw: this.formatDecimal(marketValueKrw, monetaryScale),
-          unrealizedPnlLocal: this.formatDecimal(
-            unrealizedPnlLocal,
-            monetaryScale,
-          ),
-          unrealizedPnlKrw: this.formatDecimal(unrealizedPnlKrw, monetaryScale),
-        },
-        select: {
-          id: true,
-        },
+        sourceEligibilityWorkflow: 'live_portfolio_valuation',
       });
 
-      switch (position.asset.assetType) {
-        case AssetType.domestic_stock:
-          domesticStockValueKrw = domesticStockValueKrw.add(marketValueKrw);
-          break;
-        case AssetType.us_stock:
-          usStockValueKrw = usStockValueKrw.add(marketValueKrw);
-          break;
-        case AssetType.crypto:
-          cryptoValueKrw = cryptoValueKrw.add(marketValueKrw);
-          break;
+      for (const position of positions) {
+        if (!position.latestPriceSnapshot) continue;
+        const values = calculatePositionValuation({
+          quantity: position.quantity,
+          averageCost: position.averageCost,
+          currentPrice: new Prisma.Decimal(position.latestPriceSnapshot.price),
+          currencyCode: position.currencyCode,
+          usdKrwRate: usdKrwSnapshot
+            ? new Prisma.Decimal(usdKrwSnapshot.rate)
+            : null,
+        });
+        await tx.position.update({
+          where: { id: position.id },
+          data: {
+            currentPriceLocal: this.formatDecimal(
+              new Prisma.Decimal(position.latestPriceSnapshot.price),
+              monetaryScale,
+            ),
+            currentPriceKrw: this.formatDecimal(
+              values.currentPriceKrw,
+              monetaryScale,
+            ),
+            marketValueLocal: this.formatDecimal(
+              values.marketValueLocal,
+              monetaryScale,
+            ),
+            marketValueKrw: this.formatDecimal(
+              values.marketValueKrw,
+              monetaryScale,
+            ),
+            unrealizedPnlLocal: this.formatDecimal(
+              values.unrealizedPnlLocal,
+              monetaryScale,
+            ),
+            unrealizedPnlKrw: this.formatDecimal(
+              values.unrealizedPnlKrw,
+              monetaryScale,
+            ),
+          },
+          select: { id: true },
+        });
       }
+      return valuation;
+    } catch (error) {
+      if (error instanceof PortfolioValuationError) {
+        const badRequest = [
+          'INVALID_INITIAL_CAPITAL',
+          'CASH_WALLET_INVALID',
+          'POSITION_INVALID',
+          'INVALID_DECIMAL',
+          'ORDER_PRICE_SETTLEMENT_CURRENCY_NOT_SUPPORTED',
+        ].includes(error.code);
+        this.throwApiError(
+          badRequest ? HttpStatus.BAD_REQUEST : HttpStatus.SERVICE_UNAVAILABLE,
+          error.code,
+          error.message,
+        );
+      }
+      throw error;
     }
-
-    const totalAssetKrw = krwCash
-      .add(usdCashKrw)
-      .add(domesticStockValueKrw)
-      .add(usStockValueKrw)
-      .add(cryptoValueKrw);
-    const returnRate = totalAssetKrw
-      .sub(account.initialCapitalKrw)
-      .div(account.initialCapitalKrw)
-      .mul(100);
-
-    return {
-      totalAssetKrw: this.formatDecimal(totalAssetKrw, monetaryScale),
-      returnRate: this.formatDecimal(returnRate, 8),
-      krwCash: this.formatDecimal(krwCash, monetaryScale),
-      usdCashKrw: this.formatDecimal(usdCashKrw, monetaryScale),
-      domesticStockValueKrw: this.formatDecimal(
-        domesticStockValueKrw,
-        monetaryScale,
-      ),
-      usStockValueKrw: this.formatDecimal(usStockValueKrw, monetaryScale),
-      cryptoValueKrw: this.formatDecimal(cryptoValueKrw, monetaryScale),
-    };
   }
 
   private async findLatestUsdKrwRateForPortfolio(
     tx: OrderExecuteTransactionClient,
     valuationAt: Date,
-  ): Promise<Prisma.Decimal> {
+  ): Promise<PortfolioFxRateSnapshotInput> {
     const providerEligibility = resolveFxProviderEligibility({
       workflow: 'live_portfolio_valuation',
       baseCurrency: CurrencyCode.USD,
@@ -4325,7 +4311,7 @@ export class OrdersService {
         };
 
     if (providerSelection.state === 'selected') {
-      return providerSelection.snapshot.rate;
+      return providerSelection.snapshot;
     }
 
     const providerFailureEvidence = buildSelectionFailureEvidence({
@@ -4359,6 +4345,9 @@ export class OrdersService {
       ],
       select: {
         id: true,
+        baseCurrency: true,
+        quoteCurrency: true,
+        createdAt: true,
         rate: true,
         sourceType: true,
         sourceName: true,
@@ -4437,7 +4426,7 @@ export class OrdersService {
       );
     }
 
-    return snapshot.rate;
+    return snapshot;
   }
 
   private async findLatestAssetPriceForPortfolio(
@@ -4449,11 +4438,7 @@ export class OrdersService {
       currencyCode: CurrencyCode;
     },
     valuationAt: Date,
-  ): Promise<{
-    price: Prisma.Decimal;
-    priceKrw: Prisma.Decimal | null;
-    currencyCode: CurrencyCode;
-  }> {
+  ): Promise<PortfolioAssetPriceSnapshotInput> {
     const priceRead = {
       asset: { ...input, id: input.assetId },
       workflow: 'live_portfolio_valuation' as const,
@@ -4497,11 +4482,7 @@ export class OrdersService {
         };
 
     if (providerSelection.state === 'selected') {
-      return {
-        price: providerSelection.snapshot.price,
-        priceKrw: providerSelection.snapshot.priceKrw,
-        currencyCode: providerSelection.snapshot.currencyCode,
-      };
+      return providerSelection.snapshot;
     }
 
     const providerFailureEvidence = buildSelectionFailureEvidence({
@@ -4534,6 +4515,9 @@ export class OrdersService {
       ],
       select: {
         id: true,
+        assetId: true,
+        sourceType: true,
+        createdAt: true,
         price: true,
         priceKrw: true,
         currencyCode: true,
@@ -4581,31 +4565,7 @@ export class OrdersService {
       );
     }
 
-    return {
-      price: snapshot.price,
-      priceKrw: snapshot.priceKrw,
-      currencyCode: snapshot.currencyCode,
-    };
-  }
-
-  private convertToKrwForPortfolio(
-    amount: Prisma.Decimal,
-    currencyCode: CurrencyCode,
-    usdKrwRate: Prisma.Decimal | null,
-  ): Prisma.Decimal {
-    if (currencyCode === CurrencyCode.KRW) {
-      return roundDecimalHalfUp(amount, monetaryScale);
-    }
-
-    if (!usdKrwRate) {
-      this.throwApiError(
-        HttpStatus.SERVICE_UNAVAILABLE,
-        'FX_RATE_UNAVAILABLE',
-        'USD/KRW FX rate snapshot is unavailable.',
-      );
-    }
-
-    return roundDecimalHalfUp(amount.mul(usdKrwRate), monetaryScale);
+    return snapshot;
   }
 
   private calculateRealizedPnlKrwDeltaForExecution(
