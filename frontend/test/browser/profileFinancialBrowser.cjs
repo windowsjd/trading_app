@@ -12,6 +12,16 @@ const expected = {
   light: { red_blue: ['rgb(161, 62, 59)', 'rgb(49, 95, 155)'], green_red: ['rgb(22, 128, 58)', 'rgb(161, 62, 59)'] },
   dark: { red_blue: ['rgb(255, 139, 134)', 'rgb(140, 186, 255)'], green_red: ['rgb(121, 214, 139)', 'rgb(255, 139, 134)'] },
 };
+const actions = {
+  red_blue: ['rgb(209, 17, 11)', 'rgb(10, 90, 194)'],
+  green_red: ['rgb(22, 128, 58)', 'rgb(209, 17, 11)'],
+};
+const candleColors = (appearance, palette) => palette === 'red_blue'
+  ? actions.red_blue : [expected[appearance].green_red[0], actions.green_red[1]];
+const surfaces = {
+  light: { red_blue: ['rgb(254, 242, 242)', 'rgb(239, 246, 255)'], green_red: ['rgb(240, 253, 244)', 'rgb(254, 242, 242)'] },
+  dark: { red_blue: ['rgb(56, 35, 42)', 'rgb(30, 48, 75)'], green_red: ['rgb(29, 57, 43)', 'rgb(56, 35, 42)'] },
+};
 const anchors = { home: 'home-total-asset', ranking: 'ranking-item-user-0', my: 'my-profile-avatar', market: 'market-item-asset-0', search: 'market-item-asset-0', settings: 'settings-financial-red_blue' };
 async function run() {
   fs.mkdirSync(out, { recursive: true });
@@ -60,6 +70,23 @@ async function run() {
   });
   const id = (value) => page.getByTestId(value);
   const color = (locator, property = 'color') => locator.evaluate((el, property) => getComputedStyle(el)[property], property);
+  async function strongButton(locator, background) {
+    assert.equal(await color(locator, 'backgroundColor'), background);
+    assert.equal(await color(locator.locator('[dir="auto"]').first()), 'rgb(255, 255, 255)');
+    const clipped = await locator.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      const failures = [];
+      while (walker.nextNode()) {
+        const node = walker.currentNode;
+        if (!node.textContent.trim()) continue;
+        const range = document.createRange(); range.selectNodeContents(node);
+        if ([...range.getClientRects()].some((r) => r.width && (r.left < box.left - 1 || r.right > box.right + 1 || r.top < box.top - 1 || r.bottom > box.bottom + 1))) failures.push(node.textContent);
+      }
+      return failures;
+    });
+    assert.deepEqual(clipped, [], `strong button label bounds: ${await locator.getAttribute('data-testid')}`);
+  }
   const open = async (screen, query = '', fixture = 'rootTabs') => {
     await page.goto(`${base}/${fixture}?screen=${screen}${query}`);
     if (screen === 'search') await id('market-search-input').fill('삼성');
@@ -108,11 +135,13 @@ async function run() {
             else assert.equal(await id('market-session-summary').count(), 0);
           }
           if (screen === 'home') {
+            await theme.background(id('trading-account-season-summary'), appearance, 'screen');
             await id('home-profile-avatar-fallback').waitFor();
             await theme.background(id('home-profile-avatar'), appearance, 'raised');
             assert.equal(await color(id('home-profile-avatar-fallback').locator('div').first(), 'backgroundColor'), appearance === 'light' ? 'rgb(105, 117, 131)' : 'rgb(174, 187, 200)');
             assert.equal(await color(id('home-summary-card').getByText('-3.52%', { exact: true })), expected[appearance][palette][1]);
           }
+          if (screen === 'market' || screen === 'settings') await theme.background(id(`${screen}-screen`), appearance, 'screen');
           records.push({ screen, appearance, palette, width, fontScale });
           if (width === 390 && fontScale === 1) await page.screenshot({ path: path.join(out, `${screen}-${appearance}-${palette}.png`) });
         }
@@ -165,30 +194,50 @@ async function run() {
     assert.ok(await page.evaluate(() => window.sameMarketRow === document.querySelector('[data-testid=market-item-asset-0]')), 'memoized rows repaint without remount');
 
     // Actual detail/order/chart renderers, order-book surfaces and memoized SVG repaint.
-    for (const appearance of ['light', 'dark']) for (const palette of ['red_blue', 'green_red']) for (const width of [320,360,390,430]) {
+    for (const appearance of ['light', 'dark']) for (const palette of ['red_blue', 'green_red']) for (const width of [320,360,390,430]) for (const fontScale of [1, 1.5, 2]) {
       await page.setViewportSize({ width, height: 844 }); await page.emulateMedia({ colorScheme: appearance });
-      await open('detail', `&asset=SUI&mixedCandles=1&palette=${palette}`, 'trading'); await id('asset-detail-name').waitFor();
+      await open('detail', `&asset=SUI&mixedCandles=1&palette=${palette}&fontScale=${fontScale}`, 'trading'); await id('asset-detail-name').waitFor();
       await theme.canvas(page, appearance);
+      await theme.background(id('asset-detail-screen'), appearance, 'screen');
+      await theme.background(id('asset-order-actions'), appearance, 'surface');
       const up = expected[appearance][palette][0], down = expected[appearance][palette][1];
       assert.equal(await color(id('asset-change-rate')), up);
-      const expectedAction = expected.light[palette];
-      assert.equal(await color(id('asset-detail-open-buy-order'), 'backgroundColor'), expectedAction[0]);
-      assert.equal(await color(id('asset-detail-open-sell-order'), 'backgroundColor'), expectedAction[1]);
-      const fills = await page.locator('svg rect').evaluateAll((els) => els.map((e) => getComputedStyle(e).fill));
-      assert.ok(fills.includes(up) && fills.includes(down), `candle directions ${appearance} ${palette}`);
+      const expectedAction = actions[palette];
+      await strongButton(id('asset-detail-open-buy-order'), expectedAction[0]);
+      await strongButton(id('asset-detail-open-sell-order'), expectedAction[1]);
+      const candles = await page.locator('svg g[clip-path] > g').evaluateAll((els) => els.map((el) => ({
+        body: getComputedStyle(el.querySelector('rect')).fill,
+        wick: getComputedStyle(el.querySelector('line')).stroke,
+      })));
+      const expectedCandles = candleColors(appearance, palette);
+      assert.ok(expectedCandles.every((fill) => candles.some((candle) => candle.body === fill)), `candle directions ${appearance} ${palette}`);
+      for (const candle of candles) {
+        assert.ok(expectedCandles.includes(candle.body));
+        assert.equal(candle.wick, candle.body);
+      }
+      const currentLine = page.locator('svg line[stroke-dasharray="3 3"]');
+      assert.equal(await color(currentLine, 'stroke'), expectedCandles[1], 'latest mixed candle is bearish');
+      assert.equal(await color(currentLine.locator('..').locator('rect'), 'fill'), expectedCandles[1]);
+      if (width === 390 && fontScale === 1) await page.screenshot({ path: path.join(out, `detail-${appearance}-${palette}.png`) });
       await page.evaluate(() => window.tradingAppearance.setFinancialPreference(window.tradingAppearance.financialPreference === 'red_blue' ? 'green_red' : 'red_blue'));
       const other = palette === 'red_blue' ? 'green_red' : 'red_blue';
-      await page.waitForFunction((fill) => [...document.querySelectorAll('svg rect')].some((el) => getComputedStyle(el).fill === fill), expected[appearance][other][0]);
+      await page.waitForFunction((fill) => [...document.querySelectorAll('svg g[clip-path] rect')].some((el) => getComputedStyle(el).fill === fill), candleColors(appearance, other)[0]);
       await page.evaluate((palette) => window.tradingAppearance.setFinancialPreference(palette), palette);
       await id('asset-detail-open-buy-order').click(); await id('asset-trading-columns').waitFor();
-      assert.equal(await color(id('asset-detail-buy-button'), 'backgroundColor'), expectedAction[0]);
+      await theme.background(id('order-screen').first(), appearance, 'screen');
+      await theme.background(id('asset-trading-columns'), appearance, 'surface');
+      await strongButton(id('asset-detail-buy-button'), expectedAction[0]);
+      await strongButton(id('order-execute-submit'), expectedAction[0]);
       assert.equal(await color(id('asset-order-book-bids-1').locator('div').first()), up);
       assert.equal(await color(id('asset-order-book-asks-1').locator('div').first()), down);
+      assert.equal(await color(id('asset-order-book-bids-1'), 'backgroundColor'), surfaces[appearance][palette][0]);
+      assert.equal(await color(id('asset-order-book-asks-1'), 'backgroundColor'), surfaces[appearance][palette][1]);
       await id('asset-detail-sell-button').click();
-      assert.equal(await color(id('asset-detail-sell-button'), 'backgroundColor'), expectedAction[1]);
+      await strongButton(id('asset-detail-sell-button'), expectedAction[1]);
+      await strongButton(id('order-execute-submit'), expectedAction[1]);
       await theme.canvas(page, appearance);
-      records.push({ screen: 'detail/order/chart', appearance, palette, width });
-      if (width === 390) await page.screenshot({ path: path.join(out, `order-${appearance}-${palette}.png`) });
+      records.push({ screen: 'detail/order/chart', appearance, palette, width, fontScale });
+      if (width === 390 && fontScale === 1) await page.screenshot({ path: path.join(out, `order-${appearance}-${palette}.png`) });
     }
     for (const appearance of ['light', 'dark']) for (const palette of ['red_blue', 'green_red']) {
       await page.setViewportSize({ width: 390, height: 844 }); await page.emulateMedia({ colorScheme: appearance });

@@ -12,6 +12,56 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: Dark Screen 배경 + Strong Financial Red/Blue (2026-10-05)
+
+의도: Dark Mode의 화면 배경을 기존의 푸른 네이비 계열에서 조금 더 중성적인
+`#15171C`로 조정하고, 매매 Action과 Candlestick의 방향색을 `#D1110B / #0A5AC2`로
+강화해 Light/Dark 모두에서 금융 방향성을 더 선명하게 표현하기 위함.
+
+- `git fetch origin main` 성공, clean working tree를 확인했다. 시작/종료 HEAD는
+  `649b1fc175894657686d0acfe5041e72f21d3059` (`관리자용 계정 강화5`)이며 최신 `origin/main`과 같다.
+  직전 확인 커밋 `2a2d2026`보다 최신 코드로 조사했고 커밋하지 않았다.
+- 앱 구현은 `frontend/src/theme/{appearance.tsx,financialColors.ts}` 두 파일뿐이다.
+  Dark `screen`만 `#10151C → #15171C`; Light 전체 팔레트와 Dark surface/raised/input/
+  border/navigation/selected는 유지한다. 기존 screen role로 canvas, navigator content,
+  StatusBar, Web document, 초기 Dark fallback에 적용된다.
+- 금융 팔레트에 `candle` 역할을 추가해 text와 분리했다. Red/Blue의 action/candle은
+  두 테마에서 동일한 Strong 색이다. Asset Detail 구매하기/판매하기, Order 매수/매도
+  selected tab와 최종 실행 CTA, Candle body/wick·현재가 line/marker에 자동 적용된다.
+  기존 candle role을 공유하는 Guide `CandleFigures`(해부도/단일 캔들)와
+  `MarketLessonUi`의 학습용 캔들도 적용된다. 같은 역할의 volume bar는 발견되지 않았다.
+- %/수익률/실현·미실현 손익의 rise/fall, 작은 buy/sell text와 호가 surface는 유지한다.
+  Red/Blue text는 Light `#A13E3B / #315F9B`, Dark `#FF8B86 / #8CBAFF` 그대로다.
+  Green/Red preference의 Green text/surface/action/candle은 기존 정책 유지;
+  하락 Red action/candle만 `#D1110B`다. Primary Gradient/하단 탭/Secondary Brand,
+  semantic 상태색, 흰 버튼 foreground, disabled/loading/접근성/주문 처리와 chart geometry는 유지한다.
+- 지정한 옛 hex 전체 검색 결과: runtime Dark screen과 Red/Blue action을 변경하고
+  text 값은 보존했다. RootTheme/native/financial contrast 테스트와 browser screen 기대값을 갱신했다.
+  날짜·기준 commit이 있는 `frontend/docs/trading-{screen-task-b,ui-runtime-followup}.md`는
+  historical documentation으로 보존했고, literal/pass-through·press feedback 테스트의 옛 text도 유지했다.
+- `npm run check` (두 lint gate/typecheck/122개 테스트 파일), 별도 `npm run typecheck`,
+  `npm run export:web`, 관련 23개 테스트 파일, `git diff --check` PASS.
+  실제 RN Web: profile/financial 336 layouts, Wallet/Home 384 layouts와 실제 navigation,
+  trading/chart 138 scenarios, Order layout/입력/fixture quote-create,
+  Record detail/profit 192 layouts PASS. 두 테마/두 금융색/320·360·390·430px/
+  fontScale 1·1.5·2에서 Strong 버튼의 흰 label·clipping, Candle body/wick/현재가,
+  기존 금융 text와 호가 surface를 확인했고 Light/Dark 캡처를 시각 검토했다.
+  추가 렌더 probe 18건으로 활성/비활성 최종 매수·매도 CTA, Wallet canvas/surface,
+  상승/하락 현재가 line/marker 및 기존 grid/axis 색도 PASS.
+- 시작 HEAD와 팔레트 audit PASS: UI 변경은 Dark screen뿐이고 금융 text/surface/cashflow,
+  Green, Brand 및 role token은 모두 동일하다. 전체 diff 검토 완료.
+  Backend 0줄, DB 0줄, Migration 0개, API contract 변경 0개, 새 dependency 없음.
+  Web 검증은 외부 요청을 차단한 실제 컴포넌트/Query/navigation + fixture transport 기준이다.
+  adb와 iOS runtime이 없어 실제 Native 실행은 NOT_RUN;
+  기기 font scaling 및 TalkBack/VoiceOver는 NOT_VERIFIED.
+- 변경 파일 9개: 위 앱 구현 2개, `src/theme/{appearance.test.ts,financialColors.test.ts,native.test.ts}`,
+  `src/app/navigation/RootTheme.test.ts`, `test/browser/{appearanceAssertions.cjs,profileFinancialBrowser.cjs}`,
+  이 문서. 테스트는 역할별 기대값·surface 보존·fallback/StatusBar·실제 렌더 회귀를 검증한다.
+  결과/캡처: `/tmp/strong-financial-{profile,wallet,trading,order,record}`;
+  command 로그: `/tmp/strong-financial-{related-tests,check,typecheck,export,profile,wallet,trading,order,record}.log`;
+  palette 비교: `/tmp/strong-financial-palette-audit.{cjs,json}`;
+  추가 probe/활성 CTA 캡처: `/tmp/strong-financial-probe`, 재현 runner `/tmp/strong-financial-render-probe.cjs`.
+
 ### 작업 단위: Primary Gradient 끝색 Blue–Indigo 보완 (2026-10-05)
 
 의도: 기존 Primary Blue `#326FE5`의 밝기와 브랜드 인상을 유지하면서,

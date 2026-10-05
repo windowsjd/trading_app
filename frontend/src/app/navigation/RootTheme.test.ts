@@ -8,7 +8,7 @@ const { load, elements } = createRequire(import.meta.url)('../../../test/ledgerT
 for (const mode of ['light', 'dark'] as const) {
   test(`NavigationContainer and root stack use the ${mode} appearance`, () => {
     const colors = mode === 'dark'
-      ? { screen: '#10151c', surface: '#1b2530', text: '#f2f5f7', border: '#435364' }
+      ? { screen: '#15171c', surface: '#1b2530', text: '#f2f5f7', border: '#435364' }
       : { screen: '#fcfcfd', surface: '#ffffff', text: '#202a35', border: '#e5e8eb' };
     const mocks: Record<string, unknown> = {
       'react-native': { Platform: { OS: 'ios' } },

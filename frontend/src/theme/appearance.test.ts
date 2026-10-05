@@ -42,6 +42,7 @@ function harness(saved: string | null = null, holdRead = false) {
   let renderer: any;
   return {
     module, applied, releaseRead, values,
+    get rendered() { return renderer.toJSON(); },
     get current() { return current; }, get stored() { return values.get('trading-app:appearance'); },
     setScheme: (next: 'light' | 'dark') => { scheme = next; },
     failRead: () => { failRead = true; }, failWrite: () => { failWrite = true; },
@@ -84,9 +85,12 @@ for (const preference of ['system', 'light', 'dark'] as const) {
     const h = harness(preference, true); t.after(h.close);
     h.setScheme(preference === 'dark' ? 'light' : 'dark');
     await h.mount(); assert.equal(h.current, undefined); assert.deepEqual(h.applied, []);
+    assert.equal(h.rendered.props.style.backgroundColor, preference === 'dark' ? '#fcfcfd' : '#15171c');
     await act(async () => { h.releaseRead(); await Promise.resolve(); });
     assert.equal(h.current.preference, preference);
     assert.equal(h.current.mode, preference === 'system' ? 'dark' : preference);
+    assert.equal(h.rendered[0].type, 'StatusBar');
+    assert.equal(h.rendered[0].props.backgroundColor, preference === 'light' ? '#fcfcfd' : '#15171c');
     assert.deepEqual(h.applied, [preference === 'system' ? 'unspecified' : preference]);
     assert.equal(h.stored, preference);
   });

@@ -23,7 +23,7 @@ export const PALETTES = {
     secondaryActionSurface: '#EAF4FC', secondaryActionForeground: '#285B85',
   },
   dark: {
-    screen: '#10151c', surface: '#1b2530', raised: '#273543',
+    screen: '#15171c', surface: '#1b2530', raised: '#273543',
     text: '#f2f5f7', secondary: '#c5d0da', muted: '#aebbc8',
     border: '#435364', input: '#273543', selected: '#344657',
     placeholder: '#aebbc8', cursor: '#f2f5f7', navigation: '#080a0d',

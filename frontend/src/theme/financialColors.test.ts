@@ -19,19 +19,32 @@ test('new, invalid and missing preferences use Red/Blue; Green/Red is explicit',
 });
 
 for (const mode of ['light', 'dark'] as const) for (const preference of ['red_blue', 'green_red'] as const) {
-  test(`${mode} ${preference}: all financial directions agree, with readable text and actions`, () => {
+  test(`${mode} ${preference}: text/surfaces retain their theme policy; actions/candles have separate roles`, () => {
     const colors = getFinancialColors(mode, preference);
     const expected = mode === 'light'
       ? preference === 'red_blue' ? ['#a13e3b', '#315f9b'] : ['#16803a', '#a13e3b']
       : preference === 'red_blue' ? ['#ff8b86', '#8cbaff'] : ['#79d68b', '#ff8b86'];
-    for (const role of ['buy', 'rise', 'candleUp'] as const) assert.equal(colors[role], expected[0]);
-    for (const role of ['sell', 'fall', 'candleDown'] as const) assert.equal(colors[role], expected[1]);
+    const actions = preference === 'red_blue' ? ['#d1110b', '#0a5ac2'] : ['#16803a', '#d1110b'];
+    const candles = preference === 'red_blue' ? ['#d1110b', '#0a5ac2'] : [expected[0], '#d1110b'];
+    const surfaces = mode === 'light'
+      ? preference === 'red_blue' ? ['#fef2f2', '#eff6ff'] : ['#f0fdf4', '#fef2f2']
+      : preference === 'red_blue' ? ['#38232a', '#1e304b'] : ['#1d392b', '#38232a'];
+    for (const role of ['buy', 'rise'] as const) assert.equal(colors[role], expected[0]);
+    for (const role of ['sell', 'fall'] as const) assert.equal(colors[role], expected[1]);
+    assert.equal(colors.buyAction, actions[0]);
+    assert.equal(colors.sellAction, actions[1]);
+    assert.equal(colors.candleUp, candles[0]);
+    assert.equal(colors.candleDown, candles[1]);
+    assert.equal(colors.buySurface, surfaces[0]);
+    assert.equal(colors.sellSurface, surfaces[1]);
+    assert.notEqual(colors.fall, colors.candleDown);
+    if (preference === 'red_blue') assert.notEqual(colors.rise, colors.candleUp);
     assert.equal(resolveFinancialColor(BUY_COLOR, mode, preference), colors.buyAction);
     assert.equal(resolveFinancialColor(SELL_COLOR, mode, preference), colors.sellAction);
     assert.equal(resolveFinancialColor(UP_COLOR, mode, preference), colors.candleUp);
     assert.equal(resolveFinancialColor(DOWN_COLOR, mode, preference), colors.candleDown);
     for (const color of [colors.buy, colors.sell]) {
-      for (const bg of mode === 'light' ? ['#fcfcfd', '#ffffff', '#f7f8fa'] : ['#10151c', '#1b2530', '#273543']) {
+      for (const bg of mode === 'light' ? ['#fcfcfd', '#ffffff', '#f7f8fa'] : ['#15171c', '#1b2530', '#273543']) {
         assert.ok(contrast(color, bg) >= 4.5, `${color} on ${bg}`);
       }
     }

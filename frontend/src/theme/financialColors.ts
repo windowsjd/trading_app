@@ -6,17 +6,33 @@ export function parseFinancialColorPreference(value: string | null): FinancialCo
   return value === 'green_red' ? value : 'red_blue';
 }
 
-// Text/candles adapt to appearance; solid actions retain contrast with white labels.
-const red = { text: { light: '#a13e3b', dark: '#ff8b86' }, surface: { light: '#fef2f2', dark: '#38232a' }, action: { light: '#a13e3b', dark: '#a13e3b' } };
-const blue = { text: { light: '#315f9b', dark: '#8cbaff' }, surface: { light: '#eff6ff', dark: '#1e304b' }, action: { light: '#315f9b', dark: '#315f9b' } };
-const green = { text: { light: '#16803a', dark: '#79d68b' }, surface: { light: '#f0fdf4', dark: '#1d392b' }, action: { light: '#16803a', dark: '#16803a' } };
+// Text/surfaces adapt to appearance. Red/Blue actions and candles share strong
+// direction colors in both modes; Green retains its existing role policies.
+const red = {
+  text: { light: '#a13e3b', dark: '#ff8b86' },
+  surface: { light: '#fef2f2', dark: '#38232a' },
+  action: { light: '#d1110b', dark: '#d1110b' },
+  candle: { light: '#d1110b', dark: '#d1110b' },
+};
+const blue = {
+  text: { light: '#315f9b', dark: '#8cbaff' },
+  surface: { light: '#eff6ff', dark: '#1e304b' },
+  action: { light: '#0a5ac2', dark: '#0a5ac2' },
+  candle: { light: '#0a5ac2', dark: '#0a5ac2' },
+};
+const green = {
+  text: { light: '#16803a', dark: '#79d68b' },
+  surface: { light: '#f0fdf4', dark: '#1d392b' },
+  action: { light: '#16803a', dark: '#16803a' },
+  candle: { light: '#16803a', dark: '#79d68b' },
+};
 
 function directionalPalette(positive: typeof red, negative: typeof red) {
   return {
     buy: positive.text, sell: negative.text, rise: positive.text, fall: negative.text,
     buySurface: positive.surface, sellSurface: negative.surface,
     buyAction: positive.action, sellAction: negative.action,
-    candleUp: positive.text, candleDown: negative.text,
+    candleUp: positive.candle, candleDown: negative.candle,
     // Cashflow is independent of market/order direction and of this preference.
     credit: { light: '#16803a', dark: '#79d68b' },
     debit: { light: '#bd3030', dark: '#ff8585' },
