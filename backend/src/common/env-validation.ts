@@ -4,6 +4,7 @@ import { readLimitOrderMatchingConfig } from '../orders/limit-order-matching.con
 import { readGeneralTradeFeeRate } from '../orders/general-trading.config';
 import { readLiveCandleConfig } from '../assets/live-candle.config';
 import { readGeneralFxFeeRate } from '../fx/general-fx.config';
+import { readProfileImageStorageConfig } from '../auth/profile-image.config';
 
 /**
  * Central startup validation for environment variables whose misconfiguration
@@ -42,6 +43,7 @@ export function validateEnv(
   collect(errors, () => readLiveCandleConfig(env));
   collect(errors, () => readGeneralTradeFeeRate(env));
   collect(errors, () => readGeneralFxFeeRate(env));
+  collect(errors, () => readProfileImageStorageConfig(config));
 
   // AD_REWARD_*: absent → disabled, which is a complete valid state. With
   // AD_REWARD_ENABLED=true every operational value (provider, amount, daily

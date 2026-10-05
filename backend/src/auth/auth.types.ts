@@ -32,7 +32,6 @@ export type RefreshTokenRequestBody = {
 export type UpdateProfileRequestBody = {
   portfolioPublic?: unknown;
   nickname?: unknown;
-  profileImageUrl?: unknown;
 };
 
 export type RequestAuthMetadata = {

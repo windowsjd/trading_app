@@ -22,6 +22,8 @@
     "decimal.js": "^10.6.0",
     "expo": "^55.0.8",
     "expo-dev-client": "~55.0.28",
+    "expo-image-manipulator": "~55.0.21",
+    "expo-image-picker": "~55.0.24",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-native": "0.83.6",
@@ -34,7 +36,7 @@
   "name": "LeagueOfTrading",
   "version": "1.0.0",
   "scripts": {
-    "lint:accounts:check": "eslint --no-fix --max-warnings=0 --no-warn-ignored --ignore-pattern \"**/*.test.ts\" src/hooks/usePullToRefresh.tsx src/hooks/useFocusedInputScroll.ts src/features/auth src/features/tradingAccount src/features/position/assetDisplay.ts src/features/record src/features/wallet src/app/AppProviders.tsx src/app/navigation/RootNavigator.tsx src/app/navigation/MainTabs.tsx src/app/navigation/HomeStack.tsx src/app/navigation/WalletStack.tsx src/app/navigation/MyStack.tsx src/components/states/ScreenErrorBoundary.tsx src/services/api/sessionExpiry.ts src/services/api/sessionOwnership.ts src/services/api/client.ts src/services/storage/tokenStorage.ts src/screens/auth src/screens/entry src/screens/home src/screens/my src/screens/wallet src/screens/order/OrderScreen.tsx src/screens/order/OrderPanel.tsx src/screens/order/QuantityRatioSlider*.tsx src/features/order/sideColors.ts src/screens/asset src/features/asset/AssetOrderLadder.tsx src/features/asset/tradingHeader.ts src/screens/history src/screens/record/RecordSeasonDetailScreen.tsx src/screens/record/RecordProfitAnalysisScreen.tsx src/screens/record/RecordMetric.tsx src/app/navigation/RecordStack.tsx src/components/tradingAccount src/components/common/CTAButton.tsx src/components/common/PrimaryButtonBackground.tsx src/components/common/pressFeedback.ts src/components/common/ActionPressable.tsx src/components/charts/ChartTimeframeSelector.tsx src/components/navigation/TabBarButton.tsx",
+    "lint:accounts:check": "eslint --no-fix --max-warnings=0 --no-warn-ignored --ignore-pattern \"**/*.test.ts\" src/hooks/usePullToRefresh.tsx src/hooks/useFocusedInputScroll.ts src/features/auth src/features/me src/features/tradingAccount src/features/position/assetDisplay.ts src/features/record src/features/wallet src/app/AppProviders.tsx src/app/navigation/RootNavigator.tsx src/app/navigation/MainTabs.tsx src/app/navigation/HomeStack.tsx src/app/navigation/WalletStack.tsx src/app/navigation/MyStack.tsx src/components/states/ScreenErrorBoundary.tsx src/services/api/sessionExpiry.ts src/services/api/sessionOwnership.ts src/services/api/client.ts src/services/storage/tokenStorage.ts src/screens/auth src/screens/entry src/screens/home src/screens/my src/screens/wallet src/screens/order/OrderScreen.tsx src/screens/order/OrderPanel.tsx src/screens/order/QuantityRatioSlider*.tsx src/features/order/sideColors.ts src/screens/asset src/features/asset/AssetOrderLadder.tsx src/features/asset/tradingHeader.ts src/screens/history src/screens/record/RecordSeasonDetailScreen.tsx src/screens/record/RecordProfitAnalysisScreen.tsx src/screens/record/RecordMetric.tsx src/app/navigation/RecordStack.tsx src/components/tradingAccount src/components/common/CTAButton.tsx src/components/common/PrimaryButtonBackground.tsx src/components/common/pressFeedback.ts src/components/common/ActionPressable.tsx src/components/charts/ChartTimeframeSelector.tsx src/components/navigation/TabBarButton.tsx",
     "typecheck": "tsc --noEmit",
     "test": "node --test 'src/**/*.test.ts'",
     "check": "npm run lint:accounts:check && npm run lint:guides:check && npm run typecheck && npm run test",

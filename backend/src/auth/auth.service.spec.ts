@@ -275,7 +275,6 @@ describe('AuthService', () => {
 
     const response = await service.updateMe('user-1', {
       nickname: ' newNickname ',
-      profileImageUrl: null,
       email: 'attacker@example.com',
       status: UserStatus.deleted,
       passwordHash: 'leaked',
@@ -288,7 +287,6 @@ describe('AuthService', () => {
         },
         data: {
           nickname: 'newNickname',
-          profileImageUrl: null,
         },
       }),
     );
@@ -307,6 +305,23 @@ describe('AuthService', () => {
       },
     });
   });
+
+  it.each(['https://attacker.example/photo.jpg', null])(
+    'rejects PATCH profileImageUrl %s without applying other fields',
+    async (profileImageUrl) => {
+      const { prisma, service } = createService();
+      prisma.user.findUnique.mockResolvedValue(activeUser);
+      await expect(
+        service.updateMe('user-1', {
+          profileImageUrl,
+          portfolioPublic: false,
+        } as never),
+      ).rejects.toMatchObject({
+        response: { error: { code: 'PROFILE_IMAGE_READ_ONLY' } },
+      });
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    },
+  );
 
   it('persists an explicit false and returns it from GET /me', async () => {
     const { prisma, service } = createService();

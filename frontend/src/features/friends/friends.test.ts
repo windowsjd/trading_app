@@ -154,6 +154,8 @@ describe('overall menu and server privacy setting', () => {
         useMutation: (option: any) => { options.push(option); return { isPending: false, mutate: (value: any) => mutations.push(value) }; },
       },
       '../../features/me/api': { getMe: () => {}, updateMe: async (value: any) => value },
+      '../../features/me/profileImage': { selectProfileImage: async () => null },
+      '../../features/me/profileImageCache': { applyProfileImageResponse: async () => {} },
       '../../features/auth/useLogout': { useLogout: () => () => {} },
       '../../components/states/FullPageLoading': { default: 'Loading' }, '../../components/states/ErrorState': { default: 'Error' },
     }).default;
@@ -161,11 +163,13 @@ describe('overall menu and server privacy setting', () => {
     assert.equal(toggle.props.value, false);
     toggle.props.onValueChange(true);
     assert.deepEqual(mutations, [true]);
-    const context = await options[1].onMutate(true);
+    const privacy = options.find(option => option.onMutate);
+    const context = await privacy.onMutate(true);
     assert.equal(cached.portfolioPublic, true);
     assert.equal(cached.nickname, 'me');
-    assert.deepEqual(await options[1].mutationFn(true), { portfolioPublic: true });
-    await options[1].onSuccess({ ...data, portfolioPublic: true }, true, context);
-    assert.deepEqual(saved.at(-1), [QUERY_KEYS.me, { ...data, portfolioPublic: true }]);
+    assert.deepEqual(await privacy.mutationFn(true), { portfolioPublic: true });
+    await privacy.onSuccess({ ...data, portfolioPublic: true }, true, context);
+    assert.deepEqual(cached, { ...data, portfolioPublic: true });
+    assert.equal(saved.at(-1)[0], QUERY_KEYS.me);
   });
 });

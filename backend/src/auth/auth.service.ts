@@ -393,6 +393,12 @@ export class AuthService implements OnModuleInit {
     }
 
     const data: Prisma.UserUpdateInput = {};
+    if (this.hasOwn(body, 'profileImageUrl')) {
+      this.throwBadRequest(
+        'PROFILE_IMAGE_READ_ONLY',
+        'Use the profile image upload or delete endpoint.',
+      );
+    }
     if (this.hasOwn(body, 'nickname')) {
       const nickname = this.parseNickname(body.nickname);
       if (nickname !== currentUser.nickname) {
@@ -414,10 +420,6 @@ export class AuthService implements OnModuleInit {
       }
 
       data.nickname = nickname;
-    }
-
-    if (this.hasOwn(body, 'profileImageUrl')) {
-      data.profileImageUrl = this.parseProfileImageUrl(body.profileImageUrl);
     }
 
     if (this.hasOwn(body, 'portfolioPublic')) {
@@ -540,21 +542,6 @@ export class AuthService implements OnModuleInit {
     }
 
     return nickname;
-  }
-
-  private parseProfileImageUrl(value: unknown): string | null {
-    if (value === null) {
-      return null;
-    }
-
-    if (typeof value !== 'string') {
-      this.throwBadRequest(
-        'INVALID_PROFILE_IMAGE_URL',
-        'profileImageUrl must be a string or null.',
-      );
-    }
-
-    return value.trim();
   }
 
   private hasOwn<T extends object>(value: T, key: PropertyKey): boolean {

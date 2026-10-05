@@ -10,6 +10,185 @@
 
 ---
 
+## 2026-10-06 — Settings 프로필 사진 갤러리 선택·업로드·교체·삭제
+
+의도: 기존 profileImageUrl / ProfileAvatar 표시 계약을 유지하면서,
+사용자가 Settings에서 기기 갤러리의 이미지를 선택해
+관리형 Object Storage에 프로필 사진을 업로드·교체·삭제할 수 있도록 하기 위함.
+프로필 이미지는 Backend 인증 경계를 통해 업로드하며,
+PostgreSQL의 User.profileImageUrl을 표시 상태의 Source of Truth로 유지한다.
+
+구현과 자동화/Web 검증을 마쳤다. 운영 Storage 연결 및 Native 실기기 검증은
+실행하지 않았고, Backend 전체 lint는 시작 HEAD에도 존재한 위반으로 실패한다.
+이 항목들을 PASS 또는 운영 배포 완료로 취급하지 않는다.
+
+1. **작업 시작 HEAD / 종료 HEAD**: 둘 다
+   `77717511390bcc8b16c0a59c562eab6dd6a4897d`
+   (`상단 아이콘 추가 및 홈 아이콘 변경`). 시작 working tree는 clean이었고,
+   `git fetch origin main` 후 origin/main과 일치함을 확인했다. 커밋하지 않았다.
+2. **기존 구조**: PostgreSQL User.profileImageUrl nullable 문자열을 GET /me,
+   Ranking, Friends, UserSeasonSummary가 읽는다. Home/My는 공유 me query를 사용한다.
+   기존 ProfileAvatar의 URL 검증, Image 실패 fallback, URL 변경 처리를 재사용한다.
+3. **write path 조사**: 실제 서비스의 기존 write는 AuthService.updateMe의
+   PATCH /me뿐이었다. Frontend UpdateMeBody에는 필드가 있었으나 사용하는 화면은
+   없었다. 나머지 쓰기처럼 보이는 참조는 테스트 fixture, generated 코드 또는
+   friends integration script의 null 초기값이다. 기존 arbitrary URL write를 닫았다.
+4. **Storage architecture**: 기기 갤러리 → Expo normalization → 인증 multipart
+   Backend → 메모리 검증 → S3-compatible PutObject → DB URL → 기존 Avatar.
+   presigned upload, 디스크 저장, binary DB, queue/worker를 추가하지 않았다.
+5. **dependency**: Frontend expo-image-picker `~55.0.24`,
+   expo-image-manipulator `~55.0.21` (전이 expo-image-loader 포함);
+   Backend @aws-sdk/client-s3 `^3.1146.0`. 기존 npm/pnpm lockfile을 함께 갱신했다.
+6. **upload API**: `POST /api/v1/me/profile-image`, Bearer JWT, 정확히 하나의
+   multipart `file`, text field 금지, 200 CurrentUserResponse. userId는 기존
+   request.user.userId만 사용하며 다른 사용자를 지정할 수 없다.
+7. **delete API**: `DELETE /api/v1/me/profile-image`, 동일 인증과 200 응답.
+   사진 없음/반복 삭제도 null로 성공한다. Storage 미설정이면 두 변경 API만 503이다.
+8. **파일 검증**: 최대 2 MiB = 2,097,152 bytes, image/jpeg, 실제 Buffer와 크기 일치,
+   SOI/SOF/테이블/scan/EOI의 경계 및 정사각형 1–512 px 검사. SVG/HTML,
+   가짜 MIME/signature-only/truncation/trailing bytes/과대·비정사각형을 거부한다.
+   APP/COM 메타데이터를 제거한다. 완전한 서버 pixel decoder/re-encoder는 아니다.
+9. **key / URL**: `profile-images/{authenticatedUserId}/{serverUUIDv4}.jpg`.
+   원본 filename과 client URL을 사용하지 않는다. 설정된 public base에 key를 붙여
+   image/jpeg 및 `public, max-age=31536000, immutable`로 저장한다. 변경마다 새 URL이다.
+10. **교체**: active 확인 → 새 object upload → 짧은 DB transaction에서 사용자 row
+    FOR UPDATE → 최신 이전 URL 확인/active 재검사/새 URL 저장 → commit → 이전 managed
+    object best-effort 삭제. DB 실패와 모호한 upload 실패는 새 object cleanup을 시도한다.
+    Storage 호출은 transaction 밖에 있고, cleanup 실패가 성공한 URL 변경을 되돌리지 않는다.
+11. **삭제**: 같은 row lock → URL null → commit → 이전 managed object best-effort 삭제.
+    DB 실패면 object를 삭제하지 않는다. cleanup 실패는 bounded event/userId/operation만
+    기록한다. 업로드 total timeout 10초, cleanup 5초로 제한했다.
+12. **PATCH /me**: profileImageUrl을 포함하면 string/null 모두 400
+    PROFILE_IMAGE_READ_ONLY로 전체 PATCH를 거부한다. nickname/portfolioPublic 계약은 유지한다.
+13. **Settings UI**: 기존 ProfileAvatar와 ActionPressable을 쓰는 프로필 사진 카드.
+    현재 사진이 없으면 사진 추가, 있으면 사진 변경/사진 삭제. 편집 surface는 Settings뿐이다.
+14. **gallery / permission**: 단일 이미지 library picker만 제공한다.
+    iOS 사진 권한 및 limited access 처리, Android system picker, Web file chooser.
+    camera/microphone 권한은 Expo plugin과 Android manifest merge에서 제외한다.
+    Android 광범위 새 권한을 추가하지 않았다. Web picker는 user activation 안에서 연다.
+15. **normalization**: native square editor 후 decode된 방향/크기로 다시 정사각형을
+    보장한다. Web은 중앙 crop, 최대 512 px, 작은 사진 확대 없음, JPEG quality 0.85.
+    원본 32 MiB 초과 또는 4천만 pixel 초과를 조작 전에 거부한다. EXIF/base64 요청 없음.
+    조작 context/ImageRef와 Web blob URL을 해제한다.
+16. **loading / error**: select/upload/delete 전체를 ref로 직렬화하고 action을 잠근다.
+    취소 시 API 호출 없음. 권한·크기·처리·upload/delete 실패를 한국어 inline 안내로 표시한다.
+    실패 시 기존 Avatar 유지. picker 중 화면을 떠나면 전송하지 않고, 이미 전송한 요청의
+    성공은 같은 세션의 공유 cache에 반영한다. logout/다른 세션의 늦은 응답은 무시한다.
+17. **cache**: me의 in-flight read를 취소하고 기존 cache에 profileImageUrl만 merge한다.
+    nickname/privacy의 동시 저장을 덮지 않으며 ranking list와 본인 userSeasonSummary만
+    invalidate한다. global clear/reset/refetch는 없다. privacy mutation도 자기 필드만 merge한다.
+18. **화면 전파**: Home/My 공유 me cache는 즉시 반영, Ranking은 targeted refetch.
+    Friends DTO는 viewer를 제외하므로 친구의 사진은 기존 조회로 반영된다. record list/detail에는
+    Avatar가 없어서 cache를 건드리지 않는다. 다른 기기에는 다음 fetch에 반영된다.
+19. **legacy URL**: 기존 외부 URL 표시를 유지한다. 교체/삭제 시 DB 값만 변경하고 외부
+    URL로 DELETE 요청하지 않는다. 같은 public base + 같은 owner + 정확한 UUIDv4 key만
+    삭제한다. 다른 사용자, query/fragment, encoding/alias/traversal은 삭제 대상이 아니다.
+20. **변경 파일과 이유**: 아래 표. 기존 Avatar/금융 기능/DB schema 구현은 변경하지 않았다.
+21. **DB migration**: 0개. 기존 nullable User.profileImageUrl만 사용한다.
+22. **env / deployment**: 아래 운영 설정. credential 실제 값은 기록하지 않았다.
+    모두 빈 값이면 사진 변경 기능만 503, 일부 누락/잘못된 설정은 중앙 validator에서 boot 실패.
+23. **Backend 검증**: typecheck/build, 변경 운영 코드 및 신규 spec/E2E check-only lint PASS.
+    focused 6 suites/83 cases, 전체 unit 226 suites/3,603 cases PASS
+    (opt-in 48 suites/53 cases SKIP), 전체 HTTP E2E 2 suites/370 cases PASS.
+    새 HTTP 8 cases는 실제 Nest guard/controller/multipart/error envelope를 사용하고
+    DB·Storage만 mock한다. 실제 PostgreSQL에 대한 신규 row-lock 동시성 검증은 NOT_RUN.
+24. **Frontend 검증**: npm run check (accounts/guides lint + typecheck + tests) PASS,
+    typecheck 별도 PASS, npm run export:web PASS. Node 기본 test reporter의 126은
+    test file 수이며 개별 case 수가 아니다. 관련 tests를 isolation 없이 별도 실행한
+    실제 개별 결과는 10 suites/46 cases PASS이다.
+25. **Web 검증**: Playwright 실제 Expo Web picker/manipulator, multipart local HTTP,
+    Backend JPEG validator를 사용했다. 1600×900 PNG → 512×512 JPEG 4,304 bytes,
+    EXIF orientation 6 JPEG → 올바른 회전/crop 및 메타데이터 제거(2,795 bytes),
+    16×16 원본은 확대하지 않음(760 bytes). 취소/성공/교체/실패/삭제/reload,
+    Home/My/Ranking 사진 반영 PASS. light/dark × 320/360/390/430 × fontScale 1/1.5/2
+    24 Settings layout의 clipping 검사 및 캡처 확인 PASS. 별도로 320px/fontScale 2에서
+    light/dark의 실제 upload/delete 대기 4 layouts도 문구/disabled/clipping PASS.
+    기존 Avatar/설정 회귀 336 layouts PASS.
+    DB/Storage 경계는 fixture이므로 실제 업로드 provider 검증은 아니다.
+26. **Android**: 실행 가능한 adb/emulator/device 없음. 실제 권한/gallery/crop/orientation/
+    큰 사진/cancel/upload/delete/reload는 NOT_RUN / NOT_VERIFIED. SDK mock 테스트만 PASS.
+27. **iOS**: iOS runtime/project/device 없음. Photos/limited access/picker/crop/upload/delete/
+    reload는 NOT_RUN / NOT_VERIFIED. SDK mock 테스트만 PASS.
+28. **상태**: 자동화·Web·변경 코드 lint는 PASS. Backend 전체 lint는 FAIL:
+    1,762건 = 1,716 errors + 46 warnings. HEAD archive baseline과 최종 전체 check 결과가
+    동일하다. 관련 없는 기존 위반을 auto-fix하지 않았다. Native, 실제 Storage/public GET,
+    새 실제 DB integration 및 production 배포는 NOT_RUN / NOT_VERIFIED.
+29. **전체 diff 자체 검토**: tracked diff와 신규 source/spec/fixture/browser 파일을 검토하고
+    요구한 Frontend/Backend/Security/기존 Avatar/scope와 대조했다. `git diff --check` PASS.
+    금융 API/계산, access/refresh/session rotation 정책, 기존 screen layout은 그대로다.
+30. **HANDOVER**: 이 기록과 backend/docs/auth-api-contract.md에 API/정규화/cleanup/cache/
+    legacy/env/검증/운영 한계를 남겼다. 이전 작업 기록을 보존했다.
+31. **남은 위험 / 후속**: Native binary를 rebuild하고 양 플랫폼 실기기 검증을 수행한다.
+    운영 bucket/public host/credential을 provision하고 public GET과 실제 upload/delete를 확인한다.
+    실제 PostgreSQL에서 동시 upload/delete row lock 동작을 검증한다. best-effort cleanup의
+    orphan은 운영 후속으로 확인하며 별도 queue/worker는 없다. origin 삭제 후에도 immutable
+    browser/CDN cache에 예전 사진이 남을 수 있어 필요 시 provider purge를 수행한다.
+    저장소 전체 기존 lint debt와 opt-in DB/provider suite는 별도 후속이다.
+
+변경 파일(동일 접두부의 source/spec를 묶음):
+
+| 파일 | 이유 |
+| --- | --- |
+| backend/src/auth/profile-image.config.ts, profile-image.config.spec.ts | Storage 설정/disabled/secret-safe 검증 |
+| backend/src/auth/profile-image.validation.ts, profile-image.validation.spec.ts | 크기/JPEG 구조/메타데이터 검증 |
+| backend/src/auth/profile-image-storage.service.ts, profile-image-storage.service.spec.ts | S3-compatible upload/delete와 안전한 managed key |
+| backend/src/auth/profile-image.service.ts, profile-image.service.spec.ts | DB canonical URL/row lock/보상 cleanup |
+| backend/src/auth/profile-image.controller.ts, profile-image-upload.interceptor.ts | 보호된 HTTP API/memory multipart limits |
+| backend/src/auth/auth.module.ts | 새 controller/provider wiring |
+| backend/src/auth/auth.service.ts, auth.types.ts, auth.service.spec.ts | PATCH 직접 URL write 차단/기존 필드 회귀 |
+| backend/src/common/env-validation.ts, backend/.env.example | 중앙 env validation/빈 설정 예시 |
+| backend/test/profile-image.e2e-spec.ts, test/fixtures/profile-image.jpg | 실제 HTTP 경계 및 합성 JPEG fixture |
+| backend/package.json, pnpm-lock.yaml | S3 SDK와 전이 dependency lock |
+| backend/docs/auth-api-contract.md | API/error/lifecycle/deployment 계약 |
+| frontend/src/features/me/api.ts, api.test.ts | multipart/delete API와 Web/native/session 경계 |
+| frontend/src/features/me/profileImage.ts, profileImageTypes.ts, profileImage.test.ts | picker/permission/normalization/해제 |
+| frontend/src/features/me/profileImageCache.ts, profileImageCache.test.ts | targeted cache/동시 mutation/session ownership |
+| frontend/src/screens/my/SettingsScreen.tsx, SettingsScreen.test.ts | 사진 편집 UI와 cancel/pending/failure/cache 회귀 |
+| frontend/src/features/friends/friends.test.ts | 기존 privacy fixture의 추가 Settings 의존성 대응 |
+| frontend/app.json, android/app/src/main/AndroidManifest.xml | Photos 설명/불필요한 camera·microphone 권한 제거 |
+| frontend/package.json, package-lock.json | Expo SDK dependency 및 새 me lint scope |
+| frontend/test/browser/profileImageBrowser.cjs, profileImageMocks.js | 실제 Web normalization/HTTP/반응형 검증 |
+| frontend/test/browser/nativeWeb.jsx, README.md | browser harness의 Expo process env 및 실행 안내 |
+| HANDOVER.md | 이 작업의 의도/검증/제한/운영 설정 인수인계 |
+
+운영 설정:
+
+- `PROFILE_IMAGE_STORAGE_ENDPOINT`: Backend에서 사용할 S3-compatible HTTP(S) API endpoint.
+- `PROFILE_IMAGE_STORAGE_REGION`: provider region (R2 사용 시 auto).
+- `PROFILE_IMAGE_STORAGE_BUCKET`: 전용 bucket.
+- `PROFILE_IMAGE_STORAGE_ACCESS_KEY_ID`, `PROFILE_IMAGE_STORAGE_SECRET_ACCESS_KEY`:
+  Backend secret 환경에만 배치하고 `profile-images/*` PutObject/DeleteObject 최소 권한 부여.
+- `PROFILE_IMAGE_PUBLIC_BASE_URL`: bucket root와 대응하는 public host/base path.
+  production은 HTTPS, public GET은 profile-images prefix 또는 전용 public-assets host로 제한.
+  임의의 기존 비공개 파일이 있는 bucket 전체를 공개하지 않는다.
+- R2 public custom domain 또는 S3 CDN/한정 read 정책 등 provider 방식으로 public GET을
+  구성하고 image/jpeg/immutable cache header를 확인한다. API endpoint와 public host는 별개다.
+- Web upload는 기존 Backend API CORS를 사용하므로 Storage write CORS나 client credential은
+  필요 없다. frontend origin은 기존 Backend CORS allowlist로 관리한다.
+- 새 Expo native module 때문에 기존 development client와 배포 binary rebuild가 필요하다.
+  native 생성 시 app.json image-picker plugin을 적용해 iOS Photos 설명을 포함한다.
+
+재현 명령 및 증거:
+
+- Backend: `npm run typecheck`, `npm run build`, `npm test -- --runInBand`,
+  `npm run test:e2e -- --runInBand`.
+- Backend 변경 scope: `npx eslint --no-fix --max-warnings=0 src/auth/profile-image*.ts
+  src/auth/auth.service.ts src/auth/auth.types.ts src/auth/auth.module.ts
+  src/common/env-validation.ts test/profile-image.e2e-spec.ts`.
+- Backend 전체 check-only: `npx eslint --no-fix "{src,apps,libs,test}/**/*.ts"`.
+  baseline은 시작 HEAD backend archive에 동일 node_modules/generated를 연결해서 검사했다.
+- Frontend: `npm run typecheck`, `npm run check`, `npm run export:web`,
+  `node --test --test-isolation=none src/features/me/*.test.ts
+  src/screens/my/SettingsScreen.test.ts src/components/common/ProfileAvatar.test.ts
+  src/features/friends/friends.test.ts`.
+- 새 browser runner: `node test/browser/profileImageBrowser.cjs`; 기존
+  `node test/browser/profileFinancialBrowser.cjs`. 준비 사항은 browser README 참조.
+- 이 작업 환경 로그: `/tmp/profile-image-backend-{unit,e2e-all,focused,build,lint-all,
+  lint-baseline,lint-focused}.log`, `/tmp/profile-image-frontend-{check,focused-full}.log`,
+  `/tmp/profile-image-web-export.log`, `/tmp/profile-image-browser{,-regression}.log`.
+  Web 상세 report/captures/JPEG는 `/tmp/profile-image-browser/`, 기존 회귀 캡처는
+  `/tmp/trading-profile-financial-browser/`에 있다. /tmp artifact는 영구 저장소가 아니다.
+
 
 ## 2026-10-05 — USD 시장가 주문 execute FX evidence 준비
 

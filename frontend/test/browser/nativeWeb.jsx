@@ -1,5 +1,7 @@
 import React from 'react';
 import * as Native from 'react-native-web';
+// Expo's Web modules read process.env outside Metro's inline-env transform.
+globalThis.process ??= { env: { NODE_ENV: 'production', EXPO_OS: 'web' } };
 export * from 'react-native-web';
 const scale = Number(
   new URLSearchParams(location.search).get('fontScale') ?? 1,

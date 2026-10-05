@@ -250,3 +250,17 @@ External requests are blocked. Optional
 `LD_LIBRARY_PATH`/`FONTCONFIG_FILE` supply local Chromium libraries/Korean fonts.
 iOS/Android component tests cover the role gate, unrestricted line wrapping and
 font scaling; physical-device text measurement is a separate check.
+
+`profileImageBrowser.cjs` runs the actual Expo Web image picker/manipulator,
+Settings, multipart FormData and ProfileAvatar against a local HTTP fixture.
+Run with esbuild/Playwright on NODE_PATH as above. It verifies file chooser and
+cancel, nonsquare PNG → 512px JPEG, small-image no-upscale, add/replace/delete,
+failed-upload preservation, reload persistence, Home/My/Ranking propagation,
+and Settings button glyph bounds at 320/360/390/430px × font scale 1/1.5/2 ×
+Light/Dark. Separate held HTTP responses verify upload/delete pending labels and
+disabled neighboring buttons at 320px/font scale 2 in both themes. EXIF rotation
+and metadata removal are checked with an oriented JPEG. The backend JPEG validator
+also checks the actual uploaded bytes.
+Reports, normalized images and screenshots default to `/tmp/profile-image-browser`
+(`PROFILE_IMAGE_BROWSER_OUTPUT` overrides). Real S3/R2, native permission/crop,
+and physical-device checks are separate; no external request is permitted.
