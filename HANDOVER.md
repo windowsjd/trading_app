@@ -10,6 +10,39 @@
 
 ---
 
+## 2026-10-06 — Core account PostgreSQL CI의 Friends PATCH 회귀 수정
+
+- 시작/로컬 검증 HEAD: `3acf7f7e1b09602120cc17fce8791d1a1c760bb3`
+  (`프로필 사진 갤러리 선택 기능`). `git fetch origin main` 후 동일 HEAD와 clean tree를 확인했다.
+- 원인: `backend/scripts/friends-integration.ts`가 privacy 복구·nickname 변경 PATCH /me에
+  `profileImageUrl: null`도 보내고 200을 기대했다. 새 read-only 정책에 따른 400이 정상이다.
+  해당 필드 한 줄만 제거했고 기존 Friends/Privacy/Ranking 검증을 유지했다.
+- AuthService의 PROFILE_IMAGE_READ_ONLY와 upload/delete API, Storage, Frontend, schema,
+  migration, Friends/Ranking/금융 로직은 변경하지 않았다. 중복 read-only 테스트도 추가하지 않았다.
+- repository 사용처를 다시 검색했다. 다른 production/integration legacy PATCH write는 없으며,
+  응답/DTO/null fixture와 기존 URL/null 거부 테스트는 유지했다. Friends 현행 계약 문서는
+  사진을 PATCH할 수 있다고 설명하지 않아 수정하지 않았다. 과거 investigation은 보존했다.
+- 아래 프로필 사진 기록의 Friends 참조 조사 오류와 최종 반영 commit 메타데이터를 바로잡았다.
+- PostgreSQL 16.15(UTC)·Redis 7.0.15를 /tmp/localhost에 격리해 기존 migration만 적용했다.
+  Node 24.14.1·pnpm 10.33.0 사용. 수정 전 Friends 단독 1 case FAIL(200 기대/400 응답),
+  수정 후 같은 DB에서 1 case PASS. CI와 같은 Core account 20 suites/21 cases PASS,
+  migration status/drift 및 세 repair/audit dry-run PASS.
+- 기존 Auth/Profile Image unit 7 suites/81 cases PASS. Canonical Release-critical E2E
+  2 suites/370 cases PASS(기존 Profile Image 8 cases 포함). URL/null PATCH 400과
+  nickname/portfolioPublic PATCH 200을 유지한다.
+- 추가 범위: Backend CI gated lint/format/typecheck/build와 unit 3,603 cases PASS
+  (opt-in 53 cases SKIP); Frontend lint/typecheck/tests 1,532 cases 및 Web export PASS.
+  Candle fixture 24 scenarios는 기능 PASS이나 SMOKE_ALLOW_DIRTY=1/gitDirty=true이므로
+  clean-commit release artifact gate PASS로 취급하지 않는다.
+- 추가 Limit 전체 검사는 첫 실행에서 valuation/freshness 관련 2 cases FAIL, 다른 검사 종료 후
+  새 DB의 동일 범위 재실행에서 input-policy ASSET_PRICE_UNAVAILABLE 1 case FAIL였다.
+  input-policy는 실제 opt-in 플래그를 켠 단독 재실행에서 PASS였다. 해당 금융 코드/기대값은
+  변경하지 않았으며, 전체 로컬 6/6 PASS를 주장하지 않는다.
+- 실제 GitHub CI 기준 실행은 [37355544967](https://github.com/windowsjd/trading_app/actions/runs/37355544967):
+  Core account FAIL, 나머지 5 jobs PASS. 수정 후 원격 6개 job 결과는 draft PR의 CI에서 확인한다.
+- 로그: `/tmp/core-account-ci-tools/`의 friends-before/after, core-*, auth-unit,
+  release-e2e, backend-*, frontend-*, limit-*, candle-* 파일. /tmp 증거는 임시 artifact이다.
+
 ## 2026-10-06 — Settings 프로필 사진 갤러리 선택·업로드·교체·삭제
 
 의도: 기존 profileImageUrl / ProfileAvatar 표시 계약을 유지하면서,
@@ -22,17 +55,20 @@ PostgreSQL의 User.profileImageUrl을 표시 상태의 Source of Truth로 유지
 실행하지 않았고, Backend 전체 lint는 시작 HEAD에도 존재한 위반으로 실패한다.
 이 항목들을 PASS 또는 운영 배포 완료로 취급하지 않는다.
 
-1. **작업 시작 HEAD / 종료 HEAD**: 둘 다
+1. **작업 시작 HEAD / 최종 반영 commit**: 시작은
    `77717511390bcc8b16c0a59c562eab6dd6a4897d`
-   (`상단 아이콘 추가 및 홈 아이콘 변경`). 시작 working tree는 clean이었고,
-   `git fetch origin main` 후 origin/main과 일치함을 확인했다. 커밋하지 않았다.
+   (`상단 아이콘 추가 및 홈 아이콘 변경`), 이후 실제 반영 commit은
+   `3acf7f7e1b09602120cc17fce8791d1a1c760bb3` (`프로필 사진 갤러리 선택 기능`)이다.
+   시작 working tree는 clean이었고, fetch 후 당시 origin/main과 일치함을 확인했다.
 2. **기존 구조**: PostgreSQL User.profileImageUrl nullable 문자열을 GET /me,
    Ranking, Friends, UserSeasonSummary가 읽는다. Home/My는 공유 me query를 사용한다.
    기존 ProfileAvatar의 URL 검증, Image 실패 fallback, URL 변경 처리를 재사용한다.
 3. **write path 조사**: 실제 서비스의 기존 write는 AuthService.updateMe의
    PATCH /me뿐이었다. Frontend UpdateMeBody에는 필드가 있었으나 사용하는 화면은
-   없었다. 나머지 쓰기처럼 보이는 참조는 테스트 fixture, generated 코드 또는
-   friends integration script의 null 초기값이다. 기존 arbitrary URL write를 닫았다.
+   없었다. 테스트 fixture/generated 참조 외에 Friends PostgreSQL integration이
+   실제 PATCH /me body로 profileImageUrl: null을 보내는 legacy write가 남아 있었다.
+   이를 단순 null fixture로 분류한 것은 조사 오류였다. 새 read-only 계약으로 400이
+   발생했으며, 후속 CI 회귀 수정에서 해당 요청 필드만 제거했다.
 4. **Storage architecture**: 기기 갤러리 → Expo normalization → 인증 multipart
    Backend → 메모리 검증 → S3-compatible PutObject → DB URL → 기존 Avatar.
    presigned upload, 디스크 저장, binary DB, queue/worker를 추가하지 않았다.

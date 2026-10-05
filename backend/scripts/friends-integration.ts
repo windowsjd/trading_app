@@ -351,7 +351,6 @@ async function run() {
     {
       portfolioPublic: true,
       nickname: `friends-${tag}-renamed`,
-      profileImageUrl: null,
     },
     7,
   ).expect(200);
