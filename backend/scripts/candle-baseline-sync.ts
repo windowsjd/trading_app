@@ -35,11 +35,14 @@
  *   --max-assets N           process at most N assets
  *   --no-resume              start fresh instead of resuming a checkpoint
  *
- * `--report` needs PostgreSQL only. The sync paths boot the application
- * context, so they additionally need Redis (backfill locks) and the real
- * provider credentials (KIS for stocks, Binance for crypto) — the same
- * requirements the Ops job has. Nothing is printed except aggregate counters
- * and coverage timestamps; no credential or provider payload is logged.
+ * `--report` needs PostgreSQL only. Sync dependencies are assembled directly,
+ * without starting the full Nest app, realtime streams or schedulers. Before
+ * syncing (including dry-run), the production calendar override loader must
+ * confirm an active DB snapshot; initial load failure aborts the command.
+ * The loader keeps its normal polling lifecycle until command cleanup.
+ * Apply additionally uses Redis backfill locks and the real provider clients
+ * (KIS for stocks, Binance for crypto). Dry-run makes no provider calls or
+ * candle/checkpoint writes. No credential or provider payload is logged.
  */
 import 'reflect-metadata';
 
@@ -82,6 +85,8 @@ import { KisDomesticPeriodAdapter } from '../src/providers/kis/candles/kis-domes
 import { KisOverseasPeriodAdapter } from '../src/providers/kis/candles/kis-overseas-period.adapter';
 import { KisPeriodCandleNormalizerService } from '../src/providers/kis/candles/kis-period-candle-normalizer.service';
 import { MarketCandleSyncMode } from '../src/generated/prisma/client';
+import { MarketSessionOverrideLoaderService } from '../src/orders/market-calendar/market-session-override.loader.service';
+import { getMarketSessionOverrideRuntimeStatus } from '../src/orders/market-calendar/market-session-override.store';
 
 const DAY_MS = 24 * 60 * 60_000;
 
@@ -181,10 +186,9 @@ async function report(
 }
 
 /**
- * The coverage report only needs PostgreSQL, so it runs without booting the
- * application context (which also wires Redis, the provider clients and the
- * live-candle pipeline). Operators can therefore check readiness on a machine
- * that has nothing but the database.
+ * The coverage report only reads persisted PostgreSQL evidence. It does not
+ * resolve trading sessions, so it needs neither the calendar override loader
+ * nor Redis/provider dependencies.
  */
 async function runReport(args: CandleBaselineArgs): Promise<number> {
   const prisma = new PrismaService();
@@ -201,8 +205,10 @@ async function runReport(args: CandleBaselineArgs): Promise<number> {
   }
 }
 
-async function main(): Promise<number> {
-  const args = parseCandleBaselineArgs(process.argv.slice(2));
+export async function main(
+  argv: string[] = process.argv.slice(2),
+): Promise<number> {
+  const args = parseCandleBaselineArgs(argv);
   requireDatabaseUrl();
   console.log(`database: ${formatDatabaseTarget(process.env.DATABASE_URL)}`);
 
@@ -211,10 +217,20 @@ async function main(): Promise<number> {
   // Syncing runs the real thing: provider clients, Redis backfill locks and
   // the checkpointed sync service, exactly as the Ops job does.
   const prisma = new PrismaService();
-  await prisma.$connect();
-  const redis = new RedisService(readRedisConfig());
-  const syncService = createSyncService(prisma, redis);
+  const calendarLoader = new MarketSessionOverrideLoaderService(prisma);
+  let redis: RedisService | undefined;
   try {
+    await prisma.$connect();
+    // Reuse the production lifecycle: required mode precedes the active DB
+    // read, with identical row validation and last-known-good refresh rules.
+    await calendarLoader.onModuleInit();
+    if (getMarketSessionOverrideRuntimeStatus().state !== 'ready') {
+      throw new Error(
+        'Initial market-session override load failed (calendar_unavailable); candle sync was not started. Retry when the database snapshot is available.',
+      );
+    }
+    redis = new RedisService(readRedisConfig());
+    const syncService = createSyncService(prisma, redis);
     const now = new Date();
     const from = new Date(now.getTime() - args.days * DAY_MS);
     console.log(
@@ -263,8 +279,13 @@ async function main(): Promise<number> {
     }
     return summary.failedFeeds > 0 ? 1 : 0;
   } finally {
-    await prisma.$disconnect();
-    await redis.onModuleDestroy();
+    // Stop polling and settle any in-flight calendar read before disconnecting.
+    await calendarLoader.onModuleDestroy();
+    try {
+      await prisma.$disconnect();
+    } finally {
+      await redis?.onModuleDestroy();
+    }
   }
 }
 
