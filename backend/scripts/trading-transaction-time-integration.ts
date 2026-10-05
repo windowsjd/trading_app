@@ -54,7 +54,6 @@ const fx = new FxService(
   undefined,
   access,
   performance,
-  undefined,
   valuation,
 );
 const candles = new LimitOrderCandleEvidenceService(prisma);

@@ -50,6 +50,7 @@
 - Existing `admin_manual` quote fallback keeps the established 60-second `effectiveAt` stale check.
 - Unapproved `admin_manual` rows with `approvedByUserId = null` are ignored by current-rate and quote fallback selection.
 - `/fx execute` uses execute-time fresh provider_api USD/KRW rows only, by source priority `korea_exim_exchange_rate` then `exchange_rate_api`. It compares executeRate against the durable quote quotedRate, rejects threshold breaches with `RATE_CHANGED_REQUOTE_REQUIRED`, and forbids default `admin_manual` fallback.
+- FX and USD market orders share a provider-level, process-local refresh coordinator. On-demand refresh finishes before financial transactions; already fresh DB evidence needs no provider call. Concurrent refreshes with the same freshness threshold share provider work only, while each execution independently re-reads PostgreSQL at its post-lock DB clock. A refresh success is never execution authority. Scheduler ingestion remains a background baseline, not a correctness dependency.
 - `/fx quote` exposes optional public-safe `rateSource` metadata for source/outage visibility. Raw provider payloads, `metadataJson`, and secrets are never exposed.
 - USD/KRW snapshots are also the KRW conversion evidence for USD-settled crypto valuation.
 - MVP crypto uses Binance-based USD settlement and the USD Wallet; no `USDT` wallet/currency is introduced.

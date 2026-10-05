@@ -119,6 +119,7 @@ import {
   type OrderResponsePayload,
 } from './order-response.presenter';
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
+import { UsdKrwRefreshService } from '../providers/usd-krw-refresh.service';
 import {
   closedMarketPriceScope,
   findMarketAwareAssetPriceCandidates,
@@ -689,6 +690,8 @@ export class OrdersService {
     private readonly generalPerformanceService?: GeneralAccountPerformanceService,
     @Optional()
     private readonly marketExecutionEvidenceAdapter?: MarketExecutionEvidenceAdapter,
+    @Optional()
+    private readonly usdKrwRefreshService?: UsdKrwRefreshService,
   ) {}
 
   private requireTradingAccountAccessService(): TradingAccountAccessService {
@@ -1355,6 +1358,28 @@ export class OrdersService {
     }
 
     try {
+      if (this.usdKrwRefreshService) {
+        // This read only identifies an owned, active USD quote. It is not a
+        // gate: the locked transaction still resolves concurrent replay and
+        // validates every quote/request/account fact at its own DB clock.
+        const quote = await this.prisma.quote.findFirst({
+          where: {
+            id: quoteId,
+            userId,
+            tradingAccountId,
+            quoteType: QuoteType.order,
+            orderType: OrderType.market,
+            status: QuoteStatus.active,
+            assetId: request.assetId,
+            side: request.side,
+            expiresAt: { gte: new Date() },
+          },
+          select: { currencyCode: true },
+        });
+        if (quote?.currencyCode === CurrencyCode.USD) {
+          await this.prepareOrderExecutionFx();
+        }
+      }
       let didExecute = false;
       const response = await this.prisma.$transaction(async (tx) => {
         // Quote serializes consumption and lets a waiter replay a committed
@@ -1867,6 +1892,24 @@ export class OrdersService {
 
     const parsedOrderId = this.parseOrderId(orderId);
     try {
+      if (this.usdKrwRefreshService) {
+        const stored = await this.findOwnedOrderForExecution(
+          this.prisma,
+          parsedOrderId,
+          userId,
+        );
+        if (stored?.orderType === OrderType.market) {
+          if (stored.status === OrderStatus.executed) {
+            return this.buildAlreadyExecutedOrderResponse(stored);
+          }
+          if (
+            stored.status === OrderStatus.submitted &&
+            this.getAssetSettlementCurrency(stored.asset) === CurrencyCode.USD
+          ) {
+            await this.prepareOrderExecutionFx();
+          }
+        }
+      }
       const result = await this.prisma.$transaction(async (tx) => {
         let order = await this.findOwnedOrderForExecution(
           tx,
@@ -3097,6 +3140,16 @@ export class OrdersService {
     };
   }
 
+  private async prepareOrderExecutionFx(): Promise<void> {
+    const preparation =
+      await this.usdKrwRefreshService!.prepare('orders_execute');
+    setAdminDiagnosticContext({
+      evidence: {
+        preflightRefresh: preparation,
+      },
+    });
+  }
+
   private async findFreshProviderUsdKrwSnapshotForOrderExecution(
     tx: OrderExecuteTransactionClient,
     quote: NonNullable<OrderExecutionRecord['quote']>,
@@ -3107,6 +3160,9 @@ export class OrdersService {
     rateChangeBps: Prisma.Decimal | null;
     fxRateSource: PublicSourceMetadata | null;
   }> {
+    setAdminDiagnosticContext({
+      evidence: { transactionDbRevalidation: true },
+    });
     const providerEligibility = resolveFxProviderEligibility({
       workflow: 'orders_execute',
       baseCurrency: CurrencyCode.USD,

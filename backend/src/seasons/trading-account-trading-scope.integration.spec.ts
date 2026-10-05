@@ -157,7 +157,6 @@ const fxService = new FxService(
   undefined,
   accessService,
   generalPerformanceService,
-  undefined,
   valuationService,
 );
 

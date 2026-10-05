@@ -43,10 +43,12 @@ import { BinanceOrderBookService } from './binance/binance-order-book.service';
 import { OrderBookPubSubService } from './order-book-pubsub.service';
 import { MarketPriceEventService } from './market-price-event.service';
 import { MarketOrderBookSubscriptionService } from './market-order-book-subscription.service';
+import { UsdKrwRefreshService } from './usd-krw-refresh.service';
 
 @Module({
   imports: [PrismaModule, RedisModule],
   providers: [
+    UsdKrwRefreshService,
     OrderBookPubSubService,
     BinanceOrderBookService,
     ProviderConfigService,
@@ -107,6 +109,7 @@ import { MarketOrderBookSubscriptionService } from './market-order-book-subscrip
     MarketSnapshotHealthService,
   ],
   exports: [
+    UsdKrwRefreshService,
     OrderBookPubSubService,
     BinanceOrderBookService,
     ProviderConfigService,

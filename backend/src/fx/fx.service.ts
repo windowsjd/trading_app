@@ -87,12 +87,7 @@ import {
   calculateMaxDrawdown,
   RankingRefreshService,
 } from '../ranking/ranking-refresh.service';
-import { KoreaEximExchangeIngestionService } from '../providers/korea-exim/korea-exim-exchange.ingestion.service';
-import { ExchangeRateIngestionService } from '../providers/exchange-rate/exchange-rate.ingestion.service';
-import {
-  ProviderConfigError,
-  ProviderHttpError,
-} from '../providers/provider.types';
+import { UsdKrwRefreshService } from '../providers/usd-krw-refresh.service';
 import { readGeneralFxFeeRate } from './general-fx.config';
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
 import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
@@ -365,23 +360,16 @@ export function mapFxExecuteOrchestrationDecisionToSkeletonResponse(
 
 @Injectable()
 export class FxService {
-  private readonly providerRefreshInFlight = new Map<
-    number,
-    Promise<boolean>
-  >();
-
   constructor(
     private readonly prisma: PrismaService,
     @Optional()
-    private readonly koreaEximExchangeIngestionService?: KoreaEximExchangeIngestionService,
+    private readonly usdKrwRefreshService?: UsdKrwRefreshService,
     @Optional()
     private readonly rankingRefreshService?: RankingRefreshService,
     @Optional()
     private readonly tradingAccountAccessService?: TradingAccountAccessService,
     @Optional()
     private readonly generalAccountPerformanceService?: GeneralAccountPerformanceService,
-    @Optional()
-    private readonly exchangeRateIngestionService?: ExchangeRateIngestionService,
     @Optional()
     private readonly portfolioValuationService?: PortfolioValuationService,
   ) {}
@@ -1762,12 +1750,12 @@ export class FxService {
     });
 
     if (selection.state !== 'selected' && input.allowRefresh !== false) {
-      const refreshed = await this.tryRefreshUsdKrwProviders({
-        now: input.now,
-        maxAgeSeconds: input.freshnessThresholdSeconds,
-      });
+      const preparation = await this.usdKrwRefreshService?.prepare(
+        input.workflow,
+        input.now,
+      );
 
-      if (refreshed) {
+      if (preparation) {
         selectionNow = new Date();
         candidates = await this.findProviderUsdKrwSnapshotCandidates(
           input.take,
@@ -1812,72 +1800,6 @@ export class FxService {
       sourceNames,
       take,
     });
-  }
-
-  private async tryRefreshUsdKrwProviders(input: {
-    now: Date;
-    maxAgeSeconds: number;
-  }): Promise<boolean> {
-    const key = input.maxAgeSeconds;
-    const inFlight = this.providerRefreshInFlight.get(key);
-    if (inFlight) {
-      return inFlight;
-    }
-
-    const refresh = this.runUsdKrwProviderRefresh(input);
-    this.providerRefreshInFlight.set(key, refresh);
-    try {
-      return await refresh;
-    } finally {
-      if (this.providerRefreshInFlight.get(key) === refresh) {
-        this.providerRefreshInFlight.delete(key);
-      }
-    }
-  }
-
-  private async runUsdKrwProviderRefresh(input: {
-    now: Date;
-    maxAgeSeconds: number;
-  }): Promise<boolean> {
-    if (await this.tryEnsureFreshKoreaEximUsdKrwSnapshot(input)) {
-      return true;
-    }
-
-    if (!this.exchangeRateIngestionService) {
-      return false;
-    }
-
-    const result = await this.exchangeRateIngestionService.ingestUsdKrw({
-      dryRun: false,
-      requestedBy: 'fx_on_demand_refresh',
-    });
-    return result.success;
-  }
-
-  private async tryEnsureFreshKoreaEximUsdKrwSnapshot(input: {
-    now: Date;
-    maxAgeSeconds: number;
-  }): Promise<boolean> {
-    if (!this.koreaEximExchangeIngestionService) {
-      return false;
-    }
-
-    try {
-      await this.koreaEximExchangeIngestionService.ensureFreshUsdKrwSnapshot({
-        now: input.now,
-        maxAgeSeconds: input.maxAgeSeconds,
-      });
-      return true;
-    } catch (error) {
-      if (
-        error instanceof ProviderConfigError ||
-        error instanceof ProviderHttpError
-      ) {
-        return false;
-      }
-
-      throw error;
-    }
   }
 
   private async findCurrentUsdKrwRateSnapshot(now: Date): Promise<{

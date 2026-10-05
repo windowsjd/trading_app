@@ -129,6 +129,7 @@ import {
 } from './fx-execute-request-policy';
 import { computeFxQuoteRequestHash } from '../providers/durable-quote.policy';
 import { ProviderConfigError } from '../providers/provider.types';
+import { UsdKrwRefreshService } from '../providers/usd-krw-refresh.service';
 
 const now = new Date('2026-05-01T00:01:00.000Z');
 const seasonStartAt = new Date('2026-04-28T00:00:00.000Z');
@@ -326,13 +327,28 @@ describe('FxService', () => {
     },
   ) => {
     const prisma = createPrisma();
+    const refresh =
+      koreaEximIngestionService || exchangeRateIngestionService
+        ? new UsdKrwRefreshService(
+            prisma as never,
+            (koreaEximIngestionService ?? {
+              ensureFreshUsdKrwSnapshot: jest
+                .fn()
+                .mockRejectedValue(
+                  new ProviderConfigError('common', 'DISABLED', 'Disabled'),
+                ),
+            }) as never,
+            (exchangeRateIngestionService ?? {
+              ingestUsdKrw: jest.fn().mockResolvedValue({ success: false }),
+            }) as never,
+          )
+        : undefined;
     const service = new FxService(
       prisma as never,
-      koreaEximIngestionService as never,
+      refresh,
       undefined,
       undefined,
       undefined,
-      exchangeRateIngestionService as never,
       valuationService as never,
     );
 
@@ -3432,7 +3448,8 @@ describe('FxService', () => {
         },
       });
       expect(refresh.ensureFreshUsdKrwSnapshot).toHaveBeenCalledTimes(1);
-      expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalledTimes(4);
+      // Caller selection + shared preparation + post-provider DB verification.
+      expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalledTimes(10);
       refresh.ensureFreshUsdKrwSnapshot.mockClear();
       prisma.fxRateSnapshot.findMany.mockClear();
       prisma.fxRateSnapshot.findFirst.mockClear();

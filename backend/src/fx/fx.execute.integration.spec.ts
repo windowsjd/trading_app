@@ -114,7 +114,6 @@ const service = new FxService(
   undefined,
   undefined,
   undefined,
-  undefined,
   valuation,
 );
 
@@ -937,7 +936,6 @@ async function withoutEligibleProviderSnapshots(fn) {
         undefined,
         undefined,
         undefined,
-        undefined,
         new PortfolioValuationService(tx),
       );
       await fn(isolatedService);
@@ -974,7 +972,6 @@ function createDbFailureInjectionService(mode, scenario) {
 
   return new FxService(
     injectedPrisma,
-    undefined,
     undefined,
     undefined,
     undefined,

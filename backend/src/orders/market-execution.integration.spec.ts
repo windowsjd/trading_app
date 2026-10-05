@@ -18,6 +18,12 @@ describe('One-shot market execution PostgreSQL integration', () => {
       if (result.status !== 0)
         throw new Error(`${result.stdout}\n${result.stderr}`);
       expect(result.stdout).toContain('market execution integration ok');
+      expect(result.stdout).toContain(
+        'ok provider FX preparation season stale68',
+      );
+      expect(result.stdout).toContain(
+        'ok provider FX preparation general concurrent',
+      );
     },
     130_000,
   );

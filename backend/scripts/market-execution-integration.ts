@@ -2,6 +2,19 @@
 import { tradingSessions } from '../test/support/trading-session-fixture';
 import 'dotenv/config';
 import assert from 'node:assert/strict';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { UsdKrwRefreshService } from '../src/providers/usd-krw-refresh.service';
+import { ExchangeRateIngestionService } from '../src/providers/exchange-rate/exchange-rate.ingestion.service';
+import {
+  buildProviderConfig,
+  ProviderConfigService,
+} from '../src/providers/provider-config.service';
+import {
+  KoreaEximExchangeIngestionService,
+  formatKstSearchDate,
+  kstSearchDateToUtcMidnight,
+} from '../src/providers/korea-exim/korea-exim-exchange.ingestion.service';
+import { ProviderHttpError } from '../src/providers/provider.types';
 import { randomUUID } from 'node:crypto';
 import { HttpException } from '@nestjs/common';
 import {
@@ -683,6 +696,270 @@ async function cleanup() {
   resetMarketSessionOverrideStoreForTest();
   await db.$disconnect();
 }
+// Real ingestion persists snapshots; only the remote clients are replaced.
+// Orders uses the shared coordinator with real DB execution.
+async function providerFxPreparation() {
+  for (const mode of ['season', 'general'] as const) {
+    for (const scenario of [
+      'fresh',
+      'stale68',
+      'fallback',
+      'failure',
+      'requote',
+      'krw',
+      'legacy',
+      'concurrent',
+    ] as const) {
+      const f = await fixture(
+        mode,
+        scenario === 'krw' ? 'domestic_stock' : 'crypto',
+      );
+      const transactionScope = new AsyncLocalStorage<boolean>();
+      let transactions = 0;
+      const client = new Proxy(db, {
+        get(target, property, receiver) {
+          if (property === '$transaction') {
+            return (
+              callback: (tx: Prisma.TransactionClient) => Promise<unknown>,
+            ) => {
+              transactions++;
+              return target.$transaction((tx) =>
+                transactionScope.run(true, () => callback(tx)),
+              );
+            };
+          }
+          const value: unknown = Reflect.get(target, property, receiver);
+          return typeof value === 'function'
+            ? (value.bind(target) as unknown)
+            : value;
+        },
+      });
+      const config = {
+        getConfig: () =>
+          buildProviderConfig({
+            PROVIDER_INGESTION_ENABLED: 'true',
+            KOREA_EXIM_EXCHANGE_ENABLED: 'true',
+            KOREA_EXIM_EXCHANGE_AUTH_KEY: 'fixture-only',
+            EXCHANGE_RATE_API_ENABLED: 'true',
+            EXCHANGE_RATE_API_KEY: 'fixture-only',
+          }),
+      } as ProviderConfigService;
+      let primaryCalls = 0;
+      let fallbackCalls = 0;
+      const primary = new KoreaEximExchangeIngestionService(client, config, {
+        fetchDailyExchangeRates: async () => {
+          assert.equal(
+            transactionScope.getStore(),
+            undefined,
+            'EXIM network outside transaction',
+          );
+          await Promise.resolve();
+          primaryCalls++;
+          if (scenario === 'fallback' || scenario === 'failure')
+            throw new ProviderHttpError(
+              'korea_exim_exchange_rate',
+              'PROVIDER_TIMEOUT',
+              'fixture failure',
+            );
+          return {
+            receivedAt: new Date(),
+            rows: [
+              {
+                RESULT: 1,
+                CUR_UNIT: 'USD',
+                DEAL_BAS_R: scenario === 'requote' ? '1500' : '1400',
+              },
+            ],
+          };
+        },
+      } as never);
+      const secondary = new ExchangeRateIngestionService(client, config, {
+        fetchLatestUsd: async () => {
+          assert.equal(
+            transactionScope.getStore(),
+            undefined,
+            'ExchangeRate network outside transaction',
+          );
+          await Promise.resolve();
+          fallbackCalls++;
+          if (scenario === 'failure')
+            throw new ProviderHttpError(
+              'exchange_rate_api',
+              'PROVIDER_TIMEOUT',
+              'fixture failure',
+            );
+          return {
+            receivedAt: new Date(),
+            response: {
+              result: 'success',
+              base_code: 'USD',
+              conversion_rates: { KRW: 1400 },
+              time_last_update_unix: Math.floor(Date.now() / 1000),
+            },
+          };
+        },
+      } as never);
+      const coordinator = new UsdKrwRefreshService(client, primary, secondary);
+      const svc = new OrdersService(
+        client,
+        ranking,
+        undefined,
+        undefined,
+        access,
+        performance,
+        undefined,
+        coordinator,
+      );
+      const body = await quote(f, svc, '100');
+      const secondBody =
+        scenario === 'concurrent' ? await quote(f, svc, '100') : null;
+      // Only this harness's observations are aged. The EXIM 68-second row is
+      // quote-fresh but execution-stale; no fresh fallback is left.
+      const capturedAt = new Date(Date.now() - 68000);
+      await db.fxRateSnapshot.updateMany({
+        where: { id: { in: rates } },
+        data: {
+          capturedAt,
+          effectiveAt: kstSearchDateToUtcMidnight(
+            formatKstSearchDate(new Date()),
+          ),
+        },
+      });
+      const old = await db.fxRateSnapshot.create({
+        data: {
+          baseCurrency: 'USD',
+          quoteCurrency: 'KRW',
+          rate: '1400',
+          sourceType: 'provider_api',
+          sourceName: 'korea_exim_exchange_rate',
+          effectiveAt: kstSearchDateToUtcMidnight(
+            formatKstSearchDate(new Date()),
+          ),
+          capturedAt:
+            scenario === 'fresh' ? new Date(Date.now() - 30000) : capturedAt,
+        },
+      });
+      rates.push(old.id);
+      let orderId: string | undefined;
+      if (scenario === 'legacy') {
+        const order = await db.order.create({
+          data: {
+            tradingAccountId: f.accountId,
+            assetId: f.assetId,
+            quoteId: body.quoteId,
+            side: 'buy',
+            orderType: 'market',
+            status: 'submitted',
+            quantity: '1',
+            currencyCode: 'USD',
+            submittedAt: new Date(),
+          },
+        });
+        orderId = order.id;
+      }
+      const before = await state(f);
+      const quoteBefore = await db.quote.findUniqueOrThrow({
+        where: { id: body.quoteId },
+      });
+      const initialRates = new Set(
+        (await db.fxRateSnapshot.findMany({ select: { id: true } })).map(
+          (r) => r.id,
+        ),
+      );
+      let observations: Array<{ id: string }> = [];
+      try {
+        const run = () =>
+          orderId
+            ? svc.executeOrder(f.userId, orderId)
+            : svc.createOrderForTradingAccount(f.userId, f.accountId, body);
+        if (scenario === 'failure' || scenario === 'requote') {
+          await expectCode(
+            run(),
+            scenario === 'failure'
+              ? 'PROVIDER_RATE_STALE'
+              : 'RATE_CHANGED_REQUOTE_REQUIRED',
+          );
+          assert.deepEqual(
+            await state(f),
+            before,
+            'full financial state rolled back',
+          );
+          assert.deepEqual(
+            await db.quote.findUniqueOrThrow({ where: { id: body.quoteId } }),
+            quoteBefore,
+          );
+        } else {
+          const responses = await Promise.all([
+            run(),
+            ...(secondBody
+              ? [
+                  svc.createOrderForTradingAccount(
+                    f.userId,
+                    f.accountId,
+                    secondBody,
+                  ),
+                ]
+              : []),
+          ]);
+          assert.equal(
+            transactions,
+            secondBody ? 2 : 1,
+            'independent financial transactions',
+          );
+          for (const response of responses) {
+            assert.equal(response.data.order.status, 'executed');
+            if (scenario !== 'krw') {
+              const selected = await db.fxRateSnapshot.findUniqueOrThrow({
+                where: { id: response.data.order.fxRateSnapshotId! },
+              });
+              assert.equal(
+                selected.sourceName,
+                scenario === 'fallback'
+                  ? 'exchange_rate_api'
+                  : 'korea_exim_exchange_rate',
+              );
+              assert.ok(selected.rate.eq(1400));
+              const executionAt = new Date(response.data.order.executedAt!);
+              assert.ok(
+                executionAt.getTime() - selected.capturedAt.getTime() <= 60000,
+              );
+              assert.ok(selected.capturedAt <= executionAt);
+              assert.equal(selected.id === old.id, scenario === 'fresh');
+            }
+          }
+          const calls = primaryCalls + fallbackCalls;
+          const after = await state(f);
+          await run(); // committed create or executed-order replay
+          assert.equal(
+            primaryCalls + fallbackCalls,
+            calls,
+            'replay does not refresh',
+          );
+          assert.deepEqual(await state(f), after);
+        }
+        assert.equal(
+          primaryCalls,
+          scenario === 'fresh' || scenario === 'krw' ? 0 : 1,
+        );
+        assert.equal(
+          fallbackCalls,
+          scenario === 'fallback' || scenario === 'failure' ? 1 : 0,
+        );
+      } finally {
+        observations = (
+          await db.fxRateSnapshot.findMany({ select: { id: true } })
+        ).filter((r) => !initialRates.has(r.id));
+        rates.push(...observations.map((r) => r.id));
+      }
+      assert.equal(
+        observations.length,
+        ['fresh', 'krw', 'failure'].includes(scenario) ? 0 : 1,
+      );
+      console.log(`ok provider FX preparation ${mode} ${scenario}`);
+    }
+  }
+}
+
 async function main() {
   await db.$connect();
   resetMarketSessionOverrideStoreForTest();
@@ -697,6 +974,7 @@ async function main() {
     await amount(false);
     await amount(true);
     await top();
+    await providerFxPreparation();
     await fxGuard();
     await concurrentAndLegacy();
     await failure(

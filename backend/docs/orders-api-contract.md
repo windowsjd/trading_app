@@ -219,6 +219,7 @@ use the lifecycle locks described below, without a general-account TWR fence.
 - Quote creates a durable quote row. List APIs do not execute orders, debit or credit wallets, mutate positions, create wallet transactions, create equity snapshots, run settlement, or synthesize fake order data.
 - Order execution recalculates and stores actual `executedPrice`, `grossAmount`, `feeAmount`, and `netAmount` at execution time.
 - Execute paths use execute-time fresh provider_api asset price and USD/KRW FX evidence, consume the durable quote atomically with writes, and forbid default `admin_manual` execute fallback.
+- USD market create and the internal market execute path prepare provider FX evidence before opening the financial transaction, after ownership and committed replay checks. Fresh DB evidence avoids provider calls; otherwise the shared provider refresh coordinator tries Korea EXIM, then ExchangeRate-API, and coalesces concurrent refreshes in this process. Only committed `FxRateSnapshot` rows are re-read inside execution, using the post-lock DB clock and the unchanged 60-second `orders_execute` policy. Refresh does not extend quote TTL or bypass the rate-change guard. Provider failure leaves the existing stale/unavailable selection error and rolls back financial writes. Limit matching remains DB-only and may skip `fx_evidence_unavailable` until fresh evidence arrives.
 - `docs/policy-decisions.md` records the active provider-backed execute/write policy decisions (freshness thresholds, maxChangeBps, quote TTL).
 
 ## Source Rules

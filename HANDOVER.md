@@ -10,6 +10,54 @@
 
 ---
 
+
+## 2026-10-05 — USD 시장가 주문 execute FX evidence 준비
+
+- 기준 main: `71b53850f8a5ac3b0f2dcf51d56b6b3a00d93e81`. 시작 시 origin/main fetch와
+  fast-forward pull, clean working tree를 확인했다. 기존 SHA로 reset하지 않았다.
+- 원인: Orders는 transaction 안의 provider DB snapshot만 읽었으므로 Korea EXIM
+  capturedAt age 68초가 execute 60초를 넘으면 refresh 기회 없이 실패했다.
+  FX에는 이미 transaction 전 refresh와 transaction 안 DB-only 재검증이 있었다.
+- `UsdKrwRefreshService`가 기존 FX의 Korea EXIM → ExchangeRate-API refresh와
+  process-local in-flight 병합을 담당한다. 같은 freshness threshold의 Orders/FX
+  요청은 provider 작업만 공유한다. fresh DB row면 provider 호출·새 observation 0회다.
+  EXIM 호출 성공 뒤에도 DB의 eligible evidence를 확인하고, 없으면 fallback한다.
+- 시장가 create는 ownership/committed replay 뒤 owned active quote의 통화만 읽어
+  USD를 preflight한다. 이 read는 gate가 아니며 quote lock 이후 replay와 모든
+  mutable validation을 재수행한다. 내부 `executeOrder`도 executed replay가 우선이다.
+- refresh는 금융 transaction 밖에서 완료한다. rate 객체를 실행 계획에 전달하지
+  않고 transaction DB clock으로 PostgreSQL evidence를 다시 선택한다. 60초,
+  provider-only, quote TTL, requote, arithmetic, lock/rollback/valuation은 유지한다.
+- 관리자 selection matrix를 유지하고 안전한 `preflightRefresh` 상태/source 및
+  `transactionDbRevalidation`을 추가했다. raw rate/payload/URL/exception은 넣지 않는다.
+- Limit fill은 같은 60초 DB-only 공급 문제를 확인했지만 그대로 유지했다.
+  fill 진입점의 추가 통화 조회 또는 matcher 대기/lease 영향 없이 넣을 수 없으므로
+  FIFO/liveness를 다루는 별도 후속에서 검토한다. `fx_evidence_unavailable` skip 유지.
+- 운영 기본값은 FX scheduler disabled / 3600초 / startup ingestion false,
+  provider ingestion·EXIM·ExchangeRate enable false다. 설정 변경은 없고 Render
+  실제 override는 확인하지 않았다. 기존 timeout/lookback이 유지되므로 느린 provider는
+  quote 만료 또는 최종 stale 실패를 여전히 일으킬 수 있다.
+- 검증 PASS: targeted 7 suites/284 tests, backend 전체 unit 222 suites/3,580 tests
+  (opt-in 53 tests는 기본 실행에서 skip), typecheck/build, HTTP E2E 362 tests,
+  frontend `npm run check` 1,498 tests, backend accounts lint gate, `git diff --check`.
+  실제 PostgreSQL은 격리된 로컬 DB에 기존 migration만 적용했다. 관련 15 suites/
+  16 tests와 별도 tradability 1 suite/1 test PASS; 기존 H1 closed-price parity,
+  transaction-time, fee-pinning, General trading/FX, replay, limit, scope, MVP 포함.
+  Market fixture에 추가한 General/Season 각 8개 케이스는 실제 ingestion/DB writes와
+  mocked HTTP client로 68초 복구·fallback·전체 실패 rollback·requote·fresh/KRW
+  무호출·internal execute·독립 concurrent transactions를 검증한다.
+- 파일 전체 lint는 기존 위반 124건(Orders spec 50, FX spec 70, FX service 1,
+  기존 script formatting 3)으로 FAIL; 시작 HEAD의 rule/message와 동일하고
+  새 위반은 0건이다. 신규 service/spec 및 Orders/Providers/market fixture lint PASS.
+  Limit replay integration은 한 번 `SEASON_NOT_STARTED`로 실패했으나 무변경 단독
+  재실행과 최종 묶음은 PASS였다. 새 market fixture의 초기 effectiveAt 설정 실패는
+  실제 daily provider evidence 형태로 바로잡았다. Live provider HTTP와 Render
+  운영 환경 확인은 NOT_RUN이며 외부 실제 credential을 사용하지 않았다.
+- API shape, frontend, schema/migration, Redis lock/queue는 변경하지 않았다.
+  기존 integration 파일들의 작은 FxService 생성자 변경은 공유 refresh 의존성 이동에
+  따른 wiring 갱신이며 fixture 금융 의미를 변경하지 않는다.
+
+
 ## 1. 작업 단위 기록
 
 ### 작업 단위: Dark Mode Neutral Surface 계층 정리 (2026-10-05)

@@ -40,7 +40,6 @@ const fx = new FxService(
   undefined,
   access,
   performance,
-  undefined,
   valuation,
 );
 const FEE = '0.001000';

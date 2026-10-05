@@ -75,6 +75,7 @@
   근거: 표시·일별 평가를 quote 유효기간으로 차단하면 정상 수집 중에도 환율과 일별 이력이 비게 된다.
 - Korea EXIM과 ExchangeRate-API의 실제 fetch가 성공하면 같은 rate/effectiveAt이어도 receivedAt을 capturedAt으로 새 observation을 저장한다. 기존 row는 수정하지 않으며, Korea EXIM의 fresh row 재사용 시에는 fetch/write를 하지 않는다.
   근거: 환율 값이 같다는 사실은 새 관측이 없었다는 뜻이 아니며, 과거 관측 시각을 덮어쓰면 이력의 의미가 바뀐다.
+- USD 시장가 create/internal execute는 ownership·committed replay 확인 뒤 금융 transaction 밖에서 부족한 execute FX evidence를 준비한다. FX와 공유하는 process-local coordinator가 Korea EXIM → ExchangeRate-API 순서로 refresh하고 같은 freshness 정책의 동시 요청을 병합한다. Provider 응답은 snapshot으로 commit한 뒤 transaction 안에서 DB clock과 기존 60초/provider-only 정책으로 다시 선택한다. Quote TTL·rate-change guard·거래 arithmetic은 유지하며 scheduler의 기본 FX 3600초 주기를 correctness 조건으로 삼지 않는다. Limit fill은 기존 DB-only selection/skip을 유지한다.
 
 ## Market-Date Calculation Inventory
 

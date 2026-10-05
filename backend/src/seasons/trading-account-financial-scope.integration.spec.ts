@@ -126,7 +126,6 @@ const fxService = new FxService(
   undefined,
   accessService,
   performanceService,
-  undefined,
   valuationService,
 );
 const walletsService = new WalletsService(prisma, accessService);

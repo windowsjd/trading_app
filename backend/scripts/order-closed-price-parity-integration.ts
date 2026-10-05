@@ -768,7 +768,6 @@ async function runSemanticScenario(kind: 'market' | 'limit') {
     undefined,
     new TradingAccountAccessService(prisma),
     undefined,
-    undefined,
     valuation,
   );
   const fxQuote = await fx.quoteForTradingAccount(s.userId, s.accountId, {

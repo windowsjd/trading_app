@@ -127,7 +127,6 @@ const fxService = new FxService(
   undefined,
   undefined,
   undefined,
-  undefined,
   portfolioValuationService,
 );
 const homeService = new HomeService(prisma, portfolioValuationService);
