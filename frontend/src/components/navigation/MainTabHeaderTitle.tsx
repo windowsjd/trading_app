@@ -9,12 +9,12 @@ import TabBarIcon, { type TabIconName } from './TabBarIcon';
 type Props = React.ComponentProps<typeof HeaderTitle> & { icon: TabIconName };
 
 export default function MainTabHeaderTitle({ icon, style, onLayout, ...titleProps }: Props) {
-  const { mode, colors } = useAppearance();
+  const { colors } = useAppearance();
   const { fonts } = useTheme();
-  const iconColor = icon === 'home' && mode === 'light' ? '#111111' : titleProps.tintColor ?? colors.text;
+  const iconColor = titleProps.tintColor ?? colors.text;
   return (
     <View style={styles.row} pointerEvents="none" onLayout={onLayout}>
-      <TabBarIcon name={icon} size={20} color={iconColor} />
+      <TabBarIcon name={icon} size={20} color={iconColor} focused={icon === 'home'} />
       <HeaderTitle {...titleProps} style={[style, fonts.heavy, styles.title]} maxFontSizeMultiplier={2} />
     </View>
   );

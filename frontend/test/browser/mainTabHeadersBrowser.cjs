@@ -68,7 +68,7 @@ async function run() {
       return {
         weight: getComputedStyle(el).fontWeight, fontSize: parseFloat(getComputedStyle(el).fontSize), color: getComputedStyle(el).color,
         row: box(row), title: box(el), icon: icon && box(icon), text, clipping,
-        paths: icon && [...icon.querySelectorAll('path')].map(p => p.getAttribute('d')), stroke: icon?.getAttribute('stroke'),
+        paths: icon && [...icon.querySelectorAll('path')].map(p => p.getAttribute('d')), stroke: icon?.getAttribute('stroke'), fill: icon?.getAttribute('fill'),
         artBounds: [...icon.querySelectorAll('path,circle')].map(shape => {
           const r = shape.getBBox(), style = getComputedStyle(shape), half = style.stroke === 'none' ? 0 : parseFloat(style.strokeWidth) / 2;
           return { left: r.x - half, top: r.y - half, right: r.x + r.width + half, bottom: r.y + r.height + half };
@@ -87,14 +87,16 @@ async function run() {
     assert.ok(observed.row.x >= 0 && observed.row.right <= context.width, 'title stays within screen');
     assert.ok(observed.row.y >= context.topInset, 'title stays below safe area');
     assert.equal(observed.color, context.appearance === 'light' ? 'rgb(32, 42, 53)' : 'rgb(242, 245, 247)');
-    assert.equal(observed.stroke, context.appearance === 'dark' ? '#f2f5f7' : label === '홈' ? '#111111' : '#202a35');
+    const titleTint = context.appearance === 'dark' ? '#f2f5f7' : '#202a35';
+    assert.equal(observed.stroke, label === '홈' ? 'none' : titleTint);
+    assert.equal(observed.fill, label === '홈' ? titleTint : 'none');
     assert.equal(observed.hidden, 'true'); assert.equal(observed.accessibleIcon, true);
     assert.equal(await heading(label).count(), 1);
     const bottom = await tab(label).evaluate(el => [...el.querySelectorAll('svg')].map(svg => ({
       paths: [...svg.querySelectorAll('path')].map(p => p.getAttribute('d')),
       fill: svg.getAttribute('fill'), stroke: svg.getAttribute('stroke'), hidden: svg.getAttribute('aria-hidden'),
     })));
-    assert.ok(bottom.some(icon => JSON.stringify(icon.paths) === JSON.stringify(observed.paths)), 'header shares the inactive tab geometry');
+    assert.ok(bottom.some(icon => JSON.stringify(icon.paths) === JSON.stringify(observed.paths)), 'header shares the tab geometry');
     assert.ok(bottom.some(icon => icon.fill === '#326FE5'), 'brand active tint');
     assert.equal(await tab(label).getAttribute('aria-selected'), 'true');
     assert.ok(bottom.every(icon => icon.hidden === 'true'));

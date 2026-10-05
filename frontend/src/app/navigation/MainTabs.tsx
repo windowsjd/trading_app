@@ -25,7 +25,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 export default function MainTabs() {
   const { fontScale } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const { mode: appearanceMode, colors } = useAppearance();
+  const { colors } = useAppearance();
   const reducedMotion = useReducedMotion();
   const { selectedAccount, isLoading } = useTradingAccount();
 
@@ -65,7 +65,7 @@ export default function MainTabs() {
           title: '홈',
           tabBarIcon: ({ color, size, focused }) => (
             <TabBarIcon focused={focused} name="home"
-              color={!focused && appearanceMode === 'light' ? '#111111' : color} size={size} />
+              color={focused ? color : colors.navigationHomeInactive} size={size} />
           ),
         }}
       />

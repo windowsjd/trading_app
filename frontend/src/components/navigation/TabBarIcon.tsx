@@ -19,24 +19,16 @@ type Props = {
   focused?: boolean;
 };
 
-// One contour for both states: the filled house cuts out the same whale that
-// the outline state draws. The cut-out inherits its background in either theme.
-const HOME_HOUSE = 'M3 10.5 12 3 21 10.5V21H3Z';
-const HOME_WHALE = 'M16.8 12.8 15.8 10.4C17 10.3 17.6 11 17.8 11.8 18.3 10.8 19.2 10.6 19.6 10.7L19 13.3C18.3 14.5 17.2 14.6 16.1 14.9 15 17.4 12.6 18.4 10.2 18.1 7.3 17.9 5.4 16.4 5.4 14.4 5.4 12.6 6.3 11.6 8 11.6 10.5 11.5 13 13.4 15 13.5 16 13.6 16.8 13.2 16.8 12.8Z';
+// The bottom edge turns into the arched doorway. Filling the same contour
+// leaves that opening transparent at both tab and header sizes.
+const HOME_HOUSE = 'M10.65 3.55Q12 2.4 13.35 3.55L20.15 9.4Q21 10.15 21 11.3V18.7Q21 21 18.7 21H15.35Q14.8 21 14.8 20.45V16.1C14.8 14.75 13.75 13.7 12.4 13.7H11.6C10.25 13.7 9.2 14.75 9.2 16.1V20.45Q9.2 21 8.65 21H5.3Q3 21 3 18.7V11.3Q3 10.15 3.85 9.4Z';
 
 export default function TabBarIcon({ name, color, size, focused = false }: Props) {
   let drawing: React.ReactNode;
 
   if (name === 'home') {
     drawing = (
-      <>
-        {focused && <Path d={`${HOME_HOUSE} ${HOME_WHALE}`} fillRule="evenodd" stroke="none" />}
-        <Path d={HOME_HOUSE} fill="none" stroke={color} strokeWidth={2.2} />
-        {!focused && <Path d={HOME_WHALE} strokeWidth={1.2} />}
-        <Path d="M10.4 14.6 11.8 16.7 12.8 14.8 M7 15.8l.6.8 M8.5 16.2l.5.8"
-          fill="none" stroke={color} strokeWidth={1.1} />
-        <Circle cx={7.5} cy={14} r={0.55} fill={color} stroke="none" />
-      </>
+      <Path d={HOME_HOUSE} strokeWidth={2.2} />
     );
   } else if (focused) {
     switch (name) {

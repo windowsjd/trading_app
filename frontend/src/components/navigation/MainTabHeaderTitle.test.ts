@@ -71,27 +71,33 @@ test('the root title keeps Navigation heading semantics, platform size, tint, an
   const svg = elements(row, 'TabBarIcon')[0];
   assert.equal(svg.props.name, 'home');
   assert.equal(svg.props.size, 20);
-  assert.equal(svg.props.color, '#111111', 'the light home outline is neutral black in the header too');
+  assert.equal(svg.props.color, '#f2f5f7', 'the home header follows the title tint');
+  assert.equal(svg.props.focused, true, 'the header uses the filled home silhouette');
   assert.equal(row.props.accessible, undefined, 'only HeaderTitle announces the heading');
 });
 
-test('dark header icons use the navigation tint without a black override', () => {
-  const Title = load(resolve('src/components/navigation/MainTabHeaderTitle.tsx'), {
-    'react-native': native,
-    '@react-navigation/elements': { HeaderTitle: 'HeaderTitle' },
-    '@react-navigation/native': navigationTheme,
-    '../../theme/appearance': { useAppearance: () => ({ mode: 'dark', colors: { text: '#f2f5f7' } }) },
-    './TabBarIcon': { default: 'TabBarIcon', __esModule: true },
-  }).default;
-  for (const icon of ['home', 'market', 'guide', 'ranking', 'wallet', 'menu']) {
-    for (const tintColor of [undefined, '#ffffff']) {
-      const tree = Title({ icon, children: '제목', tintColor });
-      assert.equal(elements(tree, 'TabBarIcon')[0].props.color, tintColor ?? '#f2f5f7');
+test('header icons follow the navigation tint in both themes', () => {
+  for (const mode of ['light', 'dark']) {
+    const text = mode === 'light' ? '#202a35' : '#f2f5f7';
+    const Title = load(resolve('src/components/navigation/MainTabHeaderTitle.tsx'), {
+      'react-native': native,
+      '@react-navigation/elements': { HeaderTitle: 'HeaderTitle' },
+      '@react-navigation/native': navigationTheme,
+      '../../theme/appearance': { useAppearance: () => ({ mode, colors: { text } }) },
+      './TabBarIcon': { default: 'TabBarIcon', __esModule: true },
+    }).default;
+    for (const icon of ['home', 'market', 'guide', 'ranking', 'wallet', 'menu']) {
+      for (const tintColor of [undefined, '#ffffff']) {
+        const tree = Title({ icon, children: '제목', tintColor });
+        const svg = elements(tree, 'TabBarIcon')[0];
+        assert.equal(svg.props.color, tintColor ?? text);
+        assert.equal(svg.props.focused, icon === 'home');
+      }
     }
   }
 });
 
-test('home uses the same whale contour in outline and transparent filled states at tab/header sizes', () => {
+test('home shares one undecorated contour in outline and filled states at tab/header sizes', () => {
   const Icon = load(resolve('src/components/navigation/TabBarIcon.tsx'), {
     'react-native': native,
     'react-native-svg': { default: 'Svg', Circle: 'Circle', Path: 'Path', __esModule: true },
@@ -101,15 +107,19 @@ test('home uses the same whale contour in outline and transparent filled states 
     const filled = Icon({ name: 'home', color: '#326FE5', size, focused: true });
     const outlinePaths = elements(outline, 'Path');
     const filledPaths = elements(filled, 'Path');
-    assert.ok(outlinePaths[0].props.strokeWidth > outlinePaths[1].props.strokeWidth);
-    assert.equal(filledPaths[0].props.fillRule, 'evenodd');
-    assert.equal(filledPaths[0].props.stroke, 'none', 'do not thicken or fill in the whale cut-out');
-    assert.equal(filledPaths[0].props.d, `${outlinePaths[0].props.d} ${outlinePaths[1].props.d}`);
-    assert.equal(filledPaths[1].props.d, outlinePaths[0].props.d);
-    assert.equal(elements(outline, 'Svg')[0].props.width, size);
-    assert.equal(elements(filled, 'Svg')[0].props.width, size);
-    assert.equal(elements(outline, 'Circle')[0].props.fill, '#111111');
-    assert.equal(elements(filled, 'Circle')[0].props.fill, '#326FE5');
+    assert.equal(outlinePaths.length, 1, 'the doorway belongs to the house perimeter');
+    assert.equal(filledPaths.length, 1, 'no added outline or internal decoration');
+    assert.equal(filledPaths[0].props.d, outlinePaths[0].props.d);
+    assert.ok(outlinePaths[0].props.strokeWidth > 2, 'slightly heavier than the other tab outlines');
+    for (const [tree, fill, stroke] of [[outline, 'none', '#111111'], [filled, '#326FE5', 'none']]) {
+      const svg = elements(tree, 'Svg')[0];
+      assert.equal(svg.props.width, size);
+      assert.equal(svg.props.height, size);
+      assert.equal(svg.props.viewBox, '0 0 24 24');
+      assert.equal(svg.props.fill, fill);
+      assert.equal(svg.props.stroke, stroke);
+      assert.equal(elements(tree, 'Circle').length, 0);
+    }
     assert.equal(outline.props['aria-hidden'], true);
     assert.equal(filled.props.importantForAccessibility, 'no-hide-descendants');
   }

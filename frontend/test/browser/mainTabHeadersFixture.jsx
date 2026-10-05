@@ -13,11 +13,11 @@ const params = new URLSearchParams(location.search);
 const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 60000 } } });
 window.fixture = { navigationRef, client };
 function Icons() {
-  const { mode, colors } = useAppearance();
+  const { colors } = useAppearance();
   return <View style={{ flex: 1, padding: 24, gap: 24, backgroundColor: colors.navigation }}>
     {[24, 20, 18].map(size => <View key={size} style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
       <Text>{size}px</Text>
-      <TabBarIcon name="home" size={size} color={mode === 'light' ? '#111111' : colors.navigationInactive} />
+      <TabBarIcon name="home" size={size} color={colors.navigationHomeInactive} />
       <TabBarIcon name="home" size={size} color="#326FE5" focused />
     </View>)}
   </View>;

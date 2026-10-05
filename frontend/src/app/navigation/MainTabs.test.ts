@@ -39,8 +39,8 @@ function renderTabs(mode: AccountMode | null, isLoading = false, appearance: 'li
       }),
     },
     '../../theme/appearance': { useAppearance: () => ({ mode: appearance, colors: appearance === 'light'
-      ? { navigation: '#ffffff', navigationActive: '#202a35', secondaryActionForeground: '#285B85', navigationInactive: '#697583', border: '#dfe4e9' }
-      : { navigation: '#080a0d', navigationActive: '#ffffff', secondaryActionForeground: '#B9DDFC', navigationInactive: '#9aa8b6', border: '#3b3d43' } }) },
+      ? { navigation: '#ffffff', navigationActive: '#202a35', secondaryActionForeground: '#285B85', navigationInactive: '#697583', navigationHomeInactive: '#111111', border: '#dfe4e9' }
+      : { navigation: '#080a0d', navigationActive: '#ffffff', secondaryActionForeground: '#B9DDFC', navigationInactive: '#9aa8b6', navigationHomeInactive: '#9aa8b6', border: '#3b3d43' } }) },
     '../../theme/useReducedMotion': { useReducedMotion: () => reduced },
     '../../components/navigation/TabBarButton': {
       default: 'TabBarButton',
