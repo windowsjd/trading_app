@@ -44,7 +44,7 @@ for (const mode of ['light', 'dark'] as const) for (const preference of ['red_bl
     assert.equal(resolveFinancialColor(UP_COLOR, mode, preference), colors.candleUp);
     assert.equal(resolveFinancialColor(DOWN_COLOR, mode, preference), colors.candleDown);
     for (const color of [colors.buy, colors.sell]) {
-      for (const bg of mode === 'light' ? ['#fcfcfd', '#ffffff', '#f7f8fa'] : ['#15171c', '#1b2530', '#273543']) {
+      for (const bg of mode === 'light' ? ['#fcfcfd', '#ffffff', '#f7f8fa'] : ['#15171c', '#1c1d21', '#292a2f']) {
         assert.ok(contrast(color, bg) >= 4.5, `${color} on ${bg}`);
       }
     }

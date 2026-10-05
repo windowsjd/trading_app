@@ -6,6 +6,16 @@ import type { Appearance } from 'react-native';
 
 type NativeColorScheme = Parameters<typeof Appearance.setColorScheme>[0];
 
+function luminance(hex: string) {
+  const [r, g, b] = [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16) / 255)
+    .map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+  return r * 0.2126 + g * 0.7152 + b * 0.0722;
+}
+function contrast(foreground: string, background: string) {
+  const a = luminance(foreground), b = luminance(background);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
 const require = createRequire(import.meta.url);
 const React = require('react');
 const { create, act } = require('react-test-renderer');
@@ -53,6 +63,20 @@ function harness(saved: string | null = null, holdRead = false) {
     close: async () => { if (renderer) await act(async () => renderer.unmount()); },
   };
 }
+
+test('dark neutral surfaces preserve hierarchy and improve text and secondary accent contrast', () => {
+  const { dark } = harness().module.PALETTES;
+  assert.ok(luminance(dark.screen) < luminance(dark.surface));
+  assert.ok(luminance(dark.surface) < luminance(dark.raised));
+  for (const [background, previous] of [[dark.surface, '#1b2530'], [dark.input, '#273543']]) {
+    for (const role of ['text', 'secondary', 'muted', 'placeholder'] as const) {
+      assert.ok(contrast(dark[role], background) >= 4.5, `${role} on ${background}`);
+      assert.ok(contrast(dark[role], background) >= contrast(dark[role], previous));
+    }
+  }
+  assert.ok(contrast(dark.secondaryActionForeground, dark.secondaryActionSurface) >= 4.5);
+  assert.ok(contrast(dark.secondaryActionSurface, dark.surface) > contrast(dark.secondaryActionSurface, '#1b2530'));
+});
 
 test('system follows OS changes; explicit light/dark override and persist on this device', async (t) => {
   const h = harness(); t.after(h.close);

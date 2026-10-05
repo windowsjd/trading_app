@@ -107,7 +107,7 @@ async function run() {
         assert.equal(await id(name).locator('linearGradient').count(), 0, `${name} preserves its original role/state`);
       }
       const selected = await id('brand-selected').evaluate((el) => getComputedStyle(el).backgroundColor);
-      assert.equal(selected, appearance === 'light' ? 'rgb(32, 42, 53)' : 'rgb(52, 70, 87)');
+      assert.equal(selected, appearance === 'light' ? 'rgb(32, 42, 53)' : 'rgb(48, 49, 55)');
       assert.equal(await id('brand-disabled').evaluate((el) => getComputedStyle(el).opacity), '0.45');
       assert.equal(await id('brand-blocked').getAttribute('aria-disabled'), 'true');
       assert.equal(await id('brand-loading').getAttribute('aria-disabled'), 'true');

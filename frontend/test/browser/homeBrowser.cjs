@@ -136,7 +136,7 @@ async function run() {
         assert.ok(layout.trigger.width >= 44);
         assert.ok(layout.context.paddingHorizontal >= 16 && layout.context.paddingVertical >= 20);
         assert.equal(layout.context.borderWidth, 1);
-        assert.equal(layout.context.borderColor, appearance === 'light' ? 'rgb(229, 232, 235)' : 'rgb(67, 83, 100)');
+        assert.equal(layout.context.borderColor, appearance === 'light' ? 'rgb(229, 232, 235)' : 'rgb(59, 61, 67)');
         assert.notEqual(layout.context.background, theme.palettes[appearance].screen);
         assert.ok(layout.trigger.right <= layout.context.right - 12);
         assert.ok(layout.titleTextRight <= layout.trigger.x + 1, `title and change trigger never collide: ${layout.titleTextRight} / ${layout.trigger.x}`);

@@ -12,6 +12,91 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: Dark Mode Neutral Surface 계층 정리 (2026-10-05)
+
+의도: Dark Mode의 전체 화면 배경은 `#15171C`로 유지하면서,
+카드·입력·보조 표면의 Blue 편향을 Neutral Charcoal로 줄여
+Secondary Blue, Primary Blue 및 금융 방향색이 배경에 묻히지 않고
+더 명확하게 강조되도록 하기 위함.
+
+- `git fetch origin main` 성공, 시작 working tree는 clean이었다. 시작/종료 HEAD는
+  `f5a873aa2db5807d172bb45a78be33722842c51a` (`H3 — standalone candle sync CLI와 서버/Ops job의 시장 캘린더 의미를 일치`),
+  최신 `origin/main`과 같다. 알려진 `971883b9`보다 최신 코드를 기준으로 작업했고 커밋하지 않았다.
+- 앱 구현 변경은 `frontend/src/theme/appearance.tsx`의 Dark 중립 역할 다섯 개뿐이다.
+
+  | Role | 이전 Dark | 최종 Dark |
+  | --- | --- | --- |
+  | screen | `#15171C` | `#15171C` (유지) |
+  | surface | `#1B2530` | `#1C1D21` |
+  | raised / input | `#273543` | `#292A2F` |
+  | border | `#435364` | `#3B3D43` |
+  | selected | `#344657` | `#303137` |
+
+- 기존 `semantic`과 `theme/native` 해석을 그대로 사용한다. surface는 Home/Wallet/
+  Market/Ranking/Friends/Settings/Record/Order/Asset Detail/ModeSelection 카드와
+  chart·sheet에, raised/input은 nested control·tooltip·검색·로그인/가입·주문·FX·설정 입력에,
+  border는 기존 outline/grid에, selected는 기존 중립 선택에 전파된다.
+  사용처 조사: surface 53, raised 47, input 8, border 99, selected 30개 참조;
+  기존 역할 오염이나 화면별 옛 Dark literal은 발견되지 않았다.
+- Light 전체, Secondary `#1C3042 / #B9DDFC`, Primary `#326FE5 → #4C32E5`,
+  Bottom Tab active `#326FE5`, Strong action/candle `#D1110B / #0A5AC2`를 보존했다.
+  모든 금융 text/surface와 두 금융 preference, status surface, Dark navigation `#080A0D`,
+  text/secondary/muted/placeholder/cursor, pressed `#FFFFFF20`도 시작 HEAD와 동일하다.
+  layout·navigation·touch·keyboard·selected semantics·Reduced Motion 구현은 변경하지 않았다.
+- repository의 옛 hex 및 RGB 조사 분류: A canonical palette, B unit-test expectation,
+  C browser expectation만 있었다. D historical documentation / E unrelated literal은
+  조사 당시 0건. 현재 남은 옛 hex는 B의 이전 대비 비교 baseline과 이 기록의 D뿐이다.
+  문자열 전체 치환 없이 해당 기대값만 갱신했다.
+- 실제 Dark RN Web 캡처에서 요청한 Home/Wallet/Market/Asset Detail/Order/Ranking/
+  Friends/Settings/Record/ModeSelection 10개 화면의 계층을 확인했다.
+  Home 보유종목은 screen `#15171C` → card `#1C1D21` → 자세히 보기 `#1C3042`;
+  HOT/Market/Friends/Ranking 선택은 기존 Secondary surface/foreground와 semantics를 유지한다.
+  Wallet Quick Action 및 일반 Primary CTA는 기존 gradient, 판매/매도·하락 candle은 기존 Blue다.
+  입력/raised는 card보다 한 단계 밝고, 카드 outline은 중립 회색으로 표시된다.
+- 대비(PASS): text/secondary/muted on surface는 `14.17→15.38 / 9.90→10.75 / 7.93→8.61:1`;
+  input text/placeholder는 `11.44→13.08 / 6.41→7.32:1`.
+  Secondary fill/card는 `1.15→1.24:1`, Secondary label/fill은 기존 `9.55:1`이다.
+  Primary 양 끝/card는 `3.35→3.64 / 2.14→2.32:1`, Strong Red/Blue/card는
+  `2.80→3.04 / 2.40→2.61:1`이다. fill 간 비율은 text의 4.5:1 판정과 구분한다.
+- Chart: surface/grid만 새 중립 색을 받으며 axis `#AEBBC8`, crosshair `#C5D0DA`,
+  candle body/wick·현재가 Red/Blue, SVG/gesture/viewport geometry는 기존 정책 그대로다.
+- 검증 PASS: `npm run check` (두 lint gate/typecheck/122개 테스트 파일), 별도
+  `npm run typecheck`, `npm run export:web`, 관련 38개 테스트 파일, `git diff --check`.
+  Browser PASS: Home 244 layouts/states, Wallet/Home 384, profile/financial 336,
+  root tabs 756 + Ranking 96 flows, HOT discovery 96, Home/Market 96,
+  Friends/Settings 60, Record detail/profit 192, trading/chart 138 scenarios,
+  Order 입력/계층, Primary 858 checks, Brand 20 layouts, UI cleanup 24 combinations.
+  320/360/390/430px와 fontScale 1/1.5/2에서 text clipping·입력·버튼·chart 회귀를 검증했다.
+  UI cleanup의 오래된 활성 탭 기대값 실패는 시작 HEAD에서 동일하게 재현했다.
+  테스트 기대값만 Secondary foreground에서 기존 Brand Blue로 바로잡아 재실행 PASS;
+  앱의 Bottom Tab 색은 변경하지 않았다.
+- 추가 before/after 비교에서 Asset Detail의 기존 Web chart 높이 측정 편차를 발견했다.
+  시작 HEAD/현재 소스를 각각 Light/Dark에서 8회 반복한 `390px / fontScale 2` probe는
+  모두 동일한 `362px / 439px` 두 chart 높이, 동일한 footer `[0,755,390,89]`를 보였다.
+  Light palette도 완전히 동일하므로 이번 중립 색 변경으로 새로 생긴 차이가 아니다.
+  chart/layout 구현은 그대로 유지했다. 큰 글자의 첫 렌더 chart 높이 결정성은 NOT_VERIFIED;
+  이 기존 측정 편차는 별도 chart layout 작업에서 평가해야 한다.
+  같은 chart 높이 상태로 맞춘 추가 before/after 66건(대표 10개 화면 + 검색,
+  390px × Light/Dark × fontScale 1/1.5/2)은 geometry·접근성·색상 PASS였다.
+  비동기 FlatList는 고정된 첫 10행과 컨트롤을 비교했고, 다른 화면은 전체 DOM을 비교했다.
+  Chart surface/grid/axis/crosshair/candle 실제 색상도 PASS.
+- Web은 외부 요청을 차단한 production 컴포넌트/Query/navigation + local fixture 검증이다.
+  Android/iOS runtime 부재로 실제 Native 실행은 NOT_RUN;
+  기기 font scaling·keyboard·TalkBack/VoiceOver·물리 touch는 NOT_VERIFIED.
+  Neutral palette 구현의 미해결 문제는 없으며 실제 기기 확인과 위 기존 측정 편차가 남아 있다.
+- 변경 파일 11개: 위 앱 구현 1개; `src/theme/{appearance,financialColors,native}.test.ts`와
+  `src/app/navigation/{RootTheme,MainTabs}.test.ts` (팔레트·대비·역할 기대값);
+  `test/browser/{appearanceAssertions,homeBrowser,brandGradientAuditBrowser,uiCleanupBrowser}.cjs`
+  (실제 CSS 기대값과 기존 Brand 정책); 이 HANDOVER. 전체 diff 자체 검토 완료.
+  Backend 0줄, DB 0줄, Migration 0개, API contract 변경 0개, 새 dependency 없음.
+- 로그/캡처: `/tmp/neutral-surface-{check,typecheck,export,related-tests}.log`,
+  `/tmp/neutral-surface-{home,wallet,profile,home-discovery,home-market,root-tabs,friends,record,trading,order,primary,brand,ui-cleanup}`.
+  baseline 재현: `/tmp/neutral-surface-ui-cleanup-baseline.log`;
+  팔레트/대비/사용처 audit: `/tmp/neutral-surface-palette-audit.{cjs,json}` 및
+  `/tmp/neutral-surface-role-usage.txt`. Chart 반복 재현:
+  `/tmp/neutral-surface-chart-geometry-probe.{cjs,json,log}`;
+  동일 상태 렌더 비교: `/tmp/neutral-surface-render-audit/{results.json,*-before.png,*-after.png}`.
+
 ### 작업 단위: Dark Screen 배경 + Strong Financial Red/Blue (2026-10-05)
 
 의도: Dark Mode의 화면 배경을 기존의 푸른 네이비 계열에서 조금 더 중성적인

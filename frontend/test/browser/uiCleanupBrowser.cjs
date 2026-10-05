@@ -153,7 +153,7 @@ async function run() {
               box('wallet-composition').top - box('wallet-quick-actions').bottom];
           });
           assert.deepEqual(gaps, [12, 12, 12]);
-          assert.equal(await color(page.getByRole('tab', { name: '지갑', exact: true }).locator('[dir="auto"]')), secondary.dark[1]);
+          assert.equal(await color(page.getByRole('tab', { name: '지갑', exact: true }).locator('[dir="auto"]')), 'rgb(50, 111, 229)');
           assert.equal(await page.evaluate(() => window.fixture.transport.equityRequests?.length ?? 0), 0);
           await walletId('home-trend-toggle').click(); await walletId('home-trend-chart').waitFor();
           for (const range of ['7d', '30d', '90d', '180d', '360d']) { await walletId(`home-trend-range-${range}`).click(); await page.waitForFunction(range => window.fixture.transport.equityRequests?.some(r => r.accountId === 'general-account' && r.range === range && r.granularity === 'daily'), range); }

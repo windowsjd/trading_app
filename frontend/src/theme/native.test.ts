@@ -31,7 +31,7 @@ test('secondary action roles resolve exact appearance colors independently of fi
     const UI = themed(mode, preference);
     assert.equal(flatten(UI.Pressable.render({ style: { backgroundColor: semantic.secondaryActionSurface } }, null).props.style).backgroundColor, expected[0]);
     assert.equal(flatten(UI.Text.render({ style: { color: semantic.secondaryActionForeground } }, null).props.style).color, expected[1]);
-    assert.equal(PALETTES[mode].selected, mode === 'light' ? '#202a35' : '#344657');
+    assert.equal(PALETTES[mode].selected, mode === 'light' ? '#202a35' : '#303137');
     for (const color of [...primaryGradient.colors, primaryGradient.foreground]) {
       assert.equal(resolveSemanticColor(color, PALETTES[mode], mode, preference), color);
     }
@@ -144,22 +144,25 @@ test('financial roles stay distinct from neutral roles in the actual palettes', 
 });
 
 
-test('surface hierarchy matches white cards on a near-white canvas with inset controls', () => {
+test('surface hierarchy uses white light cards and neutral charcoal dark cards with inset controls', () => {
   assert.equal(PALETTES.light.screen, '#fcfcfd');
   assert.equal(PALETTES.light.surface, '#ffffff');
   assert.equal(PALETTES.light.raised, '#f7f8fa');
   assert.equal(PALETTES.light.navigation, '#ffffff');
   assert.equal(PALETTES.light.border, '#e5e8eb');
   assert.equal(PALETTES.dark.screen, '#15171c');
-  assert.equal(PALETTES.dark.surface, '#1b2530');
-  assert.equal(PALETTES.dark.raised, '#273543');
+  assert.equal(PALETTES.dark.surface, '#1c1d21');
+  assert.equal(PALETTES.dark.raised, '#292a2f');
+  assert.equal(PALETTES.dark.input, '#292a2f');
+  assert.equal(PALETTES.dark.border, '#3b3d43');
+  assert.equal(PALETTES.dark.selected, '#303137');
   for (const mode of ['light', 'dark'] as const) {
     const colors = PALETTES[mode];
     assert.equal(colors.input, colors.raised);
     assert.equal(new Set([colors.screen, colors.surface, colors.raised]).size, 3);
     assert.equal(new Set([colors.text, colors.secondary, colors.muted]).size, 3);
     const UI = themed(mode);
-    for (const role of ['screen', 'surface', 'raised'] as const) {
+    for (const role of ['screen', 'surface', 'raised', 'input', 'selected'] as const) {
       assert.equal(flatten(UI.View.render({ style: { backgroundColor: semantic[role] } }, null).props.style).backgroundColor, colors[role]);
     }
   }

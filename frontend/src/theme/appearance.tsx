@@ -23,9 +23,9 @@ export const PALETTES = {
     secondaryActionSurface: '#EAF4FC', secondaryActionForeground: '#285B85',
   },
   dark: {
-    screen: '#15171c', surface: '#1b2530', raised: '#273543',
+    screen: '#15171c', surface: '#1c1d21', raised: '#292a2f',
     text: '#f2f5f7', secondary: '#c5d0da', muted: '#aebbc8',
-    border: '#435364', input: '#273543', selected: '#344657',
+    border: '#3b3d43', input: '#292a2f', selected: '#303137',
     placeholder: '#aebbc8', cursor: '#f2f5f7', navigation: '#080a0d',
     navigationActive: '#ffffff', navigationInactive: '#9aa8b6', pressed: '#ffffff20',
     successSurface: '#1d392b', errorSurface: '#38232a',
