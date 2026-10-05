@@ -1,4 +1,5 @@
 import React from 'react';
+import { mainTabHeaderTitle } from '../../components/navigation/MainTabHeaderTitle';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Platform } from '../../theme/native';
 import { useReducedMotion } from '../../theme/useReducedMotion';
@@ -19,7 +20,7 @@ export default function MarketStack() {
       <Stack.Screen
         name="Market"
         component={MarketScreen}
-        options={{ title: '마켓' }}
+        options={{ title: '마켓', headerTitle: mainTabHeaderTitle('market') }}
       />
       <Stack.Screen
         name="MarketSearch"

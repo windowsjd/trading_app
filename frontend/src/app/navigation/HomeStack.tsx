@@ -1,4 +1,5 @@
 import React from 'react';
+import { mainTabHeaderTitle } from '../../components/navigation/MainTabHeaderTitle';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Platform } from '../../theme/native';
 import { useReducedMotion } from '../../theme/useReducedMotion';
@@ -17,7 +18,7 @@ export default function HomeStack() {
       <Stack.Screen
         name="Home"
         component={HomeScreen}
-        options={{ title: '홈' }}
+        options={{ title: '홈', headerTitle: mainTabHeaderTitle('home') }}
       />
       <Stack.Screen
         name="Portfolio"

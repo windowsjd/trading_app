@@ -1,4 +1,5 @@
 import React from 'react';
+import { mainTabHeaderTitle } from '../../components/navigation/MainTabHeaderTitle';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Platform } from '../../theme/native';
 import { useReducedMotion } from '../../theme/useReducedMotion';
@@ -17,7 +18,7 @@ export default function RankingStack() {
       <Stack.Screen
         name="Ranking"
         component={RankingScreen}
-        options={{ title: '랭킹' }}
+        options={{ title: '랭킹', headerTitle: mainTabHeaderTitle('ranking') }}
       />
       <Stack.Screen
         name="UserSeasonSummary"

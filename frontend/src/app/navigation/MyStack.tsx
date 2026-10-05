@@ -1,4 +1,5 @@
 import React from 'react';
+import { mainTabHeaderTitle } from '../../components/navigation/MainTabHeaderTitle';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Platform } from '../../theme/native';
 import { useReducedMotion } from '../../theme/useReducedMotion';
@@ -23,7 +24,7 @@ export default function MyStack() {
       <Stack.Screen
         name="Overall"
         component={OverallScreen}
-        options={{ title: '전체' }}
+        options={{ title: '전체', headerTitle: mainTabHeaderTitle('menu') }}
       />
       <Stack.Screen name="Record" component={RecordStack} options={{ headerShown: false }} />
       <Stack.Screen

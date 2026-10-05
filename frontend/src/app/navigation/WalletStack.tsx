@@ -1,4 +1,5 @@
 import React from 'react';
+import { mainTabHeaderTitle } from '../../components/navigation/MainTabHeaderTitle';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Platform } from '../../theme/native';
 import { useReducedMotion } from '../../theme/useReducedMotion';
@@ -14,7 +15,7 @@ export default function WalletStack() {
   const reducedMotion = useReducedMotion();
   return (
     <Stack.Navigator id="WalletStack" screenOptions={stackTransition(reducedMotion, Platform.OS)}>
-      <Stack.Screen name="Wallet" component={WalletScreen} options={{ title: '지갑' }} />
+      <Stack.Screen name="Wallet" component={WalletScreen} options={{ title: '지갑', headerTitle: mainTabHeaderTitle('wallet') }} />
       <Stack.Screen name="WalletFx" component={WalletFxScreen} options={{ title: '환전' }} />
       <Stack.Screen name="WalletTransactions" component={WalletTransactionsScreen} options={{ title: '지갑 원장' }} />
     </Stack.Navigator>

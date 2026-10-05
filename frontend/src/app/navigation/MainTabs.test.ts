@@ -38,7 +38,7 @@ function renderTabs(mode: AccountMode | null, isLoading = false, appearance: 'li
         Screen: 'Screen',
       }),
     },
-    '../../theme/appearance': { useAppearance: () => ({ colors: appearance === 'light'
+    '../../theme/appearance': { useAppearance: () => ({ mode: appearance, colors: appearance === 'light'
       ? { navigation: '#ffffff', navigationActive: '#202a35', secondaryActionForeground: '#285B85', navigationInactive: '#697583', border: '#dfe4e9' }
       : { navigation: '#080a0d', navigationActive: '#ffffff', secondaryActionForeground: '#B9DDFC', navigationInactive: '#9aa8b6', border: '#3b3d43' } }) },
     '../../theme/useReducedMotion': { useReducedMotion: () => reduced },
@@ -186,13 +186,13 @@ describe('bottom tab icon contract', () => {
     assert.match(icons, /import Svg, \{ Circle, Path \} from 'react-native-svg'/);
     assert.deepEqual(
       [...new Set([...icons.matchAll(/case '(\w+)':/g)].map((match) => match[1]))],
-      ['home', 'market', 'guide', 'ranking', 'wallet', 'record', 'menu', 'profile'],
+      ['market', 'guide', 'ranking', 'wallet', 'record', 'menu', 'profile'],
     );
     assert.match(icons, /width=\{size\}\s+height=\{size\}/);
     assert.match(icons, /viewBox="0 0 24 24"/);
     assert.match(icons, /fill=\{focused \? color : 'none'\}/);
     assert.match(icons, /stroke=\{focused \? 'none' : color\}/);
-    assert.match(icons, /case 'home': drawing = <Path/);
+    assert.match(icons, /name === 'home'/);
     assert.match(icons, /strokeLinecap="round"\s+strokeLinejoin="round"/);
     assert.doesNotMatch(
       icons,
@@ -260,7 +260,9 @@ describe('bottom tab visual states', () => {
           for (const focused of [true, false]) {
             const color = focused ? options.tabBarActiveTintColor : options.tabBarInactiveTintColor;
             const icon = tab.tabBarIcon({ color, size: 25, focused });
-            assert.equal(icon.props.color, color, screen.props.name);
+            const expected = screen.props.name === 'HomeTab' && !focused && appearance === 'light'
+              ? '#111111' : color;
+            assert.equal(icon.props.color, expected, screen.props.name);
             assert.equal(icon.props.focused, focused, screen.props.name);
           }
         }

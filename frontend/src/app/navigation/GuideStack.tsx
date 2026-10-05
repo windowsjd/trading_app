@@ -1,4 +1,5 @@
 import React from 'react';
+import { mainTabHeaderTitle } from '../../components/navigation/MainTabHeaderTitle';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Platform } from '../../theme/native';
 import { useReducedMotion } from '../../theme/useReducedMotion';
@@ -24,7 +25,7 @@ export default function GuideStack() {
       <Stack.Screen
         name="Guide"
         component={GuideScreen}
-        options={{ title: '가이드' }}
+        options={{ title: '가이드', headerTitle: mainTabHeaderTitle('guide') }}
       />
       <Stack.Screen
         name="MarketBasics"
