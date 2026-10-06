@@ -285,3 +285,31 @@ also checks the actual uploaded bytes.
 Reports, normalized images and screenshots default to `/tmp/profile-image-browser`
 (`PROFILE_IMAGE_BROWSER_OUTPUT` overrides). Real S3/R2, native permission/crop,
 and physical-device checks are separate; no external request is permitted.
+
+UI appearance, button motion and logout presentation regression:
+
+```sh
+NODE_PATH=/path/to/browser-tools/node_modules node test/browser/uiPolishBrowser.cjs
+```
+
+This reuses production components and the existing root-tabs/friends/motion
+transport fixtures. It checks 144 layouts at 320/360/390/430px, font scales
+1/1.5/2 and Light/Dark: Home holdings disclosure, MY/Settings logout,
+Market/Ranking/Friends selected Secondary. It compares both logout buttons,
+checks text bounds and gradient stops, measures stationary hit targets and
+neighbors separately from scaled visual surfaces, and exercises cancellation,
+keyboard activation, loading guards and live Reduced Motion. Appearance cases
+include missing/empty/invalid storage, failed reads, stored light/dark/system,
+reload persistence and OS changes. `UI_POLISH_OUTPUT` selects artifacts
+(default `/tmp/trading-ui-polish`); `UI_POLISH_FEEDBACK_ONLY=1` narrows debugging.
+The harness makes `Date.now` advance with `performance.now` because RN Web
+Animated uses the wall clock, which can be corrected backwards on the test VM.
+Production scale/overlay interpolation is clamped to the intended bounds.
+These are RN Web observations; native frame pacing and back gestures require devices.
+
+The motion runner also covers Overall → MY → Back and Overall → Settings → Back.
+MY and Settings are sibling routes in the current navigator. For a reproducible
+before comparison, `MOTION_BASELINE_SOURCE=/path/to/extracted/frontend` builds
+production source from an extracted Git revision while retaining the same test
+instrumentation, dependencies and fonts. The output folder should be separate
+from the current-source run; the existing geometry assertions are kept active.

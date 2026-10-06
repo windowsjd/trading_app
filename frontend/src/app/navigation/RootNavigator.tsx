@@ -38,7 +38,7 @@ export default function RootNavigator() {
       <Stack.Navigator
         id="RootStack"
         initialRouteName="Splash"
-        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.screen }, ...rootTransition(reducedMotion) }}
+        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.screen }, ...rootTransition(reducedMotion, Platform.OS) }}
         // Keep navigation and session/account providers alive during a render
         // failure. Retrying remounts only this root screen (MainTabs opens Home).
         screenLayout={({ children }) => (
@@ -57,7 +57,7 @@ export default function RootNavigator() {
           headerTintColor: colors.text,
         }} />
         <Stack.Screen name="SeasonJoin" component={SeasonJoinScreen} options={stackTransition(reducedMotion, Platform.OS)} />
-        <Stack.Screen name="AssetChart" component={AssetChartScreen} options={chartTransition(reducedMotion)} />
+        <Stack.Screen name="AssetChart" component={AssetChartScreen} options={chartTransition(reducedMotion, Platform.OS)} />
       </Stack.Navigator>
     </NavigationContainer>
   );

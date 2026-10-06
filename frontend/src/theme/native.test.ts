@@ -25,7 +25,7 @@ const native = {
 
 test('secondary action roles resolve exact appearance colors independently of financial and global selection roles', () => {
   for (const mode of ['light', 'dark'] as const) for (const preference of ['red_blue', 'green_red'] as const) {
-    const expected = mode === 'light' ? ['#EAF4FC', '#285B85'] : ['#1C3042', '#B9DDFC'];
+    const expected = mode === 'light' ? ['#EAF4FC', '#285B85'] : ['#20364A', '#70AFFF'];
     assert.equal(resolveSemanticColor(semantic.secondaryActionSurface, PALETTES[mode], mode, preference), expected[0]);
     assert.equal(resolveSemanticColor(semantic.secondaryActionForeground, PALETTES[mode], mode, preference), expected[1]);
     const UI = themed(mode, preference);

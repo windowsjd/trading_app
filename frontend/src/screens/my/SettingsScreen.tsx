@@ -12,6 +12,7 @@ import {
   Platform,
 } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
+import LogoutButton from '../../components/common/LogoutButton';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -227,11 +228,11 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
               </Text>
             </ActionPressable>
             {meQuery.data.profileImageUrl ? (
-              <ActionPressable testID="settings-profile-image-delete"
-                style={[styles.logoutButton, styles.photoButton]}
+              <ActionPressable feedback="button" testID="settings-profile-image-delete"
+                style={[styles.photoDeleteButton, styles.photoButton]}
                 disabled={photoAction !== null} accessibilityState={{ disabled: photoAction !== null, busy: photoAction === 'delete' }}
                 onPress={() => void runPhotoAction(true)}>
-                <Text style={styles.logoutText}>{photoAction === 'delete' ? '삭제 중...' : '사진 삭제'}</Text>
+                <Text style={styles.photoDeleteText}>{photoAction === 'delete' ? '삭제 중...' : '사진 삭제'}</Text>
               </ActionPressable>
             ) : null}
           </View>
@@ -347,13 +348,7 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
           <Text style={styles.helper}>앱 버전 0.1.0</Text>
         </View>
 
-        <ActionPressable
-          testID={TEST_IDS.settings.logout}
-          style={styles.logoutButton}
-          onPress={() => void onLogout()}
-        >
-          <Text style={styles.logoutText}>로그아웃</Text>
-        </ActionPressable>
+        <LogoutButton testID={TEST_IDS.settings.logout} onPress={onLogout} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -400,7 +395,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryButtonText: { color: semantic.onAccent, fontWeight: '700' },
-  logoutButton: {
+  photoDeleteButton: {
     backgroundColor: semantic.errorSurface,
     borderWidth: 1,
     borderColor: semantic.border,
@@ -408,5 +403,5 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
   },
-  logoutText: { color: semantic.error, fontWeight: '700' },
+  photoDeleteText: { color: semantic.error, fontWeight: '700' },
 });

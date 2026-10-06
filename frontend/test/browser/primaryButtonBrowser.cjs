@@ -49,12 +49,14 @@ async function run() {
       }, await locator.elementHandle());
       const actual = await locator.evaluate(el => {
         const root = el.getBoundingClientRect(), style = getComputedStyle(el), svg = el.querySelector('svg');
+        const surface = el.firstElementChild?.style.transform ? el.firstElementChild : el;
+        const surfaceStyle = getComputedStyle(surface);
         const texts = [...el.querySelectorAll('[dir="auto"]')].map(text => {
           const r = text.getBoundingClientRect(); return { color: getComputedStyle(text).color,
             inside: r.x >= root.x && r.right <= root.right + 0.5 && r.y >= root.y && r.bottom <= root.bottom + 0.5 };
         });
         const gradient = el.querySelector('linearGradient'), g = svg?.getBoundingClientRect();
-        return { width: root.width, height: root.height, radius: style.borderRadius, opacity: style.opacity, background: style.backgroundColor,
+        return { width: root.width, height: root.height, radius: style.borderRadius, opacity: style.opacity, background: surfaceStyle.backgroundColor,
           disabled: el.getAttribute('aria-disabled'), busy: el.getAttribute('aria-busy'), texts,
           icons: [...el.querySelectorAll('svg[stroke]')].map(icon => icon.getAttribute('stroke')),
           svg: g ? { width: g.width, height: g.height } : null,
@@ -100,8 +102,8 @@ async function run() {
       records.push({ name, ...actual }); return actual;
     }
     const assertSecondary = (actual, mode) => {
-      assert.equal(actual.background, mode === 'light' ? 'rgb(234, 244, 252)' : 'rgb(28, 48, 66)');
-      assert.ok(actual.texts.every(text => text.color === (mode === 'light' ? 'rgb(40, 91, 133)' : 'rgb(185, 221, 252)') && text.inside));
+      assert.equal(actual.background, mode === 'light' ? 'rgb(234, 244, 252)' : 'rgb(32, 54, 74)');
+      assert.ok(actual.texts.every(text => text.color === (mode === 'light' ? 'rgb(40, 91, 133)' : 'rgb(112, 175, 255)') && text.inside));
     };
     for (const width of [320, 360, 390, 430, 768]) for (const scale of [1, 1.5, 2]) for (const mode of ['light', 'dark']) {
       const palette = mode === 'light' ? 'red_blue' : 'green_red', name = `${width}-${scale}-${mode}`;
@@ -135,7 +137,7 @@ async function run() {
       if (width === 390 && scale === 1) {
         const primary = id('primary-wide'); await primary.scrollIntoViewIfNeeded();
         const box = await primary.boundingBox(); await page.mouse.move(box.x + 14, box.y + 14); await page.mouse.down(); await page.waitForTimeout(200);
-        assert.equal(await primary.evaluate(el => Number(getComputedStyle(el.children[1]).opacity)), 0.055, 'original single pressed wash');
+        assert.equal(await primary.evaluate(el => Number(getComputedStyle(el.firstElementChild.children[1]).opacity)), 0.1, 'single enhanced pressed wash');
         await primary.screenshot({ path: path.join(out, `${mode}-pressed.png`) }); await page.mouse.up();
         await page.waitForFunction(() => window.fixture.primaryCalls === 1);
         assert.equal((await visual(primary, `${mode}-submit-loading`, false)).disabled, 'true');

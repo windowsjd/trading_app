@@ -4,6 +4,8 @@ const fs = require('node:fs'), path = require('node:path'), http = require('node
 const esbuild = require('esbuild'), { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../..');
 const out = process.env.MOTION_BROWSER_OUTPUT ?? '/tmp/trading-motion-browser';
+const source = file => fs.readFileSync(process.env.MOTION_BASELINE_SOURCE && file.startsWith(path.join(root, 'src') + path.sep)
+  ? path.join(process.env.MOTION_BASELINE_SOURCE, path.relative(root, file)) : file, 'utf8');
 async function run() {
   fs.mkdirSync(out, { recursive: true });
   if (!process.env.MOTION_REUSE_BUNDLE) await esbuild.build({ entryPoints: [path.join(__dirname, 'motionFixture.jsx')], outfile: path.join(out, 'motion.js'), bundle: true, minify: true, platform: 'browser', format: 'iife', nodePaths: [path.join(root, 'node_modules')], resolveExtensions: ['.web.tsx', '.tsx', '.web.ts', '.ts', '.web.js', '.js', '.jsx', '.json'], mainFields: ['browser', 'module', 'main'], define: { global: 'globalThis', 'process.env.NODE_ENV': '"production"', __DEV__: 'false' }, loader: { '.png': 'dataurl' }, plugins: [{ name: 'motion-fixture', setup(b) {
@@ -12,11 +14,12 @@ async function run() {
     b.onResolve({ filter: /(services\/api\/client|useMarketTickers|useAssetTicker|useAssetCandle|useAssetOrderBook)$/ }, () => ({ path: path.join(__dirname, 'motionMocks.js') }));
     b.onResolve({ filter: /screens\/auth\/SplashScreen$/ }, () => ({ path: path.join(__dirname, 'navigationBootstrap.jsx') }));
     // Instrument the real action only in this test bundle, before its handler.
-    b.onLoad({ filter: /ActionPressable\.tsx$/ }, args => ({ loader: 'tsx', contents: fs.readFileSync(args.path, 'utf8').replace('onPress={onPress}', 'onPress={(event) => { window.motion.events.push({ stage: "T2", time: performance.now() }); onPress?.(event); }}') }));
-    b.onLoad({ filter: /FullPageLoading\.tsx$/ }, args => ({ loader: 'tsx', contents: fs.readFileSync(args.path, 'utf8').replace('<SafeAreaView ', '<SafeAreaView testID="motion-loading-shell" ') }));
+    b.onLoad({ filter: /ActionPressable\.tsx$/ }, args => ({ loader: 'tsx', contents: source(args.path).replaceAll('onPress={onPress}', 'onPress={(event) => { window.motion.events.push({ stage: "T2", time: performance.now() }); onPress?.(event); }}') }));
+    b.onLoad({ filter: /FullPageLoading\.tsx$/ }, args => ({ loader: 'tsx', contents: source(args.path).replace('<SafeAreaView ', '<SafeAreaView testID="motion-loading-shell" ') }));
     // Geometry markers stay in the diagnostic bundle, not production screens.
-    b.onLoad({ filter: /AssetChartScreen\.tsx$/ }, args => ({ loader: 'tsx', contents: fs.readFileSync(args.path, 'utf8').replace('style={[styles.chart,', 'testID="motion-asset-chart" style={[styles.chart,') }));
-    b.onLoad({ filter: /RecordProfitAnalysisScreen\.tsx$/ }, args => ({ loader: 'tsx', contents: fs.readFileSync(args.path, 'utf8').replace('<View style={[styles.chartViewport,', '<View testID="motion-profit-chart" style={[styles.chartViewport,') }));
+    b.onLoad({ filter: /AssetChartScreen\.tsx$/ }, args => ({ loader: 'tsx', contents: source(args.path).replace('style={[styles.chart,', 'testID="motion-asset-chart" style={[styles.chart,') }));
+    b.onLoad({ filter: /RecordProfitAnalysisScreen\.tsx$/ }, args => ({ loader: 'tsx', contents: source(args.path).replace('<View style={[styles.chartViewport,', '<View testID="motion-profit-chart" style={[styles.chartViewport,') }));
+    if (process.env.MOTION_BASELINE_SOURCE) b.onLoad({ filter: /\/src\/.*\.(tsx|ts)$/ }, args => ({ loader: args.path.endsWith('.tsx') ? 'tsx' : 'ts', contents: source(args.path) }));
   } }], logLevel: 'warning' });
   const server = http.createServer((req, res) => {
     const script = req.url.startsWith('/motion.js'); res.setHeader('Content-Type', script ? 'text/javascript' : 'text/html');
@@ -93,7 +96,12 @@ async function run() {
       const response = Math.min(...record.requests.map(r => r.response ?? Infinity));
       assert.ok(route.time < response, `${flow}: route opens before delayed transport completes`);
     }
-    if (condition === 'cache') assert.equal(record.requests.length, 0, `${flow}: revisit uses the fresh cache`);
+    if (condition === 'cache') {
+      // Settings deliberately revalidates /me on every mount (staleTime: 0).
+      // Keep that existing contract while other fresh destinations use cache.
+      if (flow === 'Overall → Settings') assert.deepEqual(record.requests.map(request => request.path), ['/me']);
+      else assert.equal(record.requests.length, 0, `${flow}: revisit uses the fresh cache`);
+    }
     // The first-pass reservation gate was measured at 390px/default font.
     // Larger-font wrapping is recorded separately, never treated as native CLS.
     if (!process.env.MOTION_REUSE_BUNDLE && width === 390 && fontScale === 1 && condition === 'delayed' &&
@@ -157,6 +165,9 @@ async function run() {
       await step('Wallet → FX', id('wallet-exchange'), 'wallet-fx-screen', null, condition); await back();
       await step('Wallet → TradeHistory', id('wallet-orders'), 'record-order-list-screen', null, condition); await back();
       await step('Wallet → Overall tab', page.getByRole('tab', { name: '전체', exact: true }), 'overall-Record', 'overall-Record', condition);
+      await step('Overall → MY', id('overall-My'), 'my-screen', 'my-profile-avatar', condition); await back();
+      await step('Overall → Settings', id('overall-Settings'), 'settings-screen', 'settings-save-nickname', condition);
+      await step('Settings → Back', page.locator('[aria-label$="back"]:visible').first(), 'overall-Settings', 'overall-Settings', condition);
       await step('Overall → Record', id('overall-Record'), 'record-season-item-record-0', 'record-season-item-record-0', condition);
       await step('Record → SeasonDetail', id('record-season-item-record-0'), 'record-season-detail-screen', 'record-detail-return', condition);
       await step('SeasonDetail → ProfitAnalysis', id('record-season-detail-profit-analysis-cta'), 'record-profit-analysis-screen', 'record-profit-total', condition); await back(); await back(); await back();

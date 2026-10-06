@@ -9,6 +9,25 @@ const { act, create } = require('react-test-renderer');
 const { load } = require('../../test/ledgerTestHarness.cjs');
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
+test('unknown preference is motion-safe; a late initial read cannot override a live change', async () => {
+  let resolveRead!: (value: boolean) => void;
+  let change!: (value: boolean) => void;
+  const { useReducedMotion } = load(resolve('src/theme/useReducedMotion.ts'), {
+    'react-native': { Platform: { OS: 'android' }, AccessibilityInfo: {
+      isReduceMotionEnabled: () => new Promise<boolean>(resolve => { resolveRead = resolve; }),
+      addEventListener: (_: string, callback: typeof change) => { change = callback; return { remove() {} }; },
+    } },
+  });
+  let current: boolean | undefined, renderer: any;
+  function Probe() { current = useReducedMotion(); return null; }
+  act(() => { renderer = create(React.createElement(Probe)); });
+  assert.equal(current, true);
+  act(() => change(true));
+  await act(async () => resolveRead(false));
+  assert.equal(current, true);
+  act(() => renderer.unmount());
+});
+
 for (const platform of ['android', 'ios']) {
   test(`${platform}: resolves OS setting, updates live and removes its subscription`, async () => {
     let listener: (value: boolean) => void = () => {};
@@ -60,4 +79,18 @@ test('web follows prefers-reduced-motion and cleans up on unmount', async () => 
     else (globalThis as any).window = previous;
   }
   assert.equal(removed, 1);
+});
+
+test('failed native preference read retains static feedback policy', async () => {
+  const { useReducedMotion } = load(resolve('src/theme/useReducedMotion.ts'), {
+    'react-native': { Platform: { OS: 'ios' }, AccessibilityInfo: {
+      isReduceMotionEnabled: async () => { throw Error('unavailable'); },
+      addEventListener: () => ({ remove() {} }),
+    } },
+  });
+  let current: boolean | undefined, renderer: any;
+  function Probe() { current = useReducedMotion(); return null; }
+  await act(async () => { renderer = create(React.createElement(Probe)); });
+  assert.equal(current, true);
+  act(() => renderer.unmount());
 });

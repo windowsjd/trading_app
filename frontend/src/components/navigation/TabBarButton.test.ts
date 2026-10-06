@@ -40,7 +40,7 @@ function harness(platform: string, mode: 'general' | 'season' = 'general', reduc
     'react-native-safe-area-context': { useSafeAreaInsets: () => insets },
     '@react-navigation/native': { getFocusedRouteNameFromRoute: route => route.params?.screen },
     '@react-navigation/bottom-tabs': { createBottomTabNavigator: () => ({ Navigator: 'Navigator', Screen: 'Screen' }) },
-    '../../theme/appearance': { useAppearance: () => ({ colors: { navigation: '#ffffff', navigationActive: '#202a35', navigationInactive: '#697583', border: '#dfe4e9' } }) },
+    '../../theme/appearance': { useAppearance: () => ({ colors: { navigation: '#ffffff', navigationActive: '#202a35', navigationInactive: '#697583', navigationHomeInactive: '#111111', border: '#dfe4e9' } }) },
     '../../theme/useReducedMotion': { useReducedMotion: () => reducedMotion },
     '../../components/navigation/TabBarButton': { default: Button, __esModule: true },
     '../../components/navigation/TabBarIcon': { default: 'TabBarIcon', __esModule: true },
@@ -78,7 +78,7 @@ describe('bottom tab touch feedback', () => {
             : screen.props.options;
           for (const selected of [false, true]) {
             const icon = options.tabBarIcon({ color: selected ? '#fff' : '#aaa', size: 25, focused: selected });
-            assert.equal(icon.props.color, selected ? '#fff' : '#aaa');
+            assert.equal(icon.props.color, selected ? '#fff' : screen.props.name === 'HomeTab' ? '#111111' : '#aaa');
             assert.equal(icon.props.size, 25);
             assert.equal(icon.props.focused, selected);
             const calls: string[] = [];

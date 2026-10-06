@@ -17,6 +17,7 @@ function load(file, mocks) {
     if (name.endsWith('/ProfileAvatar')) return { default: 'ProfileAvatar', __esModule: true };
     if (name.endsWith('/theme/native')) return mocks['react-native'];
     if (name.endsWith('/theme/safeArea')) return mocks['react-native-safe-area-context'] ?? { SafeAreaView: 'SafeAreaView' };
+    if (name.endsWith('/theme/useReducedMotion')) return { useReducedMotion: () => false };
     if (name.endsWith('/theme/appearance')) return { AppearanceProvider: ({ children }) => children, useAppearance: () => ({ preference: 'system', financialPreference: 'red_blue', financialColors: require('../src/theme/financialColors.ts').getFinancialColors('light'), mode: 'light', colors: { screen: '#fff', text: '#111', border: '#ddd' }, setPreference() {} }) };
     // Interaction animation is a native boundary here; its real component has
     // separate render tests. Keep screen/query/gesture tests focused on actions.

@@ -12,6 +12,7 @@ import {
 import { getScreenContentStyle } from '../../theme/screenLayout';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
 import ActionPressable from '../../components/common/ActionPressable';
+import LogoutButton from '../../components/common/LogoutButton';
 import { useQuery } from '@tanstack/react-query';
 
 import type { MyScreenProps } from '../../app/navigation/types';
@@ -218,13 +219,7 @@ export default function MyScreen({ navigation }: Props) {
             <Text style={styles.menuText}>내 보상 / 뱃지</Text>
           </ActionPressable>
 
-          <ActionPressable
-            testID={TEST_IDS.my.logoutMenu}
-            style={styles.menuRow}
-            onPress={() => void onLogout()}
-          >
-            <Text style={styles.logoutText}>로그아웃</Text>
-          </ActionPressable>
+          <LogoutButton testID={TEST_IDS.my.logoutMenu} onPress={onLogout} />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -252,5 +247,4 @@ const styles = StyleSheet.create({
     borderBottomColor: semantic.border,
   },
   menuText: { fontSize: 16, fontWeight: '600' },
-  logoutText: { fontSize: 16, fontWeight: '700', color: semantic.error },
 });

@@ -7,6 +7,7 @@ export type AppearancePreference = 'system' | 'light' | 'dark';
 export type AppearanceMode = 'light' | 'dark';
 
 const STORAGE_KEY = 'trading-app:appearance';
+const DEFAULT_PREFERENCE: AppearancePreference = 'light';
 // App surfaces, text and UI status. Financial meanings live in financialColors.ts.
 // screen: page canvas; surface: major cards/sheets; raised/input: inset controls.
 export const PALETTES = {
@@ -34,7 +35,7 @@ export const PALETTES = {
     success: '#79d68b', error: '#ff8585', warning: '#e8bf69',
     warningSurface: '#3a3020', info: '#9acbe2', infoSurface: '#1c3045',
     onAccent: '#ffffff', infoAction: '#245b76',
-    secondaryActionSurface: '#1C3042', secondaryActionForeground: '#B9DDFC',
+    secondaryActionSurface: '#20364A', secondaryActionForeground: '#70AFFF',
   },
 } as const;
 
@@ -43,7 +44,7 @@ export function resolveAppearance(preference: AppearancePreference, system: stri
   return preference === 'system' ? (system === 'dark' ? 'dark' : 'light') : preference;
 }
 export function parseAppearancePreference(value: string | null): AppearancePreference {
-  return value === 'light' || value === 'dark' ? value : 'system';
+  return value === 'light' || value === 'dark' || value === 'system' ? value : DEFAULT_PREFERENCE;
 }
 
 type AppearanceContextValue = {
@@ -59,7 +60,7 @@ const AppearanceContext = createContext<AppearanceContextValue | null>(null);
 
 export function AppearanceProvider({ children }: { children: React.ReactNode }) {
   const system = useColorScheme();
-  const [preference, setPreferenceState] = useState<AppearancePreference>('system');
+  const [preference, setPreferenceState] = useState<AppearancePreference>(DEFAULT_PREFERENCE);
   const [ready, setReady] = useState(false);
   const revision = useRef(0);
   const writes = useRef<Promise<unknown>>(Promise.resolve());
@@ -71,7 +72,7 @@ export function AppearanceProvider({ children }: { children: React.ReactNode }) 
     let active = true;
     const appearanceRead = AsyncStorage.getItem(STORAGE_KEY)
       .then((value) => { if (active && revision.current === 0) setPreferenceState(parseAppearancePreference(value)); })
-      .catch(() => { if (active && revision.current === 0) setPreferenceState('system'); });
+      .catch(() => { if (active && revision.current === 0) setPreferenceState(DEFAULT_PREFERENCE); });
     const financialRead = AsyncStorage.getItem(FINANCIAL_COLOR_STORAGE_KEY)
       .then((value) => { if (active && financialRevision.current === 0) setFinancialPreferenceState(parseFinancialColorPreference(value)); })
       .catch(() => { if (active && financialRevision.current === 0) setFinancialPreferenceState('red_blue'); });
@@ -80,10 +81,11 @@ export function AppearanceProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const setPreference = (value: AppearancePreference) => {
-    const current = ++revision.current;
+    ++revision.current;
     setPreferenceState(value);
     writes.current = writes.current.catch(() => undefined).then(() => AsyncStorage.setItem(STORAGE_KEY, value))
-      .catch(() => { if (revision.current === current) setPreferenceState('system'); });
+      // A disk failure must not replace an explicit choice in this session.
+      .catch(() => undefined);
   };
   const setFinancialPreference = (value: FinancialColorPreference) => {
     const current = ++financialRevision.current;
@@ -111,7 +113,7 @@ export function AppearanceProvider({ children }: { children: React.ReactNode }) 
 
   // Wait for the device-local preference before mounting NavigationContainer.
   // This prevents a stored dark choice from briefly rendering light screens.
-  if (!ready) return <View style={{ flex: 1, backgroundColor: system === 'dark' ? PALETTES.dark.screen : PALETTES.light.screen }} />;
+  if (!ready) return <View style={{ flex: 1, backgroundColor: PALETTES.light.screen }} />;
   return (
     <AppearanceContext.Provider value={context}>
       <StatusBar barStyle={mode === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={colors.screen} />

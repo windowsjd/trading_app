@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 import type { Appearance } from 'react-native';
+import { logoutGradient } from './tokens.ts';
 
 type NativeColorScheme = Parameters<typeof Appearance.setColorScheme>[0];
 
@@ -78,8 +79,18 @@ test('dark neutral surfaces preserve hierarchy and improve text and secondary ac
   assert.ok(contrast(dark.secondaryActionSurface, dark.surface) > contrast(dark.secondaryActionSurface, '#1b2530'));
 });
 
+test('action colors retain small-label contrast without borrowing financial or error tokens', () => {
+  const { dark, light } = harness().module.PALETTES;
+  assert.ok(contrast(dark.secondaryActionForeground, dark.secondaryActionSurface) >= 5);
+  assert.ok(luminance(dark.secondaryActionSurface) > luminance('#1C3042'));
+  assert.equal(light.secondaryActionSurface, '#EAF4FC');
+  assert.equal(light.secondaryActionForeground, '#285B85');
+  for (const color of logoutGradient.colors) assert.ok(contrast('#FFFFFF', color) >= 4.5);
+  assert.equal(light.error, '#b32d2d'); assert.equal(dark.error, '#ff8585');
+});
+
 test('system follows OS changes; explicit light/dark override and persist on this device', async (t) => {
-  const h = harness(); t.after(h.close);
+  const h = harness('system'); t.after(h.close);
   await h.mount();
   assert.equal(h.current.preference, 'system'); assert.equal(h.current.mode, 'dark');
   assert.equal(h.applied.at(-1), 'unspecified');
@@ -109,7 +120,7 @@ for (const preference of ['system', 'light', 'dark'] as const) {
     const h = harness(preference, true); t.after(h.close);
     h.setScheme(preference === 'dark' ? 'light' : 'dark');
     await h.mount(); assert.equal(h.current, undefined); assert.deepEqual(h.applied, []);
-    assert.equal(h.rendered.props.style.backgroundColor, preference === 'dark' ? '#fcfcfd' : '#15171c');
+    assert.equal(h.rendered.props.style.backgroundColor, '#fcfcfd');
     await act(async () => { h.releaseRead(); await Promise.resolve(); });
     assert.equal(h.current.preference, preference);
     assert.equal(h.current.mode, preference === 'system' ? 'dark' : preference);
@@ -120,15 +131,23 @@ for (const preference of ['system', 'light', 'dark'] as const) {
   });
 }
 
-test('invalid or failed device preference safely uses system', async (t) => {
-  const invalid = harness('unexpected'); t.after(invalid.close);
-  await invalid.mount(); assert.equal(invalid.current.preference, 'system');
-  const failed = harness(); t.after(failed.close);
-  failed.failRead(); await failed.mount(); assert.equal(failed.current.mode, 'dark');
-  failed.failWrite(); await failed.choose('light');
-  assert.equal(failed.current.preference, 'system'); assert.equal(failed.current.mode, 'dark');
-});
+for (const saved of [null, '', 'unexpected']) {
+  test(`unset/invalid preference ${saved} and read failure fall back to light without writes`, async (t) => {
+    const h = harness(saved); t.after(h.close); await h.mount();
+    assert.equal(h.current.preference, 'light'); assert.equal(h.current.mode, 'light');
+    assert.equal(h.stored, saved);
+    h.setScheme('light'); await h.rerender(); h.setScheme('dark'); await h.rerender();
+    assert.equal(h.current.mode, 'light');
+    const failed = harness(); t.after(failed.close); failed.failRead(); await failed.mount();
+    assert.equal(failed.current.preference, 'light'); assert.equal(failed.current.mode, 'light');
+  });
+}
 
+test('write failure preserves the explicit in-session choice and existing disk choice', async (t) => {
+  const h = harness('system'); t.after(h.close); await h.mount(); h.failWrite();
+  await h.choose('light'); assert.equal(h.current.preference, 'light'); assert.equal(h.stored, 'system');
+  await h.choose('dark'); assert.equal(h.current.mode, 'dark'); assert.equal(h.stored, 'system');
+});
 
 test('stored dark choice is read before navigation children mount', async (t) => {
   const h = harness('dark', true); t.after(h.close);
@@ -140,14 +159,14 @@ test('stored dark choice is read before navigation children mount', async (t) =>
 
 
 test('financial preference defaults to Red/Blue, applies instantly, survives remount and OS changes', async (t) => {
-  const h = harness(); t.after(h.close);
+  const h = harness('system'); t.after(h.close);
   await h.mount();
   assert.equal(h.current.financialPreference, 'red_blue');
   assert.equal(h.current.financialColors.buy, '#ff8b86');
   await h.chooseFinancial('green_red');
   assert.equal(h.current.financialColors.buy, '#79d68b');
   assert.equal(h.values.get('trading-app:financial-colors'), 'green_red');
-  assert.equal(h.values.get('trading-app:appearance'), null);
+  assert.equal(h.values.get('trading-app:appearance'), 'system');
   await h.close(); await h.mount();
   assert.equal(h.current.financialPreference, 'green_red');
   h.setScheme('light'); await h.rerender();

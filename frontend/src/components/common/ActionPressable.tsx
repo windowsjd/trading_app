@@ -1,7 +1,11 @@
-import React from 'react';
-import { primaryGradient, resolveSemanticColor } from '../../theme/tokens';
+import React, { useEffect, useRef } from 'react';
+import { primaryGradient, resolveSemanticColor, resolveSemanticStyle, type ActionGradient } from '../../theme/tokens';
 import { useAppearance } from '../../theme/appearance';
+import { useReducedMotion } from '../../theme/useReducedMotion';
 import {
+  Animated,
+  Easing,
+  Platform,
   Pressable,
   processColor,
   StyleSheet,
@@ -10,23 +14,95 @@ import {
   type StyleProp,
   type ViewStyle,
 } from '../../theme/native';
-import { getFeedbackPalette } from './pressFeedback';
+import { buttonFeedback, getFeedbackPalette, splitButtonStyle } from './pressFeedback';
 import PrimaryButtonBackground from './PrimaryButtonBackground';
 
 type Props = Omit<PressableProps, 'android_ripple'> & {
   ref?: React.Ref<View>;
   /** Opt in only for general primary actions; disabled surfaces stay unchanged. */
   primary?: boolean;
+  gradient?: ActionGradient;
   /** Place the decorative wash on a smaller surface inside the hit target. */
   feedbackStyle?: StyleProp<ViewStyle>;
 };
 
-/** One immediate pressed surface; no motion clock or delayed action. */
-export default function ActionPressable({ feedback = 'default', primary = false, ...props }: Props & {
-  /** Reserved for the compact Market sort directions. */
-  feedback?: 'default' | 'none';
+/** Button motion is opt-in; rows/cards keep their static feedback. */
+export default function ActionPressable({ feedback, primary = false, gradient, ...props }: Props & {
+  /** `none` is reserved for Market sort; `button` requires a visual surface. */
+  feedback?: 'default' | 'button' | 'none';
 }) {
-  return feedback === 'none' ? <Pressable {...props} /> : <FeedbackActionPressable {...props} primary={primary} />;
+  if (feedback === 'none') return <Pressable {...props} />;
+  if (feedback === 'button' || (feedback === undefined && primary)) {
+    return <ButtonActionPressable {...props} gradient={gradient ?? (primary ? primaryGradient : undefined)} />;
+  }
+  return <FeedbackActionPressable {...props} primary={primary} />;
+}
+
+function ButtonActionPressable({ children, style, disabled, onPress, gradient, ...props }: Props) {
+  const { colors, mode, financialPreference } = useAppearance();
+  const blocked = !!disabled || !!props['aria-disabled'] || !!props.accessibilityState?.disabled;
+  const visualStyle = (state: { pressed: boolean }) => StyleSheet.flatten(resolveSemanticStyle(
+    [typeof style === 'function' ? style(state) : style, gradient && !blocked && { backgroundColor: gradient.colors[0] }],
+    colors, mode, financialPreference,
+  )) ?? {};
+  return (
+    <Pressable {...props} disabled={blocked} onPress={onPress}
+      style={(state) => splitButtonStyle(visualStyle(state)).target}>
+      {(state) => <ButtonSurface pressed={state.pressed} enabled={!blocked && !!onPress}
+        style={splitButtonStyle(visualStyle(state)).surface} gradient={blocked ? undefined : gradient}>
+        {typeof children === 'function' ? children(state) : children}
+      </ButtonSurface>}
+    </Pressable>
+  );
+}
+
+function ButtonSurface({ children, pressed, enabled, style, gradient }: {
+  children: React.ReactNode; pressed: boolean; enabled: boolean; style: ViewStyle; gradient?: ActionGradient;
+}) {
+  const reduced = useReducedMotion();
+  const progress = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (reduced || !enabled) { progress.setValue(0); return; }
+    const animation = Animated.timing(progress, {
+      toValue: pressed ? 1 : 0,
+      duration: pressed ? buttonFeedback.pressDuration : buttonFeedback.releaseDuration,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: Platform.OS !== 'web',
+      isInteraction: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [enabled, pressed, progress, reduced]);
+  const shape = clipShape(style);
+  return (
+    <Animated.View pointerEvents="none" style={[styles.buttonSurface, style, {
+      transform: [{ scale: reduced || !enabled ? 1 : progress.interpolate({ inputRange: [0, 1], outputRange: [1, buttonFeedback.scale], extrapolate: 'clamp' }) }],
+    }]}>
+      {gradient ? <PrimaryButtonBackground shape={shape} gradient={gradient} /> : null}
+      {enabled ? <Animated.View pointerEvents="none" accessible={false} accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants" style={[styles.clip, shape, {
+          backgroundColor: buttonFeedback.washColor,
+          opacity: reduced ? (pressed ? buttonFeedback.washOpacity : 0)
+            : progress.interpolate({ inputRange: [0, 1], outputRange: [0, buttonFeedback.washOpacity], extrapolate: 'clamp' }),
+        }]} /> : null}
+      {children}
+    </Animated.View>
+  );
+}
+
+function clipShape(base: ViewStyle): ViewStyle {
+  return {
+    borderRadius: base.borderRadius,
+    borderTopLeftRadius: base.borderTopLeftRadius,
+    borderTopRightRadius: base.borderTopRightRadius,
+    borderBottomLeftRadius: base.borderBottomLeftRadius,
+    borderBottomRightRadius: base.borderBottomRightRadius,
+    borderTopStartRadius: base.borderTopStartRadius,
+    borderTopEndRadius: base.borderTopEndRadius,
+    borderBottomStartRadius: base.borderBottomStartRadius,
+    borderBottomEndRadius: base.borderBottomEndRadius,
+    borderCurve: base.borderCurve,
+  };
 }
 
 function FeedbackActionPressable({ children, style, disabled, onPress, primary = false, feedbackStyle, ...props }: Props) {
@@ -50,18 +126,7 @@ function FeedbackActionPressable({ children, style, disabled, onPress, primary =
         const color = processColor(resolveSemanticColor(base.backgroundColor, colors, mode, financialPreference) ?? colors.screen);
         const palette = getFeedbackPalette(typeof color === 'number' ? color : null);
         // Copy only the clip shape; never clip the root's border/shadow/content.
-        const shape: ViewStyle = {
-          borderRadius: base.borderRadius,
-          borderTopLeftRadius: base.borderTopLeftRadius,
-          borderTopRightRadius: base.borderTopRightRadius,
-          borderBottomLeftRadius: base.borderBottomLeftRadius,
-          borderBottomRightRadius: base.borderBottomRightRadius,
-          borderTopStartRadius: base.borderTopStartRadius,
-          borderTopEndRadius: base.borderTopEndRadius,
-          borderBottomStartRadius: base.borderBottomStartRadius,
-          borderBottomEndRadius: base.borderBottomEndRadius,
-          borderCurve: base.borderCurve,
-        };
+        const shape = clipShape(base);
         return (
           <>
             {showPrimary ? <PrimaryButtonBackground shape={shape} /> : null}
@@ -94,6 +159,7 @@ function FeedbackActionPressable({ children, style, disabled, onPress, primary =
 }
 
 const styles = StyleSheet.create({
+  buttonSurface: { alignSelf: 'stretch', flexGrow: 1 },
   primary: { backgroundColor: primaryGradient.colors[0] },
   clip: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
   target: { position: 'absolute', overflow: 'hidden' },

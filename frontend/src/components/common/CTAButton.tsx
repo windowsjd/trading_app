@@ -1,4 +1,4 @@
-import { primaryGradient, semantic } from '../../theme/tokens';
+import { logoutGradient, primaryGradient, semantic } from '../../theme/tokens';
 import React from 'react';
 import {
   Text,
@@ -17,7 +17,7 @@ interface CTAButtonProps {
   style?: ViewStyle;
   testID?: string;
   /** History entry uses secondary; back and recovery actions keep neutral. */
-  variant?: 'primary' | 'secondary' | 'neutral';
+  variant?: 'primary' | 'secondary' | 'neutral' | 'logout';
 }
 
 export default function CTAButton({
@@ -32,13 +32,16 @@ export default function CTAButton({
 
   return (
     <ActionPressable
+      feedback="button"
       primary={variant === 'primary' && style?.backgroundColor === undefined}
+      gradient={variant === 'logout' ? logoutGradient : undefined}
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled, busy: state === 'loading' }}
       style={[
         styles.button,
+        variant === 'logout' && styles.logout,
         variant === 'secondary' && styles.secondary,
         state === 'blocked' && styles.blocked,
         state === 'disabled' && styles.disabled,
@@ -70,6 +73,7 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.45,
   },
+  logout: { backgroundColor: logoutGradient.colors[0] },
   secondary: { backgroundColor: semantic.secondaryActionSurface },
   secondaryText: { color: semantic.secondaryActionForeground },
   blocked: {

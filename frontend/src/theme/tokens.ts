@@ -12,6 +12,15 @@ export const primaryGradient = {
   opacity: 1,
 } as const;
 
+/** Session action only; neither financial direction nor global error text. */
+export const logoutGradient = {
+  ...primaryGradient,
+  colors: ['#D93636', '#B82020'],
+} as const;
+export type ActionGradient = Omit<typeof primaryGradient, 'colors'> & {
+  readonly colors: readonly [string, string];
+};
+
 /** Explicit roles use valid color sentinels for native/web StyleSheet validation.
  * Only these tokens resolve through the appearance palette; arbitrary hex stays as written. */
 export const semantic = {

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { describe, it } from 'node:test';
-import { getFeedbackPalette } from './pressFeedback.ts';
+import { buttonFeedback, getFeedbackPalette } from './pressFeedback.ts';
 import { semantic } from '../../theme/tokens.ts';
 
 const require = createRequire(import.meta.url);
@@ -10,34 +10,27 @@ const event = { nativeEvent: { pageX: 130, pageY: 215 } };
 const wash = (renderer: any) => renderer.root.findAllByType('View').find((n: any) => n.props.pointerEvents === 'none');
 
 describe('ActionPressable immediate feedback', () => {
-  it('secondary CTA keeps geometry, solid colors, loading and disabled policies', (t) => {
+  it('secondary CTA keeps solid colors, geometry and disabled/loading guards', (t) => {
     const h = interactionHarness();
     const CTA = h.load('src/components/common/CTAButton.tsx', { './ActionPressable': { default: h.ActionPressable, __esModule: true } }).default;
-    let calls = 0;
-    const props = { label: '거래 내역 보기', onPress: () => calls++, style: { flex: 1 } };
+    const props = { label: '거래 내역 보기', onPress: () => {}, style: { flex: 1 } };
     const renderer = h.render(React.createElement(CTA, props));
     t.after(() => act(() => renderer.unmount()));
     const geometry = flatten(renderer.root.findByType('Pressable').props.style);
     act(() => renderer.update(React.createElement(CTA, { ...props, variant: 'secondary' })));
+    assert.deepEqual(flatten(renderer.root.findByType('Pressable').props.style), geometry);
     assert.equal(renderer.root.findAllByType('Svg').length, 0);
-    assert.deepEqual(flatten(renderer.root.findByType('Pressable').props.style), { ...geometry, backgroundColor: semantic.secondaryActionSurface });
+    assert.equal(flatten(renderer.root.findAllByType('AnimatedView')[0].props.style).backgroundColor, semantic.secondaryActionSurface);
     assert.equal(flatten(renderer.root.findByType('Text').props.style).color, semantic.secondaryActionForeground);
-    const button = renderer.root.findByType('Pressable');
-    act(() => button.props.onPressIn(event));
-    assert.ok(flatten(wash(renderer).props.style).opacity > 0);
-    button.props.onPress();
-    assert.equal(calls, 1);
     for (const state of ['disabled', 'loading', 'blocked']) {
       act(() => renderer.update(React.createElement(CTA, { ...props, variant: 'secondary', state })));
       const disabled = renderer.root.findByType('Pressable');
-      assert.equal(disabled.props.disabled, true);
-      assert.equal(disabled.props.onPress, undefined);
+      assert.equal(disabled.props.disabled, true); assert.equal(disabled.props.onPress, undefined);
       assert.equal(disabled.props.accessibilityState.busy, state === 'loading');
-      assert.equal(wash(renderer), undefined);
+      assert.equal(renderer.root.findAllByType('AnimatedView').length, 1, 'no wash');
       assert.equal(flatten(disabled.props.style).opacity, state === 'loading' ? undefined : 0.45);
       if (state === 'loading') assert.equal(renderer.root.findByType('ActivityIndicator').props.color, semantic.secondaryActionForeground);
     }
-    assert.equal(h.animations.length, 0);
   });
 
   it('one full item target places immediate feedback only on its compact icon surface', (t) => {
@@ -68,61 +61,75 @@ describe('ActionPressable immediate feedback', () => {
     assert.equal(h.animations.length, 0);
   });
 
-  it('primary decoration is behind the existing wash, ignores touch and preserves geometry and immediate actions', (t) => {
-    const h = interactionHarness();
-    let calls = 0;
-    const style = { borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16, width: 180 };
-    const renderer = h.render(React.createElement(h.ActionPressable, {
-      primary: true, style, onPress: () => calls++, accessibilityLabel: '시즌 참가하기',
-    }, React.createElement('Text', null, '시즌 참가하기')));
-    t.after(() => act(() => renderer.unmount()));
-    const button = renderer.root.findByType('Pressable');
-    const gradient = renderer.root.findByType('Svg');
-    const decorations = renderer.root.findAllByType('View');
-    assert.equal(gradient.props.width, '100%');
-    assert.equal(gradient.props.height, '100%');
-    assert.equal(decorations.length, 2, 'one gradient clip and the original wash');
-    for (const decoration of decorations) {
-      assert.equal(decoration.props.pointerEvents, 'none');
-      assert.equal(decoration.props.accessibilityElementsHidden, true);
-      assert.equal(flatten(decoration.props.style).borderRadius, style.borderRadius);
-    }
-    assert.ok(decorations[0].findByType('Svg'));
-    assert.equal(flatten(decorations[1].props.style).opacity, 0);
-    const root = flatten(button.props.style);
-    for (const [key, value] of Object.entries(style)) assert.equal(root[key], value);
-    act(() => button.props.onPressIn(event));
-    assert.ok(flatten(renderer.root.findAllByType('View')[1].props.style).opacity > 0);
-    button.props.onPress(event);
-    assert.equal(calls, 1);
-    act(() => button.props.onPressOut(event));
-    assert.equal(flatten(renderer.root.findAllByType('View')[1].props.style).opacity, 0);
-    assert.equal(h.animations.length, 0);
-    assert.equal(h.measures.length, 0);
-  });
+  for (const platform of ['android', 'ios', 'web']) {
+    it(`${platform}: button uses one interruptible clock, stationary target, immediate actions and correct layer order`, (t) => {
+      const h = interactionHarness(platform);
+      let calls = 0;
+      const onPress = () => calls++;
+      const props = { primary: true, onPress, style: { width: 180, minHeight: 48, margin: 8, borderRadius: 12, padding: 14 }, hitSlop: 8 };
+      const renderer = h.render(React.createElement(h.ActionPressable, props, React.createElement('Text', null, '실행')));
+      t.after(() => act(() => renderer.unmount()));
+      const button = () => renderer.root.findByType('Pressable');
+      const surface = () => renderer.root.findAllByType('AnimatedView')[0];
+      const overlay = () => renderer.root.findAllByType('AnimatedView')[1];
+      const target = flatten(button().props.style);
+      assert.deepEqual(target, { width: 180, minHeight: 48, margin: 8, borderRadius: 12 });
+      assert.equal(button().props.hitSlop, 8); assert.equal(button().props.android_ripple, undefined);
+      assert.equal(flatten(surface().props.style).padding, 14);
+      assert.equal(renderer.root.findAllByType('Svg').length, 1);
+      assert.equal(surface().findAllByType('View')[0].props.pointerEvents, 'none');
+      assert.deepEqual(surface().children.map((n: any) => typeof n.type === 'function' ? n.type.name : n.type), ['PrimaryButtonBackground', 'AnimatedView', 'Text']);
+      act(() => button().props.onPressIn(event));
+      const press = h.animations.at(-1);
+      assert.equal(press.options.toValue, 1); assert.equal(press.options.duration, buttonFeedback.pressDuration);
+      assert.equal(press.options.useNativeDriver, platform !== 'web'); assert.equal(press.options.isInteraction, false);
+      assert.equal(flatten(surface().props.style).transform[0].scale.value, flatten(overlay().props.style).opacity.value);
+      assert.deepEqual(flatten(surface().props.style).transform[0].scale.outputRange, [1, 0.97]);
+      assert.equal(flatten(surface().props.style).transform[0].scale.extrapolate, 'clamp');
+      assert.equal(flatten(overlay().props.style).opacity.extrapolate, 'clamp');
+      assert.deepEqual(flatten(overlay().props.style).opacity.outputRange, [0, 0.1]);
+      assert.equal(flatten(overlay().props.style).backgroundColor, '#000');
+      button().props.onPress(); assert.equal(calls, 1, 'handler runs before animation completion');
+      assert.deepEqual(flatten(button().props.style), target);
+      act(() => button().props.onPressOut(event));
+      const release = h.animations.at(-1);
+      assert.equal(release.options.duration, buttonFeedback.releaseDuration); assert.equal(release.options.toValue, 0);
+      for (let i = 0; i < 5; i++) {
+        act(() => button().props.onPressIn(event)); act(() => button().props.onPressOut(event));
+      }
+      h.finish(); assert.equal(press.value.value, 0); assert.equal(calls, 1, 'cancellation never invokes onPress');
+      assert.deepEqual(flatten(button().props.style), target); assert.equal(h.measures.length, 0);
+      act(() => button().props.onPressIn(event));
+      h.reduced = true;
+      act(() => renderer.update(React.createElement(h.ActionPressable, props, React.createElement('Text', null, '실행'))));
+      const clocks = h.animations.length;
+      act(() => button().props.onPressIn(event));
+      assert.deepEqual(flatten(surface().props.style).transform, [{ scale: 1 }]);
+      assert.equal(flatten(overlay().props.style).opacity, 0.1);
+      act(() => button().props.onPressOut(event)); assert.equal(flatten(overlay().props.style).opacity, 0);
+      assert.equal(h.animations.length, clocks);
+      button().props.onPress(); assert.equal(calls, 2, 'keyboard/accessibility action needs no press animation');
+      for (const blocked of [{ disabled: true }, { 'aria-disabled': true }, { accessibilityState: { disabled: true } }]) {
+        act(() => renderer.update(React.createElement(h.ActionPressable, { ...props, ...blocked })));
+        assert.equal(button().props.disabled, true); assert.equal(button().props.onPress, undefined);
+        assert.equal(renderer.root.findAllByType('AnimatedView').length, 1);
+        assert.equal(renderer.root.findAllByType('Svg').length, 0);
+      }
+    });
+  }
 
-  it('CTA keeps neutral/explicit-color roles and all disabled/loading surfaces unchanged', (t) => {
+  it('CTA neutral and financial roles stay solid while logout has independent red stops', (t) => {
     const h = interactionHarness();
     const CTA = h.load('src/components/common/CTAButton.tsx', { './ActionPressable': { default: h.ActionPressable, __esModule: true } }).default;
-    const onPress = () => {};
-    const renderer = h.render(React.createElement(CTA, { label: '환전하기', onPress }));
+    const renderer = h.render(React.createElement(CTA, { label: '확인', onPress() {} }));
     t.after(() => act(() => renderer.unmount()));
-    assert.equal(renderer.root.findAllByType('Svg').length, 1);
     for (const props of [{ variant: 'neutral' }, { style: { backgroundColor: '#a13e3b' } }]) {
-      act(() => renderer.update(React.createElement(CTA, { label: '확인', onPress, ...props })));
+      act(() => renderer.update(React.createElement(CTA, { label: '확인', onPress() {}, ...props })));
       assert.equal(renderer.root.findAllByType('Svg').length, 0);
-      if ('style' in props) assert.equal(flatten(renderer.root.findByType('Pressable').props.style).backgroundColor, props.style.backgroundColor);
+      if ('style' in props) assert.equal(flatten(renderer.root.findAllByType('AnimatedView')[0].props.style).backgroundColor, props.style.backgroundColor);
     }
-    for (const state of ['disabled', 'loading', 'blocked']) {
-      act(() => renderer.update(React.createElement(CTA, { label: '환전하기', onPress, state })));
-      const button = renderer.root.findByType('Pressable');
-      assert.equal(renderer.root.findAllByType('Svg').length, 0);
-      assert.equal(renderer.root.findAllByType('View').length, 0);
-      assert.equal(button.props.disabled, true);
-      assert.equal(button.props.onPress, undefined);
-      assert.equal(flatten(button.props.style).opacity, state === 'loading' ? undefined : 0.45);
-      assert.equal(renderer.root.findAllByType('ActivityIndicator').length, state === 'loading' ? 1 : 0);
-    }
+    act(() => renderer.update(React.createElement(CTA, { label: '로그아웃', variant: 'logout', onPress() {} })));
+    assert.deepEqual(renderer.root.findAllByType('Stop').map((n: any) => n.props.stopColor), ['#D93636', '#B82020']);
   });
 
   for (const platform of ['android', 'ios', 'web']) {
@@ -178,31 +185,6 @@ describe('ActionPressable immediate feedback', () => {
     assert.equal(flatten(wash(renderer).props.style).borderTopLeftRadius, 9);
     assert.equal(flatten(renderer.root.findByType('Pressable').props.style).transform, 'translateX(4px)');
     assert.equal(renderer.root.findByType('Text').props.children, 'true');
-  });
-
-  it('CTA disabled/loading/blocked keeps actions disabled and removes feedback', (t) => {
-    const h = interactionHarness();
-    const CTA = h.load('src/components/common/CTAButton.tsx', { './ActionPressable': { default: h.ActionPressable, __esModule: true } }).default;
-    const onPress = () => {};
-    const renderer = h.render(React.createElement(CTA, { label: '환전하기', onPress, style: { backgroundColor: '#111' } }));
-    t.after(() => act(() => renderer.unmount()));
-    assert.equal(renderer.root.findByType('Text').props.numberOfLines, undefined);
-    act(() => renderer.root.findByType('Pressable').props.onPressIn(event));
-    assert.equal(flatten(wash(renderer).props.style).opacity, getFeedbackPalette(0xff111111).washOpacity);
-    for (const state of ['disabled', 'loading', 'blocked']) {
-      act(() => renderer.update(React.createElement(CTA, { label: '환전하기', state, onPress })));
-      const button = renderer.root.findByType('Pressable');
-      assert.equal(button.props.disabled, true);
-      assert.equal(button.props.onPress, undefined);
-      assert.equal(wash(renderer), undefined);
-      assert.equal(renderer.root.findAllByType('ActivityIndicator').length, state === 'loading' ? 1 : 0);
-      assert.equal(button.props.accessibilityState.busy, state === 'loading');
-    }
-    for (const props of [{}, { onPress, 'aria-disabled': true }, { onPress, accessibilityState: { disabled: true } }]) {
-      act(() => renderer.update(React.createElement(h.ActionPressable, props)));
-      assert.equal(wash(renderer), undefined);
-    }
-    assert.equal(h.animations.length, 0);
   });
 
   it('release/cancel, rapid taps, keyboard input and unmount leave no pending feedback', (t) => {

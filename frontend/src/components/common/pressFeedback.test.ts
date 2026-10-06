@@ -36,7 +36,7 @@ describe('touch coverage and exclusions', () => {
             return init && ts.isJsxExpression(init) ? init.expression : undefined;
           };
           const style = expression('style');
-          if (attr('feedback')) {
+          if (attr('feedback')?.initializer?.getText(source) === '"none"') {
             assert.equal(file, 'features/market/MarketSortControl.tsx', 'only sort directions may opt out');
             assert.equal(attr('feedback')?.initializer?.getText(source), '"none"');
           }

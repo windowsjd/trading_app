@@ -8,7 +8,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const flatten = (style) => Array.isArray(style) ? Object.assign({}, ...style.map(flatten)) : style || {};
 
 function interactionHarness(platform = 'android') {
-  const h = { animations: [], measures: [], delayedMeasure: false, bounds: [0, 0, 200, 60, 100, 200] };
+  const h = { reduced: false, animations: [], measures: [], delayedMeasure: false, bounds: [0, 0, 200, 60, 100, 200] };
   class Value {
     constructor(value) { this.value = value; this.listeners = new Map(); this.listenerId = 0; }
     setValue(value) {
@@ -53,6 +53,7 @@ function interactionHarness(platform = 'android') {
   h.insets = { top: 24, bottom: 34 };
   h.load = (file, mocks = {}) => load(resolve(file), {
     'react-native': h.native,
+    '../../theme/useReducedMotion': { useReducedMotion: () => h.reduced },
     'react-native-svg': { default: 'Svg', Path: 'Path', Defs: 'Defs', LinearGradient: 'LinearGradient', Rect: 'Rect', Stop: 'Stop', __esModule: true },
     ...mocks,
   });
