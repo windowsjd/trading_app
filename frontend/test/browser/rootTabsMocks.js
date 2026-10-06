@@ -18,7 +18,17 @@ const tickerSnapshot = { tickersByAssetId: new Map(), staleAssetIds: new Set(), 
 export const useMarketTickers = () => tickerSnapshot;
 
 export const apiClient = {
-  async post() { return response({}); },
+  async post(path, body) {
+    if (path.endsWith('/wallet-transfers')) {
+      transport.postRequests ??= []; transport.postRequests.push({ path, body });
+      const walletScope = id => id.endsWith(':usd') ? 'securities' : id.endsWith(':spot') ? 'crypto_spot' : 'crypto_futures';
+      return response({ tradingAccountId: path.split('/')[2], transferId: 'fixture-transfer', currencyCode: 'USD', amount: body.amount, executedAt: new Date().toISOString(),
+        source: { walletId: body.sourceWalletId, walletScope: walletScope(body.sourceWalletId), balanceAfter: '40.39000000', availableAfter: '20.39000000' },
+        destination: { walletId: body.destinationWalletId, walletScope: walletScope(body.destinationWalletId), balanceAfter: '510.12000000', availableAfter: '410.12000000' },
+      });
+    }
+    return response({});
+  },
   async get(path, config) {
     const url = new URL(path, 'https://fixture.invalid');
     const offset = Number(url.searchParams.get('offset') ?? 0);

@@ -1,4 +1,17 @@
-import { Controller, Get, Param, Query, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
+import {
+  TradingAccountWalletTransferService,
+  type WalletTransferRequest,
+} from './trading-account-wallet-transfer.service';
 import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import { Request } from 'express';
 import { WalletsService } from './wallets.service';
@@ -17,7 +30,24 @@ type AuthenticatedRequest = Request & {
  */
 @Controller('api/v1/trading-accounts/:accountId')
 export class TradingAccountWalletsController {
-  constructor(private readonly walletsService: WalletsService) {}
+  constructor(
+    private readonly walletsService: WalletsService,
+    private readonly transfers: TradingAccountWalletTransferService,
+  ) {}
+
+  @Post('wallet-transfers')
+  @HttpCode(200)
+  transferWallets(
+    @Req() request: AuthenticatedRequest,
+    @Param('accountId') accountId: string,
+    @Body() body: WalletTransferRequest,
+  ) {
+    return this.transfers.transfer(
+      this.extractUserId(request),
+      accountId,
+      body,
+    );
+  }
 
   @Get('wallets')
   getWallets(

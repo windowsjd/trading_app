@@ -21,7 +21,8 @@ import { getAccountHoldings } from '../../features/tradingAccount/holdings';
 import { ACCOUNT_INTEGRITY_TITLE, findAccountIntegrityFailure } from '../../features/tradingAccount/accountIntegrityGate';
 import { getCapabilityBlockMessage, type TradingAccountCapabilities } from '../../features/tradingAccount/capabilities';
 import { getPortfolioNotice } from '../../features/tradingAccount/portfolioMessage';
-import { getKnownWalletBalanceAmount } from '../../features/wallet/mapper';
+import { getWalletByIdentity } from '../../features/wallet/mapper';
+import { WALLET_GROUPS, WALLET_SCOPE_LABELS } from '../../features/wallet/walletIdentity';
 import { formatMoney } from '../../utils/format';
 import PositionAssetRow from '../../components/tradingAccount/PositionAssetRow';
 import ActionPressable from '../../components/common/ActionPressable';
@@ -93,6 +94,14 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
   const positions = positionsQuery.data?.positions;
   const quickActions = [
     {
+      testID: 'wallet-transfer',
+      label: '이체하기',
+      iconPath: 'M4 7h16m-4-4 4 4-4 4 M20 17H4m4-4-4 4 4 4',
+      disabled: !capabilities?.canExchange,
+      hidden: !!integrityFailure,
+      onPress: () => navigation.navigate('WalletTransfer'),
+    },
+    {
       testID: 'wallet-exchange',
       label: '환전하기',
       iconPath: 'M4 7h16m-4-4 4 4-4 4 M20 17H4m4-4-4 4 4 4',
@@ -110,7 +119,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
     },
     {
       testID: 'wallet-orders',
-      label: '주문 내역 보기',
+      label: '주문 내역',
       iconPath: 'M5 3h14v18l-3-2-4 2-4-2-3 2V3Z M8 7h8 M8 11h8 M8 15l2 2 5-4',
       disabled: false,
       hidden: false,
@@ -206,14 +215,20 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
             : walletsQuery.isError && !walletsQuery.data ? (
               <ErrorState title="현금 잔액을 불러오지 못했습니다." onRetry={() => void walletsQuery.refetch()} />
             ) : (
-              (['KRW', 'USD'] as const).map((currency) => (
-                <View key={currency} testID={`wallet-cash-${currency}`} style={styles.cashRow}>
-                  <Text style={styles.cashLabel}>{currency}</Text>
-                  <Text style={styles.cashValue}>{formatMoney(getKnownWalletBalanceAmount(walletsQuery.data, currency), currency)}</Text>
+              WALLET_GROUPS.map(({ scope, currencies }) => (
+                <View key={scope} testID={`wallet-group-${scope}`} style={styles.walletGroup}>
+                  <Text testID={`wallet-group-${scope}-title`} style={styles.groupTitle}>{WALLET_SCOPE_LABELS[scope]}</Text>
+                  {currencies.map((currency) => (
+                    <View key={currency} testID={scope === 'securities' ? `wallet-cash-${currency}` : `wallet-cash-${scope}-${currency}`} style={styles.cashRow}>
+                      <Text style={styles.cashLabel}>{currency}</Text>
+                      <Text style={styles.cashValue}>{formatMoney(getWalletByIdentity(walletsQuery.data, scope, currency)?.balanceAmount ?? null, currency)}</Text>
+                    </View>
+                  ))}
                 </View>
               ))
             )}
           <View style={styles.holdings}>
+            <Text testID="wallet-holdings-title" style={styles.groupTitle}>보유 종목</Text>
             {positionsQuery.isLoading ? <SectionSkeleton lines={3} />
               : positionsQuery.isError && !positionsQuery.data ? (
                 <ErrorState title="보유 종목을 불러오지 못했습니다." onRetry={() => void positionsQuery.refetch()} />
@@ -239,12 +254,14 @@ const styles = StyleSheet.create({
   content: getHeaderScreenContentStyle(Platform.OS),
   card: { padding: 16, borderWidth: 1, borderColor: semantic.border, borderRadius: 14, backgroundColor: semantic.surface },
   title: { fontSize: 14, fontWeight: '600', lineHeight: 21, color: semantic.secondary, marginBottom: 8 },
+  walletGroup: { marginTop: 8 },
+  groupTitle: { fontSize: 15, fontWeight: '600', lineHeight: 23 },
   cashRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 12, rowGap: 4, paddingVertical: 12 },
   cashLabel: { fontSize: 14, lineHeight: 21, color: semantic.secondary },
   cashValue: { flexGrow: 1, flexShrink: 1, minWidth: 0, textAlign: 'right', fontSize: 16, lineHeight: 24, fontVariant: ['tabular-nums'] },
   holdings: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: semantic.border },
   notice: { fontSize: 13, lineHeight: 20, color: semantic.warning },
-  quickActions: { width: '100%', maxWidth: 360, alignSelf: 'center', flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  quickActions: { width: '100%', maxWidth: 440, alignSelf: 'center', flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   quickActionItem: { flex: 1, minWidth: 0, alignItems: 'center', gap: 8 },
   quickActionTarget: { alignSelf: 'stretch', alignItems: 'center', gap: 8 },
   quickAction: { width: 52, height: 52, borderRadius: 12, backgroundColor: primaryGradient.colors[0], alignItems: 'center', justifyContent: 'center' },

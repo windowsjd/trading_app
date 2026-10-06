@@ -80,7 +80,11 @@ describe('selected account Wallet and shared Home holdings', () => {
       assert.equal(elements(wallet, 'Pressable').filter((row) => row.props.testID?.startsWith('wallet-position-')).length, 7);
       assert.match(text(wallet), /9,900,000원/); assert.match(text(wallet), /\$50.39/);
       assert.doesNotMatch(text(find(wallet, 'wallet-cash-USD')), /\$500|\$700|\$1,250/);
-      assert.doesNotMatch(text(wallet), /암호화폐 현물 USD|암호화폐 선물 USD/);
+      assert.match(text(find(wallet, 'wallet-cash-crypto_spot-USD')), /\$500/);
+      assert.match(text(find(wallet, 'wallet-cash-crypto_futures-USD')), /\$700/);
+      assert.match(text(wallet), /암호화폐 · 현물/);
+      assert.match(text(wallet), /암호화폐 · 선물/);
+      assert.doesNotMatch(text(wallet), /crypto_spot|crypto_futures|securities/);
       assert.doesNotMatch(text(home), /자산 구성|지갑 요약|평균 매입가|현재가|987,654|80,000/);
       assert.doesNotMatch(text(wallet), /평균 매입가|현재가|987,654|80,000/);
       const nodes = elements(wallet);
@@ -92,7 +96,7 @@ describe('selected account Wallet and shared Home holdings', () => {
       assert.ok(nodes.indexOf(find(wallet, 'wallet-exchange')) < nodes.indexOf(find(wallet, 'wallet-ledger')));
       assert.ok(nodes.indexOf(find(wallet, 'wallet-ledger')) < nodes.indexOf(find(wallet, 'wallet-orders')));
       for (const [testID, label] of [
-        ['wallet-exchange', '환전하기'], ['wallet-ledger', '원장 보기'], ['wallet-orders', '주문 내역 보기'],
+        ['wallet-transfer', '이체하기'], ['wallet-exchange', '환전하기'], ['wallet-ledger', '원장 보기'], ['wallet-orders', '주문 내역'],
       ]) {
         const item = find(group, `${testID}-item`);
         const button = find(item, testID), caption = find(item, `${testID}-label`);
@@ -118,6 +122,8 @@ describe('selected account Wallet and shared Home holdings', () => {
         assert.equal(surface.props.accessible, false);
       }
       assert.ok(nodes.indexOf(find(wallet, 'wallet-orders-label')) < nodes.indexOf(find(wallet, 'wallet-composition')));
+      find(wallet, 'wallet-transfer').props.onPress();
+      assert.deepEqual(h.navigation.at(-1), ['WalletTransfer']);
       find(wallet, 'wallet-exchange').props.onPress();
       assert.deepEqual(h.navigation.at(-1), ['WalletFx']);
       find(wallet, 'wallet-ledger').props.onPress();

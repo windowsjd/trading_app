@@ -209,7 +209,7 @@ async function fixture(
   await db.cashWallet.update({
     where: {
       tradingAccountId_walletScope_currencyCode: {
-        walletScope: 'securities',
+        walletScope: type === 'crypto' ? 'crypto_spot' : 'securities',
         tradingAccountId: accountId,
         currencyCode: currency,
       },
@@ -396,7 +396,11 @@ async function fill(
       after.positions[0].averageCost.toFixed(8),
       net.div(expected).toFixed(8),
     );
-  const wallet = after.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === f.currency)!;
+  const wallet = after.wallets.find(
+    (w) =>
+      w.walletScope === (f.type === 'crypto' ? 'crypto_spot' : 'securities') &&
+      w.currencyCode === f.currency,
+  )!;
   assert.equal(
     wallet.balanceAmount.toFixed(),
     side === 'buy'
@@ -640,6 +644,7 @@ async function concurrentAndLegacy() {
     if (legacy) {
       const row = await db.order.create({
         data: {
+          cashWalletScope: f.type === 'crypto' ? 'crypto_spot' : 'securities',
           tradingAccountId: f.accountId,
           assetId: f.assetId,
           quoteId: body.quoteId,
@@ -847,6 +852,7 @@ async function providerFxPreparation() {
       if (scenario === 'legacy') {
         const order = await db.order.create({
           data: {
+            cashWalletScope: f.type === 'crypto' ? 'crypto_spot' : 'securities',
             tradingAccountId: f.accountId,
             assetId: f.assetId,
             quoteId: body.quoteId,

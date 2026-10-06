@@ -631,6 +631,7 @@ async function createSubmittedOrder(scenario, overrides = {}) {
       : new Prisma.Decimal(grossAmount).sub(feeAmount).toFixed(8);
   const quote = await prisma.quote.create({
     data: {
+      cashWalletScope: 'securities',
       userId: scenario.userId,
       tradingAccountId: scenario.tradingAccountId,
       quoteType: QuoteType.order,
@@ -663,6 +664,7 @@ async function createSubmittedOrder(scenario, overrides = {}) {
   });
   const order = await prisma.order.create({
     data: {
+      cashWalletScope: 'securities',
       tradingAccountId: scenario.tradingAccountId,
       assetId: scenario.assetId,
       quoteId: quote.id,

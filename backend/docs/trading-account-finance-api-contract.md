@@ -1,10 +1,19 @@
-# Account-Scoped Finance API Contract (wallets / ledger / FX)
+# Account-Scoped Finance API Contract (wallets / ledger / transfers / FX)
+
+## Current policy (2026-10-07)
+
+New Crypto Spot orders use Crypto Spot USD. Stocks and FX retain Securities;
+legacy Orders/order Quotes preserve Securities through pinned provenance.
+USD internal transfers and all four wallet groups are now available in the app.
+See [transfer and provenance contract](wallet-transfers-api-contract.md).
+The implementation history below does not override this policy.
 
 ## Status
 
 - Implemented (2026-08-03, 작업 4):
   - `GET /api/v1/trading-accounts/:accountId/wallets`
   - `GET /api/v1/trading-accounts/:accountId/wallet-transactions`
+  - `POST /api/v1/trading-accounts/:accountId/wallet-transfers` (2026-10-07)
   - `POST /api/v1/trading-accounts/:accountId/fx/quote`
   - `POST /api/v1/trading-accounts/:accountId/fx/execute`
   - `GET /api/v1/trading-accounts/:accountId/fx/transactions`
@@ -47,10 +56,14 @@ current server contract.
 ## Common Rules
 
 - Canonical wallets are Securities KRW/USD + Crypto Spot USD + Crypto Futures USD.
-  `GET .../wallets` adds `id` and `walletScope` and returns all four. New Crypto balances
-  and reservations are zero; all cash is included in valuation. Orders (including current
-  Crypto Spot), FX, and their cash mutations still use Securities. The legacy wallet,
-  ledger, General-open projection and FX response contracts remain unchanged.
+  `GET .../wallets` returns all four with `id` and `walletScope`. New Crypto Spot
+  orders use Spot USD; stocks use Securities and FX stays Securities KRW↔USD.
+  Each Quote/Order pins the exact account/scope/currency identity. Pre-cutover
+  order Quotes/Orders are backfilled to Securities and keep that identity through
+  replay, fill, cancel and cleanup. Cash/reservations/Positions are not migrated.
+  Same-account USD transfers use the new route above; Futures supports cash and
+  transfers only. All canonical cash remains in the existing valuation formula.
+  Legacy wallet and General-open projections remain Securities-only.
   See [current scope/rollout policy](trading-modes-and-accounts.md).
 - Authentication required on every route (401 `UNAUTHORIZED` without a valid
   token). User identity is `request.user.userId`.
@@ -109,10 +122,10 @@ current server contract.
 
 There is one row per allowed identity (Securities KRW/USD, Crypto Spot USD, Crypto
 Futures USD). Rows are ordered by WalletScope then currency (Securities first);
-clients must select `(walletScope, currencyCode)`, never currency alone. The current
-Frontend selectors explicitly use Securities and preserve per-account cache keys
-and response ownership checks; the visible Wallet structure is unchanged. Deploy
-this client adaptation with the backend. No new endpoint/version/filter is needed.
+clients must select `(walletScope, currencyCode)`, never currency alone. The Wallet
+screen shows 증권 (KRW/USD), 암호화폐 · 현물 (USD), 암호화폐 · 선물 (USD),
+then existing Positions. FX selects Securities; the order panel selects Spot
+for Crypto. Account query keys and response ownership checks remain in force.
 
 `availableAmount = balanceAmount - reservedAmount`, same as the legacy API.
 
@@ -130,6 +143,8 @@ The account-scoped response is `success/data`, with required data fields:
   filters: { currency: 'KRW' | 'USD' | null; direction: 'credit' | 'debit' | null; txType: string | null };
   transactions: Array<{
     id: string;
+    walletId: string;
+    walletScope: 'securities' | 'crypto_spot' | 'crypto_futures';
     currencyCode: 'KRW' | 'USD';
     direction: 'credit' | 'debit';
     txType: string; // DB canonical value, never a legacy/UI alias
@@ -144,6 +159,11 @@ The account-scoped response is `success/data`, with required data fields:
       assetType: 'domestic_stock' | 'us_stock' | 'crypto';
     } | null;
     trade: { quantity: string } | null;
+    transfer: {
+      sourceWalletId: string; destinationWalletId: string;
+      sourceWalletScope: 'securities' | 'crypto_spot' | 'crypto_futures';
+      destinationWalletScope: 'securities' | 'crypto_spot' | 'crypto_futures';
+    } | null;
   }>;
   pagination: { limit: number; offset: number; total: number; returned: number; nextOffset: number | null };
 }
@@ -160,13 +180,17 @@ For `order_buy` / `order_sell`, `asset` is loaded with one batched Order/Asset
 read per page, restricted to the same account and participant identity. Missing
 or inconsistent order references fail with `TRADING_ACCOUNT_INTEGRITY`; no row
 is silently discarded and no foreign order metadata is returned. Other rows
-have `asset: null` and `trade: null`. Trade quantities come from the referenced
+have `asset: null` and `trade: null`. The account ledger reads all canonical
+scopes. `wallet_transfer` legs additionally expose `transfer` metadata for their
+shared event; other rows use `transfer: null`. Wallet/account/currency/leg and
+transfer amount references are checked before returning; corruption fails closed. Trade quantities come from the referenced
 executed Order's full fill, in the same batch read; see the daily equity and
 trade metadata contract below.
 
 The mobile ledger always requests one currency (route currency, else KRW),
 never sums currencies, and reads `balanceAfter` as supplied. Its filter labels
-are 매수 (`order_buy`), 매도 (`order_sell`), 환전 (`exchange`) and 광고 보상
+are 매수 (`order_buy`), 매도 (`order_sell`), 이체 (`wallet_transfer`, USD),
+환전 (`exchange`) and 광고 보상
 (`ad_reward`, general KRW credit only). Direction changes clear incompatible
 type selection. Current writers do not create standalone `fee`, `adjustment`
 or `settlement` ledger rows, so there are no chips for them. Existing such rows
@@ -174,6 +198,16 @@ are still returned under all types and displayed; only `initial_grant` is hidden
 
 `GET .../fx/transactions` returns the legacy exchange item shape under
 `data.exchanges` with `data.tradingAccountId`.
+
+## USD Internal Transfers
+
+`POST .../wallet-transfers` atomically moves available USD between two distinct
+canonical wallets in the same account. Active account/season/participant gates,
+account-scoped idempotency, deterministic row locks, exact-scope mutations and
+paired transfer ledger legs are specified in the [transfer contract](wallet-transfers-api-contract.md).
+The Transfer screen retains account/epoch guards across selection changes;
+stale results only invalidate their originating account and never show success
+in the new scope. No FX, fee, external funding or performance boundary occurs.
 
 ## FX Mutations (quote / execute)
 

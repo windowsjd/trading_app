@@ -76,6 +76,7 @@ export const ModelName = {
   ExchangeTransaction: 'ExchangeTransaction',
   FxRateSnapshot: 'FxRateSnapshot',
   Quote: 'Quote',
+  WalletTransfer: 'WalletTransfer',
   FxExecuteRequest: 'FxExecuteRequest',
   EquitySnapshot: 'EquitySnapshot',
   DailyPortfolioSnapshot: 'DailyPortfolioSnapshot',
@@ -471,6 +472,7 @@ export const OrderScalarFieldEnum = {
   limitPrice: 'limitPrice',
   executedPrice: 'executedPrice',
   currencyCode: 'currencyCode',
+  cashWalletScope: 'cashWalletScope',
   grossAmount: 'grossAmount',
   feeAmount: 'feeAmount',
   netAmount: 'netAmount',
@@ -612,6 +614,7 @@ export const QuoteScalarFieldEnum = {
   sourceAmount: 'sourceAmount',
   targetAmount: 'targetAmount',
   currencyCode: 'currencyCode',
+  cashWalletScope: 'cashWalletScope',
   quotedPrice: 'quotedPrice',
   quotedRate: 'quotedRate',
   quotedFeeRate: 'quotedFeeRate',
@@ -632,6 +635,22 @@ export const QuoteScalarFieldEnum = {
 } as const
 
 export type QuoteScalarFieldEnum = (typeof QuoteScalarFieldEnum)[keyof typeof QuoteScalarFieldEnum]
+
+
+export const WalletTransferScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  sourceWalletId: 'sourceWalletId',
+  destinationWalletId: 'destinationWalletId',
+  currencyCode: 'currencyCode',
+  amount: 'amount',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  responsePayloadJson: 'responsePayloadJson',
+  executedAt: 'executedAt'
+} as const
+
+export type WalletTransferScalarFieldEnum = (typeof WalletTransferScalarFieldEnum)[keyof typeof WalletTransferScalarFieldEnum]
 
 
 export const FxExecuteRequestScalarFieldEnum = {
@@ -817,6 +836,13 @@ export const NullableJsonNullValueInput = {
 } as const
 
 export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
+
+
+export const JsonNullValueInput = {
+  JsonNull: JsonNull
+} as const
+
+export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
 
 
 export const QueryMode = {

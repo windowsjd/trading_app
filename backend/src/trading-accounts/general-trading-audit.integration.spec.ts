@@ -158,6 +158,7 @@ async function main() {
 
     const quote = await prisma.quote.create({
       data: {
+        cashWalletScope: 'securities',
         userId: ownerId,
         tradingAccountId: accountId,
         quoteType: 'order',
@@ -197,6 +198,7 @@ async function main() {
 
     const order = await prisma.order.create({
       data: {
+        cashWalletScope: 'securities',
         tradingAccountId: accountId,
         quoteId: quote.id,
         assetId: asset.id,

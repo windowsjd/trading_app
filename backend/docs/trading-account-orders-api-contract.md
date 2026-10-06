@@ -1,9 +1,11 @@
 # Account-Scoped Orders & Positions API Contract
 
-> 2026-09-29 current: General/Season 모두 [공통 주문 입력 정책](orders-api-contract.md#order-input-and-session-policy-2026-09-29-current)을 적용한다.
+> 2026-10-07 current: General/Season 모두 [공통 주문 입력 정책](orders-api-contract.md#order-input-and-session-policy-2026-09-29-current)을 적용한다.
 > Crypto BUY는 `amount` 원금 입력, 나머지는 기존 `quantity` 입력이다. Quote/Create 모두 같은 amount를 보내며 서버가 수량을 확정한다.
 > 주식 소수 시장가는 유지하고 소수 지정가는 거절한다. 정수 지정가는 확정 CLOSED에도 등록하며 calendar unavailable은 거절한다.
-> 기존 account scope·replay·예약·fee pinning은 유지한다. 새 endpoint/migration은 없다.
+> 신규 Crypto는 Spot USD, 주식은 Securities를 사용한다. Quote→Order에 `cashWalletScope`를 pin하고 전체 lifecycle에서 재추론하지 않는다.
+> `20261006160000_pin_order_wallet_and_add_transfers` migration은 기존 order Quotes/Orders를 Securities로 backfill한다. 기존 잔액/예약금/Position은 이동하지 않는다.
+> 기존 account scope·replay·예약·fee pinning은 유지한다. [Wallet provenance/Transfer 계약](wallet-transfers-api-contract.md)을 함께 읽는다.
 
 ## B2-1 market execution extension (2026-10-02)
 

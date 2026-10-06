@@ -6,6 +6,7 @@ import {
 
 const expectedScope = {
   tradingAccountId: 'account-1',
+  walletScope: 'securities' as const,
 };
 
 function getError(fn: () => unknown): {
@@ -30,6 +31,22 @@ function getError(fn: () => unknown): {
 }
 
 describe('assertCashWalletTradingAccountScope', () => {
+  it.each(['crypto_spot', 'crypto_futures'] as const)(
+    'accepts %s only when explicitly expected',
+    (walletScope) => {
+      const wallet = {
+        id: 'wallet-1',
+        tradingAccountId: 'account-1',
+        walletScope,
+      };
+      expect(
+        assertCashWalletTradingAccountScope(wallet, {
+          tradingAccountId: 'account-1',
+          walletScope,
+        }),
+      ).toBe(wallet);
+    },
+  );
   it.each(['crypto_spot', 'crypto_futures', 'unknown', null, undefined])(
     'rejects wallet scope %s on current financial paths',
     (walletScope) => {

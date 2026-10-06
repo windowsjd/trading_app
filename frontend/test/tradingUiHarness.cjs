@@ -89,7 +89,8 @@ function createTradingUiHarness(screenName) {
         if (resource === 'fx-rate') return { ...base, ...h.rateQuery };
         if (resource === 'detail') return { ...base, data: { feePolicy: { fxFeeRate: '0.001', tradeFeeRate: '0.001' } } };
         if (resource === 'wallets') return { ...base, data: { wallets: [
-          { currencyCode: 'KRW', balanceAmount: '1000000' }, { currencyCode: 'USD', balanceAmount: '100' },
+          { walletScope: 'securities', currencyCode: 'KRW', balanceAmount: '1000000' }, { walletScope: 'securities', currencyCode: 'USD', balanceAmount: '100' },
+          { walletScope: 'crypto_spot', currencyCode: 'USD', balanceAmount: '100' }, { walletScope: 'crypto_futures', currencyCode: 'USD', balanceAmount: '0' },
         ] } };
         throw new Error(`Unexpected query: ${options.queryKey}`);
       },

@@ -3,6 +3,7 @@ import { diagnosePositionMutationFailure } from './position-failure-diagnosis';
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import {
   CurrencyCode,
+  WalletScope,
   OrderSide,
   OrderStatus,
   OrderType,
@@ -22,6 +23,7 @@ import {
   LIMIT_ORDER_CANCEL_REASONS,
   type LimitOrderCancelReason,
 } from './limit-order-policy';
+import { requireOrderCashWalletScope } from './order-cash-wallet-policy';
 import { OrderReservationService } from './order-reservation.service';
 import { releaseReservedPositionQuantity } from './position-reservation-atomic';
 import {
@@ -49,6 +51,7 @@ const CANCEL_ORDER_SELECT = {
   limitPrice: true,
   executedPrice: true,
   currencyCode: true,
+  cashWalletScope: true,
   grossAmount: true,
   feeAmount: true,
   netAmount: true,
@@ -238,6 +241,7 @@ export class LimitOrderCancelService {
         assetId: order.assetId,
         tradingAccountId: this.requireOrderTradingScopeForRelease(order),
         currencyCode: order.currencyCode,
+        cashWalletScope: order.cashWalletScope,
         reservedAmount: order.reservedAmount,
         reservedQuantity: order.reservedQuantity,
         cancelReason: LIMIT_ORDER_CANCEL_REASONS.userCanceled,
@@ -325,6 +329,7 @@ export class LimitOrderCancelService {
             },
           },
           currencyCode: true,
+          cashWalletScope: true,
           status: true,
           orderType: true,
           side: true,
@@ -349,6 +354,7 @@ export class LimitOrderCancelService {
         assetId: order.assetId,
         tradingAccountId: this.requireOrderTradingScopeForRelease(order),
         currencyCode: order.currencyCode,
+        cashWalletScope: order.cashWalletScope,
         reservedAmount: order.reservedAmount,
         reservedQuantity: order.reservedQuantity,
         cancelReason: input.reason,
@@ -441,6 +447,7 @@ export class LimitOrderCancelService {
                 },
               },
               currencyCode: true,
+              cashWalletScope: true,
               reservedAmount: true,
               reservedQuantity: true,
             },
@@ -453,6 +460,7 @@ export class LimitOrderCancelService {
             assetId: order.assetId,
             tradingAccountId: this.requireOrderTradingScopeForRelease(order),
             currencyCode: order.currencyCode,
+            cashWalletScope: order.cashWalletScope,
             reservedAmount: order.reservedAmount,
             reservedQuantity: order.reservedQuantity,
             cancelReason: LIMIT_ORDER_CANCEL_REASONS.seasonEnded,
@@ -529,6 +537,7 @@ export class LimitOrderCancelService {
       /** VERIFIED canonical account scope. */
       tradingAccountId: string;
       currencyCode: CurrencyCode;
+      cashWalletScope: WalletScope;
       reservedAmount: Prisma.Decimal | null;
       reservedQuantity: Prisma.Decimal | null;
       cancelReason: LimitOrderCancelReason;
@@ -607,7 +616,10 @@ export class LimitOrderCancelService {
       const wallet = await tx.cashWallet.findUnique({
         where: {
           tradingAccountId_walletScope_currencyCode: {
-            walletScope: 'securities',
+            walletScope: requireOrderCashWalletScope(
+              input.cashWalletScope,
+              input.currencyCode,
+            ),
             tradingAccountId: input.tradingAccountId,
             currencyCode: input.currencyCode,
           },
@@ -639,6 +651,7 @@ export class LimitOrderCancelService {
       // a foreign wallet is never touched (both structured 500s).
       assertCashWalletTradingAccountScope(wallet, {
         tradingAccountId: input.tradingAccountId,
+        walletScope: input.cashWalletScope,
       });
 
       releasedAmountText = formatDecimalScale(
@@ -648,6 +661,7 @@ export class LimitOrderCancelService {
 
       await this.reservation.releaseLimitBuyReservation(tx, {
         walletId: wallet.id,
+        walletScope: input.cashWalletScope,
         tradingAccountId: input.tradingAccountId,
         currencyCode: input.currencyCode,
         amount: releasedAmountText,

@@ -1,3 +1,4 @@
+import { WALLET_SCOPE_LABELS } from './walletIdentity.ts';
 import type {
   WalletCurrency,
   WalletTransactionDirection,
@@ -19,10 +20,12 @@ const TYPES: ReadonlyArray<{
   label: string;
   directions: readonly LedgerDirection[];
   generalKrwOnly?: boolean;
+  usdOnly?: boolean;
 }> = [
   { key: 'all', label: '전체', directions: ['all', 'credit', 'debit'] },
   { key: 'order_buy', label: '매수', directions: ['all', 'debit'] },
   { key: 'order_sell', label: '매도', directions: ['all', 'credit'] },
+  { key: 'wallet_transfer', label: '이체', directions: ['all', 'credit', 'debit'], usdOnly: true },
   { key: 'exchange', label: '환전', directions: ['all', 'credit', 'debit'] },
   { key: 'ad_reward', label: '광고 보상', directions: ['all', 'credit'], generalKrwOnly: true },
 ];
@@ -33,7 +36,7 @@ export function getLedgerTypeFilters(
   currency: WalletCurrency,
 ) {
   return TYPES.filter((type) =>
-    type.directions.includes(direction) &&
+    type.directions.includes(direction) && (!type.usdOnly || currency === 'USD') &&
     (!type.generalKrwOnly || (mode === 'general' && currency === 'KRW')),
   );
 }
@@ -49,7 +52,7 @@ export function compatibleLedgerType(
 }
 
 const TYPE_LABELS: Record<string, string> = {
-  order_buy: '매수', order_sell: '매도',
+  order_buy: '매수', order_sell: '매도', wallet_transfer: '이체',
   exchange_source: '환전', exchange_target: '환전', ad_reward: '광고 보상',
   // No current standalone writers/chips, but historical rows must stay visible.
   fee: '수수료', adjustment: '조정', settlement: '정산',
@@ -58,6 +61,8 @@ const TYPE_LABELS: Record<string, string> = {
 export function getLedgerRowDisplay(item: WalletTransactionDto) {
   return {
     title: TYPE_LABELS[item.txType] ?? item.txType,
+    wallet: item.walletScope ? WALLET_SCOPE_LABELS[item.walletScope] : null,
+    transfer: item.transfer ? `${WALLET_SCOPE_LABELS[item.transfer.sourceWalletScope]} USD → ${WALLET_SCOPE_LABELS[item.transfer.destinationWalletScope]} USD` : null,
     asset: item.asset ? `${item.asset.name} · ${item.asset.symbol}` : null,
     quantity: item.trade && item.asset
       ? `${formatDisplayDecimal(item.trade.quantity)}${item.asset.assetType === 'crypto' ? ` ${item.asset.symbol}` : '주'}`
@@ -127,6 +132,16 @@ export function parseWalletLedgerResponse(
     if (params.txType && !(params.txType === 'exchange'
       ? row.txType === 'exchange_source' || row.txType === 'exchange_target'
       : row.txType === params.txType)) return fail();
+    if (row.txType === 'wallet_transfer') {
+      if (row.currencyCode !== 'USD' || row.referenceType !== 'wallet_transfer' || !text(row.referenceId) ||
+          !text(row.walletId) || !isRecord(row.transfer) ||
+          !text(row.transfer.sourceWalletId) || !text(row.transfer.destinationWalletId) ||
+          row.transfer.sourceWalletId === row.transfer.destinationWalletId ||
+          typeof row.transfer.sourceWalletScope !== 'string' || !['securities', 'crypto_spot', 'crypto_futures'].includes(row.transfer.sourceWalletScope) ||
+          typeof row.transfer.destinationWalletScope !== 'string' || !['securities', 'crypto_spot', 'crypto_futures'].includes(row.transfer.destinationWalletScope) ||
+          row.walletId !== (row.direction === 'debit' ? row.transfer.sourceWalletId : row.transfer.destinationWalletId) ||
+          row.walletScope !== (row.direction === 'debit' ? row.transfer.sourceWalletScope : row.transfer.destinationWalletScope)) return fail();
+    }
     if (row.txType === 'order_buy' || row.txType === 'order_sell') {
       if (row.referenceType !== 'order' || !text(row.referenceId) ||
           !isRecord(row.asset) || !text(row.asset.id) || !text(row.asset.name) || !text(row.asset.symbol) ||

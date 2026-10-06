@@ -37,7 +37,7 @@ describe('app-wide decimal display coverage', () => {
     const lineChart = read('components/charts/LineChart.tsx');
     const donutChart = read('components/charts/DonutChart.tsx');
 
-    assert.match(wallet, /formatMoney\(getKnownWalletBalanceAmount/u);
+    assert.match(wallet, /formatMoney\(getWalletByIdentity/u);
     assert.match(lineChart, /formatDisplayDecimal\(value\.toFixed\(2\)\)/u);
     assert.match(donutChart, /formatPercent\(percentage, 1\)/u);
   });

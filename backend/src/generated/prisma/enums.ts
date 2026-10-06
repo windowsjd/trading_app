@@ -107,7 +107,8 @@ export const WalletTransactionType = {
   fee: 'fee',
   adjustment: 'adjustment',
   settlement: 'settlement',
-  ad_reward: 'ad_reward'
+  ad_reward: 'ad_reward',
+  wallet_transfer: 'wallet_transfer'
 } as const
 
 export type WalletTransactionType = (typeof WalletTransactionType)[keyof typeof WalletTransactionType]
@@ -120,7 +121,8 @@ export const WalletTransactionReferenceType = {
   manual_adjustment: 'manual_adjustment',
   settlement: 'settlement',
   general_account_open: 'general_account_open',
-  ad_reward_claim: 'ad_reward_claim'
+  ad_reward_claim: 'ad_reward_claim',
+  wallet_transfer: 'wallet_transfer'
 } as const
 
 export type WalletTransactionReferenceType = (typeof WalletTransactionReferenceType)[keyof typeof WalletTransactionReferenceType]

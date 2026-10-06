@@ -155,6 +155,11 @@ export type FxRateSnapshot = Prisma.FxRateSnapshotModel
  */
 export type Quote = Prisma.QuoteModel
 /**
+ * Model WalletTransfer
+ * 
+ */
+export type WalletTransfer = Prisma.WalletTransferModel
+/**
  * Model FxExecuteRequest
  * 
  */

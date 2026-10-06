@@ -10,6 +10,259 @@
 
 ---
 
+## 2026-10-07 — Crypto Spot 주문 provenance와 동일 통화 Wallet Transfer
+
+아래 이전 작업 2의 Securities Crypto funding/UI 설명은 **당시 과도기 기록**이다.
+현행 정책은 이 항목과 canonical API/finance/order 계약을 따른다.
+
+### 조사와 결정
+
+- 작업 시작에 `git fetch origin main` 재수행. `main`, HEAD 및 `origin/main`은 모두
+  `f8ea946014b7cd5073ba791bd102e2414b87b380` (`지갑구조변경2`), working tree clean.
+  기준 이후 변경은 없었다. 사용자 요청대로 현재 `main`에 미커밋 변경만 남겼으며
+  branch 생성/전환, commit/push, 운영 배포는 수행하지 않았다.
+- Quote/Order schema·durable hash/replay·Market Execute·Limit Quote/Create/Reservation/
+  Fill/Cancel·matcher Path A/B·Season 종료/exclusion/cleanup/operator·Position 예약·
+  cash atomic/guard/failure diagnosis·ledger writer·General/Season finance locks·
+  Wallet API·frontend Wallet/Order/FX·navigation/query/invalidation/account epoch·
+  integration scripts·현재 문서/HANDOVER를 조사했다. `walletScope: 'securities'`의
+  의미를 사용처별로 판단했다. 초기 지급/광고/Securities projection/FX는 유지한다.
+- 기존 Order는 wallet provenance를 저장하지 않고 quote, reserve, execute, fill,
+  cancel 및 cleanup이 모두 Securities를 다시 조회했다. 자산 타입만 바꾸면 기존 BUY
+  예약금이 고아가 된다. Quote도 검증한 지갑을 저장하지 않아 cutover 중 지갑이 바뀔 수 있었다.
+- walletId를 별도 중복 저장하는 대신 기존 canonical unique identity
+  `(tradingAccountId, cashWalletScope, currencyCode)`를 재사용한다. Quote가 scope를
+  pin하고 Order가 상속하며 lifecycle은 이 durable identity만 읽는다.
+  SQL CHECK와 scope 변경 금지 trigger, required Order field/no default가 잘못된
+  write를 막는다. 기존 account/currency 및 order/quote 관계 guard도 유지한다.
+  client request hash의 byte 계약은 바꾸지 않았다. hash는 intent/quoteId를 식별하고
+  cash policy는 서버가 quote row에 pin하므로 replay가 새 scope로 재해석되지 않는다.
+
+### 구현과 기존 데이터
+
+- `20261006160000_pin_order_wallet_and_add_transfers` migration:
+  기존 **모든 Orders 및 order Quotes**의 scope를 Securities로 backfill한다.
+  active legacy Quote도 Securities로 소비하고, legacy submitted Crypto BUY/SELL은
+  Securities로 terminal state까지 처리한다. FX Quote는 scope NULL이다.
+  balance/reserved/Position/order status 및 기존 timestamps/ledger/성과를 이동하거나
+  재작성하지 않는다. 금융 writers 중지→migration→새 server/frontend→writers 재개 순서다.
+  기존 server를 migration 후 함께 실행하면 안 된다.
+- 신규 Crypto는 모두 Spot: market debit/credit, limit reserve/settle/release와 cleanup이
+  `crypto_spot/USD`에 귀속된다. quote wallet과 execution wallet이 같다.
+  주식은 Securities KRW/USD, FX는 Securities KRW↔USD다. 기존 Crypto Position은
+  account+asset 그대로이며 신규 SELL의 proceeds는 Spot이다. 자동 fallback/자동환전은 없다.
+- cash primitive/guard/diagnosis는 caller의 exact expected scope를 required로 받고
+  walletId/account/scope/currency 조건을 SQL에서 유지한다. 아무 USD wallet이나
+  mutate하는 guard 완화는 없다. fee/gross/net/Position 및 기존 matcher 정책은 같다.
+- `WalletTransfer`는 committed command 한 행만 저장한다. source/destination wallet ID,
+  USD amount, account/key unique, canonical request hash, executedAt와 최초 응답을 저장한다.
+  `POST /api/v1/trading-accounts/:accountId/wallet-transfers`는 동일 계정의 세 USD wallet
+  사이만 허용한다. amount는 Decimal(24,8) 문자열, 양수이며 서로 다른 wallet이어야 한다.
+- 기존 General account finance fence / Season lifecycle lock 뒤 wallet ID 순서로 row lock.
+  post-lock DB clock과 active account/season/window/participant/excluded guard 적용.
+  `balance - reserved >= amount` 조건부 source debit, exact-scope destination credit,
+  command와 두 ledger leg를 한 PostgreSQL transaction에 기록한다. failed command는
+  남지 않는다. 동일 account/key+동일 canonical payload는 최초 결과 replay, 다르면 409.
+  ownership은 replay에서도 확인하고 committed replay는 mutable status gate보다 앞선다.
+  Season의 같은 command가 wallet lock을 기다리다가 종료 시각을 넘긴 경우도,
+  잠금 직후 committed replay를 먼저 읽는다. 새 이체의 종료 경계는 그대로 적용한다.
+- ledger는 `wallet_transfer` tx/reference와 같은 Transfer ID로 debit/credit를 연결한다.
+  amount/time/account/currency/balanceAfter는 실제 mutation과 일치한다.
+  account ledger는 모든 canonical scope를 읽고 walletId/scope 및 transfer 출발·도착
+  metadata를 제공한다. foreign wallet/통화/leg/reference 불일치는 fail closed한다.
+  FX/adjustment type을 재사용하거나 Transfer를 external funding으로 기록하지 않는다.
+- 기존 valuation 산식은 변경하지 않았다. Transfer는 총 cash/asset/PnL/return/TWR/
+  ranking에 중립이며 Position·성과 snapshot·external funding boundary를 만들지 않는다.
+  Futures는 현금 보관과 USD 이체만 가능하고 reservedAmount에 margin 의미를 넣지 않는다.
+
+### Frontend
+
+- Wallet은 증권 KRW/USD, 암호화폐 · 현물 USD, 암호화폐 · 선물 USD를 scope+currency로
+  표시하고 0도 명시한다. 보유 종목은 기존 Position list를 유지한다. Quick Action은
+  이체하기/환전하기/원장 보기/주문 내역이다. Crypto OrderPanel은 Spot available을 읽는다.
+- Transfer 화면은 세 USD wallet, source available (=balance-reserved), 금액, 확인 요약,
+  성공/실패와 같은 key 재시도를 제공한다. KRW/cross-currency/동일 wallet 선택은 실행할 수 없다.
+  계정이 바뀌면 account/epoch keyed form을 초기화한다. A→B 및 A→B→A의 늦은 응답은
+  현재 성공 UI를 바꾸지 않고 원래 요청 계정의 wallet/ledger cache만 갱신한다.
+  응답 account/IDs/scopes/amount/balance 계약과 예약금 누락도 fail closed한다.
+- USD 원장은 이체 type/filter와 Korean wallet·route를 표시한다. 내부 enum은 사용자 표시명이 아니다.
+  React Query/navigation/FX scope helper와 기존 mutable finance capability를 재사용한다.
+
+### 검증
+
+전용 로컬 PostgreSQL 16 (`spot_wallet_test_final`, UTC)와 Redis를 사용했다.
+운영 데이터나 기존 Securities 자금은 변경하지 않았다. 실제 테스트는 생성한 fixture를 정리한다.
+
+| 명령/범위 (Backend=backend/, Frontend=frontend/) | 결과 |
+| --- | --- |
+| `pnpm exec prisma format`, `validate`, `generate` | PASS; 재생성 전후 42개 generated TS 파일 fingerprint 동일 |
+| `pnpm exec prisma migrate deploy`, `status` | PASS; fresh DB 전체 59 migration 적용, 최종 up to date |
+| `pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code` | PASS; drift 없음 |
+| `pnpm run typecheck`, `pnpm run build`, `pnpm run lint:accounts:check` | PASS |
+| `pnpm run lint:candles:check`, `pnpm run format:candles:check` | PASS |
+| `pnpm exec jest --runInBand` | 227 suites / 3,647 cases PASS; opt-in 50 suites / 55 cases SKIP |
+| 기존 CI Core opt-in PostgreSQL 목록 + `pnpm exec jest --runInBand` | 21 suites / 22 cases PASS |
+| 기존 CI Limit/Market/FX 목록 + 신규 Spot/Transfer PG suite | 14 suites / 15 cases PASS |
+| `pnpm test:e2e --runInBand` | 2 suites / 372 cases PASS; 신규 Transfer 인증·HTTP 200 dispatch 포함 |
+| `CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 SMOKE_ALLOW_DIRTY=1 pnpm tsx scripts/candle-release-fixture-smoke.ts` | PG/Redis 24 scenarios PASS, cleanup 잔존 DB rows/Redis keys=0; dirty tree 진단 실행 |
+| `npm run check` | accounts/guides check-only lint·typecheck·1,612 tests PASS |
+| `npm run export:web` | PASS |
+| 기존 RN Web/Playwright `frontend/test/browser/walletBrowser.cjs` | 396 layouts + 실제 navigation/holdings/pagination/계정 전환/palettes PASS |
+| 전체 `git diff`, 신규 파일 및 `git diff --check` | 직접 검토, whitespace 오류 없음 |
+
+- 신규 `spot-wallet-transfer-integration.ts`는 이전 migration만 적용한 private schema에
+  pre-cutover BUY/SELL/active Quote를 삽입하고 실제 cutover SQL을 적용한다. cash/Position/
+  order/quote fingerprint가 scope 외에 그대로인 것을 비교한다. legacy BUY fill/cancel,
+  SELL fill/cancel, active Quote, Securities ledger 및 orphan reservation=0을 검증한다.
+- General/Season 실제 FX→Transfer→Spot Market BUY/SELL, fee/ledger/replay, Securities가
+  충분해도 Spot 부족이면 실패, quote 후 Spot drain 시 rollback, limit reservation/
+  cancel/replay, matcher snapshot/candle fill·중복, SELL 및 excluded/ended/settled cleanup.
+  기존 Core/Limit gate는 국내/미국주식·FX·TWR·ranking·실제 settlement/replay를 포함한다.
+- Transfer 양방향/Securities↔Spot/Spot↔Futures, 같은 wallet/KRW/foreign 사용자/같은 사용자
+  General↔Season 거절, available/reserved 보호, 동시 8회 같은 command replay,
+  다른 payload conflict, 10회 동시 이체·반대 방향 동시이체·limit reserve와 경합,
+  credit ledger trigger failure의 전부 rollback 및 원장 foreign metadata 차단을 검증한다.
+  Transfer 전후 실제 valuation/TWR/새 generation의 Season ranking과 snapshot 수가 같다.
+  실제 PG test barrier로 첫 이체의 commit을 시즌 종료 이후까지 지연하고 두 번째 같은
+  command를 wallet lock에서 대기시켰다. 수정 전 SEASON_ENDED를 재현했으며, 수정 후
+  같은 결과·단 한 번의 현금 이동·두 ledger leg 및 종료 후 새 command 거절을 검증했다.
+- Frontend는 USD 세 개의 서로 다른 값/순서, 0 wallet, loading/error/integrity/status,
+  확인/재시도/성공, source available 및 stale A→B/A→B→A를 검증한다. Browser는 320/360/
+  430px와 fontScale 1/2 양 모드에서 Transfer summary/success와 text bounds를 검사한다.
+  Wallet 그룹/금액/네 action/보유 종목도 작은 폭·큰 글자 조합에서 검사하고 screenshot을 직접 확인했다.
+
+### 한계와 후속 작업
+
+- 원격 GitHub 새 CI, 운영 DB migration/deploy, 실제 iOS/Android 기기 및 credential 기반
+  live Binance/KIS smoke는 실행하지 않았다. commit/push 금지 조건 때문에 clean-commit
+  candle release artifact도 만들지 않았다. 기존 smoke의 허용된 dirty 진단 모드를 사용했고
+  artifact의 `gitDirty=true`를 유지한다 (24개 시나리오 통과를 clean release 인증으로 주장하지 않는다).
+- 기존 local PG의 KST 설정은 raw DB timestamp를 9시간 이동시키므로 기존 CI와 같이 UTC로 맞췄다.
+  기존 lease 만료 timing test가 한 번 실패했으나 분리 및 전체 Core 재실행은 통과했다.
+  기존 가격/FX fixture의 순간적인 unavailable도 관찰하여 정상 evidence를 quote 시계보다
+  1초 과거에 두도록 두 fixture를 조정했다. 만료/시장 종료/participant/row-lock 경계와
+  production clock/freshness 정책은 변경하지 않았다.
+- 금융 잔존 위험은 배포 시 구버전 writer 동시 실행과 PostgreSQL transaction/clock 설정이다.
+  이번 변경의 핵심 불변조건은 실제 DB에서 검증했다. 새로운 event bus/Redis 금융 lock/
+  queue/wallet framework/Futures abstraction은 없다. 최소 provenance field+Transfer model/service를
+  기존 locking/valuation/idempotency 패턴과 결합한 범위다.
+- 다음 작업은 명시적인 FX+Transfer 정책, quote/provenance/fee/원자성 및 UI를 정의하여
+  Securities KRW→Crypto USD 등을 지원하는 것이다. 자동환전, cross-account/user 송금 및
+  Futures trading은 이번 구현에 포함하지 않는다.
+
+### 변경 파일
+
+아래는 이 작업의 실제 변경/신규 파일 전체다. generated client는 schema의 일관된 재생성 결과다.
+
+```text
+.github/workflows/ci.yml
+HANDOVER.md
+backend/README.md
+backend/docs/README.md
+backend/docs/codex-rulepack.md
+backend/docs/fixtures/wallet-ledger.json
+backend/docs/general-account-and-ad-rewards-api-contract.md
+backend/docs/orders-api-contract.md
+backend/docs/policy-decisions.md
+backend/docs/trading-account-finance-api-contract.md
+backend/docs/trading-account-orders-api-contract.md
+backend/docs/trading-modes-and-accounts.md
+backend/docs/wallet-transfers-api-contract.md
+backend/docs/wallets-api-contract.md
+backend/package.json
+backend/prisma/migrations/20261006160000_pin_order_wallet_and_add_transfers/migration.sql
+backend/prisma/schema.prisma
+backend/scripts/limit-order-idempotent-replay-integration.ts
+backend/scripts/limit-order-matching-integration.ts
+backend/scripts/market-execution-integration.ts
+backend/scripts/order-closed-price-parity-integration.ts
+backend/scripts/order-input-policy-integration.ts
+backend/scripts/season-lifecycle-lease-integration.ts
+backend/scripts/spot-wallet-transfer-integration.ts
+backend/scripts/trading-fee-pinning-integration.ts
+backend/scripts/trading-tradability-integration.ts
+backend/scripts/trading-transaction-time-integration.ts
+backend/scripts/wallet-scope-integration.ts
+backend/src/fx/fx.service.spec.ts
+backend/src/fx/fx.service.ts
+backend/src/generated/prisma/browser.ts
+backend/src/generated/prisma/client.ts
+backend/src/generated/prisma/commonInputTypes.ts
+backend/src/generated/prisma/enums.ts
+backend/src/generated/prisma/internal/class.ts
+backend/src/generated/prisma/internal/prismaNamespace.ts
+backend/src/generated/prisma/internal/prismaNamespaceBrowser.ts
+backend/src/generated/prisma/models.ts
+backend/src/generated/prisma/models/CashWallet.ts
+backend/src/generated/prisma/models/Order.ts
+backend/src/generated/prisma/models/Quote.ts
+backend/src/generated/prisma/models/TradingAccount.ts
+backend/src/generated/prisma/models/WalletTransfer.ts
+backend/src/mvp-flow.integration.spec.ts
+backend/src/orders/general-account-trading.integration.spec.ts
+backend/src/orders/limit-order-cancel.service.spec.ts
+backend/src/orders/limit-order-cancel.service.ts
+backend/src/orders/limit-order-create-no-redis.integration.spec.ts
+backend/src/orders/limit-order-create-race.integration.spec.ts
+backend/src/orders/limit-order-create.service.spec.ts
+backend/src/orders/limit-order-create.service.ts
+backend/src/orders/limit-order-execution.service.ts
+backend/src/orders/limit-order-matching.liveness.spec.ts
+backend/src/orders/limit-order-reservation.integration.spec.ts
+backend/src/orders/limit-order-transaction-time.integration.spec.ts
+backend/src/orders/order-cash-wallet-policy.ts
+backend/src/orders/order-replay-and-cancel-scope.integration.spec.ts
+backend/src/orders/order-reservation.service.spec.ts
+backend/src/orders/order-reservation.service.ts
+backend/src/orders/orders.execute.integration.spec.ts
+backend/src/orders/orders.service.spec.ts
+backend/src/orders/orders.service.ts
+backend/src/seasons/trading-account-trading-scope.integration.spec.ts
+backend/src/trading-accounts/general-trading-audit.integration.spec.ts
+backend/src/wallets/cash-wallet-atomic.ts
+backend/src/wallets/cash-wallet-failure-diagnosis.spec.ts
+backend/src/wallets/cash-wallet-failure-diagnosis.ts
+backend/src/wallets/cash-wallet-scope.spec.ts
+backend/src/wallets/cash-wallet-scope.ts
+backend/src/wallets/spot-wallet-transfer.integration.spec.ts
+backend/src/wallets/trading-account-wallet-transfer.service.ts
+backend/src/wallets/trading-account-wallets.controller.ts
+backend/src/wallets/trading-account-wallets.spec.ts
+backend/src/wallets/wallets.module.ts
+backend/src/wallets/wallets.service.ts
+backend/test/app.e2e-spec.ts
+frontend/src/app/navigation/WalletStack.tsx
+frontend/src/app/navigation/types.ts
+frontend/src/features/tradingAccount/api.ts
+frontend/src/features/tradingAccount/integrityErrors.ts
+frontend/src/features/tradingAccount/invalidation.test.ts
+frontend/src/features/tradingAccount/invalidation.ts
+frontend/src/features/wallet/api.ts
+frontend/src/features/wallet/mapper.ts
+frontend/src/features/wallet/transactions.test.ts
+frontend/src/features/wallet/transactions.ts
+frontend/src/features/wallet/walletIdentity.ts
+frontend/src/features/wallet/walletTransfer.test.ts
+frontend/src/features/wallet/walletTransfer.ts
+frontend/src/screens/home/WalletTransactionsScreen.tsx
+frontend/src/screens/home/homeIntegration.test.ts
+frontend/src/screens/order/OrderPanel.tsx
+frontend/src/screens/wallet/WalletScreen.test.ts
+frontend/src/screens/wallet/WalletScreen.tsx
+frontend/src/screens/wallet/WalletTransferScreen.test.ts
+frontend/src/screens/wallet/WalletTransferScreen.tsx
+frontend/src/utils/displayDecimalCoverage.test.ts
+frontend/test/browser/homeMocks.js
+frontend/test/browser/rootTabsFixture.jsx
+frontend/test/browser/rootTabsMocks.js
+frontend/test/browser/walletBrowser.cjs
+frontend/test/inlineTradingHarness.cjs
+frontend/test/tradingUiHarness.cjs
+frontend/test/walletTransferHarness.cjs
+```
+
+---
+
 ## 2026-10-06 — canonical Crypto USD 지갑 활성화와 전체 현금 평가
 
 - 의도: TradingAccount가 증권 KRW/USD와 암호화폐 현물/선물 USD라는 실제 현금 보관

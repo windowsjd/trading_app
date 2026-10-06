@@ -20,6 +20,7 @@ import { diagnoseCashWalletMutationFailure } from './cash-wallet-failure-diagnos
  */
 describe('diagnoseCashWalletMutationFailure', () => {
   const expected = {
+    walletScope: 'securities' as const,
     tradingAccountId: 'account-1',
     currencyCode: 'KRW',
   };

@@ -1,4 +1,4 @@
-import { Prisma } from '../generated/prisma/client';
+import { Prisma, type WalletScope } from '../generated/prisma/client';
 
 /**
  * Atomic cash-wallet mutations that respect the limit-buy reservation layer.
@@ -17,7 +17,7 @@ import { Prisma } from '../generated/prisma/client';
  * assertCashWalletTradingAccountScope). A wallet whose scope is null or was
  * concurrently re-scoped therefore matches 0 rows and the mutation fails
  * closed instead of moving another account's cash. The wallet_scope predicate
- * also pins every current mutation to securities; Crypto routing is future work.
+ * also pins every mutation to its caller's explicit expected cash scope.
  *
  * updated_at is bumped manually because @updatedAt only applies to Prisma
  * model mutations, not raw SQL.
@@ -29,6 +29,7 @@ export type CashWalletAmountInput = {
   walletId: string;
   /** VERIFIED trading account id (never null; assert scope first). */
   tradingAccountId: string;
+  walletScope: WalletScope;
   /** CurrencyCode enum value (KRW | USD). */
   currencyCode: string;
   /** Canonical positive decimal string (scale 8). Never a JS number. */
@@ -50,7 +51,7 @@ export async function debitAvailableCash(
         "updated_at" = NOW()
     WHERE "id" = ${input.walletId}
       AND "trading_account_id" = ${input.tradingAccountId}
-      AND "wallet_scope" = 'securities'::"WalletScope"
+      AND "wallet_scope" = ${input.walletScope}::"WalletScope"
       AND "currency_code" = ${input.currencyCode}::"CurrencyCode"
       AND "balance_amount" - "reserved_amount" >= ${input.amount}::numeric
   `;
@@ -71,7 +72,7 @@ export async function reserveAvailableCash(
         "updated_at" = NOW()
     WHERE "id" = ${input.walletId}
       AND "trading_account_id" = ${input.tradingAccountId}
-      AND "wallet_scope" = 'securities'::"WalletScope"
+      AND "wallet_scope" = ${input.walletScope}::"WalletScope"
       AND "currency_code" = ${input.currencyCode}::"CurrencyCode"
       AND "balance_amount" - "reserved_amount" >= ${input.amount}::numeric
   `;
@@ -93,7 +94,7 @@ export async function releaseReservedCash(
         "updated_at" = NOW()
     WHERE "id" = ${input.walletId}
       AND "trading_account_id" = ${input.tradingAccountId}
-      AND "wallet_scope" = 'securities'::"WalletScope"
+      AND "wallet_scope" = ${input.walletScope}::"WalletScope"
       AND "currency_code" = ${input.currencyCode}::"CurrencyCode"
       AND "reserved_amount" >= ${input.amount}::numeric
   `;
@@ -118,7 +119,7 @@ export async function settleLimitBuyReservedCash(
         "updated_at" = clock_timestamp()
     WHERE "id" = ${input.walletId}
       AND "trading_account_id" = ${input.tradingAccountId}
-      AND "wallet_scope" = 'securities'::"WalletScope"
+      AND "wallet_scope" = ${input.walletScope}::"WalletScope"
       AND "currency_code" = ${input.currencyCode}::"CurrencyCode"
       AND "reserved_amount" >= ${input.orderReservation}::numeric
       AND "balance_amount" >= ${input.actualDebit}::numeric

@@ -203,6 +203,7 @@ jobs:
           pnpm exec jest --runInBand
           src/orders/order-input-policy.integration.spec.ts
           src/orders/limit-order-reservation.integration.spec.ts
+          src/wallets/spot-wallet-transfer.integration.spec.ts
           src/orders/limit-order-create-race.integration.spec.ts
           src/orders/limit-order-transaction-time.integration.spec.ts
           src/orders/trading-transaction-time.integration.spec.ts

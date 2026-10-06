@@ -48,7 +48,9 @@ enabled.
   balance/reserved and create no grant/ledger. All cash contributes to valuation/TWR.
   General-open retains its existing two-Securities-wallet response projection;
   account Wallet reads expose all four with `id`/`walletScope`. Initial grant and
-  ad payouts still use Securities KRW; orders/FX still use Securities. See
+  ad payouts still use Securities KRW; stocks/FX use Securities, new Crypto Spot
+  orders use Spot USD and legacy Orders/Quotes retain their Securities provenance.
+  Same-account USD transfers are internal funding relocation, never external funding. See
   [scope policy](trading-modes-and-accounts.md) and [Wallet contract](trading-account-finance-api-contract.md).
 - Authentication required on every route (401 `UNAUTHORIZED`).
 - The accountId is explicit in the path; the server stores no "current

@@ -102,7 +102,6 @@ import {
   TradingAccountStatus,
 } from './src/generated/prisma/client';
 import { PrismaService } from './src/prisma/prisma.service';
-import { zeroCryptoCashWalletData } from './src/wallets/canonical-cash-wallets';
 import { OrdersService } from './src/orders/orders.service';
 import { OrderReservationService } from './src/orders/order-reservation.service';
 import { LimitOrderCreateService } from './src/orders/limit-order-create.service';
@@ -217,12 +216,16 @@ async function createScenario(label, options) {
     data: {
       tradingAccountId: account.id,
       currencyCode: CurrencyCode.USD,
+      walletScope: 'crypto_spot',
       balanceAmount: '1000.00000000',
       reservedAmount: ZERO,
     },
     select: { id: true },
   });
-  await prisma.cashWallet.createMany({ data: zeroCryptoCashWalletData(account.id) });
+  await prisma.cashWallet.createMany({ data: [
+    { tradingAccountId: account.id, walletScope: 'securities', currencyCode: 'USD', balanceAmount: ZERO, reservedAmount: ZERO },
+    { tradingAccountId: account.id, walletScope: 'crypto_futures', currencyCode: 'USD', balanceAmount: ZERO, reservedAmount: ZERO },
+  ] });
 
   return {
     userId,

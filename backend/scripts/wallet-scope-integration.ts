@@ -706,6 +706,7 @@ async function verifyCurrentFinance() {
     for (const wallet of cryptoBefore) {
       const input = {
         walletId: wallet.id,
+        walletScope: 'securities' as const,
         tradingAccountId: wallet.tradingAccountId,
         currencyCode: 'USD',
         amount: '1.00000000',
@@ -730,6 +731,7 @@ async function verifyCurrentFinance() {
         diagnoseCashWalletMutationFailure(prisma, {
           walletId: wallet.id,
           expected: {
+            walletScope: 'securities' as const,
             tradingAccountId: wallet.tradingAccountId,
             currencyCode: 'USD',
           },
@@ -757,6 +759,7 @@ async function verifyCurrentFinance() {
       });
       const reservation =
         await new OrderReservationService().reserveForLimitBuy(prisma, {
+          walletScope: 'securities' as const,
           tradingAccountId,
           currencyCode: 'USD',
           amount: '25.00000000',
@@ -778,6 +781,7 @@ async function verifyCurrentFinance() {
       assert.equal(reserved.reservedAmount.toFixed(8), '25.00000000');
       assert.equal(
         await releaseReservedCash(prisma, {
+          walletScope: 'securities' as const,
           walletId: wallet.id,
           tradingAccountId,
           currencyCode: 'USD',
@@ -787,6 +791,7 @@ async function verifyCurrentFinance() {
       );
       assert.equal(
         await reserveAvailableCash(prisma, {
+          walletScope: 'securities' as const,
           walletId: wallet.id,
           tradingAccountId: accountIds.find((id) => id !== tradingAccountId)!,
           currencyCode: 'USD',

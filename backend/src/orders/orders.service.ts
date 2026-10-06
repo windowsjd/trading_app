@@ -16,6 +16,7 @@ import {
   AssetPriceSourceType,
   AssetType,
   CurrencyCode,
+  WalletScope,
   FxRateSourceType,
   OrderSide,
   OrderStatus,
@@ -88,6 +89,10 @@ import {
   type OwnedTradingAccount,
 } from '../trading-accounts/trading-account-access.service';
 import { assertAccountOrderScopeIntegrity } from '../trading-accounts/trading-account-financial-integrity';
+import {
+  newOrderCashWalletScope,
+  requireOrderCashWalletScope,
+} from './order-cash-wallet-policy';
 import { debitAvailableCash } from '../wallets/cash-wallet-atomic';
 import { diagnoseCashWalletMutationFailure } from '../wallets/cash-wallet-failure-diagnosis';
 import { assertCashWalletTradingAccountScope } from '../wallets/cash-wallet-scope';
@@ -268,6 +273,7 @@ type OrderDetailResponse = {
 };
 
 type OrderQuoteCalculation = {
+  cashWalletScope: WalletScope;
   context: TradingContext;
   asset: OrderAsset;
   request: PricedOrderRequest;
@@ -303,6 +309,7 @@ type OrderQuoteCalculation = {
 };
 
 type DurableOrderQuoteForCreate = {
+  cashWalletScope: WalletScope;
   id: string;
   tradingAccountId: string;
   status: QuoteStatus;
@@ -435,6 +442,7 @@ type OrderExecutionRecord = {
   limitPrice: Prisma.Decimal | null;
   executedPrice: Prisma.Decimal | null;
   currencyCode: CurrencyCode;
+  cashWalletScope: WalletScope;
   grossAmount: Prisma.Decimal | null;
   feeAmount: Prisma.Decimal | null;
   netAmount: Prisma.Decimal | null;
@@ -470,6 +478,7 @@ type OrderExecutionRecord = {
     sourceAmount: Prisma.Decimal | null;
     limitPrice: Prisma.Decimal | null;
     currencyCode: CurrencyCode | null;
+    cashWalletScope: WalletScope | null;
     quotedPrice: Prisma.Decimal | null;
     quotedFeeRate: Prisma.Decimal | null;
     quotedRate: Prisma.Decimal | null;
@@ -551,6 +560,7 @@ const ORDER_EXECUTION_SELECT = {
   limitPrice: true,
   executedPrice: true,
   currencyCode: true,
+  cashWalletScope: true,
   grossAmount: true,
   feeAmount: true,
   netAmount: true,
@@ -593,6 +603,7 @@ const ORDER_EXECUTION_SELECT = {
       sourceAmount: true,
       limitPrice: true,
       currencyCode: true,
+      cashWalletScope: true,
       quotedPrice: true,
       quotedFeeRate: true,
       quotedRate: true,
@@ -650,6 +661,7 @@ const IDEMPOTENT_CREATE_ORDER_SELECT = {
   limitPrice: true,
   executedPrice: true,
   currencyCode: true,
+  cashWalletScope: true,
   grossAmount: true,
   feeAmount: true,
   netAmount: true,
@@ -929,6 +941,7 @@ export class OrdersService {
       tradingAccountId,
       assetId: asset.id,
       currencyCode: settlementCurrency,
+      walletScope: newOrderCashWalletScope(asset.assetType),
       limitPrice: request.limitPrice!,
       quantity: request.quantity,
       tradeFeeRate: context.feeRate,
@@ -949,6 +962,7 @@ export class OrdersService {
     );
 
     const calculation: OrderQuoteCalculation = {
+      cashWalletScope: newOrderCashWalletScope(asset.assetType),
       context,
       asset,
       request,
@@ -1090,6 +1104,7 @@ export class OrdersService {
         tradingAccountId: context.tradingAccountId,
         assetId: asset.id,
         currencyCode: settlementCurrency,
+        walletScope: newOrderCashWalletScope(asset.assetType),
         limitPrice: request.limitPrice!,
         quantity: request.quantity,
         tradeFeeRate: context.feeRate,
@@ -1104,6 +1119,7 @@ export class OrdersService {
       fxSnapshot?.rate ?? null,
     );
     const calculation: OrderQuoteCalculation = {
+      cashWalletScope: newOrderCashWalletScope(asset.assetType),
       context,
       asset,
       request,
@@ -1439,6 +1455,7 @@ export class OrdersService {
             limitPrice: null,
             executedPrice: null,
             currencyCode: this.getAssetSettlementCurrency(quote.asset),
+            cashWalletScope: quote.cashWalletScope,
             grossAmount: this.formatDecimal(grossAmount, monetaryScale),
             feeAmount: this.formatDecimal(feeAmount, monetaryScale),
             netAmount: this.formatDecimal(netAmount, monetaryScale),
@@ -1749,6 +1766,7 @@ export class OrdersService {
         const createInput = {
           quote: {
             id: quote.id,
+            cashWalletScope: quote.cashWalletScope,
             limitPrice: quote.limitPrice,
             quotedFeeRate: quote.quotedFeeRate,
             quotedGrossAmount: quote.quotedGrossAmount,
@@ -2955,6 +2973,11 @@ export class OrdersService {
       this.formatNullableDecimal(quote.limitPrice, monetaryScale) !==
         this.formatNullableDecimal(order.limitPrice, monetaryScale) ||
       quote.currencyCode !== order.currencyCode ||
+      quote.cashWalletScope !==
+        requireOrderCashWalletScope(
+          order.cashWalletScope,
+          order.currencyCode,
+        ) ||
       quote.requestHash !== expectedHash ||
       (quote.sourceAmount != null &&
         (order.asset.assetType !== AssetType.crypto ||
@@ -2995,6 +3018,10 @@ export class OrdersService {
 
     return {
       ...quote,
+      cashWalletScope: requireOrderCashWalletScope(
+        quote.cashWalletScope,
+        order.currencyCode,
+      ),
       quotedPrice: quote.quotedPrice,
     };
   }
@@ -3292,6 +3319,7 @@ export class OrdersService {
       order.currencyCode,
       tradingAccountId,
       'market_buy_debit',
+      requireOrderCashWalletScope(order.cashWalletScope, order.currencyCode),
     );
     const netAmount = this.formatDecimal(plan.netAmount, monetaryScale);
     // Atomic available-balance debit: cash reserved by submitted limit-buy
@@ -3309,6 +3337,7 @@ export class OrdersService {
     });
     const debitCount = await debitAvailableCash(tx, {
       walletId: wallet.id,
+      walletScope: order.cashWalletScope,
       tradingAccountId,
       currencyCode: order.currencyCode,
       amount: netAmount,
@@ -3317,6 +3346,7 @@ export class OrdersService {
     if (debitCount !== 1) {
       await this.throwCashDebitFailure(tx, {
         walletId: wallet.id,
+        walletScope: order.cashWalletScope,
         tradingAccountId,
         currencyCode: order.currencyCode,
         amount: plan.netAmount,
@@ -3326,6 +3356,7 @@ export class OrdersService {
 
     const postWallet = await this.findCashWalletAfterUpdateOrThrow(tx, {
       walletId: wallet.id,
+      walletScope: order.cashWalletScope,
       tradingAccountId,
       currencyCode: order.currencyCode,
       financialOperation: 'market_buy_debit',
@@ -3540,6 +3571,7 @@ export class OrdersService {
       order.currencyCode,
       tradingAccountId,
       'market_sell_credit',
+      requireOrderCashWalletScope(order.cashWalletScope, order.currencyCode),
     );
     const netAmount = this.formatDecimal(plan.netAmount, monetaryScale);
     setAdminDiagnosticContext({
@@ -3555,7 +3587,7 @@ export class OrdersService {
     });
     const creditResult = await tx.cashWallet.updateMany({
       where: {
-        walletScope: 'securities',
+        walletScope: order.cashWalletScope,
         id: wallet.id,
         tradingAccountId,
         currencyCode: order.currencyCode,
@@ -3570,6 +3602,7 @@ export class OrdersService {
     if (creditResult.count !== 1) {
       await this.throwCashCreditFailure(tx, {
         walletId: wallet.id,
+        walletScope: order.cashWalletScope,
         tradingAccountId,
         currencyCode: order.currencyCode,
         mutationAffected: creditResult.count,
@@ -3578,6 +3611,7 @@ export class OrdersService {
 
     const postWallet = await this.findCashWalletAfterUpdateOrThrow(tx, {
       walletId: wallet.id,
+      walletScope: order.cashWalletScope,
       tradingAccountId,
       currencyCode: order.currencyCode,
       financialOperation: 'market_sell_credit',
@@ -3689,11 +3723,12 @@ export class OrdersService {
     currencyCode: CurrencyCode,
     tradingAccountId: string,
     financialOperation: string,
+    walletScope: WalletScope,
   ) {
     const wallet = await tx.cashWallet.findUnique({
       where: {
         tradingAccountId_walletScope_currencyCode: {
-          walletScope: 'securities',
+          walletScope,
           tradingAccountId,
           currencyCode,
         },
@@ -3729,6 +3764,7 @@ export class OrdersService {
     // or credit — never auto-backfilled mid-trade.
     return assertCashWalletTradingAccountScope(wallet, {
       tradingAccountId,
+      walletScope,
     });
   }
 
@@ -3737,6 +3773,7 @@ export class OrdersService {
     input: {
       financialOperation: string;
       walletId: string;
+      walletScope: WalletScope;
       tradingAccountId: string;
       currencyCode: CurrencyCode;
     },
@@ -3753,7 +3790,7 @@ export class OrdersService {
     });
     const wallet = await tx.cashWallet.findFirst({
       where: {
-        walletScope: 'securities',
+        walletScope: input.walletScope,
         id: input.walletId,
         tradingAccountId: input.tradingAccountId,
         currencyCode: input.currencyCode,
@@ -3799,6 +3836,7 @@ export class OrdersService {
     input: {
       mutationAffected: number;
       walletId: string;
+      walletScope: WalletScope;
       tradingAccountId: string;
       currencyCode: CurrencyCode;
       amount: Prisma.Decimal;
@@ -3808,6 +3846,7 @@ export class OrdersService {
       walletId: input.walletId,
       expected: {
         tradingAccountId: input.tradingAccountId,
+        walletScope: input.walletScope,
         currencyCode: input.currencyCode,
       },
       requires: { available: input.amount },
@@ -3847,6 +3886,7 @@ export class OrdersService {
     input: {
       mutationAffected: number;
       walletId: string;
+      walletScope: WalletScope;
       tradingAccountId: string;
       currencyCode: CurrencyCode;
     },
@@ -3855,6 +3895,7 @@ export class OrdersService {
       walletId: input.walletId,
       expected: {
         tradingAccountId: input.tradingAccountId,
+        walletScope: input.walletScope,
         currencyCode: input.currencyCode,
       },
       diagnostic: {
@@ -5029,6 +5070,7 @@ export class OrdersService {
       assetId: asset.id,
       side: request.side,
       currencyCode: this.getAssetSettlementCurrency(asset),
+      walletScope: newOrderCashWalletScope(asset.assetType),
       quantity: request.quantity,
       netAmount,
     });
@@ -5042,6 +5084,7 @@ export class OrdersService {
         : previewBalances.positionQuantityBefore.sub(request.quantity);
 
     return {
+      cashWalletScope: newOrderCashWalletScope(asset.assetType),
       context: {
         mode: input.mode,
         season: input.season,
@@ -5112,6 +5155,7 @@ export class OrdersService {
         userId,
         tradingAccountId: quote.context.tradingAccountId,
         quoteType: QuoteType.order,
+        cashWalletScope: quote.cashWalletScope,
         status: QuoteStatus.active,
         assetId: quote.asset.id,
         side: quote.request.side,
@@ -5266,6 +5310,7 @@ export class OrdersService {
         sourceAmount: true,
         limitPrice: true,
         currencyCode: true,
+        cashWalletScope: true,
         quotedPrice: true,
         quotedFeeRate: true,
         quotedGrossAmount: true,
@@ -5460,6 +5505,10 @@ export class OrdersService {
 
     return {
       ...quote,
+      cashWalletScope: requireOrderCashWalletScope(
+        quote.cashWalletScope,
+        this.getAssetSettlementCurrency(quote.asset),
+      ),
       quotedPrice: quote.quotedPrice,
       quantity: quote.quantity,
       asset: quote.asset,
@@ -6349,6 +6398,7 @@ export class OrdersService {
     assetId: string;
     side: OrderSide;
     currencyCode: CurrencyCode;
+    walletScope: WalletScope;
     quantity: Prisma.Decimal;
     netAmount: Prisma.Decimal;
   }): Promise<{
@@ -6368,7 +6418,7 @@ export class OrdersService {
       const wallet = await this.prisma.cashWallet.findUnique({
         where: {
           tradingAccountId_walletScope_currencyCode: {
-            walletScope: 'securities',
+            walletScope: input.walletScope,
             tradingAccountId: input.tradingAccountId,
             currencyCode: input.currencyCode,
           },
@@ -6387,6 +6437,7 @@ export class OrdersService {
       if (wallet) {
         assertCashWalletTradingAccountScope(wallet, {
           tradingAccountId: input.tradingAccountId,
+          walletScope: input.walletScope,
         });
       }
 
@@ -6507,7 +6558,7 @@ export class OrdersService {
     const wallet = await this.prisma.cashWallet.findUnique({
       where: {
         tradingAccountId_walletScope_currencyCode: {
-          walletScope: 'securities',
+          walletScope: input.walletScope,
           tradingAccountId: input.tradingAccountId,
           currencyCode: input.currencyCode,
         },
@@ -6523,6 +6574,7 @@ export class OrdersService {
     if (wallet) {
       assertCashWalletTradingAccountScope(wallet, {
         tradingAccountId: input.tradingAccountId,
+        walletScope: input.walletScope,
       });
     }
 

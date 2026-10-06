@@ -237,6 +237,7 @@ async function testR04CandidatePaging(): Promise<void> {
         const reservedAmount = index === 2 ? '100.10000000' : '50.05000000';
         if (side === OrderSide.buy) {
           await reservation.reserveForLimitBuy(prisma, {
+            walletScope: 'securities' as const,
             tradingAccountId: accountId,
             currencyCode: CurrencyCode.USD,
             amount: reservedAmount,
@@ -244,6 +245,7 @@ async function testR04CandidatePaging(): Promise<void> {
         }
         const row = await prisma.order.create({
           data: {
+            cashWalletScope: 'securities' as const,
             tradingAccountId: accountId,
             assetId: s.assetId,
             side,
@@ -912,7 +914,9 @@ async function createScenario(
     },
     select: { id: true },
   });
-  await prisma.cashWallet.createMany({ data: zeroCryptoCashWalletData(tradingAccount.id) });
+  await prisma.cashWallet.createMany({
+    data: zeroCryptoCashWalletData(tradingAccount.id),
+  });
   // Portfolio valuation requires the four canonical wallets; a zero-balance KRW
   // wallet is enough (this asset settles in USD).
   await prisma.cashWallet.create({
@@ -962,6 +966,7 @@ async function createSubmittedLimitOrder(
   },
 ): Promise<{ id: string }> {
   const reserved = await reservation.reserveForLimitBuy(prisma, {
+    walletScope: 'securities' as const,
     tradingAccountId: s.tradingAccountId,
     currencyCode: CurrencyCode.USD,
     amount: input.reservedAmount,
@@ -969,6 +974,7 @@ async function createSubmittedLimitOrder(
   void reserved;
   return prisma.order.create({
     data: {
+      cashWalletScope: 'securities' as const,
       tradingAccountId: s.tradingAccountId,
       assetId: s.assetId,
       side: OrderSide.buy,

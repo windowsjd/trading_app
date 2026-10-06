@@ -1,3 +1,4 @@
+import { WalletTransferContractError } from '../wallet/walletTransfer.ts';
 import { getApiErrorInfo } from '../../services/api/errorMapper.ts';
 import { isTradingAccountScopeMismatchError } from './accountScope.ts';
 import { DailyEquityContractError } from './dailyEquity.ts';
@@ -108,6 +109,7 @@ export function classifyAccountError(error: unknown): AccountErrorKind {
   if (isTradingAccountScopeMismatchError(error)) return 'integrity';
   if (error instanceof DailyEquityContractError) return 'integrity';
   if (error instanceof HoldingsContractError) return 'integrity';
+  if (error instanceof WalletTransferContractError) return 'integrity';
 
   const info = getApiErrorInfo(error);
 

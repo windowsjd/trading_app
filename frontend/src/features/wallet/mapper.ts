@@ -85,7 +85,7 @@ export function getWalletByCurrency(
   return getWalletByIdentity(walletsDto, 'securities', currencyCode);
 }
 
-/** Scope-aware selector; current Wallet, FX and order UI still select Securities. */
+/** Canonical scope + currency selector. FX retains the Securities projection. */
 export function getWalletByIdentity(
   walletsDto: WalletBalanceSource | null | undefined,
   walletScope: WalletScope,
@@ -140,8 +140,9 @@ export function getWalletReservedAmount(
 export function getWalletAvailableAmount(
   walletsDto: WalletBalanceSource | null | undefined,
   currencyCode: WalletCurrency,
+  walletScope: WalletScope = 'securities',
 ) {
-  const wallet = getWalletByCurrency(walletsDto, currencyCode);
+  const wallet = getWalletByIdentity(walletsDto, walletScope, currencyCode);
   return (
     wallet?.availableAmount ?? wallet?.balanceAmount ?? wallet?.balance ?? '0'
   );

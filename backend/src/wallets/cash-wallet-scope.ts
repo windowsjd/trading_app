@@ -12,7 +12,7 @@ import type { WalletScope } from '../generated/prisma/client';
  *
  *   wallet.tradingAccountId !== null
  *   wallet.tradingAccountId === expected (verified) trading account
- *   wallet.walletScope === securities (all current financial paths)
+ *   wallet.walletScope === explicitly expected operation scope
  *
  * Violations are SERVER data-integrity states, never client errors, and
  * throw structured 500s:
@@ -22,8 +22,7 @@ import type { WalletScope } from '../generated/prisma/client';
  *  - account mismatch → FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH:
  *    corrupted linkage. Nothing is overwritten; the request fails closed and
  *    the mismatch is left for operators to investigate.
- *  - non-securities wallet → the same scope-mismatch error: selecting or
- *    mutating Crypto cash through the current paths is not supported.
+ *  - unexpected wallet scope → the same scope-mismatch error.
  *
  * This guard is a pre-check for clear error classification; the atomic SQL
  * in cash-wallet-atomic.ts ALSO carries the tradingAccountId in its WHERE,
@@ -49,15 +48,16 @@ export type CashWalletScopeCandidate = {
 export type ExpectedCashWalletScope = {
   /** The VERIFIED trading account (participant link / owned account id). */
   tradingAccountId: string;
+  walletScope: WalletScope;
 };
 
 /**
- * Wallet whose account ownership and securities identity have been verified,
+ * Wallet whose account ownership and exact scope have been verified,
  * so it can feed the account/scope-conditioned atomic SQL.
  */
 export type ScopeVerifiedCashWallet<T extends CashWalletScopeCandidate> = T & {
   tradingAccountId: string;
-  walletScope: 'securities';
+  walletScope: WalletScope;
 };
 
 export function assertCashWalletTradingAccountScope<
@@ -97,9 +97,14 @@ export function assertCashWalletTradingAccountScope<
     );
   }
 
-  if (wallet.walletScope !== 'securities') {
+  if (
+    !['securities', 'crypto_spot', 'crypto_futures'].includes(
+      expected.walletScope,
+    ) ||
+    wallet.walletScope !== expected.walletScope
+  ) {
     throwCashWalletScopeMismatch(
-      'Current financial operations require a securities cash wallet.',
+      'Cash wallet does not match the operation cash scope.',
     );
   }
 

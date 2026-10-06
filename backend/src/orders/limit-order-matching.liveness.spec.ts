@@ -62,6 +62,7 @@ function order(
   submittedAt = new Date(NOW.getTime() - 600_000 + position),
 ) {
   return {
+    cashWalletScope: 'securities' as const,
     id,
     side,
     status: OrderStatus.submitted,

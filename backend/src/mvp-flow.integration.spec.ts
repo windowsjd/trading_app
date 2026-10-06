@@ -74,6 +74,10 @@ import {
   WalletTransactionType,
 } from './src/generated/prisma/client';
 import { PrismaService } from './src/prisma/prisma.service';
+import { TradingAccountWalletTransferService } from './src/wallets/trading-account-wallet-transfer.service';
+import { TradingAccountAccessService } from './src/trading-accounts/trading-account-access.service';
+import { GeneralAccountPerformanceService } from './src/portfolio/general-account-performance.service';
+import { GeneralExternalFundingService } from './src/portfolio/general-external-funding.service';
 import { AuthService } from './src/auth/auth.service';
 import { SeasonsService } from './src/seasons/seasons.service';
 import { WalletsService } from './src/wallets/wallets.service';
@@ -172,6 +176,7 @@ async function main() {
     await keepFxFresh();
     await executeFxFlow();
     await assertFxSideEffects();
+    await transferSpotFunding();
 
     await keepFxFresh();
     await executeOrderFlow();
@@ -210,6 +215,7 @@ function buildScenario() {
     tradingAccountId: null,
     krwWalletId: null,
     usdWalletId: null,
+    spotWalletId: null,
     fxRateSnapshotId: null,
     krwAssetId: null,
     usdAssetId: null,
@@ -582,6 +588,14 @@ async function executeFxFlow() {
   scenario.exchangeId = executeResponse.data.exchangeId;
 }
 
+async function transferSpotFunding() {
+  const spot = await prisma.cashWallet.findUniqueOrThrow({ where: { tradingAccountId_walletScope_currencyCode: { tradingAccountId: scenario.tradingAccountId, walletScope: 'crypto_spot', currencyCode: 'USD' } } });
+  scenario.spotWalletId = spot.id;
+  const performance = new GeneralAccountPerformanceService(prisma, portfolioValuationService, new GeneralExternalFundingService(prisma));
+  const transfer = new TradingAccountWalletTransferService(prisma, new TradingAccountAccessService(prisma), performance);
+  await transfer.transfer(scenario.userId, scenario.tradingAccountId, { sourceWalletId: scenario.usdWalletId, destinationWalletId: spot.id, amount: '999', idempotencyKey: scenario.sourceName + '-transfer' });
+}
+
 async function assertFxSideEffects() {
   const krwWallet = await prisma.cashWallet.findUniqueOrThrow({
     where: {
@@ -678,7 +692,7 @@ async function assertOrderSideEffects() {
 
   const usdWallet = await prisma.cashWallet.findUniqueOrThrow({
     where: {
-      id: scenario.usdWalletId,
+      id: scenario.spotWalletId,
     },
   });
   assert.equal(formatScale8(usdWallet.balanceAmount), '798.80000000');
@@ -729,13 +743,14 @@ async function assertReadApisAfterWrites() {
   const usdWallet = walletsResponse.data.wallets.find(
     (wallet) => wallet.currencyCode === CurrencyCode.USD,
   );
-  assert.equal(usdWallet.balanceAmount, '798.80000000');
+  assert.equal(usdWallet.balanceAmount, '0.00000000');
+  assert.equal((await prisma.cashWallet.findUniqueOrThrow({ where: { id: scenario.spotWalletId } })).balanceAmount.toFixed(8), '798.80000000');
 
   const recordsResponse = await recordsService.getRecords(scenario.userId);
   assert.equal(recordsResponse.data.state, 'available');
   assert.equal(recordsResponse.data.exchanges.records.length, 1);
   assert.equal(recordsResponse.data.orders.records.length, 1);
-  assert.equal(recordsResponse.data.walletTransactions.records.length, 4);
+  assert.equal(recordsResponse.data.walletTransactions.records.length, 6);
 
   const positionsResponse = await positionsService.getPositions(scenario.userId);
   assert.equal(positionsResponse.success, true);
@@ -972,6 +987,7 @@ async function cleanup() {
     await prisma.walletTransaction.deleteMany({
       where: { tradingAccountId: { in: accountIds } },
     });
+    await prisma.walletTransfer.deleteMany({ where: { tradingAccountId: scenario.tradingAccountId } });
     await prisma.exchangeTransaction.deleteMany({
       where: { tradingAccountId: { in: accountIds } },
     });

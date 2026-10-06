@@ -210,6 +210,7 @@ async function createQuote(scenario, expiresAt) {
   });
   const quote = await prisma.quote.create({
     data: {
+      cashWalletScope: 'securities',
       userId: scenario.userId,
       tradingAccountId: scenario.tradingAccountId,
       quoteType: QuoteType.order,

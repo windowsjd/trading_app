@@ -248,6 +248,8 @@ export default function WalletTransactionsScreen({ route }: Props) {
           return (
             <View testID={TEST_IDS.walletTransactions.item(item.id)} style={styles.rowCard}>
               <Text style={styles.itemTitle}>{display.title}</Text>
+              {display.transfer ? <Text style={styles.asset}>{display.transfer}</Text> : null}
+              {display.wallet ? <Text style={styles.helper}>{display.wallet}</Text> : null}
               {display.asset ? <Text style={styles.asset}>{display.asset}</Text> : null}
               {display.quantity ? <Text style={styles.asset}>{display.quantity}</Text> : null}
               <Text style={styles.helper}>{item.currencyCode} · {display.direction}</Text>

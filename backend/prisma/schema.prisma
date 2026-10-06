@@ -80,6 +80,8 @@ enum WalletTransactionType {
   // investment return: return/PnL work units must exclude it from trading
   // performance and treat it like a deposit.
   ad_reward
+  // Internal, same-currency cash relocation; never external funding.
+  wallet_transfer
 }
 
 enum WalletTransactionReferenceType {
@@ -95,6 +97,7 @@ enum WalletTransactionReferenceType {
   // referenceId = AdRewardClaim.id, one ledger row per granted claim
   // (partial unique index; claim.walletTransactionId is the reverse link).
   ad_reward_claim
+  wallet_transfer
 }
 
 enum AdRewardClaimStatus {
@@ -404,6 +407,7 @@ model TradingAccount {
   // positions, and returns are always derived from the source tables.
   cashWallets             CashWallet[]
   walletTransactions      WalletTransaction[]
+  walletTransfers         WalletTransfer[]
   exchangeTransactions    ExchangeTransaction[]
   fxExecuteRequests       FxExecuteRequest[]
   orders                  Order[]
@@ -840,6 +844,9 @@ model Order {
   limitPrice                 Decimal?     @map("limit_price") @db.Decimal(24, 8)
   executedPrice              Decimal?     @map("executed_price") @db.Decimal(24, 8)
   currencyCode               CurrencyCode @map("currency_code")
+  // Immutable canonical cash identity: account + scope + settlement currency.
+  // All pre-cutover orders are backfilled to securities, including crypto.
+  cashWalletScope            WalletScope  @map("cash_wallet_scope")
   grossAmount                Decimal?     @map("gross_amount") @db.Decimal(24, 8)
   feeAmount                  Decimal?     @map("fee_amount") @db.Decimal(24, 8)
   netAmount                  Decimal?     @map("net_amount") @db.Decimal(24, 8)
@@ -893,8 +900,7 @@ model Order {
 model CashWallet {
   id               String       @id @default(uuid())
   tradingAccountId String       @map("trading_account_id")
-  // Compatibility default: existing and current provisioned wallets are
-  // securities. Crypto scopes are representable but not provisioned/routed yet.
+  // Canonical provisioning explicitly supplies all four scope/currency pairs.
   walletScope      WalletScope  @default(securities) @map("wallet_scope")
   currencyCode     CurrencyCode @map("currency_code")
   balanceAmount    Decimal      @map("balance_amount") @db.Decimal(24, 8)
@@ -907,6 +913,8 @@ model CashWallet {
 
   tradingAccount     TradingAccount      @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   walletTransactions WalletTransaction[]
+  outgoingTransfers  WalletTransfer[]    @relation("TransferSource")
+  incomingTransfers  WalletTransfer[]    @relation("TransferDestination")
 
   // Scope/currency CHECK is SQL-only: securities KRW/USD, crypto scopes USD.
   @@unique([tradingAccountId, walletScope, currencyCode])
@@ -1082,6 +1090,8 @@ model Quote {
   sourceAmount         Decimal?      @map("source_amount") @db.Decimal(24, 8)
   targetAmount         Decimal?      @map("target_amount") @db.Decimal(24, 8)
   currencyCode         CurrencyCode? @map("currency_code")
+  // Required by a SQL CHECK for order quotes; FX leaves this null.
+  cashWalletScope      WalletScope?  @map("cash_wallet_scope")
   quotedPrice          Decimal?      @map("quoted_price") @db.Decimal(24, 8)
   quotedRate           Decimal?      @map("quoted_rate") @db.Decimal(18, 8)
   // Fee rate pinned AT QUOTE TIME for new market, limit and FX quotes in both
@@ -1121,6 +1131,28 @@ model Quote {
   @@index([fxRateSnapshotId])
   @@index([assetPriceSnapshotId])
   @@map("quotes")
+}
+
+// Only committed internal USD commands exist; failure rolls the entire row back.
+model WalletTransfer {
+  id                  String       @id @default(uuid())
+  tradingAccountId    String       @map("trading_account_id")
+  sourceWalletId      String       @map("source_wallet_id")
+  destinationWalletId String       @map("destination_wallet_id")
+  currencyCode        CurrencyCode @map("currency_code")
+  amount              Decimal      @db.Decimal(24, 8)
+  idempotencyKey      String       @map("idempotency_key")
+  requestHash         String       @map("request_hash")
+  responsePayloadJson Json         @map("response_payload_json")
+  executedAt          DateTime     @map("executed_at")
+
+  tradingAccount    TradingAccount @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  sourceWallet      CashWallet     @relation("TransferSource", fields: [sourceWalletId], references: [id], onDelete: Restrict)
+  destinationWallet CashWallet     @relation("TransferDestination", fields: [destinationWalletId], references: [id], onDelete: Restrict)
+
+  @@unique([tradingAccountId, idempotencyKey])
+  @@index([tradingAccountId, executedAt])
+  @@map("wallet_transfers")
 }
 
 model FxExecuteRequest {

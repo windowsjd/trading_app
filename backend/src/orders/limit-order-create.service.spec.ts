@@ -323,7 +323,10 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
     prisma.asset.findUnique.mockResolvedValueOnce(input.asset ?? krxAsset);
     prisma.cashWallet.findUnique.mockResolvedValueOnce({
-      walletScope: 'securities' as const,
+      walletScope:
+        input.asset?.assetType === AssetType.crypto
+          ? 'crypto_spot'
+          : 'securities',
       id: 'wallet-1',
       tradingAccountId: 'trading-account-1',
       balanceAmount: new Prisma.Decimal(input.balance ?? '1000000.00000000'),
@@ -638,6 +641,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
     const activeQuoteRecord = (
       overrides: Partial<Record<string, unknown>> = {},
     ) => ({
+      cashWalletScope: 'securities' as const,
       id: 'quote-limit-1',
       tradingAccountId: 'trading-account-1',
       status: 'active',
@@ -781,6 +785,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         '150150.00000000',
         'wallet-1',
         'trading-account-1',
+        'securities',
         CurrencyCode.KRW,
         '150150.00000000',
       ]);

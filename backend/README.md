@@ -57,8 +57,11 @@ request ID, query exclusion, collection/depth/string and 24 KiB limits remain.
 - Every TradingAccount has Securities KRW/USD, Crypto Spot USD, and Crypto Futures
   USD canonical cash wallets. Crypto wallets start with zero balance/reserved and
   add no grant/ledger. All wallet balances count in cash valuation with one workflow
-  USD/KRW evidence. US stocks/current Crypto Spot orders and FX still use Securities;
-  Transfer, Crypto routing and Futures are future work. Existing accounts are normalized
+  USD/KRW evidence. New Crypto Spot orders use Crypto Spot USD; stocks and FX use
+  Securities. Same-account USD wallet transfers are atomic and idempotent, with
+  no fee or effect on total assets/TWR/ranking. Legacy order/Quote provenance stays
+  Securities. Futures supports storage/transfers only; FX+Transfer and Futures
+  trading remain unsupported. See `docs/wallet-transfers-api-contract.md`. Existing accounts are normalized
   by a zero-only migration, including closed accounts without changing history.
   See [current scope and rollout policy](docs/trading-modes-and-accounts.md).
 - Final valuation policy is KRW total assets.

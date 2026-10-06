@@ -76,6 +76,38 @@ describe('wallet ledger contract and real screen integration', () => {
     assert.ok(!sell.some((label) => typeof label === 'string' && label.includes('원')));
   });
 
+  it('shows both transfer legs, their wallet identities and a shared USD route', async () => {
+    const data = page('USD');
+    const transfer = { sourceWalletId: 'sec-usd', destinationWalletId: 'spot-usd', sourceWalletScope: 'securities', destinationWalletScope: 'crypto_spot' };
+    data.transactions = ['debit', 'credit'].map((direction, index) => ({
+      ...data.transactions[0], id: 'transfer-leg-' + index, direction,
+      txType: 'wallet_transfer', referenceType: 'wallet_transfer', referenceId: 'transfer-1',
+      walletId: index === 0 ? 'sec-usd' : 'spot-usd', walletScope: index === 0 ? 'securities' : 'crypto_spot',
+      amount: '500.00000000', balanceAfter: index === 0 ? '700.00000000' : '500.00000000',
+      asset: null, trade: null, transfer,
+    }));
+    data.pagination = { ...data.pagination, total: 2, returned: 2, nextOffset: null };
+    const h = createLedgerHarness({ currencyCode: 'USD' });
+    await receive(h, { success: true, data });
+    const list = listOf(h);
+    assert.equal(list.props.data.length, 2);
+    for (const [index, row] of list.props.data.entries()) {
+      const displayed = labels(list.props.renderItem({ item: row }));
+      assert.ok(displayed.includes('이체'));
+      assert.ok(displayed.includes('증권 USD → 암호화폐 · 현물 USD'));
+      assert.ok(displayed.includes(index === 0 ? '증권' : '암호화폐 · 현물'));
+      assert.ok(displayed.includes(index === 0 ? '- $500' : '+ $500'));
+      assert.ok(displayed.includes(index === 0 ? '잔액 $700' : '잔액 $500'));
+    }
+    assert.ok(chips(h, '유형').some((chip) => chip.props.label === '이체'));
+    press(h, '유형', '이체');
+    assert.deepEqual(h.options.queryKey, QUERY_KEYS.tradingAccount.walletTransactions('ta-1', { currency: 'USD', direction: undefined, txType: 'wallet_transfer', limit: 20 }));
+    const corrupted = structuredClone(data);
+    corrupted.transactions[0].walletId = 'spot-usd';
+    assert.throws(() => parseWalletLedgerResponse(corrupted, 'ta-1', { currency: 'USD' }), WalletLedgerContractError);
+    assert.equal(compatibleLedgerType('wallet_transfer', 'debit', 'general', 'KRW'), 'all');
+  });
+
   it('only offers KRW/USD, defaults to KRW and honors route USD with separate query keys', () => {
     const h = createLedgerHarness({ data: page() });
     assert.deepEqual(chips(h, '통화').map((chip) => chip.props.label), ['KRW', 'USD']);

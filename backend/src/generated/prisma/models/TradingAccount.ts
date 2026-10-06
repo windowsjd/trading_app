@@ -252,6 +252,7 @@ export type TradingAccountWhereInput = {
   seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantNullableScalarRelationFilter, Prisma.SeasonParticipantWhereInput> | null
   cashWallets?: Prisma.CashWalletListRelationFilter
   walletTransactions?: Prisma.WalletTransactionListRelationFilter
+  walletTransfers?: Prisma.WalletTransferListRelationFilter
   exchangeTransactions?: Prisma.ExchangeTransactionListRelationFilter
   fxExecuteRequests?: Prisma.FxExecuteRequestListRelationFilter
   orders?: Prisma.OrderListRelationFilter
@@ -277,6 +278,7 @@ export type TradingAccountOrderByWithRelationInput = {
   seasonParticipant?: Prisma.SeasonParticipantOrderByWithRelationInput
   cashWallets?: Prisma.CashWalletOrderByRelationAggregateInput
   walletTransactions?: Prisma.WalletTransactionOrderByRelationAggregateInput
+  walletTransfers?: Prisma.WalletTransferOrderByRelationAggregateInput
   exchangeTransactions?: Prisma.ExchangeTransactionOrderByRelationAggregateInput
   fxExecuteRequests?: Prisma.FxExecuteRequestOrderByRelationAggregateInput
   orders?: Prisma.OrderOrderByRelationAggregateInput
@@ -305,6 +307,7 @@ export type TradingAccountWhereUniqueInput = Prisma.AtLeast<{
   seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantNullableScalarRelationFilter, Prisma.SeasonParticipantWhereInput> | null
   cashWallets?: Prisma.CashWalletListRelationFilter
   walletTransactions?: Prisma.WalletTransactionListRelationFilter
+  walletTransfers?: Prisma.WalletTransferListRelationFilter
   exchangeTransactions?: Prisma.ExchangeTransactionListRelationFilter
   fxExecuteRequests?: Prisma.FxExecuteRequestListRelationFilter
   orders?: Prisma.OrderListRelationFilter
@@ -361,6 +364,7 @@ export type TradingAccountCreateInput = {
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
@@ -385,6 +389,7 @@ export type TradingAccountUncheckedCreateInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -409,6 +414,7 @@ export type TradingAccountUpdateInput = {
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
@@ -433,6 +439,7 @@ export type TradingAccountUncheckedUpdateInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -708,6 +715,20 @@ export type TradingAccountUpdateOneRequiredWithoutQuotesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutQuotesInput, Prisma.TradingAccountUpdateWithoutQuotesInput>, Prisma.TradingAccountUncheckedUpdateWithoutQuotesInput>
 }
 
+export type TradingAccountCreateNestedOneWithoutWalletTransfersInput = {
+  create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutWalletTransfersInput, Prisma.TradingAccountUncheckedCreateWithoutWalletTransfersInput>
+  connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutWalletTransfersInput
+  connect?: Prisma.TradingAccountWhereUniqueInput
+}
+
+export type TradingAccountUpdateOneRequiredWithoutWalletTransfersNestedInput = {
+  create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutWalletTransfersInput, Prisma.TradingAccountUncheckedCreateWithoutWalletTransfersInput>
+  connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutWalletTransfersInput
+  upsert?: Prisma.TradingAccountUpsertWithoutWalletTransfersInput
+  connect?: Prisma.TradingAccountWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutWalletTransfersInput, Prisma.TradingAccountUpdateWithoutWalletTransfersInput>, Prisma.TradingAccountUncheckedUpdateWithoutWalletTransfersInput>
+}
+
 export type TradingAccountCreateNestedOneWithoutFxExecuteRequestsInput = {
   create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutFxExecuteRequestsInput, Prisma.TradingAccountUncheckedCreateWithoutFxExecuteRequestsInput>
   connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutFxExecuteRequestsInput
@@ -776,6 +797,7 @@ export type TradingAccountCreateWithoutUserInput = {
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
@@ -799,6 +821,7 @@ export type TradingAccountUncheckedCreateWithoutUserInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -863,6 +886,7 @@ export type TradingAccountCreateWithoutSeasonParticipantInput = {
   user: Prisma.UserCreateNestedOneWithoutTradingAccountsInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
@@ -886,6 +910,7 @@ export type TradingAccountUncheckedCreateWithoutSeasonParticipantInput = {
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -925,6 +950,7 @@ export type TradingAccountUpdateWithoutSeasonParticipantInput = {
   user?: Prisma.UserUpdateOneRequiredWithoutTradingAccountsNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
@@ -948,6 +974,7 @@ export type TradingAccountUncheckedUpdateWithoutSeasonParticipantInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -972,6 +999,7 @@ export type TradingAccountCreateWithoutPositionsInput = {
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
@@ -995,6 +1023,7 @@ export type TradingAccountUncheckedCreateWithoutPositionsInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1034,6 +1063,7 @@ export type TradingAccountUpdateWithoutPositionsInput = {
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
@@ -1057,6 +1087,7 @@ export type TradingAccountUncheckedUpdateWithoutPositionsInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1080,6 +1111,7 @@ export type TradingAccountCreateWithoutOrdersInput = {
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionCreateNestedManyWithoutTradingAccountInput
@@ -1103,6 +1135,7 @@ export type TradingAccountUncheckedCreateWithoutOrdersInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1142,6 +1175,7 @@ export type TradingAccountUpdateWithoutOrdersInput = {
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUpdateManyWithoutTradingAccountNestedInput
@@ -1165,6 +1199,7 @@ export type TradingAccountUncheckedUpdateWithoutOrdersInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1187,6 +1222,7 @@ export type TradingAccountCreateWithoutCashWalletsInput = {
   user: Prisma.UserCreateNestedOneWithoutTradingAccountsInput
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
@@ -1210,6 +1246,7 @@ export type TradingAccountUncheckedCreateWithoutCashWalletsInput = {
   updatedAt?: Date | string
   seasonParticipant?: Prisma.SeasonParticipantUncheckedCreateNestedOneWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1249,6 +1286,7 @@ export type TradingAccountUpdateWithoutCashWalletsInput = {
   user?: Prisma.UserUpdateOneRequiredWithoutTradingAccountsNestedInput
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
@@ -1272,6 +1310,7 @@ export type TradingAccountUncheckedUpdateWithoutCashWalletsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipant?: Prisma.SeasonParticipantUncheckedUpdateOneWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1295,6 +1334,7 @@ export type TradingAccountCreateWithoutWalletTransactionsInput = {
   user: Prisma.UserCreateNestedOneWithoutTradingAccountsInput
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
@@ -1318,6 +1358,7 @@ export type TradingAccountUncheckedCreateWithoutWalletTransactionsInput = {
   updatedAt?: Date | string
   seasonParticipant?: Prisma.SeasonParticipantUncheckedCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1357,6 +1398,7 @@ export type TradingAccountUpdateWithoutWalletTransactionsInput = {
   user?: Prisma.UserUpdateOneRequiredWithoutTradingAccountsNestedInput
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
@@ -1380,6 +1422,7 @@ export type TradingAccountUncheckedUpdateWithoutWalletTransactionsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipant?: Prisma.SeasonParticipantUncheckedUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1404,6 +1447,7 @@ export type TradingAccountCreateWithoutAdRewardClaimsInput = {
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
@@ -1427,6 +1471,7 @@ export type TradingAccountUncheckedCreateWithoutAdRewardClaimsInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1466,6 +1511,7 @@ export type TradingAccountUpdateWithoutAdRewardClaimsInput = {
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
@@ -1489,6 +1535,7 @@ export type TradingAccountUncheckedUpdateWithoutAdRewardClaimsInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1512,6 +1559,7 @@ export type TradingAccountCreateWithoutExchangeTransactionsInput = {
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionCreateNestedManyWithoutTradingAccountInput
@@ -1535,6 +1583,7 @@ export type TradingAccountUncheckedCreateWithoutExchangeTransactionsInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1574,6 +1623,7 @@ export type TradingAccountUpdateWithoutExchangeTransactionsInput = {
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUpdateManyWithoutTradingAccountNestedInput
@@ -1597,6 +1647,7 @@ export type TradingAccountUncheckedUpdateWithoutExchangeTransactionsInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1620,6 +1671,7 @@ export type TradingAccountCreateWithoutQuotesInput = {
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
@@ -1643,6 +1695,7 @@ export type TradingAccountUncheckedCreateWithoutQuotesInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1682,6 +1735,7 @@ export type TradingAccountUpdateWithoutQuotesInput = {
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
@@ -1705,10 +1759,123 @@ export type TradingAccountUncheckedUpdateWithoutQuotesInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
+  equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
+}
+
+export type TradingAccountCreateWithoutWalletTransfersInput = {
+  id?: string
+  mode: $Enums.TradingAccountMode
+  status?: $Enums.TradingAccountStatus
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt: Date | string
+  closedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  user: Prisma.UserCreateNestedOneWithoutTradingAccountsInput
+  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutTradingAccountInput
+  cashWallets?: Prisma.CashWalletCreateNestedManyWithoutTradingAccountInput
+  walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutTradingAccountInput
+  exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutTradingAccountInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
+  orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
+  positions?: Prisma.PositionCreateNestedManyWithoutTradingAccountInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
+  equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
+  seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
+}
+
+export type TradingAccountUncheckedCreateWithoutWalletTransfersInput = {
+  id?: string
+  userId: string
+  mode: $Enums.TradingAccountMode
+  status?: $Enums.TradingAccountStatus
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt: Date | string
+  closedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipant?: Prisma.SeasonParticipantUncheckedCreateNestedOneWithoutTradingAccountInput
+  cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  positions?: Prisma.PositionUncheckedCreateNestedManyWithoutTradingAccountInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
+  equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
+}
+
+export type TradingAccountCreateOrConnectWithoutWalletTransfersInput = {
+  where: Prisma.TradingAccountWhereUniqueInput
+  create: Prisma.XOR<Prisma.TradingAccountCreateWithoutWalletTransfersInput, Prisma.TradingAccountUncheckedCreateWithoutWalletTransfersInput>
+}
+
+export type TradingAccountUpsertWithoutWalletTransfersInput = {
+  update: Prisma.XOR<Prisma.TradingAccountUpdateWithoutWalletTransfersInput, Prisma.TradingAccountUncheckedUpdateWithoutWalletTransfersInput>
+  create: Prisma.XOR<Prisma.TradingAccountCreateWithoutWalletTransfersInput, Prisma.TradingAccountUncheckedCreateWithoutWalletTransfersInput>
+  where?: Prisma.TradingAccountWhereInput
+}
+
+export type TradingAccountUpdateToOneWithWhereWithoutWalletTransfersInput = {
+  where?: Prisma.TradingAccountWhereInput
+  data: Prisma.XOR<Prisma.TradingAccountUpdateWithoutWalletTransfersInput, Prisma.TradingAccountUncheckedUpdateWithoutWalletTransfersInput>
+}
+
+export type TradingAccountUpdateWithoutWalletTransfersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  mode?: Prisma.EnumTradingAccountModeFieldUpdateOperationsInput | $Enums.TradingAccountMode
+  status?: Prisma.EnumTradingAccountStatusFieldUpdateOperationsInput | $Enums.TradingAccountStatus
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  user?: Prisma.UserUpdateOneRequiredWithoutTradingAccountsNestedInput
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutTradingAccountNestedInput
+  cashWallets?: Prisma.CashWalletUpdateManyWithoutTradingAccountNestedInput
+  walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutTradingAccountNestedInput
+  exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutTradingAccountNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
+  positions?: Prisma.PositionUpdateManyWithoutTradingAccountNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
+  equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
+  seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
+}
+
+export type TradingAccountUncheckedUpdateWithoutWalletTransfersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  mode?: Prisma.EnumTradingAccountModeFieldUpdateOperationsInput | $Enums.TradingAccountMode
+  status?: Prisma.EnumTradingAccountStatusFieldUpdateOperationsInput | $Enums.TradingAccountStatus
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipant?: Prisma.SeasonParticipantUncheckedUpdateOneWithoutTradingAccountNestedInput
+  cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  positions?: Prisma.PositionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1728,6 +1895,7 @@ export type TradingAccountCreateWithoutFxExecuteRequestsInput = {
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionCreateNestedManyWithoutTradingAccountInput
@@ -1751,6 +1919,7 @@ export type TradingAccountUncheckedCreateWithoutFxExecuteRequestsInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1790,6 +1959,7 @@ export type TradingAccountUpdateWithoutFxExecuteRequestsInput = {
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUpdateManyWithoutTradingAccountNestedInput
@@ -1813,6 +1983,7 @@ export type TradingAccountUncheckedUpdateWithoutFxExecuteRequestsInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1836,6 +2007,7 @@ export type TradingAccountCreateWithoutEquitySnapshotsInput = {
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
@@ -1859,6 +2031,7 @@ export type TradingAccountUncheckedCreateWithoutEquitySnapshotsInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1898,6 +2071,7 @@ export type TradingAccountUpdateWithoutEquitySnapshotsInput = {
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
@@ -1921,6 +2095,7 @@ export type TradingAccountUncheckedUpdateWithoutEquitySnapshotsInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1944,6 +2119,7 @@ export type TradingAccountCreateWithoutDailyPortfolioSnapshotsInput = {
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
@@ -1967,6 +2143,7 @@ export type TradingAccountUncheckedCreateWithoutDailyPortfolioSnapshotsInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -2006,6 +2183,7 @@ export type TradingAccountUpdateWithoutDailyPortfolioSnapshotsInput = {
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
@@ -2029,6 +2207,7 @@ export type TradingAccountUncheckedUpdateWithoutDailyPortfolioSnapshotsInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -2052,6 +2231,7 @@ export type TradingAccountCreateWithoutSeasonRankingsInput = {
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
@@ -2075,6 +2255,7 @@ export type TradingAccountUncheckedCreateWithoutSeasonRankingsInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedCreateNestedOneWithoutTradingAccountInput
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutTradingAccountInput
   walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutTradingAccountInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -2114,6 +2295,7 @@ export type TradingAccountUpdateWithoutSeasonRankingsInput = {
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
@@ -2137,6 +2319,7 @@ export type TradingAccountUncheckedUpdateWithoutSeasonRankingsInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -2170,6 +2353,7 @@ export type TradingAccountUpdateWithoutUserInput = {
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
@@ -2193,6 +2377,7 @@ export type TradingAccountUncheckedUpdateWithoutUserInput = {
   seasonParticipant?: Prisma.SeasonParticipantUncheckedUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutTradingAccountNestedInput
   walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -2223,6 +2408,7 @@ export type TradingAccountUncheckedUpdateManyWithoutUserInput = {
 export type TradingAccountCountOutputType = {
   cashWallets: number
   walletTransactions: number
+  walletTransfers: number
   exchangeTransactions: number
   fxExecuteRequests: number
   orders: number
@@ -2237,6 +2423,7 @@ export type TradingAccountCountOutputType = {
 export type TradingAccountCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   cashWallets?: boolean | TradingAccountCountOutputTypeCountCashWalletsArgs
   walletTransactions?: boolean | TradingAccountCountOutputTypeCountWalletTransactionsArgs
+  walletTransfers?: boolean | TradingAccountCountOutputTypeCountWalletTransfersArgs
   exchangeTransactions?: boolean | TradingAccountCountOutputTypeCountExchangeTransactionsArgs
   fxExecuteRequests?: boolean | TradingAccountCountOutputTypeCountFxExecuteRequestsArgs
   orders?: boolean | TradingAccountCountOutputTypeCountOrdersArgs
@@ -2270,6 +2457,13 @@ export type TradingAccountCountOutputTypeCountCashWalletsArgs<ExtArgs extends ru
  */
 export type TradingAccountCountOutputTypeCountWalletTransactionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.WalletTransactionWhereInput
+}
+
+/**
+ * TradingAccountCountOutputType without action
+ */
+export type TradingAccountCountOutputTypeCountWalletTransfersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.WalletTransferWhereInput
 }
 
 /**
@@ -2350,6 +2544,7 @@ export type TradingAccountSelect<ExtArgs extends runtime.Types.Extensions.Intern
   seasonParticipant?: boolean | Prisma.TradingAccount$seasonParticipantArgs<ExtArgs>
   cashWallets?: boolean | Prisma.TradingAccount$cashWalletsArgs<ExtArgs>
   walletTransactions?: boolean | Prisma.TradingAccount$walletTransactionsArgs<ExtArgs>
+  walletTransfers?: boolean | Prisma.TradingAccount$walletTransfersArgs<ExtArgs>
   exchangeTransactions?: boolean | Prisma.TradingAccount$exchangeTransactionsArgs<ExtArgs>
   fxExecuteRequests?: boolean | Prisma.TradingAccount$fxExecuteRequestsArgs<ExtArgs>
   orders?: boolean | Prisma.TradingAccount$ordersArgs<ExtArgs>
@@ -2406,6 +2601,7 @@ export type TradingAccountInclude<ExtArgs extends runtime.Types.Extensions.Inter
   seasonParticipant?: boolean | Prisma.TradingAccount$seasonParticipantArgs<ExtArgs>
   cashWallets?: boolean | Prisma.TradingAccount$cashWalletsArgs<ExtArgs>
   walletTransactions?: boolean | Prisma.TradingAccount$walletTransactionsArgs<ExtArgs>
+  walletTransfers?: boolean | Prisma.TradingAccount$walletTransfersArgs<ExtArgs>
   exchangeTransactions?: boolean | Prisma.TradingAccount$exchangeTransactionsArgs<ExtArgs>
   fxExecuteRequests?: boolean | Prisma.TradingAccount$fxExecuteRequestsArgs<ExtArgs>
   orders?: boolean | Prisma.TradingAccount$ordersArgs<ExtArgs>
@@ -2431,6 +2627,7 @@ export type $TradingAccountPayload<ExtArgs extends runtime.Types.Extensions.Inte
     seasonParticipant: Prisma.$SeasonParticipantPayload<ExtArgs> | null
     cashWallets: Prisma.$CashWalletPayload<ExtArgs>[]
     walletTransactions: Prisma.$WalletTransactionPayload<ExtArgs>[]
+    walletTransfers: Prisma.$WalletTransferPayload<ExtArgs>[]
     exchangeTransactions: Prisma.$ExchangeTransactionPayload<ExtArgs>[]
     fxExecuteRequests: Prisma.$FxExecuteRequestPayload<ExtArgs>[]
     orders: Prisma.$OrderPayload<ExtArgs>[]
@@ -2849,6 +3046,7 @@ export interface Prisma__TradingAccountClient<T, Null = never, ExtArgs extends r
   seasonParticipant<T extends Prisma.TradingAccount$seasonParticipantArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$seasonParticipantArgs<ExtArgs>>): Prisma.Prisma__SeasonParticipantClient<runtime.Types.Result.GetResult<Prisma.$SeasonParticipantPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   cashWallets<T extends Prisma.TradingAccount$cashWalletsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$cashWalletsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CashWalletPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   walletTransactions<T extends Prisma.TradingAccount$walletTransactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$walletTransactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WalletTransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  walletTransfers<T extends Prisma.TradingAccount$walletTransfersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$walletTransfersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WalletTransferPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   exchangeTransactions<T extends Prisma.TradingAccount$exchangeTransactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$exchangeTransactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ExchangeTransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   fxExecuteRequests<T extends Prisma.TradingAccount$fxExecuteRequestsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$fxExecuteRequestsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FxExecuteRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   orders<T extends Prisma.TradingAccount$ordersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$ordersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -3361,6 +3559,30 @@ export type TradingAccount$walletTransactionsArgs<ExtArgs extends runtime.Types.
   take?: number
   skip?: number
   distinct?: Prisma.WalletTransactionScalarFieldEnum | Prisma.WalletTransactionScalarFieldEnum[]
+}
+
+/**
+ * TradingAccount.walletTransfers
+ */
+export type TradingAccount$walletTransfersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WalletTransfer
+   */
+  select?: Prisma.WalletTransferSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the WalletTransfer
+   */
+  omit?: Prisma.WalletTransferOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.WalletTransferInclude<ExtArgs> | null
+  where?: Prisma.WalletTransferWhereInput
+  orderBy?: Prisma.WalletTransferOrderByWithRelationInput | Prisma.WalletTransferOrderByWithRelationInput[]
+  cursor?: Prisma.WalletTransferWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.WalletTransferScalarFieldEnum | Prisma.WalletTransferScalarFieldEnum[]
 }
 
 /**

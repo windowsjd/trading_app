@@ -205,6 +205,7 @@ import {
 } from './../src/generated/prisma/client';
 import { PrismaService } from './../src/prisma/prisma.service';
 import { RedisService } from './../src/redis/redis.service';
+import { TradingAccountWalletTransferService } from '../src/wallets/trading-account-wallet-transfer.service';
 import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
 import { adminDiagnosticRequestMiddleware } from './../src/common/admin-diagnostics';
 import * as argon2 from 'argon2';
@@ -2997,6 +2998,74 @@ describe('AppController (e2e)', () => {
         expectUnauthorizedBody(response.body);
         expect(prisma.cashWallet.findMany).not.toHaveBeenCalled();
       });
+  });
+
+  it('/api/v1/trading-accounts/:accountId/wallet-transfers (POST) requires authentication', async () => {
+    const service = app.get(TradingAccountWalletTransferService);
+    const spy = jest.spyOn(service, 'transfer');
+    try {
+      await request(app.getHttpServer())
+        .post('/api/v1/trading-accounts/trading-account-1/wallet-transfers')
+        .send({
+          sourceWalletId: 'source',
+          destinationWalletId: 'destination',
+          amount: '500',
+          idempotencyKey: 'transfer-key',
+        })
+        .expect(401)
+        .expect((response) => expectUnauthorizedBody(response.body));
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('/api/v1/trading-accounts/:accountId/wallet-transfers (POST) dispatches authenticated account command with 200', async () => {
+    resetPrismaMocks();
+    mockActiveUser();
+    const body = {
+      sourceWalletId: 'source',
+      destinationWalletId: 'destination',
+      amount: '500',
+      idempotencyKey: 'transfer-key',
+    };
+    const result = {
+      success: true as const,
+      data: {
+        tradingAccountId: 'trading-account-1',
+        transferId: 'transfer-1',
+        currencyCode: 'USD' as const,
+        amount: '500.00000000',
+        executedAt: now.toISOString(),
+        source: {
+          walletId: 'source',
+          walletScope: 'securities' as const,
+          balanceAfter: '500.00000000',
+          availableAfter: '500.00000000',
+        },
+        destination: {
+          walletId: 'destination',
+          walletScope: 'crypto_spot' as const,
+          balanceAfter: '500.00000000',
+          availableAfter: '500.00000000',
+        },
+      },
+    };
+    const spy = jest
+      .spyOn(app.get(TradingAccountWalletTransferService), 'transfer')
+      .mockResolvedValueOnce(result);
+    try {
+      const token = await createValidAccessToken();
+      await request(app.getHttpServer())
+        .post('/api/v1/trading-accounts/trading-account-1/wallet-transfers')
+        .set('Authorization', `Bearer ${token}`)
+        .send(body)
+        .expect(200)
+        .expect((response) => expect(response.body).toEqual(result));
+      expect(spy).toHaveBeenCalledWith(user.id, 'trading-account-1', body);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('/api/v1/trading-accounts/:accountId/wallets (GET) returns owner wallets scoped by account', async () => {

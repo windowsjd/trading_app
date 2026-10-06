@@ -1,3 +1,4 @@
+import { parseWalletTransferResponse } from '../wallet/walletTransfer.ts';
 import { assertDailyEquity } from './dailyEquity.ts';
 import { apiClient } from '../../services/api/client';
 import type {
@@ -166,6 +167,29 @@ export interface TradingAccountWalletsDto {
     hasKrwWallet: boolean;
     hasUsdWallet: boolean;
   };
+}
+
+export interface WalletTransferRequestDto {
+  sourceWalletId: string;
+  destinationWalletId: string;
+  amount: MoneyString;
+  idempotencyKey: string;
+}
+
+export interface WalletTransferDto {
+  tradingAccountId: string;
+  transferId: string;
+  currencyCode: 'USD';
+  amount: MoneyString;
+  executedAt: string;
+  source: { walletId: string; walletScope: WalletScope; balanceAfter: MoneyString; availableAfter: MoneyString };
+  destination: { walletId: string; walletScope: WalletScope; balanceAfter: MoneyString; availableAfter: MoneyString };
+}
+
+export async function transferTradingAccountWallets(accountId: string, body: WalletTransferRequestDto) {
+  const response = await apiClient.post<ApiSuccessResponse<WalletTransferDto>>(accountPath(accountId, '/wallet-transfers'), body);
+  const payload = assertAccountScope(accountPath(accountId, '/wallet-transfers'), accountId, response.data.data);
+  return parseWalletTransferResponse(payload, accountId, body);
 }
 
 export interface TradingAccountPositionsDto {

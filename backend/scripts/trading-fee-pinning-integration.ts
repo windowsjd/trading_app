@@ -14,9 +14,7 @@ import { GeneralExternalFundingService } from '../src/portfolio/general-external
 import { PortfolioValuationService } from '../src/portfolio/portfolio-valuation.service';
 import { OrdersService } from '../src/orders/orders.service';
 import { FxService, type FxExecuteSuccessResponse } from '../src/fx/fx.service';
-import {
-  resetMarketSessionOverrideStoreForTest,
-} from '../src/orders/market-calendar/market-session-override.store';
+import { resetMarketSessionOverrideStoreForTest } from '../src/orders/market-calendar/market-session-override.store';
 
 const prisma = new PrismaService();
 const access = new TradingAccountAccessService(prisma);
@@ -152,8 +150,8 @@ async function fixture(mode: TradingAccountMode, stock = true) {
       currencyCode: asset.currencyCode,
       sourceType: 'provider_api',
       sourceName: stock ? 'kis_krx_realtime_trade' : 'binance_spot_ws_ticker',
-      effectiveAt: now,
-      capturedAt: now,
+      effectiveAt: new Date(now.getTime() - 1000),
+      capturedAt: new Date(now.getTime() - 1000),
     },
   });
   const rate = await prisma.fxRateSnapshot.create({
@@ -163,8 +161,8 @@ async function fixture(mode: TradingAccountMode, stock = true) {
       rate: '1400',
       sourceType: 'provider_api',
       sourceName: 'korea_exim_exchange_rate',
-      effectiveAt: now,
-      capturedAt: now,
+      effectiveAt: new Date(now.getTime() - 1000),
+      capturedAt: new Date(now.getTime() - 1000),
     },
   });
   const s = {
@@ -274,7 +272,7 @@ async function pinned(quoteId: string, expected: string) {
 }
 
 async function changeEvidence(s: Scenario) {
-  const now = await dbNow();
+  const now = new Date((await dbNow()).getTime() - 1000);
   // Preserve source policy and quote change limits; only price/rate changes.
   await prisma.assetPriceSnapshot.update({
     where: { id: s.price.id },
@@ -343,6 +341,7 @@ async function marketCommand(
     // Simulate an existing submitted market row; execution is the real public core.
     const order = await prisma.order.create({
       data: {
+        cashWalletScope: 'securities' as const,
         tradingAccountId: s.accountId,
         assetId: s.asset.id,
         quoteId: body.quoteId,

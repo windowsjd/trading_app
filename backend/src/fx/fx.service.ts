@@ -1190,6 +1190,7 @@ export class FxService {
         for (const wallet of [sourceWallet, targetWallet]) {
           if (wallet) {
             assertCashWalletTradingAccountScope(wallet, {
+              walletScope: 'securities',
               tradingAccountId: context.account.id,
             });
           }
@@ -1634,6 +1635,7 @@ export class FxService {
     // balance basis of a quote (500 repair-required/mismatch, not 409).
     if (wallet) {
       assertCashWalletTradingAccountScope(wallet, {
+        walletScope: 'securities',
         tradingAccountId: input.tradingAccountId,
       });
     }
@@ -2968,6 +2970,7 @@ export class FxService {
     // The account id is part of the UPDATE's WHERE, so a wallet whose scope
     // changed (or was never set) after the pre-check matches 0 rows.
     const debitCount = await debitAvailableCash(tx, {
+      walletScope: 'securities',
       walletId: plan.sourceWalletId,
       tradingAccountId,
       currencyCode: plan.fromCurrency,
@@ -3013,6 +3016,7 @@ export class FxService {
       const reason = await diagnoseCashWalletMutationFailure(tx, {
         walletId: plan.targetWalletId,
         expected: {
+          walletScope: 'securities',
           tradingAccountId,
           currencyCode: plan.toCurrency,
         },
@@ -3048,6 +3052,7 @@ export class FxService {
     const reason = await diagnoseCashWalletMutationFailure(tx, {
       walletId: plan.sourceWalletId,
       expected: {
+        walletScope: 'securities',
         tradingAccountId,
         currencyCode: plan.fromCurrency,
       },

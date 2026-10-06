@@ -21,7 +21,7 @@
 
 이 현재 상태가 아래 과거 전환 단계 설명보다 우선한다.
 
-### CashWallet의 canonical Wallet Scope (2026-10-06, current)
+### CashWallet의 canonical Wallet Scope (2026-10-07, current)
 
 `TradingAccount`는 금융 소유권·일반/시즌 격리 경계이며, 그 안에서
 `CashWallet`의 금융 식별자는 `(tradingAccountId, walletScope, currencyCode)`다.
@@ -29,9 +29,9 @@
 
 | Wallet Scope | 허용 통화 | 현재 provisioning / 거래 |
 | --- | --- | --- |
-| `securities` | KRW, USD | 기존 초기자금·주문·FX 경로 유지 |
-| `crypto_spot` | USD | balance/reserved 0으로 생성, 주문 funding 전환은 다음 작업 |
-| `crypto_futures` | USD | balance/reserved 0으로 생성, Futures 기능 없음 |
+| `securities` | KRW, USD | 초기자금·주식·FX, legacy 주문의 pin된 금융 경로 |
+| `crypto_spot` | USD | balance/reserved 0으로 생성, 신규 Crypto Spot 주문과 USD 내부이체 |
+| `crypto_futures` | USD | balance/reserved 0으로 생성, 현금 보관·USD 내부이체만 허용 |
 
 정상 계정은 위 네 identity를 각각 정확히 하나씩 가진다. DB NOT NULL enum,
 scope/currency CHECK, 복합 unique와 서버의 canonical set 검증이 누락·중복·
@@ -50,10 +50,12 @@ Crypto 지갑도 그대로 보존한다. Securities KRW/USD가 손상된 계정�
 lock을 사용하고 중복 삽입은 unique conflict로 막는다. CHECK는 Prisma DSL에서
 표현하지 못하므로 기존 migration SQL이 계속 관리한다.
 
-배포는 **계정 생성 및 금융 write를 중지한 상태에서** 기존 `prisma migrate deploy`
-후 새 서버와 frontend를 배포한다. 이전 서버는 두 지갑만 만들므로 migration과
-서버 교체 사이에 provisioning을 허용하면 안 된다. schema는 이전 Wallet Scope
-foundation과 같아 Prisma enum/column/index 추가는 없다.
+작업 3 배포는 **주문 API·matcher·cleanup을 포함한 금융 writers를 중지한 상태에서**
+`prisma migrate deploy` 후 새 서버와 frontend를 배포하고 writers를 재개한다.
+작업 2의 zero-wallet 보완 배포 기록과 구분한다. 작업 3의 provenance migration
+`20261006160000_pin_order_wallet_and_add_transfers`는 order Quotes/Orders의
+`cashWalletScope`와 WalletTransfer, transfer ledger enum을 추가한다. 이전 서버는
+새 Order의 required provenance를 기록하지 못하므로 migration 후 실행하지 않는다.
 
 총 현금은 모든 canonical wallet의 `balanceAmount` 합계다. USD 세 지갑의
 balance를 Decimal로 먼저 합산하고 기존 Spot Position과 동일 workflow의 단일
@@ -67,13 +69,26 @@ scope 사이에서 바뀌어도 총현금·총자산은 같다. aggregate cash�
 차감하지 않으며 margin/이체 예약으로 재사용하지 않는다.
 
 Account Wallet API는 네 지갑을 `id`·`walletScope`·`currencyCode`로 식별하여 반환한다.
-기존 Frontend Wallet/FX/order 화면의 통화 조회는 Securities를 명시적으로 선택하고
-계정별 query key/ownership echo 검증을 유지한다. 화면의 지갑 구분 UI는 아직 바꾸지
-않는다. Legacy `/wallets`와 General-open의 기존 two-wallet projection은 유지한다.
-미국주식과 **현재 Crypto Spot 주문의 전체 lifecycle도 아직 Securities USD**를
-사용한다. FX도 Securities KRW↔USD에만 적용한다. 현재 ledger/FX 응답 계약은 유지한다.
-Crypto Spot routing 전환과 Wallet UI 구조 변경은 다음 작업이며, Transfer/FX Transfer/
-Futures Position·margin·engine은 미구현이다.
+Frontend는 scope+currency로 증권 KRW/USD, 암호화폐 · 현물 USD, 암호화폐 · 선물 USD를
+표시하고 기존 보유 종목을 유지한다. Legacy `/wallets`와 General-open의 two-wallet
+projection은 Securities로 유지한다. Account ledger는 모든 scope를 반환하며 실제
+walletId/scope와 이체의 출발·도착 지갑 정보를 표시한다.
+
+신규 `AssetType.crypto`는 모두 Spot이다. Quote가 `crypto_spot/USD` identity를 pin하고
+Order가 이를 그대로 상속한다. 주식은 Securities, FX는 Securities KRW↔USD다.
+migration 이전 order Quotes/Orders는 모두 Securities로 backfill하고 terminal state까지
+그 provenance를 유지한다. Fill/cancel/cleanup/replay에서 asset type으로 wallet을
+재추론하지 않는다. Securities reservation·balance를 이동하거나 기존 Position을
+분리하지 않는다. 기존 Spot Position을 새 SELL로 팔면 새 주문의 Spot wallet에 입금된다.
+
+동일 TradingAccount 내 세 USD wallet 간 [이체](wallet-transfers-api-contract.md)를 지원한다.
+source의 `balance - reserved`만 조건부 차감하고 destination에 같은 금액을 입금한다.
+계정/시즌 lifecycle lock과 ID 순서 wallet lock, account/key unique, 저장된 응답 replay와
+같은 사건에 연결된 debit/credit ledger를 한 PostgreSQL transaction으로 처리한다.
+Transfer는 외부 funding이 아니며 total cash/asset/PnL/return/TWR/ranking이 변하지 않는다.
+사용자는 증권 KRW→기존 환전→증권 USD→이체→현물 USD로 충전해 Crypto BUY할 수 있다.
+Cross-currency FX Transfer, 다른 계정/사용자 송금과 Futures trading은 미지원이다.
+Futures wallet은 USD를 넣고 다른 USD wallet으로 되돌려 이체할 수 있다.
 
 - SeasonRanking.tradingAccountId도 `20260910120000` migration에서 NOT NULL로 강화됐다. participant relation은 시즌 랭킹 식별자로 유지한다.
 - 일반 TWR/외부자금 경계, 양 모드 market/limit BUY·SELL 및 FX, 정산 transaction의 모든 season account 종료는 구현되어 있다.

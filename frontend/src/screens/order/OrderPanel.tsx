@@ -616,7 +616,7 @@ export function OrderForm({
   // (balance - reserved): cash locked by open limit orders is not spendable.
   const buyAvailable =
     side === 'buy' && settlementCurrency
-      ? getWalletAvailableAmount(walletsQuery.data, settlementCurrency)
+      ? getWalletAvailableAmount(walletsQuery.data, settlementCurrency, asset?.assetType === 'crypto' ? 'crypto_spot' : 'securities')
       : null;
   const buyAvailableValue = parsePositiveDecimal(buyAvailable);
   const priceValue = parsePositiveDecimal(

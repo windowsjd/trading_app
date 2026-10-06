@@ -6,6 +6,7 @@ import {
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import {
   CurrencyCode,
+  WalletScope,
   OrderSide,
   OrderStatus,
   OrderType,
@@ -35,6 +36,7 @@ import {
   type QuotedLimitReservationBasis,
 } from './limit-order-policy';
 import { reserveAvailablePositionQuantity } from './position-reservation-atomic';
+import { requireOrderCashWalletScope } from './order-cash-wallet-policy';
 import { OrderReservationService } from './order-reservation.service';
 import {
   formatOrderResponse,
@@ -189,6 +191,7 @@ export class LimitOrderCreateService {
     tradingAccountId: string;
     assetId: string;
     currencyCode: CurrencyCode;
+    walletScope: WalletScope;
     limitPrice: Prisma.Decimal;
     quantity: Prisma.Decimal;
     tradeFeeRate: Prisma.Decimal;
@@ -212,7 +215,7 @@ export class LimitOrderCreateService {
       this.prisma.cashWallet.findUnique({
         where: {
           tradingAccountId_walletScope_currencyCode: {
-            walletScope: 'securities',
+            walletScope: input.walletScope,
             tradingAccountId: input.tradingAccountId,
             currencyCode: input.currencyCode,
           },
@@ -245,6 +248,7 @@ export class LimitOrderCreateService {
     if (wallet) {
       assertCashWalletTradingAccountScope(wallet, {
         tradingAccountId: input.tradingAccountId,
+        walletScope: input.walletScope,
       });
     }
 
@@ -327,6 +331,7 @@ export class LimitOrderCreateService {
     tradingAccountId: string;
     assetId: string;
     currencyCode: CurrencyCode;
+    walletScope: WalletScope;
     limitPrice: Prisma.Decimal;
     quantity: Prisma.Decimal;
     tradeFeeRate: Prisma.Decimal;
@@ -349,7 +354,7 @@ export class LimitOrderCreateService {
       this.prisma.cashWallet.findUnique({
         where: {
           tradingAccountId_walletScope_currencyCode: {
-            walletScope: 'securities',
+            walletScope: input.walletScope,
             tradingAccountId: input.tradingAccountId,
             currencyCode: input.currencyCode,
           },
@@ -378,6 +383,7 @@ export class LimitOrderCreateService {
     if (wallet) {
       assertCashWalletTradingAccountScope(wallet, {
         tradingAccountId: input.tradingAccountId,
+        walletScope: input.walletScope,
       });
     }
     if (position && position.tradingAccountId !== input.tradingAccountId) {
@@ -546,6 +552,7 @@ export class LimitOrderCreateService {
     input: {
       quote: {
         id: string;
+        cashWalletScope: WalletScope;
         limitPrice: Prisma.Decimal;
         quotedFeeRate: Prisma.Decimal | null;
         quotedGrossAmount: Prisma.Decimal | null;
@@ -578,6 +585,10 @@ export class LimitOrderCreateService {
     });
     const currencyCode =
       input.quote.asset.settlementCurrency ?? input.quote.asset.currencyCode;
+    const cashWalletScope = requireOrderCashWalletScope(
+      input.quote.cashWalletScope,
+      currencyCode,
+    );
     const basis = this.requireQuotedReservationBasis({
       quote: input.quote,
       quantity: input.quantity,
@@ -597,6 +608,7 @@ export class LimitOrderCreateService {
     await this.reservation.reserveForLimitBuy(tx, {
       tradingAccountId: input.tradingAccountId,
       currencyCode,
+      walletScope: cashWalletScope,
       amount: reservedAmountText,
     });
 
@@ -626,6 +638,7 @@ export class LimitOrderCreateService {
         limitPrice: formatDecimalScale(input.quote.limitPrice, monetaryScale),
         executedPrice: null,
         currencyCode,
+        cashWalletScope,
         grossAmount: null,
         feeAmount: null,
         netAmount: null,
@@ -773,6 +786,7 @@ export class LimitOrderCreateService {
     input: {
       quote: {
         id: string;
+        cashWalletScope: WalletScope;
         limitPrice: Prisma.Decimal;
         quotedFeeRate: Prisma.Decimal | null;
         quotedGrossAmount: Prisma.Decimal | null;
@@ -802,6 +816,10 @@ export class LimitOrderCreateService {
     });
     const currencyCode =
       input.quote.asset.settlementCurrency ?? input.quote.asset.currencyCode;
+    const cashWalletScope = requireOrderCashWalletScope(
+      input.quote.cashWalletScope,
+      currencyCode,
+    );
     if (
       !input.quote.quotedFeeRate ||
       !input.quote.quotedGrossAmount ||
@@ -993,6 +1011,7 @@ export class LimitOrderCreateService {
         limitPrice: formatDecimalScale(input.quote.limitPrice, monetaryScale),
         executedPrice: null,
         currencyCode,
+        cashWalletScope,
         grossAmount: null,
         feeAmount: null,
         netAmount: null,

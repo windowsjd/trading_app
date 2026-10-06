@@ -95,7 +95,7 @@ async function run() {
             }
             const layout = await page.evaluate(({ prefix, screen }) => {
               const rows = [...document.querySelectorAll(`[data-testid^="${prefix}"][role="button"]`)];
-              const boundaries = [...rows, ...['home-summary-card', ...(screen === 'wallet' ? ['wallet-cash-KRW', 'wallet-cash-USD', 'wallet-quick-actions', 'wallet-exchange-item', 'wallet-ledger-item', 'wallet-orders-item'] : [])].map((name) => document.querySelector(`[data-testid="${name}"]`))];
+              const boundaries = [...rows, ...['home-summary-card', ...(screen === 'wallet' ? ['wallet-cash-KRW', 'wallet-cash-USD', 'wallet-cash-crypto_spot-USD', 'wallet-cash-crypto_futures-USD', 'wallet-group-securities-title', 'wallet-group-crypto_spot-title', 'wallet-group-crypto_futures-title', 'wallet-holdings-title', 'wallet-transfer-item', 'wallet-quick-actions', 'wallet-exchange-item', 'wallet-ledger-item', 'wallet-orders-item'] : [])].map((name) => document.querySelector(`[data-testid="${name}"]`))];
               const clipped = [];
               for (const row of boundaries) {
                 const box = row.getBoundingClientRect(), walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
@@ -138,7 +138,7 @@ async function run() {
                   }])),
                 };
               });
-              const quickActions = screen === 'wallet' ? ['wallet-exchange', 'wallet-ledger', 'wallet-orders'].map((testID) => {
+              const quickActions = screen === 'wallet' ? ['wallet-transfer', 'wallet-exchange', 'wallet-ledger', 'wallet-orders'].map((testID) => {
                 const el = document.querySelector(`[data-testid="${testID}"]`);
                 const surface = document.querySelector(`[data-testid="${testID}-surface"]`), css = getComputedStyle(surface);
                 const item = document.querySelector(`[data-testid="${testID}-item"]`);
@@ -187,13 +187,13 @@ async function run() {
               assert.ok(row.value.fontSize > row.return.fontSize);
             }
             if (layout.quickActions) {
-              const [exchange, ledger, orders] = layout.quickActions;
+              const [transfer, exchange, ledger, orders] = layout.quickActions;
               const order = layout.quickActionOrder;
               assert.ok(order.followsHero && order.precedesComposition, 'DOM order is Hero → quick actions → composition');
               assert.ok(order.hero.bottom <= order.group.top && order.group.bottom <= order.composition.top, 'the whole quick action group renders between Hero and composition');
               assert.ok(order.group.left >= 0 && order.group.right <= width, 'the group stays inside the viewport');
               assert.ok(Math.abs(order.group.left + order.group.right - width) < 1, 'the group is centered');
-              for (const button of [ledger, orders]) {
+              for (const button of [transfer, ledger, orders]) {
                 assert.ok(Math.abs(exchange.width - button.width) < 1, 'quick actions have equal rendered widths');
                 for (const property of ['height', 'top', 'padding', 'radius']) assert.equal(button[property], exchange[property]);
                 assert.equal(button.icon.top, exchange.icon.top, 'icons align across the row even when labels wrap');
@@ -217,7 +217,7 @@ async function run() {
                 assert.equal(button.accessibleButtons, 1, 'one accessible action without nested buttons');
                 assert.equal(button.buttonText, button.labelText);
                 assert.ok(button.target.top <= button.top && button.target.bottom >= button.label.bottom, 'hit target includes surface, gap and label');
-                assert.equal(button.labelText, ['환전하기', '원장 보기', '주문 내역 보기'][index]);
+                assert.equal(button.labelText, ['이체하기', '환전하기', '원장 보기', '주문 내역'][index]);
                 assert.equal(button.accessibleName, button.labelText, 'button remains named for assistive technology');
                 assert.equal(button.alignItems, 'center'); assert.equal(button.justifyContent, 'center'); assert.equal(button.textAlign, 'center');
                 assert.equal(button.fontSize, 13 * fontScale); assert.equal(button.lineHeight, 20 * fontScale);
@@ -232,7 +232,7 @@ async function run() {
             }
             if (screen === 'wallet' && account === 'general' && !long && fontScale === 1 && preference === 'red_blue') {
               await page.emulateMedia({ reducedMotion: 'reduce' });
-              for (const action of ['wallet-exchange', 'wallet-ledger', 'wallet-orders']) {
+              for (const action of ['wallet-transfer', 'wallet-exchange', 'wallet-ledger', 'wallet-orders']) {
                 await id(action).scrollIntoViewIfNeeded();
                 const label = await id(`${action}-label`).boundingBox();
                 await page.mouse.move(label.x + label.width / 2, label.y + label.height / 2);
@@ -313,6 +313,28 @@ async function run() {
       }
 
     }
+    // Actual transfer form: small mobile widths and enlarged text, summary and success.
+    for (const width of [320, 360, 430]) for (const fontScale of [1, 2]) for (const account of ['general', 'season']) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto(`${base}/?screen=transfer&holdings=1&account=${account}&fontScale=${fontScale}`);
+      await id('wallet-transfer-available').waitFor();
+      assert.match(await id('wallet-transfer-available').textContent(), /30.39/);
+      await id('wallet-transfer-amount').fill('10'); await id('wallet-transfer-review').click();
+      await id('wallet-transfer-summary').waitFor();
+      const clipping = await page.evaluate(() => {
+        const failures = [];
+        for (const el of document.querySelectorAll('[data-testid="wallet-transfer-screen"] [dir="auto"]')) {
+          const box = el.getBoundingClientRect(), range = document.createRange(); range.selectNodeContents(el);
+          for (const r of range.getClientRects()) if (r.width && (r.left < -1 || r.right > innerWidth + 1 || r.top < box.top - 1 || r.bottom > box.bottom + 1)) failures.push(el.textContent);
+        }
+        return { failures, width: document.documentElement.scrollWidth };
+      });
+      assert.deepEqual(clipping.failures, [], `${width}/${fontScale}/${account}: text fits the transfer form`);
+      assert.ok(clipping.width <= width);
+      await id('wallet-transfer-confirm').click(); await id('wallet-transfer-success').waitFor();
+      assert.equal(await page.evaluate(() => window.fixture.transport.postRequests.at(-1).path), `/trading-accounts/${account}-account/wallet-transfers`);
+      records.push({ screen: 'transfer', width, fontScale, account, clipping });
+    }
     // Installed React Navigation: real tabs, MyStack → RecordStack and back paths.
     await page.setViewportSize({ width: 390, height: 844 });
     for (const account of ['general', 'season']) {
@@ -326,6 +348,7 @@ async function run() {
       assert.equal(await id('wallet-exchange-label').textContent(), '환전하기');
       assert.notEqual(await id('wallet-exchange').getAttribute('aria-disabled'), 'true');
       for (const [action, destination, marker] of [
+        ['wallet-transfer', 'WalletTransfer', 'wallet-transfer-screen'],
         ['wallet-exchange', 'WalletFx', 'wallet-fx-screen'],
         ['wallet-ledger', 'WalletTransactions', 'wallet-transactions-screen'],
         ['wallet-orders', 'TradeHistory', 'record-order-list-screen'],

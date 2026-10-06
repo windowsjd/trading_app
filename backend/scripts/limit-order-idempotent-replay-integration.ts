@@ -553,7 +553,13 @@ async function createScenario(
   });
   await prisma.cashWallet.createMany({
     data: [
-      { tradingAccountId: tradingAccount.id, walletScope: 'securities', currencyCode: 'USD', balanceAmount: '0', reservedAmount: '0' },
+      {
+        tradingAccountId: tradingAccount.id,
+        walletScope: 'securities',
+        currencyCode: 'USD',
+        balanceAmount: '0',
+        reservedAmount: '0',
+      },
       ...zeroCryptoCashWalletData(tradingAccount.id),
     ],
   });
@@ -591,6 +597,7 @@ async function createScenario(
 async function createLimitQuote(scenario: Scenario): Promise<string> {
   const quote = await prisma.quote.create({
     data: {
+      cashWalletScope: 'securities' as const,
       userId: scenario.userId,
       tradingAccountId: scenario.tradingAccountId,
       quoteType: QuoteType.order,

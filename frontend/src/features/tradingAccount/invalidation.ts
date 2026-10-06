@@ -117,6 +117,11 @@ export function invalidateAfterFx(
   return invalidateAll(client, keys);
 }
 
+/** Internal cash relocation changes this account's balances and ledger only. */
+export function invalidateAfterWalletTransfer(client: InvalidatorClient, accountId: string) {
+  return invalidateAll(client, walletKeys(accountId));
+}
+
 /**
  * After an ad-reward claim: the claim itself, remaining eligibility, and the
  * cash it granted. General-only, so no season UI is refreshed.

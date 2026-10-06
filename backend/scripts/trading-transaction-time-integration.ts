@@ -1,3 +1,4 @@
+import { TradingAccountWalletTransferService } from '../src/wallets/trading-account-wallet-transfer.service';
 import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
 import { tradingSessions } from '../test/support/trading-session-fixture';
 /** Real PostgreSQL lock waits; no mocked execution clock or provider network. */
@@ -25,9 +26,7 @@ import {
 import { LimitOrderCandleEvidenceService } from '../src/orders/limit-order-candle-evidence.service';
 import { LimitOrderCandidateRepository } from '../src/orders/limit-order-candidate.repository';
 import { LimitOrderMatchingService } from '../src/orders/limit-order-matching.service';
-import {
-  resetMarketSessionOverrideStoreForTest,
-} from '../src/orders/market-calendar/market-session-override.store';
+import { resetMarketSessionOverrideStoreForTest } from '../src/orders/market-calendar/market-session-override.store';
 import { getAssetTradingStatus } from '../src/orders/market-hours.policy';
 
 const prisma = new PrismaService();
@@ -181,8 +180,8 @@ async function fixture(mode: TradingAccountMode, stock = false) {
       currencyCode: asset.currencyCode,
       sourceType: 'provider_api',
       sourceName: stock ? 'kis_krx_realtime_trade' : 'binance_spot_ws_ticker',
-      effectiveAt: now,
-      capturedAt: now,
+      effectiveAt: new Date(now.getTime() - 1000),
+      capturedAt: new Date(now.getTime() - 1000),
     },
   });
   const rate = await prisma.fxRateSnapshot.create({
@@ -192,8 +191,8 @@ async function fixture(mode: TradingAccountMode, stock = false) {
       rate: '1400',
       sourceType: 'provider_api',
       sourceName: 'korea_exim_exchange_rate',
-      effectiveAt: now,
-      capturedAt: now,
+      effectiveAt: new Date(now.getTime() - 1000),
+      capturedAt: new Date(now.getTime() - 1000),
     },
   });
   const s = {
@@ -208,12 +207,43 @@ async function fixture(mode: TradingAccountMode, stock = false) {
   // Fund USD through the same FX engine, preserving general TWR invariants.
   const body = await fxBody(s);
   await fx.executeForTradingAccount(user.id, accountId, body);
+  if (asset.assetType === 'crypto') {
+    const usd = await prisma.cashWallet.findUniqueOrThrow({
+      where: {
+        tradingAccountId_walletScope_currencyCode: {
+          tradingAccountId: accountId,
+          walletScope: 'securities',
+          currencyCode: 'USD',
+        },
+      },
+    });
+    const spot = await prisma.cashWallet.findUniqueOrThrow({
+      where: {
+        tradingAccountId_walletScope_currencyCode: {
+          tradingAccountId: accountId,
+          walletScope: 'crypto_spot',
+          currencyCode: 'USD',
+        },
+      },
+    });
+    await new TradingAccountWalletTransferService(
+      prisma,
+      access,
+      performance,
+    ).transfer(user.id, accountId, {
+      sourceWalletId: usd.id,
+      destinationWalletId: spot.id,
+      amount: usd.balanceAmount.toFixed(8),
+      idempotencyKey: randomUUID(),
+    });
+  }
   return s;
 }
 type Scenario = Awaited<ReturnType<typeof fixture>>;
 async function cleanup(s: Scenario) {
   const where = { tradingAccountId: s.accountId };
   await prisma.walletTransaction.deleteMany({ where });
+  await prisma.walletTransfer.deleteMany({ where });
   await prisma.fxExecuteRequest.deleteMany({ where });
   await prisma.exchangeTransaction.deleteMany({ where });
   await prisma.order.deleteMany({ where });

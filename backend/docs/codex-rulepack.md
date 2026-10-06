@@ -13,8 +13,11 @@ login → 계정/모드 선택 → 시즌 참가 또는 일반계정 개설/재�
 ### Wallet
 - Canonical set: Securities KRW/USD + Crypto Spot USD + Crypto Futures USD
 - 초기 지급은 기존 Securities KRW 10,000,000 / USD 0, Crypto 두 지갑은 balance/reserved 0
-- 모든 scope cash는 평가에 포함하되 현재 주문(암호화폐 포함)·FX는 Securities를 사용한다.
-- Transfer·Crypto Spot routing·Futures 금융 기능과 지갑 UI 전환은 후속 작업이다.
+- 신규 Crypto Spot 주문은 `crypto_spot/USD`, 주식은 Securities, FX는 Securities KRW↔USD다.
+- Quote/Order의 `cashWalletScope` + account/currency를 lifecycle 동안 유지한다. 기존 주문/Quote는 migration에서 Securities로 pin하며 현금·예약금·Position을 이동하지 않는다.
+- 각 cash mutation/진단은 exact expected scope를 명시한다. 자산 타입으로 기존 주문 scope를 재추론하거나 다른 wallet으로 fallback하지 않는다.
+- 동일 계정의 USD 지갑 간 Transfer는 PostgreSQL 원자적 내부이동이며 총자산/TWR/랭킹에 중립이다.
+- Wallet UI는 네 지갑을 scope+currency로 구분한다. Futures는 보관·이체만 가능하며 FX 포함 이체와 Futures trading은 미지원이다.
 - 기존 계정은 배포 migration에서 zero Crypto 지갑만 추가하며 GET 자동 복구를 금지한다.
 
 ### 평가

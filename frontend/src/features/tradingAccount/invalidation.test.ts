@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import {
   invalidateAfterAdRewardClaim,
   invalidateAfterFx,
+  invalidateAfterWalletTransfer,
   invalidateAfterOrderCancel,
   invalidateAfterOrderCreate,
   type InvalidatorClient,
@@ -218,4 +219,15 @@ describe('query keys separate accounts structurally', () => {
       QUERY_KEYS.tradingAccount.orders(A, { side: undefined, limit: 20 }),
     );
   });
+});
+
+
+it('transfer refreshes only the command account cash and ledger, without TWR or positions', async () => {
+  const { client, keys } = recorder();
+  await invalidateAfterWalletTransfer(client, A);
+  assert.ok(matchesAny(keys, QUERY_KEYS.tradingAccount.wallets(A)));
+  assert.ok(matchesAny(keys, QUERY_KEYS.tradingAccount.walletTransactions(A, { currency: 'USD' })));
+  for (const key of [QUERY_KEYS.tradingAccount.wallets(B), QUERY_KEYS.tradingAccount.walletTransactions(B), QUERY_KEYS.tradingAccount.portfolio(A), QUERY_KEYS.tradingAccount.positions(A)]) {
+    assert.equal(matchesAny(keys, key), false);
+  }
 });

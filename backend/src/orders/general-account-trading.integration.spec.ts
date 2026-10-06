@@ -511,7 +511,7 @@ async function main() {
   await prisma.cashWallet.update({
     where: {
       tradingAccountId_walletScope_currencyCode: {
-        walletScope: 'securities',
+        walletScope: 'crypto_spot',
         tradingAccountId: accountId,
         currencyCode: CurrencyCode.USD,
       },
@@ -647,7 +647,7 @@ async function main() {
   const beforeReplayWallet = await prisma.cashWallet.findUnique({
     where: {
       tradingAccountId_walletScope_currencyCode: {
-        walletScope: 'securities',
+        walletScope: 'crypto_spot',
         tradingAccountId: accountId,
         currencyCode: CurrencyCode.USD,
       },
@@ -687,7 +687,7 @@ async function main() {
   await prisma.cashWallet.update({
     where: {
       tradingAccountId_walletScope_currencyCode: {
-        walletScope: 'securities',
+        walletScope: 'crypto_spot',
         tradingAccountId: strangerAccountId,
         currencyCode: CurrencyCode.USD,
       },
@@ -742,7 +742,7 @@ async function main() {
   const krwReserved = await prisma.cashWallet.findUnique({
     where: {
       tradingAccountId_walletScope_currencyCode: {
-        walletScope: 'securities',
+        walletScope: 'crypto_spot',
         tradingAccountId: accountId,
         currencyCode: CurrencyCode.USD,
       },

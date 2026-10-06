@@ -14,12 +14,17 @@
   and `walletScope`; see [account finance contract](trading-account-finance-api-contract.md).
   Both validate the complete canonical set without read-side creation. Crypto USD
   containers are provisioned with zero balance/reserved and count in valuation;
-  current orders/FX still use Securities. Transfers/routing/Futures remain future work.
+  new Crypto Spot orders use `crypto_spot/USD`, stocks and FX use Securities.
+  Same-account USD internal transfers are supported; Futures is wallet only.
+  Existing order/Quote provenance remains Securities. Cross-currency FX+Transfer
+  and Futures trading are unsupported. See [transfer contract](wallet-transfers-api-contract.md).
 - Amount values are strings.
 - Timestamps are UTC ISO strings.
 - Responses keep the existing `success/data` or `success/error` structure.
 - User identity is `request.user.userId`; there is no `x-user-id` fallback.
-- MVP crypto is Binance-based USD-settled crypto and uses the existing USD Wallet.
+- MVP crypto is Binance-based Spot and uses `crypto_spot/USD` for new orders.
+  The account-scoped ledger reads all wallet scopes and adds wallet identity and
+  paired internal-transfer metadata. This legacy wallet projection remains Securities.
 - There is no USDT wallet/currency in MVP.
 
 ## Route

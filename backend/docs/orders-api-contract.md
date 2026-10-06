@@ -230,7 +230,15 @@ use the lifecycle locks described below, without a general-account TWR fence.
 - Responses keep the existing `success/data` or `success/error` structure.
 - User identity is `request.user.userId`; there is no `x-user-id` fallback.
 - MVP crypto is Binance-based USD-settled crypto.
-- Crypto orders use the USD Wallet like US stock orders.
+- New Crypto Spot orders use `crypto_spot/USD`; US stocks use `securities/USD`.
+- Durable order Quotes and Orders pin `cashWalletScope` together with account and currency.
+  Create inherits the Quote; fill/cancel/cleanup use the Order, never asset-type inference.
+  Existing orders and active order Quotes are backfilled to Securities without cash,
+  reservation or Position moves. Legacy SELL proceeds follow their pinned identity;
+  a new SELL of an existing Position follows the new Spot policy. Request hashes
+  remain unchanged and committed replay keeps its original result.
+- Exact scope guards apply to every cash mutation and failure diagnosis. No wallet fallback.
+  See [wallet transfers](wallet-transfers-api-contract.md) for funding Spot USD.
 - Upbit/Bithumb and KRW crypto trading are out of MVP scope.
 - `CurrencyCode.USDT` is not introduced; Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage.
 - Orders quote may use fresh eligible `provider_api` market data first.
@@ -364,7 +372,7 @@ use the lifecycle locks described below, without a general-account TWR fence.
 - `POST /api/v1/orders/quote` exposes optional public-safe `assetPriceSource` and `fxRateSource` metadata. Response shape remains backward-compatible and existing snapshot id fields are preserved.
 - Durable quotes have a 15-second default TTL; execute after expiry returns `QUOTE_EXPIRED`.
 - Raw provider payloads, `metadataJson`, and secrets are never exposed.
-- USD-settled crypto assets follow the same USD asset rule: order currency is USD, buy/sell resource checks use the USD Wallet, and `krwGrossAmount`/`krwFeeAmount`/`krwNetAmount` are USD amounts converted through USD/KRW.
+- USD-settled crypto assets follow the same USD asset rule: order currency is USD, new buy/sell resource checks use Crypto Spot USD (legacy lifecycle uses pinned provenance), and `krwGrossAmount`/`krwFeeAmount`/`krwNetAmount` are USD amounts converted through USD/KRW.
 - Buy quote validates cash wallet balance read-only.
 - Sell quote validates position quantity read-only.
 - Creates one active `Quote` row with public-safe source metadata and no raw provider payloads or secrets.

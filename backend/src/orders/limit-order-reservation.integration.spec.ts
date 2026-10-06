@@ -223,6 +223,7 @@ async function readWallet(scenario) {
 
 function reservationInput(scenario, amount) {
   return {
+    walletScope: 'securities',
     walletId: scenario.walletId,
     tradingAccountId: scenario.tradingAccountId,
     currencyCode: CurrencyCode.KRW,
@@ -362,6 +363,7 @@ async function testConcurrentCancelSingleRelease() {
   try {
     const order = await prisma.order.create({
       data: {
+        cashWalletScope: 'securities',
         tradingAccountId: scenario.tradingAccountId,
         assetId: scenario.assetId,
         side: OrderSide.buy,

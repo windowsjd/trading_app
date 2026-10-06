@@ -224,7 +224,6 @@ export class WalletsService {
 
     const where = {
       tradingAccountId: account.id,
-      wallet: { walletScope: 'securities' as const },
       ...(parsedQuery.currency ? { currencyCode: parsedQuery.currency } : {}),
       ...(parsedQuery.direction ? { direction: parsedQuery.direction } : {}),
       AND: [
@@ -241,6 +240,8 @@ export class WalletsService {
         take: parsedQuery.limit,
         select: {
           id: true,
+          walletId: true,
+          wallet: { select: { walletScope: true } },
           currencyCode: true,
           direction: true,
           txType: true,
@@ -308,6 +309,79 @@ export class WalletsService {
       }
     }
 
+    const transferRows = transactions.filter(
+      (row) => row.txType === 'wallet_transfer',
+    );
+    if (
+      transferRows.some(
+        (row) => row.referenceType !== 'wallet_transfer' || !row.referenceId,
+      )
+    ) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'TRADING_ACCOUNT_INTEGRITY',
+        'Invalid wallet transfer reference.',
+      );
+    }
+    const transfers = transferRows.length
+      ? await this.prisma.walletTransfer.findMany({
+          where: {
+            tradingAccountId: account.id,
+            id: {
+              in: [...new Set(transferRows.map((row) => row.referenceId!))],
+            },
+          },
+          select: {
+            id: true,
+            amount: true,
+            currencyCode: true,
+            sourceWalletId: true,
+            destinationWalletId: true,
+            sourceWallet: {
+              select: {
+                walletScope: true,
+                tradingAccountId: true,
+                currencyCode: true,
+              },
+            },
+            destinationWallet: {
+              select: {
+                walletScope: true,
+                tradingAccountId: true,
+                currencyCode: true,
+              },
+            },
+          },
+        })
+      : [];
+    const transfersById = new Map(
+      transfers.map((transfer) => [transfer.id, transfer]),
+    );
+    for (const row of transferRows) {
+      const transfer = transfersById.get(row.referenceId!);
+      if (
+        !transfer ||
+        transfer.sourceWalletId === transfer.destinationWalletId ||
+        transfer.currencyCode !== CurrencyCode.USD ||
+        transfer.sourceWallet.tradingAccountId !== account.id ||
+        transfer.destinationWallet.tradingAccountId !== account.id ||
+        transfer.sourceWallet.currencyCode !== CurrencyCode.USD ||
+        transfer.destinationWallet.currencyCode !== CurrencyCode.USD ||
+        row.currencyCode !== transfer.currencyCode ||
+        !row.amount.eq(transfer.amount) ||
+        row.walletId !==
+          (row.direction === 'debit'
+            ? transfer.sourceWalletId
+            : transfer.destinationWalletId)
+      ) {
+        this.throwApiError(
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          'TRADING_ACCOUNT_INTEGRITY',
+          'Ledger wallet transfer reference is missing or inconsistent.',
+        );
+      }
+    }
+
     return {
       success: true as const,
       data: {
@@ -315,6 +389,24 @@ export class WalletsService {
         filters: this.walletTransactionFilters(parsedQuery),
         transactions: transactions.map((transaction) => ({
           id: transaction.id,
+          walletId: transaction.walletId,
+          walletScope: transaction.wallet.walletScope,
+          transfer:
+            transaction.txType === 'wallet_transfer'
+              ? {
+                  sourceWalletId: transfersById.get(transaction.referenceId!)!
+                    .sourceWalletId,
+                  sourceWalletScope: transfersById.get(
+                    transaction.referenceId!,
+                  )!.sourceWallet.walletScope,
+                  destinationWalletId: transfersById.get(
+                    transaction.referenceId!,
+                  )!.destinationWalletId,
+                  destinationWalletScope: transfersById.get(
+                    transaction.referenceId!,
+                  )!.destinationWallet.walletScope,
+                }
+              : null,
           currencyCode: transaction.currencyCode,
           direction: transaction.direction,
           txType: transaction.txType,

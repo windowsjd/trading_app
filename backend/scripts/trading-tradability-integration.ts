@@ -12,6 +12,7 @@ import { GeneralAccountPerformanceService } from '../src/portfolio/general-accou
 import { GeneralExternalFundingService } from '../src/portfolio/general-external-funding.service';
 import { PortfolioValuationService } from '../src/portfolio/portfolio-valuation.service';
 import { OrdersService } from '../src/orders/orders.service';
+import { TradingAccountWalletTransferService } from '../src/wallets/trading-account-wallet-transfer.service';
 import { FxService } from '../src/fx/fx.service';
 import { AssetsService } from '../src/assets/assets.service';
 import { OrderReservationService } from '../src/orders/order-reservation.service';
@@ -176,12 +177,41 @@ async function fixture(mode: TradingAccountMode) {
   // Fund USD through the same FX engine, preserving general TWR invariants.
   const body = await fxBody(s);
   await fx.executeForTradingAccount(user.id, accountId, body);
+  const usd = await prisma.cashWallet.findUniqueOrThrow({
+    where: {
+      tradingAccountId_walletScope_currencyCode: {
+        tradingAccountId: accountId,
+        walletScope: 'securities',
+        currencyCode: 'USD',
+      },
+    },
+  });
+  const spot = await prisma.cashWallet.findUniqueOrThrow({
+    where: {
+      tradingAccountId_walletScope_currencyCode: {
+        tradingAccountId: accountId,
+        walletScope: 'crypto_spot',
+        currencyCode: 'USD',
+      },
+    },
+  });
+  await new TradingAccountWalletTransferService(
+    prisma,
+    access,
+    performance,
+  ).transfer(user.id, accountId, {
+    sourceWalletId: usd.id,
+    destinationWalletId: spot.id,
+    amount: usd.balanceAmount.toFixed(8),
+    idempotencyKey: randomUUID(),
+  });
   return s;
 }
 type Scenario = Awaited<ReturnType<typeof fixture>>;
 async function cleanup(s: Scenario) {
   const where = { tradingAccountId: s.accountId };
   await prisma.walletTransaction.deleteMany({ where });
+  await prisma.walletTransfer.deleteMany({ where });
   await prisma.fxExecuteRequest.deleteMany({ where });
   await prisma.exchangeTransaction.deleteMany({ where });
   await prisma.order.deleteMany({ where });
@@ -431,7 +461,7 @@ async function restrictedSeasonTest(
     const wallet = await prisma.cashWallet.findUniqueOrThrow({
       where: {
         tradingAccountId_walletScope_currencyCode: {
-          walletScope: 'securities',
+          walletScope: 'crypto_spot',
           tradingAccountId: s.accountId,
           currencyCode: 'USD',
         },

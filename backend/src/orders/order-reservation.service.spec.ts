@@ -156,6 +156,7 @@ const tx = () => ({
   $transaction: jest.fn(),
 });
 const cashInput = {
+  walletScope: 'securities' as const,
   tradingAccountId: 'account-1',
   currencyCode: CurrencyCode.KRW,
   amount: '700.00000000',
@@ -166,6 +167,7 @@ const cashReleaseInput = {
   amount: '400.00000000',
 };
 const quote = {
+  cashWalletScope: 'securities' as const,
   id: 'quote-1',
   limitPrice: d('100'),
   quotedFeeRate: d('0.001'),
@@ -190,6 +192,7 @@ const order = (
   side = OrderSide.buy,
   overrides: Record<string, unknown> = {},
 ) => ({
+  cashWalletScope: 'securities' as const,
   id: 'order-1',
   tradingAccountId: 'account-1',
   tradingAccount: {
@@ -395,6 +398,7 @@ describe('Limit quote safe availability evidence', () => {
     );
     const { diagnostic } = await captureFinancialFailure(() =>
       service.buildLimitBuyQuotePreview({
+        walletScope: 'securities' as const,
         tradingAccountId: 'account-1',
         assetId: 'asset-1',
         currencyCode: CurrencyCode.KRW,
@@ -442,6 +446,7 @@ describe('Limit quote safe availability evidence', () => {
     );
     const { diagnostic } = await captureFinancialFailure(() =>
       service.buildLimitSellQuotePreview({
+        walletScope: 'securities' as const,
         tradingAccountId: 'account-1',
         assetId: 'asset-1',
         currencyCode: CurrencyCode.KRW,

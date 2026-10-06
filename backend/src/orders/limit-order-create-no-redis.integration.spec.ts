@@ -95,7 +95,7 @@ const QUANTITY = '2.000000';
 const EXPECTED_RESERVED = '200200.00000000';
 const FEE_RATE = '0.001000';
 
-const created = { users: [], seasons: [], participants: [], assets: [] };
+const created = { users: [], seasons: [], participants: [], assets: [], rates: [] };
 
 async function main() {
   assert.ok(process.env.DATABASE_URL, 'DATABASE_URL must be configured.');
@@ -223,7 +223,8 @@ async function createScenario() {
   const wallet = await prisma.cashWallet.create({
     data: {
       tradingAccountId: tradingAccount.id,
-      currencyCode: CurrencyCode.KRW,
+      walletScope: 'crypto_spot',
+      currencyCode: CurrencyCode.USD,
       balanceAmount: '1000000.00000000',
       reservedAmount: ZERO,
     },
@@ -232,24 +233,30 @@ async function createScenario() {
   await prisma.cashWallet.createMany({
     data: [
       { tradingAccountId: tradingAccount.id, walletScope: 'securities', currencyCode: 'USD', balanceAmount: '0', reservedAmount: '0' },
-      ...zeroCryptoCashWalletData(tradingAccount.id),
+      { tradingAccountId: tradingAccount.id, walletScope: 'securities', currencyCode: 'KRW', balanceAmount: '0', reservedAmount: '0' },
+      ...zeroCryptoCashWalletData(tradingAccount.id).filter(wallet => wallet.walletScope !== 'crypto_spot'),
     ],
   });
 
   // Crypto settles in the asset currency and is tradable 24h, so nothing here
-  // depends on the wall-clock market session. KRW settlement keeps FX out.
+  // depends on the wall-clock market session. Spot USD is the funding wallet.
   const asset = await prisma.asset.create({
     data: {
       symbol: 'NR' + randomUUID().replace(/-/gu, '').slice(0, 20),
       name: PREFIX,
       market: 'BINANCE',
       assetType: AssetType.crypto,
-      currencyCode: CurrencyCode.KRW,
+      currencyCode: CurrencyCode.USD,
+      priceCurrency: CurrencyCode.USD,
+      settlementCurrency: CurrencyCode.USD,
       isActive: true,
     },
     select: { id: true },
   });
   created.assets.push(asset.id);
+
+  const rate = await prisma.fxRateSnapshot.create({ data: { baseCurrency: 'USD', quoteCurrency: 'KRW', rate: '1400', sourceType: 'provider_api', sourceName: 'exchange_rate_api', capturedAt: now, effectiveAt: now } });
+  created.rates.push(rate.id);
 
   return {
     userId: user.id,
@@ -276,6 +283,7 @@ async function cleanup() {
   await prisma.season.deleteMany({ where: { id: { in: created.seasons } } });
   await prisma.tradingAccount.deleteMany({ where: { userId: { in: created.users } } });
   await prisma.user.deleteMany({ where: { id: { in: created.users } } });
+  await prisma.fxRateSnapshot.deleteMany({ where: { id: { in: created.rates } } });
 }
 
 main().catch((error) => {

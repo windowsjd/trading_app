@@ -143,9 +143,13 @@ async function fixture() {
       {
         tradingAccountId: account.id,
         currencyCode: 'USD',
-        balanceAmount: '1000',
+        balanceAmount: '0',
       },
-      ...zeroCryptoCashWalletData(account.id),
+      ...zeroCryptoCashWalletData(account.id).map((wallet) =>
+        wallet.walletScope === 'crypto_spot'
+          ? { ...wallet, balanceAmount: '1000' }
+          : wallet,
+      ),
     ],
   });
   const stock = await prisma.asset.create({
@@ -410,7 +414,7 @@ async function runScenario(
       const wallet = await prisma.cashWallet.findUniqueOrThrow({
         where: {
           tradingAccountId_walletScope_currencyCode: {
-            walletScope: 'securities',
+            walletScope: 'crypto_spot',
             tradingAccountId: s.accountId,
             currencyCode: 'USD',
           },
@@ -530,7 +534,7 @@ async function runScenario(
     const wallet = await prisma.cashWallet.findUniqueOrThrow({
       where: {
         tradingAccountId_walletScope_currencyCode: {
-          walletScope: 'securities',
+          walletScope: 'crypto_spot',
           tradingAccountId: s.accountId,
           currencyCode: 'USD',
         },

@@ -267,12 +267,14 @@ function inlineTradingHarness() {
             data: {
               wallets: [
                 {
+                  walletScope: 'crypto_spot',
                   currencyCode: 'USD',
                   balanceAmount: h.usdBalance ?? '10000',
                   reservedAmount: h.usdReserved ?? '1000',
                   availableAmount: h.usdAvailable,
                 },
-                { currencyCode: 'KRW', balanceAmount: h.krwBalance ?? '1000000' },
+                { walletScope: 'securities', currencyCode: 'USD', balanceAmount: h.securitiesUsdBalance ?? h.usdBalance ?? '10000', reservedAmount: h.usdReserved ?? '1000', availableAmount: h.usdAvailable },
+                { walletScope: 'securities', currencyCode: 'KRW', balanceAmount: h.krwBalance ?? '1000000' },
               ],
             },
           };

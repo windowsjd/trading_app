@@ -1,3 +1,4 @@
+import { TradingAccountWalletTransferService } from '../src/wallets/trading-account-wallet-transfer.service';
 import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
 import { tradingSessions } from '../test/support/trading-session-fixture';
 /** Order input policy against an isolated PostgreSQL DB; real services and money writes. */
@@ -217,12 +218,43 @@ async function fixture(
   // Fund USD through the same FX engine, preserving general TWR invariants.
   const body = await fxBody(s);
   await fx.executeForTradingAccount(user.id, accountId, body);
+  if (asset.assetType === 'crypto') {
+    const usd = await prisma.cashWallet.findUniqueOrThrow({
+      where: {
+        tradingAccountId_walletScope_currencyCode: {
+          tradingAccountId: accountId,
+          walletScope: 'securities',
+          currencyCode: 'USD',
+        },
+      },
+    });
+    const spot = await prisma.cashWallet.findUniqueOrThrow({
+      where: {
+        tradingAccountId_walletScope_currencyCode: {
+          tradingAccountId: accountId,
+          walletScope: 'crypto_spot',
+          currencyCode: 'USD',
+        },
+      },
+    });
+    await new TradingAccountWalletTransferService(
+      prisma,
+      access,
+      performance,
+    ).transfer(user.id, accountId, {
+      sourceWalletId: usd.id,
+      destinationWalletId: spot.id,
+      amount: usd.balanceAmount.toFixed(8),
+      idempotencyKey: randomUUID(),
+    });
+  }
   return s;
 }
 type Scenario = Awaited<ReturnType<typeof fixture>>;
 async function cleanup(s: Scenario) {
   const where = { tradingAccountId: s.accountId };
   await prisma.walletTransaction.deleteMany({ where });
+  await prisma.walletTransfer.deleteMany({ where });
   await prisma.fxExecuteRequest.deleteMany({ where });
   await prisma.exchangeTransaction.deleteMany({ where });
   await prisma.order.deleteMany({ where });
@@ -286,7 +318,8 @@ const wallet = (s: Scenario) =>
   prisma.cashWallet.findUniqueOrThrow({
     where: {
       tradingAccountId_walletScope_currencyCode: {
-        walletScope: 'securities',
+        walletScope:
+          s.asset.assetType === 'crypto' ? 'crypto_spot' : 'securities',
         tradingAccountId: s.accountId,
         currencyCode: s.asset.currencyCode,
       },
@@ -314,7 +347,9 @@ async function refresh(s: Scenario, price = '100', effectiveAt?: Date) {
 }
 function closed(s: Scenario) {
   const now = new Date();
-  tradingSessions.set(now, now, [s.asset.assetType === 'us_stock' ? 'US' : 'KRX']);
+  tradingSessions.set(now, now, [
+    s.asset.assetType === 'us_stock' ? 'US' : 'KRX',
+  ]);
 }
 
 async function assertMarketAccounting(

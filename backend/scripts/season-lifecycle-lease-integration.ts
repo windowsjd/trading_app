@@ -96,6 +96,7 @@ export async function runSeasonLifecycleLeaseIntegration(
   async function seedOrders() {
     await prisma.order.createMany({
       data: Array.from({ length: 102 }, (_, index) => ({
+        cashWalletScope: 'securities' as const,
         tradingAccountId: accountId,
         assetId,
         side: index % 2 === 0 ? ('buy' as const) : ('sell' as const),

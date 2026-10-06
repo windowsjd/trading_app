@@ -1,6 +1,6 @@
 import { HttpException, Injectable } from '@nestjs/common';
 import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
-import { CurrencyCode, Prisma } from '../generated/prisma/client';
+import { CurrencyCode, Prisma, WalletScope } from '../generated/prisma/client';
 import {
   releaseReservedCash,
   reserveAvailableCash,
@@ -39,6 +39,7 @@ export class OrderReservationService {
       /** VERIFIED trading account id. */
       tradingAccountId: string;
       currencyCode: CurrencyCode;
+      walletScope: WalletScope;
       /** Canonical scale-8 decimal string, > 0. */
       amount: string;
     },
@@ -55,7 +56,7 @@ export class OrderReservationService {
     const wallet = await tx.cashWallet.findUnique({
       where: {
         tradingAccountId_walletScope_currencyCode: {
-          walletScope: 'securities',
+          walletScope: input.walletScope,
           tradingAccountId: input.tradingAccountId,
           currencyCode: input.currencyCode,
         },
@@ -85,6 +86,7 @@ export class OrderReservationService {
     // atomic UPDATE's WHERE below.
     assertCashWalletTradingAccountScope(wallet, {
       tradingAccountId: input.tradingAccountId,
+      walletScope: input.walletScope,
     });
 
     setAdminDiagnosticContext({
@@ -101,6 +103,7 @@ export class OrderReservationService {
     const reservedCount = await reserveAvailableCash(tx, {
       walletId: wallet.id,
       tradingAccountId: input.tradingAccountId,
+      walletScope: input.walletScope,
       currencyCode: input.currencyCode,
       amount: input.amount,
     });
@@ -109,6 +112,7 @@ export class OrderReservationService {
       await this.throwReservationFailure(tx, {
         walletId: wallet.id,
         tradingAccountId: input.tradingAccountId,
+        walletScope: input.walletScope,
         currencyCode: input.currencyCode,
         amount: input.amount,
         mutationAffected: reservedCount,
@@ -133,6 +137,7 @@ export class OrderReservationService {
       /** VERIFIED trading account id (order/wallet verified scope). */
       tradingAccountId: string;
       currencyCode: CurrencyCode;
+      walletScope: WalletScope;
       /** Canonical scale-8 decimal string, > 0. */
       amount: string;
     },
@@ -156,6 +161,7 @@ export class OrderReservationService {
         walletId: input.walletId,
         expected: {
           tradingAccountId: input.tradingAccountId,
+          walletScope: input.walletScope,
           currencyCode: input.currencyCode,
         },
         requires: { reserved: input.amount },
@@ -183,6 +189,7 @@ export class OrderReservationService {
       walletId: string;
       tradingAccountId: string;
       currencyCode: CurrencyCode;
+      walletScope: WalletScope;
       amount: string;
       mutationAffected: number;
     },
@@ -191,6 +198,7 @@ export class OrderReservationService {
       walletId: input.walletId,
       expected: {
         tradingAccountId: input.tradingAccountId,
+        walletScope: input.walletScope,
         currencyCode: input.currencyCode,
       },
       requires: { available: input.amount },

@@ -63,6 +63,7 @@ describe('LimitOrderCancelService', () => {
   };
 
   const orderRecord = (overrides: Partial<Record<string, unknown>> = {}) => ({
+    cashWalletScope: 'securities' as const,
     id: 'order-1',
     tradingAccountId: 'trading-account-1',
     tradingAccount: {
@@ -200,6 +201,7 @@ describe('LimitOrderCancelService', () => {
         '150150.00000000',
         'wallet-1',
         'trading-account-1',
+        'securities',
         CurrencyCode.KRW,
         '150150.00000000',
       ]);
@@ -462,6 +464,7 @@ describe('LimitOrderCancelService', () => {
       ]);
       prisma.order.findUnique
         .mockResolvedValueOnce({
+          cashWalletScope: 'securities' as const,
           id: 'order-1',
           assetId: 'asset-1',
           tradingAccountId: 'trading-account-1',
@@ -481,6 +484,7 @@ describe('LimitOrderCancelService', () => {
           reservedQuantity: null,
         })
         .mockResolvedValueOnce({
+          cashWalletScope: 'securities' as const,
           id: 'order-2',
           assetId: 'asset-1',
           tradingAccountId: 'trading-account-1',
@@ -610,6 +614,7 @@ describe('LimitOrderCancelService', () => {
             },
           },
           currencyCode: CurrencyCode.KRW,
+          cashWalletScope: 'securities',
           reservedAmount: new Prisma.Decimal('100.00000000'),
           reservedQuantity: null,
           side: 'buy',
@@ -627,6 +632,7 @@ describe('LimitOrderCancelService', () => {
             },
           },
           currencyCode: CurrencyCode.KRW,
+          cashWalletScope: 'securities',
           reservedAmount: new Prisma.Decimal('40.00000000'),
           reservedQuantity: null,
           side: 'buy',

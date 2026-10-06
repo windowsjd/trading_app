@@ -253,11 +253,26 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
   변환한다. reservation은 총자산을 줄이지 않는다. USD 현금/position이 없으면 FX를 요구하지
   않는다. Home/Portfolio/TWR/Equity/Daily/ranking/settlement/records의 의미도 같다.
   근거: scope 간 현금 위치 변경은 총자산과 수익률에 중립이어야 한다.
-- 주문(현재 Crypto Spot 포함)·FX·원자적 cash mutation은 계속 Securities에 고정한다.
-  Account Wallet read는 `id`·`walletScope`를 추가해 네 지갑을 반환하고 Frontend 통화 selector는
-  Securities를 선택한다. 현재 Wallet UI/legacy projection은 유지한다. Transfer·FX Transfer·
-  Crypto Spot routing·Futures 금융 기능은 후속 작업이다.
-  근거: 실제 주문 funding과 사용자 Wallet 표시를 다음 routing 작업에서 함께 전환한다.
+- 신규 Crypto Spot Market/Limit 주문의 quote/debit/reserve/fill/credit/cancel/cleanup은
+  `crypto_spot/USD`를 사용한다. 주식은 Securities, FX는 Securities KRW↔USD를 유지한다.
+  Quote/Order는 `cashWalletScope`와 account/currency 복합 identity를 durable하게 pin한다.
+  `20261006160000_pin_order_wallet_and_add_transfers`는 기존 모든 주문 및 order Quote를
+  Securities로 backfill하며 잔액·예약금·Position은 이동하지 않는다. active legacy Quote도
+  기존 지갑으로 소비하고 submitted legacy 주문은 그 provenance로 terminal state까지 처리한다.
+  근거: 배포 전 예약금을 새 scope에서 해제하거나 동일 command를 새 정책으로 재해석하면 안 된다.
+- 동일 TradingAccount 내부의 Securities/Spot/Futures USD 지갑 간 이체는
+  `POST /api/v1/trading-accounts/:accountId/wallet-transfers`로 지원한다. 예약금을 제외한
+  available balance만 조건부 debit하고 destination credit·두 원장 leg·멱등 command를
+  한 DB transaction에 기록한다. 기존 lifecycle/account lock 뒤 wallet ID 순서로 lock한다.
+  같은 account/key+같은 canonical payload는 최초 응답 replay, 다른 payload는 409다.
+  Transfer는 internal relocation이며 fee/FX/external funding/snapshot을 만들지 않는다.
+  총자산/PnL/General TWR/Season return/ranking은 동일 총 cash와 Position이면 같다.
+  근거: Spot 초기잔액 0을 명시적 FX→USD 이체로 충전하면서 금융 원자성과 성과 중립을 유지한다.
+- Wallet UI는 증권 KRW/USD, 암호화폐 · 현물 USD, 암호화폐 · 선물 USD와 보유 종목을
+  scope+currency로 표시하고 이체/환전/원장/주문 내역을 구분한다. Futures는 보관·이체만
+  지원하며 cross-currency FX+Transfer·자동환전·Futures trading은 후속 범위다.
+  Legacy Wallet/FX의 Securities projection은 유지하고 account 원장은 모든 scope를 읽는다.
+  근거: 통화만으로 USD 세 지갑 중 하나를 선택하거나 이체를 외부입금으로 표시하지 않는다.
 - `CashWallet`, `WalletTransaction`, `ExchangeTransaction`, `FxExecuteRequest`는 required `tradingAccountId`만 저장한다. child 관계(WalletTransaction→CashWallet, FxExecuteRequest→ExchangeTransaction)도 양쪽 account가 같아야 하며 request-time repair나 participant fallback은 없다.
   근거: 금융 소유권을 participant에 중복 기록하면 두 식별자가 불일치할 수 있다.
 - TradingAccount에는 잔액·누적액·수익률 캐시 컬럼을 두지 않는다. 금융 값의 source of truth는 지갑·원장·거래·스냅샷 테이블이다.

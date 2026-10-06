@@ -423,9 +423,10 @@ describe('OrdersService', () => {
   const mockCashWallet = (
     prisma: ReturnType<typeof createPrisma>,
     balance = '1000.00000000',
+    walletScope: 'securities' | 'crypto_spot' = 'securities',
   ) => {
     prisma.cashWallet.findUnique.mockResolvedValueOnce({
-      walletScope: 'securities' as const,
+      walletScope,
       id: 'wallet-1',
       tradingAccountId: 'trading-account-1',
       balanceAmount: new Prisma.Decimal(balance),
@@ -583,6 +584,7 @@ describe('OrdersService', () => {
     const userId = (overrides.userId as string | undefined) ?? 'user-1';
 
     return {
+      cashWalletScope: 'securities' as const,
       id: (overrides.id as string | undefined) ?? 'quote-order-1',
       userId,
       tradingAccountId,
@@ -646,6 +648,7 @@ describe('OrdersService', () => {
    * orderType + idempotencyKey, so all three must line up here.
    */
   const idempotentOrderRecord = (requestHash: string) => ({
+    cashWalletScope: 'securities' as const,
     id: 'order-idempotent-1',
     tradingAccountId: 'trading-account-1',
     quoteId: 'quote-order-create-1',
@@ -759,6 +762,7 @@ describe('OrdersService', () => {
         });
 
     return {
+      cashWalletScope: 'securities' as const,
       id: 'order-execute-1',
       tradingAccountId: 'trading-account-1',
       assetId,
@@ -1031,8 +1035,16 @@ describe('OrdersService', () => {
           currencyCode: CurrencyCode.USD,
           balanceAmount: new Prisma.Decimal(input.usdCash ?? '0.00000000'),
         },
-        { walletScope: 'crypto_spot' as const, currencyCode: CurrencyCode.USD, balanceAmount: new Prisma.Decimal('0.00000000') },
-        { walletScope: 'crypto_futures' as const, currencyCode: CurrencyCode.USD, balanceAmount: new Prisma.Decimal('0.00000000') },
+        {
+          walletScope: 'crypto_spot' as const,
+          currencyCode: CurrencyCode.USD,
+          balanceAmount: new Prisma.Decimal('0.00000000'),
+        },
+        {
+          walletScope: 'crypto_futures' as const,
+          currencyCode: CurrencyCode.USD,
+          balanceAmount: new Prisma.Decimal('0.00000000'),
+        },
       ],
       positions: [
         {
@@ -1223,6 +1235,7 @@ describe('OrdersService', () => {
   const canceledLimitOrderRecord = (
     overrides: Partial<Record<string, unknown>> = {},
   ) => ({
+    cashWalletScope: 'securities' as const,
     id: 'order-1',
     tradingAccountId: 'trading-account-1',
     quoteId: 'quote-1',
@@ -1275,8 +1288,9 @@ describe('OrdersService', () => {
         values[0] === input.amount &&
         values[1] === input.walletId &&
         values[2] === tradingAccountId &&
-        values[3] === input.currencyCode &&
-        values[4] === input.amount
+        values[3] === 'securities' &&
+        values[4] === input.currencyCode &&
+        values[5] === input.amount
       );
     });
     expect(matched).toBe(true);
@@ -1457,6 +1471,7 @@ describe('OrdersService', () => {
     expect(prisma.quote.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
+          cashWalletScope: 'securities' as const,
           quoteType: 'order',
           status: 'active',
           userId: 'user-1',
@@ -1693,7 +1708,7 @@ describe('OrdersService', () => {
       price: new Prisma.Decimal('50000.00000000'),
     });
     mockFreshFx(prisma);
-    mockCashWallet(prisma, '1000.00000000');
+    mockCashWallet(prisma, '1000.00000000', 'crypto_spot');
 
     const response = await service.quoteOrder('user-1', {
       assetId: 'asset-btc',
@@ -1729,7 +1744,7 @@ describe('OrdersService', () => {
     expect(prisma.cashWallet.findUnique).toHaveBeenCalledWith({
       where: {
         tradingAccountId_walletScope_currencyCode: {
-          walletScope: 'securities',
+          walletScope: 'crypto_spot',
           tradingAccountId: 'trading-account-1',
           currencyCode: CurrencyCode.USD,
         },
@@ -1754,7 +1769,7 @@ describe('OrdersService', () => {
     mockAssetPrice(prisma, '50000.00000000');
     mockFreshFx(prisma);
     mockPosition(prisma, '0.02000000');
-    mockCashWallet(prisma, '25.00000000');
+    mockCashWallet(prisma, '25.00000000', 'crypto_spot');
 
     const response = await service.quoteOrder('user-1', {
       assetId: 'asset-btc',
@@ -2688,6 +2703,7 @@ describe('OrdersService', () => {
   it('returns a single owned order detail with public execution metadata', async () => {
     const { prisma, service } = createService();
     prisma.order.findFirst.mockResolvedValueOnce({
+      cashWalletScope: 'securities' as const,
       id: 'order-1',
       tradingAccountId: 'trading-account-1',
       assetId: 'asset-1',
@@ -2792,6 +2808,7 @@ describe('OrdersService', () => {
     const { prisma, service } = createService();
     prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-submitted-1' }]);
     prisma.order.findUnique.mockResolvedValueOnce({
+      cashWalletScope: 'securities' as const,
       id: 'order-submitted-1',
       tradingAccountId: 'trading-account-1',
       quoteId: null,
@@ -3240,8 +3257,16 @@ describe('OrdersService', () => {
             currencyCode: CurrencyCode.USD,
             balanceAmount: new Prisma.Decimal('0'),
           },
-          { walletScope: 'crypto_spot' as const, currencyCode: CurrencyCode.USD, balanceAmount: new Prisma.Decimal('0.00000000') },
-          { walletScope: 'crypto_futures' as const, currencyCode: CurrencyCode.USD, balanceAmount: new Prisma.Decimal('0.00000000') },
+          {
+            walletScope: 'crypto_spot' as const,
+            currencyCode: CurrencyCode.USD,
+            balanceAmount: new Prisma.Decimal('0.00000000'),
+          },
+          {
+            walletScope: 'crypto_futures' as const,
+            currencyCode: CurrencyCode.USD,
+            balanceAmount: new Prisma.Decimal('0.00000000'),
+          },
         ],
         positions: [
           {

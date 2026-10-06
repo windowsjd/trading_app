@@ -53,6 +53,7 @@ import {
   LimitOrderCandleEvidenceService,
   type EligibleClosedCandle,
 } from './limit-order-candle-evidence.service';
+import { requireOrderCashWalletScope } from './order-cash-wallet-policy';
 import { OrdersService } from './orders.service';
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
 
@@ -115,6 +116,7 @@ const EXEC_ORDER_SELECT = {
   quantity: true,
   limitPrice: true,
   currencyCode: true,
+  cashWalletScope: true,
   reservedAmount: true,
   reservedQuantity: true,
   reservationFeeRate: true,
@@ -133,6 +135,7 @@ const EXEC_ORDER_SELECT = {
     select: {
       id: true,
       tradingAccountId: true,
+      cashWalletScope: true,
     },
   },
   tradingAccount: {
@@ -516,10 +519,20 @@ export class LimitOrderExecutionService {
       // The wallet must carry the ORDER's verified account scope — null or
       // foreign scope rolls the whole fill back before any money moves.
       stage = 'wallet_settlement';
+      const cashWalletScope = requireOrderCashWalletScope(
+        order.cashWalletScope,
+        order.currencyCode,
+      );
+      if (order.quote && order.quote.cashWalletScope !== cashWalletScope) {
+        this.throwTradingScopeError(
+          'TRADING_ACCOUNT_SCOPE_MISMATCH',
+          'Order and quote cash provenance disagree.',
+        );
+      }
       const wallet = await tx.cashWallet.findUnique({
         where: {
           tradingAccountId_walletScope_currencyCode: {
-            walletScope: 'securities',
+            walletScope: cashWalletScope,
             tradingAccountId,
             currencyCode: order.currencyCode,
           },
@@ -534,10 +547,12 @@ export class LimitOrderExecutionService {
       }
       assertCashWalletTradingAccountScope(wallet, {
         tradingAccountId,
+        walletScope: cashWalletScope,
       });
       if (order.side === OrderSide.buy) {
         const settled = await settleLimitBuyReservedCash(tx, {
           walletId: wallet.id,
+          walletScope: cashWalletScope,
           tradingAccountId,
           currencyCode: order.currencyCode,
           actualDebit: netAmountText,
@@ -553,6 +568,7 @@ export class LimitOrderExecutionService {
             walletId: wallet.id,
             expected: {
               tradingAccountId,
+              walletScope: cashWalletScope,
               currencyCode: order.currencyCode,
             },
             requires: {
@@ -610,7 +626,7 @@ export class LimitOrderExecutionService {
         stage = 'wallet_credit';
         const credited = await tx.cashWallet.updateMany({
           where: {
-            walletScope: 'securities',
+            walletScope: cashWalletScope,
             id: wallet.id,
             tradingAccountId,
             currencyCode: order.currencyCode,
@@ -618,6 +634,14 @@ export class LimitOrderExecutionService {
           data: { balanceAmount: { increment: netAmountText } },
         });
         if (credited.count !== 1) {
+          await diagnoseCashWalletMutationFailure(tx, {
+            walletId: wallet.id,
+            expected: {
+              tradingAccountId,
+              walletScope: cashWalletScope,
+              currencyCode: order.currencyCode,
+            },
+          });
           this.throwLimitOrderError(
             limitOrderErrorCodes.ORDER_RESERVATION_CONFLICT,
             'Wallet changed while crediting the limit sell.',

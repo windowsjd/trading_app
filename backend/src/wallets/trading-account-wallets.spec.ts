@@ -43,6 +43,7 @@ jest.mock('../generated/prisma/client', () => {
       adjustment: 'adjustment',
       settlement: 'settlement',
       ad_reward: 'ad_reward',
+      wallet_transfer: 'wallet_transfer',
     },
   };
 });
@@ -76,6 +77,7 @@ const canonicalWallets = () =>
 const createServices = (accountStatus = 'active') => {
   const prisma = {
     order: { findMany: jest.fn().mockResolvedValue([]) },
+    walletTransfer: { findMany: jest.fn().mockResolvedValue([]) },
     cashWallet: {
       findMany: jest
         .fn()
@@ -227,12 +229,67 @@ describe('WalletsService account-scoped reads', () => {
     }
   });
 
+  it('rejects transfer metadata with foreign wallet ownership, currency or a mismatched leg', async () => {
+    for (const corruption of [
+      'source-account',
+      'destination-account',
+      'destination-currency',
+      'leg',
+    ]) {
+      const { prisma, service } = createServices();
+      prisma.walletTransaction.count.mockResolvedValueOnce(1);
+      prisma.walletTransaction.findMany.mockResolvedValueOnce([
+        {
+          id: 'leg-1',
+          walletId: 'source-1',
+          wallet: { walletScope: 'securities' },
+          currencyCode: 'USD',
+          direction: 'debit',
+          txType: 'wallet_transfer',
+          referenceType: 'wallet_transfer',
+          referenceId: 'transfer-1',
+          amount: new Prisma.Decimal('500'),
+          balanceAfter: new Prisma.Decimal('500'),
+          occurredAt: NOW,
+          createdAt: NOW,
+        },
+      ]);
+      const transfer = {
+        id: 'transfer-1',
+        amount: new Prisma.Decimal('500'),
+        currencyCode: 'USD',
+        sourceWalletId: corruption === 'leg' ? 'wrong-source' : 'source-1',
+        destinationWalletId: 'destination-1',
+        sourceWallet: {
+          walletScope: 'securities',
+          tradingAccountId:
+            corruption === 'source-account' ? 'foreign' : 'ta-1',
+          currencyCode: 'USD',
+        },
+        destinationWallet: {
+          walletScope: 'crypto_spot',
+          tradingAccountId:
+            corruption === 'destination-account' ? 'foreign' : 'ta-1',
+          currencyCode: corruption === 'destination-currency' ? 'KRW' : 'USD',
+        },
+      };
+      prisma.walletTransfer.findMany.mockResolvedValueOnce([transfer]);
+      await expectStatusAndCode(
+        service.getWalletTransactionsForTradingAccount('user-1', 'ta-1'),
+        500,
+        'TRADING_ACCOUNT_INTEGRITY',
+      );
+    }
+  });
+
   it('scopes wallet transactions by the account and serializes canonical ids and metadata', async () => {
     const { prisma, service } = createServices();
     prisma.walletTransaction.count.mockResolvedValueOnce(1);
     prisma.walletTransaction.findMany.mockResolvedValueOnce([
       {
         id: 'wtx-1',
+        walletId: 'wallet-0',
+        wallet: { walletScope: 'securities' },
         currencyCode: 'KRW',
         direction: 'debit',
         txType: 'order_buy',
@@ -327,6 +384,7 @@ function ledgerServices(mode: 'general' | 'season' = 'season') {
       ...row,
       tradingAccountId: 'ta-1',
       amount: new Prisma.Decimal(row.amount),
+      walletId: row.currencyCode === 'USD' ? 'wallet-1' : 'wallet-0',
       wallet: { walletScope: 'securities' },
       balanceAfter: new Prisma.Decimal(row.balanceAfter),
       occurredAt: new Date(row.occurredAt),

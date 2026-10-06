@@ -187,7 +187,7 @@ describe('Home keeps exchange entry in Wallet', () => {
         assert.equal(elements(walletTree, 'Pressable').find(
           (node) => node.props.testID === 'wallet-exchange',
         ).props.disabled, true);
-        for (const label of ['원장 보기', '주문 내역 보기']) {
+        for (const label of ['원장 보기', '주문 내역']) {
           const button = elements(walletTree, 'Pressable').find(
             (node) => node.props.accessibilityLabel === label,
           );
@@ -346,7 +346,7 @@ describe('general/season home API, queries, rendering and navigation integration
       );
       const homeQueries = h.queries;
       const button = elements(h.renderWallet().tree, 'Pressable').find(
-        (node) => node.props.accessibilityLabel === '주문 내역 보기',
+        (node) => node.props.accessibilityLabel === '주문 내역',
       );
       button.props.onPress();
       assert.deepEqual(h.navigation.at(-1), ['TradeHistory', { accountId: h.account.id }]);
@@ -533,7 +533,7 @@ describe('wallet button through destination TradeHistory account lookup and API'
       h.seed(h.account, fixture[mode].data);
       const wallet = h.renderWallet();
       const orderButton = elements(wallet.tree, 'Pressable').find(
-        (node) => node.props.accessibilityLabel === '주문 내역 보기',
+        (node) => node.props.accessibilityLabel === '주문 내역',
       );
       orderButton.props.onPress();
       const scope = h.navigation.at(-1)[1];

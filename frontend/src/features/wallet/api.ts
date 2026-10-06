@@ -141,7 +141,7 @@ export type WalletTransactionDirection = 'credit' | 'debit';
 
 export type WalletTransactionType =
   | 'initial_grant' | 'exchange_source' | 'exchange_target'
-  | 'order_buy' | 'order_sell' | 'fee' | 'adjustment' | 'settlement' | 'ad_reward';
+  | 'wallet_transfer' | 'order_buy' | 'order_sell' | 'fee' | 'adjustment' | 'settlement' | 'ad_reward';
 /** `exchange` groups two canonical wallet legs; it is never a stored txType. */
 export type WalletTransactionFilter = WalletTransactionType | 'exchange';
 
@@ -153,6 +153,14 @@ export interface WalletTransactionFiltersDto {
 
 export interface WalletTransactionDto {
   id: string;
+  walletId?: string;
+  walletScope?: WalletScope;
+  transfer?: {
+    sourceWalletId: string;
+    sourceWalletScope: WalletScope;
+    destinationWalletId: string;
+    destinationWalletScope: WalletScope;
+  } | null;
   currencyCode: WalletCurrency;
   direction: WalletTransactionDirection;
   /** Canonical DB value. Unknown historical/future values remain visible. */

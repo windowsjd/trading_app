@@ -246,6 +246,8 @@ export type CashWalletWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"CashWallet"> | Date | string
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   walletTransactions?: Prisma.WalletTransactionListRelationFilter
+  outgoingTransfers?: Prisma.WalletTransferListRelationFilter
+  incomingTransfers?: Prisma.WalletTransferListRelationFilter
 }
 
 export type CashWalletOrderByWithRelationInput = {
@@ -259,6 +261,8 @@ export type CashWalletOrderByWithRelationInput = {
   updatedAt?: Prisma.SortOrder
   tradingAccount?: Prisma.TradingAccountOrderByWithRelationInput
   walletTransactions?: Prisma.WalletTransactionOrderByRelationAggregateInput
+  outgoingTransfers?: Prisma.WalletTransferOrderByRelationAggregateInput
+  incomingTransfers?: Prisma.WalletTransferOrderByRelationAggregateInput
 }
 
 export type CashWalletWhereUniqueInput = Prisma.AtLeast<{
@@ -276,6 +280,8 @@ export type CashWalletWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"CashWallet"> | Date | string
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   walletTransactions?: Prisma.WalletTransactionListRelationFilter
+  outgoingTransfers?: Prisma.WalletTransferListRelationFilter
+  incomingTransfers?: Prisma.WalletTransferListRelationFilter
 }, "id" | "tradingAccountId_walletScope_currencyCode">
 
 export type CashWalletOrderByWithAggregationInput = {
@@ -318,6 +324,8 @@ export type CashWalletCreateInput = {
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutCashWalletsInput
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutWalletInput
+  outgoingTransfers?: Prisma.WalletTransferCreateNestedManyWithoutSourceWalletInput
+  incomingTransfers?: Prisma.WalletTransferCreateNestedManyWithoutDestinationWalletInput
 }
 
 export type CashWalletUncheckedCreateInput = {
@@ -330,6 +338,8 @@ export type CashWalletUncheckedCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutWalletInput
+  outgoingTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutSourceWalletInput
+  incomingTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutDestinationWalletInput
 }
 
 export type CashWalletUpdateInput = {
@@ -342,6 +352,8 @@ export type CashWalletUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutCashWalletsNestedInput
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutWalletNestedInput
+  outgoingTransfers?: Prisma.WalletTransferUpdateManyWithoutSourceWalletNestedInput
+  incomingTransfers?: Prisma.WalletTransferUpdateManyWithoutDestinationWalletNestedInput
 }
 
 export type CashWalletUncheckedUpdateInput = {
@@ -354,6 +366,8 @@ export type CashWalletUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutWalletNestedInput
+  outgoingTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutSourceWalletNestedInput
+  incomingTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutDestinationWalletNestedInput
 }
 
 export type CashWalletCreateManyInput = {
@@ -494,10 +508,6 @@ export type CashWalletUncheckedUpdateManyWithoutTradingAccountNestedInput = {
   deleteMany?: Prisma.CashWalletScalarWhereInput | Prisma.CashWalletScalarWhereInput[]
 }
 
-export type EnumWalletScopeFieldUpdateOperationsInput = {
-  set?: $Enums.WalletScope
-}
-
 export type CashWalletCreateNestedOneWithoutWalletTransactionsInput = {
   create?: Prisma.XOR<Prisma.CashWalletCreateWithoutWalletTransactionsInput, Prisma.CashWalletUncheckedCreateWithoutWalletTransactionsInput>
   connectOrCreate?: Prisma.CashWalletCreateOrConnectWithoutWalletTransactionsInput
@@ -512,6 +522,34 @@ export type CashWalletUpdateOneRequiredWithoutWalletTransactionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.CashWalletUpdateToOneWithWhereWithoutWalletTransactionsInput, Prisma.CashWalletUpdateWithoutWalletTransactionsInput>, Prisma.CashWalletUncheckedUpdateWithoutWalletTransactionsInput>
 }
 
+export type CashWalletCreateNestedOneWithoutOutgoingTransfersInput = {
+  create?: Prisma.XOR<Prisma.CashWalletCreateWithoutOutgoingTransfersInput, Prisma.CashWalletUncheckedCreateWithoutOutgoingTransfersInput>
+  connectOrCreate?: Prisma.CashWalletCreateOrConnectWithoutOutgoingTransfersInput
+  connect?: Prisma.CashWalletWhereUniqueInput
+}
+
+export type CashWalletCreateNestedOneWithoutIncomingTransfersInput = {
+  create?: Prisma.XOR<Prisma.CashWalletCreateWithoutIncomingTransfersInput, Prisma.CashWalletUncheckedCreateWithoutIncomingTransfersInput>
+  connectOrCreate?: Prisma.CashWalletCreateOrConnectWithoutIncomingTransfersInput
+  connect?: Prisma.CashWalletWhereUniqueInput
+}
+
+export type CashWalletUpdateOneRequiredWithoutOutgoingTransfersNestedInput = {
+  create?: Prisma.XOR<Prisma.CashWalletCreateWithoutOutgoingTransfersInput, Prisma.CashWalletUncheckedCreateWithoutOutgoingTransfersInput>
+  connectOrCreate?: Prisma.CashWalletCreateOrConnectWithoutOutgoingTransfersInput
+  upsert?: Prisma.CashWalletUpsertWithoutOutgoingTransfersInput
+  connect?: Prisma.CashWalletWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.CashWalletUpdateToOneWithWhereWithoutOutgoingTransfersInput, Prisma.CashWalletUpdateWithoutOutgoingTransfersInput>, Prisma.CashWalletUncheckedUpdateWithoutOutgoingTransfersInput>
+}
+
+export type CashWalletUpdateOneRequiredWithoutIncomingTransfersNestedInput = {
+  create?: Prisma.XOR<Prisma.CashWalletCreateWithoutIncomingTransfersInput, Prisma.CashWalletUncheckedCreateWithoutIncomingTransfersInput>
+  connectOrCreate?: Prisma.CashWalletCreateOrConnectWithoutIncomingTransfersInput
+  upsert?: Prisma.CashWalletUpsertWithoutIncomingTransfersInput
+  connect?: Prisma.CashWalletWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.CashWalletUpdateToOneWithWhereWithoutIncomingTransfersInput, Prisma.CashWalletUpdateWithoutIncomingTransfersInput>, Prisma.CashWalletUncheckedUpdateWithoutIncomingTransfersInput>
+}
+
 export type CashWalletCreateWithoutTradingAccountInput = {
   id?: string
   walletScope?: $Enums.WalletScope
@@ -521,6 +559,8 @@ export type CashWalletCreateWithoutTradingAccountInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutWalletInput
+  outgoingTransfers?: Prisma.WalletTransferCreateNestedManyWithoutSourceWalletInput
+  incomingTransfers?: Prisma.WalletTransferCreateNestedManyWithoutDestinationWalletInput
 }
 
 export type CashWalletUncheckedCreateWithoutTradingAccountInput = {
@@ -532,6 +572,8 @@ export type CashWalletUncheckedCreateWithoutTradingAccountInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutWalletInput
+  outgoingTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutSourceWalletInput
+  incomingTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutDestinationWalletInput
 }
 
 export type CashWalletCreateOrConnectWithoutTradingAccountInput = {
@@ -583,6 +625,8 @@ export type CashWalletCreateWithoutWalletTransactionsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutCashWalletsInput
+  outgoingTransfers?: Prisma.WalletTransferCreateNestedManyWithoutSourceWalletInput
+  incomingTransfers?: Prisma.WalletTransferCreateNestedManyWithoutDestinationWalletInput
 }
 
 export type CashWalletUncheckedCreateWithoutWalletTransactionsInput = {
@@ -594,6 +638,8 @@ export type CashWalletUncheckedCreateWithoutWalletTransactionsInput = {
   reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Date | string
   updatedAt?: Date | string
+  outgoingTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutSourceWalletInput
+  incomingTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutDestinationWalletInput
 }
 
 export type CashWalletCreateOrConnectWithoutWalletTransactionsInput = {
@@ -621,6 +667,8 @@ export type CashWalletUpdateWithoutWalletTransactionsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutCashWalletsNestedInput
+  outgoingTransfers?: Prisma.WalletTransferUpdateManyWithoutSourceWalletNestedInput
+  incomingTransfers?: Prisma.WalletTransferUpdateManyWithoutDestinationWalletNestedInput
 }
 
 export type CashWalletUncheckedUpdateWithoutWalletTransactionsInput = {
@@ -632,6 +680,144 @@ export type CashWalletUncheckedUpdateWithoutWalletTransactionsInput = {
   reservedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  outgoingTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutSourceWalletNestedInput
+  incomingTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutDestinationWalletNestedInput
+}
+
+export type CashWalletCreateWithoutOutgoingTransfersInput = {
+  id?: string
+  walletScope?: $Enums.WalletScope
+  currencyCode: $Enums.CurrencyCode
+  balanceAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutCashWalletsInput
+  walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutWalletInput
+  incomingTransfers?: Prisma.WalletTransferCreateNestedManyWithoutDestinationWalletInput
+}
+
+export type CashWalletUncheckedCreateWithoutOutgoingTransfersInput = {
+  id?: string
+  tradingAccountId: string
+  walletScope?: $Enums.WalletScope
+  currencyCode: $Enums.CurrencyCode
+  balanceAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutWalletInput
+  incomingTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutDestinationWalletInput
+}
+
+export type CashWalletCreateOrConnectWithoutOutgoingTransfersInput = {
+  where: Prisma.CashWalletWhereUniqueInput
+  create: Prisma.XOR<Prisma.CashWalletCreateWithoutOutgoingTransfersInput, Prisma.CashWalletUncheckedCreateWithoutOutgoingTransfersInput>
+}
+
+export type CashWalletCreateWithoutIncomingTransfersInput = {
+  id?: string
+  walletScope?: $Enums.WalletScope
+  currencyCode: $Enums.CurrencyCode
+  balanceAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutCashWalletsInput
+  walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutWalletInput
+  outgoingTransfers?: Prisma.WalletTransferCreateNestedManyWithoutSourceWalletInput
+}
+
+export type CashWalletUncheckedCreateWithoutIncomingTransfersInput = {
+  id?: string
+  tradingAccountId: string
+  walletScope?: $Enums.WalletScope
+  currencyCode: $Enums.CurrencyCode
+  balanceAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutWalletInput
+  outgoingTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutSourceWalletInput
+}
+
+export type CashWalletCreateOrConnectWithoutIncomingTransfersInput = {
+  where: Prisma.CashWalletWhereUniqueInput
+  create: Prisma.XOR<Prisma.CashWalletCreateWithoutIncomingTransfersInput, Prisma.CashWalletUncheckedCreateWithoutIncomingTransfersInput>
+}
+
+export type CashWalletUpsertWithoutOutgoingTransfersInput = {
+  update: Prisma.XOR<Prisma.CashWalletUpdateWithoutOutgoingTransfersInput, Prisma.CashWalletUncheckedUpdateWithoutOutgoingTransfersInput>
+  create: Prisma.XOR<Prisma.CashWalletCreateWithoutOutgoingTransfersInput, Prisma.CashWalletUncheckedCreateWithoutOutgoingTransfersInput>
+  where?: Prisma.CashWalletWhereInput
+}
+
+export type CashWalletUpdateToOneWithWhereWithoutOutgoingTransfersInput = {
+  where?: Prisma.CashWalletWhereInput
+  data: Prisma.XOR<Prisma.CashWalletUpdateWithoutOutgoingTransfersInput, Prisma.CashWalletUncheckedUpdateWithoutOutgoingTransfersInput>
+}
+
+export type CashWalletUpdateWithoutOutgoingTransfersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  walletScope?: Prisma.EnumWalletScopeFieldUpdateOperationsInput | $Enums.WalletScope
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  balanceAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  reservedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutCashWalletsNestedInput
+  walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutWalletNestedInput
+  incomingTransfers?: Prisma.WalletTransferUpdateManyWithoutDestinationWalletNestedInput
+}
+
+export type CashWalletUncheckedUpdateWithoutOutgoingTransfersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
+  walletScope?: Prisma.EnumWalletScopeFieldUpdateOperationsInput | $Enums.WalletScope
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  balanceAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  reservedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutWalletNestedInput
+  incomingTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutDestinationWalletNestedInput
+}
+
+export type CashWalletUpsertWithoutIncomingTransfersInput = {
+  update: Prisma.XOR<Prisma.CashWalletUpdateWithoutIncomingTransfersInput, Prisma.CashWalletUncheckedUpdateWithoutIncomingTransfersInput>
+  create: Prisma.XOR<Prisma.CashWalletCreateWithoutIncomingTransfersInput, Prisma.CashWalletUncheckedCreateWithoutIncomingTransfersInput>
+  where?: Prisma.CashWalletWhereInput
+}
+
+export type CashWalletUpdateToOneWithWhereWithoutIncomingTransfersInput = {
+  where?: Prisma.CashWalletWhereInput
+  data: Prisma.XOR<Prisma.CashWalletUpdateWithoutIncomingTransfersInput, Prisma.CashWalletUncheckedUpdateWithoutIncomingTransfersInput>
+}
+
+export type CashWalletUpdateWithoutIncomingTransfersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  walletScope?: Prisma.EnumWalletScopeFieldUpdateOperationsInput | $Enums.WalletScope
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  balanceAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  reservedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutCashWalletsNestedInput
+  walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutWalletNestedInput
+  outgoingTransfers?: Prisma.WalletTransferUpdateManyWithoutSourceWalletNestedInput
+}
+
+export type CashWalletUncheckedUpdateWithoutIncomingTransfersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
+  walletScope?: Prisma.EnumWalletScopeFieldUpdateOperationsInput | $Enums.WalletScope
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  balanceAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  reservedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutWalletNestedInput
+  outgoingTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutSourceWalletNestedInput
 }
 
 export type CashWalletCreateManyTradingAccountInput = {
@@ -653,6 +839,8 @@ export type CashWalletUpdateWithoutTradingAccountInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutWalletNestedInput
+  outgoingTransfers?: Prisma.WalletTransferUpdateManyWithoutSourceWalletNestedInput
+  incomingTransfers?: Prisma.WalletTransferUpdateManyWithoutDestinationWalletNestedInput
 }
 
 export type CashWalletUncheckedUpdateWithoutTradingAccountInput = {
@@ -664,6 +852,8 @@ export type CashWalletUncheckedUpdateWithoutTradingAccountInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutWalletNestedInput
+  outgoingTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutSourceWalletNestedInput
+  incomingTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutDestinationWalletNestedInput
 }
 
 export type CashWalletUncheckedUpdateManyWithoutTradingAccountInput = {
@@ -683,10 +873,14 @@ export type CashWalletUncheckedUpdateManyWithoutTradingAccountInput = {
 
 export type CashWalletCountOutputType = {
   walletTransactions: number
+  outgoingTransfers: number
+  incomingTransfers: number
 }
 
 export type CashWalletCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   walletTransactions?: boolean | CashWalletCountOutputTypeCountWalletTransactionsArgs
+  outgoingTransfers?: boolean | CashWalletCountOutputTypeCountOutgoingTransfersArgs
+  incomingTransfers?: boolean | CashWalletCountOutputTypeCountIncomingTransfersArgs
 }
 
 /**
@@ -706,6 +900,20 @@ export type CashWalletCountOutputTypeCountWalletTransactionsArgs<ExtArgs extends
   where?: Prisma.WalletTransactionWhereInput
 }
 
+/**
+ * CashWalletCountOutputType without action
+ */
+export type CashWalletCountOutputTypeCountOutgoingTransfersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.WalletTransferWhereInput
+}
+
+/**
+ * CashWalletCountOutputType without action
+ */
+export type CashWalletCountOutputTypeCountIncomingTransfersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.WalletTransferWhereInput
+}
+
 
 export type CashWalletSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -718,6 +926,8 @@ export type CashWalletSelect<ExtArgs extends runtime.Types.Extensions.InternalAr
   updatedAt?: boolean
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   walletTransactions?: boolean | Prisma.CashWallet$walletTransactionsArgs<ExtArgs>
+  outgoingTransfers?: boolean | Prisma.CashWallet$outgoingTransfersArgs<ExtArgs>
+  incomingTransfers?: boolean | Prisma.CashWallet$incomingTransfersArgs<ExtArgs>
   _count?: boolean | Prisma.CashWalletCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["cashWallet"]>
 
@@ -760,6 +970,8 @@ export type CashWalletOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs
 export type CashWalletInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   walletTransactions?: boolean | Prisma.CashWallet$walletTransactionsArgs<ExtArgs>
+  outgoingTransfers?: boolean | Prisma.CashWallet$outgoingTransfersArgs<ExtArgs>
+  incomingTransfers?: boolean | Prisma.CashWallet$incomingTransfersArgs<ExtArgs>
   _count?: boolean | Prisma.CashWalletCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type CashWalletIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -774,6 +986,8 @@ export type $CashWalletPayload<ExtArgs extends runtime.Types.Extensions.Internal
   objects: {
     tradingAccount: Prisma.$TradingAccountPayload<ExtArgs>
     walletTransactions: Prisma.$WalletTransactionPayload<ExtArgs>[]
+    outgoingTransfers: Prisma.$WalletTransferPayload<ExtArgs>[]
+    incomingTransfers: Prisma.$WalletTransferPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1180,6 +1394,8 @@ export interface Prisma__CashWalletClient<T, Null = never, ExtArgs extends runti
   readonly [Symbol.toStringTag]: "PrismaPromise"
   tradingAccount<T extends Prisma.TradingAccountDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccountDefaultArgs<ExtArgs>>): Prisma.Prisma__TradingAccountClient<runtime.Types.Result.GetResult<Prisma.$TradingAccountPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   walletTransactions<T extends Prisma.CashWallet$walletTransactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.CashWallet$walletTransactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WalletTransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  outgoingTransfers<T extends Prisma.CashWallet$outgoingTransfersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.CashWallet$outgoingTransfersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WalletTransferPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  incomingTransfers<T extends Prisma.CashWallet$incomingTransfersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.CashWallet$incomingTransfersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WalletTransferPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1639,6 +1855,54 @@ export type CashWallet$walletTransactionsArgs<ExtArgs extends runtime.Types.Exte
   take?: number
   skip?: number
   distinct?: Prisma.WalletTransactionScalarFieldEnum | Prisma.WalletTransactionScalarFieldEnum[]
+}
+
+/**
+ * CashWallet.outgoingTransfers
+ */
+export type CashWallet$outgoingTransfersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WalletTransfer
+   */
+  select?: Prisma.WalletTransferSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the WalletTransfer
+   */
+  omit?: Prisma.WalletTransferOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.WalletTransferInclude<ExtArgs> | null
+  where?: Prisma.WalletTransferWhereInput
+  orderBy?: Prisma.WalletTransferOrderByWithRelationInput | Prisma.WalletTransferOrderByWithRelationInput[]
+  cursor?: Prisma.WalletTransferWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.WalletTransferScalarFieldEnum | Prisma.WalletTransferScalarFieldEnum[]
+}
+
+/**
+ * CashWallet.incomingTransfers
+ */
+export type CashWallet$incomingTransfersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WalletTransfer
+   */
+  select?: Prisma.WalletTransferSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the WalletTransfer
+   */
+  omit?: Prisma.WalletTransferOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.WalletTransferInclude<ExtArgs> | null
+  where?: Prisma.WalletTransferWhereInput
+  orderBy?: Prisma.WalletTransferOrderByWithRelationInput | Prisma.WalletTransferOrderByWithRelationInput[]
+  cursor?: Prisma.WalletTransferWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.WalletTransferScalarFieldEnum | Prisma.WalletTransferScalarFieldEnum[]
 }
 
 /**

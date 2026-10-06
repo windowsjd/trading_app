@@ -313,6 +313,7 @@ async function createLimitQuote(scenario, overrides = {}) {
 
   const quote = await prisma.quote.create({
     data: {
+      cashWalletScope: 'securities',
       userId: scenario.userId,
       tradingAccountId: scenario.tradingAccountId,
       quoteType: QuoteType.order,
@@ -733,6 +734,7 @@ async function testCreateRollback() {
           where: { id: quoteId },
           select: {
             id: true,
+            cashWalletScope: true,
             quantity: true,
             limitPrice: true,
             quotedFeeRate: true,
@@ -745,6 +747,7 @@ async function testCreateRollback() {
         await createService.createSubmittedLimitBuyInTransaction(tx, {
           quote: {
             id: quote.id,
+            cashWalletScope: quote.cashWalletScope,
             limitPrice: quote.limitPrice,
             quotedFeeRate: quote.quotedFeeRate,
             quotedGrossAmount: quote.quotedGrossAmount,

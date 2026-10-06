@@ -436,6 +436,7 @@ async function testDbUniqueSemantics() {
   trackScope({ assetIds: [asset.id] });
   const orderKey = 'order-key-' + randomUUID().slice(0, 8);
   const orderRow = (accountId, key) => ({
+    cashWalletScope: 'securities',
     tradingAccountId: accountId,
     assetId: asset.id,
     side: OrderSide.buy,
@@ -497,6 +498,7 @@ async function testCanonicalTradingScope() {
 
   const canonicalOrder = await prisma.order.create({
     data: {
+      cashWalletScope: 'securities',
       tradingAccountId: linked.accountId,
       assetId: asset.id,
       side: OrderSide.buy,
@@ -525,6 +527,7 @@ async function testCanonicalTradingScope() {
   });
   const canonicalQuote = await prisma.quote.create({
     data: {
+      cashWalletScope: 'securities',
       userId: linked.userId,
       tradingAccountId: linked.accountId,
       quoteType: QuoteType.order,
@@ -616,6 +619,7 @@ async function testCanonicalTradingScope() {
   // relationship must still be checked before execution.
   const crossQuote = await prisma.quote.create({
     data: {
+      cashWalletScope: 'securities',
       userId: linked.userId,
       tradingAccountId: other.accountId,
       quoteType: QuoteType.order,
@@ -634,6 +638,7 @@ async function testCanonicalTradingScope() {
   });
   const crossOrder = await prisma.order.create({
     data: {
+      cashWalletScope: 'securities',
       tradingAccountId: linked.accountId,
       quoteId: crossQuote.id,
       assetId: asset.id,

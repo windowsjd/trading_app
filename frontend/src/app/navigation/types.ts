@@ -22,6 +22,7 @@ export type HomeStackParamList = {
 };
 
 export type WalletStackParamList = {
+  WalletTransfer: undefined;
   Wallet: undefined;
   WalletFx: undefined;
   WalletTransactions: { currencyCode?: 'KRW' | 'USD' } | undefined;

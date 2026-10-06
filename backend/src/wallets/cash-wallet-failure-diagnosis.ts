@@ -1,4 +1,4 @@
-import { Prisma } from '../generated/prisma/client';
+import { Prisma, type WalletScope } from '../generated/prisma/client';
 import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
 import {
   assertCashWalletTradingAccountScope,
@@ -11,7 +11,7 @@ import {
  *
  * Every atomic cash mutation in cash-wallet-atomic.ts (and the equivalent
  * Prisma updateMany credits) carries the wallet id, the VERIFIED trading
- * account, securities scope, the currency, AND an amount guard in one WHERE.
+ * account, explicitly expected scope, currency, AND amount guard in one WHERE.
  * When it matches 0 rows, ANY of those could be the reason — and the old
  * per-caller diagnostics re-read the wallet with the scope columns still in
  * the WHERE, so a wallet whose scope had been corrupted simply "disappeared"
@@ -24,7 +24,7 @@ import {
  *   1. wallet row gone                       → 'wallet_not_found'
  *   2. tradingAccountId IS NULL              → 500 repair required (throws)
  *   3. tradingAccountId differs              → 500 scope mismatch (throws)
- *   4. walletScope is not securities         → 500 scope mismatch (throws)
+ *   4. walletScope differs from expected     → 500 scope mismatch (throws)
  *   5. currencyCode differs                  → 500 scope mismatch (throws)
  *   6. amount guard cannot hold              → 'insufficient_available' /
  *                                              'insufficient_reserved'
@@ -70,6 +70,7 @@ export async function diagnoseCashWalletMutationFailure(
     expected: {
       /** The VERIFIED trading account the mutation was scoped to. */
       tradingAccountId: string;
+      walletScope: WalletScope;
       /** CurrencyCode enum value. */
       currencyCode: string;
     };
@@ -101,7 +102,7 @@ export async function diagnoseCashWalletMutationFailure(
   const reserved = wallet?.reservedAmount ?? new Prisma.Decimal(0);
   const scopeValid = wallet
     ? wallet.tradingAccountId === input.expected.tradingAccountId &&
-      wallet.walletScope === 'securities'
+      wallet.walletScope === input.expected.walletScope
     : undefined;
   const currencyMatched = wallet
     ? wallet.currencyCode === input.expected.currencyCode
@@ -172,6 +173,7 @@ export async function diagnoseCashWalletMutationFailure(
   // FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH (account mismatch).
   assertCashWalletTradingAccountScope(wallet, {
     tradingAccountId: input.expected.tradingAccountId,
+    walletScope: input.expected.walletScope,
   });
 
   if (wallet.currencyCode !== input.expected.currencyCode) {
