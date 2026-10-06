@@ -14,6 +14,17 @@ import { GeneralAccountPerformanceService } from '../src/portfolio/general-accou
 import { HomeService } from '../src/home/home.service';
 import { WalletsService } from '../src/wallets/wallets.service';
 import { OrderReservationService } from '../src/orders/order-reservation.service';
+import { canonicalCashWalletSetIssue } from '../src/wallets/canonical-cash-wallets';
+import { BatchService } from '../src/batch/batch.service';
+import { GeneralDailySnapshotJobService } from '../src/batch/general-daily-snapshot-job.service';
+import { DailyPortfolioSnapshotJobService } from '../src/batch/daily-portfolio-snapshot-job.service';
+import { SeasonRankingJobService } from '../src/batch/season-ranking-job.service';
+import { SeasonSettlementJobService } from '../src/batch/season-settlement-job.service';
+import { RankingRefreshService } from '../src/ranking/ranking-refresh.service';
+import { TradingAccountPortfolioService } from '../src/portfolio/trading-account-portfolio.service';
+import { RecordsService } from '../src/records/records.service';
+import { auditGeneralAccounts } from './lib/audit-general-accounts';
+import { backfillGeneralPerformance } from './lib/backfill-general-performance';
 import {
   debitAvailableCash,
   releaseReservedCash,
@@ -23,6 +34,7 @@ import {
 import { diagnoseCashWalletMutationFailure } from '../src/wallets/cash-wallet-failure-diagnosis';
 
 const MIGRATION = '20261006120000_add_cash_wallet_scope';
+const ACTIVATION = '20261006130000_provision_canonical_crypto_cash_wallets';
 const CAPITAL = '10000000.00000000';
 const ZERO = '0.00000000';
 
@@ -35,7 +47,7 @@ function identifier(value: string) {
 async function insert(
   db: Client,
   table: string,
-  data: Record<string, string | Date>,
+  data: Record<string, string | Date | number>,
 ) {
   const columns = Object.keys(data);
   await db.query(
@@ -45,7 +57,10 @@ async function insert(
   );
 }
 
-async function fingerprint(db: Client) {
+async function fingerprint(
+  db: Client,
+  options: { walletIds?: string[]; includeScope?: boolean } = {},
+) {
   const tables = await db.query<{ tablename: string }>(
     'SELECT tablename FROM pg_tables WHERE schemaname = current_schema() ORDER BY tablename',
   );
@@ -54,8 +69,12 @@ async function fingerprint(db: Client) {
     // Keep PostgreSQL numeric/timestamp text intact; never parse money as Number.
     const rows = await db.query<{ rows: string | null }>(
       `SELECT jsonb_agg(j ORDER BY j::text)::text AS rows FROM
-       (SELECT to_jsonb(t) ${tablename === 'cash_wallets' ? "- 'wallet_scope'" : ''}
-        AS j FROM ${identifier(tablename)} t) values_to_compare`,
+       (SELECT to_jsonb(t) ${tablename === 'cash_wallets' && !options.includeScope ? "- 'wallet_scope'" : ''}
+        AS j FROM ${identifier(tablename)} t
+        ${tablename === 'cash_wallets' && options.walletIds ? 'WHERE id = ANY($1::text[])' : ''}) values_to_compare`,
+      tablename === 'cash_wallets' && options.walletIds
+        ? [options.walletIds]
+        : [],
     );
     result[tablename] = rows.rows[0].rows;
   }
@@ -154,6 +173,17 @@ async function verifyMigration() {
           updated_at: at,
         });
       }
+      await insert(db, 'positions', {
+        id: account + 'position',
+        trading_account_id: account,
+        asset_id: 'asset',
+        currency_code: 'KRW',
+        quantity: '3.12345678',
+        reserved_quantity: '1',
+        average_cost: '123.45678900',
+        realized_pnl_krw: '12.34567890',
+        updated_at: at,
+      });
       await insert(db, 'quotes', {
         id: account + 'quote',
         user_id: 'owner',
@@ -304,9 +334,139 @@ async function verifyMigration() {
       ]),
       { code: '22P02' },
     );
+    // Closed/settled historical rows must be byte-for-byte unchanged too.
+    await db.query(
+      "UPDATE trading_accounts SET status='closed', closed_at=$1 WHERE id='season'",
+      [at],
+    );
+    await db.query(
+      "UPDATE seasons SET status='settled', end_at=$1 WHERE id='season'",
+      [at],
+    );
+    await db.query(
+      "UPDATE season_participants SET participant_status='finished' WHERE id='participant'",
+    );
+    await insert(db, 'equity_snapshots', {
+      id: 'historical-equity',
+      trading_account_id: 'season',
+      total_asset_krw: '10000001.12345678',
+      return_rate: '0.00001123',
+      krw_cash: '9800000.12345678',
+      usd_cash_krw: '172839.50460000',
+      domestic_stock_value_krw: '27161.49540000',
+      us_stock_value_krw: ZERO,
+      crypto_value_krw: ZERO,
+      snapshot_reason: 'settlement',
+      captured_at: at,
+    });
+    await insert(db, 'daily_portfolio_snapshots', {
+      id: 'historical-daily',
+      trading_account_id: 'season',
+      snapshot_date: '2026-09-01',
+      total_asset_krw: '10000001.12345678',
+      return_rate: '0.00001123',
+      krw_cash: '9800000.12345678',
+      usd_cash_krw: '172839.50460000',
+      asset_value_krw: '27161.49540000',
+      realized_pnl_krw: '12.34567890',
+      unrealized_pnl_krw: '10.00000000',
+      captured_at: at,
+    });
+    await insert(db, 'season_rankings', {
+      id: 'historical-final',
+      season_id: 'season',
+      season_participant_id: 'participant',
+      trading_account_id: 'season',
+      rank_type: 'final',
+      rank: 1,
+      total_asset_krw: '10000001.12345678',
+      return_rate: '0.00001123',
+      ranking_date: '2026-09-01',
+      captured_at: at,
+    });
+    // A pre-existing Crypto identity is preserved, even if deliberately funded
+    // by a test operator. Only genuinely missing identities receive zeros.
+    await db.query(
+      "UPDATE cash_wallets SET balance_amount='37.12345678', reserved_amount='2' WHERE id='crypto_spot'",
+    );
+    const activationSql = readFileSync(
+      join('prisma/migrations', ACTIVATION, 'migration.sql'),
+      'utf8',
+    );
+    await insert(db, 'users', {
+      id: 'damaged-owner',
+      email: 'damaged@example.com',
+      password_hash: 'x',
+      nickname: 'damaged',
+      updated_at: at,
+    });
+    await insert(db, 'trading_accounts', {
+      id: 'damaged',
+      user_id: 'damaged-owner',
+      mode: 'general',
+      initial_capital_krw: CAPITAL,
+      opened_at: at,
+      updated_at: at,
+    });
+    const damagedBefore = await fingerprint(db, { includeScope: true });
+    await assert.rejects(db.query(activationSql), { code: 'P0001' });
+    await db.query('ROLLBACK');
+    assert.deepEqual(
+      await fingerprint(db, { includeScope: true }),
+      damagedBefore,
+    );
+    await db.query("DELETE FROM trading_accounts WHERE id='damaged'");
+    await db.query("DELETE FROM users WHERE id='damaged-owner'");
+    const walletIds = (
+      await db.query<{ id: string }>('SELECT id FROM cash_wallets')
+    ).rows.map((w) => w.id);
+    const financialBefore = await fingerprint(db, {
+      walletIds,
+      includeScope: true,
+    });
+    const cashTotal = async () =>
+      (
+        await db.query<{
+          trading_account_id: string;
+          currency_code: string;
+          balance: string;
+          reserved: string;
+        }>(
+          'SELECT trading_account_id, currency_code, sum(balance_amount)::text balance, sum(reserved_amount)::text reserved FROM cash_wallets GROUP BY 1,2 ORDER BY 1,2',
+        )
+      ).rows;
+    const cashBefore = await cashTotal();
+    await db.query(activationSql);
+    assert.deepEqual(
+      await fingerprint(db, { walletIds, includeScope: true }),
+      financialBefore,
+    );
+    assert.deepEqual(await cashTotal(), cashBefore);
+    const added = await db.query<{
+      balance_amount: string;
+      reserved_amount: string;
+    }>(
+      'SELECT balance_amount, reserved_amount FROM cash_wallets WHERE NOT (id=ANY($1::text[]))',
+      [walletIds],
+    );
+    assert.equal(added.rows.length, 2);
+    assert.ok(
+      added.rows.every(
+        (w) => w.balance_amount === ZERO && w.reserved_amount === ZERO,
+      ),
+    );
+    const sets = await db.query<{ trading_account_id: string; count: number }>(
+      'SELECT trading_account_id, count(*)::int count FROM cash_wallets GROUP BY 1',
+    );
+    assert.ok(sets.rows.every((w) => w.count === 4));
+    const normalized = await fingerprint(db, { includeScope: true });
+    await db.query(activationSql);
+    assert.deepEqual(await fingerprint(db, { includeScope: true }), normalized);
     console.log(
-      'migration fingerprint preserved:',
-      createHash('sha256').update(JSON.stringify(before)).digest('hex'),
+      'foundation + activation financial fingerprints preserved:',
+      createHash('sha256')
+        .update(JSON.stringify(financialBefore))
+        .digest('hex'),
     );
   } finally {
     await db.query('ROLLBACK');
@@ -332,6 +492,15 @@ async function verifyCurrentFinance() {
   );
   const home = new HomeService(prisma, valuation);
   const fxId = randomUUID();
+  const assetId = randomUUID();
+  const batch = new BatchService(prisma);
+  const access = new TradingAccountAccessService(prisma);
+  const portfolio = new TradingAccountPortfolioService(
+    prisma,
+    access,
+    performance,
+    valuation,
+  );
   await prisma.$connect();
   try {
     await prisma.user.create({
@@ -365,14 +534,27 @@ async function verifyCurrentFinance() {
       const wallets = await prisma.cashWallet.findMany({
         where: { tradingAccountId },
       });
-      assert.equal(wallets.length, 2);
-      assert.ok(wallets.every((w) => w.walletScope === 'securities'));
+      assert.equal(canonicalCashWalletSetIssue(wallets), null);
+      assert.equal(wallets.length, 4);
+      assert.ok(
+        wallets
+          .filter((w) => w.walletScope !== 'securities')
+          .every((w) => w.balanceAmount.isZero() && w.reservedAmount.isZero()),
+      );
       assert.equal(
-        wallets.find((w) => w.currencyCode === 'KRW')!.balanceAmount.toFixed(8),
+        wallets
+          .find(
+            (w) => w.walletScope === 'securities' && w.currencyCode === 'KRW',
+          )!
+          .balanceAmount.toFixed(8),
         CAPITAL,
       );
       assert.equal(
-        wallets.find((w) => w.currencyCode === 'USD')!.balanceAmount.toFixed(8),
+        wallets
+          .find(
+            (w) => w.walletScope === 'securities' && w.currencyCode === 'USD',
+          )!
+          .balanceAmount.toFixed(8),
         ZERO,
       );
       assert.ok(wallets.every((w) => w.reservedAmount.isZero()));
@@ -384,9 +566,33 @@ async function verifyCurrentFinance() {
       assert.equal(grants[0].amount.toFixed(8), CAPITAL);
       assert.equal(
         grants[0].walletId,
-        wallets.find((w) => w.currencyCode === 'KRW')!.id,
+        wallets.find(
+          (w) => w.walletScope === 'securities' && w.currencyCode === 'KRW',
+        )!.id,
       );
     }
+    const at = new Date();
+    for (const id of accountIds) {
+      const zeroValuation = await valuation.calculateTradingAccountValuation(
+        id,
+        at,
+      );
+      assert.equal(zeroValuation.totalAssetKrw, CAPITAL);
+      assert.equal(zeroValuation.returnRate, ZERO);
+      assert.equal(zeroValuation.usdCashKrw, ZERO);
+      assert.equal(zeroValuation.assetValueKrw, ZERO);
+      assert.equal(zeroValuation.fxRateSourceDecision, null);
+    }
+    const account = await prisma.tradingAccount.findUniqueOrThrow({
+      where: { id: generalId },
+      include: { seasonParticipant: true },
+    });
+    const zeroPerformance = await performance.resolveLivePerformance({
+      account,
+      valuationAt: at,
+    });
+    assert.equal(zeroPerformance.advance.returnRate.toFixed(8), ZERO);
+    assert.equal(zeroPerformance.advance.investmentPnlKrw.toFixed(8), ZERO);
     await prisma.fxRateSnapshot.create({
       data: {
         id: fxId,
@@ -399,63 +605,81 @@ async function verifyCurrentFinance() {
         capturedAt: new Date(),
       },
     });
-    const account = await prisma.tradingAccount.findUniqueOrThrow({
-      where: { id: generalId },
-      include: { seasonParticipant: true },
-    });
-    const at = new Date();
-    const before = await performance.resolveLivePerformance({
-      account,
-      valuationAt: at,
-    });
     const cryptoIds: string[] = [];
-    for (const tradingAccountId of accountIds) {
-      for (const walletScope of ['crypto_spot', 'crypto_futures'] as const) {
-        // Artificial sentinel funds only in disposable test fixtures.
-        const wallet = await prisma.cashWallet.create({
-          data: {
+    const readWallet = (
+      tradingAccountId: string,
+      walletScope: 'securities' | 'crypto_spot' | 'crypto_futures',
+    ) =>
+      prisma.cashWallet.findUniqueOrThrow({
+        where: {
+          tradingAccountId_walletScope_currencyCode: {
             tradingAccountId,
             walletScope,
             currencyCode: 'USD',
-            balanceAmount: '98765.43210000',
           },
+        },
+      });
+    for (const tradingAccountId of accountIds) {
+      for (const [walletScope, amount] of [
+        ['securities', '1000'],
+        ['crypto_spot', '500'],
+        ['crypto_futures', '200'],
+      ] as const) {
+        const wallet = await readWallet(tradingAccountId, walletScope);
+        await prisma.cashWallet.update({
+          where: { id: wallet.id },
+          data: { balanceAmount: amount },
         });
-        cryptoIds.push(wallet.id);
-        await prisma.walletTransaction.create({
-          data: {
-            tradingAccountId,
-            walletId: wallet.id,
-            currencyCode: 'USD',
-            direction: 'credit',
-            txType: 'adjustment',
-            referenceType: 'manual_adjustment',
-            amount: '98765.43210000',
-            balanceAfter: '98765.43210000',
-            occurredAt: at,
-          },
-        });
+        if (walletScope !== 'securities') cryptoIds.push(wallet.id);
       }
       const view = await walletService.getWalletsForTradingAccount(
         userId,
         tradingAccountId,
       );
-      assert.equal(view.data.wallets.length, 2);
-      assert.ok(view.data.wallets.every((w) => !('walletScope' in w)));
-      const ledger = await walletService.getWalletTransactionsForTradingAccount(
-        userId,
-        tradingAccountId,
+      assert.equal(view.data.wallets.length, 4);
+      assert.equal(canonicalCashWalletSetIssue(view.data.wallets), null);
+      assert.equal(new Set(view.data.wallets.map((w) => w.id)).size, 4);
+      assert.equal(
+        view.data.wallets.find(
+          (w) => w.walletScope === 'securities' && w.currencyCode === 'USD',
+        )!.balanceAmount,
+        '1000.00000000',
       );
-      assert.equal(ledger.data.pagination.total, 0);
       const values = await valuation.calculateTradingAccountValuation(
         tradingAccountId,
-        at,
+        new Date(),
       );
-      assert.equal(values.totalAssetKrw, CAPITAL);
+      assert.equal(values.totalAssetKrw, '12380000.00000000');
+      assert.equal(values.usdCashKrw, '2380000.00000000');
+      // Same owned USD cash, placed differently (fixture writes, no Transfer).
+      const spot = await readWallet(tradingAccountId, 'crypto_spot');
+      const securities = await readWallet(tradingAccountId, 'securities');
+      await prisma.$transaction([
+        prisma.cashWallet.update({
+          where: { id: spot.id },
+          data: { balanceAmount: '0' },
+        }),
+        prisma.cashWallet.update({
+          where: { id: securities.id },
+          data: { balanceAmount: '1500' },
+        }),
+      ]);
+      const relocated = await valuation.calculateTradingAccountValuation(
+        tradingAccountId,
+        values.valuationAt,
+      );
+      assert.deepEqual(relocated, values);
+      await prisma.$transaction([
+        prisma.cashWallet.update({
+          where: { id: spot.id },
+          data: { balanceAmount: '500' },
+        }),
+        prisma.cashWallet.update({
+          where: { id: securities.id },
+          data: { balanceAmount: '1000' },
+        }),
+      ]);
     }
-    assert.deepEqual(
-      await performance.resolveLivePerformance({ account, valuationAt: at }),
-      before,
-    );
     assert.equal(
       (await accounts.openGeneralAccount(userId)).data.wallets.length,
       2,
@@ -473,9 +697,8 @@ async function verifyCurrentFinance() {
       USD: string;
       cashWallets: unknown[];
     };
-    assert.equal(summary.USD, ZERO);
-    assert.equal(summary.cashWallets?.length, 2);
-
+    assert.equal(summary.USD, '1700.00000000');
+    assert.equal(summary.cashWallets.length, 4);
     const cryptoBefore = await prisma.cashWallet.findMany({
       where: { id: { in: cryptoIds } },
       orderBy: { id: 'asc' },
@@ -532,11 +755,6 @@ async function verifyCurrentFinance() {
           },
         },
       });
-      // Test fixture funding, after proving provisioning still starts at zero.
-      await prisma.cashWallet.update({
-        where: { id: wallet.id },
-        data: { balanceAmount: '100.00000000' },
-      });
       const reservation =
         await new OrderReservationService().reserveForLimitBuy(prisma, {
           tradingAccountId,
@@ -547,7 +765,16 @@ async function verifyCurrentFinance() {
       const reserved = await prisma.cashWallet.findUniqueOrThrow({
         where: { id: wallet.id },
       });
-      assert.equal(reserved.balanceAmount.toFixed(8), '100.00000000');
+      assert.equal(reserved.balanceAmount.toFixed(8), '1000.00000000');
+      assert.equal(
+        (
+          await valuation.calculateTradingAccountValuation(
+            tradingAccountId,
+            new Date(),
+          )
+        ).totalAssetKrw,
+        '12380000.00000000',
+      );
       assert.equal(reserved.reservedAmount.toFixed(8), '25.00000000');
       assert.equal(
         await releaseReservedCash(prisma, {
@@ -575,17 +802,262 @@ async function verifyCurrentFinance() {
       }),
       cryptoBefore,
     );
+    // One canonical FX evidence values cash and an existing spot position.
+    await prisma.asset.create({
+      data: {
+        id: assetId,
+        market: 'BINANCE',
+        symbol: 'WS' + assetId,
+        name: 'scope-fixture',
+        assetType: 'crypto',
+        currencyCode: 'USD',
+        priceCurrency: 'USD',
+        settlementCurrency: 'USD',
+      },
+    });
+    const evidenceAt = new Date();
+    await prisma.assetPriceSnapshot.create({
+      data: {
+        assetId,
+        currencyCode: 'USD',
+        price: '100',
+        sourceType: 'admin_manual',
+        effectiveAt: evidenceAt,
+        capturedAt: evidenceAt,
+      },
+    });
+    for (const tradingAccountId of accountIds) {
+      await prisma.position.create({
+        data: {
+          tradingAccountId,
+          assetId,
+          currencyCode: 'USD',
+          quantity: '2',
+          averageCost: '90',
+          realizedPnlKrw: '123',
+        },
+      });
+      const values = await valuation.calculateTradingAccountValuation(
+        tradingAccountId,
+        new Date(),
+      );
+      assert.equal(values.totalAssetKrw, '12660000.00000000');
+      assert.equal(values.usdCashKrw, '2380000.00000000');
+      assert.equal(values.cryptoValueKrw, '280000.00000000');
+      assert.equal(values.unrealizedPnlKrw, '28000.00000000');
+      assert.equal(values.realizedPnlKrw, '123.00000000');
+      assert.ok(JSON.stringify(values.fxRateSourceDecision).includes(fxId));
+      const response = await portfolio.getPortfolio(userId, tradingAccountId);
+      assert.equal(response.data.summary!.totalAssetKrw, '12660000.00000000');
+      assert.equal(response.data.summary!.returnRate, '26.60000000');
+    }
+    const live = await performance.resolveLivePerformance({
+      account,
+      valuationAt: new Date(),
+    });
+    assert.equal(live.advance.returnRate.toFixed(8), '26.60000000');
+    assert.equal(live.funding.cumulativeExternalFundingKrw.toFixed(8), CAPITAL);
+    assert.equal(live.advance.investmentPnlKrw.toFixed(8), '2660000.00000000');
+    const positiveHome = await home.getHome(userId);
+    assert.equal(
+      (positiveHome.data.summary as { totalAssetKrw: string }).totalAssetKrw,
+      '12660000.00000000',
+    );
+    const today = new Date().toISOString().slice(0, 10);
+    const jobInput = { snapshotDate: today, requestedBy: userId };
+    await new GeneralDailySnapshotJobService(batch, prisma, performance).run({
+      ...jobInput,
+      idempotencyKey: userId + '-general-daily',
+    });
+    await new DailyPortfolioSnapshotJobService(batch, prisma, valuation).run({
+      ...jobInput,
+      seasonId,
+      idempotencyKey: userId + '-season-daily',
+    });
+    for (const tradingAccountId of accountIds) {
+      const daily = await prisma.dailyPortfolioSnapshot.findUniqueOrThrow({
+        where: {
+          tradingAccountId_snapshotDate: {
+            tradingAccountId,
+            snapshotDate: new Date(today),
+          },
+        },
+      });
+      assert.equal(daily.totalAssetKrw.toFixed(8), '12660000.00000000');
+      assert.equal(daily.usdCashKrw.toFixed(8), '2380000.00000000');
+      assert.equal(daily.returnRate.toFixed(8), '26.60000000');
+    }
+    const equity = await prisma.equitySnapshot.findFirstOrThrow({
+      where: { tradingAccountId: generalId, snapshotReason: 'scheduled' },
+      orderBy: { capturedAt: 'desc' },
+    });
+    assert.equal(equity.totalAssetKrw.toFixed(8), '12660000.00000000');
+    assert.equal(equity.usdCashKrw.toFixed(8), '2380000.00000000');
+    await new RankingRefreshService(
+      prisma,
+      valuation,
+    ).refreshCurrentRankingForSeason(seasonId, { createEquitySnapshots: true });
+    await new SeasonRankingJobService(batch, prisma).run({
+      ...jobInput,
+      seasonId,
+      idempotencyKey: userId + '-daily-ranking',
+    });
+    const rankings = await prisma.seasonRanking.findMany({
+      where: { seasonId },
+    });
+    assert.ok(rankings.length >= 1);
+    assert.ok(rankings.some((r) => r.rankType === 'daily'));
+    // Current and daily share one enum/identity in this repository.
+    const rankedEquity = await prisma.equitySnapshot.findFirstOrThrow({
+      where: {
+        tradingAccountId: participant.tradingAccountId,
+        snapshotReason: 'scheduled',
+      },
+      orderBy: { capturedAt: 'desc' },
+    });
+    assert.equal(rankedEquity.totalAssetKrw.toFixed(8), '12660000.00000000');
+    assert.ok(
+      rankings.every(
+        (r) =>
+          r.totalAssetKrw.toFixed(8) === '12660000.00000000' &&
+          r.returnRate.toFixed(8) === '26.60000000',
+      ),
+    );
+    // Freeze the cutoff after the evidence; the settled result is subsequently
+    // replayed from the stored final ranking rather than recomputed.
+    const cutoff = new Date();
+    await prisma.season.update({
+      where: { id: seasonId },
+      data: { status: 'ended', endAt: cutoff },
+    });
+    const settlement = new SeasonSettlementJobService(batch, prisma, valuation);
+    await settlement.run({
+      seasonId,
+      settlementDate: today,
+      requestedBy: userId,
+      idempotencyKey: userId + '-settlement',
+    });
+    const finalBefore = await prisma.seasonRanking.findMany({
+      where: { seasonId, rankType: 'final' },
+    });
+    assert.equal(finalBefore.length, 1);
+    assert.equal(finalBefore[0].totalAssetKrw.toFixed(8), '12660000.00000000');
+    assert.equal(finalBefore[0].returnRate.toFixed(8), '26.60000000');
+    await settlement.run({
+      seasonId,
+      settlementDate: today,
+      requestedBy: userId,
+      idempotencyKey: userId + '-settlement-replay',
+    });
+    assert.deepEqual(
+      await prisma.seasonRanking.findMany({
+        where: { seasonId, rankType: 'final' },
+      }),
+      finalBefore,
+    );
+    const records = await new RecordsService(
+      prisma,
+      valuation,
+    ).getMySeasonRecordDetail(userId, seasonId);
+    assert.equal(records.data.performance.totalAssetKrw, '12660000.00000000');
+    assert.equal(
+      (
+        await prisma.tradingAccount.findUniqueOrThrow({
+          where: { id: participant.tradingAccountId },
+        })
+      ).status,
+      'closed',
+    );
+    // Structural damage must not become an empty/zero response or trigger a
+    // read-side repair, including closed Season accounts.
+    for (const tradingAccountId of accountIds) {
+      const wallet = await readWallet(tradingAccountId, 'crypto_spot');
+      await prisma.cashWallet.delete({ where: { id: wallet.id } });
+      await assert.rejects(
+        walletService.getWalletsForTradingAccount(userId, tradingAccountId),
+        (error) =>
+          (
+            error as { getResponse(): { error: { code: string } } }
+          ).getResponse().error.code ===
+          (tradingAccountId === generalId
+            ? 'GENERAL_ACCOUNT_INTEGRITY'
+            : 'FINANCIAL_SCOPE_REPAIR_REQUIRED'),
+      );
+      await assert.rejects(
+        valuation.calculateTradingAccountValuation(
+          tradingAccountId,
+          new Date(),
+        ),
+        (error) =>
+          (error as { code: string }).code === 'CASH_WALLET_UNAVAILABLE',
+      );
+      if (tradingAccountId === generalId) {
+        const audit = await auditGeneralAccounts(prisma);
+        assert.ok(
+          audit.findings.some(
+            (f) =>
+              f.tradingAccountId === generalId &&
+              f.code === 'GENERAL_ACCOUNT_CANONICAL_WALLETS_INVALID',
+          ),
+        );
+      }
+      assert.equal(
+        await prisma.cashWallet.count({ where: { tradingAccountId } }),
+        3,
+      );
+      await prisma.cashWallet.create({ data: wallet });
+    }
+    // The old performance-origin repair must not ignore funded Crypto cash
+    // and invent a 0% history. Fixture-only removal simulates a pre-origin account.
+    await prisma.position.deleteMany({
+      where: { tradingAccountId: generalId },
+    });
+    await prisma.equitySnapshot.deleteMany({
+      where: { tradingAccountId: generalId },
+    });
+    await prisma.dailyPortfolioSnapshot.deleteMany({
+      where: { tradingAccountId: generalId },
+    });
+    const securitiesUsd = await readWallet(generalId, 'securities');
+    await prisma.cashWallet.update({
+      where: { id: securitiesUsd.id },
+      data: { balanceAmount: ZERO },
+    });
+    const repair = await backfillGeneralPerformance(prisma, {
+      apply: false,
+      now: new Date(),
+    });
+    assert.ok(
+      repair.findings.some(
+        (f) =>
+          f.tradingAccountId === generalId &&
+          f.code === 'GENERAL_PERFORMANCE_HISTORY_UNRECONSTRUCTABLE' &&
+          f.detail.includes('holds USD cash'),
+      ),
+    );
+    assert.equal(
+      await prisma.equitySnapshot.count({
+        where: { tradingAccountId: generalId },
+      }),
+      0,
+    );
     console.log(
-      'General/Season provisioning, compatibility reads, valuation/TWR and scope-pinned reservations preserved',
+      'canonical provisioning, all-scope cash/FX/TWR/Home/daily/equity/ranking/settlement/records and Securities reservations verified',
     );
   } finally {
     const where = { tradingAccount: { userId } };
+    await prisma.seasonRanking.deleteMany({ where: { seasonId } });
+    await prisma.dailyPortfolioSnapshot.deleteMany({ where });
+    await prisma.position.deleteMany({ where });
     await prisma.walletTransaction.deleteMany({ where });
     await prisma.cashWallet.deleteMany({ where });
     await prisma.equitySnapshot.deleteMany({ where });
     await prisma.seasonParticipant.deleteMany({ where: { userId } });
     await prisma.tradingAccount.deleteMany({ where: { userId } });
     await prisma.fxRateSnapshot.deleteMany({ where: { id: fxId } });
+    await prisma.assetPriceSnapshot.deleteMany({ where: { assetId } });
+    await prisma.asset.deleteMany({ where: { id: assetId } });
+    await prisma.batchJobRun.deleteMany({ where: { requestedBy: userId } });
     await prisma.season.deleteMany({ where: { id: seasonId } });
     await prisma.user.deleteMany({ where: { id: userId } });
     await prisma.$disconnect();

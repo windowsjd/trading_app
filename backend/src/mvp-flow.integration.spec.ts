@@ -458,9 +458,9 @@ async function assertJoinSideEffects() {
       currencyCode: 'asc',
     },
   });
-  assert.equal(wallets.length, 2);
-  const krwWallet = wallets.find((wallet) => wallet.currencyCode === CurrencyCode.KRW);
-  const usdWallet = wallets.find((wallet) => wallet.currencyCode === CurrencyCode.USD);
+  assert.equal(wallets.length, 4);
+  const krwWallet = wallets.find((wallet) => wallet.walletScope === 'securities' && wallet.currencyCode === CurrencyCode.KRW);
+  const usdWallet = wallets.find((wallet) => wallet.walletScope === 'securities' && wallet.currencyCode === CurrencyCode.USD);
   assert.ok(krwWallet, 'join wallets: ' + JSON.stringify(wallets));
   assert.ok(usdWallet, 'join wallets: ' + JSON.stringify(wallets));
   assert.equal(formatScale8(krwWallet.balanceAmount), initialCapitalKrw);

@@ -93,6 +93,7 @@ import {
   WalletTransactionType,
 } from './src/generated/prisma/client';
 import { PrismaService } from './src/prisma/prisma.service';
+import { zeroCryptoCashWalletData } from './src/wallets/canonical-cash-wallets';
 import { OrdersService } from './src/orders/orders.service';
 import { RecordsService } from './src/records/records.service';
 import { WalletsService } from './src/wallets/wallets.service';
@@ -535,6 +536,7 @@ async function createScenario(label, options = {}) {
     },
     select: { id: true },
   });
+  await prisma.cashWallet.createMany({ data: zeroCryptoCashWalletData(tradingAccount.id) });
 
   const asset = await prisma.asset.create({
     data: {

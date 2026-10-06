@@ -53,7 +53,10 @@ describe('selected account Wallet and shared Home holdings', () => {
       Object.assign(positions[2], { name: 'Bitcoin', assetType: 'crypto', market: 'BINANCE', symbol: 'BTCUSDT', quantity: '0.00080500' });
       h.client.setQueryData(QUERY_KEYS.tradingAccount.wallets(h.account.id), {
         tradingAccountId: h.account.id, wallets: [
-          { currencyCode: 'KRW', balance: '9900000' }, { currencyCode: 'USD', balance: '50.39' },
+          { id: 'futures', walletScope: 'crypto_futures', currencyCode: 'USD', balanceAmount: '700' },
+          { id: 'spot', walletScope: 'crypto_spot', currencyCode: 'USD', balanceAmount: '500' },
+          { id: 'krw', walletScope: 'securities', currencyCode: 'KRW', balanceAmount: '9900000' },
+          { id: 'usd', walletScope: 'securities', currencyCode: 'USD', balanceAmount: '50.39' },
         ],
       });
       h.client.setQueryData(QUERY_KEYS.tradingAccount.positions(h.account.id, { limit: 1 }), { positions: positions.slice(0, 1), pagination: { total: 7 } });
@@ -76,6 +79,8 @@ describe('selected account Wallet and shared Home holdings', () => {
       assert.equal(elements(home, 'Pressable').filter((row) => row.props.testID?.startsWith('home-position-item-')).length, 7);
       assert.equal(elements(wallet, 'Pressable').filter((row) => row.props.testID?.startsWith('wallet-position-')).length, 7);
       assert.match(text(wallet), /9,900,000원/); assert.match(text(wallet), /\$50.39/);
+      assert.doesNotMatch(text(find(wallet, 'wallet-cash-USD')), /\$500|\$700|\$1,250/);
+      assert.doesNotMatch(text(wallet), /암호화폐 현물 USD|암호화폐 선물 USD/);
       assert.doesNotMatch(text(home), /자산 구성|지갑 요약|평균 매입가|현재가|987,654|80,000/);
       assert.doesNotMatch(text(wallet), /평균 매입가|현재가|987,654|80,000/);
       const nodes = elements(wallet);

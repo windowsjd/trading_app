@@ -256,6 +256,16 @@ describe('HomeService', () => {
           currencyCode: CurrencyCode.USD,
           balanceAmount: new Prisma.Decimal('100.00000000'),
         },
+        {
+          walletScope: 'crypto_spot' as const,
+          currencyCode: CurrencyCode.USD,
+          balanceAmount: new Prisma.Decimal('0.00000000'),
+        },
+        {
+          walletScope: 'crypto_futures' as const,
+          currencyCode: CurrencyCode.USD,
+          balanceAmount: new Prisma.Decimal('0.00000000'),
+        },
       ],
       positions: [
         {
@@ -504,7 +514,7 @@ describe('HomeService', () => {
     expectNoHomeWrites(prisma);
   });
 
-  it('returns KRW/USD walletSummary keys with zero fallback for missing wallet rows', async () => {
+  it('reports a missing canonical wallet without a zero-balance fallback', async () => {
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
@@ -526,15 +536,8 @@ describe('HomeService', () => {
 
     expect(response.data.mode).toBe('active_joined');
     expect(response.data.walletSummary).toMatchObject({
-      state: 'available',
-      KRW: '2500000.00000000',
-      USD: '0.00000000',
-      cashWallets: [
-        {
-          currencyCode: CurrencyCode.KRW,
-          balanceAmount: '2500000.00000000',
-        },
-      ],
+      state: 'unavailable',
+      reason: 'FINANCIAL_SCOPE_REPAIR_REQUIRED',
     });
     expectNoHomeWrites(prisma);
   });

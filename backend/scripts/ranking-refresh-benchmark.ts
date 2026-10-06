@@ -1,3 +1,4 @@
+import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
 /** Opt-in benchmark against an EMPTY, isolated loopback PostgreSQL database.
  * No environment files, providers, Redis, or HTTP are used. Driver observations
  * apply only during refresh; fixture/reset/hash/cleanup SQL is not measured.
@@ -286,6 +287,7 @@ async function seed(shape: Shape) {
           currencyCode: 'USD',
           balanceAmount: '100',
         },
+        ...zeroCryptoCashWalletData(accountId),
       ],
     });
     await db.position.createMany({

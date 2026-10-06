@@ -244,12 +244,20 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
 
 ## Financial TradingAccount Scope (Wallet/Ledger/FX 전환)
 
-- CashWallet의 지갑 식별자는 `(tradingAccountId, walletScope, currencyCode)`다.
-  `securities`는 KRW/USD, `crypto_spot`·`crypto_futures`는 USD만 허용하며 DB CHECK와
-  복합 unique로 보호한다. 기존 행의 compatibility default와 일반/시즌 신규 provisioning은
-  `securities`다. 현재 주문(암호화폐 포함)·FX·wallet API·valuation은 계속 증권 지갑을 사용한다.
-  Crypto 지갑 생성·자금 분리·이체·routing·전체 scope 평가는 후속 작업이다.
-  근거: 미래의 독립 USD 지갑을 표현하되 기존 금융 데이터·산식·공개 계약을 바꾸지 않는다.
+- CashWallet 식별자는 `(tradingAccountId, walletScope, currencyCode)`이며 DB CHECK/unique가
+  Securities KRW/USD, Crypto Spot USD, Crypto Futures USD만 허용한다. 정상 General/Season은
+  네 canonical 지갑을 가진다. 신규 Crypto는 balance/reserved 0이며 초기 지급/원장을 추가하지
+  않는다. 기존 계정도 zero-only migration으로 보완하고 기존 금융 행/정산 이력은 보존한다.
+  근거: 현금 보관 위치의 세분화가 자산 생성·재배치나 과거 성과 변경이 되어서는 안 된다.
+- 현금 평가에는 네 wallet balance를 모두 한 번씩 포함하고 USD를 합산해 workflow별 동일 FX로
+  변환한다. reservation은 총자산을 줄이지 않는다. USD 현금/position이 없으면 FX를 요구하지
+  않는다. Home/Portfolio/TWR/Equity/Daily/ranking/settlement/records의 의미도 같다.
+  근거: scope 간 현금 위치 변경은 총자산과 수익률에 중립이어야 한다.
+- 주문(현재 Crypto Spot 포함)·FX·원자적 cash mutation은 계속 Securities에 고정한다.
+  Account Wallet read는 `id`·`walletScope`를 추가해 네 지갑을 반환하고 Frontend 통화 selector는
+  Securities를 선택한다. 현재 Wallet UI/legacy projection은 유지한다. Transfer·FX Transfer·
+  Crypto Spot routing·Futures 금융 기능은 후속 작업이다.
+  근거: 실제 주문 funding과 사용자 Wallet 표시를 다음 routing 작업에서 함께 전환한다.
 - `CashWallet`, `WalletTransaction`, `ExchangeTransaction`, `FxExecuteRequest`는 required `tradingAccountId`만 저장한다. child 관계(WalletTransaction→CashWallet, FxExecuteRequest→ExchangeTransaction)도 양쪽 account가 같아야 하며 request-time repair나 participant fallback은 없다.
   근거: 금융 소유권을 participant에 중복 기록하면 두 식별자가 불일치할 수 있다.
 - TradingAccount에는 잔액·누적액·수익률 캐시 컬럼을 두지 않는다. 금융 값의 source of truth는 지갑·원장·거래·스냅샷 테이블이다.
@@ -332,7 +340,7 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
   근거: 저장된 proof는 그 자체로 재사용 가능한 자격증명이고, 키 재사용을 조용히 재검증하면 멱등성이 의미를 잃는다.
 - granted claim은 replay 전에 원장·지갑과의 1:1 정합성을 검증한다(계정·participant null·KRW 지갑·credit·`ad_reward`·`ad_reward_claim`·referenceId·금액·지갑 scope, keyed면 hash·payload·경계 snapshot 쌍까지). rejected는 ledger 없음·한도 failureCode를, pending/verified/failed는 성공 replay 금지를 요구한다. 위반은 500 `AD_REWARD_CLAIM_INTEGRITY`.
   근거: `duplicate=true, walletBalanceAfter=null`은 서버가 증명할 수 없는 지급을 성공으로 보고하는 응답이다.
-- 일반계정 금융 검사는 foundation(계정·지갑 2개·최초 지급 원장 전체 필드) + row scope 두 단계를 **항상 함께** 수행하고, 계정 재호출·지갑 조회·원장 조회·eligibility·claim·성과 경로 전부에 적용한다. 현재 잔액과 `reservedAmount`는 검사 대상이 아니다.
+- 일반계정 금융 검사는 foundation(계정·canonical 지갑 4개·최초 지급 원장 전체 필드) + row scope 두 단계를 **항상 함께** 수행하고, 계정 재호출·지갑 조회·원장 조회·eligibility·claim·성과 경로 전부에 적용한다. 현재 잔액과 `reservedAmount`는 검사 대상이 아니다.
   근거: row scope만 검사하면 USD 지갑이나 최초 지급 원장이 통째로 사라진 계정이 정상 200으로 응답한다. 반대로 잔액을 고정값으로 강제하면 정상적으로 사용된 계정이 손상으로 오판된다.
 
 ## 작업 7 (일반모드 성과·TWR·snapshot 전환)
@@ -347,9 +355,9 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
   근거: 단순 외부자금 대비 손익률은 광고를 볼 때마다 수익률이 변해 실력과 무관해지고, 반올림된 퍼센트를 되먹이면 구간이 쌓일수록 드리프트한다.
 - 완전 손실(총자산 0) 이후 factor는 0으로 고정되고 이후 외부자금이 들어와도 -100%를 유지한다. 총자산 0에서 경계 없이 양수로 변하면 `GENERAL_PERFORMANCE_DISCONTINUITY`, 음수 총자산은 `GENERAL_PERFORMANCE_INTEGRITY`다.
   근거: 자동 재기준선은 사용자의 누적 손실을 지워 없던 일로 만든다.
-- 일반계정 최초 성과 기준점은 계정 생성 트랜잭션 안에서 함께 만든다(계정·지갑 2개·최초 지급 원장·origin snapshot 5행 원자). 기존 계정에 origin이 없으면 자동 생성하지 않고 500 `GENERAL_PERFORMANCE_NOT_INITIALIZED`이며, 복구는 명시적 backfill script로만 한다.
+- 일반계정 최초 성과 기준점은 계정 생성 트랜잭션 안에서 함께 만든다(계정·지갑 4개·최초 지급 원장·origin snapshot 7행 원자). 기존 계정에 origin이 없으면 자동 생성하지 않고 500 `GENERAL_PERFORMANCE_NOT_INITIALIZED`이며, 복구는 명시적 backfill script로만 한다.
   근거: 기준점을 자동으로 만들면 그 시점 이전의 성과가 조용히 사라진다.
-- backfill script는 일반거래가 비활성이라 총자산 = 누적 외부자금이 **증명되는** 계정에만 0% baseline을 만든다. 거래 행·부분 snapshot·claim 불일치·USD 현금·알 수 없는 credit·총자산 불일치는 보고만 하고 건너뛰며 `--force`는 없다.
+- backfill script는 거래 행이 없고 모든 scope의 USD 현금이 0이며 총자산 = 누적 외부자금이 **증명되는** 계정에만 0% baseline을 만든다. 거래 행·부분 snapshot·claim 불일치·USD 현금·알 수 없는 credit·총자산 불일치는 보고만 하고 건너뛰며 `--force`는 없다.
   근거: 0% 기준선은 "아무 것도 벌거나 잃지 않았다"는 주장이고, 그 주장이 검증되지 않는 계정에서는 거짓이 된다.
 - account-scoped 포트폴리오·수익률 응답은 항상 `returnRateMethod`(`time_weighted` / `initial_capital`)를 함께 반환하고, 시즌 계정의 외부자금 필드는 0이 아니라 null이다. 가격·환율 부재는 기존 sectionErrors로, 정합성 손상은 구조화된 500으로 구분한다.
   근거: 의미가 다른 두 수익률을 같은 필드명으로 내보내면 프런트가 구분할 방법이 없고, 손상을 "일시적 불가"로 표시하면 아무도 고치지 않는다.

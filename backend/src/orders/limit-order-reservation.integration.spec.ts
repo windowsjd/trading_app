@@ -56,6 +56,7 @@ import {
   SeasonStatus,
 } from './src/generated/prisma/client';
 import { PrismaService } from './src/prisma/prisma.service';
+import { zeroCryptoCashWalletData } from './src/wallets/canonical-cash-wallets';
 import {
   debitAvailableCash,
   releaseReservedCash,
@@ -156,6 +157,12 @@ async function createScenario(label, options = {}) {
       reservedAmount: options.reserved ?? ZERO_AMOUNT,
     },
     select: { id: true },
+  });
+  await prisma.cashWallet.createMany({
+    data: [
+      { tradingAccountId: tradingAccount.id, walletScope: 'securities', currencyCode: 'USD', balanceAmount: '0', reservedAmount: '0' },
+      ...zeroCryptoCashWalletData(tradingAccount.id),
+    ],
   });
 
   let assetId = null;

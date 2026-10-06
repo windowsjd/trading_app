@@ -14,6 +14,7 @@ import type {
   FxQuoteDto,
   FxQuoteRequestDto,
   WalletBalanceDto,
+  WalletScope,
   WalletTransactionDto,
   WalletCurrency,
   WalletTransactionDirection,
@@ -159,7 +160,7 @@ export interface TradingAccountEquityDto {
 
 export interface TradingAccountWalletsDto {
   tradingAccountId: string;
-  wallets: WalletBalanceDto[];
+  wallets: (WalletBalanceDto & { id: string; walletScope: WalletScope })[];
   summary: {
     totalWallets: number;
     hasKrwWallet: boolean;

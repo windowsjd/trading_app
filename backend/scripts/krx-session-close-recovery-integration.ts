@@ -1,3 +1,4 @@
+import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
 /** Real HTTP provider contract → parser → ingestion → PostgreSQL → consumers. */
 import assert from 'node:assert/strict';
 import { randomInt, randomUUID } from 'node:crypto';
@@ -257,6 +258,7 @@ async function main() {
           currencyCode: 'USD',
           balanceAmount: '0',
         },
+        ...zeroCryptoCashWalletData(seasonAccount.id),
       ],
     });
     const expected = new Map<string, string>();

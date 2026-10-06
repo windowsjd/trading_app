@@ -205,6 +205,7 @@ import {
 } from './../src/generated/prisma/client';
 import { PrismaService } from './../src/prisma/prisma.service';
 import { RedisService } from './../src/redis/redis.service';
+import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
 import { adminDiagnosticRequestMiddleware } from './../src/common/admin-diagnostics';
 import * as argon2 from 'argon2';
 import { createHash } from 'node:crypto';
@@ -443,6 +444,10 @@ describe('AppController (e2e)', () => {
     reservedAmount: new Prisma.Decimal('0.00000000'),
     updatedAt: now,
   };
+  const cryptoWalletFixtures = (accountId: string, updatedAt: Date) => zeroCryptoCashWalletData(accountId).map(data => ({
+    ...data, id: accountId + '-' + data.walletScope,
+    balanceAmount: new Prisma.Decimal(data.balanceAmount), reservedAmount: new Prisma.Decimal(data.reservedAmount), updatedAt,
+  }));
   const refreshToken = 'r'.repeat(64);
   const refreshTokenHash = createHash('sha256')
     .update(refreshToken)
@@ -2840,7 +2845,7 @@ describe('AppController (e2e)', () => {
       seasonParticipant: null,
     };
     prisma.tradingAccount.findFirst.mockResolvedValue(existingAccount);
-    prisma.cashWallet.findMany.mockResolvedValue([
+    const walletRows = [
       {
         walletScope: 'securities' as const,
         id: 'general-krw',
@@ -2861,7 +2866,10 @@ describe('AppController (e2e)', () => {
         reservedAmount: new Prisma.Decimal('0'),
         updatedAt: openedAt,
       },
-    ]);
+      ...cryptoWalletFixtures('general-account-1', openedAt),
+    ];
+    prisma.cashWallet.findMany.mockImplementation(async (args: { where?: { walletScope?: string } }) =>
+      args.where?.walletScope ? walletRows.filter(w => w.walletScope === args.where?.walletScope) : walletRows);
     prisma.walletTransaction.findMany.mockResolvedValue([
       {
         id: 'general-grant',
@@ -3021,11 +3029,14 @@ describe('AppController (e2e)', () => {
     prisma.cashWallet.findMany.mockResolvedValueOnce([
       {
         walletScope: 'securities' as const,
+        id: 'securities-krw',
         currencyCode: 'KRW',
         balanceAmount: new Prisma.Decimal('10000000.00000000'),
         reservedAmount: new Prisma.Decimal('250000.00000000'),
         updatedAt: now,
       },
+      { ...usdWallet, id: 'securities-usd' },
+      ...cryptoWalletFixtures('trading-account-1', now),
     ]);
     const token = await createValidAccessToken();
 
@@ -3038,18 +3049,22 @@ describe('AppController (e2e)', () => {
           success: true,
           data: {
             tradingAccountId: 'trading-account-1',
-            wallets: [
-              {
+            wallets: expect.arrayContaining([
+              expect.objectContaining({
+                id: 'securities-krw', walletScope: 'securities',
                 currencyCode: 'KRW',
                 balanceAmount: '10000000.00000000',
                 reservedAmount: '250000.00000000',
                 availableAmount: '9750000.00000000',
-              },
-            ],
+              }),
+              expect.objectContaining({ id: 'securities-usd', walletScope: 'securities', currencyCode: 'USD' }),
+              expect.objectContaining({ walletScope: 'crypto_spot', currencyCode: 'USD', balanceAmount: '0.00000000' }),
+              expect.objectContaining({ walletScope: 'crypto_futures', currencyCode: 'USD', balanceAmount: '0.00000000' }),
+            ]),
             summary: {
-              totalWallets: 1,
+              totalWallets: 4,
               hasKrwWallet: true,
-              hasUsdWallet: false,
+              hasUsdWallet: true,
             },
           },
         });
@@ -3061,7 +3076,6 @@ describe('AppController (e2e)', () => {
       expect.objectContaining({
         where: {
           tradingAccountId: 'trading-account-1',
-          walletScope: 'securities',
         },
       }),
     );
@@ -3550,6 +3564,7 @@ describe('AppController (e2e)', () => {
         prisma.cashWallet.findMany.mockResolvedValueOnce([
           krwWallet,
           usdWallet,
+          ...cryptoWalletFixtures('trading-account-1', now),
         ]);
       },
       (body: Record<string, unknown>) => {
@@ -3979,7 +3994,7 @@ describe('AppController (e2e)', () => {
             }),
           }),
         );
-        expect(prisma.cashWallet.create).toHaveBeenCalledTimes(2);
+        expect(prisma.cashWallet.create).toHaveBeenCalledTimes(4);
         expect(prisma.walletTransaction.create).toHaveBeenCalledTimes(1);
         expect(prisma.equitySnapshot.create).toHaveBeenCalledWith({
           data: expect.objectContaining({

@@ -1,3 +1,4 @@
+import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
 /**
  * PostgreSQL integration for the scheduler-based limit-order matcher (paths
  * A/B). Real database, real transactions — asserts money exactness against
@@ -196,6 +197,7 @@ async function testR04CandidatePaging(): Promise<void> {
         balanceAmount: ZERO,
         reservedAmount: ZERO,
       },
+      ...zeroCryptoCashWalletData(general.id),
     ],
   });
 
@@ -910,7 +912,8 @@ async function createScenario(
     },
     select: { id: true },
   });
-  // Portfolio valuation requires both currency wallets; a zero-balance KRW
+  await prisma.cashWallet.createMany({ data: zeroCryptoCashWalletData(tradingAccount.id) });
+  // Portfolio valuation requires the four canonical wallets; a zero-balance KRW
   // wallet is enough (this asset settles in USD).
   await prisma.cashWallet.create({
     data: {

@@ -95,6 +95,7 @@ import {
   WalletTransactionType,
 } from './src/generated/prisma/client';
 import { PrismaService } from './src/prisma/prisma.service';
+import { zeroCryptoCashWalletData } from './src/wallets/canonical-cash-wallets';
 import { SeasonsService } from './src/seasons/seasons.service';
 import {
   deriveSeasonTradingAccountId,
@@ -198,6 +199,7 @@ async function createCanonicalParticipant(seasonId, userId, participantStatus) {
     },
     select: { id: true },
   });
+  await prisma.cashWallet.createMany({ data: zeroCryptoCashWalletData(accountId) });
   await prisma.walletTransaction.create({
     data: {
       tradingAccountId: accountId,

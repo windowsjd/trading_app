@@ -43,11 +43,13 @@ enabled.
 
 ## Common Rules
 
-- The current general foundation provisions and validates exactly one
-  `securities/KRW` and one `securities/USD` wallet. Wallet Scope is internal:
-  public payloads and the one-time grant remain unchanged. Crypto Spot/Futures
-  wallets are not provisioned; [scope policy](trading-modes-and-accounts.md) defines
-  the schema foundation and future boundaries.
+- The general foundation provisions and validates Securities KRW/USD, Crypto Spot
+  USD and Crypto Futures USD, one per identity. Crypto containers start at zero
+  balance/reserved and create no grant/ledger. All cash contributes to valuation/TWR.
+  General-open retains its existing two-Securities-wallet response projection;
+  account Wallet reads expose all four with `id`/`walletScope`. Initial grant and
+  ad payouts still use Securities KRW; orders/FX still use Securities. See
+  [scope policy](trading-modes-and-accounts.md) and [Wallet contract](trading-account-finance-api-contract.md).
 - Authentication required on every route (401 `UNAUTHORIZED`).
 - The accountId is explicit in the path; the server stores no "current
   account" anywhere and re-verifies ownership per request via
@@ -111,17 +113,20 @@ One DB transaction creates, in order:
 
 1. `TradingAccount` — `mode=general`, `status=active`,
    `initialCapitalKrw=10,000,000`, `openedAt=now`, `closedAt=null`
-2. KRW `CashWallet` — `tradingAccountId=<account>`, balance 10,000,000,
-   reserved 0
-3. USD `CashWallet` — same scope, balance 0, reserved 0
-4. `WalletTransaction` — `tradingAccountId=<account>`,
-   `walletId=<KRW wallet>`, `direction=credit`,
+2. Securities KRW `CashWallet` — balance 10,000,000, reserved 0
+3. Securities USD `CashWallet` — balance 0, reserved 0
+4. Crypto Spot USD `CashWallet` — balance 0, reserved 0
+5. Crypto Futures USD `CashWallet` — balance 0, reserved 0
+6. `WalletTransaction` — `tradingAccountId=<account>`,
+   `walletId=<Securities KRW wallet>`, `direction=credit`,
    `txType=initial_grant`, `referenceType=general_account_open`,
    `referenceId=<account id>`, `amount=balanceAfter=10,000,000`,
    `occurredAt=openedAt`
+7. `EquitySnapshot` origin (`general_account_open`) — the existing initial
+   funding/TWR baseline, totalAsset 10,000,000 and factor 1
 
-If ANY step fails, all four roll back together. No EquitySnapshot or
-DailyPortfolioSnapshot is written (작업 7 scope).
+If ANY step (including wallet #3/#4 or origin) fails, all seven rows roll back.
+No DailyPortfolioSnapshot or Crypto ledger is created by provisioning.
 
 ### Idempotency and concurrency
 
@@ -131,7 +136,7 @@ Enforced by the existing partial unique index
 
 - Re-calling POST returns the existing account with `created=false` and
   creates no account, wallet, or grant.
-- Concurrent POSTs converge on ONE account, ONE KRW wallet, ONE USD wallet,
+- Concurrent POSTs converge on ONE account, FOUR canonical wallets,
   and ONE `general_account_open` grant; exactly one call reports
   `created=true`. A unique violation is never surfaced as a 500 — the loser
   re-reads the winner's account and replays it.
@@ -151,8 +156,7 @@ Enforced by the existing partial unique index
 ### Damaged accounts fail closed
 
 Before replaying an existing account the server checks its structure:
-`mode=general`, no participant, `initialCapitalKrw=10,000,000`, exactly one
-KRW and one USD wallet both scoped to the account, and exactly one 10,000,000 KRW
+`mode=general`, no participant, `initialCapitalKrw=10,000,000`, all four canonical wallets scoped to the account, and exactly one 10,000,000 KRW
 `initial_grant`/`general_account_open` ledger row on the KRW wallet.
 
 Any violation → **500 `GENERAL_ACCOUNT_INTEGRITY`**. The account is NOT
@@ -257,8 +261,8 @@ Evaluation order (작업 6 보완 4) — structure before configuration:
 2. account ownership + `mode=general` (unknown and foreign ids are the same
    404; a season account is `AD_REWARD_GENERAL_ACCOUNT_ONLY`)
 3. **full general-account financial integrity**
-   (`assertGeneralAccountFinancialIntegrity`: exactly one KRW and one USD
-   wallet, both account-scoped with no participant link, exactly one
+   (`assertGeneralAccountFinancialIntegrity`: all four canonical
+   wallets, all account-scoped with no participant link, exactly one
    `initial_grant`/`general_account_open` ledger row for 10,000,000 KRW on the
    KRW wallet with the account as its `referenceId`, and no wallet or ledger
    row of this account carrying a `seasonParticipantId` or pointing at another
@@ -632,7 +636,7 @@ before. The one thing that does refuse a retry is damaged stored data.
 ## Full general-account integrity (작업 6 보완 2)
 
 `assertGeneralAccountFinancialIntegrity` = foundation check (mode, no
-participant, `initialCapitalKrw`, exactly one KRW + one USD wallet, the single
+participant, `initialCapitalKrw`, all four canonical wallets, the single
 initial grant incl. its `direction`, `balanceAfter`, and account scope) + row
 check (no wallet or ledger row carries a `seasonParticipantId`, no ledger row
 points at another account's wallet).

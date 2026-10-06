@@ -121,7 +121,11 @@ async function testActiveJoinWritePath() {
     assert.equal(state.totalAssetKrw, scenario.initialCapitalKrw);
     assert.equal(state.totalReturnRate, ZERO_AMOUNT);
     assert.equal(state.maxDrawdown, ZERO_AMOUNT);
-    assert.equal(state.walletCount, 2);
+    assert.equal(state.walletCount, 4);
+    assert.deepEqual(state.cryptoWallets, [
+      { scope: 'crypto_futures', currency: 'USD', balance: '0.00000000', reserved: '0.00000000' },
+      { scope: 'crypto_spot', currency: 'USD', balance: '0.00000000', reserved: '0.00000000' },
+    ]);
     assert.equal(state.krwWalletCount, 1);
     assert.equal(state.usdWalletCount, 1);
     assert.equal(state.krwWalletBalance, scenario.initialCapitalKrw);
@@ -187,7 +191,11 @@ async function testConcurrentDuplicateJoinRace() {
     const state = await readJoinState(scenario);
     assert.equal(await prisma.tradingAccount.count({ where: { userId: scenario.userId, mode: 'season' } }), 1);
     assert.equal(state.participantCount, 1);
-    assert.equal(state.walletCount, 2);
+    assert.equal(state.walletCount, 4);
+    assert.deepEqual(state.cryptoWallets, [
+      { scope: 'crypto_futures', currency: 'USD', balance: '0.00000000', reserved: '0.00000000' },
+      { scope: 'crypto_spot', currency: 'USD', balance: '0.00000000', reserved: '0.00000000' },
+    ]);
     assert.equal(state.krwWalletCount, 1);
     assert.equal(state.usdWalletCount, 1);
     assert.equal(state.krwWalletBalance, scenario.initialCapitalKrw);
@@ -271,6 +279,8 @@ async function testFailureInjectionRollback() {
       label: 'KRW wallet create followed by USD wallet failure',
       mode: 'usd-wallet-create-fails',
     },
+    { label: 'third wallet failure rolls back all writes', mode: 'spot-wallet-create-fails' },
+    { label: 'fourth wallet failure rolls back all writes', mode: 'futures-wallet-create-fails' },
     {
       label: 'wallet creates followed by initial grant ledger failure',
       mode: 'ledger-create-fails',
@@ -403,7 +413,7 @@ async function testJoinWinsLifecycle() {
     const equity = await prisma.equitySnapshot.findFirstOrThrow({ where: { tradingAccountId: account.id } });
     assert.equal(ledger.occurredAt.getTime(), participant.joinedAt.getTime());
     assert.equal(equity.capturedAt.getTime(), participant.joinedAt.getTime());
-    assert.equal((await readJoinState(scenario)).walletCount, 2);
+    assert.equal((await readJoinState(scenario)).walletCount, 4);
     // Same production settlement lock/state/read boundary sees the committed join.
     await prisma.$transaction(async tx => {
       const locked = await lockSeasonForWriteOrThrow(tx, scenario.seasonId);
@@ -534,6 +544,8 @@ async function readJoinState(scenario) {
           select: {
             id: true,
             currencyCode: true,
+            walletScope: true,
+            reservedAmount: true,
             balanceAmount: true,
           },
         });
@@ -581,10 +593,10 @@ async function readJoinState(scenario) {
         });
   const participant = participants[0] ?? null;
   const krwWallets = wallets.filter(
-    (wallet) => wallet.currencyCode === CurrencyCode.KRW,
+    (wallet) => wallet.walletScope === 'securities' && wallet.currencyCode === CurrencyCode.KRW,
   );
   const usdWallets = wallets.filter(
-    (wallet) => wallet.currencyCode === CurrencyCode.USD,
+    (wallet) => wallet.walletScope === 'securities' && wallet.currencyCode === CurrencyCode.USD,
   );
   const initialGrantLedgers = ledgers.filter(
     (ledger) => ledger.txType === WalletTransactionType.initial_grant,
@@ -608,6 +620,7 @@ async function readJoinState(scenario) {
       : null,
     maxDrawdown: participant ? formatScale8(participant.maxDrawdown) : null,
     walletCount: wallets.length,
+    cryptoWallets: wallets.filter((wallet) => wallet.walletScope !== 'securities').map((wallet) => ({ scope: wallet.walletScope, currency: wallet.currencyCode, balance: formatScale8(wallet.balanceAmount), reserved: formatScale8(wallet.reservedAmount) })).sort((a,b) => a.scope.localeCompare(b.scope)),
     krwWalletCount: krwWallets.length,
     usdWalletCount: usdWallets.length,
     krwWalletId: krwWallets[0]?.id ?? null,
@@ -761,6 +774,11 @@ function createJoinFailureInjectionTransaction(tx, mode) {
                   mode === 'usd-wallet-create-fails' &&
                   cashWalletCreateCalls === 2
                 ) {
+                  throw new Error('injected ' + mode);
+                }
+
+                if ((mode === 'spot-wallet-create-fails' && cashWalletCreateCalls === 3) ||
+                    (mode === 'futures-wallet-create-fails' && cashWalletCreateCalls === 4)) {
                   throw new Error('injected ' + mode);
                 }
 

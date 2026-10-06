@@ -1,3 +1,5 @@
+import { canonicalCashWalletSetIssue } from '../wallets/canonical-cash-wallets';
+import type { WalletScope } from '../generated/prisma/client';
 import {
   buildSelectionFailureEvidence,
   describeManualFallback,
@@ -97,6 +99,7 @@ type JoinedParticipant = {
   initialCapitalKrw: Prisma.Decimal;
   tradingAccount: {
     cashWallets: Array<{
+      walletScope: WalletScope;
       currencyCode: CurrencyCode;
       balanceAmount: Prisma.Decimal;
     }>;
@@ -179,7 +182,6 @@ export class HomeService {
         tradingAccount: {
           select: {
             cashWallets: {
-              where: { walletScope: 'securities' },
               select: {
                 walletScope: true,
                 currencyCode: true,
@@ -1096,25 +1098,27 @@ export class HomeService {
   }
 
   private buildWalletSummary(participant: JoinedParticipant) {
-    const walletByCurrency = new Map(
-      participant.tradingAccount.cashWallets.map((wallet) => [
-        wallet.currencyCode,
-        wallet,
-      ]),
-    );
-    const zeroAmount = new Prisma.Decimal(0);
-
+    const wallets = participant.tradingAccount.cashWallets;
+    if (canonicalCashWalletSetIssue(wallets)) {
+      return {
+        state: 'unavailable',
+        reason: 'FINANCIAL_SCOPE_REPAIR_REQUIRED',
+        message: 'The canonical cash wallet set is incomplete or invalid.',
+      };
+    }
+    const cash = (currency: CurrencyCode) =>
+      wallets
+        .filter((wallet) => wallet.currencyCode === currency)
+        .reduce(
+          (sum, wallet) => sum.add(wallet.balanceAmount),
+          new Prisma.Decimal(0),
+        );
     return {
       state: 'available',
-      KRW: this.formatDecimal(
-        walletByCurrency.get(CurrencyCode.KRW)?.balanceAmount ?? zeroAmount,
-        8,
-      ),
-      USD: this.formatDecimal(
-        walletByCurrency.get(CurrencyCode.USD)?.balanceAmount ?? zeroAmount,
-        8,
-      ),
-      cashWallets: participant.tradingAccount.cashWallets.map((wallet) => ({
+      KRW: this.formatDecimal(cash(CurrencyCode.KRW), 8),
+      USD: this.formatDecimal(cash(CurrencyCode.USD), 8),
+      cashWallets: wallets.map((wallet) => ({
+        walletScope: wallet.walletScope,
         currencyCode: wallet.currencyCode,
         balanceAmount: this.formatDecimal(wallet.balanceAmount, 8),
       })),

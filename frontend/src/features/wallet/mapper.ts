@@ -5,6 +5,7 @@ import type {
   WalletBalanceDto,
   WalletCurrency,
   WalletState,
+  WalletScope,
 } from './api';
 import { ERROR_CODE } from '../../models/enums/errorCode.ts';
 import type { WalletFxViewState } from '../../models/enums/viewState';
@@ -81,11 +82,25 @@ export function getWalletByCurrency(
   walletsDto: WalletBalanceSource | null | undefined,
   currencyCode: WalletCurrency,
 ): WalletBalanceDto | null {
-  return (
-    walletsDto?.wallets?.find(
-      (item) => (item.currencyCode ?? item.currency) === currencyCode,
-    ) ?? null
-  );
+  return getWalletByIdentity(walletsDto, 'securities', currencyCode);
+}
+
+/** Scope-aware selector; current Wallet, FX and order UI still select Securities. */
+export function getWalletByIdentity(
+  walletsDto: WalletBalanceSource | null | undefined,
+  walletScope: WalletScope,
+  currencyCode: WalletCurrency,
+): WalletBalanceDto | null {
+  const candidates = walletsDto?.wallets?.filter(
+    (wallet) => (wallet.currencyCode ?? wallet.currency) === currencyCode,
+  ) ?? [];
+  const scoped = candidates.filter((wallet) => wallet.walletScope === walletScope);
+  if (scoped.length === 1) return scoped[0];
+  if (scoped.length > 1) return null;
+  // Only the unambiguous legacy two-currency/FX projection has no scope.
+  // Never use a Crypto, unknown or duplicate USD row as Securities cash.
+  return walletScope === 'securities' && candidates.length === 1 &&
+    candidates[0].walletScope === undefined ? candidates[0] : null;
 }
 
 export function getWalletBalanceAmount(

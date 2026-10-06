@@ -46,10 +46,12 @@ current server contract.
 
 ## Common Rules
 
-- Wallet Scope foundation은 내부 식별자만 확장한다. 현재 wallet/ledger/FX 경로는
-  `securities` KRW/USD를 선택하고 request/response에는 `walletScope`를 추가하지 않는다.
-  현재 Crypto 주문도 기존 Securities USD 지갑을 사용한다. Crypto Spot/Futures 지갑 생성,
-  이체와 routing은 미구현이며 [현재 scope 정책](trading-modes-and-accounts.md)을 따른다.
+- Canonical wallets are Securities KRW/USD + Crypto Spot USD + Crypto Futures USD.
+  `GET .../wallets` adds `id` and `walletScope` and returns all four. New Crypto balances
+  and reservations are zero; all cash is included in valuation. Orders (including current
+  Crypto Spot), FX, and their cash mutations still use Securities. The legacy wallet,
+  ledger, General-open projection and FX response contracts remain unchanged.
+  See [current scope/rollout policy](trading-modes-and-accounts.md).
 - Authentication required on every route (401 `UNAUTHORIZED` without a valid
   token). User identity is `request.user.userId`.
 - The accountId is explicit in the path. The server stores no
@@ -68,8 +70,9 @@ current server contract.
 
 - Allowed for `active`, `suspended`, and `closed` accounts alike — account
   status gates asset mutation, never reads.
-- A GET never creates accounts or wallets. An account whose wallets do not
-  exist yet returns an empty `wallets` array (`summary.totalWallets = 0`).
+- A GET never creates accounts or wallets. A season account whose wallets
+  are missing/duplicated/invalid fails closed with 500 `FINANCIAL_SCOPE_REPAIR_REQUIRED`.
+  There is no zero-balance substitute, fallback, or request-time wallet creation.
 - Rows are scoped by the financial rows' own `tradingAccountId` (never by a
   client-provided participant id); no other account's rows can appear.
 - Account-owned financial rows have one required ownership key:
@@ -78,7 +81,7 @@ current server contract.
   transaction belongs to another account. A disagreement fails closed with
   500 `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`; no request-time repair or
   participant-derived fallback exists.
-- General-account reads additionally validate the fixed two-wallet and initial
+- General-account reads additionally validate the fixed four-wallet and initial
   grant foundation. A broken participant link on a general account, missing
   wallet/grant, or cross-account child relation is 500
   `GENERAL_ACCOUNT_INTEGRITY`. A GET never creates a wallet, account, grant,
@@ -91,6 +94,8 @@ current server contract.
   "tradingAccountId": "<string>",
   "wallets": [
     {
+      "id": "<canonical CashWallet id>",
+      "walletScope": "securities | crypto_spot | crypto_futures",
       "currencyCode": "KRW | USD",
       "balanceAmount": "<amount string>",
       "reservedAmount": "<amount string>",
@@ -98,9 +103,16 @@ current server contract.
       "updatedAt": "<UTC ISO string>"
     }
   ],
-  "summary": { "totalWallets": 0, "hasKrwWallet": false, "hasUsdWallet": false }
+  "summary": { "totalWallets": 4, "hasKrwWallet": true, "hasUsdWallet": true }
 }
 ```
+
+There is one row per allowed identity (Securities KRW/USD, Crypto Spot USD, Crypto
+Futures USD). Rows are ordered by WalletScope then currency (Securities first);
+clients must select `(walletScope, currencyCode)`, never currency alone. The current
+Frontend selectors explicitly use Securities and preserve per-account cache keys
+and response ownership checks; the visible Wallet structure is unchanged. Deploy
+this client adaptation with the backend. No new endpoint/version/filter is needed.
 
 `availableAmount = balanceAmount - reservedAmount`, same as the legacy API.
 

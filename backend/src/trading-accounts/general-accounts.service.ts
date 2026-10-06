@@ -1,3 +1,4 @@
+import { zeroCryptoCashWalletData } from '../wallets/canonical-cash-wallets';
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import {
   CurrencyCode,
@@ -28,7 +29,7 @@ import {
  * initial-grant ledger row.
  *
  * Everything the first call writes lives in a SINGLE transaction: if any
- * step fails, the account, both wallets, and the grant roll back together —
+ * step fails, the account, all wallets, and the grant roll back together —
  * a half-opened account can never be observed.
  *
  * NOT done here, on purpose:
@@ -170,6 +171,10 @@ export class GeneralAccountsService {
         select: { id: true },
       });
 
+      for (const data of zeroCryptoCashWalletData(account.id)) {
+        await tx.cashWallet.create({ data });
+      }
+
       // The one-time 10,000,000 KRW grant. referenceType/referenceId make it
       // unique per account through the partial unique index, so even a
       // pathological double-write cannot double-grant.
@@ -192,7 +197,7 @@ export class GeneralAccountsService {
       // The performance ORIGIN (작업 7). It lives in this same transaction so
       // a general account can never exist without the baseline every later
       // TWR advance is measured from — and so a failure here rolls the
-      // account, both wallets, and the grant back with it.
+      // account, all wallets, and the grant back with it.
       await tx.equitySnapshot.create({
         data: this.performanceService.buildOriginSnapshotData({
           tradingAccountId: account.id,

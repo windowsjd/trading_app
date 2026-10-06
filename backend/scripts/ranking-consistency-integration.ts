@@ -1,3 +1,4 @@
+import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
 /** Opt-in, isolated PostgreSQL. No provider/Redis/HTTP calls or environment-file
  * loading. Fixtures are uniquely named and only their IDs are cleaned up. */
 import assert from 'node:assert/strict';
@@ -126,6 +127,7 @@ async function fixture(count = 2) {
           currencyCode: 'USD',
           balanceAmount: '0',
         },
+        ...zeroCryptoCashWalletData(account.id),
       ],
     });
   }

@@ -84,6 +84,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { HttpException } from '@nestjs/common';
 import { PrismaService } from './src/prisma/prisma.service';
+import { zeroCryptoCashWalletData } from './src/wallets/canonical-cash-wallets';
 import { PortfolioValuationService } from './src/portfolio/portfolio-valuation.service';
 import { RankingRefreshService } from './src/ranking/ranking-refresh.service';
 import { BatchService } from './src/batch/batch.service';
@@ -220,6 +221,7 @@ async function createSeasonWithParticipants(options) {
         },
       });
     }
+    await prisma.cashWallet.createMany({ data: zeroCryptoCashWalletData(account.id) });
     participants.push({
       id: participant.id,
       userId: participant.userId,

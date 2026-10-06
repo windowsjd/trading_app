@@ -1,3 +1,4 @@
+import { CANONICAL_CASH_WALLET_IDENTITIES } from './canonical-cash-wallets';
 jest.mock('../generated/prisma/client', () => {
   const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
 
@@ -62,11 +63,23 @@ const fixture = JSON.parse(
 
 const NOW = new Date('2026-08-03T00:00:00.000Z');
 
+const canonicalWallets = () =>
+  CANONICAL_CASH_WALLET_IDENTITIES.map((identity, index) => ({
+    ...identity,
+    id: 'wallet-' + index,
+    tradingAccountId: 'ta-1',
+    balanceAmount: new Prisma.Decimal(index === 0 ? '10000000' : '0'),
+    reservedAmount: new Prisma.Decimal(index === 0 ? '250000' : '0'),
+    updatedAt: NOW,
+  }));
+
 const createServices = (accountStatus = 'active') => {
   const prisma = {
     order: { findMany: jest.fn().mockResolvedValue([]) },
     cashWallet: {
-      findMany: jest.fn().mockResolvedValue([]),
+      findMany: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve(canonicalWallets())),
       // Retained participant metadata agrees with the canonical account.
       findFirst: jest.fn().mockResolvedValue(null),
     },
@@ -149,45 +162,53 @@ describe('WalletsService account-scoped reads', () => {
     );
   });
 
-  it('queries wallets by the account scope and serializes like the legacy API', async () => {
+  it('serializes four canonical wallets with explicit scope and stable IDs', async () => {
     const { prisma, service } = createServices();
-    prisma.cashWallet.findMany.mockResolvedValueOnce([
-      {
-        walletScope: 'securities' as const,
-        currencyCode: 'KRW',
-        balanceAmount: new Prisma.Decimal('10000000.00000000'),
-        reservedAmount: new Prisma.Decimal('250000.00000000'),
-        updatedAt: NOW,
-      },
-    ]);
-
     const response = await service.getWalletsForTradingAccount(
       'user-1',
       ' ta-1 ',
     );
-
     expect(prisma.cashWallet.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { tradingAccountId: 'ta-1', walletScope: 'securities' },
+        where: { tradingAccountId: 'ta-1' },
+        orderBy: [{ walletScope: 'asc' }, { currencyCode: 'asc' }],
       }),
     );
-    expect(response.data).toEqual({
-      tradingAccountId: 'ta-1',
-      wallets: [
-        {
-          currencyCode: 'KRW',
-          balanceAmount: '10000000.00000000',
-          reservedAmount: '250000.00000000',
-          availableAmount: '9750000.00000000',
-          updatedAt: NOW.toISOString(),
-        },
-      ],
-      summary: {
-        totalWallets: 1,
-        hasKrwWallet: true,
-        hasUsdWallet: false,
-      },
+    expect(response.data.wallets).toEqual(
+      canonicalWallets().map((wallet) => ({
+        id: wallet.id,
+        walletScope: wallet.walletScope,
+        currencyCode: wallet.currencyCode,
+        balanceAmount: wallet.balanceAmount.toFixed(8),
+        reservedAmount: wallet.reservedAmount.toFixed(8),
+        availableAmount: wallet.balanceAmount
+          .sub(wallet.reservedAmount)
+          .toFixed(8),
+        updatedAt: NOW.toISOString(),
+      })),
+    );
+    expect(response.data.summary).toEqual({
+      totalWallets: 4,
+      hasKrwWallet: true,
+      hasUsdWallet: true,
     });
+  });
+
+  it('fails closed on missing or duplicate canonical wallets without a read-side repair', async () => {
+    for (const wallets of [
+      canonicalWallets().slice(0, 3),
+      [...canonicalWallets(), canonicalWallets()[0]],
+      [],
+    ]) {
+      const { prisma, service } = createServices();
+      prisma.cashWallet.findMany.mockResolvedValueOnce(wallets);
+      await expectStatusAndCode(
+        service.getWalletsForTradingAccount('user-1', 'ta-1'),
+        500,
+        'FINANCIAL_SCOPE_REPAIR_REQUIRED',
+      );
+      expect(prisma.cashWallet.findMany).toHaveBeenCalledTimes(1);
+    }
   });
 
   it('reads suspended and closed accounts (reads are never status-gated) without creating wallets', async () => {
@@ -199,8 +220,8 @@ describe('WalletsService account-scoped reads', () => {
         'ta-1',
       );
 
-      expect(response.data.wallets).toEqual([]);
-      expect(response.data.summary.totalWallets).toBe(0);
+      expect(response.data.wallets).toHaveLength(4);
+      expect(response.data.summary.totalWallets).toBe(4);
       // A GET never creates wallets/accounts.
       expect(prisma.cashWallet.findMany).toHaveBeenCalledTimes(1);
     }

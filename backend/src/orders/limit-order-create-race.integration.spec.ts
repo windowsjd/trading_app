@@ -80,6 +80,7 @@ import {
   UserRole,
 } from './src/generated/prisma/client';
 import { PrismaService } from './src/prisma/prisma.service';
+import { zeroCryptoCashWalletData } from './src/wallets/canonical-cash-wallets';
 import { OrdersService } from './src/orders/orders.service';
 import { LimitOrderCreateService } from './src/orders/limit-order-create.service';
 import { LimitOrderCancelService } from './src/orders/limit-order-cancel.service';
@@ -257,6 +258,12 @@ async function createScenario(label) {
       reservedAmount: ZERO_AMOUNT,
     },
     select: { id: true },
+  });
+  await prisma.cashWallet.createMany({
+    data: [
+      { tradingAccountId: tradingAccount.id, walletScope: 'securities', currencyCode: 'USD', balanceAmount: '0', reservedAmount: '0' },
+      ...zeroCryptoCashWalletData(tradingAccount.id),
+    ],
   });
 
   // Crypto settles in the asset currency and is tradable 24h, so the race

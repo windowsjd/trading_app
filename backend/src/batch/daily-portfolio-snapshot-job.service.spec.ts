@@ -1269,6 +1269,8 @@ function participantDetail(input: {
         currencyCode: CurrencyCode.USD,
         balanceAmount: new Prisma.Decimal(input.usdCash ?? '0.00000000'),
       },
+      { walletScope: 'crypto_spot' as const, currencyCode: CurrencyCode.USD, balanceAmount: new Prisma.Decimal('0.00000000') },
+      { walletScope: 'crypto_futures' as const, currencyCode: CurrencyCode.USD, balanceAmount: new Prisma.Decimal('0.00000000') },
     ],
     positions: input.positions ?? [],
   };

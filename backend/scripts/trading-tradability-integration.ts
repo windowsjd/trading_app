@@ -1,3 +1,4 @@
+import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
 /** Real PostgreSQL proof of asset state versus account trading authority. */
 import 'dotenv/config';
 import assert from 'node:assert/strict';
@@ -126,6 +127,7 @@ async function fixture(mode: TradingAccountMode) {
           balanceAmount: '0',
           reservedAmount: '0',
         },
+        ...zeroCryptoCashWalletData(accountId),
       ],
     });
   const asset = await prisma.asset.create({

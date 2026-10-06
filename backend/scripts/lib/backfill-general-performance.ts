@@ -1,3 +1,4 @@
+import { canonicalCashWalletSetIssue } from '../../src/wallets/canonical-cash-wallets';
 import { Prisma, type PrismaClient } from '../../src/generated/prisma/client';
 
 /**
@@ -10,8 +11,8 @@ import { Prisma, type PrismaClient } from '../../src/generated/prisma/client';
  *
  * WHY A 0% BASELINE IS SAFE HERE
  * ------------------------------
- * General-mode trading (orders, FX, positions) has never been enabled. An
- * eligible account therefore cannot have earned or lost anything: its total
+ * Only an untouched account without orders, FX or positions is eligible.
+ * Such an account cannot have earned or lost anything: its total
  * assets must equal exactly the external funding it received. Under that
  * condition — and only that condition — investment PnL is 0 and a factor of 1
  * is the truth, not an assumption. The script verifies it row by row instead
@@ -127,8 +128,7 @@ export async function backfillGeneralPerformance(
       continue;
     }
 
-    // General trading must still be disabled for this account: any trading row
-    // means the 0% baseline assumption below is not verifiable.
+    // Any trading row makes an untouched 0% baseline unverifiable.
     const [orders, positions, exchanges, fxRequests] = await Promise.all([
       prisma.order.count({ where: { tradingAccountId: account.id } }),
       prisma.position.count({ where: { tradingAccountId: account.id } }),
@@ -148,7 +148,7 @@ export async function backfillGeneralPerformance(
     }
 
     const wallets = await prisma.cashWallet.findMany({
-      where: { walletScope: 'securities', tradingAccountId: account.id },
+      where: { tradingAccountId: account.id },
       select: {
         walletScope: true,
         id: true,
@@ -157,9 +157,11 @@ export async function backfillGeneralPerformance(
         reservedAmount: true,
       },
     });
-    const krw = wallets.filter((w) => w.currencyCode === 'KRW');
+    const krw = wallets.filter(
+      (w) => w.walletScope === 'securities' && w.currencyCode === 'KRW',
+    );
     const usd = wallets.filter((w) => w.currencyCode === 'USD');
-    if (krw.length !== 1 || usd.length !== 1 || wallets.length !== 2) {
+    if (canonicalCashWalletSetIssue(wallets)) {
       add(
         'GENERAL_PERFORMANCE_FINANCIAL_INTEGRITY',
         `unexpected wallets (KRW=${krw.length}, USD=${usd.length}, total=${wallets.length})`,
@@ -238,11 +240,11 @@ export async function backfillGeneralPerformance(
       continue;
     }
 
-    // The decisive condition: with trading disabled, total assets MUST equal
+    // The decisive condition: for an untouched account, total assets MUST equal
     // the external funding received. Cash only, so no price/FX lookup is
     // involved and the comparison is exact.
-    const totalAsset = krw[0].balanceAmount.add(usd[0].balanceAmount);
-    if (!usd[0].balanceAmount.isZero()) {
+    const totalAsset = krw[0].balanceAmount;
+    if (usd.some((wallet) => !wallet.balanceAmount.isZero())) {
       add(
         'GENERAL_PERFORMANCE_HISTORY_UNRECONSTRUCTABLE',
         'account holds USD cash, which cannot exist without FX; the baseline cannot be derived',

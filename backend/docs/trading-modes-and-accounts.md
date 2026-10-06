@@ -21,47 +21,59 @@
 
 이 현재 상태가 아래 과거 전환 단계 설명보다 우선한다.
 
-### CashWallet의 Wallet Scope foundation (2026-10-06, current)
+### CashWallet의 canonical Wallet Scope (2026-10-06, current)
 
-`TradingAccount`는 계속 금융 소유권·일반/시즌 격리 경계다. 그 안에서
+`TradingAccount`는 금융 소유권·일반/시즌 격리 경계이며, 그 안에서
 `CashWallet`의 금융 식별자는 `(tradingAccountId, walletScope, currencyCode)`다.
-`WalletScope`는 기존 enum convention에 맞춰 `securities`, `crypto_spot`,
-`crypto_futures`를 사용한다. 이는 UI 라벨이 아니라 지갑 고유키의 일부다.
+`WalletScope`는 UI 라벨이 아니라 지갑 고유키의 일부다.
 
-| Wallet Scope | 허용 통화 | 현재 사용 |
+| Wallet Scope | 허용 통화 | 현재 provisioning / 거래 |
 | --- | --- | --- |
-| `securities` | KRW, USD | 기존 금융 경로의 KRW/USD 지갑 두 개 |
-| `crypto_spot` | USD | 스키마에서만 표현 가능 |
-| `crypto_futures` | USD | 스키마에서만 표현 가능 |
+| `securities` | KRW, USD | 기존 초기자금·주문·FX 경로 유지 |
+| `crypto_spot` | USD | balance/reserved 0으로 생성, 주문 funding 전환은 다음 작업 |
+| `crypto_futures` | USD | balance/reserved 0으로 생성, Futures 기능 없음 |
 
-DB의 NOT NULL enum, scope/currency CHECK, 복합 unique가 잘못된 조합과
-동일 식별자의 중복을 막는다. 같은 계정의 USD 지갑은 서로 다른 scope로
-공존할 수 있지만 이번 단계의 provisioning은 일반/시즌 모두
-`securities/KRW`, `securities/USD`만 만든다. 미국주식과 **현재 암호화폐
-현물 주문도** 기존과 같이 `securities/USD`를 사용한다. 암호화폐 현물의
-`crypto_spot/USD` routing은 후속 작업이다.
+정상 계정은 위 네 identity를 각각 정확히 하나씩 가진다. DB NOT NULL enum,
+scope/currency CHECK, 복합 unique와 서버의 canonical set 검증이 누락·중복·
+잘못된 조합을 fail-closed한다. GET/일반 금융 요청에서 지갑을 생성하거나
+다른 scope로 fallback하지 않는다. General 최초 지급은 Securities KRW 한
+지갑에만 기존 금액으로 발생하고 Crypto 생성은 원장·추가 지급을 만들지 않는다.
+General/Season provisioning은 기존 transaction 안에서 네 지갑을 함께 만든다.
 
-기존 행은 새 column의 `securities` 기본값으로 분류한다. migration은
-schema compatibility 변경이며 wallet ID·계정·통화·balance·reserved·timestamps·
-WalletTransaction와 다른 금융 관계를 수정하지 않는다. 자금 이동·분할,
-추가 지급·원장 생성·Crypto 금액 추론은 하지 않는다.
+기존 계정은 `20261006130000_provision_canonical_crypto_cash_wallets` migration에서
+누락된 Crypto USD 두 지갑만 0으로 보완한다. Closed/settled 계정도 보완하지만
+기존 wallet ID·계정·통화·balance·reserved·timestamps·ledger/order/position/FX 관계,
+저장된 수익률·snapshot·ranking·settlement 결과는 수정하지 않는다. 이미 존재하는
+Crypto 지갑도 그대로 보존한다. Securities KRW/USD가 손상된 계정은 migration
+전체를 중단하여 별도 audit/명시적 수리 대상으로 남긴다. 자금 분할·이동·Crypto
+금액 추론·historical rewriting은 없다. SQL은 transaction과 account→wallet table
+lock을 사용하고 중복 삽입은 unique conflict로 막는다. CHECK는 Prisma DSL에서
+표현하지 못하므로 기존 migration SQL이 계속 관리한다.
 
-CHECK는 Prisma schema로 모델링할 수 없어 migration SQL에서 관리한다.
-DB 초기화·배포는 기존 `prisma migrate deploy` 경로를 사용한다. 새 schema를
-먼저 적용한 뒤 재생성한 Prisma client를 포함한 서버를 배포한다.
+배포는 **계정 생성 및 금융 write를 중지한 상태에서** 기존 `prisma migrate deploy`
+후 새 서버와 frontend를 배포한다. 이전 서버는 두 지갑만 만들므로 migration과
+서버 교체 사이에 provisioning을 허용하면 안 된다. schema는 이전 Wallet Scope
+foundation과 같아 Prisma enum/column/index 추가는 없다.
 
-현재 wallet/ledger API, 주문·FX의 조회/원자적 변경, Home·valuation 및
-일반계정 foundation/audit는 증권 지갑을 명시적으로 선택한다. 지갑 종류를
-받지 않는 공개 API에는 아직 `walletScope`를 노출하지 않는다. 기존
-valuation 입력은 계속 증권 KRW/USD 두 지갑이며 금융 산식은 같다.
-`balanceAmount`는 총 보유 현금, `reservedAmount`는 submitted 지정가 BUY
-예약금, `availableAmount = balanceAmount - reservedAmount`는 파생값이다.
-예약은 총자산에서 차감하지 않으며 margin/이체 예약으로 재사용하지 않는다.
+총 현금은 모든 canonical wallet의 `balanceAmount` 합계다. USD 세 지갑의
+balance를 Decimal로 먼저 합산하고 기존 Spot Position과 동일 workflow의 단일
+canonical USD/KRW evidence로 평가한다. 모든 USD 현금이 0이고 USD position이
+없으면 FX에 의존하지 않는다. Portfolio/Home/General TWR/Equity/Daily snapshot/
+season live ranking/settlement/records는 동일 valuation 의미를 사용한다. Futures
+wallet의 cash만 포함하며 Futures PnL·margin은 추가하지 않는다. 현금 위치만
+scope 사이에서 바뀌어도 총현금·총자산은 같다. aggregate cash는 별도로 저장하지 않는다.
+`balanceAmount`는 총 보유 현금, `reservedAmount`는 submitted 지정가 BUY 예약금,
+`availableAmount = balanceAmount - reservedAmount`는 파생값이다. 예약은 총자산에서
+차감하지 않으며 margin/이체 예약으로 재사용하지 않는다.
 
-Crypto Spot/Futures provisioning·transfer·주문 routing·Futures 금융 의미는
-미구현이다. 실제 Crypto 지갑/자금을 도입하기 전에 공개 API와 전체 scope의
-valuation·snapshot·TWR·ranking/settlement 포함 정책을 후속 작업에서 정해야
-한다. 현재의 증권 지갑 전용 조회를 전체 지갑 집계로 해석하면 안 된다.
+Account Wallet API는 네 지갑을 `id`·`walletScope`·`currencyCode`로 식별하여 반환한다.
+기존 Frontend Wallet/FX/order 화면의 통화 조회는 Securities를 명시적으로 선택하고
+계정별 query key/ownership echo 검증을 유지한다. 화면의 지갑 구분 UI는 아직 바꾸지
+않는다. Legacy `/wallets`와 General-open의 기존 two-wallet projection은 유지한다.
+미국주식과 **현재 Crypto Spot 주문의 전체 lifecycle도 아직 Securities USD**를
+사용한다. FX도 Securities KRW↔USD에만 적용한다. 현재 ledger/FX 응답 계약은 유지한다.
+Crypto Spot routing 전환과 Wallet UI 구조 변경은 다음 작업이며, Transfer/FX Transfer/
+Futures Position·margin·engine은 미구현이다.
 
 - SeasonRanking.tradingAccountId도 `20260910120000` migration에서 NOT NULL로 강화됐다. participant relation은 시즌 랭킹 식별자로 유지한다.
 - 일반 TWR/외부자금 경계, 양 모드 market/limit BUY·SELL 및 FX, 정산 transaction의 모든 season account 종료는 구현되어 있다.
@@ -129,7 +141,7 @@ valuation·snapshot·TWR·ranking/settlement 포함 정책을 후속 작업에�
     분리 유지), 커밋된 지급은 계정 상태·기능 설정·provider 등록 상태와
     무관하게 최초 결과 replay, 같은 키 다른 요청은 409
     `AD_REWARD_IDEMPOTENCY_CONFLICT`
-  - 일반계정 전체 금융 integrity(계정·지갑 2개·최초 지급 원장 전 필드 +
+  - 일반계정 전체 금융 integrity(계정·canonical 지갑 4개·최초 지급 원장 전 필드 +
     row scope)를 계정 재호출·지갑/원장 조회·eligibility·claim·성과 경로 전부에
     적용
   - granted/rejected claim replay 전 원장·지갑 1:1 정합성 검증
@@ -138,7 +150,7 @@ valuation·snapshot·TWR·ranking/settlement 포함 정책을 후속 작업에�
     backfill + 신규 writer dual-write + 일반 행은 participant 없이 계정만)
   - 일반모드 시간가중수익률(TWR), 외부자금 allow-list 집계, 투자손익,
     외부자금 before/after 경계 snapshot(광고 지급 트랜잭션 내 원자 처리)
-  - 일반계정 생성 트랜잭션에 최초 성과 기준점 포함(5행 원자)
+  - 일반계정 생성 트랜잭션에 최초 성과 기준점 포함(현재 canonical 지갑 4개를 포함한 7행 원자)
   - account-scoped `GET .../portfolio`·`GET .../portfolio/equity`
     (`returnRateMethod`로 TWR/초기자본 수익률 구분)
   - 운영 스크립트 `trading-accounts:repair-snapshot-scope`,

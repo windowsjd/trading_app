@@ -11,17 +11,15 @@ login → 계정/모드 선택 → 시즌 참가 또는 일반계정 개설/재�
 ## Fixed Rules
 
 ### Wallet
-- KRW wallet
-- USD wallet
-- 현재 두 wallet은 `securities` scope다. Crypto Spot/Futures USD는 DB/domain
-  foundation만 있으며 provisioning·transfer·order routing은 후속 작업이다.
-
-### 초기값
-- KRW 10,000,000
-- USD 0
+- Canonical set: Securities KRW/USD + Crypto Spot USD + Crypto Futures USD
+- 초기 지급은 기존 Securities KRW 10,000,000 / USD 0, Crypto 두 지갑은 balance/reserved 0
+- 모든 scope cash는 평가에 포함하되 현재 주문(암호화폐 포함)·FX는 Securities를 사용한다.
+- Transfer·Crypto Spot routing·Futures 금융 기능과 지갑 UI 전환은 후속 작업이다.
+- 기존 계정은 배포 migration에서 zero Crypto 지갑만 추가하며 GET 자동 복구를 금지한다.
 
 ### 평가
-총자산 = KRW + (USD × 환율) + 자산 평가금액
+총자산 = 모든 KRW cash + (모든 USD cash × 동일 canonical FX) + 기존 Spot 자산 평가금액
+예약은 balance에서 차감하지 않는다. USD cash/position이 모두 0이면 FX가 필요하지 않다.
 
 ### API 규칙
 - 모든 금액 문자열

@@ -1,3 +1,4 @@
+import { canonicalCashWalletSetIssue } from '../wallets/canonical-cash-wallets';
 import {
   AssetPriceSourceType,
   AssetType,
@@ -347,30 +348,22 @@ export function isFxSnapshotStaleForPortfolioValuation(
 }
 
 function assertRequiredWallets(wallets: readonly PortfolioCashWalletInput[]) {
-  const hasKrwWallet = wallets.some(
-    (wallet) => wallet.currencyCode === CurrencyCode.KRW,
-  );
-  const hasUsdWallet = wallets.some(
-    (wallet) => wallet.currencyCode === CurrencyCode.USD,
-  );
-
-  if (!hasKrwWallet || !hasUsdWallet) {
+  const issue = canonicalCashWalletSetIssue(wallets);
+  if (issue === 'missing') {
     throw new PortfolioValuationError(
       'CASH_WALLET_UNAVAILABLE',
-      'KRW and USD cash wallets are required for portfolio valuation.',
+      'All four canonical cash wallets are required for portfolio valuation.',
     );
   }
-
   if (
-    wallets.length !== 2 ||
-    wallets.some((wallet) => wallet.walletScope !== 'securities') ||
+    issue === 'invalid' ||
     wallets.some((wallet) =>
       toDecimal(wallet.balanceAmount, 'balanceAmount').lt(0),
     )
   ) {
     throw new PortfolioValuationError(
       'CASH_WALLET_INVALID',
-      'Exactly one non-negative securities KRW and USD cash wallet is required.',
+      'Exactly one non-negative cash wallet per canonical scope/currency is required.',
     );
   }
 }

@@ -1,3 +1,4 @@
+import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
 /** Opt-in, isolated rows; real PostgreSQL transactions, no production adapter. */
 import { tradingSessions } from '../test/support/trading-session-fixture';
 import 'dotenv/config';
@@ -184,6 +185,7 @@ async function fixture(
           currencyCode: 'USD',
           balanceAmount: '0',
         },
+        ...zeroCryptoCashWalletData(accountId),
       ],
     });
   }
@@ -394,7 +396,7 @@ async function fill(
       after.positions[0].averageCost.toFixed(8),
       net.div(expected).toFixed(8),
     );
-  const wallet = after.wallets.find((w) => w.currencyCode === f.currency)!;
+  const wallet = after.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === f.currency)!;
   assert.equal(
     wallet.balanceAmount.toFixed(),
     side === 'buy'

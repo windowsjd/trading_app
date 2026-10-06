@@ -1,3 +1,4 @@
+import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
 /** Actual market create/execute and limit fill transactions with closed KRX holdings. */
 import 'dotenv/config';
 import assert from 'node:assert/strict';
@@ -144,6 +145,7 @@ async function fixture() {
         currencyCode: 'USD',
         balanceAmount: '1000',
       },
+      ...zeroCryptoCashWalletData(account.id),
     ],
   });
   const stock = await prisma.asset.create({

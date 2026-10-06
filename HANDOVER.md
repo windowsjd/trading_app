@@ -10,6 +10,215 @@
 
 ---
 
+## 2026-10-06 — canonical Crypto USD 지갑 활성화와 전체 현금 평가
+
+- 의도: TradingAccount가 증권 KRW/USD와 암호화폐 현물/선물 USD라는 실제 현금 보관
+  구조를 갖도록 하되, 기존 돈을 이동하거나 추가 지급하지 않고 모든 지갑의 소유 현금을
+  총자산·성과·정산에 일관되게 포함했다. 실제 Crypto Spot 주문 funding과 지갑 UI 전환은
+  다음 작업으로 남겼다.
+- 시작 시 `git fetch origin main`을 다시 수행했다. 브랜치 `main`, HEAD 및
+  `origin/main`은 모두 `4b69fefd0956012944d977371db6b7112f359406`이고 working tree는 clean이었다.
+  Prisma/Wallet Scope migration, General/Season provisioning, Wallet/ledger API,
+  frontend DTO/mapper/query/화면, integrity/audit/repair/backfill, 주문/예약/FX,
+  valuation semantic parity/TWR/Home/Equity/Daily/ranking/settlement/records 및
+  직접 wallet을 생성하는 fixtures/benchmark를 수정 전에 조사했다.
+- 조사 결과 기존 pure valuation은 이미 USD 현금을 Decimal로 합산하고 position과 같은
+  canonical FX evidence를 사용하는 구조였다. 별도 valuation 엔진이나 aggregate balance를
+  만들지 않고 Securities 전용 holdings 필터와 입력 shape만 확장했다. Orders의 별도
+  post-fill snapshot 입력도 포함한다. Home의 currency→단일 wallet Map은 다중 USD를
+  덮어쓰므로 통화별 Decimal 합산으로 바꿨다. 수익률·PnL·ranking/settlement 산식은 같다.
+- 작은 공통 helper `canonical-cash-wallets.ts`가 네 identity, zero Crypto 생성 data와
+  누락/중복/잘못된 조합 검증만 공유한다. 지갑 subsystem/transfer/margin abstraction은 없다.
+  DB의 기존 enum·NOT NULL·scope/currency CHECK·복합 unique도 그대로 재사용한다.
+- General open/Season join/dev baseline은 기존 transaction 안에서 Securities KRW/USD +
+  Crypto Spot USD + Crypto Futures USD를 생성한다. Crypto balance/reserved는 모두 0이다.
+  기존 초기자금, Securities 잔액, initial-grant wallet/reference/금액과 origin snapshot은
+  그대로다. General은 계정+4 wallet+grant+origin 7행 원자이며 Season도 기존 participant/
+  account/grant/Equity/ranking transaction을 유지한다. #3/#4 wallet 실패 시 전체 rollback,
+  중복/동시 개설 및 join/lifecycle 경쟁의 기존 결과를 실제 DB에서 검증했다.
+- 기존 계정 보완은 data-only migration
+  `20261006130000_provision_canonical_crypto_cash_wallets`로 일괄 수행한다. account→wallet
+  table lock과 명시적 transaction 안에서 모든 계정의 Securities KRW/USD를 먼저 검증하고,
+  누락된 Crypto USD만 balance/reserved 0으로 INSERT한다. closed/settled 계정도 포함한다.
+  identity unique의 ON CONFLICT는 이미 존재하는 Crypto 행을 수정하지 않으며 재실행도
+  새 ID/timestamp/ledger를 만들지 않는다. Securities가 손상되면 migration 전체를 중단한다.
+  UPDATE/DELETE/자금 추론/분할/원장 생성/관계 재작성/과거 결과 재평가는 없다.
+- 배포 경계: **계정 생성과 금융 write를 중지한 상태에서 migration → 새 서버와
+  frontend 배포**를 진행한다. 구버전 서버는 두 wallet만 생성하므로 migration과 서버
+  교체 사이에 provisioning을 허용하면 안 된다. 적용 시간은 table lock 및 실제 계정 수에
+  따라 운영에서 확인해야 한다. GET/일반 요청에서 missing wallet을 생성하는 기능은 없다.
+- Account Wallet `GET /api/v1/trading-accounts/:accountId/wallets`는 각 행에 `id`와
+  `walletScope`를 추가하고 네 wallet을 반환한다. 정렬은 scope→currency, Securities부터다.
+  누락/중복/잘못된 shape는 Season `FINANCIAL_SCOPE_REPAIR_REQUIRED`, General foundation
+  `GENERAL_ACCOUNT_INTEGRITY`로 fail-closed한다. 계정 ownership/echo 및 child row scope
+  검증은 유지한다. legacy `/wallets`, General-open/FX의 기존 Securities 두-row projection과
+  현재 ledger 계약은 유지한다. 새 endpoint/version/장기 compatibility 계층은 만들지 않았다.
+- Frontend account DTO는 scope/id를 명시하고 공통 통화 selector는 Securities를 선택한다.
+  unscoped legacy/FX 한-row-per-currency projection만 기존 fallback을 허용하며 Crypto/
+  unknown/중복 USD를 대체 지갑으로 선택하지 않는다. 계정별 query key/cache/echo 검증,
+  화면 구조는 같다. Crypto 행을 먼저 반환하는 fixture로 Wallet 표시와 account switching을
+  검증했다. Home total은 전체 현금을 평가하지만 현재 Wallet funding 표시는 Securities다.
+- 현금의 source of truth는 PostgreSQL CashWallet이고 valuation은 네 `balanceAmount`를
+  정확히 한 번 포함한다. USD 세 지갑은 먼저 합산한 뒤 같은 workflow의 단일 USD/KRW
+  evidence로 position과 함께 변환한다. USD 현금이 모두 0이고 USD position이 없으면 FX가
+  필요하지 않다. `reservedAmount`는 소유 현금의 예약이며 총자산에서 차감하지 않는다.
+  Futures는 cash만 평가하며 position/PnL/collateral/margin/새 reservation 의미는 추가하지 않았다.
+- General foundation/audit는 canonical 4개를 검사한다. 성과 origin backfill은 모든 USD
+  scope를 조사하여 nonzero Crypto 현금을 무시한 0% baseline을 만들지 않는다. 관련 backfill
+  주석·정책의 오래된 “일반거래 미활성” 설명도 실제 무거래/무USD eligibility에 맞췄다.
+  Season wallet read 및 공통 valuation 역시 같은 shape를 검사하며 손상을 0으로 숨기지 않는다.
+- 주문의 BUY debit/SELL proceeds, market/limit quote-create-reserve-fill-cancel, cash atomic
+  guard와 FX는 **여전히 Securities**다. funding 관련 production 코드는 바꾸지 않았다.
+  OrdersService 변경은 snapshot holdings 필터 제거 한 곳이다. 기존 submitted Crypto
+  order/reservation이나 wallet ledger의 walletId를 이전하지 않았다. 새 지갑에는 정상 서비스
+  경로에서 아직 자금을 넣는 writer가 없다. money lock 중 network IO와 cutoff/idempotency/
+  account isolation 정책도 그대로다.
+
+### 검증과 한계
+
+- 검증 환경: Node 24.14.1 / pnpm 10.33.0 / PostgreSQL 16.15 UTC / Redis 7.0.15.
+  localhost 전용 disposable DB `wallet_scope_activation_test`와 Redis를 사용했다.
+  전체 58 migrations를 fresh DB에 적용했다. 운영 DB/실사용자 금융 상태에는 적용하지 않았다.
+- 기존 Wallet Scope PostgreSQL suite를 확장했다. 모든 이전 migration으로 만든 private
+  schema에서 작업 1·2 SQL을 그대로 실행하고 기존 wallet ID/금액/reserved/정밀 timestamps/
+  ledger/order/quote/position/FX/request/Equity/Daily/ranking 및 FK 데이터를 fingerprint로 비교한다.
+  closed/settled 이력 보존, 이미 존재하는 Crypto 행 보존, 손상 preflight의 전면 rollback,
+  중복/invalid scope-currency 거부, zero-only 보완과 재실행 idempotency를 확인한다.
+- 실제 General/Season 서비스로 네 wallet/초기 grant를 검증한다. Crypto=0/no FX의 기존
+  결과, 세 USD 양수 balance+USD position의 단일 FX 평가, reservation이 총자산을 줄이지
+  않는 것, USD 현금 위치만 변경했을 때 모든 valuation component가 같은 것을 확인했다.
+  Wallet API/legacy projection/Home/Portfolio/General TWR/Equity/Daily/live 및 daily ranking/
+  settlement/records에서 같은 총자산·수익률을 검증했다. settlement 재호출/cutoff와 계정 간
+  mutation 거부, Crypto atomic cash mutation 거부도 포함한다.
+- 실제 DB에서 Crypto wallet 삭제 손상을 주입하여 Wallet GET/valuation이 실패하고 행을
+  생성하지 않는 것, audit가 이를 찾는 것과 nonzero Crypto USD를 가진 계정의 origin
+  backfill 거부를 확인한다. unit parity도 live와 Orders post-fill snapshot의 다중 USD 의미를
+  비교한다. 정상 계정 financial fixture에는 zero Crypto를 추가하고 funding 조회는 Securities를
+  명시하여 원래의 금액/기대값을 유지했다.
+
+| 실행 명령 (Backend는 backend/, Frontend는 frontend/) | 최종 결과 |
+| --- | --- |
+| `pnpm exec prisma validate`, `generate` | PASS; schema/generated client 변경 없음 |
+| `pnpm exec prisma migrate deploy`, `status` | PASS; 58 migrations 완전 적용 |
+| `pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code` | PASS; schema drift 없음 |
+| `pnpm run typecheck`, `build` | PASS |
+| `pnpm run lint:accounts:check`, `lint:candles:check`, `format:candles:check` | PASS |
+| `pnpm exec eslint --no-fix --max-warnings=0 src/wallets/canonical-cash-wallets.ts scripts/wallet-scope-integration.ts` 및 신규 helper/spec/script Prettier check | PASS |
+| `pnpm exec jest --runInBand` | 227 suites / 3,644 cases PASS; opt-in 49 suites / 54 cases SKIP |
+| `pnpm exec jest --runInBand` + 기존 CI Core account suite 목록/opt-in 환경 | PostgreSQL 21 suites / 22 cases PASS |
+| `pnpm exec jest --runInBand` + 기존 CI Limit/Market/FX suite 목록/opt-in 환경 | PostgreSQL 13 suites / 14 cases PASS |
+| `pnpm run test:e2e --runInBand` | 2 suites / 370 cases PASS |
+| `pnpm run trading-accounts:repair-links`, `repair-ranking-scope`, `audit-general`, `backfill-general-performance` | 실제 DB dry-run PASS; cleanup 후 0 findings/0 writes |
+| `npm run check` | lint/typecheck 및 132 test files PASS |
+| `npx expo export --platform web` | PASS; product bundle 빌드 가능 |
+| `git diff --check`와 신규 파일 포함 전체 diff 직접 검토 | PASS |
+
+- DB gate의 정확한 suite 목록/환경은 [기존 CI](.github/workflows/ci.yml)의 Core account/
+  Limit order jobs를 재사용했다. Core에는 작업 1의 Wallet Scope suite와 General/Season
+  open/join, 주문/FX, 성과/snapshot/ranking/settlement 경로가 이미 포함된다. 새로운 CI 구조는
+  추가하지 않았다. default unit의 skip을 DB gate 생략으로 해석하면 안 된다.
+- repair/audit CLI의 zero-findings 결과는 fixtures cleanup 이후의 빈 테스트 DB 결과다.
+  손상 감지/정상·기존 금융 상태 검증은 앞의 실제 데이터 fixture suite에서 담당한다.
+  테스트 로그는 `/tmp/wallet-scope-activation/logs/`에 남겼고 전용 DB/Redis 서버는 종료했다.
+- 실행하지 않은 범위: 운영 DB 적용/실데이터 fingerprint 및 lock 시간, 원격 GitHub CI,
+  Native 기기 수동 확인, 변경과 무관한 provider/live smoke 및 다른 opt-in suites,
+  synthetic ranking 성능 benchmark. Backend 전체 auto-fix `lint` 대신 저장소/CI가 정의한
+  check-only gate를 실행했다. 금융 영향권 Core/Limit DB suite는 생략하지 않았다.
+  commit/push/deploy는 수행하지 않았다.
+- 최종 diff 검토: provisioning/valuation/API 및 모든 fixture/script/doc 변경을 직접 검토했다.
+  추가 index/column/generated dependency/API v2/product Wallet layout 변경은 없고
+  기존 주문/FX/reservation funding selector가 Securities에 남아 있음을 확인했다.
+  migration의 기존 행/관계/정산 이력 보존과 General/Season 분리를 확인했다.
+  작은 identity helper 이외의 구조 확장이나 transfer/margin 엔진은 없다.
+- 다음 Crypto Spot routing 작업: quote/market BUY·SELL, limit 생성/reserve/match/fill/
+  cancel/reconcile/수수료/ledger의 전체 lifecycle을 crypto_spot/USD로 함께 전환하고
+  Wallet UI도 그 시점에 전환해야 한다. 기존 submitted 주문의 Securities 예약금 provenance를
+  보존하거나 명시적인 cutover 정책을 먼저 정해야 하며 selector 일괄 치환으로 기존 cancel/
+  fill이 새 wallet을 건드리면 안 된다. 미국주식과 FX는 Securities에 남고 Transfer/FX Transfer/
+  Futures 금융 의미는 이후 별도 작업이다.
+- 현재 정책 기준은 [trading-modes-and-accounts.md](backend/docs/trading-modes-and-accounts.md).
+  README, 정책/rulepack과 General/Wallet/account finance/Home 계약을 같은 상태로 갱신했다.
+  아래 Wallet Scope foundation 기록은 당시 단계의 역사적 기록이다.
+
+<details>
+<summary>이번 작업의 전체 변경 파일 (72개)</summary>
+
+```text
+HANDOVER.md
+backend/README.md
+backend/docs/codex-rulepack.md
+backend/docs/general-account-and-ad-rewards-api-contract.md
+backend/docs/home-api-contract.md
+backend/docs/policy-decisions.md
+backend/docs/trading-account-finance-api-contract.md
+backend/docs/trading-modes-and-accounts.md
+backend/docs/wallets-api-contract.md
+backend/prisma/migrations/20261006130000_provision_canonical_crypto_cash_wallets/migration.sql
+backend/scripts/backfill-general-performance.ts
+backend/scripts/friends-integration.ts
+backend/scripts/krx-closed-price-integration.ts
+backend/scripts/krx-session-close-recovery-integration.ts
+backend/scripts/lib/audit-general-accounts.ts
+backend/scripts/lib/backfill-general-performance.ts
+backend/scripts/lib/dev-baseline.ts
+backend/scripts/limit-order-idempotent-replay-integration.ts
+backend/scripts/limit-order-matching-integration.ts
+backend/scripts/market-execution-integration.ts
+backend/scripts/order-closed-price-parity-integration.ts
+backend/scripts/order-input-policy-integration.ts
+backend/scripts/ranking-consistency-integration.ts
+backend/scripts/ranking-refresh-benchmark.ts
+backend/scripts/season-lifecycle-lease-integration.ts
+backend/scripts/trading-fee-pinning-integration.ts
+backend/scripts/trading-tradability-integration.ts
+backend/scripts/trading-transaction-time-integration.ts
+backend/scripts/wallet-scope-integration.ts
+backend/src/batch/daily-portfolio-snapshot-job.service.spec.ts
+backend/src/fx/fx.execute.integration.spec.ts
+backend/src/home/home.service.spec.ts
+backend/src/home/home.service.ts
+backend/src/mvp-flow.integration.spec.ts
+backend/src/orders/limit-order-create-no-redis.integration.spec.ts
+backend/src/orders/limit-order-create-race.integration.spec.ts
+backend/src/orders/limit-order-reservation.integration.spec.ts
+backend/src/orders/limit-order-transaction-time.integration.spec.ts
+backend/src/orders/order-replay-and-cancel-scope.integration.spec.ts
+backend/src/orders/orders.execute.integration.spec.ts
+backend/src/orders/orders.service.spec.ts
+backend/src/orders/orders.service.ts
+backend/src/portfolio/general-performance-hardening.integration.spec.ts
+backend/src/portfolio/portfolio-valuation-source-reads.spec.ts
+backend/src/portfolio/portfolio-valuation.policy.spec.ts
+backend/src/portfolio/portfolio-valuation.policy.ts
+backend/src/portfolio/portfolio-valuation.service.spec.ts
+backend/src/portfolio/portfolio-valuation.service.ts
+backend/src/portfolio/valuation-semantic-parity.spec.ts
+backend/src/ranking/season-ranking-scope.integration.spec.ts
+backend/src/seasons/seasons.join.integration.spec.ts
+backend/src/seasons/seasons.service.ts
+backend/src/seasons/trading-account-financial-scope.integration.spec.ts
+backend/src/seasons/trading-account-link.integration.spec.ts
+backend/src/seasons/trading-account-trading-scope.integration.spec.ts
+backend/src/seasons/trading-account.integration.spec.ts
+backend/src/trading-accounts/general-account-integrity.ts
+backend/src/trading-accounts/general-account.integration.spec.ts
+backend/src/trading-accounts/general-accounts.service.ts
+backend/src/trading-accounts/general-trading-audit.integration.spec.ts
+backend/src/wallets/canonical-cash-wallets.spec.ts
+backend/src/wallets/canonical-cash-wallets.ts
+backend/src/wallets/trading-account-wallets.spec.ts
+backend/src/wallets/wallet-scope.integration.spec.ts
+backend/src/wallets/wallets.service.spec.ts
+backend/src/wallets/wallets.service.ts
+backend/test/app.e2e-spec.ts
+frontend/src/features/tradingAccount/api.ts
+frontend/src/features/wallet/api.ts
+frontend/src/features/wallet/mapper.test.ts
+frontend/src/features/wallet/mapper.ts
+frontend/src/screens/wallet/WalletScreen.test.ts
+```
+</details>
+
 ## 2026-10-06 — CashWallet Wallet Scope foundation, 기존 금융 동작 유지
 
 - 의도: 향후 증권/암호화폐 현물/암호화폐 선물 자금을 독립적으로 관리할 수 있도록

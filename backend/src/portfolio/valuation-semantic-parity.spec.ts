@@ -115,6 +115,8 @@ function fixture(
         currencyCode: CurrencyCode.USD,
         balanceAmount: decimal(usdCash),
       },
+      { walletScope: 'crypto_spot' as const, currencyCode: CurrencyCode.USD, balanceAmount: decimal('0') },
+      { walletScope: 'crypto_futures' as const, currencyCode: CurrencyCode.USD, balanceAmount: decimal('0') },
     ],
     positions: holdings.map((h) => h.position),
   };
@@ -195,6 +197,31 @@ function fixture(
 }
 
 describe('same-evidence financial valuation parity', () => {
+  it('includes all scope cash in both live and post-fill snapshot valuation', async () => {
+    const f = fixture();
+    f.account.cashWallets[1].balanceAmount = decimal('1000');
+    f.account.cashWallets[2].balanceAmount = decimal('500');
+    f.account.cashWallets[3].balanceAmount = decimal('200');
+    const live = await f.live();
+    expect(live).toMatchObject({
+      totalAssetKrw: '2661000.00000000',
+      usdCashKrw: '2380000.00000000',
+      assetValueKrw: '280000.00000000',
+      unrealizedPnlKrw: '56000.00000000',
+    });
+    await f.postFill();
+    expect(f.db.equitySnapshot.create.mock.calls[0]).toEqual([
+      containing({ data: containing({
+        totalAssetKrw: live.totalAssetKrw,
+        usdCashKrw: live.usdCashKrw,
+        cryptoValueKrw: live.cryptoValueKrw,
+        returnRate: live.returnRate,
+      }) }),
+    ]);
+    // Each independent workflow resolves one FX, shared by its cash and positions.
+    expect(f.db.fxRateSnapshot.findFirst).toHaveBeenCalledTimes(2);
+  });
+
   it.each(['130000', null, '999999'])(
     'ignores stored priceKrw=%s across Portfolio/Orders/Positions/Home/Records',
     async (priceKrw) => {

@@ -5,6 +5,8 @@ import {
   getFxExecuteSuccessDisplay,
   getFxQuoteDisplay,
   getKnownWalletBalanceAmount,
+  getWalletAvailableAmount,
+  getWalletByIdentity,
   getWalletViewState,
 } from './mapper.ts';
 import type { FxExecuteDto, FxQuoteDto, FxRateDto } from './api.ts';
@@ -161,5 +163,32 @@ describe('FX decimal display', () => {
       assert.equal(display.krwWalletBalance, wallets && !Array.isArray(wallets) && 'KRW' in wallets ? '0' : '-');
       assert.equal(display.usdWalletBalance, '-');
     }
+  });
+});
+
+describe('canonical Wallet Scope selection', () => {
+  const scoped = {
+    wallets: [
+      { id: 'futures', walletScope: 'crypto_futures' as const, currencyCode: 'USD' as const, balanceAmount: '700', availableAmount: '700' },
+      { id: 'spot', walletScope: 'crypto_spot' as const, currencyCode: 'USD' as const, balanceAmount: '500', availableAmount: '500' },
+      { id: 'usd', walletScope: 'securities' as const, currencyCode: 'USD' as const, balanceAmount: '1000', availableAmount: '900' },
+      { id: 'krw', walletScope: 'securities' as const, currencyCode: 'KRW' as const, balanceAmount: '5000000' },
+    ],
+  };
+  it('keeps the Wallet/FX/order funding readers on Securities irrespective of response order', () => {
+    assert.equal(getKnownWalletBalanceAmount(scoped, 'USD'), '1000');
+    assert.equal(getWalletAvailableAmount(scoped, 'USD'), '900');
+    assert.equal(getKnownWalletBalanceAmount(scoped, 'KRW'), '5000000');
+  });
+  it('does not substitute Crypto or duplicate legacy USD rows for Securities', () => {
+    assert.equal(getKnownWalletBalanceAmount({ wallets: scoped.wallets.slice(0, 2) }, 'USD'), null);
+    assert.equal(getKnownWalletBalanceAmount({ wallets: [{ currencyCode: 'USD', balanceAmount: '10' }, { currencyCode: 'USD', balanceAmount: '20' }] }, 'USD'), null);
+    assert.equal(getKnownWalletBalanceAmount({ wallets: [...scoped.wallets, scoped.wallets[2]] }, 'USD'), null);
+  });
+  it('can select a future scope explicitly and leaves source data unchanged', () => {
+    const before = JSON.stringify(scoped);
+    assert.equal(getWalletByIdentity(scoped, 'crypto_spot', 'USD')?.id, 'spot');
+    assert.equal(getWalletByIdentity(scoped, 'crypto_futures', 'USD')?.id, 'futures');
+    assert.equal(JSON.stringify(scoped), before);
   });
 });

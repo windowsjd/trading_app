@@ -95,7 +95,6 @@ export class PortfolioValuationService {
             mode: true,
             initialCapitalKrw: true,
             cashWallets: {
-              where: { walletScope: 'securities' },
               select: {
                 walletScope: true,
                 currencyCode: true,
@@ -197,7 +196,6 @@ export class PortfolioValuationService {
           },
         },
         cashWallets: {
-          where: { walletScope: 'securities' },
           select: {
             walletScope: true,
             currencyCode: true,

@@ -1,3 +1,4 @@
+import { zeroCryptoCashWalletData } from '../wallets/canonical-cash-wallets';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import {
   CurrencyCode,
@@ -365,6 +366,10 @@ export class SeasonsService {
             balanceAmount: ZERO_AMOUNT,
           },
         });
+
+        for (const data of zeroCryptoCashWalletData(tradingAccount.id)) {
+          await tx.cashWallet.create({ data });
+        }
 
         await tx.walletTransaction.create({
           data: {

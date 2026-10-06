@@ -1,3 +1,4 @@
+import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
 /** Isolated PostgreSQL + real HTTP/guard integration; no provider or financial writes. */
 import 'reflect-metadata';
 import assert from 'node:assert/strict';
@@ -166,6 +167,7 @@ async function run() {
           currencyCode: 'USD',
           balanceAmount: '0',
         },
+        ...zeroCryptoCashWalletData(account.id),
       ],
     });
     for (const rankType of ['daily', 'final'] as const)

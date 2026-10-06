@@ -1,3 +1,4 @@
+import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
 import { tradingSessions } from '../test/support/trading-session-fixture';
 /** Order input policy against an isolated PostgreSQL DB; real services and money writes. */
 import 'dotenv/config';
@@ -157,6 +158,7 @@ async function fixture(
           balanceAmount: '0',
           reservedAmount: '0',
         },
+        ...zeroCryptoCashWalletData(accountId),
       ],
     });
   const asset = await prisma.asset.create({

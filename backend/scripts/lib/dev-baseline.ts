@@ -1,3 +1,4 @@
+import { zeroCryptoCashWalletData } from '../../src/wallets/canonical-cash-wallets';
 import {
   CurrencyCode,
   ParticipantStatus,
@@ -332,6 +333,10 @@ export async function ensureDevBaselineParticipant(input: {
       },
       select: { id: true },
     });
+
+    for (const data of zeroCryptoCashWalletData(tradingAccount.id)) {
+      await tx.cashWallet.create({ data });
+    }
 
     await tx.walletTransaction.create({
       data: {

@@ -1,3 +1,4 @@
+import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
 /** Real PostgreSQL evidence for the shared closed-stock display/valuation policy. */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -121,6 +122,7 @@ async function main() {
           currencyCode: 'USD',
           balanceAmount: '0',
         },
+        ...zeroCryptoCashWalletData(seasonAccount.id),
       ],
     });
     const snapshots = new Map<string, string>();

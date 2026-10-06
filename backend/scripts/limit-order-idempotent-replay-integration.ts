@@ -42,6 +42,7 @@ import { LimitOrderCreateService } from '../src/orders/limit-order-create.servic
 import { OrderReservationService } from '../src/orders/order-reservation.service';
 import { OrdersService } from '../src/orders/orders.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
 import { computeOrderQuoteRequestHash } from '../src/providers/durable-quote.policy';
 
 const RUN = process.env.LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION;
@@ -549,6 +550,12 @@ async function createScenario(
       reservedAmount: ZERO,
     },
     select: { id: true },
+  });
+  await prisma.cashWallet.createMany({
+    data: [
+      { tradingAccountId: tradingAccount.id, walletScope: 'securities', currencyCode: 'USD', balanceAmount: '0', reservedAmount: '0' },
+      ...zeroCryptoCashWalletData(tradingAccount.id),
+    ],
   });
 
   // Crypto settles in the asset currency and is tradable 24h, so nothing here

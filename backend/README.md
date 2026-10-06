@@ -54,10 +54,13 @@ request ID, query exclusion, collection/depth/string and 24 KiB limits remain.
 - Orders quote stores durable quotes. Market create consumes the quote and executes from fresh provider evidence; limit BUY/SELL create commits a submitted order and cash/position reservation. Scheduler Path A/B matching fills limits when enabled. Both modes pin quote-time fees; see the current order/finance contracts.
 - Stock market order quote/create/execute require an OPEN regular session. Stock integer limit Quote/Create also allow confirmed CLOSED, register as submitted with reservation, and wait for eligible post-submission regular-session evidence; calendar-unavailable blocks both types. Crypto orders and FX quote/execute do not receive a market-hours block in this gate.
 - FX execute and orders create idempotency request hashes include `quoteId`, so the same idempotency key with a different quote conflicts instead of replaying an old result.
-- Current KRW/USD cash wallets have `WalletScope.securities`. US stocks and
-  current USD-settled crypto still use Securities USD. `crypto_spot` and
-  `crypto_futures` USD are schema/domain foundation only; provisioning, transfer
-  and routing are future work. See [current scope policy](docs/trading-modes-and-accounts.md).
+- Every TradingAccount has Securities KRW/USD, Crypto Spot USD, and Crypto Futures
+  USD canonical cash wallets. Crypto wallets start with zero balance/reserved and
+  add no grant/ledger. All wallet balances count in cash valuation with one workflow
+  USD/KRW evidence. US stocks/current Crypto Spot orders and FX still use Securities;
+  Transfer, Crypto routing and Futures are future work. Existing accounts are normalized
+  by a zero-only migration, including closed accounts without changing history.
+  See [current scope and rollout policy](docs/trading-modes-and-accounts.md).
 - Final valuation policy is KRW total assets.
 - Provider ingestion foundation exists for Korea EXIM exchange and ExchangeRate-API USD/KRW, Binance Spot WebSocket crypto streaming with REST fallback, KIS REST current-price snapshots, and KIS WebSocket KRX/US stock market data row insertion.
 - `GET /api/v1/assets/:assetId/candles` supports domestic/US stock candles through KIS and crypto chart candles through Binance Spot `GET /api/v3/klines`. 지원 candle interval은 1m, 5m, 15m, 30m, 1h, 4h, 1d, 1w만 허용한다. 프론트 자산 상세 차트 탭도 1m, 5m, 15m, 30m, 1h, 4h, 1d, 1w 순서를 사용한다. 그 외 interval은 validation error로 처리한다. 필요 시 서버가 더 짧은 원천 candle을 집계해 상위 interval candle을 생성한다.

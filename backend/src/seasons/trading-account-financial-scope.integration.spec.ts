@@ -92,6 +92,7 @@ import {
   TradingAccountStatus,
 } from './src/generated/prisma/client';
 import { PrismaService } from './src/prisma/prisma.service';
+import { zeroCryptoCashWalletData } from './src/wallets/canonical-cash-wallets';
 import { SeasonsService } from './src/seasons/seasons.service';
 import { FxService } from './src/fx/fx.service';
 import { WalletsService } from './src/wallets/wallets.service';
@@ -205,6 +206,7 @@ async function createFxScenario(label, options = {}) {
     },
     select: { id: true },
   });
+  await prisma.cashWallet.createMany({ data: zeroCryptoCashWalletData(account.id) });
   const snapshot = await prisma.fxRateSnapshot.create({
     data: {
       baseCurrency: CurrencyCode.USD,
@@ -360,7 +362,7 @@ async function testJoinAccountOwnershipAndWalletEquivalence() {
     const wallets = await prisma.cashWallet.findMany({
       where: { tradingAccountId: participant.tradingAccountId },
     });
-    assert.equal(wallets.length, 2);
+    assert.equal(wallets.length, 4);
     for (const wallet of wallets) {
       assert.equal(wallet.tradingAccountId, participant.tradingAccountId);
     }
@@ -370,15 +372,17 @@ async function testJoinAccountOwnershipAndWalletEquivalence() {
     assert.equal(grants.length, 1);
     assert.equal(grants[0].tradingAccountId, participant.tradingAccountId);
 
-    // Legacy wallets API and account-scoped API agree on every value.
+    // Securities values retain legacy compatibility; the canonical API adds scope/id and zero Crypto rows.
     const legacy = await walletsService.getWallets(user.id);
     const scoped = await walletsService.getWalletsForTradingAccount(
       user.id,
       participant.tradingAccountId,
     );
     assert.equal(legacy.data.state, 'available');
-    assert.deepEqual(scoped.data.wallets, legacy.data.wallets);
-    assert.deepEqual(scoped.data.summary, legacy.data.summary);
+    assert.deepEqual(scoped.data.wallets.filter(w => w.walletScope === 'securities').map(({ id, walletScope, ...value }) => value), legacy.data.wallets);
+    assert.ok(scoped.data.wallets.filter(w => w.walletScope !== 'securities').every(w => w.balanceAmount === ZERO && w.reservedAmount === ZERO));
+    assert.deepEqual(scoped.data.summary, { totalWallets: 4, hasKrwWallet: true, hasUsdWallet: true });
+    assert.equal(legacy.data.summary.totalWallets, 2);
 
     // The user read hides opening grants; legacy/audit rows remain intact.
     const legacyTx = await walletsService.getWalletTransactions(user.id, {});
@@ -561,7 +565,7 @@ async function testAccountScopedFxGating() {
       suspended.userId,
       suspended.accountId,
     );
-    assert.equal(wallets.data.wallets.length, 2);
+    assert.equal(wallets.data.wallets.length, 4);
     let blocked = null;
     try {
       await fxService.quoteForTradingAccount(

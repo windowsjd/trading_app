@@ -236,10 +236,11 @@ async function verifyFirstOpenIsAtomicAndComplete() {
   const accountId = response.data.account.id;
   const shape = await readGeneralShape(accountId);
 
-  assert.equal(shape.wallets.length, 2);
-  assert.ok(shape.wallets.every((wallet) => wallet.walletScope === 'securities'));
-  const krw = shape.wallets.find((w) => w.currencyCode === 'KRW');
-  const usd = shape.wallets.find((w) => w.currencyCode === 'USD');
+  assert.equal(shape.wallets.length, 4);
+  assert.equal(shape.wallets.filter((wallet) => wallet.walletScope !== 'securities').length, 2);
+  assert.ok(shape.wallets.filter((wallet) => wallet.walletScope !== 'securities').every((wallet) => wallet.balanceAmount.isZero() && wallet.reservedAmount.isZero()));
+  const krw = shape.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW');
+  const usd = shape.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'USD');
   assert.equal(krw.balanceAmount.toFixed(8), '10000000.00000000');
   assert.equal(krw.reservedAmount.toFixed(8), '0.00000000');
   assert.equal(usd.balanceAmount.toFixed(8), '0.00000000');
@@ -275,8 +276,8 @@ async function verifyReopenIsIdempotent(userId, accountId) {
   assert.equal(after.wallets.length, before.wallets.length);
   assert.equal(after.ledger.length, before.ledger.length);
   assert.equal(
-    after.wallets.find((w) => w.currencyCode === 'KRW').balanceAmount.toFixed(8),
-    before.wallets.find((w) => w.currencyCode === 'KRW').balanceAmount.toFixed(8),
+    after.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW').balanceAmount.toFixed(8),
+    before.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW').balanceAmount.toFixed(8),
   );
   const accountCount = await prisma.tradingAccount.count({
     where: { userId, mode: 'general' },
@@ -306,14 +307,14 @@ async function verifyConcurrentOpenCreatesExactlyOne() {
     await prisma.tradingAccount.count({ where: { userId, mode: 'general' } }),
     1,
   );
-  assert.equal(shape.wallets.filter((w) => w.currencyCode === 'KRW').length, 1);
-  assert.equal(shape.wallets.filter((w) => w.currencyCode === 'USD').length, 1);
+  assert.equal(shape.wallets.filter((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW').length, 1);
+  assert.equal(shape.wallets.filter((w) => w.walletScope === 'securities' && w.currencyCode === 'USD').length, 1);
   assert.equal(
     shape.ledger.filter((l) => l.referenceType === 'general_account_open').length,
     1,
   );
   assert.equal(
-    shape.wallets.find((w) => w.currencyCode === 'KRW').balanceAmount.toFixed(8),
+    shape.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW').balanceAmount.toFixed(8),
     '10000000.00000000',
   );
   return { userId, accountId };
@@ -323,7 +324,8 @@ async function verifyConcurrentOpenCreatesExactlyOne() {
  * Wraps the transaction client so ONE delegate method fails mid-way. Used to
  * prove the open transaction is all-or-nothing without corrupting the DB.
  */
-function failingPrisma(delegateName, methodName) {
+function failingPrisma(delegateName, methodName, failureCall = 1) {
+  let calls = 0;
   const originalTransaction = prisma.$transaction.bind(prisma);
 
   const wrapTx = (tx) =>
@@ -334,7 +336,11 @@ function failingPrisma(delegateName, methodName) {
         return new Proxy(value, {
           get(delegate, method) {
             if (method === methodName) {
-              return () => Promise.reject(new Error('injected failure'));
+              return (...args) => {
+                calls += 1;
+                if (calls === failureCall) return Promise.reject(new Error('injected failure'));
+                return delegate[methodName](...args);
+              };
             }
             const inner = Reflect.get(delegate, method);
             return typeof inner === 'function' ? inner.bind(delegate) : inner;
@@ -353,10 +359,10 @@ function failingPrisma(delegateName, methodName) {
   });
 }
 
-async function verifyMidTransactionFailureRollsEverythingBack(delegateName, methodName) {
+async function verifyMidTransactionFailureRollsEverythingBack(delegateName, methodName, failureCall = 1) {
   const userId = await createUser();
   const service = new GeneralAccountsService(
-    failingPrisma(delegateName, methodName),
+    failingPrisma(delegateName, methodName, failureCall),
     performance,
   );
 
@@ -399,7 +405,7 @@ async function verifyDamagedAccountFailsClosed() {
 
   // Simulate corruption: the USD wallet disappears.
   const usd = await prisma.cashWallet.findFirst({
-    where: { tradingAccountId: accountId, currencyCode: 'USD' },
+    where: { walletScope: 'securities', tradingAccountId: accountId, currencyCode: 'USD' },
   });
   await prisma.cashWallet.delete({ where: { id: usd.id } });
 
@@ -410,10 +416,10 @@ async function verifyDamagedAccountFailsClosed() {
 
   // NOTHING was re-granted or recreated.
   const shape = await readGeneralShape(accountId);
-  assert.equal(shape.wallets.length, 1);
+  assert.equal(shape.wallets.length, 3);
   assert.equal(shape.ledger.length, 1);
   assert.equal(
-    shape.wallets[0].balanceAmount.toFixed(8),
+    shape.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW').balanceAmount.toFixed(8),
     '10000000.00000000',
   );
 
@@ -464,7 +470,7 @@ async function verifyPartialUniqueRejectsASecondGrantRow(accountId) {
   let rejected = false;
   try {
     const krw = await prisma.cashWallet.findFirst({
-      where: { tradingAccountId: accountId, currencyCode: 'KRW' },
+      where: { walletScope: 'securities', tradingAccountId: accountId, currencyCode: 'KRW' },
     });
     await prisma.walletTransaction.create({
       data: {
@@ -493,8 +499,8 @@ async function verifyPartialUniqueRejectsASecondGrantRow(accountId) {
 async function verifyAccountScopedReadsForGeneralAccount(userId, accountId) {
   const walletView = await wallets.getWalletsForTradingAccount(userId, accountId);
   assert.equal(walletView.data.tradingAccountId, accountId);
-  const krw = walletView.data.wallets.find((w) => w.currencyCode === 'KRW');
-  const usd = walletView.data.wallets.find((w) => w.currencyCode === 'USD');
+  const krw = walletView.data.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW');
+  const usd = walletView.data.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'USD');
   assert.equal(krw.balanceAmount, '10000000.00000000');
   assert.equal(krw.availableAmount, '10000000.00000000');
   assert.equal(usd.balanceAmount, '0.00000000');
@@ -528,7 +534,7 @@ async function verifyGeneralRowsHaveNoParticipantOwnershipColumn() {
     userId,
     accountId,
   );
-  assert.equal(walletView.data.wallets.length, 2);
+  assert.equal(walletView.data.wallets.length, 4);
 }
 
 // ------------------------------------------------------------- ad rewards
@@ -563,8 +569,8 @@ async function verifyVerificationFailureWritesNothing(userId, accountId) {
   assert.equal(await prisma.adRewardClaim.count({ where: { userId } }), 0);
   assert.equal(after.ledger.length, before.ledger.length);
   assert.equal(
-    after.wallets.find((w) => w.currencyCode === 'KRW').balanceAmount.toFixed(8),
-    before.wallets.find((w) => w.currencyCode === 'KRW').balanceAmount.toFixed(8),
+    after.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW').balanceAmount.toFixed(8),
+    before.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW').balanceAmount.toFixed(8),
   );
 }
 
@@ -572,7 +578,7 @@ async function verifyGrantIsAtomicAndLedgered(userId, accountId) {
   enableAdRewards();
   const service = adRewardService([fakeVerifier('test-provider')]);
   const before = await readGeneralShape(accountId);
-  const beforeKrw = before.wallets.find((w) => w.currencyCode === 'KRW').balanceAmount;
+  const beforeKrw = before.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW').balanceAmount;
   const eventId = 'event-' + randomUUID();
 
   const response = await service.claim(userId, accountId, claimBody(eventId));
@@ -610,17 +616,17 @@ async function verifyGrantIsAtomicAndLedgered(userId, accountId) {
   assert.equal(ledger.amount.toFixed(8), REWARD);
 
   const after = await readGeneralShape(accountId);
-  const afterKrw = after.wallets.find((w) => w.currencyCode === 'KRW').balanceAmount;
+  const afterKrw = after.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW').balanceAmount;
   assert.equal(afterKrw.toFixed(8), beforeKrw.add(REWARD).toFixed(8));
   assert.equal(ledger.balanceAfter.toFixed(8), afterKrw.toFixed(8));
   // USD is never credited and initialCapitalKrw never moves.
   assert.equal(
-    after.wallets.find((w) => w.currencyCode === 'USD').balanceAmount.toFixed(8),
-    before.wallets.find((w) => w.currencyCode === 'USD').balanceAmount.toFixed(8),
+    after.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'USD').balanceAmount.toFixed(8),
+    before.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'USD').balanceAmount.toFixed(8),
   );
   assert.equal(after.account.initialCapitalKrw.toFixed(8), '10000000.00000000');
   assert.equal(
-    after.wallets.find((w) => w.currencyCode === 'KRW').reservedAmount.toFixed(8),
+    after.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW').reservedAmount.toFixed(8),
     '0.00000000',
   );
 
@@ -637,8 +643,8 @@ async function verifyDuplicateEventReplays(userId, accountId, eventId) {
 
   const after = await readGeneralShape(accountId);
   assert.equal(
-    after.wallets.find((w) => w.currencyCode === 'KRW').balanceAmount.toFixed(8),
-    before.wallets.find((w) => w.currencyCode === 'KRW').balanceAmount.toFixed(8),
+    after.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW').balanceAmount.toFixed(8),
+    before.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW').balanceAmount.toFixed(8),
     'a replay must not credit again',
   );
   assert.equal(after.ledger.length, before.ledger.length, 'no extra ledger row');
@@ -667,8 +673,8 @@ async function verifyEventCannotBeReusedByAnotherAccount(eventId) {
 
   const after = await readGeneralShape(otherAccountId);
   assert.equal(
-    after.wallets.find((w) => w.currencyCode === 'KRW').balanceAmount.toFixed(8),
-    before.wallets.find((w) => w.currencyCode === 'KRW').balanceAmount.toFixed(8),
+    after.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW').balanceAmount.toFixed(8),
+    before.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW').balanceAmount.toFixed(8),
   );
   assert.equal(after.ledger.length, before.ledger.length);
   return { otherUserId, otherAccountId };
@@ -706,7 +712,7 @@ async function verifyConcurrentSameEventGrantsOnce() {
   const adLedger = shape.ledger.filter((l) => l.txType === 'ad_reward');
   assert.equal(adLedger.length, 1, 'one ad_reward ledger row');
   assert.equal(
-    shape.wallets.find((w) => w.currencyCode === 'KRW').balanceAmount.toFixed(8),
+    shape.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW').balanceAmount.toFixed(8),
     '10050000.00000000',
     'credited exactly once',
   );
@@ -737,7 +743,7 @@ async function verifyDailyCountRaceCannotOverpay() {
     1,
   );
   assert.equal(
-    shape.wallets.find((w) => w.currencyCode === 'KRW').balanceAmount.toFixed(8),
+    shape.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW').balanceAmount.toFixed(8),
     '10050000.00000000',
   );
   assert.equal(
@@ -772,8 +778,8 @@ async function verifyRejectedEventIsNeverPaidLater(userId, accountId, rejectedEv
 
   const after = await readGeneralShape(accountId);
   assert.equal(
-    after.wallets.find((w) => w.currencyCode === 'KRW').balanceAmount.toFixed(8),
-    before.wallets.find((w) => w.currencyCode === 'KRW').balanceAmount.toFixed(8),
+    after.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW').balanceAmount.toFixed(8),
+    before.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW').balanceAmount.toFixed(8),
   );
   assert.equal(after.ledger.length, before.ledger.length);
   const claim = await prisma.adRewardClaim.findUnique({
@@ -807,7 +813,7 @@ async function verifyDailyAmountRaceCannotOverpay() {
   }
   const shape = await readGeneralShape(accountId);
   assert.equal(
-    shape.wallets.find((w) => w.currencyCode === 'KRW').balanceAmount.toFixed(8),
+    shape.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW').balanceAmount.toFixed(8),
     '10050000.00000000',
   );
 }
@@ -974,8 +980,8 @@ async function verifyEligibilityIsAdvisoryOnly(userId, accountId) {
     'GET eligibility must not create a claim',
   );
   assert.equal(
-    after.wallets.find((w) => w.currencyCode === 'KRW').balanceAmount.toFixed(8),
-    before.wallets.find((w) => w.currencyCode === 'KRW').balanceAmount.toFixed(8),
+    after.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW').balanceAmount.toFixed(8),
+    before.wallets.find((w) => w.walletScope === 'securities' && w.currencyCode === 'KRW').balanceAmount.toFixed(8),
   );
 }
 
@@ -1018,6 +1024,8 @@ async function main() {
 
     await verifyConcurrentOpenCreatesExactlyOne();
     await verifyMidTransactionFailureRollsEverythingBack('cashWallet', 'create');
+    await verifyMidTransactionFailureRollsEverythingBack('cashWallet', 'create', 3);
+    await verifyMidTransactionFailureRollsEverythingBack('cashWallet', 'create', 4);
     await verifyMidTransactionFailureRollsEverythingBack('walletTransaction', 'create');
     await verifyDamagedAccountFailsClosed();
     await verifySuspendedAndClosedAreNotReopened();

@@ -220,10 +220,10 @@ async function main() {
 
     const wallets = await prisma.cashWallet.findMany({
       where: { tradingAccountId: accountId },
-      select: { id: true, currencyCode: true, balanceAmount: true },
+      select: { id: true, walletScope: true, currencyCode: true, balanceAmount: true },
     });
-    const krwWallet = wallets.find((wallet) => wallet.currencyCode === 'KRW');
-    const usdWallet = wallets.find((wallet) => wallet.currencyCode === 'USD');
+    const krwWallet = wallets.find((wallet) => wallet.walletScope === 'securities' && wallet.currencyCode === 'KRW');
+    const usdWallet = wallets.find((wallet) => wallet.walletScope === 'securities' && wallet.currencyCode === 'USD');
     assert.ok(krwWallet && usdWallet);
     const fxSnapshot = await prisma.fxRateSnapshot.create({
       data: {

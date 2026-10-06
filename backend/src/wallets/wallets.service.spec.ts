@@ -178,6 +178,13 @@ describe('WalletsService', () => {
         reservedAmount: new Prisma.Decimal('0'),
         updatedAt,
       },
+      ...(['crypto_spot', 'crypto_futures'] as const).map((walletScope) => ({
+        walletScope,
+        currencyCode: CurrencyCode.USD,
+        balanceAmount: new Prisma.Decimal(0),
+        reservedAmount: new Prisma.Decimal(0),
+        updatedAt,
+      })),
     ]);
 
     const response = await service.getWallets('user-1');
@@ -251,8 +258,20 @@ describe('WalletsService', () => {
       status: SeasonStatus.upcoming,
     });
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
-    prisma.cashWallet.findMany.mockResolvedValueOnce([]);
 
+    prisma.cashWallet.findMany.mockResolvedValueOnce(
+      ['securities', 'crypto_spot', 'crypto_futures'].flatMap((walletScope) =>
+        (walletScope === 'securities' ? ['KRW', 'USD'] : ['USD']).map(
+          (currencyCode) => ({
+            walletScope,
+            currencyCode,
+            balanceAmount: new Prisma.Decimal(0),
+            reservedAmount: new Prisma.Decimal(0),
+            updatedAt,
+          }),
+        ),
+      ),
+    );
     const response = await service.getWallets('user-1');
 
     expect(response.data).toMatchObject({
@@ -260,9 +279,9 @@ describe('WalletsService', () => {
       season: {
         status: SeasonStatus.upcoming,
       },
-      wallets: [],
+      wallets: expect.any(Array),
       summary: {
-        totalWallets: 0,
+        totalWallets: 2,
       },
     });
     expectNoWalletWrites(prisma);

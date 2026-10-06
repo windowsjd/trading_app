@@ -16,8 +16,8 @@ import {
  *
  * Migrations never create one: inventing a starting point silently rewrites a
  * user's return history. This script does it explicitly and ONLY where the
- * baseline is provable — general trading has never been enabled, so an
- * eligible account's total assets must equal exactly the external funding it
+ * baseline is provable — the account has no trading history or USD cash in
+ * any scope, and its total assets equal exactly the external funding it
  * received, which makes investment PnL 0 and a TWR factor of 1 the truth
  * rather than an assumption. Every condition is verified per account.
  *

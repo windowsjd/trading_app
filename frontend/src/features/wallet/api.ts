@@ -10,9 +10,13 @@ import type {
 } from '../../models/dto/common';
 
 export type WalletCurrency = 'KRW' | 'USD';
+export type WalletScope = 'securities' | 'crypto_spot' | 'crypto_futures';
 export type WalletState = SectionState;
 
 export interface WalletBalanceDto {
+  /** Required on canonical account reads; absent on legacy FX balance projections. */
+  walletScope?: WalletScope;
+  id?: string;
   currencyCode: WalletCurrency;
   /** Total owned cash (unchanged by limit-order reservations). */
   balanceAmount: MoneyString;

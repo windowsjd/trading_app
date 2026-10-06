@@ -4173,7 +4173,6 @@ export class OrdersService {
           select: { id: true, userId: true, initialCapitalKrw: true },
         },
         cashWallets: {
-          where: { walletScope: 'securities' },
           select: {
             walletScope: true,
             currencyCode: true,

@@ -1,4 +1,8 @@
 import {
+  canonicalCashWalletSetIssue,
+  type CashWalletIdentity,
+} from './canonical-cash-wallets';
+import {
   HttpException,
   HttpStatus,
   Injectable,
@@ -129,7 +133,7 @@ export class WalletsService {
    * changes: the owned account named in the path replaces the implicit
    * current-season participant. Read-only for active, suspended, and closed
    * accounts alike; a GET never creates wallets or accounts, so an account
-   * whose wallets do not exist yet simply returns an empty array.
+   * with an incomplete canonical wallet set fails closed.
    */
   async getWalletsForTradingAccount(
     userId: string | undefined,
@@ -143,11 +147,11 @@ export class WalletsService {
     await this.assertAccountFinancialReadIntegrity(account);
 
     const wallets = await this.prisma.cashWallet.findMany({
-      where: { walletScope: 'securities', tradingAccountId: account.id },
-      orderBy: {
-        currencyCode: 'asc',
-      },
+      where: { tradingAccountId: account.id },
+      orderBy: [{ walletScope: 'asc' }, { currencyCode: 'asc' }],
       select: {
+        id: true,
+        tradingAccountId: true,
         walletScope: true,
         currencyCode: true,
         balanceAmount: true,
@@ -156,11 +160,15 @@ export class WalletsService {
       },
     });
 
+    this.assertCanonicalWalletSet(wallets);
+
     return {
       success: true as const,
       data: {
         tradingAccountId: account.id,
         wallets: wallets.map((wallet) => ({
+          id: wallet.id,
+          walletScope: wallet.walletScope,
           currencyCode: wallet.currencyCode,
           balanceAmount: this.formatDecimal(wallet.balanceAmount, 8),
           reservedAmount: this.formatDecimal(wallet.reservedAmount, 8),
@@ -548,7 +556,6 @@ export class WalletsService {
 
     const wallets = await this.prisma.cashWallet.findMany({
       where: {
-        walletScope: 'securities',
         tradingAccountId: participant.tradingAccountId,
       },
       orderBy: {
@@ -563,13 +570,18 @@ export class WalletsService {
       },
     });
 
+    this.assertCanonicalWalletSet(wallets);
+    const securitiesWallets = wallets.filter(
+      (wallet) => wallet.walletScope === 'securities',
+    );
+
     return {
       success: true,
       data: {
         state: 'available',
         season: this.formatSeason(season),
         participant: this.formatParticipant(participant),
-        wallets: wallets.map((wallet) => ({
+        wallets: securitiesWallets.map((wallet) => ({
           currencyCode: wallet.currencyCode,
           balanceAmount: this.formatDecimal(wallet.balanceAmount, 8),
           reservedAmount: this.formatDecimal(wallet.reservedAmount, 8),
@@ -581,16 +593,26 @@ export class WalletsService {
           updatedAt: wallet.updatedAt.toISOString(),
         })),
         summary: {
-          totalWallets: wallets.length,
-          hasKrwWallet: wallets.some(
+          totalWallets: securitiesWallets.length,
+          hasKrwWallet: securitiesWallets.some(
             (wallet) => wallet.currencyCode === CurrencyCode.KRW,
           ),
-          hasUsdWallet: wallets.some(
+          hasUsdWallet: securitiesWallets.some(
             (wallet) => wallet.currencyCode === CurrencyCode.USD,
           ),
         },
       },
     };
+  }
+
+  private assertCanonicalWalletSet(wallets: readonly CashWalletIdentity[]) {
+    if (canonicalCashWalletSetIssue(wallets)) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'FINANCIAL_SCOPE_REPAIR_REQUIRED',
+        'The canonical cash wallet set is incomplete or invalid; investigate explicitly. Reads never create wallets.',
+      );
+    }
   }
 
   private unavailableResponse(

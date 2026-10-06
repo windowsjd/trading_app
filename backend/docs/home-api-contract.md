@@ -37,6 +37,12 @@ it means rather than relying on the implicit current one.
 - Season ended and settled states block trading and exchange.
 - Final evaluation is based on total assets in KRW.
 - MVP crypto is Binance-based USD-settled crypto and uses the USD Wallet.
+- Cash valuation includes Securities KRW/USD + Crypto Spot USD + Crypto Futures USD
+  `balanceAmount`, never available cash. `walletSummary.KRW`/`USD` sum balances by
+  currency rather than selecting one USD wallet; `cashWallets` carries `walletScope`
+  for all four. A damaged canonical set is unavailable, never repaired by GET.
+  Zero Crypto containers do not change financial results. Current order/FX/UI funding
+  remains Securities; Transfer and Crypto Spot routing are future work.
 - USD stock/crypto KRW valuation is local USD price x quantity x the workflow's selected USD/KRW rate, shared in meaning with USD cash conversion. Stored `AssetPriceSnapshot.priceKrw` does not determine financial values. Summary and top positions use raw Decimal arithmetic until response formatting (half-up, scale 8).
 - `cryptoValueKrw` means KRW-converted value of crypto positions; `totalAssetKrw` and `returnRate` remain KRW-based.
 - Active live valuation and `topPositions` may use fresh eligible `provider_api` rows first, then existing `admin_manual` fallback rows.
@@ -270,6 +276,7 @@ The implemented MVP may return available summary/ranking sections or explicit un
       "state": "available",
       "cashWallets": [
         {
+          "walletScope": "securities | crypto_spot | crypto_futures",
           "currencyCode": "KRW | USD",
           "balanceAmount": "<amount string>"
         }

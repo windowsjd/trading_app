@@ -10,6 +10,7 @@ import { OpsJobRunnerService } from '../src/ops/ops-job-runner.service';
 import { LimitOrderCancelService } from '../src/orders/limit-order-cancel.service';
 import { OrderReservationService } from '../src/orders/order-reservation.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
 
 function deferred() {
   let resolve!: () => void;
@@ -109,7 +110,11 @@ export async function runSeasonLifecycleLeaseIntegration(
       })),
     });
     await prisma.cashWallet.updateMany({
-      where: { tradingAccountId: accountId },
+      where: {
+        tradingAccountId: accountId,
+        walletScope: 'securities',
+        currencyCode: 'KRW',
+      },
       data: { reservedAmount: '510' },
     });
     await prisma.position.updateMany({
@@ -118,8 +123,14 @@ export async function runSeasonLifecycleLeaseIntegration(
     });
   }
   async function reservations(cash: string, quantity: string) {
-    const wallet = await successorPrisma.cashWallet.findFirstOrThrow({
-      where: { tradingAccountId: accountId },
+    const wallet = await successorPrisma.cashWallet.findUniqueOrThrow({
+      where: {
+        tradingAccountId_walletScope_currencyCode: {
+          tradingAccountId: accountId,
+          walletScope: 'securities',
+          currencyCode: 'KRW',
+        },
+      },
     });
     const position = await successorPrisma.position.findFirstOrThrow({
       where: { tradingAccountId: accountId },
@@ -188,6 +199,18 @@ export async function runSeasonLifecycleLeaseIntegration(
         currencyCode: 'KRW',
         balanceAmount: '1000',
       },
+    });
+    await prisma.cashWallet.createMany({
+      data: [
+        {
+          tradingAccountId: accountId,
+          walletScope: 'securities',
+          currencyCode: 'USD',
+          balanceAmount: '0',
+          reservedAmount: '0',
+        },
+        ...zeroCryptoCashWalletData(accountId),
+      ],
     });
     await prisma.position.create({
       data: {

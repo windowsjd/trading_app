@@ -62,6 +62,16 @@ describe('portfolio valuation policy', () => {
       currencyCode: CurrencyCode.USD,
       balanceAmount: usd,
     },
+    {
+      walletScope: 'crypto_spot' as const,
+      currencyCode: CurrencyCode.USD,
+      balanceAmount: '0.00000000',
+    },
+    {
+      walletScope: 'crypto_futures' as const,
+      currencyCode: CurrencyCode.USD,
+      balanceAmount: '0.00000000',
+    },
   ];
 
   const price = (
@@ -97,7 +107,7 @@ describe('portfolio valuation policy', () => {
           valuationAt,
         }),
       ).toThrow(
-        'Exactly one non-negative securities KRW and USD cash wallet is required.',
+        'All four canonical cash wallets are required for portfolio valuation.',
       );
     },
   );

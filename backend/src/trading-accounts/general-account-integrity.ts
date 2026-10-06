@@ -1,3 +1,4 @@
+import { canonicalCashWalletSetIssue } from '../wallets/canonical-cash-wallets';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import {
   CurrencyCode,
@@ -17,7 +18,7 @@ import { GENERAL_ACCOUNT_INITIAL_CAPITAL_KRW } from './general-account.policy';
  * TradingAccount and must have a fixed, small shape:
  *
  *   mode = general, no participant attached, initialCapitalKrw = 10,000,000
- *   exactly one securities KRW + USD wallet, both owned by the account
+ *   all four canonical cash wallets, each owned by the account
  *   exactly one initial_grant / general_account_open ledger row for
  *   amount 10,000,000, on the KRW wallet, referencing the account
  *
@@ -112,7 +113,7 @@ export async function assertGeneralAccountFoundationIntegrity(
   }
 
   const wallets = await prisma.cashWallet.findMany({
-    where: { walletScope: 'securities', tradingAccountId: account.id },
+    where: { tradingAccountId: account.id },
     select: {
       walletScope: true,
       id: true,
@@ -123,16 +124,23 @@ export async function assertGeneralAccountFoundationIntegrity(
   });
 
   const krwWallets = wallets.filter(
-    (wallet) => wallet.currencyCode === CurrencyCode.KRW,
+    (wallet) =>
+      wallet.walletScope === 'securities' &&
+      wallet.currencyCode === CurrencyCode.KRW,
   );
   const usdWallets = wallets.filter(
-    (wallet) => wallet.currencyCode === CurrencyCode.USD,
+    (wallet) =>
+      wallet.walletScope === 'securities' &&
+      wallet.currencyCode === CurrencyCode.USD,
   );
 
-  if (krwWallets.length === 0 || usdWallets.length === 0) {
-    throwGeneralAccountIntegrity(account.id, 'KRW or USD wallet is missing');
+  if (canonicalCashWalletSetIssue(wallets) === 'missing') {
+    throwGeneralAccountIntegrity(
+      account.id,
+      'a canonical cash wallet is missing',
+    );
   }
-  if (krwWallets.length > 1 || usdWallets.length > 1 || wallets.length !== 2) {
+  if (canonicalCashWalletSetIssue(wallets) === 'invalid') {
     throwGeneralAccountIntegrity(
       account.id,
       'duplicate or unexpected wallets exist for the account',
@@ -140,13 +148,10 @@ export async function assertGeneralAccountFoundationIntegrity(
   }
 
   for (const wallet of wallets) {
-    if (
-      wallet.tradingAccountId !== account.id ||
-      wallet.walletScope !== 'securities'
-    ) {
+    if (wallet.tradingAccountId !== account.id) {
       throwGeneralAccountIntegrity(
         account.id,
-        'wallet account or securities scope does not match the foundation',
+        'wallet account does not match the foundation',
       );
     }
   }
@@ -258,7 +263,7 @@ export async function assertGeneralAccountFinancialRowsIntegrity(
 
 /**
  * THE entry point for every general-account financial read and write
- * (작업 6 보완 2): account shape + both wallets + the initial grant + every
+ * (작업 6 보완 2): account shape + all canonical wallets + the initial grant + every
  * row's scope.
  *
  * Before this existed, the wallet/ledger GETs and the ad-reward eligibility

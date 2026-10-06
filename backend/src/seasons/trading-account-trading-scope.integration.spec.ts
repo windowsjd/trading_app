@@ -100,6 +100,7 @@ import {
   TradingAccountStatus,
 } from './src/generated/prisma/client';
 import { PrismaService } from './src/prisma/prisma.service';
+import { zeroCryptoCashWalletData } from './src/wallets/canonical-cash-wallets';
 import { FxService } from './src/fx/fx.service';
 import { preflightFxExecuteRequest } from './src/fx/fx-execute-request-policy';
 import { computeFxQuoteRequestHash, computeOrderQuoteRequestHash } from './src/providers/durable-quote.policy';
@@ -224,7 +225,7 @@ async function createKrwCryptoAsset(label) {
 }
 
 // Full trading-capable scenario: user + season + linked account +
-// participant + both canonical wallets (zero USD needs no valuation FX).
+// participant + all four canonical wallets (zero USD needs no valuation FX).
 async function createScenario(label, options = {}) {
   const user = options.userId ? { id: options.userId } : await createUser(label);
   const season = await createSeason(label, options.seasonStartOffsetMs);
@@ -271,6 +272,7 @@ async function createScenario(label, options = {}) {
     },
     select: { id: true },
   });
+  await prisma.cashWallet.createMany({ data: zeroCryptoCashWalletData(account.id) });
   const usdWalletId = usdWallet.id;
 
   return {

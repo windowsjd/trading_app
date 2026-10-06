@@ -2,9 +2,9 @@ import { spawnSync } from 'node:child_process';
 
 const itDb = process.env.TRADING_ACCOUNT_DB_INTEGRATION === '1' ? it : it.skip;
 
-describe('Wallet Scope foundation PostgreSQL integration', () => {
+describe('Canonical Wallet Scope PostgreSQL integration', () => {
   itDb(
-    'preserves migration fingerprints and legacy finance with multiple USD scopes',
+    'preserves migration fingerprints, provisions four wallets and includes all cash in finance',
     () => {
       const command = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
       const prepare = spawnSync(

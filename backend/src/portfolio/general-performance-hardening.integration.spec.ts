@@ -234,7 +234,7 @@ function boundaryRows(accountId) {
 
 async function krwBalance(accountId) {
   const wallet = await prisma.cashWallet.findFirst({
-    where: { tradingAccountId: accountId, currencyCode: 'KRW' },
+    where: { walletScope: 'securities', tradingAccountId: accountId, currencyCode: 'KRW' },
   });
   return wallet.balanceAmount.toFixed(8);
 }
@@ -584,7 +584,7 @@ async function verifyDamagedGrantedClaimsNeverReplayAsSuccess() {
       'ledger on the USD wallet',
       async (accountId, claim) => {
         const usd = await prisma.cashWallet.findFirst({
-          where: { tradingAccountId: accountId, currencyCode: 'USD' },
+          where: { walletScope: 'securities', tradingAccountId: accountId, currencyCode: 'USD' },
         });
         return prisma.walletTransaction.update({
           where: { id: claim.walletTransactionId },
@@ -777,7 +777,7 @@ async function verifyEligibilityChecksStructureBeforeConfig() {
   // disabled + USD wallet gone → damage wins over configuration.
   const damaged = await openAccount();
   const usd = await prisma.cashWallet.findFirst({
-    where: { tradingAccountId: damaged.accountId, currencyCode: 'USD' },
+    where: { walletScope: 'securities', tradingAccountId: damaged.accountId, currencyCode: 'USD' },
   });
   await prisma.cashWallet.delete({ where: { id: usd.id } });
   await expectCode(
@@ -820,7 +820,7 @@ async function verifyEligibilityChecksStructureBeforeConfig() {
     },
   });
   const krw = await prisma.cashWallet.findFirst({
-    where: { tradingAccountId: suspended.accountId, currencyCode: 'KRW' },
+    where: { walletScope: 'securities', tradingAccountId: suspended.accountId, currencyCode: 'KRW' },
   });
   await prisma.cashWallet.update({
     where: { id: krw.id },

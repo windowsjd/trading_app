@@ -1,3 +1,4 @@
+import { canonicalCashWalletSetIssue } from '../../src/wallets/canonical-cash-wallets';
 import type { PrismaClient } from '../../src/generated/prisma/client';
 
 /**
@@ -154,11 +155,15 @@ export async function auditGeneralAccounts(
     }
 
     const wallets = await prisma.cashWallet.findMany({
-      where: { walletScope: 'securities', tradingAccountId: account.id },
+      where: { tradingAccountId: account.id },
       select: { walletScope: true, id: true, currencyCode: true },
     });
-    const krw = wallets.filter((w) => w.currencyCode === 'KRW');
-    const usd = wallets.filter((w) => w.currencyCode === 'USD');
+    const krw = wallets.filter(
+      (w) => w.walletScope === 'securities' && w.currencyCode === 'KRW',
+    );
+    const usd = wallets.filter(
+      (w) => w.walletScope === 'securities' && w.currencyCode === 'USD',
+    );
 
     if (krw.length === 0) {
       accountsMissingKrwWallet += 1;
@@ -174,6 +179,18 @@ export async function auditGeneralAccounts(
         'GENERAL_ACCOUNT_DUPLICATE_WALLET',
         account.id,
         `KRW=${krw.length}, USD=${usd.length}`,
+      );
+    }
+
+    if (
+      krw.length === 1 &&
+      usd.length === 1 &&
+      canonicalCashWalletSetIssue(wallets)
+    ) {
+      add(
+        'GENERAL_ACCOUNT_CANONICAL_WALLETS_INVALID',
+        account.id,
+        'requires exactly Securities KRW/USD, Crypto Spot USD and Crypto Futures USD',
       );
     }
 

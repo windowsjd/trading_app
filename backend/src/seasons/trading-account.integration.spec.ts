@@ -460,8 +460,9 @@ async function testJoinCreatesAccountAtomically() {
     const wallets = await prisma.cashWallet.findMany({
       where: { tradingAccountId: participant.tradingAccountId },
     });
-    assert.equal(wallets.length, 2);
-    assert.ok(wallets.every((wallet) => wallet.walletScope === 'securities'));
+    assert.equal(wallets.length, 4);
+    assert.equal(wallets.filter((wallet) => wallet.walletScope !== 'securities').length, 2);
+    assert.ok(wallets.filter((wallet) => wallet.walletScope !== 'securities').every((wallet) => wallet.balanceAmount.isZero() && wallet.reservedAmount.isZero()));
     const grants = await prisma.walletTransaction.count({
       where: {
         tradingAccountId: participant.tradingAccountId,
@@ -493,7 +494,7 @@ async function testJoinCreatesAccountAtomically() {
       await prisma.cashWallet.count({
         where: { tradingAccountId: participant.tradingAccountId },
       }),
-      2,
+      4,
     );
     assert.equal(
       await prisma.walletTransaction.count({
