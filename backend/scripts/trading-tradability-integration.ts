@@ -428,7 +428,8 @@ async function restrictedSeasonTest(
     assert.ok(canceled.reservationReleasedAt);
     const wallet = await prisma.cashWallet.findUniqueOrThrow({
       where: {
-        tradingAccountId_currencyCode: {
+        tradingAccountId_walletScope_currencyCode: {
+          walletScope: 'securities',
           tradingAccountId: s.accountId,
           currencyCode: 'USD',
         },

@@ -154,8 +154,8 @@ export async function auditGeneralAccounts(
     }
 
     const wallets = await prisma.cashWallet.findMany({
-      where: { tradingAccountId: account.id },
-      select: { id: true, currencyCode: true },
+      where: { walletScope: 'securities', tradingAccountId: account.id },
+      select: { walletScope: true, id: true, currencyCode: true },
     });
     const krw = wallets.filter((w) => w.currencyCode === 'KRW');
     const usd = wallets.filter((w) => w.currencyCode === 'USD');

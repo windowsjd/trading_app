@@ -518,12 +518,13 @@ export class LimitOrderExecutionService {
       stage = 'wallet_settlement';
       const wallet = await tx.cashWallet.findUnique({
         where: {
-          tradingAccountId_currencyCode: {
+          tradingAccountId_walletScope_currencyCode: {
+            walletScope: 'securities',
             tradingAccountId,
             currencyCode: order.currencyCode,
           },
         },
-        select: { id: true, tradingAccountId: true },
+        select: { walletScope: true, id: true, tradingAccountId: true },
       });
       if (!wallet) {
         this.throwLimitOrderError(
@@ -609,6 +610,7 @@ export class LimitOrderExecutionService {
         stage = 'wallet_credit';
         const credited = await tx.cashWallet.updateMany({
           where: {
+            walletScope: 'securities',
             id: wallet.id,
             tradingAccountId,
             currencyCode: order.currencyCode,
@@ -627,7 +629,7 @@ export class LimitOrderExecutionService {
       // 10) Ledger row + order finalization.
       const walletAfter = await tx.cashWallet.findUniqueOrThrow({
         where: { id: wallet.id },
-        select: { balanceAmount: true },
+        select: { walletScope: true, balanceAmount: true },
       });
 
       await tx.walletTransaction.create({

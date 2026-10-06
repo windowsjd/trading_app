@@ -244,6 +244,12 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
 
 ## Financial TradingAccount Scope (Wallet/Ledger/FX 전환)
 
+- CashWallet의 지갑 식별자는 `(tradingAccountId, walletScope, currencyCode)`다.
+  `securities`는 KRW/USD, `crypto_spot`·`crypto_futures`는 USD만 허용하며 DB CHECK와
+  복합 unique로 보호한다. 기존 행의 compatibility default와 일반/시즌 신규 provisioning은
+  `securities`다. 현재 주문(암호화폐 포함)·FX·wallet API·valuation은 계속 증권 지갑을 사용한다.
+  Crypto 지갑 생성·자금 분리·이체·routing·전체 scope 평가는 후속 작업이다.
+  근거: 미래의 독립 USD 지갑을 표현하되 기존 금융 데이터·산식·공개 계약을 바꾸지 않는다.
 - `CashWallet`, `WalletTransaction`, `ExchangeTransaction`, `FxExecuteRequest`는 required `tradingAccountId`만 저장한다. child 관계(WalletTransaction→CashWallet, FxExecuteRequest→ExchangeTransaction)도 양쪽 account가 같아야 하며 request-time repair나 participant fallback은 없다.
   근거: 금융 소유권을 participant에 중복 기록하면 두 식별자가 불일치할 수 있다.
 - TradingAccount에는 잔액·누적액·수익률 캐시 컬럼을 두지 않는다. 금융 값의 source of truth는 지갑·원장·거래·스냅샷 테이블이다.

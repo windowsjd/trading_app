@@ -150,6 +150,7 @@ export class GeneralAccountsService {
       // trading account.
       const krwWallet = await tx.cashWallet.create({
         data: {
+          walletScope: 'securities',
           tradingAccountId: account.id,
           currencyCode: CurrencyCode.KRW,
           balanceAmount: GENERAL_ACCOUNT_INITIAL_CAPITAL_KRW,
@@ -160,6 +161,7 @@ export class GeneralAccountsService {
 
       await tx.cashWallet.create({
         data: {
+          walletScope: 'securities',
           tradingAccountId: account.id,
           currencyCode: CurrencyCode.USD,
           balanceAmount: GENERAL_ACCOUNT_INITIAL_USD_BALANCE,
@@ -235,9 +237,10 @@ export class GeneralAccountsService {
     created: boolean,
   ): Promise<OpenGeneralAccountResponse> {
     const wallets = await this.prisma.cashWallet.findMany({
-      where: { tradingAccountId: account.id },
+      where: { walletScope: 'securities', tradingAccountId: account.id },
       orderBy: { currencyCode: 'asc' },
       select: {
+        walletScope: true,
         currencyCode: true,
         balanceAmount: true,
         reservedAmount: true,

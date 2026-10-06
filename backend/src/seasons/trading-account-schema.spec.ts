@@ -182,7 +182,7 @@ describe('TradingAccount schema contract', () => {
 
   it('keeps the account-scoped financial uniques and back-relations', () => {
     expect(modelBlock('CashWallet')).toContain(
-      '@@unique([tradingAccountId, currencyCode])',
+      '@@unique([tradingAccountId, walletScope, currencyCode])',
     );
     // FX idempotency is now exclusively account-scoped. The transitional
     // partial unique for nullable account rows is dropped by 작업 2.

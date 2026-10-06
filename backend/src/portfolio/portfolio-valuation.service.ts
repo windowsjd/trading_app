@@ -15,6 +15,7 @@ import {
   FxRateSourceType,
   Prisma,
   TradingAccountMode,
+  type WalletScope,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -94,7 +95,9 @@ export class PortfolioValuationService {
             mode: true,
             initialCapitalKrw: true,
             cashWallets: {
+              where: { walletScope: 'securities' },
               select: {
+                walletScope: true,
                 currencyCode: true,
                 balanceAmount: true,
               },
@@ -194,7 +197,12 @@ export class PortfolioValuationService {
           },
         },
         cashWallets: {
-          select: { currencyCode: true, balanceAmount: true },
+          where: { walletScope: 'securities' },
+          select: {
+            walletScope: true,
+            currencyCode: true,
+            balanceAmount: true,
+          },
         },
         positions: {
           select: {
@@ -274,6 +282,7 @@ export class PortfolioValuationService {
     };
     initialCapitalKrw: Prisma.Decimal;
     cashWallets: readonly {
+      walletScope: WalletScope;
       currencyCode: CurrencyCode;
       balanceAmount: Prisma.Decimal;
     }[];

@@ -23,6 +23,7 @@ import {
   WalletTransactionDirection,
   WalletTransactionReferenceType,
   WalletTransactionType,
+  type WalletScope,
 } from '../generated/prisma/client';
 import { buildPagination, type Pagination } from '../common/pagination';
 import { lockSeasonTradingContext } from '../seasons/season-trading-lock';
@@ -1614,12 +1615,14 @@ export class FxService {
   }): Promise<void> {
     const wallet = await this.prisma.cashWallet.findUnique({
       where: {
-        tradingAccountId_currencyCode: {
+        tradingAccountId_walletScope_currencyCode: {
+          walletScope: 'securities',
           tradingAccountId: input.tradingAccountId,
           currencyCode: input.fromCurrency,
         },
       },
       select: {
+        walletScope: true,
         id: true,
         tradingAccountId: true,
         balanceAmount: true,
@@ -2658,15 +2661,23 @@ export class FxService {
     tradingAccountId: string,
     currencyCode: FxExecuteWalletCandidate['currencyCode'],
     client: PrismaService | Prisma.TransactionClient = this.prisma,
-  ): Promise<(FxExecuteWalletCandidate & { tradingAccountId: string }) | null> {
+  ): Promise<
+    | (FxExecuteWalletCandidate & {
+        tradingAccountId: string;
+        walletScope: WalletScope;
+      })
+    | null
+  > {
     return client.cashWallet.findUnique({
       where: {
-        tradingAccountId_currencyCode: {
+        tradingAccountId_walletScope_currencyCode: {
+          walletScope: 'securities',
           tradingAccountId,
           currencyCode,
         },
       },
       select: {
+        walletScope: true,
         id: true,
         tradingAccountId: true,
         currencyCode: true,
@@ -2982,6 +2993,7 @@ export class FxService {
   ): Promise<FxExecutePostUpdateWallet> {
     const creditResult = await tx.cashWallet.updateMany({
       where: {
+        walletScope: 'securities',
         id: plan.targetWalletId,
         tradingAccountId,
         currencyCode: plan.toCurrency,
@@ -3064,11 +3076,13 @@ export class FxService {
   ): Promise<FxExecutePostUpdateWallet> {
     const wallet = await tx.cashWallet.findFirst({
       where: {
+        walletScope: 'securities',
         id: input.walletId,
         tradingAccountId: input.tradingAccountId,
         currencyCode: input.currencyCode,
       },
       select: {
+        walletScope: true,
         id: true,
         currencyCode: true,
         balanceAmount: true,

@@ -1260,10 +1260,12 @@ function participantDetail(input: {
     },
     cashWallets: [
       {
+        walletScope: 'securities' as const,
         currencyCode: CurrencyCode.KRW,
         balanceAmount: new Prisma.Decimal(input.krwCash ?? '1000000.00000000'),
       },
       {
+        walletScope: 'securities' as const,
         currencyCode: CurrencyCode.USD,
         balanceAmount: new Prisma.Decimal(input.usdCash ?? '0.00000000'),
       },

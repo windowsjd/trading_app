@@ -500,6 +500,7 @@ export type OrderScalarFieldEnum = (typeof OrderScalarFieldEnum)[keyof typeof Or
 export const CashWalletScalarFieldEnum = {
   id: 'id',
   tradingAccountId: 'tradingAccountId',
+  walletScope: 'walletScope',
   currencyCode: 'currencyCode',
   balanceAmount: 'balanceAmount',
   reservedAmount: 'reservedAmount',

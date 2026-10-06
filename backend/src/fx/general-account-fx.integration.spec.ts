@@ -207,7 +207,7 @@ async function main() {
   assert.equal(await prisma.seasonRanking.count(), rankingCountBeforeCore);
 
   const krwWallet = await prisma.cashWallet.findUniqueOrThrow({ where: {
-    tradingAccountId_currencyCode: { tradingAccountId: account, currencyCode: 'KRW' },
+    tradingAccountId_walletScope_currencyCode: { walletScope: 'securities', tradingAccountId: account, currencyCode: 'KRW' },
   }});
   await prisma.cashWallet.update({ where: { id: krwWallet.id }, data: { reservedAmount: krwWallet.balanceAmount.sub('1') } });
   await expectCode(quote(owner, account, 'KRW', 'USD', '2'), 'INSUFFICIENT_BALANCE');

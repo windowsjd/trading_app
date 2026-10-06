@@ -237,11 +237,13 @@ async function verifyFirstOpenIsAtomicAndComplete() {
   const shape = await readGeneralShape(accountId);
 
   assert.equal(shape.wallets.length, 2);
+  assert.ok(shape.wallets.every((wallet) => wallet.walletScope === 'securities'));
   const krw = shape.wallets.find((w) => w.currencyCode === 'KRW');
   const usd = shape.wallets.find((w) => w.currencyCode === 'USD');
   assert.equal(krw.balanceAmount.toFixed(8), '10000000.00000000');
   assert.equal(krw.reservedAmount.toFixed(8), '0.00000000');
   assert.equal(usd.balanceAmount.toFixed(8), '0.00000000');
+  assert.equal(usd.reservedAmount.toFixed(8), '0.00000000');
   assert.equal(krw.tradingAccountId, accountId);
   assert.equal(usd.tradingAccountId, accountId);
 

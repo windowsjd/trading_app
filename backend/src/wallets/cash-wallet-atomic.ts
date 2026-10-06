@@ -16,7 +16,8 @@ import { Prisma } from '../generated/prisma/client';
  * trading_account_id to the VERIFIED account the caller resolved (via
  * assertCashWalletTradingAccountScope). A wallet whose scope is null or was
  * concurrently re-scoped therefore matches 0 rows and the mutation fails
- * closed instead of moving another account's cash.
+ * closed instead of moving another account's cash. The wallet_scope predicate
+ * also pins every current mutation to securities; Crypto routing is future work.
  *
  * updated_at is bumped manually because @updatedAt only applies to Prisma
  * model mutations, not raw SQL.
@@ -49,6 +50,7 @@ export async function debitAvailableCash(
         "updated_at" = NOW()
     WHERE "id" = ${input.walletId}
       AND "trading_account_id" = ${input.tradingAccountId}
+      AND "wallet_scope" = 'securities'::"WalletScope"
       AND "currency_code" = ${input.currencyCode}::"CurrencyCode"
       AND "balance_amount" - "reserved_amount" >= ${input.amount}::numeric
   `;
@@ -69,6 +71,7 @@ export async function reserveAvailableCash(
         "updated_at" = NOW()
     WHERE "id" = ${input.walletId}
       AND "trading_account_id" = ${input.tradingAccountId}
+      AND "wallet_scope" = 'securities'::"WalletScope"
       AND "currency_code" = ${input.currencyCode}::"CurrencyCode"
       AND "balance_amount" - "reserved_amount" >= ${input.amount}::numeric
   `;
@@ -90,6 +93,7 @@ export async function releaseReservedCash(
         "updated_at" = NOW()
     WHERE "id" = ${input.walletId}
       AND "trading_account_id" = ${input.tradingAccountId}
+      AND "wallet_scope" = 'securities'::"WalletScope"
       AND "currency_code" = ${input.currencyCode}::"CurrencyCode"
       AND "reserved_amount" >= ${input.amount}::numeric
   `;
@@ -114,6 +118,7 @@ export async function settleLimitBuyReservedCash(
         "updated_at" = clock_timestamp()
     WHERE "id" = ${input.walletId}
       AND "trading_account_id" = ${input.tradingAccountId}
+      AND "wallet_scope" = 'securities'::"WalletScope"
       AND "currency_code" = ${input.currencyCode}::"CurrencyCode"
       AND "reserved_amount" >= ${input.orderReservation}::numeric
       AND "balance_amount" >= ${input.actualDebit}::numeric

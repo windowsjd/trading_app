@@ -600,10 +600,12 @@ describe('RecordsService', () => {
     prisma.position.findMany.mockResolvedValueOnce(positions);
     prisma.cashWallet.findMany.mockResolvedValueOnce([
       {
+        walletScope: 'securities' as const,
         currencyCode: CurrencyCode.KRW,
         balanceAmount: new Prisma.Decimal('1000000.00000000'),
       },
       {
+        walletScope: 'securities' as const,
         currencyCode: CurrencyCode.USD,
         balanceAmount: new Prisma.Decimal('0.00000000'),
       },

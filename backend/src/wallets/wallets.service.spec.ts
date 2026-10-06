@@ -165,12 +165,14 @@ describe('WalletsService', () => {
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
     prisma.cashWallet.findMany.mockResolvedValueOnce([
       {
+        walletScope: 'securities' as const,
         currencyCode: CurrencyCode.KRW,
         balanceAmount: new Prisma.Decimal('10000000.00000000'),
         reservedAmount: new Prisma.Decimal('250000.00000000'),
         updatedAt,
       },
       {
+        walletScope: 'securities' as const,
         currencyCode: CurrencyCode.USD,
         balanceAmount: new Prisma.Decimal('100.00000000'),
         reservedAmount: new Prisma.Decimal('0'),
@@ -303,6 +305,7 @@ describe('WalletsService', () => {
     expect(prisma.walletTransaction.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
+          wallet: { walletScope: 'securities' },
           tradingAccountId: 'trading-account-1',
           currencyCode: CurrencyCode.KRW,
         },
@@ -351,6 +354,7 @@ describe('WalletsService', () => {
 
     expect(prisma.walletTransaction.count).toHaveBeenCalledWith({
       where: {
+        wallet: { walletScope: 'securities' },
         tradingAccountId: 'trading-account-1',
         currencyCode: CurrencyCode.USD,
       },
@@ -374,6 +378,7 @@ describe('WalletsService', () => {
     expect(prisma.walletTransaction.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
+          wallet: { walletScope: 'securities' },
           tradingAccountId: 'trading-account-1',
           direction: 'credit',
         },
@@ -403,6 +408,7 @@ describe('WalletsService', () => {
     expect(prisma.walletTransaction.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
+          wallet: { walletScope: 'securities' },
           tradingAccountId: 'trading-account-1',
           direction: 'debit',
         },
@@ -427,6 +433,7 @@ describe('WalletsService', () => {
     expect(prisma.walletTransaction.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
+          wallet: { walletScope: 'securities' },
           tradingAccountId: 'trading-account-1',
           txType: WalletTransactionType.initial_grant,
         },
@@ -462,6 +469,7 @@ describe('WalletsService', () => {
     expect(prisma.walletTransaction.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
+          wallet: { walletScope: 'securities' },
           tradingAccountId: 'trading-account-1',
           currencyCode: CurrencyCode.KRW,
           direction: 'credit',

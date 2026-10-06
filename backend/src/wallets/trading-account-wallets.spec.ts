@@ -153,6 +153,7 @@ describe('WalletsService account-scoped reads', () => {
     const { prisma, service } = createServices();
     prisma.cashWallet.findMany.mockResolvedValueOnce([
       {
+        walletScope: 'securities' as const,
         currencyCode: 'KRW',
         balanceAmount: new Prisma.Decimal('10000000.00000000'),
         reservedAmount: new Prisma.Decimal('250000.00000000'),
@@ -167,7 +168,7 @@ describe('WalletsService account-scoped reads', () => {
 
     expect(prisma.cashWallet.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { tradingAccountId: 'ta-1' },
+        where: { tradingAccountId: 'ta-1', walletScope: 'securities' },
       }),
     );
     expect(response.data).toEqual({
@@ -305,6 +306,7 @@ function ledgerServices(mode: 'general' | 'season' = 'season') {
       ...row,
       tradingAccountId: 'ta-1',
       amount: new Prisma.Decimal(row.amount),
+      wallet: { walletScope: 'securities' },
       balanceAfter: new Prisma.Decimal(row.balanceAfter),
       occurredAt: new Date(row.occurredAt),
       createdAt: new Date(row.createdAt),
@@ -313,6 +315,7 @@ function ledgerServices(mode: 'general' | 'season' = 'season') {
     Object.entries(where).every(([key, value]: [string, any]) => {
       if (key === 'AND')
         return value.every((condition) => matches(row, condition));
+      if (key === 'wallet') return matches(row.wallet, value);
       if (value && typeof value === 'object') {
         if ('not' in value) return row[key] !== value.not;
         if ('in' in value) return value.in.includes(row[key]);

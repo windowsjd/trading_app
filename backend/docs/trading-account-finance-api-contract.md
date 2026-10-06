@@ -46,6 +46,10 @@ current server contract.
 
 ## Common Rules
 
+- Wallet Scope foundation은 내부 식별자만 확장한다. 현재 wallet/ledger/FX 경로는
+  `securities` KRW/USD를 선택하고 request/response에는 `walletScope`를 추가하지 않는다.
+  현재 Crypto 주문도 기존 Securities USD 지갑을 사용한다. Crypto Spot/Futures 지갑 생성,
+  이체와 routing은 미구현이며 [현재 scope 정책](trading-modes-and-accounts.md)을 따른다.
 - Authentication required on every route (401 `UNAUTHORIZED` without a valid
   token). User identity is `request.user.userId`.
 - The accountId is explicit in the path. The server stores no

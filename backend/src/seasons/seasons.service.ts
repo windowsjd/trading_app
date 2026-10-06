@@ -350,6 +350,7 @@ export class SeasonsService {
 
         const krwWallet = await tx.cashWallet.create({
           data: {
+            walletScope: 'securities',
             tradingAccountId: tradingAccount.id,
             currencyCode: CurrencyCode.KRW,
             balanceAmount: initialCapitalKrw,
@@ -358,6 +359,7 @@ export class SeasonsService {
 
         await tx.cashWallet.create({
           data: {
+            walletScope: 'securities',
             tradingAccountId: tradingAccount.id,
             currencyCode: CurrencyCode.USD,
             balanceAmount: ZERO_AMOUNT,

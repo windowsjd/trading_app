@@ -461,6 +461,7 @@ async function testJoinCreatesAccountAtomically() {
       where: { tradingAccountId: participant.tradingAccountId },
     });
     assert.equal(wallets.length, 2);
+    assert.ok(wallets.every((wallet) => wallet.walletScope === 'securities'));
     const grants = await prisma.walletTransaction.count({
       where: {
         tradingAccountId: participant.tradingAccountId,

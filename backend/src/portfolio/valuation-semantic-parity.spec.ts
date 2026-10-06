@@ -105,8 +105,16 @@ function fixture(
         ? { id: 'participant', userId: 'user', initialCapitalKrw }
         : null,
     cashWallets: [
-      { currencyCode: CurrencyCode.KRW, balanceAmount: decimal('1000') },
-      { currencyCode: CurrencyCode.USD, balanceAmount: decimal(usdCash) },
+      {
+        walletScope: 'securities' as const,
+        currencyCode: CurrencyCode.KRW,
+        balanceAmount: decimal('1000'),
+      },
+      {
+        walletScope: 'securities' as const,
+        currencyCode: CurrencyCode.USD,
+        balanceAmount: decimal(usdCash),
+      },
     ],
     positions: holdings.map((h) => h.position),
   };

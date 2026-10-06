@@ -11,7 +11,7 @@ import {
  *
  * Every atomic cash mutation in cash-wallet-atomic.ts (and the equivalent
  * Prisma updateMany credits) carries the wallet id, the VERIFIED trading
- * account, the currency, AND an amount guard in one WHERE.
+ * account, securities scope, the currency, AND an amount guard in one WHERE.
  * When it matches 0 rows, ANY of those could be the reason — and the old
  * per-caller diagnostics re-read the wallet with the scope columns still in
  * the WHERE, so a wallet whose scope had been corrupted simply "disappeared"
@@ -24,15 +24,16 @@ import {
  *   1. wallet row gone                       → 'wallet_not_found'
  *   2. tradingAccountId IS NULL              → 500 repair required (throws)
  *   3. tradingAccountId differs              → 500 scope mismatch (throws)
- *   4. currencyCode differs                  → 500 scope mismatch (throws)
- *   5. amount guard cannot hold              → 'insufficient_available' /
+ *   4. walletScope is not securities         → 500 scope mismatch (throws)
+ *   5. currencyCode differs                  → 500 scope mismatch (throws)
+ *   6. amount guard cannot hold              → 'insufficient_available' /
  *                                              'insufficient_reserved'
- *   6. scope AND amounts fine                → 'conflict' (real concurrency)
+ *   7. scope AND amounts fine                → 'conflict' (real concurrency)
  *
- * Steps 2–4 are structural server-side corruption and are thrown here as the
+ * Steps 2–5 are structural server-side corruption and are thrown here as the
  * SAME structured 500s the pre-check guard uses
  * (FINANCIAL_SCOPE_REPAIR_REQUIRED / FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH)
- * so every caller reports them identically. Steps 1, 5, 6 are returned so each
+ * so every caller reports them identically. Steps 1, 6, 7 are returned so each
  * caller can keep its own historical error code (INSUFFICIENT_BALANCE,
  * INSUFFICIENT_AVAILABLE_BALANCE, ORDER_RESERVATION_INCONSISTENT,
  * SOURCE_WALLET_NOT_FOUND, …).
@@ -87,6 +88,7 @@ export async function diagnoseCashWalletMutationFailure(
   const wallet = await client.cashWallet.findUnique({
     where: { id: input.walletId },
     select: {
+      walletScope: true,
       id: true,
       tradingAccountId: true,
       currencyCode: true,
@@ -98,7 +100,8 @@ export async function diagnoseCashWalletMutationFailure(
   const requires = input.requires ?? {};
   const reserved = wallet?.reservedAmount ?? new Prisma.Decimal(0);
   const scopeValid = wallet
-    ? wallet.tradingAccountId === input.expected.tradingAccountId
+    ? wallet.tradingAccountId === input.expected.tradingAccountId &&
+      wallet.walletScope === 'securities'
     : undefined;
   const currencyMatched = wallet
     ? wallet.currencyCode === input.expected.currencyCode
@@ -155,7 +158,11 @@ export async function diagnoseCashWalletMutationFailure(
 
   if (!scopeValid) {
     recordReason(
-      wallet.tradingAccountId == null ? 'null_scope' : 'account_scope_mismatch',
+      wallet.tradingAccountId == null
+        ? 'null_scope'
+        : wallet.tradingAccountId !== input.expected.tradingAccountId
+          ? 'account_scope_mismatch'
+          : 'wallet_scope_mismatch',
     );
   } else if (!currencyMatched) {
     recordReason('currency_mismatch');

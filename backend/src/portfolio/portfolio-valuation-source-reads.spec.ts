@@ -53,10 +53,12 @@ function account(id: string) {
     },
     cashWallets: [
       {
+        walletScope: 'securities' as const,
         currencyCode: CurrencyCode.KRW,
         balanceAmount: new Prisma.Decimal('900000'),
       },
       {
+        walletScope: 'securities' as const,
         currencyCode: CurrencyCode.USD,
         balanceAmount: new Prisma.Decimal('2'),
       },

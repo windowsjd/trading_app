@@ -211,12 +211,14 @@ export class LimitOrderCreateService {
     const [wallet, position] = await Promise.all([
       this.prisma.cashWallet.findUnique({
         where: {
-          tradingAccountId_currencyCode: {
+          tradingAccountId_walletScope_currencyCode: {
+            walletScope: 'securities',
             tradingAccountId: input.tradingAccountId,
             currencyCode: input.currencyCode,
           },
         },
         select: {
+          walletScope: true,
           id: true,
           tradingAccountId: true,
           balanceAmount: true,
@@ -346,12 +348,14 @@ export class LimitOrderCreateService {
     const [wallet, position] = await Promise.all([
       this.prisma.cashWallet.findUnique({
         where: {
-          tradingAccountId_currencyCode: {
+          tradingAccountId_walletScope_currencyCode: {
+            walletScope: 'securities',
             tradingAccountId: input.tradingAccountId,
             currencyCode: input.currencyCode,
           },
         },
         select: {
+          walletScope: true,
           id: true,
           tradingAccountId: true,
           balanceAmount: true,

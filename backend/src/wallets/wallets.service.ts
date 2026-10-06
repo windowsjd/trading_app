@@ -143,13 +143,12 @@ export class WalletsService {
     await this.assertAccountFinancialReadIntegrity(account);
 
     const wallets = await this.prisma.cashWallet.findMany({
-      where: {
-        tradingAccountId: account.id,
-      },
+      where: { walletScope: 'securities', tradingAccountId: account.id },
       orderBy: {
         currencyCode: 'asc',
       },
       select: {
+        walletScope: true,
         currencyCode: true,
         balanceAmount: true,
         reservedAmount: true,
@@ -217,6 +216,7 @@ export class WalletsService {
 
     const where = {
       tradingAccountId: account.id,
+      wallet: { walletScope: 'securities' as const },
       ...(parsedQuery.currency ? { currencyCode: parsedQuery.currency } : {}),
       ...(parsedQuery.direction ? { direction: parsedQuery.direction } : {}),
       AND: [
@@ -447,6 +447,7 @@ export class WalletsService {
 
     const where = {
       tradingAccountId: participant.tradingAccountId,
+      wallet: { walletScope: 'securities' as const },
       ...(parsedQuery.currency ? { currencyCode: parsedQuery.currency } : {}),
       ...(parsedQuery.direction ? { direction: parsedQuery.direction } : {}),
       ...this.walletTransactionTxTypeWhere(parsedQuery.txType),
@@ -547,12 +548,14 @@ export class WalletsService {
 
     const wallets = await this.prisma.cashWallet.findMany({
       where: {
+        walletScope: 'securities',
         tradingAccountId: participant.tradingAccountId,
       },
       orderBy: {
         currencyCode: 'asc',
       },
       select: {
+        walletScope: true,
         currencyCode: true,
         balanceAmount: true,
         reservedAmount: true,

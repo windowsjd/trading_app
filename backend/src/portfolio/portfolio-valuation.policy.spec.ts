@@ -53,10 +53,12 @@ describe('portfolio valuation policy', () => {
 
   const wallets = (krw: string, usd = '0.00000000') => [
     {
+      walletScope: 'securities' as const,
       currencyCode: CurrencyCode.KRW,
       balanceAmount: krw,
     },
     {
+      walletScope: 'securities' as const,
       currencyCode: CurrencyCode.USD,
       balanceAmount: usd,
     },
@@ -75,6 +77,30 @@ describe('portfolio valuation policy', () => {
     capturedAt: new Date('2026-05-07T00:00:01.000Z'),
     createdAt: new Date('2026-05-07T00:00:02.000Z'),
   });
+
+  it.each(['crypto_spot', 'crypto_futures'] as const)(
+    'fails closed when %s USD substitutes for the securities USD input',
+    (walletScope) => {
+      expect(() =>
+        calculatePortfolioValuation({
+          seasonParticipantId: 'sp-1',
+          initialCapitalKrw: '1000000.00000000',
+          cashWallets: [
+            wallets('1000000.00000000')[0],
+            {
+              walletScope,
+              currencyCode: CurrencyCode.USD,
+              balanceAmount: '100.00000000',
+            },
+          ],
+          positions: [],
+          valuationAt,
+        }),
+      ).toThrow(
+        'Exactly one non-negative securities KRW and USD cash wallet is required.',
+      );
+    },
+  );
 
   it('calculates cash-only KRW valuation', () => {
     expect(

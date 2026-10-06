@@ -164,6 +164,7 @@ describe('LimitOrderCancelService', () => {
           }),
         );
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        walletScope: 'securities' as const,
         id: 'wallet-1',
         tradingAccountId: 'trading-account-1',
       });
@@ -273,6 +274,7 @@ describe('LimitOrderCancelService', () => {
           }),
         );
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        walletScope: 'securities' as const,
         id: 'wallet-1',
         tradingAccountId: 'trading-account-1',
       });
@@ -355,6 +357,7 @@ describe('LimitOrderCancelService', () => {
       prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-1' }]);
       prisma.order.findUnique.mockResolvedValueOnce(orderRecord());
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        walletScope: 'securities' as const,
         id: 'wallet-1',
         tradingAccountId: 'trading-account-1',
       });
@@ -396,6 +399,7 @@ describe('LimitOrderCancelService', () => {
       prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-1' }]);
       prisma.order.findUnique.mockResolvedValueOnce(orderRecord());
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        walletScope: 'securities' as const,
         id: 'wallet-1',
         tradingAccountId: 'trading-account-1',
       });
@@ -429,6 +433,7 @@ describe('LimitOrderCancelService', () => {
             }),
           );
         prisma.cashWallet.findUnique.mockResolvedValueOnce({
+          walletScope: 'securities' as const,
           id: 'wallet-1',
           tradingAccountId: 'trading-account-1',
         });
@@ -496,10 +501,12 @@ describe('LimitOrderCancelService', () => {
         });
       prisma.cashWallet.findUnique
         .mockResolvedValueOnce({
+          walletScope: 'securities' as const,
           id: 'wallet-krw',
           tradingAccountId: 'trading-account-1',
         })
         .mockResolvedValueOnce({
+          walletScope: 'securities' as const,
           id: 'wallet-usd',
           tradingAccountId: 'trading-account-1',
         });
@@ -626,10 +633,12 @@ describe('LimitOrderCancelService', () => {
         });
       prisma.cashWallet.findUnique
         .mockResolvedValueOnce({
+          walletScope: 'securities' as const,
           id: 'wallet-1',
           tradingAccountId: 'trading-account-1',
         })
         .mockResolvedValueOnce({
+          walletScope: 'securities' as const,
           id: 'wallet-2',
           tradingAccountId: 'trading-account-2',
         });
@@ -777,6 +786,7 @@ describe('LimitOrderCancelService', () => {
           }),
         );
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        walletScope: 'securities' as const,
         id: 'wallet-1',
         tradingAccountId: 'trading-account-1',
       });
@@ -804,6 +814,7 @@ describe('LimitOrderCancelService', () => {
           }),
         );
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        walletScope: 'securities' as const,
         id: 'wallet-1',
         tradingAccountId: 'trading-account-1',
       });
@@ -937,6 +948,7 @@ describe('LimitOrderCancelService', () => {
       prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-1' }]);
       prisma.order.findUnique.mockResolvedValueOnce(orderRecord());
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        walletScope: 'securities' as const,
         id: 'wallet-1',
         tradingAccountId: null,
       });
@@ -953,6 +965,7 @@ describe('LimitOrderCancelService', () => {
       prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-1' }]);
       prisma.order.findUnique.mockResolvedValueOnce(orderRecord());
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        walletScope: 'securities' as const,
         id: 'wallet-1',
         tradingAccountId: 'trading-account-7',
       });

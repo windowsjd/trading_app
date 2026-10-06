@@ -381,6 +381,7 @@ describe('FxService', () => {
     balanceAmount: string,
   ) => {
     prisma.cashWallet.findUnique.mockResolvedValueOnce({
+      walletScope: 'securities' as const,
       id: `quote-source-wallet-${currencyCode}`,
       balanceAmount: new Prisma.Decimal(balanceAmount),
       currencyCode,
@@ -1702,12 +1703,14 @@ describe('FxService', () => {
     });
     expect(prisma.cashWallet.findUnique).toHaveBeenCalledWith({
       where: {
-        tradingAccountId_currencyCode: {
+        tradingAccountId_walletScope_currencyCode: {
+          walletScope: 'securities',
           tradingAccountId: 'trading-account-1',
           currencyCode: CurrencyCode.KRW,
         },
       },
       select: {
+        walletScope: true,
         id: true,
         tradingAccountId: true,
         balanceAmount: true,
@@ -1747,12 +1750,14 @@ describe('FxService', () => {
     });
     expect(prisma.cashWallet.findUnique).toHaveBeenCalledWith({
       where: {
-        tradingAccountId_currencyCode: {
+        tradingAccountId_walletScope_currencyCode: {
+          walletScope: 'securities',
           tradingAccountId: 'trading-account-1',
           currencyCode: CurrencyCode.USD,
         },
       },
       select: {
+        walletScope: true,
         id: true,
         tradingAccountId: true,
         balanceAmount: true,
@@ -1781,12 +1786,14 @@ describe('FxService', () => {
       createdAt,
     };
     const sourceWallet = {
+      walletScope: 'securities' as const,
       id: 'source-wallet-1',
       tradingAccountId: 'trading-account-1',
       currencyCode: CurrencyCode.KRW,
       balanceAmount: new Prisma.Decimal('1000.00000000'),
     };
     const targetWallet = {
+      walletScope: 'securities' as const,
       id: 'target-wallet-1',
       tradingAccountId: 'trading-account-1',
       currencyCode: CurrencyCode.USD,
@@ -2095,6 +2102,7 @@ describe('FxService', () => {
       ]);
       expect(prisma.cashWallet.updateMany).toHaveBeenNthCalledWith(1, {
         where: {
+          walletScope: 'securities',
           id: 'target-wallet-1',
           tradingAccountId: 'trading-account-1',
           currencyCode: CurrencyCode.USD,
@@ -3142,12 +3150,14 @@ describe('FxService', () => {
       expect(prisma.fxExecuteRequest.findFirst).not.toHaveBeenCalled();
       expect(prisma.cashWallet.findUnique).toHaveBeenNthCalledWith(1, {
         where: {
-          tradingAccountId_currencyCode: {
+          tradingAccountId_walletScope_currencyCode: {
+            walletScope: 'securities',
             tradingAccountId: 'trading-account-1',
             currencyCode: CurrencyCode.KRW,
           },
         },
         select: {
+          walletScope: true,
           id: true,
           tradingAccountId: true,
           currencyCode: true,
@@ -3157,12 +3167,14 @@ describe('FxService', () => {
       });
       expect(prisma.cashWallet.findUnique).toHaveBeenNthCalledWith(2, {
         where: {
-          tradingAccountId_currencyCode: {
+          tradingAccountId_walletScope_currencyCode: {
+            walletScope: 'securities',
             tradingAccountId: 'trading-account-1',
             currencyCode: CurrencyCode.USD,
           },
         },
         select: {
+          walletScope: true,
           id: true,
           tradingAccountId: true,
           currencyCode: true,

@@ -313,6 +313,7 @@ export async function ensureDevBaselineParticipant(input: {
 
     const krwWallet = await tx.cashWallet.create({
       data: {
+        walletScope: 'securities',
         id: DEV_KRW_WALLET_ID,
         tradingAccountId: tradingAccount.id,
         currencyCode: CurrencyCode.KRW,
@@ -323,6 +324,7 @@ export async function ensureDevBaselineParticipant(input: {
 
     await tx.cashWallet.create({
       data: {
+        walletScope: 'securities',
         id: DEV_USD_WALLET_ID,
         tradingAccountId: tradingAccount.id,
         currencyCode: CurrencyCode.USD,

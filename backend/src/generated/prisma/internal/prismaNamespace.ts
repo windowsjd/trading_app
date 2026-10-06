@@ -3315,6 +3315,7 @@ export type OrderScalarFieldEnum = (typeof OrderScalarFieldEnum)[keyof typeof Or
 export const CashWalletScalarFieldEnum = {
   id: 'id',
   tradingAccountId: 'tradingAccountId',
+  walletScope: 'walletScope',
   currencyCode: 'currencyCode',
   balanceAmount: 'balanceAmount',
   reservedAmount: 'reservedAmount',
@@ -4046,6 +4047,20 @@ export type EnumOrderStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$Pris
  * Reference to a field of type 'OrderStatus[]'
  */
 export type ListEnumOrderStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrderStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'WalletScope'
+ */
+export type EnumWalletScopeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'WalletScope'>
+    
+
+
+/**
+ * Reference to a field of type 'WalletScope[]'
+ */
+export type ListEnumWalletScopeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'WalletScope[]'>
     
 
 

@@ -606,12 +606,13 @@ export class LimitOrderCancelService {
       });
       const wallet = await tx.cashWallet.findUnique({
         where: {
-          tradingAccountId_currencyCode: {
+          tradingAccountId_walletScope_currencyCode: {
+            walletScope: 'securities',
             tradingAccountId: input.tradingAccountId,
             currencyCode: input.currencyCode,
           },
         },
-        select: { id: true, tradingAccountId: true },
+        select: { walletScope: true, id: true, tradingAccountId: true },
       });
 
       if (!wallet) {

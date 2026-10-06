@@ -407,7 +407,8 @@ async function runScenario(
     if (kind === 'limit') {
       const wallet = await prisma.cashWallet.findUniqueOrThrow({
         where: {
-          tradingAccountId_currencyCode: {
+          tradingAccountId_walletScope_currencyCode: {
+            walletScope: 'securities',
             tradingAccountId: s.accountId,
             currencyCode: 'USD',
           },
@@ -526,7 +527,8 @@ async function runScenario(
     assert.equal(crypto.averageCost.toFixed(8), '100.10000000');
     const wallet = await prisma.cashWallet.findUniqueOrThrow({
       where: {
-        tradingAccountId_currencyCode: {
+        tradingAccountId_walletScope_currencyCode: {
+          walletScope: 'securities',
           tradingAccountId: s.accountId,
           currencyCode: 'USD',
         },

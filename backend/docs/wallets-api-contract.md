@@ -9,6 +9,9 @@
 
 ## Source Rules
 - Wallet source of truth is `cash_wallets`.
+- Current reads select `wallet_scope = securities`; the internal scope field is
+  not exposed in the public response. Crypto Spot/Futures scopes are schema
+  foundation only; provisioning, transfers and order routing are future work.
 - Amount values are strings.
 - Timestamps are UTC ISO strings.
 - Responses keep the existing `success/data` or `success/error` structure.

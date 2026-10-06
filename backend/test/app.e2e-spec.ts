@@ -424,6 +424,7 @@ describe('AppController (e2e)', () => {
   // fixture without it makes `.sub(undefined)` throw and the endpoint answer 500.
   // It arrived with limit-order reservations; these fixtures predated it.
   const krwWallet = {
+    walletScope: 'securities' as const,
     id: 'wallet-krw-1',
     seasonParticipantId: participant.id,
     tradingAccountId: 'trading-account-1',
@@ -433,6 +434,7 @@ describe('AppController (e2e)', () => {
     updatedAt: now,
   };
   const usdWallet = {
+    walletScope: 'securities' as const,
     id: 'wallet-usd-1',
     seasonParticipantId: participant.id,
     tradingAccountId: 'trading-account-1',
@@ -2840,6 +2842,7 @@ describe('AppController (e2e)', () => {
     prisma.tradingAccount.findFirst.mockResolvedValue(existingAccount);
     prisma.cashWallet.findMany.mockResolvedValue([
       {
+        walletScope: 'securities' as const,
         id: 'general-krw',
         currencyCode: 'KRW',
         seasonParticipantId: null,
@@ -2849,6 +2852,7 @@ describe('AppController (e2e)', () => {
         updatedAt: openedAt,
       },
       {
+        walletScope: 'securities' as const,
         id: 'general-usd',
         currencyCode: 'USD',
         seasonParticipantId: null,
@@ -3016,6 +3020,7 @@ describe('AppController (e2e)', () => {
     });
     prisma.cashWallet.findMany.mockResolvedValueOnce([
       {
+        walletScope: 'securities' as const,
         currencyCode: 'KRW',
         balanceAmount: new Prisma.Decimal('10000000.00000000'),
         reservedAmount: new Prisma.Decimal('250000.00000000'),
@@ -3054,7 +3059,10 @@ describe('AppController (e2e)', () => {
     // GET never creates wallets.
     expect(prisma.cashWallet.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { tradingAccountId: 'trading-account-1' },
+        where: {
+          tradingAccountId: 'trading-account-1',
+          walletScope: 'securities',
+        },
       }),
     );
     expect(prisma.cashWallet.create).not.toHaveBeenCalled();

@@ -124,6 +124,7 @@ import {
 
 const d = (value: string) => new Prisma.Decimal(value);
 const wallet = (overrides: Record<string, unknown> = {}) => ({
+  walletScope: 'securities' as const,
   id: 'wallet-1',
   tradingAccountId: 'account-1',
   currencyCode: CurrencyCode.KRW,

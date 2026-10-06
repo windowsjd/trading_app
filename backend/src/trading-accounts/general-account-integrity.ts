@@ -17,7 +17,7 @@ import { GENERAL_ACCOUNT_INITIAL_CAPITAL_KRW } from './general-account.policy';
  * TradingAccount and must have a fixed, small shape:
  *
  *   mode = general, no participant attached, initialCapitalKrw = 10,000,000
- *   exactly one KRW wallet + exactly one USD wallet, both scoped to the account
+ *   exactly one securities KRW + USD wallet, both owned by the account
  *   exactly one initial_grant / general_account_open ledger row for
  *   amount 10,000,000, on the KRW wallet, referencing the account
  *
@@ -112,8 +112,9 @@ export async function assertGeneralAccountFoundationIntegrity(
   }
 
   const wallets = await prisma.cashWallet.findMany({
-    where: { tradingAccountId: account.id },
+    where: { walletScope: 'securities', tradingAccountId: account.id },
     select: {
+      walletScope: true,
       id: true,
       currencyCode: true,
       tradingAccountId: true,
@@ -139,10 +140,13 @@ export async function assertGeneralAccountFoundationIntegrity(
   }
 
   for (const wallet of wallets) {
-    if (wallet.tradingAccountId !== account.id) {
+    if (
+      wallet.tradingAccountId !== account.id ||
+      wallet.walletScope !== 'securities'
+    ) {
       throwGeneralAccountIntegrity(
         account.id,
-        'wallet trading-account scope does not match the account',
+        'wallet account or securities scope does not match the foundation',
       );
     }
   }

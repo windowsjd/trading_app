@@ -160,8 +160,10 @@ const createServices = () => {
       findFirst: jest.fn().mockResolvedValue(null),
       findUnique: jest.fn().mockImplementation(({ where }) => {
         const currencyCode =
-          where.tradingAccountId_currencyCode?.currencyCode ?? 'KRW';
+          where.tradingAccountId_walletScope_currencyCode?.currencyCode ??
+          'KRW';
         return Promise.resolve({
+          walletScope: 'securities' as const,
           id: `wallet-${currencyCode}`,
           tradingAccountId: 'ta-1',
           currencyCode,

@@ -247,10 +247,12 @@ describe('HomeService', () => {
     tradingAccount: {
       cashWallets: [
         {
+          walletScope: 'securities' as const,
           currencyCode: CurrencyCode.KRW,
           balanceAmount: new Prisma.Decimal('900000.00000000'),
         },
         {
+          walletScope: 'securities' as const,
           currencyCode: CurrencyCode.USD,
           balanceAmount: new Prisma.Decimal('100.00000000'),
         },
@@ -511,6 +513,7 @@ describe('HomeService', () => {
         ...participant.tradingAccount,
         cashWallets: [
           {
+            walletScope: 'securities' as const,
             currencyCode: CurrencyCode.KRW,
             balanceAmount: new Prisma.Decimal('2500000.00000000'),
           },

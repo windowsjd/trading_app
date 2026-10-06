@@ -206,7 +206,8 @@ async function fixture(
   assets.push(asset.id);
   await db.cashWallet.update({
     where: {
-      tradingAccountId_currencyCode: {
+      tradingAccountId_walletScope_currencyCode: {
+        walletScope: 'securities',
         tradingAccountId: accountId,
         currencyCode: currency,
       },

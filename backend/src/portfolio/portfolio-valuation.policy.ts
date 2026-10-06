@@ -4,6 +4,7 @@ import {
   CurrencyCode,
   FxRateSourceType,
   Prisma,
+  type WalletScope,
 } from '../generated/prisma/client';
 import {
   formatDecimalScale,
@@ -26,6 +27,7 @@ export type PortfolioValuationDiagnosticContext = {
 };
 
 export type PortfolioCashWalletInput = {
+  walletScope: WalletScope;
   currencyCode: CurrencyCode;
   balanceAmount: DecimalInput;
 };
@@ -361,13 +363,14 @@ function assertRequiredWallets(wallets: readonly PortfolioCashWalletInput[]) {
 
   if (
     wallets.length !== 2 ||
+    wallets.some((wallet) => wallet.walletScope !== 'securities') ||
     wallets.some((wallet) =>
       toDecimal(wallet.balanceAmount, 'balanceAmount').lt(0),
     )
   ) {
     throw new PortfolioValuationError(
       'CASH_WALLET_INVALID',
-      'Exactly one non-negative KRW and USD cash wallet is required.',
+      'Exactly one non-negative securities KRW and USD cash wallet is required.',
     );
   }
 }

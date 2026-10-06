@@ -179,7 +179,9 @@ export class HomeService {
         tradingAccount: {
           select: {
             cashWallets: {
+              where: { walletScope: 'securities' },
               select: {
+                walletScope: true,
                 currencyCode: true,
                 balanceAmount: true,
               },

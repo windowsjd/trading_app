@@ -425,6 +425,7 @@ describe('OrdersService', () => {
     balance = '1000.00000000',
   ) => {
     prisma.cashWallet.findUnique.mockResolvedValueOnce({
+      walletScope: 'securities' as const,
       id: 'wallet-1',
       tradingAccountId: 'trading-account-1',
       balanceAmount: new Prisma.Decimal(balance),
@@ -873,6 +874,7 @@ describe('OrdersService', () => {
     currencyCode = CurrencyCode.KRW,
   ) => {
     prisma.cashWallet.findUnique.mockResolvedValueOnce({
+      walletScope: 'securities' as const,
       id: 'wallet-1',
       tradingAccountId: 'trading-account-1',
       currencyCode,
@@ -883,6 +885,7 @@ describe('OrdersService', () => {
     prisma.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(1);
     prisma.cashWallet.updateMany.mockResolvedValueOnce({ count: 1 });
     prisma.cashWallet.findFirst.mockResolvedValueOnce({
+      walletScope: 'securities' as const,
       id: 'wallet-1',
       tradingAccountId: 'trading-account-1',
       currencyCode,
@@ -1019,10 +1022,12 @@ describe('OrdersService', () => {
       },
       cashWallets: [
         {
+          walletScope: 'securities' as const,
           currencyCode: CurrencyCode.KRW,
           balanceAmount: new Prisma.Decimal(input.krwCash ?? '0.00000000'),
         },
         {
+          walletScope: 'securities' as const,
           currencyCode: CurrencyCode.USD,
           balanceAmount: new Prisma.Decimal(input.usdCash ?? '0.00000000'),
         },
@@ -1721,12 +1726,14 @@ describe('OrdersService', () => {
     });
     expect(prisma.cashWallet.findUnique).toHaveBeenCalledWith({
       where: {
-        tradingAccountId_currencyCode: {
+        tradingAccountId_walletScope_currencyCode: {
+          walletScope: 'securities',
           tradingAccountId: 'trading-account-1',
           currencyCode: CurrencyCode.USD,
         },
       },
       select: {
+        walletScope: true,
         id: true,
         tradingAccountId: true,
         balanceAmount: true,
@@ -3222,10 +3229,12 @@ describe('OrdersService', () => {
         seasonParticipant: { id: 'sp-1', userId: 'user-1', initialCapitalKrw },
         cashWallets: [
           {
+            walletScope: 'securities' as const,
             currencyCode: CurrencyCode.KRW,
             balanceAmount: new Prisma.Decimal('1917000'),
           },
           {
+            walletScope: 'securities' as const,
             currencyCode: CurrencyCode.USD,
             balanceAmount: new Prisma.Decimal('0'),
           },
@@ -4147,6 +4156,7 @@ describe('OrdersService', () => {
       });
       expect(prisma.cashWallet.updateMany).toHaveBeenCalledWith({
         where: {
+          walletScope: 'securities',
           id: 'wallet-1',
           tradingAccountId: 'trading-account-1',
           currencyCode: CurrencyCode.KRW,
@@ -4331,6 +4341,7 @@ describe('OrdersService', () => {
       });
       expect(prisma.cashWallet.updateMany).toHaveBeenCalledWith({
         where: {
+          walletScope: 'securities',
           id: 'wallet-1',
           tradingAccountId: 'trading-account-1',
           currencyCode: CurrencyCode.USD,
@@ -4579,6 +4590,7 @@ describe('OrdersService', () => {
       mockExecutionPrice(prisma);
       prisma.cashWallet.findUnique
         .mockResolvedValueOnce({
+          walletScope: 'securities' as const,
           id: 'wallet-1',
           tradingAccountId: 'trading-account-1',
           currencyCode: CurrencyCode.KRW,
@@ -4586,6 +4598,7 @@ describe('OrdersService', () => {
           reservedAmount: new Prisma.Decimal('0.00000000'),
         })
         .mockResolvedValueOnce({
+          walletScope: 'securities' as const,
           id: 'wallet-1',
           tradingAccountId: 'trading-account-1',
           currencyCode: CurrencyCode.KRW,
@@ -4731,6 +4744,7 @@ describe('OrdersService', () => {
     beforeEach(() => jest.useFakeTimers().setSystemTime(executedAt));
     afterEach(() => jest.useRealTimers());
     const wallet = (overrides: Record<string, unknown> = {}) => ({
+      walletScope: 'securities' as const,
       id: 'wallet-1',
       tradingAccountId: 'trading-account-1',
       currencyCode: CurrencyCode.KRW,

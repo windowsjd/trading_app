@@ -53,10 +53,12 @@ describe('PortfolioValuationService source eligibility', () => {
       initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
       cashWallets: [
         {
+          walletScope: 'securities' as const,
           currencyCode: CurrencyCode.KRW,
           balanceAmount: new Prisma.Decimal('0.00000000'),
         },
         {
+          walletScope: 'securities' as const,
           currencyCode: CurrencyCode.USD,
           balanceAmount: new Prisma.Decimal('0.00000000'),
         },
@@ -166,10 +168,12 @@ describe('PortfolioValuationService source eligibility', () => {
       initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
       cashWallets: [
         {
+          walletScope: 'securities' as const,
           currencyCode: CurrencyCode.KRW,
           balanceAmount: new Prisma.Decimal('0.00000000'),
         },
         {
+          walletScope: 'securities' as const,
           currencyCode: CurrencyCode.USD,
           balanceAmount: new Prisma.Decimal('0.00000000'),
         },
@@ -264,10 +268,12 @@ describe('PortfolioValuationService source eligibility', () => {
       initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
       cashWallets: [
         {
+          walletScope: 'securities' as const,
           currencyCode: CurrencyCode.KRW,
           balanceAmount: new Prisma.Decimal('900000.00000000'),
         },
         {
+          walletScope: 'securities' as const,
           currencyCode: CurrencyCode.USD,
           balanceAmount: new Prisma.Decimal('0.00000000'),
         },
@@ -372,10 +378,12 @@ describe('PortfolioValuationService source eligibility', () => {
         initialCapitalKrw: new Prisma.Decimal('1000000'),
         cashWallets: [
           {
+            walletScope: 'securities' as const,
             currencyCode: CurrencyCode.KRW,
             balanceAmount: new Prisma.Decimal(1),
           },
           {
+            walletScope: 'securities' as const,
             currencyCode: CurrencyCode.USD,
             balanceAmount: new Prisma.Decimal(1),
           },
@@ -436,10 +444,12 @@ describe('PortfolioValuationService source eligibility', () => {
       initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
       cashWallets: [
         {
+          walletScope: 'securities' as const,
           currencyCode: CurrencyCode.KRW,
           balanceAmount: new Prisma.Decimal('900000.00000000'),
         },
         {
+          walletScope: 'securities' as const,
           currencyCode: CurrencyCode.USD,
           balanceAmount: new Prisma.Decimal('10.00000000'),
         },
@@ -507,10 +517,12 @@ describe('PortfolioValuationService source eligibility', () => {
       initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
       cashWallets: [
         {
+          walletScope: 'securities' as const,
           currencyCode: CurrencyCode.KRW,
           balanceAmount: new Prisma.Decimal('900000.00000000'),
         },
         {
+          walletScope: 'securities' as const,
           currencyCode: CurrencyCode.USD,
           balanceAmount: new Prisma.Decimal('0.00000000'),
         },
@@ -558,10 +570,12 @@ describe('PortfolioValuationService source eligibility', () => {
         initialCapitalKrw: new Prisma.Decimal('1000000'),
         cashWallets: [
           {
+            walletScope: 'securities' as const,
             currencyCode: CurrencyCode.KRW,
             balanceAmount: new Prisma.Decimal('0'),
           },
           {
+            walletScope: 'securities' as const,
             currencyCode: CurrencyCode.USD,
             balanceAmount: new Prisma.Decimal('0'),
           },
@@ -649,10 +663,12 @@ describe('PortfolioValuationService source eligibility', () => {
       initialCapitalKrw: new Prisma.Decimal('1000000'),
       cashWallets: [
         {
+          walletScope: 'securities' as const,
           currencyCode: CurrencyCode.KRW,
           balanceAmount: new Prisma.Decimal('0'),
         },
         {
+          walletScope: 'securities' as const,
           currencyCode: CurrencyCode.USD,
           balanceAmount: new Prisma.Decimal('0'),
         },
@@ -745,10 +761,12 @@ describe('PortfolioValuationService source eligibility', () => {
       initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
       cashWallets: [
         {
+          walletScope: 'securities' as const,
           currencyCode: CurrencyCode.KRW,
           balanceAmount: new Prisma.Decimal('0.00000000'),
         },
         {
+          walletScope: 'securities' as const,
           currencyCode: CurrencyCode.USD,
           balanceAmount: new Prisma.Decimal('0.00000000'),
         },

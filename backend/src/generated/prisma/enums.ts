@@ -81,6 +81,15 @@ export const CurrencyCode = {
 export type CurrencyCode = (typeof CurrencyCode)[keyof typeof CurrencyCode]
 
 
+export const WalletScope = {
+  securities: 'securities',
+  crypto_spot: 'crypto_spot',
+  crypto_futures: 'crypto_futures'
+} as const
+
+export type WalletScope = (typeof WalletScope)[keyof typeof WalletScope]
+
+
 export const WalletTransactionDirection = {
   credit: 'credit',
   debit: 'debit'

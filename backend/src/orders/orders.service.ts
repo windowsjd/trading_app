@@ -3555,6 +3555,7 @@ export class OrdersService {
     });
     const creditResult = await tx.cashWallet.updateMany({
       where: {
+        walletScope: 'securities',
         id: wallet.id,
         tradingAccountId,
         currencyCode: order.currencyCode,
@@ -3691,12 +3692,14 @@ export class OrdersService {
   ) {
     const wallet = await tx.cashWallet.findUnique({
       where: {
-        tradingAccountId_currencyCode: {
+        tradingAccountId_walletScope_currencyCode: {
+          walletScope: 'securities',
           tradingAccountId,
           currencyCode,
         },
       },
       select: {
+        walletScope: true,
         id: true,
         tradingAccountId: true,
         currencyCode: true,
@@ -3750,11 +3753,13 @@ export class OrdersService {
     });
     const wallet = await tx.cashWallet.findFirst({
       where: {
+        walletScope: 'securities',
         id: input.walletId,
         tradingAccountId: input.tradingAccountId,
         currencyCode: input.currencyCode,
       },
       select: {
+        walletScope: true,
         id: true,
         currencyCode: true,
         balanceAmount: true,
@@ -4168,7 +4173,9 @@ export class OrdersService {
           select: { id: true, userId: true, initialCapitalKrw: true },
         },
         cashWallets: {
+          where: { walletScope: 'securities' },
           select: {
+            walletScope: true,
             currencyCode: true,
             balanceAmount: true,
           },
@@ -6361,12 +6368,14 @@ export class OrdersService {
       });
       const wallet = await this.prisma.cashWallet.findUnique({
         where: {
-          tradingAccountId_currencyCode: {
+          tradingAccountId_walletScope_currencyCode: {
+            walletScope: 'securities',
             tradingAccountId: input.tradingAccountId,
             currencyCode: input.currencyCode,
           },
         },
         select: {
+          walletScope: true,
           id: true,
           tradingAccountId: true,
           balanceAmount: true,
@@ -6498,12 +6507,14 @@ export class OrdersService {
 
     const wallet = await this.prisma.cashWallet.findUnique({
       where: {
-        tradingAccountId_currencyCode: {
+        tradingAccountId_walletScope_currencyCode: {
+          walletScope: 'securities',
           tradingAccountId: input.tradingAccountId,
           currencyCode: input.currencyCode,
         },
       },
       select: {
+        walletScope: true,
         id: true,
         tradingAccountId: true,
         balanceAmount: true,

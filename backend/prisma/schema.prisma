@@ -56,6 +56,12 @@ enum CurrencyCode {
   USD
 }
 
+enum WalletScope {
+  securities
+  crypto_spot
+  crypto_futures
+}
+
 enum WalletTransactionDirection {
   credit
   debit
@@ -887,6 +893,9 @@ model Order {
 model CashWallet {
   id               String       @id @default(uuid())
   tradingAccountId String       @map("trading_account_id")
+  // Compatibility default: existing and current provisioned wallets are
+  // securities. Crypto scopes are representable but not provisioned/routed yet.
+  walletScope      WalletScope  @default(securities) @map("wallet_scope")
   currencyCode     CurrencyCode @map("currency_code")
   balanceAmount    Decimal      @map("balance_amount") @db.Decimal(24, 8)
   // Cash locked by submitted limit-buy orders. Never subtracted from total
@@ -899,8 +908,8 @@ model CashWallet {
   tradingAccount     TradingAccount      @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   walletTransactions WalletTransaction[]
 
-  // One wallet per currency per canonical trading account.
-  @@unique([tradingAccountId, currencyCode])
+  // Scope/currency CHECK is SQL-only: securities KRW/USD, crypto scopes USD.
+  @@unique([tradingAccountId, walletScope, currencyCode])
   @@index([tradingAccountId])
   @@map("cash_wallets")
 }

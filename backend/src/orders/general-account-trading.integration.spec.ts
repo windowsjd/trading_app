@@ -428,7 +428,8 @@ async function main() {
   assert.equal(text(domesticOrder.feeAmount), '700.00000000');
   const domesticWallet = await prisma.cashWallet.findUniqueOrThrow({
     where: {
-      tradingAccountId_currencyCode: {
+      tradingAccountId_walletScope_currencyCode: {
+        walletScope: 'securities',
         tradingAccountId: accountId,
         currencyCode: CurrencyCode.KRW,
       },
@@ -509,7 +510,8 @@ async function main() {
   const assetId = await createAsset();
   await prisma.cashWallet.update({
     where: {
-      tradingAccountId_currencyCode: {
+      tradingAccountId_walletScope_currencyCode: {
+        walletScope: 'securities',
         tradingAccountId: accountId,
         currencyCode: CurrencyCode.USD,
       },
@@ -644,7 +646,8 @@ async function main() {
 
   const beforeReplayWallet = await prisma.cashWallet.findUnique({
     where: {
-      tradingAccountId_currencyCode: {
+      tradingAccountId_walletScope_currencyCode: {
+        walletScope: 'securities',
         tradingAccountId: accountId,
         currencyCode: CurrencyCode.USD,
       },
@@ -683,7 +686,8 @@ async function main() {
   const strangerAccountId = await openGeneral(strangerId);
   await prisma.cashWallet.update({
     where: {
-      tradingAccountId_currencyCode: {
+      tradingAccountId_walletScope_currencyCode: {
+        walletScope: 'securities',
         tradingAccountId: strangerAccountId,
         currencyCode: CurrencyCode.USD,
       },
@@ -737,7 +741,8 @@ async function main() {
   );
   const krwReserved = await prisma.cashWallet.findUnique({
     where: {
-      tradingAccountId_currencyCode: {
+      tradingAccountId_walletScope_currencyCode: {
+        walletScope: 'securities',
         tradingAccountId: accountId,
         currencyCode: CurrencyCode.USD,
       },

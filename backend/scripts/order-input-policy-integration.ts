@@ -283,7 +283,8 @@ const create = (s: Scenario, body: Record<string, unknown>) =>
 const wallet = (s: Scenario) =>
   prisma.cashWallet.findUniqueOrThrow({
     where: {
-      tradingAccountId_currencyCode: {
+      tradingAccountId_walletScope_currencyCode: {
+        walletScope: 'securities',
         tradingAccountId: s.accountId,
         currencyCode: s.asset.currencyCode,
       },

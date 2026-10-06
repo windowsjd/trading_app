@@ -13,6 +13,8 @@ login → 계정/모드 선택 → 시즌 참가 또는 일반계정 개설/재�
 ### Wallet
 - KRW wallet
 - USD wallet
+- 현재 두 wallet은 `securities` scope다. Crypto Spot/Futures USD는 DB/domain
+  foundation만 있으며 provisioning·transfer·order routing은 후속 작업이다.
 
 ### 초기값
 - KRW 10,000,000

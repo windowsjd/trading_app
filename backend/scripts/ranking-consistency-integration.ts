@@ -137,7 +137,8 @@ async function balances(f: Fixture, version: 'A' | 'B') {
   for (const [i, participant] of f.participants.entries()) {
     await db.cashWallet.update({
       where: {
-        tradingAccountId_currencyCode: {
+        tradingAccountId_walletScope_currencyCode: {
+          walletScope: 'securities',
           tradingAccountId: participant.accountId,
           currencyCode: 'KRW',
         },

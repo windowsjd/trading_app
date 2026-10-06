@@ -1,5 +1,6 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
+import type { WalletScope } from '../generated/prisma/client';
 
 /**
  * Shared trading-account scope guard for every CashWallet mutation and for
@@ -11,8 +12,9 @@ import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
  *
  *   wallet.tradingAccountId !== null
  *   wallet.tradingAccountId === expected (verified) trading account
+ *   wallet.walletScope === securities (all current financial paths)
  *
- * Violations are SERVER data-integrity states, never client errors, so both
+ * Violations are SERVER data-integrity states, never client errors, and
  * throw structured 500s:
  *
  *  - null scope → FINANCIAL_SCOPE_REPAIR_REQUIRED: a canonical database
@@ -20,6 +22,8 @@ import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
  *  - account mismatch → FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH:
  *    corrupted linkage. Nothing is overwritten; the request fails closed and
  *    the mismatch is left for operators to investigate.
+ *  - non-securities wallet → the same scope-mismatch error: selecting or
+ *    mutating Crypto cash through the current paths is not supported.
  *
  * This guard is a pre-check for clear error classification; the atomic SQL
  * in cash-wallet-atomic.ts ALSO carries the tradingAccountId in its WHERE,
@@ -39,6 +43,7 @@ export type CashWalletScopeErrorCode =
 export type CashWalletScopeCandidate = {
   id: string;
   tradingAccountId: string | null;
+  walletScope: WalletScope;
 };
 
 export type ExpectedCashWalletScope = {
@@ -47,11 +52,12 @@ export type ExpectedCashWalletScope = {
 };
 
 /**
- * Wallet whose scope has been verified: tradingAccountId is proven non-null,
- * so it can feed the account-conditioned atomic SQL without further checks.
+ * Wallet whose account ownership and securities identity have been verified,
+ * so it can feed the account/scope-conditioned atomic SQL.
  */
 export type ScopeVerifiedCashWallet<T extends CashWalletScopeCandidate> = T & {
   tradingAccountId: string;
+  walletScope: 'securities';
 };
 
 export function assertCashWalletTradingAccountScope<
@@ -91,12 +97,18 @@ export function assertCashWalletTradingAccountScope<
     );
   }
 
+  if (wallet.walletScope !== 'securities') {
+    throwCashWalletScopeMismatch(
+      'Current financial operations require a securities cash wallet.',
+    );
+  }
+
   return wallet as ScopeVerifiedCashWallet<T>;
 }
 
 /**
- * Reports a wallet-scope corruption that is not one of the three linkage
- * cases above (e.g. the resolved wallet's currency does not match the
+ * Reports wallet identity corruption beyond the ownership checks above
+ * (e.g. the resolved wallet's currency does not match the
  * settlement currency) with the SAME structured 500 the linkage checks use.
  */
 export function throwCashWalletScopeMismatch(message: string): never {

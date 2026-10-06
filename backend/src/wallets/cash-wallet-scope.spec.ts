@@ -30,8 +30,29 @@ function getError(fn: () => unknown): {
 }
 
 describe('assertCashWalletTradingAccountScope', () => {
+  it.each(['crypto_spot', 'crypto_futures', 'unknown', null, undefined])(
+    'rejects wallet scope %s on current financial paths',
+    (walletScope) => {
+      const { status, code } = getError(() =>
+        assertCashWalletTradingAccountScope(
+          {
+            id: 'wallet-1',
+            tradingAccountId: 'account-1',
+            walletScope,
+          } as never,
+          expectedScope,
+        ),
+      );
+      expect(status).toBe(500);
+      expect(code).toBe(
+        cashWalletScopeErrorCodes.FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH,
+      );
+    },
+  );
+
   it('returns the wallet when the canonical account matches', () => {
     const wallet = {
+      walletScope: 'securities' as const,
       id: 'wallet-1',
       tradingAccountId: 'account-1',
       balanceAmount: '100',
@@ -48,6 +69,7 @@ describe('assertCashWalletTradingAccountScope', () => {
     const { status, code } = getError(() =>
       assertCashWalletTradingAccountScope(
         {
+          walletScope: 'securities' as const,
           id: 'wallet-1',
           tradingAccountId: null,
         },
@@ -65,6 +87,7 @@ describe('assertCashWalletTradingAccountScope', () => {
     const { status, code } = getError(() =>
       assertCashWalletTradingAccountScope(
         {
+          walletScope: 'securities' as const,
           id: 'wallet-1',
           tradingAccountId: 'account-OTHER',
         },

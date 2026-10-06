@@ -710,6 +710,7 @@ export class AdRewardService {
         // rows. reservedAmount is untouched.
         const credited = await tx.cashWallet.updateMany({
           where: {
+            walletScope: 'securities',
             id: verified.krwWalletId,
             tradingAccountId: account.id,
             currencyCode: CurrencyCode.KRW,
@@ -734,7 +735,7 @@ export class AdRewardService {
 
         const walletAfter = await tx.cashWallet.findUniqueOrThrow({
           where: { id: verified.krwWalletId },
-          select: { balanceAmount: true },
+          select: { walletScope: true, balanceAmount: true },
         });
 
         const ledger = await tx.walletTransaction.create({

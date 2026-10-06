@@ -323,6 +323,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
     prisma.asset.findUnique.mockResolvedValueOnce(input.asset ?? krxAsset);
     prisma.cashWallet.findUnique.mockResolvedValueOnce({
+      walletScope: 'securities' as const,
       id: 'wallet-1',
       tradingAccountId: 'trading-account-1',
       balanceAmount: new Prisma.Decimal(input.balance ?? '1000000.00000000'),
@@ -590,6 +591,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         createdAt: krxOpenAt,
       });
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        walletScope: 'securities' as const,
         id: 'wallet-1',
         tradingAccountId: 'trading-account-1',
         balanceAmount: new Prisma.Decimal('1000000.00000000'),
@@ -740,6 +742,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       prisma.quote.findFirst.mockResolvedValueOnce(activeQuoteRecord());
       prisma.asset.findUnique.mockResolvedValueOnce(krxAsset); // tradable check
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        walletScope: 'securities' as const,
         id: 'wallet-1',
         tradingAccountId: 'trading-account-1',
       });
@@ -1033,6 +1036,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       );
       prisma.asset.findUnique.mockResolvedValueOnce(krxAsset);
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        walletScope: 'securities' as const,
         id: 'wallet-1',
         tradingAccountId: 'trading-account-1',
       });
@@ -1061,6 +1065,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       prisma.quote.findFirst.mockResolvedValueOnce(activeQuoteRecord());
       prisma.asset.findUnique.mockResolvedValueOnce(krxAsset);
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        walletScope: 'securities' as const,
         id: 'wallet-1',
         tradingAccountId: 'trading-account-1',
       });
@@ -1086,6 +1091,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       prisma.quote.findFirst.mockResolvedValueOnce(activeQuoteRecord());
       prisma.asset.findUnique.mockResolvedValueOnce(krxAsset);
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        walletScope: 'securities' as const,
         id: 'wallet-1',
         tradingAccountId: 'trading-account-1',
       });

@@ -148,8 +148,9 @@ export async function backfillGeneralPerformance(
     }
 
     const wallets = await prisma.cashWallet.findMany({
-      where: { tradingAccountId: account.id },
+      where: { walletScope: 'securities', tradingAccountId: account.id },
       select: {
+        walletScope: true,
         id: true,
         currencyCode: true,
         balanceAmount: true,

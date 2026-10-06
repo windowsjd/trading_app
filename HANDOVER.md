@@ -10,6 +10,152 @@
 
 ---
 
+## 2026-10-06 — CashWallet Wallet Scope foundation, 기존 금융 동작 유지
+
+- 의도: 향후 증권/암호화폐 현물/암호화폐 선물 자금을 독립적으로 관리할 수 있도록
+  CashWallet의 금융 식별 범위를 확장하되, 이번 단계에서는 기존 KRW/USD 금융 동작을
+  그대로 유지하고 실제 자금 분리·지갑 생성·이체·주문 routing은 후속 작업으로 남겼다.
+- 시작 브랜치 `main`, HEAD `9a8fb765f0a14a4ae3c0cff9e51195fdf636bc9f`, clean tree를 확인했다.
+  기존 schema/migrations, General/Season provisioning, wallet/ledger/API, 금융 integrity,
+  주문/예약/FX, valuation/TWR/snapshot/ranking/settlement, scripts/fixtures와 canonical docs를
+  조사했다. 기존 `cash-wallet-scope.ts`는 계정 소유권 guard였으며 지갑 종류를 뜻하지 않았다.
+- `WalletScope`는 저장소 enum convention에 맞춘 `securities`, `crypto_spot`, `crypto_futures`다.
+  식별자를 `(tradingAccountId, walletScope, currencyCode)`로 바꾸고 DB CHECK로 Securities는
+  KRW/USD, Crypto Spot/Futures는 USD만 허용한다. 새 일반/시즌 계정은 Securities KRW/USD
+  두 개만 생성하며 초기자금과 initial-grant 원장은 같다. 미국주식과 현재 Crypto 현물 주문도
+  계속 Securities USD를 사용한다. 추가 지갑 abstraction, transfer/margin 의미는 도입하지 않았다.
+- migration `20261006120000_add_cash_wallet_scope`는 명시적 transaction 안에서 enum과
+  NOT NULL/default column, CHECK 및 새 복합 unique를 추가한 뒤 이전 unique를 제거한다.
+  기존 행은 constant default로 Securities에 분류한다. UPDATE/DELETE/INSERT 없이 기존 ID,
+  계정·통화·잔액·예약금·created/updated timestamps·원장 및 금융 FK 관계를 보존한다.
+  기존 account index는 유지하고 미래를 추측한 추가 index는 만들지 않았다.
+- 배포 순서는 migration → 재생성 Prisma client를 포함한 서버다. migration은 CashWallet
+  table lock과 CHECK/index 검증을 수행하므로 운영 적용 시간은 실제 데이터 규모에 따라
+  확인해야 한다. SQL 전용 CHECK는 Prisma drift 검사의 범위 밖이므로 실제 DB catalog와
+  제약 위반 integration을 별도로 확인했다. DB 초기화도 `migrate deploy` 경로를 사용한다.
+- 현재 조회·원자적 mutation·실패 진단·General integrity/audit 및 valuation 입력을 Securities에
+  고정했다. `balanceAmount`는 총 현금, `reservedAmount`는 submitted limit BUY 예약금,
+  available은 그 차이라는 의미와 모든 금융 산식을 유지한다. 기존 `/api/v1` request/response에
+  walletScope를 노출하지 않았으며 Frontend 구현도 변경하지 않았다.
+- 신규 실제 PostgreSQL 검증은 모든 이전 migration으로 만든 private schema의 General/Season
+  wallet·ledger·order·quote·FX/request 데이터를 fingerprint로 비교한다. migration 성공 전후
+  모든 기존 행이 같고, 늦은 DDL 실패도 transaction rollback되는 것을 확인했다. 동일 identity
+  중복, null/unknown scope 및 Crypto/KRW를 거부하고 세 USD scope의 공존을 검증한다.
+- 실제 General/Season 서비스 provisioning·자금 지급과, 추가 scope sentinel을 넣었을 때의
+  기존 Wallet/ledger/Home/valuation/TWR를 검증했다. 기존 예약금 함수의 Crypto mutation 거부,
+  잘못된 account 거부, 세 USD 중 Securities 선택도 확인한다. 관련 unit/fixture의 기존 공개
+  응답과 금융 기대값은 유지했다. 새 DB suite를 기존 Core account CI gate에 포함했다.
+- 검증 환경: Node 24.14.1, pnpm 10.33.0, PostgreSQL 16.15(UTC), Redis 7.0.15.
+  `/tmp/wallet-scope-validation/` 아래에 도구와 localhost 전용 테스트 DB/Redis를 격리했다.
+  실제 서비스 DB·사용자 자금에는 적용하지 않았다. 신규 금융 fixture script도 기존 integration
+  패턴에 맞춰 localhost DB만 허용한다. test DB에 전체 57 migrations를 적용했고 검증 서버는 종료했다.
+- Backend 명령/결과: `pnpm exec prisma generate`/`validate`, `migrate deploy`/`status`,
+  `migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code` PASS.
+  generated Prisma 41개 파일은 재생성 전후 hash가 같았다. `pnpm run typecheck`/`build`,
+  `lint:accounts:check`, `lint:candles:check`, `format:candles:check` PASS. 신규 scope script/guard/spec
+  별도 check-only ESLint와 format 검사도 PASS.
+- `pnpm exec jest --runInBand`: 226 suites / 3,636 cases PASS, opt-in 49 suites / 54 cases SKIP.
+  `.github/workflows/ci.yml`의 opt-in 환경·suite 목록으로 별도 실행한 Core account
+  21 suites / 22 cases와 Market/Limit·FX 13 suites / 14 cases PASS. 이들은 실제 PostgreSQL에서
+  General/Season 격리·join rollback/concurrency·주문/FX·reservation/cancel/fill·TWR·snapshot·
+  ranking/settlement 금융 경로를 검증한다. 신규 Wallet Scope DB suite의 최종 단독 실행도 PASS.
+- `pnpm run test:e2e --runInBand`: 2 suites / 370 cases PASS. Frontend는 변경 없이
+  `node --test src/features/wallet/*.test.ts src/screens/wallet/*.test.ts`로 기존 7개 test file PASS.
+  repair-links/repair-ranking-scope/audit-general/backfill-general-performance 네 도구는
+  disposable DB에서 dry-run/read-only PASS. cleanup 후 계정이 0개였으므로 이 dry-run 결과를
+  운영 데이터 audit 결과로 해석하지 않는다. 금융 fixture가 있는 검증은 별도 DB suite가 담당한다.
+- 실행하지 않은 범위: 실제 운영 DB 적용·실데이터 fingerprint, 원격 GitHub CI 실행, Native
+  기기 검증, 변경과 무관한 provider/live smoke 및 다른 opt-in suites. Backend 전체 `lint`는
+  auto-fix이며 CI가 명시한 기존 범위 밖 lint debt가 있어 대신 정의된 check-only gate를 사용했다.
+  금융 영향권의 기존 DB gate는 생략하지 않았다. 로그는 `/tmp/wallet-scope-validation/logs/`에
+  있으며 임시 artifact다. commit/push/deploy는 수행하지 않았다.
+- 최종 검토: 직접 전체 diff와 신규 파일을 검토했고 관련 없는 format 변경을 제거했다.
+  기존 복합 key 사용은 과거 migration/그 검증에만 남는다. 스키마·FK·공개 API 호환성,
+  General/Season 및 향후 다중 USD 표현을 확인했고 `git diff --check` PASS.
+- 후속 작업 2: Crypto 지갑 provisioning/API 식별·권한·transfer 원장/idempotency 정책과
+  실제 주문 routing을 구현하기 전에 전체 scope의 valuation/TWR/snapshot/ranking/settlement
+  포함 정책을 정해야 한다. 현재의 Securities 전용 조회는 전체 scope 집계가 아니다.
+  기존 USD 자금 분리·Futures collateral/margin/position 및 금융 의미는 이번 작업에 없다.
+- 정책 기준: [trading-modes-and-accounts.md](backend/docs/trading-modes-and-accounts.md)의
+  current Wallet Scope section. README, policy-decisions, account/finance/wallet 계약 및
+  codex-rulepack도 같은 현재 정책을 기록한다.
+
+<details>
+<summary>이번 작업의 전체 변경 파일 (68개)</summary>
+
+```text
+.github/workflows/ci.yml
+HANDOVER.md
+backend/README.md
+backend/docs/codex-rulepack.md
+backend/docs/general-account-and-ad-rewards-api-contract.md
+backend/docs/policy-decisions.md
+backend/docs/trading-account-finance-api-contract.md
+backend/docs/trading-modes-and-accounts.md
+backend/docs/wallets-api-contract.md
+backend/prisma/migrations/20261006120000_add_cash_wallet_scope/migration.sql
+backend/prisma/schema.prisma
+backend/scripts/lib/audit-general-accounts.ts
+backend/scripts/lib/backfill-general-performance.ts
+backend/scripts/lib/dev-baseline.ts
+backend/scripts/market-execution-integration.ts
+backend/scripts/order-closed-price-parity-integration.ts
+backend/scripts/order-input-policy-integration.ts
+backend/scripts/ranking-consistency-integration.ts
+backend/scripts/trading-tradability-integration.ts
+backend/scripts/trading-transaction-time-integration.ts
+backend/scripts/wallet-scope-integration.ts
+backend/src/ad-rewards/ad-reward.service.ts
+backend/src/batch/daily-portfolio-snapshot-job.service.spec.ts
+backend/src/fx/fx-trading-account-scope.spec.ts
+backend/src/fx/fx.service.spec.ts
+backend/src/fx/fx.service.ts
+backend/src/fx/general-account-fx.integration.spec.ts
+backend/src/generated/prisma/commonInputTypes.ts
+backend/src/generated/prisma/enums.ts
+backend/src/generated/prisma/internal/class.ts
+backend/src/generated/prisma/internal/prismaNamespace.ts
+backend/src/generated/prisma/internal/prismaNamespaceBrowser.ts
+backend/src/generated/prisma/models/CashWallet.ts
+backend/src/home/home.service.spec.ts
+backend/src/home/home.service.ts
+backend/src/orders/general-account-trading.integration.spec.ts
+backend/src/orders/limit-order-cancel.service.spec.ts
+backend/src/orders/limit-order-cancel.service.ts
+backend/src/orders/limit-order-create.service.spec.ts
+backend/src/orders/limit-order-create.service.ts
+backend/src/orders/limit-order-execution.service.ts
+backend/src/orders/order-reservation.service.spec.ts
+backend/src/orders/order-reservation.service.ts
+backend/src/orders/orders.service.spec.ts
+backend/src/orders/orders.service.ts
+backend/src/portfolio/portfolio-valuation-source-reads.spec.ts
+backend/src/portfolio/portfolio-valuation.policy.spec.ts
+backend/src/portfolio/portfolio-valuation.policy.ts
+backend/src/portfolio/portfolio-valuation.service.spec.ts
+backend/src/portfolio/portfolio-valuation.service.ts
+backend/src/portfolio/valuation-semantic-parity.spec.ts
+backend/src/records/records.service.spec.ts
+backend/src/seasons/seasons.service.ts
+backend/src/seasons/trading-account-schema.spec.ts
+backend/src/seasons/trading-account.integration.spec.ts
+backend/src/trading-accounts/general-account-integrity.ts
+backend/src/trading-accounts/general-account.integration.spec.ts
+backend/src/trading-accounts/general-accounts.service.ts
+backend/src/wallets/cash-wallet-atomic.ts
+backend/src/wallets/cash-wallet-failure-diagnosis.spec.ts
+backend/src/wallets/cash-wallet-failure-diagnosis.ts
+backend/src/wallets/cash-wallet-scope.spec.ts
+backend/src/wallets/cash-wallet-scope.ts
+backend/src/wallets/trading-account-wallets.spec.ts
+backend/src/wallets/wallet-scope.integration.spec.ts
+backend/src/wallets/wallets.service.spec.ts
+backend/src/wallets/wallets.service.ts
+backend/test/app.e2e-spec.ts
+```
+
+</details>
+
 ## 2026-10-06 — 홈 시즌 카드의 티어 엠블럼 중심 재설계
 
 - 의도: 시즌 홈 카드의 정보 중심을 텍스트 지표에서 티어 엠블럼으로 옮겨 시즌 성취를

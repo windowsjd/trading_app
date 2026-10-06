@@ -43,6 +43,11 @@ enabled.
 
 ## Common Rules
 
+- The current general foundation provisions and validates exactly one
+  `securities/KRW` and one `securities/USD` wallet. Wallet Scope is internal:
+  public payloads and the one-time grant remain unchanged. Crypto Spot/Futures
+  wallets are not provisioned; [scope policy](trading-modes-and-accounts.md) defines
+  the schema foundation and future boundaries.
 - Authentication required on every route (401 `UNAUTHORIZED`).
 - The accountId is explicit in the path; the server stores no "current
   account" anywhere and re-verifies ownership per request via

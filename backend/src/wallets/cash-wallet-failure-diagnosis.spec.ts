@@ -25,6 +25,7 @@ describe('diagnoseCashWalletMutationFailure', () => {
   };
 
   const wallet = (overrides: Record<string, unknown> = {}) => ({
+    walletScope: 'securities' as const,
     id: 'wallet-1',
     tradingAccountId: 'account-1',
     currencyCode: 'KRW',
@@ -104,6 +105,22 @@ describe('diagnoseCashWalletMutationFailure', () => {
       ),
     ).resolves.toBe('FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH');
   });
+
+  it.each(['crypto_spot', 'crypto_futures'])(
+    'reports %s scope drift before amount/concurrency classification',
+    async (walletScope) => {
+      await expect(
+        errorCode(
+          diagnoseCashWalletMutationFailure(
+            createClient(
+              wallet({ walletScope, balanceAmount: new Prisma.Decimal(0) }),
+            ) as never,
+            { walletId: 'wallet-1', expected, requires: { available: '200' } },
+          ),
+        ),
+      ).resolves.toBe('FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH');
+    },
+  );
 
   it('classifies an available-balance shortfall (reserved cash is not spendable)', async () => {
     await expect(
