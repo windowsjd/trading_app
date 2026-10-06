@@ -29,6 +29,8 @@ import {
   buildAdminPartialFailureDiagnostic,
   getAdminDiagnosticRequestId,
   isAdminDiagnosticRequest,
+  setAdminDiagnosticContext,
+  preserveAdminFailureCause,
 } from '../common/admin-diagnostics';
 
 /**
@@ -95,7 +97,14 @@ export class TradingAccountPortfolioService {
 
   async getPortfolio(userId: string | undefined, accountId: string) {
     const owner = this.requireUserId(userId);
+    setAdminDiagnosticContext({ failureStage: 'account_ownership_lookup' });
     const account = await this.resolveOwnedAccount(owner, accountId);
+    setAdminDiagnosticContext({
+      failureStage:
+        account.mode === TradingAccountMode.general
+          ? 'general_portfolio_transaction'
+          : 'portfolio_valuation_read',
+    });
 
     return account.mode === TradingAccountMode.general
       ? this.readGeneralConsistently(owner, account.id, (tx, locked, now) =>
@@ -787,7 +796,32 @@ export class TradingAccountPortfolioService {
    * envelope — they are server-side damage, not a temporary data gap.
    */
   private rethrowStructuralError(error: unknown): unknown {
-    return toGeneralPerformanceHttpException(error) ?? error;
+    const generalFailure = toGeneralPerformanceHttpException(error);
+    if (generalFailure) return generalFailure;
+    // Keep the domain code so clients can distinguish structural faults from
+    // transport errors. Price/FX unavailability was handled above.
+    if (error instanceof PortfolioValuationError) {
+      setAdminDiagnosticContext({
+        failureStage:
+          error.diagnosticContext?.failureStage ??
+          'portfolio_valuation_validation',
+        evidence: error.diagnosticContext?.evidence,
+      });
+      return preserveAdminFailureCause(
+        new HttpException(
+          {
+            success: false,
+            error: {
+              code: error.code,
+              message: 'Portfolio data could not be safely valued.',
+            },
+          },
+          HttpStatus.INTERNAL_SERVER_ERROR,
+        ),
+        error,
+      );
+    }
+    return error;
   }
 
   private requireUserId(userId: string | undefined): string {

@@ -175,7 +175,7 @@ async function run() {
       assert.equal(await page.getByText('환전하기', { exact: true }).count(), 0);
       assert.equal(await page.getByText('환전 안내', { exact: true }).count(), 0);
       await theme.canvas(page, appearance);
-      if (state === 'portfolio-error') await page.getByText('계정 정보를 불러오지 못했습니다.', { exact: true }).waitFor();
+      if (state === 'portfolio-error') await page.getByText('포트폴리오 정보를 불러오지 못했습니다.', { exact: true }).waitFor();
       else if (state === 'empty-summary') await page.getByText('수익률을 계산할 수 없습니다.', { exact: true }).waitFor();
       else if (state === 'ranking-integrity') await id('trading-account-integrity-error').waitFor();
       else if (state === 'loading') assert.equal(await id('home-total-asset').count(), 0);

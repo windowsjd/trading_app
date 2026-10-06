@@ -69,7 +69,8 @@ function createHomeHarness(mode = 'general') {
     stateIndex = 0; h.queries = [];
   };
   const mocks = {
-    react: { ...React, useCallback: (fn) => fn, useRef: (value) => ({ current: value }), useEffect() {}, useMemo: (fn) => fn(), useState: (initial) => {
+    '@react-navigation/native': { NavigationContext: React.createContext(undefined) },
+    react: { ...React, useContext: () => undefined, useCallback: (fn) => fn, useRef: (value) => ({ current: value }), useEffect() {}, useMemo: (fn) => fn(), useState: (initial) => {
       const index = stateIndex++;
       if (!(index in states)) states[index] = typeof initial === 'function' ? initial() : initial;
       return [states[index], (value) => { states[index] = typeof value === 'function' ? value(states[index]) : value; }];
@@ -77,6 +78,7 @@ function createHomeHarness(mode = 'general') {
     'react-native': native,
     'react-native-svg': { default: 'Svg', Path: 'Path', __esModule: true },
     '@tanstack/react-query': {
+      useQueryClient: () => client,
       useQuery: (options) => {
         const i = h.queries.length;
         h.queries.push(options);

@@ -1,3 +1,4 @@
+import { portfolioReadPolicy } from '../../features/tradingAccount/portfolioReadPolicy';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -59,6 +60,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
   const portfolioQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.portfolio(accountId),
     queryFn: () => getTradingAccountPortfolio(accountId),
+    ...portfolioReadPolicy,
   });
   const walletsQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.wallets(accountId),

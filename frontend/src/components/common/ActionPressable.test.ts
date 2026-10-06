@@ -87,7 +87,7 @@ describe('ActionPressable immediate feedback', () => {
       assert.deepEqual(flatten(surface().props.style).transform[0].scale.outputRange, [1, 0.97]);
       assert.equal(flatten(surface().props.style).transform[0].scale.extrapolate, 'clamp');
       assert.equal(flatten(overlay().props.style).opacity.extrapolate, 'clamp');
-      assert.deepEqual(flatten(overlay().props.style).opacity.outputRange, [0, 0.1]);
+      assert.deepEqual(flatten(overlay().props.style).opacity.outputRange, [0, 0.25]);
       assert.equal(flatten(overlay().props.style).backgroundColor, '#000');
       button().props.onPress(); assert.equal(calls, 1, 'handler runs before animation completion');
       assert.deepEqual(flatten(button().props.style), target);
@@ -105,7 +105,7 @@ describe('ActionPressable immediate feedback', () => {
       const clocks = h.animations.length;
       act(() => button().props.onPressIn(event));
       assert.deepEqual(flatten(surface().props.style).transform, [{ scale: 1 }]);
-      assert.equal(flatten(overlay().props.style).opacity, 0.1);
+      assert.equal(flatten(overlay().props.style).opacity, 0.25);
       act(() => button().props.onPressOut(event)); assert.equal(flatten(overlay().props.style).opacity, 0);
       assert.equal(h.animations.length, clocks);
       button().props.onPress(); assert.equal(calls, 2, 'keyboard/accessibility action needs no press animation');

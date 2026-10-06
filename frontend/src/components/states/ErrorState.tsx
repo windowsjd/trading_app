@@ -8,6 +8,7 @@ import {
 } from '../../theme/native';
 import ActionPressable from '../common/ActionPressable';
 import AdminDiagnosticPanel from './AdminDiagnosticPanel';
+import type { RuntimeFacts } from '../../services/ws/runtimeDiagnostics';
 
 interface ErrorStateProps {
   title?: string;
@@ -15,6 +16,7 @@ interface ErrorStateProps {
   actionLabel?: string;
   onRetry?: () => void;
   diagnosticError?: unknown;
+  diagnosticRuntime?: RuntimeFacts;
 }
 
 export default function ErrorState({
@@ -23,16 +25,17 @@ export default function ErrorState({
   actionLabel = '다시 시도',
   onRetry,
   diagnosticError,
+  diagnosticRuntime,
 }: ErrorStateProps) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.center}>
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.message}>{message}</Text>
-        <AdminDiagnosticPanel error={diagnosticError} />
+        <AdminDiagnosticPanel error={diagnosticError} runtime={diagnosticRuntime} includeRuntimeWithDiagnostic={!!diagnosticRuntime} />
 
         {onRetry ? (
-          <ActionPressable style={styles.button} onPress={onRetry}>
+          <ActionPressable accessibilityRole="button" feedback="button" style={styles.button} onPress={onRetry}>
             <Text style={styles.buttonText}>{actionLabel}</Text>
           </ActionPressable>
         ) : null}

@@ -83,6 +83,7 @@ async function run() {
         } else if (screen === 'home') {
           const button = id('home-holdings-toggle'); await button.waitFor(); await button.scrollIntoViewIfNeeded();
           const b = await bounds(button); assert.equal(b.radius, '12px'); assert.ok(b.inside); assert.ok(b.height >= 44);
+          if (fontScale === 1) await assertButtonFeedback(page, button, false, path.join(out, `home-more-${mode}-${width}`));
           await button.click(); assert.equal(await button.getAttribute('aria-expanded'), 'true');
           await button.click(); assert.equal(await button.getAttribute('aria-expanded'), 'false');
         } else {
@@ -113,12 +114,14 @@ async function run() {
     await page.emulateMedia({ colorScheme: 'dark' }); await page.waitForFunction(() => window.fixture.appearance.mode === 'dark');
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await assertButtonFeedback(page, id('settings-logout'), true);
+    await page.goto(`${base}/rootTabs?screen=home&holdings=1`); await id('home-holdings-toggle').waitFor();
+    await assertButtonFeedback(page, id('home-holdings-toggle'), true);
     // Real CTA variants keep financial meaning and react to live Reduced Motion.
     for (const mode of ['light', 'dark']) for (const palette of ['red_blue', 'green_red']) {
       await page.emulateMedia({ colorScheme: mode, reducedMotion: 'no-preference' });
       await page.goto(`${base}/motion?primaryProbe=1&palette=${palette}`); await id('primary-wide').waitFor();
       for (const marker of ['primary-narrow', 'secondary-enabled', 'primary-buy', 'primary-sell']) {
-        records.push({ mode, palette, marker, feedback: await assertButtonFeedback(page, id(marker)) });
+        records.push({ mode, palette, marker, feedback: await assertButtonFeedback(page, id(marker), false, path.join(out, `${mode}-${palette}-${marker}`)) });
       }
       await id('primary-wide').focus();
       await page.keyboard.press('Space');

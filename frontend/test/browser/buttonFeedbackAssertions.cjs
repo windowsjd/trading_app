@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 
 // Observe rendered visual bounds separately from the Pressable's stable target.
-async function assertButtonFeedback(page, button, reduced = false) {
+async function assertButtonFeedback(page, button, reduced = false, screenshotPrefix) {
   await button.scrollIntoViewIfNeeded();
   // Allow RN Web ScrollView to finish its programmatic scroll before pointer input.
   await page.waitForTimeout(180);
@@ -16,6 +16,17 @@ async function assertButtonFeedback(page, button, reduced = false) {
       text: el.querySelector('[dir="auto"]')?.textContent };
   });
   const idle = await snapshot();
+  const pixels = async label => {
+    const png = await button.screenshot(screenshotPrefix ? { path: `${screenshotPrefix}-${label}.png` } : {});
+    return page.evaluate(async encoded => {
+      const picture = new Image(); picture.src = `data:image/png;base64,${encoded}`; await picture.decode();
+      const canvas = document.createElement('canvas'); canvas.width = picture.width; canvas.height = picture.height;
+      const ctx = canvas.getContext('2d'); ctx.drawImage(picture, 0, 0);
+      // Away from corners/labels: compare actual composited surface pixels.
+      return [0.15, 0.85].map(x => [...ctx.getImageData(Math.floor(picture.width * x), Math.floor(picture.height * 0.18), 1, 1).data].slice(0, 3));
+    }, png.toString('base64'));
+  };
+  const idlePixels = await pixels('idle');
   const [x, y, width, height] = idle.target;
   await page.mouse.move(x + width / 2, y + height / 2);
   await page.mouse.down();
@@ -26,14 +37,20 @@ async function assertButtonFeedback(page, button, reduced = false) {
   assert.equal(held.transform, 'none');
   assert.ok(Math.abs(held.scale - (reduced ? 1 : 0.97)) < 0.001, JSON.stringify({ reduced, idle, held }));
   assert.ok(Math.abs(held.surface[2] / idle.surface[2] - (reduced ? 1 : 0.97)) < 0.001);
-  assert.equal(held.opacity, 0.1);
+  assert.equal(held.opacity, 0.25);
   assert.equal(held.text, idle.text);
+  const heldPixels = await pixels('pressed');
+  for (let sample = 0; sample < idlePixels.length; sample++) {
+    const expected = idlePixels[sample].map(channel => channel * 0.75);
+    assert.ok(expected.every((channel, i) => Math.abs(heldPixels[sample][i] - channel) <= 3),
+      `visible darkening is 25%: ${JSON.stringify({ idlePixels, heldPixels })}`);
+  }
   // Leave/cancel, then release: the fixture action must not run.
   await page.mouse.move(1, 1); await page.mouse.up();
   await page.waitForTimeout(210);
   const released = await snapshot();
   assert.equal(released.scale, 1); assert.equal(released.opacity, 0);
   assert.deepEqual(released.target, idle.target);
-  return { idle, held, released };
+  return { idle, held, released, idlePixels, heldPixels };
 }
 module.exports = { assertButtonFeedback };

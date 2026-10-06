@@ -16,6 +16,8 @@ import {
   ACCOUNT_INTEGRITY_TITLE,
   findAccountIntegrityFailure,
 } from '../../features/tradingAccount/accountIntegrityGate';
+import { portfolioReadPolicy, portfolioFailureFacts } from '../../features/tradingAccount/portfolioReadPolicy';
+import { usePortfolioFocusRecovery } from './usePortfolioFocusRecovery';
 import { getPortfolioNotice } from '../../features/tradingAccount/portfolioMessage';
 
 import ErrorState from '../../components/states/ErrorState';
@@ -64,8 +66,10 @@ export default function GeneralAccountHome({
   const portfolioQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.portfolio(accountId),
     queryFn: () => getTradingAccountPortfolio(accountId),
+    ...portfolioReadPolicy,
   });
 
+  usePortfolioFocusRecovery(accountId);
   const holdings = useHomeHoldings(accountId);
   const positionsQuery = holdings.previewQuery;
 
@@ -119,6 +123,8 @@ export default function GeneralAccountHome({
         <ErrorState
           title={ACCOUNT_INTEGRITY_TITLE}
           message={integrityFailure.message}
+          diagnosticError={integrityFailure.error}
+          diagnosticRuntime={integrityFailure.error === portfolioQuery.error ? portfolioFailureFacts(portfolioQuery.error) : undefined}
           onRetry={integrityFailure.retry}
         />
       </View>
@@ -132,8 +138,10 @@ export default function GeneralAccountHome({
   if (!portfolioQuery.data) {
     return withContext(
       <ErrorState
-        title="계정 정보를 불러오지 못했습니다."
+        title="포트폴리오 정보를 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
+        diagnosticError={portfolioQuery.error}
+        diagnosticRuntime={portfolioFailureFacts(portfolioQuery.error)}
         onRetry={() => void portfolioQuery.refetch()}
       />
     );

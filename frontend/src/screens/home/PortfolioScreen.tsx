@@ -1,3 +1,4 @@
+import { portfolioReadPolicy } from '../../features/tradingAccount/portfolioReadPolicy';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { semantic } from '../../theme/tokens';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -150,6 +151,7 @@ export default function PortfolioScreen({ navigation }: Props) {
   const overviewQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.portfolio(accountId),
     queryFn: () => getTradingAccountPortfolio(accountId),
+    ...portfolioReadPolicy,
     enabled: hasAccount,
   });
 

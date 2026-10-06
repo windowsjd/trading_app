@@ -18,15 +18,22 @@ const asset = (i, type) => ({
   isActive: true, marketStatus: 'open', tradable: true,
   price: { state: 'available', priceCurrency: 'KRW', currentPrice: '100', changeRate: ['1', '-1', '0', null][i % 4] },
 });
-function setup(mode = 'season', count = 7, screen = 'home') {
+function setup(mode = 'season', count = 7, screen = 'home', options = {}) {
   const h = interactionHarness();
   h.native.SafeAreaView = 'SafeAreaView';
   h.account = account(mode); h.requests = []; h.navigation = []; h.positions = {};
   h.positions[mode] = Array.from({ length: count }, (_, i) => position(i, mode));
   h.markets = Object.fromEntries(['domestic_stock', 'us_stock', 'crypto'].map(type => [type, Array.from({ length: 5 }, (_, i) => asset(i, type))]));
-  h.beforeRead = async () => {};
+  h.beforeRead = options.beforeRead ?? (async () => {});
+  const focusListeners = new Set();
+  h.focus = () => { act(() => focusListeners.forEach(listener => listener())); };
+  const NavigationContext = React.createContext({ addListener: (event, listener) => {
+    if (event === 'focus') focusListeners.add(listener);
+    return () => focusListeners.delete(listener);
+  } });
   const read = async (section, params = {}) => { const request = { section, ...params }; h.requests.push(request); await h.beforeRead(request); };
   const mocks = {
+    '@react-navigation/native': { NavigationContext },
     '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({ selectedAccount: h.account, capabilities: { canTrade: true, canExchange: true } }) },
     '../../app/navigation/navigationHooks': { useRootNavigation: () => ({ navigate: (...args) => h.navigation.push(args) }) },
     '../../features/tradingAccount/api': {
@@ -56,7 +63,7 @@ function setup(mode = 'season', count = 7, screen = 'home') {
     ...Object.fromEntries(['ErrorState', 'InlineEmptyState', 'SectionSkeleton', 'AdminDiagnosticPanel'].map(name => ['../../components/states/' + name, { __esModule: true, default: name }])),
   };
   const Screen = h.load(screen === 'wallet' ? 'src/screens/wallet/WalletScreen.tsx' : 'src/screens/home/HomeScreen.tsx', mocks).default;
-  h.client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity, gcTime: Infinity } } });
+  h.client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity, gcTime: Infinity, ...options.queryDefaults } } });
   const tree = () => React.createElement(QueryClientProvider, { client: h.client }, React.createElement(Screen, { navigation: { navigate() {} } }));
   h.renderer = h.render(tree());
   h.node = id => h.renderer.root.findAll(node => typeof node.type === 'string' && node.props.testID === id)[0];

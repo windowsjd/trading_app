@@ -70,4 +70,7 @@ describe('createCorsOptions', () => {
       'X-Idempotency-Key',
     ]);
   });
+  it('exposes only the existing safe request correlation header', () => {
+    expect(createCorsOptions().exposedHeaders).toEqual(['X-Request-Id']);
+  });
 });

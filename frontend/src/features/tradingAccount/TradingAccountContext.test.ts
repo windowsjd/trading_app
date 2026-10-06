@@ -38,6 +38,7 @@ function harness(account: TradingAccountDto) {
           ];
         },
         useCallback: (fn: unknown) => fn,
+        useSyncExternalStore: () => undefined,
         useMemo: (fn: () => unknown) => fn(),
         useEffect: (fn: () => (() => void) | undefined, deps: unknown[]) => {
           const i = effectIndex++,

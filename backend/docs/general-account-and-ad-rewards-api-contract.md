@@ -792,6 +792,15 @@ Price/FX gaps (`FX_RATE_UNAVAILABLE`, `FX_RATE_STALE`,
 structured 500s, because rendering damage as "temporarily unavailable" hides
 it.
 
+For both account modes, non-section `PortfolioValuationError` failures retain
+their domain code in a failed HTTP envelope with a safe public message.
+Scope mismatch, invalid capital/decimal, invalid/missing cash wallets and
+invalid positions must not be collapsed into `INTERNAL_SERVER_ERROR` or a
+successful empty portfolio. Unexpected DB exceptions still use the safe
+generic 500 envelope. Existing admin diagnostics carry request correlation
+and the ownership/transaction/valuation failure stage; Web CORS exposes the
+existing `X-Request-Id` response header.
+
 General trading is not enabled, so a general account holding an Order,
 Position, ExchangeTransaction, or FxExecuteRequest fails closed with
 `GENERAL_ACCOUNT_INTEGRITY` rather than being valued as if it were normal.

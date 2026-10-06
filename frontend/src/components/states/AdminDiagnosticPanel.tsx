@@ -16,17 +16,21 @@ type Props = {
   error?: unknown;
   /** Observed client state only; never represents a backend failure. */
   runtime?: RuntimeFacts | null;
+  /** Request facts may accompany a server diagnostic; socket facts retain
+   * their existing standalone presentation by default. */
+  includeRuntimeWithDiagnostic?: boolean;
 };
 
 export default function AdminDiagnosticPanel({
   diagnostic,
   error,
   runtime,
+  includeRuntimeWithDiagnostic = false,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const resolved = diagnostic ?? getApiErrorDiagnostic(error);
   const runtimeFacts =
-    !resolved && runtime
+    (!resolved || includeRuntimeWithDiagnostic) && runtime
       ? Object.fromEntries(
           Object.entries(runtime).filter(
             ([, value]) => value !== undefined && value !== null,
@@ -154,7 +158,8 @@ export default function AdminDiagnosticPanel({
                 </Text>
               ) : null}
             </>
-          ) : (
+          ) : null}
+          {hasRuntimeFacts ? (
             <Section title="Client runtime 상태">
               {Object.entries(runtimeFacts ?? {}).map(([label, value]) => (
                 <View key={label} style={styles.section}>
@@ -163,7 +168,7 @@ export default function AdminDiagnosticPanel({
                 </View>
               ))}
             </Section>
-          )}
+          ) : null}
         </View>
       ) : null}
     </View>
@@ -186,8 +191,8 @@ function Line({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.line}>
       <Text style={styles.label}>{label}</Text>
-      <Text selectable style={styles.value}>
-        {value}
+      <Text selectable accessibilityLabel={value} style={styles.value}>
+        {wrapRuntimeText(value)}
       </Text>
     </View>
   );

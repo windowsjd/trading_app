@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
   type PropsWithChildren,
 } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -88,6 +89,22 @@ const TradingAccountContext = createContext<TradingAccountContextValue | null>(
 export function TradingAccountProvider({ children }: PropsWithChildren) {
   const [capabilityRevision, setCapabilityRevision] = useState(0);
   const queryClient = useQueryClient();
+  // Session clear removes the observed /me Query object, then login seeds a
+  // new one. QueryObserver does not notify its consumer on cache removal.
+  // Follow that identity change so this long-lived provider reattaches, even
+  // when no other state update happens between clear and seed. Data updates
+  // still use useQuery; no session data or credentials are retained here.
+  const readMeQueryIdentity = useCallback(
+    () => queryClient.getQueryCache().find({ queryKey: QUERY_KEYS.me, exact: true }), [queryClient],
+  );
+  useSyncExternalStore(
+    useCallback((notify) => queryClient.getQueryCache().subscribe(event => {
+      if ((event.type === 'added' || event.type === 'removed') &&
+          event.query.queryKey.length === 1 && event.query.queryKey[0] === 'me') notify();
+    }), [queryClient]),
+    readMeQueryIdentity,
+    readMeQueryIdentity,
+  );
   const [storedAccountId, setStoredAccountId] = useState<string | null>(null);
   const [storedLoadedForUserId, setStoredLoadedForUserId] = useState<
     string | null

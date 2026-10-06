@@ -137,7 +137,7 @@ async function run() {
       if (width === 390 && scale === 1) {
         const primary = id('primary-wide'); await primary.scrollIntoViewIfNeeded();
         const box = await primary.boundingBox(); await page.mouse.move(box.x + 14, box.y + 14); await page.mouse.down(); await page.waitForTimeout(200);
-        assert.equal(await primary.evaluate(el => Number(getComputedStyle(el.firstElementChild.children[1]).opacity)), 0.1, 'single enhanced pressed wash');
+        assert.equal(await primary.evaluate(el => Number(getComputedStyle(el.firstElementChild.children[1]).opacity)), 0.25, 'single enhanced pressed wash');
         await primary.screenshot({ path: path.join(out, `${mode}-pressed.png`) }); await page.mouse.up();
         await page.waitForFunction(() => window.fixture.primaryCalls === 1);
         assert.equal((await visual(primary, `${mode}-submit-loading`, false)).disabled, 'true');

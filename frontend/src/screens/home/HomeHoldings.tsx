@@ -54,7 +54,7 @@ export default function HomeHoldings({ holdings, onOpenAsset }: {
       {expanded && fullQuery.isLoading ? <View testID="home-holdings-loading"><SectionSkeleton lines={2} /></View> : null}
       {expanded && fullQuery.isError ? <ErrorState title="전체 보유 종목을 불러오지 못했습니다."
         onRetry={() => void fullQuery.refetch()} /> : null}
-      {total > 1 ? <ActionPressable testID="home-holdings-toggle" style={styles.toggle}
+      {total > 1 ? <ActionPressable testID="home-holdings-toggle" feedback="button" style={styles.toggle}
         accessibilityRole="button" accessibilityLabel={expanded ? '보유 종목 접기' : '보유 종목 자세히 보기'}
         accessibilityState={{ expanded }} aria-expanded={expanded} onPress={() => setExpanded(value => !value)}>
         <Text style={styles.action}>{expanded ? '접기 ▲' : '자세히 보기 ▼'}</Text>

@@ -41,6 +41,8 @@ export type AccountScopedQuerySignal = {
 };
 
 export type AccountIntegrityFailure = {
+  /** The first failing query's safe diagnostic source. */
+  error: unknown;
   /** Every section that failed structurally, in the order given. */
   sections: string[];
   message: string;
@@ -87,6 +89,7 @@ export function findAccountIntegrityFailure(
   }
 
   return {
+    error: failed[0].error,
     sections,
     message: getAccountIntegrityMessage(sections),
     retry: () => {

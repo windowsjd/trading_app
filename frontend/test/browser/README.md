@@ -1,5 +1,21 @@
 # Trading UI browser regression
 
+Login/Home recovery uses `NODE_PATH=/path/to/browser-tools/node_modules node
+test/browser/portfolioRecoveryBrowser.cjs`. Production AppProviders, login,
+token storage, Axios interceptors, session ownership, mode selection, account
+provider and navigators run unchanged; only Axios transport uses local fixtures.
+It checks bounded timeout/network/gateway retries, persistent failures and
+manual retry without navigation, structural/ownership/generic-500 exclusions,
+retained Home focus versus Wallet observer recovery, cache reuse, and safe admin
+diagnostics. User error layouts cover Light/Dark, 320/360/390/430px and font
+scales 1/2. Artifacts default to `/tmp/trading-portfolio-recovery`.
+This is controlled Web evidence, not a production incident or native reproduction.
+
+`uiPolishBrowser.cjs` additionally checks actual screenshot pixels for 25%
+pressed darkening on Primary/Secondary/Buy/Sell/Logout/Home-more surfaces,
+stable hit targets/layout, release/cancel and Reduced Motion. Its artifacts
+default to `/tmp/trading-ui-polish` (`UI_POLISH_OUTPUT` overrides).
+
 Home tier cards use the same external esbuild/Playwright runtime:
 
 ```sh

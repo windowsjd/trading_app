@@ -50,7 +50,7 @@ function createHarness(scope?: string) {
       return React.createElement(native.FlatList, props);
     },
   });
-  mocks.set('@react-navigation/native', { useFocusEffect: () => {} });
+  mocks.set('@react-navigation/native', { useFocusEffect: () => {}, NavigationContext: React.createContext(undefined) });
   // SVG is a native host boundary; browser tests exercise its actual renderer.
   mocks.set('react-native-svg', { default: 'svg', Path: 'path', Defs: 'defs', LinearGradient: 'linearGradient', Rect: 'rect', Stop: 'stop', __esModule: true });
   mocks.set('@tanstack/react-query', {

@@ -1,4 +1,7 @@
-import type { CorsOptions, CustomOrigin } from '@nestjs/common/interfaces/external/cors-options.interface';
+import type {
+  CorsOptions,
+  CustomOrigin,
+} from '@nestjs/common/interfaces/external/cors-options.interface';
 
 const DEFAULT_CORS_METHODS = [
   'GET',
@@ -92,6 +95,7 @@ export function createCorsOptions(env: CorsEnv = process.env): CorsOptions {
     origin,
     methods: DEFAULT_CORS_METHODS,
     allowedHeaders: DEFAULT_CORS_HEADERS,
+    exposedHeaders: ['X-Request-Id'],
     credentials: false,
     optionsSuccessStatus: 204,
   };

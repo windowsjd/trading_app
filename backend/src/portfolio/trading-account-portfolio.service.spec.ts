@@ -52,6 +52,213 @@ import { join } from 'node:path';
 import { HttpException } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { TradingAccountPortfolioService } from './trading-account-portfolio.service';
+import { TradingAccountPortfolioController } from './trading-account-portfolio.controller';
+import { PortfolioValuationError } from './portfolio-valuation.policy';
+import { GlobalHttpExceptionFilter } from '../common/global-http-exception.filter';
+import { adminDiagnosticRequestMiddleware } from '../common/admin-diagnostics';
+
+describe('portfolio HTTP failure boundaries', () => {
+  function portfolioHarness(mode: 'general' | 'season') {
+    const account = {
+      id: 'account-1',
+      userId: 'user-1',
+      mode,
+      status: 'active',
+      initialCapitalKrw: new Prisma.Decimal('10000000'),
+      seasonParticipant:
+        mode === 'season' ? { id: 'sp-1', season: { id: 'season-1' } } : null,
+    };
+    const access = {
+      getOwnedAccountOrThrow: jest.fn().mockResolvedValue(account),
+    };
+    const valuation = { calculateTradingAccountValuation: jest.fn() };
+    const performance = { resolveLivePerformance: jest.fn() };
+    const client = {
+      $transaction: jest.fn().mockImplementation((handler) => handler(client)),
+    };
+    const service = new TradingAccountPortfolioService(
+      client as never,
+      access as never,
+      performance as never,
+      valuation as never,
+    );
+    const controller = new TradingAccountPortfolioController(service);
+    const fail = (error: unknown) =>
+      (mode === 'season'
+        ? valuation.calculateTradingAccountValuation
+        : performance.resolveLivePerformance
+      ).mockRejectedValue(error);
+    const read = () =>
+      controller.getPortfolio(
+        { user: { userId: 'user-1' } } as never,
+        account.id,
+      );
+    return { account, access, client, fail, read };
+  }
+  function httpFailure(error: unknown) {
+    let body: any;
+    const response = {
+      status: jest.fn().mockReturnThis(),
+      json: (value: unknown) => {
+        body = value;
+      },
+    };
+    new GlobalHttpExceptionFilter().catch(error, {
+      switchToHttp: () => ({
+        getResponse: () => response,
+        getRequest: () => ({}),
+      }),
+    } as never);
+    return { status: response.status.mock.calls[0][0], body };
+  }
+  for (const mode of ['general', 'season'] as const) {
+    it.each([
+      'ASSET_PRICE_UNAVAILABLE',
+      'ASSET_PRICE_STALE',
+      'FX_RATE_UNAVAILABLE',
+      'FX_RATE_STALE',
+    ])(
+      `${mode}: %s is a success envelope, not a failed request`,
+      async (code) => {
+        const h = portfolioHarness(mode);
+        h.fail(new PortfolioValuationError(code, 'source unavailable'));
+        expect(await h.read()).toMatchObject({
+          success: true,
+          data: {
+            tradingAccountId: h.account.id,
+            state: 'unavailable',
+            summary: null,
+            sectionErrors: [{ code }],
+          },
+        });
+      },
+    );
+    it.each([
+      'TRADING_ACCOUNT_SCOPE_MISMATCH',
+      'CASH_WALLET_INVALID',
+      'INVALID_INITIAL_CAPITAL',
+      'POSITION_INVALID',
+      'INVALID_DECIMAL',
+    ])(
+      `${mode}: %s retains its structural code through the HTTP filter`,
+      async (code) => {
+        const h = portfolioHarness(mode);
+        h.fail(
+          new PortfolioValuationError(
+            code,
+            'raw database/provider details must not be public',
+          ),
+        );
+        const error = await h.read().then(
+          () => {
+            throw new Error('must fail closed');
+          },
+          (failure) => failure,
+        );
+        const result = httpFailure(error);
+        expect(result).toMatchObject({
+          status: 500,
+          body: { success: false, error: { code } },
+        });
+        expect(JSON.stringify(result)).not.toContain('raw database/provider');
+      },
+    );
+    it(`${mode}: unexpected DB/valuation exceptions remain failed HTTP requests`, async () => {
+      const h = portfolioHarness(mode);
+      h.fail(new Error('DB unavailable: internal details'));
+      const error = await h.read().catch((failure) => failure);
+      expect(httpFailure(error)).toEqual({
+        status: 500,
+        body: {
+          success: false,
+          error: {
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Internal server error.',
+          },
+        },
+      });
+      if (mode === 'general')
+        expect(h.client.$transaction).toHaveBeenCalledWith(
+          expect.any(Function),
+          { isolationLevel: 'RepeatableRead' },
+        );
+    });
+    it(`${mode}: ownership 404 prevents valuation`, async () => {
+      const h = portfolioHarness(mode);
+      h.access.getOwnedAccountOrThrow.mockRejectedValue(
+        new HttpException(
+          {
+            success: false,
+            error: {
+              code: 'TRADING_ACCOUNT_NOT_FOUND',
+              message: 'Trading account not found',
+            },
+          },
+          404,
+        ),
+      );
+      expect(
+        httpFailure(await h.read().catch((failure) => failure)),
+      ).toMatchObject({
+        status: 404,
+        body: { error: { code: 'TRADING_ACCOUNT_NOT_FOUND' } },
+      });
+      expect(h.client.$transaction).not.toHaveBeenCalled();
+    });
+  }
+  it('reuses admin request correlation and validation stage without exposing the domain exception message', async () => {
+    const h = portfolioHarness('season');
+    h.fail(
+      new PortfolioValuationError(
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+        'private DB/provider/token values',
+      ),
+    );
+    const request = {
+      method: 'GET',
+      originalUrl: '/api/v1/trading-accounts/account-1/portfolio',
+      headers: {},
+      user: { userId: 'user-1', role: 'admin' },
+    };
+    const response = { setHeader: jest.fn() };
+    const result = await new Promise<any>((resolve, reject) => {
+      adminDiagnosticRequestMiddleware(
+        request as never,
+        response as never,
+        () => {
+          h.read().then(
+            () => reject(new Error('must fail closed')),
+            (error) => {
+              let body: any;
+              const http = {
+                status: jest.fn().mockReturnThis(),
+                json: (value) => {
+                  body = value;
+                },
+              };
+              new GlobalHttpExceptionFilter().catch(error, {
+                switchToHttp: () => ({
+                  getResponse: () => http,
+                  getRequest: () => request,
+                }),
+              } as never);
+              resolve(body);
+            },
+          );
+        },
+      );
+    });
+    expect(result.error.diagnostic).toMatchObject({
+      domain: 'PORTFOLIO',
+      failureStage: 'portfolio_valuation_validation',
+      code: 'TRADING_ACCOUNT_SCOPE_MISMATCH',
+    });
+    expect(result.error.diagnostic.requestId).toBe(
+      response.setHeader.mock.calls[0][1],
+    );
+    expect(JSON.stringify(result)).not.toContain('private DB/provider/token');
+  });
+});
 
 const fixture = JSON.parse(
   readFileSync(
