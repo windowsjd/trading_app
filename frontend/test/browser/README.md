@@ -1,5 +1,26 @@
 # Trading UI browser regression
 
+Home tier cards use the same external esbuild/Playwright runtime:
+
+```sh
+NODE_PATH=/path/to/browser-tools/node_modules node test/browser/homeTierBrowser.cjs
+```
+
+This renders production Home, AccountSwitcher, PNG frames and SVG subjects with
+fixture HTTP. It covers all six tiers plus neutral at 320/360/390/430px, font scales
+1/1.5/2 and Light/Dark (168 layouts), then ranking loading/error/unavailable,
+unknown tier and active → past settled → general → active switching. Assertions
+check loaded images, text bounds, emblem overlap, text contrast, 44px targets and
+the selected season's ranking request. Reports and contact sheets default to
+`/tmp/trading-home-tiers` (`HOME_TIER_BROWSER_OUTPUT` overrides).
+Native rendering and device screen readers require separate device verification.
+
+Provided-source preparation is reproducible with
+`node scripts/prepare-home-tier-assets.cjs <frame-directory> <whale.png>` using
+the same external Playwright runtime and Expo's installed pngjs. It preserves
+source files; source hashes, bounds, crop and interior geometry are recorded in
+`src/assets/home-tiers/preparation.json`. No new application dependency is required.
+
 Primary button colors and role exclusions use the same external browser tools:
 
 ```sh

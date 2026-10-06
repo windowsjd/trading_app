@@ -203,9 +203,9 @@ describe('the styles long text depends on are present', () => {
     const hero = read('screens/home/HomeAssetHero.tsx');
     assert.match(hero, /total:\s*\{[^}]*flexShrink:\s*1/s);
     assert.match(hero, /total:\s*\{[^}]*lineHeight/s);
-    // Rank and tier sit in a two-up row: each half must be allowed to wrap
-    // inside itself instead of pushing the other card off screen.
-    assert.match(read('screens/home/HomeAccountContext.tsx'), /metric:\s*\{[^}]*minWidth:\s*0/s);
+    // Identity shrinks beside the emblem and stacks with larger text.
+    assert.match(read('screens/home/HomeAccountContext.tsx'), /userDetails:\s*\{[^}]*minWidth:\s*0/s);
+    assert.match(read('screens/home/HomeAccountContext.tsx'), /column-reverse/);
     assert.match(read('screens/home/HomeHoldings.tsx'), /<PositionAssetRow/);
     assert.match(read('components/tradingAccount/PositionAssetRow.tsx'), /value:\s*\{[^}]*minWidth:\s*0/s);
     assert.match(read('components/tradingAccount/PositionAssetRow.tsx'), /columns:\s*\{[^}]*flexDirection:\s*'row'/s);

@@ -22,6 +22,7 @@ async function run() {
     platform: 'browser', format: 'iife', nodePaths: [path.join(root, 'node_modules')],
     resolveExtensions: ['.web.tsx', '.tsx', '.web.ts', '.ts', '.web.js', '.js', '.jsx', '.json'],
     mainFields: ['browser', 'module', 'main'],
+    loader: { '.png': 'dataurl' },
     define: { global: 'globalThis', 'process.env.NODE_ENV': '"production"', __DEV__: 'false' },
     plugins: [{ name: 'root-tab-fixtures', setup(b) {
       b.onResolve({ filter: /^react-native$/ }, () => ({ path: path.join(__dirname, 'nativeWeb.jsx') }));

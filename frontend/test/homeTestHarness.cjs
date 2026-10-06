@@ -288,7 +288,7 @@ function createHomeHarness(mode = 'general') {
       scope: 'all', seasonId: account.season.seasonId,
       rankType: account.season.seasonStatus === 'settled' ? 'final' : 'daily',
       limit: 1, offset: 0,
-    }), { myRanking: { state: 'available', rank: 2, provisionalTier: 'Silver', finalTier: 'Gold' } });
+    }), { state: 'available', myRanking: { state: 'available', rank: 2, provisionalTier: 'Silver', finalTier: 'Gold' } });
   };
   h.failEquity = (error) =>
     client

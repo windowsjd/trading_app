@@ -18,6 +18,7 @@ async function run() {
     platform: 'browser', format: 'iife', nodePaths: [path.join(root, 'node_modules')],
     resolveExtensions: ['.web.tsx', '.tsx', '.web.ts', '.ts', '.web.js', '.js', '.jsx', '.json'],
     mainFields: ['browser', 'module', 'main'],
+    loader: { '.png': 'dataurl' },
     define: { global: 'globalThis', 'process.env.NODE_ENV': '"production"', __DEV__: 'false' },
     plugins: [{ name: 'isolated-home-transport', setup(b) {
       b.onResolve({ filter: /^react-native$/ }, () => ({ path: path.join(__dirname, 'nativeWeb.jsx') }));
@@ -62,7 +63,7 @@ async function run() {
         assert.equal(await page.getByText('환전하기', { exact: true }).count(), 0);
         assert.equal(await page.getByText('환전 안내', { exact: true }).count(), 0);
         await theme.canvas(page, appearance);
-        await theme.background(id('home-account-context'), appearance, 'surface');
+        if (mode === 'general' || long) await theme.background(id('home-account-context'), appearance, 'surface');
         await theme.background(id('home-summary-card'), appearance, 'screen');
         assert.equal(await id('home-competition').count(), 0);
         const heroText = await id('home-summary-card').textContent();
@@ -136,7 +137,9 @@ async function run() {
         assert.ok(layout.trigger.width >= 44);
         assert.ok(layout.context.paddingHorizontal >= 16 && layout.context.paddingVertical >= 20);
         assert.equal(layout.context.borderWidth, 1);
-        assert.equal(layout.context.borderColor, appearance === 'light' ? 'rgb(229, 232, 235)' : 'rgb(59, 61, 67)');
+        assert.equal(layout.context.borderColor, mode === 'season' && !long
+          ? appearance === 'light' ? 'rgb(197, 206, 216)' : 'rgb(72, 85, 100)'
+          : appearance === 'light' ? 'rgb(229, 232, 235)' : 'rgb(59, 61, 67)');
         assert.notEqual(layout.context.background, theme.palettes[appearance].screen);
         assert.ok(layout.trigger.right <= layout.context.right - 12);
         assert.ok(layout.titleTextRight <= layout.trigger.x + 1, `title and change trigger never collide: ${layout.titleTextRight} / ${layout.trigger.x}`);
@@ -151,9 +154,8 @@ async function run() {
         assert.doesNotMatch(await page.locator('#root').textContent(), /자금 구성|최초 지급 자본|누적 외부 자금 유입/);
         if (layout.competition) assert.ok(layout.competition.y >= layout.total.bottom);
         if (!long && fontScale === 1) {
-          // UI8 adds 8px on each vertical edge and 8px between the two rows.
-          assert.ok(layout.context.height <= 214, 'enlarged context stays within its content budget');
-          assert.ok(layout.total.bottom <= 350, 'assets appear near the top');
+          assert.ok(layout.context.height <= (mode === 'season' ? 295 : 214), 'emblem card retains a bounded normal-text height');
+          assert.ok(layout.total.bottom <= (mode === 'season' ? 440 : 350), 'assets remain directly after the account card');
           await page.screenshot({ path: path.join(out, `${mode}-${appearance}-${width}.png`) });
         }
         if (long && width === 320 && fontScale === 2) await page.screenshot({
@@ -192,7 +194,7 @@ async function run() {
         }
       }
       await switchAccount('general-account');
-      assert.equal(await id('home-account-context').textContent(), '일반 투자변경김재민');
+      assert.equal(await id('home-account-context').textContent(), '일반 투자김재민');
       assert.equal(await page.getByText('환전하기', { exact: true }).count(), 0);
       assert.equal(await id('trading-account-capability-notice').count(), 0);
       records.push({ appearance, state });

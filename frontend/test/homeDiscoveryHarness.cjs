@@ -41,7 +41,7 @@ function setup(mode = 'season', count = 7, screen = 'home') {
     },
     '../../features/me/api': { getMe: async () => { await read('me'); return { nickname: 'mycroft' }; } },
     '../../features/ranking/api': {
-      getRankings: async params => { await read('ranking', params); return { myRanking: { state: 'available', rank: 99999, provisionalTier: 'Master', finalTier: 'Grandmaster' } }; },
+      getRankings: async params => { await read('ranking', params); return { state: 'available', myRanking: { state: 'available', rank: 99999, provisionalTier: 'master', finalTier: 'diamond' } }; },
       getRankingTier: (row, type) => row ? (type === 'final' ? row.finalTier : row.provisionalTier) : '-',
     },
     '../../features/market/api': { getAssets: async params => { await read('hot', params); return { sortSnapshot: `snapshot-${params.assetType}`, assets: h.markets[params.assetType], pagination: { nextOffset: null } }; } },

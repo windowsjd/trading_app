@@ -24,6 +24,8 @@ export const transport = {
   ],
 };
 export const navigation = { calls: [], navigate(...args) { this.calls.push(args); if (window.fixture?.navigationRef?.isReady()) window.fixture.navigationRef.navigate(...args); } };
+if (params.has('past')) transport.accounts.push({ ...base, id: 'past-account', mode: 'season', status: 'closed',
+  season: { ...season, seasonId: 'past-season', seasonName: '지난 시즌', seasonStatus: 'settled', participantStatus: 'finished' } });
 // Entry scenarios are explicit fixture inputs; production selection stays real.
 if (params.has('accountSet')) {
   const set = params.get('accountSet');
@@ -60,18 +62,23 @@ export const apiClient = {
       startAt: season.startAt, endAt: season.endAt, joined: !params.has('unjoined'),
     });
     if (path.startsWith('/ranking?')) {
+      const requested = new URL(path, location.origin).searchParams;
+      const selectedSeason = transport.accounts.find(a => a.season?.seasonId === requested.get('seasonId'))?.season;
+      if (!selectedSeason) throw new Error('Ranking must name the selected season');
+      if (variant === 'ranking-loading') await new Promise(resolve => transport.pending.push(resolve));
       if (variant === 'ranking-error' || variant === 'ranking-integrity') throw {
         response: { status: 500, data: { error: { code: variant === 'ranking-integrity' ? 'SEASON_RANKING_SCOPE_MISMATCH' : 'NETWORK_ERROR' } } },
       };
       return response({
-        state: variant === 'unranked' ? 'unavailable' : 'available',
-        season: { id: season.seasonId, name: season.seasonName, status: season.seasonStatus },
-        rankType: season.seasonStatus === 'settled' ? 'final' : 'daily',
+        state: ['unranked', 'ranking-unavailable'].includes(variant) ? 'unavailable' : 'available',
+        season: { id: selectedSeason.seasonId, name: selectedSeason.seasonName, status: selectedSeason.seasonStatus },
+        rankType: requested.get('rankType'),
         rankings: [], pagination: { nextOffset: null },
         myRanking: variant === 'unranked'
           ? { state: 'unavailable', reason: 'MY_RANKING_UNAVAILABLE' }
-          : { state: 'available', rank: long ? 123456789 : 2,
-              provisionalTier: long ? 'Silver 대한민국 모의투자 특별 등급' : 'Silver', finalTier: 'Gold' },
+          : { state: 'available', rank: selectedSeason.seasonId === 'past-season' ? 245 : long ? 123456789 : 2,
+              provisionalTier: params.get('tier') === 'null' ? null : params.get('tier') ?? (long ? 'Silver 대한민국 모의투자 특별 등급' : 'silver'),
+              finalTier: params.get('tier') === 'null' ? null : selectedSeason.seasonId === 'past-season' ? 'diamond' : 'gold' },
       });
     }
     const account = transport.accounts.find((item) => path.split('/')[2] === item.id);

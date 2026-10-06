@@ -52,7 +52,7 @@ function createHarness(scope?: string) {
   });
   mocks.set('@react-navigation/native', { useFocusEffect: () => {} });
   // SVG is a native host boundary; browser tests exercise its actual renderer.
-  mocks.set('react-native-svg', { default: 'svg', Defs: 'defs', LinearGradient: 'linearGradient', Rect: 'rect', Stop: 'stop', __esModule: true });
+  mocks.set('react-native-svg', { default: 'svg', Path: 'path', Defs: 'defs', LinearGradient: 'linearGradient', Rect: 'rect', Stop: 'stop', __esModule: true });
   mocks.set('@tanstack/react-query', {
     useQuery: (options: any) => {
       queryOptions.push(options);
@@ -94,6 +94,7 @@ function createHarness(scope?: string) {
     }
     const localRequire = (id: string) => {
       if (mocks.has(id)) return mocks.get(id);
+      if (id.endsWith('.png')) return { uri: path.resolve(path.dirname(file), id) };
       if (id.endsWith('/theme/native')) return mocks.get('react-native');
       if (id.endsWith('/theme/safeArea')) return { SafeAreaView: native.SafeAreaView };
       if (id.endsWith('/theme/appearance')) return { useAppearance: () => ({ mode: 'light', colors: {} }) };
@@ -421,10 +422,13 @@ describe('other ranking consumers', () => {
       const account = prepareAccountScreens(h);
       const props = { account };
       assert.match(h.render(screen, props), /#2/);
-      assert.match(h.render(screen, props), /silver/);
+      assert.match(h.render(screen, props), screen.startsWith('home/') ? /Silver/ : /silver/);
+      h.page.myRanking = { ...availableRankings.myRanking, provisionalTier: 'master', finalTier: null };
+      assert.match(h.render(screen, props), screen.startsWith('home/') ? /Whale/ : /master/);
+      if (screen.startsWith('my/')) assert.doesNotMatch(h.render(screen, props), /Whale/);
       account.season.seasonStatus = 'settled';
       h.page.myRanking = { ...availableRankings.myRanking, provisionalTier: null, finalTier: 'diamond' };
-      assert.match(h.render(screen, props), /diamond/);
+      assert.match(h.render(screen, props), screen.startsWith('home/') ? /Diamond/ : /diamond/);
       const options = h.queryOptions.filter((q) => q.queryKey[0] === 'ranking').at(-1);
       assert.equal(options.enabled, true);
       await options.queryFn();
@@ -436,7 +440,7 @@ describe('other ranking consumers', () => {
       for (const state of [notJoined, unavailable]) {
         h.page.myRanking = state;
         const html = h.render(screen, props);
-        assert.doesNotMatch(html, /#2|silver|diamond/);
+        assert.doesNotMatch(html, /#2|silver|diamond/i);
       }
     });
 

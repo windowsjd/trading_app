@@ -117,7 +117,8 @@ describe('Home asset hierarchy and real portfolio/ranking/me sources', () => {
     h.account.season.seasonStatus = 'settled';
     h.seed(h.account, fixture.season.data);
     const tree = h.render().tree;
-    for (const text of ['최종 자산', '최종 순위', '최종 등급', 'Gold']) assert.ok(texts(tree).includes(text));
+    for (const text of ['최종 자산', '#2', 'Gold']) assert.ok(texts(tree).includes(text));
+    assert.doesNotMatch(texts(tree), /최종 순위|최종 등급/);
     const rankingQuery = h.queries.find((query) => query.queryKey[0] === 'ranking');
     assert.ok(rankingQuery.queryKey.includes(h.account.season.seasonId));
     assert.ok(rankingQuery.queryKey.includes('final'));
@@ -325,8 +326,9 @@ describe('general/season home API, queries, rendering and navigation integration
         assert.ok(!text.includes('현재 순위'));
         assert.doesNotMatch(text, /자금 구성|최초 지급 자본|누적 외부 자금 유입|누적 광고 보상|투자 손익/);
       } else {
-        for (const label of ['김재민', '현재 순위', '현재 등급'])
+        for (const label of ['김재민', '#2', 'Silver'])
           assert.ok(text.includes(label));
+        assert.doesNotMatch(text, /현재 순위|현재 등급/);
         assert.ok(!text.includes('자금 구성'));
       }
       const line = elements(chart, 'LineChart')[0];

@@ -10,6 +10,33 @@
 
 ---
 
+## 2026-10-06 — 홈 시즌 카드의 티어 엠블럼 중심 재설계
+
+- 의도: 시즌 홈 카드의 정보 중심을 텍스트 지표에서 티어 엠블럼으로 옮겨 시즌 성취를
+  즉시 인지하도록 하면서 기존 계정/랭킹 데이터 의미와 금융 앱의 정돈된 UI를 유지했다.
+- 시작/종료 HEAD는 `364493707f868a41eb68de236accc2c554810aff`, 기존 브랜치는
+  `codex/fix-friends-profile-image-ci`다. 원격 main은 `3acf7f7e1b09602120cc17fce8791d1a1c760bb3`.
+  브랜치/워크트리 생성, checkout/reset/rebase, commit/push/merge는 수행하지 않았다.
+- 제공 프레임 6개와 고래 원본을 보존하고 512px 투명 PNG 파생 자산을 사용한다.
+  Bronze~Diamond는 같은 개미 SVG의 발전형으로, Platinum에 날개를 추가하고
+  Diamond는 날개와 제한적인 결정 면을 유지한다. Whale은 제공 프레임+고래+낮은 보조 파도다.
+- Home 전용 tierPresentation에서만 backend master를 Whale로 표시한다.
+  선택 계정의 seasonId와 daily/provisional·settled/final, getRankingTier의 기존 fallback을 보존한다.
+  backend/DB/API/계산/정산/보상 및 다른 화면의 master 명칭은 변경하지 않았다.
+- 티어별 Light/Dark 배경/테두리, 132–160px 엠블럼, 티어명, 시즌명, 프로필과 #순위를 표시한다.
+  기존 metric label은 제거하고 홈 변경 버튼을 44px 양방향 화살표로 바꿨다.
+  기존 Bottom Sheet/선택 정책/상태 안내와 일반 계정의 티어 없는 구성을 유지한다.
+- loading/error/null/unknown은 특정 티어를 추측하지 않는 중립 UI다. 오류에는 안내를 노출하고
+  캐시가 남아 있어도 정상 티어로 표시하지 않는다. 큰 글꼴은 세로 배치로 전환한다.
+- 검증: accounts/guides lint, typecheck, 관련 Home/Ranking 테스트, Web export,
+  git diff --check PASS. 신규 tier browser 173 기록, 기존 Home 244, HOT 96,
+  Home/Market 96, root tabs 756 layout+96 ranking flows PASS. 캡처와 전체 diff를 재검토했다.
+- 전체 npm run check는 1,552개 중 1,546 PASS / **기존 TabBarButton 테스트 6 FAIL**이다.
+  시작 HEAD의 임시 snapshot에서도 같은 #aaa/undefined 실패를 재현했다.
+  이를 PASS로 취급하지 않으며 unrelated 탭 수정은 하지 않았다.
+  Android/iOS 실제 runtime 및 기기 screen reader는 **NOT_RUN**이다.
+- 상세 구조/자산 mapping/테스트/시각 증거: [frontend/docs/home-tier-card.md](frontend/docs/home-tier-card.md).
+
 ## 2026-10-06 — Core account PostgreSQL CI의 Friends PATCH 회귀 수정
 
 - 시작/로컬 검증 HEAD: `3acf7f7e1b09602120cc17fce8791d1a1c760bb3`

@@ -40,7 +40,7 @@ function setup() {
 it('Home context is spacious, quiet and opens the existing account selection sheet', () => {
   const h = setup();
   try {
-    assert.equal(h.text(), 'Season 1 변경');
+    assert.equal(h.text(), 'Season 1');
     const context = h.renderer.root.findByProps({ testID: TEST_IDS.home.accountContext });
     const style = flatten(context.props.style);
     assert.ok(style.minHeight >= 96 && style.height === undefined);
@@ -57,11 +57,11 @@ it('Home context is spacious, quiet and opens the existing account selection she
     assert.ok(option);
     act(() => option.props.onPress());
     assert.deepEqual(h.selected, ['general-1']);
-    assert.equal(h.text(), 'Season 1 변경');
+    assert.equal(h.text(), 'Season 1');
     h.context.selectedAccount = h.general;
     h.context.selectedAccountId = h.general.id;
     act(() => h.renderer.update(h.render()));
-    assert.equal(h.text(), '일반 투자 변경');
+    assert.equal(h.text(), '일반 투자');
   } finally { act(() => h.renderer.unmount()); }
 });
 

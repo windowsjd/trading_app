@@ -1,0 +1,242 @@
+{
+  "bronze": {
+    "source": "단일 V형 하단 장식 청동 엠블럼.png",
+    "sha256": "c0020b6806767663c4645101e945adbe9e274722e4d001e93fe076b0d2dc57fa",
+    "sourceSize": [
+      1254,
+      1254
+    ],
+    "sourceBounds": [
+      91,
+      31,
+      1198,
+      1228
+    ],
+    "visibleBoundsAlphaAbove8": [
+      127,
+      78,
+      1127,
+      1112
+    ],
+    "crop": {
+      "x": 98,
+      "y": 66,
+      "side": 1058
+    },
+    "removedOutsideWhitePixels": 0,
+    "outputSize": [
+      512,
+      512
+    ],
+    "interior": {
+      "x": 0.5,
+      "y": 0.44801512287334594,
+      "radius": 0.3497164461247637
+    }
+  },
+  "silver": {
+    "source": "스모키 젬 실버 랭크 엠블럼.png",
+    "sha256": "1610017c8f88fb777146f3f0ff0756b1ffa818ba3facb7c737e9008690a550a7",
+    "sourceSize": [
+      1254,
+      1254
+    ],
+    "sourceBounds": [
+      21,
+      19,
+      1230,
+      1221
+    ],
+    "visibleBoundsAlphaAbove8": [
+      99,
+      76,
+      1155,
+      1116
+    ],
+    "crop": {
+      "x": 87,
+      "y": 56,
+      "side": 1080
+    },
+    "removedOutsideWhitePixels": 0,
+    "outputSize": [
+      512,
+      512
+    ],
+    "interior": {
+      "x": 0.5,
+      "y": 0.44814814814814813,
+      "radius": 0.3425925925925926
+    }
+  },
+  "gold": {
+    "source": "gold-frame-refined.png",
+    "sha256": "85790f306af5cc6863fba7d53af4376b4e0197e4b621afab702df45752f7415a",
+    "sourceSize": [
+      1254,
+      1254
+    ],
+    "sourceBounds": [
+      64,
+      21,
+      1228,
+      1254
+    ],
+    "visibleBoundsAlphaAbove8": [
+      66,
+      72,
+      1187,
+      1153
+    ],
+    "crop": {
+      "x": 54,
+      "y": 40,
+      "side": 1145
+    },
+    "removedOutsideWhitePixels": 0,
+    "outputSize": [
+      512,
+      512
+    ],
+    "interior": {
+      "x": 0.5004366812227075,
+      "y": 0.4366812227074236,
+      "radius": 0.32489082969432315
+    }
+  },
+  "platinum": {
+    "source": "청록빛 삼중 곡선 엠블럼.png",
+    "sha256": "bc1992e058c8fa97f2ee8f60361aaebccc2e66b3de873f1547c20fadcff1b380",
+    "sourceSize": [
+      1254,
+      1254
+    ],
+    "sourceBounds": [
+      0,
+      12,
+      1238,
+      1204
+    ],
+    "visibleBoundsAlphaAbove8": [
+      18,
+      69,
+      1236,
+      1200
+    ],
+    "crop": {
+      "x": 6,
+      "y": 13.5,
+      "side": 1242
+    },
+    "removedOutsideWhitePixels": 0,
+    "outputSize": [
+      512,
+      512
+    ],
+    "interior": {
+      "x": 0.5,
+      "y": 0.42391304347826086,
+      "radius": 0.3003220611916264
+    }
+  },
+  "diamond": {
+    "source": "빙결빛 다이아몬드 랭크 엠블럼.png",
+    "sha256": "2e223e68c6b3fdaabb4572da6b6524c63c7830d6722cb3b7827c709cd9eafaa5",
+    "sourceSize": [
+      1377,
+      1142
+    ],
+    "sourceBounds": [
+      0,
+      20,
+      1376,
+      1134
+    ],
+    "visibleBoundsAlphaAbove8": [
+      9,
+      56,
+      1367,
+      1126
+    ],
+    "crop": {
+      "x": -3,
+      "y": -100,
+      "side": 1382
+    },
+    "removedOutsideWhitePixels": 0,
+    "outputSize": [
+      512,
+      512
+    ],
+    "interior": {
+      "x": 0.49855282199710566,
+      "y": 0.4392185238784371,
+      "radius": 0.2568740955137482
+    }
+  },
+  "whale": {
+    "source": "whale-diamond-evolution.png",
+    "sha256": "7d8a3d39a375dc6857fe8427e3b011113bc378c8c4fbbbd92e7761edf9cbfce0",
+    "sourceSize": [
+      1254,
+      1254
+    ],
+    "sourceBounds": [
+      0,
+      17,
+      1245,
+      1244
+    ],
+    "visibleBoundsAlphaAbove8": [
+      12,
+      67,
+      1243,
+      1174
+    ],
+    "crop": {
+      "x": 0,
+      "y": -7,
+      "side": 1255
+    },
+    "removedOutsideWhitePixels": 0,
+    "outputSize": [
+      512,
+      512
+    ],
+    "interior": {
+      "x": 0.499601593625498,
+      "y": 0.42788844621513944,
+      "radius": 0.2900398406374502
+    }
+  },
+  "whale-subject": {
+    "source": "청백색 바다의 혹등고래.png",
+    "sha256": "ce7119e834dba336b5a10d1646235e5aef7bbbb6903aee3371784a4a9a8cd692",
+    "sourceSize": [
+      1254,
+      1254
+    ],
+    "sourceBounds": [
+      0,
+      0,
+      1254,
+      1254
+    ],
+    "visibleBoundsAlphaAbove8": [
+      93,
+      176,
+      1175,
+      1140
+    ],
+    "crop": {
+      "x": 81,
+      "y": 105,
+      "side": 1106
+    },
+    "removedOutsideWhitePixels": 1044181,
+    "outputSize": [
+      512,
+      512
+    ]
+  }
+}

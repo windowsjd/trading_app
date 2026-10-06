@@ -70,7 +70,7 @@ async function run() {
         for (const name of ['home-account-context', 'home-holdings', 'home-hot']) await bounds(name);
         const holdings = await id('home-holdings').boundingBox(), hot = await id('home-hot').boundingBox();
         assert.ok(hot.y >= holdings.y + holdings.height);
-        await theme.background(id('home-account-context'), appearance, 'surface');
+        if (mode === 'general') await theme.background(id('home-account-context'), appearance, 'surface');
         await theme.background(id('home-hot'), appearance, 'surface');
         assert.equal(await color(id(`home-position-item-${mode}-account-asset-0-return`)), palette[appearance][preference][0]);
         assert.equal(await color(id('home-hot-change-asset-0')), palette[appearance][preference][0]);

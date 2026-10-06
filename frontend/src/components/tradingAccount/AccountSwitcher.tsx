@@ -1,5 +1,7 @@
 import { semantic } from '../../theme/tokens';
 import React, { useState } from 'react';
+import Svg, { Path } from 'react-native-svg';
+import { useAppearance } from '../../theme/appearance';
 import {
   ActivityIndicator,
   ScrollView,
@@ -7,6 +9,8 @@ import {
   Text,
   useWindowDimensions,
   View,
+  type StyleProp,
+  type ViewStyle,
 } from '../../theme/native';
 import ActionPressable from '../common/ActionPressable';
 import { useQuery } from '@tanstack/react-query';
@@ -53,10 +57,13 @@ type Props = {
   compact?: boolean;
   /** Home context with a small change action; selection still uses this sheet. */
   home?: boolean;
+  /** Home owns tier presentation; the shared switcher has no ranking dependency. */
+  homeCardStyle?: StyleProp<ViewStyle>;
   children?: React.ReactNode;
 };
 
-export default function AccountSwitcher({ compact = false, home = false, children }: Props) {
+export default function AccountSwitcher({ compact = false, home = false, homeCardStyle, children }: Props) {
+  const { colors } = useAppearance();
   const {
     accounts,
     selectedAccount,
@@ -144,9 +151,9 @@ export default function AccountSwitcher({ compact = false, home = false, childre
   return (
     <>
       {home ? (
-        <View style={styles.homeContext} testID={TEST_IDS.home.accountContext}>
+        <View style={[styles.homeContext, selectedAccount.mode === 'season' && homeCardStyle]} testID={TEST_IDS.home.accountContext}>
           <View style={styles.homeContextRow}>
-            <Text style={styles.homeTitle}>{display.title}</Text>
+            <Text style={[styles.homeTitle, selectedAccount.mode === 'season' && styles.homeSeasonTitle]}>{display.title}</Text>
             <ActionPressable
               style={styles.homeChange}
               onPress={() => setOpen(true)}
@@ -154,7 +161,12 @@ export default function AccountSwitcher({ compact = false, home = false, childre
               accessibilityLabel={`계정 변경. 현재 ${display.title}, ${display.statusLabel}`}
               testID={TEST_IDS.tradingAccount.switcherTrigger}
             >
-              <Text style={styles.homeChangeText}>변경</Text>
+              <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
+                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={colors.secondary}
+                  strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" focusable={false}>
+                  <Path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4" />
+                </Svg>
+              </View>
             </ActionPressable>
           </View>
           {selectedAccount.status !== 'active' ? (
@@ -364,6 +376,7 @@ const styles = StyleSheet.create({
   },
   homeContextRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   homeTitle: { flex: 1, minWidth: 0, fontSize: 20, fontWeight: '700', lineHeight: 28 },
+  homeSeasonTitle: { fontSize: 16, lineHeight: 24, fontWeight: '600', color: semantic.secondary },
   homeChange: {
     flexShrink: 0,
     minWidth: 44,
@@ -375,7 +388,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  homeChangeText: { fontSize: 13, lineHeight: 20, fontWeight: '600', color: semantic.secondary },
   homeNotice: { fontSize: 13, lineHeight: 20, color: semantic.warning },
   trigger: {
     flexDirection: 'row',

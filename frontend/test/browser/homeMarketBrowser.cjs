@@ -15,6 +15,7 @@ async function run() {
     platform: 'browser', format: 'iife', nodePaths: [path.join(root, 'node_modules')],
     resolveExtensions: ['.web.tsx', '.tsx', '.web.ts', '.ts', '.web.js', '.js', '.jsx', '.json'], mainFields: ['browser', 'module', 'main'],
     define: { global: 'globalThis', 'process.env.NODE_ENV': '"production"', __DEV__: 'false' },
+    loader: { '.png': 'dataurl' },
     plugins: [{ name: 'fixture', setup(b) {
       b.onResolve({ filter: /^react-native$/ }, () => ({ path: path.join(__dirname, 'nativeWeb.jsx') }));
       b.onResolve({ filter: /(services\/api\/client|navigationHooks|useMarketTickers)$/ }, () => ({ path: path.join(__dirname, 'rootTabsMocks.js') }));

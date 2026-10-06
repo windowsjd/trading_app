@@ -13,6 +13,7 @@ function load(file, mocks) {
   }).outputText;
   const localRequire = (name) => {
     if (Object.hasOwn(mocks, name)) return mocks[name];
+    if (name.endsWith('.png')) return { uri: resolve(dirname(file), name) };
     if (name.endsWith('/ProfileAvatar')) return { default: 'ProfileAvatar', __esModule: true };
     if (name.endsWith('/theme/native')) return mocks['react-native'];
     if (name.endsWith('/theme/safeArea')) return mocks['react-native-safe-area-context'] ?? { SafeAreaView: 'SafeAreaView' };
