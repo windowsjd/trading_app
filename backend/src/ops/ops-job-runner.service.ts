@@ -22,6 +22,7 @@ import { SeasonLifecycleTransitionJobService } from '../batch/season-lifecycle-t
 import { SeasonSettlementJobService } from '../batch/season-settlement-job.service';
 import { SEASON_SETTLEMENT_JOB_NAME } from '../batch/season-settlement-job.types';
 import { BinancePriceIngestionService } from '../providers/binance/binance-price.ingestion.service';
+import { projectOpsFailure } from './ops-failure';
 import { ExchangeRateIngestionService } from '../providers/exchange-rate/exchange-rate.ingestion.service';
 import { KisRestCurrentPriceIngestionService } from '../providers/kis/kis-rest-current-price.ingestion.service';
 import { KisWebSocketClient } from '../providers/kis/kis-websocket.client';
@@ -1508,48 +1509,21 @@ export class OpsJobRunnerService {
     message: string;
     resultJson?: unknown;
   } {
+    const projected = projectOpsFailure(error);
     if (error instanceof HttpException) {
       const response = error.getResponse();
       return {
-        code: this.extractHttpErrorField(response, 'code') ?? 'OPS_JOB_FAILED',
-        message:
-          this.extractHttpErrorField(response, 'message') ?? 'Ops job failed.',
-        resultJson: this.extractHttpResultPayload(response),
+        ...projected,
+        resultJson: this.extractHttpResultPayload(response) ?? {
+          failure: projected,
+        },
       };
     }
-
-    if (error instanceof Error && error.message.trim() !== '') {
-      return {
-        code: 'OPS_JOB_FAILED',
-        message: error.message,
-      };
-    }
-
     return {
+      ...projected,
       code: 'OPS_JOB_FAILED',
-      message: 'Ops job failed.',
+      resultJson: { failure: projected },
     };
-  }
-
-  private extractHttpErrorField(
-    response: string | object,
-    fieldName: 'code' | 'message',
-  ) {
-    if (
-      typeof response !== 'object' ||
-      response === null ||
-      !('error' in response) ||
-      typeof response.error !== 'object' ||
-      response.error === null ||
-      !(fieldName in response.error)
-    ) {
-      return undefined;
-    }
-
-    const value = response.error[fieldName];
-    return typeof value === 'string' && value.trim() !== ''
-      ? value.trim()
-      : undefined;
   }
 
   private extractHttpResultPayload(response: string | object): unknown {

@@ -316,6 +316,46 @@ describe('OpsSchedulerService', () => {
     await first;
   });
 
+  it('classifies scheduler startup exceptions without console raw text', async () => {
+    jest.setSystemTime(new Date('2026-07-10T19:00:00.000Z'));
+    process.env.SCHEDULER_MARKET_CANDLE_RETENTION_ENABLED = 'true';
+    process.env.SCHEDULER_MARKET_CANDLE_RETENTION_RUN_ON_STARTUP = 'true';
+    const { service } = createService();
+    jest
+      .spyOn(service, 'runMarketCandleRetentionIfDue' as never)
+      .mockRejectedValueOnce(
+        Object.assign(
+          new Error(
+            'https://provider.invalid postgres://fake:fake@db.invalid/db 987654.12345678',
+          ),
+          { code: 'P1001' },
+        ) as never,
+      );
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      service.onModuleInit();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(warn).toHaveBeenCalledWith(
+        'Market candle retention startup check failed.',
+        {
+          safeCause: {
+            code: 'P1001',
+            category: 'db_connection_failed',
+            errorType: 'Error',
+          },
+        },
+      );
+      expect(JSON.stringify(warn.mock.calls)).not.toMatch(
+        /provider.invalid|db.invalid|987654/,
+      );
+    } finally {
+      warn.mockRestore();
+      service.clearInterval();
+    }
+  });
+
   it('uses the same due check for startup retention', async () => {
     jest.setSystemTime(new Date('2026-07-10T19:00:00.000Z'));
     process.env.SCHEDULER_MARKET_CANDLE_RETENTION_ENABLED = 'true';

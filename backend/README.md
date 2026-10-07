@@ -23,6 +23,49 @@ possible with the minimum safe information, rather than display more information
 These are design/review criteria for existing surfaces, not a new payload schema
 or a claim that every current diagnostic already meets them.
 
+### Diagnostic Enforcement Foundation
+
+Authenticated HTTP failures flow through the request middleware and global
+exception filter. New domain codes use the existing domain error helpers or
+`createApiError`; no per-code diagnostic registration is necessary. A code does
+not approve its message: only the reviewed fixed-message projection is trusted.
+Unenriched failures report `request_boundary`, not a guessed execution stage.
+Route context describes the requested workflow, never an inferred root cause.
+Simple validation/product blocks can use this baseline. Internal, financial,
+integrity, source and transaction failures also need observed domain enrichment
+via `setAdminDiagnosticContext` and a passing triage-quality contract test.
+
+Background failures belong to Ops, not HTTP diagnostics. `projectOpsFailure`
+keeps bounded declared codes and actual safe cause classification, discards raw
+exception text, and uses the existing Ops persistence redaction boundary. An
+unknown exception code is not trusted; the caller supplies a fixed fallback code.
+Returned Ops failure copy and persisted failure/message fields use the same safe
+projection. Ops JSON is bounded to depth 8, 1,000 entries per container, 2,000
+characters per string and 256 KiB total; scoped identifiers and normal numeric
+results remain permitted. Durable financial evidence is outside this projection.
+Pre-auth workflows retain public-safe responses without an admin UI bypass.
+
+The AST change gate compares production source with the PR base (or previous
+push). It rejects new direct error envelopes/emitters outside approved factories,
+unassigned coded errors, unenriched triage-required emitters and frontend error
+presentation that discards the original error. CI supplies the base explicitly;
+local checks compare with HEAD. Existing P1 migration debt is not a code allowlist
+and is not claimed as resolved. Boundary contract tests run independently of this
+change gate. Runtime quality evaluation is a test/review tool, not a production
+root-cause inference engine. See `scripts/diagnostic-enforcement.cjs` for the gate
+and its negative fixtures. Enrichment must use already-observed state, without
+additional diagnostic DB/Provider/Redis reads.
+
+Contracts are scoped by `source/path.ts#functionOrMethod` so an existing code's
+test cannot silently cover a different emitter. New/changed HTTP handlers need
+an actual failure tested with `assertDiagnosticBaseline`; complex HTTP emitters
+need `assertDiagnosticTriage` plus an observed stage before emission. `Public()`
+entry points use `assertPreAuthFailure` and safe operational logs. Existing job
+helpers carrying `resultPayloadJson` use `assertOpsFailure`, not HTTP enrichment.
+These assertions live in `backend/scripts/lib/diagnostic-quality.ts` and run in
+tests. They are not runtime diagnostic registration. Pure programming invariants
+without a production code require a local `@diagnosticSurface internal: reason`.
+
 ### Access and existing delivery contract
 
 Admin diagnostics retain the v1 envelope and are generated only for an authenticated
@@ -104,8 +147,9 @@ A timeout does not establish a DB connection-pool failure. WebSocket stale does
 not establish a Binance outage. A 0-row mutation does not establish that another
 worker modified the row. A subsequent failure read with satisfied guard
 predicates supports the existing **observed conflict** classification, not proof
-of a particular concurrent writer/process. Backend stages derived from route or
-safe error code are classification context, not proof every such step ran.
+of a particular concurrent writer/process. Route context describes the requested
+workflow, not proof that an execution step ran. Unenriched failures stay at
+`request_boundary`; only domain observations establish specific failed steps.
 
 ### Redaction and bounds
 
@@ -152,6 +196,11 @@ apply to client runtime facts or Ops JSON: source-selection evidence additionall
 caps source summaries/distinct rejection reasons at 12 each; matcher samples
 are capped at 10 and sample IDs at 128 characters. Ops redaction and the fixed
 matcher projection have their own contract, not an inherited 24 KiB guarantee.
+Ops persistence now separately caps strings at 2,000 characters, collections at
+1,000 entries, nesting at 8 and each JSON result/metadata value at 256 KiB. An
+oversized JSON value becomes an explicit truncation result. Error message fields
+use reviewed fixed copy; Error instances become safe cause classifications.
+These bounds affect Ops projections only, not financial ledgers or DB evidence.
 
 ### Diagnosis and business behavior
 

@@ -25,6 +25,7 @@ import ActionPressable from '../../components/common/ActionPressable';
 import CTAButton from '../../components/common/CTAButton';
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
+import ErrorNotice from '../../components/states/ErrorNotice';
 
 type UsdWalletIdentity = Extract<TransferWalletIdentity, { currency: 'USD' }>;
 const USD_TRANSFER_WALLETS = TRANSFER_WALLETS.filter((wallet): wallet is UsdWalletIdentity => wallet.currency === 'USD');
@@ -169,9 +170,9 @@ function TransferForm({ account, capabilities, scope, readScope }: {
               <Text style={styles.body}>받는 지갑 잔액: USD {formatDisplayDecimal(result.destination.balanceAfter)}</Text>
               <CTAButton label="다른 이체하기" onPress={() => { setResult(null); setAmount(''); attempt.current = null; }} />
             </View>
-          ) : integrity ? <ErrorState title={ACCOUNT_INTEGRITY_TITLE} message={integrity.message} onRetry={integrity.retry} />
+          ) : integrity ? <ErrorState error={integrity.error} title={ACCOUNT_INTEGRITY_TITLE} message={integrity.message} onRetry={integrity.retry} />
             : wallets.isLoading ? <FullPageLoading message="지갑 잔액을 불러오는 중입니다." />
-              : wallets.isError || !wallets.data ? <ErrorState title="지갑 잔액을 불러오지 못했습니다." onRetry={() => void wallets.refetch()} />
+              : wallets.isError || !wallets.data ? <ErrorState error={wallets.error} title="지갑 잔액을 불러오지 못했습니다." onRetry={() => void wallets.refetch()} />
                 : !hasAllWallets || (!sourceIsFutures && available === null) ? <ErrorState title={ACCOUNT_INTEGRITY_TITLE} message="지갑 정보를 확인할 수 없어 이체를 중단했습니다." onRetry={() => void wallets.refetch()} />
                   : <>
                     {block ? <Text testID="wallet-transfer-blocked" style={styles.error}>{block}</Text> : null}
@@ -197,7 +198,7 @@ function TransferForm({ account, capabilities, scope, readScope }: {
                       {amount && !canonicalAmount ? <Text style={styles.error}>0보다 큰 금액을 소수점 8자리까지 입력해주세요.</Text>
                         : canonicalAmount && available !== null && !transferAmountFits(canonicalAmount, available) && !uncertainRetry ? <Text style={styles.error}>이체 가능 금액을 초과했습니다.</Text> : null}
                     </View>
-                    {failure ? <Text testID="wallet-transfer-error" style={styles.error} accessibilityLiveRegion="polite">{transferErrorMessage(getApiErrorCode(failure))}</Text> : null}
+                    {failure ? <ErrorNotice error={failure} message={transferErrorMessage(getApiErrorCode(failure))} testID="wallet-transfer-error" style={styles.error} /> : null}
                     <View ref={inputScroll.submitRef} collapsable={false}>
                       <CTAButton testID="wallet-transfer-submit" label="이체하기" state={locked ? 'loading' : canExecute ? 'enabled' : 'disabled'} onPress={execute} />
                     </View>

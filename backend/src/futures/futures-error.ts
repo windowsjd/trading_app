@@ -1,9 +1,10 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
+import { createApiError } from '../common/api-error';
 
 export function futuresError(
   code: string,
   message: string,
   status = HttpStatus.CONFLICT,
 ): never {
-  throw new HttpException({ success: false, error: { code, message } }, status);
+  throw createApiError(code, message, status);
 }

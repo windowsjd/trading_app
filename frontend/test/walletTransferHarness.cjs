@@ -78,6 +78,7 @@ function walletTransferHarness({ platform = 'web' } = {}) {
     '../../features/tradingAccount/api': api,
     '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({ selectedAccount: h.accounts[h.accountId], capabilities: getTradingAccountCapabilities(h.accounts[h.accountId]), isLoading: false, isError: false }) },
     '../../components/common/CTAButton': { default: 'CTAButton', __esModule: true },
+    './AdminDiagnosticPanel': { default: () => null, __esModule: true },
     ...Object.fromEntries(['FullPageLoading', 'ErrorState'].map(name => ['../../components/states/' + name, { default: name, __esModule: true }])),
   }).default;
   h.bounds = { viewport: [0, 0, 320, 600], input: [0, 420, 288, 52], submit: [0, 550, 288, 52] };

@@ -26,6 +26,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  DIAGNOSTIC_AUDIT_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
+
 jobs:
   backend-quality:
     name: Backend quality
@@ -35,6 +38,8 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Install pnpm
         run: npm install -g pnpm@10.33.0
       - uses: actions/setup-node@v4
@@ -80,6 +85,8 @@ jobs:
         run: pnpm run build
       - name: Unit tests
         run: pnpm test
+      - name: Diagnostic production source gate
+        run: node ../scripts/diagnostic-enforcement.cjs backend
 
   frontend-quality:
     name: Frontend quality
@@ -89,6 +96,8 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -109,6 +118,8 @@ jobs:
         run: npm run typecheck
       - name: Tests (node --test, Node 24 type stripping)
         run: npm test
+      - name: Diagnostic presentation source gate
+        run: node ../scripts/diagnostic-enforcement.cjs frontend
       # The production compile gate for the app itself. `tsc --noEmit` proves
       # the types; only a bundle proves that every module actually resolves and
       # that the app can be built — which is what ships.

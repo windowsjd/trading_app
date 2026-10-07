@@ -42,13 +42,18 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
 
     const envelope = this.toErrorEnvelope(exception, status);
     const request = context.getRequest?.<AuthenticatedRequest>();
-    if (request?.user?.role === 'admin') {
+    if (request?.user?.role === 'admin' || !request?.user || status >= 500) {
       const logMessage = safeAdminDiagnosticLog({
-        event: 'admin_http_request_failed',
+        event:
+          request?.user?.role === 'admin'
+            ? 'admin_http_request_failed'
+            : 'http_request_failed',
+        surface: request?.user ? 'authenticated_http' : 'pre_auth_http',
         requestId: getAdminDiagnosticRequestId(),
         code: envelope.error.code,
         httpStatus: status,
         exceptionType: classifyFailureCause(exception).errorType,
+        safeCause: classifyFailureCause(exception),
       });
       if (status >= 500) {
         this.logger.error(logMessage);

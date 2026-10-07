@@ -32,6 +32,7 @@ import {
 import { GlobalHttpExceptionFilter } from '../common/global-http-exception.filter';
 import { safeDiagnosticMessage } from '../common/safe-diagnostic-message';
 import { assertCrossSafe } from './futures-risk';
+import { assertDiagnosticTriage } from '../../scripts/lib/diagnostic-quality';
 
 const d = (value: string) => new Prisma.Decimal(value);
 const now = new Date('2026-10-07T00:00:00Z');
@@ -184,12 +185,10 @@ describe('Futures existing execution diagnostic boundary', () => {
         aggregate: jest
           .fn()
           .mockResolvedValue({ _sum: { isolatedMargin: d('0') } }),
-        create: jest
-          .fn()
-          .mockImplementation(({ data }) => ({
-            id: 'position-1',
-            ...decimalRow(data),
-          })),
+        create: jest.fn().mockImplementation(({ data }) => ({
+          id: 'position-1',
+          ...decimalRow(data),
+        })),
         update: jest.fn(),
       },
       futuresExecution: {
@@ -248,6 +247,7 @@ describe('Futures existing execution diagnostic boundary', () => {
       if (role !== 'admin') expect(diagnostic).toBeUndefined();
       else {
         expectSafe(diagnostic);
+        assertDiagnosticTriage(diagnostic, 'INTERNAL_SERVER_ERROR', 'backend/src/futures/futures.service.ts#execute');
         expect(diagnostic).toMatchObject({
           domain: 'futures',
           operation: 'market_execute',
@@ -297,6 +297,7 @@ describe('Futures existing execution diagnostic boundary', () => {
       }),
     );
     expect(body.error.code).toBe('FUTURES_LIQUIDATION_REQUIRED');
+    assertDiagnosticTriage(diagnostic, 'FUTURES_LIQUIDATION_REQUIRED', 'backend/src/futures/futures.service.ts#execute');
     expect(response.status).toHaveBeenCalledWith(409);
     expect(body.error.message).toBe(
       'Loss and fee cannot settle safely without liquidation.',
@@ -322,6 +323,7 @@ describe('Futures existing execution diagnostic boundary', () => {
       service.execute('user-1', 'account-1', command),
     );
     expect(body.error.code).toBe('FUTURES_MAINTENANCE_UNSAFE');
+    assertDiagnosticTriage(diagnostic, 'FUTURES_MAINTENANCE_UNSAFE', 'backend/src/futures/futures.service.ts#execute');
     expectSafe(diagnostic);
     expect(diagnostic?.evidence?.financialGuard).toMatchObject({
       guardName: 'futures_maintenance',
@@ -338,6 +340,7 @@ describe('Futures existing execution diagnostic boundary', () => {
       service.execute('user-1', 'account-1', command),
     );
     expect(body.error.code).toBe('FINANCIAL_SCOPE_REPAIR_REQUIRED');
+    assertDiagnosticTriage(diagnostic, 'FINANCIAL_SCOPE_REPAIR_REQUIRED', 'backend/src/futures/futures.service.ts#execute');
     expect(response.status).toHaveBeenCalledWith(500);
     expect(body.error.message).toBe(
       'Futures wallet information could not be verified.',

@@ -7,7 +7,7 @@ import {
   StyleSheet,
 } from '../../theme/native';
 import ActionPressable from '../common/ActionPressable';
-import AdminDiagnosticPanel from './AdminDiagnosticPanel';
+import ErrorNotice from './ErrorNotice';
 import type { RuntimeFacts } from '../../services/ws/runtimeDiagnostics';
 
 interface ErrorStateProps {
@@ -15,15 +15,18 @@ interface ErrorStateProps {
   message?: string;
   actionLabel?: string;
   onRetry?: () => void;
+  error?: unknown;
+  /** Legacy wiring; new surfaces use error. */
   diagnosticError?: unknown;
   diagnosticRuntime?: RuntimeFacts;
 }
 
 export default function ErrorState({
   title = '문제가 발생했습니다.',
-  message = '잠시 후 다시 시도해주세요.',
+  message,
   actionLabel = '다시 시도',
   onRetry,
+  error,
   diagnosticError,
   diagnosticRuntime,
 }: ErrorStateProps) {
@@ -31,8 +34,7 @@ export default function ErrorState({
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.center}>
         <Text style={styles.title}>{title}</Text>
-        <Text style={styles.message}>{message}</Text>
-        <AdminDiagnosticPanel error={diagnosticError} runtime={diagnosticRuntime} includeRuntimeWithDiagnostic={!!diagnosticRuntime} />
+        <ErrorNotice error={error ?? diagnosticError} message={message} style={styles.message} runtime={diagnosticRuntime} />
 
         {onRetry ? (
           <ActionPressable accessibilityRole="button" feedback="button" style={styles.button} onPress={onRetry}>

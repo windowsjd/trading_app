@@ -37,6 +37,33 @@ import { OpsJobRunService } from './ops-job-run.service';
 import { ProviderHttpClient } from '../providers/provider-http.client';
 
 describe('OpsJobRunService', () => {
+  it('stores an unknown background code through the safe boundary without raw DB/financial text', async () => {
+    const { prisma, service } = createService();
+    await service.recordFailed({ id: 'run-1', startedAt } as never, {
+      errorCode: 'NEW_SYNTHETIC_BACKGROUND_ERROR',
+      errorMessage:
+        'SELECT wallet_balance postgres://fake:fake@db.invalid/db 987654.12345678',
+      resultJson: {
+        message: 'raw Provider https://provider.invalid/body 987654.12345678',
+        exception: new Error('Authorization Bearer fake-token'),
+        accountId: 'account-1',
+        count: 3,
+      },
+    });
+    const data = prisma.opsJobRun.update.mock.calls[0][0].data;
+    expect(data).toMatchObject({
+      errorCode: 'NEW_SYNTHETIC_BACKGROUND_ERROR',
+      errorMessage: 'Background operation failed.',
+      resultJson: {
+        message: 'Background operation failed.',
+        accountId: 'account-1',
+        count: 3,
+      },
+    });
+    expect(JSON.stringify(data)).not.toMatch(
+      /SELECT|db.invalid|provider.invalid|987654|fake-token|diagnostic/,
+    );
+  });
   afterEach(() => jest.restoreAllMocks());
   const startedAt = new Date('2026-06-08T00:00:00.000Z');
   const finishedAt = new Date('2026-06-08T00:00:02.500Z');
@@ -61,13 +88,11 @@ describe('OpsJobRunService', () => {
   it('persists safe provider failures and redacts free-form and structured metadata', async () => {
     const { prisma, service } = createService();
     const text = jest.fn().mockResolvedValue('unlabeled-synthetic-body');
-    jest
-      .spyOn(global, 'fetch')
-      .mockResolvedValue({
-        ok: false,
-        status: 503,
-        text,
-      } as unknown as Response);
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 503,
+      text,
+    } as unknown as Response);
     const error = (await new ProviderHttpClient()
       .getJson('https://synthetic-private.test?authkey=fake-key', {
         provider: 'exchange_rate_api',

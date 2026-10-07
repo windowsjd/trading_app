@@ -103,6 +103,7 @@ import {
 } from '../generated/prisma/client';
 import { OpsJobRunnerService } from './ops-job-runner.service';
 import { createLimitMatchingDiagnostics } from '../orders/limit-order-matching-diagnostics';
+import { assertOpsFailure } from '../../scripts/lib/diagnostic-quality';
 
 describe('OpsJobRunnerService', () => {
   const startedAt = new Date('2026-06-08T00:00:00.000Z');
@@ -298,6 +299,69 @@ describe('OpsJobRunnerService', () => {
     ).toHaveBeenCalledWith(
       expect.objectContaining({ isLockOwned: expect.any(Function) }),
     );
+  });
+
+  it('projects unexpected Provider job failures to Ops without returning raw text or an HTTP diagnostic', async () => {
+    const f = createService();
+    const run = { id: 'provider-run', startedAt };
+    f.lockService.acquireLock.mockResolvedValue({
+      acquired: true,
+      lockKey: 'provider_binance_ingest:prices',
+      ownerId: 'owner',
+    });
+    f.runService.createRunning.mockResolvedValue(run);
+    f.runService.recordFailed.mockImplementation((_run, input) =>
+      Promise.resolve({
+        serialized: serializedRun({
+          status: OpsJobRunStatus.failed,
+          resultJson: input.resultJson,
+        }),
+      }),
+    );
+    f.binancePriceIngestionService.ingestPrices.mockRejectedValue(
+      Object.assign(
+        new Error(
+          'postgres://fake:fake@db.invalid/db Authorization Bearer fake-token https://provider.invalid/body 987654.12345678',
+        ),
+        { code: 'P1001' },
+      ),
+    );
+    const response = await f.service.runProviderBinanceIngestJob({
+      trigger: OpsJobTrigger.scheduler,
+    });
+    assertOpsFailure(
+      response,
+      'OPS_JOB_FAILED',
+      'backend/src/ops/ops-job-runner.service.ts#runProviderBinanceIngestJob',
+    );
+    expect(response).toMatchObject({
+      success: false,
+      error: {
+        code: 'OPS_JOB_FAILED',
+        message: 'Background operation failed.',
+      },
+    });
+    expect(f.runService.recordFailed).toHaveBeenCalledWith(
+      run,
+      expect.objectContaining({
+        errorCode: 'OPS_JOB_FAILED',
+        errorMessage: 'Background operation failed.',
+        resultJson: {
+          failure: {
+            code: 'P1001',
+            message: 'Background operation failed.',
+            safeCause: {
+              code: 'P1001',
+              category: 'db_connection_failed',
+              errorType: 'Error',
+            },
+          },
+        },
+      }),
+    );
+    expect(
+      JSON.stringify([response, f.runService.recordFailed.mock.calls]),
+    ).not.toMatch(/db.invalid|fake-token|provider.invalid|987654|diagnostic/);
   });
 
   it('persists only safe cause metadata when a limit matcher cycle query fails', async () => {

@@ -75,7 +75,7 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
         void this.runMarketCandleRetentionIfDue(startupAt, config).catch(
           (error: unknown) => {
             console.warn('Market candle retention startup check failed.', {
-              error: error instanceof Error ? error.message : 'Unknown error',
+              safeCause: classifyFailureCause(error),
             });
           },
         );
@@ -90,7 +90,7 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
         void this.runStartupCandleReconciliation(startupAt, config).catch(
           (error: unknown) => {
             console.warn('Market candle reconciliation catch-up failed.', {
-              error: error instanceof Error ? error.message : 'Unknown error',
+              safeCause: classifyFailureCause(error),
             });
           },
         );
@@ -104,7 +104,7 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
     this.interval = setInterval(() => {
       void this.runEnabledJobs(new Date()).catch((error: unknown) => {
         console.warn('Ops scheduler tick failed.', {
-          error: error instanceof Error ? error.message : 'Unknown error',
+          safeCause: classifyFailureCause(error),
         });
       });
     }, config.tickIntervalMs);
@@ -806,7 +806,7 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
       console.warn(
         'Market snapshot health check failed to run after startup.',
         {
-          error: error instanceof Error ? error.message : 'Unknown error',
+          safeCause: classifyFailureCause(error),
         },
       );
     }

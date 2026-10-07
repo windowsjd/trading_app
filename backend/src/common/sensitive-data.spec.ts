@@ -28,10 +28,10 @@ describe('shared sensitive data policy', () => {
       sanitizeOpsJson({ amount: '987654.12345678', message: unprojected }),
     ).toEqual({
       amount: '987654.12345678',
-      message: unprojected,
+      message: 'Background operation failed.',
     });
-    // HTTP diagnostics must exclude these at the projection boundary. Ops
-    // financial business records retain their independent storage contract.
+    // Redaction does not detect arbitrary technical prose/amounts. The Ops
+    // message projection excludes the prose; permitted numeric Ops data stays.
   });
   it.each([
     ['private', 'key'],

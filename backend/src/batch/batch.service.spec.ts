@@ -58,13 +58,11 @@ describe('BatchService', () => {
     const text = jest
       .fn()
       .mockResolvedValue('unlabeled-synthetic-batch-provider-body');
-    jest
-      .spyOn(global, 'fetch')
-      .mockResolvedValue({
-        ok: false,
-        status: 502,
-        text,
-      } as unknown as Response);
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 502,
+      text,
+    } as unknown as Response);
     const failure = await service
       .runJob({
         jobName: 'provider-test',
@@ -194,8 +192,8 @@ describe('BatchService', () => {
     prisma.batchJobRun.update.mockResolvedValue(
       makeRun({
         status: BatchJobStatus.failed,
-        errorCode: 'NOOP_FAILED',
-        errorMessage: 'boom',
+        errorCode: 'BATCH_JOB_FAILED',
+        errorMessage: 'Background operation failed.',
         finishedAt: new Date('2026-05-19T00:00:01.000Z'),
       }),
     );
@@ -217,8 +215,15 @@ describe('BatchService', () => {
       where: { id: 'run-1' },
       data: expect.objectContaining({
         status: BatchJobStatus.failed,
-        errorCode: 'NOOP_FAILED',
-        errorMessage: 'boom',
+        errorCode: 'BATCH_JOB_FAILED',
+        errorMessage: 'Background operation failed.',
+        resultPayloadJson: {
+          failure: {
+            code: 'BATCH_JOB_FAILED',
+            message: 'Background operation failed.',
+            safeCause: { category: 'unexpected_error', errorType: 'Error' },
+          },
+        },
       }),
     });
   });

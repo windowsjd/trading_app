@@ -7,7 +7,7 @@ import {
 import { buildPagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { sanitizeOpsJson } from '../ops/ops-redaction';
-import { redactStoredText } from '../common/sensitive-data';
+import { projectOpsFailure } from '../ops/ops-failure';
 import {
   BatchGetJobRunResponse,
   BatchJobRunListQuery,
@@ -92,6 +92,7 @@ export class BatchService {
       });
     } catch (error) {
       const failure = this.extractFailure(error);
+      const opsFailure = projectOpsFailure(error, 'BATCH_JOB_FAILED');
       const failedRun = await this.prisma.batchJobRun.update({
         where: {
           id: run.id,
@@ -99,13 +100,11 @@ export class BatchService {
         data: {
           status: BatchJobStatus.failed,
           finishedAt: new Date(),
-          errorCode: redactStoredText(failure.errorCode),
-          errorMessage: redactStoredText(failure.errorMessage),
-          ...(failure.resultPayload === undefined
-            ? {}
-            : {
-                resultPayloadJson: this.toJsonInput(failure.resultPayload),
-              }),
+          errorCode: opsFailure.code,
+          errorMessage: opsFailure.message,
+          resultPayloadJson: this.toJsonInput(
+            failure.resultPayload ?? { failure: opsFailure },
+          ),
         },
       });
 

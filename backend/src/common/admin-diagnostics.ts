@@ -170,7 +170,7 @@ export function adminDiagnosticRequestMiddleware(
     requestNextInvestigation: [...route.nextInvestigation],
     domain: route.domain,
     operation: route.operation,
-    failureStage: 'request_processing',
+    failureStage: 'request_boundary',
     entities: route.entities,
     evidence: {},
     nextInvestigation: route.nextInvestigation,
@@ -305,9 +305,6 @@ function buildAdminDiagnosticInternal(
     return undefined;
   }
   if (update && !isolateFailure) setAdminDiagnosticContext(update);
-  if (!isolateFailure && context.failureStage === 'request_processing') {
-    context.failureStage = inferFailureStage(code);
-  }
 
   const domain = isolateFailure
     ? (update?.domain ?? context.domain)
@@ -325,7 +322,7 @@ function buildAdminDiagnosticInternal(
   const failureStage =
     wrappedFailure?.failedStep ??
     (isolateFailure
-      ? (update?.failureStage ?? inferFailureStage(code))
+      ? (update?.failureStage ?? 'request_boundary')
       : context.failureStage);
   const entities = isolateFailure
     ? { ...context.requestEntities, ...update?.entities }
@@ -481,6 +478,23 @@ function inferRouteContext(method: string, originalUrl: string) {
         'backend/src/portfolio/trading-account-portfolio.service.ts',
         'backend/src/portfolio/portfolio-valuation.service.ts',
       ];
+    } else if (route[2] === 'futures') {
+      domain = 'FUTURES';
+      const action = [
+        'instruments',
+        'positions',
+        'executions',
+        'liquidations',
+        'execute',
+      ].includes(route[3])
+        ? route[3]
+        : 'request';
+      operation = `FUTURES_${action.replace(/-/gu, '_').toUpperCase()}_${method.toUpperCase() === 'GET' ? 'READ' : 'REQUEST'}`;
+      nextInvestigation = ['backend/src/futures/futures.service.ts'];
+    } else if (route[2] === 'wallets' || route[2] === 'transfers') {
+      domain = 'WALLET';
+      operation = `WALLET_${route[2].toUpperCase()}_${method.toUpperCase() === 'GET' ? 'READ' : 'REQUEST'}`;
+      nextInvestigation = ['backend/src/wallets/wallets.service.ts'];
     }
   } else if (route[0] === 'orders') {
     domain = 'ORDER';
@@ -808,26 +822,4 @@ function nonEmptyRecord(value: Record<string, unknown>): boolean {
 
 function unique(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
-}
-
-function inferFailureStage(code: string): string {
-  if (/QUOTE_(?:EXPIRED|NOT_FOUND|NOT_ACTIVE|MISMATCH|REQUIRED)/u.test(code)) {
-    return 'quote_validation';
-  }
-  if (/PRICE_(?:STALE|UNAVAILABLE)|ASSET_PRICE/u.test(code)) {
-    return 'execution_price_selection';
-  }
-  if (/FX_RATE|PROVIDER_RATE|EXECUTION_SOURCE/u.test(code)) {
-    return 'fx_rate_selection';
-  }
-  if (/MARKET_(?:CLOSED|CALENDAR_UNAVAILABLE)/u.test(code)) {
-    return 'market_session_validation';
-  }
-  if (/CANDLE/u.test(code)) return 'candle_serving';
-  if (/BALANCE|QUANTITY|RESERVATION/u.test(code))
-    return 'funds_or_position_validation';
-  if (/IDEMPOTENCY/u.test(code)) return 'idempotency_validation';
-  if (/INTERNAL|TRANSACTION|INTEGRITY|SCOPE/u.test(code))
-    return 'backend_execution';
-  return 'request_validation';
 }

@@ -3,6 +3,20 @@
 App code for the virtual trading app. Package manager is **npm**
 (`package-lock.json` is the lockfile). API base path stays `/api/v1`.
 
+## Error presentation contract
+
+New authenticated error surfaces pass the original error to
+`ErrorState error={error}` (full page) or `ErrorNotice error={error}` (inline).
+Both use the public error mapper and the `/me`-gated AdminDiagnosticPanel.
+Layout remains owned by the screen. Optional `message` overrides must be fixed
+reviewed product copy, never exception text. Keep each error on its own surface;
+there is no global last-error store. Pre-auth screens only use safe public copy.
+CI audits new/changed error presentation against the PR/push base and rejects
+message-only error state or discarded diagnostics. Existing message-only P1
+screens remain migration work; adding new debt is blocked, without a legacy
+error-code allowlist. Backend enrichment/triage policy is canonical in
+`backend/README.md`.
+
 ```bash
 npm install
 npm run typecheck     # tsc --noEmit
