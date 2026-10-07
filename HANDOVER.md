@@ -10,6 +10,60 @@
 
 ---
 
+## 2026-10-07 — Crypto Futures F2.1 Financial / Operational Hardening
+
+- 기준: `main`, 시작 HEAD와 fetch한 `origin/main`
+  `a74b2c879f031476f67fde17675a5992ab6b3809`, 시작 working tree clean.
+  branch 생성/전환, commit/push, 운영 DB write/deploy, 사용자 Futures 활성화 없음.
+- **기능 구현 의도:** Isolated lifetime의 손실 경계가 Cross 존재 여부나 별도
+  free cash에 따라 바뀌지 않게 했다. manual Reduce/Close의 rounded
+  `fee − realizedPnl <= isolatedMarginBefore − isolatedMarginAfter`를 기존 guard로
+  검증한다. equality 허용, 1 cash quantum 초과는 기존
+  `FUTURES_LIQUIDATION_REQUIRED`로 쓰기 전 전체 rollback한다. proportional margin,
+  Decimal/fee/PnL/ledger 및 automatic bankruptcy settlement는 재설계하지 않았다.
+- PostgreSQL F2.1 runner: General/Season, 1/37/100x, Cross 유무, partial/full,
+  release ±`0.00000001`/equality, 큰 free cash, replay/retry, write-stage faults,
+  manual/liquidation financial-fence 순서 총 112 checks. 기존 F1 excessive-loss
+  fixture는 거부·rollback을 검증하고 허용되는 smaller-loss close를 별도 검증한다.
+- **Worker 구현 의도:** 실제 기존 1,000 계정 sweep이 healthy 19.835초,
+  10% candidate 19.869초여서 기존 구조 안에서 250-account lookahead + 최대
+  8개 account lane + read-only candidate preview를 선택했다. healthy는 lock을
+  피하고, 모든 candidate는 기존 transaction에서 최신 Mark/금융/lifecycle을
+  다시 검증한다. account 내 scope 순서, OpsJobLock, 완료 prefix cursor, lease
+  loss drain을 유지했다. 큐·분산 risk framework·DB pool 확대는 추가하지 않았다.
+- 장기 PG row-lock 실험에서 Prisma callback timeout만으로 실행 중인 쿼리가
+  취소되지 않음을 확인했다. liquidation transaction에 `SET LOCAL` 의미의
+  `set_config('statement_timeout','15000',true)`를 추가해 DB 쿼리도 제한한다.
+  기존 Prisma 15초 transaction timeout과 lock hierarchy를 유지하며, lease를
+  먼저 놓고 pending 금융 작업을 방치하는 우회는 하지 않는다.
+- **Migration 보존 의도:** `.env.local` persistent PG17을 driver-enforced
+  READ ONLY + `BEGIN READ ONLY`로 조회했다. F1/F2 모두 정상 적용되어 현재 파일
+  SHA-256과 DB checksum이 일치한다. 적용 파일은 byte 단위로 그대로 보존했다.
+  별도 localhost env target은 connection refused로 상태 미확인이다.
+  새 disposable PG16.15/PG17.11에서는 62개 전체 chain/status/drift 검증 통과.
+- 측정 방법, 최종 100/1,000/10,000 수치·raw JSON, migration checksum/시각,
+  검증 결과는 [F2.1 verification](backend/docs/futures-f21-hardening.md)에 기록한다.
+  최종 isolated benchmark healthy / 10% candidate sweep: 100 계정
+  `0.406 / 0.451초`, 1,000 계정 `3.678 / 3.866초`, 10,000 계정
+  `39.720 / 39.784초`; 최대 revisit `40.114초`, transaction failure 0.
+  수치는 이 머신의 관측값이며 production SLA가 아니다. 10,000 계정은 prompt
+  revisit 운영 범위를 넘으므로 결과를 공개하고 과도한 인프라를 추가하지 않았다.
+- 최종 검증: Prisma format/validate/generate, PG16/17 fresh chain/status/drift,
+  Backend typecheck/build/check-only lint, unit 239 suites/3,847 tests, E2E
+  2 suites/394 tests, financial CI list 18 suites/19 tests, Core account CI list
+  21 suites/22 tests, 최종 F2 83 checks와 PG16 F2.1 112 checks 통과.
+  Frontend `npm run check` 203 suites/1,680 tests와 Web export 통과.
+  기타 candle/provider/Redis opt-in integration, Android export/실기기,
+  원격 GitHub Actions/live Provider exercise는 NOT_RUN이다.
+- 초기 통합 실행의 FX/General price/F2 Mark/Season-time/Ops lease assertions는
+  수정 없이 후속 단독·통합 실행에서 통과했다. 간헐 실패의 원인은 확정하지
+  않았으며 flaky 검증 위험을 남긴다. 제한 sandbox의 git/IPC `EPERM`은 허용된
+  실행 환경에서 재검증했다. 장기 row-lock 실패는 실제 재현 후 SQL timeout으로
+  수정했다. 테스트를 위해 unrelated 금융 정책을 바꾸지 않았다.
+- F3 UI/활성화, open UPNL의 Home/Portfolio/TWR/Ranking/Settlement 반영,
+  Season 종료 Futures 정산, conditional orders/funding/partial liquidation 등은
+  이번 작업 밖이다. Spot/Stock/Wallet/FX 금융 정책·정상 API/DB evidence 불변.
+
 ## 2026-10-07 — Wallet 이체 UI: USD dropdown / 직접 실행 / focus scroll
 
 - 시작 branch `main`, HEAD와 fetch한 `origin/main`은

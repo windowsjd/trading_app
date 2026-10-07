@@ -87,8 +87,14 @@ evidence returns null reference/PnL. It is never written to cash.
 If loss plus fee cannot leave nonnegative cash covering remaining isolated margin
 and reservations, return `FUTURES_LIQUIDATION_REQUIRED` and roll back everything.
 Do not clamp loss, delete the position, or commit negative collateral. The separate F2 system liquidation handles this state using fresh Mark evidence.
-When Cross exists, a user Isolated reduction also cannot settle a loss/fee beyond
-its released isolated allocation by spending Cross collateral. Shared `transferInTransaction` checks Futures source free
+Every manual Isolated reduce/close requires `feeAmount - realizedPnl` to be no
+greater than `isolatedMarginBefore - isolatedMarginAfter`. This compares the
+existing rounded cash plan and proportional margin release, with equality allowed.
+It applies whether Cross exists or not: unallocated cash, other Isolated allocations
+and Cross collateral cannot fund a debit beyond that operation's release.
+An excess of even one cash quantum returns `FUTURES_LIQUIDATION_REQUIRED` before
+financial writes; system liquidation alone owns bankruptcy settlement.
+Shared `transferInTransaction` checks Futures source free
 collateral, protecting both outgoing USD Transfer and Futures USD→Securities KRW
 FX+Transfer; incoming funds remain allowed even with the trading flag OFF.
 Wallet API `availableAmount`/Transfer `availableAfter` retain their existing

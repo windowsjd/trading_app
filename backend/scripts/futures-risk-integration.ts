@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
 import { Client } from 'pg';
 import { setTimeout as delay } from 'node:timers/promises';
 import {
@@ -10,6 +11,7 @@ import {
 import { PrismaService } from '../src/prisma/prisma.service';
 import { FuturesLiquidationService } from '../src/futures/futures-liquidation.service';
 import { FuturesRiskWorker } from '../src/futures/futures-risk-worker.service';
+import { futuresRiskConfig } from '../src/futures/futures.config';
 import { FuturesMarkIngestion } from '../src/futures/futures-mark-ingestion.service';
 import { OpsJobLockService } from '../src/ops/ops-job-lock.service';
 import { OpsJobRunService } from '../src/ops/ops-job-run.service';
@@ -615,6 +617,8 @@ async function rollbackCases(mode: TradingAccountMode) {
 }
 async function waitBlocked(blocker: Client) {
   for (let i = 0; i < 150; i++) {
+    // Activity snapshots otherwise stay cached inside the blocker transaction.
+    await blocker.query('SELECT pg_stat_clear_snapshot()');
     const r = await blocker.query(
       "SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND pid <> pg_backend_pid()",
     );
@@ -923,6 +927,245 @@ async function workerCases() {
     await cleanup(s);
   }
 }
+async function workerCursorCases() {
+  const fixtures: Scenario[] = [];
+  const visits: string[] = [];
+  const scanner = new FuturesLiquidationService(db);
+  const scan = scanner.candidateScopes.bind(scanner);
+  scanner.candidateScopes = async (id) => {
+    visits.push(id);
+    return scan(id);
+  };
+  const worker = new FuturesRiskWorker(
+    db,
+    new OpsJobLockService(db),
+    new OpsJobRunService(db),
+    scanner,
+  );
+  async function add() {
+    const s = await fixture('general');
+    fixtures.push(s);
+    await db.futuresPosition.create({
+      data: {
+        tradingAccountId: s.accountId,
+        instrumentId: s.instruments[0].instrument.id,
+        direction: 'long',
+        quantity: '1',
+        averageEntryPrice: '100',
+        entryNotional: '100',
+        leverage: 100,
+        isolatedMargin: '1',
+      },
+    });
+    return s;
+  }
+  async function marks() {
+    const at = await now();
+    await db.futuresMarkSnapshot.createMany({
+      data: fixtures.map((s) => ({
+        instrumentId: s.instruments[0].instrument.id,
+        symbol: s.instruments[0].asset.symbol,
+        source: 'binance_usdm_mark_ws' as const,
+        price: '100',
+        effectiveAt: at,
+        capturedAt: at,
+      })),
+      skipDuplicates: true,
+    });
+  }
+  try {
+    const size = futuresRiskConfig().batchSize;
+    for (let i = 0; i < size + 2; i++) await add();
+    const sorted = fixtures.map((s) => s.accountId).sort();
+    await marks();
+    await worker.tick();
+    assert.deepEqual(visits.slice().sort(), sorted.slice(0, size));
+    const cursor = sorted[size - 1];
+    const removed = fixtures.find((s) => s.accountId === sorted.at(-1))!;
+    await cleanup(removed);
+    fixtures.splice(fixtures.indexOf(removed), 1);
+    const closed = fixtures.find((s) => s.accountId === sorted.at(-2))!;
+    await db.futuresPosition.updateMany({
+      where: { tradingAccountId: closed.accountId },
+      data: {
+        status: 'closed',
+        quantity: '0',
+        entryNotional: '0',
+        isolatedMargin: '0',
+        closedAt: await now(),
+      },
+    });
+    await add();
+    const current = fixtures
+      .filter((s) => s !== closed)
+      .map((s) => s.accountId)
+      .sort();
+    visits.length = 0;
+    await marks();
+    await worker.tick();
+    assert.deepEqual(
+      visits.slice().sort(),
+      current.filter((id) => id > cursor),
+    );
+    visits.length = 0;
+    await marks();
+    await worker.tick();
+    assert.deepEqual(visits.slice().sort(), current.slice(0, size));
+    visits.length = 0;
+    await marks();
+    await worker.tick();
+    assert.deepEqual(visits.slice().sort(), current.slice(size));
+    visits.length = 0;
+    const restarted = new FuturesRiskWorker(
+      db,
+      new OpsJobLockService(db),
+      new OpsJobRunService(db),
+      scanner,
+    );
+    await marks();
+    await restarted.tick();
+    assert.deepEqual(visits.slice().sort(), current.slice(0, size));
+    assert.equal(
+      await db.futuresLiquidation.count({
+        where: { tradingAccountId: { in: fixtures.map((s) => s.accountId) } },
+      }),
+      0,
+    );
+    check(
+      'worker actual PostgreSQL multiple batches, lookahead/reset, added/removed/closed accounts and restart without starvation',
+    );
+  } finally {
+    for (const s of fixtures) await cleanup(s);
+  }
+}
+
+async function candidateCases() {
+  const s = await setup('general');
+  try {
+    const o = await open(s);
+    assert.deepEqual(await liquidator.candidateScopes(s.accountId), [
+      { scope: o.data.position.id, candidate: false },
+    ]);
+    await mark(s, 0, '1');
+    assert.deepEqual(await liquidator.candidateScopes(s.accountId), [
+      { scope: o.data.position.id, candidate: true },
+    ]);
+    await mark(s, 0, '100');
+    assert.equal(
+      (await liquidator.liquidate(s.accountId, o.data.position.id)).state,
+      'healthy',
+    );
+    await clearMarks(s);
+    await mark(s, 0, '1', 6000);
+    assert.deepEqual(await liquidator.candidateScopes(s.accountId), [
+      { scope: o.data.position.id, candidate: true },
+    ]);
+    await reject(
+      liquidator.liquidate(s.accountId, o.data.position.id),
+      'FUTURES_MARK_STALE',
+    );
+    await mark(s, 0, '100');
+    await db.cashWallet.update({
+      where: { id: s.futuresWalletId },
+      data: { balanceAmount: '0.1' },
+    });
+    assert.deepEqual(await liquidator.candidateScopes(s.accountId), [
+      { scope: o.data.position.id, candidate: true },
+    ]);
+    await reject(
+      liquidator.liquidate(s.accountId, o.data.position.id),
+      'FUTURES_COLLATERAL_INTEGRITY',
+    );
+    check(
+      'readonly hints never authorize liquidation: recovery/stale/underfunded evidence rechecked by the original transaction',
+    );
+  } finally {
+    await cleanup(s);
+  }
+}
+
+async function workerLockedAccountCase() {
+  const a = await setup('general'),
+    b = await setup('general');
+  const [slow, fast] = [a, b].sort((x, y) =>
+    x.accountId.localeCompare(y.accountId),
+  );
+  const blocker = new Client({ connectionString: process.env.DATABASE_URL });
+  const worker = new FuturesRiskWorker(
+    db,
+    new OpsJobLockService(db),
+    new OpsJobRunService(db),
+    new FuturesLiquidationService(db),
+  );
+  let pending: Promise<void> | undefined;
+  let forcedRelease = false;
+  let escape: NodeJS.Timeout | undefined;
+  await blocker.connect();
+  try {
+    await open(slow);
+    await open(fast);
+    await mark(slow, 0, '1');
+    await mark(fast, 0, '1');
+    await blocker.query('BEGIN');
+    await blocker.query('SELECT id FROM cash_wallets WHERE id=$1 FOR UPDATE', [
+      slow.futuresWalletId,
+    ]);
+    // Escape only prevents a broken timeout from hanging the test/cleanup forever.
+    // Passing requires the original transaction bound to finish with the lock held.
+    escape = setTimeout(() => {
+      forcedRelease = true;
+      void blocker.query('ROLLBACK');
+    }, 25000);
+    pending = worker.tick();
+    await waitBlocked(blocker);
+    const deadline = performance.now() + 5000;
+    while ((await positions(fast)).length && performance.now() < deadline)
+      await delay(10);
+    assert.equal(
+      (await positions(fast)).length,
+      0,
+      'another account lane must progress while the first wallet is locked',
+    );
+    await pending;
+    assert.equal(
+      forcedRelease,
+      false,
+      'a locked account outlived the financial transaction bound',
+    );
+    assert.equal((await positions(slow)).length, 1);
+    const run = await db.opsJobRun.findFirstOrThrow({
+      where: { jobName: 'futures_liquidation' },
+      orderBy: { startedAt: 'desc' },
+    });
+    assert.ok(
+      JSON.stringify(run.resultJson).includes(
+        'FUTURES_RISK_TRANSACTION_FAILED',
+      ),
+    );
+    clearTimeout(escape);
+    await blocker.query('ROLLBACK');
+    await mark(slow, 0, '1');
+    await worker.tick();
+    assert.equal(
+      (await positions(slow)).length,
+      0,
+      'timed-out account must be revisited after the lock is released',
+    );
+    await invariant(slow);
+    await invariant(fast);
+    check(
+      'worker real PostgreSQL slow wallet: other lane progresses, transaction expires and next sweep revisits',
+    );
+  } finally {
+    clearTimeout(escape);
+    await blocker.query('ROLLBACK');
+    await pending?.catch(() => undefined);
+    await blocker.end();
+    await cleanup(a);
+    await cleanup(b);
+  }
+}
+
 async function lifecycleCases() {
   for (const boundary of [
     'ended',
@@ -1183,6 +1426,9 @@ async function main() {
   }
   await lifecycleCases();
   await workerCases();
+  await candidateCases();
+  await workerCursorCases();
+  await workerLockedAccountCase();
   console.log(
     `futures F2 db integration ok (${checks} consolidated financial/evidence/race/rollback checks)`,
   );

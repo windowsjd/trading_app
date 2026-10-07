@@ -27,7 +27,13 @@ export function futuresRiskConfig(env: NodeJS.ProcessEnv = process.env) {
     env.FUTURES_MARK_INGESTION_ENABLED,
     'FUTURES_MARK_INGESTION_ENABLED',
   );
-  return { enabled, ingestion, intervalMs: 1000, batchSize: 50 };
+  return {
+    enabled,
+    ingestion,
+    intervalMs: 1000,
+    batchSize: 250,
+    concurrency: 8,
+  };
 }
 export function validateFuturesConfig(env: NodeJS.ProcessEnv = process.env) {
   const mode = futuresTradingMode(env);

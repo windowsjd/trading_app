@@ -261,7 +261,6 @@ export class FuturesService {
           );
           if (
             current?.marginMode === 'isolated' &&
-            cross.rows.length > 0 &&
             plan.realizedPnl
               .sub(plan.feeAmount)
               .lt(
@@ -280,15 +279,15 @@ export class FuturesService {
                   walletScope: 'crypto_futures',
                   currencyCode: 'USD',
                   marginMode: 'isolated',
-                  crossPositionsPresent: true,
+                  crossPositionsPresent: cross.rows.length > 0,
                   isolatedAllocationSufficient: false,
-                  failureReason: 'cross_collateral_protected',
+                  failureReason: 'isolated_allocation_exceeded',
                 },
               },
             });
             futuresError(
               'FUTURES_LIQUIDATION_REQUIRED',
-              'This trade would spend collateral protected for Cross positions.',
+              'Loss and fee cannot settle safely without liquidation.',
             );
           }
           const remaining = cross.rows.filter(

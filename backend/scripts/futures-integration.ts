@@ -502,22 +502,30 @@ async function lifecycle(
     const risk = await app.futures.positions(s.userId, s.accountId);
     assert.equal(risk.data.positions[0].unrealizedPnl, '15.00000000');
     await price(s, direction === 'long' ? '90' : '130');
+    // Manual loss cannot spend free cash beyond this lifetime's allocation.
+    const beforeUnsafeClose = await state(s);
+    await reject(
+      execute(s, await positionBody(s, 'close', { quantity: '1.5' })),
+      'FUTURES_LIQUIDATION_REQUIRED',
+    );
+    assert.deepEqual(await state(s), beforeUnsafeClose);
+    await price(s, direction === 'long' ? '108' : '112');
     const closed = await execute(
       s,
       await positionBody(s, 'close', { quantity: '1.5' }),
     );
-    assert.equal(closed.data.execution.realizedPnl, '-30.00000000');
+    assert.equal(closed.data.execution.realizedPnl, '-3.00000000');
     assert.equal(closed.data.execution.operation, 'close');
     assert.equal(closed.data.position.status, 'closed');
     assert.equal(closed.data.position.isolatedMargin, '0.00000000');
-    assert.equal(closed.data.position.realizedPnl, '-25.00000000');
+    assert.equal(closed.data.position.realizedPnl, '2.00000000');
     const executions = await db.futuresExecution.findMany({
       where: { tradingAccountId: s.accountId },
     });
     const fees = executions.reduce((sum, e) => sum.add(e.feeAmount), d('0'));
     assert.equal(
       closed.data.collateral.balanceAmount,
-      d('9975').sub(fees).toFixed(8),
+      d('10002').sub(fees).toFixed(8),
     );
     for (const e of executions) {
       const evidence = await db.assetPriceSnapshot.findUniqueOrThrow({
@@ -1001,7 +1009,7 @@ async function rollback(mode: TradingAccountMode) {
       assert.deepEqual(await state(s), before);
       checks++;
     }
-    await execute(s, openBody(s));
+    await execute(s, openBody(s, { leverage: 1 }));
     for (const value of ['110', '90']) {
       for (const point of [
         value === '110' ? 'cashWallet.updateMany' : 'debit-2',
@@ -1361,6 +1369,7 @@ export {
   db,
   app,
   services,
+  faultyDb,
   now,
   fixture,
   newInstrument,

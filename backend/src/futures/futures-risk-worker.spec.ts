@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { FuturesLiquidationService } from './futures-liquidation.service';
 import { OpsJobLockService } from '../ops/ops-job-lock.service';
 import { OpsJobRunService } from '../ops/ops-job-run.service';
+import * as config from './futures.config';
 describe('Risk worker failure boundaries', () => {
   const saved = { ...process.env };
   let locks: {
@@ -21,6 +22,8 @@ describe('Risk worker failure boundaries', () => {
   };
   let runs: { createRunning: jest.Mock; recordSucceeded: jest.Mock };
   let liquidate: jest.Mock;
+  let candidateScopes: jest.Mock;
+  let scan: jest.Mock;
   let worker: FuturesRiskWorker;
   beforeEach(() => {
     process.env.FUTURES_RISK_ENGINE_ENABLED = 'true';
@@ -39,8 +42,13 @@ describe('Risk worker failure boundaries', () => {
       recordSucceeded: jest.fn().mockResolvedValue({}),
     };
     liquidate = jest.fn().mockResolvedValue({ state: 'healthy' });
+    candidateScopes = jest.fn().mockResolvedValue([
+      { scope: 'cross', candidate: true },
+      { scope: 'p3', candidate: true },
+    ]);
+    scan = jest.fn().mockResolvedValue([{ id: 'account' }]);
     const db = {
-      $queryRaw: jest.fn().mockResolvedValue([{ id: 'account' }]),
+      $queryRaw: scan,
       futuresPosition: {
         findMany: jest.fn().mockResolvedValue([
           { id: 'p1', marginMode: 'cross' },
@@ -53,12 +61,13 @@ describe('Risk worker failure boundaries', () => {
       db as unknown as PrismaService,
       locks as unknown as OpsJobLockService,
       runs as unknown as OpsJobRunService,
-      { liquidate } as unknown as FuturesLiquidationService,
+      { liquidate, candidateScopes } as unknown as FuturesLiquidationService,
     );
   });
   afterEach(() => {
     worker.onModuleDestroy();
     process.env = { ...saved };
+    jest.restoreAllMocks();
   });
   it('evaluates one Cross scope and one Isolated scope while user mode is disabled', async () => {
     await worker.tick();
@@ -149,5 +158,165 @@ describe('Risk worker failure boundaries', () => {
     process.env.FUTURES_RISK_ENGINE_ENABLED = 'false';
     await worker.tick();
     expect(locks.acquireLock).toHaveBeenCalledTimes(1);
+  });
+  it('healthy preview is an Ops state and never enters a financial transaction', async () => {
+    candidateScopes.mockResolvedValue([{ scope: 'p3', candidate: false }]);
+    await worker.tick();
+    expect(liquidate).not.toHaveBeenCalled();
+    expect(runs.recordSucceeded.mock.calls[0][1].resultJson.results).toEqual([
+      { accountId: 'account', scope: 'p3', state: 'healthy' },
+    ]);
+  });
+  function smallScan(ids: string[]) {
+    jest.spyOn(config, 'futuresRiskConfig').mockReturnValue({
+      enabled: true,
+      ingestion: false,
+      intervalMs: 1000,
+      batchSize: 2,
+      concurrency: 2,
+    });
+    scan.mockImplementation((_sql, cursor, limit) =>
+      Promise.resolve(
+        ids
+          .filter((id) => id > cursor)
+          .sort()
+          .slice(0, limit)
+          .map((id) => ({ id })),
+      ),
+    );
+    candidateScopes.mockImplementation((id) =>
+      Promise.resolve([{ scope: `${id}-position`, candidate: true }]),
+    );
+  }
+  it('uses lookahead across batches and resets at an exact batch boundary without an idle tick', async () => {
+    smallScan(['a', 'b', 'c', 'd']);
+    await worker.tick();
+    await worker.tick();
+    await worker.tick();
+    expect(candidateScopes.mock.calls.flat()).toEqual([
+      'a',
+      'b',
+      'c',
+      'd',
+      'a',
+      'b',
+    ]);
+    expect(scan.mock.calls.map((call) => call[1])).toEqual(['', 'b', '']);
+  });
+  it('visits accounts added behind the cursor on the next sweep and tolerates removed/closed accounts', async () => {
+    const ids = ['a', 'b', 'c'];
+    smallScan(ids);
+    await worker.tick();
+    ids.splice(2, 1, 'd');
+    ids.push('aa');
+    candidateScopes.mockImplementation((id) =>
+      Promise.resolve(id === 'd' ? [] : [{ scope: id, candidate: true }]),
+    );
+    await worker.tick();
+    await worker.tick();
+    expect(candidateScopes.mock.calls.flat()).toEqual([
+      'a',
+      'b',
+      'd',
+      'a',
+      'aa',
+    ]);
+  });
+  it('empty cursor end resets and a restarted worker begins at the first current account', async () => {
+    const ids = ['a', 'b', 'c'];
+    smallScan(ids);
+    await worker.tick();
+    ids.length = 0;
+    await worker.tick();
+    ids.push('a');
+    await worker.tick();
+    expect(scan.mock.calls.map((call) => call[1])).toEqual(['', 'b', '']);
+  });
+  it('does not start account reads when another durable worker owns the lease', async () => {
+    locks.acquireLock.mockResolvedValue({ acquired: false });
+    await worker.tick();
+    expect(candidateScopes).not.toHaveBeenCalled();
+    expect(locks.releaseLock).not.toHaveBeenCalled();
+  });
+  it('lease loss during a scope keeps the account cursor for safe replay', async () => {
+    jest.spyOn(config, 'futuresRiskConfig').mockReturnValue({
+      enabled: true,
+      ingestion: false,
+      intervalMs: 1000,
+      batchSize: 2,
+      concurrency: 1,
+    });
+    locks.extendLock
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    await worker.tick();
+    expect(liquidate.mock.calls).toEqual([['account', 'cross']]);
+    await worker.tick();
+    expect(scan.mock.calls.map((call) => call[1])).toEqual(['', '']);
+    expect(liquidate.mock.calls.slice(1)).toEqual([
+      ['account', 'cross'],
+      ['account', 'p3'],
+    ]);
+  });
+  it('a slow account leaves other lanes able to visit later accounts without exceeding the bound', async () => {
+    smallScan(['a', 'b']);
+    let release!: () => void;
+    liquidate.mockImplementation((id: string) =>
+      id === 'a'
+        ? new Promise((resolve) => {
+            release = () => resolve({ state: 'healthy' });
+          })
+        : Promise.resolve({ state: 'healthy' }),
+    );
+    const tick = worker.tick();
+    while (!release || liquidate.mock.calls.length < 2) await Promise.resolve();
+    expect(liquidate.mock.calls).toEqual([
+      ['a', 'a-position'],
+      ['b', 'b-position'],
+    ]);
+    expect(locks.releaseLock).not.toHaveBeenCalled();
+    release();
+    await tick;
+  });
+  it('another lane cannot start work after observing lease loss while its renewal was pending', async () => {
+    smallScan(['a', 'b']);
+    const renewals: Array<(owned: boolean) => void> = [];
+    locks.extendLock.mockImplementation(
+      () => new Promise<boolean>((resolve) => renewals.push(resolve)),
+    );
+    const tick = worker.tick();
+    while (renewals.length < 2) await Promise.resolve();
+    renewals[0](false);
+    await Promise.resolve();
+    renewals[1](true);
+    await tick;
+    expect(candidateScopes).not.toHaveBeenCalled();
+    expect(liquidate).not.toHaveBeenCalled();
+    expect(locks.releaseLock).toHaveBeenCalledTimes(1);
+  });
+  it('drains started lanes before lease release on an account read failure', async () => {
+    smallScan(['a', 'b']);
+    let release!: () => void;
+    candidateScopes.mockImplementation((id: string) =>
+      id === 'a'
+        ? Promise.reject(new Error('read failed'))
+        : Promise.resolve([{ scope: id, candidate: true }]),
+    );
+    liquidate.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ state: 'healthy' });
+        }),
+    );
+    const tick = worker.tick();
+    const rejected = expect(tick).rejects.toThrow('read failed');
+    while (!release) await Promise.resolve();
+    expect(locks.releaseLock).not.toHaveBeenCalled();
+    await worker.tick();
+    expect(locks.acquireLock).toHaveBeenCalledTimes(1);
+    release();
+    await rejected;
+    expect(locks.releaseLock).toHaveBeenCalledTimes(1);
   });
 });

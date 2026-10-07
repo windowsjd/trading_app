@@ -1,0 +1,255 @@
+{
+  "environment": {
+    "postgres": "17.11 (Ubuntu 17.11-1.pgdg24.04+2)",
+    "node": "v24.14.1",
+    "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+    "availableParallelism": 32,
+    "memoryGiB": 30.2,
+    "scope": "disposable loopback database; deterministic fresh DB Mark stream; no Provider calls; hardened run without other validation jobs"
+  },
+  "baseline": [
+    {
+      "count": 100,
+      "workload": "healthy mixed",
+      "config": {
+        "enabled": true,
+        "ingestion": false,
+        "intervalMs": 1000,
+        "batchSize": 50
+      },
+      "averagePositions": 1.33,
+      "firstSweepMs": 1885.91,
+      "accountsPerSecond": 53.02,
+      "maxObservedRevisitMs": 3001.08,
+      "ticks": 5,
+      "scopes": 266,
+      "outcomes": {
+        "healthy": 266
+      },
+      "failures": 0,
+      "maxConcurrentTransactions": 1,
+      "maxActiveConnections": 1,
+      "maxLockWaiters": 0
+    },
+    {
+      "count": 100,
+      "workload": "10% liquidation candidates",
+      "config": {
+        "enabled": true,
+        "ingestion": false,
+        "intervalMs": 1000,
+        "batchSize": 50
+      },
+      "averagePositions": 1.33,
+      "firstSweepMs": 1836.75,
+      "accountsPerSecond": 54.44,
+      "maxObservedRevisitMs": 3009.8,
+      "ticks": 5,
+      "scopes": 253,
+      "outcomes": {
+        "healthy": 240,
+        "liquidated": 13
+      },
+      "failures": 0,
+      "maxConcurrentTransactions": 1,
+      "maxActiveConnections": 1,
+      "maxLockWaiters": 0
+    },
+    {
+      "count": 1000,
+      "workload": "healthy mixed",
+      "config": {
+        "enabled": true,
+        "ingestion": false,
+        "intervalMs": 1000,
+        "batchSize": 50
+      },
+      "averagePositions": 1.333,
+      "firstSweepMs": 19835.36,
+      "accountsPerSecond": 50.42,
+      "maxObservedRevisitMs": 21111.24,
+      "ticks": 41,
+      "scopes": 2666,
+      "outcomes": {
+        "healthy": 2666
+      },
+      "failures": 0,
+      "maxConcurrentTransactions": 1,
+      "maxActiveConnections": 1,
+      "maxLockWaiters": 0
+    },
+    {
+      "count": 1000,
+      "workload": "10% liquidation candidates",
+      "config": {
+        "enabled": true,
+        "ingestion": false,
+        "intervalMs": 1000,
+        "batchSize": 50
+      },
+      "averagePositions": 1.333,
+      "firstSweepMs": 19869.43,
+      "accountsPerSecond": 50.33,
+      "maxObservedRevisitMs": 21062.51,
+      "ticks": 39,
+      "scopes": 2533,
+      "outcomes": {
+        "healthy": 2400,
+        "liquidated": 133
+      },
+      "failures": 0,
+      "maxConcurrentTransactions": 1,
+      "maxActiveConnections": 1,
+      "maxLockWaiters": 0
+    }
+  ],
+  "hardened": [
+    {
+      "count": 100,
+      "workload": "healthy mixed",
+      "config": {
+        "enabled": true,
+        "ingestion": false,
+        "intervalMs": 1000,
+        "batchSize": 250,
+        "concurrency": 8
+      },
+      "averagePositions": 1.33,
+      "firstSweepMs": 405.75,
+      "accountsPerSecond": 246.46,
+      "maxObservedRevisitMs": 989.36,
+      "ticks": 2,
+      "scopes": 266,
+      "outcomes": {
+        "healthy_preview": 266
+      },
+      "failures": 0,
+      "maxConcurrentTransactions": 0,
+      "maxActiveConnections": 6,
+      "maxLockWaiters": 5
+    },
+    {
+      "count": 100,
+      "workload": "10% liquidation candidates",
+      "config": {
+        "enabled": true,
+        "ingestion": false,
+        "intervalMs": 1000,
+        "batchSize": 250,
+        "concurrency": 8
+      },
+      "averagePositions": 1.33,
+      "firstSweepMs": 451.31,
+      "accountsPerSecond": 221.58,
+      "maxObservedRevisitMs": 1039.14,
+      "ticks": 2,
+      "scopes": 253,
+      "outcomes": {
+        "healthy_preview": 240,
+        "liquidated": 13
+      },
+      "failures": 0,
+      "maxConcurrentTransactions": 3,
+      "maxActiveConnections": 5,
+      "maxLockWaiters": 5
+    },
+    {
+      "count": 1000,
+      "workload": "healthy mixed",
+      "config": {
+        "enabled": true,
+        "ingestion": false,
+        "intervalMs": 1000,
+        "batchSize": 250,
+        "concurrency": 8
+      },
+      "averagePositions": 1.333,
+      "firstSweepMs": 3678.28,
+      "accountsPerSecond": 271.87,
+      "maxObservedRevisitMs": 4056.48,
+      "ticks": 8,
+      "scopes": 2666,
+      "outcomes": {
+        "healthy_preview": 2666
+      },
+      "failures": 0,
+      "maxConcurrentTransactions": 0,
+      "maxActiveConnections": 8,
+      "maxLockWaiters": 7
+    },
+    {
+      "count": 1000,
+      "workload": "10% liquidation candidates",
+      "config": {
+        "enabled": true,
+        "ingestion": false,
+        "intervalMs": 1000,
+        "batchSize": 250,
+        "concurrency": 8
+      },
+      "averagePositions": 1.333,
+      "firstSweepMs": 3865.66,
+      "accountsPerSecond": 258.69,
+      "maxObservedRevisitMs": 4026.1,
+      "ticks": 8,
+      "scopes": 2533,
+      "outcomes": {
+        "healthy_preview": 2400,
+        "liquidated": 133
+      },
+      "failures": 0,
+      "maxConcurrentTransactions": 3,
+      "maxActiveConnections": 9,
+      "maxLockWaiters": 7
+    },
+    {
+      "count": 10000,
+      "workload": "healthy mixed",
+      "config": {
+        "enabled": true,
+        "ingestion": false,
+        "intervalMs": 1000,
+        "batchSize": 250,
+        "concurrency": 8
+      },
+      "averagePositions": 1.3333,
+      "firstSweepMs": 39720.35,
+      "accountsPerSecond": 251.76,
+      "maxObservedRevisitMs": 40114.07,
+      "ticks": 80,
+      "scopes": 26666,
+      "outcomes": {
+        "healthy_preview": 26666
+      },
+      "failures": 0,
+      "maxConcurrentTransactions": 0,
+      "maxActiveConnections": 9,
+      "maxLockWaiters": 7
+    },
+    {
+      "count": 10000,
+      "workload": "10% liquidation candidates",
+      "config": {
+        "enabled": true,
+        "ingestion": false,
+        "intervalMs": 1000,
+        "batchSize": 250,
+        "concurrency": 8
+      },
+      "averagePositions": 1.3333,
+      "firstSweepMs": 39784.45,
+      "accountsPerSecond": 251.35,
+      "maxObservedRevisitMs": 40037.23,
+      "ticks": 76,
+      "scopes": 25333,
+      "outcomes": {
+        "healthy_preview": 24000,
+        "liquidated": 1333
+      },
+      "failures": 0,
+      "maxConcurrentTransactions": 3,
+      "maxActiveConnections": 9,
+      "maxLockWaiters": 7
+    }
+  ]
+}

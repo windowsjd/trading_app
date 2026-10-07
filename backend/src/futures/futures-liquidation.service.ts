@@ -25,11 +25,87 @@ import { bankruptcySettlement, settleFuturesCash } from './futures-settlement';
 export class FuturesLiquidationService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Read-only candidate hints, never settlement authority. Healthy scopes need
+   * no financial locks. Missing/inconsistent evidence goes through the existing
+   * locked transaction, which rechecks every financial/lifecycle/Mark invariant. */
+  async candidateScopes(accountId: string) {
+    const positions = await this.prisma.futuresPosition.findMany({
+      where: { tradingAccountId: accountId, status: 'open' },
+      include: { instrument: { include: { underlyingAsset: true } } },
+      orderBy: { id: 'asc' },
+    });
+    const scopes = [
+      ...new Set(
+        positions.map((p) => (p.marginMode === 'cross' ? 'cross' : p.id)),
+      ),
+    ];
+    if (!scopes.length) return [];
+    try {
+      const wallet = await this.prisma.cashWallet.findFirst({
+        where: {
+          tradingAccountId: accountId,
+          walletScope: 'crypto_futures',
+          currencyCode: 'USD',
+        },
+      });
+      const isolated = sumRisk(
+        positions
+          .filter((p) => p.marginMode === 'isolated')
+          .map((p) => p.isolatedMargin),
+      );
+      if (
+        !wallet ||
+        d(wallet.balanceAmount).sub(wallet.reservedAmount).lt(isolated)
+      )
+        return scopes.map((scope) => ({ scope, candidate: true }));
+      const fee = await accountFuturesFee(this.prisma, accountId);
+      const now = (
+        await this.prisma.$queryRaw<
+          Array<{ now: Date }>
+        >`SELECT clock_timestamp() AS now`
+      )[0].now;
+      return await Promise.all(
+        scopes.map(async (scope) => {
+          try {
+            const rows = positions.filter((p) =>
+              scope === 'cross' ? p.marginMode === 'cross' : p.id === scope,
+            );
+            const risks = await Promise.all(
+              rows.map(async (p) =>
+                positionRisk(
+                  p,
+                  (await readFuturesMark(this.prisma, p.instrument, now))!
+                    .price,
+                  fee,
+                ),
+              ),
+            );
+            const buffer =
+              scope === 'cross'
+                ? crossRisk(wallet, isolated, risks).liquidationBuffer
+                : risks[0].liquidationBuffer;
+            return { scope, candidate: buffer.lte(0) };
+          } catch {
+            // Never trust an incomplete preview or fabricate its cause. The locked
+            // path observes and classifies unavailable/stale/corrupt evidence itself.
+            return { scope, candidate: true };
+          }
+        }),
+      );
+    } catch {
+      return scopes.map((scope) => ({ scope, candidate: true }));
+    }
+  }
+
   /** Candidate is only a lifetime hint. Every financial fact is reloaded after locks. */
   async liquidate(accountId: string, scope: string) {
     if (!futuresRiskConfig().enabled) return { state: 'risk_disabled' };
     return this.prisma.$transaction(
       async (tx) => {
+        // Prisma's callback deadline alone does not cancel a PG query waiting on
+        // a row lock. Bound server-side statements as well, without releasing
+        // the worker lease while financial work is still draining.
+        await tx.$queryRaw`SELECT set_config('statement_timeout', '15000', true)`;
         const target = await tx.tradingAccount.findUnique({
           where: { id: accountId },
           include: { seasonParticipant: true },

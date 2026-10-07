@@ -15,6 +15,10 @@ valuation changes. User-facing trading remains disabled until F3 is complete.
   close fee. Close fee uses F1 half-up cash rounding and the current General or
   Season trade fee policy. There is no liquidation penalty.
 - Isolated equity = allocated margin + mark UPNL. Liquidate at equity <= requirement.
+  Manual reduce/close also respects its allocated collateral: the rounded net cash
+  debit cannot exceed that operation's proportional released margin, independent of
+  Cross presence or free wallet cash. Excess rolls back the whole user command with
+  `FUTURES_LIQUIDATION_REQUIRED`; it never invokes a manual bankruptcy settlement.
   Analytic Long price = (quantity × entry − margin) / (quantity × (1 − MMR − fee));
   Short = (quantity × entry + margin) / (quantity × (1 + MMR + fee)). The read
   price is conservative at 8 decimals; the Decimal equity comparison is authoritative
@@ -70,8 +74,26 @@ Final open-position settlement at season end belongs to F3.
 precedes mutable mode checks. `FUTURES_RISK_ENGINE_ENABLED` independently runs the
 worker; `FUTURES_MARK_INGESTION_ENABLED` controls ingestion. ENABLED requires both
 at startup. Risk defaults off; explicitly running risk continues in DISABLED.
-Bounded 1-second periodic scans reuse PostgreSQL OpsJobLock, renew between accounts,
-and revalidate each scope in its own transaction. No conditional-order framework.
+Bounded 1-second periodic scans reuse PostgreSQL OpsJobLock. F2.1 reads up to 250
+accounts with one-row lookahead and at most eight independent account lanes.
+Scopes within an account remain sequential. A read-only candidate preview reuses
+the same PostgreSQL Mark selector and Decimal risk math; it never authorizes a
+financial write. Healthy scopes avoid financial locks. Missing/stale/inconsistent
+preview evidence goes through the existing liquidation transaction. Every candidate
+reloads lifecycle, wallets, positions, latest fresh Mark and all integrity guards
+after financial locks. Recovery during the lock wait still discards the candidate.
+The existing Prisma 15-second transaction deadline and connection-pool limits remain.
+F2.1 also sets a transaction-local PostgreSQL 15-second statement timeout: the
+adapter's callback deadline alone does not cancel an already waiting SQL query.
+The worker drains timed-out financial work before releasing its lease and revisits
+that account on a subsequent sweep; no pending-write timeout race is introduced.
+Lease renewal precedes account/scope work, started lanes drain before release, and
+the cursor advances only through the completed prefix on lease loss/read failure.
+No conditional-order framework or external queue is introduced.
+
+Reproducible F2.1 benchmark and measured operating range are recorded in
+[the hardening verification](futures-f21-hardening.md). Wall-clock numbers describe
+that disposable PostgreSQL environment, not a production SLA.
 
 `GET /api/v1/trading-accounts/:accountId/futures/positions` adds mark risk and
 account Cross metrics. Legacy Spot reference fields remain explicitly separate.

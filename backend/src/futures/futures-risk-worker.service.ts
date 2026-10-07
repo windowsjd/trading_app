@@ -48,11 +48,13 @@ export class FuturesRiskWorker implements OnModuleInit, OnModuleDestroy {
         ttlSeconds: 30,
       });
       if (!lock.acquired) return;
-      ownerId = lock.ownerId;
-      const accounts = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      const leaseOwnerId = lock.ownerId;
+      ownerId = leaseOwnerId;
+      const scan = await this.prisma.$queryRaw<Array<{ id: string }>>`
         SELECT DISTINCT trading_account_id AS id FROM futures_positions
         WHERE status = 'open' AND trading_account_id > ${this.cursor}
-        ORDER BY trading_account_id LIMIT ${futuresRiskConfig().batchSize}`;
+        ORDER BY trading_account_id LIMIT ${futuresRiskConfig().batchSize + 1}`;
+      const accounts = scan.slice(0, futuresRiskConfig().batchSize);
       if (!accounts.length) {
         this.cursor = '';
         return;
@@ -62,36 +64,38 @@ export class FuturesRiskWorker implements OnModuleInit, OnModuleDestroy {
         scope: string;
         state: string;
       }> = [];
-      for (const account of accounts) {
+      let leaseLost = false;
+      const processAccount = async (account: { id: string }) => {
+        if (leaseLost) return false;
         if (
           !(await this.locks.extendLock({
             lockKey: key,
-            ownerId,
+            ownerId: leaseOwnerId,
             ttlSeconds: 30,
           }))
-        )
-          break;
-        const positions = await this.prisma.futuresPosition.findMany({
-          where: { tradingAccountId: account.id, status: 'open' },
-          select: { id: true, marginMode: true },
-          orderBy: { id: 'asc' },
-        });
-        const scopes = [
-          ...new Set(
-            positions.map((p) => (p.marginMode === 'cross' ? 'cross' : p.id)),
-          ),
-        ];
-        for (const scope of scopes) {
+        ) {
+          leaseLost = true;
+          return false;
+        }
+        if (leaseLost) return false;
+        const scopes = await this.liquidation.candidateScopes(account.id);
+        for (const { scope, candidate } of scopes) {
+          if (leaseLost) return false;
           if (
             !(await this.locks.extendLock({
               lockKey: key,
-              ownerId,
+              ownerId: leaseOwnerId,
               ttlSeconds: 30,
             }))
-          )
-            break;
+          ) {
+            leaseLost = true;
+            return false;
+          }
+          if (leaseLost) return false;
           try {
-            const result = await this.liquidation.liquidate(account.id, scope);
+            const result = candidate
+              ? await this.liquidation.liquidate(account.id, scope)
+              : { state: 'healthy' };
             results.push({ accountId: account.id, scope, state: result.state });
           } catch (error) {
             results.push({
@@ -101,9 +105,40 @@ export class FuturesRiskWorker implements OnModuleInit, OnModuleDestroy {
             });
           }
         }
-        this.cursor = account.id;
+        return true;
+      };
+      const { concurrency, batchSize } = futuresRiskConfig();
+      let next = 0;
+      let failed = false;
+      const completed = new Array<boolean>(accounts.length);
+      const outcomes = await Promise.allSettled(
+        Array.from(
+          { length: Math.min(concurrency, accounts.length) },
+          async () => {
+            while (!leaseLost && !failed && next < accounts.length) {
+              const index = next++;
+              try {
+                completed[index] = await processAccount(accounts[index]);
+              } catch (error) {
+                failed = true;
+                throw error;
+              }
+            }
+          },
+        ),
+      );
+      // Different accounts may run together; scopes within one wallet stay ordered.
+      // Drain every started task before releasing the PostgreSQL lease, even if
+      // one account read fails. Never move the cursor past unfinished work.
+      let completePrefix = 0;
+      while (completed[completePrefix]) {
+        this.cursor = accounts[completePrefix].id;
+        completePrefix++;
       }
-      if (accounts.length < futuresRiskConfig().batchSize) this.cursor = '';
+      const failure = outcomes.find((outcome) => outcome.status === 'rejected');
+      if (failure?.status === 'rejected') throw failure.reason;
+      if (completePrefix === accounts.length && scan.length <= batchSize)
+        this.cursor = '';
       // Bounded durable diagnostics; no idle write every second.
       if (
         results.some((r) => r.state === 'liquidated') ||

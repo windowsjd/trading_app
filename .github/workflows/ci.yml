@@ -220,6 +220,7 @@ jobs:
           src/wallets/wallet-fx-transfer.integration.spec.ts
           src/futures/futures.integration.spec.ts
           src/futures/futures-risk.integration.spec.ts
+          src/futures/futures-isolated-boundary.integration.spec.ts
           src/orders/limit-order-create-race.integration.spec.ts
           src/orders/limit-order-transaction-time.integration.spec.ts
           src/orders/trading-transaction-time.integration.spec.ts
