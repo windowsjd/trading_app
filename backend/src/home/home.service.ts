@@ -691,6 +691,10 @@ export class HomeService {
         assetValueKrw: valuation.assetValueKrw,
         realizedPnlKrw: valuation.realizedPnlKrw,
         unrealizedPnlKrw: valuation.unrealizedPnlKrw,
+        futuresUnrealizedPnlUsd:
+          valuation.futuresUnrealizedPnlUsd ?? '0.00000000',
+        futuresUnrealizedPnlKrw:
+          valuation.futuresUnrealizedPnlKrw ?? '0.00000000',
         sourceSummary: valuation.sourceSummary ?? null,
         fxRateSource: presentSourceDecision(valuation.fxRateSourceDecision),
         dataFreshness: {
@@ -736,7 +740,9 @@ export class HomeService {
   ) {
     try {
       const valuation = await getLiveValuation();
-      const totalAssetKrw = new Prisma.Decimal(valuation.totalAssetKrw);
+      const totalAssetKrw = new Prisma.Decimal(valuation.totalAssetKrw).sub(
+        valuation.futuresUnrealizedPnlKrw ?? 0,
+      );
 
       if (totalAssetKrw.eq(0)) {
         throw new PortfolioValuationError(

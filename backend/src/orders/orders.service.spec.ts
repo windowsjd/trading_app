@@ -3799,6 +3799,13 @@ describe('OrdersService', () => {
         data: {
           tradingAccountId: 'trading-account-1',
           totalAssetKrw: '1399300.00000000',
+          futuresUnrealizedPnlUsd: '0.00000000',
+          futuresUnrealizedPnlKrw: '0.00000000',
+          futuresValuationJson: {
+            positions: [],
+            usdKrw: null,
+            valuationAt: '2026-05-07T00:02:00.000Z',
+          },
           returnRate: '39.93000000',
           krwCash: '0.00000000',
           usdCashKrw: '699300.00000000',

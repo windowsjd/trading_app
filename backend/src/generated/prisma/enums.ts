@@ -125,7 +125,8 @@ export const WalletTransactionReferenceType = {
   ad_reward_claim: 'ad_reward_claim',
   wallet_transfer: 'wallet_transfer',
   futures_execution: 'futures_execution',
-  futures_liquidation: 'futures_liquidation'
+  futures_liquidation: 'futures_liquidation',
+  futures_season_settlement: 'futures_season_settlement'
 } as const
 
 export type WalletTransactionReferenceType = (typeof WalletTransactionReferenceType)[keyof typeof WalletTransactionReferenceType]

@@ -50,6 +50,9 @@ export default function HomeAssetHero({ summary, settled = false, compactBottom 
                 {formatKrw(summary.unrealizedPnlKrw)}원
               </Text>
             </Text>
+            {summary.futuresUnrealizedPnlKrw !== undefined ? <Text style={styles.metric}>
+              선물 Mark 미실현손익{' '}<Text style={performanceStyle(summary.futuresUnrealizedPnlKrw)}>{formatKrw(summary.futuresUnrealizedPnlKrw)}원</Text>
+            </Text> : null}
           </View>
         </>
       ) : (

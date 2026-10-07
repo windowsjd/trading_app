@@ -101,6 +101,7 @@ enum WalletTransactionReferenceType {
   wallet_transfer
   futures_execution
   futures_liquidation
+  futures_season_settlement
 }
 
 enum FuturesProductType {
@@ -447,6 +448,7 @@ model TradingAccount {
   futuresExecutions             FuturesExecution[]
   futuresExecuteRequests        FuturesExecuteRequest[]
   futuresLiquidations           FuturesLiquidation[]
+  futuresSeasonSettlement       FuturesSeasonSettlement?
   quotes                        Quote[]
   adRewardClaims                AdRewardClaim[]
   equitySnapshots               EquitySnapshot[]
@@ -478,6 +480,8 @@ model Season {
   userBadges                UserBadge[]
   seasonRewards             SeasonReward[]
   rewardFulfillmentRequests RewardFulfillmentRequest[]
+  futuresFinalPrices        FuturesSeasonPrice[]
+  futuresFinalSettlements   FuturesSeasonSettlement[]
 
   @@map("seasons")
 }
@@ -679,10 +683,11 @@ model AssetPriceSnapshot {
   rawPayloadJson  Json?                @map("raw_payload_json")
   note            String?
 
-  asset             Asset              @relation(fields: [assetId], references: [id], onDelete: Restrict)
-  orders            Order[]
-  quotes            Quote[]
-  futuresExecutions FuturesExecution[]
+  asset               Asset                @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  orders              Order[]
+  quotes              Quote[]
+  futuresExecutions   FuturesExecution[]
+  futuresSeasonPrices FuturesSeasonPrice[]
 
   @@index([assetId, effectiveAt])
   @@index([assetId, capturedAt])
@@ -838,6 +843,9 @@ model FuturesInstrument {
   productType        FuturesProductType @default(synthetic_perpetual) @map("product_type")
   settlementCurrency CurrencyCode       @default(USD) @map("settlement_currency")
   isActive           Boolean            @default(true) @map("is_active")
+  /// Exact public USDⓈ-M PERPETUAL contract verification. Null means unverified.
+  markContractJson   Json?              @map("mark_contract_json")
+  markVerifiedAt     DateTime?          @map("mark_verified_at")
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
 
@@ -846,6 +854,8 @@ model FuturesInstrument {
   executions        FuturesExecution[]
   marks             FuturesMarkSnapshot[]
   liquidationCloses FuturesLiquidationClose[]
+  seasonPrices      FuturesSeasonPrice[]
+  seasonCloses      FuturesSeasonClose[]
 
   @@unique([underlyingAssetId, productType, settlementCurrency])
   @@map("futures_instruments")
@@ -875,6 +885,7 @@ model FuturesPosition {
   instrument       FuturesInstrument        @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
   executions       FuturesExecution[]
   liquidationClose FuturesLiquidationClose?
+  seasonClose      FuturesSeasonClose?
 
   @@unique([id, tradingAccountId, instrumentId])
   @@index([tradingAccountId, status, instrumentId])
@@ -1402,6 +1413,10 @@ model EquitySnapshot {
   domesticStockValueKrw        Decimal                         @map("domestic_stock_value_krw") @db.Decimal(24, 8)
   usStockValueKrw              Decimal                         @map("us_stock_value_krw") @db.Decimal(24, 8)
   cryptoValueKrw               Decimal                         @map("crypto_value_krw") @db.Decimal(24, 8)
+  /// Signed Mark UPNL; NULL preserves pre-F3 snapshot semantics.
+  futuresUnrealizedPnlUsd      Decimal?                        @map("futures_unrealized_pnl_usd") @db.Decimal(24, 8)
+  futuresUnrealizedPnlKrw      Decimal?                        @map("futures_unrealized_pnl_krw") @db.Decimal(24, 8)
+  futuresValuationJson         Json?                           @map("futures_valuation_json")
   snapshotReason               SnapshotReason                  @map("snapshot_reason")
   // ---- general-mode performance state (NULL on season rows) ----
   /// initial_grant + ad_reward inflows to date. Never a guess: only the two
@@ -1447,6 +1462,9 @@ model DailyPortfolioSnapshot {
   assetValueKrw                Decimal  @map("asset_value_krw") @db.Decimal(24, 8)
   realizedPnlKrw               Decimal  @map("realized_pnl_krw") @db.Decimal(24, 8)
   unrealizedPnlKrw             Decimal  @map("unrealized_pnl_krw") @db.Decimal(24, 8)
+  futuresUnrealizedPnlUsd      Decimal? @map("futures_unrealized_pnl_usd") @db.Decimal(24, 8)
+  futuresUnrealizedPnlKrw      Decimal? @map("futures_unrealized_pnl_krw") @db.Decimal(24, 8)
+  futuresValuationJson         Json?    @map("futures_valuation_json")
   // ---- general-mode performance state (NULL on season rows) ----
   cumulativeExternalFundingKrw Decimal? @map("cumulative_external_funding_krw") @db.Decimal(24, 8)
   investmentPnlKrw             Decimal? @map("investment_pnl_krw") @db.Decimal(24, 8)
@@ -1678,4 +1696,73 @@ model FuturesLiquidationClose {
   @@index([liquidationId, tradingAccountId])
   @@index([markSnapshotId])
   @@map("futures_liquidation_closes")
+}
+
+// End-boundary evidence is pinned once for the whole Season, before any account closes.
+model FuturesSeasonPrice {
+  id                   String               @id @default(uuid())
+  seasonId             String               @map("season_id")
+  instrumentId         String               @map("instrument_id")
+  assetPriceSnapshotId String               @map("asset_price_snapshot_id")
+  endAt                DateTime             @map("end_at")
+  feeRate              Decimal              @map("fee_rate") @db.Decimal(10, 6)
+  createdAt            DateTime             @default(now()) @map("created_at")
+  season               Season               @relation(fields: [seasonId], references: [id], onDelete: Restrict)
+  instrument           FuturesInstrument    @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  snapshot             AssetPriceSnapshot   @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
+  closes               FuturesSeasonClose[]
+
+  @@unique([seasonId, instrumentId])
+  @@map("futures_season_prices")
+}
+
+// Normal Season final exit, deliberately separate from a risk liquidation.
+model FuturesSeasonSettlement {
+  id                  String               @id @default(uuid())
+  seasonId            String               @map("season_id")
+  tradingAccountId    String               @unique @map("trading_account_id")
+  endAt               DateTime             @map("end_at")
+  feeRate             Decimal              @map("fee_rate") @db.Decimal(10, 6)
+  realizedPnl         Decimal              @map("realized_pnl") @db.Decimal(24, 8)
+  feeAmount           Decimal              @map("fee_amount") @db.Decimal(24, 8)
+  settledPnl          Decimal              @map("settled_pnl") @db.Decimal(24, 8)
+  settledFee          Decimal              @map("settled_fee") @db.Decimal(24, 8)
+  settledCash         Decimal              @map("settled_cash") @db.Decimal(24, 8)
+  bankruptcyShortfall Decimal              @map("bankruptcy_shortfall") @db.Decimal(24, 8)
+  walletBalanceBefore Decimal              @map("wallet_balance_before") @db.Decimal(24, 8)
+  walletBalanceAfter  Decimal              @map("wallet_balance_after") @db.Decimal(24, 8)
+  /// Original collateral, economic result, actual cash and shortfall per scope.
+  scopesJson          Json                 @map("scopes_json")
+  executedAt          DateTime             @map("executed_at")
+  season              Season               @relation(fields: [seasonId], references: [id], onDelete: Restrict)
+  tradingAccount      TradingAccount       @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  closes              FuturesSeasonClose[]
+
+  @@unique([id, tradingAccountId])
+  @@index([seasonId])
+  @@map("futures_season_settlements")
+}
+
+model FuturesSeasonClose {
+  id               String                  @id @default(uuid())
+  settlementId     String                  @map("settlement_id")
+  tradingAccountId String                  @map("trading_account_id")
+  positionId       String                  @unique @map("position_id")
+  instrumentId     String                  @map("instrument_id")
+  priceId          String                  @map("price_id")
+  direction        FuturesDirection
+  marginMode       FuturesMarginMode       @map("margin_mode")
+  quantity         Decimal                 @db.Decimal(24, 8)
+  executionPrice   Decimal                 @map("execution_price") @db.Decimal(24, 8)
+  realizedPnl      Decimal                 @map("realized_pnl") @db.Decimal(24, 8)
+  feeRate          Decimal                 @map("fee_rate") @db.Decimal(10, 6)
+  feeAmount        Decimal                 @map("fee_amount") @db.Decimal(24, 8)
+  settlement       FuturesSeasonSettlement @relation(fields: [settlementId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
+  position         FuturesPosition         @relation(fields: [positionId, tradingAccountId, instrumentId], references: [id, tradingAccountId, instrumentId], onDelete: Restrict)
+  instrument       FuturesInstrument       @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  price            FuturesSeasonPrice      @relation(fields: [priceId], references: [id], onDelete: Restrict)
+
+  @@unique([positionId, tradingAccountId, instrumentId])
+  @@index([settlementId, tradingAccountId])
+  @@map("futures_season_closes")
 }

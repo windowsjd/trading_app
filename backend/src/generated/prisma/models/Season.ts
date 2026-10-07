@@ -273,6 +273,8 @@ export type SeasonWhereInput = {
   userBadges?: Prisma.UserBadgeListRelationFilter
   seasonRewards?: Prisma.SeasonRewardListRelationFilter
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestListRelationFilter
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceListRelationFilter
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementListRelationFilter
 }
 
 export type SeasonOrderByWithRelationInput = {
@@ -292,6 +294,8 @@ export type SeasonOrderByWithRelationInput = {
   userBadges?: Prisma.UserBadgeOrderByRelationAggregateInput
   seasonRewards?: Prisma.SeasonRewardOrderByRelationAggregateInput
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestOrderByRelationAggregateInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceOrderByRelationAggregateInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementOrderByRelationAggregateInput
 }
 
 export type SeasonWhereUniqueInput = Prisma.AtLeast<{
@@ -314,6 +318,8 @@ export type SeasonWhereUniqueInput = Prisma.AtLeast<{
   userBadges?: Prisma.UserBadgeListRelationFilter
   seasonRewards?: Prisma.SeasonRewardListRelationFilter
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestListRelationFilter
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceListRelationFilter
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementListRelationFilter
 }, "id">
 
 export type SeasonOrderByWithAggregationInput = {
@@ -369,6 +375,8 @@ export type SeasonCreateInput = {
   userBadges?: Prisma.UserBadgeCreateNestedManyWithoutSeasonInput
   seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonInput
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutSeasonInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutSeasonInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonUncheckedCreateInput = {
@@ -388,6 +396,8 @@ export type SeasonUncheckedCreateInput = {
   userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutSeasonInput
   seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonInput
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutSeasonInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutSeasonInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonUpdateInput = {
@@ -407,6 +417,8 @@ export type SeasonUpdateInput = {
   userBadges?: Prisma.UserBadgeUpdateManyWithoutSeasonNestedInput
   seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonNestedInput
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestUpdateManyWithoutSeasonNestedInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutSeasonNestedInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementUpdateManyWithoutSeasonNestedInput
 }
 
 export type SeasonUncheckedUpdateInput = {
@@ -426,6 +438,8 @@ export type SeasonUncheckedUpdateInput = {
   userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutSeasonNestedInput
   seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonNestedInput
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutSeasonNestedInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutSeasonNestedInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementUncheckedUpdateManyWithoutSeasonNestedInput
 }
 
 export type SeasonCreateManyInput = {
@@ -601,6 +615,34 @@ export type SeasonUpdateOneRequiredWithoutSeasonRankingsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.SeasonUpdateToOneWithWhereWithoutSeasonRankingsInput, Prisma.SeasonUpdateWithoutSeasonRankingsInput>, Prisma.SeasonUncheckedUpdateWithoutSeasonRankingsInput>
 }
 
+export type SeasonCreateNestedOneWithoutFuturesFinalPricesInput = {
+  create?: Prisma.XOR<Prisma.SeasonCreateWithoutFuturesFinalPricesInput, Prisma.SeasonUncheckedCreateWithoutFuturesFinalPricesInput>
+  connectOrCreate?: Prisma.SeasonCreateOrConnectWithoutFuturesFinalPricesInput
+  connect?: Prisma.SeasonWhereUniqueInput
+}
+
+export type SeasonUpdateOneRequiredWithoutFuturesFinalPricesNestedInput = {
+  create?: Prisma.XOR<Prisma.SeasonCreateWithoutFuturesFinalPricesInput, Prisma.SeasonUncheckedCreateWithoutFuturesFinalPricesInput>
+  connectOrCreate?: Prisma.SeasonCreateOrConnectWithoutFuturesFinalPricesInput
+  upsert?: Prisma.SeasonUpsertWithoutFuturesFinalPricesInput
+  connect?: Prisma.SeasonWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.SeasonUpdateToOneWithWhereWithoutFuturesFinalPricesInput, Prisma.SeasonUpdateWithoutFuturesFinalPricesInput>, Prisma.SeasonUncheckedUpdateWithoutFuturesFinalPricesInput>
+}
+
+export type SeasonCreateNestedOneWithoutFuturesFinalSettlementsInput = {
+  create?: Prisma.XOR<Prisma.SeasonCreateWithoutFuturesFinalSettlementsInput, Prisma.SeasonUncheckedCreateWithoutFuturesFinalSettlementsInput>
+  connectOrCreate?: Prisma.SeasonCreateOrConnectWithoutFuturesFinalSettlementsInput
+  connect?: Prisma.SeasonWhereUniqueInput
+}
+
+export type SeasonUpdateOneRequiredWithoutFuturesFinalSettlementsNestedInput = {
+  create?: Prisma.XOR<Prisma.SeasonCreateWithoutFuturesFinalSettlementsInput, Prisma.SeasonUncheckedCreateWithoutFuturesFinalSettlementsInput>
+  connectOrCreate?: Prisma.SeasonCreateOrConnectWithoutFuturesFinalSettlementsInput
+  upsert?: Prisma.SeasonUpsertWithoutFuturesFinalSettlementsInput
+  connect?: Prisma.SeasonWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.SeasonUpdateToOneWithWhereWithoutFuturesFinalSettlementsInput, Prisma.SeasonUpdateWithoutFuturesFinalSettlementsInput>, Prisma.SeasonUncheckedUpdateWithoutFuturesFinalSettlementsInput>
+}
+
 export type SeasonCreateWithoutParticipantsInput = {
   id?: string
   name: string
@@ -617,6 +659,8 @@ export type SeasonCreateWithoutParticipantsInput = {
   userBadges?: Prisma.UserBadgeCreateNestedManyWithoutSeasonInput
   seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonInput
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutSeasonInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutSeasonInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonUncheckedCreateWithoutParticipantsInput = {
@@ -635,6 +679,8 @@ export type SeasonUncheckedCreateWithoutParticipantsInput = {
   userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutSeasonInput
   seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonInput
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutSeasonInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutSeasonInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonCreateOrConnectWithoutParticipantsInput = {
@@ -669,6 +715,8 @@ export type SeasonUpdateWithoutParticipantsInput = {
   userBadges?: Prisma.UserBadgeUpdateManyWithoutSeasonNestedInput
   seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonNestedInput
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestUpdateManyWithoutSeasonNestedInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutSeasonNestedInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementUpdateManyWithoutSeasonNestedInput
 }
 
 export type SeasonUncheckedUpdateWithoutParticipantsInput = {
@@ -687,6 +735,8 @@ export type SeasonUncheckedUpdateWithoutParticipantsInput = {
   userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutSeasonNestedInput
   seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonNestedInput
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutSeasonNestedInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutSeasonNestedInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementUncheckedUpdateManyWithoutSeasonNestedInput
 }
 
 export type SeasonCreateWithoutUserBadgesInput = {
@@ -705,6 +755,8 @@ export type SeasonCreateWithoutUserBadgesInput = {
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonInput
   seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonInput
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutSeasonInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutSeasonInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonUncheckedCreateWithoutUserBadgesInput = {
@@ -723,6 +775,8 @@ export type SeasonUncheckedCreateWithoutUserBadgesInput = {
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonInput
   seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonInput
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutSeasonInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutSeasonInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonCreateOrConnectWithoutUserBadgesInput = {
@@ -757,6 +811,8 @@ export type SeasonUpdateWithoutUserBadgesInput = {
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonNestedInput
   seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonNestedInput
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestUpdateManyWithoutSeasonNestedInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutSeasonNestedInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementUpdateManyWithoutSeasonNestedInput
 }
 
 export type SeasonUncheckedUpdateWithoutUserBadgesInput = {
@@ -775,6 +831,8 @@ export type SeasonUncheckedUpdateWithoutUserBadgesInput = {
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonNestedInput
   seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonNestedInput
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutSeasonNestedInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutSeasonNestedInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementUncheckedUpdateManyWithoutSeasonNestedInput
 }
 
 export type SeasonCreateWithoutSeasonRewardsInput = {
@@ -793,6 +851,8 @@ export type SeasonCreateWithoutSeasonRewardsInput = {
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonInput
   userBadges?: Prisma.UserBadgeCreateNestedManyWithoutSeasonInput
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutSeasonInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutSeasonInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonUncheckedCreateWithoutSeasonRewardsInput = {
@@ -811,6 +871,8 @@ export type SeasonUncheckedCreateWithoutSeasonRewardsInput = {
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonInput
   userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutSeasonInput
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutSeasonInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutSeasonInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonCreateOrConnectWithoutSeasonRewardsInput = {
@@ -845,6 +907,8 @@ export type SeasonUpdateWithoutSeasonRewardsInput = {
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonNestedInput
   userBadges?: Prisma.UserBadgeUpdateManyWithoutSeasonNestedInput
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestUpdateManyWithoutSeasonNestedInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutSeasonNestedInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementUpdateManyWithoutSeasonNestedInput
 }
 
 export type SeasonUncheckedUpdateWithoutSeasonRewardsInput = {
@@ -863,6 +927,8 @@ export type SeasonUncheckedUpdateWithoutSeasonRewardsInput = {
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonNestedInput
   userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutSeasonNestedInput
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutSeasonNestedInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutSeasonNestedInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementUncheckedUpdateManyWithoutSeasonNestedInput
 }
 
 export type SeasonCreateWithoutRewardFulfillmentRequestsInput = {
@@ -881,6 +947,8 @@ export type SeasonCreateWithoutRewardFulfillmentRequestsInput = {
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonInput
   userBadges?: Prisma.UserBadgeCreateNestedManyWithoutSeasonInput
   seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutSeasonInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonUncheckedCreateWithoutRewardFulfillmentRequestsInput = {
@@ -899,6 +967,8 @@ export type SeasonUncheckedCreateWithoutRewardFulfillmentRequestsInput = {
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonInput
   userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutSeasonInput
   seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutSeasonInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonCreateOrConnectWithoutRewardFulfillmentRequestsInput = {
@@ -933,6 +1003,8 @@ export type SeasonUpdateWithoutRewardFulfillmentRequestsInput = {
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonNestedInput
   userBadges?: Prisma.UserBadgeUpdateManyWithoutSeasonNestedInput
   seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonNestedInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutSeasonNestedInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementUpdateManyWithoutSeasonNestedInput
 }
 
 export type SeasonUncheckedUpdateWithoutRewardFulfillmentRequestsInput = {
@@ -951,6 +1023,8 @@ export type SeasonUncheckedUpdateWithoutRewardFulfillmentRequestsInput = {
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonNestedInput
   userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutSeasonNestedInput
   seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonNestedInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutSeasonNestedInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementUncheckedUpdateManyWithoutSeasonNestedInput
 }
 
 export type SeasonCreateWithoutSeasonRankingsInput = {
@@ -969,6 +1043,8 @@ export type SeasonCreateWithoutSeasonRankingsInput = {
   userBadges?: Prisma.UserBadgeCreateNestedManyWithoutSeasonInput
   seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonInput
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutSeasonInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutSeasonInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonUncheckedCreateWithoutSeasonRankingsInput = {
@@ -987,6 +1063,8 @@ export type SeasonUncheckedCreateWithoutSeasonRankingsInput = {
   userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutSeasonInput
   seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonInput
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutSeasonInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutSeasonInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonCreateOrConnectWithoutSeasonRankingsInput = {
@@ -1021,6 +1099,8 @@ export type SeasonUpdateWithoutSeasonRankingsInput = {
   userBadges?: Prisma.UserBadgeUpdateManyWithoutSeasonNestedInput
   seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonNestedInput
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestUpdateManyWithoutSeasonNestedInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutSeasonNestedInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementUpdateManyWithoutSeasonNestedInput
 }
 
 export type SeasonUncheckedUpdateWithoutSeasonRankingsInput = {
@@ -1039,6 +1119,200 @@ export type SeasonUncheckedUpdateWithoutSeasonRankingsInput = {
   userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutSeasonNestedInput
   seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonNestedInput
   rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutSeasonNestedInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutSeasonNestedInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementUncheckedUpdateManyWithoutSeasonNestedInput
+}
+
+export type SeasonCreateWithoutFuturesFinalPricesInput = {
+  id?: string
+  name: string
+  status: $Enums.SeasonStatus
+  startAt: Date | string
+  endAt: Date | string
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  participants?: Prisma.SeasonParticipantCreateNestedManyWithoutSeasonInput
+  seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutSeasonInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonInput
+  rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutSeasonInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementCreateNestedManyWithoutSeasonInput
+}
+
+export type SeasonUncheckedCreateWithoutFuturesFinalPricesInput = {
+  id?: string
+  name: string
+  status: $Enums.SeasonStatus
+  startAt: Date | string
+  endAt: Date | string
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  participants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutSeasonInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutSeasonInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonInput
+  rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutSeasonInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedManyWithoutSeasonInput
+}
+
+export type SeasonCreateOrConnectWithoutFuturesFinalPricesInput = {
+  where: Prisma.SeasonWhereUniqueInput
+  create: Prisma.XOR<Prisma.SeasonCreateWithoutFuturesFinalPricesInput, Prisma.SeasonUncheckedCreateWithoutFuturesFinalPricesInput>
+}
+
+export type SeasonUpsertWithoutFuturesFinalPricesInput = {
+  update: Prisma.XOR<Prisma.SeasonUpdateWithoutFuturesFinalPricesInput, Prisma.SeasonUncheckedUpdateWithoutFuturesFinalPricesInput>
+  create: Prisma.XOR<Prisma.SeasonCreateWithoutFuturesFinalPricesInput, Prisma.SeasonUncheckedCreateWithoutFuturesFinalPricesInput>
+  where?: Prisma.SeasonWhereInput
+}
+
+export type SeasonUpdateToOneWithWhereWithoutFuturesFinalPricesInput = {
+  where?: Prisma.SeasonWhereInput
+  data: Prisma.XOR<Prisma.SeasonUpdateWithoutFuturesFinalPricesInput, Prisma.SeasonUncheckedUpdateWithoutFuturesFinalPricesInput>
+}
+
+export type SeasonUpdateWithoutFuturesFinalPricesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumSeasonStatusFieldUpdateOperationsInput | $Enums.SeasonStatus
+  startAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  participants?: Prisma.SeasonParticipantUpdateManyWithoutSeasonNestedInput
+  seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutSeasonNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonNestedInput
+  rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestUpdateManyWithoutSeasonNestedInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementUpdateManyWithoutSeasonNestedInput
+}
+
+export type SeasonUncheckedUpdateWithoutFuturesFinalPricesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumSeasonStatusFieldUpdateOperationsInput | $Enums.SeasonStatus
+  startAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  participants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutSeasonNestedInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutSeasonNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonNestedInput
+  rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutSeasonNestedInput
+  futuresFinalSettlements?: Prisma.FuturesSeasonSettlementUncheckedUpdateManyWithoutSeasonNestedInput
+}
+
+export type SeasonCreateWithoutFuturesFinalSettlementsInput = {
+  id?: string
+  name: string
+  status: $Enums.SeasonStatus
+  startAt: Date | string
+  endAt: Date | string
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  participants?: Prisma.SeasonParticipantCreateNestedManyWithoutSeasonInput
+  seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutSeasonInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonInput
+  rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutSeasonInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutSeasonInput
+}
+
+export type SeasonUncheckedCreateWithoutFuturesFinalSettlementsInput = {
+  id?: string
+  name: string
+  status: $Enums.SeasonStatus
+  startAt: Date | string
+  endAt: Date | string
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  participants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutSeasonInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutSeasonInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonInput
+  rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutSeasonInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutSeasonInput
+}
+
+export type SeasonCreateOrConnectWithoutFuturesFinalSettlementsInput = {
+  where: Prisma.SeasonWhereUniqueInput
+  create: Prisma.XOR<Prisma.SeasonCreateWithoutFuturesFinalSettlementsInput, Prisma.SeasonUncheckedCreateWithoutFuturesFinalSettlementsInput>
+}
+
+export type SeasonUpsertWithoutFuturesFinalSettlementsInput = {
+  update: Prisma.XOR<Prisma.SeasonUpdateWithoutFuturesFinalSettlementsInput, Prisma.SeasonUncheckedUpdateWithoutFuturesFinalSettlementsInput>
+  create: Prisma.XOR<Prisma.SeasonCreateWithoutFuturesFinalSettlementsInput, Prisma.SeasonUncheckedCreateWithoutFuturesFinalSettlementsInput>
+  where?: Prisma.SeasonWhereInput
+}
+
+export type SeasonUpdateToOneWithWhereWithoutFuturesFinalSettlementsInput = {
+  where?: Prisma.SeasonWhereInput
+  data: Prisma.XOR<Prisma.SeasonUpdateWithoutFuturesFinalSettlementsInput, Prisma.SeasonUncheckedUpdateWithoutFuturesFinalSettlementsInput>
+}
+
+export type SeasonUpdateWithoutFuturesFinalSettlementsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumSeasonStatusFieldUpdateOperationsInput | $Enums.SeasonStatus
+  startAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  participants?: Prisma.SeasonParticipantUpdateManyWithoutSeasonNestedInput
+  seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutSeasonNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonNestedInput
+  rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestUpdateManyWithoutSeasonNestedInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutSeasonNestedInput
+}
+
+export type SeasonUncheckedUpdateWithoutFuturesFinalSettlementsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumSeasonStatusFieldUpdateOperationsInput | $Enums.SeasonStatus
+  startAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  participants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutSeasonNestedInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutSeasonNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonNestedInput
+  rewardFulfillmentRequests?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutSeasonNestedInput
+  futuresFinalPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutSeasonNestedInput
 }
 
 
@@ -1052,6 +1326,8 @@ export type SeasonCountOutputType = {
   userBadges: number
   seasonRewards: number
   rewardFulfillmentRequests: number
+  futuresFinalPrices: number
+  futuresFinalSettlements: number
 }
 
 export type SeasonCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1060,6 +1336,8 @@ export type SeasonCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions
   userBadges?: boolean | SeasonCountOutputTypeCountUserBadgesArgs
   seasonRewards?: boolean | SeasonCountOutputTypeCountSeasonRewardsArgs
   rewardFulfillmentRequests?: boolean | SeasonCountOutputTypeCountRewardFulfillmentRequestsArgs
+  futuresFinalPrices?: boolean | SeasonCountOutputTypeCountFuturesFinalPricesArgs
+  futuresFinalSettlements?: boolean | SeasonCountOutputTypeCountFuturesFinalSettlementsArgs
 }
 
 /**
@@ -1107,6 +1385,20 @@ export type SeasonCountOutputTypeCountRewardFulfillmentRequestsArgs<ExtArgs exte
   where?: Prisma.RewardFulfillmentRequestWhereInput
 }
 
+/**
+ * SeasonCountOutputType without action
+ */
+export type SeasonCountOutputTypeCountFuturesFinalPricesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.FuturesSeasonPriceWhereInput
+}
+
+/**
+ * SeasonCountOutputType without action
+ */
+export type SeasonCountOutputTypeCountFuturesFinalSettlementsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.FuturesSeasonSettlementWhereInput
+}
+
 
 export type SeasonSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1125,6 +1417,8 @@ export type SeasonSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   userBadges?: boolean | Prisma.Season$userBadgesArgs<ExtArgs>
   seasonRewards?: boolean | Prisma.Season$seasonRewardsArgs<ExtArgs>
   rewardFulfillmentRequests?: boolean | Prisma.Season$rewardFulfillmentRequestsArgs<ExtArgs>
+  futuresFinalPrices?: boolean | Prisma.Season$futuresFinalPricesArgs<ExtArgs>
+  futuresFinalSettlements?: boolean | Prisma.Season$futuresFinalSettlementsArgs<ExtArgs>
   _count?: boolean | Prisma.SeasonCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["season"]>
 
@@ -1177,6 +1471,8 @@ export type SeasonInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   userBadges?: boolean | Prisma.Season$userBadgesArgs<ExtArgs>
   seasonRewards?: boolean | Prisma.Season$seasonRewardsArgs<ExtArgs>
   rewardFulfillmentRequests?: boolean | Prisma.Season$rewardFulfillmentRequestsArgs<ExtArgs>
+  futuresFinalPrices?: boolean | Prisma.Season$futuresFinalPricesArgs<ExtArgs>
+  futuresFinalSettlements?: boolean | Prisma.Season$futuresFinalSettlementsArgs<ExtArgs>
   _count?: boolean | Prisma.SeasonCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type SeasonIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -1190,6 +1486,8 @@ export type $SeasonPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     userBadges: Prisma.$UserBadgePayload<ExtArgs>[]
     seasonRewards: Prisma.$SeasonRewardPayload<ExtArgs>[]
     rewardFulfillmentRequests: Prisma.$RewardFulfillmentRequestPayload<ExtArgs>[]
+    futuresFinalPrices: Prisma.$FuturesSeasonPricePayload<ExtArgs>[]
+    futuresFinalSettlements: Prisma.$FuturesSeasonSettlementPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1602,6 +1900,8 @@ export interface Prisma__SeasonClient<T, Null = never, ExtArgs extends runtime.T
   userBadges<T extends Prisma.Season$userBadgesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Season$userBadgesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$UserBadgePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   seasonRewards<T extends Prisma.Season$seasonRewardsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Season$seasonRewardsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SeasonRewardPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   rewardFulfillmentRequests<T extends Prisma.Season$rewardFulfillmentRequestsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Season$rewardFulfillmentRequestsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RewardFulfillmentRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  futuresFinalPrices<T extends Prisma.Season$futuresFinalPricesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Season$futuresFinalPricesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesSeasonPricePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  futuresFinalSettlements<T extends Prisma.Season$futuresFinalSettlementsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Season$futuresFinalSettlementsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesSeasonSettlementPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2152,6 +2452,54 @@ export type Season$rewardFulfillmentRequestsArgs<ExtArgs extends runtime.Types.E
   take?: number
   skip?: number
   distinct?: Prisma.RewardFulfillmentRequestScalarFieldEnum | Prisma.RewardFulfillmentRequestScalarFieldEnum[]
+}
+
+/**
+ * Season.futuresFinalPrices
+ */
+export type Season$futuresFinalPricesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the FuturesSeasonPrice
+   */
+  select?: Prisma.FuturesSeasonPriceSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the FuturesSeasonPrice
+   */
+  omit?: Prisma.FuturesSeasonPriceOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FuturesSeasonPriceInclude<ExtArgs> | null
+  where?: Prisma.FuturesSeasonPriceWhereInput
+  orderBy?: Prisma.FuturesSeasonPriceOrderByWithRelationInput | Prisma.FuturesSeasonPriceOrderByWithRelationInput[]
+  cursor?: Prisma.FuturesSeasonPriceWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.FuturesSeasonPriceScalarFieldEnum | Prisma.FuturesSeasonPriceScalarFieldEnum[]
+}
+
+/**
+ * Season.futuresFinalSettlements
+ */
+export type Season$futuresFinalSettlementsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the FuturesSeasonSettlement
+   */
+  select?: Prisma.FuturesSeasonSettlementSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the FuturesSeasonSettlement
+   */
+  omit?: Prisma.FuturesSeasonSettlementOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FuturesSeasonSettlementInclude<ExtArgs> | null
+  where?: Prisma.FuturesSeasonSettlementWhereInput
+  orderBy?: Prisma.FuturesSeasonSettlementOrderByWithRelationInput | Prisma.FuturesSeasonSettlementOrderByWithRelationInput[]
+  cursor?: Prisma.FuturesSeasonSettlementWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.FuturesSeasonSettlementScalarFieldEnum | Prisma.FuturesSeasonSettlementScalarFieldEnum[]
 }
 
 /**

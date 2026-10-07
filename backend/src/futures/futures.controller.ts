@@ -67,4 +67,11 @@ export class FuturesController {
   ) {
     return this.futures.executions(req.user?.userId, id, query);
   }
+  @Get('final-settlement')
+  finalSettlement(
+    @Req() req: AuthenticatedRequest,
+    @Param('accountId') id: string,
+  ) {
+    return this.futures.finalSettlement(req.user?.userId, id);
+  }
 }

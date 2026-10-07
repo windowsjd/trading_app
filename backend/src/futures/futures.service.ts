@@ -19,8 +19,10 @@ import {
   parseFuturesCommand,
   type FuturesExecuteBody,
 } from './futures-input';
-import { assertFuturesOperation } from './futures.config';
+import { assertFuturesOperation, futuresTradingMode } from './futures.config';
+import { verifiedFuturesInstrument } from './futures-instrument-coverage';
 import { settleFuturesCash } from './futures-settlement';
+import { FuturesPerformanceService } from './futures-performance.service';
 import { readFuturesMark } from './futures-mark';
 import {
   riskStrings,
@@ -54,6 +56,9 @@ export class FuturesService {
     private readonly prisma: PrismaService,
     private readonly access: TradingAccountAccessService,
     private readonly performance: GeneralAccountPerformanceService,
+    private readonly history: FuturesPerformanceService = new FuturesPerformanceService(
+      prisma,
+    ),
   ) {}
 
   async execute(
@@ -110,7 +115,7 @@ export class FuturesService {
           const lifecycle = await lockSeasonTradingContext(tx, {
             userId,
             seasonParticipantId: account.seasonParticipant!.id,
-            participantWrite: false,
+            participantWrite: true,
           });
           if (lifecycle.account.id !== accountId)
             futuresError(
@@ -155,6 +160,14 @@ export class FuturesService {
           tx,
           request.instrumentId,
         );
+        if (
+          ['open', 'increase'].includes(request.operation) &&
+          !verifiedFuturesInstrument(lockedInstrument, executeNow)
+        )
+          futuresError(
+            'FUTURES_INSTRUMENT_UNVERIFIED',
+            'This Futures instrument is not yet available for new trades.',
+          );
         const wallet = await this.wallet(tx, accountId);
         stage('futures_execution_price_selection', accountId);
         const price = (await readFuturesPrice(
@@ -418,6 +431,7 @@ export class FuturesService {
         });
         stage('futures_ledger_write', accountId);
         await tx.walletTransaction.createMany({ data: ledger });
+        await this.history.capture(tx, lockedAccount, executeNow);
         const result: FuturesExecuteResult = {
           success: true,
           data: {
@@ -466,7 +480,8 @@ export class FuturesService {
 
   async instruments(userId: string | undefined, accountId: string) {
     requireUser(userId);
-    await this.access.getOwnedAccountOrThrow(userId, accountId);
+    const account = await this.access.getOwnedAccountOrThrow(userId, accountId);
+    const now = await this.dbNow(this.prisma);
     const rows = await this.prisma.futuresInstrument.findMany({
       where: { isActive: true, underlyingAsset: { isActive: true } },
       include: futuresInstrumentInclude,
@@ -476,7 +491,43 @@ export class FuturesService {
       success: true,
       data: {
         tradingAccountId: accountId,
-        instruments: rows.map(presentFuturesInstrument),
+        capabilities: futuresCapabilities(account, now),
+        evaluatedAt: now.toISOString(),
+        instruments: await Promise.all(
+          rows
+            .filter((row) => verifiedFuturesInstrument(row, now))
+            .map(async (row) => {
+              const mark = await readFuturesMark(this.prisma, row, now, false);
+              const price = await readFuturesPrice(
+                this.prisma,
+                row.underlyingAsset,
+                now,
+                false,
+              );
+              return {
+                ...presentFuturesInstrument(row),
+                markPrice: mark?.price.toFixed(8) ?? null,
+                referencePrice: price?.price.toFixed(8) ?? null,
+                markState: mark ? 'fresh' : 'unavailable_or_stale',
+                markCapturedAt: mark?.capturedAt.toISOString() ?? null,
+                markEvidence: mark
+                  ? {
+                      snapshotId: mark.id,
+                      source: mark.source,
+                      effectiveAt: mark.effectiveAt.toISOString(),
+                      capturedAt: mark.capturedAt.toISOString(),
+                    }
+                  : null,
+                referencePriceEvidence: price
+                  ? {
+                      effectiveAt: price.effectiveAt.toISOString(),
+                      capturedAt: price.capturedAt.toISOString(),
+                    }
+                  : null,
+                coverageVerifiedAt: row.markVerifiedAt!.toISOString(),
+              };
+            }),
+        ),
       },
     };
   }
@@ -486,7 +537,11 @@ export class FuturesService {
     await this.access.getOwnedAccountOrThrow(userId, accountId);
     return this.prisma.$transaction(
       async (tx) => {
-        await this.access.getOwnedAccountOrThrow(userId, accountId, tx);
+        const account = await this.access.getOwnedAccountOrThrow(
+          userId,
+          accountId,
+          tx,
+        );
         const wallet = await this.wallet(tx, accountId);
         const now = await this.dbNow(tx);
         const fee = await accountFuturesFee(tx, accountId);
@@ -508,6 +563,7 @@ export class FuturesService {
             return {
               ...presentFuturesPosition(row),
               markPrice: mark?.price.toFixed(8) ?? null,
+              markUnrealizedPnl: risk?.unrealizedPnl.toFixed(8) ?? null,
               markEvidence: mark
                 ? {
                     snapshotId: mark.id,
@@ -547,6 +603,7 @@ export class FuturesService {
           data: {
             tradingAccountId: accountId,
             positions,
+            capabilities: futuresCapabilities(account, now),
             cross: {
               positionIds: cross.rows.map((r) => r.position.id),
               evaluatedAt: now.toISOString(),
@@ -653,6 +710,46 @@ export class FuturesService {
       },
       { isolationLevel: 'RepeatableRead' },
     );
+  }
+
+  async finalSettlement(userId: string | undefined, accountId: string) {
+    requireUser(userId);
+    await this.access.getOwnedAccountOrThrow(userId, accountId);
+    const row = await this.prisma.futuresSeasonSettlement.findUnique({
+      where: { tradingAccountId: accountId },
+      include: {
+        closes: {
+          include: {
+            price: {
+              include: {
+                snapshot: {
+                  select: {
+                    id: true,
+                    assetId: true,
+                    price: true,
+                    currencyCode: true,
+                    sourceType: true,
+                    sourceName: true,
+                    effectiveAt: true,
+                    capturedAt: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { positionId: 'asc' },
+        },
+      },
+    });
+    return {
+      success: true,
+      data: {
+        tradingAccountId: accountId,
+        settlement: row
+          ? (JSON.parse(JSON.stringify(row)) as Prisma.JsonValue)
+          : null,
+      },
+    };
   }
 
   private async instrument(
@@ -802,4 +899,31 @@ function pageNumber(
       HttpStatus.BAD_REQUEST,
     );
   return Number(raw);
+}
+
+export function futuresCapabilities(account: OwnedTradingAccount, now: Date) {
+  const mode = futuresTradingMode();
+  const p = account.seasonParticipant;
+  const lifecycle =
+    account.status === 'active' &&
+    (account.mode === 'general' ||
+      (!!p &&
+        p.participantStatus === 'active' &&
+        p.season.status === 'active' &&
+        now >= p.season.startAt &&
+        now < p.season.endAt));
+  return {
+    tradingMode: mode,
+    canOpen: lifecycle && mode === 'ENABLED',
+    canIncrease: lifecycle && mode === 'ENABLED',
+    canReduce: lifecycle && mode !== 'DISABLED',
+    canClose: lifecycle && mode !== 'DISABLED',
+    reason: !lifecycle
+      ? 'ACCOUNT_NOT_TRADABLE'
+      : mode === 'DISABLED'
+        ? 'FUTURES_TRADING_DISABLED'
+        : mode === 'REDUCE_ONLY'
+          ? 'FUTURES_REDUCE_ONLY'
+          : null,
+  };
 }

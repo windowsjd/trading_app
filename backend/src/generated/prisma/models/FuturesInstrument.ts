@@ -30,6 +30,7 @@ export type FuturesInstrumentMinAggregateOutputType = {
   productType: $Enums.FuturesProductType | null
   settlementCurrency: $Enums.CurrencyCode | null
   isActive: boolean | null
+  markVerifiedAt: Date | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -40,6 +41,7 @@ export type FuturesInstrumentMaxAggregateOutputType = {
   productType: $Enums.FuturesProductType | null
   settlementCurrency: $Enums.CurrencyCode | null
   isActive: boolean | null
+  markVerifiedAt: Date | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -50,6 +52,8 @@ export type FuturesInstrumentCountAggregateOutputType = {
   productType: number
   settlementCurrency: number
   isActive: number
+  markContractJson: number
+  markVerifiedAt: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -62,6 +66,7 @@ export type FuturesInstrumentMinAggregateInputType = {
   productType?: true
   settlementCurrency?: true
   isActive?: true
+  markVerifiedAt?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -72,6 +77,7 @@ export type FuturesInstrumentMaxAggregateInputType = {
   productType?: true
   settlementCurrency?: true
   isActive?: true
+  markVerifiedAt?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -82,6 +88,8 @@ export type FuturesInstrumentCountAggregateInputType = {
   productType?: true
   settlementCurrency?: true
   isActive?: true
+  markContractJson?: true
+  markVerifiedAt?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -165,6 +173,8 @@ export type FuturesInstrumentGroupByOutputType = {
   productType: $Enums.FuturesProductType
   settlementCurrency: $Enums.CurrencyCode
   isActive: boolean
+  markContractJson: runtime.JsonValue | null
+  markVerifiedAt: Date | null
   createdAt: Date
   updatedAt: Date
   _count: FuturesInstrumentCountAggregateOutputType | null
@@ -196,6 +206,8 @@ export type FuturesInstrumentWhereInput = {
   productType?: Prisma.EnumFuturesProductTypeFilter<"FuturesInstrument"> | $Enums.FuturesProductType
   settlementCurrency?: Prisma.EnumCurrencyCodeFilter<"FuturesInstrument"> | $Enums.CurrencyCode
   isActive?: Prisma.BoolFilter<"FuturesInstrument"> | boolean
+  markContractJson?: Prisma.JsonNullableFilter<"FuturesInstrument">
+  markVerifiedAt?: Prisma.DateTimeNullableFilter<"FuturesInstrument"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"FuturesInstrument"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"FuturesInstrument"> | Date | string
   underlyingAsset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
@@ -203,6 +215,8 @@ export type FuturesInstrumentWhereInput = {
   executions?: Prisma.FuturesExecutionListRelationFilter
   marks?: Prisma.FuturesMarkSnapshotListRelationFilter
   liquidationCloses?: Prisma.FuturesLiquidationCloseListRelationFilter
+  seasonPrices?: Prisma.FuturesSeasonPriceListRelationFilter
+  seasonCloses?: Prisma.FuturesSeasonCloseListRelationFilter
 }
 
 export type FuturesInstrumentOrderByWithRelationInput = {
@@ -211,6 +225,8 @@ export type FuturesInstrumentOrderByWithRelationInput = {
   productType?: Prisma.SortOrder
   settlementCurrency?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
+  markContractJson?: Prisma.SortOrderInput | Prisma.SortOrder
+  markVerifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   underlyingAsset?: Prisma.AssetOrderByWithRelationInput
@@ -218,6 +234,8 @@ export type FuturesInstrumentOrderByWithRelationInput = {
   executions?: Prisma.FuturesExecutionOrderByRelationAggregateInput
   marks?: Prisma.FuturesMarkSnapshotOrderByRelationAggregateInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseOrderByRelationAggregateInput
+  seasonPrices?: Prisma.FuturesSeasonPriceOrderByRelationAggregateInput
+  seasonCloses?: Prisma.FuturesSeasonCloseOrderByRelationAggregateInput
 }
 
 export type FuturesInstrumentWhereUniqueInput = Prisma.AtLeast<{
@@ -230,6 +248,8 @@ export type FuturesInstrumentWhereUniqueInput = Prisma.AtLeast<{
   productType?: Prisma.EnumFuturesProductTypeFilter<"FuturesInstrument"> | $Enums.FuturesProductType
   settlementCurrency?: Prisma.EnumCurrencyCodeFilter<"FuturesInstrument"> | $Enums.CurrencyCode
   isActive?: Prisma.BoolFilter<"FuturesInstrument"> | boolean
+  markContractJson?: Prisma.JsonNullableFilter<"FuturesInstrument">
+  markVerifiedAt?: Prisma.DateTimeNullableFilter<"FuturesInstrument"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"FuturesInstrument"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"FuturesInstrument"> | Date | string
   underlyingAsset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
@@ -237,6 +257,8 @@ export type FuturesInstrumentWhereUniqueInput = Prisma.AtLeast<{
   executions?: Prisma.FuturesExecutionListRelationFilter
   marks?: Prisma.FuturesMarkSnapshotListRelationFilter
   liquidationCloses?: Prisma.FuturesLiquidationCloseListRelationFilter
+  seasonPrices?: Prisma.FuturesSeasonPriceListRelationFilter
+  seasonCloses?: Prisma.FuturesSeasonCloseListRelationFilter
 }, "id" | "underlyingAssetId_productType_settlementCurrency">
 
 export type FuturesInstrumentOrderByWithAggregationInput = {
@@ -245,6 +267,8 @@ export type FuturesInstrumentOrderByWithAggregationInput = {
   productType?: Prisma.SortOrder
   settlementCurrency?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
+  markContractJson?: Prisma.SortOrderInput | Prisma.SortOrder
+  markVerifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.FuturesInstrumentCountOrderByAggregateInput
@@ -261,6 +285,8 @@ export type FuturesInstrumentScalarWhereWithAggregatesInput = {
   productType?: Prisma.EnumFuturesProductTypeWithAggregatesFilter<"FuturesInstrument"> | $Enums.FuturesProductType
   settlementCurrency?: Prisma.EnumCurrencyCodeWithAggregatesFilter<"FuturesInstrument"> | $Enums.CurrencyCode
   isActive?: Prisma.BoolWithAggregatesFilter<"FuturesInstrument"> | boolean
+  markContractJson?: Prisma.JsonNullableWithAggregatesFilter<"FuturesInstrument">
+  markVerifiedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"FuturesInstrument"> | Date | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"FuturesInstrument"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"FuturesInstrument"> | Date | string
 }
@@ -270,6 +296,8 @@ export type FuturesInstrumentCreateInput = {
   productType?: $Enums.FuturesProductType
   settlementCurrency?: $Enums.CurrencyCode
   isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   underlyingAsset: Prisma.AssetCreateNestedOneWithoutFuturesInstrumentsInput
@@ -277,6 +305,8 @@ export type FuturesInstrumentCreateInput = {
   executions?: Prisma.FuturesExecutionCreateNestedManyWithoutInstrumentInput
   marks?: Prisma.FuturesMarkSnapshotCreateNestedManyWithoutInstrumentInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseCreateNestedManyWithoutInstrumentInput
+  seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutInstrumentInput
+  seasonCloses?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateInput = {
@@ -285,12 +315,16 @@ export type FuturesInstrumentUncheckedCreateInput = {
   productType?: $Enums.FuturesProductType
   settlementCurrency?: $Enums.CurrencyCode
   isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   positions?: Prisma.FuturesPositionUncheckedCreateNestedManyWithoutInstrumentInput
   executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutInstrumentInput
   marks?: Prisma.FuturesMarkSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedManyWithoutInstrumentInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutInstrumentInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUpdateInput = {
@@ -298,6 +332,8 @@ export type FuturesInstrumentUpdateInput = {
   productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
   settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   underlyingAsset?: Prisma.AssetUpdateOneRequiredWithoutFuturesInstrumentsNestedInput
@@ -305,6 +341,8 @@ export type FuturesInstrumentUpdateInput = {
   executions?: Prisma.FuturesExecutionUpdateManyWithoutInstrumentNestedInput
   marks?: Prisma.FuturesMarkSnapshotUpdateManyWithoutInstrumentNestedInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseUpdateManyWithoutInstrumentNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutInstrumentNestedInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateInput = {
@@ -313,12 +351,16 @@ export type FuturesInstrumentUncheckedUpdateInput = {
   productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
   settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   positions?: Prisma.FuturesPositionUncheckedUpdateManyWithoutInstrumentNestedInput
   executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutInstrumentNestedInput
   marks?: Prisma.FuturesMarkSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedUpdateManyWithoutInstrumentNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentNestedInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentCreateManyInput = {
@@ -327,6 +369,8 @@ export type FuturesInstrumentCreateManyInput = {
   productType?: $Enums.FuturesProductType
   settlementCurrency?: $Enums.CurrencyCode
   isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -336,6 +380,8 @@ export type FuturesInstrumentUpdateManyMutationInput = {
   productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
   settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -346,6 +392,8 @@ export type FuturesInstrumentUncheckedUpdateManyInput = {
   productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
   settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -372,6 +420,8 @@ export type FuturesInstrumentCountOrderByAggregateInput = {
   productType?: Prisma.SortOrder
   settlementCurrency?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
+  markContractJson?: Prisma.SortOrder
+  markVerifiedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -382,6 +432,7 @@ export type FuturesInstrumentMaxOrderByAggregateInput = {
   productType?: Prisma.SortOrder
   settlementCurrency?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
+  markVerifiedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -392,6 +443,7 @@ export type FuturesInstrumentMinOrderByAggregateInput = {
   productType?: Prisma.SortOrder
   settlementCurrency?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
+  markVerifiedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -503,17 +555,49 @@ export type FuturesInstrumentUpdateOneRequiredWithoutLiquidationClosesNestedInpu
   update?: Prisma.XOR<Prisma.XOR<Prisma.FuturesInstrumentUpdateToOneWithWhereWithoutLiquidationClosesInput, Prisma.FuturesInstrumentUpdateWithoutLiquidationClosesInput>, Prisma.FuturesInstrumentUncheckedUpdateWithoutLiquidationClosesInput>
 }
 
+export type FuturesInstrumentCreateNestedOneWithoutSeasonPricesInput = {
+  create?: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutSeasonPricesInput, Prisma.FuturesInstrumentUncheckedCreateWithoutSeasonPricesInput>
+  connectOrCreate?: Prisma.FuturesInstrumentCreateOrConnectWithoutSeasonPricesInput
+  connect?: Prisma.FuturesInstrumentWhereUniqueInput
+}
+
+export type FuturesInstrumentUpdateOneRequiredWithoutSeasonPricesNestedInput = {
+  create?: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutSeasonPricesInput, Prisma.FuturesInstrumentUncheckedCreateWithoutSeasonPricesInput>
+  connectOrCreate?: Prisma.FuturesInstrumentCreateOrConnectWithoutSeasonPricesInput
+  upsert?: Prisma.FuturesInstrumentUpsertWithoutSeasonPricesInput
+  connect?: Prisma.FuturesInstrumentWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.FuturesInstrumentUpdateToOneWithWhereWithoutSeasonPricesInput, Prisma.FuturesInstrumentUpdateWithoutSeasonPricesInput>, Prisma.FuturesInstrumentUncheckedUpdateWithoutSeasonPricesInput>
+}
+
+export type FuturesInstrumentCreateNestedOneWithoutSeasonClosesInput = {
+  create?: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutSeasonClosesInput, Prisma.FuturesInstrumentUncheckedCreateWithoutSeasonClosesInput>
+  connectOrCreate?: Prisma.FuturesInstrumentCreateOrConnectWithoutSeasonClosesInput
+  connect?: Prisma.FuturesInstrumentWhereUniqueInput
+}
+
+export type FuturesInstrumentUpdateOneRequiredWithoutSeasonClosesNestedInput = {
+  create?: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutSeasonClosesInput, Prisma.FuturesInstrumentUncheckedCreateWithoutSeasonClosesInput>
+  connectOrCreate?: Prisma.FuturesInstrumentCreateOrConnectWithoutSeasonClosesInput
+  upsert?: Prisma.FuturesInstrumentUpsertWithoutSeasonClosesInput
+  connect?: Prisma.FuturesInstrumentWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.FuturesInstrumentUpdateToOneWithWhereWithoutSeasonClosesInput, Prisma.FuturesInstrumentUpdateWithoutSeasonClosesInput>, Prisma.FuturesInstrumentUncheckedUpdateWithoutSeasonClosesInput>
+}
+
 export type FuturesInstrumentCreateWithoutUnderlyingAssetInput = {
   id?: string
   productType?: $Enums.FuturesProductType
   settlementCurrency?: $Enums.CurrencyCode
   isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   positions?: Prisma.FuturesPositionCreateNestedManyWithoutInstrumentInput
   executions?: Prisma.FuturesExecutionCreateNestedManyWithoutInstrumentInput
   marks?: Prisma.FuturesMarkSnapshotCreateNestedManyWithoutInstrumentInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseCreateNestedManyWithoutInstrumentInput
+  seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutInstrumentInput
+  seasonCloses?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutUnderlyingAssetInput = {
@@ -521,12 +605,16 @@ export type FuturesInstrumentUncheckedCreateWithoutUnderlyingAssetInput = {
   productType?: $Enums.FuturesProductType
   settlementCurrency?: $Enums.CurrencyCode
   isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   positions?: Prisma.FuturesPositionUncheckedCreateNestedManyWithoutInstrumentInput
   executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutInstrumentInput
   marks?: Prisma.FuturesMarkSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedManyWithoutInstrumentInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutInstrumentInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutUnderlyingAssetInput = {
@@ -564,6 +652,8 @@ export type FuturesInstrumentScalarWhereInput = {
   productType?: Prisma.EnumFuturesProductTypeFilter<"FuturesInstrument"> | $Enums.FuturesProductType
   settlementCurrency?: Prisma.EnumCurrencyCodeFilter<"FuturesInstrument"> | $Enums.CurrencyCode
   isActive?: Prisma.BoolFilter<"FuturesInstrument"> | boolean
+  markContractJson?: Prisma.JsonNullableFilter<"FuturesInstrument">
+  markVerifiedAt?: Prisma.DateTimeNullableFilter<"FuturesInstrument"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"FuturesInstrument"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"FuturesInstrument"> | Date | string
 }
@@ -573,12 +663,16 @@ export type FuturesInstrumentCreateWithoutPositionsInput = {
   productType?: $Enums.FuturesProductType
   settlementCurrency?: $Enums.CurrencyCode
   isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   underlyingAsset: Prisma.AssetCreateNestedOneWithoutFuturesInstrumentsInput
   executions?: Prisma.FuturesExecutionCreateNestedManyWithoutInstrumentInput
   marks?: Prisma.FuturesMarkSnapshotCreateNestedManyWithoutInstrumentInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseCreateNestedManyWithoutInstrumentInput
+  seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutInstrumentInput
+  seasonCloses?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutPositionsInput = {
@@ -587,11 +681,15 @@ export type FuturesInstrumentUncheckedCreateWithoutPositionsInput = {
   productType?: $Enums.FuturesProductType
   settlementCurrency?: $Enums.CurrencyCode
   isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutInstrumentInput
   marks?: Prisma.FuturesMarkSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedManyWithoutInstrumentInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutInstrumentInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutPositionsInput = {
@@ -615,12 +713,16 @@ export type FuturesInstrumentUpdateWithoutPositionsInput = {
   productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
   settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   underlyingAsset?: Prisma.AssetUpdateOneRequiredWithoutFuturesInstrumentsNestedInput
   executions?: Prisma.FuturesExecutionUpdateManyWithoutInstrumentNestedInput
   marks?: Prisma.FuturesMarkSnapshotUpdateManyWithoutInstrumentNestedInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseUpdateManyWithoutInstrumentNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutInstrumentNestedInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutPositionsInput = {
@@ -629,11 +731,15 @@ export type FuturesInstrumentUncheckedUpdateWithoutPositionsInput = {
   productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
   settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutInstrumentNestedInput
   marks?: Prisma.FuturesMarkSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedUpdateManyWithoutInstrumentNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentNestedInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentCreateWithoutExecutionsInput = {
@@ -641,12 +747,16 @@ export type FuturesInstrumentCreateWithoutExecutionsInput = {
   productType?: $Enums.FuturesProductType
   settlementCurrency?: $Enums.CurrencyCode
   isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   underlyingAsset: Prisma.AssetCreateNestedOneWithoutFuturesInstrumentsInput
   positions?: Prisma.FuturesPositionCreateNestedManyWithoutInstrumentInput
   marks?: Prisma.FuturesMarkSnapshotCreateNestedManyWithoutInstrumentInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseCreateNestedManyWithoutInstrumentInput
+  seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutInstrumentInput
+  seasonCloses?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutExecutionsInput = {
@@ -655,11 +765,15 @@ export type FuturesInstrumentUncheckedCreateWithoutExecutionsInput = {
   productType?: $Enums.FuturesProductType
   settlementCurrency?: $Enums.CurrencyCode
   isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   positions?: Prisma.FuturesPositionUncheckedCreateNestedManyWithoutInstrumentInput
   marks?: Prisma.FuturesMarkSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedManyWithoutInstrumentInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutInstrumentInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutExecutionsInput = {
@@ -683,12 +797,16 @@ export type FuturesInstrumentUpdateWithoutExecutionsInput = {
   productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
   settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   underlyingAsset?: Prisma.AssetUpdateOneRequiredWithoutFuturesInstrumentsNestedInput
   positions?: Prisma.FuturesPositionUpdateManyWithoutInstrumentNestedInput
   marks?: Prisma.FuturesMarkSnapshotUpdateManyWithoutInstrumentNestedInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseUpdateManyWithoutInstrumentNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutInstrumentNestedInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutExecutionsInput = {
@@ -697,11 +815,15 @@ export type FuturesInstrumentUncheckedUpdateWithoutExecutionsInput = {
   productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
   settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   positions?: Prisma.FuturesPositionUncheckedUpdateManyWithoutInstrumentNestedInput
   marks?: Prisma.FuturesMarkSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedUpdateManyWithoutInstrumentNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentNestedInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentCreateWithoutMarksInput = {
@@ -709,12 +831,16 @@ export type FuturesInstrumentCreateWithoutMarksInput = {
   productType?: $Enums.FuturesProductType
   settlementCurrency?: $Enums.CurrencyCode
   isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   underlyingAsset: Prisma.AssetCreateNestedOneWithoutFuturesInstrumentsInput
   positions?: Prisma.FuturesPositionCreateNestedManyWithoutInstrumentInput
   executions?: Prisma.FuturesExecutionCreateNestedManyWithoutInstrumentInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseCreateNestedManyWithoutInstrumentInput
+  seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutInstrumentInput
+  seasonCloses?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutMarksInput = {
@@ -723,11 +849,15 @@ export type FuturesInstrumentUncheckedCreateWithoutMarksInput = {
   productType?: $Enums.FuturesProductType
   settlementCurrency?: $Enums.CurrencyCode
   isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   positions?: Prisma.FuturesPositionUncheckedCreateNestedManyWithoutInstrumentInput
   executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutInstrumentInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedManyWithoutInstrumentInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutInstrumentInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutMarksInput = {
@@ -751,12 +881,16 @@ export type FuturesInstrumentUpdateWithoutMarksInput = {
   productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
   settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   underlyingAsset?: Prisma.AssetUpdateOneRequiredWithoutFuturesInstrumentsNestedInput
   positions?: Prisma.FuturesPositionUpdateManyWithoutInstrumentNestedInput
   executions?: Prisma.FuturesExecutionUpdateManyWithoutInstrumentNestedInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseUpdateManyWithoutInstrumentNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutInstrumentNestedInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutMarksInput = {
@@ -765,11 +899,15 @@ export type FuturesInstrumentUncheckedUpdateWithoutMarksInput = {
   productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
   settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   positions?: Prisma.FuturesPositionUncheckedUpdateManyWithoutInstrumentNestedInput
   executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutInstrumentNestedInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedUpdateManyWithoutInstrumentNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentNestedInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentCreateWithoutLiquidationClosesInput = {
@@ -777,12 +915,16 @@ export type FuturesInstrumentCreateWithoutLiquidationClosesInput = {
   productType?: $Enums.FuturesProductType
   settlementCurrency?: $Enums.CurrencyCode
   isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   underlyingAsset: Prisma.AssetCreateNestedOneWithoutFuturesInstrumentsInput
   positions?: Prisma.FuturesPositionCreateNestedManyWithoutInstrumentInput
   executions?: Prisma.FuturesExecutionCreateNestedManyWithoutInstrumentInput
   marks?: Prisma.FuturesMarkSnapshotCreateNestedManyWithoutInstrumentInput
+  seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutInstrumentInput
+  seasonCloses?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutLiquidationClosesInput = {
@@ -791,11 +933,15 @@ export type FuturesInstrumentUncheckedCreateWithoutLiquidationClosesInput = {
   productType?: $Enums.FuturesProductType
   settlementCurrency?: $Enums.CurrencyCode
   isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   positions?: Prisma.FuturesPositionUncheckedCreateNestedManyWithoutInstrumentInput
   executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutInstrumentInput
   marks?: Prisma.FuturesMarkSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutInstrumentInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutLiquidationClosesInput = {
@@ -819,12 +965,16 @@ export type FuturesInstrumentUpdateWithoutLiquidationClosesInput = {
   productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
   settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   underlyingAsset?: Prisma.AssetUpdateOneRequiredWithoutFuturesInstrumentsNestedInput
   positions?: Prisma.FuturesPositionUpdateManyWithoutInstrumentNestedInput
   executions?: Prisma.FuturesExecutionUpdateManyWithoutInstrumentNestedInput
   marks?: Prisma.FuturesMarkSnapshotUpdateManyWithoutInstrumentNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutInstrumentNestedInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutLiquidationClosesInput = {
@@ -833,11 +983,183 @@ export type FuturesInstrumentUncheckedUpdateWithoutLiquidationClosesInput = {
   productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
   settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   positions?: Prisma.FuturesPositionUncheckedUpdateManyWithoutInstrumentNestedInput
   executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutInstrumentNestedInput
   marks?: Prisma.FuturesMarkSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentNestedInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUncheckedUpdateManyWithoutInstrumentNestedInput
+}
+
+export type FuturesInstrumentCreateWithoutSeasonPricesInput = {
+  id?: string
+  productType?: $Enums.FuturesProductType
+  settlementCurrency?: $Enums.CurrencyCode
+  isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  underlyingAsset: Prisma.AssetCreateNestedOneWithoutFuturesInstrumentsInput
+  positions?: Prisma.FuturesPositionCreateNestedManyWithoutInstrumentInput
+  executions?: Prisma.FuturesExecutionCreateNestedManyWithoutInstrumentInput
+  marks?: Prisma.FuturesMarkSnapshotCreateNestedManyWithoutInstrumentInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseCreateNestedManyWithoutInstrumentInput
+  seasonCloses?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutInstrumentInput
+}
+
+export type FuturesInstrumentUncheckedCreateWithoutSeasonPricesInput = {
+  id?: string
+  underlyingAssetId: string
+  productType?: $Enums.FuturesProductType
+  settlementCurrency?: $Enums.CurrencyCode
+  isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  positions?: Prisma.FuturesPositionUncheckedCreateNestedManyWithoutInstrumentInput
+  executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutInstrumentInput
+  marks?: Prisma.FuturesMarkSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedManyWithoutInstrumentInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUncheckedCreateNestedManyWithoutInstrumentInput
+}
+
+export type FuturesInstrumentCreateOrConnectWithoutSeasonPricesInput = {
+  where: Prisma.FuturesInstrumentWhereUniqueInput
+  create: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutSeasonPricesInput, Prisma.FuturesInstrumentUncheckedCreateWithoutSeasonPricesInput>
+}
+
+export type FuturesInstrumentUpsertWithoutSeasonPricesInput = {
+  update: Prisma.XOR<Prisma.FuturesInstrumentUpdateWithoutSeasonPricesInput, Prisma.FuturesInstrumentUncheckedUpdateWithoutSeasonPricesInput>
+  create: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutSeasonPricesInput, Prisma.FuturesInstrumentUncheckedCreateWithoutSeasonPricesInput>
+  where?: Prisma.FuturesInstrumentWhereInput
+}
+
+export type FuturesInstrumentUpdateToOneWithWhereWithoutSeasonPricesInput = {
+  where?: Prisma.FuturesInstrumentWhereInput
+  data: Prisma.XOR<Prisma.FuturesInstrumentUpdateWithoutSeasonPricesInput, Prisma.FuturesInstrumentUncheckedUpdateWithoutSeasonPricesInput>
+}
+
+export type FuturesInstrumentUpdateWithoutSeasonPricesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  underlyingAsset?: Prisma.AssetUpdateOneRequiredWithoutFuturesInstrumentsNestedInput
+  positions?: Prisma.FuturesPositionUpdateManyWithoutInstrumentNestedInput
+  executions?: Prisma.FuturesExecutionUpdateManyWithoutInstrumentNestedInput
+  marks?: Prisma.FuturesMarkSnapshotUpdateManyWithoutInstrumentNestedInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUpdateManyWithoutInstrumentNestedInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUpdateManyWithoutInstrumentNestedInput
+}
+
+export type FuturesInstrumentUncheckedUpdateWithoutSeasonPricesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  underlyingAssetId?: Prisma.StringFieldUpdateOperationsInput | string
+  productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  positions?: Prisma.FuturesPositionUncheckedUpdateManyWithoutInstrumentNestedInput
+  executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutInstrumentNestedInput
+  marks?: Prisma.FuturesMarkSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedUpdateManyWithoutInstrumentNestedInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUncheckedUpdateManyWithoutInstrumentNestedInput
+}
+
+export type FuturesInstrumentCreateWithoutSeasonClosesInput = {
+  id?: string
+  productType?: $Enums.FuturesProductType
+  settlementCurrency?: $Enums.CurrencyCode
+  isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  underlyingAsset: Prisma.AssetCreateNestedOneWithoutFuturesInstrumentsInput
+  positions?: Prisma.FuturesPositionCreateNestedManyWithoutInstrumentInput
+  executions?: Prisma.FuturesExecutionCreateNestedManyWithoutInstrumentInput
+  marks?: Prisma.FuturesMarkSnapshotCreateNestedManyWithoutInstrumentInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseCreateNestedManyWithoutInstrumentInput
+  seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutInstrumentInput
+}
+
+export type FuturesInstrumentUncheckedCreateWithoutSeasonClosesInput = {
+  id?: string
+  underlyingAssetId: string
+  productType?: $Enums.FuturesProductType
+  settlementCurrency?: $Enums.CurrencyCode
+  isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  positions?: Prisma.FuturesPositionUncheckedCreateNestedManyWithoutInstrumentInput
+  executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutInstrumentInput
+  marks?: Prisma.FuturesMarkSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedManyWithoutInstrumentInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutInstrumentInput
+}
+
+export type FuturesInstrumentCreateOrConnectWithoutSeasonClosesInput = {
+  where: Prisma.FuturesInstrumentWhereUniqueInput
+  create: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutSeasonClosesInput, Prisma.FuturesInstrumentUncheckedCreateWithoutSeasonClosesInput>
+}
+
+export type FuturesInstrumentUpsertWithoutSeasonClosesInput = {
+  update: Prisma.XOR<Prisma.FuturesInstrumentUpdateWithoutSeasonClosesInput, Prisma.FuturesInstrumentUncheckedUpdateWithoutSeasonClosesInput>
+  create: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutSeasonClosesInput, Prisma.FuturesInstrumentUncheckedCreateWithoutSeasonClosesInput>
+  where?: Prisma.FuturesInstrumentWhereInput
+}
+
+export type FuturesInstrumentUpdateToOneWithWhereWithoutSeasonClosesInput = {
+  where?: Prisma.FuturesInstrumentWhereInput
+  data: Prisma.XOR<Prisma.FuturesInstrumentUpdateWithoutSeasonClosesInput, Prisma.FuturesInstrumentUncheckedUpdateWithoutSeasonClosesInput>
+}
+
+export type FuturesInstrumentUpdateWithoutSeasonClosesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  underlyingAsset?: Prisma.AssetUpdateOneRequiredWithoutFuturesInstrumentsNestedInput
+  positions?: Prisma.FuturesPositionUpdateManyWithoutInstrumentNestedInput
+  executions?: Prisma.FuturesExecutionUpdateManyWithoutInstrumentNestedInput
+  marks?: Prisma.FuturesMarkSnapshotUpdateManyWithoutInstrumentNestedInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUpdateManyWithoutInstrumentNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutInstrumentNestedInput
+}
+
+export type FuturesInstrumentUncheckedUpdateWithoutSeasonClosesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  underlyingAssetId?: Prisma.StringFieldUpdateOperationsInput | string
+  productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  positions?: Prisma.FuturesPositionUncheckedUpdateManyWithoutInstrumentNestedInput
+  executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutInstrumentNestedInput
+  marks?: Prisma.FuturesMarkSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedUpdateManyWithoutInstrumentNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentCreateManyUnderlyingAssetInput = {
@@ -845,6 +1167,8 @@ export type FuturesInstrumentCreateManyUnderlyingAssetInput = {
   productType?: $Enums.FuturesProductType
   settlementCurrency?: $Enums.CurrencyCode
   isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -854,12 +1178,16 @@ export type FuturesInstrumentUpdateWithoutUnderlyingAssetInput = {
   productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
   settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   positions?: Prisma.FuturesPositionUpdateManyWithoutInstrumentNestedInput
   executions?: Prisma.FuturesExecutionUpdateManyWithoutInstrumentNestedInput
   marks?: Prisma.FuturesMarkSnapshotUpdateManyWithoutInstrumentNestedInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseUpdateManyWithoutInstrumentNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutInstrumentNestedInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutUnderlyingAssetInput = {
@@ -867,12 +1195,16 @@ export type FuturesInstrumentUncheckedUpdateWithoutUnderlyingAssetInput = {
   productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
   settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   positions?: Prisma.FuturesPositionUncheckedUpdateManyWithoutInstrumentNestedInput
   executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutInstrumentNestedInput
   marks?: Prisma.FuturesMarkSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedUpdateManyWithoutInstrumentNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentNestedInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateManyWithoutUnderlyingAssetInput = {
@@ -880,6 +1212,8 @@ export type FuturesInstrumentUncheckedUpdateManyWithoutUnderlyingAssetInput = {
   productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
   settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -894,6 +1228,8 @@ export type FuturesInstrumentCountOutputType = {
   executions: number
   marks: number
   liquidationCloses: number
+  seasonPrices: number
+  seasonCloses: number
 }
 
 export type FuturesInstrumentCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -901,6 +1237,8 @@ export type FuturesInstrumentCountOutputTypeSelect<ExtArgs extends runtime.Types
   executions?: boolean | FuturesInstrumentCountOutputTypeCountExecutionsArgs
   marks?: boolean | FuturesInstrumentCountOutputTypeCountMarksArgs
   liquidationCloses?: boolean | FuturesInstrumentCountOutputTypeCountLiquidationClosesArgs
+  seasonPrices?: boolean | FuturesInstrumentCountOutputTypeCountSeasonPricesArgs
+  seasonCloses?: boolean | FuturesInstrumentCountOutputTypeCountSeasonClosesArgs
 }
 
 /**
@@ -941,6 +1279,20 @@ export type FuturesInstrumentCountOutputTypeCountLiquidationClosesArgs<ExtArgs e
   where?: Prisma.FuturesLiquidationCloseWhereInput
 }
 
+/**
+ * FuturesInstrumentCountOutputType without action
+ */
+export type FuturesInstrumentCountOutputTypeCountSeasonPricesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.FuturesSeasonPriceWhereInput
+}
+
+/**
+ * FuturesInstrumentCountOutputType without action
+ */
+export type FuturesInstrumentCountOutputTypeCountSeasonClosesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.FuturesSeasonCloseWhereInput
+}
+
 
 export type FuturesInstrumentSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -948,6 +1300,8 @@ export type FuturesInstrumentSelect<ExtArgs extends runtime.Types.Extensions.Int
   productType?: boolean
   settlementCurrency?: boolean
   isActive?: boolean
+  markContractJson?: boolean
+  markVerifiedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   underlyingAsset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
@@ -955,6 +1309,8 @@ export type FuturesInstrumentSelect<ExtArgs extends runtime.Types.Extensions.Int
   executions?: boolean | Prisma.FuturesInstrument$executionsArgs<ExtArgs>
   marks?: boolean | Prisma.FuturesInstrument$marksArgs<ExtArgs>
   liquidationCloses?: boolean | Prisma.FuturesInstrument$liquidationClosesArgs<ExtArgs>
+  seasonPrices?: boolean | Prisma.FuturesInstrument$seasonPricesArgs<ExtArgs>
+  seasonCloses?: boolean | Prisma.FuturesInstrument$seasonClosesArgs<ExtArgs>
   _count?: boolean | Prisma.FuturesInstrumentCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["futuresInstrument"]>
 
@@ -964,6 +1320,8 @@ export type FuturesInstrumentSelectCreateManyAndReturn<ExtArgs extends runtime.T
   productType?: boolean
   settlementCurrency?: boolean
   isActive?: boolean
+  markContractJson?: boolean
+  markVerifiedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   underlyingAsset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
@@ -975,6 +1333,8 @@ export type FuturesInstrumentSelectUpdateManyAndReturn<ExtArgs extends runtime.T
   productType?: boolean
   settlementCurrency?: boolean
   isActive?: boolean
+  markContractJson?: boolean
+  markVerifiedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   underlyingAsset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
@@ -986,17 +1346,21 @@ export type FuturesInstrumentSelectScalar = {
   productType?: boolean
   settlementCurrency?: boolean
   isActive?: boolean
+  markContractJson?: boolean
+  markVerifiedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type FuturesInstrumentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "underlyingAssetId" | "productType" | "settlementCurrency" | "isActive" | "createdAt" | "updatedAt", ExtArgs["result"]["futuresInstrument"]>
+export type FuturesInstrumentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "underlyingAssetId" | "productType" | "settlementCurrency" | "isActive" | "markContractJson" | "markVerifiedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["futuresInstrument"]>
 export type FuturesInstrumentInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   underlyingAsset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   positions?: boolean | Prisma.FuturesInstrument$positionsArgs<ExtArgs>
   executions?: boolean | Prisma.FuturesInstrument$executionsArgs<ExtArgs>
   marks?: boolean | Prisma.FuturesInstrument$marksArgs<ExtArgs>
   liquidationCloses?: boolean | Prisma.FuturesInstrument$liquidationClosesArgs<ExtArgs>
+  seasonPrices?: boolean | Prisma.FuturesInstrument$seasonPricesArgs<ExtArgs>
+  seasonCloses?: boolean | Prisma.FuturesInstrument$seasonClosesArgs<ExtArgs>
   _count?: boolean | Prisma.FuturesInstrumentCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type FuturesInstrumentIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1014,6 +1378,8 @@ export type $FuturesInstrumentPayload<ExtArgs extends runtime.Types.Extensions.I
     executions: Prisma.$FuturesExecutionPayload<ExtArgs>[]
     marks: Prisma.$FuturesMarkSnapshotPayload<ExtArgs>[]
     liquidationCloses: Prisma.$FuturesLiquidationClosePayload<ExtArgs>[]
+    seasonPrices: Prisma.$FuturesSeasonPricePayload<ExtArgs>[]
+    seasonCloses: Prisma.$FuturesSeasonClosePayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1021,6 +1387,11 @@ export type $FuturesInstrumentPayload<ExtArgs extends runtime.Types.Extensions.I
     productType: $Enums.FuturesProductType
     settlementCurrency: $Enums.CurrencyCode
     isActive: boolean
+    /**
+     * Exact public USDⓈ-M PERPETUAL contract verification. Null means unverified.
+     */
+    markContractJson: runtime.JsonValue | null
+    markVerifiedAt: Date | null
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["futuresInstrument"]>
@@ -1422,6 +1793,8 @@ export interface Prisma__FuturesInstrumentClient<T, Null = never, ExtArgs extend
   executions<T extends Prisma.FuturesInstrument$executionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesInstrument$executionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesExecutionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   marks<T extends Prisma.FuturesInstrument$marksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesInstrument$marksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesMarkSnapshotPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   liquidationCloses<T extends Prisma.FuturesInstrument$liquidationClosesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesInstrument$liquidationClosesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesLiquidationClosePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  seasonPrices<T extends Prisma.FuturesInstrument$seasonPricesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesInstrument$seasonPricesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesSeasonPricePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  seasonCloses<T extends Prisma.FuturesInstrument$seasonClosesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesInstrument$seasonClosesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesSeasonClosePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1456,6 +1829,8 @@ export interface FuturesInstrumentFieldRefs {
   readonly productType: Prisma.FieldRef<"FuturesInstrument", 'FuturesProductType'>
   readonly settlementCurrency: Prisma.FieldRef<"FuturesInstrument", 'CurrencyCode'>
   readonly isActive: Prisma.FieldRef<"FuturesInstrument", 'Boolean'>
+  readonly markContractJson: Prisma.FieldRef<"FuturesInstrument", 'Json'>
+  readonly markVerifiedAt: Prisma.FieldRef<"FuturesInstrument", 'DateTime'>
   readonly createdAt: Prisma.FieldRef<"FuturesInstrument", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"FuturesInstrument", 'DateTime'>
 }
@@ -1952,6 +2327,54 @@ export type FuturesInstrument$liquidationClosesArgs<ExtArgs extends runtime.Type
   take?: number
   skip?: number
   distinct?: Prisma.FuturesLiquidationCloseScalarFieldEnum | Prisma.FuturesLiquidationCloseScalarFieldEnum[]
+}
+
+/**
+ * FuturesInstrument.seasonPrices
+ */
+export type FuturesInstrument$seasonPricesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the FuturesSeasonPrice
+   */
+  select?: Prisma.FuturesSeasonPriceSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the FuturesSeasonPrice
+   */
+  omit?: Prisma.FuturesSeasonPriceOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FuturesSeasonPriceInclude<ExtArgs> | null
+  where?: Prisma.FuturesSeasonPriceWhereInput
+  orderBy?: Prisma.FuturesSeasonPriceOrderByWithRelationInput | Prisma.FuturesSeasonPriceOrderByWithRelationInput[]
+  cursor?: Prisma.FuturesSeasonPriceWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.FuturesSeasonPriceScalarFieldEnum | Prisma.FuturesSeasonPriceScalarFieldEnum[]
+}
+
+/**
+ * FuturesInstrument.seasonCloses
+ */
+export type FuturesInstrument$seasonClosesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the FuturesSeasonClose
+   */
+  select?: Prisma.FuturesSeasonCloseSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the FuturesSeasonClose
+   */
+  omit?: Prisma.FuturesSeasonCloseOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FuturesSeasonCloseInclude<ExtArgs> | null
+  where?: Prisma.FuturesSeasonCloseWhereInput
+  orderBy?: Prisma.FuturesSeasonCloseOrderByWithRelationInput | Prisma.FuturesSeasonCloseOrderByWithRelationInput[]
+  cursor?: Prisma.FuturesSeasonCloseWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.FuturesSeasonCloseScalarFieldEnum | Prisma.FuturesSeasonCloseScalarFieldEnum[]
 }
 
 /**

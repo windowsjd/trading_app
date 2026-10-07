@@ -485,6 +485,7 @@ function inferRouteContext(method: string, originalUrl: string) {
         'positions',
         'executions',
         'liquidations',
+        'final-settlement',
         'execute',
       ].includes(route[3])
         ? route[3]

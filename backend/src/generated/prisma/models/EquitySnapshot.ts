@@ -44,6 +44,8 @@ export type EquitySnapshotAvgAggregateOutputType = {
   domesticStockValueKrw: runtime.Decimal | null
   usStockValueKrw: runtime.Decimal | null
   cryptoValueKrw: runtime.Decimal | null
+  futuresUnrealizedPnlUsd: runtime.Decimal | null
+  futuresUnrealizedPnlKrw: runtime.Decimal | null
   cumulativeExternalFundingKrw: runtime.Decimal | null
   investmentPnlKrw: runtime.Decimal | null
   timeWeightedReturnFactor: runtime.Decimal | null
@@ -58,6 +60,8 @@ export type EquitySnapshotSumAggregateOutputType = {
   domesticStockValueKrw: runtime.Decimal | null
   usStockValueKrw: runtime.Decimal | null
   cryptoValueKrw: runtime.Decimal | null
+  futuresUnrealizedPnlUsd: runtime.Decimal | null
+  futuresUnrealizedPnlKrw: runtime.Decimal | null
   cumulativeExternalFundingKrw: runtime.Decimal | null
   investmentPnlKrw: runtime.Decimal | null
   timeWeightedReturnFactor: runtime.Decimal | null
@@ -74,6 +78,8 @@ export type EquitySnapshotMinAggregateOutputType = {
   domesticStockValueKrw: runtime.Decimal | null
   usStockValueKrw: runtime.Decimal | null
   cryptoValueKrw: runtime.Decimal | null
+  futuresUnrealizedPnlUsd: runtime.Decimal | null
+  futuresUnrealizedPnlKrw: runtime.Decimal | null
   snapshotReason: $Enums.SnapshotReason | null
   cumulativeExternalFundingKrw: runtime.Decimal | null
   investmentPnlKrw: runtime.Decimal | null
@@ -95,6 +101,8 @@ export type EquitySnapshotMaxAggregateOutputType = {
   domesticStockValueKrw: runtime.Decimal | null
   usStockValueKrw: runtime.Decimal | null
   cryptoValueKrw: runtime.Decimal | null
+  futuresUnrealizedPnlUsd: runtime.Decimal | null
+  futuresUnrealizedPnlKrw: runtime.Decimal | null
   snapshotReason: $Enums.SnapshotReason | null
   cumulativeExternalFundingKrw: runtime.Decimal | null
   investmentPnlKrw: runtime.Decimal | null
@@ -116,6 +124,9 @@ export type EquitySnapshotCountAggregateOutputType = {
   domesticStockValueKrw: number
   usStockValueKrw: number
   cryptoValueKrw: number
+  futuresUnrealizedPnlUsd: number
+  futuresUnrealizedPnlKrw: number
+  futuresValuationJson: number
   snapshotReason: number
   cumulativeExternalFundingKrw: number
   investmentPnlKrw: number
@@ -137,6 +148,8 @@ export type EquitySnapshotAvgAggregateInputType = {
   domesticStockValueKrw?: true
   usStockValueKrw?: true
   cryptoValueKrw?: true
+  futuresUnrealizedPnlUsd?: true
+  futuresUnrealizedPnlKrw?: true
   cumulativeExternalFundingKrw?: true
   investmentPnlKrw?: true
   timeWeightedReturnFactor?: true
@@ -151,6 +164,8 @@ export type EquitySnapshotSumAggregateInputType = {
   domesticStockValueKrw?: true
   usStockValueKrw?: true
   cryptoValueKrw?: true
+  futuresUnrealizedPnlUsd?: true
+  futuresUnrealizedPnlKrw?: true
   cumulativeExternalFundingKrw?: true
   investmentPnlKrw?: true
   timeWeightedReturnFactor?: true
@@ -167,6 +182,8 @@ export type EquitySnapshotMinAggregateInputType = {
   domesticStockValueKrw?: true
   usStockValueKrw?: true
   cryptoValueKrw?: true
+  futuresUnrealizedPnlUsd?: true
+  futuresUnrealizedPnlKrw?: true
   snapshotReason?: true
   cumulativeExternalFundingKrw?: true
   investmentPnlKrw?: true
@@ -188,6 +205,8 @@ export type EquitySnapshotMaxAggregateInputType = {
   domesticStockValueKrw?: true
   usStockValueKrw?: true
   cryptoValueKrw?: true
+  futuresUnrealizedPnlUsd?: true
+  futuresUnrealizedPnlKrw?: true
   snapshotReason?: true
   cumulativeExternalFundingKrw?: true
   investmentPnlKrw?: true
@@ -209,6 +228,9 @@ export type EquitySnapshotCountAggregateInputType = {
   domesticStockValueKrw?: true
   usStockValueKrw?: true
   cryptoValueKrw?: true
+  futuresUnrealizedPnlUsd?: true
+  futuresUnrealizedPnlKrw?: true
+  futuresValuationJson?: true
   snapshotReason?: true
   cumulativeExternalFundingKrw?: true
   investmentPnlKrw?: true
@@ -317,6 +339,9 @@ export type EquitySnapshotGroupByOutputType = {
   domesticStockValueKrw: runtime.Decimal
   usStockValueKrw: runtime.Decimal
   cryptoValueKrw: runtime.Decimal
+  futuresUnrealizedPnlUsd: runtime.Decimal | null
+  futuresUnrealizedPnlKrw: runtime.Decimal | null
+  futuresValuationJson: runtime.JsonValue | null
   snapshotReason: $Enums.SnapshotReason
   cumulativeExternalFundingKrw: runtime.Decimal | null
   investmentPnlKrw: runtime.Decimal | null
@@ -361,6 +386,9 @@ export type EquitySnapshotWhereInput = {
   domesticStockValueKrw?: Prisma.DecimalFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   usStockValueKrw?: Prisma.DecimalFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   cryptoValueKrw?: Prisma.DecimalFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.DecimalNullableFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.DecimalNullableFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.JsonNullableFilter<"EquitySnapshot">
   snapshotReason?: Prisma.EnumSnapshotReasonFilter<"EquitySnapshot"> | $Enums.SnapshotReason
   cumulativeExternalFundingKrw?: Prisma.DecimalNullableFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.DecimalNullableFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -383,6 +411,9 @@ export type EquitySnapshotOrderByWithRelationInput = {
   domesticStockValueKrw?: Prisma.SortOrder
   usStockValueKrw?: Prisma.SortOrder
   cryptoValueKrw?: Prisma.SortOrder
+  futuresUnrealizedPnlUsd?: Prisma.SortOrderInput | Prisma.SortOrder
+  futuresUnrealizedPnlKrw?: Prisma.SortOrderInput | Prisma.SortOrder
+  futuresValuationJson?: Prisma.SortOrderInput | Prisma.SortOrder
   snapshotReason?: Prisma.SortOrder
   cumulativeExternalFundingKrw?: Prisma.SortOrderInput | Prisma.SortOrder
   investmentPnlKrw?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -409,6 +440,9 @@ export type EquitySnapshotWhereUniqueInput = Prisma.AtLeast<{
   domesticStockValueKrw?: Prisma.DecimalFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   usStockValueKrw?: Prisma.DecimalFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   cryptoValueKrw?: Prisma.DecimalFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.DecimalNullableFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.DecimalNullableFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.JsonNullableFilter<"EquitySnapshot">
   snapshotReason?: Prisma.EnumSnapshotReasonFilter<"EquitySnapshot"> | $Enums.SnapshotReason
   cumulativeExternalFundingKrw?: Prisma.DecimalNullableFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.DecimalNullableFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -431,6 +465,9 @@ export type EquitySnapshotOrderByWithAggregationInput = {
   domesticStockValueKrw?: Prisma.SortOrder
   usStockValueKrw?: Prisma.SortOrder
   cryptoValueKrw?: Prisma.SortOrder
+  futuresUnrealizedPnlUsd?: Prisma.SortOrderInput | Prisma.SortOrder
+  futuresUnrealizedPnlKrw?: Prisma.SortOrderInput | Prisma.SortOrder
+  futuresValuationJson?: Prisma.SortOrderInput | Prisma.SortOrder
   snapshotReason?: Prisma.SortOrder
   cumulativeExternalFundingKrw?: Prisma.SortOrderInput | Prisma.SortOrder
   investmentPnlKrw?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -460,6 +497,9 @@ export type EquitySnapshotScalarWhereWithAggregatesInput = {
   domesticStockValueKrw?: Prisma.DecimalWithAggregatesFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   usStockValueKrw?: Prisma.DecimalWithAggregatesFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   cryptoValueKrw?: Prisma.DecimalWithAggregatesFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.DecimalNullableWithAggregatesFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.DecimalNullableWithAggregatesFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.JsonNullableWithAggregatesFilter<"EquitySnapshot">
   snapshotReason?: Prisma.EnumSnapshotReasonWithAggregatesFilter<"EquitySnapshot"> | $Enums.SnapshotReason
   cumulativeExternalFundingKrw?: Prisma.DecimalNullableWithAggregatesFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.DecimalNullableWithAggregatesFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -480,6 +520,9 @@ export type EquitySnapshotCreateInput = {
   domesticStockValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   usStockValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   cryptoValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   snapshotReason: $Enums.SnapshotReason
   cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -502,6 +545,9 @@ export type EquitySnapshotUncheckedCreateInput = {
   domesticStockValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   usStockValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   cryptoValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   snapshotReason: $Enums.SnapshotReason
   cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -522,6 +568,9 @@ export type EquitySnapshotUpdateInput = {
   domesticStockValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   usStockValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   cryptoValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   snapshotReason?: Prisma.EnumSnapshotReasonFieldUpdateOperationsInput | $Enums.SnapshotReason
   cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -544,6 +593,9 @@ export type EquitySnapshotUncheckedUpdateInput = {
   domesticStockValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   usStockValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   cryptoValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   snapshotReason?: Prisma.EnumSnapshotReasonFieldUpdateOperationsInput | $Enums.SnapshotReason
   cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -565,6 +617,9 @@ export type EquitySnapshotCreateManyInput = {
   domesticStockValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   usStockValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   cryptoValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   snapshotReason: $Enums.SnapshotReason
   cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -585,6 +640,9 @@ export type EquitySnapshotUpdateManyMutationInput = {
   domesticStockValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   usStockValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   cryptoValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   snapshotReason?: Prisma.EnumSnapshotReasonFieldUpdateOperationsInput | $Enums.SnapshotReason
   cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -606,6 +664,9 @@ export type EquitySnapshotUncheckedUpdateManyInput = {
   domesticStockValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   usStockValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   cryptoValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   snapshotReason?: Prisma.EnumSnapshotReasonFieldUpdateOperationsInput | $Enums.SnapshotReason
   cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -644,6 +705,9 @@ export type EquitySnapshotCountOrderByAggregateInput = {
   domesticStockValueKrw?: Prisma.SortOrder
   usStockValueKrw?: Prisma.SortOrder
   cryptoValueKrw?: Prisma.SortOrder
+  futuresUnrealizedPnlUsd?: Prisma.SortOrder
+  futuresUnrealizedPnlKrw?: Prisma.SortOrder
+  futuresValuationJson?: Prisma.SortOrder
   snapshotReason?: Prisma.SortOrder
   cumulativeExternalFundingKrw?: Prisma.SortOrder
   investmentPnlKrw?: Prisma.SortOrder
@@ -663,6 +727,8 @@ export type EquitySnapshotAvgOrderByAggregateInput = {
   domesticStockValueKrw?: Prisma.SortOrder
   usStockValueKrw?: Prisma.SortOrder
   cryptoValueKrw?: Prisma.SortOrder
+  futuresUnrealizedPnlUsd?: Prisma.SortOrder
+  futuresUnrealizedPnlKrw?: Prisma.SortOrder
   cumulativeExternalFundingKrw?: Prisma.SortOrder
   investmentPnlKrw?: Prisma.SortOrder
   timeWeightedReturnFactor?: Prisma.SortOrder
@@ -679,6 +745,8 @@ export type EquitySnapshotMaxOrderByAggregateInput = {
   domesticStockValueKrw?: Prisma.SortOrder
   usStockValueKrw?: Prisma.SortOrder
   cryptoValueKrw?: Prisma.SortOrder
+  futuresUnrealizedPnlUsd?: Prisma.SortOrder
+  futuresUnrealizedPnlKrw?: Prisma.SortOrder
   snapshotReason?: Prisma.SortOrder
   cumulativeExternalFundingKrw?: Prisma.SortOrder
   investmentPnlKrw?: Prisma.SortOrder
@@ -700,6 +768,8 @@ export type EquitySnapshotMinOrderByAggregateInput = {
   domesticStockValueKrw?: Prisma.SortOrder
   usStockValueKrw?: Prisma.SortOrder
   cryptoValueKrw?: Prisma.SortOrder
+  futuresUnrealizedPnlUsd?: Prisma.SortOrder
+  futuresUnrealizedPnlKrw?: Prisma.SortOrder
   snapshotReason?: Prisma.SortOrder
   cumulativeExternalFundingKrw?: Prisma.SortOrder
   investmentPnlKrw?: Prisma.SortOrder
@@ -719,6 +789,8 @@ export type EquitySnapshotSumOrderByAggregateInput = {
   domesticStockValueKrw?: Prisma.SortOrder
   usStockValueKrw?: Prisma.SortOrder
   cryptoValueKrw?: Prisma.SortOrder
+  futuresUnrealizedPnlUsd?: Prisma.SortOrder
+  futuresUnrealizedPnlKrw?: Prisma.SortOrder
   cumulativeExternalFundingKrw?: Prisma.SortOrder
   investmentPnlKrw?: Prisma.SortOrder
   timeWeightedReturnFactor?: Prisma.SortOrder
@@ -784,6 +856,9 @@ export type EquitySnapshotCreateWithoutTradingAccountInput = {
   domesticStockValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   usStockValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   cryptoValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   snapshotReason: $Enums.SnapshotReason
   cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -804,6 +879,9 @@ export type EquitySnapshotUncheckedCreateWithoutTradingAccountInput = {
   domesticStockValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   usStockValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   cryptoValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   snapshotReason: $Enums.SnapshotReason
   cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -854,6 +932,9 @@ export type EquitySnapshotScalarWhereInput = {
   domesticStockValueKrw?: Prisma.DecimalFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   usStockValueKrw?: Prisma.DecimalFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   cryptoValueKrw?: Prisma.DecimalFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.DecimalNullableFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.DecimalNullableFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.JsonNullableFilter<"EquitySnapshot">
   snapshotReason?: Prisma.EnumSnapshotReasonFilter<"EquitySnapshot"> | $Enums.SnapshotReason
   cumulativeExternalFundingKrw?: Prisma.DecimalNullableFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.DecimalNullableFilter<"EquitySnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -874,6 +955,9 @@ export type EquitySnapshotCreateManyTradingAccountInput = {
   domesticStockValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   usStockValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   cryptoValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   snapshotReason: $Enums.SnapshotReason
   cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -894,6 +978,9 @@ export type EquitySnapshotUpdateWithoutTradingAccountInput = {
   domesticStockValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   usStockValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   cryptoValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   snapshotReason?: Prisma.EnumSnapshotReasonFieldUpdateOperationsInput | $Enums.SnapshotReason
   cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -914,6 +1001,9 @@ export type EquitySnapshotUncheckedUpdateWithoutTradingAccountInput = {
   domesticStockValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   usStockValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   cryptoValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   snapshotReason?: Prisma.EnumSnapshotReasonFieldUpdateOperationsInput | $Enums.SnapshotReason
   cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -934,6 +1024,9 @@ export type EquitySnapshotUncheckedUpdateManyWithoutTradingAccountInput = {
   domesticStockValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   usStockValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   cryptoValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   snapshotReason?: Prisma.EnumSnapshotReasonFieldUpdateOperationsInput | $Enums.SnapshotReason
   cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -957,6 +1050,9 @@ export type EquitySnapshotSelect<ExtArgs extends runtime.Types.Extensions.Intern
   domesticStockValueKrw?: boolean
   usStockValueKrw?: boolean
   cryptoValueKrw?: boolean
+  futuresUnrealizedPnlUsd?: boolean
+  futuresUnrealizedPnlKrw?: boolean
+  futuresValuationJson?: boolean
   snapshotReason?: boolean
   cumulativeExternalFundingKrw?: boolean
   investmentPnlKrw?: boolean
@@ -979,6 +1075,9 @@ export type EquitySnapshotSelectCreateManyAndReturn<ExtArgs extends runtime.Type
   domesticStockValueKrw?: boolean
   usStockValueKrw?: boolean
   cryptoValueKrw?: boolean
+  futuresUnrealizedPnlUsd?: boolean
+  futuresUnrealizedPnlKrw?: boolean
+  futuresValuationJson?: boolean
   snapshotReason?: boolean
   cumulativeExternalFundingKrw?: boolean
   investmentPnlKrw?: boolean
@@ -1001,6 +1100,9 @@ export type EquitySnapshotSelectUpdateManyAndReturn<ExtArgs extends runtime.Type
   domesticStockValueKrw?: boolean
   usStockValueKrw?: boolean
   cryptoValueKrw?: boolean
+  futuresUnrealizedPnlUsd?: boolean
+  futuresUnrealizedPnlKrw?: boolean
+  futuresValuationJson?: boolean
   snapshotReason?: boolean
   cumulativeExternalFundingKrw?: boolean
   investmentPnlKrw?: boolean
@@ -1023,6 +1125,9 @@ export type EquitySnapshotSelectScalar = {
   domesticStockValueKrw?: boolean
   usStockValueKrw?: boolean
   cryptoValueKrw?: boolean
+  futuresUnrealizedPnlUsd?: boolean
+  futuresUnrealizedPnlKrw?: boolean
+  futuresValuationJson?: boolean
   snapshotReason?: boolean
   cumulativeExternalFundingKrw?: boolean
   investmentPnlKrw?: boolean
@@ -1034,7 +1139,7 @@ export type EquitySnapshotSelectScalar = {
   createdAt?: boolean
 }
 
-export type EquitySnapshotOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "tradingAccountId" | "totalAssetKrw" | "returnRate" | "krwCash" | "usdCashKrw" | "domesticStockValueKrw" | "usStockValueKrw" | "cryptoValueKrw" | "snapshotReason" | "cumulativeExternalFundingKrw" | "investmentPnlKrw" | "timeWeightedReturnFactor" | "externalFundingAmountKrw" | "externalFundingReferenceType" | "externalFundingReferenceId" | "capturedAt" | "createdAt", ExtArgs["result"]["equitySnapshot"]>
+export type EquitySnapshotOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "tradingAccountId" | "totalAssetKrw" | "returnRate" | "krwCash" | "usdCashKrw" | "domesticStockValueKrw" | "usStockValueKrw" | "cryptoValueKrw" | "futuresUnrealizedPnlUsd" | "futuresUnrealizedPnlKrw" | "futuresValuationJson" | "snapshotReason" | "cumulativeExternalFundingKrw" | "investmentPnlKrw" | "timeWeightedReturnFactor" | "externalFundingAmountKrw" | "externalFundingReferenceType" | "externalFundingReferenceId" | "capturedAt" | "createdAt", ExtArgs["result"]["equitySnapshot"]>
 export type EquitySnapshotInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
 }
@@ -1060,6 +1165,12 @@ export type $EquitySnapshotPayload<ExtArgs extends runtime.Types.Extensions.Inte
     domesticStockValueKrw: runtime.Decimal
     usStockValueKrw: runtime.Decimal
     cryptoValueKrw: runtime.Decimal
+    /**
+     * Signed Mark UPNL; NULL preserves pre-F3 snapshot semantics.
+     */
+    futuresUnrealizedPnlUsd: runtime.Decimal | null
+    futuresUnrealizedPnlKrw: runtime.Decimal | null
+    futuresValuationJson: runtime.JsonValue | null
     snapshotReason: $Enums.SnapshotReason
     /**
      * initial_grant + ad_reward inflows to date. Never a guess: only the two
@@ -1513,6 +1624,9 @@ export interface EquitySnapshotFieldRefs {
   readonly domesticStockValueKrw: Prisma.FieldRef<"EquitySnapshot", 'Decimal'>
   readonly usStockValueKrw: Prisma.FieldRef<"EquitySnapshot", 'Decimal'>
   readonly cryptoValueKrw: Prisma.FieldRef<"EquitySnapshot", 'Decimal'>
+  readonly futuresUnrealizedPnlUsd: Prisma.FieldRef<"EquitySnapshot", 'Decimal'>
+  readonly futuresUnrealizedPnlKrw: Prisma.FieldRef<"EquitySnapshot", 'Decimal'>
+  readonly futuresValuationJson: Prisma.FieldRef<"EquitySnapshot", 'Json'>
   readonly snapshotReason: Prisma.FieldRef<"EquitySnapshot", 'SnapshotReason'>
   readonly cumulativeExternalFundingKrw: Prisma.FieldRef<"EquitySnapshot", 'Decimal'>
   readonly investmentPnlKrw: Prisma.FieldRef<"EquitySnapshot", 'Decimal'>

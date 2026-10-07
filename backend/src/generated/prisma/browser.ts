@@ -256,3 +256,18 @@ export type FuturesLiquidation = Prisma.FuturesLiquidationModel
  * 
  */
 export type FuturesLiquidationClose = Prisma.FuturesLiquidationCloseModel
+/**
+ * Model FuturesSeasonPrice
+ * 
+ */
+export type FuturesSeasonPrice = Prisma.FuturesSeasonPriceModel
+/**
+ * Model FuturesSeasonSettlement
+ * 
+ */
+export type FuturesSeasonSettlement = Prisma.FuturesSeasonSettlementModel
+/**
+ * Model FuturesSeasonClose
+ * 
+ */
+export type FuturesSeasonClose = Prisma.FuturesSeasonCloseModel

@@ -1,5 +1,20 @@
 # Batch Job Foundation
 
+## Futures F3
+
+Daily/current snapshots include signed fresh Mark Futures UPNL and durable
+USD/KRW/component evidence. Spot `cryptoValueKrw` retains its meaning. Historical
+component columns remain null; no history backfill is inferred.
+
+Season final settlement now runs `FuturesSeasonSettlementService` after the existing
+reservation guard and before final valuations. It pins one Spot price per Season/
+instrument at endAt, reuses it on retries, and atomically closes each account's open
+lifetimes before publishing any final result. Excluded/non-ranking accounts are
+included in this lifecycle step. Dry-run projects final cash without writing pins,
+positions or settlement evidence. Missing evidence/collateral integrity fails closed.
+The existing no-eligible-participants error is unchanged; it never marks such a
+Season settled. [Exact boundaries and release procedure](futures-f3-contract.md).
+
 ## Market-aware daily valuation
 
 Daily portfolio snapshot and current-ranking valuation do not stop globally because KRX or US is closed. Each position applies its own market state: a closed stock market may use only the last valid provider price inside its latest completed session; an open stock market and crypto require the normal fresh price. Missing latest-session evidence is a data problem and never silently falls back to an older provider session. Existing eligible `admin_manual` fallback remains unchanged. Season settlement keeps its separate reproducible `Season.endAt` selection policy, and snapshot dates/season dates remain ordinary calendar dates.

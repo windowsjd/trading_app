@@ -1,3 +1,4 @@
+import { BINANCE_FIXED_ASSET_UNIVERSE } from '../providers/binance/binance-fixed-asset-universe';
 import type {
   FuturesExecution,
   FuturesInstrument,
@@ -20,6 +21,12 @@ export function presentFuturesInstrument(row: InstrumentWithAsset) {
       symbol: row.underlyingAsset.symbol,
       name: row.underlyingAsset.name,
       market: row.underlyingAsset.market,
+      // Reuse underlying tick display metadata; unknown crypto keeps precision
+      // instead of falling through to the generic USD two-decimal formatter.
+      displayPriceDecimals:
+        BINANCE_FIXED_ASSET_UNIVERSE.find(
+          (entry) => entry.symbol === row.underlyingAsset.symbol,
+        )?.displayPriceDecimals ?? 8,
     },
   };
 }

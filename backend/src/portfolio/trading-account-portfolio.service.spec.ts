@@ -324,7 +324,17 @@ describe('account equity daily read contract and legacy ranges', () => {
         range: '30d',
         granularity: 'daily',
       });
-      expect(response).toEqual(fixture[mode]);
+      expect(response).toEqual({
+        ...fixture[mode],
+        data: {
+          ...fixture[mode].data,
+          points: fixture[mode].data.points.map((point) => ({
+            ...point,
+            futuresUnrealizedPnlUsd: null,
+            futuresUnrealizedPnlKrw: null,
+          })),
+        },
+      });
       expect(JSON.stringify(h.rows)).toBe(before);
       expect(h.client.dailyPortfolioSnapshot.findMany).toHaveBeenCalledWith(
         expect.objectContaining({

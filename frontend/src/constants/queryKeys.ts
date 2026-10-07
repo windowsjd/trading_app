@@ -282,6 +282,13 @@ export const QUERY_KEYS = {
    * have refreshed.
    */
   tradingAccount: {
+    futures: {
+      all: (id: string) => ['tradingAccount', 'futures', id] as const,
+      instruments: (id: string) => ['tradingAccount', 'futures', id, 'instruments'] as const,
+      positions: (id: string) => ['tradingAccount', 'futures', id, 'positions'] as const,
+      history: (id: string, kind: 'executions' | 'liquidations', offset: number) => ['tradingAccount', 'futures', id, kind, offset] as const,
+      finalSettlement: (id: string) => ['tradingAccount', 'futures', id, 'final-settlement'] as const,
+    },
     /** Everything account-scoped; the logout-time clear target. */
     all: ['tradingAccount'] as const,
 

@@ -61,8 +61,10 @@ lock을 사용하고 중복 삽입은 unique conflict로 막는다. CHECK는 Pri
 balance를 Decimal로 먼저 합산하고 기존 Spot Position과 동일 workflow의 단일
 canonical USD/KRW evidence로 평가한다. 모든 USD 현금이 0이고 USD position이
 없으면 FX에 의존하지 않는다. Portfolio/Home/General TWR/Equity/Daily snapshot/
-season live ranking/settlement/records는 동일 valuation 의미를 사용한다. Futures
-wallet의 cash만 포함하며 Futures unrealized PnL·margin은 추가하지 않는다. realized PnL/fee에 따른 cash 변화는 반영한다. 현금 위치만
+season live ranking/settlement/records는 동일 valuation 의미를 사용한다. F3는 여기에
+fresh Mark 기반 signed Futures UPNL을 같은 USD/KRW evidence로 환산해 더한다.
+Futures wallet cash는 이미 포함되어 있으므로 다시 더하지 않으며 margin/요구액/notional은
+자산에 더하지 않는다. realized PnL/fee는 cash 변화로만 반영한다. 현금 위치만
 scope 사이에서 바뀌어도 총현금·총자산은 같다. aggregate cash는 별도로 저장하지 않는다.
 `balanceAmount`는 총 보유 현금, `reservedAmount`는 submitted 지정가 BUY 예약금,
 `availableAmount = balanceAmount - reservedAmount`는 파생값이다. 예약은 총자산에서
@@ -95,8 +97,9 @@ FX와 Transfer의 records/네 ledger leg는 구분하고 typed parent command로
 FX fee/repricing은 기존 standalone FX와 동일한 경제적 효과를 가지며 Transfer leg만
 성과 중립이다. 외부 funding/TWR cash-flow boundary는 추가하지 않는다.
 Securities KRW↔USD는 기존 환전 화면을 사용한다. 자동환전·Orders auto-funding·
-다른 계정/사용자 송금은 없다. Futures F1/F2 backend는 [Futures 계약](futures-api-contract.md)을 따른다.
-`FUTURES_TRADING_MODE` 기본 DISABLED(기존 boolean 호환)이며 F3 전 사용자 활성화 금지다.
+다른 계정/사용자 송금은 없다. Futures F1/F2/F3는 [Futures 계약](futures-api-contract.md)을 따른다.
+`FUTURES_TRADING_MODE` 기본 DISABLED(기존 boolean 호환)이며 실제 사용자 활성화는
+[F3 release 절차](futures-f3-contract.md)를 거친 별도 운영 결정이다.
 USD 출금과 Futures→KRW FX+Transfer는 Isolated allocation과 fresh Mark 기반 Cross initial/
 maintenance requirement를 함께 보호한다. [F2 risk 계약](futures-risk-contract.md)을 참조한다.
 `reservedAmount`는 margin이 아니며 기존 Wallet `availableAmount` 계약은 유지한다.

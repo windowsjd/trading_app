@@ -231,6 +231,8 @@ describe('DailyPortfolioSnapshotJobService', () => {
       'account-of-sp-99',
       startedAt,
       'daily_portfolio_snapshot',
+      prisma,
+      expect.objectContaining({ workflow: 'daily_portfolio_snapshot' }),
     );
     expect(result.participants).toMatchObject({
       total: 100,
@@ -338,6 +340,8 @@ describe('DailyPortfolioSnapshotJobService', () => {
         'account-of-sp-1',
         new Date('2026-05-20T14:59:59.000Z'),
         'daily_portfolio_snapshot',
+        prisma,
+        expect.objectContaining({ workflow: 'daily_portfolio_snapshot' }),
       );
     } finally {
       jest.useRealTimers();
@@ -403,6 +407,8 @@ describe('DailyPortfolioSnapshotJobService', () => {
       'account-of-sp-1',
       startedAt,
       'daily_portfolio_snapshot',
+      prisma,
+      expect.objectContaining({ workflow: 'daily_portfolio_snapshot' }),
     );
     expect(batchService.runJob).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -525,6 +531,8 @@ describe('DailyPortfolioSnapshotJobService', () => {
       'account-of-sp-1',
       startedAt,
       'daily_portfolio_snapshot',
+      prisma,
+      expect.objectContaining({ workflow: 'daily_portfolio_snapshot' }),
     );
   });
 
@@ -1269,8 +1277,16 @@ function participantDetail(input: {
         currencyCode: CurrencyCode.USD,
         balanceAmount: new Prisma.Decimal(input.usdCash ?? '0.00000000'),
       },
-      { walletScope: 'crypto_spot' as const, currencyCode: CurrencyCode.USD, balanceAmount: new Prisma.Decimal('0.00000000') },
-      { walletScope: 'crypto_futures' as const, currencyCode: CurrencyCode.USD, balanceAmount: new Prisma.Decimal('0.00000000') },
+      {
+        walletScope: 'crypto_spot' as const,
+        currencyCode: CurrencyCode.USD,
+        balanceAmount: new Prisma.Decimal('0.00000000'),
+      },
+      {
+        walletScope: 'crypto_futures' as const,
+        currencyCode: CurrencyCode.USD,
+        balanceAmount: new Prisma.Decimal('0.00000000'),
+      },
     ],
     positions: input.positions ?? [],
   };

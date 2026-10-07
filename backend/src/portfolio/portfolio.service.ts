@@ -262,6 +262,10 @@ export class PortfolioService {
       assetValueKrw: valuation.assetValueKrw,
       realizedPnlKrw: valuation.realizedPnlKrw,
       unrealizedPnlKrw: valuation.unrealizedPnlKrw,
+      futuresUnrealizedPnlUsd:
+        valuation.futuresUnrealizedPnlUsd ?? '0.00000000',
+      futuresUnrealizedPnlKrw:
+        valuation.futuresUnrealizedPnlKrw ?? '0.00000000',
     };
   }
 

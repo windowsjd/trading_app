@@ -10,7 +10,10 @@ import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
 export async function settleFuturesCash(
   tx: Prisma.TransactionClient,
   wallet: CashWallet,
-  referenceType: 'futures_execution' | 'futures_liquidation',
+  referenceType:
+    | 'futures_execution'
+    | 'futures_liquidation'
+    | 'futures_season_settlement',
   referenceId: string,
   pnl: Prisma.Decimal,
   fee: Prisma.Decimal,

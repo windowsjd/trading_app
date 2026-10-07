@@ -1,3 +1,5 @@
+import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
+import { futuresSnapshotValues } from '../portfolio/futures-snapshot-values';
 import {
   buildSelectionFailureEvidence,
   describeManualFallback,
@@ -4137,6 +4139,7 @@ export class OrdersService {
         domesticStockValueKrw: valuation.domesticStockValueKrw,
         usStockValueKrw: valuation.usStockValueKrw,
         cryptoValueKrw: valuation.cryptoValueKrw,
+        ...futuresSnapshotValues(valuation),
         snapshotReason: SnapshotReason.order_executed,
         capturedAt,
       },
@@ -4201,6 +4204,9 @@ export class OrdersService {
     domesticStockValueKrw: string;
     usStockValueKrw: string;
     cryptoValueKrw: string;
+    futuresUnrealizedPnlUsd?: string;
+    futuresUnrealizedPnlKrw?: string;
+    futuresValuationJson?: Prisma.InputJsonObject;
   }> {
     const account = await tx.tradingAccount.findUnique({
       where: {
@@ -4220,6 +4226,7 @@ export class OrdersService {
             balanceAmount: true,
           },
         },
+        futuresPositions: { where: { status: 'open' }, select: { id: true } },
         positions: {
           select: {
             id: true,
@@ -4353,6 +4360,16 @@ export class OrdersService {
           },
           select: { id: true },
         });
+      }
+      if (account.futuresPositions?.length) {
+        return new PortfolioValuationService(
+          this.prisma,
+        ).calculateTradingAccountValuation(
+          tradingAccountId,
+          valuationAt,
+          'live_portfolio_valuation',
+          tx,
+        );
       }
       return valuation;
     } catch (error) {

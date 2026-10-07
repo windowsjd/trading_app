@@ -1,5 +1,15 @@
 # Trading UI browser regression
 
+Futures uses `NODE_PATH=/path/to/browser-tools/node_modules node
+test/browser/futuresBrowser.cjs`. It mounts the production Futures screen/API/query
+and themed components with fixture transport only. It checks 112 layouts across
+320/360/390/430px, font scale 1/2, actual Light/Dark preference, open/isolated/cross/
+stale/empty/loading/error states, server trading modes, account binding, 100x,
+long prices/signed PnL and glyph bounds. Additional checks cover a 320×300 focused
+input/submit viewport and a desktop capture. Output defaults to
+`/tmp/trading-f3-browser` (`FUTURES_BROWSER_OUTPUT` overrides). The viewport resize
+is Web evidence, not a physical Android/iOS keyboard test.
+
 Login/Home recovery uses `NODE_PATH=/path/to/browser-tools/node_modules node
 test/browser/portfolioRecoveryBrowser.cjs`. Production AppProviders, login,
 token storage, Axios interceptors, session ownership, mode selection, account

@@ -1243,6 +1243,20 @@ async function legacy() {
         `UPDATE orders SET cash_wallet_scope = 'crypto_spot' WHERE id = 'buyfill'`,
       ),
     );
+    // Backfill assertions above use the original cutover. Exercise the current
+    // order implementation only after applying the remaining additive schema.
+    for (const migration of readdirSync('prisma/migrations')
+      .filter((n) => /^\d/.test(n) && n > CUTOVER)
+      .sort()) {
+      await db.query(
+        readFileSync(`prisma/migrations/${migration}/migration.sql`, 'utf8')
+          .replaceAll("'public.'", `'${schema}.'`)
+          .replaceAll(
+            'FROM pg_type WHERE',
+            'FROM pg_type WHERE typnamespace = current_schema()::regnamespace AND',
+          ),
+      );
+    }
     client = new PrismaClient({
       adapter: new PrismaPg(
         {

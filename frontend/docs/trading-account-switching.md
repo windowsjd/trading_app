@@ -69,6 +69,7 @@ plus one AsyncStorage entry.
 | Order               | **route param**, fixed at entry                            | `/orders/quote`, `/orders`, `/positions`, `/wallets`                                                                                       |
 | Wallet FX           | selected                                                   | `/wallets`, `/fx/quote`, `/fx/execute`; public `/fx/rates/current`                                                                         |
 | Wallet transfer     | selected                                                   | `/wallets`, `/wallet-transfers`; outgoing Futures also reads `/futures/positions`                                                         |
+| Futures             | route-pinned `accountId`                                    | `/futures/instruments`, `/positions`, `/execute`, `/executions`, `/liquidations`, `/final-settlement` within the account prefix            |
 | Wallet ledger       | selected                                                   | `/wallet-transactions`                                                                                                                     |
 | Order list + cancel | season record's account or General Home's pinned accountId | `/orders`, `/orders/:orderId/cancel`                                                                                                       |
 

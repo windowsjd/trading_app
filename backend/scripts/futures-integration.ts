@@ -190,7 +190,20 @@ async function newInstrument() {
     },
   });
   const instrument = await db.futuresInstrument.create({
-    data: { underlyingAssetId: asset.id },
+    data: {
+      underlyingAssetId: asset.id,
+      markVerifiedAt: await now(),
+      markContractJson: {
+        symbol: asset.symbol,
+        pair: asset.symbol,
+        baseAsset: asset.symbol.slice(0, -4),
+        contractType: 'PERPETUAL',
+        status: 'TRADING',
+        quoteAsset: 'USDT',
+        marginAsset: 'USDT',
+        underlyingType: 'COIN',
+      },
+    },
   });
   return { asset, instrument };
 }
@@ -446,6 +459,7 @@ async function lifecycle(
 ) {
   const s = await fixture(mode);
   try {
+    await fxEvidence();
     const snapshots = await db.equitySnapshot.count({
       where: { tradingAccountId: s.accountId },
     });
@@ -570,7 +584,7 @@ async function lifecycle(
       await db.equitySnapshot.count({
         where: { tradingAccountId: s.accountId },
       }),
-      snapshots,
+      snapshots + 5,
     );
     process.env.FUTURES_TRADING_ENABLED = 'false';
     await db.tradingAccount.update({
@@ -941,7 +955,7 @@ async function remainingMarginLoss(
   }
 }
 
-function faultyDb(point: string) {
+function faultyDb(point: string, occurrence = 1) {
   return new Proxy(db, {
     get(target, key) {
       if (key === '$transaction')
@@ -950,6 +964,7 @@ function faultyDb(point: string) {
         ) =>
           target.$transaction(async (tx) => {
             let debits = 0;
+            let matches = 0;
             const proxy = new Proxy(tx, {
               get(client, prop) {
                 const value = Reflect.get(client, prop);
@@ -966,6 +981,9 @@ function faultyDb(point: string) {
                     'futuresExecution',
                     'walletTransaction',
                     'futuresExecuteRequest',
+                    'futuresSeasonSettlement',
+                    'futuresSeasonClose',
+                    'equitySnapshot',
                   ].includes(String(prop))
                 )
                   return new Proxy(value, {
@@ -974,7 +992,10 @@ function faultyDb(point: string) {
                       if (typeof fn !== 'function') return fn;
                       return async (...args: unknown[]) => {
                         const result = await fn.apply(delegate, args);
-                        if (point === `${String(prop)}.${String(method)}`)
+                        if (
+                          point === `${String(prop)}.${String(method)}` &&
+                          ++matches === occurrence
+                        )
                           throw new Error(point);
                         return result;
                       };

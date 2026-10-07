@@ -1908,6 +1908,8 @@ export class RecordsService {
       if (
         !(error instanceof PortfolioValuationError) ||
         ![
+          'FUTURES_MARK_UNAVAILABLE',
+          'FUTURES_MARK_STALE',
           'ASSET_PRICE_UNAVAILABLE',
           'ASSET_PRICE_STALE',
           'PRICE_STALE',

@@ -1,6 +1,6 @@
 # Account-Scoped Finance API Contract (wallets / ledger / transfers / FX)
 
-## Current policy (2026-10-07)
+## Current policy (2026-10-08)
 
 New Crypto Spot orders use Crypto Spot USD. Stocks and FX retain Securities;
 legacy Orders/order Quotes preserve Securities through pinned provenance.
@@ -8,6 +8,11 @@ USD internal transfers, explicit Securities KRW ↔ Crypto USD composite transfe
 and all four wallet groups are available in the app. Crypto remains USD-only;
 the composite uses Securities USD between its FX and transfer legs.
 See [transfer and provenance contract](wallet-transfers-api-contract.md).
+F3 adds signed fresh Mark Futures UPNL to total equity, without duplicating any
+wallet cash or margin. Internal Transfer remains funding-neutral; FX fees retain
+their economic effect. Final Season exits use the linked
+`futures_season_settlement` ledger type, with economic PnL/fee and actual settlement/
+shortfall distinguished in [Futures final evidence](futures-f3-contract.md).
 The implementation history below does not override this policy.
 
 ## Status
@@ -68,7 +73,7 @@ current server contract.
   Same-account USD transfers retain their existing route. Explicit Securities KRW
   ↔ Crypto Spot/Futures USD transfers use the new quote/execute routes, one
   command and one DB transaction with separate linked FX/Transfer evidence.
-  Securities KRW↔USD still uses standalone FX. Futures F1/F2 backend uses this USD
+  Securities KRW↔USD still uses standalone FX. Futures F1/F2/F3 uses this USD
   wallet as collateral; [Futures contract](futures-api-contract.md) keeps trading
   default OFF and protects outgoing free collateral. No automatic FX or order
   funding is introduced. All canonical

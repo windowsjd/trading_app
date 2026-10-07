@@ -1,3 +1,4 @@
+import type { PortfolioValuationSourceReads } from '../portfolio/portfolio-valuation.service';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ParticipantStatus, SeasonStatus } from '../generated/prisma/client';
 import { buildDailyPortfolioSnapshotData } from '../portfolio/daily-portfolio-snapshot-generation';
@@ -130,6 +131,12 @@ export class DailyPortfolioSnapshotJobService {
       sourceSummary: this.emptySourceSummary(),
     };
 
+    const futuresMarks: NonNullable<
+      PortfolioValuationSourceReads['futuresMarks']
+    > = new Map();
+    const futuresMarkBoundary = input.snapshotTimezone
+      ? new Date()
+      : capturedAt;
     for (const participant of participants) {
       if (input.isLockOwned && !input.isLockOwned()) {
         throw new Error('Ops job lock ownership was lost.');
@@ -161,6 +168,15 @@ export class DailyPortfolioSnapshotJobService {
             participant.tradingAccountId,
             capturedAt,
             'daily_portfolio_snapshot',
+            this.prisma,
+            {
+              client: this.prisma,
+              valuationAtMs: +capturedAt,
+              workflow: 'daily_portfolio_snapshot',
+              assetPrices: new Map(),
+              futuresMarks,
+              futuresMarkBoundary,
+            },
           );
         if (valuation.seasonParticipantId !== participant.id) {
           throw new Error(

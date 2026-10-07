@@ -9,6 +9,93 @@ import { buildSelectionFailureEvidence } from '../providers/source-selection-dia
 import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
 import { futuresError } from './futures-error';
 
+/** Historical normal exit: query the boundary first, so post-end ingestion
+ * cannot hide an eligible earlier trade. No REST call or historical fabrication. */
+export async function readFuturesFinalPrice(
+  client: Pick<Prisma.TransactionClient, 'assetPriceSnapshot'>,
+  asset: Asset,
+  endAt: Date,
+) {
+  setAdminDiagnosticContext({
+    failureStage: 'futures_final_spot_price_selection',
+    entities: { assetId: asset.id },
+    evidence: { evaluationState: 'end_boundary_selection', endAt },
+  });
+  const eligibility = resolveAssetProviderEligibility({
+    workflow: 'orders_execute',
+    asset,
+  });
+  if (!eligibility.eligible)
+    futuresError(
+      'FUTURES_FINAL_PRICE_UNAVAILABLE',
+      'Final Futures settlement price is unavailable.',
+    );
+  const candidates = await Promise.all(
+    eligibility.sourceNames.map((sourceName) =>
+      client.assetPriceSnapshot.findFirst({
+        where: {
+          assetId: asset.id,
+          currencyCode: 'USD',
+          sourceType: 'provider_api',
+          sourceName,
+          effectiveAt: { gte: new Date(+endAt - 10000), lte: endAt },
+          capturedAt: { gte: new Date(+endAt - 10000), lte: endAt },
+          price: { gt: 0 },
+        },
+        orderBy: [
+          { effectiveAt: 'desc' },
+          { capturedAt: 'desc' },
+          { id: 'desc' },
+        ],
+      }),
+    ),
+  );
+  const selected = candidates.find(
+    (row) => row && validFuturesFinalPrice(row, asset, endAt),
+  );
+  if (!selected)
+    futuresError(
+      'FUTURES_FINAL_PRICE_UNAVAILABLE',
+      'A fresh final execution price at Season end is required.',
+    );
+  return selected;
+}
+
+export function validFuturesFinalPrice(
+  row: Prisma.AssetPriceSnapshotGetPayload<object>,
+  asset: Asset,
+  endAt: Date,
+) {
+  const eligibility = resolveAssetProviderEligibility({
+    workflow: 'orders_execute',
+    asset,
+  });
+  if (
+    !eligibility.eligible ||
+    row.assetId !== asset.id ||
+    row.currencyCode !== 'USD' ||
+    row.sourceType !== 'provider_api' ||
+    !row.price.isFinite() ||
+    row.price.lte(0) ||
+    row.effectiveAt > row.capturedAt ||
+    [row.effectiveAt, row.capturedAt].some(
+      (t) => t > endAt || +endAt - +t > 10000,
+    )
+  )
+    return false;
+  return (
+    selectMarketAwareAssetPriceSnapshotBySourcePriority({
+      asset,
+      workflow: 'orders_execute',
+      candidates: [row],
+      expectedSourceNames: eligibility.sourceNames,
+      now: endAt,
+      freshnessThresholdSeconds: eligibility.freshnessThresholdSeconds,
+      isPositiveValue: (p) => p.price.gt(0),
+    }).state === 'selected'
+  );
+}
+
 /** DB-only canonical Spot evidence; synthetic execution/reference price, never Mark Price. */
 export async function readFuturesPrice(
   client: Pick<Prisma.TransactionClient, 'assetPriceSnapshot'>,

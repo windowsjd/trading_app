@@ -38,6 +38,8 @@ import {
   type ProviderWorkflow,
 } from '../providers/source-eligibility.policy';
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
+import { readFuturesMark } from '../futures/futures-mark';
+import type { PortfolioFuturesPositionInput } from './portfolio-valuation.policy';
 
 type PortfolioSourceWorkflow = ProviderWorkflow;
 
@@ -56,6 +58,10 @@ export type PortfolioValuationSourceReads = {
     Promise<PortfolioSnapshotSelection<PortfolioAssetPriceSnapshotInput>>
   >;
   usdKrw?: Promise<PortfolioSnapshotSelection<PortfolioFxRateSnapshotInput>>;
+  futuresMarks?: Map<string, ReturnType<typeof readFuturesMark>>;
+  // Batch jobs share only immutable Mark reads across their account transactions.
+  // Each account still checks freshness at its actual locked capture time.
+  futuresMarkBoundary?: Date;
 };
 
 type PositionAssetForSourceSelection = {
@@ -121,6 +127,10 @@ export class PortfolioValuationService {
                 },
               },
             },
+            futuresPositions: {
+              where: { status: 'open' },
+              include: { instrument: { include: { underlyingAsset: true } } },
+            },
           },
         },
       },
@@ -154,6 +164,7 @@ export class PortfolioValuationService {
       initialCapitalKrw: account.initialCapitalKrw,
       cashWallets: account.cashWallets,
       positions: account.positions,
+      futuresPositions: account.futuresPositions ?? [],
       valuationAt,
       sourceEligibilityWorkflow,
       useSettlementPricePolicy,
@@ -178,9 +189,16 @@ export class PortfolioValuationService {
     sourceEligibilityWorkflow: PortfolioSourceWorkflow = 'home_live_valuation',
     client: Prisma.TransactionClient | PrismaService = this.prisma,
     sourceReads?: PortfolioValuationSourceReads,
+    finalFuturesWalletBalance?: Prisma.Decimal,
   ): Promise<PortfolioValuationResult> {
     const useSettlementPricePolicy =
       sourceEligibilityWorkflow === 'season_settlement';
+    if (finalFuturesWalletBalance !== undefined && !useSettlementPricePolicy) {
+      // @diagnosticSurface internal: Programming guard for the read-only Season dry-run projection; never supplied by user input.
+      throw new Error(
+        'Final Futures projection is only valid for Season settlement previews.',
+      );
+    }
     const account = await client.tradingAccount.findUnique({
       where: { id: tradingAccountId },
       select: {
@@ -222,6 +240,10 @@ export class PortfolioValuationService {
             },
           },
         },
+        futuresPositions: {
+          where: { status: 'open' },
+          include: { instrument: { include: { underlyingAsset: true } } },
+        },
       },
     });
 
@@ -252,8 +274,19 @@ export class PortfolioValuationService {
         tradingAccountId: account.id,
       },
       initialCapitalKrw: account.initialCapitalKrw,
-      cashWallets: account.cashWallets,
+      cashWallets:
+        finalFuturesWalletBalance === undefined
+          ? account.cashWallets
+          : account.cashWallets.map((w) =>
+              w.walletScope === 'crypto_futures' && w.currencyCode === 'USD'
+                ? { ...w, balanceAmount: finalFuturesWalletBalance }
+                : w,
+            ),
       positions: account.positions,
+      futuresPositions:
+        finalFuturesWalletBalance === undefined
+          ? (account.futuresPositions ?? [])
+          : [],
       valuationAt,
       sourceEligibilityWorkflow,
       useSettlementPricePolicy,
@@ -293,12 +326,38 @@ export class PortfolioValuationService {
       realizedPnlKrw: Prisma.Decimal;
       asset: PositionAssetForSourceSelection;
     }[];
+    futuresPositions: readonly Omit<PortfolioFuturesPositionInput, 'mark'>[];
     valuationAt: Date;
     sourceEligibilityWorkflow: PortfolioSourceWorkflow;
     useSettlementPricePolicy: boolean;
     client: Prisma.TransactionClient | PrismaService;
     sourceReads?: PortfolioValuationSourceReads;
   }): Promise<PortfolioValuationResult> {
+    if (input.useSettlementPricePolicy && input.futuresPositions.length) {
+      // @diagnosticSurface internal: Portfolio callers project valuation failures to existing partial HTTP or Ops results.
+      throw new PortfolioValuationError(
+        'FUTURES_FINAL_SETTLEMENT_REQUIRED',
+        'All Futures lifetimes must close before final Season valuation.',
+      );
+    }
+    const marks = input.sourceReads
+      ? (input.sourceReads.futuresMarks ??= new Map())
+      : new Map<string, ReturnType<typeof readFuturesMark>>();
+    const futuresPositions = await Promise.all(
+      input.futuresPositions.map(async (position) => {
+        let read = marks.get(position.instrumentId);
+        if (!read) {
+          read = readFuturesMark(
+            input.client,
+            position.instrument,
+            input.sourceReads?.futuresMarkBoundary ?? input.valuationAt,
+            false,
+          );
+          marks.set(position.instrumentId, read);
+        }
+        return { ...position, mark: await read };
+      }),
+    );
     const positions = await Promise.all(
       input.positions.map(async (position) => {
         const priceKey = JSON.stringify([
@@ -341,6 +400,7 @@ export class PortfolioValuationService {
     // No USD cash and no USD position → no FX snapshot is needed at all, so a
     // KRW-only general account never fails on a missing/stale USD rate.
     const needsUsdConversion =
+      futuresPositions.length > 0 ||
       input.cashWallets.some(
         (wallet) =>
           wallet.currencyCode === CurrencyCode.USD &&
@@ -374,6 +434,7 @@ export class PortfolioValuationService {
       initialCapitalKrw: input.initialCapitalKrw,
       cashWallets: input.cashWallets,
       positions,
+      futuresPositions,
       usdKrwSnapshot: usdKrwSelection.snapshot,
       usdKrwSelectionDiagnosticContext: usdKrwSelection.diagnosticContext,
       valuationAt: input.valuationAt,

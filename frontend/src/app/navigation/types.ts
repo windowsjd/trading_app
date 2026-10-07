@@ -19,6 +19,7 @@ export type AuthStackParamList = {
 export type HomeStackParamList = {
   Home: undefined;
   Portfolio: undefined;
+  Futures: { accountId: string };
 };
 
 export type WalletStackParamList = {
@@ -212,3 +213,5 @@ export type MyScreenProps = CompositeScreenProps<
   StackScreenProps<MyStackParamList, 'My'>,
   CompositeScreenProps<TabScreenProps<'MyTab'>, RootScreenProps<'MainTabs'>>
 >;
+
+export type FuturesScreenProps = NativeStackScreenProps<HomeStackParamList, 'Futures'>;

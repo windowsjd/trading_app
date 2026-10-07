@@ -36,6 +36,8 @@ export type DailyPortfolioSnapshotAvgAggregateOutputType = {
   assetValueKrw: runtime.Decimal | null
   realizedPnlKrw: runtime.Decimal | null
   unrealizedPnlKrw: runtime.Decimal | null
+  futuresUnrealizedPnlUsd: runtime.Decimal | null
+  futuresUnrealizedPnlKrw: runtime.Decimal | null
   cumulativeExternalFundingKrw: runtime.Decimal | null
   investmentPnlKrw: runtime.Decimal | null
   timeWeightedReturnFactor: runtime.Decimal | null
@@ -49,6 +51,8 @@ export type DailyPortfolioSnapshotSumAggregateOutputType = {
   assetValueKrw: runtime.Decimal | null
   realizedPnlKrw: runtime.Decimal | null
   unrealizedPnlKrw: runtime.Decimal | null
+  futuresUnrealizedPnlUsd: runtime.Decimal | null
+  futuresUnrealizedPnlKrw: runtime.Decimal | null
   cumulativeExternalFundingKrw: runtime.Decimal | null
   investmentPnlKrw: runtime.Decimal | null
   timeWeightedReturnFactor: runtime.Decimal | null
@@ -65,6 +69,8 @@ export type DailyPortfolioSnapshotMinAggregateOutputType = {
   assetValueKrw: runtime.Decimal | null
   realizedPnlKrw: runtime.Decimal | null
   unrealizedPnlKrw: runtime.Decimal | null
+  futuresUnrealizedPnlUsd: runtime.Decimal | null
+  futuresUnrealizedPnlKrw: runtime.Decimal | null
   cumulativeExternalFundingKrw: runtime.Decimal | null
   investmentPnlKrw: runtime.Decimal | null
   timeWeightedReturnFactor: runtime.Decimal | null
@@ -83,6 +89,8 @@ export type DailyPortfolioSnapshotMaxAggregateOutputType = {
   assetValueKrw: runtime.Decimal | null
   realizedPnlKrw: runtime.Decimal | null
   unrealizedPnlKrw: runtime.Decimal | null
+  futuresUnrealizedPnlUsd: runtime.Decimal | null
+  futuresUnrealizedPnlKrw: runtime.Decimal | null
   cumulativeExternalFundingKrw: runtime.Decimal | null
   investmentPnlKrw: runtime.Decimal | null
   timeWeightedReturnFactor: runtime.Decimal | null
@@ -101,6 +109,9 @@ export type DailyPortfolioSnapshotCountAggregateOutputType = {
   assetValueKrw: number
   realizedPnlKrw: number
   unrealizedPnlKrw: number
+  futuresUnrealizedPnlUsd: number
+  futuresUnrealizedPnlKrw: number
+  futuresValuationJson: number
   cumulativeExternalFundingKrw: number
   investmentPnlKrw: number
   timeWeightedReturnFactor: number
@@ -118,6 +129,8 @@ export type DailyPortfolioSnapshotAvgAggregateInputType = {
   assetValueKrw?: true
   realizedPnlKrw?: true
   unrealizedPnlKrw?: true
+  futuresUnrealizedPnlUsd?: true
+  futuresUnrealizedPnlKrw?: true
   cumulativeExternalFundingKrw?: true
   investmentPnlKrw?: true
   timeWeightedReturnFactor?: true
@@ -131,6 +144,8 @@ export type DailyPortfolioSnapshotSumAggregateInputType = {
   assetValueKrw?: true
   realizedPnlKrw?: true
   unrealizedPnlKrw?: true
+  futuresUnrealizedPnlUsd?: true
+  futuresUnrealizedPnlKrw?: true
   cumulativeExternalFundingKrw?: true
   investmentPnlKrw?: true
   timeWeightedReturnFactor?: true
@@ -147,6 +162,8 @@ export type DailyPortfolioSnapshotMinAggregateInputType = {
   assetValueKrw?: true
   realizedPnlKrw?: true
   unrealizedPnlKrw?: true
+  futuresUnrealizedPnlUsd?: true
+  futuresUnrealizedPnlKrw?: true
   cumulativeExternalFundingKrw?: true
   investmentPnlKrw?: true
   timeWeightedReturnFactor?: true
@@ -165,6 +182,8 @@ export type DailyPortfolioSnapshotMaxAggregateInputType = {
   assetValueKrw?: true
   realizedPnlKrw?: true
   unrealizedPnlKrw?: true
+  futuresUnrealizedPnlUsd?: true
+  futuresUnrealizedPnlKrw?: true
   cumulativeExternalFundingKrw?: true
   investmentPnlKrw?: true
   timeWeightedReturnFactor?: true
@@ -183,6 +202,9 @@ export type DailyPortfolioSnapshotCountAggregateInputType = {
   assetValueKrw?: true
   realizedPnlKrw?: true
   unrealizedPnlKrw?: true
+  futuresUnrealizedPnlUsd?: true
+  futuresUnrealizedPnlKrw?: true
+  futuresValuationJson?: true
   cumulativeExternalFundingKrw?: true
   investmentPnlKrw?: true
   timeWeightedReturnFactor?: true
@@ -288,6 +310,9 @@ export type DailyPortfolioSnapshotGroupByOutputType = {
   assetValueKrw: runtime.Decimal
   realizedPnlKrw: runtime.Decimal
   unrealizedPnlKrw: runtime.Decimal
+  futuresUnrealizedPnlUsd: runtime.Decimal | null
+  futuresUnrealizedPnlKrw: runtime.Decimal | null
+  futuresValuationJson: runtime.JsonValue | null
   cumulativeExternalFundingKrw: runtime.Decimal | null
   investmentPnlKrw: runtime.Decimal | null
   timeWeightedReturnFactor: runtime.Decimal | null
@@ -329,6 +354,9 @@ export type DailyPortfolioSnapshotWhereInput = {
   assetValueKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.JsonNullableFilter<"DailyPortfolioSnapshot">
   cumulativeExternalFundingKrw?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   timeWeightedReturnFactor?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -348,6 +376,9 @@ export type DailyPortfolioSnapshotOrderByWithRelationInput = {
   assetValueKrw?: Prisma.SortOrder
   realizedPnlKrw?: Prisma.SortOrder
   unrealizedPnlKrw?: Prisma.SortOrder
+  futuresUnrealizedPnlUsd?: Prisma.SortOrderInput | Prisma.SortOrder
+  futuresUnrealizedPnlKrw?: Prisma.SortOrderInput | Prisma.SortOrder
+  futuresValuationJson?: Prisma.SortOrderInput | Prisma.SortOrder
   cumulativeExternalFundingKrw?: Prisma.SortOrderInput | Prisma.SortOrder
   investmentPnlKrw?: Prisma.SortOrderInput | Prisma.SortOrder
   timeWeightedReturnFactor?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -371,6 +402,9 @@ export type DailyPortfolioSnapshotWhereUniqueInput = Prisma.AtLeast<{
   assetValueKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.JsonNullableFilter<"DailyPortfolioSnapshot">
   cumulativeExternalFundingKrw?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   timeWeightedReturnFactor?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -390,6 +424,9 @@ export type DailyPortfolioSnapshotOrderByWithAggregationInput = {
   assetValueKrw?: Prisma.SortOrder
   realizedPnlKrw?: Prisma.SortOrder
   unrealizedPnlKrw?: Prisma.SortOrder
+  futuresUnrealizedPnlUsd?: Prisma.SortOrderInput | Prisma.SortOrder
+  futuresUnrealizedPnlKrw?: Prisma.SortOrderInput | Prisma.SortOrder
+  futuresValuationJson?: Prisma.SortOrderInput | Prisma.SortOrder
   cumulativeExternalFundingKrw?: Prisma.SortOrderInput | Prisma.SortOrder
   investmentPnlKrw?: Prisma.SortOrderInput | Prisma.SortOrder
   timeWeightedReturnFactor?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -416,6 +453,9 @@ export type DailyPortfolioSnapshotScalarWhereWithAggregatesInput = {
   assetValueKrw?: Prisma.DecimalWithAggregatesFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalWithAggregatesFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw?: Prisma.DecimalWithAggregatesFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.DecimalNullableWithAggregatesFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.DecimalNullableWithAggregatesFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.JsonNullableWithAggregatesFilter<"DailyPortfolioSnapshot">
   cumulativeExternalFundingKrw?: Prisma.DecimalNullableWithAggregatesFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.DecimalNullableWithAggregatesFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   timeWeightedReturnFactor?: Prisma.DecimalNullableWithAggregatesFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -433,6 +473,9 @@ export type DailyPortfolioSnapshotCreateInput = {
   assetValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   timeWeightedReturnFactor?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -452,6 +495,9 @@ export type DailyPortfolioSnapshotUncheckedCreateInput = {
   assetValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   timeWeightedReturnFactor?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -469,6 +515,9 @@ export type DailyPortfolioSnapshotUpdateInput = {
   assetValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   timeWeightedReturnFactor?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -488,6 +537,9 @@ export type DailyPortfolioSnapshotUncheckedUpdateInput = {
   assetValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   timeWeightedReturnFactor?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -506,6 +558,9 @@ export type DailyPortfolioSnapshotCreateManyInput = {
   assetValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   timeWeightedReturnFactor?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -523,6 +578,9 @@ export type DailyPortfolioSnapshotUpdateManyMutationInput = {
   assetValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   timeWeightedReturnFactor?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -541,6 +599,9 @@ export type DailyPortfolioSnapshotUncheckedUpdateManyInput = {
   assetValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   timeWeightedReturnFactor?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -574,6 +635,9 @@ export type DailyPortfolioSnapshotCountOrderByAggregateInput = {
   assetValueKrw?: Prisma.SortOrder
   realizedPnlKrw?: Prisma.SortOrder
   unrealizedPnlKrw?: Prisma.SortOrder
+  futuresUnrealizedPnlUsd?: Prisma.SortOrder
+  futuresUnrealizedPnlKrw?: Prisma.SortOrder
+  futuresValuationJson?: Prisma.SortOrder
   cumulativeExternalFundingKrw?: Prisma.SortOrder
   investmentPnlKrw?: Prisma.SortOrder
   timeWeightedReturnFactor?: Prisma.SortOrder
@@ -589,6 +653,8 @@ export type DailyPortfolioSnapshotAvgOrderByAggregateInput = {
   assetValueKrw?: Prisma.SortOrder
   realizedPnlKrw?: Prisma.SortOrder
   unrealizedPnlKrw?: Prisma.SortOrder
+  futuresUnrealizedPnlUsd?: Prisma.SortOrder
+  futuresUnrealizedPnlKrw?: Prisma.SortOrder
   cumulativeExternalFundingKrw?: Prisma.SortOrder
   investmentPnlKrw?: Prisma.SortOrder
   timeWeightedReturnFactor?: Prisma.SortOrder
@@ -605,6 +671,8 @@ export type DailyPortfolioSnapshotMaxOrderByAggregateInput = {
   assetValueKrw?: Prisma.SortOrder
   realizedPnlKrw?: Prisma.SortOrder
   unrealizedPnlKrw?: Prisma.SortOrder
+  futuresUnrealizedPnlUsd?: Prisma.SortOrder
+  futuresUnrealizedPnlKrw?: Prisma.SortOrder
   cumulativeExternalFundingKrw?: Prisma.SortOrder
   investmentPnlKrw?: Prisma.SortOrder
   timeWeightedReturnFactor?: Prisma.SortOrder
@@ -623,6 +691,8 @@ export type DailyPortfolioSnapshotMinOrderByAggregateInput = {
   assetValueKrw?: Prisma.SortOrder
   realizedPnlKrw?: Prisma.SortOrder
   unrealizedPnlKrw?: Prisma.SortOrder
+  futuresUnrealizedPnlUsd?: Prisma.SortOrder
+  futuresUnrealizedPnlKrw?: Prisma.SortOrder
   cumulativeExternalFundingKrw?: Prisma.SortOrder
   investmentPnlKrw?: Prisma.SortOrder
   timeWeightedReturnFactor?: Prisma.SortOrder
@@ -638,6 +708,8 @@ export type DailyPortfolioSnapshotSumOrderByAggregateInput = {
   assetValueKrw?: Prisma.SortOrder
   realizedPnlKrw?: Prisma.SortOrder
   unrealizedPnlKrw?: Prisma.SortOrder
+  futuresUnrealizedPnlUsd?: Prisma.SortOrder
+  futuresUnrealizedPnlKrw?: Prisma.SortOrder
   cumulativeExternalFundingKrw?: Prisma.SortOrder
   investmentPnlKrw?: Prisma.SortOrder
   timeWeightedReturnFactor?: Prisma.SortOrder
@@ -695,6 +767,9 @@ export type DailyPortfolioSnapshotCreateWithoutTradingAccountInput = {
   assetValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   timeWeightedReturnFactor?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -712,6 +787,9 @@ export type DailyPortfolioSnapshotUncheckedCreateWithoutTradingAccountInput = {
   assetValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   timeWeightedReturnFactor?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -759,6 +837,9 @@ export type DailyPortfolioSnapshotScalarWhereInput = {
   assetValueKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.JsonNullableFilter<"DailyPortfolioSnapshot">
   cumulativeExternalFundingKrw?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   timeWeightedReturnFactor?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -776,6 +857,9 @@ export type DailyPortfolioSnapshotCreateManyTradingAccountInput = {
   assetValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   timeWeightedReturnFactor?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -793,6 +877,9 @@ export type DailyPortfolioSnapshotUpdateWithoutTradingAccountInput = {
   assetValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   timeWeightedReturnFactor?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -810,6 +897,9 @@ export type DailyPortfolioSnapshotUncheckedUpdateWithoutTradingAccountInput = {
   assetValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   timeWeightedReturnFactor?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -827,6 +917,9 @@ export type DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountInput 
   assetValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  futuresUnrealizedPnlUsd?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresUnrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  futuresValuationJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   timeWeightedReturnFactor?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -847,6 +940,9 @@ export type DailyPortfolioSnapshotSelect<ExtArgs extends runtime.Types.Extension
   assetValueKrw?: boolean
   realizedPnlKrw?: boolean
   unrealizedPnlKrw?: boolean
+  futuresUnrealizedPnlUsd?: boolean
+  futuresUnrealizedPnlKrw?: boolean
+  futuresValuationJson?: boolean
   cumulativeExternalFundingKrw?: boolean
   investmentPnlKrw?: boolean
   timeWeightedReturnFactor?: boolean
@@ -866,6 +962,9 @@ export type DailyPortfolioSnapshotSelectCreateManyAndReturn<ExtArgs extends runt
   assetValueKrw?: boolean
   realizedPnlKrw?: boolean
   unrealizedPnlKrw?: boolean
+  futuresUnrealizedPnlUsd?: boolean
+  futuresUnrealizedPnlKrw?: boolean
+  futuresValuationJson?: boolean
   cumulativeExternalFundingKrw?: boolean
   investmentPnlKrw?: boolean
   timeWeightedReturnFactor?: boolean
@@ -885,6 +984,9 @@ export type DailyPortfolioSnapshotSelectUpdateManyAndReturn<ExtArgs extends runt
   assetValueKrw?: boolean
   realizedPnlKrw?: boolean
   unrealizedPnlKrw?: boolean
+  futuresUnrealizedPnlUsd?: boolean
+  futuresUnrealizedPnlKrw?: boolean
+  futuresValuationJson?: boolean
   cumulativeExternalFundingKrw?: boolean
   investmentPnlKrw?: boolean
   timeWeightedReturnFactor?: boolean
@@ -904,6 +1006,9 @@ export type DailyPortfolioSnapshotSelectScalar = {
   assetValueKrw?: boolean
   realizedPnlKrw?: boolean
   unrealizedPnlKrw?: boolean
+  futuresUnrealizedPnlUsd?: boolean
+  futuresUnrealizedPnlKrw?: boolean
+  futuresValuationJson?: boolean
   cumulativeExternalFundingKrw?: boolean
   investmentPnlKrw?: boolean
   timeWeightedReturnFactor?: boolean
@@ -911,7 +1016,7 @@ export type DailyPortfolioSnapshotSelectScalar = {
   createdAt?: boolean
 }
 
-export type DailyPortfolioSnapshotOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "tradingAccountId" | "snapshotDate" | "totalAssetKrw" | "returnRate" | "krwCash" | "usdCashKrw" | "assetValueKrw" | "realizedPnlKrw" | "unrealizedPnlKrw" | "cumulativeExternalFundingKrw" | "investmentPnlKrw" | "timeWeightedReturnFactor" | "capturedAt" | "createdAt", ExtArgs["result"]["dailyPortfolioSnapshot"]>
+export type DailyPortfolioSnapshotOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "tradingAccountId" | "snapshotDate" | "totalAssetKrw" | "returnRate" | "krwCash" | "usdCashKrw" | "assetValueKrw" | "realizedPnlKrw" | "unrealizedPnlKrw" | "futuresUnrealizedPnlUsd" | "futuresUnrealizedPnlKrw" | "futuresValuationJson" | "cumulativeExternalFundingKrw" | "investmentPnlKrw" | "timeWeightedReturnFactor" | "capturedAt" | "createdAt", ExtArgs["result"]["dailyPortfolioSnapshot"]>
 export type DailyPortfolioSnapshotInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
 }
@@ -938,6 +1043,9 @@ export type $DailyPortfolioSnapshotPayload<ExtArgs extends runtime.Types.Extensi
     assetValueKrw: runtime.Decimal
     realizedPnlKrw: runtime.Decimal
     unrealizedPnlKrw: runtime.Decimal
+    futuresUnrealizedPnlUsd: runtime.Decimal | null
+    futuresUnrealizedPnlKrw: runtime.Decimal | null
+    futuresValuationJson: runtime.JsonValue | null
     cumulativeExternalFundingKrw: runtime.Decimal | null
     investmentPnlKrw: runtime.Decimal | null
     timeWeightedReturnFactor: runtime.Decimal | null
@@ -1377,6 +1485,9 @@ export interface DailyPortfolioSnapshotFieldRefs {
   readonly assetValueKrw: Prisma.FieldRef<"DailyPortfolioSnapshot", 'Decimal'>
   readonly realizedPnlKrw: Prisma.FieldRef<"DailyPortfolioSnapshot", 'Decimal'>
   readonly unrealizedPnlKrw: Prisma.FieldRef<"DailyPortfolioSnapshot", 'Decimal'>
+  readonly futuresUnrealizedPnlUsd: Prisma.FieldRef<"DailyPortfolioSnapshot", 'Decimal'>
+  readonly futuresUnrealizedPnlKrw: Prisma.FieldRef<"DailyPortfolioSnapshot", 'Decimal'>
+  readonly futuresValuationJson: Prisma.FieldRef<"DailyPortfolioSnapshot", 'Json'>
   readonly cumulativeExternalFundingKrw: Prisma.FieldRef<"DailyPortfolioSnapshot", 'Decimal'>
   readonly investmentPnlKrw: Prisma.FieldRef<"DailyPortfolioSnapshot", 'Decimal'>
   readonly timeWeightedReturnFactor: Prisma.FieldRef<"DailyPortfolioSnapshot", 'Decimal'>

@@ -17,7 +17,7 @@ jest.mock('../generated/prisma/client', () => ({
     excluded: 'excluded',
   },
   Prisma: {
-    Decimal: jest.fn(),
+    Decimal: jest.requireActual('@prisma/client/runtime/client').Decimal,
     JsonNull: null,
   },
   PrismaClient: class PrismaClient {},

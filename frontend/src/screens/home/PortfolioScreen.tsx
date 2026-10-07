@@ -660,6 +660,9 @@ function AccountSummaryCard({
         </>
       ) : null}
 
+      {summary.futuresUnrealizedPnlKrw !== undefined ? <Text style={styles.helper}>
+        선물 Mark 미실현손익 {formatKrw(summary.futuresUnrealizedPnlKrw)}원 · 총 자산에 포함
+      </Text> : null}
       <Text style={styles.helper}>KRW 현금 {formatKrw(summary.krwCash)}</Text>
       <Text style={styles.helper}>
         USD 환산 KRW {formatKrw(summary.usdCashKrw)}

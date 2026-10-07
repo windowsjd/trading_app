@@ -58,14 +58,14 @@ export function planFuturesExecution(
   current: PositionBasis | null,
   price: Prisma.Decimal,
   feeRate: Prisma.Decimal,
-  executionKind: 'user' | 'liquidation' = 'user',
+  executionKind: 'user' | 'liquidation' | 'season_final' = 'user',
 ) {
   const quantity = futuresDecimal(command.quantity);
   const rawNotional = quantity.mul(price);
   const notional = assertFuturesMoney(money(rawNotional));
   if (
     notional.lte(0) &&
-    !(executionKind === 'liquidation' && command.operation === 'close')
+    !(executionKind !== 'user' && command.operation === 'close')
   )
     futuresError(
       'FUTURES_VALUE_TOO_SMALL',

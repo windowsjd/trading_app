@@ -284,10 +284,10 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
   external funding/TWR cash-flow boundary나 새 성과 공식은 만들지 않는다.
   근거: 한 번의 사용자 이체를 두 public mutation의 순차 commit으로 처리하면 안 된다.
 - Wallet UI는 증권 KRW/USD, 암호화폐 · 현물 USD, 암호화폐 · 선물 USD와 보유 종목을
-  scope+currency로 표시하고 이체/환전/원장/주문 내역을 구분한다. Futures UI는 보관·이체만
-  지원한다. Securities KRW↔USD는 기존 환전 화면, KRW↔Crypto USD는 이체 견적 화면을
+  scope+currency로 표시하고 이체/환전/원장/주문 내역을 구분한다. F3는 별도 계정 고정
+  Futures 거래/위험/기록 화면을 제공한다. Securities KRW↔USD는 기존 환전 화면, KRW↔Crypto USD는 이체 견적 화면을
   사용한다. 자동환전·주문 auto-funding·cross-account/user 송금은 없다. Futures F1/F2 backend는
-  아래 별도 계약이며 UI 활성화는 없다.
+  아래 별도 계약이며 실제 사용자 거래 활성화는 별도 운영 단계다.
   Legacy Wallet/FX의 Securities projection은 유지하고 account 원장은 모든 scope를 읽는다.
   근거: 통화만으로 USD 세 지갑 중 하나를 선택하거나 이체를 외부입금으로 표시하지 않는다.
 - `CashWallet`, `WalletTransaction`, `ExchangeTransaction`, `FxExecuteRequest`는 required `tradingAccountId`만 저장한다. child 관계(WalletTransaction→CashWallet, FxExecuteRequest→ExchangeTransaction)도 양쪽 account가 같아야 하며 request-time repair나 participant fallback은 없다.
@@ -307,7 +307,7 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
 - legacy wallet/fx endpoint는 계약 그대로 유지하고 진입점에서 participant를 account로 resolve한 뒤 account-scoped endpoint와 같은 서비스 코드를 공유한다(수수료·환율·잔액 변경·원장·멱등·오류 코드·원자성 동일).
   근거: 환전 규칙이 두 벌 존재하는 순간부터 두 경로의 결과가 갈라진다.
 
-## Crypto Futures F2 (2026-10-07, current)
+## Crypto Futures F1/F2 risk policy (F3에서도 유지)
 
 - [Futures 계약](futures-api-contract.md)이 별도 product/domain/API를 정의한다. 기존 Asset은
   Binance Spot underlying이고 FuturesInstrument는 USD-settled synthetic perpetual identity다.
@@ -340,8 +340,33 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
   risk engine이 필수이며 startup validation이 잘못된 조합을 거부한다. 기존 boolean은 호환된다.
   stale Mark에서 open/increase/Cross outgoing transfer는 거부하지만 reduce/close/incoming은
   Mark만으로 차단하지 않는다. 자동청산은 fresh Mark와 유효 lifecycle에서만 수행한다.
-- Futures UI 및 Home/Portfolio/TWR/Ranking/Settlement 통합은 F3다. 기존 valuation은 cash와
-  Spot만 포함한다. 기본 DISABLED, F3 전 사용자/운영 활성화 금지다.
+- F3는 [아래 계약](futures-f3-contract.md)대로 UI와 valuation/성과/final settlement를 통합한다.
+  기본 DISABLED를 유지하며 코드 완료와 실제 사용자/운영 활성화를 분리한다.
+
+## Crypto Futures F3 (2026-10-08, current)
+
+- Open Futures 평가는 F2와 같은 fresh Mark UPNL이다. Long `(mark-entry)×qty`,
+  Short `(entry-mark)×qty`. Total equity = 기존 canonical cash + Spot 가치 + signed
+  Futures UPNL. USD cash와 같은 FX evidence를 사용한다. Margin/notional/예상 종료
+  수수료를 다시 가감하지 않는다. 근거: 이미 cash에 있는 담보와 실제 fee/PnL 중복 금지.
+- Current Mark는 effectiveAt/capturedAt 모두 nonfuture, 5초 이내다. stale/missing이면
+  전체 평가 section/generation을 unavailable 처리한다. Spot/0/지난 성공 값으로 보정하지 않는다.
+- General stored-factor TWR와 Season initial-capital return, 기존 ranking tie-break를 유지한다.
+  Equity/Daily snapshot은 signed Futures USD/KRW component와 Mark/FX 증거를 보존한다.
+  기존 cryptoValueKrw는 Spot이며, 과거 row는 null 그대로 두고 재평가하지 않는다.
+- Season final exit는 endAt 이하·10초 이내 canonical Spot evidence를 Season/instrument별
+  pin한다. 근거: 상품의 정상 simulated execution은 Spot이고, 종료 시각은 job 시간이 아니다.
+  예약 cleanup → 모든 계정(제외 participant 포함)의 atomic full exit → 최종 평가/순위/등급/
+  account close/settled 순서다. 중간 실패는 ended로 재시도하며 pin과 lifetime unique로 중복을 막는다.
+- 최종 exit의 Isolated/Cross 담보 budget은 account 정산 시작 상태에서 고정한다. 정상 Season
+  fee를 적용하고 economic PnL/fee, 실제 현금, shortfall을 별도 기록한다. 다른 mode의 이익으로
+  미충당 손실을 숨기지 않고 debt/insurance를 만들지 않는다.
+- UI는 explicit Long/Short, Isolated/Cross, 정수 1~100, Market Open/Increase/Reduce/Close와
+  서버 capabilities를 따른다. lifetime 설정 고정, Cross 개별 청산가 없음, account/session epoch
+  차단, 불명확한 응답은 동일 command 재시도다. SL/TP/OCO/Conditional Order는 후속 별도 작업이다.
+- Production instrument는 exact exchangeInfo 검증된 USDⓈ-M USDT perpetual만 제공한다.
+  기본 DISABLED, 실제 enable/provisioning은 CI·ingestion·risk·coverage·종료 정산·용량 검토 후
+  운영자가 별도 승인/실행한다. F3 작업은 운영 설정/DB를 바꾸지 않는다.
 
 ## Trading TradingAccount Scope (Order/Position/Quote 전환)
 

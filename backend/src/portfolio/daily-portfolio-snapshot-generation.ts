@@ -1,3 +1,5 @@
+import type { FuturesValuationComponents } from './portfolio-valuation.policy';
+import { futuresSnapshotValues } from './futures-snapshot-values';
 import { Prisma } from '../generated/prisma/client';
 import { PortfolioValuationResult } from './portfolio-valuation.policy';
 
@@ -40,18 +42,19 @@ export type DailyPortfolioSnapshotWriteResult = {
   dryRun: boolean;
 };
 
-export type DailyPortfolioSnapshotPersistenceData = {
-  tradingAccountId: string;
-  snapshotDate: Date;
-  totalAssetKrw: string;
-  returnRate: string;
-  krwCash: string;
-  usdCashKrw: string;
-  assetValueKrw: string;
-  realizedPnlKrw: string;
-  unrealizedPnlKrw: string;
-  capturedAt: Date;
-};
+export type DailyPortfolioSnapshotPersistenceData =
+  Partial<FuturesValuationComponents> & {
+    tradingAccountId: string;
+    snapshotDate: Date;
+    totalAssetKrw: string;
+    returnRate: string;
+    krwCash: string;
+    usdCashKrw: string;
+    assetValueKrw: string;
+    realizedPnlKrw: string;
+    unrealizedPnlKrw: string;
+    capturedAt: Date;
+  };
 
 type DailyPortfolioSnapshotWriter = {
   dailyPortfolioSnapshot: {
@@ -90,6 +93,7 @@ export async function writeDailyPortfolioSnapshot(
     assetValueKrw: data.assetValueKrw,
     realizedPnlKrw: data.realizedPnlKrw,
     unrealizedPnlKrw: data.unrealizedPnlKrw,
+    ...futuresSnapshotValues(data),
     capturedAt: data.capturedAt,
   };
   const row = await prisma.dailyPortfolioSnapshot.upsert({
@@ -146,6 +150,7 @@ export function buildDailyPortfolioSnapshotData(
     assetValueKrw: input.valuation.assetValueKrw,
     realizedPnlKrw: input.valuation.realizedPnlKrw,
     unrealizedPnlKrw: input.valuation.unrealizedPnlKrw,
+    ...futuresSnapshotValues(input.valuation),
     capturedAt: input.capturedAt,
   };
 }

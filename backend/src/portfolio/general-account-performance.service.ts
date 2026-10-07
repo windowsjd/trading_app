@@ -1,3 +1,6 @@
+import type { PortfolioValuationSourceReads } from './portfolio-valuation.service';
+import type { FuturesValuationComponents } from './portfolio-valuation.policy';
+import { futuresSnapshotValues } from './futures-snapshot-values';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import {
   Prisma,
@@ -89,7 +92,7 @@ export type GeneralLivePerformance = {
   advance: GeneralPerformanceAdvance;
 };
 
-export type GeneralSnapshotWriteValues = {
+export type GeneralSnapshotWriteValues = Partial<FuturesValuationComponents> & {
   tradingAccountId: string;
   totalAssetKrw: string;
   returnRate: string;
@@ -133,6 +136,7 @@ export class GeneralAccountPerformanceService {
       domesticStockValueKrw: '0',
       usStockValueKrw: '0',
       cryptoValueKrw: '0',
+      ...futuresSnapshotValues({}),
       snapshotReason: SnapshotReason.general_account_open,
       cumulativeExternalFundingKrw:
         origin.cumulativeExternalFundingKrw.toFixed(MONEY_SCALE),
@@ -336,6 +340,7 @@ export class GeneralAccountPerformanceService {
     account: GeneralAccountIntegrityTarget;
     valuationAt?: Date;
     client?: PerformanceClient;
+    sourceReads?: PortfolioValuationSourceReads;
   }): Promise<GeneralLivePerformance> {
     const client = input.client ?? this.prisma;
     const valuationAt = input.valuationAt ?? new Date();
@@ -351,6 +356,7 @@ export class GeneralAccountPerformanceService {
         valuationAt,
         'home_live_valuation',
         client,
+        ...(input.sourceReads ? ([input.sourceReads] as const) : []),
       );
 
     const advance = advanceGeneralPerformance({
@@ -372,6 +378,7 @@ export class GeneralAccountPerformanceService {
     account: GeneralAccountIntegrityTarget;
     valuationAt: Date;
     client: PerformanceClient;
+    sourceReads?: PortfolioValuationSourceReads;
   }): Promise<{
     values: GeneralSnapshotWriteValues;
     valuation: PortfolioValuationResult;
@@ -380,6 +387,7 @@ export class GeneralAccountPerformanceService {
       account: input.account,
       valuationAt: input.valuationAt,
       client: input.client,
+      ...(input.sourceReads ? { sourceReads: input.sourceReads } : {}),
     });
 
     return {
@@ -593,6 +601,7 @@ export class GeneralAccountPerformanceService {
       domesticStockValueKrw: valuation.domesticStockValueKrw,
       usStockValueKrw: valuation.usStockValueKrw,
       cryptoValueKrw: valuation.cryptoValueKrw,
+      ...futuresSnapshotValues(valuation),
       cumulativeExternalFundingKrw:
         advance.cumulativeExternalFundingKrw.toFixed(MONEY_SCALE),
       investmentPnlKrw: advance.investmentPnlKrw.toFixed(MONEY_SCALE),
@@ -621,6 +630,7 @@ export class GeneralAccountPerformanceService {
       domesticStockValueKrw: input.valuation.domesticStockValueKrw,
       usStockValueKrw: input.valuation.usStockValueKrw,
       cryptoValueKrw: input.valuation.cryptoValueKrw,
+      ...futuresSnapshotValues(input.valuation),
       snapshotReason: input.reason,
       cumulativeExternalFundingKrw:
         input.advance.cumulativeExternalFundingKrw.toFixed(MONEY_SCALE),

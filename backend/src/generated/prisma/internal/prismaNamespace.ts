@@ -426,7 +426,10 @@ export const ModelName = {
   LimitOrderCandleEvidence: 'LimitOrderCandleEvidence',
   FuturesMarkSnapshot: 'FuturesMarkSnapshot',
   FuturesLiquidation: 'FuturesLiquidation',
-  FuturesLiquidationClose: 'FuturesLiquidationClose'
+  FuturesLiquidationClose: 'FuturesLiquidationClose',
+  FuturesSeasonPrice: 'FuturesSeasonPrice',
+  FuturesSeasonSettlement: 'FuturesSeasonSettlement',
+  FuturesSeasonClose: 'FuturesSeasonClose'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -442,7 +445,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "position" | "order" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose"
+    modelProps: "user" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "position" | "order" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -3628,6 +3631,228 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    FuturesSeasonPrice: {
+      payload: Prisma.$FuturesSeasonPricePayload<ExtArgs>
+      fields: Prisma.FuturesSeasonPriceFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FuturesSeasonPriceFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonPricePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FuturesSeasonPriceFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonPricePayload>
+        }
+        findFirst: {
+          args: Prisma.FuturesSeasonPriceFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonPricePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FuturesSeasonPriceFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonPricePayload>
+        }
+        findMany: {
+          args: Prisma.FuturesSeasonPriceFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonPricePayload>[]
+        }
+        create: {
+          args: Prisma.FuturesSeasonPriceCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonPricePayload>
+        }
+        createMany: {
+          args: Prisma.FuturesSeasonPriceCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FuturesSeasonPriceCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonPricePayload>[]
+        }
+        delete: {
+          args: Prisma.FuturesSeasonPriceDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonPricePayload>
+        }
+        update: {
+          args: Prisma.FuturesSeasonPriceUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonPricePayload>
+        }
+        deleteMany: {
+          args: Prisma.FuturesSeasonPriceDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FuturesSeasonPriceUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FuturesSeasonPriceUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonPricePayload>[]
+        }
+        upsert: {
+          args: Prisma.FuturesSeasonPriceUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonPricePayload>
+        }
+        aggregate: {
+          args: Prisma.FuturesSeasonPriceAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFuturesSeasonPrice>
+        }
+        groupBy: {
+          args: Prisma.FuturesSeasonPriceGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesSeasonPriceGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FuturesSeasonPriceCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesSeasonPriceCountAggregateOutputType> | number
+        }
+      }
+    }
+    FuturesSeasonSettlement: {
+      payload: Prisma.$FuturesSeasonSettlementPayload<ExtArgs>
+      fields: Prisma.FuturesSeasonSettlementFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FuturesSeasonSettlementFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonSettlementPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FuturesSeasonSettlementFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonSettlementPayload>
+        }
+        findFirst: {
+          args: Prisma.FuturesSeasonSettlementFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonSettlementPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FuturesSeasonSettlementFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonSettlementPayload>
+        }
+        findMany: {
+          args: Prisma.FuturesSeasonSettlementFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonSettlementPayload>[]
+        }
+        create: {
+          args: Prisma.FuturesSeasonSettlementCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonSettlementPayload>
+        }
+        createMany: {
+          args: Prisma.FuturesSeasonSettlementCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FuturesSeasonSettlementCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonSettlementPayload>[]
+        }
+        delete: {
+          args: Prisma.FuturesSeasonSettlementDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonSettlementPayload>
+        }
+        update: {
+          args: Prisma.FuturesSeasonSettlementUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonSettlementPayload>
+        }
+        deleteMany: {
+          args: Prisma.FuturesSeasonSettlementDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FuturesSeasonSettlementUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FuturesSeasonSettlementUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonSettlementPayload>[]
+        }
+        upsert: {
+          args: Prisma.FuturesSeasonSettlementUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonSettlementPayload>
+        }
+        aggregate: {
+          args: Prisma.FuturesSeasonSettlementAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFuturesSeasonSettlement>
+        }
+        groupBy: {
+          args: Prisma.FuturesSeasonSettlementGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesSeasonSettlementGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FuturesSeasonSettlementCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesSeasonSettlementCountAggregateOutputType> | number
+        }
+      }
+    }
+    FuturesSeasonClose: {
+      payload: Prisma.$FuturesSeasonClosePayload<ExtArgs>
+      fields: Prisma.FuturesSeasonCloseFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FuturesSeasonCloseFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonClosePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FuturesSeasonCloseFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonClosePayload>
+        }
+        findFirst: {
+          args: Prisma.FuturesSeasonCloseFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonClosePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FuturesSeasonCloseFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonClosePayload>
+        }
+        findMany: {
+          args: Prisma.FuturesSeasonCloseFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonClosePayload>[]
+        }
+        create: {
+          args: Prisma.FuturesSeasonCloseCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonClosePayload>
+        }
+        createMany: {
+          args: Prisma.FuturesSeasonCloseCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FuturesSeasonCloseCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonClosePayload>[]
+        }
+        delete: {
+          args: Prisma.FuturesSeasonCloseDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonClosePayload>
+        }
+        update: {
+          args: Prisma.FuturesSeasonCloseUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonClosePayload>
+        }
+        deleteMany: {
+          args: Prisma.FuturesSeasonCloseDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FuturesSeasonCloseUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FuturesSeasonCloseUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonClosePayload>[]
+        }
+        upsert: {
+          args: Prisma.FuturesSeasonCloseUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesSeasonClosePayload>
+        }
+        aggregate: {
+          args: Prisma.FuturesSeasonCloseAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFuturesSeasonClose>
+        }
+        groupBy: {
+          args: Prisma.FuturesSeasonCloseGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesSeasonCloseGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FuturesSeasonCloseCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesSeasonCloseCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -4002,6 +4227,8 @@ export const FuturesInstrumentScalarFieldEnum = {
   productType: 'productType',
   settlementCurrency: 'settlementCurrency',
   isActive: 'isActive',
+  markContractJson: 'markContractJson',
+  markVerifiedAt: 'markVerifiedAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -4352,6 +4579,9 @@ export const EquitySnapshotScalarFieldEnum = {
   domesticStockValueKrw: 'domesticStockValueKrw',
   usStockValueKrw: 'usStockValueKrw',
   cryptoValueKrw: 'cryptoValueKrw',
+  futuresUnrealizedPnlUsd: 'futuresUnrealizedPnlUsd',
+  futuresUnrealizedPnlKrw: 'futuresUnrealizedPnlKrw',
+  futuresValuationJson: 'futuresValuationJson',
   snapshotReason: 'snapshotReason',
   cumulativeExternalFundingKrw: 'cumulativeExternalFundingKrw',
   investmentPnlKrw: 'investmentPnlKrw',
@@ -4377,6 +4607,9 @@ export const DailyPortfolioSnapshotScalarFieldEnum = {
   assetValueKrw: 'assetValueKrw',
   realizedPnlKrw: 'realizedPnlKrw',
   unrealizedPnlKrw: 'unrealizedPnlKrw',
+  futuresUnrealizedPnlUsd: 'futuresUnrealizedPnlUsd',
+  futuresUnrealizedPnlKrw: 'futuresUnrealizedPnlKrw',
+  futuresValuationJson: 'futuresValuationJson',
   cumulativeExternalFundingKrw: 'cumulativeExternalFundingKrw',
   investmentPnlKrw: 'investmentPnlKrw',
   timeWeightedReturnFactor: 'timeWeightedReturnFactor',
@@ -4545,6 +4778,59 @@ export const FuturesLiquidationCloseScalarFieldEnum = {
 } as const
 
 export type FuturesLiquidationCloseScalarFieldEnum = (typeof FuturesLiquidationCloseScalarFieldEnum)[keyof typeof FuturesLiquidationCloseScalarFieldEnum]
+
+
+export const FuturesSeasonPriceScalarFieldEnum = {
+  id: 'id',
+  seasonId: 'seasonId',
+  instrumentId: 'instrumentId',
+  assetPriceSnapshotId: 'assetPriceSnapshotId',
+  endAt: 'endAt',
+  feeRate: 'feeRate',
+  createdAt: 'createdAt'
+} as const
+
+export type FuturesSeasonPriceScalarFieldEnum = (typeof FuturesSeasonPriceScalarFieldEnum)[keyof typeof FuturesSeasonPriceScalarFieldEnum]
+
+
+export const FuturesSeasonSettlementScalarFieldEnum = {
+  id: 'id',
+  seasonId: 'seasonId',
+  tradingAccountId: 'tradingAccountId',
+  endAt: 'endAt',
+  feeRate: 'feeRate',
+  realizedPnl: 'realizedPnl',
+  feeAmount: 'feeAmount',
+  settledPnl: 'settledPnl',
+  settledFee: 'settledFee',
+  settledCash: 'settledCash',
+  bankruptcyShortfall: 'bankruptcyShortfall',
+  walletBalanceBefore: 'walletBalanceBefore',
+  walletBalanceAfter: 'walletBalanceAfter',
+  scopesJson: 'scopesJson',
+  executedAt: 'executedAt'
+} as const
+
+export type FuturesSeasonSettlementScalarFieldEnum = (typeof FuturesSeasonSettlementScalarFieldEnum)[keyof typeof FuturesSeasonSettlementScalarFieldEnum]
+
+
+export const FuturesSeasonCloseScalarFieldEnum = {
+  id: 'id',
+  settlementId: 'settlementId',
+  tradingAccountId: 'tradingAccountId',
+  positionId: 'positionId',
+  instrumentId: 'instrumentId',
+  priceId: 'priceId',
+  direction: 'direction',
+  marginMode: 'marginMode',
+  quantity: 'quantity',
+  executionPrice: 'executionPrice',
+  realizedPnl: 'realizedPnl',
+  feeRate: 'feeRate',
+  feeAmount: 'feeAmount'
+} as const
+
+export type FuturesSeasonCloseScalarFieldEnum = (typeof FuturesSeasonCloseScalarFieldEnum)[keyof typeof FuturesSeasonCloseScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -5431,6 +5717,9 @@ export type GlobalOmitConfig = {
   futuresMarkSnapshot?: Prisma.FuturesMarkSnapshotOmit
   futuresLiquidation?: Prisma.FuturesLiquidationOmit
   futuresLiquidationClose?: Prisma.FuturesLiquidationCloseOmit
+  futuresSeasonPrice?: Prisma.FuturesSeasonPriceOmit
+  futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementOmit
+  futuresSeasonClose?: Prisma.FuturesSeasonCloseOmit
 }
 
 /* Types for Logging */

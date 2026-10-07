@@ -1,3 +1,4 @@
+import { futuresSnapshotValues } from '../portfolio/futures-snapshot-values';
 import {
   buildSelectionFailureEvidence,
   describeManualFallback,
@@ -3079,6 +3080,7 @@ export class FxService {
         domesticStockValueKrw: valuation.domesticStockValueKrw,
         usStockValueKrw: valuation.usStockValueKrw,
         cryptoValueKrw: valuation.cryptoValueKrw,
+        ...futuresSnapshotValues(valuation),
         snapshotReason: SnapshotReason.exchange_executed,
         capturedAt,
       },

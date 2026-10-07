@@ -59,6 +59,8 @@ export type TradingAccountEquityQuery = {
 type EquityRange = '1d' | '7d' | '30d' | '90d' | '180d' | '360d' | 'all';
 
 type EquityHistoryPoint = {
+  futuresUnrealizedPnlUsd: string | null;
+  futuresUnrealizedPnlKrw: string | null;
   time: string;
   snapshotDate?: string;
   totalAssetKrw: string;
@@ -79,6 +81,8 @@ const ZERO_MONEY = '0.00000000';
  * corrupted account as "temporarily unavailable" hides real damage.
  */
 const VALUATION_SECTION_ERROR_CODES = new Set([
+  'FUTURES_MARK_UNAVAILABLE',
+  'FUTURES_MARK_STALE',
   'FX_RATE_UNAVAILABLE',
   'FX_RATE_STALE',
   'ASSET_PRICE_UNAVAILABLE',
@@ -297,6 +301,10 @@ export class TradingAccountPortfolioService {
             assetValueKrw: live.valuation.assetValueKrw,
             realizedPnlKrw: live.valuation.realizedPnlKrw,
             unrealizedPnlKrw: live.valuation.unrealizedPnlKrw,
+            futuresUnrealizedPnlUsd:
+              live.valuation.futuresUnrealizedPnlUsd ?? '0.00000000',
+            futuresUnrealizedPnlKrw:
+              live.valuation.futuresUnrealizedPnlKrw ?? '0.00000000',
             valuedAt: live.valuation.valuationAt.toISOString(),
           },
           allocation: this.buildAllocation(live.valuation),
@@ -392,6 +400,10 @@ export class TradingAccountPortfolioService {
             assetValueKrw: valuation.assetValueKrw,
             realizedPnlKrw: valuation.realizedPnlKrw,
             unrealizedPnlKrw: valuation.unrealizedPnlKrw,
+            futuresUnrealizedPnlUsd:
+              valuation.futuresUnrealizedPnlUsd ?? '0.00000000',
+            futuresUnrealizedPnlKrw:
+              valuation.futuresUnrealizedPnlKrw ?? '0.00000000',
             valuedAt: valuation.valuationAt.toISOString(),
           },
           allocation: this.buildAllocation(valuation),
@@ -472,6 +484,8 @@ export class TradingAccountPortfolioService {
         snapshotDate: true,
         capturedAt: true,
         totalAssetKrw: true,
+        futuresUnrealizedPnlUsd: true,
+        futuresUnrealizedPnlKrw: true,
         returnRate: true,
         cumulativeExternalFundingKrw: true,
         investmentPnlKrw: true,
@@ -502,6 +516,10 @@ export class TradingAccountPortfolioService {
       time: row.capturedAt.toISOString(),
       snapshotDate: row.snapshotDate.toISOString().slice(0, 10),
       totalAssetKrw: row.totalAssetKrw.toFixed(MONEY_SCALE),
+      futuresUnrealizedPnlUsd:
+        row.futuresUnrealizedPnlUsd?.toFixed(MONEY_SCALE) ?? null,
+      futuresUnrealizedPnlKrw:
+        row.futuresUnrealizedPnlKrw?.toFixed(MONEY_SCALE) ?? null,
       returnRate: row.returnRate.toFixed(RETURN_RATE_SCALE),
       returnRateMethod: this.returnRateMethod(account.mode),
       cumulativeExternalFundingKrw:
@@ -549,6 +567,8 @@ export class TradingAccountPortfolioService {
         id: true,
         tradingAccountId: true,
         totalAssetKrw: true,
+        futuresUnrealizedPnlUsd: true,
+        futuresUnrealizedPnlKrw: true,
         returnRate: true,
         snapshotReason: true,
         cumulativeExternalFundingKrw: true,
@@ -577,6 +597,10 @@ export class TradingAccountPortfolioService {
     return rows.map((row) => ({
       time: row.capturedAt.toISOString(),
       totalAssetKrw: row.totalAssetKrw.toFixed(MONEY_SCALE),
+      futuresUnrealizedPnlUsd:
+        row.futuresUnrealizedPnlUsd?.toFixed(MONEY_SCALE) ?? null,
+      futuresUnrealizedPnlKrw:
+        row.futuresUnrealizedPnlKrw?.toFixed(MONEY_SCALE) ?? null,
       returnRate: row.returnRate.toFixed(RETURN_RATE_SCALE),
       returnRateMethod: 'time_weighted' as const,
       // Non-null by assertGeneralEquityHistoryRows: a general history point
@@ -604,6 +628,8 @@ export class TradingAccountPortfolioService {
         id: true,
         tradingAccountId: true,
         totalAssetKrw: true,
+        futuresUnrealizedPnlUsd: true,
+        futuresUnrealizedPnlKrw: true,
         returnRate: true,
         cumulativeExternalFundingKrw: true,
         investmentPnlKrw: true,
@@ -621,6 +647,10 @@ export class TradingAccountPortfolioService {
     return rows.map((row) => ({
       time: row.capturedAt.toISOString(),
       totalAssetKrw: row.totalAssetKrw.toFixed(MONEY_SCALE),
+      futuresUnrealizedPnlUsd:
+        row.futuresUnrealizedPnlUsd?.toFixed(MONEY_SCALE) ?? null,
+      futuresUnrealizedPnlKrw:
+        row.futuresUnrealizedPnlKrw?.toFixed(MONEY_SCALE) ?? null,
       returnRate: row.returnRate.toFixed(RETURN_RATE_SCALE),
       returnRateMethod: 'time_weighted' as const,
       cumulativeExternalFundingKrw:
@@ -647,6 +677,8 @@ export class TradingAccountPortfolioService {
         id: true,
         tradingAccountId: true,
         totalAssetKrw: true,
+        futuresUnrealizedPnlUsd: true,
+        futuresUnrealizedPnlKrw: true,
         returnRate: true,
         snapshotReason: true,
         cumulativeExternalFundingKrw: true,
@@ -662,6 +694,10 @@ export class TradingAccountPortfolioService {
     return rows.map((row) => ({
       time: row.capturedAt.toISOString(),
       totalAssetKrw: row.totalAssetKrw.toFixed(MONEY_SCALE),
+      futuresUnrealizedPnlUsd:
+        row.futuresUnrealizedPnlUsd?.toFixed(MONEY_SCALE) ?? null,
+      futuresUnrealizedPnlKrw:
+        row.futuresUnrealizedPnlKrw?.toFixed(MONEY_SCALE) ?? null,
       returnRate: row.returnRate.toFixed(RETURN_RATE_SCALE),
       returnRateMethod: 'initial_capital' as const,
       cumulativeExternalFundingKrw:

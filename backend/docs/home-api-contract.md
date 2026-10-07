@@ -41,10 +41,17 @@ it means rather than relying on the implicit current one.
   `balanceAmount`, never available cash. `walletSummary.KRW`/`USD` sum balances by
   currency rather than selecting one USD wallet; `cashWallets` carries `walletScope`
   for all four. A damaged canonical set is unavailable, never repaired by GET.
-  Zero Crypto containers do not change financial results. Current order/FX/UI funding
-  remains Securities; Transfer and Crypto Spot routing are future work.
+  Zero Crypto containers do not change financial results. Stocks/FX use Securities;
+  new Crypto Spot orders use Spot USD, with explicit internal Transfer/FX+Transfer.
 - USD stock/crypto KRW valuation is local USD price x quantity x the workflow's selected USD/KRW rate, shared in meaning with USD cash conversion. Stored `AssetPriceSnapshot.priceKrw` does not determine financial values. Summary and top positions use raw Decimal arithmetic until response formatting (half-up, scale 8).
 - `cryptoValueKrw` means KRW-converted value of crypto positions; `totalAssetKrw` and `returnRate` remain KRW-based.
+- F3 adds signed `futuresUnrealizedPnlUsd` / `futuresUnrealizedPnlKrw` to the live
+  summary using only fresh PostgreSQL Mark evidence (F2 5-second policy) and the
+  same USD/KRW snapshot as cash. `cryptoValueKrw` remains Spot-only. Existing cash
+  + Spot market value + Futures UPNL is total equity; notional/margin are not assets.
+  Missing/stale Mark uses the existing section-unavailable contract, never zero,
+  Spot or last-known fallback. Allocation percentages use gross cash + Spot assets;
+  signed Futures UPNL is displayed separately rather than as a pie slice.
 - Active live valuation and `topPositions` may use fresh eligible `provider_api` rows first, then existing `admin_manual` fallback rows.
 - Open stock markets use capturedAt age <= 60 seconds plus current-session effective time; closed KRX/US assets use only their latest completed session price. Crypto and provider USD/KRW keep their existing continuous freshness rules.
 - Settled final result, ranking, rewards, equity chart reads, and scheduler/ops status do not use live provider rows. Operator-run daily snapshot generation may consume existing fresh eligible provider_api DB rows first with admin_manual fallback, but Home still reads the generated snapshot rows and does not query provider rows for daily snapshot sections.

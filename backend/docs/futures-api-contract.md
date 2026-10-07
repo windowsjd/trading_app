@@ -1,20 +1,26 @@
-# Crypto Futures contract (F1 execution + F2 risk)
+# Crypto Futures contract (F1 execution + F2 risk + F3 integration)
 
-Development-only USD-settled synthetic perpetuals support Market full fills,
+USD-settled synthetic perpetuals support Market full fills,
 LONG/SHORT, One-way, Isolated and Cross, with integer leverage 1–100. The
 [F2 risk contract](futures-risk-contract.md) defines fixed 0.5% maintenance,
 Mark pricing, automatic full liquidation and bankruptcy evidence.
 `FUTURES_TRADING_MODE` defaults DISABLED (legacy boolean supported); REDUCE_ONLY
 allows reduce/close; ENABLED allows all four commands only with configured ingestion
 and risk engine. Committed commands replay across mode/lifecycle changes.
-Do not enable user-facing Futures before F3 valuation/settlement integration.
+[F3](futures-f3-contract.md) integrates valuation, final Season exits and account-scoped UI.
+Production activation is a separate operator step after release gates; deployment
+does not change the default DISABLED mode.
 
 ## Identity and API
 
 `Asset` remains the Binance Spot underlying/reference asset. `FuturesInstrument`
 has its own durable ID and an explicit `synthetic_perpetual` product type and USD
 settlement currency, unique per underlying/product/currency. Only active Binance
-crypto assets priced/settled in USD qualify. Provisioning is an explicit CLI;
+crypto assets priced/settled in USD qualify. Open/increase and the instrument
+catalog also require recent exact public Binance USDⓈ-M USDT PERPETUAL mapping
+(TRADING, COIN); coverage verification expires after 24 hours. No symbol/unit
+conversion is allowed. Existing positions remain readable/reducible if coverage
+is lost. Provisioning is an explicit CLI;
 GET never creates instruments, positions, wallets, snapshots, or repairs state.
 Spot `Position`, `Order`, Quote, and reservations keep their existing meanings.
 
@@ -23,11 +29,12 @@ All routes are authenticated and account scoped under
 
 | Method/path | Contract |
 | --- | --- |
-| GET `/instruments` | Available instrument identity and underlying metadata |
+| GET `/instruments` | Verified instruments, display precision, separate Spot/Mark evidence, server capabilities and evaluatedAt |
 | POST `/execute` | A single idempotent Market command; no Spot quote/order lifecycle |
 | GET `/positions` | Open positions and collateral risk foundation |
 | GET `/executions?limit=20&offset=0` | User Market execution history, newest first; limit 1–100 |
 | GET `/liquidations?limit=20&offset=0` | System liquidation events with all closes/Mark evidence; same bounds |
+| GET `/final-settlement` | This account's single Season final exit, closes, pinned Spot evidence and cash/shortfall; null if absent |
 
 Execute body: `instrumentId`, `operation` (`open`, `increase`, `reduce`, `close`),
 `direction` (`long`, `short`), `quantity` (positive decimal string, up to 8 places),
@@ -80,9 +87,11 @@ LONG PnL is `(exit - averageEntry) * closedQty`; SHORT PnL is
 `(averageEntry - exit) * closedQty`. Reduce/close settles realized PnL as an actual
 Futures USD credit/debit, then debits the executed-notional trade fee. General
 uses `GENERAL_TRADE_FEE_RATE`; Season uses the locked `Season.tradeFeeRate`.
-Execution stores the actual rate/fee. Unrealized PnL uses the same directional
-formula with fresh synthetic reference price, only in Futures reads; stale/missing
-evidence returns null reference/PnL. It is never written to cash.
+Execution stores the actual rate/fee. The legacy `unrealizedPnl` field in Futures
+reads remains the Spot reference estimate. `markUnrealizedPnl` and `risk.unrealizedPnl`
+use Mark, also the sole open Futures valuation source for Home/Portfolio/TWR/Season
+return/Ranking. Missing/stale evidence returns null for the corresponding price/
+estimate. UPNL is never written to cash.
 
 If loss plus fee cannot leave nonnegative cash covering remaining isolated margin
 and reservations, return `FUTURES_LIQUIDATION_REQUIRED` and roll back everything.
@@ -124,7 +133,8 @@ replays that response; different request conflicts; no price/position/cash
 recalculation on replay. Ownership is always checked before replay.
 
 Locks: General account `FOR UPDATE`; Season `FOR SHARE`→account `FOR SHARE`→
-participant `FOR SHARE` via existing lifecycle helper. Then instrument/underlying
+participant `FOR NO KEY UPDATE` via the lifecycle helper, since the transaction
+may also update participant performance. Then instrument/underlying
 validation, Futures USD wallet `FOR UPDATE`, current position `FOR UPDATE`.
 Never upgrade lifecycle locks. The wallet serializes different Futures instruments
 and shared collateral with existing transfers (wallet IDs ordered in transfers).
@@ -158,7 +168,10 @@ free collateral and buffer), position IDs and evaluation time. Missing/stale mar
 produce null risk metrics and `unavailable_or_stale`, never last-known liquidation.
 `collateral.freeCollateral` is nullable when Cross marks are unavailable, including
 successful risk-reducing execute responses. Cross position `risk` omits isolated
-equity/buffer and never reports a per-position liquidation price.
+equity/buffer and never reports a per-position liquidation price. Positions and
+instrument reads include `capabilities` (`tradingMode`, `canOpen`, `canIncrease`,
+`canReduce`, `canClose`, `reason`) derived from server mode and account/Season
+lifecycle. Mutable capabilities never block a committed command replay.
 
 System history contains event-level economic PnL/due fee, actual settled PnL/fee,
 net signed cash delta, shortfall, pre/post wallet balances, collateral/equity and
@@ -183,13 +196,20 @@ ledger and liquidation history remain exact financial contracts. Durable
 `FuturesLiquidation`/`FuturesLiquidationClose` evidence, including bankruptcy
 shortfall, is not a technical diagnostic projection and is not redacted.
 
-## Deferred work
+## F3 integration and remaining exclusions
 
 No dated/inverse/coin-margin/options, funding, Hedge Mode, ADL, insurance, partial
 liquidation, futures limit orders, conditional orders (SL/TP/OCO/trailing), or
-Binance brackets/risk tiers. F3 owns Futures UI and coherent
-Home/Portfolio/TWR/Equity/Daily/Season return/Ranking/Settlement valuation.
-Open Futures UPNL remains excluded from those surfaces; settled cash/fees naturally
-affect existing cash valuation. At ended/settled Season boundaries F2 diagnoses
-and skips forced liquidation to preserve lifecycle/final-results integrity; F3
-must implement the final open-position settlement policy before user activation.
+Binance brackets/risk tiers. F3 supplies account-pinned Futures UI and coherent
+Home/Portfolio/TWR/Equity/Daily/Season return/Ranking valuation. Total equity adds
+only signed fresh Mark UPNL to existing cash + Spot holdings. Missing evidence
+makes valuation unavailable. Event snapshots reuse existing performance primitives;
+a price outage skips the observation with a fixed diagnostic and does not prevent
+a valid risk-reducing Futures exit.
+
+At ended/settled Season boundaries automatic liquidation continues to skip.
+F3 pins canonical Spot evidence at `Season.endAt` (both timestamps within 10s and
+never after end), then atomically closes each account's lifetimes before final
+ranking. `FuturesSeasonSettlement`/`FuturesSeasonClose` distinguish normal final
+exits from liquidation; cash ledger uses `futures_season_settlement`. Details,
+failure/retry policy and activation checklist: [F3 contract](futures-f3-contract.md).

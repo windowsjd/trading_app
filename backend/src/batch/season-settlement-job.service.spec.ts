@@ -373,7 +373,14 @@ describe('SeasonSettlementJobService', () => {
 
     expect(
       valuationService.calculateTradingAccountValuation,
-    ).toHaveBeenCalledWith('account-of-sp-1', seasonEndAt, 'season_settlement');
+    ).toHaveBeenCalledWith(
+      'account-of-sp-1',
+      seasonEndAt,
+      'season_settlement',
+      prisma,
+      expect.objectContaining({ valuationAtMs: +seasonEndAt }),
+      undefined,
+    );
     expect(prisma.dailyPortfolioSnapshot.findMany).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       participants: {
@@ -1119,6 +1126,10 @@ function createService(portfolioValuationService?: {
     batchService as never,
     prisma as never,
     portfolioValuationService as never,
+    {
+      settleSeason: jest.fn().mockResolvedValue(new Map()),
+      assertNoOpen: jest.fn().mockResolvedValue(undefined),
+    } as never,
   );
 
   return {

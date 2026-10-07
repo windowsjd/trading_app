@@ -314,8 +314,10 @@ evidence and observation boundaries without changing business policy.
   Spot snapshots are synthetic reference/execution price, not Mark Price. Risk uses a separate 5-second-fresh PostgreSQL Binance USDⓈ-M Mark source;
   fixed 0.5% maintenance plus normal close fee triggers atomic full liquidation.
   Bankruptcy shortfall is explicit and protected collateral is preserved.
-  Futures UI and Futures UPNL valuation integration remain deferred. Do not
-  enable for users before F3; see [Futures contract](docs/futures-api-contract.md).
+  F3 adds account-scoped Futures UI, signed Mark UPNL to shared valuation/TWR/ranking,
+  and deterministic Season final Spot exits before final ranking. Production
+  activation remains a separate operator step; defaults stay DISABLED. See
+  [Futures contract](docs/futures-api-contract.md) and [F3 release](docs/futures-f3-contract.md).
   See `docs/wallet-transfers-api-contract.md`. Existing accounts are normalized
   by a zero-only migration, including closed accounts without changing history.
   See [current scope and rollout policy](docs/trading-modes-and-accounts.md).

@@ -10,6 +10,245 @@
 
 ---
 
+## 2026-10-08 — Crypto Futures F3: Valuation / Performance / Season Final Exit / UI
+
+- 시작 branch `main`, `git fetch origin main` 후 HEAD와 origin/main 모두
+  `faea2538cce7f5902a81fd583f8b555c67760e6c` (`선물설계 2.1`), working tree clean.
+  프롬프트의 a74b2c87 이후 실제 F2.1 코드/기록을 우선했다. F2.1 unconditional
+  Isolated manual debit boundary, 실제 PG 112 checks/worker benchmark, 적용된 migration
+  checksum/원자성 검토를 확인했다. F2.1 금융 정책을 F3에서 재설계하지 않았다.
+- **기능 구현 의도:** 보유 중 Futures의 경제적 가치는 risk와 같은 Mark UPNL이어야
+  Home/성과/순위가 서로 모순되지 않는다. Season 정상 종료는 상품의 기존 synthetic
+  execution 의미인 Spot을 endAt 경계에서 사용한다. Margin/notional은 이미 존재하는
+  cash의 사용량/거래 규모이므로 자산에 다시 더하지 않는다. 종료 가격이 없으면 결과를
+  꾸미지 않고 ended로 재시도한다. 기능 구현과 production enable은 서로 다른 단계다.
+- canonical 계약: [F3](backend/docs/futures-f3-contract.md),
+  [Futures API](backend/docs/futures-api-contract.md), [Risk](backend/docs/futures-risk-contract.md).
+  이전 F1/F2/F2.1 기록의 deferred 문구는 당시 상태이며 현행 계약을 덮어쓰지 않는다.
+
+### 설계와 금융 경계
+
+- 총자산 = canonical cash + Spot 가치 + signed Mark UPNL. USD cash와 같은 FX row를
+  사용한다. Long `(mark-entry)×qty`, Short `(entry-mark)×qty`; 예상 종료 fee를 미리
+  빼지 않고 실제 fee/realized PnL은 cash로만 반영한다. Spot cryptoValueKrw 의미 유지.
+- shared PortfolioValuationService/policy와 F2 Decimal/Mark eligibility를 확장했다.
+  Mark effective/captured 모두 5초 이내·미래 금지. Missing/stale은 partial/unavailable 또는
+  batch generation 실패이며 Spot/0/지난 성공 값으로 대체하지 않는다. 같은 generation의
+  같은 instrument는 공통 Mark evidence를 사용한다. Daily가 오래 걸리면 freshness를
+  늘리지 않고 실패/재시도한다.
+- Equity/Daily snapshot은 signed Futures USD/KRW UPNL과 lifetime/Mark/FX evidence JSON을
+  보존한다. 과거 row는 null 유지. General stored factor TWR와 external funding boundary,
+  Season initial-capital return 및 기존 ranking tie-break/fill count를 유지한다. maxDrawdown과
+  history도 같은 total equity다. Futures 실행/청산은 기존 ordinary snapshot primitive를
+  재사용하며 시장 증거가 없는 observation만 건너뛴다. 금융/DB 실패는 rollback한다.
+- Season final: 기존 reservation cleanup/guard → 모든 instrument의 endAt Spot pin →
+  모든 계정(제외 participant 포함)의 account transaction → open lifetime zero barrier →
+  final valuation/ranking/tier/account close/settled. 전체 Season을 큰 transaction으로 만들지
+  않았다. Spot effective/captured 모두 endAt 이하, endAt−10초 이상; WS 우선/REST 회복.
+  missing/too-old/post-end만 존재하면 ended 유지. Retry는 처음 pin한 가격/fee를 그대로 쓴다.
+- 신규 FuturesSeasonPrice / FuturesSeasonSettlement / FuturesSeasonClose, account 및 lifetime
+  unique, typed ledger reference가 중복 settlement를 막는다. 경제적 PnL/fee, 실제 현금,
+  shortfall은 분리한다. 원래 Isolated 각 allocation 및 Cross base budget을 먼저 고정하여
+  처리 순서나 다른 mode의 이익이 bankruptcy 경계를 바꾸지 않는다. Negative wallet 없음.
+- Lock: Season→Account→Participant→Futures wallet→sorted positions. Futures 사용자/청산
+  performance writer는 participant NKU를 처음부터 획득한다. End가 먼저면 liquidator는
+  lifecycle skip, 사용자 mutation은 실패하고 final exit가 한 번 처리한다. Liquidation이
+  먼저면 final exit는 이미 닫힌 lifetime을 다시 정산하지 않는다.
+- Exact public USDⓈ-M USDT PERPETUAL/TRADING/COIN mapping을 instrument에 보존하고
+  catalog/open/increase를 검증된 상품으로 제한한다. 5분 coverage refresh, 24시간 만료,
+  없는 symbol/1000-token 자동 변환 없음. Coverage refresh는 Mark drain과 독립 실행되어
+  catalog network/row-lock 대기가 기존 Mark ingestion을 멈추지 않는다. Production coverage
+  수/실제 provisioning은 이 작업에서 조사·실행하지 않았다.
+- API `/api/v1` 유지. Instruments/positions에 server capabilities, 별도 Spot/Mark 증거,
+  Mark UPNL을 추가하고 account 단일 final-settlement GET을 제공한다. Final GET은 raw
+  provider payload/note를 반환하지 않으며 read-only/ownership 경계를 검증했다.
+- Frontend는 route-pinned accountId + 중앙 query keys + scope epoch/session generation을
+  사용한다. LONG/SHORT, Isolated/Cross, 정수 1~100, Open/Increase/Reduce/Close, 위험 및
+  execution/liquidation/final history를 제공한다. Lifetime 설정은 고정, Cross 청산가/ROE를
+  만들지 않는다. Mark와 Spot을 별도 표시하고 Mark stale이어도 fresh Spot의 Reduce/Close는
+  허용한다. Spot UI freshness는 F1의 captured-age 정책이며 Mark의 두 timestamp age와
+  혼동하지 않는다. 응답 불명 요청은 동일 command/key로 결과를 재확인한다.
+- Home/Portfolio는 signed UPNL 별도 행, allocation은 cash+Spot 양수 구성이다. 기존 Wallet/
+  Admin/focus-scroll/account selection 동작은 되돌리지 않았다. Leverage/quantity/price/cash
+  표시 의미를 분리했고 underlying 가격 precision을 재사용한다.
+
+### 실제 검증
+
+| 검사 | 결과 |
+| --- | --- |
+| Prisma format / validate / generate | PASS; 반복 generate 54개 파일 byte equality |
+| Fresh PostgreSQL 16.15 / 17.11 full chain | 각각 64 migrations / status / drift PASS |
+| 기존 migration 보존 | tracked 63개 파일(62 migrations + lock) 모두 HEAD와 byte equality |
+| Backend typecheck / build / accounts+candle check-only lint / candle format | PASS |
+| Backend full unit | 241 suites, 3,894 tests PASS; DB opt-in 등 55 suites/60 tests skipped |
+| Existing financial CI PG gate + F3 | 19 suites / 20 tests PASS |
+| Existing core/account PG gate | 21 suites / 22 tests PASS |
+| F1 / F2 / F2.1 consolidated PG | 187 / 83 / 112 checks; financial gate에 포함 |
+| F3 actual PG16 / PG17 | 각각 48 scenarios PASS |
+| Canonical backend E2E | 2 suites / 394 tests PASS |
+| Frontend npm check | 1,720 tests PASS (lint + typecheck 포함) |
+| Web / Android JS-assets export | PASS; native binary build 아님 |
+| Futures browser | 112 layouts + mode/account/focus-resize flows PASS |
+| Existing Home / Wallet Transfer browser | 244 layouts/states / 194 cases PASS |
+| Candle fixture PG+Redis | development smoke PASS, cleanup remaining DB/Redis 0; gitDirty=true |
+
+F3 PG는 General/Season×Long/Short×Isolated/Cross×1/37/100x 평가·수수료·증가·감소·종료,
+Mark/Spot basis 차이, funding-neutral transfer와 FX fee, ad reward boundary의 TWR 중립,
+daily와 1d/all history, liquidation 후 UPNL 제거, Season ranking/drawdown 변화와 missing
+Mark generation 원자성, 8개 final 경제 fixture, mixed bankruptcy, excluded 처리, account
+중간 실패/retry/pin 보존, 5개 write fault 및 3-position 두 번째 close 후 rollback,
+duplicate worker, 실제 PG end-lock 대기 중 liquidation/user close/increase를 검증한다.
+기존 F1/F2/F2.1 금융 gate가 transfer/liquidation/user close/증가 race를 추가로 검증한다.
+
+F3 worker 재측정은 기존 benchmark에 정상 General origin과 FX fixture를 추가하여
+liquidation performance observation이 실제 기록됨을 assert했다. PG16.15, Node24.14.1,
+32 logical CPUs, 250 batch/8 lanes/1초 tick, Mark upkeep은 측정 밖이다.
+
+| 계정 수 | 정상 sweep | 10% candidate sweep | candidate 성과 snapshot | 실패 |
+| --- | --- | --- | --- | --- |
+| 100 | 402.44ms | 509.13ms | 13 | 0 |
+| 1,000 | 3,712.60ms | 3,903.91ms | 133 | 0 |
+
+최대 관측 revisit는 4,042.57ms다. Production SLA가 아니며 F2.1의 10,000계정
+약 40초 결과를 무효화하지 않는다. 이번 F3에서 10,000계정은 재측정하지 않았다.
+
+### 운영 제한과 미실행
+
+- Branch 생성/전환, commit/push, persistent/운영 DB write/deploy, 운영 env 변경,
+  사용자 Futures 활성화 및 production instrument provisioning 없음. 기본 DISABLED 유지.
+- 원격 GitHub Actions, clean-commit release attestation, 실제 Binance 장시간 soak/현재
+  전체 상품 coverage, Android/iOS 실기기 keyboard/accessibility/native binary는 미실행.
+  Web 320/360/390/430 폭, font 1/2, Light/Dark, 큰 음수/가격, 100x, loading/error/empty/stale
+  bounds와 스크린샷을 확인했다. 320×300 focus/submit 검증은 native keyboard 증거가 아니다.
+- Candle release smoke의 clean-tree guard는 사용자 commit 금지 때문에 충족시키지 않았고,
+  명시적 SMOKE_ALLOW_DIRTY=1 development 실행 결과만 기록했다. 운영 권한 거부가 아니다.
+- 검증 초기 DB timezone fixture는 전용 UTC disposable DB로 분리했다. 기존 F1/F2
+  preflight price의 간헐 실패는 단독/전체 재실행에서 통과했지만 원인을 확정하지 않았다.
+  Benchmark 최초 FX observation 누락을 감지하여 fixture 기준 시각을 안정화한 뒤 재측정했다.
+  금융 freshness 정책을 완화하지 않았다. 기존 pg concurrent-query deprecation도 남아 있다.
+- Enable 전 별도 review/CI, fresh DB Mark/Spot와 intended coverage, risk 용량/ops 진단,
+  endAt evidence retention/정산 dry-run, 실기기 검토, rollback 절차가 필요하다. 긴 daily
+  generation의 5초 Mark window 운영 실패율도 모니터링한다. REDUCE_ONLY로 entry를
+  먼저 막고 위험 보호를 유지하며, 새 evidence가 존재하는 상태로 pre-F3 서버를 배포하지 않는다.
+- SL/TP/OCO/attached entry/conditional engine은 다음 별도 작업이다. Funding/Hedge/ADL/
+  insurance/partial liquidation/matching/microservice/queue는 추가하지 않았다.
+- 실제 diff/schema/new migrations/generated client/API routes/query keys/CI/new files를 검토했다.
+  기존 migration 수정/파일 삭제/production flag 변경 없음. `git diff --check` PASS.
+  raw 실행 로그와 browser evidence는 `/tmp/trading-f3-logs`, `/tmp/trading-f3-browser`에 있다.
+
+### 변경 파일 전체
+
+아래는 generated Prisma 파일을 포함한 F3 working tree 변경 목록이다. 삭제 파일은 없다.
+
+```text
+.github/workflows/ci.yml
+HANDOVER.md
+backend/README.md
+backend/docs/README.md
+backend/docs/batch-job-foundation.md
+backend/docs/codex-rulepack.md
+backend/docs/futures-api-contract.md
+backend/docs/futures-f3-contract.md
+backend/docs/futures-risk-contract.md
+backend/docs/home-api-contract.md
+backend/docs/policy-decisions.md
+backend/docs/ranking-api-contract.md
+backend/docs/scheduler-ops-foundation.md
+backend/docs/trading-account-finance-api-contract.md
+backend/docs/trading-modes-and-accounts.md
+backend/prisma/migrations/20261008175900_add_futures_season_reference/migration.sql
+backend/prisma/migrations/20261008180000_integrate_futures_valuation_and_season_exit/migration.sql
+backend/prisma/schema.prisma
+backend/scripts/futures-f3-integration.ts
+backend/scripts/futures-integration.ts
+backend/scripts/futures-risk-benchmark.ts
+backend/scripts/provision-futures-instruments.ts
+backend/scripts/spot-wallet-transfer-integration.ts
+backend/src/app.controller.spec.ts
+backend/src/app.service.spec.ts
+backend/src/batch/batch-admin-runner.spec.ts
+backend/src/batch/batch.module.ts
+backend/src/batch/daily-portfolio-snapshot-job.service.spec.ts
+backend/src/batch/daily-portfolio-snapshot-job.service.ts
+backend/src/batch/general-daily-snapshot-job.service.ts
+backend/src/batch/season-settlement-job.service.spec.ts
+backend/src/batch/season-settlement-job.service.ts
+backend/src/common/admin-diagnostics.ts
+backend/src/common/safe-diagnostic-message.ts
+backend/src/futures/futures-diagnostics.spec.ts
+backend/src/futures/futures-f3.integration.spec.ts
+backend/src/futures/futures-final-diagnostics.spec.ts
+backend/src/futures/futures-instrument-coverage.ts
+backend/src/futures/futures-liquidation.service.ts
+backend/src/futures/futures-mark-ingestion.service.ts
+backend/src/futures/futures-mark-ingestion.spec.ts
+backend/src/futures/futures-math.ts
+backend/src/futures/futures-performance.service.ts
+backend/src/futures/futures-price.ts
+backend/src/futures/futures-season-settlement.service.ts
+backend/src/futures/futures-settlement.ts
+backend/src/futures/futures-valuation.spec.ts
+backend/src/futures/futures.controller.ts
+backend/src/futures/futures.module.ts
+backend/src/futures/futures.presenter.ts
+backend/src/futures/futures.service.ts
+backend/src/fx/fx.service.ts
+backend/src/generated/prisma/browser.ts
+backend/src/generated/prisma/client.ts
+backend/src/generated/prisma/enums.ts
+backend/src/generated/prisma/internal/class.ts
+backend/src/generated/prisma/internal/prismaNamespace.ts
+backend/src/generated/prisma/internal/prismaNamespaceBrowser.ts
+backend/src/generated/prisma/models.ts
+backend/src/generated/prisma/models/AssetPriceSnapshot.ts
+backend/src/generated/prisma/models/DailyPortfolioSnapshot.ts
+backend/src/generated/prisma/models/EquitySnapshot.ts
+backend/src/generated/prisma/models/FuturesInstrument.ts
+backend/src/generated/prisma/models/FuturesPosition.ts
+backend/src/generated/prisma/models/FuturesSeasonClose.ts
+backend/src/generated/prisma/models/FuturesSeasonPrice.ts
+backend/src/generated/prisma/models/FuturesSeasonSettlement.ts
+backend/src/generated/prisma/models/Season.ts
+backend/src/generated/prisma/models/TradingAccount.ts
+backend/src/home/home.service.ts
+backend/src/orders/orders.service.spec.ts
+backend/src/orders/orders.service.ts
+backend/src/portfolio/daily-portfolio-snapshot-generation.ts
+backend/src/portfolio/futures-snapshot-values.ts
+backend/src/portfolio/general-account-performance.service.ts
+backend/src/portfolio/portfolio-valuation.policy.ts
+backend/src/portfolio/portfolio-valuation.service.ts
+backend/src/portfolio/portfolio.service.ts
+backend/src/portfolio/trading-account-portfolio.service.spec.ts
+backend/src/portfolio/trading-account-portfolio.service.ts
+backend/src/ranking/ranking-refresh.service.ts
+backend/src/records/records.service.ts
+frontend/docs/trading-account-switching.md
+frontend/package.json
+frontend/src/app/navigation/HomeStack.tsx
+frontend/src/app/navigation/types.ts
+frontend/src/constants/queryKeys.ts
+frontend/src/features/futures/api.ts
+frontend/src/features/futures/policy.ts
+frontend/src/features/tradingAccount/api.ts
+frontend/src/features/tradingAccount/portfolioMessage.ts
+frontend/src/screens/futures/FuturesEntry.tsx
+frontend/src/screens/futures/FuturesScreen.test.ts
+frontend/src/screens/futures/FuturesScreen.tsx
+frontend/src/screens/home/GeneralAccountHome.tsx
+frontend/src/screens/home/HomeAssetHero.tsx
+frontend/src/screens/home/PortfolioScreen.tsx
+frontend/src/screens/home/SeasonAccountHome.tsx
+frontend/test/browser/README.md
+frontend/test/browser/futuresBrowser.cjs
+frontend/test/browser/futuresFixture.jsx
+frontend/test/browser/futuresMocks.js
+frontend/test/futuresFixtures.cjs
+frontend/test/futuresHarness.cjs
+```
+
+---
+
 ## 2026-10-07 — Crypto Futures F2.1 Financial / Operational Hardening
 
 - 기준: `main`, 시작 HEAD와 fetch한 `origin/main`

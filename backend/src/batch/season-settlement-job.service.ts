@@ -1,3 +1,6 @@
+import type { FuturesValuationComponents } from '../portfolio/portfolio-valuation.policy';
+import { futuresSnapshotValues } from '../portfolio/futures-snapshot-values';
+import { FuturesSeasonSettlementService } from '../futures/futures-season-settlement.service';
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import {
   OrderStatus,
@@ -91,7 +94,7 @@ type EquityHistoryPoint = {
   createdAt?: Date | null;
 };
 
-type FinalValuation = {
+type FinalValuation = Partial<FuturesValuationComponents> & {
   seasonParticipantId: string;
   userId: string;
   totalAssetKrw: string;
@@ -182,6 +185,9 @@ export class SeasonSettlementJobService {
     private readonly batchService: BatchService,
     private readonly prisma: PrismaService,
     private readonly portfolioValuationService?: PortfolioValuationService,
+    private readonly futuresFinal: FuturesSeasonSettlementService = new FuturesSeasonSettlementService(
+      prisma,
+    ),
   ) {}
 
   async run(
@@ -264,6 +270,7 @@ export class SeasonSettlementJobService {
     }
 
     if (existingFinalRankings.length > 0) {
+      await this.futuresFinal.assertNoOpen(seasonId);
       return this.handleExistingFinalRankings({
         season,
         settlementDate,
@@ -282,11 +289,16 @@ export class SeasonSettlementJobService {
       participants,
     );
 
+    const finalFuturesProjections = await this.futuresFinal.settleSeason(
+      seasonId,
+      dryRun,
+    );
     const finalValuations = await this.calculateFinalValuations({
       participants,
       participantScopes,
       settlementAt: season.endAt,
       settlementDate,
+      finalFuturesProjections: dryRun ? finalFuturesProjections : undefined,
     }).catch((error) => {
       // A scope fault is not a transient valuation outage: collapsing it into
       // 503 FINAL_VALUATION_FAILED would tell the operator to retry a job that
@@ -586,12 +598,19 @@ export class SeasonSettlementJobService {
     participantScopes: ReadonlyMap<string, string>;
     settlementAt: Date;
     settlementDate: Date;
+    finalFuturesProjections?: Map<string, Prisma.Decimal>;
   }): Promise<FinalValuation[]> {
     if (!this.portfolioValuationService) {
       return this.calculateFinalValuationsFromDailySnapshots(input);
     }
 
     const finalValuations: FinalValuation[] = [];
+    const sourceReads = {
+      client: this.prisma,
+      valuationAtMs: +input.settlementAt,
+      workflow: 'season_settlement' as const,
+      assetPrices: new Map(),
+    };
 
     for (const participant of input.participants) {
       const valuation =
@@ -599,6 +618,9 @@ export class SeasonSettlementJobService {
           participant.tradingAccountId,
           input.settlementAt,
           'season_settlement',
+          this.prisma,
+          sourceReads,
+          input.finalFuturesProjections?.get(participant.tradingAccountId),
         );
       if (valuation.seasonParticipantId !== participant.id) {
         throw new Error(
@@ -628,6 +650,7 @@ export class SeasonSettlementJobService {
         domesticStockValueKrw: valuation.domesticStockValueKrw,
         usStockValueKrw: valuation.usStockValueKrw,
         cryptoValueKrw: valuation.cryptoValueKrw,
+        ...futuresSnapshotValues(valuation),
         maxDrawdown: formatDecimalScale(
           calculateMaxDrawdown(mergedHistory),
           returnRateScale,
@@ -844,6 +867,7 @@ export class SeasonSettlementJobService {
 
       // 2) Preconditions re-verified under the lock, not merely before it.
       await this.assertNoOpenLimitReservations(input.seasonId, tx);
+      await this.futuresFinal.assertNoOpen(input.seasonId, tx);
 
       // 3) EVERY participant of this season and its account, whatever status.
       const accountParticipants = await this.findSettlementAccountParticipants(
@@ -970,6 +994,7 @@ export class SeasonSettlementJobService {
           domesticStockValueKrw: row.domesticStockValueKrw,
           usStockValueKrw: row.usStockValueKrw,
           cryptoValueKrw: row.cryptoValueKrw,
+          ...futuresSnapshotValues(row),
           capturedAt: input.capturedAt,
         };
 

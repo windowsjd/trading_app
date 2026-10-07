@@ -8,11 +8,13 @@ import { TradingAccountsModule } from '../trading-accounts/trading-accounts.modu
 import { GeneralPerformanceModule } from '../portfolio/general-performance.module';
 import { FuturesController } from './futures.controller';
 import { FuturesService } from './futures.service';
+import { FuturesPerformanceService } from './futures-performance.service';
 
 @Module({
   imports: [TradingAccountsModule, GeneralPerformanceModule],
   controllers: [FuturesController],
   providers: [
+    FuturesPerformanceService,
     FuturesService,
     FuturesLiquidationService,
     FuturesRiskWorker,

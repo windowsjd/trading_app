@@ -1,5 +1,16 @@
 # GET /api/v1/ranking API Contract
 
+## F3 valuation (current)
+
+Current ranking uses the shared fresh Mark Futures UPNL component in total equity.
+Season return remains the initial-capital ratio; no General TWR or new tie-breaker
+is introduced. One generation shares Mark evidence per instrument. A missing/stale
+required Mark fails the generation without publishing a partial ranking. Current
+EquitySnapshot history, daily rows and final valuation all use the same total-equity
+meaning for maxDrawdown. Final ranking follows all account Futures exits (including
+non-ranking participants) at the pinned Season end Spot price. Historical rows are
+not rewritten. [F3 details](futures-f3-contract.md).
+
 ## Status
 
 - `GET /api/v1/ranking` read-only MVP is implemented.

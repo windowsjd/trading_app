@@ -2,6 +2,22 @@
 
 Status: implemented foundation, disabled by default.
 
+## Futures F3 integration
+
+The existing jobs/OpsJobLock remain authoritative. F3 adds no scheduler or queue.
+Current ranking and daily valuation share instrument Mark reads within a generation;
+each capture still requires eligible 5-second evidence. A generation that takes
+longer than this window can fail closed and needs a later retry; it cannot extend
+freshness to make a large batch succeed. Monitor these failures and batch duration.
+
+Season final settlement pins all required canonical Spot end-boundary evidence,
+then closes accounts in bounded idempotent transactions before existing final
+snapshot/ranking/tier/account-close/settled writes. Existing limit/reservation cleanup
+must complete first. F2 liquidation skips ended/settled Seasons and uses the same
+lifecycle lock hierarchy. Missing final evidence leaves the Season ended and the
+batch retryable. No request-time or provider network I/O is added to financial locks.
+See [F3 release and retry procedure](futures-f3-contract.md).
+
 ## Scope
 
 This gate adds an internal operations foundation for scheduler ownership, job run audit, and duplicate-run locks.

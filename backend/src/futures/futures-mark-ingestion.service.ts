@@ -1,3 +1,8 @@
+import { Prisma } from '../generated/prisma/client';
+import {
+  FUTURES_EXCHANGE_INFO_URL,
+  parseFuturesContracts,
+} from './futures-instrument-coverage';
 import {
   Injectable,
   Logger,
@@ -26,6 +31,8 @@ export class FuturesMarkIngestion implements OnModuleInit, OnModuleDestroy {
   private lastConnect = 0;
   private lastTargets = 0;
   private lastRecovery = 0;
+  private lastCoverage = 0;
+  private coverageTask?: Promise<void>;
   constructor(private readonly prisma: PrismaService) {}
   onModuleInit() {
     if (!futuresRiskConfig().ingestion) return;
@@ -38,10 +45,11 @@ export class FuturesMarkIngestion implements OnModuleInit, OnModuleDestroy {
       this.logger.warn('FUTURES_MARK_BOOTSTRAP_FAILED'),
     );
   }
-  onModuleDestroy() {
+  async onModuleDestroy() {
     this.stopped = true;
     if (this.timer) clearInterval(this.timer);
     this.socket?.close();
+    await this.coverageTask;
   }
   async persist(
     payload: unknown,
@@ -58,6 +66,30 @@ export class FuturesMarkIngestion implements OnModuleInit, OnModuleDestroy {
       skipDuplicates: true,
     });
     return result.count === 1;
+  }
+  async refreshCoverage() {
+    const reply = await fetch(FUTURES_EXCHANGE_INFO_URL, {
+      signal: AbortSignal.timeout(2500),
+    });
+    if (!reply.ok) {
+      // @diagnosticSurface internal: The cycle catches public coverage transport failure and reports coverage unavailable.
+      throw new Error('FUTURES_COVERAGE_UNAVAILABLE');
+    }
+    const contracts = parseFuturesContracts(await reply.json());
+    const capturedAt = new Date();
+    const instruments = await this.prisma.futuresInstrument.findMany({
+      include: { underlyingAsset: true },
+    });
+    for (const instrument of instruments) {
+      const contract = contracts.get(instrument.underlyingAsset.symbol);
+      await this.prisma.futuresInstrument.update({
+        where: { id: instrument.id },
+        data: {
+          markContractJson: contract ?? Prisma.DbNull,
+          markVerifiedAt: contract ? capturedAt : null,
+        },
+      });
+    }
   }
   private connect() {
     this.lastConnect = Date.now();
@@ -117,6 +149,18 @@ export class FuturesMarkIngestion implements OnModuleInit, OnModuleDestroy {
     if (this.busy || this.stopped || !futuresRiskConfig().ingestion) return;
     this.busy = true;
     try {
+      if (!this.coverageTask && Date.now() - this.lastCoverage >= 300000) {
+        this.lastCoverage = Date.now();
+        // Catalog network/row-lock latency must not hold up the 1s Mark drain.
+        // One in-flight task, no new scheduler or financial owner.
+        this.coverageTask = this.refreshCoverage()
+          .catch(() => {
+            this.logger.warn('FUTURES_COVERAGE_UNAVAILABLE');
+          })
+          .finally(() => {
+            this.coverageTask = undefined;
+          });
+      }
       if (Date.now() - this.lastTargets > 30000) {
         const instruments = await this.prisma.futuresInstrument.findMany({
           where: {

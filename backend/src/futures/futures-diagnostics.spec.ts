@@ -1,3 +1,11 @@
+jest.mock('./futures-performance.service', () => ({
+  FuturesPerformanceService: class {
+    async capture() {}
+  },
+}));
+jest.mock('./futures-instrument-coverage', () => ({
+  verifiedFuturesInstrument: () => true,
+}));
 jest.mock('../generated/prisma/client', () => ({
   CurrencyCode: { KRW: 'KRW', USD: 'USD' },
   Prisma: {

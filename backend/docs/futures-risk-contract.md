@@ -1,7 +1,8 @@
 # Futures F2 risk contract
 
-User-authorized F2 extends the F1 synthetic USD perpetual domain, with no UI or
-valuation changes. User-facing trading remains disabled until F3 is complete.
+F2 risk semantics remain current. [F3](futures-f3-contract.md) adds the product UI,
+Mark valuation and deterministic Season final exits without changing this risk
+engine. User trading stays DISABLED by default until a separate release decision.
 
 - Isolated is the backward-compatible default; explicit `marginMode: cross` opens
   Cross. Mode, direction and integer leverage 1–100 are immutable per lifetime.
@@ -48,7 +49,8 @@ REST. Duplicate source/instrument/effectiveAt is immutable, and selection orders
 by provider time so delayed evidence cannot supersede newer evidence.
 Only exact matching USDT symbols are accepted. A Spot underlying without the same
 USDⓈ-M perpetual symbol stays unavailable; no implicit 1000-token/unit conversion
-is introduced. Verify intended instrument coverage before F3 activation.
+is introduced. F3 persists exact exchangeInfo coverage and filters the user catalog
+and open/increase by recent verification. Verify intended coverage before activation.
 
 Missing/stale marks fail open/increase and Cross outgoing transfers closed.
 Reduce/close still require fresh Spot execution evidence but do not require marks.
@@ -67,7 +69,8 @@ commit wins; unique liquidation close per lifetime is additional durable protect
 Automatic risk action ignores user trading mode. It rechecks account lifecycle and
 financial scope. Suspended/excluded accounts may shed risk; closed accounts and
 ended/settled seasons are diagnosed and skipped so F2 cannot rewrite final results.
-Final open-position settlement at season end belongs to F3.
+F3 final Season exits use normal Spot execution at endAt, after existing reservation
+cleanup and before final ranking. They are not liquidations.
 
 `FUTURES_TRADING_MODE`: ENABLED / REDUCE_ONLY / DISABLED. Absent mode maps legacy
 `FUTURES_TRADING_ENABLED=true` to ENABLED, otherwise DISABLED. Committed replay
@@ -100,9 +103,9 @@ account Cross metrics. Legacy Spot reference fields remain explicitly separate.
 `GET .../futures/liquidations` is ownership-scoped, read-only history with the same
 limit (1–100, default 20) and offset (0–1,000,000) conventions as executions.
 
-F3 owns UI, coherent Home/Portfolio/TWR/Ranking/Settlement Futures UPNL valuation
-and final season settlement. Stop Loss, Take Profit, OCO, trailing stops, limit
-orders, funding, hedge mode, brackets and risk tiers remain outside F2.
+The F3 UI and shared valuation reuse these Mark eligibility and UPNL primitives.
+Stop Loss, Take Profit, OCO, trailing stops, limit orders, funding, hedge mode,
+brackets and risk tiers remain outside the implemented Futures scope.
 
 ## Diagnostic safety
 

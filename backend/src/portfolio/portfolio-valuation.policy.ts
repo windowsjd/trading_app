@@ -1,4 +1,11 @@
 import { canonicalCashWalletSetIssue } from '../wallets/canonical-cash-wallets';
+import { validMark } from '../futures/futures-mark';
+import { futuresDecimal, futuresPnl } from '../futures/futures-math';
+import type { InstrumentWithAsset } from '../futures/futures.presenter';
+import type {
+  FuturesPosition,
+  FuturesMarkSnapshot,
+} from '../generated/prisma/client';
 import {
   AssetPriceSourceType,
   AssetType,
@@ -20,6 +27,17 @@ import {
 } from '../providers/source-eligibility.policy';
 
 type DecimalInput = string | Prisma.Decimal;
+
+export type PortfolioFuturesPositionInput = FuturesPosition & {
+  instrument: InstrumentWithAsset;
+  mark: FuturesMarkSnapshot | null;
+};
+
+export type FuturesValuationComponents = {
+  futuresUnrealizedPnlUsd: string;
+  futuresUnrealizedPnlKrw: string;
+  futuresValuationJson: Prisma.InputJsonObject;
+};
 
 export type PortfolioValuationDiagnosticContext = {
   failureStage?: string;
@@ -101,6 +119,7 @@ export type PortfolioValuationInput = {
   initialCapitalKrw: DecimalInput;
   cashWallets: readonly PortfolioCashWalletInput[];
   positions: readonly PortfolioPositionInput[];
+  futuresPositions?: readonly PortfolioFuturesPositionInput[];
   usdKrwSnapshot?: PortfolioFxRateSnapshotInput | null;
   usdKrwSelectionDiagnosticContext?: PortfolioValuationDiagnosticContext;
   valuationAt: Date;
@@ -108,7 +127,7 @@ export type PortfolioValuationInput = {
   enforceAdminManualFxFreshness?: boolean;
 };
 
-export type PortfolioValuationResult = {
+export type PortfolioValuationResult = Partial<FuturesValuationComponents> & {
   positionValues: Array<{ assetId: string; valueKrw: string }>;
   seasonParticipantId: string | null;
   tradingAccountId: string | null;
@@ -158,6 +177,59 @@ export function calculatePortfolioValuation(
   }
 
   assertRequiredWallets(input.cashWallets);
+  const futures = input.futuresPositions ?? [];
+  // The F2 validator is shared with risk. No Spot/manual/zero fallback is possible.
+  const futuresEvidence = futures.map((position) => {
+    if (
+      position.status !== 'open' ||
+      position.tradingAccountId !== input.tradingAccountId ||
+      position.instrumentId !== position.instrument.id ||
+      position.quantity.lte(0)
+    ) {
+      // @diagnosticSurface internal: Portfolio callers project valuation failures to existing partial HTTP or Ops results.
+      throw new PortfolioValuationError(
+        'FUTURES_POSITION_INVALID',
+        'Futures position scope could not be verified.',
+      );
+    }
+    const mark = position.mark;
+    if (!mark || !validMark(mark, position.instrument, input.valuationAt)) {
+      // @diagnosticSurface internal: Shared Mark eligibility failure is projected by Portfolio partial and Batch boundaries.
+      throw new PortfolioValuationError(
+        mark ? 'FUTURES_MARK_STALE' : 'FUTURES_MARK_UNAVAILABLE',
+        'Fresh Futures Mark Price is required to value this account.',
+        {
+          failureStage: 'futures_mark_valuation',
+          entities: { instrumentId: position.instrumentId },
+          evidence: { valuationAt: input.valuationAt, markAvailable: !!mark },
+        },
+      );
+    }
+    const pnl = futuresPnl(
+      position.direction,
+      position.averageEntryPrice,
+      mark.price,
+      position.quantity,
+    );
+    return {
+      positionId: position.id,
+      instrumentId: position.instrumentId,
+      direction: position.direction,
+      marginMode: position.marginMode,
+      quantity: position.quantity.toFixed(8),
+      averageEntryPrice: position.averageEntryPrice.toFixed(8),
+      markSnapshotId: mark.id,
+      source: mark.source,
+      markPrice: mark.price.toFixed(8),
+      effectiveAt: mark.effectiveAt.toISOString(),
+      capturedAt: mark.capturedAt.toISOString(),
+      unrealizedPnlUsd: pnl.toFixed(8),
+    };
+  });
+  const futuresPnlUsd = futuresEvidence.reduce(
+    (sum, p) => sum.add(p.unrealizedPnlUsd),
+    futuresDecimal('0'),
+  );
   for (const position of input.positions) {
     assertPortfolioPosition(position);
   }
@@ -165,7 +237,9 @@ export function calculatePortfolioValuation(
   const krwCash = sumWallets(input.cashWallets, CurrencyCode.KRW);
   const usdCash = sumWallets(input.cashWallets, CurrencyCode.USD);
   const needsUsdConversion =
-    !usdCash.eq(0) || input.positions.some(positionNeedsUsdConversion);
+    futures.length > 0 ||
+    !usdCash.eq(0) ||
+    input.positions.some(positionNeedsUsdConversion);
   const usdKrwRate = needsUsdConversion
     ? selectUsableUsdKrwRate(
         input.usdKrwSnapshot,
@@ -279,7 +353,11 @@ export function calculatePortfolioValuation(
     unrealizedPnlKrw = unrealizedPnlKrw.add(values.unrealizedPnlKrw);
   }
 
-  const totalAssetKrw = krwCash.add(usdCashKrw).add(assetValueKrw);
+  const futuresPnlKrw = futuresPnlUsd.mul(usdKrwRate ?? 0);
+  const totalAssetKrw = krwCash
+    .add(usdCashKrw)
+    .add(assetValueKrw)
+    .add(futuresPnlKrw);
   const returnRate = totalAssetKrw
     .sub(initialCapitalKrw)
     .div(initialCapitalKrw)
@@ -299,6 +377,20 @@ export function calculatePortfolioValuation(
     cryptoValueKrw: formatMoneyScale8(cryptoValueKrw),
     realizedPnlKrw: formatMoneyScale8(realizedPnlKrw),
     unrealizedPnlKrw: formatMoneyScale8(unrealizedPnlKrw),
+    futuresUnrealizedPnlUsd: formatMoneyScale8(futuresPnlUsd),
+    futuresUnrealizedPnlKrw: formatMoneyScale8(futuresPnlKrw),
+    futuresValuationJson: {
+      valuationAt: input.valuationAt.toISOString(),
+      positions: futuresEvidence,
+      usdKrw:
+        futures.length > 0 && input.usdKrwSnapshot
+          ? {
+              snapshotId: input.usdKrwSnapshot.id ?? null,
+              rate: usdKrwRate!.toString(),
+              effectiveAt: input.usdKrwSnapshot.effectiveAt.toISOString(),
+            }
+          : null,
+    },
     valuationAt: input.valuationAt,
     sourceSummary: buildPortfolioSourceSummary([
       ...assetPriceSourceDecisions.map((source) => source.sourceDecision),

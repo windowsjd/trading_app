@@ -1,3 +1,5 @@
+import type { PortfolioValuationSourceReads } from '../portfolio/portfolio-valuation.service';
+import { futuresSnapshotValues } from '../portfolio/futures-snapshot-values';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import {
   Prisma,
@@ -191,6 +193,10 @@ export class GeneralDailySnapshotJobService {
       errors: [],
     };
 
+    const futuresMarks: NonNullable<
+      PortfolioValuationSourceReads['futuresMarks']
+    > = new Map();
+    const futuresMarkBoundary = new Date();
     for (const account of accounts) {
       if (input.isLockOwned && !input.isLockOwned()) {
         throw new Error('Ops job lock ownership was lost.');
@@ -204,6 +210,8 @@ export class GeneralDailySnapshotJobService {
         snapshotDate,
         snapshotTimezone: input.snapshotTimezone,
         capturedAt,
+        futuresMarks,
+        futuresMarkBoundary,
         dryRun,
         result,
       });
@@ -217,6 +225,8 @@ export class GeneralDailySnapshotJobService {
     snapshotDate: Date;
     snapshotTimezone?: string;
     capturedAt: Date;
+    futuresMarks: NonNullable<PortfolioValuationSourceReads['futuresMarks']>;
+    futuresMarkBoundary: Date;
     dryRun: boolean;
     result: GeneralDailySnapshotJobResult;
   }): Promise<void> {
@@ -231,6 +241,14 @@ export class GeneralDailySnapshotJobService {
           account,
           valuationAt: input.capturedAt,
           client: this.prisma,
+          sourceReads: {
+            client: this.prisma,
+            valuationAtMs: +input.capturedAt,
+            workflow: 'home_live_valuation',
+            assetPrices: new Map(),
+            futuresMarks: input.futuresMarks,
+            futuresMarkBoundary: input.capturedAt,
+          },
         });
         result.accounts.wouldCreate += 1;
       } catch (error) {
@@ -287,6 +305,14 @@ export class GeneralDailySnapshotJobService {
             account: reloaded,
             valuationAt: capturedAt,
             client: tx,
+            sourceReads: {
+              client: tx,
+              valuationAtMs: +capturedAt,
+              workflow: 'home_live_valuation',
+              assetPrices: new Map(),
+              futuresMarks: input.futuresMarks,
+              futuresMarkBoundary: input.futuresMarkBoundary,
+            },
           });
 
         const equity = await tx.equitySnapshot.create({
@@ -299,6 +325,7 @@ export class GeneralDailySnapshotJobService {
             domesticStockValueKrw: values.domesticStockValueKrw,
             usStockValueKrw: values.usStockValueKrw,
             cryptoValueKrw: values.cryptoValueKrw,
+            ...futuresSnapshotValues(values),
             snapshotReason: SnapshotReason.scheduled,
             cumulativeExternalFundingKrw: values.cumulativeExternalFundingKrw,
             investmentPnlKrw: values.investmentPnlKrw,
@@ -404,6 +431,7 @@ export class GeneralDailySnapshotJobService {
       assetValueKrw: input.valuation.assetValueKrw,
       realizedPnlKrw: input.valuation.realizedPnlKrw,
       unrealizedPnlKrw: input.valuation.unrealizedPnlKrw,
+      ...futuresSnapshotValues(input.values),
       cumulativeExternalFundingKrw: input.values.cumulativeExternalFundingKrw,
       investmentPnlKrw: input.values.investmentPnlKrw,
       timeWeightedReturnFactor: input.values.timeWeightedReturnFactor,

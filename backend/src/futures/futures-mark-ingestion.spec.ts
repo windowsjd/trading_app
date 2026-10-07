@@ -64,8 +64,8 @@ describe('Mark transport failure and independent REST recovery', () => {
       }),
     );
   });
-  afterEach(() => {
-    service.onModuleDestroy();
+  afterEach(async () => {
+    await service.onModuleDestroy();
     process.env = { ...saved };
     global.fetch = oldFetch;
     jest.useRealTimers();
@@ -130,6 +130,7 @@ describe('Mark transport failure and independent REST recovery', () => {
     expect(createMany.mock.calls[0][0].data[0].price.toString()).toBe('101');
   });
   it('REST failure cannot fabricate evidence and a later recovery can resume', async () => {
+    jest.spyOn(service, 'refreshCoverage').mockResolvedValueOnce();
     (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('offline'));
     await expect(service.cycle()).rejects.toThrow('offline');
     expect(createMany).not.toHaveBeenCalled();
@@ -144,5 +145,37 @@ describe('Mark transport failure and independent REST recovery', () => {
     await service.cycle();
     expect(global.fetch).not.toHaveBeenCalled();
     expect(createMany).not.toHaveBeenCalled();
+  });
+  it('slow catalog verification does not delay Mark bootstrap or WS persistence', async () => {
+    let release!: () => void;
+    const coverage = jest.spyOn(service, 'refreshCoverage').mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+    try {
+      await service.cycle();
+      expect(createMany).toHaveBeenCalledTimes(1);
+      sockets()[0].emit(
+        'message',
+        Buffer.from(
+          JSON.stringify({
+            e: 'markPriceUpdate',
+            s: 'BTCUSDT',
+            p: '101',
+            E: Date.now(),
+            st: 1,
+          }),
+        ),
+      );
+      await service.cycle();
+      expect(createMany.mock.calls.at(-1)[0].data[0].source).toBe(
+        'binance_usdm_mark_ws',
+      );
+      expect(coverage).toHaveBeenCalledTimes(1);
+    } finally {
+      release();
+    }
   });
 });

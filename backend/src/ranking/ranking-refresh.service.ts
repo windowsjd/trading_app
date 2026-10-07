@@ -1,3 +1,5 @@
+import type { FuturesValuationComponents } from '../portfolio/portfolio-valuation.policy';
+import { futuresSnapshotValues } from '../portfolio/futures-snapshot-values';
 import { Injectable, Logger } from '@nestjs/common';
 import {
   ParticipantStatus,
@@ -49,7 +51,7 @@ type EquityPoint = {
   createdAt?: Date | null;
 };
 
-type CurrentRankingValuation = {
+type CurrentRankingValuation = Partial<FuturesValuationComponents> & {
   participant: RankableParticipant;
   totalAssetKrw: string;
   returnRate: string;
@@ -291,6 +293,7 @@ export class RankingRefreshService {
             domesticStockValueKrw: valuation.domesticStockValueKrw,
             usStockValueKrw: valuation.usStockValueKrw,
             cryptoValueKrw: valuation.cryptoValueKrw,
+            ...futuresSnapshotValues(valuation),
             maxDrawdown: formatDecimal(calculateMaxDrawdown(mergedHistory), 8),
             reachedReturnAt: calculateReachedReturnAt(
               mergedHistory,
@@ -545,6 +548,7 @@ export class RankingRefreshService {
               domesticStockValueKrw: valuation.domesticStockValueKrw,
               usStockValueKrw: valuation.usStockValueKrw,
               cryptoValueKrw: valuation.cryptoValueKrw,
+              ...futuresSnapshotValues(valuation),
               snapshotReason: SnapshotReason.scheduled,
               capturedAt: input.capturedAt,
             })),

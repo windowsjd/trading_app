@@ -48,7 +48,7 @@ async function seed(count: number, candidates: boolean) {
   );
   await fixtureDb.query(
     `INSERT INTO trading_accounts (id,user_id,mode,initial_capital_krw,opened_at,updated_at)
-    SELECT 'bench-a-'||lpad(n::text,5,'0'), 'bench-u-'||n, 'general', 10000000, now(), now()
+    SELECT 'bench-a-'||lpad(n::text,5,'0'), 'bench-u-'||n, 'general', 10000000, clock_timestamp()-interval '1 minute', now()
     FROM generate_series(1,$1) n`,
     [count],
   );
@@ -62,6 +62,14 @@ async function seed(count: number, candidates: boolean) {
   );
   await fixtureDb.query(`INSERT INTO wallet_transactions (id,trading_account_id,wallet_id,currency_code,direction,tx_type,reference_type,reference_id,amount,balance_after,occurred_at)
     SELECT a.id||'-grant',a.id,a.id||'-securities-KRW','KRW','credit','initial_grant','general_account_open',a.id,10000000,10000000,now() FROM trading_accounts a`);
+  // F3 candidate work includes actual performance recording, not a missing-FX
+  // or missing-origin shortcut. Fixture preparation stays outside the timings.
+  await fixtureDb.query(`INSERT INTO equity_snapshots
+    (id,trading_account_id,total_asset_krw,return_rate,krw_cash,usd_cash_krw,domestic_stock_value_krw,us_stock_value_krw,crypto_value_krw,snapshot_reason,cumulative_external_funding_krw,investment_pnl_krw,time_weighted_return_factor,external_funding_amount_krw,external_funding_reference_type,external_funding_reference_id,captured_at)
+    SELECT id||'-origin',id,10000000,0,10000000,0,0,0,0,'general_account_open',10000000,0,1,10000000,'general_account_open',id,opened_at FROM trading_accounts`);
+  await fixtureDb.query(`INSERT INTO fx_rate_snapshots
+    (id,base_currency,quote_currency,rate,source_type,source_name,effective_at,captured_at)
+    VALUES ('bench-fx','USD','KRW',1400,'provider_api','korea_exim_exchange_rate',clock_timestamp()-interval '1 minute',clock_timestamp()-interval '1 minute')`);
   for (const n of [0, 1, 2, 3]) {
     await db.asset.create({
       data: {
@@ -107,7 +115,7 @@ async function refreshMarks() {
 }
 async function clear() {
   await fixtureDb.query(
-    'TRUNCATE users,assets,ops_job_locks,ops_job_runs CASCADE',
+    'TRUNCATE users,assets,fx_rate_snapshots,ops_job_locks,ops_job_runs CASCADE',
   );
 }
 async function measure(count: number, candidates: boolean) {
@@ -235,7 +243,15 @@ async function measure(count: number, candidates: boolean) {
     maxConcurrentTransactions,
     maxActiveConnections,
     maxLockWaiters,
+    performanceSnapshots: await db.equitySnapshot.count({
+      where: { snapshotReason: 'order_executed' },
+    }),
   };
+  assert.equal(
+    report.performanceSnapshots,
+    outcomes.liquidated ?? 0,
+    'Every benchmark liquidation must include its F3 performance snapshot',
+  );
   assert.equal(
     failures,
     0,

@@ -100,6 +100,8 @@ export interface TradingAccountPortfolioSummaryDto {
   assetValueKrw: MoneyString;
   realizedPnlKrw: MoneyString;
   unrealizedPnlKrw: MoneyString;
+  futuresUnrealizedPnlUsd?: MoneyString;
+  futuresUnrealizedPnlKrw?: MoneyString;
   valuedAt?: string;
   /** general only; `null` on a season account — never 0, which would read as "none received". */
   initialFundingKrw: MoneyString | null;

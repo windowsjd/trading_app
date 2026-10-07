@@ -1,3 +1,7 @@
+import {
+  FUTURES_EXCHANGE_INFO_URL,
+  parseFuturesContracts,
+} from '../src/futures/futures-instrument-coverage';
 import { loadRuntimeEnv } from './lib/load-runtime-env';
 import { PrismaService } from '../src/prisma/prisma.service';
 
@@ -8,7 +12,14 @@ if (unknown.length)
   throw new Error('Usage: pnpm futures:provision-instruments [--apply]');
 const db = new PrismaService();
 async function main() {
-  const assets = await db.asset.findMany({
+  const response = await fetch(FUTURES_EXCHANGE_INFO_URL, {
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!response.ok)
+    throw new Error('Futures public exchange information is unavailable.');
+  const contracts = parseFuturesContracts(await response.json());
+  const verifiedAt = new Date();
+  const candidates = await db.asset.findMany({
     where: {
       isActive: true,
       assetType: 'crypto',
@@ -23,10 +34,14 @@ async function main() {
     select: { id: true, symbol: true },
     orderBy: { id: 'asc' },
   });
+  const assets = candidates.filter((asset) => contracts.has(asset.symbol));
   console.log(
     JSON.stringify({
       mode: apply ? 'apply' : 'dry-run',
       missingInstruments: assets,
+      unsupportedSymbols: candidates
+        .filter((asset) => !contracts.has(asset.symbol))
+        .map((asset) => asset.symbol),
     }),
   );
   if (apply && assets.length) {
@@ -35,6 +50,8 @@ async function main() {
         underlyingAssetId: asset.id,
         productType: 'synthetic_perpetual',
         settlementCurrency: 'USD',
+        markContractJson: contracts.get(asset.symbol)!,
+        markVerifiedAt: verifiedAt,
       })),
       skipDuplicates: true,
     });

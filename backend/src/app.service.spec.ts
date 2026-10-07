@@ -1,5 +1,8 @@
 jest.mock('./generated/prisma/client', () => ({
   PrismaClient: class PrismaClient {},
+  Prisma: {
+    Decimal: jest.requireActual('@prisma/client/runtime/client').Decimal,
+  },
   AssetPriceSourceType: {
     admin_manual: 'admin_manual',
     official_batch: 'official_batch',

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { FuturesSeasonSettlementService } from '../futures/futures-season-settlement.service';
 import { LimitOrderCancelService } from '../orders/limit-order-cancel.service';
 import { OrderReservationService } from '../orders/order-reservation.service';
 import { GeneralPerformanceModule } from '../portfolio/general-performance.module';
@@ -17,6 +18,7 @@ import { SeasonLifecycleTransitionJobService } from './season-lifecycle-transiti
 @Module({
   imports: [PrismaModule, GeneralPerformanceModule],
   providers: [
+    FuturesSeasonSettlementService,
     BatchService,
     LimitOrderCancelService,
     OrderReservationService,

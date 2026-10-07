@@ -93,7 +93,10 @@ export const ModelName = {
   LimitOrderCandleEvidence: 'LimitOrderCandleEvidence',
   FuturesMarkSnapshot: 'FuturesMarkSnapshot',
   FuturesLiquidation: 'FuturesLiquidation',
-  FuturesLiquidationClose: 'FuturesLiquidationClose'
+  FuturesLiquidationClose: 'FuturesLiquidationClose',
+  FuturesSeasonPrice: 'FuturesSeasonPrice',
+  FuturesSeasonSettlement: 'FuturesSeasonSettlement',
+  FuturesSeasonClose: 'FuturesSeasonClose'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -447,6 +450,8 @@ export const FuturesInstrumentScalarFieldEnum = {
   productType: 'productType',
   settlementCurrency: 'settlementCurrency',
   isActive: 'isActive',
+  markContractJson: 'markContractJson',
+  markVerifiedAt: 'markVerifiedAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -797,6 +802,9 @@ export const EquitySnapshotScalarFieldEnum = {
   domesticStockValueKrw: 'domesticStockValueKrw',
   usStockValueKrw: 'usStockValueKrw',
   cryptoValueKrw: 'cryptoValueKrw',
+  futuresUnrealizedPnlUsd: 'futuresUnrealizedPnlUsd',
+  futuresUnrealizedPnlKrw: 'futuresUnrealizedPnlKrw',
+  futuresValuationJson: 'futuresValuationJson',
   snapshotReason: 'snapshotReason',
   cumulativeExternalFundingKrw: 'cumulativeExternalFundingKrw',
   investmentPnlKrw: 'investmentPnlKrw',
@@ -822,6 +830,9 @@ export const DailyPortfolioSnapshotScalarFieldEnum = {
   assetValueKrw: 'assetValueKrw',
   realizedPnlKrw: 'realizedPnlKrw',
   unrealizedPnlKrw: 'unrealizedPnlKrw',
+  futuresUnrealizedPnlUsd: 'futuresUnrealizedPnlUsd',
+  futuresUnrealizedPnlKrw: 'futuresUnrealizedPnlKrw',
+  futuresValuationJson: 'futuresValuationJson',
   cumulativeExternalFundingKrw: 'cumulativeExternalFundingKrw',
   investmentPnlKrw: 'investmentPnlKrw',
   timeWeightedReturnFactor: 'timeWeightedReturnFactor',
@@ -990,6 +1001,59 @@ export const FuturesLiquidationCloseScalarFieldEnum = {
 } as const
 
 export type FuturesLiquidationCloseScalarFieldEnum = (typeof FuturesLiquidationCloseScalarFieldEnum)[keyof typeof FuturesLiquidationCloseScalarFieldEnum]
+
+
+export const FuturesSeasonPriceScalarFieldEnum = {
+  id: 'id',
+  seasonId: 'seasonId',
+  instrumentId: 'instrumentId',
+  assetPriceSnapshotId: 'assetPriceSnapshotId',
+  endAt: 'endAt',
+  feeRate: 'feeRate',
+  createdAt: 'createdAt'
+} as const
+
+export type FuturesSeasonPriceScalarFieldEnum = (typeof FuturesSeasonPriceScalarFieldEnum)[keyof typeof FuturesSeasonPriceScalarFieldEnum]
+
+
+export const FuturesSeasonSettlementScalarFieldEnum = {
+  id: 'id',
+  seasonId: 'seasonId',
+  tradingAccountId: 'tradingAccountId',
+  endAt: 'endAt',
+  feeRate: 'feeRate',
+  realizedPnl: 'realizedPnl',
+  feeAmount: 'feeAmount',
+  settledPnl: 'settledPnl',
+  settledFee: 'settledFee',
+  settledCash: 'settledCash',
+  bankruptcyShortfall: 'bankruptcyShortfall',
+  walletBalanceBefore: 'walletBalanceBefore',
+  walletBalanceAfter: 'walletBalanceAfter',
+  scopesJson: 'scopesJson',
+  executedAt: 'executedAt'
+} as const
+
+export type FuturesSeasonSettlementScalarFieldEnum = (typeof FuturesSeasonSettlementScalarFieldEnum)[keyof typeof FuturesSeasonSettlementScalarFieldEnum]
+
+
+export const FuturesSeasonCloseScalarFieldEnum = {
+  id: 'id',
+  settlementId: 'settlementId',
+  tradingAccountId: 'tradingAccountId',
+  positionId: 'positionId',
+  instrumentId: 'instrumentId',
+  priceId: 'priceId',
+  direction: 'direction',
+  marginMode: 'marginMode',
+  quantity: 'quantity',
+  executionPrice: 'executionPrice',
+  realizedPnl: 'realizedPnl',
+  feeRate: 'feeRate',
+  feeAmount: 'feeAmount'
+} as const
+
+export type FuturesSeasonCloseScalarFieldEnum = (typeof FuturesSeasonCloseScalarFieldEnum)[keyof typeof FuturesSeasonCloseScalarFieldEnum]
 
 
 export const SortOrder = {

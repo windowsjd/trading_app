@@ -20,10 +20,16 @@ import { readFuturesMark } from './futures-mark';
 import { futuresRiskConfig } from './futures.config';
 import { futuresError } from './futures-error';
 import { bankruptcySettlement, settleFuturesCash } from './futures-settlement';
+import { FuturesPerformanceService } from './futures-performance.service';
 
 @Injectable()
 export class FuturesLiquidationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly history: FuturesPerformanceService = new FuturesPerformanceService(
+      prisma,
+    ),
+  ) {}
 
   /** Read-only candidate hints, never settlement authority. Healthy scopes need
    * no financial locks. Missing/inconsistent evidence goes through the existing
@@ -121,7 +127,7 @@ export class FuturesLiquidationService {
             );
           const lifecycle = await lockSeasonTradingContext(tx, {
             seasonParticipantId: target.seasonParticipant.id,
-            participantWrite: false,
+            participantWrite: true,
           });
           if (lifecycle.account.id !== accountId)
             futuresError(
@@ -312,6 +318,7 @@ export class FuturesLiquidationService {
           now,
         );
         await tx.walletTransaction.createMany({ data: cash.ledger });
+        await this.history.capture(tx, account, now);
         return { state: 'liquidated', eventId: event.id };
       },
       { maxWait: 5000, timeout: 15000 },
