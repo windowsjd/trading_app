@@ -110,8 +110,9 @@ function TransferForm({ account, capabilities, scope, readScope }: {
   const usdWallets = USD_TRANSFER_WALLETS.map(wallet => getWalletByIdentity(scopedWallets, wallet.scope, 'USD'));
   const hasAllWallets = usdWallets.every(wallet => typeof wallet?.id === 'string' && !!wallet.id && wallet.currencyCode === 'USD') &&
     new Set(usdWallets.map(wallet => wallet?.id)).size === USD_TRANSFER_WALLETS.length;
+  // Background refresh keeps validated collateral; missing data and query errors fail closed.
   const available = sourceIsFutures
-    ? futures.isError || futures.isFetching ? null : futuresTransferAvailableAmount(futures.data, account.id, source)
+    ? futures.isError ? null : futuresTransferAvailableAmount(futures.data, account.id, source)
     : transferAvailableAmount(source);
   const canonicalAmount = parseTransferAmount(amount);
   const block = capabilities?.canExchange ? null : getCapabilityBlockMessage(capabilities, capabilities?.exchangeBlockReason) ?? '현재 계정에서는 이체할 수 없습니다.';

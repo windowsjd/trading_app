@@ -131,6 +131,49 @@ test('Futures outgoing availability and validation use margin-aware free collate
   await h.amount('25'); assert.equal(h.node('wallet-transfer-submit').props.state, 'enabled');
 });
 
+for (const refreshedCollateral of ['10.00000000', null]) test(`Futures background refresh retains validated collateral until the new ${refreshedCollateral} result`, async t => {
+  const h = walletTransferHarness(); await h.start(); t.after(h.close); await h.choose('source', 'crypto_futures'); await h.amount('20');
+  const available = h.node('wallet-transfer-available').props.children;
+  assert.equal(available, '이체 가능 금액: USD 25');
+  assert.equal(h.node('wallet-transfer-submit').props.state, 'enabled');
+
+  const key = QUERY_KEYS.tradingAccount.futuresCollateral('A');
+  const { act } = createRequire(import.meta.url)('react-test-renderer');
+  h.riskGate = { A: deferred() };
+  let refresh;
+  await act(async () => { refresh = h.client.refetchQueries({ queryKey: key }); }); await h.flush();
+  assert.equal(h.client.getQueryState(key).fetchStatus, 'fetching');
+  assert.equal(h.node('wallet-transfer-available').props.children, available);
+  assert.equal(h.node('wallet-transfer-submit').props.state, 'enabled');
+  assert.doesNotMatch(text(h), /이체 가능 금액을 확인하고 있습니다/);
+
+  h.risk.A = { ...h.risk.A, collateral: { ...h.risk.A.collateral, freeCollateral: refreshedCollateral } };
+  h.riskGate.A.resolve(); await act(async () => { await refresh; }); await h.flush();
+  assert.equal(h.node('wallet-transfer-submit').props.state, 'disabled');
+  if (refreshedCollateral === null) {
+    assert.doesNotMatch(h.node('wallet-transfer-available').props.children, /이체 가능 금액: USD/);
+  } else {
+    assert.equal(h.node('wallet-transfer-available').props.children, '이체 가능 금액: USD 10');
+    await h.amount('10'); assert.equal(h.node('wallet-transfer-submit').props.state, 'enabled');
+  }
+});
+
+test('Futures background refresh error blocks outgoing transfer even with cached valid collateral', async t => {
+  const h = walletTransferHarness(); await h.start(); t.after(h.close); await h.choose('source', 'crypto_futures'); await h.amount('1');
+  assert.equal(h.node('wallet-transfer-submit').props.state, 'enabled');
+  const key = QUERY_KEYS.tradingAccount.futuresCollateral('A');
+  const { act } = createRequire(import.meta.url)('react-test-renderer');
+  h.riskFailure = new Error('PROVIDER_INTERNAL_FAILURE secret');
+  await act(async () => { await h.client.refetchQueries({ queryKey: key }); }); await h.flush();
+  assert.equal(h.client.getQueryState(key).status, 'error');
+  assert.equal(h.client.getQueryData(key).collateral.freeCollateral, '25.00000000');
+  assert.equal(h.node('wallet-transfer-submit').props.state, 'disabled');
+  assert.doesNotMatch(text(h), /PROVIDER_INTERNAL|secret|이체 가능 금액: USD/);
+  await h.press('wallet-transfer-submit'); assert.equal(h.requests.length, 0);
+  await h.choose('source', 'securities'); await h.choose('destination', 'crypto_futures');
+  assert.equal(h.node('wallet-transfer-submit').props.state, 'enabled');
+});
+
 for (const state of ['null', 'stale-mark', 'error', 'loading', 'wrong-wallet', 'wrong-account', 'malformed', 'negative']) test(`Futures ${state} never falls back to cash; incoming remains available`, async t => {
   const h = walletTransferHarness();
   if (state === 'null' || state === 'stale-mark') { h.risk.A.collateral.freeCollateral = null; h.risk.A.cross = { markState: 'unavailable_or_stale' }; }
@@ -142,6 +185,8 @@ for (const state of ['null', 'stale-mark', 'error', 'loading', 'wrong-wallet', '
   if (state === 'negative') h.risk.A.collateral.freeCollateral = '-1.00000000';
   await h.start(); t.after(h.close); await h.choose('source', 'crypto_futures'); await h.amount('1');
   assert.equal(h.node('wallet-transfer-submit').props.state, 'disabled'); assert.doesNotMatch(text(h), /PROVIDER_INTERNAL|secret|이체 가능 금액: USD/);
+  if (state === 'loading') assert.equal(h.node('wallet-transfer-available').props.children, '이체 가능 금액을 확인하고 있습니다.');
+  await h.press('wallet-transfer-submit'); assert.equal(h.requests.length, 0);
   await h.choose('source', 'securities'); await h.choose('destination', 'crypto_futures');
   assert.equal(h.node('wallet-transfer-submit').props.state, 'enabled');
   if (h.riskGate) { h.riskGate.A.resolve(); await h.flush(); }
