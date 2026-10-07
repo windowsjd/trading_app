@@ -1,3 +1,5 @@
+import { safeAdminDiagnosticLog } from '../common/admin-diagnostics';
+import { classifyFailureCause } from '../common/safe-failure-cause';
 import {
   HttpException,
   HttpStatus,
@@ -443,7 +445,7 @@ export class CandleServingService {
     extra: Record<string, unknown> = {},
   ): void {
     this.logger.log(
-      JSON.stringify({
+      safeAdminDiagnosticLog({
         event: 'candle_delivery',
         state,
         ...this.deliveryContext(assetId, query, plan),
@@ -460,7 +462,7 @@ export class CandleServingService {
     extra: Record<string, unknown> = {},
   ): void {
     this.logger.warn(
-      JSON.stringify({
+      safeAdminDiagnosticLog({
         event: 'candle_delivery_failed',
         state,
         ...this.deliveryContext(assetId, query, plan),
@@ -514,7 +516,12 @@ export class CandleServingService {
   }
 
   private errorName(error: unknown): string {
-    return error instanceof Error ? error.name : 'operational_error';
+    if (error instanceof CandleOperationalRefreshError)
+      return 'CandleOperationalRefreshError';
+    if (error instanceof CandleSingleFlightWaitTimeoutError)
+      return 'CandleSingleFlightWaitTimeoutError';
+    const cause = classifyFailureCause(error);
+    return cause.code ?? cause.errorType;
   }
 }
 

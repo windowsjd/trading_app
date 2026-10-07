@@ -10,6 +10,147 @@
 
 ---
 
+## 2026-10-07 — Crypto Futures F1: synthetic USD perpetual Market / One-way / Isolated
+
+### 저장소 조사 및 작업 경계
+
+- 시작에 `git fetch origin main`을 실행했다. 현재 branch `main`, HEAD와 origin/main은
+  `f8e8b343ecec17b09156c8dbcb6a4f6a1bb94346` (`장애 triage 기준 공식화`)였다.
+  작업 트리에는 기존 진단/오류 표시 변경이 있었다. 시작 diff와 SHA-256을 보관하여 보존했고,
+  함께 편집한 `backend/README.md`와 `backend/test/app.e2e-spec.ts`는 시작 상태 대비 F1
+  변경만 별도로 대조했다. 다른 기존 변경 및 frontend 파일은 시작 해시와 동일하다.
+  branch 생성/전환·commit·push·운영 배포는 하지 않았다.
+- Prisma Asset/Spot Position/Order/Quote/Wallet/ledger/account/season 및 migration chain,
+  Binance Spot REST/WS snapshot과 source/freshness selector, General/Season order fee/context/
+  idempotency/cash primitives/lifecycle locks, Transfer와 FX+Transfer의 transaction seam,
+  Portfolio/General TWR/ranking/settlement, feature flag/startup validation, CI 및 현행
+  triage 정책을 조사했다. 현재 코드는 Futures Wallet과 명시적 이체까지 있고 Futures 거래
+  도메인은 없었다. 기존 Spot 소유/예약 모델과 새로운 Futures 금융 state를 분리했다.
+
+### 상품·position·execution 및 API
+
+- 새 `FuturesInstrument`는 기존 Asset을 underlying으로 참조하며 독립 ID,
+  `synthetic_perpetual` product type, USD settlement identity를 가진다. symbol이나
+  `AssetType.crypto`로 Futures를 추론하지 않는다. 명시적 provisioning CLI는 dry-run 기본,
+  `--apply` 때 누락 instrument만 생성하며 재실행 가능하다. GET은 생성/수리하지 않는다.
+- 별도 `FuturesPosition`에 account/instrument/direction/quantity/averageEntryPrice/
+  integer leverage/isolatedMargin/realizedPnl/timestamps를 저장한다. 열린 account+instrument
+  partial unique가 One-way를 보호한다. Closed lifetime은 qty/margin/entry basis 0과 PnL을
+  보존하고 재진입은 새 lifetime이다. Spot Position·Order·Quote schema/동작은 불변이다.
+- `FuturesExecution`은 operation, direction, qty, leverage, isolated mode, execution price,
+  snapshot FK, source/effectiveAt/capturedAt, notional, actual fee rate/amount, realized PnL,
+  실행 후 position state 및 executedAt을 저장한다. `FuturesExecuteRequest`는 account/key/hash,
+  unique execution FK 및 최초 전체 response를 같은 transaction에 저장한다. 과거 의미를 현재
+  position에서 재추론하지 않는다. Fee/PnL 원장의 reference는 `futures_execution`이다.
+- `/api/v1/trading-accounts/:accountId/futures` 아래 `POST /execute`, `GET /instruments`,
+  `GET /positions`, `GET /executions`를 추가했다. DTO·pagination·오류·운영/provisioning 계약은
+  [Futures API 계약](backend/docs/futures-api-contract.md)에 있다. Money는 문자열, UTC ISO 시간,
+  기존 success/data 형식이다. Spot Quote/Order lifecycle을 일반화하지 않았다.
+
+### 거래·계산·collateral
+
+- LONG/SHORT open, same-side increase, partial reduce, full close를 지원한다. 기존 lifetime을
+  다루는 command는 positionId를 요구한다. 반대 방향 open/auto flip/초과 reduce를 금지하며,
+  reduce가 전량이면 durable operation은 close다. 1~100 **모든 자연수** leverage를 허용하고
+  0/음수/101/소수/NaN/Infinity/문자열/잘못된 타입을 거절한다. SQL INTEGER+CHECK와 lifetime
+  immutable trigger가 저장 구조를 보호한다. 열린 leverage는 increase 포함 변경 불가다.
+- 평균가는 `(oldQty*oldAvg + addedQty*price)/newQty`다. 기존 HALF_UP 8자리 금액 정책과
+  로컬 Decimal precision 60을 사용해 Spot/FX 전역 설정을 바꾸지 않았다. 초기 margin은
+  exact entry notional/leverage를 8자리 올림한다. 16자리 entry-notional basis는 평균가 반올림에
+  따른 margin 과소 배정을 막는다. Increase는 margin을 release하지 않고, partial reduce는
+  남은 비율을 올림하여 보존하며 full close는 전체 release한다. 범위 초과/rounded-zero
+  notional은 write 전에 거절한다. 대표 leverage 및 cash quantum 경계를 검증했다.
+- Futures USD balance는 총 소유 collateral cash다. Margin 자체는 debit하지 않고
+  `SUM(open isolatedMargin)`으로 계산한다. Aggregate column/별도 margin wallet은 없다.
+  `freeCollateral = balance - reservedAmount - totalMarginUsed`이며 신규 fee debit 후에도
+  모든 사용 중 margin과 cash obligations를 커버해야 한다. reservedAmount 의미는 불변이다.
+- LONG `(exit-entry)*qty`, SHORT `(entry-exit)*qty` PnL을 적용한다. Reduce/close는 실제
+  realized PnL credit/debit 후 fee debit을 반영하고 partial 후 누적 PnL을 보존한다. General은
+  GENERAL_TRADE_FEE_RATE, Season은 locked Season.tradeFeeRate를 사용한다. Fee는 실행
+  notional 기준이며 leverage가 높아도 줄지 않는다. Unrealized PnL은 fresh reference가 있는
+  Futures read에서만 계산하고 cash/Home/Portfolio/TWR/ranking/settlement에 추가하지 않는다.
+- Loss+fee가 negative cash 또는 남은 margin 미충족을 만들면
+  `FUTURES_LIQUIDATION_REQUIRED`로 전부 rollback한다. Full/partial, Long/Short에서 검증했으며
+  loss clamp·silent delete·부분 금융 write가 없다. Liquidation engine은 F2다.
+- 기존 `transferInTransaction`에 Futures-source free collateral guard만 추가했다. 두 public
+  mutation을 새로 조합하지 않았으며 outgoing USD와 Futures→Securities KRW composite가 함께
+  보호된다. Incoming은 허용하고 flag OFF여도 출금 margin 보호는 유지한다. 기존 Wallet
+  availableAmount/Transfer availableAfter는 balance-reserved 계약이며 margin-aware 값은
+  Futures risk read에서 제공한다. UI 변경은 없다.
+
+### 가격·잠금·lifecycle·멱등성
+
+- 기존 canonical Binance **Spot** AssetPriceSnapshot과 WS→REST source priority 및 Crypto
+  execute freshness를 그대로 사용한다. F1 의미는 synthetic execution/reference price이며
+  **Mark Price가 아니다**. Fresh DB evidence면 full fill, stale/missing/wrong asset/source면
+  reject다. 별도 snapshot/ingestion/Redis financial SoT/partial fill/slippage는 없다.
+- Preflight는 DB-only이며 provider/network I/O를 추가하지 않았다. Transaction 안에서 모든
+  wallet/position lock 뒤 clock_timestamp()로 새 evidence와 lifecycle/flag를 재검증한다.
+  General account FOR UPDATE, Season→account→participant FOR SHARE(기존 helper),
+  instrument+underlying FOR SHARE, Futures USD wallet FOR UPDATE, open position FOR UPDATE
+  순서다. Season lock upgrade는 없다. Futures wallet이 다른 상품 및 기존 outgoing transfer와
+  collateral을 직렬화한다. 기존 transfer의 wallet ID 정렬과 상충하지 않는다.
+- Ownership·General financial integrity·active account·Season active participant/excluded/status/
+  start/end window를 재사용/재검증했다. Committed replay는 ownership 뒤 mutable gate보다 먼저,
+  lifecycle/wallet 대기 뒤에도 재확인한다. 같은 account/key/request는 최초 response를 그대로,
+  다른 request는 conflict다. 재가격 계산·fee 중복·execution 중복은 없다.
+- `FUTURES_TRADING_ENABLED`는 strict startup validation을 가지며 기본 **OFF**다.
+  Open/increase/reduce/close 모두 막고 읽기/기존 금융 기능은 허용한다. F2/F3 전 사용자/운영
+  활성화 금지다. API 계약과 canonical policy/README/rulepack/Wallet 문서를 함께 갱신했다.
+
+### Migration·파일·검증
+
+- 새 migration은 `20261007180000_add_synthetic_perpetual_futures` 하나다. 새 domain enum,
+  4개 table, FK/unique/index/CHECK/identity/evidence trigger 및 ledger enum만 additive하게 추가한다.
+  기존 60개 migration의 내용/이름/checksum과 기존 wallet/position/order/history는 수정하지 않는다.
+  Generated Prisma artifacts도 갱신했다. 운영 DB에는 이 migration/provisioning을 적용하지 않았다.
+- 제품 코드: `backend/src/futures/`의 service/controller/module/input/math/collateral/price/presenter/
+  config/error, `src/app.module.ts`, `src/common/env-validation.ts`,
+  `src/wallets/trading-account-wallet-transfer.service.ts`, schema/migration/generated client,
+  `scripts/provision-futures-instruments.ts`, `.env.example`, `package.json`, 기존 CI gate.
+  테스트는 Futures policy/price unit, opt-in PG wrapper+`scripts/futures-integration.ts`,
+  기존 `test/app.e2e-spec.ts`의 인증·dispatch·잘못된 leverage·scalar-query 14 cases다.
+  문서는 Futures API 계약 및 docs 안내/policy/rulepack/account/wallet/transfer 계약·README·이 기록이다.
+- 실제 PostgreSQL 16.15 + 별도 Redis 7.0.15, UTC, `/tmp` 일회성 서버를 사용했다.
+  General/Season×Long/Short lifetime/average/PnL/fee/evidence, 1~100 대표값·DB invalid writes,
+  margin+fee·cash quantum·양 출금/incoming·mode isolation·replay·모든 필수 8 race×2 mode,
+  17 fault points×2 mode, post-wallet-lock price/flag/Season deadline를 검증했다. PG wrapper는
+  여러 내부 금융 시나리오를 한 case에서 실행하는 기존 저장소 pattern을 따른다.
+  최종 schema drift 재검증도 no difference였고, 검증 완료 후 전용 PG/Redis 서버를 종료했다.
+
+| Gate | 최종 결과 |
+| --- | --- |
+| Prisma format/validate/generate | PASS |
+| Fresh DB 전체 61 migration deploy/status/schema drift | PASS, up to date, no difference |
+| Backend typecheck/build | PASS |
+| Backend 전체 unit | 231 suites / 3,736 cases PASS; opt-in 52 suites / 57 cases SKIP |
+| Core Account 실제 PG/Redis CI 목록 | 21 suites / 22 cases PASS |
+| Order/Limit/FX/Wallet + Futures 실제 PG CI 목록 | 16 suites / 17 cases PASS |
+| Futures PG 최종 별도 재검증 | 1 suite / 1 consolidated case PASS |
+| Backend E2E (isolated DB/Redis 주소 명시) | 2 suites / 391 cases PASS |
+| Accounts/Futures + candle check-only lint, candle/Futures format | PASS |
+| Provision CLI dry-run→apply→rerun | PASS; Crypto instrument 1, Stock 제외, Asset 2/Wallet 0 유지 |
+| 기존 repair-links/repair-ranking-scope/audit-general dry-run | PASS, 0 findings/writes |
+| Frontend npm check + web export | PASS; lint/typecheck/137 tests, dist export 성공 |
+| 전체 diff 자체 검토 / git diff --check | PASS; 범위/계약/기존 변경 보존 확인 |
+
+- 최초 unit 4건은 sandbox TSX IPC 소켓 제한으로 실패하여 isolated env의 승인된 실행으로
+  전체 재검증했다. 환경변수 없는 E2E 요청은 자동 승인 검토가 `.env.local`의 공유 원격 DB
+  대상으로 거절했으며, 일회성 DB/Redis를 명시한 안전한 실행으로 통과했다.
+- 초기 F1 실행에서 PRICE_UNAVAILABLE 1회가 관측됐다. Fixture를 기존 금융 테스트처럼
+  완료된 DB clock-1s evidence로 맞추고 재검증했다; production freshness를 완화하지 않았다.
+  그 거절의 세부 원인을 확정했다고 주장하지 않는다. 초기 Core 게이트는 이전 F1 실행의
+  전역 FX fixture와 source selection이 충돌했다. F1 fixture의 FX snapshot 정리를 추가하고
+  전용 fresh DB에서 전체 Core 및 F1 포함 금융 게이트를 통과했다. 실패를 숨기거나 guard를
+  제거하지 않았다.
+- NOT_RUN: 운영 DB migration/provisioning/deploy, 실제 Binance/KIS live-provider smoke,
+  원격 GitHub CI 실행, PG17 별도 runtime 검증. Futures UI가 없어 실기기 Futures UI 검증은
+  대상이 아니다. 이번 구현에는 exchange risk tier/bracket, queue/saga/event sourcing 또는
+  별도 liquidation framework가 없고 기존 DB/finance/CI pattern을 재사용했다.
+- F2 TODO: Cross, Maintenance Margin, reference/mark 정책, liquidation threshold/price 및
+  automatic full liquidation. F3 TODO: Futures UI, coherent Portfolio/TWR/Ranking/Settlement
+  및 Season 종료 처리. 이 두 단계 전 사용자 활성화하지 않는다.
+
 ## 2026-10-07 — 관리자 진단 Triage Sufficiency 정책 명문화 (문서만)
 
 - 시작 전 `git fetch origin main`으로 갱신했다. 조사 HEAD = `origin/main` =

@@ -38,7 +38,15 @@ Opted-in wrapped failures (shared FX execute transaction, Order failure wrappers
 and Portfolio structural valuation failures) preserve
 a safe cause category and failed step without retaining raw DB/provider messages.
 Home/Portfolio unexpected partial errors use public generic messages, with
-sanitized internal details confined to admin diagnostics. Typed domain messages
+only safe cause classification confined to admin diagnostics. Diagnostic exception
+messages are selected from reviewed fixed domain messages; arbitrary messages,
+names and nested causes are never copied. Stack projection retains bounded source
+locations, excluding exception headers and free text. Generic application logger
+inputs are represented by a fixed summary/classification in the diagnostic buffer;
+existing domain log projections explicitly opt in through `safeAdminDiagnosticLog`.
+This does not change the operational console logging subsystem. Public UI copy
+uses fixed product messages for all roles; codes/status remain available for client
+control flow, and technical detail uses the existing admin panel. Typed domain messages
 are preserved. HTTP 200 partial diagnostics explicitly receive each
 row/section's local evidence and never inherit shared request evidence. Existing
 request ID, query exclusion, collection/depth/string and 24 KiB limits remain.
@@ -235,8 +243,15 @@ evidence and observation boundaries without changing business policy.
   one durable quote/execute command and one PostgreSQL transaction, reusing
   Securities-only FX and internal USD transfer evidence. Transfer stays neutral;
   FX fee/repricing keeps its existing economic effect. Automatic FX/order funding
-  and Futures trading remain unsupported. Futures supports USD storage and
-  explicit transfers only. See `docs/wallet-transfers-api-contract.md`. Existing accounts are normalized
+  remains unsupported. Futures F1 uses its USD wallet as collateral; synthetic
+  USD perpetual Market Long/Short, One-way, Isolated and integer 1–100x leverage
+  are available only behind default-OFF `FUTURES_TRADING_ENABLED`. Open leverage
+  is fixed. Margin is separate from cash reservations; actual fees/realized PnL
+  mutate cash, and outgoing transfers respect free collateral. Existing Binance
+  Spot snapshots are synthetic reference/execution price, not Mark Price. There
+  is no Cross, liquidation, Futures UI or Futures valuation integration. Do not
+  enable for users before F2/F3; see [Futures contract](docs/futures-api-contract.md).
+  See `docs/wallet-transfers-api-contract.md`. Existing accounts are normalized
   by a zero-only migration, including closed accounts without changing history.
   See [current scope and rollout policy](docs/trading-modes-and-accounts.md).
 - Final valuation policy is KRW total assets.

@@ -68,6 +68,10 @@ export const ModelName = {
   MarketCandle: 'MarketCandle',
   MarketCandleSyncState: 'MarketCandleSyncState',
   MarketSessionOverride: 'MarketSessionOverride',
+  FuturesInstrument: 'FuturesInstrument',
+  FuturesPosition: 'FuturesPosition',
+  FuturesExecution: 'FuturesExecution',
+  FuturesExecuteRequest: 'FuturesExecuteRequest',
   Position: 'Position',
   Order: 'Order',
   CashWallet: 'CashWallet',
@@ -432,6 +436,84 @@ export const MarketSessionOverrideScalarFieldEnum = {
 } as const
 
 export type MarketSessionOverrideScalarFieldEnum = (typeof MarketSessionOverrideScalarFieldEnum)[keyof typeof MarketSessionOverrideScalarFieldEnum]
+
+
+export const FuturesInstrumentScalarFieldEnum = {
+  id: 'id',
+  underlyingAssetId: 'underlyingAssetId',
+  productType: 'productType',
+  settlementCurrency: 'settlementCurrency',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FuturesInstrumentScalarFieldEnum = (typeof FuturesInstrumentScalarFieldEnum)[keyof typeof FuturesInstrumentScalarFieldEnum]
+
+
+export const FuturesPositionScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  instrumentId: 'instrumentId',
+  direction: 'direction',
+  marginMode: 'marginMode',
+  status: 'status',
+  quantity: 'quantity',
+  averageEntryPrice: 'averageEntryPrice',
+  entryNotional: 'entryNotional',
+  leverage: 'leverage',
+  isolatedMargin: 'isolatedMargin',
+  realizedPnl: 'realizedPnl',
+  closedAt: 'closedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FuturesPositionScalarFieldEnum = (typeof FuturesPositionScalarFieldEnum)[keyof typeof FuturesPositionScalarFieldEnum]
+
+
+export const FuturesExecutionScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  instrumentId: 'instrumentId',
+  positionId: 'positionId',
+  operation: 'operation',
+  direction: 'direction',
+  marginMode: 'marginMode',
+  quantity: 'quantity',
+  leverage: 'leverage',
+  executionPrice: 'executionPrice',
+  assetPriceSnapshotId: 'assetPriceSnapshotId',
+  priceSourceType: 'priceSourceType',
+  priceSourceName: 'priceSourceName',
+  priceEffectiveAt: 'priceEffectiveAt',
+  priceCapturedAt: 'priceCapturedAt',
+  notional: 'notional',
+  feeRate: 'feeRate',
+  feeAmount: 'feeAmount',
+  realizedPnl: 'realizedPnl',
+  positionQuantityAfter: 'positionQuantityAfter',
+  averageEntryPriceAfter: 'averageEntryPriceAfter',
+  isolatedMarginAfter: 'isolatedMarginAfter',
+  executedAt: 'executedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type FuturesExecutionScalarFieldEnum = (typeof FuturesExecutionScalarFieldEnum)[keyof typeof FuturesExecutionScalarFieldEnum]
+
+
+export const FuturesExecuteRequestScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  executionId: 'executionId',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  responsePayloadJson: 'responsePayloadJson',
+  executedAt: 'executedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type FuturesExecuteRequestScalarFieldEnum = (typeof FuturesExecuteRequestScalarFieldEnum)[keyof typeof FuturesExecuteRequestScalarFieldEnum]
 
 
 export const PositionScalarFieldEnum = {

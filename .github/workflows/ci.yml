@@ -160,6 +160,7 @@ jobs:
       ORDER_EXECUTE_DB_INTEGRATION: "1"
       MARKET_EXECUTION_DB_INTEGRATION: "1"
       FX_EXECUTE_DB_INTEGRATION: "1"
+      FUTURES_DB_INTEGRATION: "1"
       MVP_FLOW_DB_SMOKE: "1"
     defaults:
       run:
@@ -205,6 +206,7 @@ jobs:
           src/orders/limit-order-reservation.integration.spec.ts
           src/wallets/spot-wallet-transfer.integration.spec.ts
           src/wallets/wallet-fx-transfer.integration.spec.ts
+          src/futures/futures.integration.spec.ts
           src/orders/limit-order-create-race.integration.spec.ts
           src/orders/limit-order-transaction-time.integration.spec.ts
           src/orders/trading-transaction-time.integration.spec.ts

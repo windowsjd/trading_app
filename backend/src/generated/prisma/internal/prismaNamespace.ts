@@ -401,6 +401,10 @@ export const ModelName = {
   MarketCandle: 'MarketCandle',
   MarketCandleSyncState: 'MarketCandleSyncState',
   MarketSessionOverride: 'MarketSessionOverride',
+  FuturesInstrument: 'FuturesInstrument',
+  FuturesPosition: 'FuturesPosition',
+  FuturesExecution: 'FuturesExecution',
+  FuturesExecuteRequest: 'FuturesExecuteRequest',
   Position: 'Position',
   Order: 'Order',
   CashWallet: 'CashWallet',
@@ -435,7 +439,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "position" | "order" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence"
+    modelProps: "user" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "position" | "order" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1694,6 +1698,302 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.MarketSessionOverrideCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.MarketSessionOverrideCountAggregateOutputType> | number
+        }
+      }
+    }
+    FuturesInstrument: {
+      payload: Prisma.$FuturesInstrumentPayload<ExtArgs>
+      fields: Prisma.FuturesInstrumentFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FuturesInstrumentFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesInstrumentPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FuturesInstrumentFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesInstrumentPayload>
+        }
+        findFirst: {
+          args: Prisma.FuturesInstrumentFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesInstrumentPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FuturesInstrumentFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesInstrumentPayload>
+        }
+        findMany: {
+          args: Prisma.FuturesInstrumentFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesInstrumentPayload>[]
+        }
+        create: {
+          args: Prisma.FuturesInstrumentCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesInstrumentPayload>
+        }
+        createMany: {
+          args: Prisma.FuturesInstrumentCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FuturesInstrumentCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesInstrumentPayload>[]
+        }
+        delete: {
+          args: Prisma.FuturesInstrumentDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesInstrumentPayload>
+        }
+        update: {
+          args: Prisma.FuturesInstrumentUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesInstrumentPayload>
+        }
+        deleteMany: {
+          args: Prisma.FuturesInstrumentDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FuturesInstrumentUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FuturesInstrumentUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesInstrumentPayload>[]
+        }
+        upsert: {
+          args: Prisma.FuturesInstrumentUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesInstrumentPayload>
+        }
+        aggregate: {
+          args: Prisma.FuturesInstrumentAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFuturesInstrument>
+        }
+        groupBy: {
+          args: Prisma.FuturesInstrumentGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesInstrumentGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FuturesInstrumentCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesInstrumentCountAggregateOutputType> | number
+        }
+      }
+    }
+    FuturesPosition: {
+      payload: Prisma.$FuturesPositionPayload<ExtArgs>
+      fields: Prisma.FuturesPositionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FuturesPositionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesPositionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FuturesPositionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesPositionPayload>
+        }
+        findFirst: {
+          args: Prisma.FuturesPositionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesPositionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FuturesPositionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesPositionPayload>
+        }
+        findMany: {
+          args: Prisma.FuturesPositionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesPositionPayload>[]
+        }
+        create: {
+          args: Prisma.FuturesPositionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesPositionPayload>
+        }
+        createMany: {
+          args: Prisma.FuturesPositionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FuturesPositionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesPositionPayload>[]
+        }
+        delete: {
+          args: Prisma.FuturesPositionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesPositionPayload>
+        }
+        update: {
+          args: Prisma.FuturesPositionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesPositionPayload>
+        }
+        deleteMany: {
+          args: Prisma.FuturesPositionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FuturesPositionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FuturesPositionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesPositionPayload>[]
+        }
+        upsert: {
+          args: Prisma.FuturesPositionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesPositionPayload>
+        }
+        aggregate: {
+          args: Prisma.FuturesPositionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFuturesPosition>
+        }
+        groupBy: {
+          args: Prisma.FuturesPositionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesPositionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FuturesPositionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesPositionCountAggregateOutputType> | number
+        }
+      }
+    }
+    FuturesExecution: {
+      payload: Prisma.$FuturesExecutionPayload<ExtArgs>
+      fields: Prisma.FuturesExecutionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FuturesExecutionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecutionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FuturesExecutionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecutionPayload>
+        }
+        findFirst: {
+          args: Prisma.FuturesExecutionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecutionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FuturesExecutionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecutionPayload>
+        }
+        findMany: {
+          args: Prisma.FuturesExecutionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecutionPayload>[]
+        }
+        create: {
+          args: Prisma.FuturesExecutionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecutionPayload>
+        }
+        createMany: {
+          args: Prisma.FuturesExecutionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FuturesExecutionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecutionPayload>[]
+        }
+        delete: {
+          args: Prisma.FuturesExecutionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecutionPayload>
+        }
+        update: {
+          args: Prisma.FuturesExecutionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecutionPayload>
+        }
+        deleteMany: {
+          args: Prisma.FuturesExecutionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FuturesExecutionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FuturesExecutionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecutionPayload>[]
+        }
+        upsert: {
+          args: Prisma.FuturesExecutionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecutionPayload>
+        }
+        aggregate: {
+          args: Prisma.FuturesExecutionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFuturesExecution>
+        }
+        groupBy: {
+          args: Prisma.FuturesExecutionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesExecutionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FuturesExecutionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesExecutionCountAggregateOutputType> | number
+        }
+      }
+    }
+    FuturesExecuteRequest: {
+      payload: Prisma.$FuturesExecuteRequestPayload<ExtArgs>
+      fields: Prisma.FuturesExecuteRequestFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FuturesExecuteRequestFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecuteRequestPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FuturesExecuteRequestFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecuteRequestPayload>
+        }
+        findFirst: {
+          args: Prisma.FuturesExecuteRequestFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecuteRequestPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FuturesExecuteRequestFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecuteRequestPayload>
+        }
+        findMany: {
+          args: Prisma.FuturesExecuteRequestFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecuteRequestPayload>[]
+        }
+        create: {
+          args: Prisma.FuturesExecuteRequestCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecuteRequestPayload>
+        }
+        createMany: {
+          args: Prisma.FuturesExecuteRequestCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FuturesExecuteRequestCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecuteRequestPayload>[]
+        }
+        delete: {
+          args: Prisma.FuturesExecuteRequestDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecuteRequestPayload>
+        }
+        update: {
+          args: Prisma.FuturesExecuteRequestUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecuteRequestPayload>
+        }
+        deleteMany: {
+          args: Prisma.FuturesExecuteRequestDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FuturesExecuteRequestUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FuturesExecuteRequestUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecuteRequestPayload>[]
+        }
+        upsert: {
+          args: Prisma.FuturesExecuteRequestUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesExecuteRequestPayload>
+        }
+        aggregate: {
+          args: Prisma.FuturesExecuteRequestAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFuturesExecuteRequest>
+        }
+        groupBy: {
+          args: Prisma.FuturesExecuteRequestGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesExecuteRequestGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FuturesExecuteRequestCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesExecuteRequestCountAggregateOutputType> | number
         }
       }
     }
@@ -3471,6 +3771,84 @@ export const MarketSessionOverrideScalarFieldEnum = {
 export type MarketSessionOverrideScalarFieldEnum = (typeof MarketSessionOverrideScalarFieldEnum)[keyof typeof MarketSessionOverrideScalarFieldEnum]
 
 
+export const FuturesInstrumentScalarFieldEnum = {
+  id: 'id',
+  underlyingAssetId: 'underlyingAssetId',
+  productType: 'productType',
+  settlementCurrency: 'settlementCurrency',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FuturesInstrumentScalarFieldEnum = (typeof FuturesInstrumentScalarFieldEnum)[keyof typeof FuturesInstrumentScalarFieldEnum]
+
+
+export const FuturesPositionScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  instrumentId: 'instrumentId',
+  direction: 'direction',
+  marginMode: 'marginMode',
+  status: 'status',
+  quantity: 'quantity',
+  averageEntryPrice: 'averageEntryPrice',
+  entryNotional: 'entryNotional',
+  leverage: 'leverage',
+  isolatedMargin: 'isolatedMargin',
+  realizedPnl: 'realizedPnl',
+  closedAt: 'closedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FuturesPositionScalarFieldEnum = (typeof FuturesPositionScalarFieldEnum)[keyof typeof FuturesPositionScalarFieldEnum]
+
+
+export const FuturesExecutionScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  instrumentId: 'instrumentId',
+  positionId: 'positionId',
+  operation: 'operation',
+  direction: 'direction',
+  marginMode: 'marginMode',
+  quantity: 'quantity',
+  leverage: 'leverage',
+  executionPrice: 'executionPrice',
+  assetPriceSnapshotId: 'assetPriceSnapshotId',
+  priceSourceType: 'priceSourceType',
+  priceSourceName: 'priceSourceName',
+  priceEffectiveAt: 'priceEffectiveAt',
+  priceCapturedAt: 'priceCapturedAt',
+  notional: 'notional',
+  feeRate: 'feeRate',
+  feeAmount: 'feeAmount',
+  realizedPnl: 'realizedPnl',
+  positionQuantityAfter: 'positionQuantityAfter',
+  averageEntryPriceAfter: 'averageEntryPriceAfter',
+  isolatedMarginAfter: 'isolatedMarginAfter',
+  executedAt: 'executedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type FuturesExecutionScalarFieldEnum = (typeof FuturesExecutionScalarFieldEnum)[keyof typeof FuturesExecutionScalarFieldEnum]
+
+
+export const FuturesExecuteRequestScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  executionId: 'executionId',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  responsePayloadJson: 'responsePayloadJson',
+  executedAt: 'executedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type FuturesExecuteRequestScalarFieldEnum = (typeof FuturesExecuteRequestScalarFieldEnum)[keyof typeof FuturesExecuteRequestScalarFieldEnum]
+
+
 export const PositionScalarFieldEnum = {
   id: 'id',
   tradingAccountId: 'tradingAccountId',
@@ -4283,6 +4661,76 @@ export type ListEnumMarketSessionOverrideTypeFieldRefInput<$PrismaModel> = Field
 
 
 /**
+ * Reference to a field of type 'FuturesProductType'
+ */
+export type EnumFuturesProductTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FuturesProductType'>
+    
+
+
+/**
+ * Reference to a field of type 'FuturesProductType[]'
+ */
+export type ListEnumFuturesProductTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FuturesProductType[]'>
+    
+
+
+/**
+ * Reference to a field of type 'FuturesDirection'
+ */
+export type EnumFuturesDirectionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FuturesDirection'>
+    
+
+
+/**
+ * Reference to a field of type 'FuturesDirection[]'
+ */
+export type ListEnumFuturesDirectionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FuturesDirection[]'>
+    
+
+
+/**
+ * Reference to a field of type 'FuturesMarginMode'
+ */
+export type EnumFuturesMarginModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FuturesMarginMode'>
+    
+
+
+/**
+ * Reference to a field of type 'FuturesMarginMode[]'
+ */
+export type ListEnumFuturesMarginModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FuturesMarginMode[]'>
+    
+
+
+/**
+ * Reference to a field of type 'FuturesPositionStatus'
+ */
+export type EnumFuturesPositionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FuturesPositionStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'FuturesPositionStatus[]'
+ */
+export type ListEnumFuturesPositionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FuturesPositionStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'FuturesOperation'
+ */
+export type EnumFuturesOperationFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FuturesOperation'>
+    
+
+
+/**
+ * Reference to a field of type 'FuturesOperation[]'
+ */
+export type ListEnumFuturesOperationFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FuturesOperation[]'>
+    
+
+
+/**
  * Reference to a field of type 'OrderSide'
  */
 export type EnumOrderSideFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrderSide'>
@@ -4659,6 +5107,10 @@ export type GlobalOmitConfig = {
   marketCandle?: Prisma.MarketCandleOmit
   marketCandleSyncState?: Prisma.MarketCandleSyncStateOmit
   marketSessionOverride?: Prisma.MarketSessionOverrideOmit
+  futuresInstrument?: Prisma.FuturesInstrumentOmit
+  futuresPosition?: Prisma.FuturesPositionOmit
+  futuresExecution?: Prisma.FuturesExecutionOmit
+  futuresExecuteRequest?: Prisma.FuturesExecuteRequestOmit
   position?: Prisma.PositionOmit
   order?: Prisma.OrderOmit
   cashWallet?: Prisma.CashWalletOmit

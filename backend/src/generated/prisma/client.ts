@@ -125,6 +125,26 @@ export type MarketCandleSyncState = Prisma.MarketCandleSyncStateModel
  */
 export type MarketSessionOverride = Prisma.MarketSessionOverrideModel
 /**
+ * Model FuturesInstrument
+ * 
+ */
+export type FuturesInstrument = Prisma.FuturesInstrumentModel
+/**
+ * Model FuturesPosition
+ * 
+ */
+export type FuturesPosition = Prisma.FuturesPositionModel
+/**
+ * Model FuturesExecution
+ * 
+ */
+export type FuturesExecution = Prisma.FuturesExecutionModel
+/**
+ * Model FuturesExecuteRequest
+ * 
+ */
+export type FuturesExecuteRequest = Prisma.FuturesExecuteRequestModel
+/**
  * Model Position
  * 
  */

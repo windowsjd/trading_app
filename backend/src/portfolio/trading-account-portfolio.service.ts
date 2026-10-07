@@ -31,6 +31,7 @@ import {
   isAdminDiagnosticRequest,
   setAdminDiagnosticContext,
   preserveAdminFailureCause,
+  safeAdminDiagnosticLog,
 } from '../common/admin-diagnostics';
 
 /**
@@ -743,7 +744,7 @@ export class TradingAccountPortfolioService {
   ) {
     if (isAdminDiagnosticRequest()) {
       this.logger.warn(
-        JSON.stringify({
+        safeAdminDiagnosticLog({
           event: 'portfolio_partial_valuation_failed',
           requestId: getAdminDiagnosticRequestId(),
           code,

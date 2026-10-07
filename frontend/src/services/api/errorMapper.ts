@@ -30,13 +30,6 @@ export type ApiErrorInfo = {
 };
 
 const KNOWN_ERROR_CODES = new Set<string>(Object.values(ERROR_CODE));
-const SERVER_CODE_MAX_LENGTH = 80;
-const SERVER_MESSAGE_MAX_LENGTH = 160;
-const SENSITIVE_KEY_VALUE_PATTERN =
-  /\b(?:accessToken|refreshToken|password|authorization|secret|DATABASE_URL|api[_\s-]*key)\b\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;{}]+)/gi;
-const SENSITIVE_WORD_PATTERN =
-  /\b(?:accessToken|refreshToken|password|authorization|secret|DATABASE_URL|api[_\s-]*key)\b/gi;
-const BEARER_TOKEN_PATTERN = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
 const NETWORK_ERROR_CODES = new Set([
   'ERR_NETWORK',
   'ENOTFOUND',
@@ -63,18 +56,6 @@ function toStatusOrNull(value: unknown) {
   return null;
 }
 
-function sanitizeDisplayText(value: string, maxLength: number) {
-  const redacted = value
-    .replace(BEARER_TOKEN_PATTERN, 'Bearer [REDACTED]')
-    .replace(SENSITIVE_KEY_VALUE_PATTERN, '[REDACTED]')
-    .replace(SENSITIVE_WORD_PATTERN, '[REDACTED]')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (redacted.length <= maxLength) return redacted;
-  return `${redacted.slice(0, Math.max(0, maxLength - 3))}...`;
-}
-
 function getErrorMessageFromStatus(status?: number | null) {
   switch (status) {
     case 400:
@@ -93,7 +74,7 @@ function getErrorMessageFromStatus(status?: number | null) {
       return '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.';
     default:
       if (status && status >= 500) {
-        return '서버 내부 오류가 발생했습니다. 백엔드 로그를 확인해주세요.';
+        return '요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.';
       }
       return null;
   }
@@ -277,9 +258,9 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.INVALID_REFRESH_TOKEN:
       return '로그인 세션이 만료되었거나 유효하지 않습니다. 다시 로그인해주세요.';
     case ERROR_CODE.AUTH_SIGNUP_CONFLICT:
-      return '회원가입 처리 중 중복 데이터 충돌이 발생했습니다.';
+      return '회원가입을 완료하지 못했습니다. 입력 정보를 확인하고 다시 시도해주세요.';
     case ERROR_CODE.AUTH_CONFIGURATION_ERROR:
-      return '서버 인증 설정 오류입니다. 백엔드 환경변수 설정을 확인해야 합니다.';
+      return '로그인 또는 회원가입을 완료하지 못했습니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.USER_NOT_ACTIVE:
       return '정지되었거나 삭제된 계정입니다. 고객센터에 문의해주세요.';
     case ERROR_CODE.UNAUTHORIZED:
@@ -298,9 +279,9 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.TOO_MANY_REQUESTS:
       return '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.INTERNAL_SERVER_ERROR:
-      return '서버 내부 오류가 발생했습니다. 백엔드 로그를 확인해주세요.';
+      return '요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.HTTP_ERROR:
-      return 'HTTP 요청 처리 중 오류가 발생했습니다.';
+      return '요청을 처리하지 못했습니다. 다시 시도해주세요.';
     case ERROR_CODE.SEASON_NOT_JOINED:
       return '시즌에 참가해야 이용할 수 있습니다.';
     case ERROR_CODE.SEASON_NOT_ACTIVE:
@@ -378,7 +359,7 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.RATE_CHANGED_REQUOTE_REQUIRED:
       return '가격 또는 환율이 변경되었습니다. 다시 견적을 받아주세요.';
     case ERROR_CODE.IDEMPOTENCY_REQUIRED:
-      return '요청 식별자가 필요합니다. 다시 시도해주세요.';
+      return '요청을 처리하지 못했습니다. 다시 시도해주세요.';
     case ERROR_CODE.IDEMPOTENCY_CONFLICT:
     case ERROR_CODE.ORDER_IDEMPOTENCY_CONFLICT:
       return '이미 다른 내용으로 처리 중인 요청입니다. 새로고침 후 다시 시도해주세요.';
@@ -432,32 +413,18 @@ export function getApiErrorDisplayMessage(error: unknown) {
 
   if (codeMessage) return codeMessage;
 
-  if (info.serverCode) {
-    const safeCode = sanitizeDisplayText(
-      info.serverCode,
-      SERVER_CODE_MAX_LENGTH,
-    );
-    const safeMessage = info.serverMessage
-      ? sanitizeDisplayText(info.serverMessage, SERVER_MESSAGE_MAX_LENGTH)
-      : null;
-
-    return safeMessage
-      ? `알 수 없는 서버 오류입니다. code=${safeCode}, message=${safeMessage}`
-      : `알 수 없는 서버 오류입니다. code=${safeCode}`;
-  }
-
   const statusMessage = getErrorMessageFromStatus(info.status);
   if (statusMessage) return statusMessage;
 
   if (isTimeoutError(info)) {
-    return '서버 응답 시간이 초과되었습니다. 백엔드 상태와 네트워크를 확인해주세요.';
+    return '응답이 늦어지고 있습니다. 잠시 후 다시 시도해주세요.';
   }
 
   if (isNetworkErrorWithoutResponse(info)) {
-    return '서버에 연결할 수 없습니다. 백엔드 실행 상태, API 주소, 네트워크를 확인해주세요.';
+    return '연결하지 못했습니다. 네트워크 연결을 확인하고 다시 시도해주세요.';
   }
 
-  return '알 수 없는 오류가 발생했습니다. 콘솔 로그를 확인해주세요.';
+  return '요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.';
 }
 
 export function isRequoteRequiredError(code?: string | null) {

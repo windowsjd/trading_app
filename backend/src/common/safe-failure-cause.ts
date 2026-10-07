@@ -5,7 +5,10 @@ export type SafeFailureCause = {
 };
 
 /** Request-neutral allowlist; never retains messages, stacks or payloads. */
-export function classifyFailureCause(cause: unknown): SafeFailureCause {
+export function classifyFailureCause(
+  cause: unknown,
+  depth = 0,
+): SafeFailureCause {
   const categories: Record<string, string> = {
     P2002: 'db_unique_constraint',
     P2003: 'db_foreign_key_constraint',
@@ -36,6 +39,15 @@ export function classifyFailureCause(cause: unknown): SafeFailureCause {
       'TypeError',
       'RangeError',
       'SyntaxError',
+      'HttpException',
+      'BadRequestException',
+      'UnauthorizedException',
+      'ForbiddenException',
+      'NotFoundException',
+      'ConflictException',
+      'InternalServerErrorException',
+      'ServiceUnavailableException',
+      'PortfolioValuationError',
       'PrismaClientKnownRequestError',
       'PrismaClientUnknownRequestError',
       'PrismaClientInitializationError',
@@ -45,12 +57,26 @@ export function classifyFailureCause(cause: unknown): SafeFailureCause {
       : cause instanceof Error
         ? 'Error'
         : 'NonError';
-  return {
+  const result: SafeFailureCause = {
     category:
       code && Object.hasOwn(categories, code)
         ? categories[code]
-        : 'unexpected_error',
+        : knownType.startsWith('PrismaClient')
+          ? 'database_failure'
+          : 'unexpected_error',
     errorType: knownType,
     ...(code && Object.hasOwn(categories, code) ? { code } : {}),
   };
+  // A cause may supply an observed allowlisted code. Strings/payloads and
+  // unknown names are never retained, and cycles cannot recurse indefinitely.
+  if (
+    result.category === 'unexpected_error' &&
+    cause instanceof Error &&
+    depth < 3 &&
+    cause.cause
+  ) {
+    const nested = classifyFailureCause(cause.cause, depth + 1);
+    if (nested.category !== 'unexpected_error') return nested;
+  }
+  return result;
 }

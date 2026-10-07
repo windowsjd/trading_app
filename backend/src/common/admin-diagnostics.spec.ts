@@ -5,6 +5,7 @@ import {
   recordAdminDiagnosticEvent,
   setAdminDiagnosticContext,
   preserveAdminFailureCause,
+  safeAdminDiagnosticLog,
 } from './admin-diagnostics';
 import {
   BadRequestException,
@@ -45,6 +46,155 @@ function inRequest<T>(
 }
 
 describe('admin request diagnostics', () => {
+  const forbidden = [
+    'postgresql://fixture:fake-password@db.invalid/private-db',
+    'https://provider.invalid/private?account=foreign-fixture',
+    'Bearer fake-only-token',
+    '184527.938475',
+    '78243.564829',
+    'fake-nested-secret',
+    'foreign-private-id',
+    'SELECT private_wallet FROM sensitive_table',
+  ];
+  const rawText =
+    forbidden.join(' ') +
+    ' ' +
+    JSON.stringify({ nested: { secret: 'fake-nested-secret' } });
+
+  it.each(['error', 'http', 'non-error'])(
+    'projects unwrapped %s failures without raw message/name/cause/logs',
+    (kind) => {
+      const raw = Object.assign(
+        new Error(rawText, { cause: new Error(rawText) }),
+        {
+          name: rawText,
+          code: 'P1001',
+        },
+      );
+      raw.stack = `${rawText}\n    at OrdersService.execute (/private/home/backend/src/orders/orders.service.ts:25:9)\n${rawText}\n    at secret (${rawText})`;
+      const error =
+        kind === 'http'
+          ? new HttpException(
+              {
+                success: false,
+                error: { code: 'PRICE_STALE', message: rawText },
+              },
+              503,
+            )
+          : kind === 'non-error'
+            ? { code: 'P1001', message: rawText, cause: raw }
+            : raw;
+      const diagnostic = inRequest(
+        'admin',
+        'req-raw-regression',
+        () => {
+          setAdminDiagnosticContext({
+            failureStage: 'general_portfolio_transaction',
+            evidence: { selectionResult: 'REJECTED', observedError: raw },
+            nextInvestigation: [
+              'backend/src/portfolio/portfolio-valuation.service.ts',
+            ],
+          });
+          recordAdminDiagnosticEvent(
+            'warn',
+            'SAFE_FAILURE_OBSERVED',
+            'Failure observed.',
+            { error: raw },
+          );
+          applicationLogger.error(raw, rawText, {
+            cause: raw,
+            message: rawText,
+          });
+          applicationLogger.warn(rawText, { detail: rawText }, rawText);
+          applicationLogger.warn(
+            { message: rawText, cause: raw, nested: { arbitrary: rawText } },
+            rawText,
+          );
+          applicationLogger.warn(
+            JSON.stringify({
+              event: 'admin_http_request_failed',
+              message: rawText,
+            }),
+            rawText,
+          );
+          applicationLogger.warn(
+            safeAdminDiagnosticLog({
+              event: 'safe_domain_failure',
+              available: false,
+            }),
+            rawText,
+            raw,
+          );
+          return buildAdminDiagnostic(error, 'INTERNAL_SERVER_ERROR', 500);
+        },
+        '/api/v1/trading-accounts/account-1/portfolio',
+      );
+      const serialized = JSON.stringify(diagnostic);
+      for (const value of forbidden) expect(serialized).not.toContain(value);
+      expect(diagnostic).toMatchObject({
+        domain: 'PORTFOLIO',
+        operation: 'PORTFOLIO_VALUATION',
+        failureStage: 'general_portfolio_transaction',
+        requestId: 'req-raw-regression',
+        evidence: { selectionResult: 'REJECTED' },
+        exception: { message: 'Unexpected internal failure.' },
+        nextInvestigation: expect.arrayContaining([
+          'backend/src/portfolio/portfolio-valuation.service.ts',
+        ]),
+      });
+      if (kind !== 'http')
+        expect(diagnostic?.evidence?.safeCause).toMatchObject({
+          category: 'db_connection_failed',
+          code: 'P1001',
+        });
+      if (kind === 'error')
+        expect(diagnostic?.exception.applicationStack).toEqual([
+          'at src/orders/orders.service.ts:25:9',
+        ]);
+      expect(diagnostic?.serverLogs.entries).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            message: expect.stringContaining('safe_domain_failure'),
+          }),
+        ]),
+      );
+    },
+  );
+
+  it('keeps fixed typed domain copy and stack bounds without trusting its shape', () => {
+    const error = new HttpException(
+      {
+        success: false,
+        error: {
+          code: 'INSUFFICIENT_BALANCE',
+          message: 'Cash wallet balance is insufficient.',
+        },
+      },
+      409,
+    );
+    error.stack = [
+      'HttpException: Cash wallet balance is insufficient.',
+      ...Array.from(
+        { length: 40 },
+        (_, i) =>
+          `    at execute (/srv/backend/src/orders/orders.service.ts:${i + 1}:2)`,
+      ),
+    ].join('\n');
+    const diagnostic = inRequest('admin', 'req-safe-domain', () =>
+      buildAdminDiagnostic(error, 'INSUFFICIENT_BALANCE', 409),
+    );
+    expect(diagnostic?.exception.message).toBe(
+      'Cash wallet balance is insufficient.',
+    );
+    expect(diagnostic?.exception).not.toHaveProperty('cause');
+    expect(diagnostic?.evidence?.safeCause).toBeUndefined();
+    expect(diagnostic?.exception.stack).toHaveLength(24);
+    expect(diagnostic?.exception.applicationStack).toHaveLength(12);
+    expect(diagnostic?.exception.truncated).toBe(true);
+    expect(Buffer.byteLength(JSON.stringify(diagnostic))).toBeLessThanOrEqual(
+      24 * 1024,
+    );
+  });
   it('pins the active financial failure step when preserving a generic wrapper cause', () => {
     const diagnostic = inRequest('admin', 'req-financial-cause', () => {
       setAdminDiagnosticContext({ failureStage: 'position_create' });
@@ -98,8 +248,10 @@ describe('admin request diagnostics', () => {
     expect(JSON.stringify(diagnostic)).not.toContain(
       'synthetic-escaped-secret',
     );
-    expect(diagnostic?.exception.message).toBe('[REDACTED]');
-    expect(diagnostic?.serverLogs.entries[0].message).toBe('[REDACTED]');
+    expect(diagnostic?.exception.message).toBe('Unexpected internal failure.');
+    expect(diagnostic?.serverLogs.entries[0].message).toBe(
+      '[UNPROJECTED_APPLICATION_LOG]',
+    );
   });
   it('redacts normalized keys, embedded JSON and console arguments end to end', () => {
     const consoleSpy = jest
@@ -150,29 +302,32 @@ describe('admin request diagnostics', () => {
   });
 
   it.each([
-    ['Domain message', 'Domain message'],
-    [{ message: 'Nest message' }, 'Nest message'],
+    ['Order not found.', 'Order not found.'],
+    [{ message: 'Invalid credentials.' }, 'Invalid credentials.'],
     [
       {
         success: false,
-        error: { code: 'DOMAIN', message: 'Safe domain message' },
+        error: { code: 'PRICE_STALE', message: 'Price is stale.' },
       },
-      'Safe domain message',
+      'Price is stale.',
     ],
     [
       { message: ['First validation', 'Second validation'] },
-      'First validation; Second validation',
+      'Unexpected internal failure.',
     ],
-  ])('preserves structured HTTP messages (%j)', (response, expected) => {
-    const exception = new HttpException(response, 400);
-    const original = exception.getResponse();
-    const diagnostic = inRequest('admin', 'req-http-message', () =>
-      buildAdminDiagnostic(exception, 'DOMAIN', 400),
-    );
-    expect(diagnostic?.exception.message).toBe(expected);
-    expect(exception.getResponse()).toBe(original);
-    expect(exception.getStatus()).toBe(400);
-  });
+  ])(
+    'preserves reviewed fixed HTTP messages and suppresses arbitrary arrays (%j)',
+    (response, expected) => {
+      const exception = new HttpException(response, 400);
+      const original = exception.getResponse();
+      const diagnostic = inRequest('admin', 'req-http-message', () =>
+        buildAdminDiagnostic(exception, 'DOMAIN', 400),
+      );
+      expect(diagnostic?.exception.message).toBe(expected);
+      expect(exception.getResponse()).toBe(original);
+      expect(exception.getStatus()).toBe(400);
+    },
+  );
 
   it.each([
     null,
@@ -449,7 +604,7 @@ describe('admin request diagnostics', () => {
     expect(diagnostic?.serverLogs.entries).toEqual([
       expect.objectContaining({
         level: 'warn',
-        context: 'ProviderService',
+        message: '[UNPROJECTED_APPLICATION_LOG]',
       }),
     ]);
   });
@@ -504,12 +659,18 @@ describe('admin request diagnostics', () => {
   it('isolates related logs by request context', () => {
     inRequest('admin', 'req-first', () => {
       recordAdminDiagnosticEvent('warn', 'FIRST_ONLY', 'first request');
-      applicationLogger.error('FIRST_APPLICATION_LOG', 'FirstService');
+      applicationLogger.error(
+        safeAdminDiagnosticLog({ event: 'FIRST_APPLICATION_LOG' }),
+        'FirstService',
+      );
       return buildAdminDiagnostic(new Error('first'), 'FIRST', 500);
     });
     const second = inRequest('admin', 'req-second', () => {
       recordAdminDiagnosticEvent('warn', 'SECOND_ONLY', 'second request');
-      applicationLogger.error('SECOND_APPLICATION_LOG', 'SecondService');
+      applicationLogger.error(
+        safeAdminDiagnosticLog({ event: 'SECOND_APPLICATION_LOG' }),
+        'SecondService',
+      );
       return buildAdminDiagnostic(new Error('second'), 'SECOND', 500);
     });
     const serialized = JSON.stringify(second);
@@ -596,14 +757,17 @@ describe('admin request diagnostics', () => {
           'parallel asset B failed',
         );
         applicationLogger.warn(
-          JSON.stringify({
+          safeAdminDiagnosticLog({
             assetId: 'asset-a-shadow',
             snapshotId: 'snapshot-a-shadow',
           }),
           'PortfolioValuationService',
         );
         applicationLogger.warn(
-          JSON.stringify({ assetId: 'asset-a', snapshotId: 'snapshot-a' }),
+          safeAdminDiagnosticLog({
+            assetId: 'asset-a',
+            snapshotId: 'snapshot-a',
+          }),
           'PortfolioService',
         );
         return buildAdminPartialFailureDiagnostic(
@@ -640,7 +804,6 @@ describe('admin request diagnostics', () => {
     expect(serialized).not.toContain('ASSET_B_REJECTED');
     expect(diagnostic?.serverLogs.entries).toEqual([
       expect.objectContaining({
-        context: 'PortfolioService',
         message: expect.stringContaining('asset-a'),
       }),
     ]);

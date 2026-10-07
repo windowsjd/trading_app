@@ -82,6 +82,7 @@ enum WalletTransactionType {
   ad_reward
   // Internal, same-currency cash relocation; never external funding.
   wallet_transfer
+  futures_pnl
 }
 
 enum WalletTransactionReferenceType {
@@ -98,6 +99,32 @@ enum WalletTransactionReferenceType {
   // (partial unique index; claim.walletTransactionId is the reverse link).
   ad_reward_claim
   wallet_transfer
+  futures_execution
+}
+
+enum FuturesProductType {
+  synthetic_perpetual
+}
+
+enum FuturesDirection {
+  long
+  short
+}
+
+enum FuturesMarginMode {
+  isolated
+}
+
+enum FuturesPositionStatus {
+  open
+  closed
+}
+
+enum FuturesOperation {
+  open
+  increase
+  reduce
+  close
 }
 
 enum AdRewardClaimStatus {
@@ -413,6 +440,9 @@ model TradingAccount {
   fxExecuteRequests             FxExecuteRequest[]
   orders                        Order[]
   positions                     Position[]
+  futuresPositions              FuturesPosition[]
+  futuresExecutions             FuturesExecution[]
+  futuresExecuteRequests        FuturesExecuteRequest[]
   quotes                        Quote[]
   adRewardClaims                AdRewardClaim[]
   equitySnapshots               EquitySnapshot[]
@@ -622,6 +652,7 @@ model Asset {
   orders                   Order[]
   quotes                   Quote[]
   limitOrderCandleEvidence LimitOrderCandleEvidence[]
+  futuresInstruments       FuturesInstrument[]
 
   @@unique([market, symbol])
   @@index([assetType, market])
@@ -644,9 +675,10 @@ model AssetPriceSnapshot {
   rawPayloadJson  Json?                @map("raw_payload_json")
   note            String?
 
-  asset  Asset   @relation(fields: [assetId], references: [id], onDelete: Restrict)
-  orders Order[]
-  quotes Quote[]
+  asset             Asset              @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  orders            Order[]
+  quotes            Quote[]
+  futuresExecutions FuturesExecution[]
 
   @@index([assetId, effectiveAt])
   @@index([assetId, capturedAt])
@@ -793,6 +825,114 @@ model MarketSessionOverride {
   @@index([isActive, market, localDate])
   @@index([localDate])
   @@map("market_session_overrides")
+}
+
+// Asset remains the Spot underlying. Product identity is never inferred from symbol.
+model FuturesInstrument {
+  id                 String             @id @default(uuid())
+  underlyingAssetId  String             @map("underlying_asset_id")
+  productType        FuturesProductType @default(synthetic_perpetual) @map("product_type")
+  settlementCurrency CurrencyCode       @default(USD) @map("settlement_currency")
+  isActive           Boolean            @default(true) @map("is_active")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  underlyingAsset Asset              @relation(fields: [underlyingAssetId], references: [id], onDelete: Restrict)
+  positions       FuturesPosition[]
+  executions      FuturesExecution[]
+
+  @@unique([underlyingAssetId, productType, settlementCurrency])
+  @@map("futures_instruments")
+}
+
+// One row per lifetime. SQL partial unique permits only one OPEN lifetime per
+// account/instrument. Closed rows preserve cumulative realized PnL and identity.
+model FuturesPosition {
+  id                String                @id @default(uuid())
+  tradingAccountId  String                @map("trading_account_id")
+  instrumentId      String                @map("instrument_id")
+  direction         FuturesDirection
+  marginMode        FuturesMarginMode     @default(isolated) @map("margin_mode")
+  status            FuturesPositionStatus @default(open)
+  quantity          Decimal               @db.Decimal(24, 8)
+  averageEntryPrice Decimal               @map("average_entry_price") @db.Decimal(24, 8)
+  // Exact entry basis for conservative margin allocation across rounded averages.
+  entryNotional     Decimal               @map("entry_notional") @db.Decimal(40, 16)
+  leverage          Int
+  isolatedMargin    Decimal               @map("isolated_margin") @db.Decimal(24, 8)
+  realizedPnl       Decimal               @default(0) @map("realized_pnl") @db.Decimal(24, 8)
+  closedAt          DateTime?             @map("closed_at")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+
+  tradingAccount TradingAccount     @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  instrument     FuturesInstrument  @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  executions     FuturesExecution[]
+
+  @@unique([id, tradingAccountId, instrumentId])
+  @@index([tradingAccountId, status, instrumentId])
+  @@index([instrumentId])
+  @@map("futures_positions")
+}
+
+// A terminal full-fill event, separate from the Spot order/quote lifecycle.
+model FuturesExecution {
+  id                     String               @id @default(uuid())
+  tradingAccountId       String               @map("trading_account_id")
+  instrumentId           String               @map("instrument_id")
+  positionId             String               @map("position_id")
+  operation              FuturesOperation
+  direction              FuturesDirection
+  marginMode             FuturesMarginMode    @default(isolated) @map("margin_mode")
+  quantity               Decimal              @db.Decimal(24, 8)
+  leverage               Int
+  executionPrice         Decimal              @map("execution_price") @db.Decimal(24, 8)
+  assetPriceSnapshotId   String               @map("asset_price_snapshot_id")
+  priceSourceType        AssetPriceSourceType @map("price_source_type")
+  priceSourceName        String               @map("price_source_name")
+  priceEffectiveAt       DateTime             @map("price_effective_at")
+  priceCapturedAt        DateTime             @map("price_captured_at")
+  notional               Decimal              @db.Decimal(24, 8)
+  feeRate                Decimal              @map("fee_rate") @db.Decimal(10, 6)
+  feeAmount              Decimal              @map("fee_amount") @db.Decimal(24, 8)
+  realizedPnl            Decimal              @map("realized_pnl") @db.Decimal(24, 8)
+  positionQuantityAfter  Decimal              @map("position_quantity_after") @db.Decimal(24, 8)
+  averageEntryPriceAfter Decimal              @map("average_entry_price_after") @db.Decimal(24, 8)
+  isolatedMarginAfter    Decimal              @map("isolated_margin_after") @db.Decimal(24, 8)
+  executedAt             DateTime             @map("executed_at")
+  createdAt              DateTime             @default(now()) @map("created_at")
+
+  tradingAccount     TradingAccount         @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  instrument         FuturesInstrument      @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  position           FuturesPosition        @relation(fields: [positionId, tradingAccountId, instrumentId], references: [id, tradingAccountId, instrumentId], onDelete: Restrict)
+  assetPriceSnapshot AssetPriceSnapshot     @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
+  executeRequest     FuturesExecuteRequest?
+
+  @@unique([id, tradingAccountId])
+  @@index([tradingAccountId, executedAt, id])
+  @@index([instrumentId])
+  @@index([positionId])
+  @@index([assetPriceSnapshotId])
+  @@map("futures_executions")
+}
+
+// Only committed commands. Replay returns this exact response, never live state.
+model FuturesExecuteRequest {
+  id                  String   @id @default(uuid())
+  tradingAccountId    String   @map("trading_account_id")
+  executionId         String   @unique @map("execution_id")
+  idempotencyKey      String   @map("idempotency_key")
+  requestHash         String   @map("request_hash")
+  responsePayloadJson Json     @map("response_payload_json")
+  executedAt          DateTime @map("executed_at")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  tradingAccount TradingAccount   @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  execution      FuturesExecution @relation(fields: [executionId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
+
+  @@unique([tradingAccountId, idempotencyKey])
+  @@unique([executionId, tradingAccountId])
+  @@map("futures_execute_requests")
 }
 
 model Position {

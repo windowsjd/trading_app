@@ -686,7 +686,10 @@ describe('HomeService', () => {
             httpStatus: 200,
             evidence: { section: sectionError.section },
           });
-          expect(sectionError.diagnostic?.exception.message).toContain(
+          expect(sectionError.diagnostic?.exception.message).toBe(
+            'Unexpected internal failure.',
+          );
+          expect(JSON.stringify(sectionError.diagnostic)).not.toContain(
             'synthetic-internal-detail',
           );
           expect(JSON.stringify(sectionError.diagnostic)).not.toMatch(

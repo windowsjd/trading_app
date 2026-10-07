@@ -48,6 +48,7 @@ import InlineEmptyState from '../../components/states/InlineEmptyState';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import OrderPanel from './OrderPanel';
 import { useFocusedInputScroll } from '../../hooks/useFocusedInputScroll';
+import { safeRuntimeCode } from '../../services/ws/runtimeDiagnostics';
 
 export default function OrderScreen(props: OrderScreenProps) {
   const { assetId, accountId, side } = props.route.params;
@@ -151,9 +152,9 @@ export function OrderTradingScreen({
                   ...tickerRuntime,
                   connectionState,
                   tickerPriceAvailable: ticker?.priceLocal != null,
-                  tickerReason: ticker?.reason,
+                  tickerReason: safeRuntimeCode(ticker?.reason) ?? 'not_observed',
                   priceKrwState: displayPrice.priceKrwState,
-                  priceKrwReason: displayPrice.priceKrwReason,
+                  priceKrwReason: safeRuntimeCode(displayPrice.priceKrwReason) ?? 'not_observed',
                   priceCapturedAt: displayPrice.priceCapturedAt,
                 }
               : null

@@ -207,6 +207,7 @@ import { PrismaService } from './../src/prisma/prisma.service';
 import { RedisService } from './../src/redis/redis.service';
 import { TradingAccountWalletTransferService } from '../src/wallets/trading-account-wallet-transfer.service';
 import { TradingAccountWalletFxTransferService } from '../src/wallets/trading-account-wallet-fx-transfer.service';
+import { FuturesService } from '../src/futures/futures.service';
 import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
 import { adminDiagnosticRequestMiddleware } from './../src/common/admin-diagnostics';
 import * as argon2 from 'argon2';
@@ -3009,6 +3010,116 @@ describe('AppController (e2e)', () => {
       });
   });
 
+  for (const endpoint of [
+    'execute',
+    'instruments',
+    'positions',
+    'executions',
+  ] as const) {
+    it(`Futures ${endpoint} requires authentication before dispatch`, async () => {
+      const spy = jest.spyOn(app.get(FuturesService), endpoint);
+      try {
+        const route = `/api/v1/trading-accounts/trading-account-1/futures/${endpoint}`;
+        const req =
+          endpoint === 'execute'
+            ? request(app.getHttpServer()).post(route).send({})
+            : request(app.getHttpServer()).get(route);
+        await req
+          .expect(401)
+          .expect((response) => expectUnauthorizedBody(response.body));
+        expect(spy).not.toHaveBeenCalled();
+      } finally {
+        spy.mockRestore();
+      }
+    });
+    it(`Futures ${endpoint} dispatches authenticated account scope`, async () => {
+      resetPrismaMocks();
+      mockActiveUser();
+      const result = {
+        success: true,
+        data: { tradingAccountId: 'trading-account-1' },
+      };
+      const service = app.get(FuturesService);
+      const spy = jest
+        .spyOn(service, endpoint)
+        .mockResolvedValueOnce(result as never);
+      const body = {
+        instrumentId: 'i',
+        operation: 'open',
+        direction: 'short',
+        leverage: 37,
+        quantity: '1',
+        idempotencyKey: 'f1-key',
+      };
+      try {
+        const token = await createValidAccessToken();
+        const route = `/api/v1/trading-accounts/trading-account-1/futures/${endpoint}`;
+        const req =
+          endpoint === 'execute'
+            ? request(app.getHttpServer()).post(route).send(body)
+            : request(app.getHttpServer()).get(
+                endpoint === 'executions' ? `${route}?limit=2&offset=1` : route,
+              );
+        await req
+          .set('Authorization', `Bearer ${token}`)
+          .expect(200)
+          .expect((response) => expect(response.body).toEqual(result));
+        expect(spy).toHaveBeenCalledWith(
+          user.id,
+          'trading-account-1',
+          ...(endpoint === 'execute'
+            ? [body]
+            : endpoint === 'executions'
+              ? [{ limit: '2', offset: '1' }]
+              : []),
+        );
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  }
+  it.each([0, 101, 1.5, '37', null])(
+    'Futures HTTP rejects invalid leverage %j before financial reads',
+    async (leverage) => {
+      resetPrismaMocks();
+      mockActiveUser();
+      const token = await createValidAccessToken();
+      await request(app.getHttpServer())
+        .post('/api/v1/trading-accounts/trading-account-1/futures/execute')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          instrumentId: 'i',
+          operation: 'open',
+          direction: 'long',
+          quantity: '1',
+          leverage,
+          idempotencyKey: 'key',
+        })
+        .expect(400)
+        .expect((response) =>
+          expect(response.body.error.code).toBe('INVALID_FUTURES_LEVERAGE'),
+        );
+      expect(prisma.tradingAccount.findFirst).not.toHaveBeenCalled();
+    },
+  );
+  it('Futures history rejects compound scalar query before dispatch', async () => {
+    resetPrismaMocks();
+    mockActiveUser();
+    const token = await createValidAccessToken();
+    const spy = jest.spyOn(app.get(FuturesService), 'executions');
+    try {
+      await request(app.getHttpServer())
+        .get(
+          '/api/v1/trading-accounts/trading-account-1/futures/executions?limit=1&limit=2',
+        )
+        .set('Authorization', `Bearer ${token}`)
+        .expect(400);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('/api/v1/trading-accounts/:accountId/wallet-transfers (POST) requires authentication', async () => {
     const service = app.get(TradingAccountWalletTransferService);
     const spy = jest.spyOn(service, 'transfer');
@@ -4346,6 +4457,41 @@ describe('AppController (e2e)', () => {
       });
     },
   );
+
+  it('keeps unexpected asset exceptions safe and follows current DB role changes with the same token', async () => {
+    const token = await createValidAccessToken('p0-user');
+    const raw =
+      'postgresql://fixture:fake-password@db.invalid/private-db https://provider.invalid/private Bearer fake-token wallet 184927.543281 foreign-private-id {"nested":{"secret":"fake-secret"}}';
+    for (const role of ['admin', 'operator', 'user']) {
+      mockActiveUser('p0-user', role);
+      prisma.asset.findUnique.mockRejectedValueOnce(
+        Object.assign(new Error(raw, { cause: new Error(raw) }), {
+          code: 'P2034',
+          name: raw,
+        }),
+      );
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/assets/p0-asset')
+        .set('Authorization', `Bearer ${token}`)
+        .set('x-request-id', `p0-${role}`)
+        .expect(500);
+      expect(response.body.error.code).toBe('INTERNAL_SERVER_ERROR');
+      expect(JSON.stringify(response.body)).not.toMatch(
+        /db.invalid|provider.invalid|fake-token|184927|foreign-private-id|fake-secret/,
+      );
+      if (role === 'admin') {
+        expect(response.body.error.diagnostic).toMatchObject({
+          domain: 'MARKET_DATA',
+          operation: 'ASSET_READ',
+          requestId: 'p0-admin',
+          evidence: {
+            safeCause: { category: 'db_transaction_conflict', code: 'P2034' },
+          },
+          nextInvestigation: ['backend/src/assets/assets.service.ts'],
+        });
+      } else expect(response.body.error).not.toHaveProperty('diagnostic');
+    }
+  });
 
   describe('HTTP query runtime boundary', () => {
     // Independent API expectations: every query route is exercised through

@@ -15,6 +15,7 @@ import {
   buildAdminPartialFailureDiagnostic,
   getAdminDiagnosticRequestId,
   isAdminDiagnosticRequest,
+  safeAdminDiagnosticLog,
 } from '../common/admin-diagnostics';
 
 export type PortfolioEquityQuery = {
@@ -486,7 +487,7 @@ export class PortfolioService {
         : 'VALUATION_UNAVAILABLE';
     if (isAdminDiagnosticRequest()) {
       this.logger.warn(
-        JSON.stringify({
+        safeAdminDiagnosticLog({
           event: 'portfolio_partial_valuation_failed',
           requestId: getAdminDiagnosticRequestId(),
           code,

@@ -238,6 +238,8 @@ function inlineTradingHarness() {
           isError: false,
           refetch,
         };
+        if (scope === 'asset' && resource !== 'detail' && h.candleFailure)
+          return { ...base, isError: true, error: h.candleFailure, data: undefined };
         if (scope === 'asset')
           return {
             ...base,

@@ -14,7 +14,7 @@ export const CANDLE_BASELINE_NOT_READY_CODE = 'ASSET_CANDLES_BASELINE_NOT_READY'
 export const CANDLE_BASELINE_NOT_READY_MESSAGE =
   '차트 데이터를 준비 중입니다.';
 export const CANDLE_BASELINE_NOT_READY_HELPER =
-  '잠시 후 다시 시도해주세요. 저장된 5분봉을 모으는 중입니다.';
+  '잠시 후 다시 시도해주세요.';
 
 /** Reads the API error code out of an axios-style error, safely. */
 export function getApiErrorCode(error: unknown): string | null {
@@ -54,10 +54,8 @@ const FAILED_TITLE = '차트를 불러오지 못했습니다.';
  * What the chart area should say about a failed candle request.
  *
  * A real failure must READ like a failure: hiding it behind a loading
- * skeleton made an outage look like a slow request and hid the reason
- * (provider unavailable, network, auth) from whoever was debugging it. The
- * backend error code is shown as-is — it is the same string the server logs
- * and the API contract documents.
+ * skeleton made an outage look like a slow request. Public copy is safe for
+ * every role; technical detail belongs in the existing admin panel.
  */
 export function describeCandleError(error: unknown): CandleErrorView {
   if (isCandleBaselineNotReadyError(error)) {
@@ -67,21 +65,9 @@ export function describeCandleError(error: unknown): CandleErrorView {
       message: CANDLE_BASELINE_NOT_READY_HELPER,
     };
   }
-  const code = getApiErrorCode(error);
-  const status = getApiErrorStatus(error);
-  if (code) {
-    return { kind: 'failed', title: FAILED_TITLE, message: `오류 코드: ${code}` };
-  }
-  if (status) {
-    return {
-      kind: 'failed',
-      title: FAILED_TITLE,
-      message: `서버 응답 오류 (HTTP ${status})`,
-    };
-  }
   return {
     kind: 'failed',
     title: FAILED_TITLE,
-    message: '네트워크 연결을 확인한 뒤 다시 시도해주세요.',
+    message: '잠시 후 다시 시도해주세요.',
   };
 }

@@ -15,6 +15,7 @@ First compare current implementation, tests and migrations with explicit current
    - `docs/wallets-api-contract.md`
    - `docs/wallet-transfers-api-contract.md` — Spot cash provenance, internal USD transfers and atomic Securities FX + Crypto transfer
    - `docs/positions-api-contract.md`
+   - `docs/futures-api-contract.md` — development-only F1 synthetic USD perpetuals; default OFF
    - `docs/records-api-contract.md`
    - `docs/rewards-api-contract.md`
    - `docs/trading-accounts-api-contract.md`

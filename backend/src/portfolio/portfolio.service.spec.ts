@@ -159,7 +159,10 @@ describe('PortfolioService', () => {
         message: 'Portfolio is unavailable.',
       });
       if (role === 'admin') {
-        expect(sectionError.diagnostic?.exception.message).toContain(
+        expect(sectionError.diagnostic?.exception.message).toBe(
+          'Unexpected internal failure.',
+        );
+        expect(JSON.stringify(sectionError.diagnostic)).not.toContain(
           'synthetic-portfolio-internal',
         );
         expect(JSON.stringify(sectionError.diagnostic)).not.toContain(

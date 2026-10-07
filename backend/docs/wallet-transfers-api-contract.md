@@ -3,7 +3,12 @@
 Current policy (2026-10-07): new `AssetType.crypto` orders are Spot and use
 `crypto_spot/USD`. Stocks use Securities KRW/USD. FX remains Securities
 KRW ↔ USD. Crypto Futures supports USD storage and explicit transfers, including
-the atomic FX + transfer command below. Futures trading remains unsupported.
+the atomic FX + transfer command below. [Futures F1](futures-api-contract.md) is
+development-only and default OFF. Futures-source USD transfers (including the
+reverse FX+Transfer leg) additionally check balance minus reservations minus the
+sum of open isolated margins under the same wallet lock. Incoming transfers are
+allowed. Margin never uses `reservedAmount`, and this protection applies even
+with Futures trading OFF.
 
 ## Durable order identity
 
@@ -128,7 +133,8 @@ the acting account's wallets/ledger and portfolio/equity/performance plus Season
 ranking when applicable. FX records remain visible in the existing server FX
 history API and wallet ledger; the current UI has no separately cached FX history
 query. Same-currency and standalone FX APIs remain intact.
-No automatic FX, order auto-funding, central wallet or Futures trading exists.
+No automatic FX, order auto-funding or central wallet exists. Futures trading has
+its own default-OFF F1 command; it is not part of these transfer APIs.
 
 Schema additions use a new migration only. Applied migration
 `20261006160000_pin_order_wallet_and_add_transfers` must never be rewritten.

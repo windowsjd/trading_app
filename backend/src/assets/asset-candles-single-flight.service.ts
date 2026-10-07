@@ -1,3 +1,4 @@
+import { safeAdminDiagnosticLog } from '../common/admin-diagnostics';
 import { Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { RedisLockService, type RedisLock } from '../redis/redis-lock.service';
@@ -194,7 +195,7 @@ export class AssetCandlesSingleFlightService {
     }
     if (staleValue) {
       this.logger.log(
-        JSON.stringify({
+        safeAdminDiagnosticLog({
           event: 'candle_delivery',
           state: 'stale_cache_fallback',
           reason: 'remote_refresh_in_progress',

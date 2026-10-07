@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { HttpException } from '@nestjs/common';
+import { safeDiagnosticMessage } from './safe-diagnostic-message';
 import {
   classifyFailureCause,
   type SafeFailureCause,
@@ -25,6 +26,25 @@ const wrappedFailures = new WeakMap<
   Error,
   { failedStep: string; cause: SafeFailureCause }
 >();
+
+/** Opt in only at an existing, reviewed domain log projection (never raw errors).
+ * The exact, already-projected string is trusted only in this request's buffer.
+ * A matching generic log can contain no information beyond that safe snapshot.
+ */
+export function safeAdminDiagnosticLog(
+  projection: Record<string, unknown>,
+): string {
+  const message = sanitizeLogMessage(projection);
+  const context = requestDiagnostics.getStore();
+  if (context?.request.user?.role === 'admin') {
+    if (context.safeLogMessages.size >= MAX_SERVER_LOG_ENTRIES) {
+      const [oldest] = context.safeLogMessages.keys();
+      if (oldest !== undefined) context.safeLogMessages.delete(oldest);
+    }
+    context.safeLogMessages.set(message, hasSanitizationLoss(projection));
+  }
+  return message;
+}
 
 /** Keep only classification, never the original message, stack or payload. */
 export function preserveAdminFailureCause<T extends Error>(
@@ -122,6 +142,7 @@ type RequestDiagnosticContext = {
     details?: DiagnosticValue[];
   }>;
   serverLogsTruncated: boolean;
+  safeLogMessages: Map<string, boolean>;
 };
 
 export type DiagnosticContextUpdate = {
@@ -157,6 +178,7 @@ export function adminDiagnosticRequestMiddleware(
     diagnosticEventsTruncated: false,
     serverLogs: [],
     serverLogsTruncated: false,
+    safeLogMessages: new Map(),
   };
 
   response.setHeader('x-request-id', requestId);
@@ -220,26 +242,26 @@ export function recordAdminApplicationLog(
     context.serverLogs.shift();
     context.serverLogsTruncated = true;
   }
-  const loggerContext =
-    typeof optionalParams.at(-1) === 'string'
-      ? (optionalParams.at(-1) as string)
-      : undefined;
-  const details = loggerContext ? optionalParams.slice(0, -1) : optionalParams;
+  const safeLog =
+    typeof message === 'string' && context.safeLogMessages.has(message);
+  // Optional logger arguments can be raw messages, stacks, objects or causes.
+  // They never inherit the message projection's trust.
   if (
+    !safeLog ||
     hasSanitizationLoss(message) ||
-    hasSanitizationLoss(details) ||
-    (loggerContext?.length ?? 0) > MAX_STRING_LENGTH
+    hasSanitizationLoss(optionalParams) ||
+    (safeLog && context.safeLogMessages.get(message))
   ) {
     context.serverLogsTruncated = true;
   }
   context.serverLogs.push({
     timestamp: new Date().toISOString(),
     level,
-    ...(loggerContext ? { context: sanitizeString(loggerContext) } : {}),
-    message: sanitizeLogMessage(message),
-    ...(details.length
-      ? { details: sanitizeValue(details, 0) as DiagnosticValue[] }
-      : {}),
+    message: safeLog
+      ? message
+      : message instanceof Error
+        ? sanitizeLogMessage(classifyFailureCause(message))
+        : '[UNPROJECTED_APPLICATION_LOG]',
   });
 }
 
@@ -295,6 +317,11 @@ function buildAdminDiagnosticInternal(
     : context.operation;
   const wrappedFailure =
     exception instanceof Error ? wrappedFailures.get(exception) : undefined;
+  const safeCause = wrappedFailure?.cause ?? classifyFailureCause(exception);
+  const includeSafeCause =
+    Boolean(wrappedFailure) ||
+    safeCause.category !== 'unexpected_error' ||
+    !safeExceptionMessage(exception);
   const failureStage =
     wrappedFailure?.failedStep ??
     (isolateFailure
@@ -305,12 +332,8 @@ function buildAdminDiagnosticInternal(
     : context.entities;
   const evidence = {
     ...(isolateFailure ? (update?.evidence ?? {}) : context.evidence),
-    ...(wrappedFailure
-      ? {
-          failedStep: wrappedFailure.failedStep,
-          safeCause: wrappedFailure.cause,
-        }
-      : {}),
+    ...(includeSafeCause ? { safeCause } : {}),
+    ...(wrappedFailure ? { failedStep: wrappedFailure.failedStep } : {}),
   };
   const nextInvestigation = isolateFailure
     ? unique([
@@ -525,40 +548,65 @@ function describeException(exception: unknown): AdminDiagnostic['exception'] {
     (typeof error?.message === 'string'
       ? error.message
       : 'Non-Error exception');
-  const stack =
-    typeof error?.stack === 'string'
-      ? redactSensitiveText(error.stack)
-          .split('\n')
-          .map((line) => line.trim())
-      : [];
+  const rawLines =
+    typeof error?.stack === 'string' ? error.stack.split('\n') : [];
+  const stack = rawLines.flatMap((line) => {
+    const frame = projectStackFrame(line);
+    return frame ? [frame] : [];
+  });
   const applicationStack = stack.filter((line) =>
-    /(?:backend[\\/](?:src|dist)|[\\/](?:src|dist)[\\/](?:orders|fx|portfolio|assets|providers|common))[\\/]/u.test(
-      line,
-    ),
+    /^at (?:src|dist)\//u.test(line),
   );
   const wrapped = error ? wrappedFailures.get(error) : undefined;
-  const cause = wrapped
-    ? `${wrapped.cause.errorType}: ${wrapped.cause.category}${wrapped.cause.code ? ` (${wrapped.cause.code})` : ''}`
-    : error && 'cause' in error
-      ? describeCause(error.cause)
-      : undefined;
+  const classified = wrapped?.cause ?? classifyFailureCause(exception);
+  const cause = `${classified.errorType}: ${classified.category}${classified.code ? ` (${classified.code})` : ''}`;
+  const safeMessage = safeDiagnosticMessage(rawMessage);
+  const includeCause =
+    Boolean(wrapped) ||
+    classified.category !== 'unexpected_error' ||
+    !safeMessage;
 
   return {
-    type: sanitizeString(
-      typeof error?.name === 'string' ? error.name : typeof exception,
-    ),
-    message: sanitizeString(rawMessage),
-    ...(cause ? { cause } : {}),
+    type: classifyFailureCause(exception).errorType,
+    message: safeMessage ?? 'Unexpected internal failure.',
+    ...(includeCause ? { cause } : {}),
     applicationStack: applicationStack
       .slice(0, MAX_APPLICATION_STACK_FRAMES)
       .map(sanitizeString),
     stack: stack.slice(0, MAX_STACK_FRAMES).map(sanitizeString),
     truncated:
-      rawMessage.length > MAX_STRING_LENGTH ||
+      !safeMessage ||
+      rawLines.some(
+        (line, index) => index > 0 && line.trim() && !projectStackFrame(line),
+      ) ||
       stack.length > MAX_STACK_FRAMES ||
       applicationStack.length > MAX_APPLICATION_STACK_FRAMES ||
       stack.some((line) => line.length > MAX_STRING_LENGTH),
   };
+}
+
+function safeExceptionMessage(exception: unknown): string | undefined {
+  return safeDiagnosticMessage(
+    httpExceptionMessage(exception) ??
+      (exception instanceof Error ? exception.message : undefined),
+  );
+}
+
+/** Only source locations: exception headers, function names, arguments and
+ * trailing text are untrusted. Drop absolute prefixes and non-frame lines.
+ */
+function projectStackFrame(line: string): string | undefined {
+  const match =
+    /^\s*at (?:[\w.$<> ]+ \()?((?:[A-Za-z]:)?[\\/][\w./\\@-]+\.[cm]?[jt]s):(\d{1,7}):(\d{1,7})\)?\s*$/u.exec(
+      line,
+    );
+  if (!match) return undefined;
+  const path = match[1].replace(/\\/gu, '/');
+  const location =
+    /\/(?:backend\/)?((?:src|dist)\/[\w./-]+)$/u.exec(path)?.[1] ??
+    /\/node_modules\/([\w./@-]+)$/u.exec(path)?.[1];
+  if (!location || location.split('/').includes('..')) return undefined;
+  return sanitizeString(`at ${location}:${match[2]}:${match[3]}`);
 }
 
 function httpExceptionMessage(exception: unknown): string | undefined {
@@ -591,14 +639,6 @@ function httpExceptionMessage(exception: unknown): string | undefined {
   return undefined;
 }
 
-function describeCause(value: unknown): string | undefined {
-  if (value instanceof Error) {
-    return sanitizeString(`${value.name}: ${value.message}`);
-  }
-  if (typeof value === 'string') return sanitizeString(value);
-  return undefined;
-}
-
 function sanitizeRecord(
   value: Record<string, unknown>,
 ): Record<string, DiagnosticValue> {
@@ -611,6 +651,8 @@ function sanitizeValue(value: unknown, depth: number): DiagnosticValue {
   if (typeof value === 'number')
     return Number.isFinite(value) ? value : String(value);
   if (typeof value === 'boolean') return value;
+  if (value instanceof Error)
+    return sanitizeValue(classifyFailureCause(value), depth);
   if (value instanceof Date) return value.toISOString();
   if (depth >= MAX_OBJECT_DEPTH) return '[TRUNCATED_DEPTH]';
   if (Array.isArray(value)) {
@@ -645,7 +687,7 @@ function sanitizeString(value: string): string {
 
 function sanitizeLogMessage(value: unknown): string {
   if (value instanceof Error) {
-    return sanitizeString(`${value.name}: ${value.message}`);
+    return JSON.stringify(classifyFailureCause(value));
   }
   if (typeof value === 'string') return sanitizeString(value);
   const sanitized = sanitizeValue(value, 0);

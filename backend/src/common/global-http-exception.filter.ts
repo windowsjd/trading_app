@@ -13,7 +13,10 @@ import {
   type AdminDiagnostic,
   buildAdminDiagnostic,
   getAdminDiagnosticRequestId,
+  safeAdminDiagnosticLog,
 } from './admin-diagnostics';
+import { classifyFailureCause } from './safe-failure-cause';
+import { safeDiagnosticMessage } from './safe-diagnostic-message';
 
 type ErrorEnvelope = {
   success: false;
@@ -40,13 +43,12 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
     const envelope = this.toErrorEnvelope(exception, status);
     const request = context.getRequest?.<AuthenticatedRequest>();
     if (request?.user?.role === 'admin') {
-      const logMessage = JSON.stringify({
+      const logMessage = safeAdminDiagnosticLog({
         event: 'admin_http_request_failed',
         requestId: getAdminDiagnosticRequestId(),
         code: envelope.error.code,
         httpStatus: status,
-        exceptionType:
-          exception instanceof Error ? exception.name : typeof exception,
+        exceptionType: classifyFailureCause(exception).errorType,
       });
       if (status >= 500) {
         this.logger.error(logMessage);
@@ -84,7 +86,12 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
       const body = exception.getResponse();
 
       if (this.isErrorEnvelope(body)) {
-        return body;
+        // Only the filter attaches a diagnostic after the current-role check.
+        const { code, message, details } = body.error;
+        if (status >= 500 && !safeDiagnosticMessage(message)) {
+          return this.errorEnvelope(code, this.defaultMessage(status));
+        }
+        return this.errorEnvelope(code, message, details);
       }
 
       return this.fromHttpExceptionBody(body, status);
@@ -100,6 +107,14 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
   }
 
   private fromHttpExceptionBody(body: unknown, status: number): ErrorEnvelope {
+    // Unexpected HTTP wrappers are not typed domain envelopes. In particular,
+    // InternalServerErrorException(error.message) must not publish a raw error.
+    if (status >= 500) {
+      return this.errorEnvelope(
+        this.defaultCode(status),
+        this.defaultMessage(status),
+      );
+    }
     if (typeof body === 'string') {
       return this.errorEnvelope(this.defaultCode(status), body);
     }
@@ -154,31 +169,31 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
   }
 
   private defaultCode(status: number): string {
-    if (status === HttpStatus.BAD_REQUEST) {
+    if (status === Number(HttpStatus.BAD_REQUEST)) {
       return 'VALIDATION_ERROR';
     }
 
-    if (status === HttpStatus.UNAUTHORIZED) {
+    if (status === Number(HttpStatus.UNAUTHORIZED)) {
       return 'UNAUTHORIZED';
     }
 
-    if (status === HttpStatus.FORBIDDEN) {
+    if (status === Number(HttpStatus.FORBIDDEN)) {
       return 'FORBIDDEN';
     }
 
-    if (status === HttpStatus.NOT_FOUND) {
+    if (status === Number(HttpStatus.NOT_FOUND)) {
       return 'NOT_FOUND';
     }
 
-    if (status === HttpStatus.CONFLICT) {
+    if (status === Number(HttpStatus.CONFLICT)) {
       return 'CONFLICT';
     }
 
-    if (status === HttpStatus.GONE) {
+    if (status === Number(HttpStatus.GONE)) {
       return 'GONE';
     }
 
-    if (status === HttpStatus.TOO_MANY_REQUESTS) {
+    if (status === Number(HttpStatus.TOO_MANY_REQUESTS)) {
       return 'TOO_MANY_REQUESTS';
     }
 

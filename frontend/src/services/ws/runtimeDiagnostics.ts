@@ -123,7 +123,7 @@ export function realtimeRuntimeFacts(
     acknowledgedAt: runtimeTime(subscription.acknowledgedAt),
     lastRestoredAt: runtimeTime(subscription.lastRestoredAt),
     subscriptionError: subscription.subscriptionError,
-    lastSubscriptionErrorCode: subscription.lastSubscriptionErrorCode,
+    lastSubscriptionErrorCode: safeRuntimeCode(subscription.lastSubscriptionErrorCode),
     lastSubscriptionErrorAt: runtimeTime(subscription.lastSubscriptionErrorAt),
     lastSubscriptionErrorScope: subscription.lastSubscriptionErrorScope,
   };

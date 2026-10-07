@@ -1,0 +1,35 @@
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { describe, it } from 'node:test';
+import { getApiErrorDisplayMessage } from '../../services/api/errorMapper.ts';
+const { interactionHarness, React, act } = createRequire(import.meta.url)('../../../test/interactionTestHarness.cjs');
+
+const diagnostic = { version: 1, code: 'INTERNAL_SERVER_ERROR', httpStatus: 500,
+  timestamp: '2026-10-07T00:00:00Z', requestId: 'req-private', domain: 'ORDER', operation: 'ORDER_CREATE', failureStage: 'wallet_write',
+  evidence: { selectionResult: 'REJECTED', safeCause: { category: 'db_transaction_conflict' } },
+  exception: { type: 'Error', message: 'Unexpected internal failure.', applicationStack: [], stack: [], truncated: false },
+  diagnosticEvents: { events: [], truncated: false }, serverLogs: { entries: [], truncated: false },
+  nextInvestigation: ['backend/src/orders/orders.service.ts'], truncated: false };
+const error = { response: { status: 500, data: { error: { code: 'PRIVATE_UNKNOWN_CODE', message: 'JWT_ACCESS_SECRET raw provider https://private.invalid exact balance 184927.543281', diagnostic } } } };
+
+describe('rendered public error boundary', () => {
+  for (const role of ['user', 'operator', 'admin', undefined]) it(`keeps public text safe with role=${role}`, () => {
+    const h = interactionHarness(); h.native.SafeAreaView = 'SafeAreaView';
+    const Screen = h.load('src/components/states/ErrorState.tsx', {
+      '@tanstack/react-query': { useQuery: () => ({ data: { role }, isError: false }) },
+      '../../features/me/api': { getMe: async () => ({ role }) },
+    }).default;
+    const renderer = h.render(React.createElement(Screen, { message: getApiErrorDisplayMessage(error), diagnosticError: error, onRetry() {} }));
+    const visible = () => JSON.stringify(renderer.toJSON()).replace(/\u200b/g, '');
+    assert.match(visible(), /잠시 후 다시 시도/);
+    assert.doesNotMatch(visible(), /PRIVATE_UNKNOWN_CODE|JWT_ACCESS_SECRET|private.invalid|184927|req-private|wallet_write|INTERNAL_SERVER_ERROR/);
+    const toggles = renderer.root.findAllByProps({ testID: 'admin-diagnostic-toggle' });
+    assert.equal(toggles.length, role === 'admin' ? 1 : 0);
+    if (role === 'admin') {
+      act(() => toggles[0].props.onPress());
+      for (const value of ['ORDER_CREATE', 'wallet_write', 'req-private', 'db_transaction_conflict', 'orders.service.ts']) assert.ok(visible().includes(value));
+      assert.doesNotMatch(visible(), /JWT_ACCESS_SECRET|private.invalid|184927/);
+    }
+    act(() => renderer.unmount());
+  });
+});

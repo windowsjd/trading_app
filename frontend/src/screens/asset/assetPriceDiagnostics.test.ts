@@ -5,7 +5,7 @@ import { TEST_IDS } from '../../constants/testIds.ts';
 import type { AdminDiagnosticDto } from '../../models/dto/common.ts';
 import { applyTicker, toAssetTickerAcceptState } from '../../features/asset/assetTickerPolicy.ts';
 
-const { inlineTradingHarness, deferred } = createRequire(import.meta.url)(
+const { inlineTradingHarness, deferred, act } = createRequire(import.meta.url)(
   '../../../test/inlineTradingHarness.cjs',
 );
 const visibleText = (h: any) => JSON.stringify(h.renderer.toJSON()).replace(/\u200b/g, '');
@@ -36,6 +36,40 @@ const unavailable = (h: any) => {
 };
 
 describe('asset detail HTTP 200 price diagnostics', () => {
+  for (const role of ['user', 'operator', 'admin']) it(`keeps chart failure copy safe and diagnostics gated for ${role}`, async (t) => {
+    const h = inlineTradingHarness(); h.Screen = h.Chart; h.role = role;
+    h.candleFailure = { response: { status: 502, data: { error: {
+      code: 'ASSET_CANDLES_PROVIDER_ERROR',
+      message: 'JWT_ACCESS_SECRET https://provider.invalid/raw 184927.543281',
+      diagnostic: { ...diagnostic, domain: 'CANDLE', operation: 'CANDLE_READ', failureStage: 'provider_candle_fetch' },
+    } } } };
+    await h.mount(); t.after(h.close); await h.flush();
+    assert.match(visibleText(h), /차트를 불러오지 못했습니다/);
+    assert.match(visibleText(h), /잠시 후 다시 시도/);
+    assert.doesNotMatch(visibleText(h), /ASSET_CANDLES_PROVIDER_ERROR|502|JWT_ACCESS_SECRET|provider.invalid|184927|provider_candle_fetch/);
+    if (role === 'admin') {
+      await h.press('admin-diagnostic-toggle');
+      for (const value of ['CANDLE_READ', 'provider_candle_fetch', 'price-request']) assert.ok(visibleText(h).includes(value));
+    } else assert.equal(h.node('admin-diagnostic-toggle'), undefined);
+    const before = h.refetches;
+    await h.press(TEST_IDS.assetDetail.chartRetry);
+    assert.equal(h.refetches, before + 1);
+  });
+
+  for (const screen of ['Detail', 'OrderScreen']) it(`filters arbitrary ticker/conversion reasons in ${screen} runtime diagnostics`, async (t) => {
+    const h = inlineTradingHarness(); h.Screen = h[screen]; h.role = 'admin';
+    h.ticker = { type: 'asset_ticker', assetId: 'bnb', priceLocal: null,
+      priceCurrency: 'USD', priceKrw: null, priceKrwState: 'unavailable',
+      reason: 'https://provider.invalid/raw 184927.543281',
+      priceKrwReason: 'JWT_ACCESS_SECRET private-provider-message',
+      priceCapturedAt: new Date().toISOString() };
+    await h.mount(); t.after(h.close); await h.flush();
+    const toggles = h.renderer.root.findAllByProps({ testID: 'admin-diagnostic-toggle' });
+    assert.ok(toggles.length > 0);
+    for (const toggle of toggles) await act(async () => toggle.props.onPress());
+    assert.doesNotMatch(visibleText(h), /provider.invalid|184927|JWT_ACCESS_SECRET|private-provider-message/);
+    assert.match(visibleText(h), /not_observed/);
+  });
   it('shows an actual HTTP quote failure beside the order error, collapsed', async (t) => {
     const h = inlineTradingHarness();
     h.role = 'admin';

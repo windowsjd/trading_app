@@ -11,6 +11,7 @@ import { BatchModule } from './batch/batch.module';
 import { validateEnv } from './common/env-validation';
 import { GlobalHttpExceptionFilter } from './common/global-http-exception.filter';
 import { FxModule } from './fx/fx.module';
+import { FuturesModule } from './futures/futures.module';
 import { HomeModule } from './home/home.module';
 import { OperatorModule } from './operator/operator.module';
 import { OpsModule } from './ops/ops.module';
@@ -43,6 +44,7 @@ import { WalletsModule } from './wallets/wallets.module';
     BatchModule,
     FriendsModule,
     FxModule,
+    FuturesModule,
     HomeModule,
     OperatorModule,
     OpsModule,

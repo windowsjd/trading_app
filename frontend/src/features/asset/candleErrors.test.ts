@@ -65,7 +65,7 @@ describe('describeCandleError (what the chart area says)', () => {
     assert.equal(view.title, CANDLE_BASELINE_NOT_READY_MESSAGE);
   });
 
-  it('shows a real failure AS a failure, with the backend error code', () => {
+  it('shows a real failure with safe public copy', () => {
     // Hiding this behind a loading skeleton is what made an outage look like
     // a slow request and hid the reason.
     const view = describeCandleError(
@@ -73,18 +73,18 @@ describe('describeCandleError (what the chart area says)', () => {
     );
     assert.equal(view.kind, 'failed');
     assert.equal(view.title, '차트를 불러오지 못했습니다.');
-    assert.ok(view.message.includes('ASSET_CANDLES_PROVIDER_UNAVAILABLE'));
+    assert.equal(view.message, '잠시 후 다시 시도해주세요.');
   });
 
-  it('falls back to the HTTP status, then to a network hint', () => {
+  it('hides HTTP status and raw network exception text', () => {
     const statusOnly = describeCandleError({ response: { status: 502 } });
     assert.equal(statusOnly.kind, 'failed');
-    assert.ok(statusOnly.message.includes('502'));
+    assert.equal(statusOnly.message, '잠시 후 다시 시도해주세요.');
     assert.equal(getApiErrorStatus({ response: { status: 502 } }), 502);
 
     const networkError = describeCandleError(new Error('Network Error'));
     assert.equal(networkError.kind, 'failed');
-    assert.ok(networkError.message.includes('네트워크'));
+    assert.equal(networkError.message, '잠시 후 다시 시도해주세요.');
     assert.equal(getApiErrorStatus(new Error('x')), null);
   });
 });

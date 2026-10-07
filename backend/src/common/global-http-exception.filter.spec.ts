@@ -3,6 +3,7 @@ import {
   BadRequestException,
   HttpException,
   HttpStatus,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { adminDiagnosticRequestMiddleware } from './admin-diagnostics';
 import { GlobalHttpExceptionFilter } from './global-http-exception.filter';
@@ -79,6 +80,51 @@ describe('GlobalHttpExceptionFilter', () => {
     });
     expect(JSON.stringify(getJsonBody())).not.toContain('secret');
   });
+
+  it.each(['user', 'operator', 'admin'] as const)(
+    'keeps raw HTTP wrappers and attached diagnostics out of the %s public envelope',
+    (role) => {
+      const request = {
+        method: 'GET',
+        originalUrl: '/api/v1/portfolio',
+        headers: {},
+        user: { userId: 'user-1', role },
+      };
+      for (const exception of [
+        new InternalServerErrorException(
+          'https://db.invalid/secret balance 198234.123456',
+        ),
+        new HttpException(
+          {
+            success: false,
+            error: {
+              code: 'PORTFOLIO_FAILED',
+              message: 'https://db.invalid/secret balance 198234.123456',
+              details: { raw: 'foreign-private-id' },
+              diagnostic: { raw: 'injected-diagnostic' },
+            },
+          },
+          503,
+        ),
+      ]) {
+        const { host, response, getJsonBody } = createHost(request);
+        adminDiagnosticRequestMiddleware(
+          request as never,
+          response as never,
+          () => new GlobalHttpExceptionFilter().catch(exception, host),
+        );
+        const body = getJsonBody() as {
+          error: { code: string; diagnostic?: unknown };
+        };
+        expect(JSON.stringify(body)).not.toMatch(
+          /db.invalid|198234|foreign-private-id|injected-diagnostic/,
+        );
+        expect(Boolean(body.error.diagnostic)).toBe(role === 'admin');
+        if (exception.getStatus() === 503)
+          expect(body.error.code).toBe('PORTFOLIO_FAILED');
+      }
+    },
+  );
 
   it.each([
     ['user', false],

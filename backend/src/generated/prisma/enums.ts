@@ -108,7 +108,8 @@ export const WalletTransactionType = {
   adjustment: 'adjustment',
   settlement: 'settlement',
   ad_reward: 'ad_reward',
-  wallet_transfer: 'wallet_transfer'
+  wallet_transfer: 'wallet_transfer',
+  futures_pnl: 'futures_pnl'
 } as const
 
 export type WalletTransactionType = (typeof WalletTransactionType)[keyof typeof WalletTransactionType]
@@ -122,10 +123,51 @@ export const WalletTransactionReferenceType = {
   settlement: 'settlement',
   general_account_open: 'general_account_open',
   ad_reward_claim: 'ad_reward_claim',
-  wallet_transfer: 'wallet_transfer'
+  wallet_transfer: 'wallet_transfer',
+  futures_execution: 'futures_execution'
 } as const
 
 export type WalletTransactionReferenceType = (typeof WalletTransactionReferenceType)[keyof typeof WalletTransactionReferenceType]
+
+
+export const FuturesProductType = {
+  synthetic_perpetual: 'synthetic_perpetual'
+} as const
+
+export type FuturesProductType = (typeof FuturesProductType)[keyof typeof FuturesProductType]
+
+
+export const FuturesDirection = {
+  long: 'long',
+  short: 'short'
+} as const
+
+export type FuturesDirection = (typeof FuturesDirection)[keyof typeof FuturesDirection]
+
+
+export const FuturesMarginMode = {
+  isolated: 'isolated'
+} as const
+
+export type FuturesMarginMode = (typeof FuturesMarginMode)[keyof typeof FuturesMarginMode]
+
+
+export const FuturesPositionStatus = {
+  open: 'open',
+  closed: 'closed'
+} as const
+
+export type FuturesPositionStatus = (typeof FuturesPositionStatus)[keyof typeof FuturesPositionStatus]
+
+
+export const FuturesOperation = {
+  open: 'open',
+  increase: 'increase',
+  reduce: 'reduce',
+  close: 'close'
+} as const
+
+export type FuturesOperation = (typeof FuturesOperation)[keyof typeof FuturesOperation]
 
 
 export const AdRewardClaimStatus = {

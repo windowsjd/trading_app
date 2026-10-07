@@ -18,6 +18,7 @@ import { assertCashWalletTradingAccountScope } from './cash-wallet-scope';
 import { debitAvailableCash } from './cash-wallet-atomic';
 import { diagnoseCashWalletMutationFailure } from './cash-wallet-failure-diagnosis';
 import { canonicalCashWalletSetIssue } from './canonical-cash-wallets';
+import { assertFuturesTransferCollateral } from '../futures/futures-collateral';
 
 export type WalletTransferRequest = {
   sourceWalletId?: unknown;
@@ -265,6 +266,7 @@ export class TradingAccountWalletTransferService {
         walletScope: wallet.walletScope,
       });
     }
+    await assertFuturesTransferCollateral(tx, source, amount);
     const changed = await debitAvailableCash(tx, {
       walletId: source.id,
       tradingAccountId: accountId,

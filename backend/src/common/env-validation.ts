@@ -5,6 +5,7 @@ import { readGeneralTradeFeeRate } from '../orders/general-trading.config';
 import { readLiveCandleConfig } from '../assets/live-candle.config';
 import { readGeneralFxFeeRate } from '../fx/general-fx.config';
 import { readProfileImageStorageConfig } from '../auth/profile-image.config';
+import { isFuturesTradingEnabled } from '../futures/futures.config';
 
 /**
  * Central startup validation for environment variables whose misconfiguration
@@ -42,6 +43,7 @@ export function validateEnv(
 
   collect(errors, () => readLiveCandleConfig(env));
   collect(errors, () => readGeneralTradeFeeRate(env));
+  collect(errors, () => isFuturesTradingEnabled(env));
   collect(errors, () => readGeneralFxFeeRate(env));
   collect(errors, () => readProfileImageStorageConfig(config));
 

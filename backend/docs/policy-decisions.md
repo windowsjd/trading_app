@@ -284,9 +284,10 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
   external funding/TWR cash-flow boundary나 새 성과 공식은 만들지 않는다.
   근거: 한 번의 사용자 이체를 두 public mutation의 순차 commit으로 처리하면 안 된다.
 - Wallet UI는 증권 KRW/USD, 암호화폐 · 현물 USD, 암호화폐 · 선물 USD와 보유 종목을
-  scope+currency로 표시하고 이체/환전/원장/주문 내역을 구분한다. Futures는 보관·이체만
+  scope+currency로 표시하고 이체/환전/원장/주문 내역을 구분한다. Futures UI는 보관·이체만
   지원한다. Securities KRW↔USD는 기존 환전 화면, KRW↔Crypto USD는 이체 견적 화면을
-  사용한다. 자동환전·주문 auto-funding·cross-account/user 송금·Futures trading은 없다.
+  사용한다. 자동환전·주문 auto-funding·cross-account/user 송금은 없다. Futures F1 backend는
+  아래 별도 계약이며 UI 활성화는 없다.
   Legacy Wallet/FX의 Securities projection은 유지하고 account 원장은 모든 scope를 읽는다.
   근거: 통화만으로 USD 세 지갑 중 하나를 선택하거나 이체를 외부입금으로 표시하지 않는다.
 - `CashWallet`, `WalletTransaction`, `ExchangeTransaction`, `FxExecuteRequest`는 required `tradingAccountId`만 저장한다. child 관계(WalletTransaction→CashWallet, FxExecuteRequest→ExchangeTransaction)도 양쪽 account가 같아야 하며 request-time repair나 participant fallback은 없다.
@@ -305,6 +306,29 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
   근거: 환전은 가치의 통화 구성만 바꾸므로 TWR 자금 유입 경계를 만들면 수익률이 왜곡된다. account lock은 주문·광고보상과의 snapshot 순서를 같은 fence로 직렬화한다.
 - legacy wallet/fx endpoint는 계약 그대로 유지하고 진입점에서 participant를 account로 resolve한 뒤 account-scoped endpoint와 같은 서비스 코드를 공유한다(수수료·환율·잔액 변경·원장·멱등·오류 코드·원자성 동일).
   근거: 환전 규칙이 두 벌 존재하는 순간부터 두 경로의 결과가 갈라진다.
+
+## Crypto Futures F1 (2026-10-07, current)
+
+- [Futures 계약](futures-api-contract.md)이 별도 product/domain/API를 정의한다. 기존 Asset은
+  Binance Spot underlying이고 FuturesInstrument는 USD-settled synthetic perpetual identity다.
+  Spot Position/Order/Quote 의미는 유지하며 Futures Position/Execution/ExecuteRequest를 분리한다.
+- F1은 Market full fill, LONG/SHORT, One-way, Isolated only다. leverage는 1~100 모든 자연수,
+  소수/잘못된 타입은 거절하며 열린 position lifetime의 leverage 변경/increase mismatch를 금지한다.
+  반대 방향 open/초과 reduce/자동 flip은 없다. Full close 후 새 lifetime은 방향/leverage를 다시 선택한다.
+- 초기 margin은 notional/leverage이며 cash에서 debit하지 않는다. 보수적인 8자리 올림과 별도
+  entry-notional basis로 rounding 과소 배정을 막고 열린 position에서 margin을 합산한다.
+  Futures Wallet이 유일한 collateral boundary이며 reservedAmount는 기존 cash reservation이다.
+  Fee와 realized PnL만 실제 USD cash/원장에 반영한다. General/Season의 기존 trade fee policy를 쓴다.
+- Outgoing Futures USD Transfer 및 Futures→Securities KRW composite는 공유 transaction 이체
+  seam에서 margin-aware free collateral을 검증한다. wallet lock이 trade/transfer와 여러 상품의
+  collateral 경합을 직렬화하고 lifecycle lock 순서/committed replay 의미는 기존 계약을 따른다.
+- Canonical fresh Binance Spot snapshot은 synthetic execution/reference price이며 Mark Price가
+  아니다. 기존 snapshot/selector/execute freshness를 재사용하며 stale/missing은 reject한다.
+  PostgreSQL이 금융 SoT이고 network I/O는 financial locks 내부에 없다.
+- 손실+fee를 안전하게 정산할 수 없는 manual reduce/close는 `FUTURES_LIQUIDATION_REQUIRED`로
+  전체 rollback한다. Loss clamp/negative wallet/silent close는 없다. Cross/Maintenance/Liquidation은
+  F2, Futures UI 및 Home/Portfolio/TWR/Ranking/Settlement 통합은 F3다. 기존 valuation은 cash와
+  Spot만 포함한다. `FUTURES_TRADING_ENABLED` 기본 OFF, F2/F3 전 사용자/운영 활성화 금지다.
 
 ## Trading TradingAccount Scope (Order/Position/Quote 전환)
 

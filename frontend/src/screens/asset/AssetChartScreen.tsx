@@ -21,6 +21,7 @@ import { applyTickerMarketState } from '../../features/asset/assetTickerPolicy';
 import { selectDisplayPrice } from '../../features/asset/displayPricePolicy';
 import { mergeAssetCandleSnapshot } from '../../features/asset/liveCandle';
 import { describeCandleError } from '../../features/asset/candleErrors';
+import { safeRuntimeCode } from '../../services/ws/runtimeDiagnostics';
 import {
   getStockMarketStatus,
   getTradingPair,
@@ -221,7 +222,8 @@ export function AssetMarketChart({
           </View>
           {isAdmin && usdAsset && !krwAvailable ? (
             <AdminDiagnosticPanel runtime={{ assetId, priceBasis: displayPrice.basis,
-              priceKrwState: displayPrice.priceKrwState, priceKrwReason: displayPrice.priceKrwReason }} />
+              priceKrwState: displayPrice.priceKrwState,
+              priceKrwReason: safeRuntimeCode(displayPrice.priceKrwReason) ?? 'not_observed' }} />
           ) : null}
         </View>
       ) : (
