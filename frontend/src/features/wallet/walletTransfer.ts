@@ -1,5 +1,6 @@
 import Decimal from 'decimal.js';
 import type { WalletBalanceDto } from './api';
+import type { TradingAccountFuturesCollateralDto } from '../tradingAccount/api';
 
 export function parseTransferAmount(text: string): string | null {
   const value = text.trim();
@@ -22,7 +23,17 @@ export function transferAmountFits(amount: string | null, available: string | nu
   return amount !== null && available !== null && new Decimal(amount).lte(available);
 }
 
+export function futuresTransferAvailableAmount(payload: TradingAccountFuturesCollateralDto | undefined, accountId: string, wallet: WalletBalanceDto | null): string | null {
+  const collateral = payload?.collateral;
+  if (typeof wallet?.id !== 'string' || !wallet.id || wallet.walletScope !== 'crypto_futures' || wallet.currencyCode !== 'USD' || payload?.tradingAccountId !== accountId ||
+      collateral?.walletId !== wallet.id || collateral?.currencyCode !== 'USD' ||
+      typeof collateral.freeCollateral !== 'string' || !/^\d{1,16}\.\d{8}$/.test(collateral.freeCollateral)) return null;
+  return collateral.freeCollateral;
+}
+
 export function transferErrorMessage(code: string | null): string {
+  if (code === 'INSUFFICIENT_FUTURES_FREE_COLLATERAL') return '선물 지갑의 이체 가능 금액이 부족합니다. 금액을 확인해주세요.';
+  if (code === 'FUTURES_MARK_UNAVAILABLE' || code === 'FUTURES_MARK_STALE') return '현재 선물 지갑의 이체 가능 금액을 확인할 수 없습니다. 잠시 후 다시 시도해주세요.';
   if (code === 'INSUFFICIENT_AVAILABLE_BALANCE' || code === 'INSUFFICIENT_BALANCE') return '보내는 지갑의 이체 가능 잔액이 부족합니다. 잔액을 확인해주세요.';
   if (code === 'WALLET_TRANSFER_IDEMPOTENCY_CONFLICT') return '다른 이체에 사용된 요청입니다. 원장에서 처리 내역을 확인해주세요.';
   if (code === 'WALLET_TRANSFER_WALLET_NOT_FOUND') return '선택한 계정에서 지갑을 확인할 수 없습니다.';

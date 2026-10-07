@@ -68,6 +68,7 @@ plus one AsyncStorage entry.
 | AssetDetail         | selected (order CTA only)                                  | public price/candles; selected accountId is passed to `Order` route only on an explicit press                                               |
 | Order               | **route param**, fixed at entry                            | `/orders/quote`, `/orders`, `/positions`, `/wallets`                                                                                       |
 | Wallet FX           | selected                                                   | `/wallets`, `/fx/quote`, `/fx/execute`; public `/fx/rates/current`                                                                         |
+| Wallet transfer     | selected                                                   | `/wallets`, `/wallet-transfers`; outgoing Futures also reads `/futures/positions`                                                         |
 | Wallet ledger       | selected                                                   | `/wallet-transactions`                                                                                                                     |
 | Order list + cancel | season record's account or General Home's pinned accountId | `/orders`, `/orders/:orderId/cancel`                                                                                                       |
 
@@ -413,6 +414,32 @@ Record order-list route. That route resolves the id against the owned-account
 list and keeps it fixed for polling and cancel; a later global account switch
 cannot retarget the request. Season record entry points keep their seasonId
 lookup and use the same account-scoped list/cancel implementation.
+
+## USD wallet transfer
+
+`WalletTransferScreen` uses the selected account without a local account switcher
+or account title. Its inline selectors offer Securities, Crypto Spot and Crypto
+Futures USD only, excluding the opposite selection. KRW identities and the
+composite FX+Transfer API/parsers remain available in the shared contracts;
+this screen has no quote or confirmation step.
+
+One press submits the existing USD transfer command. The account/epoch guard and
+synchronous pending fence remain in place. An uncertain response keeps the same
+canonical command/key, including after refreshed cash reflects its debit;
+changing account, wallet or canonical amount starts a new intent.
+
+Outgoing Futures availability comes from the existing positions response's
+`collateral.freeCollateral`, matched to the account and wallet. Unknown, malformed,
+negative, loading or failed collateral blocks outgoing transfers without a cash
+fallback. Incoming Futures transfers do not depend on this read. The server
+remains authoritative. Transfers involving Futures refresh that account's cash,
+ledger and collateral cache; portfolio/TWR and other accounts are unaffected.
+
+The screen reuses `useFocusedInputScroll`, measured input/submit containers and
+the navigation header offset. Opening a selector blurs the input and dismisses
+the keyboard; focusing the input closes the dropdown. Browser resize/font-scale
+tests complement hook wiring tests; native keyboard behavior still needs device
+verification.
 
 ## Errors
 

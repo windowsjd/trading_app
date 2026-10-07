@@ -176,6 +176,19 @@ export interface WalletTransferRequestDto {
   idempotencyKey: string;
 }
 
+/** Only the existing positions response fields needed by outgoing transfers. */
+export interface TradingAccountFuturesCollateralDto {
+  tradingAccountId: string;
+  evaluatedAt: string;
+  collateral: { walletId: string; currencyCode: 'USD'; freeCollateral: MoneyString | null };
+}
+
+export async function getTradingAccountFuturesCollateral(accountId: string) {
+  const path = accountPath(accountId, '/futures/positions');
+  const response = await apiClient.get<ApiSuccessResponse<TradingAccountFuturesCollateralDto>>(path);
+  return assertAccountScope(path, accountId, response.data.data);
+}
+
 export interface WalletTransferDto {
   tradingAccountId: string;
   transferId: string;

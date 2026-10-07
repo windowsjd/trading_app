@@ -1,7 +1,24 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { parseTransferAmount, transferAmountFits, transferAvailableAmount, parseWalletTransferResponse, parseWalletFxTransferQuote, parseWalletFxTransferResponse, WalletTransferContractError } from './walletTransfer.ts';
+import { parseTransferAmount, transferAmountFits, transferAvailableAmount, futuresTransferAvailableAmount, transferErrorMessage, parseWalletTransferResponse, parseWalletFxTransferQuote, parseWalletFxTransferResponse, WalletTransferContractError } from './walletTransfer.ts';
 import { TRANSFER_WALLETS, transferRouteKind } from './walletIdentity.ts';
+
+test('Futures availability requires the account-owned wallet and canonical nonnegative collateral', () => {
+  const wallet = { id: 'futures-A', walletScope: 'crypto_futures' as const, currencyCode: 'USD' as const, balanceAmount: '1000', reservedAmount: '0' };
+  const response = { tradingAccountId: 'A', evaluatedAt: '2026-10-07T00:00:00.000Z', collateral: { walletId: wallet.id, currencyCode: 'USD' as const, freeCollateral: '12.34567890' } };
+  assert.equal(futuresTransferAvailableAmount(response, 'A', wallet), '12.34567890');
+  assert.equal(futuresTransferAvailableAmount({ ...response, collateral: { ...response.collateral, freeCollateral: '0.00000000' } }, 'A', wallet), '0.00000000');
+  for (const freeCollateral of [null, 'NaN', '-1.00000000', '12.345678901', '1e3', '12']) {
+    assert.equal(futuresTransferAvailableAmount({ ...response, collateral: { ...response.collateral, freeCollateral } }, 'A', wallet), null);
+  }
+  assert.equal(futuresTransferAvailableAmount(response, 'B', wallet), null);
+  assert.equal(futuresTransferAvailableAmount(response, 'A', { ...wallet, id: 'other' }), null);
+  assert.equal(futuresTransferAvailableAmount(undefined, 'A', wallet), null);
+  for (const code of ['INSUFFICIENT_FUTURES_FREE_COLLATERAL', 'FUTURES_MARK_UNAVAILABLE', 'FUTURES_MARK_STALE']) {
+    assert.match(transferErrorMessage(code), /선물 지갑의 이체 가능 금액/);
+    assert.doesNotMatch(transferErrorMessage(code), /FUTURES_|Mark|HTTP/);
+  }
+});
 
 test('amount and available cash preserve eight decimal digits without spending reservations', () => {
   assert.equal(parseTransferAmount(' 0500.10000000 '), '500.10000000');

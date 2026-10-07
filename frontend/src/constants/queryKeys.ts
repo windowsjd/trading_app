@@ -307,6 +307,9 @@ export const QUERY_KEYS = {
     detail: (accountId: string) =>
       ['tradingAccount', 'detail', accountId] as const,
 
+    futuresCollateral: (accountId: string) =>
+      ['tradingAccount', 'futures', accountId, 'collateral'] as const,
+
     portfolioAll: (accountId: string) =>
       ['tradingAccount', 'portfolio', accountId] as const,
     portfolio: (accountId: string) =>

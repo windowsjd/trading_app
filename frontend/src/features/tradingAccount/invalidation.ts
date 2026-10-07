@@ -117,9 +117,12 @@ export function invalidateAfterFx(
   return invalidateAll(client, keys);
 }
 
-/** Internal cash relocation changes this account's balances and ledger only. */
-export function invalidateAfterWalletTransfer(client: InvalidatorClient, accountId: string) {
-  return invalidateAll(client, walletKeys(accountId));
+/** Internal cash relocation changes cash/ledger and affected Futures collateral. */
+export function invalidateAfterWalletTransfer(client: InvalidatorClient, accountId: string, options: { futuresCollateral?: boolean } = {}) {
+  return invalidateAll(client, [
+    ...walletKeys(accountId),
+    ...(options.futuresCollateral ? [QUERY_KEYS.tradingAccount.futuresCollateral(accountId)] : []),
+  ]);
 }
 
 /** FX fees affect valuation; the internal transfer adds no funding boundary. */

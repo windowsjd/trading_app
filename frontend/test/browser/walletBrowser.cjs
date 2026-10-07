@@ -53,7 +53,7 @@ async function run() {
     }
   };
   try {
-    if (!process.argv.includes('--navigation-only')) {
+    if (!process.argv.includes('--navigation-only') && !process.argv.includes('--transfer-only')) {
       for (const appearance of ['light', 'dark']) for (const preference of ['red_blue', 'green_red'])
         for (const width of [320, 360, 390, 430]) for (const fontScale of [1, 1.5, 2])
           for (const account of ['general', 'season']) for (const long of [0, 1]) for (const screen of ['home', 'wallet']) {
@@ -313,64 +313,90 @@ async function run() {
       }
 
     }
-    // Actual transfer form: small mobile widths and enlarged text, summary and success.
-    for (const width of [320, 360, 430]) for (const fontScale of [1, 2]) for (const account of ['general', 'season']) {
-      await page.setViewportSize({ width, height: 844 });
-      await page.goto(`${base}/?screen=transfer&holdings=1&account=${account}&fontScale=${fontScale}`);
-      await id('wallet-transfer-available').waitFor();
-      assert.match(await id('wallet-transfer-available').textContent(), /30.39/);
-      await id('wallet-transfer-amount').fill('10'); await id('wallet-transfer-review').click();
-      await id('wallet-transfer-summary').waitFor();
-      const clipping = await page.evaluate(() => {
-        const failures = [];
-        for (const el of document.querySelectorAll('[data-testid="wallet-transfer-screen"] [dir="auto"]')) {
-          const box = el.getBoundingClientRect(), range = document.createRange(); range.selectNodeContents(el);
-          for (const r of range.getClientRects()) if (r.width && (r.left < -1 || r.right > innerWidth + 1 || r.top < box.top - 1 || r.bottom > box.bottom + 1)) failures.push(el.textContent);
-        }
-        return { failures, width: document.documentElement.scrollWidth };
-      });
-      assert.deepEqual(clipping.failures, [], `${width}/${fontScale}/${account}: text fits the transfer form`);
-      assert.ok(clipping.width <= width);
-      await id('wallet-transfer-confirm').click(); await id('wallet-transfer-success').waitFor();
-      assert.equal(await page.evaluate(() => window.fixture.transport.postRequests.at(-1).path), `/trading-accounts/${account}-account/wallet-transfers`);
-      records.push({ screen: 'transfer', width, fontScale, account, clipping });
-    }
-    // Installed React Navigation: real tabs, MyStack → RecordStack and back paths.
-    for (const width of [320, 360, 390, 430, 768]) for (const fontScale of [1, 1.5, 2])
-      for (const account of ['general', 'season']) for (const crypto of ['crypto_spot', 'crypto_futures']) for (const reverse of [false, true]) {
-        await page.setViewportSize({ width, height: 844 });
-        await page.goto(`${base}/?screen=transfer&holdings=1&account=${account}&fontScale=${fontScale}`);
-        await id('wallet-transfer-available').waitFor();
-        await id(`wallet-transfer-source-${reverse ? crypto : 'securities-KRW'}`).click();
-        await id(`wallet-transfer-destination-${reverse ? 'securities-KRW' : crypto}`).click();
-        await id('wallet-transfer-amount').fill(reverse ? '10' : '1000000');
-        await id('wallet-transfer-review').click(); await id('wallet-transfer-expected-received').waitFor();
-        for (const stage of ['quote', 'success']) {
-          if (stage === 'success') { await id('wallet-transfer-confirm').click(); await id('wallet-transfer-actual-received').waitFor(); }
-          const clipping = await page.evaluate(() => {
-            const failures = [];
-            for (const el of document.querySelectorAll('[data-testid="wallet-transfer-screen"] [dir="auto"]')) {
-              const box = el.getBoundingClientRect(), walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-              while (walker.nextNode()) for (let i = 0; i < walker.currentNode.textContent.length; i++) {
-                if (!walker.currentNode.textContent[i].trim()) continue;
-                const range = document.createRange(); range.setStart(walker.currentNode, i); range.setEnd(walker.currentNode, i + 1);
-                for (const r of range.getClientRects()) if (r.width && (r.left < -1 || r.right > innerWidth + 1 || r.top < box.top - 1 || r.bottom > box.bottom + 1)) failures.push(el.textContent);
-              }
-            }
-            return { failures, width: document.documentElement.scrollWidth };
-          });
-          assert.deepEqual(clipping.failures, [], `${width}/${fontScale}/${account}/${crypto}/${reverse}/${stage}`);
-          assert.ok(clipping.width <= width);
-          records.push({ screen: 'cross-transfer', width, fontScale, account, crypto, reverse, stage, clipping });
-          if (width === 320 && fontScale === 2 && account === 'general' && crypto === 'crypto_futures') {
-            await id(stage === 'quote' ? 'wallet-transfer-summary' : 'wallet-transfer-success').scrollIntoViewIfNeeded();
-            await page.screenshot({ path: path.join(out, `cross-${reverse ? 'reverse' : 'forward'}-${stage}-320-font2.png`) });
+    // USD-only production transfer screen, including browser resize/focus evidence.
+    if (!process.argv.includes('--navigation-only')) {
+      for (const appearance of ['light', 'dark']) for (const width of [320, 360, 390, 430])
+        for (const fontScale of [1, 1.5, 2]) for (const account of ['general', 'season'])
+          for (const long of [0, 1]) for (const height of [844, 400]) {
+            const context = { appearance, width, fontScale, account, long, height };
+            await page.setViewportSize({ width, height }); await page.emulateMedia({ colorScheme: appearance });
+            await page.goto(`${base}/?screen=transfer&holdings=1&account=${account}&fontScale=${fontScale}&long=${long}`);
+            await id('wallet-transfer-available').waitFor(); await theme.canvas(page, appearance);
+            assert.equal(await id('trading-account-switcher-trigger').count(), 0);
+            assert.equal(await id('wallet-transfer-source-options').count(), 0);
+            assert.equal(await id('wallet-transfer-destination-options').count(), 0);
+            assert.doesNotMatch(await id('wallet-transfer-screen').textContent(), /KRW|견적|환율|환전|이체 내용 확인|자금 보관/);
+            const clipping = async stage => {
+              const result = await page.evaluate(() => {
+                const failures = [];
+                for (const el of document.querySelectorAll('[data-testid="wallet-transfer-screen"] [dir="auto"]')) {
+                  const box = el.getBoundingClientRect(), walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+                  while (walker.nextNode()) for (let i = 0; i < walker.currentNode.textContent.length; i++) {
+                    if (!walker.currentNode.textContent[i].trim()) continue;
+                    const range = document.createRange(); range.setStart(walker.currentNode, i); range.setEnd(walker.currentNode, i + 1);
+                    for (const r of range.getClientRects()) if (r.width && (r.left < -1 || r.right > innerWidth + 1 || r.top < box.top - 1 || r.bottom > box.bottom + 1)) failures.push(el.textContent);
+                  }
+                }
+                return { failures, width: document.documentElement.scrollWidth };
+              });
+              assert.deepEqual(result.failures, [], JSON.stringify({ ...context, stage, result })); assert.ok(result.width <= width);
+            };
+            await clipping('collapsed');
+            if ([320, 390].includes(width) && [1, 2].includes(fontScale) && account === 'general' && !long && height === 844) await page.screenshot({ path: path.join(out, `transfer-form-${appearance}-${width}-font${fontScale}.png`) });
+            await id('wallet-transfer-amount').focus();
+            await id('wallet-transfer-source-selector').click();
+            assert.equal(await id('wallet-transfer-source-selector').getAttribute('aria-expanded'), 'true');
+            assert.equal(await id('wallet-transfer-source-crypto_spot').count(), 0);
+            assert.equal(await id('wallet-transfer-source-selector').locator('svg').count(), 1);
+            assert.equal(await id('wallet-transfer-amount').evaluate(el => document.activeElement === el), false);
+            await clipping('dropdown');
+            if (width === 320 && fontScale === 2 && account === 'general' && !long && height === 844) await page.screenshot({ path: path.join(out, `transfer-dropdown-${appearance}-320-font2.png`) });
+            await id('wallet-transfer-source-crypto_futures').click();
+            assert.equal(await id('wallet-transfer-source-options').count(), 0);
+            await page.waitForFunction(() => document.querySelector('[data-testid="wallet-transfer-available"]').textContent.includes('USD'));
+            assert.match(await id('wallet-transfer-available').textContent(), long ? /1234567890100/ : /25/);
+            await id('wallet-transfer-amount').fill(long ? '1234567890123456.12345678' : '25.00000001');
+            assert.equal(await id('wallet-transfer-submit').getAttribute('aria-disabled'), 'true');
+            await clipping('amount-too-large');
+            await id('wallet-transfer-destination-selector').click();
+            assert.equal(await id('wallet-transfer-destination-crypto_futures').count(), 0);
+            await id('wallet-transfer-amount').focus();
+            assert.equal(await id('wallet-transfer-destination-options').count(), 0);
+            await id('wallet-transfer-amount').fill('10');
+            await id('wallet-transfer-submit').click(); await id('wallet-transfer-success').waitFor();
+            await clipping('success');
+            const requests = await page.evaluate(() => window.fixture.transport.postRequests);
+            assert.equal(requests.length, 1); assert.equal(requests[0].path, `/trading-accounts/${account}-account/wallet-transfers`);
+            assert.equal(requests[0].body.sourceWalletId, `${account}-account:futures`); assert.equal(requests[0].body.amount, '10.00000000');
+            if (width === 320 && fontScale === 2 && account === 'general' && !long && height === 844) await page.screenshot({ path: path.join(out, `transfer-${appearance}-320-font2.png`), fullPage: true });
+            records.push({ screen: 'transfer', ...context, stages: 'collapsed/dropdown/long amount/success', clipping: 'passed' });
           }
-        }
-        const requests = await page.evaluate(() => window.fixture.transport.postRequests);
-        assert.deepEqual(requests.map(r => r.path), [`/trading-accounts/${account}-account/wallet-transfers/quote`, `/trading-accounts/${account}-account/wallet-transfers/execute`]);
-        assert.deepEqual(Object.keys(requests[1].body).sort(), ['idempotencyKey', 'quoteId']);
+      // Failure surface plus incoming Futures transfer must remain usable.
+      for (const appearance of ['light', 'dark']) {
+        await page.setViewportSize({ width: 320, height: 400 }); await page.emulateMedia({ colorScheme: appearance });
+        await page.goto(`${base}/?screen=transfer&holdings=1&account=general&fontScale=2&riskUnavailable=1`);
+        await id('wallet-transfer-source-selector').waitFor(); await id('wallet-transfer-source-selector').click(); await id('wallet-transfer-source-crypto_futures').click();
+        await id('wallet-transfer-amount').fill('1'); assert.equal(await id('wallet-transfer-submit').getAttribute('aria-disabled'), 'true');
+        assert.doesNotMatch(await id('wallet-transfer-available').textContent(), /USD/);
+        await id('wallet-transfer-source-selector').click(); await id('wallet-transfer-source-securities').click();
+        await id('wallet-transfer-destination-selector').click(); await id('wallet-transfer-destination-crypto_futures').click();
+        await page.evaluate(() => { window.fixture.transport.transferError = 'INSUFFICIENT_FUTURES_FREE_COLLATERAL'; });
+        await id('wallet-transfer-submit').click(); await id('wallet-transfer-error').waitFor();
+        assert.match(await id('wallet-transfer-error').textContent(), /이체 가능 금액이 부족/);
+        assert.doesNotMatch(await id('wallet-transfer-error').textContent(), /internal fixture/);
+        await page.evaluate(() => { window.fixture.transport.transferError = null; });
+        await id('wallet-transfer-submit').click(); await id('wallet-transfer-success').waitFor();
+        assert.equal(await page.evaluate(() => window.fixture.transport.postRequests.length), 2);
+        records.push({ screen: 'transfer-unavailable-error-incoming', appearance, width: 320, height: 400, fontScale: 2 });
       }
+      if (process.argv.includes('--transfer-only')) {
+        assert.deepEqual(errors, []);
+        fs.writeFileSync(path.join(out, 'transfer-results.json'), JSON.stringify({ records, errors, nativeKeyboard: 'NOT_RUN: browser resize is not a native keyboard' }, null, 2));
+        console.log(`WALLET_TRANSFER_BROWSER_PASSED ${records.length} cases: widths/font scales/themes/general/season/short viewport + unavailable/error/incoming`);
+        for (const name of ['failure.json', 'failure.png']) fs.rmSync(path.join(out, name), { force: true });
+        return;
+      }
+    }
     // Installed React Navigation: real tabs, MyStack → RecordStack and back paths.
     await page.setViewportSize({ width: 390, height: 844 });
     for (const account of ['general', 'season']) {

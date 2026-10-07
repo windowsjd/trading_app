@@ -1,29 +1,34 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from '../../theme/native';
+import { useHeaderHeight } from '@react-navigation/elements';
+import Svg, { Path } from 'react-native-svg';
+import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from '../../theme/native';
 import { SafeAreaView } from '../../theme/safeArea';
 import { semantic } from '../../theme/tokens';
+import { useAppearance } from '../../theme/appearance';
 import { getHeaderScreenContentStyle } from '../../theme/screenLayout';
+import { useFocusedInputScroll } from '../../hooks/useFocusedInputScroll';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import { getCapabilityBlockMessage, type TradingAccountCapabilities } from '../../features/tradingAccount/capabilities';
-import { getAccountDisplay } from '../../features/tradingAccount/accountDisplay';
-import { getTradingAccountWallets, transferTradingAccountWallets, quoteTradingAccountWalletTransfer, executeTradingAccountWalletTransfer, type TradingAccountDto, type WalletTransferDto, type WalletTransferRequestDto, type WalletFxTransferQuoteDto, type WalletFxTransferDto } from '../../features/tradingAccount/api';
+import { getTradingAccountWallets, getTradingAccountFuturesCollateral, transferTradingAccountWallets, type TradingAccountDto, type WalletTransferDto, type WalletTransferRequestDto } from '../../features/tradingAccount/api';
 import { ACCOUNT_INTEGRITY_TITLE, findAccountIntegrityFailure } from '../../features/tradingAccount/accountIntegrityGate';
-import { invalidateAfterWalletTransfer, invalidateAfterWalletFxTransfer } from '../../features/tradingAccount/invalidation';
+import { invalidateAfterWalletTransfer } from '../../features/tradingAccount/invalidation';
 import { getWalletByIdentity } from '../../features/wallet/mapper';
-import { TRANSFER_WALLETS, WALLET_SCOPE_LABELS, transferRouteKind, type TransferWalletIdentity } from '../../features/wallet/walletIdentity';
-import { parseTransferAmount, transferAmountFits, transferAvailableAmount, transferErrorMessage } from '../../features/wallet/walletTransfer';
+import { TRANSFER_WALLETS, WALLET_SCOPE_LABELS, type TransferWalletIdentity } from '../../features/wallet/walletIdentity';
+import { parseTransferAmount, transferAmountFits, transferAvailableAmount, futuresTransferAvailableAmount, transferErrorMessage, WalletTransferContractError } from '../../features/wallet/walletTransfer';
 import { isFxResponseInScope as isTransferResponseInScope, type FxRequestScope as TransferScope } from '../../features/wallet/fxAccountScope';
-import type { WalletCurrency } from '../../features/wallet/api';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { createIdempotencyKey } from '../../utils/idempotency';
 import { formatDisplayDecimal } from '../../utils/format';
-import { getApiErrorCode } from '../../services/api/errorMapper';
+import { getApiErrorCode, getApiErrorInfo, getApiErrorStatus } from '../../services/api/errorMapper';
 import ActionPressable from '../../components/common/ActionPressable';
 import CTAButton from '../../components/common/CTAButton';
-import AccountSwitcher from '../../components/tradingAccount/AccountSwitcher';
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
+
+type UsdWalletIdentity = Extract<TransferWalletIdentity, { currency: 'USD' }>;
+const USD_TRANSFER_WALLETS = TRANSFER_WALLETS.filter((wallet): wallet is UsdWalletIdentity => wallet.currency === 'USD');
+const walletLabel = (wallet: UsdWalletIdentity) => WALLET_SCOPE_LABELS[wallet.scope] + ' USD';
 
 export default function WalletTransferScreen() {
   const { selectedAccount, capabilities, isLoading, isError, refetchAccounts } = useTradingAccount();
@@ -32,18 +37,15 @@ export default function WalletTransferScreen() {
   if (scopeRef.current.accountId !== accountId) scopeRef.current = { accountId, scopeEpoch: scopeRef.current.scopeEpoch + 1 };
   if (isLoading) return <FullPageLoading message="계정 정보를 불러오는 중입니다." />;
   if (isError || !selectedAccount) return <ErrorState title="계정 정보를 불러오지 못했습니다." onRetry={() => void refetchAccounts()} />;
-  return <TransferForm key={`${accountId}:${scopeRef.current.scopeEpoch}`} account={selectedAccount} capabilities={capabilities} scope={scopeRef.current} readScope={() => scopeRef.current} />;
+  return <TransferForm key={accountId + ':' + scopeRef.current.scopeEpoch} account={selectedAccount} capabilities={capabilities} scope={scopeRef.current} readScope={() => scopeRef.current} />;
 }
 
 type TransferCommand = TransferScope & {
   body: WalletTransferRequestDto;
-  currency: WalletCurrency;
-  crossCurrency: boolean;
-  seasonUi: boolean;
-  quote?: WalletFxTransferQuoteDto;
+  futuresCollateral: boolean;
   running?: boolean;
-  attempted?: boolean;
   completed?: boolean;
+  uncertain?: boolean;
 };
 function TransferForm({ account, capabilities, scope, readScope }: {
   account: TradingAccountDto;
@@ -52,212 +54,207 @@ function TransferForm({ account, capabilities, scope, readScope }: {
   readScope: () => TransferScope;
 }) {
   const queryClient = useQueryClient();
+  const headerHeight = useHeaderHeight();
+  const inputScroll = useFocusedInputScroll();
+  const amountRef = useRef<View>(null);
+  const amountInputRef = useRef<TextInput>(null);
   const wallets = useQuery({ queryKey: QUERY_KEYS.tradingAccount.wallets(account.id), queryFn: () => getTradingAccountWallets(account.id) });
-  const [sourceKey, setSourceKey] = useState<TransferWalletIdentity['key']>('securities');
-  const [destinationKey, setDestinationKey] = useState<TransferWalletIdentity['key']>('crypto_spot');
-  const sourceIdentity = TRANSFER_WALLETS.find(wallet => wallet.key === sourceKey);
-  const destinationIdentity = TRANSFER_WALLETS.find(wallet => wallet.key === destinationKey);
-  const routeKind = transferRouteKind(sourceIdentity, destinationIdentity);
+  const [sourceKey, setSourceKey] = useState<UsdWalletIdentity['key']>('securities');
+  const [destinationKey, setDestinationKey] = useState<UsdWalletIdentity['key']>('crypto_spot');
+  const [openDropdown, setOpenDropdown] = useState<'source' | 'destination' | null>(null);
+  const sourceIdentity = USD_TRANSFER_WALLETS.find(wallet => wallet.key === sourceKey);
+  const destinationIdentity = USD_TRANSFER_WALLETS.find(wallet => wallet.key === destinationKey);
   const [amount, setAmount] = useState('');
-  const [review, setReview] = useState<TransferCommand | null>(null);
-  const [result, setResult] = useState<WalletTransferDto | WalletFxTransferDto | null>(null);
+  const [result, setResult] = useState<WalletTransferDto | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
-  const [requote, setRequote] = useState(false);
-  const [now, setNow] = useState(Date.now());
   const attempt = useRef<TransferCommand | null>(null);
-  const quoteLock = useRef(false);
-  useEffect(() => {
-    if (!review?.quote) return;
-    const timer = setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(timer);
-  }, [review]);
-  const expired = !!review?.quote && now > Date.parse(review.quote.expiresAt);
-  // Uncertain execute retries keep the quote/key beyond local expiry: server
-  // replay precedes expiry. Only an authoritative rejection permits requoting.
-  const needsRequote = requote || (expired && !review?.attempted);
-  const quoteMutation = useMutation({
-    retry: false,
-    mutationFn: (command: TransferCommand) => quoteTradingAccountWalletTransfer(command.accountId, {
-      sourceWalletId: command.body.sourceWalletId, destinationWalletId: command.body.destinationWalletId,
-      amount: command.body.amount,
-    }, command.currency),
-    onSuccess: (quote, command) => {
-      if (!isTransferResponseInScope(command, readScope())) return;
-      const ready = { ...command, quote };
-      attempt.current = ready; setReview(ready); setNow(Date.now()); setFailure(null); setRequote(false);
-    },
-    onError: (error, command) => {
-      if (isTransferResponseInScope(command, readScope())) setFailure(error);
-    },
-    onSettled: () => { quoteLock.current = false; },
+  const sourceIsFutures = sourceIdentity.scope === 'crypto_futures';
+  const futures = useQuery({
+    queryKey: QUERY_KEYS.tradingAccount.futuresCollateral(account.id),
+    queryFn: () => getTradingAccountFuturesCollateral(account.id),
+    enabled: sourceIsFutures && !result,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchInterval: sourceIsFutures && !result ? 5000 : false,
   });
   const mutation = useMutation({
     retry: false,
     mutationFn: async (command: TransferCommand) => {
-      command.attempted = true;
       try {
-        const data = command.crossCurrency
-          ? await executeTradingAccountWalletTransfer(command.accountId, command.quote, command.body.idempotencyKey)
-          : await transferTradingAccountWallets(command.accountId, command.body);
+        const data = await transferTradingAccountWallets(command.accountId, command.body);
         command.completed = true;
         return data;
       } finally { command.running = false; }
     },
     onSuccess: (data, command) => {
-      if (!data) return;
       // Money may have moved in A even after A→B→A. Refresh only request A.
-      void (command.crossCurrency
-        ? invalidateAfterWalletFxTransfer(queryClient, command.accountId, { seasonUi: command.seasonUi })
-        : invalidateAfterWalletTransfer(queryClient, command.accountId));
+      void invalidateAfterWalletTransfer(queryClient, command.accountId, { futuresCollateral: command.futuresCollateral });
       if (!isTransferResponseInScope(command, readScope())) return;
-      setResult(data); setFailure(null); setReview(null);
+      setResult(data); setFailure(null);
     },
     onError: (error, command) => {
-      // A transport/response error may follow a committed FX command.
-      void (command.crossCurrency
-        ? invalidateAfterWalletFxTransfer(queryClient, command.accountId, { seasonUi: command.seasonUi })
-        : queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tradingAccount.wallets(command.accountId) }));
-      if (!isTransferResponseInScope(command, readScope())) return;
-      setFailure(error);
-      const code = getApiErrorCode(error);
-      setRequote(command.crossCurrency && ['QUOTE_EXPIRED', 'QUOTE_NOT_ACTIVE', 'RATE_CHANGED_REQUOTE_REQUIRED'].includes(code ?? ''));
+      // A transport/response error may follow a committed command.
+      command.uncertain = error instanceof WalletTransferContractError || !getApiErrorInfo(error).hasResponse || (getApiErrorStatus(error) ?? 0) >= 500;
+      void invalidateAfterWalletTransfer(queryClient, command.accountId, { futuresCollateral: command.futuresCollateral });
+      if (isTransferResponseInScope(command, readScope())) setFailure(error);
     },
   });
   const integrity = findAccountIntegrityFailure([
     { section: '지갑', isError: wallets.isError, error: wallets.error, retry: () => void wallets.refetch() },
     { section: '이체', isError: !!failure, error: failure, retry: () => { setFailure(null); void wallets.refetch(); } },
   ]);
-  const source = getWalletByIdentity(wallets.data, sourceIdentity.scope, sourceIdentity.currency);
-  const destination = getWalletByIdentity(wallets.data, destinationIdentity.scope, destinationIdentity.currency);
-  const available = transferAvailableAmount(source);
+  const scopedWallets = wallets.data?.tradingAccountId === account.id ? wallets.data : undefined;
+  const source = getWalletByIdentity(scopedWallets, sourceIdentity.scope, 'USD');
+  const destination = getWalletByIdentity(scopedWallets, destinationIdentity.scope, 'USD');
+  const usdWallets = USD_TRANSFER_WALLETS.map(wallet => getWalletByIdentity(scopedWallets, wallet.scope, 'USD'));
+  const hasAllWallets = usdWallets.every(wallet => typeof wallet?.id === 'string' && !!wallet.id && wallet.currencyCode === 'USD') &&
+    new Set(usdWallets.map(wallet => wallet?.id)).size === USD_TRANSFER_WALLETS.length;
+  const available = sourceIsFutures
+    ? futures.isError || futures.isFetching ? null : futuresTransferAvailableAmount(futures.data, account.id, source)
+    : transferAvailableAmount(source);
   const canonicalAmount = parseTransferAmount(amount);
   const block = capabilities?.canExchange ? null : getCapabilityBlockMessage(capabilities, capabilities?.exchangeBlockReason) ?? '현재 계정에서는 이체할 수 없습니다.';
-  const hasAllWallets = TRANSFER_WALLETS.every(wallet => !!getWalletByIdentity(wallets.data, wallet.scope, wallet.currency)?.id);
-  const canReview = !block && !wallets.isError && hasAllWallets && ['same_currency', 'cross_currency'].includes(routeKind) && !!source?.id && !!destination?.id && transferAmountFits(canonicalAmount, available);
-  const executeCommand = (command: TransferCommand) => {
-    // Fence before React Query creates a mutation: a duplicate tap must not
-    // replace the pending observer and re-enable editing while money is moving.
-    if (command.running || command.completed || !isTransferResponseInScope(command, readScope())) return;
-    command.running = true;
+  const locked = mutation.isPending || !!attempt.current?.running;
+  const sameIntent = (command: TransferCommand | null): command is TransferCommand => !!command &&
+    isTransferResponseInScope(command, readScope()) && command.body.sourceWalletId === source?.id &&
+    command.body.destinationWalletId === destination?.id && command.body.amount === canonicalAmount;
+  // Reconcile an uncertain commit with the pinned key even if refreshed cash
+  // already reflects that debit. Unknown Futures collateral still fails closed.
+  const uncertainRetry = sameIntent(attempt.current) && !!attempt.current.uncertain;
+  const canExecute = !block && !wallets.isError && hasAllWallets && !!source?.id && !!destination?.id &&
+    source.id !== destination.id && !!canonicalAmount && available !== null &&
+    (transferAmountFits(canonicalAmount, available) || uncertainRetry);
+  const dismissAmount = () => {
+    amountInputRef.current?.blur();
+    inputScroll.onInputBlur();
+    Keyboard.dismiss();
+  };
+  const execute = () => {
+    if (!canExecute || !source?.id || !destination?.id || !canonicalAmount || mutation.isPending ||
+        attempt.current?.running || attempt.current?.completed || !isTransferResponseInScope(scope, readScope())) return;
+    const previous = attempt.current;
+    const command: TransferCommand = sameIntent(previous) ? previous : { ...scope,
+      futuresCollateral: sourceIsFutures || destinationIdentity.scope === 'crypto_futures',
+      body: { sourceWalletId: source.id, destinationWalletId: destination.id, amount: canonicalAmount, idempotencyKey: createIdempotencyKey('wallet-transfer') },
+    };
+    // Fence synchronously, before React Query updates the pending observer.
+    command.running = true; attempt.current = command;
+    dismissAmount(); setOpenDropdown(null); setFailure(null);
     mutation.mutate(command);
   };
-  const beginReview = (forceQuote = false) => {
-    if (!canReview || !source?.id || !destination?.id || !canonicalAmount || quoteLock.current) return;
-    const previous = forceQuote ? null : attempt.current;
-    const same = previous?.body.sourceWalletId === source.id && previous.body.destinationWalletId === destination.id && previous.body.amount === canonicalAmount;
-    const command: TransferCommand = same ? previous : { ...scope, currency: sourceIdentity.currency, crossCurrency: routeKind === 'cross_currency', seasonUi: capabilities?.isSeason ?? false, body: {
-      sourceWalletId: source.id, destinationWalletId: destination.id, amount: canonicalAmount, idempotencyKey: createIdempotencyKey('wallet-transfer'),
-    } };
-    attempt.current = command; setFailure(null); setRequote(false);
-    if (command.crossCurrency && (!command.quote || forceQuote)) {
-      quoteLock.current = true; setReview(null); quoteMutation.mutate(command);
-    } else setReview(command);
+  const toggleDropdown = (kind: 'source' | 'destination') => {
+    if (locked || attempt.current?.running) return;
+    dismissAmount();
+    setOpenDropdown(current => current === kind ? null : kind);
   };
-  const changeSource = (wallet: TransferWalletIdentity) => {
-    setSourceKey(wallet.key);
-    if (!['same_currency', 'cross_currency'].includes(transferRouteKind(wallet, destinationIdentity))) {
-      setDestinationKey(TRANSFER_WALLETS.find(value => ['same_currency', 'cross_currency'].includes(transferRouteKind(wallet, value))).key);
-    }
-    setFailure(null);
+  const chooseWallet = (kind: 'source' | 'destination', wallet: UsdWalletIdentity) => {
+    if (locked || attempt.current?.running || wallet.key === (kind === 'source' ? destinationKey : sourceKey)) return;
+    if (wallet.key !== (kind === 'source' ? sourceKey : destinationKey)) attempt.current = null;
+    if (kind === 'source') setSourceKey(wallet.key); else setDestinationKey(wallet.key);
+    setOpenDropdown(null); setFailure(null);
   };
-  const locked = !!review || quoteMutation.isPending;
-  const label = (wallet: TransferWalletIdentity) => `${WALLET_SCOPE_LABELS[wallet.scope]} ${wallet.currency}`;
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.screen}>
-      <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView testID="wallet-transfer-screen" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-          <AccountSwitcher />
-          <Text style={styles.account}>{getAccountDisplay(account).title}</Text>
-          <Text style={styles.notice}>USD 지갑 간 이체는 수수료가 없습니다. 원화와 암호화폐 USD 사이의 이체에는 환전 수수료가 적용됩니다.</Text>
-          {integrity ? <ErrorState title={ACCOUNT_INTEGRITY_TITLE} message={integrity.message} onRetry={integrity.retry} />
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.screen}>
+      <KeyboardAvoidingView style={styles.screen} keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView testID="wallet-transfer-screen" ref={inputScroll.scrollRef} onLayout={inputScroll.revealFocusedInput}
+          onContentSizeChange={inputScroll.revealFocusedInput} onScroll={inputScroll.onScroll} scrollEventThrottle={16}
+          keyboardShouldPersistTaps="handled" keyboardDismissMode="none" contentContainerStyle={styles.content}>
+          {result ? (
+            <View testID="wallet-transfer-success" style={styles.card} accessibilityLiveRegion="polite">
+              <Text style={styles.heading}>이체가 완료되었습니다.</Text>
+              <Text style={styles.body}>{WALLET_SCOPE_LABELS[result.source.walletScope]} USD → {WALLET_SCOPE_LABELS[result.destination.walletScope]} USD</Text>
+              <Text style={styles.money}>보낸 금액: USD {formatDisplayDecimal(result.amount)}</Text>
+              <Text style={styles.body}>보내는 지갑 잔액: USD {formatDisplayDecimal(result.source.balanceAfter)}</Text>
+              <Text style={styles.body}>받는 지갑 잔액: USD {formatDisplayDecimal(result.destination.balanceAfter)}</Text>
+              <CTAButton label="다른 이체하기" onPress={() => { setResult(null); setAmount(''); attempt.current = null; }} />
+            </View>
+          ) : integrity ? <ErrorState title={ACCOUNT_INTEGRITY_TITLE} message={integrity.message} onRetry={integrity.retry} />
             : wallets.isLoading ? <FullPageLoading message="지갑 잔액을 불러오는 중입니다." />
               : wallets.isError || !wallets.data ? <ErrorState title="지갑 잔액을 불러오지 못했습니다." onRetry={() => void wallets.refetch()} />
-                : !hasAllWallets || available === null ? <ErrorState title={ACCOUNT_INTEGRITY_TITLE} message="지갑 정보를 확인할 수 없어 이체를 중단했습니다." onRetry={() => void wallets.refetch()} />
-                  : result ? (
-                    <View testID="wallet-transfer-success" style={styles.card} accessibilityLiveRegion="polite">
-                      <Text style={styles.heading}>이체가 완료되었습니다.</Text>
-                      <Text style={styles.body}>{WALLET_SCOPE_LABELS[result.source.walletScope]} {'fx' in result ? result.source.currencyCode : 'USD'} → {WALLET_SCOPE_LABELS[result.destination.walletScope]} {'fx' in result ? result.destination.currencyCode : 'USD'}</Text>
-                      <Text style={styles.money}>보낸 금액: {'fx' in result ? `${result.source.currencyCode} ${formatDisplayDecimal(result.sourceAmount)}` : `USD ${formatDisplayDecimal(result.amount)}`}</Text>
-                      {'fx' in result ? <>
-                        <Text style={styles.body}>실제 적용 환율: 1 USD = {formatDisplayDecimal(result.fx.appliedRate)} KRW</Text>
-                        <Text style={styles.body}>실제 환전 수수료: {result.fx.feeCurrency} {formatDisplayDecimal(result.fx.feeAmount)}</Text>
-                        <Text testID="wallet-transfer-actual-received" style={styles.money}>실제 수령액: {result.destination.currencyCode} {formatDisplayDecimal(result.receivedAmount)}</Text>
-                      </> : null}
-                      <Text style={styles.body}>보내는 지갑 잔액: {'fx' in result ? result.source.currencyCode : 'USD'} {formatDisplayDecimal(result.source.balanceAfter)}</Text>
-                      <Text style={styles.body}>받는 지갑 잔액: {'fx' in result ? result.destination.currencyCode : 'USD'} {formatDisplayDecimal(result.destination.balanceAfter)}</Text>
-                      <CTAButton label="다른 이체하기" onPress={() => { setResult(null); setAmount(''); attempt.current = null; }} />
+                : !hasAllWallets || (!sourceIsFutures && available === null) ? <ErrorState title={ACCOUNT_INTEGRITY_TITLE} message="지갑 정보를 확인할 수 없어 이체를 중단했습니다." onRetry={() => void wallets.refetch()} />
+                  : <>
+                    {block ? <Text testID="wallet-transfer-blocked" style={styles.error}>{block}</Text> : null}
+                    <WalletSelector kind="source" selected={sourceIdentity} excludedKey={destinationKey} expanded={openDropdown === 'source'} disabled={locked} onToggle={() => toggleDropdown('source')} onSelect={wallet => chooseWallet('source', wallet)} />
+                    <WalletSelector kind="destination" selected={destinationIdentity} excludedKey={sourceKey} expanded={openDropdown === 'destination'} disabled={locked} onToggle={() => toggleDropdown('destination')} onSelect={wallet => chooseWallet('destination', wallet)} />
+                    <View style={styles.card}>
+                      <Text style={styles.heading}>이체 금액 (USD)</Text>
+                      <View ref={amountRef} collapsable={false}>
+                        <TextInput ref={amountInputRef} testID="wallet-transfer-amount" accessibilityLabel="이체 금액 USD" value={amount}
+                          onFocus={() => { setOpenDropdown(null); inputScroll.onInputFocus(amountRef.current); }} onBlur={inputScroll.onInputBlur}
+                          onChangeText={value => {
+                            if (locked || attempt.current?.running) return;
+                            if (parseTransferAmount(value) !== canonicalAmount) attempt.current = null;
+                            setAmount(value); setFailure(null);
+                          }}
+                          editable={!locked} keyboardType="decimal-pad" placeholder="0" style={styles.input} />
+                      </View>
+                      <Text testID="wallet-transfer-available" style={styles.money}>
+                        {available !== null ? '이체 가능 금액: USD ' + formatDisplayDecimal(available)
+                          : futures.isFetching ? '이체 가능 금액을 확인하고 있습니다.' : '현재 선물 지갑의 이체 가능 금액을 확인할 수 없습니다.'}
+                      </Text>
+                      {sourceIsFutures && available === null && !futures.isFetching ? <CTAButton label="이체 가능 금액 다시 확인" variant="neutral" state={locked ? 'disabled' : 'enabled'} onPress={() => void futures.refetch()} /> : null}
+                      {amount && !canonicalAmount ? <Text style={styles.error}>0보다 큰 금액을 소수점 8자리까지 입력해주세요.</Text>
+                        : canonicalAmount && available !== null && !transferAmountFits(canonicalAmount, available) && !uncertainRetry ? <Text style={styles.error}>이체 가능 금액을 초과했습니다.</Text> : null}
                     </View>
-                  ) : (
-                    <>
-                      {block ? <Text testID="wallet-transfer-blocked" style={styles.error}>{block}</Text> : null}
-                      <View style={styles.card}>
-                        <Text style={styles.heading}>보내는 지갑</Text>
-                        {TRANSFER_WALLETS.map(wallet => (
-                          <WalletOption key={wallet.key} wallet={wallet} selected={sourceKey === wallet.key} disabled={locked} kind="source" onPress={() => changeSource(wallet)} />
-                        ))}
-                        <Text testID="wallet-transfer-available" style={styles.money}>이체 가능 잔액: {sourceIdentity.currency} {formatDisplayDecimal(available)}</Text>
-                        <Text style={styles.notice}>지정가 주문에 예약된 금액은 이체할 수 없습니다.</Text>
-                      </View>
-                      <View style={styles.card}>
-                        <Text style={styles.heading}>받는 지갑</Text>
-                        {TRANSFER_WALLETS.map(wallet => (
-                          <WalletOption key={wallet.key} wallet={wallet} selected={destinationKey === wallet.key} disabled={locked || ['invalid', 'fx'].includes(transferRouteKind(sourceIdentity, wallet))} kind="destination" onPress={() => { setDestinationKey(wallet.key); setFailure(null); }} />
-                        ))}
-                      </View>
-                      <Text style={styles.notice}>증권 KRW ↔ USD 사이의 이동은 환전하기를 이용해주세요.</Text>
-                      <View style={styles.card}>
-                        <Text style={styles.heading}>보낼 금액 ({sourceIdentity.currency})</Text>
-                        <TextInput testID="wallet-transfer-amount" accessibilityLabel={`보낼 금액 ${sourceIdentity.currency}`} value={amount} onChangeText={value => { setAmount(value); setFailure(null); }} editable={!locked} keyboardType="decimal-pad" placeholder="0" style={styles.input} />
-                        {amount && !canonicalAmount ? <Text style={styles.error}>0보다 큰 금액을 소수점 8자리까지 입력해주세요.</Text> : canonicalAmount && !transferAmountFits(canonicalAmount, available) ? <Text style={styles.error}>이체 가능 잔액을 초과했습니다.</Text> : null}
-                      </View>
-                      {review ? (
-                        <View testID="wallet-transfer-summary" style={styles.card}>
-                          <Text style={styles.heading}>이체 내용을 확인해주세요.</Text>
-                          <Text style={styles.body}>{label(sourceIdentity)} → {label(destinationIdentity)}</Text>
-                          <Text style={styles.money}>{sourceIdentity.currency} {formatDisplayDecimal(review.body.amount)}</Text>
-                          {review.quote ? <>
-                            <Text style={styles.body}>적용 예정 환율: 1 USD = {formatDisplayDecimal(review.quote.appliedRate)} KRW</Text>
-                            <Text style={styles.body}>환전 수수료: {review.quote.feeCurrency} {formatDisplayDecimal(review.quote.feeAmount)}</Text>
-                            <Text testID="wallet-transfer-expected-received" style={styles.money}>예상 수령액: {review.quote.toCurrency} {formatDisplayDecimal(review.quote.netTargetAmount)}</Text>
-                            <Text style={styles.notice}>실행 직전 최신 환율로 계산합니다. 환전 수수료는 수령 통화에서 차감됩니다.</Text>
-                            <Text style={styles.notice}>{needsRequote ? '견적이 만료되었거나 새 견적이 필요합니다.' : `견적 유효 시간: ${Math.max(0, Math.ceil((Date.parse(review.quote.expiresAt) - now) / 1000))}초`}</Text>
-                          </> : <Text style={styles.notice}>수수료 0 · 총자산과 수익률은 변하지 않습니다.</Text>}
-                          {failure ? <Text testID="wallet-transfer-error" style={styles.error} accessibilityLiveRegion="polite">{transferErrorMessage(getApiErrorCode(failure))}</Text> : null}
-                          {needsRequote ? <CTAButton testID="wallet-transfer-requote" label="다시 견적 받기" state={block ? 'blocked' : 'enabled'} onPress={() => beginReview(true)} /> : <CTAButton testID="wallet-transfer-confirm" label={failure ? '같은 요청으로 다시 이체' : '이체하기'} state={mutation.isPending ? 'loading' : block ? 'blocked' : 'enabled'} onPress={() => executeCommand(review)} />}
-                          <CTAButton label="수정하기" variant="neutral" state={mutation.isPending ? 'disabled' : 'enabled'} onPress={() => { setReview(null); setFailure(null); }} />
-                        </View>
-                      ) : <>
-                        {failure ? <Text testID="wallet-transfer-error" style={styles.error} accessibilityLiveRegion="polite">{transferErrorMessage(getApiErrorCode(failure))}</Text> : null}
-                        <CTAButton testID="wallet-transfer-review" label="이체 내용 확인" state={quoteMutation.isPending ? 'loading' : canReview ? 'enabled' : 'disabled'} onPress={() => beginReview()} />
-                      </>}
-                      <Text style={styles.notice}>암호화폐 선물 지갑은 현재 자금 보관과 이체만 지원합니다.</Text>
-                    </>
-                  )}
+                    {failure ? <Text testID="wallet-transfer-error" style={styles.error} accessibilityLiveRegion="polite">{transferErrorMessage(getApiErrorCode(failure))}</Text> : null}
+                    <View ref={inputScroll.submitRef} collapsable={false}>
+                      <CTAButton testID="wallet-transfer-submit" label="이체하기" state={locked ? 'loading' : canExecute ? 'enabled' : 'disabled'} onPress={execute} />
+                    </View>
+                  </>}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-function WalletOption({ wallet, selected, disabled, kind, onPress }: { wallet: TransferWalletIdentity; selected: boolean; disabled: boolean; kind: string; onPress: () => void }) {
-  return <ActionPressable testID={`wallet-transfer-${kind}-${wallet.key}`} accessibilityRole="radio" accessibilityState={{ selected, disabled }} disabled={disabled} onPress={onPress} style={[styles.option, selected && styles.selected, disabled && styles.disabled]}>
-    <Text style={styles.body}>{WALLET_SCOPE_LABELS[wallet.scope]} {wallet.currency}{selected ? ' · 선택됨' : ''}</Text>
-  </ActionPressable>;
+function WalletSelector({ kind, selected, excludedKey, expanded, disabled, onToggle, onSelect }: {
+  kind: 'source' | 'destination';
+  selected: UsdWalletIdentity;
+  excludedKey: UsdWalletIdentity['key'];
+  expanded: boolean;
+  disabled: boolean;
+  onToggle: () => void;
+  onSelect: (wallet: UsdWalletIdentity) => void;
+}) {
+  const { colors } = useAppearance();
+  const title = kind === 'source' ? '보내는 지갑' : '받는 지갑';
+  return <View style={styles.card}>
+    <Text style={styles.heading}>{title}</Text>
+    <ActionPressable testID={'wallet-transfer-' + kind + '-selector'} accessibilityRole="button" accessibilityLabel={title + ': ' + walletLabel(selected)}
+      accessibilityState={{ expanded, disabled }} aria-expanded={expanded} disabled={disabled} onPress={onToggle} style={[styles.selector, disabled && styles.disabled]}>
+      <Text style={styles.selection}>{walletLabel(selected)}</Text>
+      <View accessible={false} style={[styles.indicator, expanded && styles.expandedIndicator]}>
+        <Svg width={16} height={16} viewBox="0 0 16 16"><Path d="M3 6h10l-5 5z" fill={colors.secondary} /></Svg>
+      </View>
+    </ActionPressable>
+    {expanded ? <View testID={'wallet-transfer-' + kind + '-options'} style={styles.options}>
+      {USD_TRANSFER_WALLETS.filter(wallet => wallet.key !== excludedKey).map(wallet => (
+        <ActionPressable key={wallet.key} testID={'wallet-transfer-' + kind + '-' + wallet.key} accessibilityRole="button"
+          accessibilityLabel={walletLabel(wallet) + ' 선택'} accessibilityState={{ selected: selected.key === wallet.key, disabled }}
+          disabled={disabled} onPress={() => onSelect(wallet)} style={[styles.option, selected.key === wallet.key && styles.selected]}>
+          <Text style={styles.body}>{walletLabel(wallet)}</Text>
+        </ActionPressable>
+      ))}
+    </View> : null}
+  </View>;
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: semantic.screen },
   content: getHeaderScreenContentStyle(Platform.OS),
-  account: { fontSize: 17, lineHeight: 26, fontWeight: '600' },
   card: { padding: 16, borderRadius: 14, borderWidth: 1, borderColor: semantic.border, backgroundColor: semantic.surface, gap: 12 },
   heading: { fontSize: 16, lineHeight: 25, fontWeight: '600' },
   body: { fontSize: 14, lineHeight: 22, flexShrink: 1 },
   money: { fontSize: 16, lineHeight: 25, fontVariant: ['tabular-nums'], flexShrink: 1 },
-  notice: { color: semantic.secondary, fontSize: 13, lineHeight: 21 },
   error: { color: semantic.warning, fontSize: 14, lineHeight: 23 },
-  option: { padding: 12, borderWidth: 1, borderColor: semantic.border, borderRadius: 10 },
+  selector: { minHeight: 52, padding: 12, borderWidth: 1, borderColor: semantic.border, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  selection: { fontSize: 16, lineHeight: 25, flex: 1, minWidth: 0, flexShrink: 1 },
+  indicator: { width: 20, alignItems: 'center', flexShrink: 0 },
+  expandedIndicator: { transform: [{ rotate: '180deg' }] },
+  options: { gap: 8 },
+  option: { minHeight: 48, padding: 12, borderWidth: 1, borderColor: semantic.border, borderRadius: 10, justifyContent: 'center' },
   selected: { borderColor: semantic.selected, backgroundColor: semantic.raised },
   disabled: { opacity: 0.5 },
-  input: { borderWidth: 1, borderColor: semantic.border, borderRadius: 10, padding: 12, fontSize: 18, minHeight: 48 },
+  input: { borderWidth: 1, borderColor: semantic.border, borderRadius: 10, padding: 12, fontSize: 18, minHeight: 52 },
 });

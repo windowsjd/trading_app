@@ -10,6 +10,25 @@
 
 ---
 
+## 2026-10-07 — Wallet 이체 UI: USD dropdown / 직접 실행 / focus scroll
+
+- 시작 branch `main`, HEAD와 fetch한 `origin/main`은
+  `e7d252831917804fa2e383ebf607b97e0a370243`, working tree는 clean이었다.
+- 이체 화면의 AccountSwitcher/계정명/KRW 복합 환전/사전 확인 UI를 제거했다.
+  USD 지갑 세 개만 inline dropdown으로 선택하고 한 번의 CTA로 실행한다.
+  공유 KRW identity, FX+Transfer API/parser와 Backend/DB 금융 계약은 유지했다.
+- 동일 canonical intent의 불확실한 응답은 기존 key로 재시도한다. 동기 실행
+  fence, pending 편집 잠금, account/epoch 응답 차단과 요청 계정 invalidation을 유지했다.
+- 선물 출금은 기존 `/futures/positions`의 account/wallet-scoped free collateral을
+  표시·검증한다. unknown/error에는 cash fallback 없이 차단하며 선물 입금은 독립적이다.
+- 기존 focus-scroll hook과 header offset을 연결했다. selector는 input blur와
+  keyboard dismiss 후 열리고 input focus는 dropdown을 닫는다.
+- 검증: frontend `npm run check`(137 test files), 관련 화면/금융/scroll tests,
+  Web/Android export, browser 194 반응형·테마 케이스와 실제 navigator 회귀 통과.
+  Android/iOS 실기기 keyboard, screen reader 검증은 NOT_RUN이다.
+- 세부 UI 계약: [frontend account switching](frontend/docs/trading-account-switching.md#usd-wallet-transfer).
+  branch 생성/전환, commit, push는 수행하지 않았다.
+
 ## 2026-10-07 — Crypto Futures F2: Cross / Mark / Maintenance / Automatic Full Liquidation
 
 ### 저장소 조사와 변경 범위

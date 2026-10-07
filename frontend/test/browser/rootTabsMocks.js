@@ -41,6 +41,7 @@ export const apiClient = {
     }
     if (path.endsWith('/wallet-transfers')) {
       transport.postRequests ??= []; transport.postRequests.push({ path, body });
+      if (transport.transferError) throw { response: { status: 409, data: { error: { code: transport.transferError, message: 'internal fixture text' } } } };
       const walletScope = id => id.endsWith(':usd') ? 'securities' : id.endsWith(':spot') ? 'crypto_spot' : 'crypto_futures';
       return response({ tradingAccountId: path.split('/')[2], transferId: 'fixture-transfer', currencyCode: 'USD', amount: body.amount, executedAt: new Date().toISOString(),
         source: { walletId: body.sourceWalletId, walletScope: walletScope(body.sourceWalletId), balanceAfter: '40.39000000', availableAfter: '20.39000000' },
@@ -50,6 +51,13 @@ export const apiClient = {
     return response({});
   },
   async get(path, config) {
+    if (path.endsWith('/futures/positions')) {
+      transport.requests.push(path);
+      const accountId = path.split('/')[2];
+      return response({ tradingAccountId: accountId, evaluatedAt: new Date().toISOString(),
+        collateral: { walletId: accountId + ':futures', currencyCode: 'USD', freeCollateral: params.has('riskUnavailable') ? null : long ? '1234567890100.12345678' : '25.00000000' },
+      });
+    }
     const url = new URL(path, 'https://fixture.invalid');
     const offset = Number(url.searchParams.get('offset') ?? 0);
     const limit = Number(url.searchParams.get('limit') ?? 20);

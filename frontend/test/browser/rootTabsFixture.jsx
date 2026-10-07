@@ -16,6 +16,7 @@ import My from '../../src/screens/my/MyScreen';
 import Settings from '../../src/screens/my/SettingsScreen';
 import ModeSelection from '../../src/screens/entry/ModeSelectionScreen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { HeaderHeightContext } from '@react-navigation/elements';
 import { navigation, transport } from './rootTabsMocks';
 
 const screens = { transfer: WalletTransfer, wallet: Wallet, home: Home, market: Market, search: Search, ranking: Ranking, record: Record, overall: Overall, guide: Guide, my: My, settings: Settings, mode: ModeSelection };
@@ -25,7 +26,7 @@ function App() {
   const appearance = useAppearance();
   const Screen = screens[screen];
   window.fixture = { client, navigation, transport, setScreen, appearance };
-  return <Screen navigation={navigation} route={{ params: {} }} />;
+  return <HeaderHeightContext.Provider value={64}><Screen navigation={navigation} route={{ params: {} }} /></HeaderHeightContext.Provider>;
 }
 createRoot(document.getElementById('root')).render(
   <SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: innerWidth, height: innerHeight }, insets: { top: 0, right: 0, bottom: 0, left: 0 } }}>
