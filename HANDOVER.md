@@ -10,6 +10,163 @@
 
 ---
 
+## 2026-10-07 — Crypto Futures F2: Cross / Mark / Maintenance / Automatic Full Liquidation
+
+### 저장소 조사와 변경 범위
+
+- 시작 시 `git fetch origin main`을 실행했다. branch는 `main`, HEAD와 origin/main은
+  `d743e266e18fa53e29660148e13f777123b56cea` (`티어작업2`), 시작 working tree는 clean이었다.
+  요청 기준 `2694c3aec96a4ddaddf276f407d9b3db19499048` 이후 실제 최신 코드/계약을 사용했다.
+  branch 생성/전환, commit, push, 운영 DB 변경, 배포, 사용자 Futures 활성화는 하지 않았다.
+- F1 Position/Execution/ExecuteRequest, canonical wallet/transfer/FX+Transfer, General/Season
+  lifecycle/financial integrity/lock hierarchy, Binance Spot evidence/selector, scheduler/OpsJobLock,
+  fee/Decimal/ledger, valuation 및 기존 PostgreSQL CI gate를 조사했다. F1 execution/PnL/margin
+  primitives를 재사용하고 cash settlement/fee/ledger primitive만 공통 helper로 추출했다.
+- current 계약: [Futures API](backend/docs/futures-api-contract.md),
+  [F2 risk](backend/docs/futures-risk-contract.md). API는 계속 `/api/v1`이다.
+  Frontend 소스, Spot/Stock selector 및 Portfolio/TWR/Ranking/Settlement 공식은 변경하지 않았다.
+
+### Margin과 risk 계산
+
+- `FuturesMarginMode.cross`를 additive하게 추가했다. 생략된 `marginMode`는 isolated이며
+  기존 F1 request hash를 보존한다. Cross는 명시적으로 선택하며 후속 요청도 mode를 명시한다.
+  One-way는 instrument별로 유지하고 mode/direction/1~100 정수 leverage는 lifetime 동안 고정한다.
+- collateral은 해당 account의 `crypto_futures/USD`뿐이다. Cross의 `isolatedMargin`은 0이며
+  별도 account aggregate column을 만들지 않았다. 현재 positions와 durable fresh marks로 계산한다.
+- `crossBaseCollateral = balance − reservedAmount − SUM(open Isolated allocated margin)`.
+  `crossEquity = crossBaseCollateral + SUM(Cross Mark UPNL)`.
+  `crossInitialMarginRequirement = SUM(ceil8(quantity × mark / leverage))`.
+  `crossFreeCollateral = crossEquity − crossInitialMarginRequirement`.
+- fixed MMR `0.005`; maintenance는 `ceil8(quantity × mark × 0.005)`이고 예상 close fee는
+  기존 execution과 같은 8자리 HALF_UP notional/fee 정책이다. General은
+  `GENERAL_TRADE_FEE_RATE`, Season은 잠근 `Season.tradeFeeRate`를 사용한다.
+  requirement = maintenance + normal close fee; liquidation penalty/tier/bracket은 없다.
+- Isolated equity = allocation + Mark UPNL. Equity <= requirement일 때 그 lifetime만 전량청산한다.
+  Long 청산가 = `(q × entry − margin) / (q × (1 − 0.005 − feeRate))`, Short는
+  `(q × entry + margin) / (q × (1 + 0.005 + feeRate))`. Long 올림/Short 내림 8자리 analytic
+  reference를 제공하고 cash rounding 경계에서는 Decimal equity 비교가 authoritative하다.
+  양의 Long threshold가 없으면 null이다. Cross에 가짜 position별 청산가는 제공하지 않는다.
+- Cross equity <= SUM(requirement)이면 account의 모든 열린 Cross를 한 transaction에서 종료한다.
+  Open/increase는 fee 반영 후 isolated allocation, Cross initial/free 및 maintenance를 동시에
+  검증한다. Isolated/Cross가 서로 같은 collateral을 중복 사용하는 것을 금지한다.
+
+### Mark provider와 가격 경계
+
+- Binance 공식 public 문서를 확인하고 REST/WS 실제 연결 smoke를 실행했다. API key/계정/주문
+  API는 사용하지 않는다. Primary `wss://fstream.binance.com/market/stream`에서
+  `<symbol>@markPrice@1s`, bootstrap/recovery `https://fapi.binance.com/fapi/v1/premiumIndex`다.
+  WS `E`/REST `time`이 effectiveAt, 수신 시각이 capturedAt이다. WS st=2(COIN-M)는 거부한다.
+- 독립 `FuturesMarkSnapshot`은 instrument/symbol/USD/USDM perpetual/source/가격/두 시각을
+  PostgreSQL에 저장한다. identity checks/trigger와 source+instrument+effectiveAt uniqueness로
+  잘못된 매핑/중복/변조를 거부한다. provider 시각순 선택으로 out-of-order를 처리한다.
+  Fresh WS 우선, fresh REST fallback이다. Spot `AssetPriceSnapshot`에는 Mark를 저장하지 않는다.
+- capturedAt와 effectiveAt 모두 미래가 아니고 age <= 5,000ms여야 한다. Redis/WS/in-memory는
+  금융 판단의 owner가 아니다. transaction은 lock 후 PostgreSQL evidence를 다시 읽으며
+  provider network I/O를 하지 않는다. User Market은 기존 canonical Binance Spot last trade,
+  liquidation은 trigger에 사용한 Mark snapshot 가격으로 synthetic full fill한다.
+- Missing/stale Mark는 open/increase 및 Cross outgoing transfer를 fail closed한다.
+  Reduce/close는 Mark 부재만으로 막지 않고 기존 fresh Spot execution 규칙을 적용한다.
+  Incoming transfer는 Mark 없이 가능하다. 읽기는 null risk와 명시적 freshness state를 반환한다.
+  자동청산은 stale 값을 사용하지 않으며 worker는 account/scope/error code를 OpsJobRun에 남긴다.
+- 같은 USDT symbol인 perpetual만 매핑한다. 없는 종목은 unavailable로 남긴다. 1000-token
+  symbol을 임의 변환하지 않는다. F3 활성화 전 대상 instrument coverage를 검증해야 한다.
+
+### Atomic liquidation, bankruptcy와 concurrency
+
+- `FuturesLiquidation` 하나에 여러 `FuturesLiquidationClose`를 연결한다. account/mode,
+  evaluation/execution time, collateral/equity/maintenance/fee requirement, wallet 전후,
+  full economic PnL/fee, 실제 settled PnL/fee/cash와 bankruptcyShortfall을 저장한다.
+  각 close는 lifetime/instrument/quantity/direction/Mark FK/가격/PnL/fee를 보존한다.
+- Isolated의 최대 debit은 그 allocation, Cross의 최대 debit은 reserved와 모든 Isolated
+  allocation을 제외한 pool이다. 경제적 PnL을 clamp하지 않는다. 현금 settlement만 그 한도에
+  맞추고 차액을 explicit shortfall로 남긴다. Wallet negative/다른 mode 담보 침범은 없다.
+  `settledCash = settledPnl − settledFee`,
+  `bankruptcyShortfall = settledCash − economicPnl + economicFee`다. 사용자 debt로 이월하지 않는다.
+  Cash quantum보다 작은 Mark notional에서도 강제 전량청산은 가능하다.
+- event/모든 Position close/close evidence/Wallet PnL·fee/ledger를 같은 PostgreSQL transaction에서
+  처리한다. ledger reference는 `futures_liquidation`; Cross 실제 cash settlement는 event에
+  귀속하며 position별 cash를 임의 배분하지 않는다. Insurance Fund/ADL subsystem은 없다.
+- General account FOR UPDATE 또는 Season→Account→Participant FOR SHARE 다음 Futures wallet
+  FOR UPDATE, open Position id 오름차순 FOR UPDATE다. 기존 user execution/Transfer/FX+Transfer의
+  wallet fence와 순서를 유지한다. Lock 뒤 lifecycle/current quantity/mode/latest fresh mark/risk를
+  재확인하므로 기다리는 중 회복했거나 이미 닫힌 position은 청산하지 않는다.
+- lifetime별 liquidation close UNIQUE가 durable idempotency다. 중복 worker/재시작/재시도는
+  같은 lifetime을 다시 settlement하지 못한다. User close와 liquidation 중 첫 valid commit만
+  effect를 남긴다. Redis lock이나 단순 scheduler candidate만 믿지 않는다.
+- Outgoing USD Transfer와 Futures USD→KRW FX+Transfer의 기존 공통 transaction seam에
+  post-debit Cross initial/maintenance 검증을 추가했다. Reserved/Isolated를 보호하며
+  Cross Mark 부재 시 거부한다. Cross가 있을 때 manual Isolated reduce도 released allocation을
+  넘는 손실/fee를 Cross cash로 보전하지 못한다.
+
+### 운영·읽기·lifecycle
+
+- `FUTURES_TRADING_MODE=ENABLED|REDUCE_ONLY|DISABLED`; mode 생략 시 기존 boolean에 대응한다.
+  기본 DISABLED, REDUCE_ONLY는 reduce/close만, DISABLED는 모든 새 사용자 mutation을 차단한다.
+  이미 committed된 idempotent 결과는 mode 변경 후에도 최초 결과를 replay한다.
+- `FUTURES_RISK_ENGINE_ENABLED`와 `FUTURES_MARK_INGESTION_ENABLED`는 별도 기본 false flag다.
+  ENABLED인데 둘 중 하나가 꺼져 있으면 startup validation 실패다. 명시적으로 risk가 켜져 있으면
+  REDUCE_ONLY/DISABLED에서도 자동청산한다. Risk false는 별도 운영 비상정지다.
+- 1초 interval, 50-account bounded keyset scan, 30초 OpsJobLock lease와 scope 사이 renewal을
+  사용한다. local overlap도 차단한다. 정상/실패 진단은 60초마다, 청산 발생은 즉시 durable run을
+  남긴다. 새 queue/event bus/conditional-order framework를 만들지 않았다.
+- General/Season 모두 기존 ownership/financial integrity를 검증한다. Forced reduction은
+  suspended/excluded에서도 가능하나 closed account, 미시작/종료/settled Season은 진단하고
+  건너뛴다. F2가 확정 결과를 뒤집지 않으며 Season end 최종 포지션 정산은 F3 책임이다.
+- GET positions는 Mark evidence, risk UPNL/MM/fee/buffer/Isolated liquidation price와
+  account Cross metrics/evaluation time을 추가한다. 기존 Spot reference 필드는 별도 의미로
+  유지한다. `freeCollateral`은 Cross Mark 부재 시 null이다. GET liquidations는 account ownership,
+  repeatable-read, 기존 실행 내역과 같은 limit 1~100/default20, offset <=1,000,000이며 mutation 없다.
+
+### Migration·검증·자체 검토
+
+- 새 migration `20261007210000_add_futures_cross_risk_liquidation`만 추가했다. 기존 migration은
+  전체 byte 비교에서 변경 0개다. F1 migration SHA-256은
+  `f9cad2a48e69a8f04a8632241e4024fed2202420ef4a9550014ef7a5ccc7f7e0`로 HEAD와 같다.
+  기존 Position/Wallet/Order 데이터를 rewrite하지 않았다. Prisma client는 schema에서 재생성했다.
+- Disposable PostgreSQL 16.15와 17.11에서 62개 migration 전체 적용, migrate status 정상,
+  schema diff 없음. Persistent/운영 DB에는 테스트 write를 하지 않았다. Redis도 별도 disposable
+  로컬 인스턴스를 사용했다. Public REST/WS smoke는 DB를 쓰지 않고 실제 payload를 확인했다.
+- Backend typecheck/build, account check-only lint, candle check-only lint/format 통과.
+  전체 unit 235 suites / 3,787 tests 통과(별도 DB opt-in 58 tests skip), E2E 2 suites / 393 tests 통과.
+  Financial PG gate 17 suites / 18 runner tests(F1/F2/Wallet/FX/Transfer/Orders/MVP) 통과.
+  Core PG gate 21 suites / 22 tests(account/ownership/Spot/TWR/ranking/lifecycle 등) 통과.
+  Frontend `npm run check`(typecheck/gated lint/137 tests)와 web export 통과; UI 변경 없음.
+- F2 runner는 78개 통합 시나리오로 General/Season, Long/Short, 1/37/100x, 정확한 threshold
+  위/같음/아래, 이익·손실 상쇄, 3 Cross atomic bankruptcy, mixed/reserved 보호, outgoing USD/FX,
+  modes/stale/replay/history/DB identity를 검증한다. 실제 PG lock wait에서 user close/reduce/
+  increase/transfer/Cross open/Isolated execution, duplicate worker, market recovery 및 역순 승자를
+  검증한다. event/position 1·2·3/close evidence/PnL debit/fee debit/positive credit/ledger 후 fault를
+  주입하여 전체 rollback을 확인한다. Provider disconnect/REST failure/worker lease failure는 unit과
+  durable stale-worker PG 사례로 검증한다. 기존 financial DB CI job에 F2 runner만 추가했다.
+- F1 lock-wait 시간 fixture는 고정 JS sleep 대신 DB clock으로 Spot freshness/Season 경계를
+  확인하도록 바꿨다. 기존 General closed-account fixture도 DB openedAt와 같은 clock을 쓴다.
+  테스트 중 기존 fee-pinning/input-policy 및 F2 preflight price 조회의 간헐적 실패가 있어 분리
+  재실행/진단을 했다. Spot 제품 가격 정책을 완화하지 않았으며 최종 financial gate는 통과했다.
+- 전체 tracked/untracked diff를 재검토했다. Spot source 분리, collateral/shortfall 보존식,
+  all-or-nothing Cross close, lock 순서, replay/mode, nullable read 의미, default OFF와 migration
+  보존을 확인했다. `git diff --check` 통과. 새 금융 subsystem은 Mark/risk/full-close 범위로 한정했다.
+- 미실행: remote GitHub Actions(미push), 운영 migration/deploy/사용자 enable, 장시간 live provider
+  soak/대규모 부하 시험. F3 TODO: UI와 Home/Portfolio/TWR/Equity/Daily/Season return/Ranking/
+  Settlement UPNL 통합, 종료 Season 최종 정산, instrument Mark coverage 및 운영 준비 확인.
+  Stop Loss/Take Profit/OCO/trailing/Futures limit/funding/hedge/partial liquidation/ADL/insurance는
+  구현하지 않았다. **F3 완료 전 user-facing Futures 활성화 금지**다.
+
+### 변경 파일 지도
+
+- `backend/src/futures/`: 기존 input/math/config/collateral/service/controller/module/presenter 확장;
+  새 `futures-risk.ts`, `futures-mark.ts`, `futures-settlement.ts`,
+  `futures-mark-ingestion.service.ts`, `futures-liquidation.service.ts`, `futures-risk-worker.service.ts`.
+- Tests: 기존 `futures-policy.spec.ts`; 새 `futures-risk.spec.ts`, `futures-mark.spec.ts`,
+  `futures-mark-ingestion.spec.ts`, `futures-risk-worker.spec.ts`, `futures-risk.integration.spec.ts`;
+  `backend/scripts/futures-integration.ts`, `backend/scripts/futures-risk-integration.ts`,
+  `backend/src/orders/general-account-trading.integration.spec.ts`, `backend/test/app.e2e-spec.ts`.
+- Schema/ops: `backend/prisma/schema.prisma`, 위 새 migration, `backend/src/generated/prisma/**`,
+  `backend/src/common/env-validation.ts`, `backend/src/ops/ops-config.ts`, `.github/workflows/ci.yml`.
+- Docs/config: `HANDOVER.md`, `backend/.env.example`, `backend/README.md`, `backend/docs/README.md`,
+  `futures-api-contract.md`, 새 `futures-risk-contract.md`, `policy-decisions.md`, `codex-rulepack.md`,
+  `wallets-api-contract.md`, `wallet-transfers-api-contract.md`, `trading-account-finance-api-contract.md`,
+  `trading-modes-and-accounts.md`, `assets-api-contract.md`.
+
 ## 2026-10-07 — Crypto Futures F1: synthetic USD perpetual Market / One-way / Isolated
 
 ### 저장소 조사 및 작업 경계

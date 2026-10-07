@@ -15,7 +15,7 @@
   Both validate the complete canonical set without read-side creation. Crypto USD
   containers are provisioned with zero balance/reserved and count in valuation;
   new Crypto Spot orders use `crypto_spot/USD`, stocks and FX use Securities.
-  Same-account USD internal transfers are supported; Futures F1 collateral policy is
+  Same-account USD internal transfers are supported; Futures F1/F2 collateral policy is
   [separate and default OFF](futures-api-contract.md).
   Existing order/Quote provenance remains Securities. Explicit Securities KRW
   ↔ Crypto Spot/Futures USD transfers use one atomic FX+Transfer command with

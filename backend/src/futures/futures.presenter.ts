@@ -85,7 +85,7 @@ export type FuturesExecuteResult = {
       currencyCode: 'USD';
       balanceAmount: string;
       totalMarginUsed: string;
-      freeCollateral: string;
+      freeCollateral: string | null;
     };
   };
 };

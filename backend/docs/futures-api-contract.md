@@ -1,11 +1,13 @@
-# Crypto Futures F1 contract
+# Crypto Futures contract (F1 execution + F2 risk)
 
-F1 is a development-only USD-settled synthetic perpetual, with Market full fills,
-LONG/SHORT, One-way Position Mode, and Isolated Margin only. The default
-`FUTURES_TRADING_ENABLED=false` rejects every new financial mutation, including
-reductions and closes. Committed commands still replay after flag/lifecycle
-changes. Do not enable this for users or production before F2 liquidation and F3
-portfolio integration. Reads and existing Spot/Stock/FX/Transfer work with it OFF.
+Development-only USD-settled synthetic perpetuals support Market full fills,
+LONG/SHORT, One-way, Isolated and Cross, with integer leverage 1–100. The
+[F2 risk contract](futures-risk-contract.md) defines fixed 0.5% maintenance,
+Mark pricing, automatic full liquidation and bankruptcy evidence.
+`FUTURES_TRADING_MODE` defaults DISABLED (legacy boolean supported); REDUCE_ONLY
+allows reduce/close; ENABLED allows all four commands only with configured ingestion
+and risk engine. Committed commands replay across mode/lifecycle changes.
+Do not enable user-facing Futures before F3 valuation/settlement integration.
 
 ## Identity and API
 
@@ -24,7 +26,8 @@ All routes are authenticated and account scoped under
 | GET `/instruments` | Available instrument identity and underlying metadata |
 | POST `/execute` | A single idempotent Market command; no Spot quote/order lifecycle |
 | GET `/positions` | Open positions and collateral risk foundation |
-| GET `/executions?limit=20&offset=0` | Durable history, newest first; limit 1–100 |
+| GET `/executions?limit=20&offset=0` | User Market execution history, newest first; limit 1–100 |
+| GET `/liquidations?limit=20&offset=0` | System liquidation events with all closes/Mark evidence; same bounds |
 
 Execute body: `instrumentId`, `operation` (`open`, `increase`, `reduce`, `close`),
 `direction` (`long`, `short`), `quantity` (positive decimal string, up to 8 places),
@@ -32,11 +35,14 @@ Execute body: `instrumentId`, `operation` (`open`, `increase`, `reduce`, `close`
 `positionId` is forbidden for open and required for all other operations to pin
 the intended position lifetime. Close quantity must equal the current quantity.
 Reduce of the entire current quantity records operation `close` in history.
-Client price/rate/fee/margin/order-type/margin-mode fields are not accepted.
+`marginMode` is optional: omitted or `isolated` retains F1 semantics; `cross` opts
+into Cross. Every subsequent command must identify the same margin mode (omission
+means isolated). Mode cannot change before full close. Client price/rate/fee/margin/
+order-type fields are not accepted.
 Money/quantity/price/PnL values are strings; timestamps are UTC ISO strings.
 
 Flat permits long or short open. An open position permits same-direction,
-same-leverage increase and explicit reduce/close. Another open, opposite direction,
+same-leverage, same-margin-mode increase and explicit reduce/close. Another open, opposite direction,
 excess reduction, decimal leverage, or leverage change is rejected. No auto-flip.
 Leverage is every natural number from 1 through 100, never a preset enum. Full
 close retains a closed lifetime row and its cumulative realized PnL; reopening
@@ -56,14 +62,19 @@ never releases previously allocated margin. Partial reduce retains the proportio
 of margin and entry-notional basis for the remaining quantity, rounded UP; full
 close sets both to zero. This conservative rounding prevents a cash quantum of
 over-allocation or excess release. Financial range overflow/tiny rounded-zero
-notional is rejected before writes.
+user notional is rejected before writes. Forced full close still settles when
+Mark notional rounds to zero, preserving economic PnL and bankruptcy evidence.
 
 `crypto_futures/USD.balanceAmount` is all owned collateral cash. Initial isolated
 margin does **not** debit that cash and is **not** `CashWallet.reservedAmount`.
 `totalMarginUsed = SUM(open FuturesPosition.isolatedMargin)`; no account aggregate
-column or separate margin wallet exists. Spendable free collateral is wallet cash
-minus existing cash reservations minus total margin. Open/increase checks cash
-after the actual fee debit against all remaining margin and cash reservations.
+column or separate margin wallet exists. For Isolated-only accounts, free collateral is wallet cash minus reservations
+and isolated allocations. Cross stores zero isolated allocation: its current Mark
+initial requirement is computed from positions rather than persisted in a total.
+Cross free collateral includes Mark UPNL and excludes all isolated allocations;
+see the risk contract. Open/increase validates the post-fee whole account plus the
+new/increased isolated maintenance threshold. Cross outgoing transfers also protect
+initial and maintenance requirements; missing marks fail closed.
 
 LONG PnL is `(exit - averageEntry) * closedQty`; SHORT PnL is
 `(averageEntry - exit) * closedQty`. Reduce/close settles realized PnL as an actual
@@ -75,8 +86,9 @@ evidence returns null reference/PnL. It is never written to cash.
 
 If loss plus fee cannot leave nonnegative cash covering remaining isolated margin
 and reservations, return `FUTURES_LIQUIDATION_REQUIRED` and roll back everything.
-Do not clamp loss, delete the position, or commit negative collateral. F2 must
-handle this state. Shared `transferInTransaction` checks Futures source free
+Do not clamp loss, delete the position, or commit negative collateral. The separate F2 system liquidation handles this state using fresh Mark evidence.
+When Cross exists, a user Isolated reduction also cannot settle a loss/fee beyond
+its released isolated allocation by spending Cross collateral. Shared `transferInTransaction` checks Futures source free
 collateral, protecting both outgoing USD Transfer and Futures USD→Securities KRW
 FX+Transfer; incoming funds remain allowed even with the trading flag OFF.
 Wallet API `availableAmount`/Transfer `availableAfter` retain their existing
@@ -90,13 +102,13 @@ are the synthetic execution/reference price. This is **not Mark Price**.
 Reuse `AssetPriceSnapshot` and the current Crypto execution provider-only source
 selector/freshness policy (10s capturedAt threshold, no future effective/captured
 timestamps). Fresh durable DB evidence gives one full fill; stale/missing/wrong
-asset/source/currency evidence rejects. No new ingestion, Redis/cache pricing,
+asset/source/currency evidence rejects. User execution introduces no new ingestion or Redis/cache pricing,
 partial fills, spread/slippage, exchange matching, or provider I/O inside locks.
 Preflight reads DB evidence; transaction reselects/validates after wallet/position
 locks against `clock_timestamp()`, so lock wait cannot hide staleness.
 
 `FuturesExecution` records position lifetime, account/instrument, operation,
-direction, quantity, leverage, isolated mode, execution price, snapshot FK,
+direction, quantity, leverage, margin mode, execution price, snapshot FK,
 copied source/effectiveAt/capturedAt, notional, fee rate/amount, realized PnL,
 post-position state and executedAt. History never infers prior operations from
 the current position. Fee/PnL ledger rows reference `futures_execution`.
@@ -128,13 +140,35 @@ does not change assets, wallets or the trading flag. Deployment order is additiv
 `prisma migrate deploy` → new server/generated client → explicit provisioning;
 keep the mutation flag OFF. Financial API reads never provision or repair rows.
 
+## F2 risk reads and durable system history
+
+Positions retain F1 `referencePrice`, `referencePriceEvidence` and `unrealizedPnl`
+for the explicitly Spot-based synthetic reference estimate. `markPrice`,
+`markEvidence` and `markState` identify the separate risk source. `risk` contains
+Mark-based `unrealizedPnl`, initial requirement, maintenance, estimated fee,
+liquidation requirement, isolated equity/buffer and isolated liquidation price.
+Cross exposes account-level `cross.metrics` (base, UPNL, equity, initial/maintenance,
+free collateral and buffer), position IDs and evaluation time. Missing/stale marks
+produce null risk metrics and `unavailable_or_stale`, never last-known liquidation.
+`collateral.freeCollateral` is nullable when Cross marks are unavailable, including
+successful risk-reducing execute responses. Cross position `risk` omits isolated
+equity/buffer and never reports a per-position liquidation price.
+
+System history contains event-level economic PnL/due fee, actual settled PnL/fee,
+net signed cash delta, shortfall, pre/post wallet balances, collateral/equity and
+requirements. Each event contains lifetime-unique position closes with direction,
+quantity, execution Mark FK and price, requirement components and economic PnL/fee.
+Cross cash settlement is deliberately attributed to the shared event, not arbitrarily
+allocated among its positions. Fee/PnL ledger references `futures_liquidation`.
+GET is ownership-scoped, read-only and repeatable-read; offset max is 1,000,000.
+
 ## Deferred work
 
-No Cross Margin, Maintenance Margin, liquidation engine/threshold/price, dated/
-inverse/coin-margin/options, funding, Hedge Mode, ADL, insurance, partial liquidation,
-limit orders, Binance brackets/tiers, or mark/index ingestion. F2 owns Cross,
-Maintenance Margin, liquidation and price policy. F3 owns Futures UI and coherent
-Home/Portfolio/TWR/Equity/Daily/Season return/Ranking/Settlement valuation. F1
-does not change those valuation formulas or snapshot writers; realized cash/fees
-naturally affect existing cash valuation. Development Season positions must be
-closed before lifecycle end; F1 adds no settlement cleanup or liquidation.
+No dated/inverse/coin-margin/options, funding, Hedge Mode, ADL, insurance, partial
+liquidation, futures limit orders, conditional orders (SL/TP/OCO/trailing), or
+Binance brackets/risk tiers. F3 owns Futures UI and coherent
+Home/Portfolio/TWR/Equity/Daily/Season return/Ranking/Settlement valuation.
+Open Futures UPNL remains excluded from those surfaces; settled cash/fees naturally
+affect existing cash valuation. At ended/settled Season boundaries F2 diagnoses
+and skips forced liquidation to preserve lifecycle/final-results integrity; F3
+must implement the final open-position settlement policy before user activation.

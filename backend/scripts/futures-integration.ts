@@ -16,15 +16,22 @@ import { GeneralAccountPerformanceService } from '../src/portfolio/general-accou
 import { GeneralExternalFundingService } from '../src/portfolio/general-external-funding.service';
 import { PortfolioValuationService } from '../src/portfolio/portfolio-valuation.service';
 import { FuturesService } from '../src/futures/futures.service';
-import { futuresDecimal } from '../src/futures/futures-math';
-import type { FuturesExecuteBody } from '../src/futures/futures-input';
+import {
+  planFuturesExecution,
+  futuresDecimal,
+} from '../src/futures/futures-math';
+import {
+  parseFuturesCommand,
+  type FuturesExecuteBody,
+} from '../src/futures/futures-input';
 import { TradingAccountWalletTransferService } from '../src/wallets/trading-account-wallet-transfer.service';
 import { TradingAccountWalletFxTransferService } from '../src/wallets/trading-account-wallet-fx-transfer.service';
 import { FxService } from '../src/fx/fx.service';
 
 if (
   process.env.NODE_ENV !== 'test' ||
-  process.env.FUTURES_DB_INTEGRATION !== '1'
+  (process.env.FUTURES_DB_INTEGRATION !== '1' &&
+    process.env.FUTURES_RISK_DB_INTEGRATION !== '1')
 )
   throw new Error('Explicit test DB opt-in is required.');
 process.env.GENERAL_TRADE_FEE_RATE = '0.001000';
@@ -173,7 +180,7 @@ async function fixture(mode: TradingAccountMode, cash = '10000') {
 async function newInstrument() {
   const asset = await db.asset.create({
     data: {
-      symbol: `F1${randomUUID().replaceAll('-', '').slice(0, 12)}`,
+      symbol: `F1${randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}USDT`,
       name: 'F1 fixture',
       market: 'BINANCE',
       assetType: 'crypto',
@@ -229,11 +236,60 @@ function openBody(s: Scenario, patch: FuturesExecuteBody = {}) {
     ...patch,
   };
 }
-const execute = (
+const execute = async (
   s: Scenario,
   body: FuturesExecuteBody,
   service = app.futures,
-) => service.execute(s.userId, s.accountId, body);
+) => {
+  // F1 exercises Spot execution. F2 risk evidence is independently kept healthy
+  // at the planned entry basis; adverse/stale marks are covered by the F2 suite.
+  if (['open', 'increase'].includes(String(body.operation))) {
+    const row = s.instruments.find(
+      (r) => r.instrument.id === body.instrumentId,
+    );
+    const price =
+      row &&
+      (await db.assetPriceSnapshot.findFirst({
+        where: { assetId: row.asset.id },
+        orderBy: { capturedAt: 'desc' },
+      }));
+    if (row && price) {
+      const current = await db.futuresPosition.findFirst({
+        where: {
+          tradingAccountId: s.accountId,
+          instrumentId: row.instrument.id,
+          status: 'open',
+        },
+      });
+      let mark = price.price;
+      try {
+        mark = planFuturesExecution(
+          parseFuturesCommand(body),
+          current,
+          price.price,
+          d('0.001'),
+        ).averageEntryPrice;
+      } catch {
+        /* Invalid command still reaches the product guard. */
+      }
+      const clock = await now();
+      await db.futuresMarkSnapshot.createMany({
+        data: [
+          {
+            instrumentId: row.instrument.id,
+            symbol: row.asset.symbol,
+            source: 'binance_usdm_mark_ws',
+            price: mark,
+            effectiveAt: clock,
+            capturedAt: clock,
+          },
+        ],
+        skipDuplicates: true,
+      });
+    }
+  }
+  return service.execute(s.userId, s.accountId, body);
+};
 async function positionBody(
   s: Scenario,
   operation: 'increase' | 'reduce' | 'close',
@@ -277,6 +333,14 @@ async function state(s: Scenario) {
         orderBy: { id: 'asc' },
       }),
       executions: await db.futuresExecution.findMany({
+        where,
+        orderBy: { id: 'asc' },
+      }),
+      liquidations: await db.futuresLiquidation.findMany({
+        where,
+        orderBy: { id: 'asc' },
+      }),
+      liquidationCloses: await db.futuresLiquidationClose.findMany({
         where,
         orderBy: { id: 'asc' },
       }),
@@ -349,6 +413,8 @@ async function cleanup(s: Scenario) {
   await db.futuresExecuteRequest.deleteMany({ where });
   await db.walletTransaction.deleteMany({ where });
   await db.futuresExecution.deleteMany({ where });
+  await db.futuresLiquidationClose.deleteMany({ where });
+  await db.futuresLiquidation.deleteMany({ where });
   await db.futuresPosition.deleteMany({ where });
   await db.walletTransferExecuteRequest.deleteMany({ where });
   await db.walletTransferQuote.deleteMany({ where: { quote: where } });
@@ -362,6 +428,9 @@ async function cleanup(s: Scenario) {
   await db.tradingAccount.delete({ where: { id: s.accountId } });
   if (s.season) await db.season.delete({ where: { id: s.season.id } });
   for (const row of s.instruments) {
+    await db.futuresMarkSnapshot.deleteMany({
+      where: { instrumentId: row.instrument.id },
+    });
     await db.futuresInstrument.delete({ where: { id: row.instrument.id } });
     await db.assetPriceSnapshot.deleteMany({
       where: { assetId: row.asset.id },
@@ -585,7 +654,16 @@ async function marginAndFlags(mode: TradingAccountMode) {
       where: { id: s.futuresWalletId },
       data: { balanceAmount: '0.00000001' },
     });
-    await execute(s, openBody(s, { leverage: 100, quantity: '0.00000001' }));
+    await reject(
+      execute(s, openBody(s, { leverage: 100, quantity: '0.00000001' })),
+      'FUTURES_MAINTENANCE_UNSAFE',
+    );
+    // F2 rounds maintenance up: allocate two cash quanta to remain above it.
+    await db.cashWallet.update({
+      where: { id: s.futuresWalletId },
+      data: { balanceAmount: '0.00000002' },
+    });
+    await execute(s, openBody(s, { leverage: 50, quantity: '0.00000001' }));
     assert.equal(
       (await app.futures.positions(s.userId, s.accountId)).data.collateral
         .freeCollateral,
@@ -1045,6 +1123,14 @@ async function races(mode: TradingAccountMode) {
       assert.equal(
         success,
         ['duplicate', 'increase', 'increase-reduce'].includes(kind) ? 2 : 1,
+        JSON.stringify({
+          kind,
+          outcomes: result.map((r) =>
+            r.status === 'rejected'
+              ? { code: code(r.reason), message: String(r.reason) }
+              : 'fulfilled',
+          ),
+        }),
       );
       if (kind === 'duplicate')
         assert.deepEqual(
@@ -1127,7 +1213,29 @@ async function walletWait(
       await delay(10);
     }
     if (boundary === 'flag') process.env.FUTURES_TRADING_ENABLED = 'false';
-    else await delay(2300);
+    else {
+      // Wait for the authoritative DB boundary, not a JS timer assumption.
+      const boundaryAt =
+        boundary === 'season'
+          ? (await db.season.findUniqueOrThrow({ where: { id: s.season!.id } }))
+              .endAt
+          : new Date(
+              (
+                await db.assetPriceSnapshot.findFirstOrThrow({
+                  where: { assetId: s.instruments[0].asset.id },
+                  orderBy: { capturedAt: 'desc' },
+                })
+              ).capturedAt.getTime() + 11001,
+            );
+      const started = Date.now();
+      while (
+        (await blocker.query('SELECT clock_timestamp() AS now')).rows[0].now <
+        boundaryAt
+      ) {
+        assert.ok(Date.now() - started < 10000, 'DB boundary did not advance');
+        await delay(25);
+      }
+    }
     await blocker.query('COMMIT');
     await reject(
       pending,
@@ -1248,14 +1356,34 @@ async function main() {
     `futures F1 db integration ok (${checks} financial/guard/race/rollback checks)`,
   );
 }
-main()
-  .catch((error: unknown) => {
-    console.error(error);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await db.fxRateSnapshot.deleteMany({
-      where: { id: { in: fxEvidenceIds } },
+export {
+  fxEvidenceIds,
+  db,
+  app,
+  services,
+  now,
+  fixture,
+  newInstrument,
+  price,
+  fxEvidence,
+  openBody,
+  positionBody,
+  reject,
+  state,
+  invariant,
+  cleanup,
+  code,
+};
+export type { Scenario };
+if (process.argv[1]?.endsWith('futures-integration.ts'))
+  main()
+    .catch((error: unknown) => {
+      console.error(error);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await db.fxRateSnapshot.deleteMany({
+        where: { id: { in: fxEvidenceIds } },
+      });
+      await db.$disconnect();
     });
-    await db.$disconnect();
-  });

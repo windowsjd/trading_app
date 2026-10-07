@@ -423,7 +423,10 @@ export const ModelName = {
   BatchJobRun: 'BatchJobRun',
   OpsJobRun: 'OpsJobRun',
   OpsJobLock: 'OpsJobLock',
-  LimitOrderCandleEvidence: 'LimitOrderCandleEvidence'
+  LimitOrderCandleEvidence: 'LimitOrderCandleEvidence',
+  FuturesMarkSnapshot: 'FuturesMarkSnapshot',
+  FuturesLiquidation: 'FuturesLiquidation',
+  FuturesLiquidationClose: 'FuturesLiquidationClose'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -439,7 +442,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "position" | "order" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence"
+    modelProps: "user" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "position" | "order" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -3403,6 +3406,228 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    FuturesMarkSnapshot: {
+      payload: Prisma.$FuturesMarkSnapshotPayload<ExtArgs>
+      fields: Prisma.FuturesMarkSnapshotFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FuturesMarkSnapshotFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarkSnapshotPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FuturesMarkSnapshotFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarkSnapshotPayload>
+        }
+        findFirst: {
+          args: Prisma.FuturesMarkSnapshotFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarkSnapshotPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FuturesMarkSnapshotFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarkSnapshotPayload>
+        }
+        findMany: {
+          args: Prisma.FuturesMarkSnapshotFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarkSnapshotPayload>[]
+        }
+        create: {
+          args: Prisma.FuturesMarkSnapshotCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarkSnapshotPayload>
+        }
+        createMany: {
+          args: Prisma.FuturesMarkSnapshotCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FuturesMarkSnapshotCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarkSnapshotPayload>[]
+        }
+        delete: {
+          args: Prisma.FuturesMarkSnapshotDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarkSnapshotPayload>
+        }
+        update: {
+          args: Prisma.FuturesMarkSnapshotUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarkSnapshotPayload>
+        }
+        deleteMany: {
+          args: Prisma.FuturesMarkSnapshotDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FuturesMarkSnapshotUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FuturesMarkSnapshotUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarkSnapshotPayload>[]
+        }
+        upsert: {
+          args: Prisma.FuturesMarkSnapshotUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarkSnapshotPayload>
+        }
+        aggregate: {
+          args: Prisma.FuturesMarkSnapshotAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFuturesMarkSnapshot>
+        }
+        groupBy: {
+          args: Prisma.FuturesMarkSnapshotGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesMarkSnapshotGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FuturesMarkSnapshotCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesMarkSnapshotCountAggregateOutputType> | number
+        }
+      }
+    }
+    FuturesLiquidation: {
+      payload: Prisma.$FuturesLiquidationPayload<ExtArgs>
+      fields: Prisma.FuturesLiquidationFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FuturesLiquidationFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FuturesLiquidationFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationPayload>
+        }
+        findFirst: {
+          args: Prisma.FuturesLiquidationFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FuturesLiquidationFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationPayload>
+        }
+        findMany: {
+          args: Prisma.FuturesLiquidationFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationPayload>[]
+        }
+        create: {
+          args: Prisma.FuturesLiquidationCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationPayload>
+        }
+        createMany: {
+          args: Prisma.FuturesLiquidationCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FuturesLiquidationCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationPayload>[]
+        }
+        delete: {
+          args: Prisma.FuturesLiquidationDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationPayload>
+        }
+        update: {
+          args: Prisma.FuturesLiquidationUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationPayload>
+        }
+        deleteMany: {
+          args: Prisma.FuturesLiquidationDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FuturesLiquidationUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FuturesLiquidationUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationPayload>[]
+        }
+        upsert: {
+          args: Prisma.FuturesLiquidationUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationPayload>
+        }
+        aggregate: {
+          args: Prisma.FuturesLiquidationAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFuturesLiquidation>
+        }
+        groupBy: {
+          args: Prisma.FuturesLiquidationGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesLiquidationGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FuturesLiquidationCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesLiquidationCountAggregateOutputType> | number
+        }
+      }
+    }
+    FuturesLiquidationClose: {
+      payload: Prisma.$FuturesLiquidationClosePayload<ExtArgs>
+      fields: Prisma.FuturesLiquidationCloseFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FuturesLiquidationCloseFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationClosePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FuturesLiquidationCloseFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationClosePayload>
+        }
+        findFirst: {
+          args: Prisma.FuturesLiquidationCloseFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationClosePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FuturesLiquidationCloseFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationClosePayload>
+        }
+        findMany: {
+          args: Prisma.FuturesLiquidationCloseFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationClosePayload>[]
+        }
+        create: {
+          args: Prisma.FuturesLiquidationCloseCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationClosePayload>
+        }
+        createMany: {
+          args: Prisma.FuturesLiquidationCloseCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FuturesLiquidationCloseCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationClosePayload>[]
+        }
+        delete: {
+          args: Prisma.FuturesLiquidationCloseDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationClosePayload>
+        }
+        update: {
+          args: Prisma.FuturesLiquidationCloseUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationClosePayload>
+        }
+        deleteMany: {
+          args: Prisma.FuturesLiquidationCloseDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FuturesLiquidationCloseUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FuturesLiquidationCloseUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationClosePayload>[]
+        }
+        upsert: {
+          args: Prisma.FuturesLiquidationCloseUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLiquidationClosePayload>
+        }
+        aggregate: {
+          args: Prisma.FuturesLiquidationCloseAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFuturesLiquidationClose>
+        }
+        groupBy: {
+          args: Prisma.FuturesLiquidationCloseGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesLiquidationCloseGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FuturesLiquidationCloseCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesLiquidationCloseCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -4263,6 +4488,65 @@ export const LimitOrderCandleEvidenceScalarFieldEnum = {
 export type LimitOrderCandleEvidenceScalarFieldEnum = (typeof LimitOrderCandleEvidenceScalarFieldEnum)[keyof typeof LimitOrderCandleEvidenceScalarFieldEnum]
 
 
+export const FuturesMarkSnapshotScalarFieldEnum = {
+  id: 'id',
+  instrumentId: 'instrumentId',
+  symbol: 'symbol',
+  providerProduct: 'providerProduct',
+  currencyCode: 'currencyCode',
+  source: 'source',
+  price: 'price',
+  effectiveAt: 'effectiveAt',
+  capturedAt: 'capturedAt'
+} as const
+
+export type FuturesMarkSnapshotScalarFieldEnum = (typeof FuturesMarkSnapshotScalarFieldEnum)[keyof typeof FuturesMarkSnapshotScalarFieldEnum]
+
+
+export const FuturesLiquidationScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  marginMode: 'marginMode',
+  evaluationAt: 'evaluationAt',
+  collateralAvailable: 'collateralAvailable',
+  preEquity: 'preEquity',
+  maintenanceMargin: 'maintenanceMargin',
+  estimatedCloseFee: 'estimatedCloseFee',
+  liquidationRequirement: 'liquidationRequirement',
+  realizedPnl: 'realizedPnl',
+  feeAmount: 'feeAmount',
+  settledPnl: 'settledPnl',
+  settledFee: 'settledFee',
+  settledCash: 'settledCash',
+  bankruptcyShortfall: 'bankruptcyShortfall',
+  walletBalanceBefore: 'walletBalanceBefore',
+  walletBalanceAfter: 'walletBalanceAfter',
+  executedAt: 'executedAt'
+} as const
+
+export type FuturesLiquidationScalarFieldEnum = (typeof FuturesLiquidationScalarFieldEnum)[keyof typeof FuturesLiquidationScalarFieldEnum]
+
+
+export const FuturesLiquidationCloseScalarFieldEnum = {
+  id: 'id',
+  liquidationId: 'liquidationId',
+  tradingAccountId: 'tradingAccountId',
+  positionId: 'positionId',
+  instrumentId: 'instrumentId',
+  markSnapshotId: 'markSnapshotId',
+  direction: 'direction',
+  quantity: 'quantity',
+  executionPrice: 'executionPrice',
+  maintenanceMargin: 'maintenanceMargin',
+  estimatedCloseFee: 'estimatedCloseFee',
+  realizedPnl: 'realizedPnl',
+  feeRate: 'feeRate',
+  feeAmount: 'feeAmount'
+} as const
+
+export type FuturesLiquidationCloseScalarFieldEnum = (typeof FuturesLiquidationCloseScalarFieldEnum)[keyof typeof FuturesLiquidationCloseScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -4983,6 +5267,20 @@ export type ListEnumOpsJobTriggerFieldRefInput<$PrismaModel> = FieldRefInputType
 
 
 /**
+ * Reference to a field of type 'FuturesMarkSource'
+ */
+export type EnumFuturesMarkSourceFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FuturesMarkSource'>
+    
+
+
+/**
+ * Reference to a field of type 'FuturesMarkSource[]'
+ */
+export type ListEnumFuturesMarkSourceFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FuturesMarkSource[]'>
+    
+
+
+/**
  * Reference to a field of type 'Float'
  */
 export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
@@ -5130,6 +5428,9 @@ export type GlobalOmitConfig = {
   opsJobRun?: Prisma.OpsJobRunOmit
   opsJobLock?: Prisma.OpsJobLockOmit
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceOmit
+  futuresMarkSnapshot?: Prisma.FuturesMarkSnapshotOmit
+  futuresLiquidation?: Prisma.FuturesLiquidationOmit
+  futuresLiquidationClose?: Prisma.FuturesLiquidationCloseOmit
 }
 
 /* Types for Logging */

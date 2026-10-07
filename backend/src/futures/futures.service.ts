@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { Prisma, type CashWallet } from '../generated/prisma/client';
+import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   TradingAccountAccessService,
@@ -11,7 +11,6 @@ import { assertAccountFinancialScopeIntegrity } from '../trading-accounts/tradin
 import { lockSeasonTradingContext } from '../seasons/season-trading-lock';
 import { readGeneralTradeFeeRate } from '../orders/general-trading.config';
 import { canonicalCashWalletSetIssue } from '../wallets/canonical-cash-wallets';
-import { debitAvailableCash } from '../wallets/cash-wallet-atomic';
 import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
 import { buildPagination } from '../common/pagination';
 import { futuresError } from './futures-error';
@@ -20,7 +19,18 @@ import {
   parseFuturesCommand,
   type FuturesExecuteBody,
 } from './futures-input';
-import { isFuturesTradingEnabled } from './futures.config';
+import { assertFuturesOperation } from './futures.config';
+import { settleFuturesCash } from './futures-settlement';
+import { readFuturesMark } from './futures-mark';
+import {
+  riskStrings,
+  assertCrossSafe,
+  loadCrossRisk,
+  crossRisk,
+  positionRisk,
+  presentPositionRisk,
+  accountFuturesFee,
+} from './futures-risk';
 import {
   assertFuturesMoney,
   futuresDecimal,
@@ -77,7 +87,7 @@ export class FuturesService {
       where,
     });
     if (committed) return replay(committed);
-    assertEnabled();
+    assertFuturesOperation(request.operation);
     await this.assertTradable(
       account,
       await this.dbNow(this.prisma),
@@ -128,7 +138,7 @@ export class FuturesService {
             AND "instrument_id" = ${request.instrumentId} AND "status" = 'open' FOR UPDATE
         `;
         const executeNow = await this.dbNow(tx);
-        assertEnabled();
+        assertFuturesOperation(request.operation);
         const lockedAccount = await this.access.getOwnedAccountOrThrow(
           userId,
           accountId,
@@ -179,9 +189,98 @@ export class FuturesService {
             .add(plan.realizedPnl)
             .sub(plan.feeAmount),
         );
-        const freeAfter = balanceAfter
-          .sub(wallet.reservedAmount)
-          .sub(usedAfter);
+        let freeAfter = balanceAfter.sub(wallet.reservedAmount).sub(usedAfter);
+        let reportedFreeAfter: Prisma.Decimal | null = freeAfter;
+        if (['open', 'increase'].includes(request.operation)) {
+          const mark = (await readFuturesMark(
+            tx,
+            lockedInstrument,
+            executeNow,
+          ))!;
+          const nextRisk = positionRisk(
+            {
+              ...plan,
+              direction: request.direction,
+              leverage: request.leverage,
+              marginMode: request.marginMode ?? 'isolated',
+            },
+            mark.price,
+            feeRate,
+          );
+          if (
+            request.marginMode !== 'cross' &&
+            nextRisk.liquidationBuffer.lte(0)
+          )
+            futuresError(
+              'FUTURES_MAINTENANCE_UNSAFE',
+              'Position would open at or below maintenance.',
+            );
+          const cross = await loadCrossRisk(
+            tx,
+            wallet,
+            executeNow,
+            usedAfter,
+            feeRate,
+          );
+          const risks = cross.rows
+            .filter((r) => r.position.id !== current?.id)
+            .map((r) => r.risk!);
+          if (request.marginMode === 'cross') risks.push(nextRisk);
+          const after = crossRisk(
+            { ...wallet, balanceAmount: balanceAfter },
+            usedAfter,
+            risks,
+          );
+          assertCrossSafe(after, risks.length > 0);
+          freeAfter = after.crossFreeCollateral;
+          reportedFreeAfter = freeAfter;
+        } else {
+          const cross = await loadCrossRisk(
+            tx,
+            wallet,
+            executeNow,
+            usedAfter,
+            feeRate,
+            false,
+          );
+          if (
+            current?.marginMode === 'isolated' &&
+            cross.rows.length > 0 &&
+            plan.realizedPnl
+              .sub(plan.feeAmount)
+              .lt(
+                futuresDecimal(current.isolatedMargin)
+                  .sub(plan.isolatedMargin)
+                  .neg(),
+              )
+          )
+            futuresError(
+              'FUTURES_LIQUIDATION_REQUIRED',
+              'Isolated reduction cannot spend the shared Cross collateral pool.',
+            );
+          const remaining = cross.rows.filter(
+            (row) => row.position.id !== current?.id || plan.status === 'open',
+          );
+          const risks = remaining.map((row) =>
+            !row.mark
+              ? null
+              : positionRisk(
+                  row.position.id === current?.id
+                    ? { ...row.position, ...plan }
+                    : row.position,
+                  row.mark.price,
+                  feeRate,
+                ),
+          );
+          // Risk-reducing commands do not require marks. Never label raw cash as Cross free collateral.
+          reportedFreeAfter = risks.every((r) => r !== null)
+            ? crossRisk(
+                { ...wallet, balanceAmount: balanceAfter },
+                usedAfter,
+                risks.filter((r) => r !== null),
+              ).crossFreeCollateral
+            : null;
+        }
         setAdminDiagnosticContext({
           evidence: {
             financialGuard: {
@@ -208,59 +307,14 @@ export class FuturesService {
           );
         const executionId = randomUUID();
         const commandId = randomUUID();
-        const ledger: Prisma.WalletTransactionCreateManyInput[] = [];
-        let runningBalance = futuresDecimal(wallet.balanceAmount);
-        stage('futures_realized_pnl_settlement', accountId);
-        // Settle PnL first, so a profitable reduction can fund its actual fee.
-        if (!plan.realizedPnl.eq(0)) {
-          if (plan.realizedPnl.lt(0))
-            await this.debit(tx, wallet, plan.realizedPnl.abs().toFixed(8));
-          else {
-            const credit = await tx.cashWallet.updateMany({
-              where: {
-                id: wallet.id,
-                tradingAccountId: accountId,
-                walletScope: 'crypto_futures',
-                currencyCode: 'USD',
-              },
-              data: {
-                balanceAmount: { increment: plan.realizedPnl.toFixed(8) },
-              },
-            });
-            if (credit.count !== 1)
-              futuresError(
-                'FUTURES_CASH_CONFLICT',
-                'Futures collateral wallet changed.',
-              );
-          }
-          runningBalance = runningBalance.add(plan.realizedPnl);
-          assertFuturesMoney(runningBalance);
-          ledger.push(
-            this.ledger(
-              wallet,
-              executionId,
-              executeNow,
-              'futures_pnl',
-              plan.realizedPnl.gt(0) ? 'credit' : 'debit',
-              plan.realizedPnl.abs().toFixed(8),
-              runningBalance.toFixed(8),
-            ),
-          );
-        }
-        stage('futures_fee_debit', accountId);
-        if (plan.feeAmount.gt(0))
-          await this.debit(tx, wallet, plan.feeAmount.toFixed(8));
-        runningBalance = runningBalance.sub(plan.feeAmount);
-        ledger.push(
-          this.ledger(
-            wallet,
-            executionId,
-            executeNow,
-            'fee',
-            'debit',
-            plan.feeAmount.toFixed(8),
-            runningBalance.toFixed(8),
-          ),
+        const { ledger } = await settleFuturesCash(
+          tx,
+          wallet,
+          'futures_execution',
+          executionId,
+          plan.realizedPnl,
+          plan.feeAmount,
+          executeNow,
         );
         const positionData = {
           quantity: plan.quantity.toFixed(8),
@@ -285,6 +339,7 @@ export class FuturesService {
                 tradingAccountId: accountId,
                 instrumentId: lockedInstrument.id,
                 direction: request.direction,
+                marginMode: request.marginMode,
                 createdAt: executeNow,
               },
             });
@@ -297,6 +352,7 @@ export class FuturesService {
             positionId: position.id,
             operation: plan.status === 'closed' ? 'close' : request.operation,
             direction: request.direction,
+            marginMode: request.marginMode,
             quantity: request.quantity,
             leverage: request.leverage,
             executionPrice: price.price,
@@ -331,7 +387,7 @@ export class FuturesService {
               currencyCode: 'USD',
               balanceAmount: balanceAfter.toFixed(8),
               totalMarginUsed: usedAfter.toFixed(8),
-              freeCollateral: freeAfter.toFixed(8),
+              freeCollateral: reportedFreeAfter?.toFixed(8) ?? null,
             },
           },
         };
@@ -389,6 +445,7 @@ export class FuturesService {
         await this.access.getOwnedAccountOrThrow(userId, accountId, tx);
         const wallet = await this.wallet(tx, accountId);
         const now = await this.dbNow(tx);
+        const fee = await accountFuturesFee(tx, accountId);
         const rows = await tx.futuresPosition.findMany({
           where: { tradingAccountId: accountId, status: 'open' },
           include: { instrument: { include: futuresInstrumentInclude } },
@@ -402,8 +459,21 @@ export class FuturesService {
               now,
               false,
             );
+            const mark = await readFuturesMark(tx, row.instrument, now, false);
+            const risk = mark ? positionRisk(row, mark.price, fee) : null;
             return {
               ...presentFuturesPosition(row),
+              markPrice: mark?.price.toFixed(8) ?? null,
+              markEvidence: mark
+                ? {
+                    snapshotId: mark.id,
+                    source: mark.source,
+                    effectiveAt: mark.effectiveAt.toISOString(),
+                    capturedAt: mark.capturedAt.toISOString(),
+                  }
+                : null,
+              markState: mark ? 'fresh' : 'unavailable_or_stale',
+              risk: risk ? presentPositionRisk(row, risk, fee) : null,
               instrument: presentFuturesInstrument(row.instrument),
               referencePrice: price?.price.toFixed(8) ?? null,
               unrealizedPnl: price
@@ -427,20 +497,25 @@ export class FuturesService {
           }),
         );
         const used = await futuresMarginUsed(tx, accountId);
+        const cross = await loadCrossRisk(tx, wallet, now, used, fee, false);
         return {
           success: true,
           data: {
             tradingAccountId: accountId,
             positions,
+            cross: {
+              positionIds: cross.rows.map((r) => r.position.id),
+              evaluatedAt: now.toISOString(),
+              markState: cross.risk ? 'fresh' : 'unavailable_or_stale',
+              metrics: cross.risk ? riskStrings(cross.risk) : null,
+            },
             collateral: {
               walletId: wallet.id,
               currencyCode: 'USD',
               balanceAmount: wallet.balanceAmount.toFixed(8),
               totalMarginUsed: used.toFixed(8),
-              freeCollateral: futuresDecimal(wallet.balanceAmount)
-                .sub(wallet.reservedAmount)
-                .sub(used)
-                .toFixed(8),
+              freeCollateral:
+                cross.risk?.crossFreeCollateral.toFixed(8) ?? null,
             },
             evaluatedAt: now.toISOString(),
           },
@@ -479,6 +554,50 @@ export class FuturesService {
               ...presentFuturesExecution(row),
               instrument: presentFuturesInstrument(row.instrument),
             })),
+            pagination: buildPagination({
+              limit,
+              offset,
+              total,
+              returned: rows.length,
+            }),
+          },
+        };
+      },
+      { isolationLevel: 'RepeatableRead' },
+    );
+  }
+
+  async liquidations(
+    userId: string | undefined,
+    accountId: string,
+    query: { limit?: string; offset?: string } = {},
+  ) {
+    requireUser(userId);
+    const limit = pageNumber(query.limit, 20, 1, 100),
+      offset = pageNumber(query.offset, 0, 0, 1_000_000);
+    await this.access.getOwnedAccountOrThrow(userId, accountId);
+    return this.prisma.$transaction(
+      async (tx) => {
+        await this.access.getOwnedAccountOrThrow(userId, accountId, tx);
+        const where = { tradingAccountId: accountId };
+        const total = await tx.futuresLiquidation.count({ where });
+        const rows = await tx.futuresLiquidation.findMany({
+          where,
+          include: {
+            closes: {
+              include: { markSnapshot: true },
+              orderBy: { positionId: 'asc' },
+            },
+          },
+          orderBy: [{ executedAt: 'desc' }, { id: 'desc' }],
+          take: limit,
+          skip: offset,
+        });
+        return {
+          success: true,
+          data: {
+            tradingAccountId: accountId,
+            liquidations: JSON.parse(JSON.stringify(rows)) as Prisma.JsonValue,
             pagination: buildPagination({
               limit,
               offset,
@@ -589,60 +708,11 @@ export class FuturesService {
       >`SELECT clock_timestamp() AS "now"`
     )[0].now;
   }
-  private async debit(
-    tx: Prisma.TransactionClient,
-    wallet: CashWallet,
-    amount: string,
-  ) {
-    if (
-      (await debitAvailableCash(tx, {
-        walletId: wallet.id,
-        tradingAccountId: wallet.tradingAccountId,
-        walletScope: 'crypto_futures',
-        currencyCode: 'USD',
-        amount,
-      })) !== 1
-    )
-      futuresError(
-        'FUTURES_CASH_CONFLICT',
-        'Futures collateral cash debit failed.',
-      );
-  }
-  private ledger(
-    wallet: CashWallet,
-    executionId: string,
-    now: Date,
-    txType: 'fee' | 'futures_pnl',
-    direction: 'credit' | 'debit',
-    amount: string,
-    balanceAfter: string,
-  ): Prisma.WalletTransactionCreateManyInput {
-    return {
-      tradingAccountId: wallet.tradingAccountId,
-      walletId: wallet.id,
-      currencyCode: 'USD',
-      direction,
-      txType,
-      referenceType: 'futures_execution',
-      referenceId: executionId,
-      amount,
-      balanceAfter,
-      occurredAt: now,
-    };
-  }
 }
 
 function requireUser(userId: string | undefined): asserts userId is string {
   if (!userId)
     futuresError('UNAUTHORIZED', 'Unauthorized', HttpStatus.UNAUTHORIZED);
-}
-function assertEnabled() {
-  if (!isFuturesTradingEnabled())
-    futuresError(
-      'FUTURES_TRADING_DISABLED',
-      'Futures trading is disabled.',
-      HttpStatus.FORBIDDEN,
-    );
 }
 function stage(failureStage: string, accountId: string) {
   setAdminDiagnosticContext({

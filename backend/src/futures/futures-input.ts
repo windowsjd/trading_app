@@ -14,6 +14,7 @@ export type FuturesExecuteBody = {
   direction?: unknown;
   quantity?: unknown;
   leverage?: unknown;
+  marginMode?: unknown;
   idempotencyKey?: unknown;
 };
 export type FuturesCommand = {
@@ -23,6 +24,7 @@ export type FuturesCommand = {
   direction: FuturesDirection;
   quantity: string;
   leverage: number;
+  marginMode?: 'isolated' | 'cross';
   idempotencyKey: string;
 };
 
@@ -48,6 +50,7 @@ export function parseFuturesCommand(body: FuturesExecuteBody): FuturesCommand {
     'direction',
     'quantity',
     'leverage',
+    'marginMode',
     'idempotencyKey',
   ];
   if (
@@ -58,6 +61,11 @@ export function parseFuturesCommand(body: FuturesExecuteBody): FuturesCommand {
   )
     invalid();
   assertFuturesLeverage(body.leverage);
+  if (
+    body.marginMode !== undefined &&
+    !['isolated', 'cross'].includes(body.marginMode as string)
+  )
+    invalid();
   const text = (value: unknown) =>
     typeof value === 'string' ? value.trim() : '';
   const instrumentId = text(body.instrumentId);
@@ -88,6 +96,7 @@ export function parseFuturesCommand(body: FuturesExecuteBody): FuturesCommand {
     direction: body.direction as FuturesDirection,
     quantity: new Prisma.Decimal(quantity).toFixed(8),
     leverage: body.leverage,
+    marginMode: (body.marginMode ?? 'isolated') as 'isolated' | 'cross',
   };
 }
 
@@ -103,6 +112,8 @@ export function futuresCommandHash(accountId: string, command: FuturesCommand) {
         direction: command.direction,
         quantity: command.quantity,
         leverage: command.leverage,
+        // Preserve the exact F1 isolated hash, including committed replay.
+        ...(command.marginMode === 'cross' ? { marginMode: 'cross' } : {}),
       }),
     )
     .digest('hex');

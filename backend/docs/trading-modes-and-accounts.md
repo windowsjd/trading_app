@@ -31,7 +31,7 @@
 | --- | --- | --- |
 | `securities` | KRW, USD | 초기자금·주식·FX, legacy 주문의 pin된 금융 경로 |
 | `crypto_spot` | USD | balance/reserved 0으로 생성, 신규 Crypto Spot 주문·USD 이체·명시적 KRW composite 이체 |
-| `crypto_futures` | USD | balance/reserved 0으로 생성, 현금 보관·명시적 이체 및 기본 OFF인 F1 Futures collateral |
+| `crypto_futures` | USD | balance/reserved 0으로 생성, 현금 보관·명시적 이체 및 기본 OFF인 F1/F2 Futures collateral |
 
 정상 계정은 위 네 identity를 각각 정확히 하나씩 가진다. DB NOT NULL enum,
 scope/currency CHECK, 복합 unique와 서버의 canonical set 검증이 누락·중복·
@@ -95,9 +95,10 @@ FX와 Transfer의 records/네 ledger leg는 구분하고 typed parent command로
 FX fee/repricing은 기존 standalone FX와 동일한 경제적 효과를 가지며 Transfer leg만
 성과 중립이다. 외부 funding/TWR cash-flow boundary는 추가하지 않는다.
 Securities KRW↔USD는 기존 환전 화면을 사용한다. 자동환전·Orders auto-funding·
-다른 계정/사용자 송금은 없다. Futures F1 backend는 [Futures 계약](futures-api-contract.md)을 따른다.
-`FUTURES_TRADING_ENABLED` 기본 OFF이며 F2/F3 전 사용자 활성화 금지다. 열린 isolated margin은
-Futures domain에서 합산하여 USD 출금과 Futures→KRW FX+Transfer의 free collateral을 보호한다.
+다른 계정/사용자 송금은 없다. Futures F1/F2 backend는 [Futures 계약](futures-api-contract.md)을 따른다.
+`FUTURES_TRADING_MODE` 기본 DISABLED(기존 boolean 호환)이며 F3 전 사용자 활성화 금지다.
+USD 출금과 Futures→KRW FX+Transfer는 Isolated allocation과 fresh Mark 기반 Cross initial/
+maintenance requirement를 함께 보호한다. [F2 risk 계약](futures-risk-contract.md)을 참조한다.
 `reservedAmount`는 margin이 아니며 기존 Wallet `availableAmount` 계약은 유지한다.
 
 신규 `20261007120000_add_cross_currency_wallet_transfers` migration은 quote route와

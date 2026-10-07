@@ -90,7 +90,7 @@ describe('Futures input and flag policies', () => {
     { operation: ['open'] },
     { direction: ['long'] },
     { operation: 'limit' },
-    { marginMode: 'cross' },
+    { marginMode: 'portfolio' },
     { price: '100' },
     { positionId: 'p' },
     { operation: 'reduce' },

@@ -1,5 +1,10 @@
 import type { Prisma, CashWallet } from '../generated/prisma/client';
 import { futuresDecimal } from './futures-math';
+import {
+  accountFuturesFee,
+  loadCrossRisk,
+  assertCrossSafe,
+} from './futures-risk';
 import { futuresError } from './futures-error';
 
 /** Caller holds the Futures USD wallet FOR UPDATE for every financial check. */
@@ -8,7 +13,11 @@ export async function futuresMarginUsed(
   accountId: string,
 ) {
   const result = await client.futuresPosition.aggregate({
-    where: { tradingAccountId: accountId, status: 'open' },
+    where: {
+      tradingAccountId: accountId,
+      status: 'open',
+      marginMode: 'isolated',
+    },
     _sum: { isolatedMargin: true },
   });
   return futuresDecimal(result._sum.isolatedMargin ?? '0');
@@ -32,4 +41,19 @@ export async function assertFuturesTransferCollateral(
       'INSUFFICIENT_FUTURES_FREE_COLLATERAL',
       'Transfer would spend isolated Futures collateral.',
     );
+  // No mark is required when there are no Cross positions (F1 compatibility).
+  const now = (
+    await tx.$queryRaw<Array<{ now: Date }>>`SELECT clock_timestamp() AS now`
+  )[0].now;
+  const cross = await loadCrossRisk(
+    tx,
+    {
+      ...source,
+      balanceAmount: futuresDecimal(source.balanceAmount).sub(amount),
+    },
+    now,
+    used,
+    await accountFuturesFee(tx, source.tradingAccountId),
+  );
+  assertCrossSafe(cross.risk!, cross.rows.length > 0);
 }

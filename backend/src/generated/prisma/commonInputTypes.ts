@@ -1157,6 +1157,23 @@ export type EnumOpsJobTriggerWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumOpsJobTriggerFilter<$PrismaModel>
 }
 
+export type EnumFuturesMarkSourceFilter<$PrismaModel = never> = {
+  equals?: $Enums.FuturesMarkSource | Prisma.EnumFuturesMarkSourceFieldRefInput<$PrismaModel>
+  in?: $Enums.FuturesMarkSource[] | Prisma.ListEnumFuturesMarkSourceFieldRefInput<$PrismaModel>
+  notIn?: $Enums.FuturesMarkSource[] | Prisma.ListEnumFuturesMarkSourceFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumFuturesMarkSourceFilter<$PrismaModel> | $Enums.FuturesMarkSource
+}
+
+export type EnumFuturesMarkSourceWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.FuturesMarkSource | Prisma.EnumFuturesMarkSourceFieldRefInput<$PrismaModel>
+  in?: $Enums.FuturesMarkSource[] | Prisma.ListEnumFuturesMarkSourceFieldRefInput<$PrismaModel>
+  notIn?: $Enums.FuturesMarkSource[] | Prisma.ListEnumFuturesMarkSourceFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumFuturesMarkSourceWithAggregatesFilter<$PrismaModel> | $Enums.FuturesMarkSource
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumFuturesMarkSourceFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumFuturesMarkSourceFilter<$PrismaModel>
+}
+
 export type NestedStringFilter<$PrismaModel = never> = {
   equals?: string | Prisma.StringFieldRefInput<$PrismaModel>
   in?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
@@ -2257,6 +2274,23 @@ export type NestedEnumOpsJobTriggerWithAggregatesFilter<$PrismaModel = never> = 
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumOpsJobTriggerFilter<$PrismaModel>
   _max?: Prisma.NestedEnumOpsJobTriggerFilter<$PrismaModel>
+}
+
+export type NestedEnumFuturesMarkSourceFilter<$PrismaModel = never> = {
+  equals?: $Enums.FuturesMarkSource | Prisma.EnumFuturesMarkSourceFieldRefInput<$PrismaModel>
+  in?: $Enums.FuturesMarkSource[] | Prisma.ListEnumFuturesMarkSourceFieldRefInput<$PrismaModel>
+  notIn?: $Enums.FuturesMarkSource[] | Prisma.ListEnumFuturesMarkSourceFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumFuturesMarkSourceFilter<$PrismaModel> | $Enums.FuturesMarkSource
+}
+
+export type NestedEnumFuturesMarkSourceWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.FuturesMarkSource | Prisma.EnumFuturesMarkSourceFieldRefInput<$PrismaModel>
+  in?: $Enums.FuturesMarkSource[] | Prisma.ListEnumFuturesMarkSourceFieldRefInput<$PrismaModel>
+  notIn?: $Enums.FuturesMarkSource[] | Prisma.ListEnumFuturesMarkSourceFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumFuturesMarkSourceWithAggregatesFilter<$PrismaModel> | $Enums.FuturesMarkSource
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumFuturesMarkSourceFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumFuturesMarkSourceFilter<$PrismaModel>
 }
 
 

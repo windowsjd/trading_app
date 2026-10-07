@@ -421,7 +421,8 @@ Trading note policy:
 - Fake/static/sample business price fallback.
 - Crypto candle frontend integration.
 - Crypto candle DB persistence.
-- Binance Futures API.
+- Binance Futures prices in Spot asset reads. Public Mark Price ingestion is
+  isolated in the [F2 risk domain](futures-risk-contract.md).
 - Binance authenticated API.
 ## Market list sorting (2026-10-02)
 

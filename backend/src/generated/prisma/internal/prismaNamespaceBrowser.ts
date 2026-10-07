@@ -90,7 +90,10 @@ export const ModelName = {
   BatchJobRun: 'BatchJobRun',
   OpsJobRun: 'OpsJobRun',
   OpsJobLock: 'OpsJobLock',
-  LimitOrderCandleEvidence: 'LimitOrderCandleEvidence'
+  LimitOrderCandleEvidence: 'LimitOrderCandleEvidence',
+  FuturesMarkSnapshot: 'FuturesMarkSnapshot',
+  FuturesLiquidation: 'FuturesLiquidation',
+  FuturesLiquidationClose: 'FuturesLiquidationClose'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -928,6 +931,65 @@ export const LimitOrderCandleEvidenceScalarFieldEnum = {
 } as const
 
 export type LimitOrderCandleEvidenceScalarFieldEnum = (typeof LimitOrderCandleEvidenceScalarFieldEnum)[keyof typeof LimitOrderCandleEvidenceScalarFieldEnum]
+
+
+export const FuturesMarkSnapshotScalarFieldEnum = {
+  id: 'id',
+  instrumentId: 'instrumentId',
+  symbol: 'symbol',
+  providerProduct: 'providerProduct',
+  currencyCode: 'currencyCode',
+  source: 'source',
+  price: 'price',
+  effectiveAt: 'effectiveAt',
+  capturedAt: 'capturedAt'
+} as const
+
+export type FuturesMarkSnapshotScalarFieldEnum = (typeof FuturesMarkSnapshotScalarFieldEnum)[keyof typeof FuturesMarkSnapshotScalarFieldEnum]
+
+
+export const FuturesLiquidationScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  marginMode: 'marginMode',
+  evaluationAt: 'evaluationAt',
+  collateralAvailable: 'collateralAvailable',
+  preEquity: 'preEquity',
+  maintenanceMargin: 'maintenanceMargin',
+  estimatedCloseFee: 'estimatedCloseFee',
+  liquidationRequirement: 'liquidationRequirement',
+  realizedPnl: 'realizedPnl',
+  feeAmount: 'feeAmount',
+  settledPnl: 'settledPnl',
+  settledFee: 'settledFee',
+  settledCash: 'settledCash',
+  bankruptcyShortfall: 'bankruptcyShortfall',
+  walletBalanceBefore: 'walletBalanceBefore',
+  walletBalanceAfter: 'walletBalanceAfter',
+  executedAt: 'executedAt'
+} as const
+
+export type FuturesLiquidationScalarFieldEnum = (typeof FuturesLiquidationScalarFieldEnum)[keyof typeof FuturesLiquidationScalarFieldEnum]
+
+
+export const FuturesLiquidationCloseScalarFieldEnum = {
+  id: 'id',
+  liquidationId: 'liquidationId',
+  tradingAccountId: 'tradingAccountId',
+  positionId: 'positionId',
+  instrumentId: 'instrumentId',
+  markSnapshotId: 'markSnapshotId',
+  direction: 'direction',
+  quantity: 'quantity',
+  executionPrice: 'executionPrice',
+  maintenanceMargin: 'maintenanceMargin',
+  estimatedCloseFee: 'estimatedCloseFee',
+  realizedPnl: 'realizedPnl',
+  feeRate: 'feeRate',
+  feeAmount: 'feeAmount'
+} as const
+
+export type FuturesLiquidationCloseScalarFieldEnum = (typeof FuturesLiquidationCloseScalarFieldEnum)[keyof typeof FuturesLiquidationCloseScalarFieldEnum]
 
 
 export const SortOrder = {

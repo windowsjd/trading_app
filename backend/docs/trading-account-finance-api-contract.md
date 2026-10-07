@@ -68,7 +68,7 @@ current server contract.
   Same-account USD transfers retain their existing route. Explicit Securities KRW
   ↔ Crypto Spot/Futures USD transfers use the new quote/execute routes, one
   command and one DB transaction with separate linked FX/Transfer evidence.
-  Securities KRW↔USD still uses standalone FX. Futures F1 backend uses this USD
+  Securities KRW↔USD still uses standalone FX. Futures F1/F2 backend uses this USD
   wallet as collateral; [Futures contract](futures-api-contract.md) keeps trading
   default OFF and protects outgoing free collateral. No automatic FX or order
   funding is introduced. All canonical

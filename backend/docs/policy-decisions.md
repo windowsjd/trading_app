@@ -286,7 +286,7 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
 - Wallet UI는 증권 KRW/USD, 암호화폐 · 현물 USD, 암호화폐 · 선물 USD와 보유 종목을
   scope+currency로 표시하고 이체/환전/원장/주문 내역을 구분한다. Futures UI는 보관·이체만
   지원한다. Securities KRW↔USD는 기존 환전 화면, KRW↔Crypto USD는 이체 견적 화면을
-  사용한다. 자동환전·주문 auto-funding·cross-account/user 송금은 없다. Futures F1 backend는
+  사용한다. 자동환전·주문 auto-funding·cross-account/user 송금은 없다. Futures F1/F2 backend는
   아래 별도 계약이며 UI 활성화는 없다.
   Legacy Wallet/FX의 Securities projection은 유지하고 account 원장은 모든 scope를 읽는다.
   근거: 통화만으로 USD 세 지갑 중 하나를 선택하거나 이체를 외부입금으로 표시하지 않는다.
@@ -307,16 +307,17 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
 - legacy wallet/fx endpoint는 계약 그대로 유지하고 진입점에서 participant를 account로 resolve한 뒤 account-scoped endpoint와 같은 서비스 코드를 공유한다(수수료·환율·잔액 변경·원장·멱등·오류 코드·원자성 동일).
   근거: 환전 규칙이 두 벌 존재하는 순간부터 두 경로의 결과가 갈라진다.
 
-## Crypto Futures F1 (2026-10-07, current)
+## Crypto Futures F2 (2026-10-07, current)
 
 - [Futures 계약](futures-api-contract.md)이 별도 product/domain/API를 정의한다. 기존 Asset은
   Binance Spot underlying이고 FuturesInstrument는 USD-settled synthetic perpetual identity다.
   Spot Position/Order/Quote 의미는 유지하며 Futures Position/Execution/ExecuteRequest를 분리한다.
-- F1은 Market full fill, LONG/SHORT, One-way, Isolated only다. leverage는 1~100 모든 자연수,
+- Market full fill, LONG/SHORT, One-way, Isolated + Cross를 지원한다. leverage는 1~100 모든 자연수,
   소수/잘못된 타입은 거절하며 열린 position lifetime의 leverage 변경/increase mismatch를 금지한다.
   반대 방향 open/초과 reduce/자동 flip은 없다. Full close 후 새 lifetime은 방향/leverage를 다시 선택한다.
-- 초기 margin은 notional/leverage이며 cash에서 debit하지 않는다. 보수적인 8자리 올림과 별도
-  entry-notional basis로 rounding 과소 배정을 막고 열린 position에서 margin을 합산한다.
+- Isolated 초기 margin은 execution notional/leverage이며 cash에서 debit하지 않는다. 보수적인
+  8자리 올림과 별도 entry-notional basis로 rounding 과소 배정을 막고 allocation을 합산한다.
+  Cross는 별도 allocation 없이 현재 Mark notional/leverage로 initial requirement를 계산한다.
   Futures Wallet이 유일한 collateral boundary이며 reservedAmount는 기존 cash reservation이다.
   Fee와 realized PnL만 실제 USD cash/원장에 반영한다. General/Season의 기존 trade fee policy를 쓴다.
 - Outgoing Futures USD Transfer 및 Futures→Securities KRW composite는 공유 transaction 이체
@@ -326,9 +327,21 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
   아니다. 기존 snapshot/selector/execute freshness를 재사용하며 stale/missing은 reject한다.
   PostgreSQL이 금융 SoT이고 network I/O는 financial locks 내부에 없다.
 - 손실+fee를 안전하게 정산할 수 없는 manual reduce/close는 `FUTURES_LIQUIDATION_REQUIRED`로
-  전체 rollback한다. Loss clamp/negative wallet/silent close는 없다. Cross/Maintenance/Liquidation은
-  F2, Futures UI 및 Home/Portfolio/TWR/Ranking/Settlement 통합은 F3다. 기존 valuation은 cash와
-  Spot만 포함한다. `FUTURES_TRADING_ENABLED` 기본 OFF, F2/F3 전 사용자/운영 활성화 금지다.
+  전체 rollback한다. Loss clamp/negative wallet/silent close는 없다.
+- [F2 risk 계약](futures-risk-contract.md): MMR=0.005 고정, normal close fee 포함,
+  USDⓈ-M Futures Mark Price 전용 PostgreSQL evidence(5초/미래시각 금지)로 위험/청산을 평가한다.
+  Cross base = Futures cash − reserved − Isolated allocation; equity = base + Cross Mark UPNL;
+  free = equity − sum(ceil8(mark notional/leverage)). Cross equity <= maintenance+close fee이면
+  모든 Cross lifetime을 하나의 transaction/event로 전량 청산한다. Isolated는 해당 lifetime만
+  margin+UPNL <= requirement에서 청산한다. Mode 간 담보를 침범하지 않는다.
+- Full economic PnL/fee, actual settled cash, bankruptcy shortfall을 구분한다.
+  별도 penalty/partial liquidation/Insurance Fund/ADL/debt/SL·TP는 없다.
+- ENABLED/REDUCE_ONLY/DISABLED와 독립 risk engine을 사용한다. ENABLED에는 ingestion과
+  risk engine이 필수이며 startup validation이 잘못된 조합을 거부한다. 기존 boolean은 호환된다.
+  stale Mark에서 open/increase/Cross outgoing transfer는 거부하지만 reduce/close/incoming은
+  Mark만으로 차단하지 않는다. 자동청산은 fresh Mark와 유효 lifecycle에서만 수행한다.
+- Futures UI 및 Home/Portfolio/TWR/Ranking/Settlement 통합은 F3다. 기존 valuation은 cash와
+  Spot만 포함한다. 기본 DISABLED, F3 전 사용자/운영 활성화 금지다.
 
 ## Trading TradingAccount Scope (Order/Position/Quote 전환)
 

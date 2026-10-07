@@ -124,7 +124,8 @@ export const WalletTransactionReferenceType = {
   general_account_open: 'general_account_open',
   ad_reward_claim: 'ad_reward_claim',
   wallet_transfer: 'wallet_transfer',
-  futures_execution: 'futures_execution'
+  futures_execution: 'futures_execution',
+  futures_liquidation: 'futures_liquidation'
 } as const
 
 export type WalletTransactionReferenceType = (typeof WalletTransactionReferenceType)[keyof typeof WalletTransactionReferenceType]
@@ -146,6 +147,7 @@ export type FuturesDirection = (typeof FuturesDirection)[keyof typeof FuturesDir
 
 
 export const FuturesMarginMode = {
+  cross: 'cross',
   isolated: 'isolated'
 } as const
 
@@ -345,7 +347,8 @@ export const OpsJobName = {
   market_candle_reconciliation: 'market_candle_reconciliation',
   limit_order_matcher: 'limit_order_matcher',
   limit_order_candle_reconciliation: 'limit_order_candle_reconciliation',
-  limit_order_matching: 'limit_order_matching'
+  limit_order_matching: 'limit_order_matching',
+  futures_liquidation: 'futures_liquidation'
 } as const
 
 export type OpsJobName = (typeof OpsJobName)[keyof typeof OpsJobName]
@@ -416,3 +419,11 @@ export const FriendshipStatus = {
 } as const
 
 export type FriendshipStatus = (typeof FriendshipStatus)[keyof typeof FriendshipStatus]
+
+
+export const FuturesMarkSource = {
+  binance_usdm_mark_ws: 'binance_usdm_mark_ws',
+  binance_usdm_mark_rest: 'binance_usdm_mark_rest'
+} as const
+
+export type FuturesMarkSource = (typeof FuturesMarkSource)[keyof typeof FuturesMarkSource]

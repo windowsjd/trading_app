@@ -201,6 +201,8 @@ export type FuturesInstrumentWhereInput = {
   underlyingAsset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
   positions?: Prisma.FuturesPositionListRelationFilter
   executions?: Prisma.FuturesExecutionListRelationFilter
+  marks?: Prisma.FuturesMarkSnapshotListRelationFilter
+  liquidationCloses?: Prisma.FuturesLiquidationCloseListRelationFilter
 }
 
 export type FuturesInstrumentOrderByWithRelationInput = {
@@ -214,6 +216,8 @@ export type FuturesInstrumentOrderByWithRelationInput = {
   underlyingAsset?: Prisma.AssetOrderByWithRelationInput
   positions?: Prisma.FuturesPositionOrderByRelationAggregateInput
   executions?: Prisma.FuturesExecutionOrderByRelationAggregateInput
+  marks?: Prisma.FuturesMarkSnapshotOrderByRelationAggregateInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseOrderByRelationAggregateInput
 }
 
 export type FuturesInstrumentWhereUniqueInput = Prisma.AtLeast<{
@@ -231,6 +235,8 @@ export type FuturesInstrumentWhereUniqueInput = Prisma.AtLeast<{
   underlyingAsset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
   positions?: Prisma.FuturesPositionListRelationFilter
   executions?: Prisma.FuturesExecutionListRelationFilter
+  marks?: Prisma.FuturesMarkSnapshotListRelationFilter
+  liquidationCloses?: Prisma.FuturesLiquidationCloseListRelationFilter
 }, "id" | "underlyingAssetId_productType_settlementCurrency">
 
 export type FuturesInstrumentOrderByWithAggregationInput = {
@@ -269,6 +275,8 @@ export type FuturesInstrumentCreateInput = {
   underlyingAsset: Prisma.AssetCreateNestedOneWithoutFuturesInstrumentsInput
   positions?: Prisma.FuturesPositionCreateNestedManyWithoutInstrumentInput
   executions?: Prisma.FuturesExecutionCreateNestedManyWithoutInstrumentInput
+  marks?: Prisma.FuturesMarkSnapshotCreateNestedManyWithoutInstrumentInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateInput = {
@@ -281,6 +289,8 @@ export type FuturesInstrumentUncheckedCreateInput = {
   updatedAt?: Date | string
   positions?: Prisma.FuturesPositionUncheckedCreateNestedManyWithoutInstrumentInput
   executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutInstrumentInput
+  marks?: Prisma.FuturesMarkSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUpdateInput = {
@@ -293,6 +303,8 @@ export type FuturesInstrumentUpdateInput = {
   underlyingAsset?: Prisma.AssetUpdateOneRequiredWithoutFuturesInstrumentsNestedInput
   positions?: Prisma.FuturesPositionUpdateManyWithoutInstrumentNestedInput
   executions?: Prisma.FuturesExecutionUpdateManyWithoutInstrumentNestedInput
+  marks?: Prisma.FuturesMarkSnapshotUpdateManyWithoutInstrumentNestedInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateInput = {
@@ -305,6 +317,8 @@ export type FuturesInstrumentUncheckedUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   positions?: Prisma.FuturesPositionUncheckedUpdateManyWithoutInstrumentNestedInput
   executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutInstrumentNestedInput
+  marks?: Prisma.FuturesMarkSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentCreateManyInput = {
@@ -461,6 +475,34 @@ export type FuturesInstrumentUpdateOneRequiredWithoutExecutionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.FuturesInstrumentUpdateToOneWithWhereWithoutExecutionsInput, Prisma.FuturesInstrumentUpdateWithoutExecutionsInput>, Prisma.FuturesInstrumentUncheckedUpdateWithoutExecutionsInput>
 }
 
+export type FuturesInstrumentCreateNestedOneWithoutMarksInput = {
+  create?: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutMarksInput, Prisma.FuturesInstrumentUncheckedCreateWithoutMarksInput>
+  connectOrCreate?: Prisma.FuturesInstrumentCreateOrConnectWithoutMarksInput
+  connect?: Prisma.FuturesInstrumentWhereUniqueInput
+}
+
+export type FuturesInstrumentUpdateOneRequiredWithoutMarksNestedInput = {
+  create?: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutMarksInput, Prisma.FuturesInstrumentUncheckedCreateWithoutMarksInput>
+  connectOrCreate?: Prisma.FuturesInstrumentCreateOrConnectWithoutMarksInput
+  upsert?: Prisma.FuturesInstrumentUpsertWithoutMarksInput
+  connect?: Prisma.FuturesInstrumentWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.FuturesInstrumentUpdateToOneWithWhereWithoutMarksInput, Prisma.FuturesInstrumentUpdateWithoutMarksInput>, Prisma.FuturesInstrumentUncheckedUpdateWithoutMarksInput>
+}
+
+export type FuturesInstrumentCreateNestedOneWithoutLiquidationClosesInput = {
+  create?: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutLiquidationClosesInput, Prisma.FuturesInstrumentUncheckedCreateWithoutLiquidationClosesInput>
+  connectOrCreate?: Prisma.FuturesInstrumentCreateOrConnectWithoutLiquidationClosesInput
+  connect?: Prisma.FuturesInstrumentWhereUniqueInput
+}
+
+export type FuturesInstrumentUpdateOneRequiredWithoutLiquidationClosesNestedInput = {
+  create?: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutLiquidationClosesInput, Prisma.FuturesInstrumentUncheckedCreateWithoutLiquidationClosesInput>
+  connectOrCreate?: Prisma.FuturesInstrumentCreateOrConnectWithoutLiquidationClosesInput
+  upsert?: Prisma.FuturesInstrumentUpsertWithoutLiquidationClosesInput
+  connect?: Prisma.FuturesInstrumentWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.FuturesInstrumentUpdateToOneWithWhereWithoutLiquidationClosesInput, Prisma.FuturesInstrumentUpdateWithoutLiquidationClosesInput>, Prisma.FuturesInstrumentUncheckedUpdateWithoutLiquidationClosesInput>
+}
+
 export type FuturesInstrumentCreateWithoutUnderlyingAssetInput = {
   id?: string
   productType?: $Enums.FuturesProductType
@@ -470,6 +512,8 @@ export type FuturesInstrumentCreateWithoutUnderlyingAssetInput = {
   updatedAt?: Date | string
   positions?: Prisma.FuturesPositionCreateNestedManyWithoutInstrumentInput
   executions?: Prisma.FuturesExecutionCreateNestedManyWithoutInstrumentInput
+  marks?: Prisma.FuturesMarkSnapshotCreateNestedManyWithoutInstrumentInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutUnderlyingAssetInput = {
@@ -481,6 +525,8 @@ export type FuturesInstrumentUncheckedCreateWithoutUnderlyingAssetInput = {
   updatedAt?: Date | string
   positions?: Prisma.FuturesPositionUncheckedCreateNestedManyWithoutInstrumentInput
   executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutInstrumentInput
+  marks?: Prisma.FuturesMarkSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutUnderlyingAssetInput = {
@@ -531,6 +577,8 @@ export type FuturesInstrumentCreateWithoutPositionsInput = {
   updatedAt?: Date | string
   underlyingAsset: Prisma.AssetCreateNestedOneWithoutFuturesInstrumentsInput
   executions?: Prisma.FuturesExecutionCreateNestedManyWithoutInstrumentInput
+  marks?: Prisma.FuturesMarkSnapshotCreateNestedManyWithoutInstrumentInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutPositionsInput = {
@@ -542,6 +590,8 @@ export type FuturesInstrumentUncheckedCreateWithoutPositionsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutInstrumentInput
+  marks?: Prisma.FuturesMarkSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutPositionsInput = {
@@ -569,6 +619,8 @@ export type FuturesInstrumentUpdateWithoutPositionsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   underlyingAsset?: Prisma.AssetUpdateOneRequiredWithoutFuturesInstrumentsNestedInput
   executions?: Prisma.FuturesExecutionUpdateManyWithoutInstrumentNestedInput
+  marks?: Prisma.FuturesMarkSnapshotUpdateManyWithoutInstrumentNestedInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutPositionsInput = {
@@ -580,6 +632,8 @@ export type FuturesInstrumentUncheckedUpdateWithoutPositionsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutInstrumentNestedInput
+  marks?: Prisma.FuturesMarkSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentCreateWithoutExecutionsInput = {
@@ -591,6 +645,8 @@ export type FuturesInstrumentCreateWithoutExecutionsInput = {
   updatedAt?: Date | string
   underlyingAsset: Prisma.AssetCreateNestedOneWithoutFuturesInstrumentsInput
   positions?: Prisma.FuturesPositionCreateNestedManyWithoutInstrumentInput
+  marks?: Prisma.FuturesMarkSnapshotCreateNestedManyWithoutInstrumentInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutExecutionsInput = {
@@ -602,6 +658,8 @@ export type FuturesInstrumentUncheckedCreateWithoutExecutionsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   positions?: Prisma.FuturesPositionUncheckedCreateNestedManyWithoutInstrumentInput
+  marks?: Prisma.FuturesMarkSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutExecutionsInput = {
@@ -629,6 +687,8 @@ export type FuturesInstrumentUpdateWithoutExecutionsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   underlyingAsset?: Prisma.AssetUpdateOneRequiredWithoutFuturesInstrumentsNestedInput
   positions?: Prisma.FuturesPositionUpdateManyWithoutInstrumentNestedInput
+  marks?: Prisma.FuturesMarkSnapshotUpdateManyWithoutInstrumentNestedInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutExecutionsInput = {
@@ -640,6 +700,144 @@ export type FuturesInstrumentUncheckedUpdateWithoutExecutionsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   positions?: Prisma.FuturesPositionUncheckedUpdateManyWithoutInstrumentNestedInput
+  marks?: Prisma.FuturesMarkSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedUpdateManyWithoutInstrumentNestedInput
+}
+
+export type FuturesInstrumentCreateWithoutMarksInput = {
+  id?: string
+  productType?: $Enums.FuturesProductType
+  settlementCurrency?: $Enums.CurrencyCode
+  isActive?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  underlyingAsset: Prisma.AssetCreateNestedOneWithoutFuturesInstrumentsInput
+  positions?: Prisma.FuturesPositionCreateNestedManyWithoutInstrumentInput
+  executions?: Prisma.FuturesExecutionCreateNestedManyWithoutInstrumentInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseCreateNestedManyWithoutInstrumentInput
+}
+
+export type FuturesInstrumentUncheckedCreateWithoutMarksInput = {
+  id?: string
+  underlyingAssetId: string
+  productType?: $Enums.FuturesProductType
+  settlementCurrency?: $Enums.CurrencyCode
+  isActive?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  positions?: Prisma.FuturesPositionUncheckedCreateNestedManyWithoutInstrumentInput
+  executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutInstrumentInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedManyWithoutInstrumentInput
+}
+
+export type FuturesInstrumentCreateOrConnectWithoutMarksInput = {
+  where: Prisma.FuturesInstrumentWhereUniqueInput
+  create: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutMarksInput, Prisma.FuturesInstrumentUncheckedCreateWithoutMarksInput>
+}
+
+export type FuturesInstrumentUpsertWithoutMarksInput = {
+  update: Prisma.XOR<Prisma.FuturesInstrumentUpdateWithoutMarksInput, Prisma.FuturesInstrumentUncheckedUpdateWithoutMarksInput>
+  create: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutMarksInput, Prisma.FuturesInstrumentUncheckedCreateWithoutMarksInput>
+  where?: Prisma.FuturesInstrumentWhereInput
+}
+
+export type FuturesInstrumentUpdateToOneWithWhereWithoutMarksInput = {
+  where?: Prisma.FuturesInstrumentWhereInput
+  data: Prisma.XOR<Prisma.FuturesInstrumentUpdateWithoutMarksInput, Prisma.FuturesInstrumentUncheckedUpdateWithoutMarksInput>
+}
+
+export type FuturesInstrumentUpdateWithoutMarksInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  underlyingAsset?: Prisma.AssetUpdateOneRequiredWithoutFuturesInstrumentsNestedInput
+  positions?: Prisma.FuturesPositionUpdateManyWithoutInstrumentNestedInput
+  executions?: Prisma.FuturesExecutionUpdateManyWithoutInstrumentNestedInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUpdateManyWithoutInstrumentNestedInput
+}
+
+export type FuturesInstrumentUncheckedUpdateWithoutMarksInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  underlyingAssetId?: Prisma.StringFieldUpdateOperationsInput | string
+  productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  positions?: Prisma.FuturesPositionUncheckedUpdateManyWithoutInstrumentNestedInput
+  executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutInstrumentNestedInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedUpdateManyWithoutInstrumentNestedInput
+}
+
+export type FuturesInstrumentCreateWithoutLiquidationClosesInput = {
+  id?: string
+  productType?: $Enums.FuturesProductType
+  settlementCurrency?: $Enums.CurrencyCode
+  isActive?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  underlyingAsset: Prisma.AssetCreateNestedOneWithoutFuturesInstrumentsInput
+  positions?: Prisma.FuturesPositionCreateNestedManyWithoutInstrumentInput
+  executions?: Prisma.FuturesExecutionCreateNestedManyWithoutInstrumentInput
+  marks?: Prisma.FuturesMarkSnapshotCreateNestedManyWithoutInstrumentInput
+}
+
+export type FuturesInstrumentUncheckedCreateWithoutLiquidationClosesInput = {
+  id?: string
+  underlyingAssetId: string
+  productType?: $Enums.FuturesProductType
+  settlementCurrency?: $Enums.CurrencyCode
+  isActive?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  positions?: Prisma.FuturesPositionUncheckedCreateNestedManyWithoutInstrumentInput
+  executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutInstrumentInput
+  marks?: Prisma.FuturesMarkSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+}
+
+export type FuturesInstrumentCreateOrConnectWithoutLiquidationClosesInput = {
+  where: Prisma.FuturesInstrumentWhereUniqueInput
+  create: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutLiquidationClosesInput, Prisma.FuturesInstrumentUncheckedCreateWithoutLiquidationClosesInput>
+}
+
+export type FuturesInstrumentUpsertWithoutLiquidationClosesInput = {
+  update: Prisma.XOR<Prisma.FuturesInstrumentUpdateWithoutLiquidationClosesInput, Prisma.FuturesInstrumentUncheckedUpdateWithoutLiquidationClosesInput>
+  create: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutLiquidationClosesInput, Prisma.FuturesInstrumentUncheckedCreateWithoutLiquidationClosesInput>
+  where?: Prisma.FuturesInstrumentWhereInput
+}
+
+export type FuturesInstrumentUpdateToOneWithWhereWithoutLiquidationClosesInput = {
+  where?: Prisma.FuturesInstrumentWhereInput
+  data: Prisma.XOR<Prisma.FuturesInstrumentUpdateWithoutLiquidationClosesInput, Prisma.FuturesInstrumentUncheckedUpdateWithoutLiquidationClosesInput>
+}
+
+export type FuturesInstrumentUpdateWithoutLiquidationClosesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  underlyingAsset?: Prisma.AssetUpdateOneRequiredWithoutFuturesInstrumentsNestedInput
+  positions?: Prisma.FuturesPositionUpdateManyWithoutInstrumentNestedInput
+  executions?: Prisma.FuturesExecutionUpdateManyWithoutInstrumentNestedInput
+  marks?: Prisma.FuturesMarkSnapshotUpdateManyWithoutInstrumentNestedInput
+}
+
+export type FuturesInstrumentUncheckedUpdateWithoutLiquidationClosesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  underlyingAssetId?: Prisma.StringFieldUpdateOperationsInput | string
+  productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  positions?: Prisma.FuturesPositionUncheckedUpdateManyWithoutInstrumentNestedInput
+  executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutInstrumentNestedInput
+  marks?: Prisma.FuturesMarkSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentCreateManyUnderlyingAssetInput = {
@@ -660,6 +858,8 @@ export type FuturesInstrumentUpdateWithoutUnderlyingAssetInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   positions?: Prisma.FuturesPositionUpdateManyWithoutInstrumentNestedInput
   executions?: Prisma.FuturesExecutionUpdateManyWithoutInstrumentNestedInput
+  marks?: Prisma.FuturesMarkSnapshotUpdateManyWithoutInstrumentNestedInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutUnderlyingAssetInput = {
@@ -671,6 +871,8 @@ export type FuturesInstrumentUncheckedUpdateWithoutUnderlyingAssetInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   positions?: Prisma.FuturesPositionUncheckedUpdateManyWithoutInstrumentNestedInput
   executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutInstrumentNestedInput
+  marks?: Prisma.FuturesMarkSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateManyWithoutUnderlyingAssetInput = {
@@ -690,11 +892,15 @@ export type FuturesInstrumentUncheckedUpdateManyWithoutUnderlyingAssetInput = {
 export type FuturesInstrumentCountOutputType = {
   positions: number
   executions: number
+  marks: number
+  liquidationCloses: number
 }
 
 export type FuturesInstrumentCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   positions?: boolean | FuturesInstrumentCountOutputTypeCountPositionsArgs
   executions?: boolean | FuturesInstrumentCountOutputTypeCountExecutionsArgs
+  marks?: boolean | FuturesInstrumentCountOutputTypeCountMarksArgs
+  liquidationCloses?: boolean | FuturesInstrumentCountOutputTypeCountLiquidationClosesArgs
 }
 
 /**
@@ -721,6 +927,20 @@ export type FuturesInstrumentCountOutputTypeCountExecutionsArgs<ExtArgs extends 
   where?: Prisma.FuturesExecutionWhereInput
 }
 
+/**
+ * FuturesInstrumentCountOutputType without action
+ */
+export type FuturesInstrumentCountOutputTypeCountMarksArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.FuturesMarkSnapshotWhereInput
+}
+
+/**
+ * FuturesInstrumentCountOutputType without action
+ */
+export type FuturesInstrumentCountOutputTypeCountLiquidationClosesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.FuturesLiquidationCloseWhereInput
+}
+
 
 export type FuturesInstrumentSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -733,6 +953,8 @@ export type FuturesInstrumentSelect<ExtArgs extends runtime.Types.Extensions.Int
   underlyingAsset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   positions?: boolean | Prisma.FuturesInstrument$positionsArgs<ExtArgs>
   executions?: boolean | Prisma.FuturesInstrument$executionsArgs<ExtArgs>
+  marks?: boolean | Prisma.FuturesInstrument$marksArgs<ExtArgs>
+  liquidationCloses?: boolean | Prisma.FuturesInstrument$liquidationClosesArgs<ExtArgs>
   _count?: boolean | Prisma.FuturesInstrumentCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["futuresInstrument"]>
 
@@ -773,6 +995,8 @@ export type FuturesInstrumentInclude<ExtArgs extends runtime.Types.Extensions.In
   underlyingAsset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   positions?: boolean | Prisma.FuturesInstrument$positionsArgs<ExtArgs>
   executions?: boolean | Prisma.FuturesInstrument$executionsArgs<ExtArgs>
+  marks?: boolean | Prisma.FuturesInstrument$marksArgs<ExtArgs>
+  liquidationCloses?: boolean | Prisma.FuturesInstrument$liquidationClosesArgs<ExtArgs>
   _count?: boolean | Prisma.FuturesInstrumentCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type FuturesInstrumentIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -788,6 +1012,8 @@ export type $FuturesInstrumentPayload<ExtArgs extends runtime.Types.Extensions.I
     underlyingAsset: Prisma.$AssetPayload<ExtArgs>
     positions: Prisma.$FuturesPositionPayload<ExtArgs>[]
     executions: Prisma.$FuturesExecutionPayload<ExtArgs>[]
+    marks: Prisma.$FuturesMarkSnapshotPayload<ExtArgs>[]
+    liquidationCloses: Prisma.$FuturesLiquidationClosePayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1194,6 +1420,8 @@ export interface Prisma__FuturesInstrumentClient<T, Null = never, ExtArgs extend
   underlyingAsset<T extends Prisma.AssetDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AssetDefaultArgs<ExtArgs>>): Prisma.Prisma__AssetClient<runtime.Types.Result.GetResult<Prisma.$AssetPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   positions<T extends Prisma.FuturesInstrument$positionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesInstrument$positionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesPositionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   executions<T extends Prisma.FuturesInstrument$executionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesInstrument$executionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesExecutionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  marks<T extends Prisma.FuturesInstrument$marksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesInstrument$marksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesMarkSnapshotPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  liquidationCloses<T extends Prisma.FuturesInstrument$liquidationClosesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesInstrument$liquidationClosesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesLiquidationClosePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1676,6 +1904,54 @@ export type FuturesInstrument$executionsArgs<ExtArgs extends runtime.Types.Exten
   take?: number
   skip?: number
   distinct?: Prisma.FuturesExecutionScalarFieldEnum | Prisma.FuturesExecutionScalarFieldEnum[]
+}
+
+/**
+ * FuturesInstrument.marks
+ */
+export type FuturesInstrument$marksArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the FuturesMarkSnapshot
+   */
+  select?: Prisma.FuturesMarkSnapshotSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the FuturesMarkSnapshot
+   */
+  omit?: Prisma.FuturesMarkSnapshotOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FuturesMarkSnapshotInclude<ExtArgs> | null
+  where?: Prisma.FuturesMarkSnapshotWhereInput
+  orderBy?: Prisma.FuturesMarkSnapshotOrderByWithRelationInput | Prisma.FuturesMarkSnapshotOrderByWithRelationInput[]
+  cursor?: Prisma.FuturesMarkSnapshotWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.FuturesMarkSnapshotScalarFieldEnum | Prisma.FuturesMarkSnapshotScalarFieldEnum[]
+}
+
+/**
+ * FuturesInstrument.liquidationCloses
+ */
+export type FuturesInstrument$liquidationClosesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the FuturesLiquidationClose
+   */
+  select?: Prisma.FuturesLiquidationCloseSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the FuturesLiquidationClose
+   */
+  omit?: Prisma.FuturesLiquidationCloseOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FuturesLiquidationCloseInclude<ExtArgs> | null
+  where?: Prisma.FuturesLiquidationCloseWhereInput
+  orderBy?: Prisma.FuturesLiquidationCloseOrderByWithRelationInput | Prisma.FuturesLiquidationCloseOrderByWithRelationInput[]
+  cursor?: Prisma.FuturesLiquidationCloseWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.FuturesLiquidationCloseScalarFieldEnum | Prisma.FuturesLiquidationCloseScalarFieldEnum[]
 }
 
 /**

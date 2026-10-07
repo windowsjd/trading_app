@@ -263,3 +263,18 @@ export type OpsJobLock = Prisma.OpsJobLockModel
  * 
  */
 export type LimitOrderCandleEvidence = Prisma.LimitOrderCandleEvidenceModel
+/**
+ * Model FuturesMarkSnapshot
+ * 
+ */
+export type FuturesMarkSnapshot = Prisma.FuturesMarkSnapshotModel
+/**
+ * Model FuturesLiquidation
+ * 
+ */
+export type FuturesLiquidation = Prisma.FuturesLiquidationModel
+/**
+ * Model FuturesLiquidationClose
+ * 
+ */
+export type FuturesLiquidationClose = Prisma.FuturesLiquidationCloseModel

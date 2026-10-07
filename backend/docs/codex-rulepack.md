@@ -18,7 +18,7 @@ login → 계정/모드 선택 → 시즌 참가 또는 일반계정 개설/재�
 - 각 cash mutation/진단은 exact expected scope를 명시한다. 자산 타입으로 기존 주문 scope를 재추론하거나 다른 wallet으로 fallback하지 않는다.
 - 동일 계정의 USD 지갑 간 Transfer는 PostgreSQL 원자적 내부이동이며 총자산/TWR/랭킹에 중립이다.
 - Securities KRW↔Crypto Spot/Futures USD는 명시적 quote→execute FX+Transfer다. Securities만 FX 경계이며 한 user command를 한 PostgreSQL transaction으로 처리한다. FX/Transfer evidence는 구분하고 parent command로 연결한다.
-- Wallet UI는 네 지갑을 scope+currency로 구분한다. Securities KRW↔USD는 기존 환전 화면을 사용한다. 자동환전·주문 auto-funding은 없다. Futures F1 backend는 [Futures 계약](futures-api-contract.md)을 따르며 기본 OFF, 사용자 활성화/UI/전체 평가 통합은 없다.
+- Wallet UI는 네 지갑을 scope+currency로 구분한다. Securities KRW↔USD는 기존 환전 화면을 사용한다. 자동환전·주문 auto-funding은 없다. Futures F1/F2 backend는 [Futures 계약](futures-api-contract.md)을 따르며 기본 OFF, 사용자 활성화/UI/전체 평가 통합은 없다.
 - 기존 계정은 배포 migration에서 zero Crypto 지갑만 추가하며 GET 자동 복구를 금지한다.
 
 ### 평가
@@ -36,7 +36,7 @@ login → 계정/모드 선택 → 시즌 참가 또는 일반계정 개설/재�
 - 지정가: quote → create(submitted + 예약) → scheduler Path A/B 전량 체결 또는 cancel/시즌 cleanup
 - 매칭 권위: PostgreSQL submitted orders + scheduler polling + OpsJobLock + 주문별 execution transaction
 - 신규 지정가는 `LIMIT_ORDER_ENABLED`, 자동 체결은 `SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED`로 각각 제어
-- F1 Futures는 별도 instrument/position/execution/command, USD synthetic perpetual Market Long/Short One-way Isolated만 지원한다. leverage는 1~100 정수이며 열린 lifetime에서 고정한다. margin은 Futures 지갑 collateral 사용량으로 cash/reserved를 차감·재사용하지 않는다. 실제 fee/PnL만 cash와 원장에 쓴다. `FUTURES_TRADING_ENABLED` 기본 OFF이며 F2/F3 전 사용자 활성화 금지다.
+- Futures는 별도 instrument/position/execution/command, USD synthetic perpetual Market Long/Short One-way Isolated/Cross를 지원한다. [F2 risk](futures-risk-contract.md)의 MMR 0.5%, Mark 기반 전량청산, bankruptcy evidence 및 mode별 collateral 경계를 따른다. leverage는 1~100 정수이며 열린 lifetime에서 고정한다. margin은 Futures 지갑 collateral 사용량으로 cash/reserved를 차감·재사용하지 않는다. 실제 fee/PnL만 cash와 원장에 쓴다. `FUTURES_TRADING_MODE` 기본 DISABLED (기존 boolean 호환)이며 F3 전 사용자 활성화 금지다.
 - lock order·fee 예외는 [주문 계약](orders-api-contract.md)과 [정책](policy-decisions.md) 참조
 
 ### 상태

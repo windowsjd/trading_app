@@ -100,6 +100,7 @@ enum WalletTransactionReferenceType {
   ad_reward_claim
   wallet_transfer
   futures_execution
+  futures_liquidation
 }
 
 enum FuturesProductType {
@@ -112,6 +113,7 @@ enum FuturesDirection {
 }
 
 enum FuturesMarginMode {
+  cross
   isolated
 }
 
@@ -261,6 +263,7 @@ enum OpsJobName {
   limit_order_matcher
   limit_order_candle_reconciliation
   limit_order_matching
+  futures_liquidation
 }
 
 enum MarketCandleSyncMode {
@@ -443,6 +446,7 @@ model TradingAccount {
   futuresPositions              FuturesPosition[]
   futuresExecutions             FuturesExecution[]
   futuresExecuteRequests        FuturesExecuteRequest[]
+  futuresLiquidations           FuturesLiquidation[]
   quotes                        Quote[]
   adRewardClaims                AdRewardClaim[]
   equitySnapshots               EquitySnapshot[]
@@ -837,9 +841,11 @@ model FuturesInstrument {
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
 
-  underlyingAsset Asset              @relation(fields: [underlyingAssetId], references: [id], onDelete: Restrict)
-  positions       FuturesPosition[]
-  executions      FuturesExecution[]
+  underlyingAsset   Asset                     @relation(fields: [underlyingAssetId], references: [id], onDelete: Restrict)
+  positions         FuturesPosition[]
+  executions        FuturesExecution[]
+  marks             FuturesMarkSnapshot[]
+  liquidationCloses FuturesLiquidationClose[]
 
   @@unique([underlyingAssetId, productType, settlementCurrency])
   @@map("futures_instruments")
@@ -865,9 +871,10 @@ model FuturesPosition {
   createdAt         DateTime              @default(now()) @map("created_at")
   updatedAt         DateTime              @updatedAt @map("updated_at")
 
-  tradingAccount TradingAccount     @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
-  instrument     FuturesInstrument  @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
-  executions     FuturesExecution[]
+  tradingAccount   TradingAccount           @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  instrument       FuturesInstrument        @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  executions       FuturesExecution[]
+  liquidationClose FuturesLiquidationClose?
 
   @@unique([id, tradingAccountId, instrumentId])
   @@index([tradingAccountId, status, instrumentId])
@@ -1594,4 +1601,81 @@ model LimitOrderCandleEvidence {
   @@unique([assetId, interval, openTime, provider], map: "limit_order_candle_evidences_asset_interval_open_provider_key")
   @@index([assetId, openTime])
   @@map("limit_order_candle_evidences")
+}
+
+enum FuturesMarkSource {
+  binance_usdm_mark_ws
+  binance_usdm_mark_rest
+}
+
+// Deliberately separate from Spot valuation/execution evidence.
+model FuturesMarkSnapshot {
+  id              String                    @id @default(uuid())
+  instrumentId    String                    @map("instrument_id")
+  symbol          String
+  providerProduct String                    @default("binance_usdm_perpetual") @map("provider_product")
+  currencyCode    CurrencyCode              @default(USD) @map("currency_code")
+  source          FuturesMarkSource
+  price           Decimal                   @db.Decimal(24, 8)
+  effectiveAt     DateTime                  @map("effective_at")
+  capturedAt      DateTime                  @map("captured_at")
+  instrument      FuturesInstrument         @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  closes          FuturesLiquidationClose[]
+
+  @@unique([instrumentId, source, effectiveAt])
+  @@index([instrumentId, effectiveAt])
+  @@map("futures_mark_snapshots")
+}
+
+model FuturesLiquidation {
+  id                     String                    @id @default(uuid())
+  tradingAccountId       String                    @map("trading_account_id")
+  marginMode             FuturesMarginMode         @map("margin_mode")
+  evaluationAt           DateTime                  @map("evaluation_at")
+  collateralAvailable    Decimal                   @map("collateral_available") @db.Decimal(24, 8)
+  preEquity              Decimal                   @map("pre_equity") @db.Decimal(24, 8)
+  maintenanceMargin      Decimal                   @map("maintenance_margin") @db.Decimal(24, 8)
+  estimatedCloseFee      Decimal                   @map("estimated_close_fee") @db.Decimal(24, 8)
+  liquidationRequirement Decimal                   @map("liquidation_requirement") @db.Decimal(24, 8)
+  realizedPnl            Decimal                   @map("realized_pnl") @db.Decimal(24, 8)
+  feeAmount              Decimal                   @map("fee_amount") @db.Decimal(24, 8)
+  settledPnl             Decimal                   @map("settled_pnl") @db.Decimal(24, 8)
+  settledFee             Decimal                   @map("settled_fee") @db.Decimal(24, 8)
+  settledCash            Decimal                   @map("settled_cash") @db.Decimal(24, 8)
+  bankruptcyShortfall    Decimal                   @map("bankruptcy_shortfall") @db.Decimal(24, 8)
+  walletBalanceBefore    Decimal                   @map("wallet_balance_before") @db.Decimal(24, 8)
+  walletBalanceAfter     Decimal                   @map("wallet_balance_after") @db.Decimal(24, 8)
+  executedAt             DateTime                  @map("executed_at")
+  tradingAccount         TradingAccount            @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  closes                 FuturesLiquidationClose[]
+
+  @@unique([id, tradingAccountId])
+  @@index([tradingAccountId, executedAt, id])
+  @@map("futures_liquidations")
+}
+
+model FuturesLiquidationClose {
+  id                String              @id @default(uuid())
+  liquidationId     String              @map("liquidation_id")
+  tradingAccountId  String              @map("trading_account_id")
+  positionId        String              @unique @map("position_id")
+  instrumentId      String              @map("instrument_id")
+  markSnapshotId    String              @map("mark_snapshot_id")
+  direction         FuturesDirection
+  quantity          Decimal             @db.Decimal(24, 8)
+  executionPrice    Decimal             @map("execution_price") @db.Decimal(24, 8)
+  maintenanceMargin Decimal             @map("maintenance_margin") @db.Decimal(24, 8)
+  estimatedCloseFee Decimal             @map("estimated_close_fee") @db.Decimal(24, 8)
+  realizedPnl       Decimal             @map("realized_pnl") @db.Decimal(24, 8)
+  feeRate           Decimal             @map("fee_rate") @db.Decimal(10, 6)
+  feeAmount         Decimal             @map("fee_amount") @db.Decimal(24, 8)
+  liquidation       FuturesLiquidation  @relation(fields: [liquidationId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
+  position          FuturesPosition     @relation(fields: [positionId, tradingAccountId, instrumentId], references: [id, tradingAccountId, instrumentId], onDelete: Restrict)
+  instrument        FuturesInstrument   @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  markSnapshot      FuturesMarkSnapshot @relation(fields: [markSnapshotId], references: [id], onDelete: Restrict)
+
+  @@unique([positionId, tradingAccountId, instrumentId])
+  @@index([liquidationId, tradingAccountId])
+  @@index([markSnapshotId])
+  @@map("futures_liquidation_closes")
 }

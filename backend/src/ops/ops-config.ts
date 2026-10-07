@@ -180,6 +180,7 @@ export function getOpsSchedulerConfig(
     ),
     tickIntervalMs: resolveTickIntervalMs(env),
     jobs: {
+      [OpsJobName.futures_liquidation]: false, // Dedicated FuturesRiskWorker dispatches.
       [OpsJobName.provider_fx_ingest]: providerFxEnabled,
       [OpsJobName.provider_binance_ingest]: providerBinanceEnabled,
       [OpsJobName.provider_kis_ingest]: providerKisEnabled,

@@ -12,9 +12,10 @@ import { futuresError } from './futures-error';
 const CalculationDecimal = Prisma.Decimal.clone({ precision: 60 });
 export const futuresDecimal = (value: Prisma.Decimal | string) =>
   new CalculationDecimal(value.toString());
-const money = (value: Prisma.Decimal) =>
+export const futuresMoney = (value: Prisma.Decimal) =>
   roundDecimalHalfUp(value, monetaryScale);
-const marginCeil = (value: Prisma.Decimal) =>
+const money = futuresMoney;
+export const marginCeil = (value: Prisma.Decimal) =>
   value.toDecimalPlaces(monetaryScale, Prisma.Decimal.ROUND_CEIL);
 const maxMoney = new CalculationDecimal('9999999999999999.99999999');
 
@@ -50,18 +51,22 @@ type PositionBasis = Pick<
   | 'leverage'
   | 'isolatedMargin'
   | 'realizedPnl'
->;
+> & { marginMode?: 'isolated' | 'cross' };
 
 export function planFuturesExecution(
   command: FuturesCommand,
   current: PositionBasis | null,
   price: Prisma.Decimal,
   feeRate: Prisma.Decimal,
+  executionKind: 'user' | 'liquidation' = 'user',
 ) {
   const quantity = futuresDecimal(command.quantity);
   const rawNotional = quantity.mul(price);
   const notional = assertFuturesMoney(money(rawNotional));
-  if (notional.lte(0))
+  if (
+    notional.lte(0) &&
+    !(executionKind === 'liquidation' && command.operation === 'close')
+  )
     futuresError(
       'FUTURES_VALUE_TOO_SMALL',
       'Executed notional must be positive at the cash scale.',
@@ -91,9 +96,10 @@ export function planFuturesExecution(
       quantity,
       averageEntryPrice: futuresDecimal(price),
       entryNotional: rawNotional,
-      isolatedMargin: assertFuturesMoney(
-        marginCeil(rawNotional.div(command.leverage)),
-      ),
+      isolatedMargin:
+        command.marginMode === 'cross'
+          ? futuresDecimal('0')
+          : assertFuturesMoney(marginCeil(rawNotional.div(command.leverage))),
       realizedPnl: futuresDecimal('0'),
       cumulativeRealizedPnl: futuresDecimal('0'),
       notional,
@@ -118,6 +124,11 @@ export function planFuturesExecution(
       'Leverage is fixed for the open position lifetime.',
     );
   const oldQty = futuresDecimal(current.quantity);
+  if ((current.marginMode ?? 'isolated') !== (command.marginMode ?? 'isolated'))
+    futuresError(
+      'FUTURES_MARGIN_MODE_MISMATCH',
+      'Margin mode is fixed for the position lifetime.',
+    );
   if (command.operation === 'increase') {
     const newQty = assertFuturesMoney(oldQty.add(quantity));
     const averageEntryPrice = assertFuturesMoney(
@@ -130,12 +141,15 @@ export function planFuturesExecution(
       quantity: newQty,
       averageEntryPrice,
       entryNotional,
-      isolatedMargin: assertFuturesMoney(
-        CalculationDecimal.max(
-          current.isolatedMargin.toString(),
-          marginCeil(entryNotional.div(command.leverage)),
-        ),
-      ),
+      isolatedMargin:
+        command.marginMode === 'cross'
+          ? futuresDecimal('0')
+          : assertFuturesMoney(
+              CalculationDecimal.max(
+                current.isolatedMargin.toString(),
+                marginCeil(entryNotional.div(command.leverage)),
+              ),
+            ),
       realizedPnl: futuresDecimal('0'),
       cumulativeRealizedPnl: futuresDecimal(current.realizedPnl),
       notional,

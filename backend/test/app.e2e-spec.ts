@@ -3015,6 +3015,7 @@ describe('AppController (e2e)', () => {
     'instruments',
     'positions',
     'executions',
+    'liquidations',
   ] as const) {
     it(`Futures ${endpoint} requires authentication before dispatch`, async () => {
       const spy = jest.spyOn(app.get(FuturesService), endpoint);
@@ -3058,7 +3059,9 @@ describe('AppController (e2e)', () => {
           endpoint === 'execute'
             ? request(app.getHttpServer()).post(route).send(body)
             : request(app.getHttpServer()).get(
-                endpoint === 'executions' ? `${route}?limit=2&offset=1` : route,
+                endpoint === 'executions' || endpoint === 'liquidations'
+                  ? `${route}?limit=2&offset=1`
+                  : route,
               );
         await req
           .set('Authorization', `Bearer ${token}`)
@@ -3069,7 +3072,7 @@ describe('AppController (e2e)', () => {
           'trading-account-1',
           ...(endpoint === 'execute'
             ? [body]
-            : endpoint === 'executions'
+            : endpoint === 'executions' || endpoint === 'liquidations'
               ? [{ limit: '2', offset: '1' }]
               : []),
         );

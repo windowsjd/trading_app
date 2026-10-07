@@ -898,10 +898,9 @@ async function main() {
     '70.00000000',
     'limit-closed-' + randomUUID(),
   );
-  await prisma.tradingAccount.update({
-    where: { id: accountId },
-    data: { status: TradingAccountStatus.closed, closedAt: new Date() },
-  });
+  // Account openedAt is DB-authored. Keep this fixture on that same clock.
+  await prisma.$executeRaw\`UPDATE trading_accounts SET status = 'closed',
+    closed_at = GREATEST(clock_timestamp(), opened_at) WHERE id = \${accountId}\`;
   await expectCode(
     orders.quoteOrderForTradingAccount(userId, accountId, {
       assetId,

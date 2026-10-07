@@ -243,14 +243,16 @@ evidence and observation boundaries without changing business policy.
   one durable quote/execute command and one PostgreSQL transaction, reusing
   Securities-only FX and internal USD transfer evidence. Transfer stays neutral;
   FX fee/repricing keeps its existing economic effect. Automatic FX/order funding
-  remains unsupported. Futures F1 uses its USD wallet as collateral; synthetic
-  USD perpetual Market Long/Short, One-way, Isolated and integer 1–100x leverage
-  are available only behind default-OFF `FUTURES_TRADING_ENABLED`. Open leverage
+  remains unsupported. Futures F1/F2 uses its USD wallet as collateral; synthetic
+  USD perpetual Market Long/Short, One-way, Isolated/Cross and integer 1–100x leverage
+  are available only behind default-DISABLED `FUTURES_TRADING_MODE` (legacy boolean supported). Open leverage
   is fixed. Margin is separate from cash reservations; actual fees/realized PnL
   mutate cash, and outgoing transfers respect free collateral. Existing Binance
-  Spot snapshots are synthetic reference/execution price, not Mark Price. There
-  is no Cross, liquidation, Futures UI or Futures valuation integration. Do not
-  enable for users before F2/F3; see [Futures contract](docs/futures-api-contract.md).
+  Spot snapshots are synthetic reference/execution price, not Mark Price. Risk uses a separate 5-second-fresh PostgreSQL Binance USDⓈ-M Mark source;
+  fixed 0.5% maintenance plus normal close fee triggers atomic full liquidation.
+  Bankruptcy shortfall is explicit and protected collateral is preserved.
+  Futures UI and Futures UPNL valuation integration remain deferred. Do not
+  enable for users before F3; see [Futures contract](docs/futures-api-contract.md).
   See `docs/wallet-transfers-api-contract.md`. Existing accounts are normalized
   by a zero-only migration, including closed accounts without changing history.
   See [current scope and rollout policy](docs/trading-modes-and-accounts.md).
@@ -273,7 +275,8 @@ evidence and observation boundaries without changing business policy.
 These are intentionally outside the current implementation and should not be added without a separate gate:
 
 - Provider-backed reward workflows.
-- Binance Futures APIs and Binance authenticated order/account/user-data APIs.
+- Binance authenticated order/account/user-data APIs and real Futures trading.
+  Public USDⓈ-M Mark Price market data is used only by the synthetic F2 risk engine.
 - OANDA and Twelve Data are historical provider candidates only, not the current MVP core provider stack.
 - Batch run HTTP APIs, scheduler HTTP APIs, external reward fulfillment APIs, and reward policy/catalog APIs.
 - Production cron job implementation beyond the disabled-by-default foundation, scheduler-driven provider ingestion, scheduler-driven reward automation, or external reward fulfillment jobs.

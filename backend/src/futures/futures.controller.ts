@@ -39,6 +39,20 @@ export class FuturesController {
   positions(@Req() req: AuthenticatedRequest, @Param('accountId') id: string) {
     return this.futures.positions(req.user?.userId, id);
   }
+  @Get('liquidations')
+  liquidations(
+    @Req() req: AuthenticatedRequest,
+    @Param('accountId') id: string,
+    @Query(
+      new ScalarQueryPipe({
+        limit: 'INVALID_PAGINATION',
+        offset: 'INVALID_PAGINATION',
+      }),
+    )
+    query: { limit?: string; offset?: string },
+  ) {
+    return this.futures.liquidations(req.user?.userId, id, query);
+  }
   @Get('executions')
   executions(
     @Req() req: AuthenticatedRequest,
