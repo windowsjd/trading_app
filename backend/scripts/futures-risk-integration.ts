@@ -16,6 +16,11 @@ import { OpsJobRunService } from '../src/ops/ops-job-run.service';
 import { futuresDecimal as d } from '../src/futures/futures-math';
 import { readFuturesMark } from '../src/futures/futures-mark';
 import { readFuturesPrice } from '../src/futures/futures-price';
+import { HttpException } from '@nestjs/common';
+import {
+  adminDiagnosticRequestMiddleware,
+  buildAdminDiagnostic,
+} from '../src/common/admin-diagnostics';
 import {
   db,
   fxEvidenceIds,
@@ -30,6 +35,7 @@ import {
   state,
   invariant,
   cleanup,
+  code,
   type Scenario,
 } from './futures-integration';
 if (
@@ -180,6 +186,16 @@ async function assertEvent(s: Scenario, count: number, shortfall: boolean) {
     assert.ok(c.executionPrice.eq(c.markSnapshot.price));
     assert.equal(c.markSnapshot.instrumentId, c.instrumentId);
   }
+  const history = await app.futures.liquidations(s.userId, s.accountId);
+  const expected = JSON.parse(JSON.stringify(event)) as {
+    closes: Array<{ positionId: string }>;
+  };
+  expected.closes.sort((a, b) => a.positionId.localeCompare(b.positionId));
+  const persisted = (history.data.liquidations as Array<{ id: string }>).find(
+    (row) => row.id === event.id,
+  );
+  // Technical redaction must never alter durable financial evidence/history.
+  assert.deepEqual(persisted, expected);
   await invariant(s);
   return event;
 }
@@ -193,6 +209,22 @@ async function isolatedCases(mode: TradingAccountMode) {
           where: { id: o.data.position.id },
         });
         const read = await app.futures.positions(s.userId, s.accountId);
+        assert.equal(read.data.positions[0].quantity, p.quantity.toFixed(8));
+        assert.equal(
+          read.data.positions[0].averageEntryPrice,
+          p.averageEntryPrice.toFixed(8),
+        );
+        assert.equal(
+          read.data.positions[0].isolatedMargin,
+          p.isolatedMargin.toFixed(8),
+        );
+        assert.equal(read.data.positions[0].markPrice, '100.00000000');
+        assert.equal(read.data.positions[0].risk?.markNotional, '100.00000000');
+        assert.equal(read.data.positions[0].risk?.unrealizedPnl, '0.00000000');
+        assert.equal(
+          read.data.collateral.balanceAmount,
+          (await wallet(s)).balanceAmount.toFixed(8),
+        );
         assert.equal(
           read.data.positions[0].risk?.maintenanceMargin,
           '0.50000000',
@@ -1025,8 +1057,119 @@ async function quantumAndCreditRollback() {
   }
 }
 
+async function diagnosticSafety() {
+  const capture = async (
+    s: Scenario,
+    action: () => Promise<unknown>,
+    expectedCode: string,
+  ) => {
+    let pending!: Promise<ReturnType<typeof buildAdminDiagnostic>>;
+    adminDiagnosticRequestMiddleware(
+      {
+        method: 'POST',
+        originalUrl: `/api/v1/trading-accounts/${s.accountId}/futures/execute`,
+        headers: { 'x-request-id': 'futures-db-p0' },
+        user: { userId: s.userId, role: 'admin' },
+      } as never,
+      { setHeader() {} } as never,
+      () => {
+        pending = action().then(
+          () => {
+            throw new Error('Expected guard rejection');
+          },
+          (error: unknown) => {
+            assert.ok(error instanceof HttpException);
+            assert.equal(code(error), expectedCode);
+            const diagnostic = buildAdminDiagnostic(
+              error,
+              expectedCode,
+              error.getStatus(),
+            );
+            assert.ok(diagnostic);
+            assert.equal(diagnostic.domain, 'futures');
+            assert.equal(diagnostic.operation, 'market_execute');
+            assert.equal(diagnostic.requestId, 'futures-db-p0');
+            assert.equal(
+              diagnostic.exception.message,
+              (error.getResponse() as { error: { message: string } }).error
+                .message,
+            );
+            assert.ok(
+              diagnostic.nextInvestigation?.includes(
+                'backend/src/futures/futures.service.ts',
+              ),
+            );
+            const serialized = JSON.stringify(diagnostic);
+            assert.ok(Buffer.byteLength(serialized) <= 24 * 1024);
+            assert.doesNotMatch(
+              serialized,
+              /987654\.12345678|"(?:balance|reserved|marginUsed|marginAfter|feeAmount|realizedPnl|freeAfter|quantity|price|balanceAmount|reservedAmount)":/,
+            );
+            return diagnostic;
+          },
+        );
+      },
+    );
+    return (await pending)!;
+  };
+  const s = await setup('general', '987654.12345678');
+  try {
+    const before = await state(s);
+    const insufficient = await capture(
+      s,
+      () =>
+        app.futures.execute(
+          s.userId,
+          s.accountId,
+          openBody(s, { quantity: '99999', leverage: 10 }),
+        ),
+      'INSUFFICIENT_FUTURES_FREE_COLLATERAL',
+    );
+    assert.equal(
+      (insufficient.evidence?.financialGuard as Record<string, unknown>)
+        .failureReason,
+      'isolated_allocation_underfunded',
+    );
+    assert.deepEqual(await state(s), before);
+    await mark(s, 0, '0.12345678');
+    const maintenance = await capture(
+      s,
+      () => app.futures.execute(s.userId, s.accountId, openBody(s)),
+      'FUTURES_MAINTENANCE_UNSAFE',
+    );
+    assert.equal(
+      (maintenance.evidence?.financialGuard as Record<string, unknown>)
+        .maintenanceSufficient,
+      false,
+    );
+    check(
+      'admin financial guards retain scope/predicates without exact amounts; failures roll back',
+    );
+  } finally {
+    await cleanup(s);
+  }
+  const t = await setup('season');
+  try {
+    await db.cashWallet.delete({ where: { id: t.spotWalletId } });
+    const integrity = await capture(
+      t,
+      () => app.futures.execute(t.userId, t.accountId, openBody(t)),
+      'FINANCIAL_SCOPE_REPAIR_REQUIRED',
+    );
+    assert.equal(
+      (integrity.evidence?.financialGuard as Record<string, unknown>)
+        .canonicalWalletSetValid,
+      false,
+    );
+    check('admin wallet integrity evidence excludes canonical financial rows');
+  } finally {
+    await cleanup(t);
+  }
+}
+
 async function main() {
   await db.$connect();
+  await diagnosticSafety();
   await evidenceCases();
   await quantumAndCreditRollback();
   await reservedAndScopeProtection();

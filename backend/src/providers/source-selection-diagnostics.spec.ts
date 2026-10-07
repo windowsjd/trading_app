@@ -93,6 +93,38 @@ function fxEvidence(
 }
 
 describe('selection failure evidence', () => {
+  it('projects arbitrary DB source labels as unrecognized while retaining observed rejection facts', () => {
+    const raw =
+      'https://provider.invalid/private 987654.12345678 SELECT private_wallet {"secret":"fake-secret"}';
+    const evidence = fxEvidence([candidate({ sourceName: raw })]);
+    expect(JSON.stringify(evidence)).not.toMatch(
+      /provider.invalid|987654|private_wallet|fake-secret/,
+    );
+    expect(
+      evidence.providerCandidates.find((row) => row.candidateFound),
+    ).toMatchObject({
+      sourceName: 'unrecognized',
+      sourceType: 'provider_api',
+      candidateFound: true,
+      snapshotId: 'snapshot-safe',
+      reason: 'source_name_mismatch',
+      observedCandidateCount: 1,
+    });
+    const manual = describeManualFallback({
+      snapshot: candidate({ sourceName: raw }),
+      evaluationAt: now,
+      queryChecks: ['approved', 'positive_value'],
+      reason: 'captured_at_stale',
+    });
+    expect(manual).toMatchObject({
+      sourceName: 'unrecognized',
+      snapshotId: 'snapshot-safe',
+      reason: 'captured_at_stale',
+    });
+    expect(JSON.stringify(manual)).not.toMatch(
+      /provider.invalid|987654|private_wallet|fake-secret/,
+    );
+  });
   it('distinguishes first source stale, second missing and a filtered manual miss without raw values', () => {
     const evidence = fxEvidence([candidate()]);
     expect(evidence).toMatchObject({

@@ -122,7 +122,7 @@ export function futuresCommandHash(accountId: string, command: FuturesCommand) {
 function invalid(): never {
   futuresError(
     'INVALID_FUTURES_COMMAND',
-    'An explicit instrument, operation, direction, positive quantity, leverage and idempotency key are required; existing-position commands also require positionId.',
+    'Check the instrument, operation, direction, quantity, leverage and position.',
     HttpStatus.BAD_REQUEST,
   );
 }

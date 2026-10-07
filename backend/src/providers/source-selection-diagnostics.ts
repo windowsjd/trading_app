@@ -1,6 +1,7 @@
 import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
 import {
   CLOSED_MARKET_CARRY_FORWARD_WORKFLOWS,
+  PROVIDER_SOURCE_NAMES,
   selectFreshProviderSnapshotBySourcePriority,
   selectMarketAwareAssetPriceSnapshotBySourcePriority,
   selectProviderSnapshotAtOrBeforeBySourcePriority,
@@ -9,6 +10,15 @@ import {
   type ProviderSnapshotSelection,
   type ProviderWorkflow,
 } from './source-eligibility.policy';
+
+const SAFE_SOURCE_NAMES = new Set<string>(Object.values(PROVIDER_SOURCE_NAMES));
+function diagnosticSourceName(value: string | null): string | null {
+  return value === null
+    ? null
+    : SAFE_SOURCE_NAMES.has(value)
+      ? value
+      : 'unrecognized';
+}
 
 type Eligibility =
   | {
@@ -43,7 +53,7 @@ export function describeManualFallback(input: {
     ...(input.snapshot
       ? {
           snapshotId: input.snapshot.id,
-          sourceName: input.snapshot.sourceName,
+          sourceName: diagnosticSourceName(input.snapshot.sourceName),
           effectiveAt: input.snapshot.effectiveAt,
           capturedAt: input.snapshot.capturedAt,
           positiveValue: input.positiveValue,
@@ -113,8 +123,8 @@ export function buildSelectionFailureEvidence<
       });
     return selectFreshProviderSnapshotBySourcePriority(args);
   };
-  // Expected sources stay first/in priority order. Unexpected observed sources
-  // remain visible (including a null source); no source is inferred from a miss.
+  // Expected sources stay first/in priority order. Unexpected observed source
+  // groups retain their facts, but their free-text DB labels are not projected.
   const observedSources = [
     ...new Set(input.candidates.map((candidate) => candidate.sourceName)),
   ];
@@ -129,7 +139,7 @@ export function buildSelectionFailureEvidence<
     const candidate = candidates[0];
     if (!candidate)
       return {
-        sourceName,
+        sourceName: diagnosticSourceName(sourceName),
         candidateFound: false,
         observedCandidateCount: 0,
         result: 'missing',
@@ -138,13 +148,17 @@ export function buildSelectionFailureEvidence<
     const selection = select(candidates);
     const first = select([candidate]);
     return {
-      sourceName,
+      sourceName: diagnosticSourceName(sourceName),
       candidateFound: true,
       observedCandidateCount: candidates.length,
       result: selection.state,
       reason: selection.decision.rejectedProviderReason,
       snapshotId: candidate.id,
-      sourceType: candidate.sourceType,
+      sourceType: ['provider_api', 'admin_manual', 'official_batch'].includes(
+        candidate.sourceType,
+      )
+        ? candidate.sourceType
+        : 'unrecognized',
       effectiveAt: candidate.effectiveAt,
       capturedAt: candidate.capturedAt,
       ageSeconds: Math.floor(
@@ -179,12 +193,19 @@ export function buildSelectionFailureEvidence<
               ? 'last_completed_session'
               : null
             : 'capturedAt',
-    expectedSourceNames: sourceNames,
+    expectedSourceNames: sourceNames.map(diagnosticSourceName),
     eligibilityReason: eligibility.eligible ? null : eligibility.reason,
     observationScope: 'already_read_candidates',
     observedCandidateCount: input.candidates.length,
     omittedSourceCount: Math.max(0, sources.length - providerCandidates.length),
-    providerDecision: input.selection?.decision ?? null,
+    providerDecision: input.selection
+      ? {
+          ...input.selection.decision,
+          selectedSourceName: diagnosticSourceName(
+            input.selection.decision.selectedSourceName,
+          ),
+        }
+      : null,
     providerCandidates,
     marketSession: marketState,
     manualFallback: input.manualFallback,

@@ -91,7 +91,7 @@ export async function readFuturesMark(
   });
   futuresError(
     code,
-    'Fresh durable Binance USD-M Mark Price is required.',
+    'The current Mark Price is unavailable for risk evaluation. Please try again.',
     HttpStatus.SERVICE_UNAVAILABLE,
   );
 }

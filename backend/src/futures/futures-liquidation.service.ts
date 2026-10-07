@@ -41,7 +41,7 @@ export class FuturesLiquidationService {
           if (!target.seasonParticipant)
             futuresError(
               'FINANCIAL_SCOPE_REPAIR_REQUIRED',
-              'Season participant link is missing.',
+              'Account information could not be verified. Please try again.',
             );
           const lifecycle = await lockSeasonTradingContext(tx, {
             seasonParticipantId: target.seasonParticipant.id,
@@ -50,7 +50,7 @@ export class FuturesLiquidationService {
           if (lifecycle.account.id !== accountId)
             futuresError(
               'TRADING_ACCOUNT_SCOPE_MISMATCH',
-              'Liquidation account link changed.',
+              'Account information could not be verified. Please try again.',
             );
         }
         await tx.$queryRaw`SELECT id FROM cash_wallets WHERE trading_account_id = ${accountId} AND wallet_scope = 'crypto_futures' AND currency_code = 'USD' FOR UPDATE`;
@@ -85,7 +85,7 @@ export class FuturesLiquidationService {
         if (canonicalCashWalletSetIssue(wallets))
           futuresError(
             'FINANCIAL_SCOPE_REPAIR_REQUIRED',
-            'Canonical wallets are inconsistent.',
+            'Futures wallet information could not be verified.',
           );
         await assertAccountFinancialScopeIntegrity(tx, {
           tradingAccountId: accountId,
@@ -158,7 +158,7 @@ export class FuturesLiquidationService {
         if (d(wallet.balanceAmount).sub(wallet.reservedAmount).lt(isolated))
           futuresError(
             'FUTURES_COLLATERAL_INTEGRITY',
-            'Protected isolated collateral is underfunded.',
+            'Futures collateral information could not be verified.',
           );
         const equity =
           scope === 'cross' ? cross.crossEquity : rows[0].risk.equity;

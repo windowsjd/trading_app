@@ -13,6 +13,7 @@ import {
 import { readFuturesMark } from './futures-mark';
 import { futuresError } from './futures-error';
 import { readGeneralTradeFeeRate } from '../orders/general-trading.config';
+import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
 
 export const FUTURES_MMR = '0.005';
 export function riskStrings<T extends Record<string, Prisma.Decimal>>(risk: T) {
@@ -161,7 +162,7 @@ export async function accountFuturesFee(
   )
     futuresError(
       'FUTURES_FEE_POLICY_INVALID',
-      'Account trade fee policy is invalid.',
+      'Trading fees could not be verified. Please try again.',
     );
   return fee;
 }
@@ -209,9 +210,34 @@ export function assertCrossSafe(
     risk.crossBaseCollateral.lt(0) ||
     risk.crossFreeCollateral.lt(0) ||
     (hasCross && risk.liquidationBuffer.lte(0))
-  )
+  ) {
+    // Project the already-calculated predicates, never riskStrings(risk).
+    setAdminDiagnosticContext({
+      evidence: {
+        financialGuard: {
+          guardName: 'futures_collateral',
+          observation: 'mutation_plan',
+          mutationResult: 'rejected',
+          walletScope: 'crypto_futures',
+          currencyCode: 'USD',
+          crossPositionsPresent: hasCross,
+          isolatedAllocationSufficient: risk.crossBaseCollateral.gte(0),
+          collateralSufficient: risk.crossFreeCollateral.gte(0),
+          ...(hasCross
+            ? { maintenanceSufficient: risk.liquidationBuffer.gt(0) }
+            : {}),
+          failureReason: risk.crossBaseCollateral.lt(0)
+            ? 'isolated_allocation_underfunded'
+            : risk.crossFreeCollateral.lt(0)
+              ? 'insufficient_free_collateral'
+              : 'maintenance_unsafe',
+        },
+      },
+      nextInvestigation: ['backend/src/futures/futures-risk.ts'],
+    });
     futuresError(
       'INSUFFICIENT_FUTURES_FREE_COLLATERAL',
-      'Post-mutation collateral must cover isolated allocations, Cross initial margin and maintenance.',
+      'Available Futures collateral is insufficient for the required margin and maintenance.',
     );
+  }
 }

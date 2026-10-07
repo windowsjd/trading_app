@@ -10,7 +10,7 @@ const diagnostic = { version: 1, code: 'INTERNAL_SERVER_ERROR', httpStatus: 500,
   exception: { type: 'Error', message: 'Unexpected internal failure.', applicationStack: [], stack: [], truncated: false },
   diagnosticEvents: { events: [], truncated: false }, serverLogs: { entries: [], truncated: false },
   nextInvestigation: ['backend/src/orders/orders.service.ts'], truncated: false };
-const error = { response: { status: 500, data: { error: { code: 'PRIVATE_UNKNOWN_CODE', message: 'JWT_ACCESS_SECRET raw provider https://private.invalid exact balance 184927.543281', diagnostic } } } };
+const error = { code: 'ECONNABORTED', response: { status: 503, data: { error: { code: 'INTERNAL_DB_FAILURE', message: 'PRIVATE_UNKNOWN_CODE HTTP 503 PROVIDER_INTERNAL_FAILURE JWT_ACCESS_SECRET postgres://user:secret@host/db https://private.invalid Request ID req-private failureStage wallet_write exact balance 184927.543281', diagnostic } } } };
 
 describe('rendered public error boundary', () => {
   for (const role of ['user', 'operator', 'admin', undefined]) it(`keeps public text safe with role=${role}`, () => {
@@ -22,7 +22,7 @@ describe('rendered public error boundary', () => {
     const renderer = h.render(React.createElement(Screen, { message: getApiErrorDisplayMessage(error), diagnosticError: error, onRetry() {} }));
     const visible = () => JSON.stringify(renderer.toJSON()).replace(/\u200b/g, '');
     assert.match(visible(), /잠시 후 다시 시도/);
-    assert.doesNotMatch(visible(), /PRIVATE_UNKNOWN_CODE|JWT_ACCESS_SECRET|private.invalid|184927|req-private|wallet_write|INTERNAL_SERVER_ERROR/);
+    assert.doesNotMatch(visible(), /PRIVATE_UNKNOWN_CODE|JWT_ACCESS_SECRET|private.invalid|184927|req-private|wallet_write|INTERNAL_SERVER_ERROR|INTERNAL_DB_FAILURE|PROVIDER_INTERNAL_FAILURE|HTTP 503|ECONNABORTED|postgres/);
     const toggles = renderer.root.findAllByProps({ testID: 'admin-diagnostic-toggle' });
     assert.equal(toggles.length, role === 'admin' ? 1 : 0);
     if (role === 'admin') {

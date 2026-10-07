@@ -79,7 +79,7 @@ export class FuturesService {
       if (row.requestHash !== requestHash)
         futuresError(
           'FUTURES_IDEMPOTENCY_CONFLICT',
-          'Idempotency key was used for another Futures command.',
+          'This request conflicts with an earlier Futures command.',
         );
       return row.responsePayloadJson as unknown as FuturesExecuteResult;
     };
@@ -115,7 +115,7 @@ export class FuturesService {
           if (lifecycle.account.id !== accountId)
             futuresError(
               'TRADING_ACCOUNT_SCOPE_MISMATCH',
-              'Season trading account changed.',
+              'Account information could not be verified. Please try again.',
               HttpStatus.INTERNAL_SERVER_ERROR,
             );
         }
@@ -147,7 +147,7 @@ export class FuturesService {
         if (lockedAccount.mode !== account.mode)
           futuresError(
             'TRADING_ACCOUNT_SCOPE_MISMATCH',
-            'Trading account mode changed.',
+            'Account information could not be verified. Please try again.',
             HttpStatus.INTERNAL_SERVER_ERROR,
           );
         await this.assertTradable(lockedAccount, executeNow, tx);
@@ -210,11 +210,27 @@ export class FuturesService {
           if (
             request.marginMode !== 'cross' &&
             nextRisk.liquidationBuffer.lte(0)
-          )
+          ) {
+            setAdminDiagnosticContext({
+              evidence: {
+                financialGuard: {
+                  financialOperation: 'market_execute',
+                  guardName: 'futures_maintenance',
+                  observation: 'mutation_plan',
+                  mutationResult: 'rejected',
+                  walletScope: 'crypto_futures',
+                  currencyCode: 'USD',
+                  marginMode: 'isolated',
+                  maintenanceSufficient: false,
+                  failureReason: 'maintenance_unsafe',
+                },
+              },
+            });
             futuresError(
               'FUTURES_MAINTENANCE_UNSAFE',
-              'Position would open at or below maintenance.',
+              'The position would not meet maintenance requirements.',
             );
+          }
           const cross = await loadCrossRisk(
             tx,
             wallet,
@@ -253,11 +269,28 @@ export class FuturesService {
                   .sub(plan.isolatedMargin)
                   .neg(),
               )
-          )
+          ) {
+            setAdminDiagnosticContext({
+              evidence: {
+                financialGuard: {
+                  financialOperation: 'market_execute',
+                  guardName: 'isolated_allocation',
+                  observation: 'mutation_plan',
+                  mutationResult: 'rejected',
+                  walletScope: 'crypto_futures',
+                  currencyCode: 'USD',
+                  marginMode: 'isolated',
+                  crossPositionsPresent: true,
+                  isolatedAllocationSufficient: false,
+                  failureReason: 'cross_collateral_protected',
+                },
+              },
+            });
             futuresError(
               'FUTURES_LIQUIDATION_REQUIRED',
-              'Isolated reduction cannot spend the shared Cross collateral pool.',
+              'This trade would spend collateral protected for Cross positions.',
             );
+          }
           const remaining = cross.rows.filter(
             (row) => row.position.id !== current?.id || plan.status === 'open',
           );
@@ -284,15 +317,27 @@ export class FuturesService {
         setAdminDiagnosticContext({
           evidence: {
             financialGuard: {
+              financialOperation: 'market_execute',
+              guardName: 'futures_collateral',
+              observation: 'mutation_plan',
               walletScope: 'crypto_futures',
-              balance: wallet.balanceAmount.toFixed(8),
-              reserved: wallet.reservedAmount.toFixed(8),
-              marginUsed: usedBefore.toFixed(8),
-              marginAfter: usedAfter.toFixed(8),
-              feeAmount: plan.feeAmount.toFixed(8),
-              realizedPnl: plan.realizedPnl.toFixed(8),
-              freeAfter: freeAfter.toFixed(8),
+              currencyCode: 'USD',
+              walletFound: true,
+              scopeValid: wallet.tradingAccountId === accountId,
+              currencyMatched: wallet.currencyCode === 'USD',
+              reservedCashPresent: wallet.reservedAmount.gt(0),
+              isolatedAllocationsPresent: usedAfter.gt(0),
+              balanceSufficient: balanceAfter.gte(0),
               collateralSufficient: freeAfter.gte(0),
+              mutationResult:
+                freeAfter.lt(0) || balanceAfter.lt(0)
+                  ? 'rejected'
+                  : 'guard_satisfied',
+              failureReason: balanceAfter.lt(0)
+                ? 'insufficient_balance'
+                : freeAfter.lt(0)
+                  ? 'insufficient_free_collateral'
+                  : 'none',
             },
           },
         });
@@ -303,7 +348,7 @@ export class FuturesService {
               : 'INSUFFICIENT_FUTURES_FREE_COLLATERAL',
             ['reduce', 'close'].includes(request.operation)
               ? 'Loss and fee cannot settle safely without liquidation.'
-              : 'Free collateral must cover additional margin and executed-notional fee.',
+              : 'Available Futures collateral is insufficient for margin and fees.',
           );
         const executionId = randomUUID();
         const commandId = randomUUID();
@@ -639,7 +684,7 @@ export class FuturesService {
     )
       futuresError(
         'FUTURES_INSTRUMENT_UNSUPPORTED',
-        'Only active USD-settled synthetic Binance crypto perpetual instruments are supported.',
+        'This Futures instrument is not available for trading.',
       );
     return row;
   }
@@ -651,12 +696,27 @@ export class FuturesService {
     const rows = await client.cashWallet.findMany({
       where: { tradingAccountId: accountId },
     });
-    if (canonicalCashWalletSetIssue(rows))
+    const walletSetIssue = canonicalCashWalletSetIssue(rows);
+    if (walletSetIssue) {
+      setAdminDiagnosticContext({
+        evidence: {
+          financialGuard: {
+            guardName: 'wallet_scope',
+            observation: 'existing_read',
+            mutationResult: 'rejected',
+            walletScope: 'crypto_futures',
+            currencyCode: 'USD',
+            canonicalWalletSetValid: false,
+            failureReason: walletSetIssue,
+          },
+        },
+      });
       futuresError(
         'FINANCIAL_SCOPE_REPAIR_REQUIRED',
-        'Canonical cash wallets are missing or inconsistent.',
+        'Futures wallet information could not be verified.',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
+    }
     return rows.find(
       (row) =>
         row.walletScope === 'crypto_futures' && row.currencyCode === 'USD',

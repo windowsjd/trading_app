@@ -81,3 +81,15 @@ limit (1–100, default 20) and offset (0–1,000,000) conventions as executions
 F3 owns UI, coherent Home/Portfolio/TWR/Ranking/Settlement Futures UPNL valuation
 and final season settlement. Stop Loss, Take Profit, OCO, trailing stops, limit
 orders, funding, hedge mode, brackets and risk tiers remain outside F2.
+
+## Diagnostic safety
+
+HTTP diagnostic access and bounds follow the [common policy](../README.md#admin-diagnostic-policy).
+Mark candidate evidence contains identity/source/timing and the existing 5-second
+threshold, without prices or Provider payloads. Public errors describe unavailable
+risk pricing and blocked risk increases, without transport/ingestion/storage detail.
+Collateral/maintenance diagnostic evidence is boolean/classification-only; actual
+Mark risk metrics and durable liquidation/settlement evidence retain financial values.
+Risk-worker failures stay in existing Ops results and safe fixed logs, never a user
+HTTP diagnostic. Ops state accepts reviewed domain codes, with a fixed fallback for
+unexpected failures; account/scope identifiers retain the existing Ops contract.

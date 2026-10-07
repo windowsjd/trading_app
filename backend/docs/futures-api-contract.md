@@ -162,6 +162,21 @@ Cross cash settlement is deliberately attributed to the shared event, not arbitr
 allocated among its positions. Fee/PnL ledger references `futures_liquidation`.
 GET is ownership-scoped, read-only and repeatable-read; offset max is 1,000,000.
 
+## Error and diagnostic boundary
+
+Typed error status/code remain the client branching contract. Public messages
+describe input, position policy, collateral, maintenance, trading mode and price
+availability; they do not describe Provider endpoints, DB structures or operational
+configuration. The common fixed-message diagnostic policy also applies to Futures.
+Admin-only `financialGuard` uses bounded existence/scope/sufficiency/invariant facts
+from the existing calculation, never exact balance/reserved/margin/fee/PnL/free
+collateral. No diagnostic-purpose DB/Provider/Redis reads are added.
+
+Position/Mark/risk/collateral responses, command replay payloads, execution history,
+ledger and liquidation history remain exact financial contracts. Durable
+`FuturesLiquidation`/`FuturesLiquidationClose` evidence, including bankruptcy
+shortfall, is not a technical diagnostic projection and is not redacted.
+
 ## Deferred work
 
 No dated/inverse/coin-margin/options, funding, Hedge Mode, ADL, insurance, partial

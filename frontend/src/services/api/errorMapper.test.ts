@@ -6,7 +6,7 @@ import {
   getErrorMessageFromCode, isRequoteRequiredError,
 } from './errorMapper.ts';
 
-const raw = 'JWT_ACCESS_SECRET DB_SERVICE HTTP 599 req-private failureStage=wallet_write https://provider.invalid/private exact balance 194873.928374';
+const raw = 'JWT_ACCESS_SECRET INTERNAL_DB_FAILURE PROVIDER_INTERNAL_FAILURE DB_SERVICE HTTP 503 HTTP 599 ECONNABORTED postgres://user:secret@host/db req-private failureStage=wallet_write https://provider.invalid/private exact balance 194873.928374';
 
 describe('public error presentation', () => {
   it('never copies unknown code, server message or client exception text', () => {
@@ -19,8 +19,17 @@ describe('public error presentation', () => {
       { request: {}, code: 'ECONNABORTED', message: raw },
     ]) {
       const message = getApiErrorDisplayMessage(error);
-      assert.doesNotMatch(message, /JWT|SECRET|DB_SERVICE|HTTP|599|418|req-private|failureStage|provider.invalid|194873|백엔드|환경변수|콘솔|로그를/);
+      assert.doesNotMatch(message, /JWT|SECRET|INTERNAL_DB_FAILURE|PROVIDER_INTERNAL_FAILURE|DB_SERVICE|HTTP|599|503|418|ECONNABORTED|postgres|req-private|failureStage|provider.invalid|194873|백엔드|환경변수|콘솔|로그를/);
       assert.match(message, /다시|확인/);
+    }
+  });
+
+  it('keeps future Futures consumers safe without adding a Futures UI', () => {
+    for (const code of ['FUTURES_MARK_STALE', 'FUTURES_COLLATERAL_INTEGRITY', 'FUTURES_CASH_CONFLICT', 'INSUFFICIENT_FUTURES_FREE_COLLATERAL']) {
+      const error = { response: { status: 503, data: { error: { code, message: raw } } } };
+      assert.match(getApiErrorDisplayMessage(error), /잠시 후 다시 시도/);
+      assert.doesNotMatch(getApiErrorDisplayMessage(error), /FUTURES|HTTP|postgres|INTERNAL_DB|PROVIDER|ECONNABORTED|JWT|req-private|failureStage|194873/);
+      assert.equal(getApiErrorCode(error), code);
     }
   });
 

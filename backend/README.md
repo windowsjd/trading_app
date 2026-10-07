@@ -117,6 +117,20 @@ entity IDs, or unbounded stacks/logs/messages. Only existing approved scoped
 identifiers and safe projections may be retained. The common sanitizer is a
 backstop: financial values/foreign IDs must be excluded by the domain projection,
 not assumed to be automatically removed by secret-key redaction.
+Diagnostic source names use the existing Provider vocabulary; unrecognized DB
+source labels are represented by `unrecognized`, retaining rejection/timing facts.
+This projects diagnostic metadata only, without changing source selection or
+successful source metadata in financial responses.
+
+Futures F1/F2 follows the same boundary: execution collateral/maintenance guards
+project only scope, existence, sufficiency and invariant classifications from
+already-read state. Exact cash, reservations, margin, fees, PnL and free collateral
+never enter `financialGuard`. Safe fixed Futures domain messages remain available;
+Mark/price failures describe availability without Provider/storage implementation.
+This restriction does not redact ownership-scoped financial API responses, Mark
+snapshots, execution/ledger records or durable liquidation/bankruptcy evidence.
+The background risk worker keeps its separate Ops surface: reviewed error states
+and scoped account/position identifiers, without exception text or Provider data.
 
 Current HTTP `AdminDiagnostic` bounds in `src/common/admin-diagnostics.ts`:
 

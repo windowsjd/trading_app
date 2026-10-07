@@ -7,6 +7,12 @@ import { parseBinanceMark, validMark, readFuturesMark } from './futures-mark';
 import { futuresDecimal as d } from './futures-math';
 import type { InstrumentWithAsset } from './futures.presenter';
 import type { Prisma, FuturesMarkSnapshot } from '../generated/prisma/client';
+import {
+  captureFinancialFailure,
+  expectSafeFinancialDiagnostic,
+} from '../../test/support/financial-diagnostics';
+import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
+import { GlobalHttpExceptionFilter } from '../common/global-http-exception.filter';
 const now = new Date('2026-10-07T00:00:10Z');
 const inst = {
   id: 'i',
@@ -40,6 +46,65 @@ const ws = {
   st: 1,
 };
 describe('Binance public Mark evidence is typed and fresh', () => {
+  for (const role of ['admin', 'operator', 'user']) {
+    it.each([false, true])(
+      'keeps Mark absence/staleness public-safe for ' + role + ' (stale=%s)',
+      async (stale) => {
+        const tx = {
+          futuresMarkSnapshot: {
+            findFirst: jest.fn().mockResolvedValue(
+              stale
+                ? {
+                    ...row,
+                    price: d('987654.12345678'),
+                    effectiveAt: new Date(now.getTime() - 6000),
+                    rawPayload: { secret: 'fake-provider-secret' },
+                  }
+                : null,
+            ),
+          },
+        } as unknown as Prisma.TransactionClient;
+        const { error, diagnostic } = await captureFinancialFailure(() => {
+          setAdminDiagnosticContext({
+            domain: 'futures',
+            operation: 'market_execute',
+          });
+          return readFuturesMark(tx, inst, now);
+        }, role);
+        expect(error.getStatus()).toBe(503);
+        const expected = {
+          success: false,
+          error: {
+            code: stale ? 'FUTURES_MARK_STALE' : 'FUTURES_MARK_UNAVAILABLE',
+            message:
+              'The current Mark Price is unavailable for risk evaluation. Please try again.',
+          },
+        };
+        expect(error.getResponse()).toEqual(expected);
+        const response = {
+          status: jest.fn().mockReturnThis(),
+          json: jest.fn(),
+        };
+        new GlobalHttpExceptionFilter().catch(error, {
+          switchToHttp: () => ({ getResponse: () => response }),
+        } as never);
+        expect(response.json).toHaveBeenCalledWith(expected);
+        expect(diagnostic !== undefined).toBe(role === 'admin');
+        if (diagnostic) {
+          expectSafeFinancialDiagnostic(diagnostic);
+          expect(diagnostic).toMatchObject({
+            domain: 'futures',
+            failureStage: 'futures_mark_selection',
+            evidence: { maxAgeMs: 5000 },
+          });
+          expect(diagnostic.exception.message).toBe(expected.error.message);
+          expect(JSON.stringify(diagnostic)).not.toMatch(
+            /987654|fake-provider-secret/,
+          );
+        }
+      },
+    );
+  }
   it('accepts WS E and REST time with explicit capture time', () => {
     expect(
       parseBinanceMark(ws, row.source, 'BTCUSDT', now)?.price.toString(),

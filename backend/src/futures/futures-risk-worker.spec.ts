@@ -88,6 +88,50 @@ describe('Risk worker failure boundaries', () => {
     await worker.tick();
     expect(locks.acquireLock).toHaveBeenCalledTimes(2);
   });
+  it.each(['error', 'string-code', 'object-code', 'null-body', 'unknown-code'])(
+    'keeps raw %s failures out of Ops results without removing account/scope',
+    async (kind) => {
+      const raw =
+        'https://provider.invalid/private postgres://fake:password@db.invalid/db Bearer fake-token 987654.12345678 {"secret":"fake-nested-secret"}';
+      const error =
+        kind === 'error'
+          ? new Error(raw, { cause: new Error(raw) })
+          : new HttpException(
+              {
+                error:
+                  kind === 'null-body'
+                    ? null
+                    : {
+                        code:
+                          kind === 'object-code'
+                            ? { message: raw }
+                            : kind === 'unknown-code'
+                              ? 'UNREVIEWED_FAILURE_CODE'
+                              : raw,
+                        message: raw,
+                        cause: raw,
+                      },
+              },
+              500,
+            );
+      liquidate.mockRejectedValueOnce(error);
+      await worker.tick();
+      const result = runs.recordSucceeded.mock.calls[0][1].resultJson;
+      expect(result.results[0]).toEqual({
+        accountId: 'account',
+        scope: 'cross',
+        state: 'FUTURES_RISK_TRANSACTION_FAILED',
+      });
+      expect(result.results[1]).toEqual({
+        accountId: 'account',
+        scope: 'p3',
+        state: 'healthy',
+      });
+      expect(JSON.stringify(result)).not.toMatch(
+        /provider.invalid|db.invalid|fake-token|987654|fake-nested-secret|UNREVIEWED_FAILURE_CODE/,
+      );
+    },
+  );
   it('deduplicates scheduler overlap in one process and respects the separate emergency stop', async () => {
     let release!: () => void;
     liquidate.mockImplementationOnce(

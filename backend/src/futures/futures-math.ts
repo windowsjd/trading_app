@@ -23,7 +23,7 @@ export function assertFuturesMoney(value: Prisma.Decimal): Prisma.Decimal {
   if (!value.isFinite() || value.abs().gt(maxMoney))
     futuresError(
       'FUTURES_VALUE_OUT_OF_RANGE',
-      'Calculated value exceeds the financial Decimal range.',
+      'The requested trade exceeds the supported amount range.',
       HttpStatus.BAD_REQUEST,
     );
   return value;
@@ -69,7 +69,7 @@ export function planFuturesExecution(
   )
     futuresError(
       'FUTURES_VALUE_TOO_SMALL',
-      'Executed notional must be positive at the cash scale.',
+      'The trade amount is below the supported minimum.',
       HttpStatus.BAD_REQUEST,
     );
   if (
@@ -80,7 +80,7 @@ export function planFuturesExecution(
   )
     futuresError(
       'FUTURES_FEE_POLICY_INVALID',
-      'Account trade fee policy is invalid.',
+      'Trading fees could not be verified. Please try again.',
       HttpStatus.INTERNAL_SERVER_ERROR,
     );
   const feeAmount = assertFuturesMoney(

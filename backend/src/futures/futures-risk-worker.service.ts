@@ -94,16 +94,10 @@ export class FuturesRiskWorker implements OnModuleInit, OnModuleDestroy {
             const result = await this.liquidation.liquidate(account.id, scope);
             results.push({ accountId: account.id, scope, state: result.state });
           } catch (error) {
-            const response =
-              error instanceof HttpException ? error.getResponse() : null;
-            const code =
-              response && typeof response === 'object' && 'error' in response
-                ? (response.error as { code?: string }).code
-                : undefined;
             results.push({
               accountId: account.id,
               scope,
-              state: code ?? 'FUTURES_RISK_TRANSACTION_FAILED',
+              state: riskFailureState(error),
             });
           }
         }
@@ -135,4 +129,41 @@ export class FuturesRiskWorker implements OnModuleInit, OnModuleDestroy {
       }
     }
   }
+}
+
+// Ops retains its account/scope identifiers. Exception fields are untrusted,
+// including a value shaped like a domain code; never store arbitrary prose.
+const SAFE_RISK_FAILURE_CODES = new Set([
+  'FUTURES_MARK_STALE',
+  'FUTURES_MARK_UNAVAILABLE',
+  'FUTURES_FEE_POLICY_INVALID',
+  'FUTURES_COLLATERAL_INTEGRITY',
+  'FUTURES_CASH_CONFLICT',
+  'FUTURES_VALUE_OUT_OF_RANGE',
+  'FUTURES_POSITION_NOT_FOUND',
+  'FUTURES_ONE_WAY_VIOLATION',
+  'FUTURES_LEVERAGE_MISMATCH',
+  'FUTURES_MARGIN_MODE_MISMATCH',
+  'INVALID_FUTURES_REDUCE_QUANTITY',
+  'FINANCIAL_SCOPE_REPAIR_REQUIRED',
+  'FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH',
+  'TRADING_ACCOUNT_LINK_INTEGRITY',
+  'TRADING_ACCOUNT_SCOPE_MISMATCH',
+  'GENERAL_ACCOUNT_INTEGRITY',
+  'PARTICIPANT_NOT_FOUND',
+  'SEASON_NOT_ACTIVE',
+]);
+
+function riskFailureState(error: unknown): string {
+  const response: unknown =
+    error instanceof HttpException ? error.getResponse() : null;
+  if (response && typeof response === 'object' && 'error' in response) {
+    const body: unknown = response.error;
+    if (body && typeof body === 'object' && 'code' in body) {
+      const code: unknown = body.code;
+      if (typeof code === 'string' && SAFE_RISK_FAILURE_CODES.has(code))
+        return code;
+    }
+  }
+  return 'FUTURES_RISK_TRANSACTION_FAILED';
 }

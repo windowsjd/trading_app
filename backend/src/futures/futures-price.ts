@@ -23,7 +23,7 @@ export async function readFuturesPrice(
     if (!required) return null;
     futuresError(
       'FUTURES_EXECUTION_SOURCE_INELIGIBLE',
-      'Synthetic reference asset has no eligible execution source.',
+      'The current execution price is unavailable. Please try again.',
       HttpStatus.SERVICE_UNAVAILABLE,
     );
   }
@@ -75,7 +75,7 @@ export async function readFuturesPrice(
     selection.decision.rejectedProviderReason === 'captured_at_stale'
       ? 'FUTURES_PRICE_STALE'
       : 'FUTURES_PRICE_UNAVAILABLE',
-    'Fresh canonical synthetic execution price evidence is required.',
+    'The current execution price is unavailable. Please try again.',
     HttpStatus.SERVICE_UNAVAILABLE,
   );
 }

@@ -3105,6 +3105,63 @@ describe('AppController (e2e)', () => {
       expect(prisma.tradingAccount.findFirst).not.toHaveBeenCalled();
     },
   );
+  it('Futures errors keep safe domain copy and follow current DB role with the same token', async () => {
+    const token = await createValidAccessToken('p0-futures-user');
+    const raw =
+      'postgres://fake:fake-password@db.invalid/db https://provider.invalid/body Bearer fake-token 987654.12345678 {"secret":"fake-nested-secret"}';
+    for (const role of ['admin', 'operator', 'user']) {
+      resetPrismaMocks();
+      mockActiveUser('p0-futures-user', role);
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/trading-accounts/trading-account-1/futures/execute')
+        .set('Authorization', `Bearer ${token}`)
+        .set('x-request-id', `p0-futures-${role}`)
+        .send({ leverage: 1.5 })
+        .expect(400);
+      expect(response.body.error).toMatchObject({
+        code: 'INVALID_FUTURES_LEVERAGE',
+        message: 'Leverage must be an integer from 1 through 100.',
+      });
+      expect(Boolean(response.body.error.diagnostic)).toBe(role === 'admin');
+      if (role === 'admin')
+        expect(response.body.error.diagnostic).toMatchObject({
+          domain: 'futures',
+          operation: 'market_execute',
+          failureStage: 'futures_ownership',
+          requestId: 'p0-futures-admin',
+          exception: {
+            message: 'Leverage must be an integer from 1 through 100.',
+          },
+        });
+      const spy = jest
+        .spyOn(app.get(FuturesService), 'instruments')
+        .mockRejectedValueOnce(
+          Object.assign(new Error(raw, { cause: new Error(raw) }), {
+            code: 'P1001',
+          }),
+        );
+      try {
+        const unexpected = await request(app.getHttpServer())
+          .get('/api/v1/trading-accounts/trading-account-1/futures/instruments')
+          .set('Authorization', `Bearer ${token}`)
+          .expect(500);
+        expect(unexpected.body.error.code).toBe('INTERNAL_SERVER_ERROR');
+        expect(JSON.stringify(unexpected.body)).not.toMatch(
+          /db.invalid|provider.invalid|fake-token|987654|fake-nested-secret/,
+        );
+        expect(Boolean(unexpected.body.error.diagnostic)).toBe(
+          role === 'admin',
+        );
+        if (role === 'admin')
+          expect(
+            unexpected.body.error.diagnostic.evidence.safeCause,
+          ).toMatchObject({ category: 'db_connection_failed', code: 'P1001' });
+      } finally {
+        spy.mockRestore();
+      }
+    }
+  });
+
   it('Futures history rejects compound scalar query before dispatch', async () => {
     resetPrismaMocks();
     mockActiveUser();

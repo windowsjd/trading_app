@@ -20,6 +20,19 @@ const variants = (words: string[]) => [
 ];
 
 describe('shared sensitive data policy', () => {
+  it('does not claim arbitrary URLs, SQL or financial values are secret assignments', () => {
+    const unprojected =
+      'https://provider.invalid/private SELECT wallet_balance FROM private_wallet balance 987654.12345678';
+    expect(redactSensitiveText(unprojected)).toBe(unprojected);
+    expect(
+      sanitizeOpsJson({ amount: '987654.12345678', message: unprojected }),
+    ).toEqual({
+      amount: '987654.12345678',
+      message: unprojected,
+    });
+    // HTTP diagnostics must exclude these at the projection boundary. Ops
+    // financial business records retain their independent storage contract.
+  });
   it.each([
     ['private', 'key'],
     ['database', 'url'],

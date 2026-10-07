@@ -28,7 +28,10 @@ export async function settleFuturesCash(
         amount: amount.toFixed(8),
       })) !== 1
     )
-      futuresError('FUTURES_CASH_CONFLICT', 'Futures collateral debit failed.');
+      futuresError(
+        'FUTURES_CASH_CONFLICT',
+        'Futures collateral could not be settled. Please try again.',
+      );
   };
   const entry = (
     txType: 'futures_pnl' | 'fee',
@@ -65,7 +68,7 @@ export async function settleFuturesCash(
       if (credit.count !== 1)
         futuresError(
           'FUTURES_CASH_CONFLICT',
-          'Futures collateral wallet changed.',
+          'Futures collateral could not be settled. Please try again.',
         );
     }
     balance = assertFuturesMoney(balance.add(pnl));
@@ -85,7 +88,7 @@ export function bankruptcySettlement(
   if (collateral.lt(0))
     futuresError(
       'FUTURES_COLLATERAL_INTEGRITY',
-      'Liquidation collateral is negative.',
+      'Futures collateral information could not be verified.',
     );
   const settledPnl = economicPnl.lt(collateral.neg())
     ? collateral.neg()
