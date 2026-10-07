@@ -160,6 +160,16 @@ export type Quote = Prisma.QuoteModel
  */
 export type WalletTransfer = Prisma.WalletTransferModel
 /**
+ * Model WalletTransferQuote
+ * 
+ */
+export type WalletTransferQuote = Prisma.WalletTransferQuoteModel
+/**
+ * Model WalletTransferExecuteRequest
+ * 
+ */
+export type WalletTransferExecuteRequest = Prisma.WalletTransferExecuteRequestModel
+/**
  * Model FxExecuteRequest
  * 
  */

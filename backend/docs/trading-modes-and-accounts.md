@@ -30,8 +30,8 @@
 | Wallet Scope | 허용 통화 | 현재 provisioning / 거래 |
 | --- | --- | --- |
 | `securities` | KRW, USD | 초기자금·주식·FX, legacy 주문의 pin된 금융 경로 |
-| `crypto_spot` | USD | balance/reserved 0으로 생성, 신규 Crypto Spot 주문과 USD 내부이체 |
-| `crypto_futures` | USD | balance/reserved 0으로 생성, 현금 보관·USD 내부이체만 허용 |
+| `crypto_spot` | USD | balance/reserved 0으로 생성, 신규 Crypto Spot 주문·USD 이체·명시적 KRW composite 이체 |
+| `crypto_futures` | USD | balance/reserved 0으로 생성, 현금 보관·USD 이체·명시적 KRW composite 이체만 허용 |
 
 정상 계정은 위 네 identity를 각각 정확히 하나씩 가진다. DB NOT NULL enum,
 scope/currency CHECK, 복합 unique와 서버의 canonical set 검증이 누락·중복·
@@ -85,10 +85,23 @@ migration 이전 order Quotes/Orders는 모두 Securities로 backfill하고 term
 source의 `balance - reserved`만 조건부 차감하고 destination에 같은 금액을 입금한다.
 계정/시즌 lifecycle lock과 ID 순서 wallet lock, account/key unique, 저장된 응답 replay와
 같은 사건에 연결된 debit/credit ledger를 한 PostgreSQL transaction으로 처리한다.
-Transfer는 외부 funding이 아니며 total cash/asset/PnL/return/TWR/ranking이 변하지 않는다.
-사용자는 증권 KRW→기존 환전→증권 USD→이체→현물 USD로 충전해 Crypto BUY할 수 있다.
-Cross-currency FX Transfer, 다른 계정/사용자 송금과 Futures trading은 미지원이다.
-Futures wallet은 USD를 넣고 다른 USD wallet으로 되돌려 이체할 수 있다.
+이 same-currency Transfer는 외부 funding이 아니며 total cash/asset/PnL/return/TWR/ranking이 변하지 않는다.
+Securities KRW↔Crypto Spot/Futures USD는 명시적인 FX+Transfer composite 이체도 지원한다.
+한 사용자 command의 durable quote→execute를 한 PostgreSQL transaction으로 처리한다.
+FX는 Securities KRW↔USD에만 귀속되고 Securities USD가 중간 routing wallet이다.
+KRW→Crypto는 기존 FX net USD를 그대로 이체하며, 반대는 원래 source USD를 먼저
+Securities로 이체한 뒤 같은 금액을 FX한다. 기존 reservation을 소비하지 않는다.
+FX와 Transfer의 records/네 ledger leg는 구분하고 typed parent command로 연결한다.
+FX fee/repricing은 기존 standalone FX와 동일한 경제적 효과를 가지며 Transfer leg만
+성과 중립이다. 외부 funding/TWR cash-flow boundary는 추가하지 않는다.
+Securities KRW↔USD는 기존 환전 화면을 사용한다. 자동환전·Orders auto-funding·
+다른 계정/사용자 송금·Futures trading은 없다. Futures는 USD 보관과 명시적 이체만 지원한다.
+
+신규 `20261007120000_add_cross_currency_wallet_transfers` migration은 quote route와
+committed composite command 두 table만 추가한다. 이미 적용된
+`20261006160000_pin_order_wallet_and_add_transfers`는 수정하지 않는다.
+새 route를 노출하기 전에 migration과 새 financial writers를 배포한다. 구버전 FX writer는
+linked transfer quote를 구분하지 못하므로 새 route와 함께 실행하지 않는다.
 
 - SeasonRanking.tradingAccountId도 `20260910120000` migration에서 NOT NULL로 강화됐다. participant relation은 시즌 랭킹 식별자로 유지한다.
 - 일반 TWR/외부자금 경계, 양 모드 market/limit BUY·SELL 및 FX, 정산 transaction의 모든 season account 종료는 구현되어 있다.

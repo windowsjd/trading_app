@@ -12,6 +12,13 @@
 - `docs/policy-decisions.md` records the active provider-backed execute/write policy decisions (freshness thresholds, maxChangeBps, quote TTL).
 - Do not add fake/temporary FX rates, new currencies, automatic order-time FX,
   scheduled/limit FX, or real bank/exchange orders from this document.
+- FX always mutates Securities KRW/USD. The explicit
+  [cross-currency wallet transfer](wallet-transfers-api-contract.md) reuses this
+  quote calculation, fee pinning, provider refresh, post-lock repricing and
+  durable FX write path inside its single composite transaction. Crypto wallets
+  are USD-only and are never FX source/target wallets. A quote with a typed
+  `WalletTransferQuote` route cannot be executed by standalone `/fx/execute`.
+  Existing standalone FX requests and results remain unchanged.
 
 ## Source Rules
 

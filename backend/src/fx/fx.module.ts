@@ -18,5 +18,6 @@ import { TradingAccountFxController } from './trading-account-fx.controller';
   ],
   controllers: [FxController, TradingAccountFxController],
   providers: [FxService],
+  exports: [FxService],
 })
 export class FxModule {}

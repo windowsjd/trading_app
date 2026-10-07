@@ -16,8 +16,10 @@
   containers are provisioned with zero balance/reserved and count in valuation;
   new Crypto Spot orders use `crypto_spot/USD`, stocks and FX use Securities.
   Same-account USD internal transfers are supported; Futures is wallet only.
-  Existing order/Quote provenance remains Securities. Cross-currency FX+Transfer
-  and Futures trading are unsupported. See [transfer contract](wallet-transfers-api-contract.md).
+  Existing order/Quote provenance remains Securities. Explicit Securities KRW
+  ↔ Crypto Spot/Futures USD transfers use one atomic FX+Transfer command with
+  Securities USD routing; automatic FX/order funding and Futures trading remain
+  unsupported. See [transfer contract](wallet-transfers-api-contract.md).
 - Amount values are strings.
 - Timestamps are UTC ISO strings.
 - Responses keep the existing `success/data` or `success/error` structure.

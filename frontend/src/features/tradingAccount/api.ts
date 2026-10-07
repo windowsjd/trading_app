@@ -1,4 +1,4 @@
-import { parseWalletTransferResponse } from '../wallet/walletTransfer.ts';
+import { parseWalletTransferResponse, parseWalletFxTransferQuote, parseWalletFxTransferResponse } from '../wallet/walletTransfer.ts';
 import { assertDailyEquity } from './dailyEquity.ts';
 import { apiClient } from '../../services/api/client';
 import type {
@@ -190,6 +190,35 @@ export async function transferTradingAccountWallets(accountId: string, body: Wal
   const response = await apiClient.post<ApiSuccessResponse<WalletTransferDto>>(accountPath(accountId, '/wallet-transfers'), body);
   const payload = assertAccountScope(accountPath(accountId, '/wallet-transfers'), accountId, response.data.data);
   return parseWalletTransferResponse(payload, accountId, body);
+}
+
+export type WalletFxTransferQuoteRequestDto = Omit<WalletTransferRequestDto, 'idempotencyKey'>;
+export interface WalletFxTransferQuoteDto extends FxQuoteDto {
+  tradingAccountId: string;
+  sourceWalletId: string;
+  destinationWalletId: string;
+}
+export interface WalletFxTransferDto {
+  commandId: string;
+  tradingAccountId: string;
+  quoteId: string;
+  executedAt: string;
+  sourceAmount: string;
+  receivedAmount: string;
+  source: WalletTransferDto['source'] & { currencyCode: WalletCurrency };
+  destination: WalletTransferDto['destination'] & { currencyCode: WalletCurrency };
+  fx: FxExecuteDto;
+  transferId: string;
+}
+
+export async function quoteTradingAccountWalletTransfer(accountId: string, body: WalletFxTransferQuoteRequestDto, sourceCurrency: WalletCurrency) {
+  const response = await apiClient.post<ApiSuccessResponse<WalletFxTransferQuoteDto>>(accountPath(accountId, '/wallet-transfers/quote'), body);
+  return parseWalletFxTransferQuote(response.data.data, accountId, body, sourceCurrency);
+}
+
+export async function executeTradingAccountWalletTransfer(accountId: string, quote: WalletFxTransferQuoteDto, idempotencyKey: string) {
+  const response = await apiClient.post<ApiSuccessResponse<WalletFxTransferDto>>(accountPath(accountId, '/wallet-transfers/execute'), { quoteId: quote.quoteId, idempotencyKey });
+  return parseWalletFxTransferResponse(response.data.data, accountId, quote);
 }
 
 export interface TradingAccountPositionsDto {

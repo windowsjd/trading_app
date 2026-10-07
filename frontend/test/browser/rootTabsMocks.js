@@ -19,6 +19,26 @@ export const useMarketTickers = () => tickerSnapshot;
 
 export const apiClient = {
   async post(path, body) {
+    if (path.endsWith('/wallet-transfers/quote')) {
+      transport.postRequests ??= []; transport.postRequests.push({ path, body });
+      const fromCurrency = body.sourceWalletId.endsWith(':krw') ? 'KRW' : 'USD';
+      transport.transferQuote = {
+        tradingAccountId: path.split('/')[2], sourceWalletId: body.sourceWalletId, destinationWalletId: body.destinationWalletId,
+        quoteId: 'fixture-transfer-quote', fromCurrency, toCurrency: fromCurrency === 'KRW' ? 'USD' : 'KRW', sourceAmount: body.amount,
+        appliedRate: '1400.00000000', grossTargetAmount: '1000.00000000', netTargetAmount: '999.00000000', feeRate: '0.001000', feeAmount: '1.00000000', feeCurrency: fromCurrency === 'KRW' ? 'USD' : 'KRW',
+        maxChangeBps: '30.0000', expiresAt: new Date(Date.now() + 15000).toISOString(), rateCapturedAt: new Date().toISOString(), rateEffectiveAt: new Date().toISOString(), rateSource: null,
+      };
+      return response(transport.transferQuote);
+    }
+    if (path.endsWith('/wallet-transfers/execute')) {
+      transport.postRequests.push({ path, body });
+      const q = transport.transferQuote;
+      const wallet = (id, currencyCode) => ({ walletId: id, currencyCode, walletScope: id.endsWith(':krw') ? 'securities' : id.endsWith(':spot') ? 'crypto_spot' : 'crypto_futures', balanceAfter: '1234567.12345678', availableAfter: '1234000.12345678' });
+      return response({ commandId: 'fixture-composite', quoteId: q.quoteId, tradingAccountId: q.tradingAccountId, executedAt: new Date().toISOString(),
+        sourceAmount: q.sourceAmount, receivedAmount: '998.00000000', source: wallet(q.sourceWalletId, q.fromCurrency), destination: wallet(q.destinationWalletId, q.toCurrency), transferId: 'fixture-transfer',
+        fx: { ...q, exchangeId: 'fixture-exchange', quotedRate: q.appliedRate, appliedRate: '1401.00000000', netTargetAmount: '998.00000000' },
+      });
+    }
     if (path.endsWith('/wallet-transfers')) {
       transport.postRequests ??= []; transport.postRequests.push({ path, body });
       const walletScope = id => id.endsWith(':usd') ? 'securities' : id.endsWith(':spot') ? 'crypto_spot' : 'crypto_futures';

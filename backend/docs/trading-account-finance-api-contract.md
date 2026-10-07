@@ -4,7 +4,9 @@
 
 New Crypto Spot orders use Crypto Spot USD. Stocks and FX retain Securities;
 legacy Orders/order Quotes preserve Securities through pinned provenance.
-USD internal transfers and all four wallet groups are now available in the app.
+USD internal transfers, explicit Securities KRW ↔ Crypto USD composite transfers
+and all four wallet groups are available in the app. Crypto remains USD-only;
+the composite uses Securities USD between its FX and transfer legs.
 See [transfer and provenance contract](wallet-transfers-api-contract.md).
 The implementation history below does not override this policy.
 
@@ -14,6 +16,8 @@ The implementation history below does not override this policy.
   - `GET /api/v1/trading-accounts/:accountId/wallets`
   - `GET /api/v1/trading-accounts/:accountId/wallet-transactions`
   - `POST /api/v1/trading-accounts/:accountId/wallet-transfers` (2026-10-07)
+  - `POST /api/v1/trading-accounts/:accountId/wallet-transfers/quote` (2026-10-07)
+  - `POST /api/v1/trading-accounts/:accountId/wallet-transfers/execute` (2026-10-07)
   - `POST /api/v1/trading-accounts/:accountId/fx/quote`
   - `POST /api/v1/trading-accounts/:accountId/fx/execute`
   - `GET /api/v1/trading-accounts/:accountId/fx/transactions`
@@ -61,8 +65,13 @@ current server contract.
   Each Quote/Order pins the exact account/scope/currency identity. Pre-cutover
   order Quotes/Orders are backfilled to Securities and keep that identity through
   replay, fill, cancel and cleanup. Cash/reservations/Positions are not migrated.
-  Same-account USD transfers use the new route above; Futures supports cash and
-  transfers only. All canonical cash remains in the existing valuation formula.
+  Same-account USD transfers retain their existing route. Explicit Securities KRW
+  ↔ Crypto Spot/Futures USD transfers use the new quote/execute routes, one
+  command and one DB transaction with separate linked FX/Transfer evidence.
+  Securities KRW↔USD still uses standalone FX. Futures supports cash and
+  transfers only; no automatic FX or order funding is introduced. All canonical
+  cash remains in the existing valuation formula. The transfer leg is neutral,
+  while the FX fee/repricing keeps its existing economic effect.
   Legacy wallet and General-open projections remain Securities-only.
   See [current scope/rollout policy](trading-modes-and-accounts.md).
 - Authentication required on every route (401 `UNAUTHORIZED` without a valid

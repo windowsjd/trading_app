@@ -77,6 +77,8 @@ export const ModelName = {
   FxRateSnapshot: 'FxRateSnapshot',
   Quote: 'Quote',
   WalletTransfer: 'WalletTransfer',
+  WalletTransferQuote: 'WalletTransferQuote',
+  WalletTransferExecuteRequest: 'WalletTransferExecuteRequest',
   FxExecuteRequest: 'FxExecuteRequest',
   EquitySnapshot: 'EquitySnapshot',
   DailyPortfolioSnapshot: 'DailyPortfolioSnapshot',
@@ -651,6 +653,30 @@ export const WalletTransferScalarFieldEnum = {
 } as const
 
 export type WalletTransferScalarFieldEnum = (typeof WalletTransferScalarFieldEnum)[keyof typeof WalletTransferScalarFieldEnum]
+
+
+export const WalletTransferQuoteScalarFieldEnum = {
+  quoteId: 'quoteId',
+  sourceWalletId: 'sourceWalletId',
+  destinationWalletId: 'destinationWalletId'
+} as const
+
+export type WalletTransferQuoteScalarFieldEnum = (typeof WalletTransferQuoteScalarFieldEnum)[keyof typeof WalletTransferQuoteScalarFieldEnum]
+
+
+export const WalletTransferExecuteRequestScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  quoteId: 'quoteId',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  exchangeTransactionId: 'exchangeTransactionId',
+  walletTransferId: 'walletTransferId',
+  responsePayloadJson: 'responsePayloadJson',
+  executedAt: 'executedAt'
+} as const
+
+export type WalletTransferExecuteRequestScalarFieldEnum = (typeof WalletTransferExecuteRequestScalarFieldEnum)[keyof typeof WalletTransferExecuteRequestScalarFieldEnum]
 
 
 export const FxExecuteRequestScalarFieldEnum = {

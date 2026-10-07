@@ -265,12 +265,28 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
   available balance만 조건부 debit하고 destination credit·두 원장 leg·멱등 command를
   한 DB transaction에 기록한다. 기존 lifecycle/account lock 뒤 wallet ID 순서로 lock한다.
   같은 account/key+같은 canonical payload는 최초 응답 replay, 다른 payload는 409다.
-  Transfer는 internal relocation이며 fee/FX/external funding/snapshot을 만들지 않는다.
+  이 same-currency Transfer는 internal relocation이며 fee/FX/external funding/snapshot을 만들지 않는다.
   총자산/PnL/General TWR/Season return/ranking은 동일 총 cash와 Position이면 같다.
-  근거: Spot 초기잔액 0을 명시적 FX→USD 이체로 충전하면서 금융 원자성과 성과 중립을 유지한다.
+  근거: 같은 통화의 지갑 이동은 금융 원자성과 성과 중립을 유지한다.
+- Securities KRW↔Crypto Spot/Futures USD의 명시적 cross-currency 이체는
+  `wallet-transfers/quote`→`wallet-transfers/execute`로 지원한다. 입력 금액은 원래 source
+  wallet 통화이며 기존 FX Quote가 rate/fee/amount/evidence/expiry/maxChangeBps를 pin한다.
+  `WalletTransferQuote`가 두 wallet ID를 저장하고 `WalletTransferExecuteRequest`가 기존
+  ExchangeTransaction/FxExecuteRequest 및 WalletTransfer를 한 command로 연결한다.
+  Provider network work는 lock 전에 끝내고, lifecycle→ID 순서 wallet lock 뒤 하나의 DB
+  clock으로 eligibility/quote/provider evidence를 다시 검증한다. 기존 FX의 repricing,
+  fee pinning·Decimal·rounding·snapshot writer를 같은 transaction에서 재사용한다.
+  KRW→Crypto는 Securities FX 후 정확한 net USD를 이체하고, Crypto→KRW는 정확한
+  source USD를 Securities로 이체한 뒤 FX한다. 기존 Securities USD 예약금은 보존한다.
+  전체 cash mutation·네 ledger leg·FX/Transfer records·parent result는 모두 commit 또는
+  rollback한다. account/key+동일 quote는 최초 응답 replay, 다른 quote는 409다.
+  Transfer leg는 성과 중립이며 FX fee/repricing의 효과는 standalone FX와 같다.
+  external funding/TWR cash-flow boundary나 새 성과 공식은 만들지 않는다.
+  근거: 한 번의 사용자 이체를 두 public mutation의 순차 commit으로 처리하면 안 된다.
 - Wallet UI는 증권 KRW/USD, 암호화폐 · 현물 USD, 암호화폐 · 선물 USD와 보유 종목을
   scope+currency로 표시하고 이체/환전/원장/주문 내역을 구분한다. Futures는 보관·이체만
-  지원하며 cross-currency FX+Transfer·자동환전·Futures trading은 후속 범위다.
+  지원한다. Securities KRW↔USD는 기존 환전 화면, KRW↔Crypto USD는 이체 견적 화면을
+  사용한다. 자동환전·주문 auto-funding·cross-account/user 송금·Futures trading은 없다.
   Legacy Wallet/FX의 Securities projection은 유지하고 account 원장은 모든 scope를 읽는다.
   근거: 통화만으로 USD 세 지갑 중 하나를 선택하거나 이체를 외부입금으로 표시하지 않는다.
 - `CashWallet`, `WalletTransaction`, `ExchangeTransaction`, `FxExecuteRequest`는 required `tradingAccountId`만 저장한다. child 관계(WalletTransaction→CashWallet, FxExecuteRequest→ExchangeTransaction)도 양쪽 account가 같아야 하며 request-time repair나 participant fallback은 없다.

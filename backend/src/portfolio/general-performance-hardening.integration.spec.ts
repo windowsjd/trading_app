@@ -721,7 +721,7 @@ async function verifyCommittedCommandSurvivesStateAndConfigChanges() {
     const balance = await krwBalance(accountId);
     await prisma.tradingAccount.update({
       where: { id: accountId },
-      data: { status, closedAt: status === 'closed' ? new Date() : null },
+      data: { status, closedAt: status === 'closed' ? (await prisma.$queryRawUnsafe('SELECT clock_timestamp() AS now'))[0].now : null },
     });
 
     const replay = await adRewardService().claim(userId, accountId, granted.request);
@@ -840,7 +840,7 @@ async function verifyEligibilityChecksStructureBeforeConfig() {
   const closed = await openAccount();
   await prisma.tradingAccount.update({
     where: { id: closed.accountId },
-    data: { status: 'closed', closedAt: new Date() },
+    data: { status: 'closed', closedAt: (await prisma.$queryRawUnsafe('SELECT clock_timestamp() AS now'))[0].now },
   });
   const closedView = await adRewardService().getEligibility(closed.userId, closed.accountId);
   assert.equal(closedView.data.eligible, false);
@@ -888,7 +888,7 @@ async function verifyDailySnapshotJob() {
   const closedAcc = await openAccount();
   await prisma.tradingAccount.update({
     where: { id: closedAcc.accountId },
-    data: { status: 'closed', closedAt: new Date() },
+    data: { status: 'closed', closedAt: (await prisma.$queryRawUnsafe('SELECT clock_timestamp() AS now'))[0].now },
   });
 
   // A Sunday: a general cash account's daily snapshot does not depend on any
@@ -1342,7 +1342,7 @@ async function verifyPortfolioReadIsConsistentAcrossAPayout() {
 
   await prisma.tradingAccount.update({
     where: { id: accountId },
-    data: { status: 'closed', closedAt: new Date() },
+    data: { status: 'closed', closedAt: (await prisma.$queryRawUnsafe('SELECT clock_timestamp() AS now'))[0].now },
   });
   const closed = await portfolio.getPortfolio(userId, accountId);
   assert.equal(closed.data.status, 'closed');
@@ -1434,7 +1434,7 @@ async function verifyClosedDuringRunLeavesNoSnapshot() {
     await new Promise((resolve) => setTimeout(resolve, 300));
     await tx.tradingAccount.update({
       where: { id: accountId },
-      data: { status: 'closed', closedAt: new Date() },
+      data: { status: 'closed', closedAt: (await prisma.$queryRawUnsafe('SELECT clock_timestamp() AS now'))[0].now },
     });
   });
 

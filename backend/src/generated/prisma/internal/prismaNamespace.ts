@@ -410,6 +410,8 @@ export const ModelName = {
   FxRateSnapshot: 'FxRateSnapshot',
   Quote: 'Quote',
   WalletTransfer: 'WalletTransfer',
+  WalletTransferQuote: 'WalletTransferQuote',
+  WalletTransferExecuteRequest: 'WalletTransferExecuteRequest',
   FxExecuteRequest: 'FxExecuteRequest',
   EquitySnapshot: 'EquitySnapshot',
   DailyPortfolioSnapshot: 'DailyPortfolioSnapshot',
@@ -433,7 +435,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "position" | "order" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence"
+    modelProps: "user" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "position" | "order" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2361,6 +2363,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    WalletTransferQuote: {
+      payload: Prisma.$WalletTransferQuotePayload<ExtArgs>
+      fields: Prisma.WalletTransferQuoteFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.WalletTransferQuoteFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferQuotePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.WalletTransferQuoteFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferQuotePayload>
+        }
+        findFirst: {
+          args: Prisma.WalletTransferQuoteFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferQuotePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.WalletTransferQuoteFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferQuotePayload>
+        }
+        findMany: {
+          args: Prisma.WalletTransferQuoteFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferQuotePayload>[]
+        }
+        create: {
+          args: Prisma.WalletTransferQuoteCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferQuotePayload>
+        }
+        createMany: {
+          args: Prisma.WalletTransferQuoteCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.WalletTransferQuoteCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferQuotePayload>[]
+        }
+        delete: {
+          args: Prisma.WalletTransferQuoteDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferQuotePayload>
+        }
+        update: {
+          args: Prisma.WalletTransferQuoteUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferQuotePayload>
+        }
+        deleteMany: {
+          args: Prisma.WalletTransferQuoteDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.WalletTransferQuoteUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.WalletTransferQuoteUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferQuotePayload>[]
+        }
+        upsert: {
+          args: Prisma.WalletTransferQuoteUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferQuotePayload>
+        }
+        aggregate: {
+          args: Prisma.WalletTransferQuoteAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateWalletTransferQuote>
+        }
+        groupBy: {
+          args: Prisma.WalletTransferQuoteGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WalletTransferQuoteGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.WalletTransferQuoteCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WalletTransferQuoteCountAggregateOutputType> | number
+        }
+      }
+    }
+    WalletTransferExecuteRequest: {
+      payload: Prisma.$WalletTransferExecuteRequestPayload<ExtArgs>
+      fields: Prisma.WalletTransferExecuteRequestFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.WalletTransferExecuteRequestFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferExecuteRequestPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.WalletTransferExecuteRequestFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferExecuteRequestPayload>
+        }
+        findFirst: {
+          args: Prisma.WalletTransferExecuteRequestFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferExecuteRequestPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.WalletTransferExecuteRequestFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferExecuteRequestPayload>
+        }
+        findMany: {
+          args: Prisma.WalletTransferExecuteRequestFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferExecuteRequestPayload>[]
+        }
+        create: {
+          args: Prisma.WalletTransferExecuteRequestCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferExecuteRequestPayload>
+        }
+        createMany: {
+          args: Prisma.WalletTransferExecuteRequestCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.WalletTransferExecuteRequestCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferExecuteRequestPayload>[]
+        }
+        delete: {
+          args: Prisma.WalletTransferExecuteRequestDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferExecuteRequestPayload>
+        }
+        update: {
+          args: Prisma.WalletTransferExecuteRequestUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferExecuteRequestPayload>
+        }
+        deleteMany: {
+          args: Prisma.WalletTransferExecuteRequestDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.WalletTransferExecuteRequestUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.WalletTransferExecuteRequestUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferExecuteRequestPayload>[]
+        }
+        upsert: {
+          args: Prisma.WalletTransferExecuteRequestUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WalletTransferExecuteRequestPayload>
+        }
+        aggregate: {
+          args: Prisma.WalletTransferExecuteRequestAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateWalletTransferExecuteRequest>
+        }
+        groupBy: {
+          args: Prisma.WalletTransferExecuteRequestGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WalletTransferExecuteRequestGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.WalletTransferExecuteRequestCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WalletTransferExecuteRequestCountAggregateOutputType> | number
+        }
+      }
+    }
     FxExecuteRequest: {
       payload: Prisma.$FxExecuteRequestPayload<ExtArgs>
       fields: Prisma.FxExecuteRequestFieldRefs
@@ -3542,6 +3692,30 @@ export const WalletTransferScalarFieldEnum = {
 export type WalletTransferScalarFieldEnum = (typeof WalletTransferScalarFieldEnum)[keyof typeof WalletTransferScalarFieldEnum]
 
 
+export const WalletTransferQuoteScalarFieldEnum = {
+  quoteId: 'quoteId',
+  sourceWalletId: 'sourceWalletId',
+  destinationWalletId: 'destinationWalletId'
+} as const
+
+export type WalletTransferQuoteScalarFieldEnum = (typeof WalletTransferQuoteScalarFieldEnum)[keyof typeof WalletTransferQuoteScalarFieldEnum]
+
+
+export const WalletTransferExecuteRequestScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  quoteId: 'quoteId',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  exchangeTransactionId: 'exchangeTransactionId',
+  walletTransferId: 'walletTransferId',
+  responsePayloadJson: 'responsePayloadJson',
+  executedAt: 'executedAt'
+} as const
+
+export type WalletTransferExecuteRequestScalarFieldEnum = (typeof WalletTransferExecuteRequestScalarFieldEnum)[keyof typeof WalletTransferExecuteRequestScalarFieldEnum]
+
+
 export const FxExecuteRequestScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -4494,6 +4668,8 @@ export type GlobalOmitConfig = {
   fxRateSnapshot?: Prisma.FxRateSnapshotOmit
   quote?: Prisma.QuoteOmit
   walletTransfer?: Prisma.WalletTransferOmit
+  walletTransferQuote?: Prisma.WalletTransferQuoteOmit
+  walletTransferExecuteRequest?: Prisma.WalletTransferExecuteRequestOmit
   fxExecuteRequest?: Prisma.FxExecuteRequestOmit
   equitySnapshot?: Prisma.EquitySnapshotOmit
   dailyPortfolioSnapshot?: Prisma.DailyPortfolioSnapshotOmit

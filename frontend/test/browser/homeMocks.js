@@ -120,8 +120,8 @@ export const apiClient = {
         state: points.length ? 'available' : 'empty', range, granularity: 'daily', returnRateMethod, points });
     }
     if (path.endsWith('/wallets')) return response({ tradingAccountId: account.id, wallets: params.has('holdings') ? [
-      { id: `${account.id}:krw`, walletScope: 'securities', currencyCode: 'KRW', balanceAmount: long ? '1234567890123456' : account.mode === 'general' ? '9900000' : '8800000' },
-      { id: `${account.id}:futures`, walletScope: 'crypto_futures', currencyCode: 'USD', balanceAmount: long ? '1234567890123.45' : '0', reservedAmount: '0' },
+      { id: `${account.id}:krw`, walletScope: 'securities', currencyCode: 'KRW', reservedAmount: '0', balanceAmount: long ? '1234567890123456' : account.mode === 'general' ? '9900000' : '8800000' },
+      { id: `${account.id}:futures`, walletScope: 'crypto_futures', currencyCode: 'USD', balanceAmount: long ? '1234567890123.45' : params.get('screen') === 'transfer' ? '500' : '0', reservedAmount: '0' },
       { id: `${account.id}:spot`, walletScope: 'crypto_spot', currencyCode: 'USD', balanceAmount: long ? '1234567890123.45' : '500.12', reservedAmount: '100.00' },
       { id: `${account.id}:usd`, walletScope: 'securities', currencyCode: 'USD', reservedAmount: '20', balanceAmount: long ? '1234567890123.45' : '50.39' },
     ] : [] });

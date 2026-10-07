@@ -255,6 +255,7 @@ export type WalletTransferWhereInput = {
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   sourceWallet?: Prisma.XOR<Prisma.CashWalletScalarRelationFilter, Prisma.CashWalletWhereInput>
   destinationWallet?: Prisma.XOR<Prisma.CashWalletScalarRelationFilter, Prisma.CashWalletWhereInput>
+  compositeCommand?: Prisma.XOR<Prisma.WalletTransferExecuteRequestNullableScalarRelationFilter, Prisma.WalletTransferExecuteRequestWhereInput> | null
 }
 
 export type WalletTransferOrderByWithRelationInput = {
@@ -271,6 +272,7 @@ export type WalletTransferOrderByWithRelationInput = {
   tradingAccount?: Prisma.TradingAccountOrderByWithRelationInput
   sourceWallet?: Prisma.CashWalletOrderByWithRelationInput
   destinationWallet?: Prisma.CashWalletOrderByWithRelationInput
+  compositeCommand?: Prisma.WalletTransferExecuteRequestOrderByWithRelationInput
 }
 
 export type WalletTransferWhereUniqueInput = Prisma.AtLeast<{
@@ -291,6 +293,7 @@ export type WalletTransferWhereUniqueInput = Prisma.AtLeast<{
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   sourceWallet?: Prisma.XOR<Prisma.CashWalletScalarRelationFilter, Prisma.CashWalletWhereInput>
   destinationWallet?: Prisma.XOR<Prisma.CashWalletScalarRelationFilter, Prisma.CashWalletWhereInput>
+  compositeCommand?: Prisma.XOR<Prisma.WalletTransferExecuteRequestNullableScalarRelationFilter, Prisma.WalletTransferExecuteRequestWhereInput> | null
 }, "id" | "tradingAccountId_idempotencyKey">
 
 export type WalletTransferOrderByWithAggregationInput = {
@@ -338,6 +341,7 @@ export type WalletTransferCreateInput = {
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutWalletTransfersInput
   sourceWallet: Prisma.CashWalletCreateNestedOneWithoutOutgoingTransfersInput
   destinationWallet: Prisma.CashWalletCreateNestedOneWithoutIncomingTransfersInput
+  compositeCommand?: Prisma.WalletTransferExecuteRequestCreateNestedOneWithoutWalletTransferInput
 }
 
 export type WalletTransferUncheckedCreateInput = {
@@ -351,6 +355,7 @@ export type WalletTransferUncheckedCreateInput = {
   requestHash: string
   responsePayloadJson: Prisma.JsonNullValueInput | runtime.InputJsonValue
   executedAt: Date | string
+  compositeCommand?: Prisma.WalletTransferExecuteRequestUncheckedCreateNestedOneWithoutWalletTransferInput
 }
 
 export type WalletTransferUpdateInput = {
@@ -364,6 +369,7 @@ export type WalletTransferUpdateInput = {
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutWalletTransfersNestedInput
   sourceWallet?: Prisma.CashWalletUpdateOneRequiredWithoutOutgoingTransfersNestedInput
   destinationWallet?: Prisma.CashWalletUpdateOneRequiredWithoutIncomingTransfersNestedInput
+  compositeCommand?: Prisma.WalletTransferExecuteRequestUpdateOneWithoutWalletTransferNestedInput
 }
 
 export type WalletTransferUncheckedUpdateInput = {
@@ -377,6 +383,7 @@ export type WalletTransferUncheckedUpdateInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   responsePayloadJson?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   executedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  compositeCommand?: Prisma.WalletTransferExecuteRequestUncheckedUpdateOneWithoutWalletTransferNestedInput
 }
 
 export type WalletTransferCreateManyInput = {
@@ -473,6 +480,11 @@ export type WalletTransferMinOrderByAggregateInput = {
 
 export type WalletTransferSumOrderByAggregateInput = {
   amount?: Prisma.SortOrder
+}
+
+export type WalletTransferScalarRelationFilter = {
+  is?: Prisma.WalletTransferWhereInput
+  isNot?: Prisma.WalletTransferWhereInput
 }
 
 export type WalletTransferCreateNestedManyWithoutTradingAccountInput = {
@@ -601,6 +613,20 @@ export type WalletTransferUncheckedUpdateManyWithoutDestinationWalletNestedInput
   deleteMany?: Prisma.WalletTransferScalarWhereInput | Prisma.WalletTransferScalarWhereInput[]
 }
 
+export type WalletTransferCreateNestedOneWithoutCompositeCommandInput = {
+  create?: Prisma.XOR<Prisma.WalletTransferCreateWithoutCompositeCommandInput, Prisma.WalletTransferUncheckedCreateWithoutCompositeCommandInput>
+  connectOrCreate?: Prisma.WalletTransferCreateOrConnectWithoutCompositeCommandInput
+  connect?: Prisma.WalletTransferWhereUniqueInput
+}
+
+export type WalletTransferUpdateOneRequiredWithoutCompositeCommandNestedInput = {
+  create?: Prisma.XOR<Prisma.WalletTransferCreateWithoutCompositeCommandInput, Prisma.WalletTransferUncheckedCreateWithoutCompositeCommandInput>
+  connectOrCreate?: Prisma.WalletTransferCreateOrConnectWithoutCompositeCommandInput
+  upsert?: Prisma.WalletTransferUpsertWithoutCompositeCommandInput
+  connect?: Prisma.WalletTransferWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.WalletTransferUpdateToOneWithWhereWithoutCompositeCommandInput, Prisma.WalletTransferUpdateWithoutCompositeCommandInput>, Prisma.WalletTransferUncheckedUpdateWithoutCompositeCommandInput>
+}
+
 export type WalletTransferCreateWithoutTradingAccountInput = {
   id?: string
   currencyCode: $Enums.CurrencyCode
@@ -611,6 +637,7 @@ export type WalletTransferCreateWithoutTradingAccountInput = {
   executedAt: Date | string
   sourceWallet: Prisma.CashWalletCreateNestedOneWithoutOutgoingTransfersInput
   destinationWallet: Prisma.CashWalletCreateNestedOneWithoutIncomingTransfersInput
+  compositeCommand?: Prisma.WalletTransferExecuteRequestCreateNestedOneWithoutWalletTransferInput
 }
 
 export type WalletTransferUncheckedCreateWithoutTradingAccountInput = {
@@ -623,6 +650,7 @@ export type WalletTransferUncheckedCreateWithoutTradingAccountInput = {
   requestHash: string
   responsePayloadJson: Prisma.JsonNullValueInput | runtime.InputJsonValue
   executedAt: Date | string
+  compositeCommand?: Prisma.WalletTransferExecuteRequestUncheckedCreateNestedOneWithoutWalletTransferInput
 }
 
 export type WalletTransferCreateOrConnectWithoutTradingAccountInput = {
@@ -677,6 +705,7 @@ export type WalletTransferCreateWithoutSourceWalletInput = {
   executedAt: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutWalletTransfersInput
   destinationWallet: Prisma.CashWalletCreateNestedOneWithoutIncomingTransfersInput
+  compositeCommand?: Prisma.WalletTransferExecuteRequestCreateNestedOneWithoutWalletTransferInput
 }
 
 export type WalletTransferUncheckedCreateWithoutSourceWalletInput = {
@@ -689,6 +718,7 @@ export type WalletTransferUncheckedCreateWithoutSourceWalletInput = {
   requestHash: string
   responsePayloadJson: Prisma.JsonNullValueInput | runtime.InputJsonValue
   executedAt: Date | string
+  compositeCommand?: Prisma.WalletTransferExecuteRequestUncheckedCreateNestedOneWithoutWalletTransferInput
 }
 
 export type WalletTransferCreateOrConnectWithoutSourceWalletInput = {
@@ -711,6 +741,7 @@ export type WalletTransferCreateWithoutDestinationWalletInput = {
   executedAt: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutWalletTransfersInput
   sourceWallet: Prisma.CashWalletCreateNestedOneWithoutOutgoingTransfersInput
+  compositeCommand?: Prisma.WalletTransferExecuteRequestCreateNestedOneWithoutWalletTransferInput
 }
 
 export type WalletTransferUncheckedCreateWithoutDestinationWalletInput = {
@@ -723,6 +754,7 @@ export type WalletTransferUncheckedCreateWithoutDestinationWalletInput = {
   requestHash: string
   responsePayloadJson: Prisma.JsonNullValueInput | runtime.InputJsonValue
   executedAt: Date | string
+  compositeCommand?: Prisma.WalletTransferExecuteRequestUncheckedCreateNestedOneWithoutWalletTransferInput
 }
 
 export type WalletTransferCreateOrConnectWithoutDestinationWalletInput = {
@@ -767,6 +799,74 @@ export type WalletTransferUpdateManyWithWhereWithoutDestinationWalletInput = {
   data: Prisma.XOR<Prisma.WalletTransferUpdateManyMutationInput, Prisma.WalletTransferUncheckedUpdateManyWithoutDestinationWalletInput>
 }
 
+export type WalletTransferCreateWithoutCompositeCommandInput = {
+  id?: string
+  currencyCode: $Enums.CurrencyCode
+  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  idempotencyKey: string
+  requestHash: string
+  responsePayloadJson: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  executedAt: Date | string
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutWalletTransfersInput
+  sourceWallet: Prisma.CashWalletCreateNestedOneWithoutOutgoingTransfersInput
+  destinationWallet: Prisma.CashWalletCreateNestedOneWithoutIncomingTransfersInput
+}
+
+export type WalletTransferUncheckedCreateWithoutCompositeCommandInput = {
+  id?: string
+  tradingAccountId: string
+  sourceWalletId: string
+  destinationWalletId: string
+  currencyCode: $Enums.CurrencyCode
+  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  idempotencyKey: string
+  requestHash: string
+  responsePayloadJson: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  executedAt: Date | string
+}
+
+export type WalletTransferCreateOrConnectWithoutCompositeCommandInput = {
+  where: Prisma.WalletTransferWhereUniqueInput
+  create: Prisma.XOR<Prisma.WalletTransferCreateWithoutCompositeCommandInput, Prisma.WalletTransferUncheckedCreateWithoutCompositeCommandInput>
+}
+
+export type WalletTransferUpsertWithoutCompositeCommandInput = {
+  update: Prisma.XOR<Prisma.WalletTransferUpdateWithoutCompositeCommandInput, Prisma.WalletTransferUncheckedUpdateWithoutCompositeCommandInput>
+  create: Prisma.XOR<Prisma.WalletTransferCreateWithoutCompositeCommandInput, Prisma.WalletTransferUncheckedCreateWithoutCompositeCommandInput>
+  where?: Prisma.WalletTransferWhereInput
+}
+
+export type WalletTransferUpdateToOneWithWhereWithoutCompositeCommandInput = {
+  where?: Prisma.WalletTransferWhereInput
+  data: Prisma.XOR<Prisma.WalletTransferUpdateWithoutCompositeCommandInput, Prisma.WalletTransferUncheckedUpdateWithoutCompositeCommandInput>
+}
+
+export type WalletTransferUpdateWithoutCompositeCommandInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
+  requestHash?: Prisma.StringFieldUpdateOperationsInput | string
+  responsePayloadJson?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  executedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutWalletTransfersNestedInput
+  sourceWallet?: Prisma.CashWalletUpdateOneRequiredWithoutOutgoingTransfersNestedInput
+  destinationWallet?: Prisma.CashWalletUpdateOneRequiredWithoutIncomingTransfersNestedInput
+}
+
+export type WalletTransferUncheckedUpdateWithoutCompositeCommandInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
+  sourceWalletId?: Prisma.StringFieldUpdateOperationsInput | string
+  destinationWalletId?: Prisma.StringFieldUpdateOperationsInput | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
+  requestHash?: Prisma.StringFieldUpdateOperationsInput | string
+  responsePayloadJson?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  executedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
 export type WalletTransferCreateManyTradingAccountInput = {
   id?: string
   sourceWalletId: string
@@ -789,6 +889,7 @@ export type WalletTransferUpdateWithoutTradingAccountInput = {
   executedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sourceWallet?: Prisma.CashWalletUpdateOneRequiredWithoutOutgoingTransfersNestedInput
   destinationWallet?: Prisma.CashWalletUpdateOneRequiredWithoutIncomingTransfersNestedInput
+  compositeCommand?: Prisma.WalletTransferExecuteRequestUpdateOneWithoutWalletTransferNestedInput
 }
 
 export type WalletTransferUncheckedUpdateWithoutTradingAccountInput = {
@@ -801,6 +902,7 @@ export type WalletTransferUncheckedUpdateWithoutTradingAccountInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   responsePayloadJson?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   executedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  compositeCommand?: Prisma.WalletTransferExecuteRequestUncheckedUpdateOneWithoutWalletTransferNestedInput
 }
 
 export type WalletTransferUncheckedUpdateManyWithoutTradingAccountInput = {
@@ -849,6 +951,7 @@ export type WalletTransferUpdateWithoutSourceWalletInput = {
   executedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutWalletTransfersNestedInput
   destinationWallet?: Prisma.CashWalletUpdateOneRequiredWithoutIncomingTransfersNestedInput
+  compositeCommand?: Prisma.WalletTransferExecuteRequestUpdateOneWithoutWalletTransferNestedInput
 }
 
 export type WalletTransferUncheckedUpdateWithoutSourceWalletInput = {
@@ -861,6 +964,7 @@ export type WalletTransferUncheckedUpdateWithoutSourceWalletInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   responsePayloadJson?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   executedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  compositeCommand?: Prisma.WalletTransferExecuteRequestUncheckedUpdateOneWithoutWalletTransferNestedInput
 }
 
 export type WalletTransferUncheckedUpdateManyWithoutSourceWalletInput = {
@@ -885,6 +989,7 @@ export type WalletTransferUpdateWithoutDestinationWalletInput = {
   executedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutWalletTransfersNestedInput
   sourceWallet?: Prisma.CashWalletUpdateOneRequiredWithoutOutgoingTransfersNestedInput
+  compositeCommand?: Prisma.WalletTransferExecuteRequestUpdateOneWithoutWalletTransferNestedInput
 }
 
 export type WalletTransferUncheckedUpdateWithoutDestinationWalletInput = {
@@ -897,6 +1002,7 @@ export type WalletTransferUncheckedUpdateWithoutDestinationWalletInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   responsePayloadJson?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   executedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  compositeCommand?: Prisma.WalletTransferExecuteRequestUncheckedUpdateOneWithoutWalletTransferNestedInput
 }
 
 export type WalletTransferUncheckedUpdateManyWithoutDestinationWalletInput = {
@@ -927,6 +1033,7 @@ export type WalletTransferSelect<ExtArgs extends runtime.Types.Extensions.Intern
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   sourceWallet?: boolean | Prisma.CashWalletDefaultArgs<ExtArgs>
   destinationWallet?: boolean | Prisma.CashWalletDefaultArgs<ExtArgs>
+  compositeCommand?: boolean | Prisma.WalletTransfer$compositeCommandArgs<ExtArgs>
 }, ExtArgs["result"]["walletTransfer"]>
 
 export type WalletTransferSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -979,6 +1086,7 @@ export type WalletTransferInclude<ExtArgs extends runtime.Types.Extensions.Inter
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   sourceWallet?: boolean | Prisma.CashWalletDefaultArgs<ExtArgs>
   destinationWallet?: boolean | Prisma.CashWalletDefaultArgs<ExtArgs>
+  compositeCommand?: boolean | Prisma.WalletTransfer$compositeCommandArgs<ExtArgs>
 }
 export type WalletTransferIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
@@ -997,6 +1105,7 @@ export type $WalletTransferPayload<ExtArgs extends runtime.Types.Extensions.Inte
     tradingAccount: Prisma.$TradingAccountPayload<ExtArgs>
     sourceWallet: Prisma.$CashWalletPayload<ExtArgs>
     destinationWallet: Prisma.$CashWalletPayload<ExtArgs>
+    compositeCommand: Prisma.$WalletTransferExecuteRequestPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1406,6 +1515,7 @@ export interface Prisma__WalletTransferClient<T, Null = never, ExtArgs extends r
   tradingAccount<T extends Prisma.TradingAccountDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccountDefaultArgs<ExtArgs>>): Prisma.Prisma__TradingAccountClient<runtime.Types.Result.GetResult<Prisma.$TradingAccountPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   sourceWallet<T extends Prisma.CashWalletDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.CashWalletDefaultArgs<ExtArgs>>): Prisma.Prisma__CashWalletClient<runtime.Types.Result.GetResult<Prisma.$CashWalletPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   destinationWallet<T extends Prisma.CashWalletDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.CashWalletDefaultArgs<ExtArgs>>): Prisma.Prisma__CashWalletClient<runtime.Types.Result.GetResult<Prisma.$CashWalletPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  compositeCommand<T extends Prisma.WalletTransfer$compositeCommandArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.WalletTransfer$compositeCommandArgs<ExtArgs>>): Prisma.Prisma__WalletTransferExecuteRequestClient<runtime.Types.Result.GetResult<Prisma.$WalletTransferExecuteRequestPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1843,6 +1953,25 @@ export type WalletTransferDeleteManyArgs<ExtArgs extends runtime.Types.Extension
    * Limit how many WalletTransfers to delete.
    */
   limit?: number
+}
+
+/**
+ * WalletTransfer.compositeCommand
+ */
+export type WalletTransfer$compositeCommandArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WalletTransferExecuteRequest
+   */
+  select?: Prisma.WalletTransferExecuteRequestSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the WalletTransferExecuteRequest
+   */
+  omit?: Prisma.WalletTransferExecuteRequestOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.WalletTransferExecuteRequestInclude<ExtArgs> | null
+  where?: Prisma.WalletTransferExecuteRequestWhereInput
 }
 
 /**

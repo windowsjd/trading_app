@@ -8,6 +8,7 @@ import {
   TradingAccountMode,
   TradingAccountStatus,
   type WalletScope,
+  type CashWallet,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
@@ -203,139 +204,15 @@ export class TradingAccountWalletTransferService {
             'WALLET_TRANSFER_WALLET_NOT_FOUND',
             'Transfer wallets were not found in this account.',
           );
-        if (
-          source.currencyCode !== CurrencyCode.USD ||
-          destination.currencyCode !== CurrencyCode.USD
-        )
-          fail(
-            HttpStatus.BAD_REQUEST,
-            'WALLET_TRANSFER_USD_ONLY',
-            'Only same-currency USD transfers are supported.',
-          );
-        for (const wallet of [source, destination]) {
-          assertCashWalletTradingAccountScope(wallet, {
-            tradingAccountId: accountId,
-            walletScope: wallet.walletScope,
-          });
-        }
-        const changed = await debitAvailableCash(tx, {
-          walletId: source.id,
-          tradingAccountId: accountId,
-          walletScope: source.walletScope,
-          currencyCode: CurrencyCode.USD,
+        return this.transferInTransaction(tx, {
+          accountId,
+          source,
+          destination,
           amount: request.amount,
+          idempotencyKey: request.idempotencyKey,
+          requestHash,
+          executeNow: clock.now,
         });
-        if (changed !== 1) {
-          await diagnoseCashWalletMutationFailure(tx, {
-            walletId: source.id,
-            expected: {
-              tradingAccountId: accountId,
-              walletScope: source.walletScope,
-              currencyCode: CurrencyCode.USD,
-            },
-            requires: { available: request.amount },
-          });
-          fail(
-            HttpStatus.CONFLICT,
-            'INSUFFICIENT_AVAILABLE_BALANCE',
-            'Available source balance is insufficient.',
-          );
-        }
-        const credit = await tx.cashWallet.updateMany({
-          where: {
-            id: destination.id,
-            tradingAccountId: accountId,
-            walletScope: destination.walletScope,
-            currencyCode: CurrencyCode.USD,
-          },
-          data: { balanceAmount: { increment: request.amount } },
-        });
-        if (credit.count !== 1) {
-          await diagnoseCashWalletMutationFailure(tx, {
-            walletId: destination.id,
-            expected: {
-              tradingAccountId: accountId,
-              walletScope: destination.walletScope,
-              currencyCode: CurrencyCode.USD,
-            },
-          });
-          fail(
-            HttpStatus.CONFLICT,
-            'WALLET_TRANSFER_CONFLICT',
-            'Destination wallet changed.',
-          );
-        }
-        const transferId = randomUUID();
-        const amount = new Prisma.Decimal(request.amount);
-        const sourceAfter = source.balanceAmount.sub(amount);
-        const destinationAfter = destination.balanceAmount.add(amount);
-        const result: WalletTransferResult = {
-          success: true,
-          data: {
-            tradingAccountId: accountId,
-            transferId,
-            currencyCode: 'USD',
-            amount: request.amount,
-            executedAt: clock.now.toISOString(),
-            source: {
-              walletId: source.id,
-              walletScope: source.walletScope,
-              balanceAfter: sourceAfter.toFixed(8),
-              availableAfter: sourceAfter.sub(source.reservedAmount).toFixed(8),
-            },
-            destination: {
-              walletId: destination.id,
-              walletScope: destination.walletScope,
-              balanceAfter: destinationAfter.toFixed(8),
-              availableAfter: destinationAfter
-                .sub(destination.reservedAmount)
-                .toFixed(8),
-            },
-          },
-        };
-        await tx.walletTransfer.create({
-          data: {
-            id: transferId,
-            tradingAccountId: accountId,
-            sourceWalletId: source.id,
-            destinationWalletId: destination.id,
-            currencyCode: CurrencyCode.USD,
-            amount: request.amount,
-            idempotencyKey: request.idempotencyKey,
-            requestHash,
-            responsePayloadJson: result as unknown as Prisma.InputJsonValue,
-            executedAt: clock.now,
-          },
-        });
-        await tx.walletTransaction.createMany({
-          data: [
-            {
-              tradingAccountId: accountId,
-              walletId: source.id,
-              currencyCode: CurrencyCode.USD,
-              direction: 'debit',
-              txType: 'wallet_transfer',
-              referenceType: 'wallet_transfer',
-              referenceId: transferId,
-              amount: request.amount,
-              balanceAfter: sourceAfter,
-              occurredAt: clock.now,
-            },
-            {
-              tradingAccountId: accountId,
-              walletId: destination.id,
-              currencyCode: CurrencyCode.USD,
-              direction: 'credit',
-              txType: 'wallet_transfer',
-              referenceType: 'wallet_transfer',
-              referenceId: transferId,
-              amount: request.amount,
-              balanceAfter: destinationAfter,
-              occurredAt: clock.now,
-            },
-          ],
-        });
-        return result;
       });
     } catch (error) {
       if (
@@ -349,6 +226,163 @@ export class TradingAccountWalletTransferService {
       }
       throw error;
     }
+  }
+
+  /** Caller owns lifecycle/wallet locks and the transaction; no commit/replay here. */
+  async transferInTransaction(
+    tx: Prisma.TransactionClient,
+    input: {
+      accountId: string;
+      source: CashWallet;
+      destination: CashWallet;
+      amount: string;
+      idempotencyKey: string;
+      requestHash: string;
+      executeNow: Date;
+    },
+  ): Promise<WalletTransferResult> {
+    const {
+      accountId,
+      source,
+      destination,
+      amount,
+      idempotencyKey,
+      requestHash,
+      executeNow,
+    } = input;
+    if (
+      source.currencyCode !== CurrencyCode.USD ||
+      destination.currencyCode !== CurrencyCode.USD
+    )
+      fail(
+        HttpStatus.BAD_REQUEST,
+        'WALLET_TRANSFER_USD_ONLY',
+        'Only same-currency USD transfers are supported.',
+      );
+    for (const wallet of [source, destination]) {
+      assertCashWalletTradingAccountScope(wallet, {
+        tradingAccountId: accountId,
+        walletScope: wallet.walletScope,
+      });
+    }
+    const changed = await debitAvailableCash(tx, {
+      walletId: source.id,
+      tradingAccountId: accountId,
+      walletScope: source.walletScope,
+      currencyCode: CurrencyCode.USD,
+      amount: amount,
+    });
+    if (changed !== 1) {
+      await diagnoseCashWalletMutationFailure(tx, {
+        walletId: source.id,
+        expected: {
+          tradingAccountId: accountId,
+          walletScope: source.walletScope,
+          currencyCode: CurrencyCode.USD,
+        },
+        requires: { available: amount },
+      });
+      fail(
+        HttpStatus.CONFLICT,
+        'INSUFFICIENT_AVAILABLE_BALANCE',
+        'Available source balance is insufficient.',
+      );
+    }
+    const credit = await tx.cashWallet.updateMany({
+      where: {
+        id: destination.id,
+        tradingAccountId: accountId,
+        walletScope: destination.walletScope,
+        currencyCode: CurrencyCode.USD,
+      },
+      data: { balanceAmount: { increment: amount } },
+    });
+    if (credit.count !== 1) {
+      await diagnoseCashWalletMutationFailure(tx, {
+        walletId: destination.id,
+        expected: {
+          tradingAccountId: accountId,
+          walletScope: destination.walletScope,
+          currencyCode: CurrencyCode.USD,
+        },
+      });
+      fail(
+        HttpStatus.CONFLICT,
+        'WALLET_TRANSFER_CONFLICT',
+        'Destination wallet changed.',
+      );
+    }
+    const transferId = randomUUID();
+    const decimalAmount = new Prisma.Decimal(amount);
+    const sourceAfter = source.balanceAmount.sub(decimalAmount);
+    const destinationAfter = destination.balanceAmount.add(decimalAmount);
+    const result: WalletTransferResult = {
+      success: true,
+      data: {
+        tradingAccountId: accountId,
+        transferId,
+        currencyCode: 'USD',
+        amount: amount,
+        executedAt: executeNow.toISOString(),
+        source: {
+          walletId: source.id,
+          walletScope: source.walletScope,
+          balanceAfter: sourceAfter.toFixed(8),
+          availableAfter: sourceAfter.sub(source.reservedAmount).toFixed(8),
+        },
+        destination: {
+          walletId: destination.id,
+          walletScope: destination.walletScope,
+          balanceAfter: destinationAfter.toFixed(8),
+          availableAfter: destinationAfter
+            .sub(destination.reservedAmount)
+            .toFixed(8),
+        },
+      },
+    };
+    await tx.walletTransfer.create({
+      data: {
+        id: transferId,
+        tradingAccountId: accountId,
+        sourceWalletId: source.id,
+        destinationWalletId: destination.id,
+        currencyCode: CurrencyCode.USD,
+        amount: amount,
+        idempotencyKey: idempotencyKey,
+        requestHash,
+        responsePayloadJson: result as unknown as Prisma.InputJsonValue,
+        executedAt: executeNow,
+      },
+    });
+    await tx.walletTransaction.createMany({
+      data: [
+        {
+          tradingAccountId: accountId,
+          walletId: source.id,
+          currencyCode: CurrencyCode.USD,
+          direction: 'debit',
+          txType: 'wallet_transfer',
+          referenceType: 'wallet_transfer',
+          referenceId: transferId,
+          amount: amount,
+          balanceAfter: sourceAfter,
+          occurredAt: executeNow,
+        },
+        {
+          tradingAccountId: accountId,
+          walletId: destination.id,
+          currencyCode: CurrencyCode.USD,
+          direction: 'credit',
+          txType: 'wallet_transfer',
+          referenceType: 'wallet_transfer',
+          referenceId: transferId,
+          amount: amount,
+          balanceAfter: destinationAfter,
+          occurredAt: executeNow,
+        },
+      ],
+    });
+    return result;
   }
 }
 

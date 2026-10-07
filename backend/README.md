@@ -60,8 +60,12 @@ request ID, query exclusion, collection/depth/string and 24 KiB limits remain.
   USD/KRW evidence. New Crypto Spot orders use Crypto Spot USD; stocks and FX use
   Securities. Same-account USD wallet transfers are atomic and idempotent, with
   no fee or effect on total assets/TWR/ranking. Legacy order/Quote provenance stays
-  Securities. Futures supports storage/transfers only; FX+Transfer and Futures
-  trading remain unsupported. See `docs/wallet-transfers-api-contract.md`. Existing accounts are normalized
+  Securities. Explicit Securities KRW ↔ Crypto Spot/Futures USD transfers use
+  one durable quote/execute command and one PostgreSQL transaction, reusing
+  Securities-only FX and internal USD transfer evidence. Transfer stays neutral;
+  FX fee/repricing keeps its existing economic effect. Automatic FX/order funding
+  and Futures trading remain unsupported. Futures supports USD storage and
+  explicit transfers only. See `docs/wallet-transfers-api-contract.md`. Existing accounts are normalized
   by a zero-only migration, including closed accounts without changing history.
   See [current scope and rollout policy](docs/trading-modes-and-accounts.md).
 - Final valuation policy is KRW total assets.

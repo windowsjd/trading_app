@@ -5,11 +5,17 @@ import { TradingAccountWalletTransferService } from './trading-account-wallet-tr
 import { TradingAccountWalletsController } from './trading-account-wallets.controller';
 import { WalletsController } from './wallets.controller';
 import { WalletsService } from './wallets.service';
+import { FxModule } from '../fx/fx.module';
+import { TradingAccountWalletFxTransferService } from './trading-account-wallet-fx-transfer.service';
 
 @Module({
-  imports: [TradingAccountsModule, GeneralPerformanceModule],
+  imports: [TradingAccountsModule, GeneralPerformanceModule, FxModule],
   controllers: [WalletsController, TradingAccountWalletsController],
-  providers: [WalletsService, TradingAccountWalletTransferService],
+  providers: [
+    WalletsService,
+    TradingAccountWalletTransferService,
+    TradingAccountWalletFxTransferService,
+  ],
   exports: [WalletsService],
 })
 export class WalletsModule {}

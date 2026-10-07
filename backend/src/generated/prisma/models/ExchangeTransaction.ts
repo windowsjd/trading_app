@@ -311,6 +311,7 @@ export type ExchangeTransactionWhereInput = {
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   fxRateSnapshot?: Prisma.XOR<Prisma.FxRateSnapshotNullableScalarRelationFilter, Prisma.FxRateSnapshotWhereInput> | null
   fxExecuteRequests?: Prisma.FxExecuteRequestListRelationFilter
+  walletTransferExecuteRequest?: Prisma.XOR<Prisma.WalletTransferExecuteRequestNullableScalarRelationFilter, Prisma.WalletTransferExecuteRequestWhereInput> | null
 }
 
 export type ExchangeTransactionOrderByWithRelationInput = {
@@ -331,6 +332,7 @@ export type ExchangeTransactionOrderByWithRelationInput = {
   tradingAccount?: Prisma.TradingAccountOrderByWithRelationInput
   fxRateSnapshot?: Prisma.FxRateSnapshotOrderByWithRelationInput
   fxExecuteRequests?: Prisma.FxExecuteRequestOrderByRelationAggregateInput
+  walletTransferExecuteRequest?: Prisma.WalletTransferExecuteRequestOrderByWithRelationInput
 }
 
 export type ExchangeTransactionWhereUniqueInput = Prisma.AtLeast<{
@@ -354,6 +356,7 @@ export type ExchangeTransactionWhereUniqueInput = Prisma.AtLeast<{
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   fxRateSnapshot?: Prisma.XOR<Prisma.FxRateSnapshotNullableScalarRelationFilter, Prisma.FxRateSnapshotWhereInput> | null
   fxExecuteRequests?: Prisma.FxExecuteRequestListRelationFilter
+  walletTransferExecuteRequest?: Prisma.XOR<Prisma.WalletTransferExecuteRequestNullableScalarRelationFilter, Prisma.WalletTransferExecuteRequestWhereInput> | null
 }, "id">
 
 export type ExchangeTransactionOrderByWithAggregationInput = {
@@ -414,6 +417,7 @@ export type ExchangeTransactionCreateInput = {
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutExchangeTransactionsInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutExchangeTransactionsInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutExchangeTransactionInput
+  walletTransferExecuteRequest?: Prisma.WalletTransferExecuteRequestCreateNestedOneWithoutExchangeTransactionInput
 }
 
 export type ExchangeTransactionUncheckedCreateInput = {
@@ -432,6 +436,7 @@ export type ExchangeTransactionUncheckedCreateInput = {
   executedAt: Date | string
   createdAt?: Date | string
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutExchangeTransactionInput
+  walletTransferExecuteRequest?: Prisma.WalletTransferExecuteRequestUncheckedCreateNestedOneWithoutExchangeTransactionInput
 }
 
 export type ExchangeTransactionUpdateInput = {
@@ -450,6 +455,7 @@ export type ExchangeTransactionUpdateInput = {
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutExchangeTransactionsNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutExchangeTransactionsNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutExchangeTransactionNestedInput
+  walletTransferExecuteRequest?: Prisma.WalletTransferExecuteRequestUpdateOneWithoutExchangeTransactionNestedInput
 }
 
 export type ExchangeTransactionUncheckedUpdateInput = {
@@ -468,6 +474,7 @@ export type ExchangeTransactionUncheckedUpdateInput = {
   executedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutExchangeTransactionNestedInput
+  walletTransferExecuteRequest?: Prisma.WalletTransferExecuteRequestUncheckedUpdateOneWithoutExchangeTransactionNestedInput
 }
 
 export type ExchangeTransactionCreateManyInput = {
@@ -598,6 +605,11 @@ export type ExchangeTransactionSumOrderByAggregateInput = {
   netTargetAmount?: Prisma.SortOrder
 }
 
+export type ExchangeTransactionScalarRelationFilter = {
+  is?: Prisma.ExchangeTransactionWhereInput
+  isNot?: Prisma.ExchangeTransactionWhereInput
+}
+
 export type ExchangeTransactionNullableScalarRelationFilter = {
   is?: Prisma.ExchangeTransactionWhereInput | null
   isNot?: Prisma.ExchangeTransactionWhereInput | null
@@ -687,6 +699,20 @@ export type ExchangeTransactionUncheckedUpdateManyWithoutFxRateSnapshotNestedInp
   deleteMany?: Prisma.ExchangeTransactionScalarWhereInput | Prisma.ExchangeTransactionScalarWhereInput[]
 }
 
+export type ExchangeTransactionCreateNestedOneWithoutWalletTransferExecuteRequestInput = {
+  create?: Prisma.XOR<Prisma.ExchangeTransactionCreateWithoutWalletTransferExecuteRequestInput, Prisma.ExchangeTransactionUncheckedCreateWithoutWalletTransferExecuteRequestInput>
+  connectOrCreate?: Prisma.ExchangeTransactionCreateOrConnectWithoutWalletTransferExecuteRequestInput
+  connect?: Prisma.ExchangeTransactionWhereUniqueInput
+}
+
+export type ExchangeTransactionUpdateOneRequiredWithoutWalletTransferExecuteRequestNestedInput = {
+  create?: Prisma.XOR<Prisma.ExchangeTransactionCreateWithoutWalletTransferExecuteRequestInput, Prisma.ExchangeTransactionUncheckedCreateWithoutWalletTransferExecuteRequestInput>
+  connectOrCreate?: Prisma.ExchangeTransactionCreateOrConnectWithoutWalletTransferExecuteRequestInput
+  upsert?: Prisma.ExchangeTransactionUpsertWithoutWalletTransferExecuteRequestInput
+  connect?: Prisma.ExchangeTransactionWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ExchangeTransactionUpdateToOneWithWhereWithoutWalletTransferExecuteRequestInput, Prisma.ExchangeTransactionUpdateWithoutWalletTransferExecuteRequestInput>, Prisma.ExchangeTransactionUncheckedUpdateWithoutWalletTransferExecuteRequestInput>
+}
+
 export type ExchangeTransactionCreateNestedOneWithoutFxExecuteRequestsInput = {
   create?: Prisma.XOR<Prisma.ExchangeTransactionCreateWithoutFxExecuteRequestsInput, Prisma.ExchangeTransactionUncheckedCreateWithoutFxExecuteRequestsInput>
   connectOrCreate?: Prisma.ExchangeTransactionCreateOrConnectWithoutFxExecuteRequestsInput
@@ -718,6 +744,7 @@ export type ExchangeTransactionCreateWithoutTradingAccountInput = {
   createdAt?: Date | string
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutExchangeTransactionsInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutExchangeTransactionInput
+  walletTransferExecuteRequest?: Prisma.WalletTransferExecuteRequestCreateNestedOneWithoutExchangeTransactionInput
 }
 
 export type ExchangeTransactionUncheckedCreateWithoutTradingAccountInput = {
@@ -735,6 +762,7 @@ export type ExchangeTransactionUncheckedCreateWithoutTradingAccountInput = {
   executedAt: Date | string
   createdAt?: Date | string
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutExchangeTransactionInput
+  walletTransferExecuteRequest?: Prisma.WalletTransferExecuteRequestUncheckedCreateNestedOneWithoutExchangeTransactionInput
 }
 
 export type ExchangeTransactionCreateOrConnectWithoutTradingAccountInput = {
@@ -798,6 +826,7 @@ export type ExchangeTransactionCreateWithoutFxRateSnapshotInput = {
   createdAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutExchangeTransactionsInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutExchangeTransactionInput
+  walletTransferExecuteRequest?: Prisma.WalletTransferExecuteRequestCreateNestedOneWithoutExchangeTransactionInput
 }
 
 export type ExchangeTransactionUncheckedCreateWithoutFxRateSnapshotInput = {
@@ -815,6 +844,7 @@ export type ExchangeTransactionUncheckedCreateWithoutFxRateSnapshotInput = {
   executedAt: Date | string
   createdAt?: Date | string
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutExchangeTransactionInput
+  walletTransferExecuteRequest?: Prisma.WalletTransferExecuteRequestUncheckedCreateNestedOneWithoutExchangeTransactionInput
 }
 
 export type ExchangeTransactionCreateOrConnectWithoutFxRateSnapshotInput = {
@@ -843,6 +873,94 @@ export type ExchangeTransactionUpdateManyWithWhereWithoutFxRateSnapshotInput = {
   data: Prisma.XOR<Prisma.ExchangeTransactionUpdateManyMutationInput, Prisma.ExchangeTransactionUncheckedUpdateManyWithoutFxRateSnapshotInput>
 }
 
+export type ExchangeTransactionCreateWithoutWalletTransferExecuteRequestInput = {
+  id?: string
+  fromCurrency: $Enums.CurrencyCode
+  toCurrency: $Enums.CurrencyCode
+  sourceAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  grossTargetAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  feeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  feeAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  feeCurrency: $Enums.CurrencyCode
+  appliedRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  netTargetAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedAt: Date | string
+  createdAt?: Date | string
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutExchangeTransactionsInput
+  fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutExchangeTransactionsInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutExchangeTransactionInput
+}
+
+export type ExchangeTransactionUncheckedCreateWithoutWalletTransferExecuteRequestInput = {
+  id?: string
+  tradingAccountId: string
+  fxRateSnapshotId?: string | null
+  fromCurrency: $Enums.CurrencyCode
+  toCurrency: $Enums.CurrencyCode
+  sourceAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  grossTargetAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  feeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  feeAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  feeCurrency: $Enums.CurrencyCode
+  appliedRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  netTargetAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedAt: Date | string
+  createdAt?: Date | string
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutExchangeTransactionInput
+}
+
+export type ExchangeTransactionCreateOrConnectWithoutWalletTransferExecuteRequestInput = {
+  where: Prisma.ExchangeTransactionWhereUniqueInput
+  create: Prisma.XOR<Prisma.ExchangeTransactionCreateWithoutWalletTransferExecuteRequestInput, Prisma.ExchangeTransactionUncheckedCreateWithoutWalletTransferExecuteRequestInput>
+}
+
+export type ExchangeTransactionUpsertWithoutWalletTransferExecuteRequestInput = {
+  update: Prisma.XOR<Prisma.ExchangeTransactionUpdateWithoutWalletTransferExecuteRequestInput, Prisma.ExchangeTransactionUncheckedUpdateWithoutWalletTransferExecuteRequestInput>
+  create: Prisma.XOR<Prisma.ExchangeTransactionCreateWithoutWalletTransferExecuteRequestInput, Prisma.ExchangeTransactionUncheckedCreateWithoutWalletTransferExecuteRequestInput>
+  where?: Prisma.ExchangeTransactionWhereInput
+}
+
+export type ExchangeTransactionUpdateToOneWithWhereWithoutWalletTransferExecuteRequestInput = {
+  where?: Prisma.ExchangeTransactionWhereInput
+  data: Prisma.XOR<Prisma.ExchangeTransactionUpdateWithoutWalletTransferExecuteRequestInput, Prisma.ExchangeTransactionUncheckedUpdateWithoutWalletTransferExecuteRequestInput>
+}
+
+export type ExchangeTransactionUpdateWithoutWalletTransferExecuteRequestInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  fromCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  toCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  sourceAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  grossTargetAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  feeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  feeAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  feeCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  appliedRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  netTargetAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutExchangeTransactionsNestedInput
+  fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutExchangeTransactionsNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutExchangeTransactionNestedInput
+}
+
+export type ExchangeTransactionUncheckedUpdateWithoutWalletTransferExecuteRequestInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
+  fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fromCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  toCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  sourceAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  grossTargetAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  feeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  feeAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  feeCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  appliedRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  netTargetAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutExchangeTransactionNestedInput
+}
+
 export type ExchangeTransactionCreateWithoutFxExecuteRequestsInput = {
   id?: string
   fromCurrency: $Enums.CurrencyCode
@@ -858,6 +976,7 @@ export type ExchangeTransactionCreateWithoutFxExecuteRequestsInput = {
   createdAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutExchangeTransactionsInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutExchangeTransactionsInput
+  walletTransferExecuteRequest?: Prisma.WalletTransferExecuteRequestCreateNestedOneWithoutExchangeTransactionInput
 }
 
 export type ExchangeTransactionUncheckedCreateWithoutFxExecuteRequestsInput = {
@@ -875,6 +994,7 @@ export type ExchangeTransactionUncheckedCreateWithoutFxExecuteRequestsInput = {
   netTargetAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   executedAt: Date | string
   createdAt?: Date | string
+  walletTransferExecuteRequest?: Prisma.WalletTransferExecuteRequestUncheckedCreateNestedOneWithoutExchangeTransactionInput
 }
 
 export type ExchangeTransactionCreateOrConnectWithoutFxExecuteRequestsInput = {
@@ -908,6 +1028,7 @@ export type ExchangeTransactionUpdateWithoutFxExecuteRequestsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutExchangeTransactionsNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutExchangeTransactionsNestedInput
+  walletTransferExecuteRequest?: Prisma.WalletTransferExecuteRequestUpdateOneWithoutExchangeTransactionNestedInput
 }
 
 export type ExchangeTransactionUncheckedUpdateWithoutFxExecuteRequestsInput = {
@@ -925,6 +1046,7 @@ export type ExchangeTransactionUncheckedUpdateWithoutFxExecuteRequestsInput = {
   netTargetAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   executedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  walletTransferExecuteRequest?: Prisma.WalletTransferExecuteRequestUncheckedUpdateOneWithoutExchangeTransactionNestedInput
 }
 
 export type ExchangeTransactionCreateManyTradingAccountInput = {
@@ -958,6 +1080,7 @@ export type ExchangeTransactionUpdateWithoutTradingAccountInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutExchangeTransactionsNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutExchangeTransactionNestedInput
+  walletTransferExecuteRequest?: Prisma.WalletTransferExecuteRequestUpdateOneWithoutExchangeTransactionNestedInput
 }
 
 export type ExchangeTransactionUncheckedUpdateWithoutTradingAccountInput = {
@@ -975,6 +1098,7 @@ export type ExchangeTransactionUncheckedUpdateWithoutTradingAccountInput = {
   executedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutExchangeTransactionNestedInput
+  walletTransferExecuteRequest?: Prisma.WalletTransferExecuteRequestUncheckedUpdateOneWithoutExchangeTransactionNestedInput
 }
 
 export type ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountInput = {
@@ -1024,6 +1148,7 @@ export type ExchangeTransactionUpdateWithoutFxRateSnapshotInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutExchangeTransactionsNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutExchangeTransactionNestedInput
+  walletTransferExecuteRequest?: Prisma.WalletTransferExecuteRequestUpdateOneWithoutExchangeTransactionNestedInput
 }
 
 export type ExchangeTransactionUncheckedUpdateWithoutFxRateSnapshotInput = {
@@ -1041,6 +1166,7 @@ export type ExchangeTransactionUncheckedUpdateWithoutFxRateSnapshotInput = {
   executedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutExchangeTransactionNestedInput
+  walletTransferExecuteRequest?: Prisma.WalletTransferExecuteRequestUncheckedUpdateOneWithoutExchangeTransactionNestedInput
 }
 
 export type ExchangeTransactionUncheckedUpdateManyWithoutFxRateSnapshotInput = {
@@ -1108,6 +1234,7 @@ export type ExchangeTransactionSelect<ExtArgs extends runtime.Types.Extensions.I
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.ExchangeTransaction$fxRateSnapshotArgs<ExtArgs>
   fxExecuteRequests?: boolean | Prisma.ExchangeTransaction$fxExecuteRequestsArgs<ExtArgs>
+  walletTransferExecuteRequest?: boolean | Prisma.ExchangeTransaction$walletTransferExecuteRequestArgs<ExtArgs>
   _count?: boolean | Prisma.ExchangeTransactionCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["exchangeTransaction"]>
 
@@ -1171,6 +1298,7 @@ export type ExchangeTransactionInclude<ExtArgs extends runtime.Types.Extensions.
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.ExchangeTransaction$fxRateSnapshotArgs<ExtArgs>
   fxExecuteRequests?: boolean | Prisma.ExchangeTransaction$fxExecuteRequestsArgs<ExtArgs>
+  walletTransferExecuteRequest?: boolean | Prisma.ExchangeTransaction$walletTransferExecuteRequestArgs<ExtArgs>
   _count?: boolean | Prisma.ExchangeTransactionCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type ExchangeTransactionIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1188,6 +1316,7 @@ export type $ExchangeTransactionPayload<ExtArgs extends runtime.Types.Extensions
     tradingAccount: Prisma.$TradingAccountPayload<ExtArgs>
     fxRateSnapshot: Prisma.$FxRateSnapshotPayload<ExtArgs> | null
     fxExecuteRequests: Prisma.$FxExecuteRequestPayload<ExtArgs>[]
+    walletTransferExecuteRequest: Prisma.$WalletTransferExecuteRequestPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1601,6 +1730,7 @@ export interface Prisma__ExchangeTransactionClient<T, Null = never, ExtArgs exte
   tradingAccount<T extends Prisma.TradingAccountDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccountDefaultArgs<ExtArgs>>): Prisma.Prisma__TradingAccountClient<runtime.Types.Result.GetResult<Prisma.$TradingAccountPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   fxRateSnapshot<T extends Prisma.ExchangeTransaction$fxRateSnapshotArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ExchangeTransaction$fxRateSnapshotArgs<ExtArgs>>): Prisma.Prisma__FxRateSnapshotClient<runtime.Types.Result.GetResult<Prisma.$FxRateSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   fxExecuteRequests<T extends Prisma.ExchangeTransaction$fxExecuteRequestsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ExchangeTransaction$fxExecuteRequestsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FxExecuteRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  walletTransferExecuteRequest<T extends Prisma.ExchangeTransaction$walletTransferExecuteRequestArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ExchangeTransaction$walletTransferExecuteRequestArgs<ExtArgs>>): Prisma.Prisma__WalletTransferExecuteRequestClient<runtime.Types.Result.GetResult<Prisma.$WalletTransferExecuteRequestPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2085,6 +2215,25 @@ export type ExchangeTransaction$fxExecuteRequestsArgs<ExtArgs extends runtime.Ty
   take?: number
   skip?: number
   distinct?: Prisma.FxExecuteRequestScalarFieldEnum | Prisma.FxExecuteRequestScalarFieldEnum[]
+}
+
+/**
+ * ExchangeTransaction.walletTransferExecuteRequest
+ */
+export type ExchangeTransaction$walletTransferExecuteRequestArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WalletTransferExecuteRequest
+   */
+  select?: Prisma.WalletTransferExecuteRequestSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the WalletTransferExecuteRequest
+   */
+  omit?: Prisma.WalletTransferExecuteRequestOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.WalletTransferExecuteRequestInclude<ExtArgs> | null
+  where?: Prisma.WalletTransferExecuteRequestWhereInput
 }
 
 /**

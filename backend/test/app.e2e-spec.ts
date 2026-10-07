@@ -206,6 +206,7 @@ import {
 import { PrismaService } from './../src/prisma/prisma.service';
 import { RedisService } from './../src/redis/redis.service';
 import { TradingAccountWalletTransferService } from '../src/wallets/trading-account-wallet-transfer.service';
+import { TradingAccountWalletFxTransferService } from '../src/wallets/trading-account-wallet-fx-transfer.service';
 import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
 import { adminDiagnosticRequestMiddleware } from './../src/common/admin-diagnostics';
 import * as argon2 from 'argon2';
@@ -445,10 +446,14 @@ describe('AppController (e2e)', () => {
     reservedAmount: new Prisma.Decimal('0.00000000'),
     updatedAt: now,
   };
-  const cryptoWalletFixtures = (accountId: string, updatedAt: Date) => zeroCryptoCashWalletData(accountId).map(data => ({
-    ...data, id: accountId + '-' + data.walletScope,
-    balanceAmount: new Prisma.Decimal(data.balanceAmount), reservedAmount: new Prisma.Decimal(data.reservedAmount), updatedAt,
-  }));
+  const cryptoWalletFixtures = (accountId: string, updatedAt: Date) =>
+    zeroCryptoCashWalletData(accountId).map((data) => ({
+      ...data,
+      id: accountId + '-' + data.walletScope,
+      balanceAmount: new Prisma.Decimal(data.balanceAmount),
+      reservedAmount: new Prisma.Decimal(data.reservedAmount),
+      updatedAt,
+    }));
   const refreshToken = 'r'.repeat(64);
   const refreshTokenHash = createHash('sha256')
     .update(refreshToken)
@@ -2869,8 +2874,12 @@ describe('AppController (e2e)', () => {
       },
       ...cryptoWalletFixtures('general-account-1', openedAt),
     ];
-    prisma.cashWallet.findMany.mockImplementation(async (args: { where?: { walletScope?: string } }) =>
-      args.where?.walletScope ? walletRows.filter(w => w.walletScope === args.where?.walletScope) : walletRows);
+    prisma.cashWallet.findMany.mockImplementation(
+      async (args: { where?: { walletScope?: string } }) =>
+        args.where?.walletScope
+          ? walletRows.filter((w) => w.walletScope === args.where?.walletScope)
+          : walletRows,
+    );
     prisma.walletTransaction.findMany.mockResolvedValue([
       {
         id: 'general-grant',
@@ -3068,6 +3077,60 @@ describe('AppController (e2e)', () => {
     }
   });
 
+  for (const endpoint of ['quote', 'execute'] as const) {
+    it(`wallet-transfers/${endpoint} requires authentication before command dispatch`, async () => {
+      const spy = jest.spyOn(
+        app.get(TradingAccountWalletFxTransferService),
+        endpoint,
+      );
+      try {
+        await request(app.getHttpServer())
+          .post(
+            `/api/v1/trading-accounts/trading-account-1/wallet-transfers/${endpoint}`,
+          )
+          .send({ quoteId: 'q', idempotencyKey: 'key' })
+          .expect(401)
+          .expect((response) => expectUnauthorizedBody(response.body));
+        expect(spy).not.toHaveBeenCalled();
+      } finally {
+        spy.mockRestore();
+      }
+    });
+    it(`wallet-transfers/${endpoint} dispatches the authenticated account command with 200`, async () => {
+      resetPrismaMocks();
+      mockActiveUser();
+      const body =
+        endpoint === 'quote'
+          ? {
+              sourceWalletId: 'krw',
+              destinationWalletId: 'spot',
+              amount: '1400',
+            }
+          : { quoteId: 'q', idempotencyKey: 'key' };
+      const result = {
+        success: true,
+        data: { tradingAccountId: 'trading-account-1', quoteId: 'q' },
+      };
+      const spy = jest
+        .spyOn(app.get(TradingAccountWalletFxTransferService), endpoint)
+        .mockResolvedValueOnce(result as never);
+      try {
+        const token = await createValidAccessToken();
+        await request(app.getHttpServer())
+          .post(
+            `/api/v1/trading-accounts/trading-account-1/wallet-transfers/${endpoint}`,
+          )
+          .set('Authorization', `Bearer ${token}`)
+          .send(body)
+          .expect(200)
+          .expect((response) => expect(response.body).toEqual(result));
+        expect(spy).toHaveBeenCalledWith(user.id, 'trading-account-1', body);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  }
+
   it('/api/v1/trading-accounts/:accountId/wallets (GET) returns owner wallets scoped by account', async () => {
     resetPrismaMocks();
     mockActiveUser();
@@ -3120,15 +3183,28 @@ describe('AppController (e2e)', () => {
             tradingAccountId: 'trading-account-1',
             wallets: expect.arrayContaining([
               expect.objectContaining({
-                id: 'securities-krw', walletScope: 'securities',
+                id: 'securities-krw',
+                walletScope: 'securities',
                 currencyCode: 'KRW',
                 balanceAmount: '10000000.00000000',
                 reservedAmount: '250000.00000000',
                 availableAmount: '9750000.00000000',
               }),
-              expect.objectContaining({ id: 'securities-usd', walletScope: 'securities', currencyCode: 'USD' }),
-              expect.objectContaining({ walletScope: 'crypto_spot', currencyCode: 'USD', balanceAmount: '0.00000000' }),
-              expect.objectContaining({ walletScope: 'crypto_futures', currencyCode: 'USD', balanceAmount: '0.00000000' }),
+              expect.objectContaining({
+                id: 'securities-usd',
+                walletScope: 'securities',
+                currencyCode: 'USD',
+              }),
+              expect.objectContaining({
+                walletScope: 'crypto_spot',
+                currencyCode: 'USD',
+                balanceAmount: '0.00000000',
+              }),
+              expect.objectContaining({
+                walletScope: 'crypto_futures',
+                currencyCode: 'USD',
+                balanceAmount: '0.00000000',
+              }),
             ]),
             summary: {
               totalWallets: 4,

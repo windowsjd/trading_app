@@ -336,6 +336,42 @@ async function run() {
       records.push({ screen: 'transfer', width, fontScale, account, clipping });
     }
     // Installed React Navigation: real tabs, MyStack → RecordStack and back paths.
+    for (const width of [320, 360, 390, 430, 768]) for (const fontScale of [1, 1.5, 2])
+      for (const account of ['general', 'season']) for (const crypto of ['crypto_spot', 'crypto_futures']) for (const reverse of [false, true]) {
+        await page.setViewportSize({ width, height: 844 });
+        await page.goto(`${base}/?screen=transfer&holdings=1&account=${account}&fontScale=${fontScale}`);
+        await id('wallet-transfer-available').waitFor();
+        await id(`wallet-transfer-source-${reverse ? crypto : 'securities-KRW'}`).click();
+        await id(`wallet-transfer-destination-${reverse ? 'securities-KRW' : crypto}`).click();
+        await id('wallet-transfer-amount').fill(reverse ? '10' : '1000000');
+        await id('wallet-transfer-review').click(); await id('wallet-transfer-expected-received').waitFor();
+        for (const stage of ['quote', 'success']) {
+          if (stage === 'success') { await id('wallet-transfer-confirm').click(); await id('wallet-transfer-actual-received').waitFor(); }
+          const clipping = await page.evaluate(() => {
+            const failures = [];
+            for (const el of document.querySelectorAll('[data-testid="wallet-transfer-screen"] [dir="auto"]')) {
+              const box = el.getBoundingClientRect(), walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+              while (walker.nextNode()) for (let i = 0; i < walker.currentNode.textContent.length; i++) {
+                if (!walker.currentNode.textContent[i].trim()) continue;
+                const range = document.createRange(); range.setStart(walker.currentNode, i); range.setEnd(walker.currentNode, i + 1);
+                for (const r of range.getClientRects()) if (r.width && (r.left < -1 || r.right > innerWidth + 1 || r.top < box.top - 1 || r.bottom > box.bottom + 1)) failures.push(el.textContent);
+              }
+            }
+            return { failures, width: document.documentElement.scrollWidth };
+          });
+          assert.deepEqual(clipping.failures, [], `${width}/${fontScale}/${account}/${crypto}/${reverse}/${stage}`);
+          assert.ok(clipping.width <= width);
+          records.push({ screen: 'cross-transfer', width, fontScale, account, crypto, reverse, stage, clipping });
+          if (width === 320 && fontScale === 2 && account === 'general' && crypto === 'crypto_futures') {
+            await id(stage === 'quote' ? 'wallet-transfer-summary' : 'wallet-transfer-success').scrollIntoViewIfNeeded();
+            await page.screenshot({ path: path.join(out, `cross-${reverse ? 'reverse' : 'forward'}-${stage}-320-font2.png`) });
+          }
+        }
+        const requests = await page.evaluate(() => window.fixture.transport.postRequests);
+        assert.deepEqual(requests.map(r => r.path), [`/trading-accounts/${account}-account/wallet-transfers/quote`, `/trading-accounts/${account}-account/wallet-transfers/execute`]);
+        assert.deepEqual(Object.keys(requests[1].body).sort(), ['idempotencyKey', 'quoteId']);
+      }
+    // Installed React Navigation: real tabs, MyStack → RecordStack and back paths.
     await page.setViewportSize({ width: 390, height: 844 });
     for (const account of ['general', 'season']) {
       await page.goto(`${base}/navigation?navigation=1&holdings=1&account=${account}`);

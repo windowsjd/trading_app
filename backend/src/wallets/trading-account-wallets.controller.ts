@@ -16,6 +16,11 @@ import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import { Request } from 'express';
 import { WalletsService } from './wallets.service';
 import type { WalletTransactionsQuery } from './wallets.service';
+import {
+  TradingAccountWalletFxTransferService,
+  type WalletFxTransferQuoteRequest,
+  type WalletFxTransferExecuteRequest,
+} from './trading-account-wallet-fx-transfer.service';
 
 type AuthenticatedRequest = Request & {
   user?: {
@@ -33,7 +38,32 @@ export class TradingAccountWalletsController {
   constructor(
     private readonly walletsService: WalletsService,
     private readonly transfers: TradingAccountWalletTransferService,
+    private readonly fxTransfers: TradingAccountWalletFxTransferService,
   ) {}
+
+  @Post('wallet-transfers/quote')
+  @HttpCode(200)
+  quoteTransfer(
+    @Req() request: AuthenticatedRequest,
+    @Param('accountId') accountId: string,
+    @Body() body: WalletFxTransferQuoteRequest,
+  ) {
+    return this.fxTransfers.quote(this.extractUserId(request), accountId, body);
+  }
+
+  @Post('wallet-transfers/execute')
+  @HttpCode(200)
+  executeTransfer(
+    @Req() request: AuthenticatedRequest,
+    @Param('accountId') accountId: string,
+    @Body() body: WalletFxTransferExecuteRequest,
+  ) {
+    return this.fxTransfers.execute(
+      this.extractUserId(request),
+      accountId,
+      body,
+    );
+  }
 
   @Post('wallet-transfers')
   @HttpCode(200)

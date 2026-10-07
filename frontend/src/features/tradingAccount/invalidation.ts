@@ -122,6 +122,14 @@ export function invalidateAfterWalletTransfer(client: InvalidatorClient, account
   return invalidateAll(client, walletKeys(accountId));
 }
 
+/** FX fees affect valuation; the internal transfer adds no funding boundary. */
+export function invalidateAfterWalletFxTransfer(client: InvalidatorClient, accountId: string, options: { seasonUi?: boolean } = {}) {
+  return invalidateAll(client, [
+    ...walletKeys(accountId), ...portfolioKeys(accountId),
+    ...(options.seasonUi ? [QUERY_KEYS.ranking.all] : []),
+  ]);
+}
+
 /**
  * After an ad-reward claim: the claim itself, remaining eligibility, and the
  * cash it granted. General-only, so no season UI is refreshed.

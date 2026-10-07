@@ -10,10 +10,238 @@
 
 ---
 
+## 2026-10-07 — 명시적 cross-currency Wallet Transfer와 Wallet 구조 개편 완료
+
+### 저장소 조사와 transaction boundary
+
+- 작업 시작에 `git fetch origin main`을 실행했다. `main`, HEAD, `origin/main`은 모두
+  `7b61f65210b84ee40fe31068fb9e5aa51c60a577` (`지갑구성구조변경3`)이며 working tree는
+  clean이었다. 이전 인수인계의 후속 FX+Transfer 제외 문구는 아래 현행 정책으로 대체한다.
+- Prisma schema·전체 migration chain·canonical docs·FX quote/execute/fee/provider/
+  repricing/replay/write path·Transfer mutation/ledger/idempotency·cash atomic primitives·
+  Order reservation/Market/legacy provenance·General TWR/Equity/Daily snapshot·Season
+  lifecycle/ranking/settlement·frontend FX/Transfer/account epoch/cache·CI suites를 조사했다.
+- 기존 FX public execute는 Quote→lifecycle lock 뒤 자기 transaction에서 quote consume,
+  FxExecuteRequest, ExchangeTransaction, 두 원장 leg와 성과 snapshot을 기록한다.
+  기존 Transfer public execute도 lifecycle→정렬 wallet lock과 자신의 transaction/replay를
+  가진다. 두 public methods를 순차 호출하면 partial commit이므로 composite에서 호출하지 않는다.
+- 계산을 다시 구현하지 않고 FX의 provider 준비·eligibility·기존 quote/plan/write path를
+  사용할 transaction 내부 entry와 Transfer의 기존 atomic mutation/ledger entry만 분리했다.
+  orchestration은 작은 전용 service 하나이며 범용 workflow/saga/queue/Redis 금융 lock은 없다.
+
+### 현행 제품 정책과 API
+
+| 경로 | 사용자 작업 / 금융 의미 |
+| --- | --- |
+| Securities KRW↔USD | 기존 `환전하기`, Securities FX |
+| Securities/Spot/Futures USD 사이 | 기존 `이체하기`, 수수료 0 same-currency Transfer |
+| Securities KRW↔Crypto Spot/Futures USD | `이체하기`, 명시적 FX+Transfer composite |
+
+- 네 cross-currency 방향 모두 General/Season에서 지원한다. 입력 amount는 언제나 원래
+  source wallet 통화다. Crypto는 계속 USD-only, FX source/target은 계속 Securities다.
+  중앙 Funding/Basic/Master Wallet, 주문 자동환전/자동자금사용, Futures 거래는 없다.
+- 기존 `POST .../wallet-transfers`와 `.../fx/quote`, `.../fx/execute` 계약은 유지한다.
+  신규 API는 `/api/v1/trading-accounts/:accountId/wallet-transfers/quote`와 `/execute`다.
+  quote body는 sourceWalletId/destinationWalletId/amount, execute body는 quoteId/key뿐이다.
+  client가 rate/fee/최종 금액을 제출하지 않는다. 상세 계약은
+  [wallet-transfers-api-contract.md](backend/docs/wallet-transfers-api-contract.md)를 따른다.
+
+### Quote·repricing·atomicity·멱등성
+
+- 기존 FX Quote를 재사용하여 account/direction/currencies/source amount/quoted rate/
+  pinned fee rate/gross·fee·net target/provider snapshot/expiry/maxChangeBps를 저장한다.
+  기존 Quote만으로 두 wallet ID를 표현할 수 없어 typed `WalletTransferQuote` extension을
+  추가했다. 중요 route provenance를 JSON에 숨기지 않는다. SQL trigger가 route 변경을 막는다.
+  standalone FX는 이 linked quote를 `QUOTE_MISMATCH`로 거절한다.
+- provider refresh/network work는 transaction 전에 끝난다. transaction 내부에서는 lock
+  이후 DB wall clock으로 durable DB evidence를 다시 선택한다. 기존 source priority,
+  freshness, pinned General/Season fee, Decimal/half-up round8, expiry, maxChangeBps,
+  gross/net/fee currency 및 actual repricing writer를 그대로 사용한다. 범위 초과는 재견적이다.
+- Quote row lock→General account FOR UPDATE 또는 Season→account→participant NO KEY
+  UPDATE→관련 세 wallet ID 오름차순 FOR UPDATE다. 기존 주문/FX/Transfer fence와 맞춘다.
+  하나의 locked lifecycle context와 post-wallet-lock DB clock을 두 leg에 공유한다.
+- KRW→Crypto: Securities FX→정확한 netTargetAmount USD Transfer.
+  Crypto→KRW: 정확한 source USD Transfer→같은 amount의 Securities FX.
+  routing Securities USD의 기존 balance/reserved는 최종 그대로이며 새 입금만 FX에 사용된다.
+  원래 source 및 각 debit의 balance-reserved 조건은 conditional atomic SQL로 보호한다.
+- quote consume·FX debit/credit·Transfer debit/credit·FX execute/exchange·Transfer·
+  네 원장 leg·FX snapshot·parent result가 한 Prisma PostgreSQL transaction에 속한다.
+  어느 write라도 실패하면 모두 rollback한다. 두 public mutation의 별도 commit은 없다.
+- `WalletTransferExecuteRequest`는 committed command만 저장하며 account/key unique,
+  quote unique, canonical account+quote requestHash와 최초 response를 가진다.
+  같은 account/key/quote는 최초 결과, 다른 quote는 409 conflict다. FX/Transfer leg key는
+  서버가 parent UUID에서 생성한다. 사용자 retry는 하나의 parent key만 사용한다.
+  ownership은 매번 확인한다. replay는 provider/mutable gate보다 먼저, lock 대기 후에도
+  다시 확인하므로 committed command는 account/participant/season 변경 후에도 replay된다.
+
+### Durable evidence·ledger·성과
+
+- parent는 typed FK로 WalletTransferQuote, ExchangeTransaction, WalletTransfer를 각각
+  unique 연결한다. ExchangeTransaction의 기존 FxExecuteRequest relation도 유지한다.
+  FX source/target 원장과 USD Transfer debit/credit 원장은 각 기존 reference/type을 유지한다.
+  네 `balanceAfter`는 FX→Transfer 또는 Transfer→FX의 실제 순서와 일치한다.
+- USD Transfer leg는 성과 중립이고 composite의 FX fee/repricing은 standalone FX와 같다.
+  총자산 항상 동일이라는 가정은 없다. 기존 `exchange_executed` valuation/snapshot/
+  General TWR/Season ranking 의미를 재사용하며 external funding/cash-flow boundary를
+  추가하지 않는다. Forward FX snapshot 이후 USD 이동도 총 USD 합계가 같아서 경제적 결과가 같다.
+
+### Frontend
+
+- 기존 account/epoch keyed form과 React Query/navigation/Decimal amount parser를 유지한다.
+  selector는 증권 KRW/USD, 암호화폐 · 현물 USD, 암호화폐 · 선물 USD를 표시한다.
+  Securities KRW↔USD 조합은 이체 destination에서 disable하고 환전하기를 안내한다.
+- USD 이체의 입력→확인→수수료 0→성공 흐름은 유지한다. Cross route는 server quote를 받아
+  적용 예정 환율·환전 수수료·예상 수령액·유효 시간을 보여준 뒤 명시적 execute 한 번만 보낸다.
+  성공은 실제 보낸 금액·환율·수수료·수령액·원래 두 지갑 잔액을 표시한다.
+- 확정된 expiry/rate-change rejection은 새 quote/key로 재견적한다. 불확실한 transport 또는
+  응답 계약 오류는 기존 quote/key를 유지하며 local expiry 후에도 committed replay를 시도한다.
+  동기 running/completed guard와 mutation retry=false가 이중 submit을 막는다.
+- A→B 및 A→B→A의 늦은 quote/success/error는 현재 UI를 변경하지 않는다. 원래 A의
+  wallets/ledger·portfolio/equity/performance만 invalidate하고 Season이면 ranking도 갱신한다.
+  성공 여부 불확실한 FX 응답도 같은 영향 범위로 갱신한다. 현재 UI에는 별도 cached FX history
+  query가 없으며 기존 ledger/서버 FX history API로 FX records를 조회한다. 전체 query clear는 없다.
+- 320px·fontScale 2에서도 한 column과 wrapping을 유지한다. 내부 enum을 표시하거나
+  고정폭을 늘려 overflow를 숨기지 않는다.
+
+### Migration·persistent DB
+
+- 새 migration은 `20261007120000_add_cross_currency_wallet_transfers` 하나다. Quote route와
+  parent execute 두 table, FK/unique/index 및 route immutable/distinct CHECK만 추가한다.
+  기존 row/금액/주문/예약금/원장/history를 backfill하거나 재작성하지 않는다.
+- 이미 적용된 `20261006160000_pin_order_wallet_and_add_transfers`는 수정/rename/squash하지
+  않았다. persistent PostgreSQL 17.11의 applied checksum과 파일 SHA-256이 모두
+  `8ffa92165047915f17bfd0f93fc8757de2132acd7521605b427d38af9bc5ccb2`다.
+  persistent DB는 read-only status/checksum/기존 schema drift 확인만 했고 새 migration은 pending이다.
+- 별도 disposable PostgreSQL 16.15에서 전체 60 migration chain 적용, status 및 schema drift를
+  확인했다. SQL은 PostgreSQL 16/17 공통 기능만 사용한다. 테스트는 UTC와 전용 Redis를 사용한다.
+  배포 때 새 migration→새 financial writers→새 route 노출 순서를 지킨다. 구버전 FX writer는
+  linked transfer quote를 구분하지 못하므로 새 기능과 함께 실행하지 않는다.
+
+### 검증과 regression 평가
+
+- 신규 실제 PG suite: General/Season×Spot/Futures×양방향 8 economic parity 시나리오.
+  standalone FX+USD Transfer와 최종 source/routing/destination balance·reservation·FX rate/fee·
+  total cash/totalAssetKrw/return·TWR/funding snapshot·ExchangeTransaction·원장 금액을 비교한다.
+  두 leg/parent evidence와 네 balanceAfter, idempotent replay/status-change/conflict도 확인한다.
+- 13 fault points×2 mode×2 direction=52 rollback 검증. FX/Transfer의 각 debit/credit,
+  destination rejection, exchange/transfer/ledger/FX execute/snapshot/parent write failure 후
+  모든 금액·예약금·records가 그대로이며 Quote는 active다. 같은 command의 후속 성공도 검증한다.
+- 양 모드에서 replay/서로 다른 command/양방향/기존 USD Transfer/standalone FX/Limit BUY
+  reservation/Market BUY와 경합한다. deadlock 없이 종료하며 reserved cash를 침범하지 않는다.
+  원래 KRW 및 Crypto source의 quote/execute reservation guard, Securities USD available=0에서
+  새 입금만 사용하는 reverse route, fee 변경 후 pin 유지, repricing/bps/expiry, provider stale/
+  source priority/eligibility/network-before-transaction도 확인한다.
+- 실제 PG barrier로 wallet lock 대기 중 Quote/Season/provider가 만료되면 새 command 전체가
+  rollback됨을 확인한다. parent insert를 Season 종료 뒤까지 지연하고 동일 command의 waiter가
+  committed 최초 결과를 반환하며 각 FX/Transfer/parent가 하나만 생성됨도 확인한다.
+- 신규 인증/E2E dispatch 4 cases와 backend route matrix 16 cases, frontend 네 경로×양 모드,
+  USD 유지·FX route 차단·quote loading/error/expiry/requote·uncertain retry·response 계약·
+  A→B/A→B→A stale success/error·source available·server preview/actual result 테스트를 추가했다.
+- browser fixture는 5 폭×3 fontScale×2 mode×2 crypto×2 direction×quote/success=240 layouts와
+  기존 USD 12 layouts, 실제 Wallet/FX/ledger/Record navigation을 검증한다. geometry 실패/console
+  errors가 없으며 작은 폭/큰 글자 screenshot도 직접 확인했다.
+- 기존 Core TWR integration의 closed fixture만 DB clock을 사용하도록 보완했다. 앱/DB 시각차로
+  closedAt<openedAt constraint를 위반했으며 제품 lifecycle/성과 gate는 변경하지 않았다.
+  새 provider fixture도 두 clock에서 완료된 evidence를 사용한다. freshness 정책 완화는 없다.
+- 금융 핵심 불변조건은 실제 DB에서 검증했다. 기존 Order/Market/Limit/General/Season/ranking/
+  settlement suites를 재사용했고 자동환전·auto-funding·legacy provenance·Futures trading 변경은 없다.
+  독립 PG transaction 두 개, 새 성과 공식, 범용 financial framework 없이 기존 infrastructure와
+  두 typed evidence table만 확장했으므로 Trading Class 규모에 맞는 구현이다.
+
+### 최종 gate 결과
+
+| 명령/범위 (Backend=backend/, Frontend=frontend/) | 결과 |
+| --- | --- |
+| 작업 시작/마지막 `git fetch origin main`, HEAD/branch/status | main/HEAD/origin 모두 `7b61f652...`; 시작 clean, 완료 시 이번 변경만 미커밋 |
+| Prisma format/validate/generate | PASS; generated TS 44개 재생성 fingerprint 동일 |
+| Fresh PostgreSQL 16.15 migrate deploy/status/schema diff | PASS; 전체 60 migration, up to date, drift 없음 |
+| Persistent PostgreSQL 17.11 status/checksum/기존 schema diff | READ-ONLY 확인; 기존 applied migration checksum 일치·기존 schema drift 없음, 새 migration pending |
+| Backend typecheck/build/accounts check-only lint | PASS |
+| Backend candle check-only lint/format | PASS |
+| Backend 전체 unit | 228 suites / 3,663 cases PASS; opt-in 51 suites / 56 cases SKIP |
+| CI Core 실제 PostgreSQL/Redis 목록 | 21 suites / 22 cases PASS |
+| CI Limit/Market/FX/Spot Transfer + 신규 composite 실제 PostgreSQL 목록 | 15 suites / 16 cases PASS |
+| Backend E2E | 2 suites / 376 cases PASS |
+| CI candle fixture smoke (dirty 진단 모드) | 24 scenarios PASS, cleanup DB rows/Redis keys=0 |
+| Frontend `npm run check` | account/guides check-only lint·typecheck·전체 134 test files PASS |
+| Frontend `npm run export:web` | PASS |
+| Wallet/FX RN Web + Playwright navigation/fontScale fixture | 이체 252 layouts PASS, navigation PASS, console/geometry errors=0 |
+| 전체 `git diff`, 신규 파일, `git diff --check` | 직접 검토; whitespace 오류 없음 |
+
+- Core closed fixture의 DB clock 보완과 신규 Prisma route spec의 기존 mock 패턴 적용 후
+  전체 gates를 다시 실행했다. 기존 Order/Home parity fixture도 한 번 timing-sensitive 실패를
+  관찰했으나 최종 Limit/Market/FX 전체 목록은 통과했다. 금융 제품 정책을 완화하지 않았다.
+- Candle fixture artifact는 `SMOKE_ALLOW_DIRTY=1`, `gitDirty=true`의 진단 결과이며 clean
+  release 인증이 아니다. 운영 migration/deploy, 원격 새 GitHub CI, 실제 iOS/Android 기기,
+  credential 기반 live provider smoke는 실행하지 않았다. Persistent 설정은 원격 datasource여서
+  read-only 검증만 했다. 새 migration은 배포 시 적용해야 한다.
+- commit/push/branch 전환은 수행하지 않았다. Wallet 구조 개편의 구현 범위는 완료이며 이후
+  Long/Short/Leverage/Isolated/Cross/Liquidation 등은 별도 Crypto Futures 프로젝트다.
+
+### 변경 파일
+
+아래 48개는 이번 작업의 변경/신규 파일 전체다. Generated client는 schema 재생성 결과다.
+
+```text
+.github/workflows/ci.yml
+HANDOVER.md
+backend/README.md
+backend/docs/README.md
+backend/docs/codex-rulepack.md
+backend/docs/fx-api-contract.md
+backend/docs/policy-decisions.md
+backend/docs/trading-account-finance-api-contract.md
+backend/docs/trading-modes-and-accounts.md
+backend/docs/wallet-transfers-api-contract.md
+backend/docs/wallets-api-contract.md
+backend/prisma/migrations/20261007120000_add_cross_currency_wallet_transfers/migration.sql
+backend/prisma/schema.prisma
+backend/scripts/wallet-fx-transfer-integration.ts
+backend/src/fx/fx.module.ts
+backend/src/fx/fx.service.ts
+backend/src/generated/prisma/browser.ts
+backend/src/generated/prisma/client.ts
+backend/src/generated/prisma/internal/class.ts
+backend/src/generated/prisma/internal/prismaNamespace.ts
+backend/src/generated/prisma/internal/prismaNamespaceBrowser.ts
+backend/src/generated/prisma/models.ts
+backend/src/generated/prisma/models/CashWallet.ts
+backend/src/generated/prisma/models/ExchangeTransaction.ts
+backend/src/generated/prisma/models/Quote.ts
+backend/src/generated/prisma/models/TradingAccount.ts
+backend/src/generated/prisma/models/WalletTransfer.ts
+backend/src/generated/prisma/models/WalletTransferExecuteRequest.ts
+backend/src/generated/prisma/models/WalletTransferQuote.ts
+backend/src/portfolio/general-performance-hardening.integration.spec.ts
+backend/src/wallets/trading-account-wallet-fx-transfer.service.spec.ts
+backend/src/wallets/trading-account-wallet-fx-transfer.service.ts
+backend/src/wallets/trading-account-wallet-transfer.service.ts
+backend/src/wallets/trading-account-wallets.controller.ts
+backend/src/wallets/wallet-fx-transfer.integration.spec.ts
+backend/src/wallets/wallets.module.ts
+backend/test/app.e2e-spec.ts
+frontend/src/features/tradingAccount/api.ts
+frontend/src/features/tradingAccount/invalidation.ts
+frontend/src/features/wallet/walletIdentity.ts
+frontend/src/features/wallet/walletTransfer.test.ts
+frontend/src/features/wallet/walletTransfer.ts
+frontend/src/screens/wallet/WalletTransferScreen.test.ts
+frontend/src/screens/wallet/WalletTransferScreen.tsx
+frontend/test/browser/homeMocks.js
+frontend/test/browser/rootTabsMocks.js
+frontend/test/browser/walletBrowser.cjs
+frontend/test/walletTransferHarness.cjs
+```
+
+---
+
 ## 2026-10-07 — Crypto Spot 주문 provenance와 동일 통화 Wallet Transfer
 
+이 항목은 이전 작업 기록이다. FX 포함 이체의 제외/후속 계획은 위 최신 항목으로 대체한다.
+
 아래 이전 작업 2의 Securities Crypto funding/UI 설명은 **당시 과도기 기록**이다.
-현행 정책은 이 항목과 canonical API/finance/order 계약을 따른다.
+이 항목의 주문 provenance·same-currency 정책은 유지한다. 현행 전체 Wallet 정책은
+위 최신 작업과 canonical API/finance/order 계약을 따른다.
 
 ### 조사와 결정
 
@@ -146,9 +374,8 @@
   이번 변경의 핵심 불변조건은 실제 DB에서 검증했다. 새로운 event bus/Redis 금융 lock/
   queue/wallet framework/Futures abstraction은 없다. 최소 provenance field+Transfer model/service를
   기존 locking/valuation/idempotency 패턴과 결합한 범위다.
-- 다음 작업은 명시적인 FX+Transfer 정책, quote/provenance/fee/원자성 및 UI를 정의하여
-  Securities KRW→Crypto USD 등을 지원하는 것이다. 자동환전, cross-account/user 송금 및
-  Futures trading은 이번 구현에 포함하지 않는다.
+- 당시 후속 계획이었던 명시적 FX+Transfer는 위 최신 작업에서 구현했다.
+  자동환전과 cross-account/user 송금은 지원하지 않는다. Futures trading은 별도 프로젝트다.
 
 ### 변경 파일
 

@@ -13,7 +13,7 @@ First compare current implementation, tests and migrations with explicit current
    - `docs/home-api-contract.md`
    - `docs/ranking-api-contract.md`
    - `docs/wallets-api-contract.md`
-   - `docs/wallet-transfers-api-contract.md` — current Spot cash provenance and internal USD transfers
+   - `docs/wallet-transfers-api-contract.md` — Spot cash provenance, internal USD transfers and atomic Securities FX + Crypto transfer
    - `docs/positions-api-contract.md`
    - `docs/records-api-contract.md`
    - `docs/rewards-api-contract.md`

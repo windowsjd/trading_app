@@ -400,25 +400,26 @@ model TradingAccount {
   createdAt         DateTime             @default(now()) @map("created_at")
   updatedAt         DateTime             @updatedAt @map("updated_at")
 
-  user                    User                     @relation(fields: [userId], references: [id], onDelete: Restrict)
-  seasonParticipant       SeasonParticipant?
+  user                          User                           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  seasonParticipant             SeasonParticipant?
   // Financial + trading ownership lives directly on TradingAccount.
   // NO aggregate/cached value columns live here — balances, ledgers,
   // positions, and returns are always derived from the source tables.
-  cashWallets             CashWallet[]
-  walletTransactions      WalletTransaction[]
-  walletTransfers         WalletTransfer[]
-  exchangeTransactions    ExchangeTransaction[]
-  fxExecuteRequests       FxExecuteRequest[]
-  orders                  Order[]
-  positions               Position[]
-  quotes                  Quote[]
-  adRewardClaims          AdRewardClaim[]
-  equitySnapshots         EquitySnapshot[]
-  dailyPortfolioSnapshots DailyPortfolioSnapshot[]
+  cashWallets                   CashWallet[]
+  walletTransactions            WalletTransaction[]
+  walletTransfers               WalletTransfer[]
+  walletTransferExecuteRequests WalletTransferExecuteRequest[]
+  exchangeTransactions          ExchangeTransaction[]
+  fxExecuteRequests             FxExecuteRequest[]
+  orders                        Order[]
+  positions                     Position[]
+  quotes                        Quote[]
+  adRewardClaims                AdRewardClaim[]
+  equitySnapshots               EquitySnapshot[]
+  dailyPortfolioSnapshots       DailyPortfolioSnapshot[]
   // Season accounts only — a general account attached here is an integrity
   // violation, never a supported ranking scope (작업 8).
-  seasonRankings          SeasonRanking[]
+  seasonRankings                SeasonRanking[]
 
   @@index([userId, mode])
   @@index([mode, status])
@@ -911,10 +912,12 @@ model CashWallet {
   createdAt        DateTime     @default(now()) @map("created_at")
   updatedAt        DateTime     @updatedAt @map("updated_at")
 
-  tradingAccount     TradingAccount      @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
-  walletTransactions WalletTransaction[]
-  outgoingTransfers  WalletTransfer[]    @relation("TransferSource")
-  incomingTransfers  WalletTransfer[]    @relation("TransferDestination")
+  tradingAccount         TradingAccount        @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  walletTransactions     WalletTransaction[]
+  outgoingTransfers      WalletTransfer[]      @relation("TransferSource")
+  incomingTransfers      WalletTransfer[]      @relation("TransferDestination")
+  outgoingTransferQuotes WalletTransferQuote[] @relation("TransferQuoteSource")
+  incomingTransferQuotes WalletTransferQuote[] @relation("TransferQuoteDestination")
 
   // Scope/currency CHECK is SQL-only: securities KRW/USD, crypto scopes USD.
   @@unique([tradingAccountId, walletScope, currencyCode])
@@ -1037,9 +1040,10 @@ model ExchangeTransaction {
   executedAt        DateTime     @map("executed_at")
   createdAt         DateTime     @default(now()) @map("created_at")
 
-  tradingAccount    TradingAccount     @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
-  fxRateSnapshot    FxRateSnapshot?    @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
-  fxExecuteRequests FxExecuteRequest[]
+  tradingAccount               TradingAccount                @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  fxRateSnapshot               FxRateSnapshot?               @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
+  fxExecuteRequests            FxExecuteRequest[]
+  walletTransferExecuteRequest WalletTransferExecuteRequest?
 
   @@index([tradingAccountId, executedAt])
   @@index([fxRateSnapshotId])
@@ -1122,6 +1126,8 @@ model Quote {
   fxRateSnapshot     FxRateSnapshot?     @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
   orders             Order[]
 
+  walletTransferQuote WalletTransferQuote?
+
   @@index([userId, createdAt])
   @@index([tradingAccountId, createdAt])
   @@index([tradingAccountId, status, expiresAt])
@@ -1146,13 +1152,52 @@ model WalletTransfer {
   responsePayloadJson Json         @map("response_payload_json")
   executedAt          DateTime     @map("executed_at")
 
-  tradingAccount    TradingAccount @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
-  sourceWallet      CashWallet     @relation("TransferSource", fields: [sourceWalletId], references: [id], onDelete: Restrict)
-  destinationWallet CashWallet     @relation("TransferDestination", fields: [destinationWalletId], references: [id], onDelete: Restrict)
+  tradingAccount    TradingAccount                @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  sourceWallet      CashWallet                    @relation("TransferSource", fields: [sourceWalletId], references: [id], onDelete: Restrict)
+  destinationWallet CashWallet                    @relation("TransferDestination", fields: [destinationWalletId], references: [id], onDelete: Restrict)
+  compositeCommand  WalletTransferExecuteRequest?
 
   @@unique([tradingAccountId, idempotencyKey])
   @@index([tradingAccountId, executedAt])
   @@map("wallet_transfers")
+}
+
+// Typed route extension; all FX financial evidence stays on the canonical Quote.
+model WalletTransferQuote {
+  quoteId             String @id @map("quote_id")
+  sourceWalletId      String @map("source_wallet_id")
+  destinationWalletId String @map("destination_wallet_id")
+
+  quote             Quote                         @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  sourceWallet      CashWallet                    @relation("TransferQuoteSource", fields: [sourceWalletId], references: [id], onDelete: Restrict)
+  destinationWallet CashWallet                    @relation("TransferQuoteDestination", fields: [destinationWalletId], references: [id], onDelete: Restrict)
+  command           WalletTransferExecuteRequest?
+
+  @@index([sourceWalletId])
+  @@index([destinationWalletId])
+  @@map("wallet_transfer_quotes")
+}
+
+// Exists only if BOTH financial events and their ledger/snapshot writes commit.
+model WalletTransferExecuteRequest {
+  id                    String   @id @default(uuid())
+  tradingAccountId      String   @map("trading_account_id")
+  quoteId               String   @unique @map("quote_id")
+  idempotencyKey        String   @map("idempotency_key")
+  requestHash           String   @map("request_hash")
+  exchangeTransactionId String   @unique @map("exchange_transaction_id")
+  walletTransferId      String   @unique @map("wallet_transfer_id")
+  responsePayloadJson   Json     @map("response_payload_json")
+  executedAt            DateTime @map("executed_at")
+
+  tradingAccount      TradingAccount      @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  quote               WalletTransferQuote @relation(fields: [quoteId], references: [quoteId], onDelete: Restrict)
+  exchangeTransaction ExchangeTransaction @relation(fields: [exchangeTransactionId], references: [id], onDelete: Restrict)
+  walletTransfer      WalletTransfer      @relation(fields: [walletTransferId], references: [id], onDelete: Restrict)
+
+  @@unique([tradingAccountId, idempotencyKey])
+  @@index([tradingAccountId, executedAt])
+  @@map("wallet_transfer_execute_requests")
 }
 
 model FxExecuteRequest {

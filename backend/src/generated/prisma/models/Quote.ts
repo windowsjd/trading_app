@@ -482,6 +482,7 @@ export type QuoteWhereInput = {
   assetPriceSnapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotNullableScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput> | null
   fxRateSnapshot?: Prisma.XOR<Prisma.FxRateSnapshotNullableScalarRelationFilter, Prisma.FxRateSnapshotWhereInput> | null
   orders?: Prisma.OrderListRelationFilter
+  walletTransferQuote?: Prisma.XOR<Prisma.WalletTransferQuoteNullableScalarRelationFilter, Prisma.WalletTransferQuoteWhereInput> | null
 }
 
 export type QuoteOrderByWithRelationInput = {
@@ -524,6 +525,7 @@ export type QuoteOrderByWithRelationInput = {
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotOrderByWithRelationInput
   fxRateSnapshot?: Prisma.FxRateSnapshotOrderByWithRelationInput
   orders?: Prisma.OrderOrderByRelationAggregateInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteOrderByWithRelationInput
 }
 
 export type QuoteWhereUniqueInput = Prisma.AtLeast<{
@@ -569,6 +571,7 @@ export type QuoteWhereUniqueInput = Prisma.AtLeast<{
   assetPriceSnapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotNullableScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput> | null
   fxRateSnapshot?: Prisma.XOR<Prisma.FxRateSnapshotNullableScalarRelationFilter, Prisma.FxRateSnapshotWhereInput> | null
   orders?: Prisma.OrderListRelationFilter
+  walletTransferQuote?: Prisma.XOR<Prisma.WalletTransferQuoteNullableScalarRelationFilter, Prisma.WalletTransferQuoteWhereInput> | null
 }, "id">
 
 export type QuoteOrderByWithAggregationInput = {
@@ -686,6 +689,7 @@ export type QuoteCreateInput = {
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutQuotesInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutQuotesInput
   orders?: Prisma.OrderCreateNestedManyWithoutQuoteInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteCreateNestedOneWithoutQuoteInput
 }
 
 export type QuoteUncheckedCreateInput = {
@@ -723,6 +727,7 @@ export type QuoteUncheckedCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutQuoteInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteUncheckedCreateNestedOneWithoutQuoteInput
 }
 
 export type QuoteUpdateInput = {
@@ -760,6 +765,7 @@ export type QuoteUpdateInput = {
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutQuotesNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutQuotesNestedInput
   orders?: Prisma.OrderUpdateManyWithoutQuoteNestedInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteUpdateOneWithoutQuoteNestedInput
 }
 
 export type QuoteUncheckedUpdateInput = {
@@ -797,6 +803,7 @@ export type QuoteUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUncheckedUpdateManyWithoutQuoteNestedInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteUncheckedUpdateOneWithoutQuoteNestedInput
 }
 
 export type QuoteCreateManyInput = {
@@ -1051,6 +1058,11 @@ export type QuoteSumOrderByAggregateInput = {
   maxChangeBps?: Prisma.SortOrder
 }
 
+export type QuoteScalarRelationFilter = {
+  is?: Prisma.QuoteWhereInput
+  isNot?: Prisma.QuoteWhereInput
+}
+
 export type QuoteCreateNestedManyWithoutUserInput = {
   create?: Prisma.XOR<Prisma.QuoteCreateWithoutUserInput, Prisma.QuoteUncheckedCreateWithoutUserInput> | Prisma.QuoteCreateWithoutUserInput[] | Prisma.QuoteUncheckedCreateWithoutUserInput[]
   connectOrCreate?: Prisma.QuoteCreateOrConnectWithoutUserInput | Prisma.QuoteCreateOrConnectWithoutUserInput[]
@@ -1301,6 +1313,20 @@ export type NullableEnumWalletScopeFieldUpdateOperationsInput = {
   set?: $Enums.WalletScope | null
 }
 
+export type QuoteCreateNestedOneWithoutWalletTransferQuoteInput = {
+  create?: Prisma.XOR<Prisma.QuoteCreateWithoutWalletTransferQuoteInput, Prisma.QuoteUncheckedCreateWithoutWalletTransferQuoteInput>
+  connectOrCreate?: Prisma.QuoteCreateOrConnectWithoutWalletTransferQuoteInput
+  connect?: Prisma.QuoteWhereUniqueInput
+}
+
+export type QuoteUpdateOneRequiredWithoutWalletTransferQuoteNestedInput = {
+  create?: Prisma.XOR<Prisma.QuoteCreateWithoutWalletTransferQuoteInput, Prisma.QuoteUncheckedCreateWithoutWalletTransferQuoteInput>
+  connectOrCreate?: Prisma.QuoteCreateOrConnectWithoutWalletTransferQuoteInput
+  upsert?: Prisma.QuoteUpsertWithoutWalletTransferQuoteInput
+  connect?: Prisma.QuoteWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.QuoteUpdateToOneWithWhereWithoutWalletTransferQuoteInput, Prisma.QuoteUpdateWithoutWalletTransferQuoteInput>, Prisma.QuoteUncheckedUpdateWithoutWalletTransferQuoteInput>
+}
+
 export type QuoteCreateWithoutUserInput = {
   id?: string
   quoteType: $Enums.QuoteType
@@ -1335,6 +1361,7 @@ export type QuoteCreateWithoutUserInput = {
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutQuotesInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutQuotesInput
   orders?: Prisma.OrderCreateNestedManyWithoutQuoteInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteCreateNestedOneWithoutQuoteInput
 }
 
 export type QuoteUncheckedCreateWithoutUserInput = {
@@ -1371,6 +1398,7 @@ export type QuoteUncheckedCreateWithoutUserInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutQuoteInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteUncheckedCreateNestedOneWithoutQuoteInput
 }
 
 export type QuoteCreateOrConnectWithoutUserInput = {
@@ -1472,6 +1500,7 @@ export type QuoteCreateWithoutTradingAccountInput = {
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutQuotesInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutQuotesInput
   orders?: Prisma.OrderCreateNestedManyWithoutQuoteInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteCreateNestedOneWithoutQuoteInput
 }
 
 export type QuoteUncheckedCreateWithoutTradingAccountInput = {
@@ -1508,6 +1537,7 @@ export type QuoteUncheckedCreateWithoutTradingAccountInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutQuoteInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteUncheckedCreateNestedOneWithoutQuoteInput
 }
 
 export type QuoteCreateOrConnectWithoutTradingAccountInput = {
@@ -1570,6 +1600,7 @@ export type QuoteCreateWithoutAssetInput = {
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutQuotesInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutQuotesInput
   orders?: Prisma.OrderCreateNestedManyWithoutQuoteInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteCreateNestedOneWithoutQuoteInput
 }
 
 export type QuoteUncheckedCreateWithoutAssetInput = {
@@ -1606,6 +1637,7 @@ export type QuoteUncheckedCreateWithoutAssetInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutQuoteInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteUncheckedCreateNestedOneWithoutQuoteInput
 }
 
 export type QuoteCreateOrConnectWithoutAssetInput = {
@@ -1668,6 +1700,7 @@ export type QuoteCreateWithoutAssetPriceSnapshotInput = {
   asset?: Prisma.AssetCreateNestedOneWithoutQuotesInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutQuotesInput
   orders?: Prisma.OrderCreateNestedManyWithoutQuoteInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteCreateNestedOneWithoutQuoteInput
 }
 
 export type QuoteUncheckedCreateWithoutAssetPriceSnapshotInput = {
@@ -1704,6 +1737,7 @@ export type QuoteUncheckedCreateWithoutAssetPriceSnapshotInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutQuoteInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteUncheckedCreateNestedOneWithoutQuoteInput
 }
 
 export type QuoteCreateOrConnectWithoutAssetPriceSnapshotInput = {
@@ -1766,6 +1800,7 @@ export type QuoteCreateWithoutOrdersInput = {
   asset?: Prisma.AssetCreateNestedOneWithoutQuotesInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutQuotesInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutQuotesInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteCreateNestedOneWithoutQuoteInput
 }
 
 export type QuoteUncheckedCreateWithoutOrdersInput = {
@@ -1802,6 +1837,7 @@ export type QuoteUncheckedCreateWithoutOrdersInput = {
   consumedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  walletTransferQuote?: Prisma.WalletTransferQuoteUncheckedCreateNestedOneWithoutQuoteInput
 }
 
 export type QuoteCreateOrConnectWithoutOrdersInput = {
@@ -1854,6 +1890,7 @@ export type QuoteUpdateWithoutOrdersInput = {
   asset?: Prisma.AssetUpdateOneWithoutQuotesNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutQuotesNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutQuotesNestedInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteUpdateOneWithoutQuoteNestedInput
 }
 
 export type QuoteUncheckedUpdateWithoutOrdersInput = {
@@ -1890,6 +1927,7 @@ export type QuoteUncheckedUpdateWithoutOrdersInput = {
   consumedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  walletTransferQuote?: Prisma.WalletTransferQuoteUncheckedUpdateOneWithoutQuoteNestedInput
 }
 
 export type QuoteCreateWithoutFxRateSnapshotInput = {
@@ -1926,6 +1964,7 @@ export type QuoteCreateWithoutFxRateSnapshotInput = {
   asset?: Prisma.AssetCreateNestedOneWithoutQuotesInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutQuotesInput
   orders?: Prisma.OrderCreateNestedManyWithoutQuoteInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteCreateNestedOneWithoutQuoteInput
 }
 
 export type QuoteUncheckedCreateWithoutFxRateSnapshotInput = {
@@ -1962,6 +2001,7 @@ export type QuoteUncheckedCreateWithoutFxRateSnapshotInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutQuoteInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteUncheckedCreateNestedOneWithoutQuoteInput
 }
 
 export type QuoteCreateOrConnectWithoutFxRateSnapshotInput = {
@@ -1988,6 +2028,170 @@ export type QuoteUpdateWithWhereUniqueWithoutFxRateSnapshotInput = {
 export type QuoteUpdateManyWithWhereWithoutFxRateSnapshotInput = {
   where: Prisma.QuoteScalarWhereInput
   data: Prisma.XOR<Prisma.QuoteUpdateManyMutationInput, Prisma.QuoteUncheckedUpdateManyWithoutFxRateSnapshotInput>
+}
+
+export type QuoteCreateWithoutWalletTransferQuoteInput = {
+  id?: string
+  quoteType: $Enums.QuoteType
+  status?: $Enums.QuoteStatus
+  side?: $Enums.OrderSide | null
+  orderType?: $Enums.OrderType | null
+  quantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  fromCurrency?: $Enums.CurrencyCode | null
+  toCurrency?: $Enums.CurrencyCode | null
+  sourceAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  targetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: $Enums.CurrencyCode | null
+  cashWalletScope?: $Enums.WalletScope | null
+  quotedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  maxChangeBps: runtime.Decimal | runtime.DecimalJsLike | number | string
+  expiresAt: Date | string
+  requestHash: string
+  consumedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  user: Prisma.UserCreateNestedOneWithoutQuotesInput
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutQuotesInput
+  asset?: Prisma.AssetCreateNestedOneWithoutQuotesInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutQuotesInput
+  fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutQuotesInput
+  orders?: Prisma.OrderCreateNestedManyWithoutQuoteInput
+}
+
+export type QuoteUncheckedCreateWithoutWalletTransferQuoteInput = {
+  id?: string
+  userId: string
+  tradingAccountId: string
+  quoteType: $Enums.QuoteType
+  status?: $Enums.QuoteStatus
+  assetId?: string | null
+  side?: $Enums.OrderSide | null
+  orderType?: $Enums.OrderType | null
+  quantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  fromCurrency?: $Enums.CurrencyCode | null
+  toCurrency?: $Enums.CurrencyCode | null
+  sourceAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  targetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: $Enums.CurrencyCode | null
+  cashWalletScope?: $Enums.WalletScope | null
+  quotedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  assetPriceSnapshotId?: string | null
+  fxRateSnapshotId?: string | null
+  assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  maxChangeBps: runtime.Decimal | runtime.DecimalJsLike | number | string
+  expiresAt: Date | string
+  requestHash: string
+  consumedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutQuoteInput
+}
+
+export type QuoteCreateOrConnectWithoutWalletTransferQuoteInput = {
+  where: Prisma.QuoteWhereUniqueInput
+  create: Prisma.XOR<Prisma.QuoteCreateWithoutWalletTransferQuoteInput, Prisma.QuoteUncheckedCreateWithoutWalletTransferQuoteInput>
+}
+
+export type QuoteUpsertWithoutWalletTransferQuoteInput = {
+  update: Prisma.XOR<Prisma.QuoteUpdateWithoutWalletTransferQuoteInput, Prisma.QuoteUncheckedUpdateWithoutWalletTransferQuoteInput>
+  create: Prisma.XOR<Prisma.QuoteCreateWithoutWalletTransferQuoteInput, Prisma.QuoteUncheckedCreateWithoutWalletTransferQuoteInput>
+  where?: Prisma.QuoteWhereInput
+}
+
+export type QuoteUpdateToOneWithWhereWithoutWalletTransferQuoteInput = {
+  where?: Prisma.QuoteWhereInput
+  data: Prisma.XOR<Prisma.QuoteUpdateWithoutWalletTransferQuoteInput, Prisma.QuoteUncheckedUpdateWithoutWalletTransferQuoteInput>
+}
+
+export type QuoteUpdateWithoutWalletTransferQuoteInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  quoteType?: Prisma.EnumQuoteTypeFieldUpdateOperationsInput | $Enums.QuoteType
+  status?: Prisma.EnumQuoteStatusFieldUpdateOperationsInput | $Enums.QuoteStatus
+  side?: Prisma.NullableEnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide | null
+  orderType?: Prisma.NullableEnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType | null
+  quantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  fromCurrency?: Prisma.NullableEnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode | null
+  toCurrency?: Prisma.NullableEnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode | null
+  sourceAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  targetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: Prisma.NullableEnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode | null
+  cashWalletScope?: Prisma.NullableEnumWalletScopeFieldUpdateOperationsInput | $Enums.WalletScope | null
+  quotedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  maxChangeBps?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  requestHash?: Prisma.StringFieldUpdateOperationsInput | string
+  consumedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  user?: Prisma.UserUpdateOneRequiredWithoutQuotesNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutQuotesNestedInput
+  asset?: Prisma.AssetUpdateOneWithoutQuotesNestedInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutQuotesNestedInput
+  fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutQuotesNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutQuoteNestedInput
+}
+
+export type QuoteUncheckedUpdateWithoutWalletTransferQuoteInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
+  quoteType?: Prisma.EnumQuoteTypeFieldUpdateOperationsInput | $Enums.QuoteType
+  status?: Prisma.EnumQuoteStatusFieldUpdateOperationsInput | $Enums.QuoteStatus
+  assetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  side?: Prisma.NullableEnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide | null
+  orderType?: Prisma.NullableEnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType | null
+  quantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  fromCurrency?: Prisma.NullableEnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode | null
+  toCurrency?: Prisma.NullableEnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode | null
+  sourceAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  targetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: Prisma.NullableEnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode | null
+  cashWalletScope?: Prisma.NullableEnumWalletScopeFieldUpdateOperationsInput | $Enums.WalletScope | null
+  quotedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedNetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  maxChangeBps?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  requestHash?: Prisma.StringFieldUpdateOperationsInput | string
+  consumedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutQuoteNestedInput
 }
 
 export type QuoteCreateManyUserInput = {
@@ -2059,6 +2263,7 @@ export type QuoteUpdateWithoutUserInput = {
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutQuotesNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutQuotesNestedInput
   orders?: Prisma.OrderUpdateManyWithoutQuoteNestedInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteUpdateOneWithoutQuoteNestedInput
 }
 
 export type QuoteUncheckedUpdateWithoutUserInput = {
@@ -2095,6 +2300,7 @@ export type QuoteUncheckedUpdateWithoutUserInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUncheckedUpdateManyWithoutQuoteNestedInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteUncheckedUpdateOneWithoutQuoteNestedInput
 }
 
 export type QuoteUncheckedUpdateManyWithoutUserInput = {
@@ -2201,6 +2407,7 @@ export type QuoteUpdateWithoutTradingAccountInput = {
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutQuotesNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutQuotesNestedInput
   orders?: Prisma.OrderUpdateManyWithoutQuoteNestedInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteUpdateOneWithoutQuoteNestedInput
 }
 
 export type QuoteUncheckedUpdateWithoutTradingAccountInput = {
@@ -2237,6 +2444,7 @@ export type QuoteUncheckedUpdateWithoutTradingAccountInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUncheckedUpdateManyWithoutQuoteNestedInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteUncheckedUpdateOneWithoutQuoteNestedInput
 }
 
 export type QuoteUncheckedUpdateManyWithoutTradingAccountInput = {
@@ -2343,6 +2551,7 @@ export type QuoteUpdateWithoutAssetInput = {
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutQuotesNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutQuotesNestedInput
   orders?: Prisma.OrderUpdateManyWithoutQuoteNestedInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteUpdateOneWithoutQuoteNestedInput
 }
 
 export type QuoteUncheckedUpdateWithoutAssetInput = {
@@ -2379,6 +2588,7 @@ export type QuoteUncheckedUpdateWithoutAssetInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUncheckedUpdateManyWithoutQuoteNestedInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteUncheckedUpdateOneWithoutQuoteNestedInput
 }
 
 export type QuoteUncheckedUpdateManyWithoutAssetInput = {
@@ -2485,6 +2695,7 @@ export type QuoteUpdateWithoutAssetPriceSnapshotInput = {
   asset?: Prisma.AssetUpdateOneWithoutQuotesNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutQuotesNestedInput
   orders?: Prisma.OrderUpdateManyWithoutQuoteNestedInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteUpdateOneWithoutQuoteNestedInput
 }
 
 export type QuoteUncheckedUpdateWithoutAssetPriceSnapshotInput = {
@@ -2521,6 +2732,7 @@ export type QuoteUncheckedUpdateWithoutAssetPriceSnapshotInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUncheckedUpdateManyWithoutQuoteNestedInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteUncheckedUpdateOneWithoutQuoteNestedInput
 }
 
 export type QuoteUncheckedUpdateManyWithoutAssetPriceSnapshotInput = {
@@ -2627,6 +2839,7 @@ export type QuoteUpdateWithoutFxRateSnapshotInput = {
   asset?: Prisma.AssetUpdateOneWithoutQuotesNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutQuotesNestedInput
   orders?: Prisma.OrderUpdateManyWithoutQuoteNestedInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteUpdateOneWithoutQuoteNestedInput
 }
 
 export type QuoteUncheckedUpdateWithoutFxRateSnapshotInput = {
@@ -2663,6 +2876,7 @@ export type QuoteUncheckedUpdateWithoutFxRateSnapshotInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUncheckedUpdateManyWithoutQuoteNestedInput
+  walletTransferQuote?: Prisma.WalletTransferQuoteUncheckedUpdateOneWithoutQuoteNestedInput
 }
 
 export type QuoteUncheckedUpdateManyWithoutFxRateSnapshotInput = {
@@ -2771,6 +2985,7 @@ export type QuoteSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   assetPriceSnapshot?: boolean | Prisma.Quote$assetPriceSnapshotArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.Quote$fxRateSnapshotArgs<ExtArgs>
   orders?: boolean | Prisma.Quote$ordersArgs<ExtArgs>
+  walletTransferQuote?: boolean | Prisma.Quote$walletTransferQuoteArgs<ExtArgs>
   _count?: boolean | Prisma.QuoteCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["quote"]>
 
@@ -2900,6 +3115,7 @@ export type QuoteInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   assetPriceSnapshot?: boolean | Prisma.Quote$assetPriceSnapshotArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.Quote$fxRateSnapshotArgs<ExtArgs>
   orders?: boolean | Prisma.Quote$ordersArgs<ExtArgs>
+  walletTransferQuote?: boolean | Prisma.Quote$walletTransferQuoteArgs<ExtArgs>
   _count?: boolean | Prisma.QuoteCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type QuoteIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2926,6 +3142,7 @@ export type $QuotePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     assetPriceSnapshot: Prisma.$AssetPriceSnapshotPayload<ExtArgs> | null
     fxRateSnapshot: Prisma.$FxRateSnapshotPayload<ExtArgs> | null
     orders: Prisma.$OrderPayload<ExtArgs>[]
+    walletTransferQuote: Prisma.$WalletTransferQuotePayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -3361,6 +3578,7 @@ export interface Prisma__QuoteClient<T, Null = never, ExtArgs extends runtime.Ty
   assetPriceSnapshot<T extends Prisma.Quote$assetPriceSnapshotArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Quote$assetPriceSnapshotArgs<ExtArgs>>): Prisma.Prisma__AssetPriceSnapshotClient<runtime.Types.Result.GetResult<Prisma.$AssetPriceSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   fxRateSnapshot<T extends Prisma.Quote$fxRateSnapshotArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Quote$fxRateSnapshotArgs<ExtArgs>>): Prisma.Prisma__FxRateSnapshotClient<runtime.Types.Result.GetResult<Prisma.$FxRateSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   orders<T extends Prisma.Quote$ordersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Quote$ordersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  walletTransferQuote<T extends Prisma.Quote$walletTransferQuoteArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Quote$walletTransferQuoteArgs<ExtArgs>>): Prisma.Prisma__WalletTransferQuoteClient<runtime.Types.Result.GetResult<Prisma.$WalletTransferQuotePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3902,6 +4120,25 @@ export type Quote$ordersArgs<ExtArgs extends runtime.Types.Extensions.InternalAr
   take?: number
   skip?: number
   distinct?: Prisma.OrderScalarFieldEnum | Prisma.OrderScalarFieldEnum[]
+}
+
+/**
+ * Quote.walletTransferQuote
+ */
+export type Quote$walletTransferQuoteArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WalletTransferQuote
+   */
+  select?: Prisma.WalletTransferQuoteSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the WalletTransferQuote
+   */
+  omit?: Prisma.WalletTransferQuoteOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.WalletTransferQuoteInclude<ExtArgs> | null
+  where?: Prisma.WalletTransferQuoteWhereInput
 }
 
 /**

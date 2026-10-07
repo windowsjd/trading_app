@@ -1,9 +1,9 @@
-# Same-currency wallet transfers and order cash provenance
+# Wallet transfers and order cash provenance
 
 Current policy (2026-10-07): new `AssetType.crypto` orders are Spot and use
 `crypto_spot/USD`. Stocks use Securities KRW/USD. FX remains Securities
-KRW ↔ USD. Crypto Futures supports cash storage and USD internal transfers
-only; Futures trading and combined FX + transfer are unsupported.
+KRW ↔ USD. Crypto Futures supports USD storage and explicit transfers, including
+the atomic FX + transfer command below. Futures trading remains unsupported.
 
 ## Durable order identity
 
@@ -73,3 +73,65 @@ Errors: 400 `INVALID_WALLET_TRANSFER` (shape, amount, same wallet), 404
 `WALLET_TRANSFER_WALLET_NOT_FOUND` (missing/foreign wallet), 400
 `WALLET_TRANSFER_USD_ONLY`, 409 `INSUFFICIENT_AVAILABLE_BALANCE`, plus existing
 account/season/participant/integrity errors. All financial values are strings.
+
+## Cross-currency quote → execute (2026-10-07)
+
+Supported routes: Securities KRW ↔ Crypto Spot USD and Securities KRW ↔ Crypto
+Futures USD. Securities KRW ↔ Securities USD uses the existing `fx/quote` and
+`fx/execute` surface, never the transfer surface. Crypto wallets remain USD-only.
+
+`POST /api/v1/trading-accounts/:accountId/wallet-transfers/quote` accepts
+`sourceWalletId`, `destinationWalletId`, `amount`. Amount always names the
+original source wallet's currency. The server returns the existing FX quote
+fields plus `tradingAccountId`, `sourceWalletId`, `destinationWalletId`.
+`sourceAmount`, `appliedRate`, `feeRate`, `feeAmount`, `feeCurrency`,
+`grossTargetAmount`, `netTargetAmount`, `expiresAt`, `maxChangeBps` and public
+provider evidence are canonical. Route identities are stored in a typed
+`WalletTransferQuote` extension of the existing durable FX Quote. The existing
+Quote pins the account, currencies/direction, amount, fee, rate, received amount,
+snapshot and expiry. Standalone FX cannot consume a transfer quote.
+
+`POST /api/v1/trading-accounts/:accountId/wallet-transfers/execute` accepts only
+`quoteId`, `idempotencyKey`. Clients never submit a rate, fee or received amount.
+The committed response includes `commandId`, `quoteId`, `tradingAccountId`,
+`executedAt`, `sourceAmount`, `receivedAmount`, original source/destination
+(`walletId`, `walletScope`, `currencyCode`, `balanceAfter`, `availableAfter`),
+the full actual `fx` execution and `transferId`. Same account/key/quote replays
+the exact committed response; another quote conflicts. Ownership is always
+checked; replay precedes mutable lifecycle and provider gates.
+
+Provider refresh/network work finishes before the transaction. Execution locks
+Quote → lifecycle (General account FOR UPDATE, or Season → account → participant
+FOR NO KEY UPDATE) → all three wallets in ID order. One post-lock DB wall clock
+governs eligibility, expiry, DB-only fresh provider reselection and repricing.
+All FX calculation/fee pinning/round8/maxChangeBps policies are the existing FX
+policies. A changed rate beyond the quote's bound requires a new quote.
+
+KRW → Crypto: Securities FX first, then transfer exactly FX `netTargetAmount`
+USD to Crypto. Crypto → KRW: transfer exactly source USD into Securities USD,
+then FX exactly that amount. Available balance checks protect the original
+source and each debit; newly routed cash is usable without touching reservations.
+
+One PostgreSQL transaction commits or rolls back the quote consume, both cash
+legs of FX, both cash legs of Transfer, FxExecuteRequest, ExchangeTransaction,
+WalletTransfer, four distinct ledger legs, FX valuation snapshot and composite
+WalletTransferExecuteRequest. The parent links the quote, ExchangeTransaction
+(and its FxExecuteRequest) and WalletTransfer through typed foreign keys.
+Internal leg keys are server-generated from the parent UUID; client retry uses
+only the parent's account/key. Each ledger balanceAfter follows mutation order.
+
+Transfer is performance-neutral; the FX fee/repricing has the same economic
+effect as standalone FX followed/preceded by an internal USD transfer. The
+ordinary `exchange_executed` snapshot uses existing valuation/TWR; no external
+funding boundary or performance formula is added. Client success invalidates
+the acting account's wallets/ledger and portfolio/equity/performance plus Season
+ranking when applicable. FX records remain visible in the existing server FX
+history API and wallet ledger; the current UI has no separately cached FX history
+query. Same-currency and standalone FX APIs remain intact.
+No automatic FX, order auto-funding, central wallet or Futures trading exists.
+
+Schema additions use a new migration only. Applied migration
+`20261006160000_pin_order_wallet_and_add_transfers` must never be rewritten.
+Apply `20261007120000_add_cross_currency_wallet_transfers` and deploy new
+financial writers before enabling the new transfer routes. An old FX writer
+does not reject linked transfer quotes and must not run alongside this feature.

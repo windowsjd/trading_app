@@ -30,8 +30,33 @@ function walletTransferHarness() {
     '../../services/api/client': { apiClient: {
       post: async (path, body) => {
         h.requests.push({ path, body });
+        if (path.endsWith('/quote')) {
+          if (h.quoteGate) await h.quoteGate.promise;
+          if (h.quoteFailure) throw h.quoteFailure;
+          const fromCurrency = body.sourceWalletId.endsWith(':krw') ? 'KRW' : 'USD';
+          const quote = {
+            tradingAccountId: path.split('/')[2], sourceWalletId: body.sourceWalletId, destinationWalletId: body.destinationWalletId,
+            quoteId: `quote-${h.requests.length}`, fromCurrency, toCurrency: fromCurrency === 'KRW' ? 'USD' : 'KRW', sourceAmount: body.amount,
+            appliedRate: '1400.00000000', grossTargetAmount: '100.00000000', netTargetAmount: '99.90000000',
+            feeRate: '0.001000', feeAmount: '0.10000000', feeCurrency: fromCurrency === 'KRW' ? 'USD' : 'KRW',
+            maxChangeBps: '30.0000', expiresAt: h.expiresAt ?? new Date(Date.now() + 15000).toISOString(),
+            rateCapturedAt: new Date().toISOString(), rateEffectiveAt: new Date().toISOString(), rateSource: null,
+          };
+          h.quote = quote;
+          return { data: { success: true, data: h.quoteResponse ?? quote } };
+        }
         if (h.gate) await h.gate.promise;
         if (h.failure) throw h.failure;
+        if (path.endsWith('/execute')) {
+          const q = h.quote;
+          const wallet = (walletId, currencyCode) => ({ walletId, walletScope: walletId.endsWith(':krw') ? 'securities' : walletId.split(':')[1], currencyCode, balanceAfter: '500.00000000', availableAfter: '200.00000000' });
+          return { data: { success: true, data: h.response ?? {
+            tradingAccountId: path.split('/')[2], commandId: 'command-1', quoteId: q.quoteId, transferId: 'transfer-1',
+            executedAt: new Date().toISOString(), sourceAmount: q.sourceAmount, receivedAmount: '99.82869375',
+            source: wallet(q.sourceWalletId, q.fromCurrency), destination: wallet(q.destinationWalletId, q.toCurrency),
+            fx: { ...q, appliedRate: '1401.00000000', quotedRate: q.appliedRate, netTargetAmount: '99.82869375', feeAmount: '0.09992862', exchangeId: 'exchange-1' },
+          } } };
+        }
         const wallet = (walletId, balance) => ({ walletId, walletScope: walletId.split(':')[1], balanceAfter: balance, availableAfter: balance });
         return { data: { success: true, data: h.response ?? {
           tradingAccountId: path.split('/')[2], transferId: 'transfer-1', currencyCode: 'USD', amount: body.amount,

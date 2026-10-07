@@ -9,7 +9,7 @@ export function parseTransferAmount(text: string): string | null {
 }
 
 export function transferAvailableAmount(wallet: WalletBalanceDto | null): string | null {
-  if (!wallet || wallet.currencyCode !== 'USD' || typeof wallet.balanceAmount !== 'string' || typeof wallet.reservedAmount !== 'string') return null;
+  if (!wallet || !['KRW', 'USD'].includes(wallet.currencyCode) || typeof wallet.balanceAmount !== 'string' || typeof wallet.reservedAmount !== 'string') return null;
   try {
     const balance = new Decimal(wallet.balanceAmount);
     const reserved = new Decimal(wallet.reservedAmount);
@@ -23,9 +23,13 @@ export function transferAmountFits(amount: string | null, available: string | nu
 }
 
 export function transferErrorMessage(code: string | null): string {
-  if (code === 'INSUFFICIENT_AVAILABLE_BALANCE') return '보내는 지갑의 이체 가능 잔액이 부족합니다. 잔액을 확인해주세요.';
+  if (code === 'INSUFFICIENT_AVAILABLE_BALANCE' || code === 'INSUFFICIENT_BALANCE') return '보내는 지갑의 이체 가능 잔액이 부족합니다. 잔액을 확인해주세요.';
   if (code === 'WALLET_TRANSFER_IDEMPOTENCY_CONFLICT') return '다른 이체에 사용된 요청입니다. 원장에서 처리 내역을 확인해주세요.';
   if (code === 'WALLET_TRANSFER_WALLET_NOT_FOUND') return '선택한 계정에서 지갑을 확인할 수 없습니다.';
+  if (code === 'QUOTE_EXPIRED') return '견적이 만료되었습니다. 다시 견적을 받아주세요.';
+  if (code === 'RATE_CHANGED_REQUOTE_REQUIRED') return '환율이 허용 범위보다 변경되었습니다. 다시 견적을 받아주세요.';
+  if (code === 'FX_RATE_UNAVAILABLE' || code === 'FX_RATE_STALE' || code === 'FX_PROVIDER_RATE_STALE' || code === 'FX_PROVIDER_RATE_UNAVAILABLE' || code === 'PROVIDER_RATE_STALE' || code === 'PROVIDER_RATE_UNAVAILABLE') return '최신 환율을 확인할 수 없습니다. 잠시 후 다시 견적을 받아주세요.';
+  if (code === 'WALLET_TRANSFER_ROUTE_UNSUPPORTED') return '증권 KRW와 USD 사이의 이동은 환전하기를 이용해주세요.';
   return '이체를 처리하지 못했습니다. 같은 요청으로 다시 시도할 수 있습니다.';
 }
 
@@ -57,4 +61,43 @@ export function parseWalletTransferResponse(
   }
   if (payload.source.walletScope === payload.destination.walletScope) return fail();
   return payload as unknown as import('../tradingAccount/api').WalletTransferDto;
+}
+
+type FxTransferQuote = import('../tradingAccount/api').WalletFxTransferQuoteDto;
+const record = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
+const money = (value: unknown): value is string => typeof value === 'string' && /^\d{1,16}\.\d{8}$/.test(value);
+const iso = (value: unknown): value is string => typeof value === 'string' && value.endsWith('Z') && Number.isFinite(Date.parse(value));
+const id = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
+const feeRate = (value: unknown): value is string => typeof value === 'string' && /^\d\.\d{6}$/.test(value) && new Decimal(value).lte(1);
+const contractFailure = (): never => { throw new WalletTransferContractError(); };
+
+export function parseWalletFxTransferQuote(payload: unknown, accountId: string, request: import('../tradingAccount/api').WalletFxTransferQuoteRequestDto, sourceCurrency: 'KRW' | 'USD'): FxTransferQuote {
+  if (!record(payload) || payload.tradingAccountId !== accountId || !id(payload.quoteId) ||
+      payload.sourceWalletId !== request.sourceWalletId || payload.destinationWalletId !== request.destinationWalletId ||
+      payload.fromCurrency !== sourceCurrency || payload.toCurrency !== (sourceCurrency === 'KRW' ? 'USD' : 'KRW') ||
+      payload.sourceAmount !== parseTransferAmount(request.amount) || !money(payload.sourceAmount) ||
+      !money(payload.appliedRate) || new Decimal(payload.appliedRate).lte(0) ||
+      !feeRate(payload.feeRate) || !money(payload.feeAmount) || payload.feeCurrency !== payload.toCurrency ||
+      !money(payload.netTargetAmount) || !money(payload.grossTargetAmount) || !iso(payload.expiresAt) ||
+      !iso(payload.rateCapturedAt) || !iso(payload.rateEffectiveAt) ||
+      !((typeof payload.maxChangeBps === 'string' || typeof payload.maxChangeBps === 'number') && /^\d+(\.\d+)?$/.test(String(payload.maxChangeBps)))) return contractFailure();
+  return payload as unknown as FxTransferQuote;
+}
+
+export function parseWalletFxTransferResponse(payload: unknown, accountId: string, quote: FxTransferQuote): import('../tradingAccount/api').WalletFxTransferDto {
+  if (!record(payload) || payload.tradingAccountId !== accountId || quote.tradingAccountId !== accountId ||
+      payload.quoteId !== quote.quoteId || !id(payload.commandId) || !id(payload.transferId) || !iso(payload.executedAt) ||
+      payload.sourceAmount !== quote.sourceAmount || !money(payload.receivedAmount) ||
+      !record(payload.source) || !record(payload.destination) || !record(payload.fx)) return contractFailure();
+  const fx = payload.fx;
+  if (fx.quoteId !== quote.quoteId || !id(fx.exchangeId) || fx.fromCurrency !== quote.fromCurrency || fx.toCurrency !== quote.toCurrency ||
+      fx.sourceAmount !== quote.sourceAmount || fx.netTargetAmount !== payload.receivedAmount ||
+      !money(fx.appliedRate) || new Decimal(fx.appliedRate).lte(0) || !money(fx.feeAmount) || !feeRate(fx.feeRate) ||
+      fx.feeCurrency !== quote.toCurrency || fx.feeRate !== quote.feeRate || fx.quotedRate !== quote.appliedRate) return contractFailure();
+  for (const [wallet, walletId, currency] of [[payload.source, quote.sourceWalletId, quote.fromCurrency], [payload.destination, quote.destinationWalletId, quote.toCurrency]] as const) {
+    if (wallet.walletId !== walletId || wallet.currencyCode !== currency ||
+        (currency === 'KRW' ? wallet.walletScope !== 'securities' : !(typeof wallet.walletScope === 'string' && ['crypto_spot', 'crypto_futures'].includes(wallet.walletScope))) ||
+        !money(wallet.balanceAfter) || !money(wallet.availableAfter) || new Decimal(wallet.availableAfter).gt(wallet.balanceAfter)) return contractFailure();
+  }
+  return payload as unknown as import('../tradingAccount/api').WalletFxTransferDto;
 }
