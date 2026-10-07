@@ -1,0 +1,548 @@
+{
+  "baselineHead": "2694c3aec96a4ddaddf276f407d9b3db19499048",
+  "date": "2026-10-07",
+  "platform": "Chromium / React Native Web, fixture HTTP, Malgun Gothic",
+  "layoutCases": 504,
+  "stateAndSwitchRecords": 5,
+  "widths": [
+    320,
+    360,
+    390,
+    430,
+    768,
+    1280
+  ],
+  "fontScales": [
+    1,
+    1.5,
+    2
+  ],
+  "appearances": [
+    "light",
+    "dark"
+  ],
+  "normalAndLongText": true,
+  "errors": [],
+  "minimumTextContrast": 5.738560063674032,
+  "maximumUniformScaleRatioError": 5.324383473115368e-05,
+  "normal390": [
+    {
+      "appearance": "light",
+      "width": 390,
+      "fontScale": 1,
+      "long": false,
+      "tier": "bronze",
+      "layout": {
+        "image": {
+          "sx": 0.2919516509433962,
+          "sy": 0.2919363839285714,
+          "fit": "contain",
+          "equivalentSize": 127.9920491057193,
+          "visibleWidth": 151.223046875,
+          "visibleHeight": 159.98113839285713
+        },
+        "title": {
+          "x": 29,
+          "y": 40,
+          "right": 121.015625,
+          "bottom": 66,
+          "width": 92.015625,
+          "height": 26,
+          "size": 18,
+          "weight": 800
+        },
+        "nickname": {
+          "x": 75,
+          "y": 153.984375,
+          "right": 198.265625,
+          "bottom": 180.984375,
+          "width": 123.265625,
+          "height": 27,
+          "size": 18,
+          "weight": 700
+        },
+        "card": {
+          "x": 16,
+          "y": 16,
+          "right": 374,
+          "bottom": 240.484375,
+          "width": 358,
+          "height": 224.484375
+        },
+        "emblem": {
+          "x": 206.265625,
+          "y": 31,
+          "right": 361,
+          "bottom": 194.484375,
+          "width": 154.734375,
+          "height": 163.484375
+        },
+        "button": {
+          "x": 125.015625,
+          "y": 31,
+          "right": 169.015625,
+          "bottom": 75,
+          "width": 44,
+          "height": 44
+        },
+        "clipped": [],
+        "overlaps": [],
+        "contrast": [
+          {
+            "text": "Season 1",
+            "ratio": 10.649477713749185
+          },
+          {
+            "text": "김재민",
+            "ratio": 10.649477713749185
+          },
+          {
+            "text": "#2",
+            "ratio": 6.147651344202064
+          },
+          {
+            "text": "Bronze",
+            "ratio": 6.147651344202064
+          }
+        ],
+        "text": "Season 1김재민#2Bronze",
+        "label": "계정 변경. 현재 Season 1, 운영 중"
+      }
+    },
+    {
+      "appearance": "light",
+      "width": 390,
+      "fontScale": 1,
+      "long": false,
+      "tier": "silver",
+      "layout": {
+        "image": {
+          "sx": 0.30228701117318435,
+          "sy": 0.30228701117318435,
+          "fit": "contain",
+          "equivalentSize": 129.27683756240666,
+          "visibleWidth": 158.70068086592178,
+          "visibleHeight": 158.70068086592178
+        },
+        "title": {
+          "x": 29,
+          "y": 40,
+          "right": 121.015625,
+          "bottom": 66,
+          "width": 92.015625,
+          "height": 26,
+          "size": 18,
+          "weight": 800
+        },
+        "nickname": {
+          "x": 75,
+          "y": 152.828125,
+          "right": 190.671875,
+          "bottom": 179.828125,
+          "width": 115.671875,
+          "height": 27,
+          "size": 18,
+          "weight": 700
+        },
+        "card": {
+          "x": 16,
+          "y": 16,
+          "right": 374,
+          "bottom": 239.328125,
+          "width": 358,
+          "height": 223.328125
+        },
+        "emblem": {
+          "x": 198.671875,
+          "y": 31,
+          "right": 361,
+          "bottom": 193.328125,
+          "width": 162.328125,
+          "height": 162.328125
+        },
+        "button": {
+          "x": 125.015625,
+          "y": 31,
+          "right": 169.015625,
+          "bottom": 75,
+          "width": 44,
+          "height": 44
+        },
+        "clipped": [],
+        "overlaps": [],
+        "contrast": [
+          {
+            "text": "Season 1",
+            "ratio": 11.140448096166418
+          },
+          {
+            "text": "김재민",
+            "ratio": 11.140448096166418
+          },
+          {
+            "text": "#2",
+            "ratio": 6.077039905269256
+          },
+          {
+            "text": "Silver",
+            "ratio": 6.077039905269256
+          }
+        ],
+        "text": "Season 1김재민#2Silver",
+        "label": "계정 변경. 현재 Season 1, 운영 중"
+      }
+    },
+    {
+      "appearance": "light",
+      "width": 390,
+      "fontScale": 1,
+      "long": false,
+      "tier": "gold",
+      "layout": {
+        "image": {
+          "sx": 0.29706621503496505,
+          "sy": 0.2970706618962433,
+          "fit": "contain",
+          "equivalentSize": 130.55524871949163,
+          "visibleWidth": 166.35708041958043,
+          "visibleHeight": 162.4952196241259
+        },
+        "title": {
+          "x": 29,
+          "y": 40,
+          "right": 121.015625,
+          "bottom": 66,
+          "width": 92.015625,
+          "height": 26,
+          "size": 18,
+          "weight": 800
+        },
+        "nickname": {
+          "x": 75,
+          "y": 156.5625,
+          "right": 183.078125,
+          "bottom": 183.5625,
+          "width": 108.078125,
+          "height": 27,
+          "size": 18,
+          "weight": 700
+        },
+        "card": {
+          "x": 16,
+          "y": 16,
+          "right": 374,
+          "bottom": 243.0625,
+          "width": 358,
+          "height": 227.0625
+        },
+        "emblem": {
+          "x": 191.078125,
+          "y": 31,
+          "right": 361,
+          "bottom": 197.0625,
+          "width": 169.921875,
+          "height": 166.0625
+        },
+        "button": {
+          "x": 125.015625,
+          "y": 31,
+          "right": 169.015625,
+          "bottom": 75,
+          "width": 44,
+          "height": 44
+        },
+        "clipped": [],
+        "overlaps": [],
+        "contrast": [
+          {
+            "text": "Season 1",
+            "ratio": 11.114131843290037
+          },
+          {
+            "text": "김재민",
+            "ratio": 11.114131843290037
+          },
+          {
+            "text": "#2",
+            "ratio": 5.738560063674032
+          },
+          {
+            "text": "Gold",
+            "ratio": 5.738560063674032
+          }
+        ],
+        "text": "Season 1김재민#2Gold",
+        "label": "계정 변경. 현재 Season 1, 운영 중"
+      }
+    },
+    {
+      "appearance": "light",
+      "width": 390,
+      "fontScale": 1,
+      "long": false,
+      "tier": "platinum",
+      "layout": {
+        "image": {
+          "sx": 0.2824635922330097,
+          "sy": 0.2824786324786325,
+          "fit": "contain",
+          "equivalentSize": 131.82900898728178,
+          "visibleWidth": 171.17293689320388,
+          "visibleHeight": 161.85163834951456
+        },
+        "title": {
+          "x": 29,
+          "y": 40,
+          "right": 121.015625,
+          "bottom": 66,
+          "width": 92.015625,
+          "height": 26,
+          "size": 18,
+          "weight": 800
+        },
+        "nickname": {
+          "x": 75,
+          "y": 155.75,
+          "right": 178.4375,
+          "bottom": 182.75,
+          "width": 103.4375,
+          "height": 27,
+          "size": 18,
+          "weight": 700
+        },
+        "card": {
+          "x": 16,
+          "y": 16,
+          "right": 374,
+          "bottom": 242.25,
+          "width": 358,
+          "height": 226.25
+        },
+        "emblem": {
+          "x": 186.4375,
+          "y": 31,
+          "right": 361,
+          "bottom": 196.25,
+          "width": 174.5625,
+          "height": 165.25
+        },
+        "button": {
+          "x": 125.015625,
+          "y": 31,
+          "right": 169.015625,
+          "bottom": 75,
+          "width": 44,
+          "height": 44
+        },
+        "clipped": [],
+        "overlaps": [],
+        "contrast": [
+          {
+            "text": "Season 1",
+            "ratio": 11.217854540720719
+          },
+          {
+            "text": "김재민",
+            "ratio": 11.217854540720719
+          },
+          {
+            "text": "#2",
+            "ratio": 5.824053435983578
+          },
+          {
+            "text": "Platinum",
+            "ratio": 5.824053435983578
+          }
+        ],
+        "text": "Season 1김재민#2Platinum",
+        "label": "계정 변경. 현재 Season 1, 운영 중"
+      }
+    },
+    {
+      "appearance": "light",
+      "width": 390,
+      "fontScale": 1,
+      "long": false,
+      "tier": "diamond",
+      "layout": {
+        "image": {
+          "sx": 0.2926779197080292,
+          "sy": 0.29268973214285715,
+          "fit": "contain",
+          "equivalentSize": 133.11131572635034,
+          "visibleWidth": 196.6795620437956,
+          "visibleHeight": 160.09482208029198
+        },
+        "title": {
+          "x": 29,
+          "y": 31,
+          "right": 121.015625,
+          "bottom": 57,
+          "width": 92.015625,
+          "height": 26,
+          "size": 18,
+          "weight": 800
+        },
+        "nickname": {
+          "x": 75,
+          "y": 154.40625,
+          "right": 152.515625,
+          "bottom": 181.40625,
+          "width": 77.515625,
+          "height": 27,
+          "size": 18,
+          "weight": 700
+        },
+        "card": {
+          "x": 16,
+          "y": 16,
+          "right": 374,
+          "bottom": 240.90625,
+          "width": 358,
+          "height": 224.90625
+        },
+        "emblem": {
+          "x": 160.515625,
+          "y": 31,
+          "right": 361,
+          "bottom": 194.90625,
+          "width": 200.484375,
+          "height": 163.90625
+        },
+        "button": {
+          "x": 29,
+          "y": 61,
+          "right": 73,
+          "bottom": 105,
+          "width": 44,
+          "height": 44
+        },
+        "clipped": [],
+        "overlaps": [],
+        "contrast": [
+          {
+            "text": "Season 1",
+            "ratio": 11.22851372135336
+          },
+          {
+            "text": "김재민",
+            "ratio": 11.22851372135336
+          },
+          {
+            "text": "#2",
+            "ratio": 5.894202991372565
+          },
+          {
+            "text": "Diamond",
+            "ratio": 5.894202991372565
+          }
+        ],
+        "text": "Season 1김재민#2Diamond",
+        "label": "계정 변경. 현재 Season 1, 운영 중"
+      }
+    },
+    {
+      "appearance": "light",
+      "width": 390,
+      "fontScale": 1,
+      "long": false,
+      "tier": "master",
+      "layout": {
+        "image": {
+          "sx": 0.3101293103448276,
+          "sy": 0.31011703667953666,
+          "fit": "contain",
+          "equivalentSize": 134.3877799355045,
+          "visibleWidth": 175.8363597972973,
+          "visibleHeight": 156.91922055984554
+        },
+        "title": {
+          "x": 29,
+          "y": 40,
+          "right": 121.015625,
+          "bottom": 66,
+          "width": 92.015625,
+          "height": 26,
+          "size": 18,
+          "weight": 800
+        },
+        "nickname": {
+          "x": 75,
+          "y": 151.140625,
+          "right": 173.125,
+          "bottom": 178.140625,
+          "width": 98.125,
+          "height": 27,
+          "size": 18,
+          "weight": 700
+        },
+        "card": {
+          "x": 16,
+          "y": 16,
+          "right": 374,
+          "bottom": 237.640625,
+          "width": 358,
+          "height": 221.640625
+        },
+        "emblem": {
+          "x": 181.125,
+          "y": 31,
+          "right": 361,
+          "bottom": 191.640625,
+          "width": 179.875,
+          "height": 160.640625
+        },
+        "button": {
+          "x": 125.015625,
+          "y": 31,
+          "right": 169.015625,
+          "bottom": 75,
+          "width": 44,
+          "height": 44
+        },
+        "clipped": [],
+        "overlaps": [],
+        "contrast": [
+          {
+            "text": "Season 1",
+            "ratio": 10.013169220984146
+          },
+          {
+            "text": "김재민",
+            "ratio": 10.013169220984146
+          },
+          {
+            "text": "#2",
+            "ratio": 7.26841850794301
+          },
+          {
+            "text": "Whale",
+            "ratio": 7.26841850794301
+          }
+        ],
+        "text": "Season 1김재민#2Whale",
+        "label": "계정 변경. 현재 Season 1, 운영 중"
+      }
+    }
+  ],
+  "normal320Heights": {
+    "bronze": 195.875,
+    "silver": 194.921875,
+    "gold": 198,
+    "platinum": 197.328125,
+    "diamond": 236,
+    "master": 193.53125,
+    "null": 193
+  },
+  "before390Heights": {
+    "bronze": 293,
+    "silver": 293,
+    "gold": 293,
+    "platinum": 293,
+    "diamond": 293,
+    "master": 293,
+    "null": 293
+  },
+  "nativeAndroid": "NOT_RUN",
+  "nativeIOS": "NOT_RUN"
+}

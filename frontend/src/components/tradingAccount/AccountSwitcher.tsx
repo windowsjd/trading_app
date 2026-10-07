@@ -59,10 +59,12 @@ type Props = {
   home?: boolean;
   /** Home owns tier presentation; the shared switcher has no ranking dependency. */
   homeCardStyle?: StyleProp<ViewStyle>;
+  /** Optional Home illustration shares the title/profile column's vertical space. */
+  homeVisual?: React.ReactNode;
   children?: React.ReactNode;
 };
 
-export default function AccountSwitcher({ compact = false, home = false, homeCardStyle, children }: Props) {
+export default function AccountSwitcher({ compact = false, home = false, homeCardStyle, homeVisual, children }: Props) {
   const { colors } = useAppearance();
   const {
     accounts,
@@ -76,7 +78,7 @@ export default function AccountSwitcher({ compact = false, home = false, homeCar
   } = useTradingAccount();
   const [open, setOpen] = useState(false);
   const rootNavigation = useRootNavigation();
-  const { height } = useWindowDimensions();
+  const { height, fontScale } = useWindowDimensions();
   const seasonQuery = useQuery({
     queryKey: QUERY_KEYS.season.current,
     queryFn: getCurrentSeason,
@@ -147,41 +149,50 @@ export default function AccountSwitcher({ compact = false, home = false, homeCar
   }
 
   const display = getAccountDisplay(selectedAccount);
+  const hasHomeVisual = selectedAccount.mode === 'season' && !!homeVisual;
+  const stackHomeVisual = fontScale > 1.3;
 
   return (
     <>
       {home ? (
-        <View style={[styles.homeContext, selectedAccount.mode === 'season' && homeCardStyle]} testID={TEST_IDS.home.accountContext}>
-          <View style={styles.homeContextRow}>
-            <Text style={[styles.homeTitle, selectedAccount.mode === 'season' && styles.homeSeasonTitle]}>{display.title}</Text>
-            <ActionPressable
-              style={styles.homeChange}
-              onPress={() => setOpen(true)}
-              accessibilityRole="button"
-              accessibilityLabel={`계정 변경. 현재 ${display.title}, ${display.statusLabel}`}
-              testID={TEST_IDS.tradingAccount.switcherTrigger}
-            >
-              <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
-                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={colors.secondary}
-                  strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" focusable={false}>
-                  <Path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4" />
-                </Svg>
+        <View style={[styles.homeContext, hasHomeVisual && styles.homeSeasonContext,
+          hasHomeVisual && stackHomeVisual && styles.homeStacked,
+          selectedAccount.mode === 'season' && homeCardStyle]} testID={TEST_IDS.home.accountContext}>
+          <View style={[styles.homeInfo, hasHomeVisual && !stackHomeVisual && styles.homeSeasonInfo]}>
+            <View style={[styles.homeHeading, hasHomeVisual && styles.homeSeasonHeading]}>
+              <View style={[styles.homeContextRow, hasHomeVisual && styles.homeSeasonRow]}>
+                <Text testID="home-account-title" style={[styles.homeTitle, selectedAccount.mode === 'season' && styles.homeSeasonTitle]}>{display.title}</Text>
+                <ActionPressable
+                  style={styles.homeChange}
+                  onPress={() => setOpen(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`계정 변경. 현재 ${display.title}, ${display.statusLabel}`}
+                  testID={TEST_IDS.tradingAccount.switcherTrigger}
+                >
+                  <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
+                    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={colors.secondary}
+                      strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" focusable={false}>
+                      <Path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4" />
+                    </Svg>
+                  </View>
+                </ActionPressable>
               </View>
-            </ActionPressable>
+              {selectedAccount.status !== 'active' ? (
+                <Text style={styles.homeNotice}>계정 {display.statusLabel}</Text>
+              ) : null}
+              {selectedAccount.mode === 'season' && (
+                !selectedAccount.season ||
+                selectedAccount.season.seasonStatus !== 'active' ||
+                selectedAccount.season.participantStatus !== 'active'
+              ) ? (
+                <Text style={styles.homeNotice}>
+                  {display.subtitle ?? '시즌 정보를 확인할 수 없습니다.'}
+                </Text>
+              ) : null}
+            </View>
+            {children}
           </View>
-          {selectedAccount.status !== 'active' ? (
-            <Text style={styles.homeNotice}>계정 {display.statusLabel}</Text>
-          ) : null}
-          {selectedAccount.mode === 'season' && (
-            !selectedAccount.season ||
-            selectedAccount.season.seasonStatus !== 'active' ||
-            selectedAccount.season.participantStatus !== 'active'
-          ) ? (
-            <Text style={styles.homeNotice}>
-              {display.subtitle ?? '시즌 정보를 확인할 수 없습니다.'}
-            </Text>
-          ) : null}
-          {children}
+          {hasHomeVisual ? homeVisual : null}
         </View>
       ) : (
         <ActionPressable
@@ -375,8 +386,15 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   homeContextRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  homeSeasonContext: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 14, gap: 8 },
+  homeStacked: { flexDirection: 'column', gap: 16 },
+  homeInfo: { minWidth: 0, gap: 16 },
+  homeSeasonInfo: { flex: 1, justifyContent: 'space-between', gap: 12 },
+  homeHeading: { gap: 16 },
+  homeSeasonHeading: { gap: 8 },
+  homeSeasonRow: { gap: 4, flexWrap: 'wrap' },
   homeTitle: { flex: 1, minWidth: 0, fontSize: 20, fontWeight: '700', lineHeight: 28 },
-  homeSeasonTitle: { fontSize: 16, lineHeight: 24, fontWeight: '600', color: semantic.secondary },
+  homeSeasonTitle: { flexGrow: 0, flexShrink: 1, flexBasis: 'auto', fontSize: 18, lineHeight: 26, fontWeight: '800' },
   homeChange: {
     flexShrink: 0,
     minWidth: 44,

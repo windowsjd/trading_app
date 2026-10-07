@@ -11,7 +11,7 @@ function setup() {
   const Card = h.load('src/screens/home/HomeAccountContext.tsx', {
     '../../features/ranking/api': rankingApi,
     '../../features/me/api': { getMe() {} },
-    '../../components/tradingAccount/AccountSwitcher': { __esModule: true, default: ({ children, ...props }) => React.createElement('AccountSwitcher', props, children) },
+    '../../components/tradingAccount/AccountSwitcher': { __esModule: true, default: ({ children, ...props }) => React.createElement('AccountSwitcher', props, children, props.homeVisual) },
     '../../components/states/SectionSkeleton': { __esModule: true, default: 'Skeleton' },
     '../../components/states/InlineEmptyState': { __esModule: true, default: 'Empty' },
   }).default;
@@ -29,19 +29,17 @@ function setup() {
 for (const [canonical, name, id] of [
   ['bronze', 'Bronze', 'bronze'], ['silver', 'Silver', 'silver'], ['gold', 'Gold', 'gold'],
   ['platinum', 'Platinum', 'platinum'], ['diamond', 'Diamond', 'diamond'], ['master', 'Whale', 'whale'],
-]) it(`${canonical} selects its provided frame and Home presentation in both appearances`, t => {
+]) it(`${canonical} selects its complete provided emblem and Home presentation in both appearances`, t => {
   for (const mode of ['light', 'dark'] as const) assert.equal(getHomeTier(canonical, mode)?.name, name);
   const h = setup(); t.after(h.close);
   h.context.rankingQuery.data.myRanking.provisionalTier = canonical; h.update();
   assert.equal(h.node('home-tier').props.children, name);
   assert.ok(h.node(`home-emblem-${id}`));
-  assert.ok(h.node('home-tier-frame').props.source.uri.endsWith(`/${id}-frame.png`));
-  assert.equal(h.node('home-tier-frame').props.resizeMode, 'contain');
+  assert.ok(h.node('home-tier-image').props.source.uri.endsWith(`/${id}.png`));
+  assert.equal(h.node('home-tier-image').props.resizeMode, 'contain');
   assert.equal(h.node('home-rank').props.children, '#12');
-  if (canonical === 'master') {
-    assert.ok(h.node('home-whale-subject').props.source.uri.endsWith('/whale-subject.png'));
-    assert.ok(h.node('home-whale-wave'));
-  } else assert.equal(h.node('home-whale-subject'), undefined);
+  assert.equal(h.node('home-whale-subject'), undefined);
+  assert.equal(h.node('home-whale-wave'), undefined);
   assert.equal(h.renderer.root.findByType('AccountSwitcher').props.homeCardStyle.backgroundColor, getHomeTier(canonical, 'light')?.palette.backgroundColor);
 });
 
@@ -74,7 +72,7 @@ for (const state of ['loading', 'error', 'null', 'unknown', 'response-unavailabl
     if (state === 'missing-response') q.data = undefined;
     h.update();
     assert.ok(h.node('home-tier-neutral'));
-    assert.equal(h.node('home-tier-frame'), undefined);
+    assert.equal(h.node('home-tier-image'), undefined);
     assert.equal(h.renderer.root.findByType('AccountSwitcher').props.homeCardStyle, undefined);
     if (state === 'loading') assert.equal(h.node('home-tier').props.children, '티어 확인 중');
     if (state === 'error') assert.equal(h.node('home-tier').props.children, '티어 확인 실패');
@@ -92,16 +90,15 @@ it('general account has no tier, frame, background or rank; missing me does not 
   h.context.meQuery.data = undefined; h.update();
   assert.ok(h.node('home-emblem-gold'));
   h.context.hasSeason = false; h.context.seasonId = null; h.update();
-  for (const id of ['home-tier', 'home-tier-frame', 'home-tier-neutral', 'home-rank']) assert.equal(h.node(id), undefined);
+  for (const id of ['home-tier', 'home-tier-image', 'home-tier-neutral', 'home-rank']) assert.equal(h.node(id), undefined);
   assert.equal(h.renderer.root.findByType('AccountSwitcher').props.homeCardStyle, undefined);
 });
 
-it('font scale stacks the prominent emblem without truncating text', t => {
+it('supplies the emblem beside the account information and leaves all text untruncated', t => {
   const h = setup(); t.after(h.close);
-  const views = h.renderer.root.findAllByType('View');
-  assert.ok(views.some(n => flatten(n.props.style).flexDirection === 'column-reverse'));
-  assert.ok(h.node('home-emblem-gold').props.style.width >= 132);
+  assert.ok(h.renderer.root.findByType('AccountSwitcher').props.homeVisual);
   assert.equal(h.node('home-nickname').props.numberOfLines, undefined);
+  assert.ok(flatten(h.node('home-nickname').props.style).fontSize > 15);
 });
 
 it('an unavailable rank never prints an invalid number or hides the known tier', t => {

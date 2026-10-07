@@ -149,7 +149,8 @@ function createHomeHarness(mode = 'general') {
     if (Array.isArray(node)) return node.map(expandDisplay);
     if (!React.isValidElement(node)) return node;
     if (node.type === hero || node.type === positionRow || node.type === charts || homeComponents.includes(node.type)) return expandDisplay(node.type(node.props));
-    return React.cloneElement(node, {}, expandDisplay(node.props.children));
+    return React.cloneElement(node, {}, expandDisplay(node.type === 'AccountSwitcher'
+      ? [node.props.children, node.props.homeVisual] : node.props.children));
   };
   h.renderWallet = () => {
     beginRender('wallet');

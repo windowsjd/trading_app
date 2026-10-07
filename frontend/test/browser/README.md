@@ -22,20 +22,36 @@ Home tier cards use the same external esbuild/Playwright runtime:
 NODE_PATH=/path/to/browser-tools/node_modules node test/browser/homeTierBrowser.cjs
 ```
 
-This renders production Home, AccountSwitcher, PNG frames and SVG subjects with
-fixture HTTP. It covers all six tiers plus neutral at 320/360/390/430px, font scales
-1/1.5/2 and Light/Dark (168 layouts), then ranking loading/error/unavailable,
-unknown tier and active → past settled → general → active switching. Assertions
-check loaded images, text bounds, emblem overlap, text contrast, 44px targets and
-the selected season's ranking request. Reports and contact sheets default to
-`/tmp/trading-home-tiers` (`HOME_TIER_BROWSER_OUTPUT` overrides).
-Native rendering and device screen readers require separate device verification.
+This renders production Home, AccountSwitcher and the six complete PNG emblems
+with fixture HTTP. It covers six tiers plus neutral at 320/360/390/430/768/1280px,
+font scales 1/1.5/2, normal/long names and Light/Dark (504 layouts), followed by
+ranking loading/error/unavailable, unknown tier and active → past settled →
+general → active switching. It checks text bounds, emblem overlap, text contrast,
+44px targets, title/nickname emphasis, the selected season's request, and actual
+PNG alpha area / intrinsic ratio against rendered dimensions. The area-equivalent
+size increases about 1% per tier and remains uniform across appearances.
+`HOME_TIER_BASELINE_RESULTS=/path/to/baseline/results.json` optionally checks that
+normal mobile card heights are at least 10% lower under the same browser/font.
+Reports and contact sheets default to `/tmp/trading-home-tiers`
+(`HOME_TIER_BROWSER_OUTPUT` overrides). Native rendering and device screen readers
+require separate device verification.
 
-Provided-source preparation is reproducible with
-`node scripts/prepare-home-tier-assets.cjs <frame-directory> <whale.png>` using
-the same external Playwright runtime and Expo's installed pngjs. It preserves
-source files; source hashes, bounds, crop and interior geometry are recorded in
-`src/assets/home-tiers/preparation.json`. No new application dependency is required.
+Reproduce the provided-source preparation with:
+
+```sh
+node scripts/prepare-home-tier-assets.cjs /path/to/provided-images
+```
+
+This uses Expo's installed pngjs, preserves the six original files, measures the
+main inner rim, and applies the user-approved small ratio correction before
+cropping/resampling. `scripts/home-tier-geometry.cjs` measures the same rim again
+in the prepared PNG. The script rejects >2% correction on either axis or a fitted
+rim diameter difference >=0.1 display px. It records source/output hashes, alpha
+bounds/area/centroid, correction and measurements in
+`src/assets/home-tiers/preparation.json`. This is raster measurement with a
+subpixel tolerance, not proof that every decorative curve has mathematical e=0.
+No application dependency is added. See `docs/home-tier-card.md` for evidence and
+remaining physical-device checks.
 
 Primary button colors and role exclusions use the same external browser tools:
 

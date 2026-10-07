@@ -36,7 +36,7 @@ export type HomeAccountContextData = ReturnType<typeof useHomeAccountContext>;
 
 export default function HomeAccountContext({ context }: { context: HomeAccountContextData }) {
   const { meQuery, rankingQuery, rankType, hasSeason, seasonId } = context;
-  const { width, fontScale } = useWindowDimensions();
+  const { width } = useWindowDimensions();
   const { mode } = useAppearance();
   const loading = !!seasonId && rankingQuery.isLoading;
   const myRanking = !rankingQuery.isError && !loading && seasonId &&
@@ -44,35 +44,32 @@ export default function HomeAccountContext({ context }: { context: HomeAccountCo
     ? rankingQuery.data.myRanking : null;
   const tier = hasSeason ? getHomeTier(getRankingTier(myRanking, rankType), mode) : null;
   const emblemSize = width < 360 ? 132 : 160;
-  const stacked = fontScale > 1.3;
   const rank = myRanking && Number.isFinite(myRanking.rank) && myRanking.rank > 0 ? `#${myRanking.rank}` : '-';
   const tierLabel = tier?.name ?? (loading ? '티어 확인 중' : rankingQuery.isError ? '티어 확인 실패' : '티어 미정');
   const notice = rankingQuery.isError ? '랭킹 정보를 불러오지 못했습니다.' :
     !loading && !!seasonId && !myRanking ? '아직 표시할 랭킹 정보가 없습니다.' : null;
   return (
-    <AccountSwitcher home homeCardStyle={tier ? { backgroundColor: tier.palette.backgroundColor, borderColor: tier.palette.borderColor } : undefined}>
-      <View style={[styles.details, hasSeason && stacked && styles.stacked]}>
-        <View style={[styles.userDetails, hasSeason && !stacked && styles.seasonUser]}>
-          <View style={styles.identity}>
-            {meQuery.isLoading ? <SectionSkeleton lines={1} /> : meQuery.data ? <>
-              <ProfileAvatar profileImageUrl={meQuery.data.profileImageUrl} size={36} testID="home-profile-avatar" />
-              <Text testID={TEST_IDS.home.nickname} style={styles.nickname}>{meQuery.data.nickname}</Text>
-            </> : <InlineEmptyState message="사용자 정보를 불러오지 못했습니다." />}
-          </View>
-          {hasSeason ? <Text testID={TEST_IDS.home.rank} style={styles.rank}
-            accessibilityLabel={`${rankType === 'final' ? '최종' : '현재'} 순위 ${rank === '-' ? '확인 중 또는 정보 없음' : rank}`}>
-            {loading ? '—' : rank}
-          </Text> : null}
+    <AccountSwitcher home homeCardStyle={tier ? { backgroundColor: tier.palette.backgroundColor, borderColor: tier.palette.borderColor } : undefined}
+      homeVisual={hasSeason ? <View style={styles.tier}>
+        {tier ? <TierEmblem tier={tier.id} size={emblemSize} /> :
+          <View testID="home-tier-neutral" style={[styles.neutral, { width: emblemSize, height: emblemSize }]}
+            accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
+            <View style={styles.neutralRing}><Text style={styles.neutralMark}>—</Text></View>
+          </View>}
+        <Text testID={TEST_IDS.home.tier} style={[styles.tierName, tier && { color: tier.palette.color }]}
+          accessibilityLiveRegion="polite">{tierLabel}</Text>
+      </View> : undefined}>
+      <View style={styles.userDetails}>
+        <View style={styles.identity}>
+          {meQuery.isLoading ? <SectionSkeleton lines={1} /> : meQuery.data ? <>
+            <ProfileAvatar profileImageUrl={meQuery.data.profileImageUrl} size={36} testID="home-profile-avatar" />
+            <Text testID={TEST_IDS.home.nickname} style={[styles.nickname, hasSeason && styles.seasonNickname]}>{meQuery.data.nickname}</Text>
+          </> : <InlineEmptyState message="사용자 정보를 불러오지 못했습니다." />}
         </View>
-        {hasSeason ? <View style={[styles.tier, stacked && styles.stackedTier]}>
-          {tier ? <TierEmblem tier={tier.id} size={emblemSize} /> :
-            <View testID="home-tier-neutral" style={[styles.neutral, { width: emblemSize, height: emblemSize }]}
-              accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
-              <View style={styles.neutralRing}><Text style={styles.neutralMark}>—</Text></View>
-            </View>}
-          <Text testID={TEST_IDS.home.tier} style={[styles.tierName, tier && { color: tier.palette.color }]}
-            accessibilityLiveRegion="polite">{tierLabel}</Text>
-        </View> : null}
+        {hasSeason ? <Text testID={TEST_IDS.home.rank} style={[styles.rank, tier && { color: tier.palette.color }]}
+          accessibilityLabel={`${rankType === 'final' ? '최종' : '현재'} 순위 ${rank === '-' ? '확인 중 또는 정보 없음' : rank}`}>
+          {loading ? '—' : rank}
+        </Text> : null}
       </View>
       {hasSeason && notice ? <Text style={styles.notice}>{notice}</Text> : null}
     </AccountSwitcher>
@@ -80,15 +77,12 @@ export default function HomeAccountContext({ context }: { context: HomeAccountCo
 }
 
 const styles = StyleSheet.create({
-  details: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  stacked: { flexDirection: 'column-reverse', alignItems: 'stretch', gap: 20 },
-  userDetails: { flex: 1, minWidth: 0, gap: 14 },
-  seasonUser: { paddingBottom: 16 },
+  userDetails: { minWidth: 0, gap: 10 },
   identity: { flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 },
   nickname: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: '600', lineHeight: 23 },
+  seasonNickname: { fontSize: 18, lineHeight: 27, fontWeight: '700' },
   rank: { fontSize: 20, lineHeight: 30, fontWeight: '600', color: semantic.secondary, flexShrink: 1 },
   tier: { alignItems: 'center', gap: 2, flexShrink: 0, maxWidth: '100%' },
-  stackedTier: { alignSelf: 'center' },
   tierName: { fontSize: 20, lineHeight: 29, fontWeight: '700', textAlign: 'center', color: semantic.secondary },
   neutral: { alignItems: 'center', justifyContent: 'center' },
   neutralRing: { width: '65%', height: '65%', borderRadius: 999, borderWidth: 1, borderColor: semantic.border, alignItems: 'center', justifyContent: 'center' },

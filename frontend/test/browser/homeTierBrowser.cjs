@@ -1,9 +1,10 @@
-// Actual Home/queries/account sheet/vectors; only HTTP and navigation are mocked.
+// Actual Home/queries/account sheet/emblems; only HTTP and navigation are mocked.
 const path = require('node:path'), fs = require('node:fs'), http = require('node:http');
 const assert = require('node:assert/strict'), esbuild = require('esbuild');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../..');
 const out = process.env.HOME_TIER_BROWSER_OUTPUT ?? '/tmp/trading-home-tiers';
+const baseline = process.env.HOME_TIER_BASELINE_RESULTS ? JSON.parse(fs.readFileSync(process.env.HOME_TIER_BASELINE_RESULTS)).records : null;
 const tiers = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Platinum', diamond: 'Diamond', master: 'Whale', null: '티어 미정' };
 (async () => {
   fs.mkdirSync(out, { recursive: true });
@@ -34,9 +35,9 @@ const tiers = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Pla
     await id('trading-account-switcher-sheet').waitFor({ state: 'hidden' });
   };
   try {
-    for (const appearance of ['light', 'dark']) for (const width of [320, 360, 390, 430]) for (const fontScale of [1, 1.5, 2]) for (const [tier, name] of Object.entries(tiers)) {
+    for (const appearance of ['light', 'dark']) for (const width of [320, 360, 390, 430, 768, 1280]) for (const fontScale of [1, 1.5, 2]) for (const long of [false, true]) for (const [tier, name] of Object.entries(tiers)) {
       await page.setViewportSize({ width, height: 900 }); await page.emulateMedia({ colorScheme: appearance });
-      await page.goto(`${base}/?tier=${tier}&fontScale=${fontScale}&long=${fontScale > 1 ? 1 : 0}`);
+      await page.goto(`${base}/?tier=${tier}&fontScale=${fontScale}&long=${long ? 1 : 0}`);
       await id('home-tier').filter({ hasText: name }).waitFor(); await id('home-nickname').waitFor();
       await page.waitForFunction(() => [...document.querySelectorAll('[data-testid="home-account-context"] img')].every(i => i.complete && i.naturalWidth > 0));
       const layout = await id('home-account-context').evaluate(card => {
@@ -57,27 +58,64 @@ const tiers = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Pla
           const foreground = luminance(getComputedStyle(t.parentElement).color);
           contrast.push({ text: t.textContent, ratio: (Math.max(background, foreground) + .05) / (Math.min(background, foreground) + .05) });
         }
+        let image = null;
+        const imageView = card.querySelector('[data-testid="home-tier-image"]');
+        const img = imageView?.querySelector('img');
+        if (img) {
+          const canvas = document.createElement('canvas'); canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0);
+          const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+          let alphaArea = 0; const bounds = [canvas.width, canvas.height, 0, 0];
+          for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width; x++) {
+            const alpha = pixels[(y * canvas.width + x) * 4 + 3];
+            if (alpha <= 8) continue;
+            alphaArea += alpha / 255;
+            bounds[0] = Math.min(bounds[0], x); bounds[1] = Math.min(bounds[1], y);
+            bounds[2] = Math.max(bounds[2], x + 1); bounds[3] = Math.max(bounds[3], y + 1);
+          }
+          const view = rect(imageView), sx = view.width / canvas.width, sy = view.height / canvas.height;
+          const renderedScale = Math.min(sx, sy); // RN Web background-size: contain
+          image = { sx, sy, fit: getComputedStyle(imageView.firstElementChild).backgroundSize,
+            equivalentSize: Math.sqrt(alphaArea) * renderedScale,
+            visibleWidth: (bounds[2] - bounds[0]) * renderedScale,
+            visibleHeight: (bounds[3] - bounds[1]) * renderedScale };
+        }
+        const typography = selector => { const e = card.querySelector(selector), c = getComputedStyle(e); return { ...rect(e), size: parseFloat(c.fontSize), weight: Number(c.fontWeight) }; };
         const button = card.querySelector('[role="button"]');
-        return { card: rect(card), emblem: rect(emblem), button: rect(button), clipped, overlaps, contrast, text: card.textContent, label: button.getAttribute('aria-label') };
+        return { image, title: typography('[data-testid="home-account-title"]'), nickname: typography('[data-testid="home-nickname"]'), card: rect(card), emblem: rect(emblem), button: rect(button), clipped, overlaps, contrast, text: card.textContent, label: button.getAttribute('aria-label') };
       });
       assert.deepEqual(layout.clipped, [], JSON.stringify({ appearance, width, fontScale, tier, layout }));
       assert.deepEqual(layout.overlaps, [], 'text must not cover the emblem');
       assert.ok(layout.contrast.every(x => x.ratio >= 4.5), JSON.stringify(layout.contrast));
       assert.ok(layout.button.width >= 44 && layout.button.height >= 44); assert.match(layout.label, /계정 변경.*Season 1/);
-      assert.ok(layout.emblem.width >= 132); assert.ok(layout.emblem.right <= layout.card.right);
+      assert.ok(layout.emblem.right <= layout.card.right);
       assert.doesNotMatch(layout.text, /현재 순위|최종 순위|현재 등급|최종 등급|변경/);
-      if (tier === 'null') assert.equal(await id('home-tier-frame').count(), 0);
+      if (tier === 'null') assert.equal(await id('home-tier-image').count(), 0);
       else assert.equal(await id(`home-emblem-${tier === 'master' ? 'whale' : tier}`).count(), 1);
-      if (width === 390 && fontScale === 1) {
+      if (layout.image) {
+        assert.ok(Math.abs(layout.image.sx / layout.image.sy - 1) < .0002, 'uniform image scaling at the raster layout precision');
+        assert.equal(layout.image.fit, 'contain');
+        const index = Object.keys(tiers).indexOf(tier);
+        const expected = 128 * (1 + index * .01) * (width < 360 ? 132 / 160 : 1);
+        assert.ok(Math.abs(layout.image.equivalentSize - expected) < .03, 'rendered alpha area keeps the 1% progression');
+      }
+      assert.ok(layout.title.size > 16 * fontScale && layout.title.weight > 600);
+      assert.ok(layout.nickname.size > 15 * fontScale && layout.nickname.weight > 600);
+      if (fontScale === 1 && !long) {
+        assert.ok(layout.emblem.y < layout.title.bottom, 'emblem uses the top title band');
+        const before = baseline?.find(r => r.appearance === appearance && r.width === width && r.fontScale === fontScale && r.tier === tier);
+        if (before) assert.ok(layout.card.height <= before.layout.card.height * .9, 'at least 10% less card height while preserving the visible emblem area');
+      }
+      if (width === 390 && fontScale === 1 && !long) {
         await id('home-account-context').screenshot({ path: path.join(out, `${tier}-${appearance}.png`) });
         if (tier === 'master') await page.screenshot({ path: path.join(out, `home-whale-${appearance}.png`) });
       }
-      if (width === 320 && fontScale === 2 && tier === 'master') await id('home-account-context').screenshot({ path: path.join(out, `large-text-${appearance}.png`) });
-      records.push({ appearance, width, fontScale, tier, layout });
+      if (width === 320 && fontScale === 2 && long && tier === 'master') await id('home-account-context').screenshot({ path: path.join(out, `large-text-${appearance}.png`) });
+      records.push({ appearance, width, fontScale, long, tier, layout });
     }
     for (const state of ['ranking-loading', 'ranking-error', 'ranking-unavailable', 'unranked']) {
       await page.goto(`${base}/?tier=master&state=${state}`); await id('home-tier-neutral').waitFor();
-      assert.equal(await id('home-tier-frame').count(), 0);
+      assert.equal(await id('home-tier-image').count(), 0);
       assert.equal(await id('home-tier').textContent(), state === 'ranking-loading' ? '티어 확인 중' : state === 'ranking-error' ? '티어 확인 실패' : '티어 미정');
       if (state === 'ranking-loading') {
         await switchAccount('general-account'); await page.evaluate(() => window.fixture.transport.release());
@@ -95,8 +133,8 @@ const tiers = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Pla
     await switchAccount('season-account'); await id('home-emblem-whale').waitFor(); assert.equal(await id('home-rank').textContent(), '#2');
     records.push({ scenario: 'active-past-general-active', calls });
     for (const appearance of ['light', 'dark']) {
-      await page.setViewportSize({ width: 1122, height: 940 });
-      await page.setContent(`<html><body style="margin:0;padding:18px;background:${appearance === 'light' ? '#fcfcfd' : '#15171c'};display:grid;grid-template-columns:repeat(3,358px);gap:6px">${Object.keys(tiers).map(t => `<img width="358" src="${base}/capture/${t}-${appearance}.png">`).join('')}</body></html>`);
+      await page.setViewportSize({ width: 1122, height: 510 });
+      await page.setContent(`<html><body style="margin:0;padding:18px;background:${appearance === 'light' ? '#fcfcfd' : '#15171c'};display:grid;grid-template-columns:repeat(3,358px);gap:6px">${Object.keys(tiers).filter(t => t !== 'null').map(t => `<img width="358" src="${base}/capture/${t}-${appearance}.png">`).join('')}</body></html>`);
       await page.waitForFunction(() => [...document.images].every(i => i.complete && i.naturalWidth));
       await page.screenshot({ path: path.join(out, `tiers-${appearance}.png`), fullPage: true });
     }

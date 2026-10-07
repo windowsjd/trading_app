@@ -205,7 +205,7 @@ describe('the styles long text depends on are present', () => {
     assert.match(hero, /total:\s*\{[^}]*lineHeight/s);
     // Identity shrinks beside the emblem and stacks with larger text.
     assert.match(read('screens/home/HomeAccountContext.tsx'), /userDetails:\s*\{[^}]*minWidth:\s*0/s);
-    assert.match(read('screens/home/HomeAccountContext.tsx'), /column-reverse/);
+    assert.match(read('components/tradingAccount/AccountSwitcher.tsx'), /homeStacked:\s*\{[^}]*flexDirection:\s*'column'/s);
     assert.match(read('screens/home/HomeHoldings.tsx'), /<PositionAssetRow/);
     assert.match(read('components/tradingAccount/PositionAssetRow.tsx'), /value:\s*\{[^}]*minWidth:\s*0/s);
     assert.match(read('components/tradingAccount/PositionAssetRow.tsx'), /columns:\s*\{[^}]*flexDirection:\s*'row'/s);

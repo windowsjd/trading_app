@@ -91,8 +91,9 @@ async function run() {
               )) clipped.push(text.textContent);
             }
           }
-          const title = node('home-account-context').firstElementChild.firstElementChild;
+          const title = node('home-account-title');
           const titleRange = document.createRange(); titleRange.selectNodeContents(title);
+          const titleTextBottom = Math.max(...[...titleRange.getClientRects()].map((r) => r.bottom));
           const titleTextRight = Math.max(...[...titleRange.getClientRects()].map((r) => r.right));
           const luminance = (color) => {
             const channels = color.match(/[\d.]+/g).slice(0, 3).map((s) => {
@@ -118,7 +119,7 @@ async function run() {
             total: box('home-total-asset'),
             trigger: box('trading-account-switcher-trigger'),
             competition: node('home-competition') ? box('home-competition') : null,
-            text: node('home-account-context').textContent, clipped, titleTextRight, contrasts,
+            text: node('home-account-context').textContent, clipped, titleTextRight, titleTextBottom, contrasts,
             sectionGaps: sections.slice(1).map((el, i) =>
               el.getBoundingClientRect().top - sections[i].getBoundingClientRect().bottom),
             gap: parseFloat(contentStyle.rowGap),
@@ -132,17 +133,17 @@ async function run() {
         assert.ok(Math.abs(layout.context.width - contentWidth) <= 1, 'Home uses the shared desktop content width');
         assert.ok(Math.abs(layout.context.x - (width - contentWidth) / 2) <= 1, 'content stays centered');
         assert.equal(layout.context.minHeight, 96);
-        assert.equal(layout.context.gap, 16);
+        assert.equal(layout.context.gap, mode === 'season' && fontScale <= 1.3 ? 8 : 16);
         assert.ok(layout.context.height >= 96 && layout.trigger.height >= 44);
         assert.ok(layout.trigger.width >= 44);
-        assert.ok(layout.context.paddingHorizontal >= 16 && layout.context.paddingVertical >= 20);
+        assert.ok(layout.context.paddingHorizontal >= (mode === 'season' ? 12 : 16) && layout.context.paddingVertical >= (mode === 'season' ? 14 : 20));
         assert.equal(layout.context.borderWidth, 1);
         assert.equal(layout.context.borderColor, mode === 'season' && !long
-          ? appearance === 'light' ? 'rgb(197, 206, 216)' : 'rgb(72, 85, 100)'
+          ? appearance === 'light' ? 'rgb(168, 181, 194)' : 'rgb(99, 115, 135)'
           : appearance === 'light' ? 'rgb(229, 232, 235)' : 'rgb(59, 61, 67)');
         assert.notEqual(layout.context.background, theme.palettes[appearance].screen);
         assert.ok(layout.trigger.right <= layout.context.right - 12);
-        assert.ok(layout.titleTextRight <= layout.trigger.x + 1, `title and change trigger never collide: ${layout.titleTextRight} / ${layout.trigger.x}`);
+        assert.ok(layout.titleTextRight <= layout.trigger.x + 1 || layout.titleTextBottom <= layout.trigger.y + 1, `title and change trigger never collide: ${layout.titleTextRight} / ${layout.trigger.x}`);
         assert.ok(layout.contrasts.every((ratio) => ratio >= 4.5), 'Hero text and financial colors have readable contrast');
         assert.ok(layout.total.y >= layout.context.bottom && layout.total.right <= width);
         assert.ok(layout.total.fontSize >= 36 * fontScale);
