@@ -10,6 +10,42 @@
 
 ---
 
+## 2026-10-07 — 관리자 진단 Triage Sufficiency 정책 명문화 (문서만)
+
+- 시작 전 `git fetch origin main`으로 갱신했다. 조사 HEAD = `origin/main` =
+  `924d9461618607d8aa0a1c48010cf55a4debd76c` (`지갑구조변경4`), clean tree였다.
+- 관리자 상세 진단은 장애 triage 도구다. 진단 하나로 **domain → operation →
+  failure stage → observed evidence → failure category → next investigation**을
+  따라 원인 범위를 실질적으로 좁히고 다음 조사 위치를 선택할 수 있어야 한다.
+  항상 root cause를 확정할 필요는 없으며 errorCode/500/timeout만으로 완료라고
+  판단하지 않는다. 최소한의 안전한 정보로 원인 후보를 좁히는 것이 합격 기준이다.
+- 공통 기준은 [Backend README](backend/README.md#admin-diagnostic-policy)에 둔다.
+  Provider는 candidate/source/freshness/rejection, Finance/Orders는
+  existence/scope/sufficiency/invariant와 허용된 bounded failure-only read,
+  Scheduler/Ops는 matcher candidate/planning/path/execution/skip을 설명한다.
+  이 기록은 설계 의도이며 현행 도메인 계약을 대체하지 않는다.
+- 관측되지 않은 사실은 `not_observed` 등 기존 안전한 표현으로 남긴다. timeout을
+  DB pool 장애로, stale을 특정 Provider 장애로, 0-row를 특정 worker 수정으로
+  단정하지 않는다. 관측된 guard 충족에 따른 conflict 분류와 writer 증명은 다르다.
+  조사 후보는 NEXT에 남기며 admin-only/user·operator 비노출, redaction,
+  bounded evidence와 금융·Provider·주문·retry·resync 정책 분리를 유지한다.
+- 현재 Portfolio timeout client facts는 응답 미관측/클라이언트 timeout/기존 transient
+  recovery 후보를 구분하지만 Backend 도착·지연 단계·DB/host 원인은 증명하지 못한다.
+  실제 endpoint는 account-scoped `/api/v1` template이며 명시적 NEXT 필드는 없다.
+  response가 없거나 response ID가 UUID 형태가 아니면 client requestId는
+  `not_observed`일 수 있다. correlation/NEXT의 현재 한계를 숨기지 않았고 구현은
+  별도 과제로 남겼다. HTTP AdminDiagnostic과 client runtime/Ops 진단은 별도 표면이다.
+- drift 수정: README의 FX-only wrapper 설명을 Order/Portfolio까지 반영하고 오래된
+  release 날짜를 조사일의 implementation scope로 정리했다. Finance의 옛 participant
+  검사를 현재 account/walletScope 분류 순서로 바로잡고 “real concurrency” 단정을
+  관측 기반 conflict로 수정했다. HTTP bound와 Provider/matcher 별도 bound를 대조했다.
+- 변경은 이 기록 및 Backend 문서뿐이다. Production/test 코드, type/payload,
+  API/DB/UI/request ID/CORS/logging/금융 동작은 변경하지 않았다.
+- 검증: 추가 문서 링크/앵커 17개와 주요 코드 조사 경로 확인, Markdown 7개 파일만
+  변경 확인, `git diff --check` 통과. 전체 diff 자체 리뷰에서 admin-only/관측·추론
+  경계/redaction/bounds/도메인 I/O 예외/중복·모순을 확인했다. 코드·frontend 변경이
+  없어 build/typecheck/lint/test는 실행하지 않았다.
+
 ## 2026-10-07 — 명시적 cross-currency Wallet Transfer와 Wallet 구조 개편 완료
 
 ### 저장소 조사와 transaction boundary

@@ -1,5 +1,10 @@
 # Orders API Contract
 
+[Common Diagnostic Triage Sufficiency](../README.md#admin-diagnostic-policy)
+defines acceptance and safety. The [finance diagnostic contract](trading-account-finance-api-contract.md#atomic-wallet-mutation-failure-diagnosis-작업-5-보완-3)
+defines guard evidence and allowed failure reads; matcher triage is specified in
+[Scheduler/Ops](scheduler-ops-foundation.md#matcher-triage-sufficiency).
+
 Admin financial guard diagnostics (2-B): market execution and limit quote,
 reservation/create/cancel preserve read-only cash/position failure reasons in
 admin-only `diagnostic.evidence.financialGuard`. Evidence uses existence,

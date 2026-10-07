@@ -4,7 +4,7 @@ Season/general virtual trading app backend built with NestJS, Prisma 7 adapter s
 
 This service owns backend APIs, database access, financial calculations, and server-side write paths for the MVP. Financial values are exchanged as strings.
 
-Current release status (2026-08-18): general-mode market/limit orders,
+Current implementation scope (reviewed 2026-10-07): general-mode market/limit orders,
 positions, and explicit KRW↔USD FX are implemented through the shared
 TradingAccount-scoped cores. General ranking remains intentionally unavailable.
 General market and FX fees use independent `GENERAL_TRADE_FEE_RATE` and
@@ -13,7 +13,17 @@ durable quotes; execution price/rate still reprices from fresh provider data.
 `pnpm trading-accounts:audit-general` audits general trading and FX scope,
 reservation, command/exchange/ledger, and performance integrity read-only.
 
-## Current MVP Scope
+## Admin diagnostic policy
+
+This is the canonical common policy for **Diagnostic Triage Sufficiency**.
+Admin detailed diagnostics are a triage tool: one diagnostic should let an admin
+meaningfully narrow the failure scope and choose the next investigation target.
+A complete root cause is not required. The goal is to narrow causes as much as
+possible with the minimum safe information, rather than display more information.
+These are design/review criteria for existing surfaces, not a new payload schema
+or a claim that every current diagnostic already meets them.
+
+### Access and existing delivery contract
 
 Admin diagnostics retain the v1 envelope and are generated only for an authenticated
 request whose DB-resolved current role is `admin`; operators and ordinary users do
@@ -24,13 +34,174 @@ Escaped nested JSON secret fields and ambiguous raw payload text are conservativ
 redacted as whole strings; ordinary safe prose and business keys are preserved.
 Provider HTTP errors must contain only provider, safe failure category and HTTP
 status, never response bodies or URLs.
-Opted-in wrapped failures (currently the shared FX execute transaction) preserve
+Opted-in wrapped failures (shared FX execute transaction, Order failure wrappers,
+and Portfolio structural valuation failures) preserve
 a safe cause category and failed step without retaining raw DB/provider messages.
 Home/Portfolio unexpected partial errors use public generic messages, with
 sanitized internal details confined to admin diagnostics. Typed domain messages
 are preserved. HTTP 200 partial diagnostics explicitly receive each
 row/section's local evidence and never inherit shared request evidence. Existing
 request ID, query exclusion, collection/depth/string and 24 KiB limits remain.
+
+The frontend `AdminDiagnosticPanel` additionally gates server diagnostics and
+observed client runtime facts through `/api/v1/me`: only `role=admin` is shown;
+user/operator, unresolved role and role-query failure hide the panel. Client
+runtime facts are client observations, not a synthetic Backend exception.
+Background matcher summaries in `OpsJobRun.resultJson` are a separate internal
+Ops surface with existing Ops authorization; they do not grant operators access
+to the HTTP admin diagnostic or the frontend panel.
+
+### Five triage axes
+
+Read the diagnostic as **domain → operation → failure stage → observed evidence
+→ failure category → next investigation**. WHERE covers domain and operation.
+Supply the applicable axes from actual observations within the domain's bounds:
+
+| Axis | Design/review requirement | Existing representation / examples |
+| --- | --- | --- |
+| A. WHERE | Distinguish the layer/domain, operation, endpoint/workflow and safe resource scope: Portfolio, FX, Order or WebSocket. | `domain`, `operation`, scoped `entities`; client endpoint/channel/workflow facts. |
+| B. STAGE | Identify the meaningful failed step when observed, rather than stopping at generic `request_processing`. | `failureStage` / `failedStep` / client stage; authentication, account ownership, valuation, source selection, wallet guard, order reservation, matcher planning/execution, transport, subscription, freshness or resync. |
+| C. OBSERVED EVIDENCE | Preserve the facts that support narrowing, including their observation scope and missing information. | Response presence/status, safe server/client codes, candidate/rejection facts, safe age/threshold metadata, sent/ACK/first snapshot, reconnect attempt, boolean guard predicates and bounded counts. |
+| D. WHY CATEGORY | Distinguish the supported failure class; classification is not root-cause attribution. | Existing safe cause/code/reason: transport/network, timeout, gateway/server response, authentication, scope/integrity, source unavailable/stale, financial guard, reservation invariant, concurrency observation, subscription, freshness, malformed/validation or unexpected internal failure. |
+| E. NEXT | Make the next service/module or operational surface identifiable even when root cause is unresolved. | Existing `nextInvestigation` module paths; request-correlated server logs, Provider ingestion, Scheduler, `OpsJobRun` or the relevant policy/service. |
+
+These categories are conceptual review axes, not new enum values or required
+fields. Keep existing `AdminDiagnostic` plus domain-specific evidence and client
+runtime projections; do not require a giant common schema. Use existing safe
+`not_observed`, `unavailable`, `unrecognized`, null/omission or unclassified
+representations as appropriate to the current surface. Do not invent missing
+facts to fill an axis. Current generic stages, missing evidence/next hints and
+bound-related truncation are limitations to assess, not permission to dump data.
+
+### Acceptance and observation boundary
+
+A good diagnostic **meaningfully narrows the failure scope and identifies the
+next investigation target even if it cannot establish the exact root cause**.
+Reviewers must be able to explain which observed facts support that narrowing
+and which facts remain unknown. A diagnostic showing only `INTERNAL_SERVER_ERROR`,
+HTTP 500, `timeout=true`, generic exception, unknown error or data unavailable
+is insufficient if it cannot narrow candidates or guide investigation. Missing
+meaningful stage, evidence or next direction is likewise a sufficiency gap;
+merely adding error codes does not complete diagnostic work.
+
+Unavailable observations must remain unavailable. If an axis cannot safely be
+provided, document the boundary and the remaining investigation target; do not
+claim complete triage coverage or fabricate an explanation. NEXT hints are
+investigation targets, not established causes or commands executed by diagnostics.
+In client runtime surfaces without `nextInvestigation`, assess whether the
+endpoint/channel and observed stage select an actionable target; an absent
+explicit hint remains a current limitation, not an invented payload field.
+
+A timeout does not establish a DB connection-pool failure. WebSocket stale does
+not establish a Binance outage. A 0-row mutation does not establish that another
+worker modified the row. A subsequent failure read with satisfied guard
+predicates supports the existing **observed conflict** classification, not proof
+of a particular concurrent writer/process. Backend stages derived from route or
+safe error code are classification context, not proof every such step ran.
+
+### Redaction and bounds
+
+Triage sufficiency never weakens redaction. Do not project access/refresh tokens,
+Authorization headers, API keys/secrets, DB URLs, raw DB exceptions, raw Provider
+response bodies/payloads/full URLs, exact wallet/reserved balances, exact position
+or reserved quantities, order amounts, cost basis or PnL, sensitive foreign/internal
+entity IDs, or unbounded stacks/logs/messages. Only existing approved scoped
+identifiers and safe projections may be retained. The common sanitizer is a
+backstop: financial values/foreign IDs must be excluded by the domain projection,
+not assumed to be automatically removed by secret-key redaction.
+
+Current HTTP `AdminDiagnostic` bounds in `src/common/admin-diagnostics.ts`:
+
+| Content | Limit |
+| --- | --- |
+| Diagnostic event buffer / server log buffer | 20 each; oldest entries are dropped on overflow |
+| Exception stack / application stack | 24 / 12 frames |
+| Sanitized string (including keys and stack lines) | 1,000 characters |
+| Collection | 30 array items or object entries per collection |
+| Object nesting | At depth 5, nested arrays/objects become `[TRUNCATED_DEPTH]` |
+| `nextInvestigation` | Up to 8 distinct hints |
+| Total serialized diagnostic | 24 KiB (`24 * 1024` UTF-8 bytes) |
+
+The total-bound reducer can shorten stacks/event/log buffers, replace evidence
+or entities with truncation markers, remove next hints and finally clear logs/
+stacks. Read `truncated` indicators as loss of context, never evidence of absence.
+Do not dump all logs to improve triage. These HTTP bounds do not automatically
+apply to client runtime facts or Ops JSON: source-selection evidence additionally
+caps source summaries/distinct rejection reasons at 12 each; matcher samples
+are capped at 10 and sample IDs at 128 characters. Ops redaction and the fixed
+matcher projection have their own contract, not an inherited 24 KiB guarantee.
+
+### Diagnosis and business behavior
+
+Diagnostics do not change financial calculations, Provider priority/freshness,
+order fills, reservation/cancellation, Wallet guards, ranking, account scope,
+WebSocket subscription, retry or resync policy. Diagnostics themselves do not
+repair, write, retry or activate fallback. They may describe existing business
+recovery/fallback behavior without controlling it.
+
+Use already-read outcomes by default. Keep the existing explicitly permitted
+bounded failure-only financial reads; do not generalize this to “all diagnostics
+absolutely forbid extra I/O.” Likewise the existing sorted-page failure reselection
+is a labeled later observation, not historical evidence. New diagnostic I/O or
+recovery behavior requires separate implementation work and domain review.
+
+### Request correlation and Portfolio HTTP example
+
+The existing middleware accepts a safe `x-request-id` (1–100 characters matching
+`[A-Za-z0-9._:-]`) or generates a UUID and sets the response header; the server
+admin diagnostic carries that ID. When observable, use it to connect Backend logs
+and the relevant Ops investigation; do not assume an Ops run shares the HTTP ID.
+The Portfolio client facts currently retain only UUID-shaped response-header IDs;
+a non-UUID server ID may therefore be `not_observed` in that client projection.
+Without a response, the client may not observe any request ID. Correlation
+availability on paths ending before an HTTP response is itself part of triage
+sufficiency review. Client-generated correlation is a separate future decision;
+this documentation adds no header transmission, CORS or request-ID behavior.
+
+For example, the current Portfolio projection can show the templated endpoint
+`GET /api/v1/trading-accounts/:accountId/portfolio`, `httpStatus=no_response`,
+`serverCode=not_observed`, `clientCode=ECONNABORTED`, `timeout=true`, `network=false`,
+`requestId=not_observed`, `clientFailureStage=portfolio_request` and
+`automaticRecoveryEligible=true`. This distinguishes a client timeout from an
+observed structural-account response and observes no 401/403/404 response.
+`network=false` means the allowlisted network-error classification was not matched;
+it does not prove network health. Recovery eligibility describes the existing
+transient-read policy, not proof that recovery succeeded or permission for new retries.
+
+This is useful triage without confirmed root cause: it selects the Portfolio
+request/transport path for investigation, but cannot prove Backend receipt, a
+Backend delay stage, or DB/host/event-loop cause, and does not rule out an unseen
+structural fault. Next inspect request-correlated server logs if available and
+Portfolio ownership/valuation services; missing correlation limits that search.
+Current client facts have no explicit NEXT field. Treat that as an investigation
+guidance limitation rather than claim full five-axis coverage.
+
+### Document responsibilities
+
+- This section owns common purpose, acceptance, safety and observation rules.
+- [HANDOVER](../HANDOVER.md) records design intent and the work's investigation/validation.
+- [Provider selection](docs/provider-ingestion-foundation.md#admin-selection-failure-evidence)
+  owns candidate/source/freshness/rejection and filtered/later-read boundaries.
+- [Finance](docs/trading-account-finance-api-contract.md#atomic-wallet-mutation-failure-diagnosis-작업-5-보완-3)
+  and [Orders](docs/orders-api-contract.md) own existence/scope/sufficiency/invariant
+  evidence and authorized failure-read exceptions.
+- [Scheduler/Ops](docs/scheduler-ops-foundation.md#matcher-triage-sufficiency)
+  owns matcher candidate/planning/path/execution/skip evidence and Ops access.
+  Realtime client evidence is traced through `frontend/src/services/ws/runtimeDiagnostics.ts`,
+  `features/asset/{tickerRuntime,useAssetOrderBook,useAssetCandle}` and
+  `features/wallet/fxRateUpdates`: transport/subscription and accepted-message,
+  first-snapshot, freshness/resync facts vary by channel. Investigate the socket
+  manager, channel hook/store and then server gateway/Ops; client observations do
+  not establish upstream Provider health. The [runtime verification record](../frontend/docs/trading-ui-runtime-followup.md)
+  is historical evidence, not a replacement common policy.
+- [Docs guide](docs/README.md) indexes these roles; [business policy decisions](docs/policy-decisions.md)
+  continue to own finance/source/freshness/order policy.
+
+## Current MVP Scope
+
+Admin diagnostic design and acceptance criteria are defined in
+[Admin diagnostic policy](#admin-diagnostic-policy); domain contracts refine the
+evidence and observation boundaries without changing business policy.
 
 - Access token + refresh token auth: signup, login, refresh, logout, logout-all, and `GET /api/v1/me`.
 - Admin/operator authorization and account management: `UserRole`, DB-current-role access context, `GET /api/v1/operator/me`, admin-only user list/get, admin-only role change, admin-only user status/restore, and internal operator audit log service/model.

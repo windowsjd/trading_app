@@ -422,3 +422,25 @@ query miss does not prove an upstream row never existed. General and season
 orders share this summary contract; per-order transaction validation remains
 the authority. Internal diagnostics are visible only through the existing Ops
 authorization boundary, never through ordinary order responses.
+
+### Matcher triage sufficiency
+
+Apply [common Diagnostic Triage Sufficiency](../README.md#admin-diagnostic-policy)
+to this separate Ops surface: job/candidate scope → planning Path A/B or actual
+execution stage → observed counts/reasons/sample → no-plan/skip/safe error category
+→ next investigation. Candidate/planning evidence alone must not imply execution
+started. Unknown stages/reasons remain `not_observed` or the existing safe
+unclassified category; no provider/DB/process root cause is inferred.
+
+Use the existing Ops run status/lock outcome and matcher summary to select
+`src/orders/limit-order-matching.service.ts`, the Path A selector, Path B candle
+policy/evidence or the execution/reservation service according to the observed
+phase. Missing/stale source observations lead to Provider ingestion and Scheduler
+configuration/Ops runs; lock loss leads to Ops runner/lease investigation. These
+are investigation targets, not additional summary fields or diagnostic actions.
+The current counters/samples do not expose HTTP `nextInvestigation` or request IDs.
+
+Preserve the 10-sample/128-character ID limits, fixed reason vocabularies and Ops
+sanitizer described above. The HTTP 24 KiB/depth/collection bounds are not a generic
+Ops JSON guarantee. No diagnostic I/O, retry, repair or financial policy changes
+are introduced; existing Ops access does not expose the admin-only HTTP panel.

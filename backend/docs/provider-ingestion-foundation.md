@@ -256,6 +256,11 @@ All scripts and HTTP triggers are explicit operator actions. Scheduler-owned pro
 
 ## Admin selection failure evidence
 
+Apply [Diagnostic Triage Sufficiency](../README.md#admin-diagnostic-policy):
+workflow/domain and source-selection stage must connect the observed candidates,
+freshness/rejections and safe failure class to the next investigation target.
+This domain contract supplies the evidence; it does not redefine the common policy.
+
 The existing `AdminDiagnostic.evidence` summarizes source selection failures in
 Assets, Orders, FX, shared Portfolio valuation, Home top positions, Positions and
 Records live profit analysis. Source policy and source priority are unchanged.
@@ -267,7 +272,8 @@ Records live profit analysis. Source policy and source priority are unchanged.
   latest completed session, not a capturedAt age rejection. A null freshness basis
   means selection stopped before that check (for example workflow/calendar gates).
 - `providerCandidates` is a bounded **per-source** projection of the already-read
-  candidates: observed count, first observed snapshot metadata/positive-value
+  candidates (at most 12 source summaries, with at most 12 distinct rejection
+  reasons per source): observed count, first observed snapshot metadata/positive-value
   verdict, representative reason, aggregate source reason and distinct rejection
   reasons. `candidateFound=false` is scoped to those bounded/filtered reads; it
   does not claim the source has never produced a row. No raw price, rate, credential

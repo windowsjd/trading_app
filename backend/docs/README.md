@@ -39,6 +39,13 @@ First compare current implementation, tests and migrations with explicit current
 9. `docs/codex-rulepack.md` — coding rulepack for Codex/agent work in this repo.
 10. `docs/provider-fixtures/` — test fixtures referenced by provider tests.
 
+For admin diagnostics, [the common policy](../README.md#admin-diagnostic-policy)
+is canonical for Diagnostic Triage Sufficiency, access, redaction and observation
+boundaries. Provider, finance/orders and scheduler contracts below it own their
+domain evidence and permitted reads; they do not redefine the common policy.
+HANDOVER records intent/history. HTTP admin diagnostics, client runtime facts and
+internal Ops summaries retain their separate payload and authorization contracts.
+
 Historical HANDOVER/investigation records and explicitly historical migration sections preserve past evidence, not current authority. For orders/FX use the account-scoped contracts above, for lock ordering and fee pinning use `orders-api-contract.md` / current `policy-decisions.md`, and for ownership use the current section of `trading-modes-and-accounts.md`.
 
 [Execution Realism System](execution-realism-system.md) defines the internal,

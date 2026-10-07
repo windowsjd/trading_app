@@ -297,9 +297,9 @@ serialization fence as general orders and external-funding writers.
 
 ## Atomic wallet-mutation failure diagnosis (작업 5 보완 3)
 
-Every guarded cash mutation carries the wallet id, participant, VERIFIED
-trading account, currency, AND an amount guard in one WHERE. When it matches
-0 rows, any of those could be the reason — but the old per-caller
+Every guarded cash mutation carries the wallet id, VERIFIED trading account,
+explicit expected walletScope, currency, AND the applicable amount guard in one
+WHERE. When it matches 0 rows, any of those could be the reason — but the old per-caller
 diagnostics re-read the wallet with the scope columns STILL in the WHERE, so
 a wallet whose scope had become null or mismatched simply "disappeared" and
 was reported as a missing wallet or a generic concurrency CONFLICT.
@@ -309,13 +309,14 @@ now re-reads the wallet BY ID ALONE inside the same transaction and
 classifies in a fixed order:
 
 1. wallet row gone → the caller's existing "not found"/balance error
-2. `seasonParticipantId` ≠ expected → 500 `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`
-3. `tradingAccountId IS NULL` → 500 `FINANCIAL_SCOPE_REPAIR_REQUIRED`
-4. `tradingAccountId` ≠ expected → 500 `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`
+2. `tradingAccountId IS NULL` → 500 `FINANCIAL_SCOPE_REPAIR_REQUIRED`
+3. `tradingAccountId` ≠ expected → 500 `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`
+4. `walletScope` ≠ expected → 500 `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`
 5. `currencyCode` ≠ expected → 500 `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`
 6. amount guard cannot hold → the caller's existing `INSUFFICIENT_BALANCE` /
    `INSUFFICIENT_AVAILABLE_BALANCE` / `ORDER_RESERVATION_INCONSISTENT`
-7. scope AND amounts both fine → a real concurrency `CONFLICT`
+7. scope AND amount predicates hold on the failure read → observed `conflict`,
+   mapped to the caller's existing conflict code; no concurrent writer is proven
 
 Scope is always checked BEFORE amounts, so corruption is never reported as a
 shortfall. The diagnosis is read-only: it never writes, repairs, or
@@ -336,6 +337,16 @@ Applied to every 0-row path, not a subset:
 
 The `tradingAccountId` in each atomic UPDATE's WHERE is unchanged — the
 diagnosis explains a 0-row result, it never relaxes the guard.
+
+Under [Diagnostic Triage Sufficiency](../README.md#admin-diagnostic-policy),
+financial operation and actual guard stage must connect existence/scope,
+sufficiency and reservation-invariant predicates to the failure reason and the
+relevant wallet/position/reservation service in `nextInvestigation`. A 0-row count
+alone is insufficient. A failure read is a later observation, not a reconstruction
+of the rejected mutation's exact state; a scoped read miss cannot prove deletion
+or scope change. Invalid-scope rows must not contribute financial predicates or
+foreign identifiers. The bounded failure-only reads below are an explicit domain
+exception, not permission to add success-path queries, repair, retry or writes.
 
 Order financial admin evidence (2-B) preserves these classifier reasons via
 the existing AdminDiagnostic sanitizer and 24 KiB bound. It records existence,
