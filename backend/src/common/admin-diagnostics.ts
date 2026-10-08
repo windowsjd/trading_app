@@ -1,3 +1,4 @@
+import { apiErrorDiagnosticMessage } from './api-error';
 import { randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { HttpException } from '@nestjs/common';
@@ -516,7 +517,11 @@ function inferRouteContext(method: string, originalUrl: string) {
             ? 'WALLET_TRANSACTIONS_READ'
             : 'WALLET_WALLETS_READ';
       nextInvestigation = [
-        'backend/src/wallets/trading-account-wallets.service.ts',
+        route[2] === 'wallet-transfers'
+          ? route[3] === 'quote' || route[3] === 'execute'
+            ? 'backend/src/wallets/trading-account-wallet-fx-transfer.service.ts'
+            : 'backend/src/wallets/trading-account-wallet-transfer.service.ts'
+          : 'backend/src/wallets/wallets.service.ts',
       ];
     }
   } else if (route[0] === 'orders') {
@@ -581,6 +586,7 @@ function decodeSegment(value: string): string {
 function describeException(exception: unknown): AdminDiagnostic['exception'] {
   const error = exception instanceof Error ? exception : null;
   const rawMessage =
+    apiErrorDiagnosticMessage(exception) ??
     httpExceptionMessage(exception) ??
     (typeof error?.message === 'string'
       ? error.message
@@ -624,7 +630,8 @@ function describeException(exception: unknown): AdminDiagnostic['exception'] {
 
 function safeExceptionMessage(exception: unknown): string | undefined {
   return safeDiagnosticMessage(
-    httpExceptionMessage(exception) ??
+    apiErrorDiagnosticMessage(exception) ??
+      httpExceptionMessage(exception) ??
       (exception instanceof Error ? exception.message : undefined),
   );
 }

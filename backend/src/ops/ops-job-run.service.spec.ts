@@ -45,6 +45,10 @@ describe('OpsJobRunService', () => {
         'SELECT wallet_balance postgres://fake:fake@db.invalid/db 987654.12345678',
       resultJson: {
         message: 'raw Provider https://provider.invalid/body 987654.12345678',
+        errors: [
+          'https://provider.invalid/private SELECT wallet_balance 987654.12345678',
+        ],
+        failures: [{ details: ['SELECT wallet_balance 987654.12345678'] }],
         exception: new Error('Authorization Bearer fake-token'),
         accountId: 'account-1',
         count: 3,
@@ -56,6 +60,8 @@ describe('OpsJobRunService', () => {
       errorMessage: 'Background operation failed.',
       resultJson: {
         message: 'Background operation failed.',
+        errors: ['Background operation failed.'],
+        failures: [{ details: ['Background operation failed.'] }],
         accountId: 'account-1',
         count: 3,
       },

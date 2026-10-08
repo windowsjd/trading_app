@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { Logger, type ArgumentsHost } from '@nestjs/common';
 import { createApiError } from './api-error';
 import {
@@ -53,6 +55,144 @@ function http(
 }
 
 describe('Diagnostic Enforcement Foundation', () => {
+  it.each([
+    ['wallets', 'GET', 'WALLET_WALLETS_READ', 'wallets.service.ts'],
+    [
+      'wallet-transactions',
+      'GET',
+      'WALLET_TRANSACTIONS_READ',
+      'wallets.service.ts',
+    ],
+    [
+      'wallet-transfers',
+      'POST',
+      'WALLET_TRANSFER',
+      'trading-account-wallet-transfer.service.ts',
+    ],
+    [
+      'wallet-transfers/quote',
+      'POST',
+      'WALLET_TRANSFER_QUOTE',
+      'trading-account-wallet-fx-transfer.service.ts',
+    ],
+    [
+      'wallet-transfers/execute',
+      'POST',
+      'WALLET_TRANSFER_EXECUTE',
+      'trading-account-wallet-fx-transfer.service.ts',
+    ],
+  ])(
+    'resolves the responsible Wallet service for %s',
+    (route, method, operation, file) => {
+      for (const role of ['user', 'operator', 'admin']) {
+        const body = http(
+          role,
+          `/api/v1/trading-accounts/account-1/${route}`,
+          () =>
+            createApiError('WALLET_FAILURE', 'Source wallet not found', 409),
+          method,
+        );
+        if (role !== 'admin') {
+          expect(body.error.diagnostic).toBeUndefined();
+          continue;
+        }
+        const diagnostic = body.error.diagnostic!;
+        expect(diagnostic).toMatchObject({
+          domain: 'WALLET',
+          operation,
+          failureStage: 'request_boundary',
+        });
+        const path = `backend/src/wallets/${file}`;
+        expect(diagnostic.nextInvestigation).toContain(path);
+        expect(existsSync(resolve(__dirname, '../../..', path))).toBe(true);
+      }
+    },
+  );
+
+  it.each([
+    ['PROTECTION_POSITION_UNAVAILABLE', 'An open position is required.', true],
+    [
+      'PROTECTION_POSITION_UNAVAILABLE',
+      'An open Futures lifetime is required.',
+      true,
+    ],
+    ['PROTECTION_CHILD_CHANGED', 'Protection changed before execution.', true],
+    [
+      'PROTECTION_CHILD_CHANGED',
+      'The protected Futures lifetime changed.',
+      true,
+    ],
+    [
+      'CONDITIONAL_LIMIT_UNAVAILABLE',
+      'Spot Limit registration and matching must be available.',
+      false,
+    ],
+    [
+      'FUTURES_FINAL_SETTLEMENT_REQUIRED',
+      'Season final results require all Futures positions to be closed.',
+      true,
+    ],
+    [
+      'SEASON_NOT_ENDED',
+      'Futures final settlement requires an ended Season.',
+      true,
+    ],
+    [
+      'OPEN_LIMIT_ORDER_RESERVATIONS',
+      'Release all Season reservations before final settlement.',
+      true,
+    ],
+    [
+      'FUTURES_FINAL_PRICE_UNAVAILABLE',
+      'Final Futures settlement price is unavailable.',
+      true,
+    ],
+    [
+      'FUTURES_FINAL_PRICE_UNAVAILABLE',
+      'A fresh final execution price at Season end is required.',
+      true,
+    ],
+    [
+      'FUTURES_FINAL_PRICE_UNAVAILABLE',
+      'Final Futures settlement price could not be verified.',
+      false,
+    ],
+    [
+      'FUTURES_FINAL_EVIDENCE_INTEGRITY',
+      'Season final settlement terms could not be verified.',
+      false,
+    ],
+    [
+      'FUTURES_FINAL_SETTLEMENT_INTEGRITY',
+      'Final Futures settlement lifecycle could not be verified.',
+      false,
+    ],
+  ] as const)(
+    'preserves the public/admin boundary for %s: %s',
+    (code, message, publicSafe) => {
+      for (const role of ['user', 'operator', 'admin']) {
+        const exception = createApiError(code, message, 409);
+        expect(exception.getStatus()).toBe(409);
+        const body = http(
+          role,
+          '/api/v1/trading-accounts/account-1/futures/execute',
+          () => exception,
+          'POST',
+        );
+        expect(body.error).toMatchObject({
+          code,
+          message: publicSafe ? message : 'Request could not be completed.',
+        });
+        if (role === 'admin')
+          expect(body.error.diagnostic?.exception.message).toBe(message);
+        else {
+          expect(body.error.diagnostic).toBeUndefined();
+          if (!publicSafe) expect(JSON.stringify(body)).not.toContain(message);
+        }
+      }
+    },
+  );
+
   it('does not promote admin-reviewed Provider details into public copy or accept private code text', () => {
     const message = http(
       'admin',
@@ -119,7 +259,11 @@ describe('Diagnostic Enforcement Foundation', () => {
         failureStage: 'request_boundary',
         entities: { tradingAccountId: 'account-1' },
         nextInvestigation: [
-          'backend/src/wallets/trading-account-wallets.service.ts',
+          path === 'wallet-transfers'
+            ? 'backend/src/wallets/trading-account-wallet-transfer.service.ts'
+            : path.startsWith('wallet-transfers/')
+              ? 'backend/src/wallets/trading-account-wallet-fx-transfer.service.ts'
+              : 'backend/src/wallets/wallets.service.ts',
         ],
       });
       expect(JSON.stringify(body)).not.toContain('private-query');

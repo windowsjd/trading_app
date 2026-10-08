@@ -17,12 +17,7 @@ export function sanitizeOpsJson(value: unknown): unknown {
 
 /** Failed result payloads are exception surfaces, unlike normal Ops metadata. */
 export function sanitizeOpsFailureJson(value: unknown): unknown {
-  return sanitizeBoundedJson(
-    typeof value === 'string'
-      ? (safeDiagnosticMessage(value) ?? 'Background operation failed.')
-      : value,
-    true,
-  );
+  return sanitizeBoundedJson(value, true);
 }
 
 function sanitizeBoundedJson(value: unknown, failure: boolean): unknown {
@@ -40,13 +35,18 @@ function sanitizeJsonValue(
   value: unknown,
   depth: number,
   failure: boolean,
+  projectString = true,
 ): unknown {
   if (value === null) {
     return null;
   }
 
   if (typeof value === 'string') {
-    return redactStoredText(value).slice(0, MAX_STRING);
+    return redactStoredText(
+      failure && projectString
+        ? (safeDiagnosticMessage(value) ?? 'Background operation failed.')
+        : value,
+    ).slice(0, MAX_STRING);
   }
 
   if (typeof value === 'number' || typeof value === 'boolean') {
@@ -87,6 +87,10 @@ function sanitizeJsonValue(
                   item,
                   depth + 1,
                   failure || /^(?:errors?|exceptions?|failures?)$/iu.test(key),
+                  // Scalar metadata (scope, codes, amounts) keeps its meaning;
+                  // free strings in failure arrays are exception prose.
+                  typeof item !== 'string' ||
+                    /^(?:errors?|exceptions?|failures?)$/iu.test(key),
                 ),
         ]),
     );

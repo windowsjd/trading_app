@@ -1,6 +1,63 @@
 import { sanitizeOpsJson, sanitizeOpsFailureJson } from './ops-redaction';
 
 describe('ops redaction', () => {
+  it.each([sanitizeOpsJson, sanitizeOpsFailureJson])(
+    'projects nested failure strings without changing structured facts',
+    (sanitize) => {
+      const raw =
+        'https://provider.invalid/private SELECT wallet_balance 987654.12345678';
+      const projected = sanitize({
+        errors: [raw, ['Job failed.', raw]],
+        failures: [
+          raw,
+          {
+            code: 'PROVIDER_TIMEOUT',
+            count: 2,
+            accountId: 'account-1',
+            details: [raw],
+            failure: raw,
+          },
+        ],
+        error: { errors: [raw] },
+      });
+      expect(projected).toEqual({
+        errors: [
+          'Background operation failed.',
+          ['Job failed.', 'Background operation failed.'],
+        ],
+        failures: [
+          'Background operation failed.',
+          {
+            code: 'PROVIDER_TIMEOUT',
+            count: 2,
+            accountId: 'account-1',
+            details: ['Background operation failed.'],
+            failure: 'Background operation failed.',
+          },
+        ],
+        error: { errors: ['Background operation failed.'] },
+      });
+      expect(JSON.stringify(projected)).not.toMatch(
+        /provider.invalid|SELECT|987654/,
+      );
+    },
+  );
+  it('bounds failure arrays and cycles and preserves ordinary arrays', () => {
+    expect(
+      sanitizeOpsJson({ messages: ['Preview only'], counts: [1, 2] }),
+    ).toEqual({ messages: ['Preview only'], counts: [1, 2] });
+    expect(sanitizeOpsFailureJson(Array(1001).fill('raw'))).toHaveLength(1000);
+    const cycle: unknown[] = [];
+    cycle.push(cycle);
+    expect(JSON.stringify(sanitizeOpsFailureJson(cycle))).toContain(
+      '[TRUNCATED_DEPTH]',
+    );
+    expect(
+      sanitizeOpsFailureJson({
+        rows: Array(1000).fill({ scope: 'x'.repeat(2000) }),
+      }),
+    ).toEqual({ truncated: true, reason: 'ops_result_size_limit' });
+  });
   it('separates normal metadata messages from explicit failure messages', () => {
     const raw =
       'SELECT private_wallet https://provider.invalid/body 987654.12345678';

@@ -79,6 +79,12 @@ describe('BatchService', () => {
                 resultPayloadJson: {
                   message:
                     'raw Provider https://provider.invalid/body 987654.12345678',
+                  errors: [
+                    'https://provider.invalid/private SELECT wallet_balance 987654.12345678',
+                  ],
+                  failures: [
+                    { details: ['SELECT wallet_balance 987654.12345678'] },
+                  ],
                   count: 3,
                 },
               },
@@ -90,7 +96,12 @@ describe('BatchService', () => {
     ).rejects.toBeInstanceOf(HttpException);
     expect(prisma.batchJobRun.update.mock.calls[1][0].data).toMatchObject({
       errorCode: 'DECLARED_BATCH_FAILURE',
-      resultPayloadJson: { message: 'Background operation failed.', count: 3 },
+      resultPayloadJson: {
+        message: 'Background operation failed.',
+        count: 3,
+        errors: ['Background operation failed.'],
+        failures: [{ details: ['Background operation failed.'] }],
+      },
     });
   });
 
