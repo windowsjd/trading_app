@@ -18,9 +18,14 @@ import { sanitizeOpsJson } from '../ops/ops-redaction';
 const raw =
   'Authorization Bearer fake-token postgres://fake:fake@db.invalid/db https://provider.invalid/body SELECT private_wallet 987654.12345678 {"nested":{"secret":"fake-nested"}}';
 
-function http(role: string | undefined, route: string, action: () => unknown) {
+function http(
+  role: string | undefined,
+  route: string,
+  action: () => unknown,
+  method = 'GET',
+) {
   const request = {
-    method: 'GET',
+    method,
     originalUrl: route,
     headers: { 'x-request-id': 'foundation-request' },
     ...(role ? { user: { userId: 'user-1', role } } : {}),
@@ -91,6 +96,55 @@ describe('Diagnostic Enforcement Foundation', () => {
     } finally {
       log.mockRestore();
     }
+  });
+  it('supplies account-scoped Conditional read/create/cancel diagnostics', () => {
+    const action = () =>
+      createApiError(
+        'PROTECTION_CONFLICT',
+        'Request could not be completed.',
+        409,
+      );
+    const read = http(
+      'admin',
+      '/api/v1/trading-accounts/account-1/protections',
+      action,
+    );
+    const create = http(
+      'admin',
+      '/api/v1/trading-accounts/account-1/protections',
+      action,
+      'POST',
+    );
+    const cancel = http(
+      'admin',
+      '/api/v1/trading-accounts/account-1/protections/group-1/cancel',
+      action,
+      'POST',
+    );
+    assertDiagnosticBaseline(
+      read.error.diagnostic,
+      'backend/src/conditional/conditional.controller.ts#list',
+    );
+    assertDiagnosticBaseline(
+      create.error.diagnostic,
+      'backend/src/conditional/conditional.controller.ts#create',
+    );
+    assertDiagnosticBaseline(
+      cancel.error.diagnostic,
+      'backend/src/conditional/conditional.controller.ts#cancel',
+    );
+    expect(read.error.diagnostic?.operation).toBe(
+      'CONDITIONAL_PROTECTION_READ',
+    );
+    expect(create.error.diagnostic?.operation).toBe(
+      'CONDITIONAL_PROTECTION_CREATE',
+    );
+    expect(cancel.error.diagnostic?.operation).toBe(
+      'CONDITIONAL_PROTECTION_CANCEL',
+    );
+    expect(cancel.error.diagnostic?.entities).toMatchObject({
+      tradingAccountId: 'account-1',
+    });
   });
   it('route contracts reject generic workflow context and accept observed Futures context', () => {
     const generic = http('admin', '/api/v1/new-feature', () =>

@@ -56,8 +56,96 @@ import { TradingAccountPortfolioController } from './trading-account-portfolio.c
 import { PortfolioValuationError } from './portfolio-valuation.policy';
 import { GlobalHttpExceptionFilter } from '../common/global-http-exception.filter';
 import { adminDiagnosticRequestMiddleware } from '../common/admin-diagnostics';
+import { assertDiagnosticTriage } from '../../scripts/lib/diagnostic-quality';
 
 describe('portfolio HTTP failure boundaries', () => {
+  it('reports inconsistent final ranking/snapshot evidence without current-price fallback', async () => {
+    const account = {
+      id: 'account-1',
+      userId: 'user-1',
+      mode: 'season',
+      status: 'closed',
+      seasonParticipant: {
+        id: 'sp-1',
+        season: { id: 'season-1', status: 'settled', endAt: new Date() },
+      },
+    };
+    const client = {
+      seasonRanking: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'rank-1',
+          seasonId: 'season-1',
+          seasonParticipantId: 'sp-1',
+          tradingAccountId: account.id,
+          totalAssetKrw: new Prisma.Decimal('100'),
+          returnRate: new Prisma.Decimal('0'),
+          capturedAt: new Date(),
+          seasonParticipant: {
+            id: 'sp-1',
+            seasonId: 'season-1',
+            userId: 'user-1',
+            tradingAccountId: account.id,
+            tradingAccount: {
+              id: account.id,
+              mode: 'season',
+              userId: 'user-1',
+            },
+          },
+        }),
+      },
+      equitySnapshot: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({
+            id: 'snapshot-1',
+            totalAssetKrw: new Prisma.Decimal('200'),
+          }),
+      },
+    };
+    const valuation = { calculateTradingAccountValuation: jest.fn() };
+    const service = new TradingAccountPortfolioService(
+      client as never,
+      { getOwnedAccountOrThrow: jest.fn().mockResolvedValue(account) } as never,
+      {} as never,
+      valuation as never,
+    );
+    const request = {
+      method: 'GET',
+      originalUrl: '/api/v1/trading-accounts/account-1/portfolio',
+      headers: {},
+      user: { userId: 'user-1', role: 'admin' },
+    };
+    const response = { setHeader: jest.fn() };
+    const result = await new Promise<any>((resolve, reject) => {
+      adminDiagnosticRequestMiddleware(
+        request as never,
+        response as never,
+        () => {
+          service.getPortfolio('user-1', account.id).then(
+            () => reject(new Error('Expected integrity failure')),
+            (error) => {
+              const http = {
+                status: jest.fn().mockReturnThis(),
+                json: resolve,
+              };
+              new GlobalHttpExceptionFilter().catch(error, {
+                switchToHttp: () => ({
+                  getResponse: () => http,
+                  getRequest: () => request,
+                }),
+              } as never);
+            },
+          );
+        },
+      );
+    });
+    assertDiagnosticTriage(
+      result.error.diagnostic,
+      'TRADING_ACCOUNT_INTEGRITY',
+      'backend/src/portfolio/trading-account-portfolio.service.ts#getSettledPortfolio',
+    );
+    expect(valuation.calculateTradingAccountValuation).not.toHaveBeenCalled();
+  });
   function portfolioHarness(mode: 'general' | 'season') {
     const account = {
       id: 'account-1',
@@ -272,7 +360,8 @@ function setup(mode: 'general' | 'season') {
     id: `${mode}-1`,
     mode,
     openedAt: new Date('2026-01-01T16:00:00Z'),
-    seasonParticipant: mode === 'season' ? { id: 'sp-1' } : null,
+    seasonParticipant:
+      mode === 'season' ? { id: 'sp-1', season: { status: 'active' } } : null,
   };
   const rows = fixture[mode].data.points.map((point, index) => ({
     id: `daily-${index}`,

@@ -260,6 +260,7 @@ function inlineTradingHarness() {
                     ],
                   },
           };
+        if (resource === 'protections') return { ...base, data: h.protections ?? { tradingAccountId: id, capabilities: { enabled: false, canCreateSpot: false, canCreateFutures: false, canUseSpotLimit: false, canCancel: true }, groups: [], pagination: { total: 0, limit: 30, offset: 0, hasNext: false } } };
         if (resource === 'detail')
           return { ...base, data: { feePolicy: { tradeFeeRate: h.feeRate ?? '0.001' } } };
         if (resource === 'wallets')

@@ -1,3 +1,4 @@
+import { emptyProtectionState } from '../../test/support/empty-protection-state';
 jest.mock('../generated/prisma/client', () => {
   const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
 
@@ -1142,6 +1143,7 @@ function createService(portfolioValuationService?: {
 function createPrismaMock() {
   settlementParticipantResults = new Map();
   const tx = {
+    ...emptyProtectionState(),
     // The season row lock taken first inside the settlement transaction
     // (작업 8 §13.3 / §14.1).
     $queryRaw: jest.fn().mockResolvedValue([
@@ -1231,6 +1233,7 @@ function createPrismaMock() {
   };
 
   return {
+    ...emptyProtectionState(),
     __tx: tx,
     $transaction: jest.fn(async (callback) => callback(tx)),
     season: {

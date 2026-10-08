@@ -1,5 +1,11 @@
 # 주문 입력 정책 (A)
 
+Current additive exception: [Conditional v1](conditional-orders-contract.md)
+Position-bound SELL children may reserve the exact fractional stock remainder.
+The capability is internal, validated against a live group, and never parsed from
+HTTP. Ordinary stock Limit inputs remain integer-only. This preserves protection
+after a fractional Market reduction without changing the normal order form.
+
 적용 범위는 General/Season 공통 주문 코어다. API base는 `/api/v1`이다.
 
 - 주식 소수 수량은 시장가에서만 허용한다. 지정가는 Decimal 정수 판정으로 검증하여 `1.000000`은 허용한다.

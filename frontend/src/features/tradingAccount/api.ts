@@ -133,6 +133,21 @@ export interface TradingAccountPortfolioDto {
   status: TradingAccountStatus;
   state: 'available' | 'unavailable';
   summary: TradingAccountPortfolioSummaryDto | null;
+  /** Settled Season uses immutable final evidence; live summary is null. */
+  finalResult?: {
+    state: 'available';
+    resultSource: 'season_rankings';
+    totalAssetKrw: MoneyString;
+    returnRate: PercentString;
+    returnRateMethod: 'initial_capital';
+    rank: number;
+    tier: string | null;
+    maxDrawdown: PercentString;
+    totalFillCount: number;
+    reachedReturnAt: string | null;
+    endAt: string;
+    capturedAt: string;
+  } | { state: 'unavailable'; reason: string };
   allocation: TradingAccountAllocationDto;
   sectionErrors: TradingAccountSectionErrorDto[];
   reason?: string;

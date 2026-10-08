@@ -18,6 +18,8 @@ First compare current implementation, tests and migrations with explicit current
    - `docs/futures-api-contract.md` — F1/F2/F3 synthetic USD perpetuals; default OFF
    - `docs/futures-risk-contract.md` — F2 Mark, Cross collateral, maintenance and full liquidation policy
    - `docs/futures-f3-contract.md` — Mark valuation, final Season Spot exit, UI and release procedure
+   - `docs/conditional-orders-contract.md` — SL/TP Market/Limit exits, OCO and attached Spot Limit entry; default OFF
+   - `docs/futures-f31-contract.md` — user fill counts, immutable final reads, endAt cutoff and Mark retention
    - `docs/records-api-contract.md`
    - `docs/rewards-api-contract.md`
    - `docs/trading-accounts-api-contract.md`

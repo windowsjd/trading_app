@@ -1,4 +1,6 @@
 import { semantic } from '../../theme/tokens';
+import { getProtections } from '../../features/conditional/api';
+import { ProtectionEditor, draftLegs, emptyProtection, protectionInputError } from '../../features/conditional/ProtectionEditor';
 import Decimal from 'decimal.js';
 import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';
 import {
@@ -100,6 +102,7 @@ type Props = {
   onInputFocus?: (input: View | null) => void;
   onInputBlur?: () => void;
   submitRef?: React.RefObject<View | null>;
+  onAttachedProtectionVisibilityChange?: (visible: boolean) => void;
 };
 
 /** One flow per asset/account/side. Unmounting invalidates pending callbacks. */
@@ -217,6 +220,7 @@ export function OrderForm({
   onInputFocus,
   onInputBlur,
   submitRef,
+  onAttachedProtectionVisibilityChange,
 }: Props & { side: 'buy' | 'sell' }) {
   // accountId is immutable for this mounted form, supplied by the route or
   // the keyed inline panel. Selection changes never retarget a pending request.
@@ -250,6 +254,8 @@ export function OrderForm({
   const { fontScale } = useWindowDimensions();
   const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
   const [limitPrice, setLimitPrice] = useState('');
+  const [protectionDraft, setProtectionDraft] = useState(emptyProtection);
+  const protectionQuery = useQuery({ queryKey: QUERY_KEYS.tradingAccount.protections.list(accountId, 'spot', assetId), queryFn: ({ signal }) => getProtections(accountId, 'spot', assetId, false, signal), enabled: accountKnown && side === 'buy' && orderType === 'limit', retry: false });
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [domainError, setDomainError] = useState<string | null>(null);
   const [diagnosticError, setDiagnosticError] = useState<unknown>(null);
@@ -265,6 +271,7 @@ export function OrderForm({
     revision: number;
     seasonUi: boolean;
     payload: Parameters<typeof quoteTradingAccountOrder>[1];
+    attachedProtection?: import('../../features/conditional/api').ProtectionLeg[];
   };
   const orderActionRef = useRef<QuotedAction<
     OrderRequest,
@@ -330,6 +337,7 @@ export function OrderForm({
               : { quantity: quote.quantity }),
             quoteId: quote.quoteId,
             idempotencyKey: key,
+            ...(request.attachedProtection ? { attachedProtection: request.attachedProtection } : {}),
             ...(request.payload.orderType === 'limit'
               ? { orderType: 'limit' as const, limitPrice: quote.limitPrice }
               : {}),
@@ -346,6 +354,7 @@ export function OrderForm({
         if (isOrderSuccess(data.result)) {
           setSuccessState(captureOrderSuccess(data.result, data.quote));
           setOrderInput('');
+          setProtectionDraft(emptyProtection());
           setQuotedPreview(null);
           setFieldError(null);
           setDomainError(null);
@@ -537,6 +546,12 @@ export function OrderForm({
     positionQuery.data,
     assetId,
   );
+  const attachedEditorVisible = side === 'buy' && orderType === 'limit' && !protectionQuery.isError && protectionQuery.data?.tradingAccountId === accountId && !!protectionQuery.data.capabilities.canCreateSpot && !!protectionQuery.data.capabilities.canUseSpotLimit;
+  useEffect(() => {
+    onAttachedProtectionVisibilityChange?.(attachedEditorVisible);
+    return () => onAttachedProtectionVisibilityChange?.(false);
+  }, [attachedEditorVisible, onAttachedProtectionVisibilityChange]);
+
 
   /**
    * Every gate below is about the ROUTE account. General and season accounts
@@ -769,12 +784,15 @@ export function OrderForm({
     setDiagnosticError(null);
     // An uncertain create response retains this exact quote/key for a user
     // retry. It never silently obtains a second executable order.
+    const attached = side === 'buy' && orderType === 'limit' && !protectionQuery.isError && protectionQuery.data?.tradingAccountId === accountId && protectionQuery.data.capabilities.canCreateSpot ? draftLegs(protectionDraft) : [];
+    if (!orderActionRef.current && attached.length && protectionInputError(protectionDraft)) { setFieldError(protectionInputError(protectionDraft)); return; }
     orderActionRef.current ??= {
       request: {
         accountId,
         epoch: scopeRef.current.epoch,
         revision: quoteRevisionRef.current,
         seasonUi: capabilities?.isSeason ?? false,
+        ...(attached.length ? { attachedProtection: attached } : {}),
         payload: {
           assetId,
           side,
@@ -904,6 +922,13 @@ export function OrderForm({
           onBlur={onInputBlur}
         />
       </View>
+      {attachedEditorVisible ? (
+        <View style={styles.group} testID="attached-entry-editor">
+          <Text style={styles.label}>체결 후 익절/손절 (선택)</Text>
+          <Text style={styles.helper}>새 보유 종목을 여는 진입 주문에 설정합니다. 진입 체결 전에는 조건을 감시하지 않습니다.</Text>
+          <ProtectionEditor value={protectionDraft} onChange={(draft) => resetInput(() => setProtectionDraft(draft))} disabled={pending} canLimit onInputFocus={onInputFocus} onInputBlur={onInputBlur} />
+        </View>
+      ) : null}
       {isAmountBuy ? (
         <Text style={styles.helper} testID="order-estimated-quantity">
           {estimatedQuantity

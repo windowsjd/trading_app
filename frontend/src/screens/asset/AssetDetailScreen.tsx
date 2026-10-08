@@ -9,6 +9,7 @@ import { TEST_IDS } from '../../constants/testIds';
 import CTAButton from '../../components/common/CTAButton';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import { AssetMarketChart } from './AssetChartScreen';
+import SpotProtectionPanel from '../../features/conditional/SpotProtectionPanel';
 
 export default function AssetDetailScreen(props: AssetDetailScreenProps) {
   // Recreate the chart subscription and timeframe state when the pair changes.
@@ -37,9 +38,9 @@ export function AssetDetailContent({
           onChangePair={() =>
             navigation.navigate('MarketSearch', { returnToAsset: true })
           }
-          footerContent={!isLoading && !accountId ? (
+          footerContent={(inputScroll) => !isLoading && !accountId ? (
             <InlineEmptyState title="계정이 없습니다." message="계정을 개설하면 주문할 수 있습니다." />
-          ) : null}
+          ) : accountId ? <SpotProtectionPanel key={`${accountId}:${assetId}`} accountId={accountId} assetId={assetId} onInputFocus={inputScroll.onInputFocus} onInputBlur={inputScroll.onInputBlur} /> : null}
         />
       </View>
       <View style={styles.footer} testID="asset-order-actions">

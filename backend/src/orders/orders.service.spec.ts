@@ -1,3 +1,4 @@
+import { emptyProtectionState } from '../../test/support/empty-protection-state';
 import {
   captureFinancialFailure,
   expectSafeFinancialDiagnostic,
@@ -181,6 +182,7 @@ describe('OrdersService', () => {
   };
 
   const createPrisma = () => ({
+    ...emptyProtectionState(),
     season: {
       findFirst: jest.fn(),
       findUnique: jest.fn(),

@@ -145,6 +145,26 @@ export type FuturesExecution = Prisma.FuturesExecutionModel
  */
 export type FuturesExecuteRequest = Prisma.FuturesExecuteRequestModel
 /**
+ * Model ProtectionGroup
+ * 
+ */
+export type ProtectionGroup = Prisma.ProtectionGroupModel
+/**
+ * Model ProtectionLeg
+ * 
+ */
+export type ProtectionLeg = Prisma.ProtectionLegModel
+/**
+ * Model ProtectionChild
+ * 
+ */
+export type ProtectionChild = Prisma.ProtectionChildModel
+/**
+ * Model ProtectionCommand
+ * 
+ */
+export type ProtectionCommand = Prisma.ProtectionCommandModel
+/**
  * Model Position
  * 
  */

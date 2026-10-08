@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import ProtectionPanel from "../../features/conditional/ProtectionPanel";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -160,6 +161,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       if (!isCurrentSession(request.session)) return;
       for (const queryKey of [
         QUERY_KEYS.tradingAccount.futures.all(accountId),
+        QUERY_KEYS.tradingAccount.protections.all(accountId),
         QUERY_KEYS.tradingAccount.futuresCollateral(accountId),
         QUERY_KEYS.tradingAccount.walletsAll(accountId),
         QUERY_KEYS.tradingAccount.portfolioAll(accountId),
@@ -436,13 +438,23 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
           <Text style={styles.muted}>보유 중인 선물 포지션이 없습니다.</Text>
         ) : (
           data.positions.map((p) => (
-            <PositionCard
-              key={p.id}
-              position={p}
-              clock={clock}
-              timely={timely}
-              onSelect={() => choose(p.instrumentId)}
-            />
+            <View key={p.id} style={{ gap: 12 }}>
+              <PositionCard
+                position={p}
+                clock={clock}
+                timely={timely}
+                onSelect={() => choose(p.instrumentId)}
+              />
+              <ProtectionPanel
+                accountId={accountId}
+                assetId={p.instrument.underlying.assetId}
+                domain="futures"
+                currency="USD"
+                positionId={p.id}
+                onInputFocus={inputScroll.onInputFocus}
+                onInputBlur={inputScroll.onInputBlur}
+              />
+            </View>
           ))
         )}
         <View style={styles.card}>
@@ -633,6 +645,14 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
             </>
           )}
         </View>
+        {instrument && !position ? (
+          <ProtectionPanel
+            accountId={accountId}
+            assetId={instrument.underlying.assetId}
+            domain="futures"
+            currency="USD"
+          />
+        ) : null}
         <View style={styles.card}>
           <Text style={styles.heading}>선물 기록</Text>
           <View style={styles.choices}>

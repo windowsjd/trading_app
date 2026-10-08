@@ -315,6 +315,14 @@ async function marketQuote(
   side: 'buy' | 'sell',
   quantity = '1',
 ) {
+  // This suite varies fee pins, not evidence freshness. Each new quote gets a
+  // fresh observation at the existing price, including after slow replay/state
+  // assertions. Dedicated transaction-time suites cover stale-price rejection.
+  const observedAt = new Date((await dbNow()).getTime() - 1000);
+  await prisma.assetPriceSnapshot.update({
+    where: { id: s.price.id },
+    data: { effectiveAt: observedAt, capturedAt: observedAt },
+  });
   const request = { assetId: s.asset.id, side, orderType: 'market', quantity };
   const quote =
     route === 'legacy'

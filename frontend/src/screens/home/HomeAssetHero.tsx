@@ -3,13 +3,14 @@ import { View, Text, StyleSheet } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import { financial } from '../../theme/financialColors';
 import { TEST_IDS } from '../../constants/testIds';
-import type { TradingAccountPortfolioSummaryDto } from '../../features/tradingAccount/api';
+import type { TradingAccountPortfolioSummaryDto, TradingAccountPortfolioDto } from '../../features/tradingAccount/api';
 import { getReturnRateMethodLabel } from '../../features/tradingAccount/accountDisplay';
 import { formatKrw, formatPercent } from '../../utils/format';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 
 type Props = {
   summary: TradingAccountPortfolioSummaryDto | null;
+  finalResult?: TradingAccountPortfolioDto['finalResult'];
   settled?: boolean;
   compactBottom?: boolean;
   compactTop?: boolean;
@@ -23,34 +24,35 @@ function performanceStyle(value: string | null | undefined) {
   return amount > 0 ? styles.up : styles.down;
 }
 
-export default function HomeAssetHero({ summary, settled = false, compactBottom = false, compactTop = false, unavailableMessage }: Props) {
+export default function HomeAssetHero({ summary, finalResult, settled = false, compactBottom = false, compactTop = false, unavailableMessage }: Props) {
+  const result = settled ? (finalResult?.state === 'available' ? finalResult : null) : summary;
   return (
     <View testID={TEST_IDS.home.summaryCard} style={[styles.hero, compactBottom && styles.compactBottom, compactTop && styles.compactTop]}>
       <Text style={styles.label}>{settled ? '최종 자산' : '총 자산'}</Text>
-      {summary ? (
+      {result ? (
         <>
           <Text testID={TEST_IDS.home.totalAsset} style={styles.total}>
-            {formatKrw(summary.totalAssetKrw)}원
+            {formatKrw(result.totalAssetKrw)}원
           </Text>
           <View style={styles.performance}>
             <Text style={styles.metric}>
               {/* Home's season context makes the initial-capital explanation redundant. */}
-              {summary.returnRateMethod === 'initial_capital'
+              {result.returnRateMethod === 'initial_capital'
                 ? '시즌 수익률'
-                : getReturnRateMethodLabel(summary.returnRateMethod)}{' '}
-              <Text style={performanceStyle(summary.returnRate)}>
-                {summary.returnRate === null || summary.returnRate === undefined
+                : getReturnRateMethodLabel(result.returnRateMethod)}{' '}
+              <Text style={performanceStyle(result.returnRate)}>
+                {result.returnRate === null || result.returnRate === undefined
                   ? '알 수 없음'
-                  : `${formatPercent(summary.returnRate)}%`}
+                  : `${formatPercent(result.returnRate)}%`}
               </Text>
             </Text>
-            <Text style={styles.metric}>
+            {!settled && summary ? <Text style={styles.metric}>
               평가 손익{' '}
               <Text style={performanceStyle(summary.unrealizedPnlKrw)}>
                 {formatKrw(summary.unrealizedPnlKrw)}원
               </Text>
-            </Text>
-            {summary.futuresUnrealizedPnlKrw !== undefined ? <Text style={styles.metric}>
+            </Text> : null}
+            {!settled && summary?.futuresUnrealizedPnlKrw !== undefined ? <Text style={styles.metric}>
               선물 Mark 미실현손익{' '}<Text style={performanceStyle(summary.futuresUnrealizedPnlKrw)}>{formatKrw(summary.futuresUnrealizedPnlKrw)}원</Text>
             </Text> : null}
           </View>

@@ -181,6 +181,8 @@ export function getOpsSchedulerConfig(
     tickIntervalMs: resolveTickIntervalMs(env),
     jobs: {
       [OpsJobName.futures_liquidation]: false, // Dedicated FuturesRiskWorker dispatches.
+      [OpsJobName.futures_mark_retention]: false, // Dedicated bounded retention worker.
+      [OpsJobName.conditional_orders]: false, // Dedicated bounded conditional worker.
       [OpsJobName.provider_fx_ingest]: providerFxEnabled,
       [OpsJobName.provider_binance_ingest]: providerBinanceEnabled,
       [OpsJobName.provider_kis_ingest]: providerKisEnabled,

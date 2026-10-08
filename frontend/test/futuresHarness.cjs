@@ -32,6 +32,7 @@ function futuresHarness(options = {}) {
   Object.assign(native, { Platform: { OS: 'web' }, StyleSheet: { create: value => value }, Keyboard: { addListener: () => ({ remove() {} }), dismiss() {} } });
   const screen = load(resolve(__dirname, '../src/screens/futures/FuturesScreen.tsx'), {
     'react-native': native,
+    '../../components/states/AdminDiagnosticPanel': { default: () => null, __esModule: true },
     './AdminDiagnosticPanel': { default: () => null, __esModule: true },
     '@react-navigation/native': { useIsFocused: () => true }, '@react-navigation/elements': { useHeaderHeight: () => 64 },
     '../../features/futures/api': api,

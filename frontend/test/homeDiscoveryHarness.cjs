@@ -21,6 +21,8 @@ const asset = (i, type) => ({
 function setup(mode = 'season', count = 7, screen = 'home', options = {}) {
   const h = interactionHarness();
   h.native.SafeAreaView = 'SafeAreaView';
+  h.native.FlatList = ({ data = [], ListHeaderComponent, ListEmptyComponent, renderItem, ...props }) => React.createElement('FlatList', props,
+    ListHeaderComponent, data.length ? data.map((item, index) => React.createElement(React.Fragment, { key: item.positionId ?? index }, renderItem({ item, index }))) : ListEmptyComponent);
   h.account = account(mode); h.requests = []; h.navigation = []; h.positions = {};
   h.positions[mode] = Array.from({ length: count }, (_, i) => position(i, mode));
   h.markets = Object.fromEntries(['domestic_stock', 'us_stock', 'crypto'].map(type => [type, Array.from({ length: 5 }, (_, i) => asset(i, type))]));
@@ -34,10 +36,10 @@ function setup(mode = 'season', count = 7, screen = 'home', options = {}) {
   const read = async (section, params = {}) => { const request = { section, ...params }; h.requests.push(request); await h.beforeRead(request); };
   const mocks = {
     '@react-navigation/native': { NavigationContext },
-    '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({ selectedAccount: h.account, capabilities: { canTrade: true, canExchange: true } }) },
+    '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({ selectedAccount: h.account, selectedAccountId: h.account.id, capabilities: { canTrade: true, canExchange: true } }) },
     '../../app/navigation/navigationHooks': { useRootNavigation: () => ({ navigate: (...args) => h.navigation.push(args) }) },
     '../../features/tradingAccount/api': {
-      getTradingAccountPortfolio: async id => { await read('portfolio', { account: id }); return { state: 'available', sectionErrors: [], summary: { totalAssetKrw: id } }; },
+      getTradingAccountPortfolio: async id => { await read('portfolio', { account: id }); return options.portfolios?.[id] ?? { state: 'available', sectionErrors: [], summary: { totalAssetKrw: id } }; },
       getTradingAccountPositions: async (id, params) => {
         await read('positions', { account: id, ...params });
         const all = h.positions[id] ?? [], rows = all.slice(params.offset, params.offset + params.limit);
@@ -57,12 +59,13 @@ function setup(mode = 'season', count = 7, screen = 'home', options = {}) {
     '../home/HomeAssetHero': { __esModule: true, default: 'Hero' },
     '../home/HomeAssetTrend': { __esModule: true, default: 'Trend' },
     '../../components/common/CTAButton': { __esModule: true, default: 'CTA' },
+    '../../components/charts': { DonutChart: 'DonutChart', LineChart: 'LineChart' },
     '../../components/tradingAccount/AccountSwitcher': { __esModule: true, default: ({ children }) => React.createElement('AccountSwitcher', {}, children) },
     '../../components/tradingAccount/AccountSetupPanel': { __esModule: true, default: 'AccountSetupPanel' },
     '../../components/states/FullPageLoading': { __esModule: true, default: 'FullPageLoading' },
     ...Object.fromEntries(['ErrorState', 'InlineEmptyState', 'SectionSkeleton', 'AdminDiagnosticPanel'].map(name => ['../../components/states/' + name, { __esModule: true, default: name }])),
   };
-  const Screen = h.load(screen === 'wallet' ? 'src/screens/wallet/WalletScreen.tsx' : 'src/screens/home/HomeScreen.tsx', mocks).default;
+  const Screen = h.load(screen === 'wallet' ? 'src/screens/wallet/WalletScreen.tsx' : screen === 'portfolio' ? 'src/screens/home/PortfolioScreen.tsx' : 'src/screens/home/HomeScreen.tsx', mocks).default;
   h.client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity, gcTime: Infinity, ...options.queryDefaults } } });
   const tree = () => React.createElement(QueryClientProvider, { client: h.client }, React.createElement(Screen, { navigation: { navigate() {} } }));
   h.renderer = h.render(tree());

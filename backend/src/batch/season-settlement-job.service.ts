@@ -521,33 +521,44 @@ export class SeasonSettlementJobService {
     seasonId: string,
     client: PrismaService | Prisma.TransactionClient = this.prisma,
   ) {
-    const [openLimitOrderCount, reservedWalletCount, reservedPositionCount] =
-      await Promise.all([
-        client.order.count({
-          where: {
-            status: OrderStatus.submitted,
-            orderType: OrderType.limit,
-            tradingAccount: { seasonParticipant: { seasonId } },
-          },
-        }),
-        client.cashWallet.count({
-          where: {
-            tradingAccount: { seasonParticipant: { seasonId } },
-            reservedAmount: { gt: 0 },
-          },
-        }),
-        client.position.count({
-          where: {
-            tradingAccount: { seasonParticipant: { seasonId } },
-            reservedQuantity: { gt: 0 },
-          },
-        }),
-      ]);
+    const [
+      openLimitOrderCount,
+      reservedWalletCount,
+      reservedPositionCount,
+      activeProtectionCount,
+    ] = await Promise.all([
+      client.order.count({
+        where: {
+          status: OrderStatus.submitted,
+          orderType: OrderType.limit,
+          tradingAccount: { seasonParticipant: { seasonId } },
+        },
+      }),
+      client.cashWallet.count({
+        where: {
+          tradingAccount: { seasonParticipant: { seasonId } },
+          reservedAmount: { gt: 0 },
+        },
+      }),
+      client.position.count({
+        where: {
+          tradingAccount: { seasonParticipant: { seasonId } },
+          reservedQuantity: { gt: 0 },
+        },
+      }),
+      client.protectionGroup.count({
+        where: {
+          status: { in: ['holding', 'active'] },
+          tradingAccount: { seasonParticipant: { seasonId } },
+        },
+      }),
+    ]);
 
     if (
       openLimitOrderCount > 0 ||
       reservedWalletCount > 0 ||
-      reservedPositionCount > 0
+      reservedPositionCount > 0 ||
+      activeProtectionCount > 0
     ) {
       this.logger.error(
         JSON.stringify({
@@ -556,6 +567,7 @@ export class SeasonSettlementJobService {
           openLimitOrderCount,
           reservedWalletCount,
           reservedPositionCount,
+          activeProtectionCount,
           recovery:
             'run season lifecycle transition cleanup to cancel open limit orders and release reservations, then retry settlement',
         }),
@@ -630,6 +642,7 @@ export class SeasonSettlementJobService {
       const history = await this.findEquityHistory(
         participant.id,
         input.participantScopes,
+        input.settlementAt,
       );
       const currentPoint = {
         totalAssetKrw: new Prisma.Decimal(valuation.totalAssetKrw),
@@ -685,6 +698,7 @@ export class SeasonSettlementJobService {
     const snapshots = await this.prisma.dailyPortfolioSnapshot.findMany({
       where: {
         snapshotDate: input.settlementDate,
+        capturedAt: { lte: input.settlementAt },
         tradingAccountId: {
           in: [...input.participantScopes.values()],
         },
@@ -780,10 +794,12 @@ export class SeasonSettlementJobService {
   private async findEquityHistory(
     seasonParticipantId: string,
     participantScopes: ReadonlyMap<string, string>,
+    endAt: Date,
   ): Promise<EquityHistoryPoint[]> {
     const rows = await this.prisma.equitySnapshot.findMany({
       where: {
         tradingAccountId: participantScopes.get(seasonParticipantId)!,
+        capturedAt: { lte: endAt },
       },
       orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
       select: {
@@ -1945,10 +1961,8 @@ function appendCurrentPoint(
   history: readonly EquityHistoryPoint[],
   currentPoint: EquityHistoryPoint,
 ): EquityHistoryPoint[] {
-  const withoutExistingFinalAtSameTime = history.filter(
-    (snapshot) =>
-      snapshot.capturedAt.getTime() !== currentPoint.capturedAt.getTime(),
-  );
-
-  return [...withoutExistingFinalAtSameTime, currentPoint];
+  // An ordinary observation exactly at endAt is part of the competition.
+  // Keep it, then append the actual final cash/equity after forced exits/fees.
+  // Retry with committed final rankings bypasses recomputation entirely.
+  return [...history, currentPoint];
 }

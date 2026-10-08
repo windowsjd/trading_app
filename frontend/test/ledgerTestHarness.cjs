@@ -13,6 +13,9 @@ function load(file, mocks) {
   }).outputText;
   const localRequire = (name) => {
     if (Object.hasOwn(mocks, name)) return mocks[name];
+    if (name.endsWith('/conditional/api') || (file.includes('/features/conditional/') && name === './api')) {
+      return mocks['../../features/conditional/api'] ?? { getProtections: async id => ({ tradingAccountId: id, capabilities: { enabled: false, canCreateSpot: false, canCreateFutures: false, canUseSpotLimit: false, canCancel: true }, groups: [], pagination: { limit: 30, offset: 0, total: 0, returned: 0, nextOffset: null } }) };
+    }
     if (name.endsWith('.png')) return { uri: resolve(dirname(file), name) };
     if (name.endsWith('.json')) return require(resolve(dirname(file), name));
     if (name.endsWith('/ProfileAvatar')) return { default: 'ProfileAvatar', __esModule: true };

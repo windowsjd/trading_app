@@ -25,6 +25,11 @@ import {
 } from './general-performance.policy';
 import { PortfolioValuationError } from './portfolio-valuation.policy';
 import { PortfolioValuationService } from './portfolio-valuation.service';
+import { createApiError } from '../common/api-error';
+import {
+  assertSeasonRankingScope,
+  SEASON_RANKING_SCOPE_SELECT,
+} from '../ranking/season-ranking-scope';
 import {
   buildAdminPartialFailureDiagnostic,
   getAdminDiagnosticRequestId,
@@ -141,14 +146,20 @@ export class TradingAccountPortfolioService {
     const daily = query.granularity === 'daily';
 
     if (account.mode !== TradingAccountMode.general) {
+      const endAt =
+        account.seasonParticipant?.season.status === 'settled'
+          ? account.seasonParticipant.season.endAt
+          : undefined;
+      const historyAt = endAt ?? new Date();
       return this.buildEquityResponse(
         account,
         range,
         daily
-          ? await this.findDailyPoints(this.prisma, account, range, new Date())
+          ? await this.findDailyPoints(this.prisma, account, range, historyAt)
           : await this.findEquityPointsForSeason(
               account.id,
-              this.resolveSince(range, account.openedAt, Date.now()),
+              this.resolveSince(range, account.openedAt, +historyAt),
+              endAt,
             ),
         daily,
       );
@@ -372,6 +383,10 @@ export class TradingAccountPortfolioService {
       );
     }
 
+    if (account.seasonParticipant.season.status === 'settled') {
+      return this.getSettledPortfolio(account);
+    }
+
     try {
       const valuation =
         await this.valuationService.calculateTradingAccountValuation(
@@ -451,6 +466,185 @@ export class TradingAccountPortfolioService {
 
   // ------------------------------------------------------------- helpers
 
+  /** Final totals are immutable ranking evidence, never a current-price read.
+   * Old settlement rows did not preserve realized/unrealized breakdowns: keep
+   * the live summary absent rather than manufacture those historical values. */
+  private async getSettledPortfolio(account: OwnedTradingAccount) {
+    const participant = account.seasonParticipant!;
+    const ranking = await this.prisma.seasonRanking.findFirst({
+      where: {
+        seasonId: participant.season.id,
+        seasonParticipantId: participant.id,
+        tradingAccountId: account.id,
+        rankType: 'final',
+      },
+      orderBy: [
+        { rankingDate: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        ...SEASON_RANKING_SCOPE_SELECT,
+        id: true,
+        rank: true,
+        totalAssetKrw: true,
+        returnRate: true,
+        maxDrawdown: true,
+        totalFillCount: true,
+        reachedReturnAt: true,
+        capturedAt: true,
+        seasonParticipant: {
+          select: {
+            ...SEASON_RANKING_SCOPE_SELECT.seasonParticipant.select,
+            finalTier: true,
+          },
+        },
+      },
+    });
+    if (ranking) assertSeasonRankingScope(ranking);
+    const snapshot = ranking
+      ? await this.prisma.equitySnapshot.findFirst({
+          where: {
+            tradingAccountId: account.id,
+            snapshotReason: 'settlement',
+            capturedAt: ranking.capturedAt,
+          },
+          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        })
+      : null;
+    if (
+      snapshot &&
+      ranking &&
+      (!snapshot.totalAssetKrw.eq(ranking.totalAssetKrw) ||
+        !snapshot.returnRate.eq(ranking.returnRate) ||
+        snapshot.cumulativeExternalFundingKrw !== null ||
+        snapshot.timeWeightedReturnFactor !== null)
+    ) {
+      setAdminDiagnosticContext({
+        domain: 'PORTFOLIO',
+        operation: 'SETTLED_PORTFOLIO_READ',
+        failureStage: 'final_evidence_consistency',
+        entities: {
+          tradingAccountId: account.id,
+          seasonId: participant.season.id,
+        },
+        evidence: {
+          result: 'ranking_snapshot_mismatch',
+          rankingId: ranking.id,
+          snapshotId: snapshot.id,
+        },
+        nextInvestigation: [
+          'backend/src/batch/season-settlement-job.service.ts',
+        ],
+      });
+      throw createApiError(
+        'TRADING_ACCOUNT_INTEGRITY',
+        'Stored final portfolio evidence could not be verified.',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+    const allocationAvailable =
+      snapshot &&
+      [
+        snapshot.krwCash,
+        snapshot.usdCashKrw,
+        snapshot.domesticStockValueKrw,
+        snapshot.usStockValueKrw,
+        snapshot.cryptoValueKrw,
+      ].every((v) => v !== null);
+    const reason = ranking
+      ? 'FINAL_ALLOCATION_UNAVAILABLE'
+      : 'FINAL_RANKING_UNAVAILABLE';
+    const diagnosticContext = {
+      domain: 'PORTFOLIO',
+      operation: 'SETTLED_PORTFOLIO_READ',
+      failureStage: 'final_evidence_read',
+      entities: {
+        tradingAccountId: account.id,
+        seasonId: participant.season.id,
+        seasonParticipantId: participant.id,
+      },
+      evidence: {
+        result: 'final_evidence_missing',
+        finalRankingAvailable: !!ranking,
+        settlementSnapshotAvailable: !!snapshot,
+      },
+      nextInvestigation: ['backend/src/batch/season-settlement-job.service.ts'],
+    };
+    const sectionErrors = !ranking
+      ? [
+          {
+            section: 'finalResult',
+            code: 'FINAL_RANKING_UNAVAILABLE',
+            message: 'The stored final ranking is unavailable.',
+            diagnostic: buildAdminPartialFailureDiagnostic(
+              null,
+              'FINAL_RANKING_UNAVAILABLE',
+              diagnosticContext,
+            ),
+          },
+        ]
+      : !allocationAvailable
+        ? [
+            {
+              section: 'allocation',
+              code: 'FINAL_ALLOCATION_UNAVAILABLE',
+              message: 'The stored final allocation is unavailable.',
+              diagnostic: buildAdminPartialFailureDiagnostic(
+                null,
+                'FINAL_ALLOCATION_UNAVAILABLE',
+                diagnosticContext,
+              ),
+            },
+          ]
+        : [];
+    return {
+      success: true as const,
+      data: {
+        tradingAccountId: account.id,
+        mode: account.mode,
+        status: account.status,
+        state: ranking ? ('available' as const) : ('unavailable' as const),
+        summary: null,
+        finalResult: ranking
+          ? {
+              state: 'available' as const,
+              resultSource: 'season_rankings' as const,
+              totalAssetKrw: ranking.totalAssetKrw.toFixed(8),
+              returnRate: ranking.returnRate.toFixed(8),
+              returnRateMethod: 'initial_capital' as const,
+              maxDrawdown: ranking.maxDrawdown.toFixed(8),
+              totalFillCount: ranking.totalFillCount,
+              reachedReturnAt: ranking.reachedReturnAt?.toISOString() ?? null,
+              rank: ranking.rank,
+              tier: ranking.seasonParticipant.finalTier,
+              endAt: participant.season.endAt.toISOString(),
+              capturedAt: ranking.capturedAt.toISOString(),
+            }
+          : { state: 'unavailable' as const, reason },
+        allocation: allocationAvailable
+          ? {
+              state: 'available' as const,
+              cashKrwValue: snapshot.krwCash
+                .add(snapshot.usdCashKrw)
+                .toFixed(8),
+              domesticStockValueKrw: snapshot.domesticStockValueKrw.toFixed(8),
+              usStockValueKrw: snapshot.usStockValueKrw.toFixed(8),
+              cryptoValueKrw: snapshot.cryptoValueKrw.toFixed(8),
+            }
+          : {
+              state: 'unavailable' as const,
+              cashKrwValue: ZERO_MONEY,
+              domesticStockValueKrw: ZERO_MONEY,
+              usStockValueKrw: ZERO_MONEY,
+              cryptoValueKrw: ZERO_MONEY,
+              reason,
+            },
+        sectionErrors,
+      },
+    };
+  }
+
   /** Explicit daily read: job date is authoritative, even for late captures.
    * Never substitute intraday/funding-boundary rows for missing daily history. */
   private async findDailyPoints(
@@ -476,6 +670,11 @@ export class TradingAccountPortfolioService {
       where: {
         tradingAccountId: account.id,
         snapshotDate: { gte: start, lte: end },
+        ...(account.seasonParticipant?.season.status === 'settled'
+          ? {
+              capturedAt: { lte: account.seasonParticipant.season.endAt },
+            }
+          : {}),
       },
       orderBy: { snapshotDate: 'asc' },
       select: {
@@ -669,9 +868,21 @@ export class TradingAccountPortfolioService {
   private async findEquityPointsForSeason(
     tradingAccountId: string,
     since: Date,
+    endAt?: Date,
   ): Promise<EquityHistoryPoint[]> {
     const rows = await this.prisma.equitySnapshot.findMany({
-      where: { tradingAccountId, capturedAt: { gte: since } },
+      where: {
+        tradingAccountId,
+        capturedAt: { gte: since },
+        ...(endAt
+          ? {
+              OR: [
+                { capturedAt: { lte: endAt } },
+                { snapshotReason: SnapshotReason.settlement },
+              ],
+            }
+          : {}),
+      },
       orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
       select: {
         id: true,

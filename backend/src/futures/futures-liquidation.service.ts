@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { lockSeasonTradingContext } from '../seasons/season-trading-lock';
 import { assertAccountFinancialScopeIntegrity } from '../trading-accounts/trading-account-financial-integrity';
 import { canonicalCashWalletSetIssue } from '../wallets/canonical-cash-wallets';
+import { finishFuturesProtection } from '../conditional/conditional-state';
 import {
   assertGeneralAccountFinancialIntegrity,
   assertGeneralAccountTradingRowsIntegrity,
@@ -307,6 +308,7 @@ export class FuturesLiquidationService {
               feeAmount: row.plan.feeAmount,
             },
           });
+          await finishFuturesProtection(tx, row.p.id, 'liquidated', now);
         }
         const cash = await settleFuturesCash(
           tx,

@@ -45,6 +45,7 @@ export async function runSeasonLifecycleLeaseIntegration(
   const runService = new OpsJobRunService(prisma);
 
   const cleanupPrisma = {
+    protectionGroup: prisma.protectionGroup,
     order: {
       findMany: (args: Prisma.OrderFindManyArgs) => {
         selections += 1;

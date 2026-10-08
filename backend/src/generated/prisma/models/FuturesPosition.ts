@@ -321,6 +321,7 @@ export type FuturesPositionWhereInput = {
   executions?: Prisma.FuturesExecutionListRelationFilter
   liquidationClose?: Prisma.XOR<Prisma.FuturesLiquidationCloseNullableScalarRelationFilter, Prisma.FuturesLiquidationCloseWhereInput> | null
   seasonClose?: Prisma.XOR<Prisma.FuturesSeasonCloseNullableScalarRelationFilter, Prisma.FuturesSeasonCloseWhereInput> | null
+  protectionGroups?: Prisma.ProtectionGroupListRelationFilter
 }
 
 export type FuturesPositionOrderByWithRelationInput = {
@@ -344,6 +345,7 @@ export type FuturesPositionOrderByWithRelationInput = {
   executions?: Prisma.FuturesExecutionOrderByRelationAggregateInput
   liquidationClose?: Prisma.FuturesLiquidationCloseOrderByWithRelationInput
   seasonClose?: Prisma.FuturesSeasonCloseOrderByWithRelationInput
+  protectionGroups?: Prisma.ProtectionGroupOrderByRelationAggregateInput
 }
 
 export type FuturesPositionWhereUniqueInput = Prisma.AtLeast<{
@@ -371,6 +373,7 @@ export type FuturesPositionWhereUniqueInput = Prisma.AtLeast<{
   executions?: Prisma.FuturesExecutionListRelationFilter
   liquidationClose?: Prisma.XOR<Prisma.FuturesLiquidationCloseNullableScalarRelationFilter, Prisma.FuturesLiquidationCloseWhereInput> | null
   seasonClose?: Prisma.XOR<Prisma.FuturesSeasonCloseNullableScalarRelationFilter, Prisma.FuturesSeasonCloseWhereInput> | null
+  protectionGroups?: Prisma.ProtectionGroupListRelationFilter
 }, "id" | "id_tradingAccountId_instrumentId">
 
 export type FuturesPositionOrderByWithAggregationInput = {
@@ -436,6 +439,7 @@ export type FuturesPositionCreateInput = {
   executions?: Prisma.FuturesExecutionCreateNestedManyWithoutPositionInput
   liquidationClose?: Prisma.FuturesLiquidationCloseCreateNestedOneWithoutPositionInput
   seasonClose?: Prisma.FuturesSeasonCloseCreateNestedOneWithoutPositionInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutFuturesPositionInput
 }
 
 export type FuturesPositionUncheckedCreateInput = {
@@ -457,6 +461,7 @@ export type FuturesPositionUncheckedCreateInput = {
   executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutPositionInput
   liquidationClose?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedOneWithoutPositionInput
   seasonClose?: Prisma.FuturesSeasonCloseUncheckedCreateNestedOneWithoutPositionInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutFuturesPositionInput
 }
 
 export type FuturesPositionUpdateInput = {
@@ -478,6 +483,7 @@ export type FuturesPositionUpdateInput = {
   executions?: Prisma.FuturesExecutionUpdateManyWithoutPositionNestedInput
   liquidationClose?: Prisma.FuturesLiquidationCloseUpdateOneWithoutPositionNestedInput
   seasonClose?: Prisma.FuturesSeasonCloseUpdateOneWithoutPositionNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutFuturesPositionNestedInput
 }
 
 export type FuturesPositionUncheckedUpdateInput = {
@@ -499,6 +505,7 @@ export type FuturesPositionUncheckedUpdateInput = {
   executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutPositionNestedInput
   liquidationClose?: Prisma.FuturesLiquidationCloseUncheckedUpdateOneWithoutPositionNestedInput
   seasonClose?: Prisma.FuturesSeasonCloseUncheckedUpdateOneWithoutPositionNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutFuturesPositionNestedInput
 }
 
 export type FuturesPositionCreateManyInput = {
@@ -646,6 +653,11 @@ export type FuturesPositionScalarRelationFilter = {
   isNot?: Prisma.FuturesPositionWhereInput
 }
 
+export type FuturesPositionNullableScalarRelationFilter = {
+  is?: Prisma.FuturesPositionWhereInput | null
+  isNot?: Prisma.FuturesPositionWhereInput | null
+}
+
 export type FuturesPositionCreateNestedManyWithoutTradingAccountInput = {
   create?: Prisma.XOR<Prisma.FuturesPositionCreateWithoutTradingAccountInput, Prisma.FuturesPositionUncheckedCreateWithoutTradingAccountInput> | Prisma.FuturesPositionCreateWithoutTradingAccountInput[] | Prisma.FuturesPositionUncheckedCreateWithoutTradingAccountInput[]
   connectOrCreate?: Prisma.FuturesPositionCreateOrConnectWithoutTradingAccountInput | Prisma.FuturesPositionCreateOrConnectWithoutTradingAccountInput[]
@@ -756,6 +768,22 @@ export type FuturesPositionUpdateOneRequiredWithoutExecutionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.FuturesPositionUpdateToOneWithWhereWithoutExecutionsInput, Prisma.FuturesPositionUpdateWithoutExecutionsInput>, Prisma.FuturesPositionUncheckedUpdateWithoutExecutionsInput>
 }
 
+export type FuturesPositionCreateNestedOneWithoutProtectionGroupsInput = {
+  create?: Prisma.XOR<Prisma.FuturesPositionCreateWithoutProtectionGroupsInput, Prisma.FuturesPositionUncheckedCreateWithoutProtectionGroupsInput>
+  connectOrCreate?: Prisma.FuturesPositionCreateOrConnectWithoutProtectionGroupsInput
+  connect?: Prisma.FuturesPositionWhereUniqueInput
+}
+
+export type FuturesPositionUpdateOneWithoutProtectionGroupsNestedInput = {
+  create?: Prisma.XOR<Prisma.FuturesPositionCreateWithoutProtectionGroupsInput, Prisma.FuturesPositionUncheckedCreateWithoutProtectionGroupsInput>
+  connectOrCreate?: Prisma.FuturesPositionCreateOrConnectWithoutProtectionGroupsInput
+  upsert?: Prisma.FuturesPositionUpsertWithoutProtectionGroupsInput
+  disconnect?: Prisma.FuturesPositionWhereInput | boolean
+  delete?: Prisma.FuturesPositionWhereInput | boolean
+  connect?: Prisma.FuturesPositionWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.FuturesPositionUpdateToOneWithWhereWithoutProtectionGroupsInput, Prisma.FuturesPositionUpdateWithoutProtectionGroupsInput>, Prisma.FuturesPositionUncheckedUpdateWithoutProtectionGroupsInput>
+}
+
 export type FuturesPositionCreateNestedOneWithoutLiquidationCloseInput = {
   create?: Prisma.XOR<Prisma.FuturesPositionCreateWithoutLiquidationCloseInput, Prisma.FuturesPositionUncheckedCreateWithoutLiquidationCloseInput>
   connectOrCreate?: Prisma.FuturesPositionCreateOrConnectWithoutLiquidationCloseInput
@@ -802,6 +830,7 @@ export type FuturesPositionCreateWithoutTradingAccountInput = {
   executions?: Prisma.FuturesExecutionCreateNestedManyWithoutPositionInput
   liquidationClose?: Prisma.FuturesLiquidationCloseCreateNestedOneWithoutPositionInput
   seasonClose?: Prisma.FuturesSeasonCloseCreateNestedOneWithoutPositionInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutFuturesPositionInput
 }
 
 export type FuturesPositionUncheckedCreateWithoutTradingAccountInput = {
@@ -822,6 +851,7 @@ export type FuturesPositionUncheckedCreateWithoutTradingAccountInput = {
   executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutPositionInput
   liquidationClose?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedOneWithoutPositionInput
   seasonClose?: Prisma.FuturesSeasonCloseUncheckedCreateNestedOneWithoutPositionInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutFuturesPositionInput
 }
 
 export type FuturesPositionCreateOrConnectWithoutTradingAccountInput = {
@@ -889,6 +919,7 @@ export type FuturesPositionCreateWithoutInstrumentInput = {
   executions?: Prisma.FuturesExecutionCreateNestedManyWithoutPositionInput
   liquidationClose?: Prisma.FuturesLiquidationCloseCreateNestedOneWithoutPositionInput
   seasonClose?: Prisma.FuturesSeasonCloseCreateNestedOneWithoutPositionInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutFuturesPositionInput
 }
 
 export type FuturesPositionUncheckedCreateWithoutInstrumentInput = {
@@ -909,6 +940,7 @@ export type FuturesPositionUncheckedCreateWithoutInstrumentInput = {
   executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutPositionInput
   liquidationClose?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedOneWithoutPositionInput
   seasonClose?: Prisma.FuturesSeasonCloseUncheckedCreateNestedOneWithoutPositionInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutFuturesPositionInput
 }
 
 export type FuturesPositionCreateOrConnectWithoutInstrumentInput = {
@@ -955,6 +987,7 @@ export type FuturesPositionCreateWithoutExecutionsInput = {
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutPositionsInput
   liquidationClose?: Prisma.FuturesLiquidationCloseCreateNestedOneWithoutPositionInput
   seasonClose?: Prisma.FuturesSeasonCloseCreateNestedOneWithoutPositionInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutFuturesPositionInput
 }
 
 export type FuturesPositionUncheckedCreateWithoutExecutionsInput = {
@@ -975,6 +1008,7 @@ export type FuturesPositionUncheckedCreateWithoutExecutionsInput = {
   updatedAt?: Date | string
   liquidationClose?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedOneWithoutPositionInput
   seasonClose?: Prisma.FuturesSeasonCloseUncheckedCreateNestedOneWithoutPositionInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutFuturesPositionInput
 }
 
 export type FuturesPositionCreateOrConnectWithoutExecutionsInput = {
@@ -1011,6 +1045,7 @@ export type FuturesPositionUpdateWithoutExecutionsInput = {
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutPositionsNestedInput
   liquidationClose?: Prisma.FuturesLiquidationCloseUpdateOneWithoutPositionNestedInput
   seasonClose?: Prisma.FuturesSeasonCloseUpdateOneWithoutPositionNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutFuturesPositionNestedInput
 }
 
 export type FuturesPositionUncheckedUpdateWithoutExecutionsInput = {
@@ -1029,6 +1064,107 @@ export type FuturesPositionUncheckedUpdateWithoutExecutionsInput = {
   closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  liquidationClose?: Prisma.FuturesLiquidationCloseUncheckedUpdateOneWithoutPositionNestedInput
+  seasonClose?: Prisma.FuturesSeasonCloseUncheckedUpdateOneWithoutPositionNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutFuturesPositionNestedInput
+}
+
+export type FuturesPositionCreateWithoutProtectionGroupsInput = {
+  id?: string
+  direction: $Enums.FuturesDirection
+  marginMode?: $Enums.FuturesMarginMode
+  status?: $Enums.FuturesPositionStatus
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  averageEntryPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  entryNotional: runtime.Decimal | runtime.DecimalJsLike | number | string
+  leverage: number
+  isolatedMargin: runtime.Decimal | runtime.DecimalJsLike | number | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  closedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutFuturesPositionsInput
+  instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutPositionsInput
+  executions?: Prisma.FuturesExecutionCreateNestedManyWithoutPositionInput
+  liquidationClose?: Prisma.FuturesLiquidationCloseCreateNestedOneWithoutPositionInput
+  seasonClose?: Prisma.FuturesSeasonCloseCreateNestedOneWithoutPositionInput
+}
+
+export type FuturesPositionUncheckedCreateWithoutProtectionGroupsInput = {
+  id?: string
+  tradingAccountId: string
+  instrumentId: string
+  direction: $Enums.FuturesDirection
+  marginMode?: $Enums.FuturesMarginMode
+  status?: $Enums.FuturesPositionStatus
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  averageEntryPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  entryNotional: runtime.Decimal | runtime.DecimalJsLike | number | string
+  leverage: number
+  isolatedMargin: runtime.Decimal | runtime.DecimalJsLike | number | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  closedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutPositionInput
+  liquidationClose?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedOneWithoutPositionInput
+  seasonClose?: Prisma.FuturesSeasonCloseUncheckedCreateNestedOneWithoutPositionInput
+}
+
+export type FuturesPositionCreateOrConnectWithoutProtectionGroupsInput = {
+  where: Prisma.FuturesPositionWhereUniqueInput
+  create: Prisma.XOR<Prisma.FuturesPositionCreateWithoutProtectionGroupsInput, Prisma.FuturesPositionUncheckedCreateWithoutProtectionGroupsInput>
+}
+
+export type FuturesPositionUpsertWithoutProtectionGroupsInput = {
+  update: Prisma.XOR<Prisma.FuturesPositionUpdateWithoutProtectionGroupsInput, Prisma.FuturesPositionUncheckedUpdateWithoutProtectionGroupsInput>
+  create: Prisma.XOR<Prisma.FuturesPositionCreateWithoutProtectionGroupsInput, Prisma.FuturesPositionUncheckedCreateWithoutProtectionGroupsInput>
+  where?: Prisma.FuturesPositionWhereInput
+}
+
+export type FuturesPositionUpdateToOneWithWhereWithoutProtectionGroupsInput = {
+  where?: Prisma.FuturesPositionWhereInput
+  data: Prisma.XOR<Prisma.FuturesPositionUpdateWithoutProtectionGroupsInput, Prisma.FuturesPositionUncheckedUpdateWithoutProtectionGroupsInput>
+}
+
+export type FuturesPositionUpdateWithoutProtectionGroupsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  direction?: Prisma.EnumFuturesDirectionFieldUpdateOperationsInput | $Enums.FuturesDirection
+  marginMode?: Prisma.EnumFuturesMarginModeFieldUpdateOperationsInput | $Enums.FuturesMarginMode
+  status?: Prisma.EnumFuturesPositionStatusFieldUpdateOperationsInput | $Enums.FuturesPositionStatus
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  averageEntryPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  entryNotional?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  leverage?: Prisma.IntFieldUpdateOperationsInput | number
+  isolatedMargin?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  realizedPnl?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutFuturesPositionsNestedInput
+  instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutPositionsNestedInput
+  executions?: Prisma.FuturesExecutionUpdateManyWithoutPositionNestedInput
+  liquidationClose?: Prisma.FuturesLiquidationCloseUpdateOneWithoutPositionNestedInput
+  seasonClose?: Prisma.FuturesSeasonCloseUpdateOneWithoutPositionNestedInput
+}
+
+export type FuturesPositionUncheckedUpdateWithoutProtectionGroupsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
+  instrumentId?: Prisma.StringFieldUpdateOperationsInput | string
+  direction?: Prisma.EnumFuturesDirectionFieldUpdateOperationsInput | $Enums.FuturesDirection
+  marginMode?: Prisma.EnumFuturesMarginModeFieldUpdateOperationsInput | $Enums.FuturesMarginMode
+  status?: Prisma.EnumFuturesPositionStatusFieldUpdateOperationsInput | $Enums.FuturesPositionStatus
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  averageEntryPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  entryNotional?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  leverage?: Prisma.IntFieldUpdateOperationsInput | number
+  isolatedMargin?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  realizedPnl?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutPositionNestedInput
   liquidationClose?: Prisma.FuturesLiquidationCloseUncheckedUpdateOneWithoutPositionNestedInput
   seasonClose?: Prisma.FuturesSeasonCloseUncheckedUpdateOneWithoutPositionNestedInput
 }
@@ -1051,6 +1187,7 @@ export type FuturesPositionCreateWithoutLiquidationCloseInput = {
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutPositionsInput
   executions?: Prisma.FuturesExecutionCreateNestedManyWithoutPositionInput
   seasonClose?: Prisma.FuturesSeasonCloseCreateNestedOneWithoutPositionInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutFuturesPositionInput
 }
 
 export type FuturesPositionUncheckedCreateWithoutLiquidationCloseInput = {
@@ -1071,6 +1208,7 @@ export type FuturesPositionUncheckedCreateWithoutLiquidationCloseInput = {
   updatedAt?: Date | string
   executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutPositionInput
   seasonClose?: Prisma.FuturesSeasonCloseUncheckedCreateNestedOneWithoutPositionInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutFuturesPositionInput
 }
 
 export type FuturesPositionCreateOrConnectWithoutLiquidationCloseInput = {
@@ -1107,6 +1245,7 @@ export type FuturesPositionUpdateWithoutLiquidationCloseInput = {
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutPositionsNestedInput
   executions?: Prisma.FuturesExecutionUpdateManyWithoutPositionNestedInput
   seasonClose?: Prisma.FuturesSeasonCloseUpdateOneWithoutPositionNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutFuturesPositionNestedInput
 }
 
 export type FuturesPositionUncheckedUpdateWithoutLiquidationCloseInput = {
@@ -1127,6 +1266,7 @@ export type FuturesPositionUncheckedUpdateWithoutLiquidationCloseInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutPositionNestedInput
   seasonClose?: Prisma.FuturesSeasonCloseUncheckedUpdateOneWithoutPositionNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutFuturesPositionNestedInput
 }
 
 export type FuturesPositionCreateWithoutSeasonCloseInput = {
@@ -1147,6 +1287,7 @@ export type FuturesPositionCreateWithoutSeasonCloseInput = {
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutPositionsInput
   executions?: Prisma.FuturesExecutionCreateNestedManyWithoutPositionInput
   liquidationClose?: Prisma.FuturesLiquidationCloseCreateNestedOneWithoutPositionInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutFuturesPositionInput
 }
 
 export type FuturesPositionUncheckedCreateWithoutSeasonCloseInput = {
@@ -1167,6 +1308,7 @@ export type FuturesPositionUncheckedCreateWithoutSeasonCloseInput = {
   updatedAt?: Date | string
   executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutPositionInput
   liquidationClose?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedOneWithoutPositionInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutFuturesPositionInput
 }
 
 export type FuturesPositionCreateOrConnectWithoutSeasonCloseInput = {
@@ -1203,6 +1345,7 @@ export type FuturesPositionUpdateWithoutSeasonCloseInput = {
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutPositionsNestedInput
   executions?: Prisma.FuturesExecutionUpdateManyWithoutPositionNestedInput
   liquidationClose?: Prisma.FuturesLiquidationCloseUpdateOneWithoutPositionNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutFuturesPositionNestedInput
 }
 
 export type FuturesPositionUncheckedUpdateWithoutSeasonCloseInput = {
@@ -1223,6 +1366,7 @@ export type FuturesPositionUncheckedUpdateWithoutSeasonCloseInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutPositionNestedInput
   liquidationClose?: Prisma.FuturesLiquidationCloseUncheckedUpdateOneWithoutPositionNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutFuturesPositionNestedInput
 }
 
 export type FuturesPositionCreateManyTradingAccountInput = {
@@ -1260,6 +1404,7 @@ export type FuturesPositionUpdateWithoutTradingAccountInput = {
   executions?: Prisma.FuturesExecutionUpdateManyWithoutPositionNestedInput
   liquidationClose?: Prisma.FuturesLiquidationCloseUpdateOneWithoutPositionNestedInput
   seasonClose?: Prisma.FuturesSeasonCloseUpdateOneWithoutPositionNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutFuturesPositionNestedInput
 }
 
 export type FuturesPositionUncheckedUpdateWithoutTradingAccountInput = {
@@ -1280,6 +1425,7 @@ export type FuturesPositionUncheckedUpdateWithoutTradingAccountInput = {
   executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutPositionNestedInput
   liquidationClose?: Prisma.FuturesLiquidationCloseUncheckedUpdateOneWithoutPositionNestedInput
   seasonClose?: Prisma.FuturesSeasonCloseUncheckedUpdateOneWithoutPositionNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutFuturesPositionNestedInput
 }
 
 export type FuturesPositionUncheckedUpdateManyWithoutTradingAccountInput = {
@@ -1334,6 +1480,7 @@ export type FuturesPositionUpdateWithoutInstrumentInput = {
   executions?: Prisma.FuturesExecutionUpdateManyWithoutPositionNestedInput
   liquidationClose?: Prisma.FuturesLiquidationCloseUpdateOneWithoutPositionNestedInput
   seasonClose?: Prisma.FuturesSeasonCloseUpdateOneWithoutPositionNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutFuturesPositionNestedInput
 }
 
 export type FuturesPositionUncheckedUpdateWithoutInstrumentInput = {
@@ -1354,6 +1501,7 @@ export type FuturesPositionUncheckedUpdateWithoutInstrumentInput = {
   executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutPositionNestedInput
   liquidationClose?: Prisma.FuturesLiquidationCloseUncheckedUpdateOneWithoutPositionNestedInput
   seasonClose?: Prisma.FuturesSeasonCloseUncheckedUpdateOneWithoutPositionNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutFuturesPositionNestedInput
 }
 
 export type FuturesPositionUncheckedUpdateManyWithoutInstrumentInput = {
@@ -1380,10 +1528,12 @@ export type FuturesPositionUncheckedUpdateManyWithoutInstrumentInput = {
 
 export type FuturesPositionCountOutputType = {
   executions: number
+  protectionGroups: number
 }
 
 export type FuturesPositionCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   executions?: boolean | FuturesPositionCountOutputTypeCountExecutionsArgs
+  protectionGroups?: boolean | FuturesPositionCountOutputTypeCountProtectionGroupsArgs
 }
 
 /**
@@ -1401,6 +1551,13 @@ export type FuturesPositionCountOutputTypeDefaultArgs<ExtArgs extends runtime.Ty
  */
 export type FuturesPositionCountOutputTypeCountExecutionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.FuturesExecutionWhereInput
+}
+
+/**
+ * FuturesPositionCountOutputType without action
+ */
+export type FuturesPositionCountOutputTypeCountProtectionGroupsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ProtectionGroupWhereInput
 }
 
 
@@ -1425,6 +1582,7 @@ export type FuturesPositionSelect<ExtArgs extends runtime.Types.Extensions.Inter
   executions?: boolean | Prisma.FuturesPosition$executionsArgs<ExtArgs>
   liquidationClose?: boolean | Prisma.FuturesPosition$liquidationCloseArgs<ExtArgs>
   seasonClose?: boolean | Prisma.FuturesPosition$seasonCloseArgs<ExtArgs>
+  protectionGroups?: boolean | Prisma.FuturesPosition$protectionGroupsArgs<ExtArgs>
   _count?: boolean | Prisma.FuturesPositionCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["futuresPosition"]>
 
@@ -1493,6 +1651,7 @@ export type FuturesPositionInclude<ExtArgs extends runtime.Types.Extensions.Inte
   executions?: boolean | Prisma.FuturesPosition$executionsArgs<ExtArgs>
   liquidationClose?: boolean | Prisma.FuturesPosition$liquidationCloseArgs<ExtArgs>
   seasonClose?: boolean | Prisma.FuturesPosition$seasonCloseArgs<ExtArgs>
+  protectionGroups?: boolean | Prisma.FuturesPosition$protectionGroupsArgs<ExtArgs>
   _count?: boolean | Prisma.FuturesPositionCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type FuturesPositionIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1512,6 +1671,7 @@ export type $FuturesPositionPayload<ExtArgs extends runtime.Types.Extensions.Int
     executions: Prisma.$FuturesExecutionPayload<ExtArgs>[]
     liquidationClose: Prisma.$FuturesLiquidationClosePayload<ExtArgs> | null
     seasonClose: Prisma.$FuturesSeasonClosePayload<ExtArgs> | null
+    protectionGroups: Prisma.$ProtectionGroupPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1928,6 +2088,7 @@ export interface Prisma__FuturesPositionClient<T, Null = never, ExtArgs extends 
   executions<T extends Prisma.FuturesPosition$executionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesPosition$executionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesExecutionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   liquidationClose<T extends Prisma.FuturesPosition$liquidationCloseArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesPosition$liquidationCloseArgs<ExtArgs>>): Prisma.Prisma__FuturesLiquidationCloseClient<runtime.Types.Result.GetResult<Prisma.$FuturesLiquidationClosePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   seasonClose<T extends Prisma.FuturesPosition$seasonCloseArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesPosition$seasonCloseArgs<ExtArgs>>): Prisma.Prisma__FuturesSeasonCloseClient<runtime.Types.Result.GetResult<Prisma.$FuturesSeasonClosePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  protectionGroups<T extends Prisma.FuturesPosition$protectionGroupsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesPosition$protectionGroupsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProtectionGroupPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2432,6 +2593,30 @@ export type FuturesPosition$seasonCloseArgs<ExtArgs extends runtime.Types.Extens
    */
   include?: Prisma.FuturesSeasonCloseInclude<ExtArgs> | null
   where?: Prisma.FuturesSeasonCloseWhereInput
+}
+
+/**
+ * FuturesPosition.protectionGroups
+ */
+export type FuturesPosition$protectionGroupsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ProtectionGroup
+   */
+  select?: Prisma.ProtectionGroupSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ProtectionGroup
+   */
+  omit?: Prisma.ProtectionGroupOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ProtectionGroupInclude<ExtArgs> | null
+  where?: Prisma.ProtectionGroupWhereInput
+  orderBy?: Prisma.ProtectionGroupOrderByWithRelationInput | Prisma.ProtectionGroupOrderByWithRelationInput[]
+  cursor?: Prisma.ProtectionGroupWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ProtectionGroupScalarFieldEnum | Prisma.ProtectionGroupScalarFieldEnum[]
 }
 
 /**

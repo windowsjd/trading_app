@@ -1,6 +1,9 @@
 function futuresFixture(accountId = 'A', options = {}) {
-  const at = new Date(Date.now() - (options.stale ? 6000 : 0)).toISOString();
-  const referenceAt = new Date().toISOString();
+  // Model evidence captured before the HTTP response/render, rather than a
+  // zero-age timestamp that can cross a millisecond during React query reads.
+  const observedAt = Date.now() - 50;
+  const at = new Date(observedAt - (options.stale ? 6000 : 0)).toISOString();
+  const referenceAt = new Date(observedAt).toISOString();
   const mode = options.mode ?? 'ENABLED';
   const capabilities = { tradingMode: mode, canOpen: mode === 'ENABLED', canIncrease: mode === 'ENABLED', canReduce: mode !== 'DISABLED', canClose: mode !== 'DISABLED', reason: null };
   const instrument = { id: 'btc', isActive: true, productType: 'synthetic_perpetual', settlementCurrency: 'USD', underlying: { assetId: 'asset-btc', symbol: 'BTCUSDT', name: '비트코인', market: 'BINANCE', displayPriceDecimals: 2 }, markPrice: options.large ? '9876543210123456.12345678' : '101', referencePrice: '102', markState: options.stale ? 'unavailable_or_stale' : 'fresh', markEvidence: { snapshotId: 'mark', source: 'binance_usdm_mark_ws', effectiveAt: at, capturedAt: at }, referencePriceEvidence: { effectiveAt: options.oldReference ? new Date(Date.now() - 60000).toISOString() : referenceAt, capturedAt: referenceAt } };

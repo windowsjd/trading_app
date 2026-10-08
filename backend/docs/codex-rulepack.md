@@ -22,8 +22,8 @@ login → 계정/모드 선택 → 시즌 참가 또는 일반계정 개설/재�
 - 기존 계정은 배포 migration에서 zero Crypto 지갑만 추가하며 GET 자동 복구를 금지한다.
 
 ### 평가
-총자산 = 모든 KRW cash + (모든 USD cash × 동일 canonical FX) + 기존 Spot 자산 평가금액
-예약은 balance에서 차감하지 않는다. USD cash/position이 모두 0이면 FX가 필요하지 않다.
+총자산 = 모든 KRW cash + (모든 USD cash × 동일 canonical FX) + 기존 Spot 자산 평가금액 + (open Futures signed Mark UPNL USD × 동일 canonical FX)
+예약은 balance에서 차감하지 않는다. USD cash/Spot position이 모두 0이고 open Futures Position도 없으면 FX가 필요하지 않다.
 
 ### API 규칙
 - 모든 금액 문자열

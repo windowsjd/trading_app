@@ -69,6 +69,7 @@ export function OrderTradingScreen({
   const { colors } = useAppearance();
   const compact = width < 600;
   const [showKrw, setShowKrw] = useState(false);
+  const [attachedProtectionVisible, setAttachedProtectionVisible] = useState(false);
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
   const { accounts } = useTradingAccount();
   const account = accounts.find((item) => item.id === accountId) ?? null;
@@ -286,7 +287,7 @@ export function OrderTradingScreen({
               runtime={tickerRuntime}
             />
           ) : null}
-          <View style={[styles.tradingRow, compact && styles.compactTradingRow]} testID="asset-trading-columns">
+          <View style={[styles.tradingRow, compact && styles.compactTradingRow, compact && attachedProtectionVisible && styles.protectionTradingColumn]} testID="asset-trading-columns">
             <View style={styles.orderColumn} testID="asset-order-column">
               {account ? (
                 <OrderPanel
@@ -299,6 +300,7 @@ export function OrderTradingScreen({
                   onInputFocus={inputScroll.onInputFocus}
                   onInputBlur={inputScroll.onInputBlur}
                   submitRef={inputScroll.submitRef}
+                  onAttachedProtectionVisibilityChange={setAttachedProtectionVisible}
                   onReturnToAsset={() => navigation.goBack()}
                 />
               ) : (
@@ -399,6 +401,7 @@ const styles = StyleSheet.create({
     paddingTop: 14,
   },
   compactTradingRow: { gap: 6 },
+  protectionTradingColumn: { flexDirection: 'column' },
   orderColumn: { flex: 1.15, minWidth: 0 },
   priceColumn: { flex: 1, minWidth: 0, overflow: 'hidden' },
   currentPrice: { paddingVertical: 14, gap: 4, minWidth: 0 },

@@ -87,10 +87,19 @@ export const apiClient = {
     if (path.endsWith('/portfolio')) {
       if (transport.delay === account.id || variant === 'loading') await new Promise((resolve) => transport.pending.push(resolve));
       if (variant === 'portfolio-error') throw new Error('Test network error');
+      const settled = account.season?.seasonStatus === 'settled';
       return response({
         tradingAccountId: account.id, mode: account.mode, status: account.status,
         state: variant === 'empty-summary' ? 'unavailable' : 'available', sectionErrors: [],
-        summary: variant === 'empty-summary' ? null : {
+        finalResult: settled ? {
+          state: 'available', resultSource: 'season_rankings',
+          totalAssetKrw: long ? '1234567890123456' : '9648192',
+          returnRate: '-3.52', returnRateMethod: 'initial_capital',
+          maxDrawdown: '8', totalFillCount: 7, reachedReturnAt: null,
+          rank: 2, tier: 'gold', endAt: account.season.endAt,
+          capturedAt: '2026-10-02T00:00:00Z',
+        } : undefined,
+        summary: variant === 'empty-summary' || settled ? null : {
           totalAssetKrw: long ? '1234567890123456' : account.mode === 'season' ? '9648192' : '12530200',
           returnRate: account.mode === 'season' ? '-3.52' : '4.82', returnRateMethod,
           unrealizedPnlKrw: '-351885', realizedPnlKrw: '12000',

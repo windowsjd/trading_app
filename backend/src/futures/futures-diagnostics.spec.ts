@@ -1,3 +1,4 @@
+import { emptyProtectionState } from '../../test/support/empty-protection-state';
 jest.mock('./futures-performance.service', () => ({
   FuturesPerformanceService: class {
     async capture() {}
@@ -174,6 +175,7 @@ describe('Futures existing execution diagnostic boundary', () => {
       wallet,
     ];
     tx = {
+      ...emptyProtectionState(),
       $queryRaw: jest.fn().mockResolvedValue([{ now }]),
       $executeRaw: jest.fn().mockResolvedValue(1),
       futuresExecuteRequest: {

@@ -72,6 +72,10 @@ export const ModelName = {
   FuturesPosition: 'FuturesPosition',
   FuturesExecution: 'FuturesExecution',
   FuturesExecuteRequest: 'FuturesExecuteRequest',
+  ProtectionGroup: 'ProtectionGroup',
+  ProtectionLeg: 'ProtectionLeg',
+  ProtectionChild: 'ProtectionChild',
+  ProtectionCommand: 'ProtectionCommand',
   Position: 'Position',
   Order: 'Order',
   CashWallet: 'CashWallet',
@@ -522,6 +526,68 @@ export const FuturesExecuteRequestScalarFieldEnum = {
 } as const
 
 export type FuturesExecuteRequestScalarFieldEnum = (typeof FuturesExecuteRequestScalarFieldEnum)[keyof typeof FuturesExecuteRequestScalarFieldEnum]
+
+
+export const ProtectionGroupScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  assetId: 'assetId',
+  domain: 'domain',
+  direction: 'direction',
+  positionId: 'positionId',
+  futuresPositionId: 'futuresPositionId',
+  parentOrderId: 'parentOrderId',
+  status: 'status',
+  terminalReason: 'terminalReason',
+  createdAt: 'createdAt',
+  activatedAt: 'activatedAt',
+  endedAt: 'endedAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ProtectionGroupScalarFieldEnum = (typeof ProtectionGroupScalarFieldEnum)[keyof typeof ProtectionGroupScalarFieldEnum]
+
+
+export const ProtectionLegScalarFieldEnum = {
+  id: 'id',
+  groupId: 'groupId',
+  kind: 'kind',
+  triggerPrice: 'triggerPrice',
+  childOrderType: 'childOrderType',
+  childLimitPrice: 'childLimitPrice'
+} as const
+
+export type ProtectionLegScalarFieldEnum = (typeof ProtectionLegScalarFieldEnum)[keyof typeof ProtectionLegScalarFieldEnum]
+
+
+export const ProtectionChildScalarFieldEnum = {
+  id: 'id',
+  groupId: 'groupId',
+  legId: 'legId',
+  status: 'status',
+  quantity: 'quantity',
+  orderId: 'orderId',
+  futuresExecutionId: 'futuresExecutionId',
+  assetPriceSnapshotId: 'assetPriceSnapshotId',
+  triggerEvidenceJson: 'triggerEvidenceJson',
+  triggeredAt: 'triggeredAt',
+  endedAt: 'endedAt',
+  terminalReason: 'terminalReason'
+} as const
+
+export type ProtectionChildScalarFieldEnum = (typeof ProtectionChildScalarFieldEnum)[keyof typeof ProtectionChildScalarFieldEnum]
+
+
+export const ProtectionCommandScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  responsePayloadJson: 'responsePayloadJson',
+  createdAt: 'createdAt'
+} as const
+
+export type ProtectionCommandScalarFieldEnum = (typeof ProtectionCommandScalarFieldEnum)[keyof typeof ProtectionCommandScalarFieldEnum]
 
 
 export const PositionScalarFieldEnum = {

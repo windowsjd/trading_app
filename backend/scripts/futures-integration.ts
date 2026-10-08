@@ -984,6 +984,13 @@ function faultyDb(point: string, occurrence = 1) {
                     'futuresSeasonSettlement',
                     'futuresSeasonClose',
                     'equitySnapshot',
+                    'protectionGroup',
+                    'protectionLeg',
+                    'protectionChild',
+                    'protectionCommand',
+                    'order',
+                    'position',
+                    'quote',
                   ].includes(String(prop))
                 )
                   return new Proxy(value, {

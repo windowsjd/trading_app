@@ -3,6 +3,7 @@ import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
 import React, { useEffect, useMemo, useState } from 'react';
+import { useFocusedInputScroll } from '../../hooks/useFocusedInputScroll';
 import { ScrollView, StyleSheet, Text, View } from '../../theme/native';
 import { SafeAreaView } from '../../theme/safeArea';
 import { useIsFocused } from '@react-navigation/native';
@@ -63,7 +64,7 @@ type AssetMarketChartProps = {
   variant?: 'fullscreen' | 'detail';
   onBack?: () => void;
   onChangePair?: () => void;
-  footerContent?: React.ReactNode;
+  footerContent?: React.ReactNode | ((input: ReturnType<typeof useFocusedInputScroll>) => React.ReactNode);
 };
 
 export function AssetMarketChart({
@@ -73,6 +74,7 @@ export function AssetMarketChart({
   onChangePair,
   footerContent,
 }: AssetMarketChartProps) {
+  const inputScroll = useFocusedInputScroll();
   const isFocused = useIsFocused();
   const isAdmin = useAdminDiagnostics();
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
@@ -331,10 +333,10 @@ export function AssetMarketChart({
     </>
   );
   return detailView ? (
-    <ScrollView refreshControl={refresh.refreshControl} style={styles.screen} contentContainerStyle={styles.detailContent}
+    <ScrollView ref={inputScroll.scrollRef} onScroll={inputScroll.onScroll} scrollEventThrottle={16} onLayout={inputScroll.revealFocusedInput} onContentSizeChange={inputScroll.revealFocusedInput} keyboardShouldPersistTaps="handled" refreshControl={refresh.refreshControl} style={styles.screen} contentContainerStyle={styles.detailContent}
       nestedScrollEnabled testID={TEST_IDS.assetDetail.screen}>
       {chartBody}
-      {footerContent}
+      {typeof footerContent === 'function' ? footerContent(inputScroll) : footerContent}
     </ScrollView>
   ) : (
     <SafeAreaView style={styles.screen} testID="asset-chart-screen">

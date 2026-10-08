@@ -1,5 +1,16 @@
+import { createApiError } from '../common/api-error';
 import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
 import { futuresSnapshotValues } from '../portfolio/futures-snapshot-values';
+import {
+  assertPendingChild,
+  prepareSpotProtection,
+  reconcileSpotProtection,
+} from '../conditional/conditional-state';
+import {
+  parseProtectionLegs,
+  type ProtectionLegInput,
+} from '../conditional/conditional-policy';
+import { createProtectionInTransaction } from '../conditional/conditional-registration';
 import {
   buildSelectionFailureEvidence,
   describeManualFallback,
@@ -156,6 +167,7 @@ export type OrdersQuery = {
 };
 
 export type OrderRequestBody = {
+  attachedProtection?: unknown;
   assetId?: unknown;
   side?: unknown;
   orderType?: unknown;
@@ -213,6 +225,9 @@ type OrderAsset = {
 };
 
 type ParsedOrderRequest = {
+  /** Internal worker capability, never parsed from HTTP. */
+  protectionChildId?: string;
+  attachedProtection?: ProtectionLegInput[];
   assetId: string;
   side: OrderSide;
   orderType: OrderType;
@@ -804,6 +819,7 @@ export class OrdersService {
     userId: string | undefined,
     tradingAccountId: string,
     body: OrderRequestBody = {},
+    conditionalChildId?: string,
   ): Promise<OrderQuoteResponse> {
     if (!userId) {
       this.throwApiError(
@@ -815,6 +831,15 @@ export class OrdersService {
 
     const quoteAt = new Date();
     const request = this.parseOrderRequest(body);
+    if (conditionalChildId) {
+      await assertPendingChild(
+        this.prisma,
+        conditionalChildId,
+        tradingAccountId,
+        'spot',
+      );
+      request.protectionChildId = conditionalChildId;
+    }
     const context = await this.resolveAccountTradingContext(
       userId,
       tradingAccountId,
@@ -908,7 +933,10 @@ export class OrdersService {
     }
 
     const asset = await this.findUsableAsset(inputRequest.assetId);
-    assertOrderInputPolicy({ ...inputRequest, assetType: asset.assetType });
+    assertOrderInputPolicy(
+      { ...inputRequest, assetType: asset.assetType },
+      { positionBoundExit: !!inputRequest.protectionChildId },
+    );
     const request: PricedOrderRequest = {
       ...inputRequest,
       quantity: inputRequest.amount
@@ -1078,7 +1106,10 @@ export class OrdersService {
       );
     }
     const asset = await this.findUsableAsset(inputRequest.assetId);
-    assertOrderInputPolicy({ ...inputRequest, assetType: asset.assetType });
+    assertOrderInputPolicy(
+      { ...inputRequest, assetType: asset.assetType },
+      { positionBoundExit: !!inputRequest.protectionChildId },
+    );
     const request: PricedOrderRequest = {
       ...inputRequest,
       quantity: inputRequest.amount
@@ -1289,6 +1320,7 @@ export class OrdersService {
     userId: string | undefined,
     tradingAccountId: string,
     body: OrderRequestBody = {},
+    conditionalChildId?: string,
   ): Promise<CreateOrderResponse | LimitOrderCreateResponse> {
     if (!userId) {
       this.throwApiError(
@@ -1299,6 +1331,7 @@ export class OrdersService {
     }
 
     const request = this.parseOrderRequest(body);
+    request.protectionChildId = conditionalChildId;
     const submittedAt = new Date();
 
     if (request.orderType === OrderType.limit) {
@@ -1307,6 +1340,7 @@ export class OrdersService {
         tradingAccountId,
         body,
         request,
+        conditionalChildId,
       );
     }
 
@@ -1354,10 +1388,12 @@ export class OrdersService {
       quoteId,
       idempotency,
       context,
+      conditionalChildId,
     });
   }
 
   private async createMarketOrderForContext(input: {
+    conditionalChildId?: string;
     userId: string;
     request: ParsedOrderRequest;
     quoteId: string;
@@ -1413,7 +1449,15 @@ export class OrdersService {
         if (racedOrder)
           return this.replayIdempotentCreateOrder(racedOrder, idempotency);
         await this.lockTradingContextInTransaction(tx, input.context, userId);
-        const transactionNow = await this.readTransactionWallClock(tx);
+        let transactionNow = await this.readTransactionWallClock(tx);
+        await this.prepareProtection(
+          tx,
+          tradingAccountId,
+          request,
+          transactionNow,
+          input.conditionalChildId,
+        );
+        transactionNow = await this.readTransactionWallClock(tx);
         const quote = await this.findActiveOrderQuoteForCreateOrThrow(tx, {
           quoteId,
           userId,
@@ -1493,6 +1537,11 @@ export class OrdersService {
           );
         }
 
+        if (input.conditionalChildId)
+          await tx.protectionChild.update({
+            where: { id: input.conditionalChildId },
+            data: { orderId },
+          });
         const executionOrder = order as OrderExecutionRecord;
         this.assertExecutableSeasonAndAsset(executionOrder, transactionNow);
         const plan = await this.buildOrderExecutionPlan(
@@ -1644,6 +1693,7 @@ export class OrdersService {
     tradingAccountId: string,
     body: OrderRequestBody,
     request: ParsedOrderRequest,
+    conditionalChildId?: string,
   ): Promise<CreateOrderResponse | LimitOrderCreateResponse> {
     const quoteId = this.parseQuoteId(body.quoteId);
     const idempotency = this.buildOrderCreateIdempotency({
@@ -1687,10 +1737,12 @@ export class OrdersService {
       quoteId,
       idempotency,
       context,
+      conditionalChildId,
     });
   }
 
   private async createLimitBuyOrderForContext(input: {
+    conditionalChildId?: string;
     userId: string;
     request: ParsedOrderRequest;
     quoteId: string;
@@ -1735,7 +1787,15 @@ export class OrdersService {
         // The wall clock is read only after every authorization row lock, so
         // lock wait time is never omitted from final quote/season/market
         // checks.
-        const transactionNow = await this.readTransactionWallClock(tx);
+        let transactionNow = await this.readTransactionWallClock(tx);
+        await this.prepareProtection(
+          tx,
+          tradingAccountId,
+          request,
+          transactionNow,
+          input.conditionalChildId,
+        );
+        transactionNow = await this.readTransactionWallClock(tx);
         if (lockedContext) {
           limitOrderCreate.assertLockedTradableContext(
             lockedContext,
@@ -1788,18 +1848,37 @@ export class OrdersService {
             this.limitOrderExecutionPolicy().autoExecutionEnabled,
         };
         if (request.side === OrderSide.sell) {
-          return limitOrderCreate.createSubmittedLimitSellInTransaction(tx, {
-            ...createInput,
-            quote: {
-              ...createInput.quote,
-              quotedNetAmount: quote.quotedNetAmount,
-            },
-          });
+          const response =
+            await limitOrderCreate.createSubmittedLimitSellInTransaction(tx, {
+              ...createInput,
+              quote: {
+                ...createInput.quote,
+                quotedNetAmount: quote.quotedNetAmount,
+              },
+            });
+          if (input.conditionalChildId)
+            await tx.protectionChild.update({
+              where: { id: input.conditionalChildId },
+              data: { orderId: response.data.order.orderId },
+            });
+          return response;
         }
-        return limitOrderCreate.createSubmittedLimitBuyInTransaction(
-          tx,
-          createInput,
-        );
+        const response =
+          await limitOrderCreate.createSubmittedLimitBuyInTransaction(
+            tx,
+            createInput,
+          );
+        if (request.attachedProtection)
+          await createProtectionInTransaction(tx, {
+            accountId: tradingAccountId,
+            domain: 'spot',
+            assetId: request.assetId,
+            parentOrderId: response.data.order.orderId,
+            parentQuantity: quote.quantity,
+            legs: request.attachedProtection,
+            now: transactionNow,
+          });
+        return response;
       });
     } catch (error) {
       if (!this.isUniqueConstraintError(error)) {
@@ -1993,6 +2072,12 @@ export class OrdersService {
           );
         if (order.status === OrderStatus.executed)
           return this.buildAlreadyExecutedOrderResponse(order);
+        await this.prepareProtection(
+          tx,
+          order.tradingAccountId,
+          order,
+          await this.readTransactionWallClock(tx),
+        );
         const transactionNow = await this.readTransactionWallClock(tx);
         this.assertExecutableSeasonAndAsset(order, transactionNow);
 
@@ -2806,6 +2891,74 @@ export class OrdersService {
     };
   }
 
+  private async prepareProtection(
+    tx: Prisma.TransactionClient,
+    accountId: string,
+    request: Pick<ParsedOrderRequest, 'assetId' | 'side' | 'orderType'>,
+    now: Date,
+    childId?: string,
+  ) {
+    await prepareSpotProtection(
+      tx,
+      { accountId, ...request, now, childId },
+      (orderId) =>
+        this.requireLimitOrderCancelService().cancelConditionalChildInTransaction(
+          tx,
+          orderId,
+          'conditional_manual_reduce',
+          now,
+        ),
+    );
+  }
+
+  /** Worker-only adapter. Quotes/ERS/fees/settlement remain the user Order core. */
+  async executeConditionalExit(
+    userId: string,
+    accountId: string,
+    childId: string,
+  ) {
+    const child = await this.prisma.protectionChild.findUnique({
+      where: { id: childId },
+      include: { group: { include: { position: true } }, leg: true },
+    });
+    if (
+      !child ||
+      child.status !== 'pending' ||
+      child.orderId ||
+      child.group.status !== 'active' ||
+      child.group.tradingAccountId !== accountId ||
+      child.group.domain !== 'spot'
+    )
+      return;
+    const quantity = child.group.position?.quantity;
+    if (!quantity?.gt(0)) return;
+    const request: OrderRequestBody = {
+      assetId: child.group.assetId,
+      side: 'sell',
+      orderType: child.leg.childOrderType,
+      quantity: quantity.toFixed(8),
+      ...(child.leg.childLimitPrice
+        ? { limitPrice: child.leg.childLimitPrice.toFixed(8) }
+        : {}),
+    };
+    const quote = await this.quoteOrderForTradingAccount(
+      userId,
+      accountId,
+      request,
+      childId,
+    );
+    return this.createOrderForTradingAccount(
+      userId,
+      accountId,
+      {
+        ...request,
+        quoteId: quote.data.quoteId,
+        idempotencyKey: `protection:${childId}`,
+      },
+      childId,
+    );
+  }
+
   /**
    * Market quotes pin the fee rate in both modes; amounts still reprice at
    * execution. Only legacy season quotes without a rate use the season fee.
@@ -3394,6 +3547,13 @@ export class OrdersService {
       },
     });
     const finalizedOrder = await this.finalizeExecutedOrder(tx, order, plan);
+    await reconcileSpotProtection(
+      tx,
+      tradingAccountId,
+      order.assetId,
+      order.id,
+      plan.executedAt,
+    );
     setAdminDiagnosticContext({
       failureStage: 'order_portfolio_snapshot',
       evidence: { financialGuard: { guardName: 'portfolio_snapshot' } },
@@ -3643,6 +3803,13 @@ export class OrdersService {
       },
     });
     const finalizedOrder = await this.finalizeExecutedOrder(tx, order, plan);
+    await reconcileSpotProtection(
+      tx,
+      tradingAccountId,
+      order.assetId,
+      order.id,
+      plan.executedAt,
+    );
     setAdminDiagnosticContext({
       failureStage: 'order_portfolio_snapshot',
       evidence: { financialGuard: { guardName: 'portfolio_snapshot' } },
@@ -5012,7 +5179,10 @@ export class OrdersService {
       sourceWorkflow,
     } = input;
     const asset = await this.findUsableAsset(inputRequest.assetId);
-    assertOrderInputPolicy({ ...inputRequest, assetType: asset.assetType });
+    assertOrderInputPolicy(
+      { ...inputRequest, assetType: asset.assetType },
+      { positionBoundExit: !!inputRequest.protectionChildId },
+    );
     if (
       inputRequest.currencyCode &&
       inputRequest.currencyCode !== this.getAssetSettlementCurrency(asset)
@@ -5444,10 +5614,13 @@ export class OrdersService {
       );
     }
 
-    assertOrderInputPolicy({
-      ...input.request,
-      assetType: quote.asset.assetType,
-    });
+    assertOrderInputPolicy(
+      {
+        ...input.request,
+        assetType: quote.asset.assetType,
+      },
+      { positionBoundExit: !!input.request.protectionChildId },
+    );
     const canonicalQuantity =
       input.request.amount && quote.quotedPrice
         ? quantityFromBuyAmount(input.request.amount, quote.quotedPrice)
@@ -5586,6 +5759,9 @@ export class OrdersService {
         ? this.formatDecimal(request.limitPrice, monetaryScale)
         : null,
       currencyCode: request.currencyCode ?? null,
+      ...(request.attachedProtection
+        ? { attachedProtection: request.attachedProtection }
+        : {}),
     };
     const canonicalJson = JSON.stringify(canonicalPayload);
     const requestHash = createHash('sha256')
@@ -5609,6 +5785,16 @@ export class OrdersService {
 
     const orderType = this.parseOrderType(body.orderType);
     const side = this.parseRequiredSide(body.side);
+    const attachedProtection =
+      body.attachedProtection === undefined
+        ? undefined
+        : parseProtectionLegs(body.attachedProtection);
+    if (attachedProtection && (side !== 'buy' || orderType !== 'limit'))
+      throw createApiError(
+        'INVALID_ATTACHED_ENTRY',
+        'Attached protection is supported only on Spot BUY Limit entries.',
+        400,
+      );
     if (
       this.hasProvidedValue(body.amount) &&
       this.hasProvidedValue(body.quantity)
@@ -5662,6 +5848,7 @@ export class OrdersService {
       orderType,
       quantity,
       amount,
+      attachedProtection,
       limitPrice: this.parsePositiveDecimalField(
         body.limitPrice,
         'limitPrice',
@@ -6549,10 +6736,30 @@ export class OrdersService {
       });
     }
 
+    // A manual Market sell will atomically cancel its own protection child.
+    // Normal reservations remain unavailable. This is only a quote preview.
+    const ownChild = position?.reservedQuantity?.gt(0)
+      ? await this.prisma.protectionChild.findFirst({
+          where: {
+            status: 'pending',
+            group: {
+              tradingAccountId: input.tradingAccountId,
+              assetId: input.assetId,
+              domain: 'spot',
+              status: 'active',
+            },
+            order: { status: 'submitted', side: 'sell', orderType: 'limit' },
+          },
+          select: { order: { select: { reservedQuantity: true } } },
+        })
+      : null;
+    const releasable =
+      ownChild?.order?.reservedQuantity ?? new Prisma.Decimal(0);
     if (
       !position ||
       position.quantity
         .sub(position.reservedQuantity ?? new Prisma.Decimal(0))
+        .add(releasable)
         .lt(input.quantity)
     ) {
       setAdminDiagnosticContext({

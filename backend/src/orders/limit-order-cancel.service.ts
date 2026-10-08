@@ -2,6 +2,12 @@ import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
 import { diagnosePositionMutationFailure } from './position-failure-diagnosis';
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import {
+  finishProtection,
+  liveProtection,
+  protectionOrderCanceled,
+} from '../conditional/conditional-state';
+import { lockSeasonTradingContext } from '../seasons/season-trading-lock';
+import {
   CurrencyCode,
   WalletScope,
   OrderSide,
@@ -114,6 +120,30 @@ type CancelTransactionClient = Prisma.TransactionClient;
  */
 @Injectable()
 export class LimitOrderCancelService {
+  /** Account/lifecycle fence precedes this existing Order → reservation lock. */
+  async cancelConditionalChildInTransaction(
+    tx: CancelTransactionClient,
+    orderId: string,
+    reason: LimitOrderCancelReason,
+    now: Date,
+  ) {
+    await tx.$queryRaw`SELECT id FROM orders WHERE id = ${orderId} FOR UPDATE`;
+    const order = await tx.order.findUnique({ where: { id: orderId } });
+    if (!order || order.status !== 'submitted' || order.orderType !== 'limit')
+      return;
+    await this.releaseAndCancelLockedOrder(tx, {
+      orderId,
+      side: order.side,
+      assetId: order.assetId,
+      tradingAccountId: order.tradingAccountId,
+      currencyCode: order.currencyCode,
+      cashWalletScope: order.cashWalletScope,
+      reservedAmount: order.reservedAmount,
+      reservedQuantity: order.reservedQuantity,
+      cancelReason: reason,
+      canceledAt: now,
+    });
+  }
   private readonly logger = new Logger(LimitOrderCancelService.name);
 
   constructor(
@@ -363,6 +393,18 @@ export class LimitOrderCancelService {
       canceledOrderCount += 1;
     }
 
+    const protections = await tx.protectionGroup.findMany({
+      where: { tradingAccountId: input.tradingAccountId, ...liveProtection },
+      select: { id: true },
+    });
+    for (const group of protections)
+      await finishProtection(
+        tx,
+        group.id,
+        'canceled',
+        input.reason,
+        input.canceledAt,
+      );
     return {
       canceledOrderCount,
       releasedReservationCount: canceledOrderCount,
@@ -477,6 +519,46 @@ export class LimitOrderCancelService {
       }
     }
 
+    if (input.isLockOwned && !input.isLockOwned())
+      // @diagnosticSurface internal: Existing Ops runner records lease loss before another cleanup query.
+      throw new Error('Ops job lock ownership was lost.');
+    // The same lifecycle cleanup also handles armed groups with no submitted
+    // Order (including Futures intents). Bounded work resumes next lifecycle tick.
+    const protections = await this.prisma.protectionGroup.findMany({
+      where: {
+        ...liveProtection,
+        tradingAccount: {
+          mode: 'season',
+          seasonParticipant: {
+            season: { status: { in: ['ended', 'settled'] } },
+          },
+        },
+      },
+      select: {
+        tradingAccountId: true,
+        tradingAccount: {
+          select: { seasonParticipant: { select: { id: true } } },
+        },
+      },
+      orderBy: { id: 'asc' },
+      take: batchSize,
+    });
+    for (const group of protections) {
+      if (input.isLockOwned && !input.isLockOwned())
+        // @diagnosticSurface internal: Existing Ops runner records lease loss and retries lifecycle cleanup.
+        throw new Error('Ops job lock ownership was lost.');
+      await this.prisma.$transaction(async (tx) => {
+        await lockSeasonTradingContext(tx, {
+          seasonParticipantId: group.tradingAccount.seasonParticipant!.id,
+          participantWrite: true,
+        });
+        await this.cancelOpenLimitBuysForParticipantInTransaction(tx, {
+          tradingAccountId: group.tradingAccountId,
+          reason: 'season_ended',
+          canceledAt: input.now,
+        });
+      });
+    }
     if (canceledOrderCount > 0) {
       this.logger.log(
         JSON.stringify({
@@ -797,6 +879,12 @@ export class LimitOrderCancelService {
       );
     }
 
+    await protectionOrderCanceled(
+      tx,
+      input.orderId,
+      input.cancelReason,
+      input.canceledAt,
+    );
     return {
       reservedAmount: releasedAmountText,
       reservedQuantity: releasedQuantityText,

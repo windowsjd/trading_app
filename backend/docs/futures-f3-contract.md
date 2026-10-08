@@ -40,8 +40,13 @@ General keeps stored `timeWeightedReturnFactor` and existing external-funding
 boundaries. An internal USD transfer changes no performance; FX fees/repricing
 retain their existing economic effect. Ad reward boundaries include the same
 Mark UPNL before/after and neutralize only the external cash. Season keeps simple
-initial-capital return and the existing ranking order/ties/fill-count policy.
+initial-capital return and the existing ranking order/ties. F3.1 counts each
+committed Season user Futures execution once in totalFillCount, excluding replay,
+rollback, liquidation and final forced settlement.
 Current/daily/final maxDrawdown uses the same total-equity history.
+Final history stops at endAt, preserving exact-boundary observations before the
+final economic point. Settled Home/Portfolio use persisted final results.
+See [F3.1 hardening](futures-f31-contract.md) for immutable reads and Mark retention.
 
 EquitySnapshot and DailyPortfolioSnapshot add nullable signed
 `futuresUnrealizedPnlUsd`, `futuresUnrealizedPnlKrw` and `futuresValuationJson`.
@@ -183,9 +188,11 @@ Before a separately authorized production enable:
    durable evidence, and do not downgrade to a pre-F3 valuation server while open
    Futures or final-exit evidence exists. Fix/roll forward compatible code instead.
 
-No microservice, bus, queue, new margin wallet or clearing system. No SL/TP/OCO,
-conditional-order framework, limit/partial fill, funding, hedge mode, brackets,
-partial liquidation, ADL, insurance or real Binance account/order APIs.
+F3 itself introduced no conditional orders. The subsequent
+[Conditional v1](conditional-orders-contract.md) adds SL/TP/OCO exits using Spot
+reference evidence. No microservice, bus, queue, new margin wallet, clearing
+system, standalone Futures Limit entry, Futures partial fill, funding, hedge mode,
+brackets, partial liquidation, ADL, insurance or real Binance account/order APIs.
 
 Provider references: [Binance USDⓈ-M market data](https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/market-data),
 [Mark streams](https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/ws-streams/market).

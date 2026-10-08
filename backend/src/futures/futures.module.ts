@@ -9,16 +9,19 @@ import { GeneralPerformanceModule } from '../portfolio/general-performance.modul
 import { FuturesController } from './futures.controller';
 import { FuturesService } from './futures.service';
 import { FuturesPerformanceService } from './futures-performance.service';
+import { FuturesMarkRetentionService } from './futures-mark-retention.service';
 
 @Module({
   imports: [TradingAccountsModule, GeneralPerformanceModule],
   controllers: [FuturesController],
+  exports: [FuturesService],
   providers: [
     FuturesPerformanceService,
     FuturesService,
     FuturesLiquidationService,
     FuturesRiskWorker,
     FuturesMarkIngestion,
+    FuturesMarkRetentionService,
     OpsJobLockService,
     OpsJobRunService,
   ],

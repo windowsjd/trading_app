@@ -1,3 +1,4 @@
+import { emptyProtectionState } from '../../test/support/empty-protection-state';
 jest.mock('../generated/prisma/client', () => {
   const { Decimal, sqltag } = jest.requireActual<
     typeof import('@prisma/client/runtime/client')
@@ -174,6 +175,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
   };
 
   const createPrisma = () => ({
+    ...emptyProtectionState(),
     season: { findFirst: jest.fn() },
     seasonParticipant: { findUnique: jest.fn() },
     asset: { findUnique: jest.fn() },

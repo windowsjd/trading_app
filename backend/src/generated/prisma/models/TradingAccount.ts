@@ -263,6 +263,8 @@ export type TradingAccountWhereInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestListRelationFilter
   futuresLiquidations?: Prisma.FuturesLiquidationListRelationFilter
   futuresSeasonSettlement?: Prisma.XOR<Prisma.FuturesSeasonSettlementNullableScalarRelationFilter, Prisma.FuturesSeasonSettlementWhereInput> | null
+  protectionGroups?: Prisma.ProtectionGroupListRelationFilter
+  protectionCommands?: Prisma.ProtectionCommandListRelationFilter
   quotes?: Prisma.QuoteListRelationFilter
   adRewardClaims?: Prisma.AdRewardClaimListRelationFilter
   equitySnapshots?: Prisma.EquitySnapshotListRelationFilter
@@ -295,6 +297,8 @@ export type TradingAccountOrderByWithRelationInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestOrderByRelationAggregateInput
   futuresLiquidations?: Prisma.FuturesLiquidationOrderByRelationAggregateInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementOrderByWithRelationInput
+  protectionGroups?: Prisma.ProtectionGroupOrderByRelationAggregateInput
+  protectionCommands?: Prisma.ProtectionCommandOrderByRelationAggregateInput
   quotes?: Prisma.QuoteOrderByRelationAggregateInput
   adRewardClaims?: Prisma.AdRewardClaimOrderByRelationAggregateInput
   equitySnapshots?: Prisma.EquitySnapshotOrderByRelationAggregateInput
@@ -330,6 +334,8 @@ export type TradingAccountWhereUniqueInput = Prisma.AtLeast<{
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestListRelationFilter
   futuresLiquidations?: Prisma.FuturesLiquidationListRelationFilter
   futuresSeasonSettlement?: Prisma.XOR<Prisma.FuturesSeasonSettlementNullableScalarRelationFilter, Prisma.FuturesSeasonSettlementWhereInput> | null
+  protectionGroups?: Prisma.ProtectionGroupListRelationFilter
+  protectionCommands?: Prisma.ProtectionCommandListRelationFilter
   quotes?: Prisma.QuoteListRelationFilter
   adRewardClaims?: Prisma.AdRewardClaimListRelationFilter
   equitySnapshots?: Prisma.EquitySnapshotListRelationFilter
@@ -393,6 +399,8 @@ export type TradingAccountCreateInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
@@ -424,6 +432,8 @@ export type TradingAccountUncheckedCreateInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -455,6 +465,8 @@ export type TradingAccountUpdateInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -486,6 +498,8 @@ export type TradingAccountUncheckedUpdateInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -699,6 +713,34 @@ export type TradingAccountUpdateOneRequiredWithoutFuturesExecuteRequestsNestedIn
   upsert?: Prisma.TradingAccountUpsertWithoutFuturesExecuteRequestsInput
   connect?: Prisma.TradingAccountWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutFuturesExecuteRequestsInput, Prisma.TradingAccountUpdateWithoutFuturesExecuteRequestsInput>, Prisma.TradingAccountUncheckedUpdateWithoutFuturesExecuteRequestsInput>
+}
+
+export type TradingAccountCreateNestedOneWithoutProtectionGroupsInput = {
+  create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutProtectionGroupsInput, Prisma.TradingAccountUncheckedCreateWithoutProtectionGroupsInput>
+  connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutProtectionGroupsInput
+  connect?: Prisma.TradingAccountWhereUniqueInput
+}
+
+export type TradingAccountUpdateOneRequiredWithoutProtectionGroupsNestedInput = {
+  create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutProtectionGroupsInput, Prisma.TradingAccountUncheckedCreateWithoutProtectionGroupsInput>
+  connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutProtectionGroupsInput
+  upsert?: Prisma.TradingAccountUpsertWithoutProtectionGroupsInput
+  connect?: Prisma.TradingAccountWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutProtectionGroupsInput, Prisma.TradingAccountUpdateWithoutProtectionGroupsInput>, Prisma.TradingAccountUncheckedUpdateWithoutProtectionGroupsInput>
+}
+
+export type TradingAccountCreateNestedOneWithoutProtectionCommandsInput = {
+  create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutProtectionCommandsInput, Prisma.TradingAccountUncheckedCreateWithoutProtectionCommandsInput>
+  connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutProtectionCommandsInput
+  connect?: Prisma.TradingAccountWhereUniqueInput
+}
+
+export type TradingAccountUpdateOneRequiredWithoutProtectionCommandsNestedInput = {
+  create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutProtectionCommandsInput, Prisma.TradingAccountUncheckedCreateWithoutProtectionCommandsInput>
+  connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutProtectionCommandsInput
+  upsert?: Prisma.TradingAccountUpsertWithoutProtectionCommandsInput
+  connect?: Prisma.TradingAccountWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutProtectionCommandsInput, Prisma.TradingAccountUpdateWithoutProtectionCommandsInput>, Prisma.TradingAccountUncheckedUpdateWithoutProtectionCommandsInput>
 }
 
 export type TradingAccountCreateNestedOneWithoutPositionsInput = {
@@ -934,6 +976,8 @@ export type TradingAccountCreateWithoutUserInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
@@ -964,6 +1008,8 @@ export type TradingAccountUncheckedCreateWithoutUserInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1035,6 +1081,8 @@ export type TradingAccountCreateWithoutSeasonParticipantInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
@@ -1065,6 +1113,8 @@ export type TradingAccountUncheckedCreateWithoutSeasonParticipantInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1111,6 +1161,8 @@ export type TradingAccountUpdateWithoutSeasonParticipantInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -1141,6 +1193,8 @@ export type TradingAccountUncheckedUpdateWithoutSeasonParticipantInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1171,6 +1225,8 @@ export type TradingAccountCreateWithoutFuturesPositionsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
@@ -1201,6 +1257,8 @@ export type TradingAccountUncheckedCreateWithoutFuturesPositionsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1247,6 +1305,8 @@ export type TradingAccountUpdateWithoutFuturesPositionsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -1277,6 +1337,8 @@ export type TradingAccountUncheckedUpdateWithoutFuturesPositionsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1307,6 +1369,8 @@ export type TradingAccountCreateWithoutFuturesExecutionsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
@@ -1337,6 +1401,8 @@ export type TradingAccountUncheckedCreateWithoutFuturesExecutionsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1383,6 +1449,8 @@ export type TradingAccountUpdateWithoutFuturesExecutionsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -1413,6 +1481,8 @@ export type TradingAccountUncheckedUpdateWithoutFuturesExecutionsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1443,6 +1513,8 @@ export type TradingAccountCreateWithoutFuturesExecuteRequestsInput = {
   futuresExecutions?: Prisma.FuturesExecutionCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
@@ -1473,6 +1545,8 @@ export type TradingAccountUncheckedCreateWithoutFuturesExecuteRequestsInput = {
   futuresExecutions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1519,6 +1593,8 @@ export type TradingAccountUpdateWithoutFuturesExecuteRequestsInput = {
   futuresExecutions?: Prisma.FuturesExecutionUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -1549,6 +1625,296 @@ export type TradingAccountUncheckedUpdateWithoutFuturesExecuteRequestsInput = {
   futuresExecutions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
+  equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
+}
+
+export type TradingAccountCreateWithoutProtectionGroupsInput = {
+  id?: string
+  mode: $Enums.TradingAccountMode
+  status?: $Enums.TradingAccountStatus
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt: Date | string
+  closedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  user: Prisma.UserCreateNestedOneWithoutTradingAccountsInput
+  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutTradingAccountInput
+  cashWallets?: Prisma.CashWalletCreateNestedManyWithoutTradingAccountInput
+  walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferCreateNestedManyWithoutTradingAccountInput
+  walletTransferExecuteRequests?: Prisma.WalletTransferExecuteRequestCreateNestedManyWithoutTradingAccountInput
+  exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutTradingAccountInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
+  orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
+  positions?: Prisma.PositionCreateNestedManyWithoutTradingAccountInput
+  futuresPositions?: Prisma.FuturesPositionCreateNestedManyWithoutTradingAccountInput
+  futuresExecutions?: Prisma.FuturesExecutionCreateNestedManyWithoutTradingAccountInput
+  futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
+  futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
+  futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
+  equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
+  seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
+}
+
+export type TradingAccountUncheckedCreateWithoutProtectionGroupsInput = {
+  id?: string
+  userId: string
+  mode: $Enums.TradingAccountMode
+  status?: $Enums.TradingAccountStatus
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt: Date | string
+  closedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipant?: Prisma.SeasonParticipantUncheckedCreateNestedOneWithoutTradingAccountInput
+  cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransferExecuteRequests?: Prisma.WalletTransferExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
+  exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  positions?: Prisma.PositionUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresPositions?: Prisma.FuturesPositionUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresExecutions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
+  equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
+}
+
+export type TradingAccountCreateOrConnectWithoutProtectionGroupsInput = {
+  where: Prisma.TradingAccountWhereUniqueInput
+  create: Prisma.XOR<Prisma.TradingAccountCreateWithoutProtectionGroupsInput, Prisma.TradingAccountUncheckedCreateWithoutProtectionGroupsInput>
+}
+
+export type TradingAccountUpsertWithoutProtectionGroupsInput = {
+  update: Prisma.XOR<Prisma.TradingAccountUpdateWithoutProtectionGroupsInput, Prisma.TradingAccountUncheckedUpdateWithoutProtectionGroupsInput>
+  create: Prisma.XOR<Prisma.TradingAccountCreateWithoutProtectionGroupsInput, Prisma.TradingAccountUncheckedCreateWithoutProtectionGroupsInput>
+  where?: Prisma.TradingAccountWhereInput
+}
+
+export type TradingAccountUpdateToOneWithWhereWithoutProtectionGroupsInput = {
+  where?: Prisma.TradingAccountWhereInput
+  data: Prisma.XOR<Prisma.TradingAccountUpdateWithoutProtectionGroupsInput, Prisma.TradingAccountUncheckedUpdateWithoutProtectionGroupsInput>
+}
+
+export type TradingAccountUpdateWithoutProtectionGroupsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  mode?: Prisma.EnumTradingAccountModeFieldUpdateOperationsInput | $Enums.TradingAccountMode
+  status?: Prisma.EnumTradingAccountStatusFieldUpdateOperationsInput | $Enums.TradingAccountStatus
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  user?: Prisma.UserUpdateOneRequiredWithoutTradingAccountsNestedInput
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutTradingAccountNestedInput
+  cashWallets?: Prisma.CashWalletUpdateManyWithoutTradingAccountNestedInput
+  walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUpdateManyWithoutTradingAccountNestedInput
+  walletTransferExecuteRequests?: Prisma.WalletTransferExecuteRequestUpdateManyWithoutTradingAccountNestedInput
+  exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutTradingAccountNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
+  positions?: Prisma.PositionUpdateManyWithoutTradingAccountNestedInput
+  futuresPositions?: Prisma.FuturesPositionUpdateManyWithoutTradingAccountNestedInput
+  futuresExecutions?: Prisma.FuturesExecutionUpdateManyWithoutTradingAccountNestedInput
+  futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
+  futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
+  futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
+  equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
+  seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
+}
+
+export type TradingAccountUncheckedUpdateWithoutProtectionGroupsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  mode?: Prisma.EnumTradingAccountModeFieldUpdateOperationsInput | $Enums.TradingAccountMode
+  status?: Prisma.EnumTradingAccountStatusFieldUpdateOperationsInput | $Enums.TradingAccountStatus
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipant?: Prisma.SeasonParticipantUncheckedUpdateOneWithoutTradingAccountNestedInput
+  cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransferExecuteRequests?: Prisma.WalletTransferExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
+  exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  positions?: Prisma.PositionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresPositions?: Prisma.FuturesPositionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresExecutions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
+  equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
+}
+
+export type TradingAccountCreateWithoutProtectionCommandsInput = {
+  id?: string
+  mode: $Enums.TradingAccountMode
+  status?: $Enums.TradingAccountStatus
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt: Date | string
+  closedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  user: Prisma.UserCreateNestedOneWithoutTradingAccountsInput
+  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutTradingAccountInput
+  cashWallets?: Prisma.CashWalletCreateNestedManyWithoutTradingAccountInput
+  walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferCreateNestedManyWithoutTradingAccountInput
+  walletTransferExecuteRequests?: Prisma.WalletTransferExecuteRequestCreateNestedManyWithoutTradingAccountInput
+  exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutTradingAccountInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
+  orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
+  positions?: Prisma.PositionCreateNestedManyWithoutTradingAccountInput
+  futuresPositions?: Prisma.FuturesPositionCreateNestedManyWithoutTradingAccountInput
+  futuresExecutions?: Prisma.FuturesExecutionCreateNestedManyWithoutTradingAccountInput
+  futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
+  futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
+  futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
+  equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
+  seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
+}
+
+export type TradingAccountUncheckedCreateWithoutProtectionCommandsInput = {
+  id?: string
+  userId: string
+  mode: $Enums.TradingAccountMode
+  status?: $Enums.TradingAccountStatus
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt: Date | string
+  closedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipant?: Prisma.SeasonParticipantUncheckedCreateNestedOneWithoutTradingAccountInput
+  cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransferExecuteRequests?: Prisma.WalletTransferExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
+  exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  positions?: Prisma.PositionUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresPositions?: Prisma.FuturesPositionUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresExecutions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
+  equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
+}
+
+export type TradingAccountCreateOrConnectWithoutProtectionCommandsInput = {
+  where: Prisma.TradingAccountWhereUniqueInput
+  create: Prisma.XOR<Prisma.TradingAccountCreateWithoutProtectionCommandsInput, Prisma.TradingAccountUncheckedCreateWithoutProtectionCommandsInput>
+}
+
+export type TradingAccountUpsertWithoutProtectionCommandsInput = {
+  update: Prisma.XOR<Prisma.TradingAccountUpdateWithoutProtectionCommandsInput, Prisma.TradingAccountUncheckedUpdateWithoutProtectionCommandsInput>
+  create: Prisma.XOR<Prisma.TradingAccountCreateWithoutProtectionCommandsInput, Prisma.TradingAccountUncheckedCreateWithoutProtectionCommandsInput>
+  where?: Prisma.TradingAccountWhereInput
+}
+
+export type TradingAccountUpdateToOneWithWhereWithoutProtectionCommandsInput = {
+  where?: Prisma.TradingAccountWhereInput
+  data: Prisma.XOR<Prisma.TradingAccountUpdateWithoutProtectionCommandsInput, Prisma.TradingAccountUncheckedUpdateWithoutProtectionCommandsInput>
+}
+
+export type TradingAccountUpdateWithoutProtectionCommandsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  mode?: Prisma.EnumTradingAccountModeFieldUpdateOperationsInput | $Enums.TradingAccountMode
+  status?: Prisma.EnumTradingAccountStatusFieldUpdateOperationsInput | $Enums.TradingAccountStatus
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  user?: Prisma.UserUpdateOneRequiredWithoutTradingAccountsNestedInput
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutTradingAccountNestedInput
+  cashWallets?: Prisma.CashWalletUpdateManyWithoutTradingAccountNestedInput
+  walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUpdateManyWithoutTradingAccountNestedInput
+  walletTransferExecuteRequests?: Prisma.WalletTransferExecuteRequestUpdateManyWithoutTradingAccountNestedInput
+  exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutTradingAccountNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
+  positions?: Prisma.PositionUpdateManyWithoutTradingAccountNestedInput
+  futuresPositions?: Prisma.FuturesPositionUpdateManyWithoutTradingAccountNestedInput
+  futuresExecutions?: Prisma.FuturesExecutionUpdateManyWithoutTradingAccountNestedInput
+  futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
+  futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
+  futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
+  equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
+  seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
+}
+
+export type TradingAccountUncheckedUpdateWithoutProtectionCommandsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  mode?: Prisma.EnumTradingAccountModeFieldUpdateOperationsInput | $Enums.TradingAccountMode
+  status?: Prisma.EnumTradingAccountStatusFieldUpdateOperationsInput | $Enums.TradingAccountStatus
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipant?: Prisma.SeasonParticipantUncheckedUpdateOneWithoutTradingAccountNestedInput
+  cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransferExecuteRequests?: Prisma.WalletTransferExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
+  exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  positions?: Prisma.PositionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresPositions?: Prisma.FuturesPositionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresExecutions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1579,6 +1945,8 @@ export type TradingAccountCreateWithoutPositionsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
@@ -1609,6 +1977,8 @@ export type TradingAccountUncheckedCreateWithoutPositionsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1655,6 +2025,8 @@ export type TradingAccountUpdateWithoutPositionsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -1685,6 +2057,8 @@ export type TradingAccountUncheckedUpdateWithoutPositionsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1715,6 +2089,8 @@ export type TradingAccountCreateWithoutOrdersInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
@@ -1745,6 +2121,8 @@ export type TradingAccountUncheckedCreateWithoutOrdersInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1791,6 +2169,8 @@ export type TradingAccountUpdateWithoutOrdersInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -1821,6 +2201,8 @@ export type TradingAccountUncheckedUpdateWithoutOrdersInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1851,6 +2233,8 @@ export type TradingAccountCreateWithoutCashWalletsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
@@ -1881,6 +2265,8 @@ export type TradingAccountUncheckedCreateWithoutCashWalletsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1927,6 +2313,8 @@ export type TradingAccountUpdateWithoutCashWalletsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -1957,6 +2345,8 @@ export type TradingAccountUncheckedUpdateWithoutCashWalletsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1987,6 +2377,8 @@ export type TradingAccountCreateWithoutWalletTransactionsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
@@ -2017,6 +2409,8 @@ export type TradingAccountUncheckedCreateWithoutWalletTransactionsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -2063,6 +2457,8 @@ export type TradingAccountUpdateWithoutWalletTransactionsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -2093,6 +2489,8 @@ export type TradingAccountUncheckedUpdateWithoutWalletTransactionsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -2124,6 +2522,8 @@ export type TradingAccountCreateWithoutAdRewardClaimsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
@@ -2154,6 +2554,8 @@ export type TradingAccountUncheckedCreateWithoutAdRewardClaimsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -2200,6 +2602,8 @@ export type TradingAccountUpdateWithoutAdRewardClaimsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -2230,6 +2634,8 @@ export type TradingAccountUncheckedUpdateWithoutAdRewardClaimsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -2259,6 +2665,8 @@ export type TradingAccountCreateWithoutExchangeTransactionsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
@@ -2289,6 +2697,8 @@ export type TradingAccountUncheckedCreateWithoutExchangeTransactionsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -2335,6 +2745,8 @@ export type TradingAccountUpdateWithoutExchangeTransactionsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -2365,6 +2777,8 @@ export type TradingAccountUncheckedUpdateWithoutExchangeTransactionsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -2396,6 +2810,8 @@ export type TradingAccountCreateWithoutQuotesInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
@@ -2426,6 +2842,8 @@ export type TradingAccountUncheckedCreateWithoutQuotesInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -2472,6 +2890,8 @@ export type TradingAccountUpdateWithoutQuotesInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -2502,6 +2922,8 @@ export type TradingAccountUncheckedUpdateWithoutQuotesInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -2531,6 +2953,8 @@ export type TradingAccountCreateWithoutWalletTransfersInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
@@ -2561,6 +2985,8 @@ export type TradingAccountUncheckedCreateWithoutWalletTransfersInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -2607,6 +3033,8 @@ export type TradingAccountUpdateWithoutWalletTransfersInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -2637,6 +3065,8 @@ export type TradingAccountUncheckedUpdateWithoutWalletTransfersInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -2667,6 +3097,8 @@ export type TradingAccountCreateWithoutWalletTransferExecuteRequestsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
@@ -2697,6 +3129,8 @@ export type TradingAccountUncheckedCreateWithoutWalletTransferExecuteRequestsInp
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -2743,6 +3177,8 @@ export type TradingAccountUpdateWithoutWalletTransferExecuteRequestsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -2773,6 +3209,8 @@ export type TradingAccountUncheckedUpdateWithoutWalletTransferExecuteRequestsInp
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -2803,6 +3241,8 @@ export type TradingAccountCreateWithoutFxExecuteRequestsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
@@ -2833,6 +3273,8 @@ export type TradingAccountUncheckedCreateWithoutFxExecuteRequestsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -2879,6 +3321,8 @@ export type TradingAccountUpdateWithoutFxExecuteRequestsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -2909,6 +3353,8 @@ export type TradingAccountUncheckedUpdateWithoutFxExecuteRequestsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -2940,6 +3386,8 @@ export type TradingAccountCreateWithoutEquitySnapshotsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
@@ -2970,6 +3418,8 @@ export type TradingAccountUncheckedCreateWithoutEquitySnapshotsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -3016,6 +3466,8 @@ export type TradingAccountUpdateWithoutEquitySnapshotsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -3046,6 +3498,8 @@ export type TradingAccountUncheckedUpdateWithoutEquitySnapshotsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -3076,6 +3530,8 @@ export type TradingAccountCreateWithoutDailyPortfolioSnapshotsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
@@ -3106,6 +3562,8 @@ export type TradingAccountUncheckedCreateWithoutDailyPortfolioSnapshotsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -3152,6 +3610,8 @@ export type TradingAccountUpdateWithoutDailyPortfolioSnapshotsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -3182,6 +3642,8 @@ export type TradingAccountUncheckedUpdateWithoutDailyPortfolioSnapshotsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -3212,6 +3674,8 @@ export type TradingAccountCreateWithoutSeasonRankingsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
@@ -3242,6 +3706,8 @@ export type TradingAccountUncheckedCreateWithoutSeasonRankingsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -3288,6 +3754,8 @@ export type TradingAccountUpdateWithoutSeasonRankingsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -3318,6 +3786,8 @@ export type TradingAccountUncheckedUpdateWithoutSeasonRankingsInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -3347,6 +3817,8 @@ export type TradingAccountCreateWithoutFuturesLiquidationsInput = {
   futuresExecutions?: Prisma.FuturesExecutionCreateNestedManyWithoutTradingAccountInput
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
@@ -3377,6 +3849,8 @@ export type TradingAccountUncheckedCreateWithoutFuturesLiquidationsInput = {
   futuresExecutions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -3423,6 +3897,8 @@ export type TradingAccountUpdateWithoutFuturesLiquidationsInput = {
   futuresExecutions?: Prisma.FuturesExecutionUpdateManyWithoutTradingAccountNestedInput
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -3453,6 +3929,8 @@ export type TradingAccountUncheckedUpdateWithoutFuturesLiquidationsInput = {
   futuresExecutions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -3483,6 +3961,8 @@ export type TradingAccountCreateWithoutFuturesSeasonSettlementInput = {
   futuresExecutions?: Prisma.FuturesExecutionCreateNestedManyWithoutTradingAccountInput
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
@@ -3513,6 +3993,8 @@ export type TradingAccountUncheckedCreateWithoutFuturesSeasonSettlementInput = {
   futuresExecutions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -3559,6 +4041,8 @@ export type TradingAccountUpdateWithoutFuturesSeasonSettlementInput = {
   futuresExecutions?: Prisma.FuturesExecutionUpdateManyWithoutTradingAccountNestedInput
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -3589,6 +4073,8 @@ export type TradingAccountUncheckedUpdateWithoutFuturesSeasonSettlementInput = {
   futuresExecutions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -3630,6 +4116,8 @@ export type TradingAccountUpdateWithoutUserInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -3660,6 +4148,8 @@ export type TradingAccountUncheckedUpdateWithoutUserInput = {
   futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -3696,6 +4186,8 @@ export type TradingAccountCountOutputType = {
   futuresExecutions: number
   futuresExecuteRequests: number
   futuresLiquidations: number
+  protectionGroups: number
+  protectionCommands: number
   quotes: number
   adRewardClaims: number
   equitySnapshots: number
@@ -3716,6 +4208,8 @@ export type TradingAccountCountOutputTypeSelect<ExtArgs extends runtime.Types.Ex
   futuresExecutions?: boolean | TradingAccountCountOutputTypeCountFuturesExecutionsArgs
   futuresExecuteRequests?: boolean | TradingAccountCountOutputTypeCountFuturesExecuteRequestsArgs
   futuresLiquidations?: boolean | TradingAccountCountOutputTypeCountFuturesLiquidationsArgs
+  protectionGroups?: boolean | TradingAccountCountOutputTypeCountProtectionGroupsArgs
+  protectionCommands?: boolean | TradingAccountCountOutputTypeCountProtectionCommandsArgs
   quotes?: boolean | TradingAccountCountOutputTypeCountQuotesArgs
   adRewardClaims?: boolean | TradingAccountCountOutputTypeCountAdRewardClaimsArgs
   equitySnapshots?: boolean | TradingAccountCountOutputTypeCountEquitySnapshotsArgs
@@ -3820,6 +4314,20 @@ export type TradingAccountCountOutputTypeCountFuturesLiquidationsArgs<ExtArgs ex
 /**
  * TradingAccountCountOutputType without action
  */
+export type TradingAccountCountOutputTypeCountProtectionGroupsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ProtectionGroupWhereInput
+}
+
+/**
+ * TradingAccountCountOutputType without action
+ */
+export type TradingAccountCountOutputTypeCountProtectionCommandsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ProtectionCommandWhereInput
+}
+
+/**
+ * TradingAccountCountOutputType without action
+ */
 export type TradingAccountCountOutputTypeCountQuotesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.QuoteWhereInput
 }
@@ -3878,6 +4386,8 @@ export type TradingAccountSelect<ExtArgs extends runtime.Types.Extensions.Intern
   futuresExecuteRequests?: boolean | Prisma.TradingAccount$futuresExecuteRequestsArgs<ExtArgs>
   futuresLiquidations?: boolean | Prisma.TradingAccount$futuresLiquidationsArgs<ExtArgs>
   futuresSeasonSettlement?: boolean | Prisma.TradingAccount$futuresSeasonSettlementArgs<ExtArgs>
+  protectionGroups?: boolean | Prisma.TradingAccount$protectionGroupsArgs<ExtArgs>
+  protectionCommands?: boolean | Prisma.TradingAccount$protectionCommandsArgs<ExtArgs>
   quotes?: boolean | Prisma.TradingAccount$quotesArgs<ExtArgs>
   adRewardClaims?: boolean | Prisma.TradingAccount$adRewardClaimsArgs<ExtArgs>
   equitySnapshots?: boolean | Prisma.TradingAccount$equitySnapshotsArgs<ExtArgs>
@@ -3941,6 +4451,8 @@ export type TradingAccountInclude<ExtArgs extends runtime.Types.Extensions.Inter
   futuresExecuteRequests?: boolean | Prisma.TradingAccount$futuresExecuteRequestsArgs<ExtArgs>
   futuresLiquidations?: boolean | Prisma.TradingAccount$futuresLiquidationsArgs<ExtArgs>
   futuresSeasonSettlement?: boolean | Prisma.TradingAccount$futuresSeasonSettlementArgs<ExtArgs>
+  protectionGroups?: boolean | Prisma.TradingAccount$protectionGroupsArgs<ExtArgs>
+  protectionCommands?: boolean | Prisma.TradingAccount$protectionCommandsArgs<ExtArgs>
   quotes?: boolean | Prisma.TradingAccount$quotesArgs<ExtArgs>
   adRewardClaims?: boolean | Prisma.TradingAccount$adRewardClaimsArgs<ExtArgs>
   equitySnapshots?: boolean | Prisma.TradingAccount$equitySnapshotsArgs<ExtArgs>
@@ -3973,6 +4485,8 @@ export type $TradingAccountPayload<ExtArgs extends runtime.Types.Extensions.Inte
     futuresExecuteRequests: Prisma.$FuturesExecuteRequestPayload<ExtArgs>[]
     futuresLiquidations: Prisma.$FuturesLiquidationPayload<ExtArgs>[]
     futuresSeasonSettlement: Prisma.$FuturesSeasonSettlementPayload<ExtArgs> | null
+    protectionGroups: Prisma.$ProtectionGroupPayload<ExtArgs>[]
+    protectionCommands: Prisma.$ProtectionCommandPayload<ExtArgs>[]
     quotes: Prisma.$QuotePayload<ExtArgs>[]
     adRewardClaims: Prisma.$AdRewardClaimPayload<ExtArgs>[]
     equitySnapshots: Prisma.$EquitySnapshotPayload<ExtArgs>[]
@@ -4398,6 +4912,8 @@ export interface Prisma__TradingAccountClient<T, Null = never, ExtArgs extends r
   futuresExecuteRequests<T extends Prisma.TradingAccount$futuresExecuteRequestsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$futuresExecuteRequestsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesExecuteRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   futuresLiquidations<T extends Prisma.TradingAccount$futuresLiquidationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$futuresLiquidationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesLiquidationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   futuresSeasonSettlement<T extends Prisma.TradingAccount$futuresSeasonSettlementArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$futuresSeasonSettlementArgs<ExtArgs>>): Prisma.Prisma__FuturesSeasonSettlementClient<runtime.Types.Result.GetResult<Prisma.$FuturesSeasonSettlementPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  protectionGroups<T extends Prisma.TradingAccount$protectionGroupsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$protectionGroupsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProtectionGroupPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  protectionCommands<T extends Prisma.TradingAccount$protectionCommandsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$protectionCommandsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProtectionCommandPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   quotes<T extends Prisma.TradingAccount$quotesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$quotesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$QuotePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   adRewardClaims<T extends Prisma.TradingAccount$adRewardClaimsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$adRewardClaimsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AdRewardClaimPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   equitySnapshots<T extends Prisma.TradingAccount$equitySnapshotsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$equitySnapshotsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$EquitySnapshotPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -5165,6 +5681,54 @@ export type TradingAccount$futuresSeasonSettlementArgs<ExtArgs extends runtime.T
    */
   include?: Prisma.FuturesSeasonSettlementInclude<ExtArgs> | null
   where?: Prisma.FuturesSeasonSettlementWhereInput
+}
+
+/**
+ * TradingAccount.protectionGroups
+ */
+export type TradingAccount$protectionGroupsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ProtectionGroup
+   */
+  select?: Prisma.ProtectionGroupSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ProtectionGroup
+   */
+  omit?: Prisma.ProtectionGroupOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ProtectionGroupInclude<ExtArgs> | null
+  where?: Prisma.ProtectionGroupWhereInput
+  orderBy?: Prisma.ProtectionGroupOrderByWithRelationInput | Prisma.ProtectionGroupOrderByWithRelationInput[]
+  cursor?: Prisma.ProtectionGroupWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ProtectionGroupScalarFieldEnum | Prisma.ProtectionGroupScalarFieldEnum[]
+}
+
+/**
+ * TradingAccount.protectionCommands
+ */
+export type TradingAccount$protectionCommandsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ProtectionCommand
+   */
+  select?: Prisma.ProtectionCommandSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ProtectionCommand
+   */
+  omit?: Prisma.ProtectionCommandOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ProtectionCommandInclude<ExtArgs> | null
+  where?: Prisma.ProtectionCommandWhereInput
+  orderBy?: Prisma.ProtectionCommandOrderByWithRelationInput | Prisma.ProtectionCommandOrderByWithRelationInput[]
+  cursor?: Prisma.ProtectionCommandWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ProtectionCommandScalarFieldEnum | Prisma.ProtectionCommandScalarFieldEnum[]
 }
 
 /**

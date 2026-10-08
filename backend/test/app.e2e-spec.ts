@@ -207,6 +207,8 @@ import { PrismaService } from './../src/prisma/prisma.service';
 import { RedisService } from './../src/redis/redis.service';
 import { TradingAccountWalletTransferService } from '../src/wallets/trading-account-wallet-transfer.service';
 import { TradingAccountWalletFxTransferService } from '../src/wallets/trading-account-wallet-fx-transfer.service';
+import { emptyProtectionState } from './support/empty-protection-state';
+import { ConditionalService } from '../src/conditional/conditional.service';
 import { FuturesService } from '../src/futures/futures.service';
 import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
 import { adminDiagnosticRequestMiddleware } from './../src/common/admin-diagnostics';
@@ -217,7 +219,7 @@ const mockedArgon2 = jest.mocked(argon2);
 
 type HttpMethod = 'get' | 'patch' | 'post';
 
-type PrismaMock = {
+type PrismaMock = ReturnType<typeof emptyProtectionState> & {
   $connect: jest.Mock;
   $disconnect: jest.Mock;
   $queryRaw: jest.Mock;
@@ -519,6 +521,7 @@ describe('AppController (e2e)', () => {
     mockedArgon2.verify.mockResolvedValue(true);
 
     prisma = {
+      ...emptyProtectionState(),
       $connect: jest.fn(),
       $disconnect: jest.fn(),
       $queryRaw: jest.fn().mockResolvedValue([{ result: 1 }]),
@@ -709,6 +712,7 @@ describe('AppController (e2e)', () => {
     };
 
     resetMockObject(prisma);
+    Object.assign(prisma, emptyProtectionState());
     prisma.$queryRaw.mockResolvedValue([{ result: 1 }]);
     mockTransactionPassthrough();
   };
@@ -3075,6 +3079,50 @@ describe('AppController (e2e)', () => {
             : endpoint === 'executions' || endpoint === 'liquidations'
               ? [{ limit: '2', offset: '1' }]
               : []),
+        );
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  }
+  for (const method of ['list', 'create', 'cancelGroup'] as const) {
+    it(`Conditional ${method} authenticates and dispatches exact account scope`, async () => {
+      const svc = app.get(ConditionalService);
+      const result = {
+        success: true,
+        data: { tradingAccountId: 'trading-account-1' },
+      };
+      const spy = jest.spyOn(svc, method).mockResolvedValue(result as never);
+      const path =
+        '/api/v1/trading-accounts/trading-account-1/protections' +
+        (method === 'cancelGroup' ? '/group-1/cancel' : '');
+      const body = { idempotencyKey: 'conditional-http-key' };
+      const req = () =>
+        method === 'list'
+          ? request(app.getHttpServer()).get(
+              path + '?domain=spot&history=true&limit=2',
+            )
+          : request(app.getHttpServer()).post(path).send(body);
+      try {
+        await req().expect(401);
+        expect(spy).not.toHaveBeenCalled();
+        resetPrismaMocks();
+        mockActiveUser();
+        const token = await createValidAccessToken();
+        await req()
+          .set('Authorization', `Bearer ${token}`)
+          .expect(200)
+          .expect((r) => expect(r.body).toEqual(result));
+        expect(spy).toHaveBeenCalledWith(
+          user.id,
+          'trading-account-1',
+          ...(method === 'cancelGroup'
+            ? ['group-1', body]
+            : [
+                method === 'list'
+                  ? { domain: 'spot', history: 'true', limit: '2' }
+                  : body,
+              ]),
         );
       } finally {
         spy.mockRestore();

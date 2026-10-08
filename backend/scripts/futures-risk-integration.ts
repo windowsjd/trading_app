@@ -674,7 +674,11 @@ async function raceCases(mode: TradingAccountMode) {
       const outcome = Promise.allSettled([system, user]);
       await blocker.query('COMMIT');
       const results = await outcome;
-      assert.equal(results[0].status, 'fulfilled');
+      assert.equal(
+        results[0].status,
+        'fulfilled',
+        JSON.stringify({ mode, kind, result: results[0] }),
+      );
       if (results[0].status === 'fulfilled')
         assert.equal(
           (results[0].value as { state: string }).state,

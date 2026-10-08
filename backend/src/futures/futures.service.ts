@@ -1,4 +1,11 @@
+import { createApiError } from '../common/api-error';
 import { HttpStatus, Injectable } from '@nestjs/common';
+import {
+  assertPendingChild,
+  finishFuturesProtection,
+  liveProtection,
+  protectionInclude,
+} from '../conditional/conditional-state';
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -65,6 +72,7 @@ export class FuturesService {
     userId: string | undefined,
     accountId: string,
     body: FuturesExecuteBody,
+    conditionalChildId?: string,
   ): Promise<FuturesExecuteResult> {
     requireUser(userId);
     stage('futures_ownership', accountId);
@@ -182,6 +190,57 @@ export class FuturesService {
             status: 'open',
           },
         });
+        const protection = current
+          ? await tx.protectionGroup.findFirst({
+              where: { futuresPositionId: current.id, ...liveProtection },
+              include: protectionInclude,
+            })
+          : null;
+        if (conditionalChildId) {
+          const child = await assertPendingChild(
+            tx,
+            conditionalChildId,
+            accountId,
+            'futures',
+          );
+          if (
+            !current ||
+            child.group.futuresPositionId !== current.id ||
+            request.operation !== 'close' ||
+            !current.quantity.eq(request.quantity)
+          )
+            throw createApiError(
+              'PROTECTION_CHILD_CHANGED',
+              'The protected Futures lifetime changed.',
+              409,
+            );
+          if (
+            child.leg.childOrderType === 'limit' &&
+            (current.direction === 'long'
+              ? price.price.lt(child.leg.childLimitPrice!)
+              : price.price.gt(child.leg.childLimitPrice!))
+          )
+            throw createApiError(
+              'CONDITIONAL_LIMIT_NOT_REACHED',
+              'The exit limit is not executable.',
+              409,
+            );
+        } else if (protection?.children.length) {
+          if (request.operation === 'increase')
+            throw createApiError(
+              'PROTECTION_CHILD_PENDING',
+              'Cancel the pending exit before increasing.',
+              409,
+            );
+          await tx.protectionChild.updateMany({
+            where: { groupId: protection.id, status: 'pending' },
+            data: {
+              status: 'canceled',
+              endedAt: executeNow,
+              terminalReason: 'conditional_manual_reduce',
+            },
+          });
+        }
         const usedBefore = await futuresMarginUsed(tx, accountId);
         stage('futures_collateral_calculation', accountId);
         const feeRate =
@@ -430,7 +489,33 @@ export class FuturesService {
           },
         });
         stage('futures_ledger_write', accountId);
+        if (conditionalChildId)
+          await tx.protectionChild.update({
+            where: { id: conditionalChildId },
+            data: {
+              status: 'filled',
+              futuresExecutionId: execution.id,
+              endedAt: executeNow,
+              terminalReason: 'executed',
+            },
+          });
+        if (position.status === 'closed')
+          await finishFuturesProtection(
+            tx,
+            position.id,
+            'position_closed',
+            executeNow,
+          );
         await tx.walletTransaction.createMany({ data: ledger });
+        // Count committed USER executions even when fresh valuation evidence is
+        // unavailable. Replay returns before this transaction; system liquidation
+        // and Season final exits never traverse this user execution path.
+        if (lockedAccount.mode === 'season') {
+          await tx.seasonParticipant.update({
+            where: { tradingAccountId: accountId },
+            data: { totalFillCount: { increment: 1 } },
+          });
+        }
         await this.history.capture(tx, lockedAccount, executeNow);
         const result: FuturesExecuteResult = {
           success: true,

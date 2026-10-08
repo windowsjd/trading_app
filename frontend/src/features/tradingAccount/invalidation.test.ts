@@ -92,9 +92,9 @@ describe('account-scoped invalidation targets ONE account', () => {
         QUERY_KEYS.tradingAccount.wallets(A),
         QUERY_KEYS.tradingAccount.walletTransactions(A, {}),
         QUERY_KEYS.tradingAccount.portfolio(A),
+        QUERY_KEYS.tradingAccount.positions(A, { limit: 20 }),
       ],
-      // A cancel never fills, so no holding changed.
-      mustNotInvalidate: [QUERY_KEYS.tradingAccount.positions(A, { limit: 20 })],
+      // Conditional cancellation releases executable quantity protection.
     },
     {
       name: 'fx execute',

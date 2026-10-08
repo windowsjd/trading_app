@@ -1,3 +1,10 @@
+import { createApiError } from '../common/api-error';
+import {
+  assertPendingChild,
+  reconcileSpotProtection,
+  liveProtection,
+  protectionInclude,
+} from '../conditional/conditional-state';
 import {
   HttpException,
   HttpStatus,
@@ -268,6 +275,38 @@ export class LimitOrderExecutionService {
       }
 
       stage = 'transaction_clock';
+      const protectionChild = await tx.protectionChild.findUnique({
+        where: { orderId },
+      });
+      if (protectionChild)
+        await assertPendingChild(
+          tx,
+          protectionChild.id,
+          order.tradingAccountId,
+          'spot',
+        );
+      if (order.side === 'buy') {
+        const protection = await tx.protectionGroup.findFirst({
+          where: {
+            tradingAccountId: order.tradingAccountId,
+            assetId: order.assetId,
+            domain: 'spot',
+            ...liveProtection,
+          },
+          include: protectionInclude,
+        });
+        if (
+          protection &&
+          ((protection.status === 'holding' &&
+            protection.parentOrderId !== order.id) ||
+            protection.children.length)
+        )
+          throw createApiError(
+            'PROTECTION_CHILD_PENDING',
+            'A conflicting protection intent prevents this increase.',
+            409,
+          );
+      }
       const transactionNow = await this.readTransactionWallClock(tx);
 
       // 3) Re-validate season / participant / asset (§17: no fill at/after endAt).
@@ -712,6 +751,13 @@ export class LimitOrderExecutionService {
       }
 
       stage = 'portfolio_snapshot';
+      await reconcileSpotProtection(
+        tx,
+        tradingAccountId,
+        order.assetId,
+        order.id,
+        transactionNow,
+      );
       // 11) Equity snapshot — reuse the market path's exact valuation so a
       // limit fill and a market fill leave identical portfolio state.
       await this.ordersService.recordOrderExecutedPortfolioSnapshotInTransaction(

@@ -1,5 +1,11 @@
 # Orders API Contract
 
+[Conditional Orders v1](conditional-orders-contract.md) adds optional
+`attachedProtection` to Spot BUY Limit create and reuses these Market/Limit
+settlement primitives for Position-bound SL/TP exits. Existing requests retain
+their hashes and financial policy; the worker-only protected fractional stock
+SELL exception does not enable normal fractional Limit entry/sell requests.
+
 [Common Diagnostic Triage Sufficiency](../README.md#admin-diagnostic-policy)
 defines acceptance and safety. The [finance diagnostic contract](trading-account-finance-api-contract.md#atomic-wallet-mutation-failure-diagnosis-작업-5-보완-3)
 defines guard evidence and allowed failure reads; matcher triage is specified in

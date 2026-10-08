@@ -60,6 +60,7 @@ export function invalidateAfterOrderCreate(
 ) {
   const keys: QueryKey[] = [
     QUERY_KEYS.tradingAccount.ordersAll(accountId),
+    QUERY_KEYS.tradingAccount.protections.all(accountId),
     QUERY_KEYS.tradingAccount.positionsAll(accountId),
     ...walletKeys(accountId),
     ...portfolioKeys(accountId),
@@ -75,7 +76,7 @@ export function invalidateAfterOrderCreate(
 
 /**
  * After cancelling: the order's status, and the cash its reservation released.
- * Positions are NOT invalidated — a cancel never fills, so no holding changed.
+ * Position/protection reads refresh released executable reservations.
  */
 export function invalidateAfterOrderCancel(
   client: InvalidatorClient,
@@ -84,6 +85,8 @@ export function invalidateAfterOrderCancel(
 ) {
   const keys: QueryKey[] = [
     QUERY_KEYS.tradingAccount.ordersAll(accountId),
+    QUERY_KEYS.tradingAccount.protections.all(accountId),
+    QUERY_KEYS.tradingAccount.positionsAll(accountId),
     ...walletKeys(accountId),
     ...portfolioKeys(accountId),
     ...(options.seasonUi ? [QUERY_KEYS.record.all] : []),

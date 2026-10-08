@@ -8,6 +8,10 @@
 
 ## 금융 valuation 의미 (2026-10-05, current)
 
+- F3.1: Season 사용자 Futures open/increase/reduce/close는 실제 commit마다 기존 totalFillCount를 1회 증가시킨다. Replay/rollback/청산/최종 강제정산은 제외한다. 근거: 사용자 Spot/Futures 체결이 동일한 경쟁 tie-break 의미를 가져야 한다.
+- F3.1: settled Home/Portfolio 확정값은 final season_rankings를 사용하고 final MDD/reachedReturnAt history는 endAt 이하로 한정한다. 근거: 배치 지연과 종료 이후 시세가 확정 경쟁 결과를 바꾸면 안 된다.
+- F3.1: 참조 없는 Mark evidence는 기본 24시간 후 bounded Ops 작업으로 삭제하되 instrument/source 최신 row 및 금융 FK 참조는 보존한다. 근거: 1초 시세의 무한 누적을 막으면서 금융 감사 근거를 유지한다.
+
 - PostgreSQL TradingAccount/CashWallet/Position의 원본 보유 상태와 선택된 AssetPriceSnapshot/FxRateSnapshot이 금융 평가 근거다. USD cash와 USD position은 같은 valuationAt/workflow에서 선택한 USD/KRW evidence로 평가하며, USD position KRW 금액은 `quantity × local price × selected FX`다. stored `AssetPriceSnapshot.priceKrw`는 금융 입력으로 사용하지 않고 기존 display/cache/ingestion 계약과 column은 유지한다.
   근거: 저장 단가의 별도 환율이 같은 평가의 현금·자산·화면 총액을 갈라놓으면 안 된다.
 - valuation의 곱셈·손익·합산은 raw Decimal로 수행하고 공개 결과/DB 저장 경계에서 half-up 8자리로 반올림한다. Position cache를 반올림해 저장해도 그 값을 canonical total 계산에 다시 넣지 않는다. 주문 gross/fee/net, quote, 예약, 실행 settlement의 기존 round8 chain은 유지한다.
@@ -363,7 +367,7 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
   미충당 손실을 숨기지 않고 debt/insurance를 만들지 않는다.
 - UI는 explicit Long/Short, Isolated/Cross, 정수 1~100, Market Open/Increase/Reduce/Close와
   서버 capabilities를 따른다. lifetime 설정 고정, Cross 개별 청산가 없음, account/session epoch
-  차단, 불명확한 응답은 동일 command 재시도다. SL/TP/OCO/Conditional Order는 후속 별도 작업이다.
+  차단, 불명확한 응답은 동일 command 재시도다. SL/TP/OCO는 후속 Conditional v1의 별도 user-exit 도메인으로 추가됐다.
 - Production instrument는 exact exchangeInfo 검증된 USDⓈ-M USDT perpetual만 제공한다.
   기본 DISABLED, 실제 enable/provisioning은 CI·ingestion·risk·coverage·종료 정산·용량 검토 후
   운영자가 별도 승인/실행한다. F3 작업은 운영 설정/DB를 바꾸지 않는다.
@@ -520,3 +524,24 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
 
 Reason: a single terminal Order result fits the virtual-trading product and
 preserves financial atomicity without exchange-style fill event infrastructure.
+
+
+## Conditional Orders v1 (2026-10-08, current)
+
+- [계약](conditional-orders-contract.md): Position 전체 잔량을 하나의 SL/TP/OCO group이
+  보호한다. Spot은 기존 시장별 실행 evidence, Futures는 canonical Binance Spot을
+  trigger/exit에 사용한다. Mark는 risk/강제청산 전용이다.
+- Trigger는 실제 exit가 아니다. 미체결 Limit 동안 sibling은 살아 있고, 반대 trigger는
+  기존 child 예약 해제/취소 후 하나의 새 child로 교체한다. 실제 flat만 group 완료다.
+- armed leg는 예약하지 않고 Spot Limit child만 기존 reservedQuantity를 1회 사용한다.
+  Manual reduce는 child 취소 후 실제 잔량을 보호하며 increase와 pending child 충돌은 거부한다.
+  일반 주식 Limit의 정수 입력 규칙은 유지한다. 소수점 잔량을 보호하는 internal
+  Position-bound Conditional SELL만 기존 Limit reservation/settlement 코어로 정확히 예약한다.
+- Attached SL/TP는 flat Spot BUY Limit에만 붙고 parent fill 전 HOLDING이다. Parent cancel/
+  만료/시즌 cleanup은 attachment와 미체결 child를 정리한다. Futures Limit entry는 없다.
+- 사용자 Futures Conditional 실제 execution만 totalFillCount +1이다. Trigger/cancel,
+  liquidation/final system settlement는 증가하지 않는다. 계정/시즌 금융 fence와 DB unique가
+  중복·경합을 방어한다. endAt 이후 신규 조건 체결은 차단한다.
+- 기본 `CONDITIONAL_ORDERS_ENABLED=false`. Futures ENABLED/REDUCE_ONLY에서는 exit 가능,
+  DISABLED에서는 user condition도 대기한다. Read/cancel/lifecycle cleanup과 risk는 분리한다.
+  Production enable은 코드 완료와 별도다.

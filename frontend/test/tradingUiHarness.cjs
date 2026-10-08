@@ -85,6 +85,7 @@ function createTradingUiHarness(screenName) {
         const [scope, resource] = options.queryKey;
         const base = { refetch: () => {}, isLoading: false, isError: false };
         if (scope === 'asset') return { ...base, data: resource === 'detail' ? { asset: h.asset } : { candles: h.candles ?? [] } };
+        if (resource === 'protections') return { ...base, data: { tradingAccountId: 'account-1', capabilities: { enabled: false, canCreateSpot: false, canUseSpotLimit: false, canCancel: true }, groups: [] } };
         if (resource === 'positions') return { ...base, ...h.positionQuery };
         if (resource === 'fx-rate') return { ...base, ...h.rateQuery };
         if (resource === 'detail') return { ...base, data: { feePolicy: { fxFeeRate: '0.001', tradeFeeRate: '0.001' } } };

@@ -28,6 +28,7 @@ import {
   getTradingAccountPositions,
   type TradingAccountEquityRange,
   type TradingAccountPortfolioSummaryDto,
+  type TradingAccountPortfolioDto,
 } from '../../features/tradingAccount/api';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import { classifyAccountError } from '../../features/tradingAccount/integrityErrors';
@@ -369,7 +370,7 @@ export default function PortfolioScreen({ navigation }: Props) {
           <>
             <AccountSwitcher />
 
-            <AccountSummaryCard summary={summary} />
+            <AccountSummaryCard summary={summary} finalResult={overview.finalResult} />
 
             {capabilityNotice ? (
               <View
@@ -400,7 +401,7 @@ export default function PortfolioScreen({ navigation }: Props) {
             ))}
 
             <View style={styles.card}>
-              <Text style={styles.label}>자산 비중</Text>
+              <Text style={styles.label}>{overview.finalResult ? '최종 자산 비중' : '자산 비중'}</Text>
               <DonutChart
                 segments={allocationSegments}
                 valueFormatter={formatKrwChartValue}
@@ -473,6 +474,9 @@ export default function PortfolioScreen({ navigation }: Props) {
 
             <View style={styles.card}>
               <Text style={styles.label}>보유 포지션</Text>
+              {overview.finalResult ? <Text style={styles.helper}>
+                아래 보유 종목의 가격은 현재 참고 정보이며, 확정된 최종 자산과 수익률에 반영되지 않습니다.
+              </Text> : null}
 
               <View style={styles.row}>
                 {POSITION_TABS.map((tab) => {
@@ -606,9 +610,22 @@ export default function PortfolioScreen({ navigation }: Props) {
  */
 function AccountSummaryCard({
   summary,
+  finalResult,
 }: {
   summary: TradingAccountPortfolioSummaryDto | null;
+  finalResult?: TradingAccountPortfolioDto['finalResult'];
 }) {
+  if (finalResult) {
+    return <View style={styles.card} testID={TEST_IDS.tradingAccount.seasonSummary}>
+      <Text style={styles.label}>최종 자산</Text>
+      {finalResult.state === 'available' ? <>
+        <Text style={styles.big}>{formatKrw(finalResult.totalAssetKrw)}원</Text>
+        <Text style={styles.helper}>최종 수익률 {formatPercent(finalResult.returnRate)}%</Text>
+        <Text style={styles.helper}>최종 순위 {finalResult.rank}위{finalResult.tier ? ` · ${finalResult.tier}` : ''}</Text>
+        <Text style={styles.footnote}>시즌 종료 기준 확정 결과 · {formatKstDateTime(finalResult.endAt)}</Text>
+      </> : <Text style={styles.helper}>확정된 최종 결과를 불러오지 못했습니다.</Text>}
+    </View>;
+  }
   if (!summary) {
     return (
       <View style={styles.card}>

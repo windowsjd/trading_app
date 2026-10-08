@@ -1,3 +1,4 @@
+import { emptyProtectionState } from '../../test/support/empty-protection-state';
 jest.mock('../generated/prisma/client', () => {
   const { Decimal, sqltag } = jest.requireActual<
     typeof import('@prisma/client/runtime/client')
@@ -142,6 +143,7 @@ const position = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 const tx = () => ({
+  ...emptyProtectionState(),
   cashWallet: { findUnique: jest.fn() },
   position: { findUnique: jest.fn() },
   order: {

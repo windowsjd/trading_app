@@ -10,6 +10,103 @@
 
 ---
 
+## 2026-10-08 — Conditional Orders v1 (Phase B, F3.1 gate 이후)
+
+- **기능 구현 의도:** SL/TP는 사용자 exit intent이며 Mark 강제청산과 다르다.
+  Futures 조건도 기존 Spot 체결 기준가를 사용한다. Trigger만으로 sibling을 버리지
+  않고 실제 잔량 종료까지 보호하며, 하나의 실행 child만 기존 예약/체결 코어를 사용해
+  이중 예약·이중 PnL을 막는다. Attached entry는 실제 매수 전에는 감시하지 않는다.
+- Phase A의 PG/금융/core gate PASS를 확인한 뒤 Phase B를 진행했다. 확정 Season
+  결과, endAt history cutoff, 사용자 Futures fill count, Mark retention은 유지한다.
+- `protection_groups/legs/children/commands`와 additive migration
+  `20261008200000_add_conditional_protection`을 추가했다. 한 account/product/asset에
+  live group 하나, group당 pending child 하나를 DB partial unique로 보장한다.
+  Trigger는 Spot snapshot FK와 가격/source/시각/identity 복사본을 보존한다.
+- 기존 Market/Limit Order 및 Futures close 금융 primitive를 재사용한다. Spot Limit
+  child만 reservedQuantity를 사용한다. 반대 trigger는 이전 child 취소/예약 해제/새
+  intent를 원자적으로 교체한다. 실제 full exit가 group을 완료하며 ERS partial은
+  실제 잔량을 계속 보호한다. Futures child는 lifetime-bound reduce-only다.
+- 수동 partial/full close, liquidation, final settlement, Season cleanup hook을
+  기존 account/lifecycle fence 안에 연결했다. pending child와 충돌하는 increase와
+  별도 SELL Limit은 typed conflict다. 일반 주식 Limit 정수 규칙은 유지하되 내부의
+  Position-bound Conditional SELL만 소수 잔량을 허용해 수동 소수 매도 후에도 보호한다.
+  Worker cleanup 취소 사유도 일반 계정 종료/시즌 제외/시즌 종료로 구분해 감사 기록을 보존한다.
+- Spot BUY Limit create의 `attachedProtection`만 additive하게 확장했다. Flat/no
+  competing entry에서 HOLDING → 실제 parent fill 후 ACTIVE, parent cancel/expiry/
+  lifecycle cleanup 시 cancel이다. 기존 unattached idempotency hash는 유지한다.
+- `/api/v1/trading-accounts/:accountId/protections` GET/POST와 `/:groupId/cancel`을
+  추가했다. Dedicated worker는 1초, 100 candidate, 기존 Ops lease를 사용한다.
+  Provider network I/O는 금융 transaction 밖이다. Restart/중복 평가도 DB 재검증한다.
+- Asset Detail/선물 Position/Spot BUY Limit 화면에 Trigger·Market/Limit·OCO·HOLDING
+  UI를 추가했다. 종료된 Futures 보호 이력도 선택 상품에서 읽을 수 있다. 계정/session
+  변경 후 이전 응답 차단과 불명확한 mutation의 동일 key 재시도를 유지했다.
+  작은 화면에서 attached editor는 전체 폭을 사용하고 긴 입력 가격은 전체 값도
+  줄바꿈으로 보여준다. Keyboard focus-scroll은 기존 hook을 재사용한다.
+- 기본 `CONDITIONAL_ORDERS_ENABLED=false`, Futures mode 기본 DISABLED는 유지한다.
+  ENABLED/REDUCE_ONLY exit 허용, DISABLED 조건 실행 대기; read/cancel/cleanup과
+  automatic liquidation은 별도다. 운영 enable/provisioning/DB write는 수행하지 않았다.
+- 최종 검증: F3.1 PG16/17 28 checks, Conditional PG16/17 77 checks. 기존 financial
+  CI gate 21 suites/22 tests, core/account gate 21 suites/22 tests 통과. Backend
+  canonical typecheck/build/check-only lint, unit 245 suites/3916 tests(62 opt-in
+  skip), E2E 2 suites/397 tests 통과. Frontend check 1743 tests와 Web/Android export
+  통과. Conditional 80/Futures 112/settled Home·Portfolio 32 browser layouts 통과.
+  320/360/390/430px, light/dark, 글자 확대, 큰 가격/손익, 100x 및 상태 표시를 점검했다.
+- Prisma format/validate/generate 및 fresh PG16.15/PG17.11의 전체 66 migration,
+  status, schema drift 통과. 기존 64 migration bytes는 그대로다. 기존 CI workflow의
+  financial gate에 F3.1/Conditional integration만 추가했다. GitHub Actions는 실행하지 않았다.
+- 이전 기록의 로컬 clock 역행 제약 때문에 금융 DB와 최종 frontend freshness 검증에는
+  동일 test-only monotonic epoch를 사용했다. 운영 시계/제품 freshness는 변경하지 않았다.
+  실제 단말 IME/키보드·서명된 native 앱·운영 provider 실시간 soak는 미실행이다.
+- 추가 raw test-inclusive tsc는 기존 test typing 오류 126건으로 실패한다. 시작 HEAD의
+  격리된 /tmp 사본과 비교해 동일한 126건, 신규 오류 0건을 확인했다. Repository의
+  canonical typecheck/build와 실제 unit/PG/E2E gate는 통과했다.
+- 상세 결과와 변경 파일 전체: [검증 보고서](docs/investigations/2026-10-08-f31-conditional/report.md).
+  현행 계약: [Conditional v1](backend/docs/conditional-orders-contract.md),
+  [F3.1](backend/docs/futures-f31-contract.md).
+
+## 2026-10-08 — F3.1 Verification & Hardening (Phase A)
+
+- 시작 branch `main`, fetch 후 HEAD/origin/main
+  `13e870fc6765fd0207459e7319a7131620928366`, working tree clean.
+- **기능 구현 의도:** 실제 사용자 Futures 체결은 Spot과 같은 경쟁 체결 횟수로
+  계산한다. 종료 시즌의 결과는 현재 시세가 아닌 확정 evidence로 읽고, 종료 이후
+  관측은 최종 MDD/도달 시각에 넣지 않는다. 1초 Mark의 무한 누적은 막되 금융 감사
+  참조와 snapshot에 복사된 증거를 보존한다. Production enable은 별도 운영 단계다.
+- A: 사용자 Futures execute에 SeasonParticipant.totalFillCount 증가가 없었다.
+  기존 실행 transaction에 1회 증가를 추가했다. Replay/rollback/system close는 제외.
+- B: legacy Home API는 이미 final ranking을 읽었지만 실제 Expo Home이 사용하는
+  account Portfolio는 settled도 live valuation이었다. `finalResult`를 추가하여 final
+  ranking의 total/return/rank/tier를 읽고 matching settlement snapshot으로 allocation을
+  제공한다. 과거 row에 없는 실현/미실현 breakdown을 만들지 않고 summary는 null이다.
+  현재 보유종목 가격은 참고 정보로 구분한다. 누락은 unavailable, 모순은 integrity error.
+- C: final Equity history와 legacy daily fallback에 endAt cutoff가 없었다.
+  `capturedAt <= endAt`로 제한했다. Exact-endAt 관측을 지우던 append 로직도 수정했다.
+  Settled history read는 endAt를 range 기준으로 쓰고 post-end 일반 관측을 제외한다.
+- D: Mark retention이 없었다. 기존 OpsJobLock/OpsJobRun을 사용하는 60초 bounded
+  worker를 추가했다. 기본 24시간, 1000행 × 최대 10 batch. 상품/source별 최신 행과
+  FuturesLiquidationClose FK 참조는 보존한다. Snapshot JSON에는 원본 삭제 이후에도
+  price/source/effectiveAt/capturedAt/instrument를 재현할 증거가 이미 있었고,
+  symbol/product/currency를 추가해 읽기 쉽게 했다.
+- 신규 additive migration `20261008190000_add_futures_mark_retention`은 Ops enum과
+  capturedAt/id index만 추가한다. 설정된 persistent DB는 세션 read-only로 migration
+  기록만 감사했다: 적용 64개 모두 저장소 checksum과 일치, unknown/unfinished 없음.
+  Persistent write/deploy/provisioning/enable 및 git commit/push/branch 변경은 하지 않았다.
+- 검증 진행 기록: 폐기용 PG16/17 전체 65 migration, status, drift 통과. 신규 F3.1
+  28 checks PG17 통과. Core/account 21 suites/22 tests, Backend unit 242 suites/
+  3906 tests(61 opt-in skip), E2E 2 suites/394 tests, Frontend check 1724 tests 통과.
+  Backend typecheck/build/check-only lint 통과. 한글 font를 적용한 실제 Home/Portfolio
+  320/360/390/430px × light/dark × font scale 1/2, 32 layouts와 screenshot 검토 완료.
+- **Phase A gate PASS:** 시각을 안정화한 폐기용 PG16 financial CI 전체 20 suites /
+  21 tests 통과(163.393초). 신규 F3.1 28 checks는 PG16/17 모두 통과했다. F1/F2/F2.1/F3,
+  Spot/Stock/예약/Wallet/FX 및 core/account gate가 통과한 뒤 Phase B로 진행한다.
+- 로컬 검증 환경: 원래 host wall clock이 약 30초 간격으로 2.46~2.55초 역행하는 것을
+  monotonic clock과 비교해 5회 관측했다. 기존 fresh-price 테스트가 future evidence로
+  거절되는 환경이어서 `/tmp` 전용 shim으로 폐기용 PG16/17과 테스트 프로세스의
+  CLOCK_REALTIME을 공통 epoch + kernel monotonic 경과로 맞췄다. 시스템/운영 시계는
+  변경하지 않았다. 실제 PG transaction/lock, 5초 Mark/10초 execution freshness 및
+  future rejection 정책은 변경하지 않았다. 이 환경 조건을 최종 검증 보고에 포함한다.
+- 현행 계약: [F3.1](backend/docs/futures-f31-contract.md).
+
 ## 2026-10-08 — Crypto Futures F3: Valuation / Performance / Season Final Exit / UI
 
 - 시작 branch `main`, `git fetch origin main` 후 HEAD와 origin/main 모두

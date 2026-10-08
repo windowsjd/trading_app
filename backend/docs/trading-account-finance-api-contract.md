@@ -15,6 +15,19 @@ their economic effect. Final Season exits use the linked
 shortfall distinguished in [Futures final evidence](futures-f3-contract.md).
 The implementation history below does not override this policy.
 
+### Settled Season portfolio (F3.1)
+
+`GET /api/v1/trading-accounts/:accountId/portfolio` returns additive `finalResult`
+for a settled Season. `summary` is null: old final snapshots do not contain the
+complete live realized/unrealized breakdown. Available finalResult contains
+`resultSource: season_rankings`, totalAssetKrw, returnRate,
+`returnRateMethod: initial_capital`, maxDrawdown, totalFillCount, reachedReturnAt,
+rank, tier, endAt and capturedAt. Money and return values remain strings.
+Allocation comes from the matching settlement EquitySnapshot. Missing final
+ranking or allocation is explicitly unavailable; contradictory final evidence
+fails with `TRADING_ACCOUNT_INTEGRITY`. GET never repairs or revalues final data.
+Active Seasons and General accounts retain their existing live contract.
+
 ## Status
 
 - Implemented (2026-08-03, 작업 4):
@@ -395,3 +408,13 @@ Asia/Seoul, using `snapshotDate` and only real DailyPortfolioSnapshot rows. Miss
 dates remain missing and short histories remain short. Existing `1d`, `7d`, `30d`,
 `all` and omitted-granularity source/fallback behavior remain compatible. GET does
 not create snapshots; account scope, TWR and initial-capital meanings are unchanged.
+
+
+## Conditional exit integration
+
+Account-scoped `/protections` reads/create/cancel and optional Spot BUY Limit
+`attachedProtection` follow [Conditional v1](conditional-orders-contract.md).
+Groups are shared whole-position intent, not an additional cash/quantity reserve.
+Only an executable Spot Limit child owns the existing single quantity reservation.
+Future exits retain the Futures wallet-only collateral scope and user execution
+fee/PnL/TWR/fill-count primitives. Liquidation remains a distinct Mark system action.

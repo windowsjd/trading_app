@@ -50,7 +50,16 @@ Operator-run daily ranking and final settlement ranking use the same persisted p
 
 `(runningPeakTotalAssetKrw - currentTotalAssetKrw) / runningPeakTotalAssetKrw * 100`
 
-`totalFillCount` counts only `orders.status = executed` through the ranking snapshot `capturedAt`; submitted, canceled, rejected orders and FX exchanges are excluded.
+`totalFillCount` counts committed Spot fills and Season user Futures executions
+(open/increase/reduce/close) once each. The existing participant counter is updated
+in the same financial transaction; replay and rollback add nothing. Automatic
+liquidation and final forced settlement are excluded, as are unfilled/canceled
+orders and FX exchanges. General accounts have no Season fill counter.
+
+Final settlement history uses `capturedAt <= Season.endAt` (including exact
+endAt), followed by the canonical final economic point. Post-end snapshots do
+not affect final MDD, reached-return time or tie-break ordering. Settled Home and
+Portfolio use the persisted final ranking; current prices never reprice it.
 
 `reachedReturnAt` is the first daily snapshot `capturedAt` where the participant's snapshot `returnRate` is greater than or equal to the ranking row's `returnRate`; if no snapshot matches, the ranking snapshot `capturedAt` is used when generating new rows.
 

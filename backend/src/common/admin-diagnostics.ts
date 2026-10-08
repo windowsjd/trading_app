@@ -478,6 +478,15 @@ function inferRouteContext(method: string, originalUrl: string) {
         'backend/src/portfolio/trading-account-portfolio.service.ts',
         'backend/src/portfolio/portfolio-valuation.service.ts',
       ];
+    } else if (route[2] === 'protections') {
+      domain = 'CONDITIONAL';
+      operation =
+        method.toUpperCase() === 'GET'
+          ? 'CONDITIONAL_PROTECTION_READ'
+          : route[4] === 'cancel'
+            ? 'CONDITIONAL_PROTECTION_CANCEL'
+            : 'CONDITIONAL_PROTECTION_CREATE';
+      nextInvestigation = ['backend/src/conditional/conditional.service.ts'];
     } else if (route[2] === 'futures') {
       domain = 'FUTURES';
       const action = [

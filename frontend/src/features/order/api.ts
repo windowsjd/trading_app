@@ -113,6 +113,7 @@ export interface OrderQuoteDto {
 }
 
 export type CreateOrderRequestDto = OrderQuoteRequestDto & {
+  attachedProtection?: import('../conditional/api').ProtectionLeg[];
   quoteId: string;
   idempotencyKey: string;
 };

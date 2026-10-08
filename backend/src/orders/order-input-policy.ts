@@ -9,13 +9,16 @@ import { monetaryScale, roundDecimalHalfUp } from '../fx/fx-decimal-policy';
 
 export const orderInputQuantityScale = 6;
 
-export function assertOrderInputPolicy(input: {
-  assetType: AssetType;
-  side: OrderSide;
-  orderType: OrderType;
-  quantity: Prisma.Decimal | null;
-  amount: Prisma.Decimal | null;
-}): void {
+export function assertOrderInputPolicy(
+  input: {
+    assetType: AssetType;
+    side: OrderSide;
+    orderType: OrderType;
+    quantity: Prisma.Decimal | null;
+    amount: Prisma.Decimal | null;
+  },
+  options?: { positionBoundExit: boolean },
+): void {
   const amountBuy =
     input.assetType === AssetType.crypto && input.side === OrderSide.buy;
   if (
@@ -34,6 +37,7 @@ export function assertOrderInputPolicy(input: {
     (input.assetType === AssetType.domestic_stock ||
       input.assetType === AssetType.us_stock) &&
     input.orderType === OrderType.limit &&
+    !(options?.positionBoundExit && input.side === OrderSide.sell) &&
     input.quantity &&
     !input.quantity.isInteger()
   ) {

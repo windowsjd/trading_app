@@ -239,6 +239,7 @@ export type AssetWhereInput = {
   quotes?: Prisma.QuoteListRelationFilter
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceListRelationFilter
   futuresInstruments?: Prisma.FuturesInstrumentListRelationFilter
+  protectionGroups?: Prisma.ProtectionGroupListRelationFilter
 }
 
 export type AssetOrderByWithRelationInput = {
@@ -262,6 +263,7 @@ export type AssetOrderByWithRelationInput = {
   quotes?: Prisma.QuoteOrderByRelationAggregateInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceOrderByRelationAggregateInput
   futuresInstruments?: Prisma.FuturesInstrumentOrderByRelationAggregateInput
+  protectionGroups?: Prisma.ProtectionGroupOrderByRelationAggregateInput
 }
 
 export type AssetWhereUniqueInput = Prisma.AtLeast<{
@@ -289,6 +291,7 @@ export type AssetWhereUniqueInput = Prisma.AtLeast<{
   quotes?: Prisma.QuoteListRelationFilter
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceListRelationFilter
   futuresInstruments?: Prisma.FuturesInstrumentListRelationFilter
+  protectionGroups?: Prisma.ProtectionGroupListRelationFilter
 }, "id" | "market_symbol">
 
 export type AssetOrderByWithAggregationInput = {
@@ -346,6 +349,7 @@ export type AssetCreateInput = {
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutAssetInput
   futuresInstruments?: Prisma.FuturesInstrumentCreateNestedManyWithoutUnderlyingAssetInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateInput = {
@@ -369,6 +373,7 @@ export type AssetUncheckedCreateInput = {
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutAssetInput
   futuresInstruments?: Prisma.FuturesInstrumentUncheckedCreateNestedManyWithoutUnderlyingAssetInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUpdateInput = {
@@ -392,6 +397,7 @@ export type AssetUpdateInput = {
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutAssetNestedInput
   futuresInstruments?: Prisma.FuturesInstrumentUpdateManyWithoutUnderlyingAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateInput = {
@@ -415,6 +421,7 @@ export type AssetUncheckedUpdateInput = {
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetNestedInput
   futuresInstruments?: Prisma.FuturesInstrumentUncheckedUpdateManyWithoutUnderlyingAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateManyInput = {
@@ -594,6 +601,20 @@ export type AssetUpdateOneRequiredWithoutFuturesInstrumentsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.AssetUpdateToOneWithWhereWithoutFuturesInstrumentsInput, Prisma.AssetUpdateWithoutFuturesInstrumentsInput>, Prisma.AssetUncheckedUpdateWithoutFuturesInstrumentsInput>
 }
 
+export type AssetCreateNestedOneWithoutProtectionGroupsInput = {
+  create?: Prisma.XOR<Prisma.AssetCreateWithoutProtectionGroupsInput, Prisma.AssetUncheckedCreateWithoutProtectionGroupsInput>
+  connectOrCreate?: Prisma.AssetCreateOrConnectWithoutProtectionGroupsInput
+  connect?: Prisma.AssetWhereUniqueInput
+}
+
+export type AssetUpdateOneRequiredWithoutProtectionGroupsNestedInput = {
+  create?: Prisma.XOR<Prisma.AssetCreateWithoutProtectionGroupsInput, Prisma.AssetUncheckedCreateWithoutProtectionGroupsInput>
+  connectOrCreate?: Prisma.AssetCreateOrConnectWithoutProtectionGroupsInput
+  upsert?: Prisma.AssetUpsertWithoutProtectionGroupsInput
+  connect?: Prisma.AssetWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AssetUpdateToOneWithWhereWithoutProtectionGroupsInput, Prisma.AssetUpdateWithoutProtectionGroupsInput>, Prisma.AssetUncheckedUpdateWithoutProtectionGroupsInput>
+}
+
 export type AssetCreateNestedOneWithoutPositionsInput = {
   create?: Prisma.XOR<Prisma.AssetCreateWithoutPositionsInput, Prisma.AssetUncheckedCreateWithoutPositionsInput>
   connectOrCreate?: Prisma.AssetCreateOrConnectWithoutPositionsInput
@@ -672,6 +693,7 @@ export type AssetCreateWithoutPriceSnapshotsInput = {
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutAssetInput
   futuresInstruments?: Prisma.FuturesInstrumentCreateNestedManyWithoutUnderlyingAssetInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutPriceSnapshotsInput = {
@@ -694,6 +716,7 @@ export type AssetUncheckedCreateWithoutPriceSnapshotsInput = {
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutAssetInput
   futuresInstruments?: Prisma.FuturesInstrumentUncheckedCreateNestedManyWithoutUnderlyingAssetInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutPriceSnapshotsInput = {
@@ -732,6 +755,7 @@ export type AssetUpdateWithoutPriceSnapshotsInput = {
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutAssetNestedInput
   futuresInstruments?: Prisma.FuturesInstrumentUpdateManyWithoutUnderlyingAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutPriceSnapshotsInput = {
@@ -754,6 +778,7 @@ export type AssetUncheckedUpdateWithoutPriceSnapshotsInput = {
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetNestedInput
   futuresInstruments?: Prisma.FuturesInstrumentUncheckedUpdateManyWithoutUnderlyingAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutOrderbookSnapshotsInput = {
@@ -776,6 +801,7 @@ export type AssetCreateWithoutOrderbookSnapshotsInput = {
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutAssetInput
   futuresInstruments?: Prisma.FuturesInstrumentCreateNestedManyWithoutUnderlyingAssetInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutOrderbookSnapshotsInput = {
@@ -798,6 +824,7 @@ export type AssetUncheckedCreateWithoutOrderbookSnapshotsInput = {
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutAssetInput
   futuresInstruments?: Prisma.FuturesInstrumentUncheckedCreateNestedManyWithoutUnderlyingAssetInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutOrderbookSnapshotsInput = {
@@ -836,6 +863,7 @@ export type AssetUpdateWithoutOrderbookSnapshotsInput = {
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutAssetNestedInput
   futuresInstruments?: Prisma.FuturesInstrumentUpdateManyWithoutUnderlyingAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutOrderbookSnapshotsInput = {
@@ -858,6 +886,7 @@ export type AssetUncheckedUpdateWithoutOrderbookSnapshotsInput = {
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetNestedInput
   futuresInstruments?: Prisma.FuturesInstrumentUncheckedUpdateManyWithoutUnderlyingAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutMarketCandlesInput = {
@@ -880,6 +909,7 @@ export type AssetCreateWithoutMarketCandlesInput = {
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutAssetInput
   futuresInstruments?: Prisma.FuturesInstrumentCreateNestedManyWithoutUnderlyingAssetInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutMarketCandlesInput = {
@@ -902,6 +932,7 @@ export type AssetUncheckedCreateWithoutMarketCandlesInput = {
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutAssetInput
   futuresInstruments?: Prisma.FuturesInstrumentUncheckedCreateNestedManyWithoutUnderlyingAssetInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutMarketCandlesInput = {
@@ -940,6 +971,7 @@ export type AssetUpdateWithoutMarketCandlesInput = {
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutAssetNestedInput
   futuresInstruments?: Prisma.FuturesInstrumentUpdateManyWithoutUnderlyingAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutMarketCandlesInput = {
@@ -962,6 +994,7 @@ export type AssetUncheckedUpdateWithoutMarketCandlesInput = {
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetNestedInput
   futuresInstruments?: Prisma.FuturesInstrumentUncheckedUpdateManyWithoutUnderlyingAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutMarketCandleSyncStatesInput = {
@@ -984,6 +1017,7 @@ export type AssetCreateWithoutMarketCandleSyncStatesInput = {
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutAssetInput
   futuresInstruments?: Prisma.FuturesInstrumentCreateNestedManyWithoutUnderlyingAssetInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutMarketCandleSyncStatesInput = {
@@ -1006,6 +1040,7 @@ export type AssetUncheckedCreateWithoutMarketCandleSyncStatesInput = {
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutAssetInput
   futuresInstruments?: Prisma.FuturesInstrumentUncheckedCreateNestedManyWithoutUnderlyingAssetInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutMarketCandleSyncStatesInput = {
@@ -1044,6 +1079,7 @@ export type AssetUpdateWithoutMarketCandleSyncStatesInput = {
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutAssetNestedInput
   futuresInstruments?: Prisma.FuturesInstrumentUpdateManyWithoutUnderlyingAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutMarketCandleSyncStatesInput = {
@@ -1066,6 +1102,7 @@ export type AssetUncheckedUpdateWithoutMarketCandleSyncStatesInput = {
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetNestedInput
   futuresInstruments?: Prisma.FuturesInstrumentUncheckedUpdateManyWithoutUnderlyingAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutFuturesInstrumentsInput = {
@@ -1088,6 +1125,7 @@ export type AssetCreateWithoutFuturesInstrumentsInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutAssetInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutFuturesInstrumentsInput = {
@@ -1110,6 +1148,7 @@ export type AssetUncheckedCreateWithoutFuturesInstrumentsInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutFuturesInstrumentsInput = {
@@ -1148,6 +1187,7 @@ export type AssetUpdateWithoutFuturesInstrumentsInput = {
   orders?: Prisma.OrderUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutFuturesInstrumentsInput = {
@@ -1170,6 +1210,115 @@ export type AssetUncheckedUpdateWithoutFuturesInstrumentsInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutAssetNestedInput
+}
+
+export type AssetCreateWithoutProtectionGroupsInput = {
+  id?: string
+  symbol: string
+  name: string
+  market: string
+  currencyCode: $Enums.CurrencyCode
+  priceCurrency?: $Enums.CurrencyCode
+  settlementCurrency?: $Enums.CurrencyCode
+  assetType: $Enums.AssetType
+  isActive?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  priceSnapshots?: Prisma.AssetPriceSnapshotCreateNestedManyWithoutAssetInput
+  orderbookSnapshots?: Prisma.AssetOrderbookSnapshotCreateNestedManyWithoutAssetInput
+  marketCandles?: Prisma.MarketCandleCreateNestedManyWithoutAssetInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateCreateNestedManyWithoutAssetInput
+  positions?: Prisma.PositionCreateNestedManyWithoutAssetInput
+  orders?: Prisma.OrderCreateNestedManyWithoutAssetInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
+  limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutAssetInput
+  futuresInstruments?: Prisma.FuturesInstrumentCreateNestedManyWithoutUnderlyingAssetInput
+}
+
+export type AssetUncheckedCreateWithoutProtectionGroupsInput = {
+  id?: string
+  symbol: string
+  name: string
+  market: string
+  currencyCode: $Enums.CurrencyCode
+  priceCurrency?: $Enums.CurrencyCode
+  settlementCurrency?: $Enums.CurrencyCode
+  assetType: $Enums.AssetType
+  isActive?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  priceSnapshots?: Prisma.AssetPriceSnapshotUncheckedCreateNestedManyWithoutAssetInput
+  orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUncheckedCreateNestedManyWithoutAssetInput
+  marketCandles?: Prisma.MarketCandleUncheckedCreateNestedManyWithoutAssetInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUncheckedCreateNestedManyWithoutAssetInput
+  positions?: Prisma.PositionUncheckedCreateNestedManyWithoutAssetInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
+  limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  futuresInstruments?: Prisma.FuturesInstrumentUncheckedCreateNestedManyWithoutUnderlyingAssetInput
+}
+
+export type AssetCreateOrConnectWithoutProtectionGroupsInput = {
+  where: Prisma.AssetWhereUniqueInput
+  create: Prisma.XOR<Prisma.AssetCreateWithoutProtectionGroupsInput, Prisma.AssetUncheckedCreateWithoutProtectionGroupsInput>
+}
+
+export type AssetUpsertWithoutProtectionGroupsInput = {
+  update: Prisma.XOR<Prisma.AssetUpdateWithoutProtectionGroupsInput, Prisma.AssetUncheckedUpdateWithoutProtectionGroupsInput>
+  create: Prisma.XOR<Prisma.AssetCreateWithoutProtectionGroupsInput, Prisma.AssetUncheckedCreateWithoutProtectionGroupsInput>
+  where?: Prisma.AssetWhereInput
+}
+
+export type AssetUpdateToOneWithWhereWithoutProtectionGroupsInput = {
+  where?: Prisma.AssetWhereInput
+  data: Prisma.XOR<Prisma.AssetUpdateWithoutProtectionGroupsInput, Prisma.AssetUncheckedUpdateWithoutProtectionGroupsInput>
+}
+
+export type AssetUpdateWithoutProtectionGroupsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  symbol?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  market?: Prisma.StringFieldUpdateOperationsInput | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  assetType?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priceSnapshots?: Prisma.AssetPriceSnapshotUpdateManyWithoutAssetNestedInput
+  orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUpdateManyWithoutAssetNestedInput
+  marketCandles?: Prisma.MarketCandleUpdateManyWithoutAssetNestedInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUpdateManyWithoutAssetNestedInput
+  positions?: Prisma.PositionUpdateManyWithoutAssetNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutAssetNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
+  limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutAssetNestedInput
+  futuresInstruments?: Prisma.FuturesInstrumentUpdateManyWithoutUnderlyingAssetNestedInput
+}
+
+export type AssetUncheckedUpdateWithoutProtectionGroupsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  symbol?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  market?: Prisma.StringFieldUpdateOperationsInput | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  assetType?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priceSnapshots?: Prisma.AssetPriceSnapshotUncheckedUpdateManyWithoutAssetNestedInput
+  orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUncheckedUpdateManyWithoutAssetNestedInput
+  marketCandles?: Prisma.MarketCandleUncheckedUpdateManyWithoutAssetNestedInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUncheckedUpdateManyWithoutAssetNestedInput
+  positions?: Prisma.PositionUncheckedUpdateManyWithoutAssetNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
+  limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  futuresInstruments?: Prisma.FuturesInstrumentUncheckedUpdateManyWithoutUnderlyingAssetNestedInput
 }
 
 export type AssetCreateWithoutPositionsInput = {
@@ -1192,6 +1341,7 @@ export type AssetCreateWithoutPositionsInput = {
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutAssetInput
   futuresInstruments?: Prisma.FuturesInstrumentCreateNestedManyWithoutUnderlyingAssetInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutPositionsInput = {
@@ -1214,6 +1364,7 @@ export type AssetUncheckedCreateWithoutPositionsInput = {
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutAssetInput
   futuresInstruments?: Prisma.FuturesInstrumentUncheckedCreateNestedManyWithoutUnderlyingAssetInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutPositionsInput = {
@@ -1252,6 +1403,7 @@ export type AssetUpdateWithoutPositionsInput = {
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutAssetNestedInput
   futuresInstruments?: Prisma.FuturesInstrumentUpdateManyWithoutUnderlyingAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutPositionsInput = {
@@ -1274,6 +1426,7 @@ export type AssetUncheckedUpdateWithoutPositionsInput = {
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetNestedInput
   futuresInstruments?: Prisma.FuturesInstrumentUncheckedUpdateManyWithoutUnderlyingAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutOrdersInput = {
@@ -1296,6 +1449,7 @@ export type AssetCreateWithoutOrdersInput = {
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutAssetInput
   futuresInstruments?: Prisma.FuturesInstrumentCreateNestedManyWithoutUnderlyingAssetInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutOrdersInput = {
@@ -1318,6 +1472,7 @@ export type AssetUncheckedCreateWithoutOrdersInput = {
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutAssetInput
   futuresInstruments?: Prisma.FuturesInstrumentUncheckedCreateNestedManyWithoutUnderlyingAssetInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutOrdersInput = {
@@ -1356,6 +1511,7 @@ export type AssetUpdateWithoutOrdersInput = {
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutAssetNestedInput
   futuresInstruments?: Prisma.FuturesInstrumentUpdateManyWithoutUnderlyingAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutOrdersInput = {
@@ -1378,6 +1534,7 @@ export type AssetUncheckedUpdateWithoutOrdersInput = {
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetNestedInput
   futuresInstruments?: Prisma.FuturesInstrumentUncheckedUpdateManyWithoutUnderlyingAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutQuotesInput = {
@@ -1400,6 +1557,7 @@ export type AssetCreateWithoutQuotesInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutAssetInput
   futuresInstruments?: Prisma.FuturesInstrumentCreateNestedManyWithoutUnderlyingAssetInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutQuotesInput = {
@@ -1422,6 +1580,7 @@ export type AssetUncheckedCreateWithoutQuotesInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutAssetInput
   futuresInstruments?: Prisma.FuturesInstrumentUncheckedCreateNestedManyWithoutUnderlyingAssetInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutQuotesInput = {
@@ -1460,6 +1619,7 @@ export type AssetUpdateWithoutQuotesInput = {
   orders?: Prisma.OrderUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutAssetNestedInput
   futuresInstruments?: Prisma.FuturesInstrumentUpdateManyWithoutUnderlyingAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutQuotesInput = {
@@ -1482,6 +1642,7 @@ export type AssetUncheckedUpdateWithoutQuotesInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetNestedInput
   futuresInstruments?: Prisma.FuturesInstrumentUncheckedUpdateManyWithoutUnderlyingAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutLimitOrderCandleEvidenceInput = {
@@ -1504,6 +1665,7 @@ export type AssetCreateWithoutLimitOrderCandleEvidenceInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
   futuresInstruments?: Prisma.FuturesInstrumentCreateNestedManyWithoutUnderlyingAssetInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutLimitOrderCandleEvidenceInput = {
@@ -1526,6 +1688,7 @@ export type AssetUncheckedCreateWithoutLimitOrderCandleEvidenceInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
   futuresInstruments?: Prisma.FuturesInstrumentUncheckedCreateNestedManyWithoutUnderlyingAssetInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutLimitOrderCandleEvidenceInput = {
@@ -1564,6 +1727,7 @@ export type AssetUpdateWithoutLimitOrderCandleEvidenceInput = {
   orders?: Prisma.OrderUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
   futuresInstruments?: Prisma.FuturesInstrumentUpdateManyWithoutUnderlyingAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutLimitOrderCandleEvidenceInput = {
@@ -1586,6 +1750,7 @@ export type AssetUncheckedUpdateWithoutLimitOrderCandleEvidenceInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
   futuresInstruments?: Prisma.FuturesInstrumentUncheckedUpdateManyWithoutUnderlyingAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 
@@ -1603,6 +1768,7 @@ export type AssetCountOutputType = {
   quotes: number
   limitOrderCandleEvidence: number
   futuresInstruments: number
+  protectionGroups: number
 }
 
 export type AssetCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1615,6 +1781,7 @@ export type AssetCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.
   quotes?: boolean | AssetCountOutputTypeCountQuotesArgs
   limitOrderCandleEvidence?: boolean | AssetCountOutputTypeCountLimitOrderCandleEvidenceArgs
   futuresInstruments?: boolean | AssetCountOutputTypeCountFuturesInstrumentsArgs
+  protectionGroups?: boolean | AssetCountOutputTypeCountProtectionGroupsArgs
 }
 
 /**
@@ -1690,6 +1857,13 @@ export type AssetCountOutputTypeCountFuturesInstrumentsArgs<ExtArgs extends runt
   where?: Prisma.FuturesInstrumentWhereInput
 }
 
+/**
+ * AssetCountOutputType without action
+ */
+export type AssetCountOutputTypeCountProtectionGroupsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ProtectionGroupWhereInput
+}
+
 
 export type AssetSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1712,6 +1886,7 @@ export type AssetSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   quotes?: boolean | Prisma.Asset$quotesArgs<ExtArgs>
   limitOrderCandleEvidence?: boolean | Prisma.Asset$limitOrderCandleEvidenceArgs<ExtArgs>
   futuresInstruments?: boolean | Prisma.Asset$futuresInstrumentsArgs<ExtArgs>
+  protectionGroups?: boolean | Prisma.Asset$protectionGroupsArgs<ExtArgs>
   _count?: boolean | Prisma.AssetCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["asset"]>
 
@@ -1768,6 +1943,7 @@ export type AssetInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   quotes?: boolean | Prisma.Asset$quotesArgs<ExtArgs>
   limitOrderCandleEvidence?: boolean | Prisma.Asset$limitOrderCandleEvidenceArgs<ExtArgs>
   futuresInstruments?: boolean | Prisma.Asset$futuresInstrumentsArgs<ExtArgs>
+  protectionGroups?: boolean | Prisma.Asset$protectionGroupsArgs<ExtArgs>
   _count?: boolean | Prisma.AssetCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type AssetIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -1785,6 +1961,7 @@ export type $AssetPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     quotes: Prisma.$QuotePayload<ExtArgs>[]
     limitOrderCandleEvidence: Prisma.$LimitOrderCandleEvidencePayload<ExtArgs>[]
     futuresInstruments: Prisma.$FuturesInstrumentPayload<ExtArgs>[]
+    protectionGroups: Prisma.$ProtectionGroupPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2201,6 +2378,7 @@ export interface Prisma__AssetClient<T, Null = never, ExtArgs extends runtime.Ty
   quotes<T extends Prisma.Asset$quotesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$quotesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$QuotePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   limitOrderCandleEvidence<T extends Prisma.Asset$limitOrderCandleEvidenceArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$limitOrderCandleEvidenceArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LimitOrderCandleEvidencePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   futuresInstruments<T extends Prisma.Asset$futuresInstrumentsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$futuresInstrumentsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesInstrumentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  protectionGroups<T extends Prisma.Asset$protectionGroupsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$protectionGroupsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProtectionGroupPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2847,6 +3025,30 @@ export type Asset$futuresInstrumentsArgs<ExtArgs extends runtime.Types.Extension
   take?: number
   skip?: number
   distinct?: Prisma.FuturesInstrumentScalarFieldEnum | Prisma.FuturesInstrumentScalarFieldEnum[]
+}
+
+/**
+ * Asset.protectionGroups
+ */
+export type Asset$protectionGroupsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ProtectionGroup
+   */
+  select?: Prisma.ProtectionGroupSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ProtectionGroup
+   */
+  omit?: Prisma.ProtectionGroupOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ProtectionGroupInclude<ExtArgs> | null
+  where?: Prisma.ProtectionGroupWhereInput
+  orderBy?: Prisma.ProtectionGroupOrderByWithRelationInput | Prisma.ProtectionGroupOrderByWithRelationInput[]
+  cursor?: Prisma.ProtectionGroupWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ProtectionGroupScalarFieldEnum | Prisma.ProtectionGroupScalarFieldEnum[]
 }
 
 /**

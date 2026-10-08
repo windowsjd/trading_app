@@ -14,6 +14,9 @@ export const LIMIT_ORDER_CANCEL_REASONS = {
   userCanceled: 'user_canceled',
   seasonEnded: 'season_ended',
   participantExcluded: 'participant_excluded',
+  accountNotTradable: 'account_not_tradable',
+  conditionalReplaced: 'conditional_replaced',
+  conditionalManualReduce: 'conditional_manual_reduce',
 } as const;
 
 export type LimitOrderCancelReason =

@@ -199,8 +199,9 @@ shortfall, is not a technical diagnostic projection and is not redacted.
 ## F3 integration and remaining exclusions
 
 No dated/inverse/coin-margin/options, funding, Hedge Mode, ADL, insurance, partial
-liquidation, futures limit orders, conditional orders (SL/TP/OCO/trailing), or
-Binance brackets/risk tiers. F3 supplies account-pinned Futures UI and coherent
+liquidation, standalone Futures Limit entries, trailing stops, or Binance
+brackets/risk tiers. [Conditional v1](conditional-orders-contract.md) adds
+Position-bound SL/TP Market/Limit exits and OCO using Spot reference prices. F3 supplies account-pinned Futures UI and coherent
 Home/Portfolio/TWR/Equity/Daily/Season return/Ranking valuation. Total equity adds
 only signed fresh Mark UPNL to existing cash + Spot holdings. Missing evidence
 makes valuation unavailable. Event snapshots reuse existing performance primitives;

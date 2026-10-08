@@ -1,0 +1,88 @@
+{
+  "date": "2026-10-08",
+  "start": {
+    "branch": "main",
+    "head": "13e870fc6765fd0207459e7319a7131620928366",
+    "originMain": "13e870fc6765fd0207459e7319a7131620928366",
+    "workingTree": "clean",
+    "fetchedOriginMain": true
+  },
+  "phaseA": "PASS before Phase B",
+  "phaseB": "PASS",
+  "financialPG": {
+    "suitesPassed": 21,
+    "testsPassed": 22,
+    "log": "/tmp/trading-f31-logs/conditional-financial-final.log",
+    "sha256": "ab6d89e94c2d7392043fecf4bf77c4ca3fac1721999cc9b0c38e17f998f1bbd0"
+  },
+  "corePG": {
+    "suitesPassed": 21,
+    "testsPassed": 22,
+    "log": "/tmp/trading-f31-logs/conditional-core-final.log",
+    "sha256": "134892c7d55f6d1ec596bf3e0fef110730d66c1cdc14c9f53e03056be9affb45"
+  },
+  "backendUnit": {
+    "suitesPassed": 245,
+    "testsPassed": 3916,
+    "log": "/tmp/trading-f31-logs/conditional-unit-complete.log",
+    "sha256": "3c00edca4e40625858fdcb07e410cd73e18b847b4be634ae1f4c5a4b48fe45a5"
+  },
+  "e2e": {
+    "suitesPassed": 2,
+    "testsPassed": 397,
+    "log": "/tmp/trading-f31-logs/conditional-e2e-final.log",
+    "sha256": "b24352ea47227b01e8c42e66a6e0367fd4f61f1c052e0096de4c55cecb1b2065"
+  },
+  "f31Checks": {
+    "PG16": 28,
+    "PG17": 28
+  },
+  "conditionalChecks": {
+    "PG16": 77,
+    "PG17": 77
+  },
+  "frontend": {
+    "testsPassed": 1743,
+    "suites": 203,
+    "check": "npm run check",
+    "webExport": "PASS",
+    "androidExport": "PASS"
+  },
+  "migrations": {
+    "PG16": "16.15",
+    "PG17": "17.11",
+    "freshFullChainCount": 66,
+    "status": "PASS both",
+    "drift": "no difference both",
+    "preexistingMigrationBytes": "unchanged",
+    "persistentReadOnlyAudit": {
+      "applied": 64,
+      "mismatched": 0,
+      "unknown": 0,
+      "unfinished": 0
+    }
+  },
+  "typecheck": {
+    "canonical": "PASS",
+    "rawTestInclusive": "FAIL: 126 pre-existing diagnostics, 0 introduced",
+    "baselineComparison": "test-typecheck-comparison.json"
+  },
+  "git": {
+    "branchChanged": false,
+    "committed": false,
+    "pushed": false,
+    "diffCheck": "PASS"
+  },
+  "production": {
+    "dbWritten": false,
+    "deployed": false,
+    "enabled": false,
+    "provisioned": false
+  },
+  "limits": [
+    "Host wall clock reversals isolated only in disposable DB/test processes using a shared monotonic epoch",
+    "Native device IME/signed native apps not exercised",
+    "Production provider soak/provisioning/enable/load benchmark not run",
+    "Remote GitHub Actions not dispatched"
+  ]
+}

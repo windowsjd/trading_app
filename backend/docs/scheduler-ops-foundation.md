@@ -2,6 +2,18 @@
 
 Status: implemented foundation, disabled by default.
 
+## Futures Mark retention (F3.1)
+
+`futures_mark_retention` uses a dedicated 60-second interval and the existing
+OpsJobLock/OpsJobRun services. Its generic scheduler map is deliberately disabled
+to avoid two scheduling owners. Enablement follows Mark ingestion unless
+`FUTURES_MARK_RETENTION_ENABLED` is explicitly set. Default unreferenced retention
+is 24 hours; batches default to 1000 rows, at most ten per run. Latest rows per
+instrument/source and every liquidation-close FK reference remain. Counts,
+cutoff and failures are persisted in Ops history. This job never changes financial
+settlement or trading mode. Configuration and audit details are in
+[F3.1](futures-f31-contract.md).
+
 ## Futures F3 integration
 
 The existing jobs/OpsJobLock remain authoritative. F3 adds no scheduler or queue.
@@ -460,3 +472,12 @@ Preserve the 10-sample/128-character ID limits, fixed reason vocabularies and Op
 sanitizer described above. The HTTP 24 KiB/depth/collection bounds are not a generic
 Ops JSON guarantee. No diagnostic I/O, retry, repair or financial policy changes
 are introduced; existing Ops access does not expose the admin-only HTTP panel.
+
+
+## Conditional Orders polling
+
+The dedicated `ConditionalWorker` uses OpsJobLock `conditional_orders:current`,
+a 1-second cycle, at most 100 evaluations, and a renewed 30-second lease. The
+ordinary scheduler dispatch flag stays false to avoid duplicate scheduling.
+Feature OFF pauses trigger/fill but leaves lifecycle cleanup available. See
+[Conditional contract](conditional-orders-contract.md) for source, OCO and retry.

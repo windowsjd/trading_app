@@ -1,6 +1,7 @@
 import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { finishFuturesProtection } from '../conditional/conditional-state';
 import {
   Prisma,
   type FuturesPosition,
@@ -317,6 +318,12 @@ export class FuturesSeasonSettlementService {
               feeAmount: row.close.feeAmount,
             },
           });
+          await finishFuturesProtection(
+            tx,
+            row.position.id,
+            'season_settled',
+            now,
+          );
         }
         const { ledger } = await settleFuturesCash(
           tx,

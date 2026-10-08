@@ -349,7 +349,9 @@ export const OpsJobName = {
   limit_order_matcher: 'limit_order_matcher',
   limit_order_candle_reconciliation: 'limit_order_candle_reconciliation',
   limit_order_matching: 'limit_order_matching',
-  futures_liquidation: 'futures_liquidation'
+  futures_liquidation: 'futures_liquidation',
+  futures_mark_retention: 'futures_mark_retention',
+  conditional_orders: 'conditional_orders'
 } as const
 
 export type OpsJobName = (typeof OpsJobName)[keyof typeof OpsJobName]
@@ -420,6 +422,41 @@ export const FriendshipStatus = {
 } as const
 
 export type FriendshipStatus = (typeof FriendshipStatus)[keyof typeof FriendshipStatus]
+
+
+export const ProtectionDomain = {
+  spot: 'spot',
+  futures: 'futures'
+} as const
+
+export type ProtectionDomain = (typeof ProtectionDomain)[keyof typeof ProtectionDomain]
+
+
+export const ProtectionStatus = {
+  holding: 'holding',
+  active: 'active',
+  completed: 'completed',
+  canceled: 'canceled'
+} as const
+
+export type ProtectionStatus = (typeof ProtectionStatus)[keyof typeof ProtectionStatus]
+
+
+export const ProtectionKind = {
+  stop_loss: 'stop_loss',
+  take_profit: 'take_profit'
+} as const
+
+export type ProtectionKind = (typeof ProtectionKind)[keyof typeof ProtectionKind]
+
+
+export const ProtectionChildStatus = {
+  pending: 'pending',
+  filled: 'filled',
+  canceled: 'canceled'
+} as const
+
+export type ProtectionChildStatus = (typeof ProtectionChildStatus)[keyof typeof ProtectionChildStatus]
 
 
 export const FuturesMarkSource = {

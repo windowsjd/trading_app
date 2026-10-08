@@ -27,6 +27,12 @@ The season Home is now built from account-scoped reads
 kept for compatibility; any future client use must supply the account or season
 it means rather than relying on the implicit current one.
 
+F3.1: the account-scoped settled Portfolio returns `finalResult` from the final
+ranking, with `summary: null`. Expo Home displays that final total/return and the
+same Season's final ranking/tier. Missing final evidence is unavailable, never a
+live-price fallback. Portfolio labels retained holdings as current reference
+information, separate from the immutable final result.
+
 ## Source Rules
 
 - Amount values are strings.

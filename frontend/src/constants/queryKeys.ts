@@ -282,6 +282,10 @@ export const QUERY_KEYS = {
    * have refreshed.
    */
   tradingAccount: {
+    protections: {
+      all: (id: string) => ['tradingAccount', 'protections', id] as const,
+      list: (id: string, domain: 'spot' | 'futures', assetId: string, history = false) => ['tradingAccount', 'protections', id, domain, assetId, history] as const,
+    },
     futures: {
       all: (id: string) => ['tradingAccount', 'futures', id] as const,
       instruments: (id: string) => ['tradingAccount', 'futures', id, 'instruments'] as const,

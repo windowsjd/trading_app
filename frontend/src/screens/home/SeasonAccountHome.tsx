@@ -212,7 +212,8 @@ export default function SeasonAccountHome({
       <View style={styles.assetOverview}>
         <HomeAssetHero compactBottom
           summary={summary}
-          settled={isSettled}
+          finalResult={portfolio.finalResult}
+          settled={isSettled || !!portfolio.finalResult}
           unavailableMessage={portfolioNotice?.message}
         />
 

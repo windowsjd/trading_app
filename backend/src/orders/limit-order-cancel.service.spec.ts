@@ -1,3 +1,4 @@
+import { emptyProtectionState } from '../../test/support/empty-protection-state';
 jest.mock('../generated/prisma/client', () => {
   const { Decimal } = jest.requireActual<
     typeof import('@prisma/client/runtime/client')
@@ -110,6 +111,7 @@ describe('LimitOrderCancelService', () => {
   });
 
   const createPrisma = () => ({
+    ...emptyProtectionState(),
     order: {
       findUnique: jest.fn(),
       findMany: jest.fn(),

@@ -526,6 +526,8 @@ export type OrderWhereInput = {
   assetPriceSnapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotNullableScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput> | null
   fxRateSnapshot?: Prisma.XOR<Prisma.FxRateSnapshotNullableScalarRelationFilter, Prisma.FxRateSnapshotWhereInput> | null
   candleEvidence?: Prisma.XOR<Prisma.LimitOrderCandleEvidenceNullableScalarRelationFilter, Prisma.LimitOrderCandleEvidenceWhereInput> | null
+  attachedProtection?: Prisma.XOR<Prisma.ProtectionGroupNullableScalarRelationFilter, Prisma.ProtectionGroupWhereInput> | null
+  protectionChild?: Prisma.XOR<Prisma.ProtectionChildNullableScalarRelationFilter, Prisma.ProtectionChildWhereInput> | null
 }
 
 export type OrderOrderByWithRelationInput = {
@@ -573,6 +575,8 @@ export type OrderOrderByWithRelationInput = {
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotOrderByWithRelationInput
   fxRateSnapshot?: Prisma.FxRateSnapshotOrderByWithRelationInput
   candleEvidence?: Prisma.LimitOrderCandleEvidenceOrderByWithRelationInput
+  attachedProtection?: Prisma.ProtectionGroupOrderByWithRelationInput
+  protectionChild?: Prisma.ProtectionChildOrderByWithRelationInput
 }
 
 export type OrderWhereUniqueInput = Prisma.AtLeast<{
@@ -624,6 +628,8 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   assetPriceSnapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotNullableScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput> | null
   fxRateSnapshot?: Prisma.XOR<Prisma.FxRateSnapshotNullableScalarRelationFilter, Prisma.FxRateSnapshotWhereInput> | null
   candleEvidence?: Prisma.XOR<Prisma.LimitOrderCandleEvidenceNullableScalarRelationFilter, Prisma.LimitOrderCandleEvidenceWhereInput> | null
+  attachedProtection?: Prisma.XOR<Prisma.ProtectionGroupNullableScalarRelationFilter, Prisma.ProtectionGroupWhereInput> | null
+  protectionChild?: Prisma.XOR<Prisma.ProtectionChildNullableScalarRelationFilter, Prisma.ProtectionChildWhereInput> | null
 }, "id" | "quoteId" | "tradingAccountId_idempotencyKey">
 
 export type OrderOrderByWithAggregationInput = {
@@ -755,6 +761,8 @@ export type OrderCreateInput = {
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutOrdersInput
   candleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedOneWithoutOrdersInput
+  attachedProtection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentOrderInput
+  protectionChild?: Prisma.ProtectionChildCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateInput = {
@@ -796,6 +804,8 @@ export type OrderUncheckedCreateInput = {
   rejectReason?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
+  protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUpdateInput = {
@@ -837,6 +847,8 @@ export type OrderUpdateInput = {
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutOrdersNestedInput
   candleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateOneWithoutOrdersNestedInput
+  attachedProtection?: Prisma.ProtectionGroupUpdateOneWithoutParentOrderNestedInput
+  protectionChild?: Prisma.ProtectionChildUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateInput = {
@@ -878,6 +890,8 @@ export type OrderUncheckedUpdateInput = {
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
+  protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateManyInput = {
@@ -1005,6 +1019,11 @@ export type OrderListRelationFilter = {
 
 export type OrderOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
+}
+
+export type OrderNullableScalarRelationFilter = {
+  is?: Prisma.OrderWhereInput | null
+  isNot?: Prisma.OrderWhereInput | null
 }
 
 export type OrderTradingAccountIdIdempotencyKeyCompoundUniqueInput = {
@@ -1289,12 +1308,40 @@ export type OrderUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput = {
   deleteMany?: Prisma.OrderScalarWhereInput | Prisma.OrderScalarWhereInput[]
 }
 
-export type EnumOrderSideFieldUpdateOperationsInput = {
-  set?: $Enums.OrderSide
+export type OrderCreateNestedOneWithoutAttachedProtectionInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutAttachedProtectionInput, Prisma.OrderUncheckedCreateWithoutAttachedProtectionInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutAttachedProtectionInput
+  connect?: Prisma.OrderWhereUniqueInput
 }
 
-export type EnumOrderTypeFieldUpdateOperationsInput = {
-  set?: $Enums.OrderType
+export type OrderUpdateOneWithoutAttachedProtectionNestedInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutAttachedProtectionInput, Prisma.OrderUncheckedCreateWithoutAttachedProtectionInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutAttachedProtectionInput
+  upsert?: Prisma.OrderUpsertWithoutAttachedProtectionInput
+  disconnect?: Prisma.OrderWhereInput | boolean
+  delete?: Prisma.OrderWhereInput | boolean
+  connect?: Prisma.OrderWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OrderUpdateToOneWithWhereWithoutAttachedProtectionInput, Prisma.OrderUpdateWithoutAttachedProtectionInput>, Prisma.OrderUncheckedUpdateWithoutAttachedProtectionInput>
+}
+
+export type OrderCreateNestedOneWithoutProtectionChildInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutProtectionChildInput, Prisma.OrderUncheckedCreateWithoutProtectionChildInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutProtectionChildInput
+  connect?: Prisma.OrderWhereUniqueInput
+}
+
+export type OrderUpdateOneWithoutProtectionChildNestedInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutProtectionChildInput, Prisma.OrderUncheckedCreateWithoutProtectionChildInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutProtectionChildInput
+  upsert?: Prisma.OrderUpsertWithoutProtectionChildInput
+  disconnect?: Prisma.OrderWhereInput | boolean
+  delete?: Prisma.OrderWhereInput | boolean
+  connect?: Prisma.OrderWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OrderUpdateToOneWithWhereWithoutProtectionChildInput, Prisma.OrderUpdateWithoutProtectionChildInput>, Prisma.OrderUncheckedUpdateWithoutProtectionChildInput>
+}
+
+export type EnumOrderSideFieldUpdateOperationsInput = {
+  set?: $Enums.OrderSide
 }
 
 export type EnumOrderStatusFieldUpdateOperationsInput = {
@@ -1469,6 +1516,8 @@ export type OrderCreateWithoutTradingAccountInput = {
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutOrdersInput
   candleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedOneWithoutOrdersInput
+  attachedProtection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentOrderInput
+  protectionChild?: Prisma.ProtectionChildCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutTradingAccountInput = {
@@ -1509,6 +1558,8 @@ export type OrderUncheckedCreateWithoutTradingAccountInput = {
   rejectReason?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
+  protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutTradingAccountInput = {
@@ -1619,6 +1670,8 @@ export type OrderCreateWithoutAssetInput = {
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutOrdersInput
   candleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedOneWithoutOrdersInput
+  attachedProtection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentOrderInput
+  protectionChild?: Prisma.ProtectionChildCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutAssetInput = {
@@ -1659,6 +1712,8 @@ export type OrderUncheckedCreateWithoutAssetInput = {
   rejectReason?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
+  protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutAssetInput = {
@@ -1725,6 +1780,8 @@ export type OrderCreateWithoutAssetPriceSnapshotInput = {
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutOrdersInput
   candleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedOneWithoutOrdersInput
+  attachedProtection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentOrderInput
+  protectionChild?: Prisma.ProtectionChildCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutAssetPriceSnapshotInput = {
@@ -1765,6 +1822,8 @@ export type OrderUncheckedCreateWithoutAssetPriceSnapshotInput = {
   rejectReason?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
+  protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutAssetPriceSnapshotInput = {
@@ -1791,6 +1850,374 @@ export type OrderUpdateWithWhereUniqueWithoutAssetPriceSnapshotInput = {
 export type OrderUpdateManyWithWhereWithoutAssetPriceSnapshotInput = {
   where: Prisma.OrderScalarWhereInput
   data: Prisma.XOR<Prisma.OrderUpdateManyMutationInput, Prisma.OrderUncheckedUpdateManyWithoutAssetPriceSnapshotInput>
+}
+
+export type OrderCreateWithoutAttachedProtectionInput = {
+  id?: string
+  side: $Enums.OrderSide
+  orderType: $Enums.OrderType
+  status?: $Enums.OrderStatus
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode: $Enums.CurrencyCode
+  cashWalletScope: $Enums.WalletScope
+  grossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  feeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  netAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  idempotencyKey?: string | null
+  requestHash?: string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
+  submittedAt: Date | string
+  executedAt?: Date | string | null
+  canceledAt?: Date | string | null
+  rejectedAt?: Date | string | null
+  rejectReason?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
+  asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
+  quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
+  fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutOrdersInput
+  candleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedOneWithoutOrdersInput
+  protectionChild?: Prisma.ProtectionChildCreateNestedOneWithoutOrderInput
+}
+
+export type OrderUncheckedCreateWithoutAttachedProtectionInput = {
+  id?: string
+  tradingAccountId: string
+  assetId: string
+  quoteId?: string | null
+  side: $Enums.OrderSide
+  orderType: $Enums.OrderType
+  status?: $Enums.OrderStatus
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode: $Enums.CurrencyCode
+  cashWalletScope: $Enums.WalletScope
+  grossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  feeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  netAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  assetPriceSnapshotId?: string | null
+  fxRateSnapshotId?: string | null
+  idempotencyKey?: string | null
+  requestHash?: string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
+  limitOrderCandleEvidenceId?: string | null
+  submittedAt: Date | string
+  executedAt?: Date | string | null
+  canceledAt?: Date | string | null
+  rejectedAt?: Date | string | null
+  rejectReason?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
+}
+
+export type OrderCreateOrConnectWithoutAttachedProtectionInput = {
+  where: Prisma.OrderWhereUniqueInput
+  create: Prisma.XOR<Prisma.OrderCreateWithoutAttachedProtectionInput, Prisma.OrderUncheckedCreateWithoutAttachedProtectionInput>
+}
+
+export type OrderUpsertWithoutAttachedProtectionInput = {
+  update: Prisma.XOR<Prisma.OrderUpdateWithoutAttachedProtectionInput, Prisma.OrderUncheckedUpdateWithoutAttachedProtectionInput>
+  create: Prisma.XOR<Prisma.OrderCreateWithoutAttachedProtectionInput, Prisma.OrderUncheckedCreateWithoutAttachedProtectionInput>
+  where?: Prisma.OrderWhereInput
+}
+
+export type OrderUpdateToOneWithWhereWithoutAttachedProtectionInput = {
+  where?: Prisma.OrderWhereInput
+  data: Prisma.XOR<Prisma.OrderUpdateWithoutAttachedProtectionInput, Prisma.OrderUncheckedUpdateWithoutAttachedProtectionInput>
+}
+
+export type OrderUpdateWithoutAttachedProtectionInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
+  orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  cashWalletScope?: Prisma.EnumWalletScopeFieldUpdateOperationsInput | $Enums.WalletScope
+  grossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  feeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  netAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
+  asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
+  quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
+  fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutOrdersNestedInput
+  candleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateOneWithoutOrdersNestedInput
+  protectionChild?: Prisma.ProtectionChildUpdateOneWithoutOrderNestedInput
+}
+
+export type OrderUncheckedUpdateWithoutAttachedProtectionInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetId?: Prisma.StringFieldUpdateOperationsInput | string
+  quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
+  orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  cashWalletScope?: Prisma.EnumWalletScopeFieldUpdateOperationsInput | $Enums.WalletScope
+  grossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  feeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  netAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  limitOrderCandleEvidenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
+}
+
+export type OrderCreateWithoutProtectionChildInput = {
+  id?: string
+  side: $Enums.OrderSide
+  orderType: $Enums.OrderType
+  status?: $Enums.OrderStatus
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode: $Enums.CurrencyCode
+  cashWalletScope: $Enums.WalletScope
+  grossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  feeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  netAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  idempotencyKey?: string | null
+  requestHash?: string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
+  submittedAt: Date | string
+  executedAt?: Date | string | null
+  canceledAt?: Date | string | null
+  rejectedAt?: Date | string | null
+  rejectReason?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
+  asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
+  quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
+  fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutOrdersInput
+  candleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedOneWithoutOrdersInput
+  attachedProtection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentOrderInput
+}
+
+export type OrderUncheckedCreateWithoutProtectionChildInput = {
+  id?: string
+  tradingAccountId: string
+  assetId: string
+  quoteId?: string | null
+  side: $Enums.OrderSide
+  orderType: $Enums.OrderType
+  status?: $Enums.OrderStatus
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode: $Enums.CurrencyCode
+  cashWalletScope: $Enums.WalletScope
+  grossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  feeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  netAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  assetPriceSnapshotId?: string | null
+  fxRateSnapshotId?: string | null
+  idempotencyKey?: string | null
+  requestHash?: string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
+  limitOrderCandleEvidenceId?: string | null
+  submittedAt: Date | string
+  executedAt?: Date | string | null
+  canceledAt?: Date | string | null
+  rejectedAt?: Date | string | null
+  rejectReason?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
+}
+
+export type OrderCreateOrConnectWithoutProtectionChildInput = {
+  where: Prisma.OrderWhereUniqueInput
+  create: Prisma.XOR<Prisma.OrderCreateWithoutProtectionChildInput, Prisma.OrderUncheckedCreateWithoutProtectionChildInput>
+}
+
+export type OrderUpsertWithoutProtectionChildInput = {
+  update: Prisma.XOR<Prisma.OrderUpdateWithoutProtectionChildInput, Prisma.OrderUncheckedUpdateWithoutProtectionChildInput>
+  create: Prisma.XOR<Prisma.OrderCreateWithoutProtectionChildInput, Prisma.OrderUncheckedCreateWithoutProtectionChildInput>
+  where?: Prisma.OrderWhereInput
+}
+
+export type OrderUpdateToOneWithWhereWithoutProtectionChildInput = {
+  where?: Prisma.OrderWhereInput
+  data: Prisma.XOR<Prisma.OrderUpdateWithoutProtectionChildInput, Prisma.OrderUncheckedUpdateWithoutProtectionChildInput>
+}
+
+export type OrderUpdateWithoutProtectionChildInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
+  orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  cashWalletScope?: Prisma.EnumWalletScopeFieldUpdateOperationsInput | $Enums.WalletScope
+  grossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  feeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  netAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
+  asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
+  quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
+  fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutOrdersNestedInput
+  candleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateOneWithoutOrdersNestedInput
+  attachedProtection?: Prisma.ProtectionGroupUpdateOneWithoutParentOrderNestedInput
+}
+
+export type OrderUncheckedUpdateWithoutProtectionChildInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetId?: Prisma.StringFieldUpdateOperationsInput | string
+  quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
+  orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  cashWalletScope?: Prisma.EnumWalletScopeFieldUpdateOperationsInput | $Enums.WalletScope
+  grossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  feeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  netAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  limitOrderCandleEvidenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
 }
 
 export type OrderCreateWithoutFxRateSnapshotInput = {
@@ -1831,6 +2258,8 @@ export type OrderCreateWithoutFxRateSnapshotInput = {
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
   candleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedOneWithoutOrdersInput
+  attachedProtection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentOrderInput
+  protectionChild?: Prisma.ProtectionChildCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutFxRateSnapshotInput = {
@@ -1871,6 +2300,8 @@ export type OrderUncheckedCreateWithoutFxRateSnapshotInput = {
   rejectReason?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
+  protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutFxRateSnapshotInput = {
@@ -1937,6 +2368,8 @@ export type OrderCreateWithoutQuoteInput = {
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutOrdersInput
   candleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedOneWithoutOrdersInput
+  attachedProtection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentOrderInput
+  protectionChild?: Prisma.ProtectionChildCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutQuoteInput = {
@@ -1977,6 +2410,8 @@ export type OrderUncheckedCreateWithoutQuoteInput = {
   rejectReason?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
+  protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutQuoteInput = {
@@ -2043,6 +2478,8 @@ export type OrderCreateWithoutCandleEvidenceInput = {
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutOrdersInput
+  attachedProtection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentOrderInput
+  protectionChild?: Prisma.ProtectionChildCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutCandleEvidenceInput = {
@@ -2083,6 +2520,8 @@ export type OrderUncheckedCreateWithoutCandleEvidenceInput = {
   rejectReason?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
+  protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutCandleEvidenceInput = {
@@ -2189,6 +2628,8 @@ export type OrderUpdateWithoutTradingAccountInput = {
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutOrdersNestedInput
   candleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateOneWithoutOrdersNestedInput
+  attachedProtection?: Prisma.ProtectionGroupUpdateOneWithoutParentOrderNestedInput
+  protectionChild?: Prisma.ProtectionChildUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutTradingAccountInput = {
@@ -2229,6 +2670,8 @@ export type OrderUncheckedUpdateWithoutTradingAccountInput = {
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
+  protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutTradingAccountInput = {
@@ -2349,6 +2792,8 @@ export type OrderUpdateWithoutAssetInput = {
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutOrdersNestedInput
   candleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateOneWithoutOrdersNestedInput
+  attachedProtection?: Prisma.ProtectionGroupUpdateOneWithoutParentOrderNestedInput
+  protectionChild?: Prisma.ProtectionChildUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutAssetInput = {
@@ -2389,6 +2834,8 @@ export type OrderUncheckedUpdateWithoutAssetInput = {
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
+  protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutAssetInput = {
@@ -2509,6 +2956,8 @@ export type OrderUpdateWithoutAssetPriceSnapshotInput = {
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutOrdersNestedInput
   candleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateOneWithoutOrdersNestedInput
+  attachedProtection?: Prisma.ProtectionGroupUpdateOneWithoutParentOrderNestedInput
+  protectionChild?: Prisma.ProtectionChildUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutAssetPriceSnapshotInput = {
@@ -2549,6 +2998,8 @@ export type OrderUncheckedUpdateWithoutAssetPriceSnapshotInput = {
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
+  protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutAssetPriceSnapshotInput = {
@@ -2669,6 +3120,8 @@ export type OrderUpdateWithoutFxRateSnapshotInput = {
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
   candleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateOneWithoutOrdersNestedInput
+  attachedProtection?: Prisma.ProtectionGroupUpdateOneWithoutParentOrderNestedInput
+  protectionChild?: Prisma.ProtectionChildUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutFxRateSnapshotInput = {
@@ -2709,6 +3162,8 @@ export type OrderUncheckedUpdateWithoutFxRateSnapshotInput = {
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
+  protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutFxRateSnapshotInput = {
@@ -2829,6 +3284,8 @@ export type OrderUpdateWithoutQuoteInput = {
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutOrdersNestedInput
   candleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateOneWithoutOrdersNestedInput
+  attachedProtection?: Prisma.ProtectionGroupUpdateOneWithoutParentOrderNestedInput
+  protectionChild?: Prisma.ProtectionChildUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutQuoteInput = {
@@ -2869,6 +3326,8 @@ export type OrderUncheckedUpdateWithoutQuoteInput = {
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
+  protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutQuoteInput = {
@@ -2989,6 +3448,8 @@ export type OrderUpdateWithoutCandleEvidenceInput = {
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutOrdersNestedInput
+  attachedProtection?: Prisma.ProtectionGroupUpdateOneWithoutParentOrderNestedInput
+  protectionChild?: Prisma.ProtectionChildUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutCandleEvidenceInput = {
@@ -3029,6 +3490,8 @@ export type OrderUncheckedUpdateWithoutCandleEvidenceInput = {
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
+  protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutCandleEvidenceInput = {
@@ -3118,6 +3581,8 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   assetPriceSnapshot?: boolean | Prisma.Order$assetPriceSnapshotArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.Order$fxRateSnapshotArgs<ExtArgs>
   candleEvidence?: boolean | Prisma.Order$candleEvidenceArgs<ExtArgs>
+  attachedProtection?: boolean | Prisma.Order$attachedProtectionArgs<ExtArgs>
+  protectionChild?: boolean | Prisma.Order$protectionChildArgs<ExtArgs>
 }, ExtArgs["result"]["order"]>
 
 export type OrderSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -3263,6 +3728,8 @@ export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   assetPriceSnapshot?: boolean | Prisma.Order$assetPriceSnapshotArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.Order$fxRateSnapshotArgs<ExtArgs>
   candleEvidence?: boolean | Prisma.Order$candleEvidenceArgs<ExtArgs>
+  attachedProtection?: boolean | Prisma.Order$attachedProtectionArgs<ExtArgs>
+  protectionChild?: boolean | Prisma.Order$protectionChildArgs<ExtArgs>
 }
 export type OrderIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
@@ -3290,6 +3757,8 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     assetPriceSnapshot: Prisma.$AssetPriceSnapshotPayload<ExtArgs> | null
     fxRateSnapshot: Prisma.$FxRateSnapshotPayload<ExtArgs> | null
     candleEvidence: Prisma.$LimitOrderCandleEvidencePayload<ExtArgs> | null
+    attachedProtection: Prisma.$ProtectionGroupPayload<ExtArgs> | null
+    protectionChild: Prisma.$ProtectionChildPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -3730,6 +4199,8 @@ export interface Prisma__OrderClient<T, Null = never, ExtArgs extends runtime.Ty
   assetPriceSnapshot<T extends Prisma.Order$assetPriceSnapshotArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$assetPriceSnapshotArgs<ExtArgs>>): Prisma.Prisma__AssetPriceSnapshotClient<runtime.Types.Result.GetResult<Prisma.$AssetPriceSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   fxRateSnapshot<T extends Prisma.Order$fxRateSnapshotArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$fxRateSnapshotArgs<ExtArgs>>): Prisma.Prisma__FxRateSnapshotClient<runtime.Types.Result.GetResult<Prisma.$FxRateSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   candleEvidence<T extends Prisma.Order$candleEvidenceArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$candleEvidenceArgs<ExtArgs>>): Prisma.Prisma__LimitOrderCandleEvidenceClient<runtime.Types.Result.GetResult<Prisma.$LimitOrderCandleEvidencePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  attachedProtection<T extends Prisma.Order$attachedProtectionArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$attachedProtectionArgs<ExtArgs>>): Prisma.Prisma__ProtectionGroupClient<runtime.Types.Result.GetResult<Prisma.$ProtectionGroupPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  protectionChild<T extends Prisma.Order$protectionChildArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$protectionChildArgs<ExtArgs>>): Prisma.Prisma__ProtectionChildClient<runtime.Types.Result.GetResult<Prisma.$ProtectionChildPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -4271,6 +4742,44 @@ export type Order$candleEvidenceArgs<ExtArgs extends runtime.Types.Extensions.In
    */
   include?: Prisma.LimitOrderCandleEvidenceInclude<ExtArgs> | null
   where?: Prisma.LimitOrderCandleEvidenceWhereInput
+}
+
+/**
+ * Order.attachedProtection
+ */
+export type Order$attachedProtectionArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ProtectionGroup
+   */
+  select?: Prisma.ProtectionGroupSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ProtectionGroup
+   */
+  omit?: Prisma.ProtectionGroupOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ProtectionGroupInclude<ExtArgs> | null
+  where?: Prisma.ProtectionGroupWhereInput
+}
+
+/**
+ * Order.protectionChild
+ */
+export type Order$protectionChildArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ProtectionChild
+   */
+  select?: Prisma.ProtectionChildSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ProtectionChild
+   */
+  omit?: Prisma.ProtectionChildOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ProtectionChildInclude<ExtArgs> | null
+  where?: Prisma.ProtectionChildWhereInput
 }
 
 /**

@@ -33,6 +33,16 @@ export function getPortfolioNotice(
     return null;
   }
 
+  if (portfolio.finalResult) {
+    return portfolio.finalResult.state === 'available' ? {
+      title: '최종 자산 비중 조회 불가',
+      message: '최종 자산과 수익률은 확정값입니다. 자산 비중의 저장된 세부 내역을 불러오지 못했습니다.',
+    } : {
+      title: '최종 결과 조회 불가',
+      message: '저장된 시즌 최종 결과를 불러오지 못했습니다. 현재 시세로 다시 계산하지 않습니다.',
+    };
+  }
+
   const codes = [
     portfolio.reason,
     ...portfolio.sectionErrors.map((error) => error.code),

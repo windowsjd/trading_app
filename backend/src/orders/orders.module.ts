@@ -38,6 +38,6 @@ import { TradingAccountOrdersController } from './trading-account-orders.control
     LimitOrderExecutionService,
     LimitOrderMatchingService,
   ],
-  exports: [LimitOrderCancelService, LimitOrderMatchingService],
+  exports: [OrdersService, LimitOrderCancelService, LimitOrderMatchingService],
 })
 export class OrdersModule {}

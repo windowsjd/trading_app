@@ -1,3 +1,6 @@
+import React from 'react';
+export const NavigationContext = React.createContext(undefined);
+import { conditionalFixture } from '../conditionalFixtures.cjs';
 import { getTradingAccountCapabilities } from '../../src/features/tradingAccount/capabilities';
 const params = new URLSearchParams(location.search);
 export const state = {
@@ -106,6 +109,13 @@ export function useAssetOrderBook({ assetId }) {
 const response = (data) => ({ data: { success: true, data } });
 export const apiClient = {
   async get(path, options = {}) {
+    if(path.endsWith('/protections')) {
+      const protection = params.get('protection');
+      if(protection==='error') throw new Error('protection fixture unavailable');
+      if(protection==='loading') return new Promise(()=>{});
+      const id=path.split('/')[2], data=conditionalFixture(id,{enabled:!!protection,active:protection==='active',holding:protection==='holding',mode:state.mode,domain:'spot'});
+      return {data:{success:true,data}};
+    }
     state.reads.push(path);
     const u = new URL(path, 'http://fixture'),
       parts = u.pathname.split('/'),
@@ -182,6 +192,7 @@ export const apiClient = {
               {
                 ...assets.find((a) => a.id === state.assetId),
                 assetId: state.assetId,
+                positionId: 'spot-position',
                 quantity: String(state.position),
                 averageCost: '0.5',
                 currencyCode: 'USD',

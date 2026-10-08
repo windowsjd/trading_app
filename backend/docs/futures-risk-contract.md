@@ -104,8 +104,9 @@ account Cross metrics. Legacy Spot reference fields remain explicitly separate.
 limit (1–100, default 20) and offset (0–1,000,000) conventions as executions.
 
 The F3 UI and shared valuation reuse these Mark eligibility and UPNL primitives.
-Stop Loss, Take Profit, OCO, trailing stops, limit orders, funding, hedge mode,
-brackets and risk tiers remain outside the implemented Futures scope.
+SL/TP/OCO now belong to the separate [Conditional v1](conditional-orders-contract.md)
+user-exit domain: Spot triggers/execution, never Mark. Trailing stops, standalone
+Limit entries, funding, hedge mode, brackets and risk tiers remain excluded.
 
 ## Diagnostic safety
 

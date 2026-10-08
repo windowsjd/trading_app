@@ -405,6 +405,10 @@ export const ModelName = {
   FuturesPosition: 'FuturesPosition',
   FuturesExecution: 'FuturesExecution',
   FuturesExecuteRequest: 'FuturesExecuteRequest',
+  ProtectionGroup: 'ProtectionGroup',
+  ProtectionLeg: 'ProtectionLeg',
+  ProtectionChild: 'ProtectionChild',
+  ProtectionCommand: 'ProtectionCommand',
   Position: 'Position',
   Order: 'Order',
   CashWallet: 'CashWallet',
@@ -445,7 +449,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "position" | "order" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose"
+    modelProps: "user" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2000,6 +2004,302 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.FuturesExecuteRequestCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.FuturesExecuteRequestCountAggregateOutputType> | number
+        }
+      }
+    }
+    ProtectionGroup: {
+      payload: Prisma.$ProtectionGroupPayload<ExtArgs>
+      fields: Prisma.ProtectionGroupFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ProtectionGroupFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionGroupPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ProtectionGroupFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionGroupPayload>
+        }
+        findFirst: {
+          args: Prisma.ProtectionGroupFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionGroupPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ProtectionGroupFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionGroupPayload>
+        }
+        findMany: {
+          args: Prisma.ProtectionGroupFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionGroupPayload>[]
+        }
+        create: {
+          args: Prisma.ProtectionGroupCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionGroupPayload>
+        }
+        createMany: {
+          args: Prisma.ProtectionGroupCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ProtectionGroupCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionGroupPayload>[]
+        }
+        delete: {
+          args: Prisma.ProtectionGroupDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionGroupPayload>
+        }
+        update: {
+          args: Prisma.ProtectionGroupUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionGroupPayload>
+        }
+        deleteMany: {
+          args: Prisma.ProtectionGroupDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ProtectionGroupUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ProtectionGroupUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionGroupPayload>[]
+        }
+        upsert: {
+          args: Prisma.ProtectionGroupUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionGroupPayload>
+        }
+        aggregate: {
+          args: Prisma.ProtectionGroupAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateProtectionGroup>
+        }
+        groupBy: {
+          args: Prisma.ProtectionGroupGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ProtectionGroupGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ProtectionGroupCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ProtectionGroupCountAggregateOutputType> | number
+        }
+      }
+    }
+    ProtectionLeg: {
+      payload: Prisma.$ProtectionLegPayload<ExtArgs>
+      fields: Prisma.ProtectionLegFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ProtectionLegFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionLegPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ProtectionLegFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionLegPayload>
+        }
+        findFirst: {
+          args: Prisma.ProtectionLegFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionLegPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ProtectionLegFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionLegPayload>
+        }
+        findMany: {
+          args: Prisma.ProtectionLegFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionLegPayload>[]
+        }
+        create: {
+          args: Prisma.ProtectionLegCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionLegPayload>
+        }
+        createMany: {
+          args: Prisma.ProtectionLegCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ProtectionLegCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionLegPayload>[]
+        }
+        delete: {
+          args: Prisma.ProtectionLegDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionLegPayload>
+        }
+        update: {
+          args: Prisma.ProtectionLegUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionLegPayload>
+        }
+        deleteMany: {
+          args: Prisma.ProtectionLegDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ProtectionLegUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ProtectionLegUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionLegPayload>[]
+        }
+        upsert: {
+          args: Prisma.ProtectionLegUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionLegPayload>
+        }
+        aggregate: {
+          args: Prisma.ProtectionLegAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateProtectionLeg>
+        }
+        groupBy: {
+          args: Prisma.ProtectionLegGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ProtectionLegGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ProtectionLegCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ProtectionLegCountAggregateOutputType> | number
+        }
+      }
+    }
+    ProtectionChild: {
+      payload: Prisma.$ProtectionChildPayload<ExtArgs>
+      fields: Prisma.ProtectionChildFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ProtectionChildFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionChildPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ProtectionChildFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionChildPayload>
+        }
+        findFirst: {
+          args: Prisma.ProtectionChildFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionChildPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ProtectionChildFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionChildPayload>
+        }
+        findMany: {
+          args: Prisma.ProtectionChildFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionChildPayload>[]
+        }
+        create: {
+          args: Prisma.ProtectionChildCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionChildPayload>
+        }
+        createMany: {
+          args: Prisma.ProtectionChildCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ProtectionChildCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionChildPayload>[]
+        }
+        delete: {
+          args: Prisma.ProtectionChildDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionChildPayload>
+        }
+        update: {
+          args: Prisma.ProtectionChildUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionChildPayload>
+        }
+        deleteMany: {
+          args: Prisma.ProtectionChildDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ProtectionChildUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ProtectionChildUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionChildPayload>[]
+        }
+        upsert: {
+          args: Prisma.ProtectionChildUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionChildPayload>
+        }
+        aggregate: {
+          args: Prisma.ProtectionChildAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateProtectionChild>
+        }
+        groupBy: {
+          args: Prisma.ProtectionChildGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ProtectionChildGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ProtectionChildCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ProtectionChildCountAggregateOutputType> | number
+        }
+      }
+    }
+    ProtectionCommand: {
+      payload: Prisma.$ProtectionCommandPayload<ExtArgs>
+      fields: Prisma.ProtectionCommandFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ProtectionCommandFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionCommandPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ProtectionCommandFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionCommandPayload>
+        }
+        findFirst: {
+          args: Prisma.ProtectionCommandFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionCommandPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ProtectionCommandFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionCommandPayload>
+        }
+        findMany: {
+          args: Prisma.ProtectionCommandFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionCommandPayload>[]
+        }
+        create: {
+          args: Prisma.ProtectionCommandCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionCommandPayload>
+        }
+        createMany: {
+          args: Prisma.ProtectionCommandCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ProtectionCommandCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionCommandPayload>[]
+        }
+        delete: {
+          args: Prisma.ProtectionCommandDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionCommandPayload>
+        }
+        update: {
+          args: Prisma.ProtectionCommandUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionCommandPayload>
+        }
+        deleteMany: {
+          args: Prisma.ProtectionCommandDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ProtectionCommandUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ProtectionCommandUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionCommandPayload>[]
+        }
+        upsert: {
+          args: Prisma.ProtectionCommandUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProtectionCommandPayload>
+        }
+        aggregate: {
+          args: Prisma.ProtectionCommandAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateProtectionCommand>
+        }
+        groupBy: {
+          args: Prisma.ProtectionCommandGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ProtectionCommandGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ProtectionCommandCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ProtectionCommandCountAggregateOutputType> | number
         }
       }
     }
@@ -4301,6 +4601,68 @@ export const FuturesExecuteRequestScalarFieldEnum = {
 export type FuturesExecuteRequestScalarFieldEnum = (typeof FuturesExecuteRequestScalarFieldEnum)[keyof typeof FuturesExecuteRequestScalarFieldEnum]
 
 
+export const ProtectionGroupScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  assetId: 'assetId',
+  domain: 'domain',
+  direction: 'direction',
+  positionId: 'positionId',
+  futuresPositionId: 'futuresPositionId',
+  parentOrderId: 'parentOrderId',
+  status: 'status',
+  terminalReason: 'terminalReason',
+  createdAt: 'createdAt',
+  activatedAt: 'activatedAt',
+  endedAt: 'endedAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ProtectionGroupScalarFieldEnum = (typeof ProtectionGroupScalarFieldEnum)[keyof typeof ProtectionGroupScalarFieldEnum]
+
+
+export const ProtectionLegScalarFieldEnum = {
+  id: 'id',
+  groupId: 'groupId',
+  kind: 'kind',
+  triggerPrice: 'triggerPrice',
+  childOrderType: 'childOrderType',
+  childLimitPrice: 'childLimitPrice'
+} as const
+
+export type ProtectionLegScalarFieldEnum = (typeof ProtectionLegScalarFieldEnum)[keyof typeof ProtectionLegScalarFieldEnum]
+
+
+export const ProtectionChildScalarFieldEnum = {
+  id: 'id',
+  groupId: 'groupId',
+  legId: 'legId',
+  status: 'status',
+  quantity: 'quantity',
+  orderId: 'orderId',
+  futuresExecutionId: 'futuresExecutionId',
+  assetPriceSnapshotId: 'assetPriceSnapshotId',
+  triggerEvidenceJson: 'triggerEvidenceJson',
+  triggeredAt: 'triggeredAt',
+  endedAt: 'endedAt',
+  terminalReason: 'terminalReason'
+} as const
+
+export type ProtectionChildScalarFieldEnum = (typeof ProtectionChildScalarFieldEnum)[keyof typeof ProtectionChildScalarFieldEnum]
+
+
+export const ProtectionCommandScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  responsePayloadJson: 'responsePayloadJson',
+  createdAt: 'createdAt'
+} as const
+
+export type ProtectionCommandScalarFieldEnum = (typeof ProtectionCommandScalarFieldEnum)[keyof typeof ProtectionCommandScalarFieldEnum]
+
+
 export const PositionScalarFieldEnum = {
   id: 'id',
   tradingAccountId: 'tradingAccountId',
@@ -5301,16 +5663,44 @@ export type ListEnumFuturesOperationFieldRefInput<$PrismaModel> = FieldRefInputT
 
 
 /**
- * Reference to a field of type 'OrderSide'
+ * Reference to a field of type 'ProtectionDomain'
  */
-export type EnumOrderSideFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrderSide'>
+export type EnumProtectionDomainFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ProtectionDomain'>
     
 
 
 /**
- * Reference to a field of type 'OrderSide[]'
+ * Reference to a field of type 'ProtectionDomain[]'
  */
-export type ListEnumOrderSideFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrderSide[]'>
+export type ListEnumProtectionDomainFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ProtectionDomain[]'>
+    
+
+
+/**
+ * Reference to a field of type 'ProtectionStatus'
+ */
+export type EnumProtectionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ProtectionStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'ProtectionStatus[]'
+ */
+export type ListEnumProtectionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ProtectionStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'ProtectionKind'
+ */
+export type EnumProtectionKindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ProtectionKind'>
+    
+
+
+/**
+ * Reference to a field of type 'ProtectionKind[]'
+ */
+export type ListEnumProtectionKindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ProtectionKind[]'>
     
 
 
@@ -5325,6 +5715,34 @@ export type EnumOrderTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$Prisma
  * Reference to a field of type 'OrderType[]'
  */
 export type ListEnumOrderTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrderType[]'>
+    
+
+
+/**
+ * Reference to a field of type 'ProtectionChildStatus'
+ */
+export type EnumProtectionChildStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ProtectionChildStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'ProtectionChildStatus[]'
+ */
+export type ListEnumProtectionChildStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ProtectionChildStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'OrderSide'
+ */
+export type EnumOrderSideFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrderSide'>
+    
+
+
+/**
+ * Reference to a field of type 'OrderSide[]'
+ */
+export type ListEnumOrderSideFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrderSide[]'>
     
 
 
@@ -5695,6 +6113,10 @@ export type GlobalOmitConfig = {
   futuresPosition?: Prisma.FuturesPositionOmit
   futuresExecution?: Prisma.FuturesExecutionOmit
   futuresExecuteRequest?: Prisma.FuturesExecuteRequestOmit
+  protectionGroup?: Prisma.ProtectionGroupOmit
+  protectionLeg?: Prisma.ProtectionLegOmit
+  protectionChild?: Prisma.ProtectionChildOmit
+  protectionCommand?: Prisma.ProtectionCommandOmit
   position?: Prisma.PositionOmit
   order?: Prisma.OrderOmit
   cashWallet?: Prisma.CashWalletOmit

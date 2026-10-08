@@ -265,6 +265,8 @@ enum OpsJobName {
   limit_order_candle_reconciliation
   limit_order_matching
   futures_liquidation
+  futures_mark_retention
+  conditional_orders
 }
 
 enum MarketCandleSyncMode {
@@ -449,6 +451,8 @@ model TradingAccount {
   futuresExecuteRequests        FuturesExecuteRequest[]
   futuresLiquidations           FuturesLiquidation[]
   futuresSeasonSettlement       FuturesSeasonSettlement?
+  protectionGroups              ProtectionGroup[]
+  protectionCommands            ProtectionCommand[]
   quotes                        Quote[]
   adRewardClaims                AdRewardClaim[]
   equitySnapshots               EquitySnapshot[]
@@ -661,6 +665,7 @@ model Asset {
   quotes                   Quote[]
   limitOrderCandleEvidence LimitOrderCandleEvidence[]
   futuresInstruments       FuturesInstrument[]
+  protectionGroups         ProtectionGroup[]
 
   @@unique([market, symbol])
   @@index([assetType, market])
@@ -688,6 +693,7 @@ model AssetPriceSnapshot {
   quotes              Quote[]
   futuresExecutions   FuturesExecution[]
   futuresSeasonPrices FuturesSeasonPrice[]
+  protectionChildren  ProtectionChild[]
 
   @@index([assetId, effectiveAt])
   @@index([assetId, capturedAt])
@@ -886,6 +892,7 @@ model FuturesPosition {
   executions       FuturesExecution[]
   liquidationClose FuturesLiquidationClose?
   seasonClose      FuturesSeasonClose?
+  protectionGroups ProtectionGroup[]
 
   @@unique([id, tradingAccountId, instrumentId])
   @@index([tradingAccountId, status, instrumentId])
@@ -925,6 +932,7 @@ model FuturesExecution {
   position           FuturesPosition        @relation(fields: [positionId, tradingAccountId, instrumentId], references: [id, tradingAccountId, instrumentId], onDelete: Restrict)
   assetPriceSnapshot AssetPriceSnapshot     @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
   executeRequest     FuturesExecuteRequest?
+  protectionChild    ProtectionChild?
 
   @@unique([id, tradingAccountId])
   @@index([tradingAccountId, executedAt, id])
@@ -953,6 +961,115 @@ model FuturesExecuteRequest {
   @@map("futures_execute_requests")
 }
 
+enum ProtectionDomain {
+  spot
+  futures
+}
+
+enum ProtectionStatus {
+  holding
+  active
+  completed
+  canceled
+}
+
+enum ProtectionKind {
+  stop_loss
+  take_profit
+}
+
+enum ProtectionChildStatus {
+  pending
+  filled
+  canceled
+}
+
+// Partial unique indexes enforce one live group per account/product asset and
+// one pending child per group. Legs themselves never reserve position quantity.
+model ProtectionGroup {
+  id                String           @id @default(uuid())
+  tradingAccountId  String           @map("trading_account_id")
+  assetId           String           @map("asset_id")
+  domain            ProtectionDomain
+  direction         FuturesDirection
+  positionId        String?          @map("position_id")
+  futuresPositionId String?          @map("futures_position_id")
+  parentOrderId     String?          @unique @map("parent_order_id")
+  status            ProtectionStatus
+  terminalReason    String?          @map("terminal_reason")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  activatedAt       DateTime?        @map("activated_at")
+  endedAt           DateTime?        @map("ended_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  tradingAccount  TradingAccount    @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  asset           Asset             @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  position        Position?         @relation(fields: [positionId], references: [id], onDelete: Restrict)
+  futuresPosition FuturesPosition?  @relation(fields: [futuresPositionId], references: [id], onDelete: Restrict)
+  parentOrder     Order?            @relation(fields: [parentOrderId], references: [id], onDelete: Restrict)
+  legs            ProtectionLeg[]
+  children        ProtectionChild[]
+
+  @@index([status, id])
+  @@index([tradingAccountId, createdAt, id])
+  @@index([futuresPositionId])
+  @@index([positionId])
+  @@map("protection_groups")
+}
+
+model ProtectionLeg {
+  id              String            @id @default(uuid())
+  groupId         String            @map("group_id")
+  kind            ProtectionKind
+  triggerPrice    Decimal           @map("trigger_price") @db.Decimal(24, 8)
+  childOrderType  OrderType         @map("child_order_type")
+  childLimitPrice Decimal?          @map("child_limit_price") @db.Decimal(24, 8)
+  group           ProtectionGroup   @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  children        ProtectionChild[]
+
+  @@unique([groupId, kind])
+  @@unique([id, groupId])
+  @@map("protection_legs")
+}
+
+model ProtectionChild {
+  id                   String                @id @default(uuid())
+  groupId              String                @map("group_id")
+  legId                String                @map("leg_id")
+  status               ProtectionChildStatus @default(pending)
+  quantity             Decimal               @db.Decimal(24, 8)
+  orderId              String?               @unique @map("order_id")
+  futuresExecutionId   String?               @unique @map("futures_execution_id")
+  assetPriceSnapshotId String                @map("asset_price_snapshot_id")
+  triggerEvidenceJson  Json                  @map("trigger_evidence_json")
+  triggeredAt          DateTime              @map("triggered_at")
+  endedAt              DateTime?             @map("ended_at")
+  terminalReason       String?               @map("terminal_reason")
+
+  group              ProtectionGroup    @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  leg                ProtectionLeg      @relation(fields: [legId, groupId], references: [id, groupId], onDelete: Restrict)
+  order              Order?             @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  futuresExecution   FuturesExecution?  @relation(fields: [futuresExecutionId], references: [id], onDelete: Restrict)
+  assetPriceSnapshot AssetPriceSnapshot @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
+
+  @@index([groupId, triggeredAt, id])
+  @@index([assetPriceSnapshotId])
+  @@map("protection_children")
+}
+
+model ProtectionCommand {
+  id                  String         @id @default(uuid())
+  tradingAccountId    String         @map("trading_account_id")
+  idempotencyKey      String         @map("idempotency_key")
+  requestHash         String         @map("request_hash")
+  responsePayloadJson Json           @map("response_payload_json")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  tradingAccount      TradingAccount @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+
+  @@unique([tradingAccountId, idempotencyKey])
+  @@map("protection_commands")
+}
+
 model Position {
   id                 String       @id @default(uuid())
   tradingAccountId   String       @map("trading_account_id")
@@ -974,8 +1091,9 @@ model Position {
   createdAt          DateTime     @default(now()) @map("created_at")
   updatedAt          DateTime     @updatedAt @map("updated_at")
 
-  tradingAccount TradingAccount @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
-  asset          Asset          @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  tradingAccount   TradingAccount    @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  asset            Asset             @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  protectionGroups ProtectionGroup[]
 
   // One aggregate position per asset per canonical trading account.
   @@unique([tradingAccountId, assetId])
@@ -1040,6 +1158,8 @@ model Order {
   assetPriceSnapshot AssetPriceSnapshot?       @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
   fxRateSnapshot     FxRateSnapshot?           @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
   candleEvidence     LimitOrderCandleEvidence? @relation(fields: [limitOrderCandleEvidenceId], references: [id], onDelete: Restrict)
+  attachedProtection ProtectionGroup?
+  protectionChild    ProtectionChild?
 
   // Account-scoped create idempotency: the same key may be reused by the
   // SAME user on a different trading account. idempotencyKey stays nullable.
@@ -1642,6 +1762,7 @@ model FuturesMarkSnapshot {
 
   @@unique([instrumentId, source, effectiveAt])
   @@index([instrumentId, effectiveAt])
+  @@index([capturedAt, id])
   @@map("futures_mark_snapshots")
 }
 
