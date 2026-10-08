@@ -80,6 +80,45 @@ describe('GlobalHttpExceptionFilter', () => {
     });
     expect(JSON.stringify(getJsonBody())).not.toContain('secret');
   });
+  it.each(['user', 'operator', 'admin'])(
+    'does not publish diagnostic-only legacy 503 envelope text for %s',
+    (role) => {
+      const message = 'Trading account access service unavailable';
+      const request = {
+        method: 'GET',
+        originalUrl: '/api/v1/portfolio',
+        headers: {},
+        user: { userId: 'user-1', role },
+      };
+      const { host, response, getJsonBody } = createHost(request);
+      adminDiagnosticRequestMiddleware(
+        request as never,
+        response as never,
+        () => {
+          new GlobalHttpExceptionFilter().catch(
+            new HttpException(
+              {
+                success: false,
+                error: { code: 'ACCOUNT_UNAVAILABLE', message },
+              },
+              503,
+            ),
+            host,
+          );
+        },
+      );
+      const body = getJsonBody() as {
+        error: {
+          message: string;
+          diagnostic?: { exception: { message: string } };
+        };
+      };
+      expect(body.error.message).toBe('Service Unavailable');
+      expect(Boolean(body.error.diagnostic)).toBe(role === 'admin');
+      if (role === 'admin')
+        expect(body.error.diagnostic?.exception.message).toBe(message);
+    },
+  );
 
   it.each(['user', 'operator', 'admin'] as const)(
     'keeps raw HTTP wrappers and attached diagnostics out of the %s public envelope',

@@ -85,7 +85,8 @@ jobs:
         run: pnpm run build
       - name: Unit tests
         run: pnpm test
-      - name: Diagnostic production source gate
+      # Unit tests cover in-memory gate fixtures. Audit the actual diff only here.
+      - name: Diagnostic production bypass gate (changed files)
         run: node ../scripts/diagnostic-enforcement.cjs backend
 
   frontend-quality:
@@ -118,7 +119,8 @@ jobs:
         run: npm run typecheck
       - name: Tests (node --test, Node 24 type stripping)
         run: npm test
-      - name: Diagnostic presentation source gate
+      # Frontend tests cover in-memory fixtures, not another repository audit.
+      - name: Diagnostic presentation bypass gate (changed files)
         run: node ../scripts/diagnostic-enforcement.cjs frontend
       # The production compile gate for the app itself. `tsc --noEmit` proves
       # the types; only a bundle proves that every module actually resolves and

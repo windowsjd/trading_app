@@ -6,7 +6,7 @@ import {
 } from '../generated/prisma/client';
 import { buildPagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
-import { sanitizeOpsJson } from '../ops/ops-redaction';
+import { sanitizeOpsJson, sanitizeOpsFailureJson } from '../ops/ops-redaction';
 import { projectOpsFailure } from '../ops/ops-failure';
 import {
   BatchGetJobRunResponse,
@@ -104,6 +104,7 @@ export class BatchService {
           errorMessage: opsFailure.message,
           resultPayloadJson: this.toJsonInput(
             failure.resultPayload ?? { failure: opsFailure },
+            sanitizeOpsFailureJson,
           ),
         },
       });
@@ -376,12 +377,13 @@ export class BatchService {
 
   private toJsonInput(
     value: unknown,
+    sanitize = sanitizeOpsJson,
   ): Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue {
     if (value === null) {
       return Prisma.JsonNull;
     }
 
-    return sanitizeOpsJson(value) as Prisma.InputJsonValue;
+    return sanitize(value) as Prisma.InputJsonValue;
   }
 
   private isUniqueConstraintError(error: unknown) {

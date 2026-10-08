@@ -75,6 +75,56 @@ describe('Diagnostic Enforcement Foundation', () => {
       /fake-token|db.invalid|provider.invalid|987654|fake-nested/,
     );
   });
+  it.each(['user', 'operator', 'admin', undefined])(
+    'keeps diagnostic-only product factory copy out of the public response for %s',
+    (role) => {
+      for (const message of [
+        'Limit order cancel service is not wired.',
+        'Participant has no trading account link; run trading-accounts:repair-links.',
+        'Trading account access service unavailable',
+      ]) {
+        const body = http(
+          role,
+          '/api/v1/trading-accounts/account-1/wallets',
+          () => createApiError('NEW_DOMAIN_CODE', message, 409),
+        );
+        expect(body.error.message).toBe('Request could not be completed.');
+        expect(Boolean(body.error.diagnostic)).toBe(role === 'admin');
+      }
+    },
+  );
+  it.each([
+    ['GET', 'wallets', 'WALLET_WALLETS_READ'],
+    ['POST', 'wallet-transfers', 'WALLET_TRANSFER'],
+    ['POST', 'wallet-transfers/quote', 'WALLET_TRANSFER_QUOTE'],
+    ['POST', 'wallet-transfers/execute', 'WALLET_TRANSFER_EXECUTE'],
+    ['GET', 'wallet-transactions', 'WALLET_TRANSACTIONS_READ'],
+  ])(
+    'maps the real %s %s workflow without inferring a failure stage',
+    (method, path, operation) => {
+      const body = http(
+        'admin',
+        `/api/v1/trading-accounts/account-1/${path}?token=private-query`,
+        () =>
+          createApiError(
+            'WALLET_TRANSACTION_FAILURE',
+            'Request could not be completed.',
+            503,
+          ),
+        method,
+      );
+      expect(body.error.diagnostic).toMatchObject({
+        domain: 'WALLET',
+        operation,
+        failureStage: 'request_boundary',
+        entities: { tradingAccountId: 'account-1' },
+        nextInvestigation: [
+          'backend/src/wallets/trading-account-wallets.service.ts',
+        ],
+      });
+      expect(JSON.stringify(body)).not.toContain('private-query');
+    },
+  );
   it('logs unexpected pre-auth failures safely without exposing an admin bypass', () => {
     const log = jest
       .spyOn(Logger.prototype, 'error')
@@ -181,7 +231,13 @@ describe('Diagnostic Enforcement Foundation', () => {
       ),
     ).toThrow('workflow operation');
   });
-  it.each(['instruments', 'positions', 'executions', 'liquidations'])(
+  it.each([
+    'instruments',
+    'positions',
+    'executions',
+    'liquidations',
+    'final-settlement',
+  ])(
     'automatically supplies the %s route baseline for an unregistered code',
     (action) => {
       const body = http(
@@ -194,7 +250,7 @@ describe('Diagnostic Enforcement Foundation', () => {
         httpStatus: 409,
         requestId: 'foundation-request',
         domain: 'FUTURES',
-        operation: `FUTURES_${action.toUpperCase()}_READ`,
+        operation: `FUTURES_${action.replace(/-/g, '_').toUpperCase()}_READ`,
         failureStage: 'request_boundary',
         nextInvestigation: ['backend/src/futures/futures.service.ts'],
       });

@@ -1,27 +1,33 @@
-/* Change-aware AST gate. Existing P1 debt is the comparison base, not exemptions.
- * Boundary contracts and runtime triage tests run separately on every build.
+/* High-signal, change-only bypass checks. This is not a control/data-flow proof.
+ * Domain triage, bootstrap wiring and role safety have separate runtime tests.
  */
-const { readFileSync, readdirSync, existsSync } = require("node:fs");
-const { resolve, posix } = require("node:path");
+const { readFileSync, existsSync } = require("node:fs");
+const { resolve, basename } = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { createRequire } = require("node:module");
 
-function auditSources(ts, base, current, scope, requireBoundaries = false) {
+const boundaries = new Set([
+  "backend/src/common/api-error.ts",
+  "backend/src/common/global-http-exception.filter.ts",
+  "backend/src/ops/ops-failure.ts",
+  "frontend/src/components/states/ErrorState.tsx",
+  "frontend/src/components/states/ErrorNotice.tsx",
+]);
+const productionFile = (path, scope) =>
+  path.startsWith(`${scope}/src/`) &&
+  /\.tsx?$/u.test(path) &&
+  !/(?:\.spec|\.test)\.tsx?$|\/generated\//u.test(path);
+
+function findings(ts, path, text, scope) {
+  const tree = ts.createSourceFile(
+    path,
+    text,
+    ts.ScriptTarget.Latest,
+    true,
+    path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
   const printer = ts.createPrinter({ removeComments: true });
-  const parse = (path, text) =>
-    ts.createSourceFile(
-      path,
-      text,
-      ts.ScriptTarget.Latest,
-      true,
-      path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-    );
-  const trees = new Map(
-    [...current].map(([path, text]) => [path, parse(path, text)]),
-  );
-  const baseTrees = new Map(
-    [...base].map(([path, text]) => [path, parse(path, text)]),
-  );
+  const result = [];
   const name = (node) =>
     node && (ts.isIdentifier(node) || ts.isStringLiteral(node))
       ? node.text
@@ -30,940 +36,301 @@ function auditSources(ts, base, current, scope, requireBoundaries = false) {
     visit(node);
     ts.forEachChild(node, (child) => walk(child, visit));
   };
-  const owner = (node) => {
-    for (let p = node.parent; p; p = p.parent) {
-      if (
-        ts.isFunctionDeclaration(p) ||
-        ts.isMethodDeclaration(p) ||
-        ts.isClassDeclaration(p)
-      )
-        return name(p.name);
-    }
-    return "<module>";
-  };
-  const fingerprint = (node, tree) => {
-    // Moving an existing getter into visible JSX creates a new delivery path,
-    // even when the getter's spelling has not changed.
-    let presentation = "";
-    if (ts.isPropertyAccessExpression(node) || ts.isCallExpression(node)) {
-      for (let parent = node.parent; parent; parent = parent.parent) {
-        if (ts.isJsxExpression(parent)) {
-          presentation = `jsx:${ts.isJsxAttribute(parent.parent) ? name(parent.parent.name) : "children"}`;
-          break;
-        }
-        if (ts.isFunctionLike(parent)) break;
-      }
-    }
-    return `${owner(node)}:${presentation}:${node.kind}:${printer.printNode(ts.EmitHint.Unspecified, node, tree)}`;
-  };
-  const properties = (node) =>
-    new Map(node.properties.map((p) => [name(p.name), p]));
-  const imports = (tree) => {
-    const result = new Map();
-    for (const statement of tree.statements) {
-      if (!ts.isImportDeclaration(statement)) continue;
-      const bindings = statement.importClause?.namedBindings;
-      if (bindings && ts.isNamedImports(bindings))
-        for (const binding of bindings.elements) {
-          result.set(binding.name.text, {
-            symbol: name(binding.propertyName ?? binding.name),
-            module: statement.moduleSpecifier.text,
-          });
-        }
-      if (statement.importClause?.name)
-        result.set(statement.importClause.name.text, {
-          symbol: "default",
-          module: statement.moduleSpecifier.text,
-        });
-    }
-    return result;
-  };
-  const resolveImport = (path, imported, sourceTrees) => {
-    if (!imported.module.startsWith("."))
-      return `${imported.module}:${imported.symbol}`;
-    const stem = posix.normalize(
-      posix.join(posix.dirname(path), imported.module),
-    );
-    const target = [stem, `${stem}.ts`, `${stem}.tsx`, `${stem}/index.ts`].find(
-      (p) => sourceTrees.has(p),
-    );
-    return `${target ?? stem}:${imported.symbol}`;
-  };
-  const callee = (path, tree, expression, sourceTrees) => {
-    if (ts.isIdentifier(expression)) {
-      const imported = imports(tree).get(expression.text);
-      return imported
-        ? resolveImport(path, imported, sourceTrees)
-        : `${path}:${expression.text}`;
-    }
-    if (
-      ts.isPropertyAccessExpression(expression) &&
-      expression.expression.kind === ts.SyntaxKind.ThisKeyword
-    ) {
-      return `${path}:${expression.name.text}`;
-    }
-    return "";
-  };
-  // Discover existing domain factories from their terminal Nest envelope, rather
-  // than maintaining an error-code/file exemption registry. New factories must
-  // delegate to createApiError/projectOpsFailure.
-  const statusName = (path, tree, expression, sourceTrees) => {
-    if (!expression) return "";
-    if (
-      ts.isAsExpression(expression) ||
-      ts.isParenthesizedExpression(expression)
-    )
-      return statusName(path, tree, expression.expression, sourceTrees);
-    if (
-      ts.isPropertyAccessExpression(expression) &&
-      callee(path, tree, expression.expression, sourceTrees) ===
-        "@nestjs/common:HttpStatus"
-    )
-      return `HttpStatus.${expression.name.text}`;
-    return expression.getText(tree);
-  };
-  const factories = new Map([
-    [
-      "backend/src/common/api-error.ts:createApiError",
-      { code: 0, status: 2, message: 1, safe: true },
-    ],
-    [
-      "backend/src/ops/ops-failure.ts:projectOpsFailure",
-      { code: 1, ops: true },
-    ],
-    [
-      "backend/src/common/admin-diagnostics.ts:buildAdminPartialFailureDiagnostic",
-      { code: 1, status: -1, partial: true, safe: true },
-    ],
-  ]);
-  for (const [path, tree] of baseTrees)
-    walk(tree, (node) => {
-      if (
-        !(ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) ||
-        !node.body
-      )
-        return;
-      const params = node.parameters.map((p) => name(p.name));
-      const code = params.findIndex((p) => /^(?:code|errorCode)$/u.test(p));
-      if (code < 0 || !params.includes("message")) return;
-      let terminal = false,
-        defaultStatus = "",
-        opsMapped = false;
-      walk(node.body, (child) => {
-        if (
-          ts.isNewExpression(child) &&
-          callee(path, tree, child.expression, baseTrees) ===
-            "@nestjs/common:HttpException"
-        ) {
-          terminal = true;
-          defaultStatus = statusName(
-            path,
-            tree,
-            child.arguments?.[1],
-            baseTrees,
-          );
-          walk(child.arguments?.[0] ?? child, (part) => {
-            if (
-              (ts.isPropertyAssignment(part) ||
-                ts.isShorthandPropertyAssignment(part)) &&
-              name(part.name) === "resultPayloadJson"
-            )
-              opsMapped = true;
-          });
-        }
-      });
-      const status = params.indexOf("status");
-      if (status >= 0 && node.parameters[status].initializer)
-        defaultStatus = statusName(
-          path,
-          tree,
-          node.parameters[status].initializer,
-          baseTrees,
-        );
-      if (terminal)
-        factories.set(`${path}:${name(node.name)}`, {
-          code,
-          status,
-          message: params.indexOf("message"),
-          defaultStatus,
-          opsMapped,
-        });
+  const report = (node, rule) =>
+    result.push({
+      path,
+      rule,
+      line: tree.getLineAndCharacterOfPosition(node.getStart(tree)).line + 1,
+      key: `${rule}:${printer.printNode(ts.EmitHint.Unspecified, node, tree)}`,
     });
-  // A migrated factory remains approved in subsequent PRs, when its original
-  // Nest constructor has been replaced by a safe common-factory delegation.
-  let discovered = true;
-  while (discovered) {
-    discovered = false;
-    for (const [path, tree] of trees)
-      walk(tree, (node) => {
-        if (
-          !(ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) ||
-          !node.body
-        )
-          return;
-        const key = `${path}:${name(node.name)}`;
-        if (factories.has(key)) return;
-        const params = node.parameters.map((p) => name(p.name));
-        const code = params.indexOf("code"),
-          message = params.indexOf("message");
-        if (code < 0 || message < 0) return;
-        let delegate;
-        walk(node.body, (child) => {
-          if (ts.isCallExpression(child)) {
-            const target = factories.get(
-              callee(path, tree, child.expression, trees),
-            );
-            if (
-              target &&
-              !target.ops &&
-              name(child.arguments[target.code]) === "code" &&
-              name(child.arguments[target.message]) === "message"
-            )
-              delegate = target;
-          }
-        });
-        if (delegate) {
-          const status = params.indexOf("status");
-          const defaultStatus =
-            status >= 0
-              ? statusName(
-                  path,
-                  tree,
-                  node.parameters[status].initializer,
-                  trees,
-                )
-              : delegate.defaultStatus;
-          factories.set(key, {
-            code,
-            message,
-            status,
-            defaultStatus,
-            safe: delegate.safe,
-            opsMapped: delegate.opsMapped,
-          });
-          discovered = true;
-        }
+  // Local import spelling only, including aliases. No module resolution or graph.
+  const imported = new Map();
+  for (const statement of tree.statements) {
+    if (!ts.isImportDeclaration(statement)) continue;
+    const module = statement.moduleSpecifier.text;
+    const clause = statement.importClause;
+    if (clause?.name)
+      imported.set(clause.name.text, {
+        symbol: basename(module).replace(/\.tsx?$/u, ""),
+        module,
       });
+    const bindings = clause?.namedBindings;
+    if (bindings && ts.isNamedImports(bindings))
+      for (const item of bindings.elements)
+        imported.set(item.name.text, {
+          symbol: name(item.propertyName ?? item.name),
+          module,
+        });
+    if (bindings && ts.isNamespaceImport(bindings))
+      imported.set(bindings.name.text, { symbol: "*", module });
   }
-  const reviewedMessages = new Set();
-  const messagePolicy = trees.get(
-    "backend/src/common/safe-diagnostic-message.ts",
-  );
-  if (messagePolicy)
-    walk(messagePolicy, (node) => {
-      if (
-        ts.isVariableDeclaration(node) &&
-        name(node.name) === "SAFE_MESSAGES" &&
-        node.initializer &&
-        ts.isNewExpression(node.initializer)
-      ) {
-        const entries = node.initializer.arguments?.[0];
-        if (entries && ts.isArrayLiteralExpression(entries))
-          for (const item of entries.elements) {
-            if (ts.isStringLiteral(item)) reviewedMessages.add(item.text);
-          }
-      }
-    });
-  const contracts = new Set(),
-    routes = new Set(),
-    opsContracts = new Set(),
-    preauthContracts = new Set(),
-    preauthSubjects = new Set();
-  for (const [path, tree] of trees)
-    if (path.endsWith(".spec.ts"))
-      walk(tree, (node) => {
-        if (
-          ts.isCallExpression(node) &&
-          callee(path, tree, node.expression, trees) ===
-            "backend/scripts/lib/diagnostic-quality.ts:assertDiagnosticTriage" &&
-          ts.isStringLiteral(node.arguments[1] ?? {}) &&
-          ts.isStringLiteral(node.arguments[2] ?? {})
-        ) {
-          contracts.add(`${node.arguments[2].text}:${node.arguments[1].text}`);
-        }
-        if (
-          ts.isCallExpression(node) &&
-          callee(path, tree, node.expression, trees) ===
-            "backend/scripts/lib/diagnostic-quality.ts:assertDiagnosticBaseline" &&
-          ts.isStringLiteral(node.arguments[1] ?? {})
-        ) {
-          routes.add(node.arguments[1].text);
-        }
-        if (
-          ts.isCallExpression(node) &&
-          callee(path, tree, node.expression, trees) ===
-            "backend/scripts/lib/diagnostic-quality.ts:assertPreAuthFailure" &&
-          ts.isStringLiteral(node.arguments[1] ?? {})
-        ) {
-          preauthContracts.add(node.arguments[1].text);
-        }
-        if (
-          ts.isCallExpression(node) &&
-          callee(path, tree, node.expression, trees) ===
-            "backend/scripts/lib/diagnostic-quality.ts:assertOpsFailure" &&
-          ts.isStringLiteral(node.arguments[1] ?? {}) &&
-          ts.isStringLiteral(node.arguments[2] ?? {})
-        )
-          opsContracts.add(
-            `${node.arguments[2].text}:${node.arguments[1].text}`,
-          );
-      });
-  // Resolve actual Public() entry points and their injected service methods.
-  // An arbitrary comment cannot exempt an authenticated handler.
-  for (const [path, tree] of trees)
-    walk(tree, (node) => {
-      if (!ts.isMethodDeclaration(node) || !ts.isClassDeclaration(node.parent))
-        return;
-      const isPublic = ts
-        .getDecorators(node)
-        ?.some(
-          (d) =>
-            ts.isCallExpression(d.expression) &&
-            callee(path, tree, d.expression.expression, trees) ===
-              "backend/src/auth/auth.decorators.ts:Public",
-        );
-      if (!isPublic) return;
-      preauthSubjects.add(`${path}#${name(node.name)}`);
-      const injections = new Map();
-      for (const member of node.parent.members)
-        if (ts.isConstructorDeclaration(member))
-          for (const parameter of member.parameters) {
-            if (parameter.type && ts.isTypeReferenceNode(parameter.type))
-              injections.set(
-                name(parameter.name),
-                callee(path, tree, parameter.type.typeName, trees).split(
-                  ":",
-                )[0],
-              );
-          }
-      if (node.body)
-        walk(node.body, (child) => {
-          if (
-            !ts.isCallExpression(child) ||
-            !ts.isPropertyAccessExpression(child.expression)
-          )
-            return;
-          const receiver = child.expression.expression;
-          if (
-            ts.isPropertyAccessExpression(receiver) &&
-            receiver.expression.kind === ts.SyntaxKind.ThisKeyword
-          ) {
-            const service = injections.get(receiver.name.text);
-            if (service)
-              preauthSubjects.add(`${service}#${child.expression.name.text}`);
-          }
-        });
-    });
-  const violations = [];
-  if (requireBoundaries && scope === "backend") {
-    const main = trees.get("backend/src/main.ts");
-    let middleware = false,
-      logger = false,
-      filter = false;
-    if (main)
-      walk(main, (node) => {
-        if (
-          !ts.isCallExpression(node) ||
-          !ts.isPropertyAccessExpression(node.expression)
-        )
-          return;
-        if (
-          node.expression.name.text === "use" &&
-          node.arguments.some(
-            (arg) =>
-              callee("backend/src/main.ts", main, arg, trees) ===
-              "backend/src/common/admin-diagnostics.ts:adminDiagnosticRequestMiddleware",
-          )
-        )
-          middleware = true;
-        if (
-          node.expression.name.text === "useLogger" &&
-          node.arguments.some(
-            (arg) =>
-              ts.isNewExpression(arg) &&
-              callee("backend/src/main.ts", main, arg.expression, trees) ===
-                "backend/src/common/admin-diagnostic.logger.ts:AdminDiagnosticLogger",
-          )
-        )
-          logger = true;
-      });
-    const module = trees.get("backend/src/app.module.ts");
-    if (module)
-      walk(module, (node) => {
-        if (!ts.isObjectLiteralExpression(node)) return;
-        const fields = properties(node);
-        const provided = fields.get("provide"),
-          handler = fields.get("useClass");
-        if (
-          provided &&
-          handler &&
-          ts.isPropertyAssignment(provided) &&
-          ts.isPropertyAssignment(handler) &&
-          callee(
-            "backend/src/app.module.ts",
-            module,
-            provided.initializer,
-            trees,
-          ) === "@nestjs/core:APP_FILTER" &&
-          callee(
-            "backend/src/app.module.ts",
-            module,
-            handler.initializer,
-            trees,
-          ) ===
-            "backend/src/common/global-http-exception.filter.ts:GlobalHttpExceptionFilter"
-        )
-          filter = true;
-      });
-    for (const [bound, present] of [
-      ["request middleware", middleware],
-      ["safe logger", logger],
-      ["global filter", filter],
-    ]) {
-      if (!present)
-        violations.push({
-          path: "backend/src/main.ts",
-          line: 1,
-          rule: `Missing common diagnostic ${bound} registration.`,
-        });
-    }
-  }
-  const boundaryFiles = new Set(
-    scope === "backend"
-      ? [
-          "backend/src/common/api-error.ts",
-          "backend/src/common/global-http-exception.filter.ts",
-          "backend/src/ops/ops-failure.ts",
-        ]
-      : [
-          "frontend/src/components/states/ErrorNotice.tsx",
-          "frontend/src/components/states/ErrorState.tsx",
-        ],
-  );
-  for (const [path, tree] of trees) {
+  const symbol = (node) => imported.get(name(node))?.symbol ?? name(node);
+  const from = (node, file) =>
+    imported
+      .get(name(node))
+      ?.module.replace(/\.tsx?$/u, "")
+      .endsWith(`/${file}`);
+  const isCall = (node, fn, file) =>
+    ts.isCallExpression(node) &&
+    symbol(node.expression) === fn &&
+    from(node.expression, file);
+  // A directly projected local is a common persistence idiom, not a helper chain.
+  const projectedLocals = new Set();
+  walk(tree, (node) => {
     if (
-      !path.startsWith(`${scope}/src/`) ||
-      /(?:\.spec|\.test)\.ts$|\/generated\//u.test(path) ||
-      boundaryFiles.has(path)
+      ts.isVariableDeclaration(node) &&
+      node.initializer &&
+      isCall(node.initializer, "projectOpsFailure", "ops-failure")
     )
-      continue;
-    const previous = baseTrees.get(path);
-    const unchanged = new Map();
-    if (previous)
-      walk(previous, (node) => {
-        const key = fingerprint(node, previous);
-        unchanged.set(key, (unchanged.get(key) ?? 0) + 1);
-      });
-    const preauth = [
-      "frontend/src/screens/auth/LoginScreen.tsx",
-      "frontend/src/screens/auth/SignupScreen.tsx",
-    ].includes(path);
-    const projectedOpsField = (property) => {
-      if (
-        !ts.isPropertyAssignment(property) ||
-        !ts.isPropertyAccessExpression(property.initializer)
-      )
-        return false;
-      const identifier = property.initializer.expression;
-      if (!ts.isIdentifier(identifier)) return false;
-      let found = false;
-      walk(tree, (candidate) => {
-        if (
-          ts.isVariableDeclaration(candidate) &&
-          name(candidate.name) === identifier.text &&
-          candidate.initializer &&
-          ts.isCallExpression(candidate.initializer) &&
-          callee(path, tree, candidate.initializer.expression, trees) ===
-            "backend/src/ops/ops-failure.ts:projectOpsFailure"
-        )
-          found = true;
-      });
-      return found;
-    };
-    const meaningfulStage = (call) => {
-      const target = callee(path, tree, call.expression, trees);
-      if (
-        target ===
-        "backend/src/common/admin-diagnostics.ts:setAdminDiagnosticContext"
-      ) {
-        const update = call.arguments[0];
-        const field =
-          update &&
-          ts.isObjectLiteralExpression(update) &&
-          properties(update).get("failureStage");
-        return (
-          field &&
-          ts.isPropertyAssignment(field) &&
-          ts.isStringLiteral(field.initializer) &&
-          ![
-            "request_boundary",
-            "request_processing",
-            "backend_execution",
-            "request_validation",
-          ].includes(field.initializer.text)
-        );
-      }
-      // Resolve an existing stage helper to its actual setter/parameter.
-      const helperName = target.startsWith(`${path}:`)
-        ? target.slice(path.length + 1)
-        : "";
-      let valid = false;
-      for (const candidate of tree.statements)
-        if (
-          ts.isFunctionDeclaration(candidate) &&
-          name(candidate.name) === helperName &&
-          candidate.body
-        ) {
-          const index = candidate.parameters.findIndex(
-            (p) => name(p.name) === "failureStage",
-          );
-          if (index < 0 || !ts.isStringLiteral(call.arguments[index] ?? {}))
-            continue;
-          walk(candidate.body, (child) => {
-            if (
-              ts.isCallExpression(child) &&
-              callee(path, tree, child.expression, trees) ===
-                "backend/src/common/admin-diagnostics.ts:setAdminDiagnosticContext"
-            )
-              valid = true;
-          });
-        }
-      return valid;
-    };
-    const hasObservedStage = (emitter) => {
-      for (
-        let child = emitter, parent = emitter.parent;
-        parent;
-        child = parent, parent = parent.parent
-      ) {
-        if (!ts.isBlock(parent)) continue;
-        for (const statement of parent.statements) {
-          if (statement.getStart(tree) >= child.getStart(tree)) break;
-          if (
-            !ts.isExpressionStatement(statement) ||
-            !ts.isCallExpression(statement.expression)
-          )
-            continue;
-          if (meaningfulStage(statement.expression)) return true;
-        }
-      }
+      projectedLocals.add(name(node.name));
+  });
+  const fields = (node) => new Set(node.properties.map((p) => name(p.name)));
+  const preauth = path.startsWith("frontend/src/screens/auth/");
+  const jsx = (node) => {
+    for (let parent = node.parent; parent; parent = parent.parent) {
+      if (ts.isJsxExpression(parent)) return parent;
+      if (ts.isFunctionLike(parent)) break;
+    }
+  };
+  const rawName =
+    /^(?:error|err|failure|exception|cause|payload|serverMessage)$/iu;
+  const rawValue = (node) => {
+    if (
+      ts.isCallExpression(node) &&
+      [
+        ["safeAdminDiagnosticLog", "admin-diagnostics"],
+        ["classifyFailureCause", "safe-failure-cause"],
+        ["projectOpsFailure", "ops-failure"],
+      ].some(([fn, file]) => isCall(node, fn, file))
+    )
       return false;
-    };
-    const report = (node, rule) =>
-      violations.push({
-        path,
-        line: tree.getLineAndCharacterOfPosition(node.getStart(tree)).line + 1,
-        rule,
-      });
-    const isNew = (node) => {
-      const key = fingerprint(node, tree),
-        count = unchanged.get(key) ?? 0;
-      if (count) {
-        unchanged.set(key, count - 1);
-        return false;
-      }
+    if (ts.isIdentifier(node) && rawName.test(node.text)) return true;
+    if (
+      ts.isPropertyAccessExpression(node) &&
+      /^(?:message|stack|serverMessage|payload|rawPayload|response|body)$/u.test(
+        node.name.text,
+      )
+    )
       return true;
-    };
-    walk(tree, (node) => {
-      if (!isNew(node)) return;
-      if (scope === "backend") {
-        if (ts.isMethodDeclaration(node)) {
-          const http = ts
-            .getDecorators(node)
-            ?.some(
-              (decorator) =>
-                ts.isCallExpression(decorator.expression) &&
-                /^@nestjs\/common:(?:Get|Post|Put|Patch|Delete)$/u.test(
-                  callee(path, tree, decorator.expression.expression, trees),
-                ),
-            );
-          const subject = `${path}#${name(node.name)}`;
-          if (
-            http &&
-            !(preauthSubjects.has(subject)
-              ? preauthContracts.has(subject)
-              : routes.has(subject))
+    return ts.forEachChild(node, rawValue) === true;
+  };
+  walk(tree, (node) => {
+    if (scope === "backend") {
+      if (ts.isNewExpression(node)) {
+        const expression = node.expression;
+        const nest =
+          imported.get(name(expression))?.module === "@nestjs/common" ||
+          (ts.isPropertyAccessExpression(expression) &&
+            imported.get(name(expression.expression))?.module ===
+              "@nestjs/common");
+        const constructor = ts.isPropertyAccessExpression(expression)
+          ? name(expression.name)
+          : symbol(expression);
+        if (nest && /Exception$/u.test(constructor)) {
+          report(
+            node,
+            "Use an approved HTTP factory; direct exceptions bypass public message policy.",
+          );
+        } else if (
+          /(?:Error|Exception)$/u.test(constructor) &&
+          !isCall(node.parent, "projectOpsFailure", "ops-failure") &&
+          !/@diagnosticSurface internal: \S.+/u.test(
+            tree.text.slice(node.parent.getFullStart(), node.getStart()),
           )
-            report(
-              node,
-              "New/changed HTTP handler needs a scoped baseline (or Public pre-auth) contract; generic routes must declare observed workflow context.",
-            );
+        ) {
+          report(
+            node,
+            "Raw error emitter needs an HTTP/Ops boundary or a local @diagnosticSurface internal: reason.",
+          );
         }
-        if (ts.isNewExpression(node)) {
-          const target = callee(path, tree, node.expression, trees);
-          if (
-            target.startsWith("@nestjs/common:") &&
-            target.endsWith("Exception")
-          )
-            report(
-              node,
-              "Use an approved HTTP error factory; direct exceptions bypass reviewed message policy.",
-            );
-          if (
-            !target.startsWith("@nestjs/common:") &&
-            /(?:Error|Exception)$/u.test(
-              target.split(":").at(-1) || name(node.expression),
-            )
-          ) {
-            // Internal programming invariants need a local reason, not a file exemption.
-            const statement = node.parent;
-            if (
-              !/@diagnosticSurface internal: .+/u.test(
-                tree.text.slice(statement.getFullStart(), node.getStart()),
-              )
-            ) {
-              report(
-                node,
-                "New Error emitter needs an approved HTTP/Ops path or a local @diagnosticSurface internal: reason.",
-              );
-            }
-          }
-        }
-        if (ts.isObjectLiteralExpression(node)) {
-          const fields = properties(node);
-          const call = node.parent;
-          const projectedInput =
-            ts.isCallExpression(call) &&
-            factories.get(callee(path, tree, call.expression, trees))?.ops;
-          const diagnostic = fields.get("diagnostic");
-          const partial =
-            diagnostic &&
-            ts.isPropertyAssignment(diagnostic) &&
-            ts.isCallExpression(diagnostic.initializer) &&
-            factories.get(
-              callee(path, tree, diagnostic.initializer.expression, trees),
-            )?.partial;
-          if (
-            fields.has("code") &&
-            fields.has("message") &&
-            !projectedInput &&
-            !partial
-          )
-            report(
-              node,
-              "Unassigned structured error: use an approved HTTP factory, partial diagnostic or projectOpsFailure.",
-            );
-          if (fields.has("errorCode") && fields.has("errorMessage")) {
-            if (
-              !(
-                ts.isCallExpression(call) &&
-                ts.isPropertyAccessExpression(call.expression) &&
-                call.expression.name.text === "recordFailed"
-              ) &&
-              !(
-                projectedOpsField(fields.get("errorCode")) &&
-                projectedOpsField(fields.get("errorMessage"))
-              )
-            )
-              report(
-                node,
-                "Ops failure fields must pass through the Ops persistence boundary.",
-              );
-          }
-        }
+      }
+      if (ts.isObjectLiteralExpression(node)) {
+        const keys = fields(node);
+        const partial = node.properties.some(
+          (p) =>
+            name(p.name) === "diagnostic" &&
+            ts.isPropertyAssignment(p) &&
+            isCall(
+              p.initializer,
+              "buildAdminPartialFailureDiagnostic",
+              "admin-diagnostics",
+            ),
+        );
         if (
-          ts.isBinaryExpression(node) &&
+          keys.has("code") &&
+          keys.has("message") &&
+          !partial &&
+          !isCall(node.parent, "projectOpsFailure", "ops-failure")
+        )
+          report(
+            node,
+            "Unassigned structured error: use an HTTP factory, partial diagnostic or projectOpsFailure.",
+          );
+        const projectedFields = ["errorCode", "errorMessage"].every((key) =>
+          node.properties.some(
+            (p) =>
+              name(p.name) === key &&
+              ts.isPropertyAssignment(p) &&
+              ts.isPropertyAccessExpression(p.initializer) &&
+              (projectedLocals.has(name(p.initializer.expression)) ||
+                isCall(
+                  p.initializer.expression,
+                  "projectOpsFailure",
+                  "ops-failure",
+                )),
+          ),
+        );
+        if (
+          keys.has("errorCode") &&
+          keys.has("errorMessage") &&
+          !projectedFields &&
+          !(
+            ts.isCallExpression(node.parent) &&
+            ts.isPropertyAccessExpression(node.parent.expression) &&
+            node.parent.expression.name.text === "recordFailed"
+          )
+        )
+          report(
+            node,
+            "Ops failure fields must pass through the Ops persistence boundary.",
+          );
+      }
+      if (
+        (ts.isBinaryExpression(node) &&
+          node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
           ts.isPropertyAccessExpression(node.left) &&
-          ["code", "errorCode"].includes(node.left.name.text) &&
-          node.operatorToken.kind === ts.SyntaxKind.EqualsToken
+          /^(?:code|errorCode)$/u.test(node.left.name.text)) ||
+        (ts.isPropertyDeclaration(node) &&
+          /^(?:code|errorCode)$/u.test(name(node.name)))
+      )
+        report(
+          node,
+          "New coded error requires an approved diagnostic surface.",
+        );
+      if (
+        ts.isCallExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression)
+      ) {
+        const method = node.expression.name.text;
+        const receiver = node.expression.expression.getText(tree);
+        if (
+          /^(?:error|warn|log|debug|verbose|fatal)$/u.test(method) &&
+          /logger|^console$/iu.test(receiver) &&
+          node.arguments.some(rawValue)
         )
           report(
             node,
-            "New coded exception requires an approved diagnostic surface.",
+            "Do not log raw exceptions/messages/payloads; use a safe projection.",
           );
         if (
-          ts.isPropertyDeclaration(node) &&
-          ["code", "errorCode"].includes(name(node.name))
+          /^(?:json|send)$/u.test(method) &&
+          /\b(?:res|response)\b/u.test(receiver) &&
+          node.arguments.some(
+            (arg) =>
+              ts.isObjectLiteralExpression(arg) && fields(arg).has("error"),
+          )
         )
           report(
             node,
-            "New coded exception requires an approved diagnostic surface.",
+            "Direct HTTP error response bypasses the global exception filter.",
           );
-        if (ts.isCallExpression(node)) {
-          const factory = factories.get(
-            callee(path, tree, node.expression, trees),
-          );
-          if (factory && !factory.ops) {
-            const codeArg = node.arguments[factory.code];
-            const statusArg = node.arguments[factory.status];
-            const code =
-              codeArg && ts.isStringLiteral(codeArg) ? codeArg.text : undefined;
-            const status = statusArg
-              ? statusName(path, tree, statusArg, trees)
-              : (factory.defaultStatus ?? "");
-            const messageArg = node.arguments[factory.message];
-            if (
-              !factory.safe &&
-              (!messageArg ||
-                !ts.isStringLiteral(messageArg) ||
-                !reviewedMessages.has(messageArg.text))
-            )
-              report(
-                node,
-                "New domain factory message must be fixed reviewed copy; otherwise use createApiError for safe projection.",
-              );
-            const triage =
-              (code &&
-                /(?:INTERNAL|FINANCIAL|INTEGRITY|SCOPE_(?:MISMATCH|REPAIR)|CORRUPT|SETTLEMENT|TRANSACTION|WRITE_CONFLICT|PROVIDER|(?:PRICE|RATE|MARK|SOURCE)_(?:STALE|UNAVAILABLE)|COLLATERAL|MAINTENANCE|LIQUIDATION|BANKRUPTCY|RESERVATION_INVARIANT)/u.test(
-                  code,
-                )) ||
-              /^(?:5\d\d|HttpStatus\.(?:INTERNAL_SERVER_ERROR|BAD_GATEWAY|SERVICE_UNAVAILABLE|GATEWAY_TIMEOUT))$/u.test(
-                status,
-              );
-            const subject = `${path}#${owner(node)}`;
-            const preauthEmitter = preauthSubjects.has(subject);
-            if (
-              triage &&
-              (factory.opsMapped
-                ? !opsContracts.has(`${subject}:${code}`)
-                : preauthEmitter
-                  ? !preauthContracts.has(subject)
-                  : !code || !contracts.has(`${subject}:${code}`))
-            )
-              report(
-                node,
-                "Triage-required emitter needs a scoped actual diagnostic (or Public pre-auth / Ops) contract test.",
-              );
-            if (
-              triage &&
-              !factory.opsMapped &&
-              !preauthEmitter &&
-              !hasObservedStage(node)
-            )
-              report(
-                node,
-                "Triage-required emitter has no locally observed meaningful failure stage before emission.",
-              );
-            if (codeArg && !code && !factories.has(`${path}:${owner(node)}`)) {
-              report(
-                node,
-                "Dynamic production code needs a fixed-code factory contract; do not hide emitters in expressions.",
-              );
-            }
-          }
-          if (
-            ts.isPropertyAccessExpression(node.expression) &&
-            ["json", "send"].includes(node.expression.name.text)
-          ) {
-            const receiver = node.expression.expression.getText(tree);
-            if (/\b(?:res|response)\b/u.test(receiver))
-              report(
-                node,
-                "Direct HTTP response bypasses the global exception filter.",
-              );
-          }
-          if (
-            ts.isPropertyAccessExpression(node.expression) &&
-            ["error", "warn"].includes(node.expression.name.text) &&
-            /logger|^console$/iu.test(
-              node.expression.expression.getText(tree),
-            ) &&
-            node.arguments.some((a) =>
-              /^(?:error|failure|err|payload)$|\.message\b|JSON\.stringify\((?:error|failure|payload)\)/u.test(
-                a.getText(tree),
-              ),
-            )
-          ) {
-            report(
-              node,
-              "Project background/server failures safely; do not log raw exception text or payload.",
-            );
-          }
-        }
-      } else {
-        if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
-          const imported = imports(tree).get(name(node.tagName));
-          const target = imported && resolveImport(path, imported, trees);
-          if (
-            preauth &&
-            target?.includes("/components/states/AdminDiagnosticPanel")
-          )
+      }
+    } else {
+      if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+        const component = symbol(node.tagName);
+        if (from(node.tagName, component)) {
+          if (preauth && component === "AdminDiagnosticPanel")
             report(
               node,
               "Pre-auth workflows must not expose an admin diagnostic panel.",
             );
-          const component = target?.includes(
-            "/components/states/ErrorState.tsx:",
-          )
-            ? "ErrorState"
-            : target?.includes("/components/states/ErrorNotice.tsx:")
-              ? "ErrorNotice"
-              : "";
-          if (
-            !preauth &&
-            component &&
-            !node.attributes.properties.some(
+          if (!preauth && /^(?:ErrorState|ErrorNotice)$/u.test(component)) {
+            const error = node.attributes.properties.find(
               (p) => ts.isJsxAttribute(p) && name(p.name) === "error",
-            )
-          ) {
-            report(
-              node,
-              `${component} must receive the original error (use fixed copy alone only for non-error product state).`,
             );
-          }
-        }
-        if (
-          !preauth &&
-          ts.isCallExpression(node) &&
-          ts.isIdentifier(node.expression) &&
-          /^set.*(?:Error|Failure|Message)$/u.test(node.expression.text) &&
-          node.arguments.some(
-            (a) =>
-              ts.isCallExpression(a) &&
-              /(?:Error.*Message|Message.*Error)/u.test(
-                a.expression.getText(tree),
-              ),
-          )
-        ) {
-          report(
-            node,
-            "Keep the original error in local state; message-only state loses admin diagnostics.",
-          );
-        }
-        if (
-          !preauth &&
-          ts.isCallExpression(node) &&
-          ts.isIdentifier(node.expression) &&
-          /^set.*(?:Error|Failure)$/u.test(node.expression.text)
-        ) {
-          let handler;
-          for (let parent = node.parent; parent; parent = parent.parent) {
-            if (ts.isCatchClause(parent)) {
-              handler = name(parent.variableDeclaration?.name);
-              break;
-            }
-            if (ts.isFunctionLike(parent)) {
-              handler = parent.parameters
-                .map((p) => name(p.name))
-                .find((p) => /^(?:error|failure|err)$/u.test(p));
-              if (handler) break;
-            }
-          }
-          if (
-            handler &&
-            node.arguments.some((a) => {
-              if (name(a) === handler) return false;
-              if (ts.isObjectLiteralExpression(a))
-                return ![...properties(a).values()].some(
-                  (p) =>
-                    (ts.isShorthandPropertyAssignment(p) &&
-                      name(p.name) === handler) ||
-                    (ts.isPropertyAssignment(p) &&
-                      name(p.initializer) === handler),
-                );
-              return true;
-            })
-          )
-            report(
-              node,
-              "Authenticated failure handlers must retain the original error, including for fixed public copy.",
-            );
-        }
-        if (
-          !preauth &&
-          ts.isCallExpression(node) &&
-          callee(path, tree, node.expression, trees).endsWith(
-            "/services/api/errorMapper.ts:getApiErrorDisplayMessage",
-          ) &&
-          path.endsWith(".tsx")
-        )
-          report(
-            node,
-            "New error presentation must use ErrorState/ErrorNotice with the original error.",
-          );
-        if (
-          ts.isCallExpression(node) &&
-          /\/services\/api\/errorMapper\.ts:getApiError(?:Code|Status|Info)$/u.test(
-            callee(path, tree, node.expression, trees),
-          )
-        ) {
-          for (let parent = node.parent; parent; parent = parent.parent) {
-            if (ts.isFunctionLike(parent)) break;
-            if (!ts.isJsxExpression(parent)) continue;
-            const attribute = ts.isJsxAttribute(parent.parent)
-              ? parent.parent
-              : undefined;
             if (
-              attribute &&
-              !["message", "title", "children"].includes(name(attribute.name))
+              !error?.initializer ||
+              (ts.isJsxExpression(error.initializer) &&
+                (!error.initializer.expression ||
+                  /^(?:undefined|null|false)$/u.test(
+                    error.initializer.expression.getText(tree),
+                  )))
             )
-              break;
-            const opening = attribute?.parent.parent;
-            const imported =
-              opening &&
-              (ts.isJsxOpeningElement(opening) ||
-                ts.isJsxSelfClosingElement(opening)) &&
-              imports(tree).get(name(opening.tagName));
-            const target = imported && resolveImport(path, imported, trees);
-            if (
-              !target ||
-              !/\/components\/states\/Error(?:State|Notice)\.tsx:/u.test(target)
-            )
-              report(
-                node,
-                "Code-based public error copy must retain the original error in ErrorState/ErrorNotice.",
-              );
-            break;
+              report(node, `${component} must receive the original error.`);
           }
-        }
-        if (
-          ts.isCallExpression(node) &&
-          callee(path, tree, node.expression, trees).endsWith(
-            "/services/api/errorMapper.ts:getApiErrorServerMessage",
-          ) &&
-          path.endsWith(".tsx")
-        )
-          report(
-            node,
-            "Raw server messages cannot become product copy; use the approved presentation boundary.",
-          );
-        if (
-          ts.isPropertyAccessExpression(node) &&
-          (["message", "serverMessage", "clientMessage"].includes(
-            node.name.text,
-          ) ||
-            (["code", "status", "requestId", "failureStage"].includes(
-              node.name.text,
-            ) &&
-              /\b(?:error|failure|err)\b/iu.test(
-                node.expression.getText(tree),
-              )))
-        ) {
-          for (let parent = node.parent; parent; parent = parent.parent) {
-            if (ts.isJsxExpression(parent)) {
-              report(node, "Raw exception text is not product copy.");
-              break;
-            }
-            if (ts.isFunctionLike(parent)) break;
-          }
-          if (
-            ts.isCallExpression(node.parent) &&
-            ts.isIdentifier(node.parent.expression) &&
-            /^set.*(?:Error|Failure)$/u.test(node.parent.expression.text)
-          )
-            report(node, "Raw exception text is not product copy.");
         }
       }
-    });
-  }
-  return violations;
+      if (
+        !preauth &&
+        ts.isCallExpression(node) &&
+        /^set.*(?:Error|Failure|Message)$/u.test(name(node.expression)) &&
+        node.arguments.some((arg) =>
+          isCall(arg, "getApiErrorDisplayMessage", "errorMapper"),
+        )
+      )
+        report(
+          node,
+          "Keep the original error; message-only state loses admin diagnostics.",
+        );
+      if (
+        ts.isPropertyAccessExpression(node) &&
+        (/^(?:serverMessage|clientMessage)$/u.test(node.name.text) ||
+          (/^(?:message|code|status|stack|requestId|failureStage)$/u.test(
+            node.name.text,
+          ) &&
+            /\b(?:error|failure|err|exception)\b/iu.test(
+              node.expression.getText(tree),
+            )))
+      ) {
+        if (
+          jsx(node) ||
+          (ts.isCallExpression(node.parent) &&
+            /^set.*(?:Error|Failure)$/u.test(name(node.parent.expression)))
+        )
+          report(
+            node,
+            "Raw exception/server text or fields are not public JSX copy.",
+          );
+      }
+      if (
+        ts.isIdentifier(node) &&
+        node.text === "serverMessage" &&
+        ts.isJsxExpression(node.parent)
+      )
+        report(node, "Raw server message is not public JSX copy.");
+      if (
+        ts.isCallExpression(node) &&
+        from(node.expression, "errorMapper") &&
+        /^(?:getApiErrorServerMessage|getApiErrorCode|getApiErrorStatus|getApiErrorInfo)$/u.test(
+          symbol(node.expression),
+        ) &&
+        ts.isJsxExpression(node.parent)
+      )
+        report(node, "Raw error mapper fields are not public JSX copy.");
+    }
+  });
+  return result;
 }
 
-function collectSources(root, scope) {
-  const result = new Map();
-  const scan = (dir) => {
-    if (!existsSync(dir)) return;
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const path = resolve(dir, entry.name);
-      if (entry.isDirectory()) {
-        if (entry.name !== "generated") scan(path);
-      } else if (/\.tsx?$/u.test(entry.name))
-        result.set(posix.relative(root, path), readFileSync(path, "utf8"));
+function auditSources(ts, base, current, scope) {
+  const violations = [];
+  for (const [path, source] of current) {
+    if (
+      !productionFile(path, scope) ||
+      boundaries.has(path) ||
+      source === base.get(path)
+    )
+      continue;
+    const counts = new Map();
+    for (const issue of findings(ts, path, base.get(path) ?? "", scope))
+      counts.set(issue.key, (counts.get(issue.key) ?? 0) + 1);
+    for (const { key, ...issue } of findings(ts, path, source, scope)) {
+      const previous = counts.get(key) ?? 0;
+      if (previous) counts.set(key, previous - 1);
+      else violations.push(issue);
     }
-  };
-  scan(resolve(root, scope, "src"));
-  if (scope === "backend") scan(resolve(root, scope, "scripts/lib"));
-  return result;
+  }
+  return violations;
 }
 
 function runAudit(
@@ -978,50 +345,87 @@ function runAudit(
     !process.env.DIAGNOSTIC_AUDIT_BASE
   )
     throw new Error("CI diagnostic comparison base is required.");
-  execFileSync("git", ["rev-parse", "--verify", `${baseRef}^{commit}`], {
-    cwd: root,
-    stdio: "pipe",
-  });
-  const ts = createRequire(resolve(root, scope, "package.json"))("typescript");
-  const current = collectSources(root, scope);
-  const base = new Map();
-  const paths = execFileSync(
-    "git",
-    [
-      "ls-tree",
-      "-r",
-      "--name-only",
-      baseRef,
-      `${scope}/src`,
-      `${scope}/scripts/lib`,
-    ],
-    { cwd: root, encoding: "utf8" },
-  )
-    .trim()
-    .split("\n");
-  for (const path of paths)
-    if (/\.tsx?$/u.test(path) && !path.includes("/generated/")) {
-      base.set(
-        path,
-        execFileSync("git", ["show", `${baseRef}:${path}`], {
-          cwd: root,
-          encoding: "utf8",
-          maxBuffer: 4 * 1024 * 1024,
-        }),
-      );
+  const git = (args, input) =>
+    execFileSync("git", args, {
+      cwd: root,
+      input,
+      maxBuffer: 64 * 1024 * 1024,
+    });
+  const commit = git([
+    "rev-parse",
+    "--verify",
+    "--end-of-options",
+    `${baseRef}^{commit}`,
+  ])
+    .toString()
+    .trim();
+  const paths = [
+    ...new Set([
+      ...git([
+        "diff",
+        "--name-only",
+        "--no-renames",
+        "-z",
+        commit,
+        "--",
+        `${scope}/src`,
+      ])
+        .toString()
+        .split("\0"),
+      ...git([
+        "ls-files",
+        "--others",
+        "--exclude-standard",
+        "-z",
+        "--",
+        `${scope}/src`,
+      ])
+        .toString()
+        .split("\0"),
+    ]),
+  ].filter(
+    (path) =>
+      productionFile(path, scope) &&
+      !boundaries.has(path) &&
+      existsSync(resolve(root, path)),
+  );
+  if (!paths.length) return [];
+  if (paths.some((path) => /[\r\n]/u.test(path)))
+    throw new Error("Unsupported newline in source path.");
+  // One Git process for all needed base blobs, not one process per repository file.
+  const blobs = git(
+    ["cat-file", "--batch"],
+    paths.map((path) => `${commit}:${path}\n`).join(""),
+  );
+  const base = new Map(),
+    current = new Map();
+  let offset = 0;
+  for (const path of paths) {
+    const end = blobs.indexOf(10, offset);
+    if (end < 0) throw new Error("Incomplete git cat-file response.");
+    const header = blobs.subarray(offset, end).toString();
+    offset = end + 1;
+    if (!header.endsWith(" missing")) {
+      const match = /^\w+ blob (\d+)$/u.exec(header);
+      if (!match) throw new Error("Unexpected git cat-file response.");
+      const size = Number(match[1]);
+      base.set(path, blobs.subarray(offset, offset + size).toString());
+      offset += size + 1;
     }
-  return auditSources(ts, base, current, scope, true);
+    current.set(path, readFileSync(resolve(root, path), "utf8"));
+  }
+  const ts = createRequire(resolve(root, scope, "package.json"))("typescript");
+  return auditSources(ts, base, current, scope);
 }
 
 module.exports = { auditSources, runAudit };
 if (require.main === module) {
-  const root = resolve(__dirname, "..");
   const scope = process.argv[2];
-  const violations = runAudit(root, scope);
+  const violations = runAudit(resolve(__dirname, ".."), scope);
   for (const issue of violations)
     process.stderr.write(`${issue.path}:${issue.line}: ${issue.rule}\n`);
   process.stdout.write(
-    `Diagnostic AST gate (${scope}): ${violations.length ? "FAIL" : "PASS"}\n`,
+    `Diagnostic bypass gate (${scope}): ${violations.length ? "FAIL" : "PASS"}\n`,
   );
   process.exitCode = violations.length ? 1 : 0;
 }

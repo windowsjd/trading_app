@@ -3,7 +3,7 @@ import {
   isSensitiveDiagnosticKey,
   redactSensitiveText,
 } from './sensitive-data';
-import { sanitizeOpsJson } from '../ops/ops-redaction';
+import { sanitizeOpsJson, sanitizeOpsFailureJson } from '../ops/ops-redaction';
 import { redactJsonValue } from '../providers/provider-secret-redaction';
 
 const variants = (words: string[]) => [
@@ -25,13 +25,25 @@ describe('shared sensitive data policy', () => {
       'https://provider.invalid/private SELECT wallet_balance FROM private_wallet balance 987654.12345678';
     expect(redactSensitiveText(unprojected)).toBe(unprojected);
     expect(
-      sanitizeOpsJson({ amount: '987654.12345678', message: unprojected }),
+      sanitizeOpsFailureJson({
+        amount: '987654.12345678',
+        message: unprojected,
+      }),
     ).toEqual({
       amount: '987654.12345678',
       message: 'Background operation failed.',
     });
     // Redaction does not detect arbitrary technical prose/amounts. The Ops
-    // message projection excludes the prose; permitted numeric Ops data stays.
+    // failure projection excludes the prose; permitted numeric Ops data stays.
+    expect(
+      sanitizeOpsJson({
+        message: 'normal operational message',
+        amount: '987654.12345678',
+      }),
+    ).toEqual({
+      message: 'normal operational message',
+      amount: '987654.12345678',
+    });
   });
   it.each([
     ['private', 'key'],

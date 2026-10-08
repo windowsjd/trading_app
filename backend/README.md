@@ -28,7 +28,9 @@ or a claim that every current diagnostic already meets them.
 Authenticated HTTP failures flow through the request middleware and global
 exception filter. New domain codes use the existing domain error helpers or
 `createApiError`; no per-code diagnostic registration is necessary. A code does
-not approve its message: only the reviewed fixed-message projection is trusted.
+not approve its message: public product copy has its own exact-match policy,
+separate from admin/ops diagnostic copy. Technical diagnostic-safe text does not
+become public-safe through a code or a technical-word blacklist.
 Unenriched failures report `request_boundary`, not a guessed execution stage.
 Route context describes the requested workflow, never an inferred root cause.
 Simple validation/product blocks can use this baseline. Internal, financial,
@@ -40,26 +42,42 @@ keeps bounded declared codes and actual safe cause classification, discards raw
 exception text, and uses the existing Ops persistence redaction boundary. An
 unknown exception code is not trusted; the caller supplies a fixed fallback code.
 Returned Ops failure copy and persisted failure/message fields use the same safe
-projection. Ops JSON is bounded to depth 8, 1,000 entries per container, 2,000
+projection. Generic success/dry-run/skipped/locked metadata retains normal message
+semantics with secret/payload redaction; failed results use a separate failure
+projection. Explicit error/failure subtrees are also treated as failures. Plain
+object codes are no more trusted than arbitrary SDK exception codes; declared
+caller fallbacks and allowlisted infrastructure causes are the supported inputs.
+Ops JSON is bounded to depth 8, 1,000 entries per container, 2,000
 characters per string and 256 KiB total; scoped identifiers and normal numeric
 results remain permitted. Durable financial evidence is outside this projection.
 Pre-auth workflows retain public-safe responses without an admin UI bypass.
 
-The AST change gate compares production source with the PR base (or previous
-push). It rejects new direct error envelopes/emitters outside approved factories,
-unassigned coded errors, unenriched triage-required emitters and frontend error
-presentation that discards the original error. CI supplies the base explicitly;
-local checks compare with HEAD. Existing P1 migration debt is not a code allowlist
-and is not claimed as resolved. Boundary contract tests run independently of this
-change gate. Runtime quality evaluation is a test/review tool, not a production
-root-cause inference engine. See `scripts/diagnostic-enforcement.cjs` for the gate
-and its negative fixtures. Enrichment must use already-observed state, without
-additional diagnostic DB/Provider/Redis reads.
+The source gate blocks obvious new bypasses: direct HTTP error envelopes/raw
+emitters, unassigned coded errors, raw exception logging, unprojected Ops failures,
+missing original-error props on ErrorState/ErrorNotice, direct raw JSX output,
+message-only error state, and pre-auth admin panels. It parses only changed
+production files, compares their local findings with the base, and batch-loads
+only those base blobs. It has no import graph, factory discovery, route/test
+registry, injected-service tracing or failure-stage/control-flow proof.
+CI supplies the PR/push base explicitly; local checks compare with HEAD. Unit
+tests run deterministic source fixtures, not another repository audit. Each CI
+quality job runs its dedicated actual-source gate once.
 
-Contracts are scoped by `source/path.ts#functionOrMethod` so an existing code's
-test cannot silently cover a different emitter. New/changed HTTP handlers need
-an actual failure tested with `assertDiagnosticBaseline`; complex HTTP emitters
-need `assertDiagnosticTriage` plus an observed stage before emission. `Public()`
+The common HTTP boundary automatically supplies a baseline. Passing the original
+error to ErrorState/ErrorNotice automatically supplies role-gated presentation.
+Neither guarantee proves domain triage sufficiency or detects every possible new
+UI pattern. Existing P1 coverage debt remains; arbitrary helper chains and all
+React Query error branches require review and screen/domain tests. Runtime quality
+evaluation is a test/review tool, not a production root-cause inference engine.
+Enrichment must use already-observed state, without diagnostic DB/Provider/Redis
+reads. See `scripts/diagnostic-enforcement.cjs` and its positive/negative fixtures.
+
+Contracts identify `source/path.ts#functionOrMethod` to make the tested production
+failure explicit for review; the source gate does not match these strings to
+emitters. Test representative HTTP failures with `assertDiagnosticBaseline`;
+complex financial/integrity/provider/transaction failures need actual runtime
+diagnostics checked by `assertDiagnosticTriage`. Simple validation does not need
+invented evidence. `Public()`
 entry points use `assertPreAuthFailure` and safe operational logs. Existing job
 helpers carrying `resultPayloadJson` use `assertOpsFailure`, not HTTP enrichment.
 These assertions live in `backend/scripts/lib/diagnostic-quality.ts` and run in
@@ -89,8 +107,9 @@ inputs are represented by a fixed summary/classification in the diagnostic buffe
 existing domain log projections explicitly opt in through `safeAdminDiagnosticLog`.
 This does not change the operational console logging subsystem. Public UI copy
 uses fixed product messages for all roles; codes/status remain available for client
-control flow, and technical detail uses the existing admin panel. Typed domain messages
-are preserved. HTTP 200 partial diagnostics explicitly receive each
+control flow, and technical detail uses the existing admin panel. Reviewed product
+copy is preserved; diagnostic-safe technical copy is not a public allowlist.
+HTTP 200 partial diagnostics explicitly receive each
 row/section's local evidence and never inherit shared request evidence. Existing
 request ID, query exclusion, collection/depth/string and 24 KiB limits remain.
 

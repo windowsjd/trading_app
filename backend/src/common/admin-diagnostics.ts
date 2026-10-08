@@ -501,10 +501,23 @@ function inferRouteContext(method: string, originalUrl: string) {
         : 'request';
       operation = `FUTURES_${action.replace(/-/gu, '_').toUpperCase()}_${method.toUpperCase() === 'GET' ? 'READ' : 'REQUEST'}`;
       nextInvestigation = ['backend/src/futures/futures.service.ts'];
-    } else if (route[2] === 'wallets' || route[2] === 'transfers') {
+    } else if (
+      ['wallets', 'wallet-transfers', 'wallet-transactions'].includes(route[2])
+    ) {
       domain = 'WALLET';
-      operation = `WALLET_${route[2].toUpperCase()}_${method.toUpperCase() === 'GET' ? 'READ' : 'REQUEST'}`;
-      nextInvestigation = ['backend/src/wallets/wallets.service.ts'];
+      operation =
+        route[2] === 'wallet-transfers'
+          ? route[3] === 'quote'
+            ? 'WALLET_TRANSFER_QUOTE'
+            : route[3] === 'execute'
+              ? 'WALLET_TRANSFER_EXECUTE'
+              : 'WALLET_TRANSFER'
+          : route[2] === 'wallet-transactions'
+            ? 'WALLET_TRANSACTIONS_READ'
+            : 'WALLET_WALLETS_READ';
+      nextInvestigation = [
+        'backend/src/wallets/trading-account-wallets.service.ts',
+      ];
     }
   } else if (route[0] === 'orders') {
     domain = 'ORDER';

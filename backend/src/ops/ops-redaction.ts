@@ -12,17 +12,35 @@ const MAX_STRING = 2_000;
 const MAX_BYTES = 256 * 1024;
 
 export function sanitizeOpsJson(value: unknown): unknown {
+  return sanitizeBoundedJson(value, false);
+}
+
+/** Failed result payloads are exception surfaces, unlike normal Ops metadata. */
+export function sanitizeOpsFailureJson(value: unknown): unknown {
+  return sanitizeBoundedJson(
+    typeof value === 'string'
+      ? (safeDiagnosticMessage(value) ?? 'Background operation failed.')
+      : value,
+    true,
+  );
+}
+
+function sanitizeBoundedJson(value: unknown, failure: boolean): unknown {
   if (value === undefined) {
     return undefined;
   }
 
-  const result = sanitizeJsonValue(value);
+  const result = sanitizeJsonValue(value, 0, failure);
   return Buffer.byteLength(JSON.stringify(result), 'utf8') <= MAX_BYTES
     ? result
     : { truncated: true, reason: 'ops_result_size_limit' };
 }
 
-function sanitizeJsonValue(value: unknown, depth = 0): unknown {
+function sanitizeJsonValue(
+  value: unknown,
+  depth: number,
+  failure: boolean,
+): unknown {
   if (value === null) {
     return null;
   }
@@ -44,7 +62,7 @@ function sanitizeJsonValue(value: unknown, depth = 0): unknown {
   if (Array.isArray(value)) {
     return value
       .slice(0, MAX_ITEMS)
-      .map((item) => sanitizeJsonValue(item, depth + 1));
+      .map((item) => sanitizeJsonValue(item, depth + 1, failure));
   }
 
   if (typeof value === 'object') {
@@ -60,10 +78,16 @@ function sanitizeJsonValue(value: unknown, depth = 0): unknown {
           key.slice(0, MAX_STRING),
           isSensitiveDiagnosticKey(key)
             ? REDACTED
-            : /message$/iu.test(key.replace(/[^a-z]/giu, '')) &&
-                typeof item === 'string'
+            : (failure
+                  ? /message$/iu
+                  : /(?:error|exception|failure)message$/iu
+                ).test(key.replace(/[^a-z]/giu, '')) && typeof item === 'string'
               ? (safeDiagnosticMessage(item) ?? 'Background operation failed.')
-              : sanitizeJsonValue(item, depth + 1),
+              : sanitizeJsonValue(
+                  item,
+                  depth + 1,
+                  failure || /^(?:errors?|exceptions?|failures?)$/iu.test(key),
+                ),
         ]),
     );
   }

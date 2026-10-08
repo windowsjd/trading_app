@@ -48,6 +48,52 @@ describe('BatchService', () => {
 
   afterEach(() => jest.restoreAllMocks());
 
+  it('separates successful preview metadata from failed result message projection', async () => {
+    prisma.batchJobRun.create.mockResolvedValue(
+      makeRun({ status: BatchJobStatus.running }),
+    );
+    prisma.batchJobRun.update.mockImplementation(async ({ data }) =>
+      makeRun(data),
+    );
+    const message = 'Batch operation would run when dryRun is false.';
+    await service.runJob({
+      jobName: 'preview',
+      idempotencyKey: 'preview-key',
+      dryRun: true,
+      handler: () => ({ message, count: 3 }),
+    });
+    expect(
+      prisma.batchJobRun.update.mock.calls[0][0].data.resultPayloadJson,
+    ).toEqual({ message, count: 3 });
+
+    await expect(
+      service.runJob({
+        jobName: 'failed',
+        idempotencyKey: 'failed-key',
+        handler: () => {
+          throw new HttpException(
+            {
+              success: false,
+              error: { code: 'DECLARED_BATCH_FAILURE', message: 'Job failed.' },
+              data: {
+                resultPayloadJson: {
+                  message:
+                    'raw Provider https://provider.invalid/body 987654.12345678',
+                  count: 3,
+                },
+              },
+            },
+            503,
+          );
+        },
+      }),
+    ).rejects.toBeInstanceOf(HttpException);
+    expect(prisma.batchJobRun.update.mock.calls[1][0].data).toMatchObject({
+      errorCode: 'DECLARED_BATCH_FAILURE',
+      resultPayloadJson: { message: 'Background operation failed.', count: 3 },
+    });
+  });
+
   it('persists provider category/status without raw body and scrubs request/result/error text', async () => {
     prisma.batchJobRun.create.mockResolvedValue(
       makeRun({ status: BatchJobStatus.running }),

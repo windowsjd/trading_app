@@ -11,11 +11,18 @@ Both use the public error mapper and the `/me`-gated AdminDiagnosticPanel.
 Layout remains owned by the screen. Optional `message` overrides must be fixed
 reviewed product copy, never exception text. Keep each error on its own surface;
 there is no global last-error store. Pre-auth screens only use safe public copy.
-CI audits new/changed error presentation against the PR/push base and rejects
-message-only error state or discarded diagnostics. Existing message-only P1
-screens remain migration work; adding new debt is blocked, without a legacy
-error-code allowlist. Backend enrichment/triage policy is canonical in
-`backend/README.md`.
+The dedicated CI source gate checks changed files against the PR/push base for
+obvious bypasses: ErrorState/ErrorNotice missing the original error, direct raw
+error/server fields in JSX, directly storing only getApiErrorDisplayMessage's
+result, and pre-auth admin panels. Unit tests run small in-memory gate fixtures;
+they do not repeat the repository source audit.
+
+These standard components provide role-gated presentation when given the original
+error. The gate does not prove that every React Query isError branch or arbitrary
+helper/UI pattern uses them. Screen tests and review cover that gap. Existing P1
+Home partial, Holdings/Equity, Wallet, Transfer, Cancel, History, Ranking/Records,
+Friends/Season/Settings coverage remains separate migration work. Backend runtime
+enrichment/triage policy is canonical in `backend/README.md`.
 
 ```bash
 npm install

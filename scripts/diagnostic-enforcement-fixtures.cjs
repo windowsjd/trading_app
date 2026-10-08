@@ -1,306 +1,162 @@
 const { auditSources } = require("./diagnostic-enforcement.cjs");
 
-module.exports = function enforcementFixtures(ts, assert) {
-  const backend = (source) =>
-    new Map([
-      [
-        "backend/src/common/api-error.ts",
-        "export function createApiError(code: string, message: string, status: number) {}",
-      ],
-      [
-        "backend/src/ops/ops-failure.ts",
-        "export function projectOpsFailure(error: unknown) {}",
-      ],
-      [
-        "backend/src/common/admin-diagnostics.ts",
-        "export function setAdminDiagnosticContext(update) {}",
-      ],
-      [
-        "backend/scripts/lib/diagnostic-quality.ts",
-        "export function assertDiagnosticTriage(d, code, subject) {} export function assertDiagnosticBaseline(d, subject) {} export function assertPreAuthFailure(body, subject, logs) {} export function assertOpsFailure(result, code, subject) {}",
-      ],
-      ["backend/src/feature/feature.service.ts", source],
-    ]);
-  const frontend = (source) =>
-    new Map([
-      [
-        "frontend/src/components/states/ErrorState.tsx",
-        "export default function ErrorState() {}",
-      ],
-      [
-        "frontend/src/components/states/ErrorNotice.tsx",
-        "export default function ErrorNotice() {}",
-      ],
-      [
-        "frontend/src/services/api/errorMapper.ts",
-        "export function getApiErrorDisplayMessage(error: unknown) {} export function getApiErrorCode(error: unknown) {}",
-      ],
-      ["frontend/src/screens/feature/FeatureScreen.tsx", source],
-    ]);
-  const failures = (map, scope) =>
-    auditSources(ts, new Map(), map, scope).map((issue) => issue.rule);
-  const apiImport =
-    "import { createApiError as fail } from '../common/api-error';";
+// In-memory snippets only. Real repository reads belong to the dedicated CI gate.
+module.exports = function enforcementFixtures(ts, assert, scope) {
+  const path =
+    scope === "backend"
+      ? "backend/src/feature/feature.service.ts"
+      : "frontend/src/screens/feature/FeatureScreen.tsx";
+  const source = (text, file = path) => new Map([[file, text]]);
+  const check = (text, expected, file = path) => {
+    const issues = auditSources(ts, new Map(), source(text, file), scope);
+    if (expected)
+      assert.ok(
+        issues.some((issue) => issue.rule.includes(expected)),
+        `${expected}: ${text}`,
+      );
+    else assert.deepEqual(issues, [], text);
+  };
+  if (scope === "backend") {
+    check(
+      "import {HttpException as E} from '@nestjs/common'; throw new E({error:{code:'NEW',message:raw}},500);",
+      "direct exceptions",
+    );
+    check(
+      "import * as nest from '@nestjs/common'; throw new nest.BadRequestException(raw);",
+      "direct exceptions",
+    );
+    check(
+      "response.status(503).json({error:{code:'NEW',message:raw}});",
+      "Direct HTTP",
+    );
+    check("return {code:'NEW',message:raw};", "Unassigned");
+    check("class NewFailure extends Error { code = 'NEW'; }", "coded error");
+    check("error.code = 'NEW';", "coded error");
+    check("throw new Error(raw);", "Raw error emitter");
+    check("logger.error(error);", "Do not log raw");
+    check("this.logger.warn(error.message);", "Do not log raw");
+    check("console.log(JSON.stringify(payload));", "Do not log raw");
+    check(
+      "db.opsJobRun.update({data:{errorCode:err.code,errorMessage:err.message}});",
+      "Ops failure fields",
+    );
+    check(
+      "import {createApiError as fail} from '../common/api-error'; throw fail('NEW_PROVIDER_FAILURE',raw,503);",
+    );
+    check(
+      "import {projectOpsFailure as project} from '../ops/ops-failure'; return project(error,'FIXED_DOMAIN_FAILURE');",
+    );
+    check(
+      "import {projectOpsFailure} from '../ops/ops-failure'; return projectOpsFailure({code:raw,message:raw});",
+    );
+    check(
+      "import {projectOpsFailure} from '../ops/ops-failure'; return projectOpsFailure(new Error(raw));",
+    );
+    check(
+      "runService.recordFailed(run,{errorCode:'FIXED_DOMAIN_FAILURE',errorMessage:raw});",
+    );
+    check(
+      "import {projectOpsFailure} from '../ops/ops-failure'; const projected=projectOpsFailure(error); db.opsJobRun.update({data:{errorCode:projected.code,errorMessage:projected.message}});",
+    );
+    check(
+      "const projected=error; db.opsJobRun.update({data:{errorCode:projected.code,errorMessage:projected.message}});",
+      "Ops failure fields",
+    );
+    check(
+      "import {safeAdminDiagnosticLog as safe} from '../common/admin-diagnostics'; logger.error(safe({failure:error}));",
+    );
+    check(
+      "import {classifyFailureCause} from '../common/safe-failure-cause'; logger.error(classifyFailureCause(error));",
+    );
+    check(
+      "// @diagnosticSurface internal: impossible local invariant, reviewed here\nthrow new Error('invariant');",
+    );
+    check(
+      "import {buildAdminPartialFailureDiagnostic as partial} from '../common/admin-diagnostics'; return {code:'NEW',message:fixed,diagnostic:partial(error,'NEW')};",
+    );
+    // No route registry, lexical stage proof, factory graph or test-name matching.
+    check(
+      "import {Get} from '@nestjs/common'; class Feature { @Get() read(){ return service.read(); } }",
+    );
+    check(
+      "import {domainError} from './domain'; function action(){ throw domainError(code, message); }",
+    );
+  } else {
+    const state = "import State from '../../components/states/ErrorState';";
+    const notice =
+      "import {ErrorNotice as Notice} from '../../components/states/ErrorNotice';";
+    const mapper =
+      "import {getApiErrorDisplayMessage as display} from '../../services/api/errorMapper';";
+    check(`${state} return <State message='safe'/>;`, "original error");
+    check(`${notice} return <Notice message='safe'/>;`, "original error");
+    check(`${state} return <State error={undefined}/>;`, "original error");
+    check(`${state} return <State {...props}/>;`, "original error");
+    check(
+      `${state} return <State error={query.error} onRetry={query.refetch}/>;`,
+    );
+    check(`${notice} return <Notice error={error} message='Try again.'/>;`);
+    check("return <Text>{error.message}</Text>;", "Raw exception");
+    check("return <Text>{query.error?.code}</Text>;", "Raw exception");
+    check("return <Text>{error.response.status}</Text>;", "Raw exception");
+    check("return <Text>{info.serverMessage}</Text>;", "Raw exception");
+    check("return <Text>{serverMessage}</Text>;", "Raw server message");
+    check(
+      "import {getApiErrorServerMessage as raw} from '../../services/api/errorMapper'; return <Text>{raw(error)}</Text>;",
+      "Raw error mapper",
+    );
+    check(`${mapper} setFailure(display(error));`, "original error");
+    check(`${mapper} setFailure({error, message:display(error)});`);
+    check(`${mapper} const publicCopy=display(error); return null;`);
+    const auth = "frontend/src/screens/auth/LoginScreen.tsx";
+    check(
+      "import Panel from '../../components/states/AdminDiagnosticPanel'; return <Panel diagnostic={value}/>;",
+      "Pre-auth",
+      auth,
+    );
+    check(`${mapper} setError(display(error));`, undefined, auth);
+    check("setError(error.message);", "Raw exception", auth);
+    // Deliberately outside static coverage: review/screen tests own arbitrary UI.
+    check("if (query.isError) return <Text>Try again.</Text>;");
+    const before = source("const text = error.message; return null;");
+    assert.ok(
+      auditSources(
+        ts,
+        before,
+        source("return <Text>{error.message}</Text>;"),
+        scope,
+      ).length,
+    );
+  }
+  const bad =
+    scope === "backend"
+      ? "logger.error(error);"
+      : "return <Text>{error.message}</Text>;";
+  const before = source(bad);
+  assert.deepEqual(auditSources(ts, before, before, scope), []);
   assert.deepEqual(
-    failures(
-      backend(
-        `${apiImport} export function action() { throw fail('NEW_SYNTHETIC_ERROR', 'safe fixed copy', 409); }`,
-      ),
-      "backend",
-    ),
+    auditSources(ts, before, source(`\n ${bad} // reformat\n`), scope),
     [],
   );
   assert.ok(
-    failures(
-      backend(
-        "import { HttpException as E } from '@nestjs/common'; export function action() { throw new E({success:false,error:{code:'NEW',message:privateMessage}},500); }",
-      ),
-      "backend",
-    ).some((rule) => rule.includes("direct exceptions")),
-  );
-  assert.ok(
-    failures(
-      backend(
-        "export function action(res) { return res.status(503).json({error:{code:'NEW',message:'private'}}); }",
-      ),
-      "backend",
-    ).some((rule) => rule.includes("Direct HTTP")),
-  );
-  assert.ok(
-    failures(
-      backend(
-        "export function job() { return {code:'NEW_BACKGROUND_CODE',message:raw}; }",
-      ),
-      "backend",
-    ).some((rule) => rule.includes("Unassigned")),
-  );
-  assert.ok(
-    failures(
-      backend("class NewFailure extends Error { code = 'NEW_FAILURE'; }"),
-      "backend",
-    ).some((rule) => rule.includes("coded exception")),
-  );
-  assert.ok(
-    failures(
-      backend(
-        `${apiImport} export function action() { throw fail('NEW_PROVIDER_FAILURE','safe',503); }`,
-      ),
-      "backend",
-    ).some((rule) => rule.includes("Triage-required")),
-  );
-  const stage =
-    "import {setAdminDiagnosticContext as observed} from '../common/admin-diagnostics';";
-  assert.ok(
-    failures(
-      backend(
-        `${apiImport} import {HttpStatus as S} from '@nestjs/common'; function action() { throw fail('NEW_SIMPLE_ERROR','safe',S.SERVICE_UNAVAILABLE); }`,
-      ),
-      "backend",
-    ).some((rule) => rule.includes("Triage-required")),
-  );
-  assert.ok(
-    failures(
-      backend(
-        "function job(result) { result.errorCode = 'NEW_BACKGROUND_CODE'; }",
-      ),
-      "backend",
-    ).some((rule) => rule.includes("coded exception")),
-  );
-  const approvedTriage = backend(
-    `${apiImport} ${stage} export function action() { observed({failureStage:'provider_fetch'}); throw fail('NEW_PROVIDER_FAILURE','safe',503); }`,
-  );
-  approvedTriage.set(
-    "backend/src/feature/feature.spec.ts",
-    "import { assertDiagnosticTriage as check } from '../../scripts/lib/diagnostic-quality'; check(actualDiagnostic, 'NEW_PROVIDER_FAILURE', 'backend/src/feature/feature.service.ts#action');",
-  );
-  assert.deepEqual(failures(approvedTriage, "backend"), []);
-  const unenriched = new Map(approvedTriage);
-  unenriched.set(
-    "backend/src/feature/feature.service.ts",
-    `${apiImport} export function action() { throw fail('NEW_PROVIDER_FAILURE','safe',503); }`,
-  );
-  assert.ok(
-    failures(unenriched, "backend").some((rule) =>
-      rule.includes("observed meaningful"),
-    ),
-  );
-  const anotherPath = new Map(approvedTriage);
-  anotherPath.set(
-    "backend/src/feature/feature.service.ts",
-    `${apiImport} ${stage} export function another() { observed({failureStage:'provider_fetch'}); throw fail('NEW_PROVIDER_FAILURE','safe',503); }`,
-  );
-  assert.ok(
-    failures(anotherPath, "backend").some((rule) =>
-      rule.includes("scoped actual"),
-    ),
+    auditSources(ts, before, source(`${bad}\n${bad}`), scope).length,
+    "duplicate bypass is new",
   );
   assert.deepEqual(
-    failures(
-      backend(
-        "import { projectOpsFailure } from '../ops/ops-failure'; export function job(error) { return projectOpsFailure(error); }",
-      ),
-      "backend",
+    auditSources(
+      ts,
+      new Map(),
+      source(bad, `${scope}/src/feature/example.test.ts`),
+      scope,
     ),
     [],
   );
-  const opsFactory = backend(
-    "import {HttpException} from '@nestjs/common'; function jobError(code:string,message:string,resultPayloadJson:unknown) { return new HttpException({error:{code,message},data:{resultPayloadJson}},503); }",
-  );
-  const opsPath = new Map(opsFactory);
-  opsPath.set(
-    "backend/src/common/safe-diagnostic-message.ts",
-    "const SAFE_MESSAGES = new Set(['Background operation failed.']);",
-  );
-  opsPath.set(
-    "backend/src/feature/feature.service.ts",
-    `${opsFactory.get("backend/src/feature/feature.service.ts")} function job() { throw jobError('NEW_PROVIDER_FAILURE','Background operation failed.',result); }`,
-  );
-  assert.ok(
-    auditSources(ts, opsFactory, opsPath, "backend").some((issue) =>
-      issue.rule.includes("scoped actual"),
-    ),
-  );
-  opsPath.set(
-    "backend/src/feature/feature.spec.ts",
-    "import {assertOpsFailure} from '../../scripts/lib/diagnostic-quality'; assertOpsFailure(actual, 'NEW_PROVIDER_FAILURE', 'backend/src/feature/feature.service.ts#job');",
-  );
-  assert.deepEqual(auditSources(ts, opsFactory, opsPath, "backend"), []);
-  assert.ok(
-    failures(
-      backend("export function invariant() { throw new Error(raw); }"),
-      "backend",
-    ).length,
-  );
   assert.deepEqual(
-    failures(
-      backend(
-        'export function invariant() { // @diagnosticSurface internal: impossible in-memory invariant; no production code\n throw new Error("invariant"); }',
-      ),
-      "backend",
+    auditSources(
+      ts,
+      new Map(),
+      source(bad, `${scope}/src/generated/example.ts`),
+      scope,
     ),
     [],
   );
-  const uiImport = "import State from '../../components/states/ErrorState';";
-  assert.deepEqual(
-    failures(
-      frontend(
-        `${uiImport} export function Screen() { return <State error={query.error} />; }`,
-      ),
-      "frontend",
-    ),
-    [],
-  );
-  assert.ok(
-    failures(
-      frontend(
-        `${uiImport} export function Screen() { return <State message="safe" onRetry={query.refetch} />; }`,
-      ),
-      "frontend",
-    ).some((rule) => rule.includes("original error")),
-  );
-  assert.ok(
-    failures(
-      frontend(
-        "import {getApiErrorDisplayMessage as message} from '../../services/api/errorMapper'; export function Screen() { setFailure(message(error)); return <Text>{message(error)}</Text>; }",
-      ),
-      "frontend",
-    ).length,
-  );
-  assert.ok(
-    failures(
-      frontend(
-        "export function Screen() { return <Text>{error.message}</Text>; }",
-      ),
-      "frontend",
-    ).some((rule) => rule.includes("Raw exception")),
-  );
-  assert.ok(
-    failures(
-      frontend(
-        "export function Screen() { return <Text>{query.error?.code}</Text>; }",
-      ),
-      "frontend",
-    ).some((rule) => rule.includes("Raw exception")),
-  );
-  const preauth = new Map([
-    [
-      "frontend/src/screens/auth/LoginScreen.tsx",
-      "setError(getApiErrorDisplayMessage(error));",
-    ],
-  ]);
-  assert.deepEqual(failures(preauth, "frontend"), []);
-  preauth.set(
-    "frontend/src/screens/auth/LoginScreen.tsx",
-    "setError(error.message);",
-  );
-  assert.ok(failures(preauth, "frontend").length);
-  const newRoute = backend("");
-  newRoute.set(
-    "backend/src/feature/feature.controller.ts",
-    "import {Get} from '@nestjs/common'; class Feature { @Get('read') read() { return service.read(); } }",
-  );
-  assert.ok(
-    failures(newRoute, "backend").some((rule) => rule.includes("HTTP handler")),
-  );
-  newRoute.set(
-    "backend/src/feature/feature.spec.ts",
-    "import {assertDiagnosticBaseline} from '../../scripts/lib/diagnostic-quality'; assertDiagnosticBaseline(actual, 'backend/src/feature/feature.controller.ts#read');",
-  );
-  assert.deepEqual(failures(newRoute, "backend"), []);
-  const migratedFactory = backend(
-    "import {createApiError} from '../common/api-error'; export function domainError(code:string,message:string,status:number) { throw createApiError(code,message,status); }",
-  );
-  const nextFeature = new Map(migratedFactory);
-  nextFeature.set(
-    "backend/src/feature/new.service.ts",
-    "import {domainError} from './feature.service'; export function action() { domainError('NEXT_SYNTHETIC_CODE', raw, 409); }",
-  );
-  assert.deepEqual(
-    auditSources(ts, migratedFactory, nextFeature, "backend"),
-    [],
-  );
-  assert.deepEqual(failures(nextFeature, "backend"), []);
-  const privateRead = frontend(
-    "export function Screen() { const text = error.message; return null; }",
-  );
-  const visibleRead = frontend(
-    "export function Screen() { return <Text>{error.message}</Text>; }",
-  );
-  assert.ok(
-    auditSources(ts, privateRead, visibleRead, "frontend").some((issue) =>
-      issue.rule.includes("Raw exception"),
-    ),
-  );
-  const codeCopy =
-    "import {getApiErrorCode} from '../../services/api/errorMapper';";
-  assert.ok(
-    failures(
-      frontend(
-        `${codeCopy} function Screen() { return <Text>{domainMessage(getApiErrorCode(error))}</Text>; }`,
-      ),
-      "frontend",
-    ).some((rule) => rule.includes("Code-based")),
-  );
-  assert.deepEqual(
-    failures(
-      frontend(
-        `${codeCopy} import Notice from '../../components/states/ErrorNotice'; function Screen() { return <Notice error={error} message={domainMessage(getApiErrorCode(error))} />; }`,
-      ),
-      "frontend",
-    ),
-    [],
-  );
-  // Reformatting does not create an emitter; adding an identical second emitter does.
-  const before = backend(
-    "import {HttpException} from '@nestjs/common'; function a() { throw new HttpException('x',400); }",
-  );
-  const after = backend(
-    "import { HttpException } from '@nestjs/common';\nfunction a(){\nthrow new HttpException('x', 400);\n}",
-  );
-  assert.deepEqual(auditSources(ts, before, after, "backend"), []);
-  after.set(
-    "backend/src/feature/feature.service.ts",
-    "import {HttpException} from '@nestjs/common'; function a(){ throw new HttpException('x',400); throw new HttpException('x',400); }",
-  );
-  assert.ok(auditSources(ts, before, after, "backend").length);
 };

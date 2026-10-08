@@ -10,6 +10,60 @@
 
 ---
 
+## 2026-10-08 — Diagnostic Enforcement Foundation 단순화·안전성 보완
+
+- **기능 구현 의도:** 공통 HTTP/admin·Frontend original-error·Ops 안전 경계는 유지한다.
+  Source gate는 명백한 신규 bypass만 막고, 실제 failureStage/triage 품질은 production
+  failure를 실행하는 domain contract test와 리뷰로 검증한다. 모든 오류 경로를 정적으로
+  증명한다는 의미로 운영하거나 문서화하지 않는다.
+- 시작 시 `git fetch origin main` 완료. 실제 branch `main`, HEAD/origin/main은 모두
+  `6824a53fc7bae8153036ab2c9d6a0d8dd44920b9`, working tree clean이었다.
+  요청에 적힌 `399b1c8f`를 고정하지 않고 실제 checkout의 foundation을 조사했다.
+- Analyzer에서 import resolution/factory graph, 전체 base/current tree 로딩, Public()
+  service 추적, route/test/code matching, failureStage lexical predecessor 검사를 제거했다.
+  변경 production 파일의 로컬 AST finding만 비교하며 필요한 base blob을 한 번의
+  `git cat-file --batch`로 읽는다. 실제 Git trace는 총 4회 호출, batch 1회였다.
+  Main script 1027→431줄, fixture 306→162줄. 복잡성을 다른 파일로 옮기지 않았다.
+- Unit의 실제 repository runAudit 중복을 제거했다. Backend/Frontend는 각자 in-memory
+  positive/negative fixture를 실행하고, 실제 diff gate는 각 CI quality job에서 1회다.
+  Bootstrap 3개 등록은 별도 작은 2-file wiring contract로 보호한다. Runtime diagnostic
+  quality helper와 실제 filter/role/financial/provider failure tests는 유지했다.
+- `public-error-message.ts`의 exact product-copy policy를 분리했다. `createApiError`와
+  legacy 5xx filter는 diagnostic-safe catalog/기술 단어 blacklist로 public copy를 승인하지
+  않는다. Service wiring/repair command/internal availability는 공개되지 않고 기존
+  Futures disabled/잔액 부족/안전한 지갑 확인 실패 등 product copy는 유지한다.
+- Ops generic JSON과 failed-result JSON projection을 분리했다. Success/dryRun/skipped/
+  locked/metadata의 정상 message를 보존하며, failed payload와 명시적 error/failure
+  subtree는 안전한 실패 문구로 projection한다. Secret/payload/DB URL/private key,
+  Error classification, depth/count/string/total-byte bounds 및 허용된 Ops 숫자/ID는 유지한다.
+  OpsJobRunService와 BatchService의 기존 persistence 경계에만 연결했다.
+- Plain-object exception code도 Error instance와 같이 safe classifier의 allowlist만
+  상속한다. 명시적 caller fallback/declared domain HTTP code는 유지한다. DB safe cause의
+  숫자 code도 허용된 classifier 결과로만 보존한다. 거대한 code registry는 없다.
+- 실제 wallets/wallet-transfers(/quote,/execute)/wallet-transactions route를 WALLET
+  workflow로 연결하고 nextInvestigation을 실제 account wallet service로 교정했다.
+  failureStage는 관측된 enrichment가 없으면 request_boundary 그대로다.
+- 검증: Backend canonical typecheck/build, 변경 production 파일 check-only lint 통과.
+  Unit 247 suites/3959 tests 통과(62 DB opt-in skip), release-critical E2E 2 suites/397
+  tests 통과. Frontend npm run check 1742 tests 통과. 두 dedicated source gate 통과.
+  기존 financial PG CI 범위는 19 suites/20 tests + 명시적 F3/F3.1 2 suites/2 tests로
+  전부 확인했다(로컬 wrapper의 숫자 포함 opt-in 추출 누락으로 두 suite를 별도 실행).
+  Core/account PG 21 suites/22 tests 통과. 작업 전용 PG16에 기존 66 migration 적용,
+  status/drift 통과 후 PG/Redis 종료. Schema/generated/migration 변경과 운영 DB write 없음.
+- 같은 로컬 환경에서 monotonic wall time으로 before/after를 측정했다. Backend unit
+  23.410→16.581초, Backend gate 5.571→0.186초, Frontend tests 11.762→11.463초,
+  Frontend gate 3.102→0.022초. 정밀 CI benchmark가 아니며 Frontend 전체 시간 변화는 작다.
+  첫 sandbox 측정은 Git/tsx IPC EPERM으로 실패해 동일 명령을 허용된 환경에서 비교했다.
+  이번 검증에는 test clock shim을 사용하지 않았다. 로그는 `/tmp/trading-diagnostic-simplification`.
+- 공통 정책/Frontend README/Ops 계약에 정적 보장 한계를 명시했다. Home partial,
+  Holdings/Equity, Wallet/Transfer/Cancel/History, Ranking/Records/Friends/Season/Settings의
+  기존 P1 coverage는 별도 작업이다. 기존 WalletTransfer original-error 연결은 그대로다.
+- 거래/가격/예약/Wallet/FX/PnL/risk/settlement, transaction/lock/idempotency/freshness/
+  retry/timeout 정책은 변경하지 않았다. Diagnostic DB/Provider/Redis I/O도 추가하지 않았다.
+  GitHub Actions 원격 실행, commit/push/merge/배포/운영 flag 변경은 하지 않았다.
+- 최종 diff 자체 검토와 `git diff --check`, 신규 파일 whitespace 검사를 통과했다.
+  변경은 기존 22개 수정 + 신규 3개이며 삭제 파일은 없다.
+
 ## 2026-10-08 — Conditional Orders v1 (Phase B, F3.1 gate 이후)
 
 - **기능 구현 의도:** SL/TP는 사용자 exit intent이며 Mark 강제청산과 다르다.

@@ -7,7 +7,7 @@ import {
   Prisma,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { sanitizeOpsJson } from './ops-redaction';
+import { sanitizeOpsJson, sanitizeOpsFailureJson } from './ops-redaction';
 import { projectOpsFailure } from './ops-failure';
 
 export type SerializedOpsJobRun = {
@@ -105,10 +105,12 @@ export class OpsJobRunService {
     },
   ) {
     const finishedAt = input.finishedAt ?? new Date();
-    const failure = projectOpsFailure({
-      code: this.requiredString(input.errorCode, 'errorCode'),
-      message: this.requiredString(input.errorMessage, 'errorMessage'),
-    });
+    // This typed persistence API takes a caller-declared domain code. It is not
+    // an arbitrary exception.code; raw exceptions go through projectOpsFailure.
+    const failure = projectOpsFailure(
+      { message: this.requiredString(input.errorMessage, 'errorMessage') },
+      this.requiredString(input.errorCode, 'errorCode'),
+    );
 
     return this.prisma.opsJobRun.update({
       where: {
@@ -123,7 +125,10 @@ export class OpsJobRunService {
         ...(input.resultJson === undefined
           ? {}
           : {
-              resultJson: this.toJsonInput(input.resultJson),
+              resultJson: this.toJsonInput(
+                input.resultJson,
+                sanitizeOpsFailureJson,
+              ),
             }),
       },
     });
@@ -256,8 +261,9 @@ export class OpsJobRunService {
 
   private toJsonInput(
     value: unknown,
+    sanitize = sanitizeOpsJson,
   ): Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue {
-    const sanitized = sanitizeOpsJson(value);
+    const sanitized = sanitize(value);
     if (sanitized === null) {
       return Prisma.JsonNull;
     }

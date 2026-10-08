@@ -85,6 +85,86 @@ describe('OpsJobRunService', () => {
     };
   };
 
+  it('preserves an already classified numeric SQLSTATE through the persistence boundary', async () => {
+    const { prisma, service } = createService();
+    await service.recordFailed(
+      { id: 'run-1', startedAt },
+      {
+        errorCode: '23505',
+        errorMessage: 'Background operation failed.',
+      },
+    );
+    expect(prisma.opsJobRun.update.mock.calls[0][0].data.errorCode).toBe(
+      '23505',
+    );
+  });
+
+  it.each([
+    ['succeeded', { message: 'normal operational message', count: 3 }],
+    [
+      'dryRun',
+      {
+        dryRun: true,
+        message: 'Reconciliation would run when dryRun is false.',
+      },
+    ],
+    [
+      'skipped',
+      {
+        reason: 'NOT_IMPLEMENTED',
+        message: 'This operation is not implemented yet.',
+      },
+    ],
+    ['locked', { reason: 'LOCKED', message: 'Another worker owns this job.' }],
+  ] as const)(
+    'preserves %s result and metadata message meaning through persistence',
+    async (kind, resultJson) => {
+      const { prisma, service } = createService();
+      const metadataJson = {
+        message: 'Operator requested a preview.',
+        token: 'fake-secret',
+      };
+      const input = {
+        jobName: OpsJobName.daily_portfolio_snapshot,
+        trigger: OpsJobTrigger.test,
+        startedAt,
+        dryRun: kind === 'dryRun',
+        metadataJson,
+        resultJson,
+      };
+      if (kind === 'succeeded' || kind === 'dryRun') {
+        prisma.opsJobRun.create.mockResolvedValueOnce({
+          id: 'run-1',
+          startedAt,
+        });
+        const run = await service.createRunning(input);
+        await service.recordSucceeded(run, { finishedAt, resultJson });
+        expect(prisma.opsJobRun.update.mock.calls[0][0].data).toMatchObject({
+          status: OpsJobRunStatus.succeeded,
+          resultJson,
+        });
+      } else if (kind === 'skipped') {
+        await service.recordSkipped(input);
+      } else {
+        await service.recordLocked(input);
+      }
+      const created = prisma.opsJobRun.create.mock.calls[0][0].data;
+      expect(created.metadataJson).toEqual({
+        message: metadataJson.message,
+        token: '[REDACTED]',
+      });
+      if (kind === 'skipped' || kind === 'locked')
+        expect(created).toMatchObject({ status: kind, resultJson });
+      if (kind === 'dryRun') expect(created.dryRun).toBe(true);
+      expect(
+        JSON.stringify([
+          prisma.opsJobRun.create.mock.calls,
+          prisma.opsJobRun.update.mock.calls,
+        ]),
+      ).not.toMatch(/Background operation failed|fake-secret/);
+    },
+  );
+
   it('persists safe provider failures and redacts free-form and structured metadata', async () => {
     const { prisma, service } = createService();
     const text = jest.fn().mockResolvedValue('unlabeled-synthetic-body');

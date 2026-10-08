@@ -1,6 +1,51 @@
-import { sanitizeOpsJson } from './ops-redaction';
+import { sanitizeOpsJson, sanitizeOpsFailureJson } from './ops-redaction';
 
 describe('ops redaction', () => {
+  it('separates normal metadata messages from explicit failure messages', () => {
+    const raw =
+      'SELECT private_wallet https://provider.invalid/body 987654.12345678';
+    expect(
+      sanitizeOpsJson({
+        message: 'normal operational message',
+        dryRunMessage: 'Would run when dryRun is false.',
+        failure: { message: raw },
+        errors: [{ message: raw }],
+      }),
+    ).toEqual({
+      message: 'normal operational message',
+      dryRunMessage: 'Would run when dryRun is false.',
+      failure: { message: 'Background operation failed.' },
+      errors: [{ message: 'Background operation failed.' }],
+    });
+    expect(
+      sanitizeOpsFailureJson({
+        message: raw,
+        count: 3,
+        totalAmount: '123.45678900',
+      }),
+    ).toEqual({
+      message: 'Background operation failed.',
+      count: 3,
+      totalAmount: '123.45678900',
+    });
+    expect(sanitizeOpsFailureJson(raw)).toBe('Background operation failed.');
+  });
+  it('retains secret and payload redaction for ordinary success messages', () => {
+    const projected = sanitizeOpsJson({
+      message: 'postgresql://user:private@db.invalid/db',
+      notice: 'Bearer fake-token',
+      dryRunMessage: 'preview token=fake-private-token',
+      nested: { message: 'rawPayload={"private":"data"}' },
+      key: '-----BEGIN PRIVATE KEY-----private-key-----END PRIVATE KEY-----',
+    });
+    expect(JSON.stringify(projected)).not.toMatch(
+      /db.invalid|fake-token|fake-private-token|private-key|"data"/,
+    );
+    expect(projected).toMatchObject({
+      message: '[REDACTED]',
+      nested: { message: '[REDACTED]' },
+    });
+  });
   it('bounds nested/cyclic and oversized diagnostic results while retaining ordinary Ops financial facts', () => {
     const cyclic: Record<string, unknown> = {
       count: 3,

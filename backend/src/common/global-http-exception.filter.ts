@@ -16,7 +16,7 @@ import {
   safeAdminDiagnosticLog,
 } from './admin-diagnostics';
 import { classifyFailureCause } from './safe-failure-cause';
-import { safeDiagnosticMessage } from './safe-diagnostic-message';
+import { safePublicErrorMessage } from './public-error-message';
 
 type ErrorEnvelope = {
   success: false;
@@ -93,7 +93,7 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
       if (this.isErrorEnvelope(body)) {
         // Only the filter attaches a diagnostic after the current-role check.
         const { code, message, details } = body.error;
-        if (status >= 500 && !safeDiagnosticMessage(message)) {
+        if (status >= 500 && !safePublicErrorMessage(message)) {
           return this.errorEnvelope(code, this.defaultMessage(status));
         }
         return this.errorEnvelope(code, message, details);
