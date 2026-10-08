@@ -57,12 +57,24 @@ its committed response on the entry itself, avoiding a second accounting or
 command engine. Cancel after fill returns the existing terminal order without
 releasing collateral again. Existing Season cleanup includes entries without
 attachments, because every pending reservation must be resolved before final
-valuation, regardless of whether TP/SL was requested.
+valuation, regardless of whether TP/SL was requested. Final settlement additionally
+counts submitted Futures entries in the target Season, both before and inside its
+Season lock, independently of wallet reservations. Executed/canceled entries and
+other Season/General accounts do not block it.
 
-The worker polls every second, at most 100 entries per cycle with an indexed
+The pending Limit tab aggregates Spot and Futures emptiness; TP/SL retains its
+independent state. The existing Protection editor checks attached trigger direction
+against the entry limit with decimal arithmetic and presents direction-specific
+SL/TP guidance. Backend validation remains authoritative.
+
+The worker polls every second, at most 200 entries per cycle with an indexed
 cursor and the existing 30-second Ops lease. The lease limits duplicate work;
 the PostgreSQL financial fence determines the single winner even after lease
-loss or duplicate execution. Pre-creation Spot evidence is ineligible for a fill.
+loss or duplicate execution. A read-only canonical Spot preview skips only
+negative price predicates on currently tradable accounts. Every candidate retains
+the original lifecycle cleanup transaction and the complete financial execution
+transaction; preview evidence never authorizes a fill. Stale/missing evidence
+remains fail-closed. Pre-creation Spot evidence is ineligible for a fill.
 Database time, current operating mode and account lifecycle are rechecked after
 the wallet lock. Maintenance, fees, PnL, loss allocation and rounding stay in the
 existing Futures primitives.

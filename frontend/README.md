@@ -112,7 +112,11 @@ Asset holdings start at **현재 종목**; **전체 보유** retains the full li
 Spot card opens the existing account/asset/Position-bound TP/SL panel; live
 protection opens management instead of duplicate registration. **대기 목록**
 separates **지정가** (Spot BUY/SELL and Futures Long/Short entries) from **TP/SL**
-(active groups and attached HOLDING). Conditional Limit children are shown through
+(active groups and attached HOLDING). The Limit empty state appears only after both
+Spot and Futures lists confirm zero pending entries; TP/SL emptiness is independent.
+Attached trigger validation reuses the Protection editor and compares decimal
+prices against the entry limit, with LONG/SHORT-specific SL/TP guidance. Server
+validation remains authoritative. Conditional Limit children are shown through
 their protection group once; terminal history stays in the history view. Shared
 account query keys ensure fills/cancels refresh the correct financial views.
 Pending protection labels follow the per-domain server capability, including

@@ -40,10 +40,20 @@ export function BoundPendingOrders(props: Props) {
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8 }}>
       {(['limit', 'protection'] as const).map(value => <ActionPressable key={value} testID={`pending-kind-${value}`} accessibilityRole="button" accessibilityState={{ selected: value === kind }} aria-pressed={value === kind} onPress={() => setKind(value)} style={styles.retry}><Text style={styles.value}>{value === 'limit' ? '지정가' : 'TP/SL'}</Text></ActionPressable>)}
     </View>
-    {kind === 'limit' ? <><SpotPendingOrders {...props} /><PendingFuturesAndProtections key={`futures:${props.accountId}`} accountId={props.accountId} focused={props.isFocused} seasonUi={props.seasonUi} /></> : <PendingFuturesAndProtections key={`protection:${props.accountId}`} accountId={props.accountId} focused={props.isFocused} seasonUi={props.seasonUi} protections />}
+    {kind === 'limit' ? <LimitPendingOrders {...props} /> : <PendingFuturesAndProtections key={`protection:${props.accountId}`} accountId={props.accountId} focused={props.isFocused} seasonUi={props.seasonUi} protections />}
   </View>;
 }
-export function SpotPendingOrders({ accountId, isFocused, seasonUi }: Props) {
+function LimitPendingOrders(props: Props) {
+  const [spotCount, setSpotCount] = useState<number | undefined>(undefined);
+  const [futuresCount, setFuturesCount] = useState<number | undefined>(undefined);
+  return <>
+    <SpotPendingOrders {...props} onCount={setSpotCount} />
+    <PendingFuturesAndProtections accountId={props.accountId} focused={props.isFocused} seasonUi={props.seasonUi} onCount={setFuturesCount} />
+    {spotCount === 0 && futuresCount === 0 ? <InlineEmptyState title="대기 중인 지정가 주문이 없습니다." message="" /> : null}
+  </>;
+}
+
+export function SpotPendingOrders({ accountId, isFocused, seasonUi, onCount }: Props & { onCount?: (count: number | undefined) => void }) {
   const queryClient = useQueryClient();
   const previous = useRef<{ accountId: string; ids: Set<string> }>({
     accountId,
@@ -65,6 +75,8 @@ export function SpotPendingOrders({ accountId, isFocused, seasonUi }: Props) {
   });
   // The account ID is part of the key and checked again at the display boundary.
   const data = query.data?.tradingAccountId === accountId ? query.data : undefined;
+  const count = !query.isError && data ? data.items.filter(item => !item.conditionalChildId).length : undefined;
+  useEffect(() => { onCount?.(count); }, [count, onCount]);
   const integrityMessage = query.isError
     ? getIntegrityErrorMessage(query.error)
     : null;
@@ -114,7 +126,7 @@ export function SpotPendingOrders({ accountId, isFocused, seasonUi }: Props) {
   if (!data) return <SectionSkeleton lines={4} />;
   const items = data.items.filter(item => !item.conditionalChildId);
   if (items.length === 0) {
-    return <InlineEmptyState title="대기 중인 지정가 주문이 없습니다." message="" />;
+    return null;
   }
 
   return (

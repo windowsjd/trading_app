@@ -1,0 +1,576 @@
+{
+  "head": "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b",
+  "level": "service-level; no HTTP/auth transport overhead",
+  "matching": [
+    {
+      "label": "A",
+      "contentionMs": 50,
+      "contentionInjections": 10,
+      "oldestObservedUninspectedWaitMs": 996.67,
+      "orders": 100,
+      "eligible": 0,
+      "elapsedMs": 1407.52,
+      "cycles": {
+        "samples": 2,
+        "p50": 405.73,
+        "p95": 425.09,
+        "max": 425.09
+      },
+      "evaluationMs": {
+        "samples": 200,
+        "p50": 2.8,
+        "p95": 3.31,
+        "max": 6.45
+      },
+      "fillCommitLatencyMs": {
+        "samples": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "firstSweepMs": 428.71,
+      "revisitMs": {
+        "samples": 100,
+        "p50": 985.43,
+        "p95": 988.31,
+        "max": 996.67
+      },
+      "evaluationsPerSecond": 142.09,
+      "commitsPerSecond": 0,
+      "states": {
+        "FUTURES_ENTRY_LIMIT_NOT_REACHED": 200
+      },
+      "unexpectedStates": [],
+      "resources": {
+        "nodeRssPeakBytes": 394448896,
+        "nodeCpuPeakPercentOneCore": 65.88,
+        "pgBackendCpuPeakPercentOneCore": 39.47,
+        "nodeCpuPercentOneCore": 37.53,
+        "pgBackendRssSumPeakBytes": 92700672,
+        "pgBackendCpuPercentOneCore": 16.1,
+        "maxConnections": 4,
+        "maxActiveConnections": 2,
+        "maxSampledLockWaiters": 0,
+        "applicationQueries": 2438,
+        "totalDatabaseQueriesIncludingFeedAndMonitor": 2477,
+        "dbDeadlocks": 0,
+        "pgTopStatements": [
+          {
+            "calls": "200",
+            "total_exec_time": 4.167580999999999,
+            "mean_exec_time": 0.020837905000000018,
+            "max_exec_time": 0.048369999999999996,
+            "query": "UPDATE \"public\".\"ops_job_locks\" SET \"expires_at\" = $1, \"updated_at\" = $2 WHERE (\"public\".\"ops_job_locks\".\"lock_key\" = $3 AND \"public\".\"ops_job_locks\".\"owner_id\" = $4 AND \"public\".\""
+          },
+          {
+            "calls": "200",
+            "total_exec_time": 3.850461000000001,
+            "mean_exec_time": 0.01925230499999999,
+            "max_exec_time": 0.043103999999999996,
+            "query": "SELECT \"public\".\"asset_price_snapshots\".\"id\", \"public\".\"asset_price_snapshots\".\"asset_id\", \"public\".\"asset_price_snapshots\".\"price\", \"public\".\"asset_price_snapshots\".\"price_krw\", \""
+          },
+          {
+            "calls": "200",
+            "total_exec_time": 1.952605,
+            "mean_exec_time": 0.009763024999999996,
+            "max_exec_time": 0.021419,
+            "query": "SELECT \"public\".\"futures_limit_orders\".\"id\", \"public\".\"futures_limit_orders\".\"trading_account_id\", \"public\".\"futures_limit_orders\".\"instrument_id\", \"public\".\"futures_limit_orders\"."
+          },
+          {
+            "calls": "200",
+            "total_exec_time": 1.6716780000000009,
+            "mean_exec_time": 0.008358390000000005,
+            "max_exec_time": 0.125504,
+            "query": "SELECT \"public\".\"futures_instruments\".\"id\", \"public\".\"futures_instruments\".\"underlying_asset_id\", \"public\".\"futures_instruments\".\"product_type\"::text, \"public\".\"futures_instruments"
+          },
+          {
+            "calls": "200",
+            "total_exec_time": 1.6035299999999995,
+            "mean_exec_time": 0.00801765,
+            "max_exec_time": 0.039832,
+            "query": "SELECT \"public\".\"trading_accounts\".\"id\", \"public\".\"trading_accounts\".\"user_id\", \"public\".\"trading_accounts\".\"mode\"::text, \"public\".\"trading_accounts\".\"status\"::text, \"public\".\"trad"
+          },
+          {
+            "calls": "200",
+            "total_exec_time": 1.4373089999999997,
+            "mean_exec_time": 0.007186544999999998,
+            "max_exec_time": 0.023384,
+            "query": "SELECT \"public\".\"trading_accounts\".\"id\", \"public\".\"trading_accounts\".\"user_id\", \"public\".\"trading_accounts\".\"mode\"::text, \"public\".\"trading_accounts\".\"status\"::text, \"public\".\"trad"
+          },
+          {
+            "calls": "200",
+            "total_exec_time": 1.2907789999999995,
+            "mean_exec_time": 0.006453894999999998,
+            "max_exec_time": 0.012983999999999999,
+            "query": "SELECT \"public\".\"assets\".\"id\", \"public\".\"assets\".\"symbol\", \"public\".\"assets\".\"name\", \"public\".\"assets\".\"market\", \"public\".\"assets\".\"currency_code\"::text, \"public\".\"assets\".\"price_c"
+          },
+          {
+            "calls": "1",
+            "total_exec_time": 0.656948,
+            "mean_exec_time": 0.656948,
+            "max_exec_time": 0.656948,
+            "query": "INSERT INTO \"public\".\"ops_job_runs\" (\"id\",\"job_name\",\"status\",\"trigger\",\"requested_by\",\"started_at\",\"lock_key\",\"idempotency_key\",\"dry_run\",\"attempt\",\"max_attempts\",\"created_at\",\"up"
+          }
+        ]
+      }
+    },
+    {
+      "label": "B",
+      "contentionMs": 50,
+      "contentionInjections": 5,
+      "oldestObservedUninspectedWaitMs": 976.31,
+      "orders": 100,
+      "eligible": 10,
+      "elapsedMs": 1349.28,
+      "cycles": {
+        "samples": 2,
+        "p50": 349.76,
+        "p95": 979.5,
+        "max": 979.5
+      },
+      "evaluationMs": {
+        "samples": 190,
+        "p50": 2.65,
+        "p95": 31.99,
+        "max": 112.11
+      },
+      "fillCommitLatencyMs": {
+        "samples": 10,
+        "p50": 512.02,
+        "p95": 946.68,
+        "max": 946.68
+      },
+      "firstSweepMs": 982.15,
+      "revisitMs": {
+        "samples": 90,
+        "p50": 588.96,
+        "p95": 880.54,
+        "max": 882.27
+      },
+      "evaluationsPerSecond": 140.82,
+      "commitsPerSecond": 10.18,
+      "states": {
+        "executed": 10,
+        "FUTURES_ENTRY_LIMIT_NOT_REACHED": 180
+      },
+      "unexpectedStates": [],
+      "resources": {
+        "nodeRssPeakBytes": 407031808,
+        "nodeCpuPeakPercentOneCore": 59.69,
+        "pgBackendCpuPeakPercentOneCore": 34.53,
+        "nodeCpuPercentOneCore": 48.08,
+        "pgBackendRssSumPeakBytes": 155271168,
+        "pgBackendCpuPercentOneCore": 23.19,
+        "maxConnections": 6,
+        "maxActiveConnections": 2,
+        "maxSampledLockWaiters": 1,
+        "applicationQueries": 3248,
+        "totalDatabaseQueriesIncludingFeedAndMonitor": 3282,
+        "dbDeadlocks": 0,
+        "pgTopStatements": [
+          {
+            "calls": "20",
+            "total_exec_time": 237.97057199999995,
+            "mean_exec_time": 11.898528599999999,
+            "max_exec_time": 48.248444,
+            "query": "SELECT id FROM cash_wallets WHERE trading_account_id = $1 AND wallet_scope = $2 AND currency_code = $3 FOR UPDATE"
+          },
+          {
+            "calls": "10",
+            "total_exec_time": 6.133788,
+            "mean_exec_time": 0.6133788,
+            "max_exec_time": 1.4420920000000002,
+            "query": "INSERT INTO \"public\".\"futures_executions\" (\"id\",\"trading_account_id\",\"instrument_id\",\"position_id\",\"operation\",\"direction\",\"margin_mode\",\"quantity\",\"leverage\",\"execution_price\",\"as"
+          },
+          {
+            "calls": "210",
+            "total_exec_time": 4.062348000000002,
+            "mean_exec_time": 0.019344514285714272,
+            "max_exec_time": 0.041044000000000004,
+            "query": "SELECT \"public\".\"asset_price_snapshots\".\"id\", \"public\".\"asset_price_snapshots\".\"asset_id\", \"public\".\"asset_price_snapshots\".\"price\", \"public\".\"asset_price_snapshots\".\"price_krw\", \""
+          },
+          {
+            "calls": "190",
+            "total_exec_time": 3.970313,
+            "mean_exec_time": 0.020896384210526316,
+            "max_exec_time": 0.054578,
+            "query": "UPDATE \"public\".\"ops_job_locks\" SET \"expires_at\" = $1, \"updated_at\" = $2 WHERE (\"public\".\"ops_job_locks\".\"lock_key\" = $3 AND \"public\".\"ops_job_locks\".\"owner_id\" = $4 AND \"public\".\""
+          },
+          {
+            "calls": "10",
+            "total_exec_time": 2.558481,
+            "mean_exec_time": 0.25584809999999997,
+            "max_exec_time": 0.756706,
+            "query": "UPDATE \"public\".\"futures_limit_orders\" SET \"status\" = CAST($1::text AS \"public\".\"OrderStatus\"), \"execution_id\" = $2, \"response_payload_json\" = $3, \"ended_at\" = $4, \"terminal_reason"
+          },
+          {
+            "calls": "190",
+            "total_exec_time": 1.819798999999999,
+            "mean_exec_time": 0.009577889473684209,
+            "max_exec_time": 0.067402,
+            "query": "SELECT \"public\".\"futures_limit_orders\".\"id\", \"public\".\"futures_limit_orders\".\"trading_account_id\", \"public\".\"futures_limit_orders\".\"instrument_id\", \"public\".\"futures_limit_orders\"."
+          },
+          {
+            "calls": "210",
+            "total_exec_time": 1.6275780000000006,
+            "mean_exec_time": 0.007750371428571427,
+            "max_exec_time": 0.022855999999999998,
+            "query": "SELECT \"public\".\"futures_instruments\".\"id\", \"public\".\"futures_instruments\".\"underlying_asset_id\", \"public\".\"futures_instruments\".\"product_type\"::text, \"public\".\"futures_instruments"
+          },
+          {
+            "calls": "220",
+            "total_exec_time": 1.5228830000000004,
+            "mean_exec_time": 0.0069221954545454515,
+            "max_exec_time": 0.03982,
+            "query": "SELECT \"public\".\"trading_accounts\".\"id\", \"public\".\"trading_accounts\".\"user_id\", \"public\".\"trading_accounts\".\"mode\"::text, \"public\".\"trading_accounts\".\"status\"::text, \"public\".\"trad"
+          }
+        ]
+      }
+    },
+    {
+      "label": "C",
+      "contentionMs": 50,
+      "contentionInjections": 25,
+      "oldestObservedUninspectedWaitMs": 4901.56,
+      "orders": 500,
+      "eligible": 50,
+      "elapsedMs": 7198.1,
+      "cycles": {
+        "samples": 6,
+        "p50": 777.33,
+        "p95": 1861.79,
+        "max": 1861.79
+      },
+      "evaluationMs": {
+        "samples": 950,
+        "p50": 2.54,
+        "p95": 30.68,
+        "max": 95.17
+      },
+      "fillCommitLatencyMs": {
+        "samples": 50,
+        "p50": 2443.01,
+        "p95": 4686.83,
+        "max": 4870.76
+      },
+      "firstSweepMs": 4905.02,
+      "revisitMs": {
+        "samples": 450,
+        "p50": 3519.89,
+        "p95": 4759.48,
+        "max": 4899.48
+      },
+      "evaluationsPerSecond": 131.98,
+      "commitsPerSecond": 10.19,
+      "states": {
+        "executed": 50,
+        "FUTURES_ENTRY_LIMIT_NOT_REACHED": 900
+      },
+      "unexpectedStates": [],
+      "resources": {
+        "nodeRssPeakBytes": 429023232,
+        "nodeCpuPeakPercentOneCore": 60.16,
+        "pgBackendCpuPeakPercentOneCore": 44.17,
+        "nodeCpuPercentOneCore": 39.7,
+        "pgBackendRssSumPeakBytes": 170213376,
+        "pgBackendCpuPercentOneCore": 26.89,
+        "maxConnections": 6,
+        "maxActiveConnections": 2,
+        "maxSampledLockWaiters": 1,
+        "applicationQueries": 16200,
+        "totalDatabaseQueriesIncludingFeedAndMonitor": 16370,
+        "dbDeadlocks": 0,
+        "pgTopStatements": [
+          {
+            "calls": "100",
+            "total_exec_time": 1196.5410220000003,
+            "mean_exec_time": 11.965410220000004,
+            "max_exec_time": 49.067838,
+            "query": "SELECT id FROM cash_wallets WHERE trading_account_id = $1 AND wallet_scope = $2 AND currency_code = $3 FOR UPDATE"
+          },
+          {
+            "calls": "1050",
+            "total_exec_time": 29.15486300000003,
+            "mean_exec_time": 0.027766536190476195,
+            "max_exec_time": 0.441617,
+            "query": "SELECT \"public\".\"asset_price_snapshots\".\"id\", \"public\".\"asset_price_snapshots\".\"asset_id\", \"public\".\"asset_price_snapshots\".\"price\", \"public\".\"asset_price_snapshots\".\"price_krw\", \""
+          },
+          {
+            "calls": "950",
+            "total_exec_time": 21.686623999999995,
+            "mean_exec_time": 0.022828025263157893,
+            "max_exec_time": 0.213473,
+            "query": "UPDATE \"public\".\"ops_job_locks\" SET \"expires_at\" = $1, \"updated_at\" = $2 WHERE (\"public\".\"ops_job_locks\".\"lock_key\" = $3 AND \"public\".\"ops_job_locks\".\"owner_id\" = $4 AND \"public\".\""
+          },
+          {
+            "calls": "950",
+            "total_exec_time": 13.626637000000002,
+            "mean_exec_time": 0.014343828421052631,
+            "max_exec_time": 0.048094,
+            "query": "SELECT \"public\".\"trading_accounts\".\"id\", \"public\".\"trading_accounts\".\"user_id\", \"public\".\"trading_accounts\".\"mode\"::text, \"public\".\"trading_accounts\".\"status\"::text, \"public\".\"trad"
+          },
+          {
+            "calls": "50",
+            "total_exec_time": 11.590984999999998,
+            "mean_exec_time": 0.23181969999999996,
+            "max_exec_time": 1.0163010000000001,
+            "query": "INSERT INTO \"public\".\"futures_executions\" (\"id\",\"trading_account_id\",\"instrument_id\",\"position_id\",\"operation\",\"direction\",\"margin_mode\",\"quantity\",\"leverage\",\"execution_price\",\"as"
+          },
+          {
+            "calls": "1100",
+            "total_exec_time": 9.769348999999997,
+            "mean_exec_time": 0.008881226363636361,
+            "max_exec_time": 0.045292,
+            "query": "SELECT \"public\".\"trading_accounts\".\"id\", \"public\".\"trading_accounts\".\"user_id\", \"public\".\"trading_accounts\".\"mode\"::text, \"public\".\"trading_accounts\".\"status\"::text, \"public\".\"trad"
+          },
+          {
+            "calls": "950",
+            "total_exec_time": 9.386031,
+            "mean_exec_time": 0.009880032631578928,
+            "max_exec_time": 0.04899,
+            "query": "SELECT \"public\".\"futures_limit_orders\".\"id\", \"public\".\"futures_limit_orders\".\"trading_account_id\", \"public\".\"futures_limit_orders\".\"instrument_id\", \"public\".\"futures_limit_orders\"."
+          },
+          {
+            "calls": "1050",
+            "total_exec_time": 7.909930000000004,
+            "mean_exec_time": 0.007533266666666665,
+            "max_exec_time": 0.070131,
+            "query": "SELECT \"public\".\"futures_instruments\".\"id\", \"public\".\"futures_instruments\".\"underlying_asset_id\", \"public\".\"futures_instruments\".\"product_type\"::text, \"public\".\"futures_instruments"
+          }
+        ]
+      }
+    },
+    {
+      "label": "D",
+      "contentionMs": 50,
+      "contentionInjections": 50,
+      "oldestObservedUninspectedWaitMs": 9907.8,
+      "orders": 1000,
+      "eligible": 100,
+      "elapsedMs": 14381.12,
+      "cycles": {
+        "samples": 10,
+        "p50": 776.14,
+        "p95": 1872.97,
+        "max": 1872.97
+      },
+      "evaluationMs": {
+        "samples": 1900,
+        "p50": 2.6,
+        "p95": 30.47,
+        "max": 91.12
+      },
+      "fillCommitLatencyMs": {
+        "samples": 100,
+        "p50": 4906.01,
+        "p95": 9369.07,
+        "max": 9775.06
+      },
+      "firstSweepMs": 9806.23,
+      "revisitMs": {
+        "samples": 900,
+        "p50": 7175.07,
+        "p95": 9652.49,
+        "max": 9907.8
+      },
+      "evaluationsPerSecond": 132.12,
+      "commitsPerSecond": 10.2,
+      "states": {
+        "executed": 100,
+        "FUTURES_ENTRY_LIMIT_NOT_REACHED": 1800
+      },
+      "unexpectedStates": [],
+      "resources": {
+        "nodeRssPeakBytes": 431857664,
+        "nodeCpuPeakPercentOneCore": 62.74,
+        "pgBackendCpuPeakPercentOneCore": 44.23,
+        "nodeCpuPercentOneCore": 38.48,
+        "pgBackendRssSumPeakBytes": 184631296,
+        "pgBackendCpuPercentOneCore": 28.29,
+        "maxConnections": 6,
+        "maxActiveConnections": 3,
+        "maxSampledLockWaiters": 1,
+        "applicationQueries": 32382,
+        "totalDatabaseQueriesIncludingFeedAndMonitor": 32717,
+        "dbDeadlocks": 0,
+        "pgTopStatements": [
+          {
+            "calls": "200",
+            "total_exec_time": 2389.3955170000004,
+            "mean_exec_time": 11.946977585,
+            "max_exec_time": 48.832186,
+            "query": "SELECT id FROM cash_wallets WHERE trading_account_id = $1 AND wallet_scope = $2 AND currency_code = $3 FOR UPDATE"
+          },
+          {
+            "calls": "2100",
+            "total_exec_time": 55.23464300000001,
+            "mean_exec_time": 0.02630221095238098,
+            "max_exec_time": 0.44336499999999995,
+            "query": "SELECT \"public\".\"asset_price_snapshots\".\"id\", \"public\".\"asset_price_snapshots\".\"asset_id\", \"public\".\"asset_price_snapshots\".\"price\", \"public\".\"asset_price_snapshots\".\"price_krw\", \""
+          },
+          {
+            "calls": "1900",
+            "total_exec_time": 45.10859199999992,
+            "mean_exec_time": 0.023741364210526306,
+            "max_exec_time": 0.210787,
+            "query": "UPDATE \"public\".\"ops_job_locks\" SET \"expires_at\" = $1, \"updated_at\" = $2 WHERE (\"public\".\"ops_job_locks\".\"lock_key\" = $3 AND \"public\".\"ops_job_locks\".\"owner_id\" = $4 AND \"public\".\""
+          },
+          {
+            "calls": "2200",
+            "total_exec_time": 20.30797600000002,
+            "mean_exec_time": 0.009230898181818175,
+            "max_exec_time": 0.067958,
+            "query": "SELECT \"public\".\"trading_accounts\".\"id\", \"public\".\"trading_accounts\".\"user_id\", \"public\".\"trading_accounts\".\"mode\"::text, \"public\".\"trading_accounts\".\"status\"::text, \"public\".\"trad"
+          },
+          {
+            "calls": "1900",
+            "total_exec_time": 19.634282000000024,
+            "mean_exec_time": 0.010333832631578953,
+            "max_exec_time": 0.385496,
+            "query": "SELECT \"public\".\"futures_limit_orders\".\"id\", \"public\".\"futures_limit_orders\".\"trading_account_id\", \"public\".\"futures_limit_orders\".\"instrument_id\", \"public\".\"futures_limit_orders\"."
+          },
+          {
+            "calls": "1900",
+            "total_exec_time": 17.753370999999987,
+            "mean_exec_time": 0.009343879473684221,
+            "max_exec_time": 0.354101,
+            "query": "SELECT \"public\".\"trading_accounts\".\"id\", \"public\".\"trading_accounts\".\"user_id\", \"public\".\"trading_accounts\".\"mode\"::text, \"public\".\"trading_accounts\".\"status\"::text, \"public\".\"trad"
+          },
+          {
+            "calls": "100",
+            "total_exec_time": 17.660375999999996,
+            "mean_exec_time": 0.17660375999999997,
+            "max_exec_time": 0.938632,
+            "query": "INSERT INTO \"public\".\"futures_executions\" (\"id\",\"trading_account_id\",\"instrument_id\",\"position_id\",\"operation\",\"direction\",\"margin_mode\",\"quantity\",\"leverage\",\"execution_price\",\"as"
+          },
+          {
+            "calls": "2100",
+            "total_exec_time": 16.159945000000043,
+            "mean_exec_time": 0.007695211904761919,
+            "max_exec_time": 0.054395,
+            "query": "SELECT \"public\".\"futures_instruments\".\"id\", \"public\".\"futures_instruments\".\"underlying_asset_id\", \"public\".\"futures_instruments\".\"product_type\"::text, \"public\".\"futures_instruments"
+          }
+        ]
+      }
+    },
+    {
+      "label": "E",
+      "contentionMs": 50,
+      "contentionInjections": 50,
+      "oldestObservedUninspectedWaitMs": 39146.71,
+      "orders": 1000,
+      "eligible": 1000,
+      "elapsedMs": 39177.32,
+      "cycles": {
+        "samples": 5,
+        "p50": 7487.01,
+        "p95": 7538.71,
+        "max": 7538.71
+      },
+      "evaluationMs": {
+        "samples": 1000,
+        "p50": 33.63,
+        "p95": 40.12,
+        "max": 92.91
+      },
+      "fillCommitLatencyMs": {
+        "samples": 1000,
+        "p50": 19750.19,
+        "p95": 37531.85,
+        "max": 39176.14
+      },
+      "firstSweepMs": 39177.32,
+      "revisitMs": {
+        "samples": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "evaluationsPerSecond": 25.52,
+      "commitsPerSecond": 25.52,
+      "states": {
+        "executed": 1000
+      },
+      "unexpectedStates": [],
+      "resources": {
+        "nodeRssPeakBytes": 434196480,
+        "nodeCpuPeakPercentOneCore": 73.17,
+        "pgBackendCpuPeakPercentOneCore": 59.06,
+        "nodeCpuPercentOneCore": 49.32,
+        "pgBackendRssSumPeakBytes": 217788416,
+        "pgBackendCpuPercentOneCore": 39.89,
+        "maxConnections": 7,
+        "maxActiveConnections": 2,
+        "maxSampledLockWaiters": 1,
+        "applicationQueries": 107142,
+        "totalDatabaseQueriesIncludingFeedAndMonitor": 107965,
+        "dbDeadlocks": 0,
+        "pgTopStatements": [
+          {
+            "calls": "2000",
+            "total_exec_time": 2406.8464989999998,
+            "mean_exec_time": 1.203423249500002,
+            "max_exec_time": 48.68736,
+            "query": "SELECT id FROM cash_wallets WHERE trading_account_id = $1 AND wallet_scope = $2 AND currency_code = $3 FOR UPDATE"
+          },
+          {
+            "calls": "1000",
+            "total_exec_time": 165.3338029999999,
+            "mean_exec_time": 0.16533380299999995,
+            "max_exec_time": 0.9963699999999999,
+            "query": "INSERT INTO \"public\".\"futures_executions\" (\"id\",\"trading_account_id\",\"instrument_id\",\"position_id\",\"operation\",\"direction\",\"margin_mode\",\"quantity\",\"leverage\",\"execution_price\",\"as"
+          },
+          {
+            "calls": "1000",
+            "total_exec_time": 122.28709799999992,
+            "mean_exec_time": 0.1222870979999997,
+            "max_exec_time": 0.561424,
+            "query": "UPDATE \"public\".\"futures_limit_orders\" SET \"status\" = CAST($1::text AS \"public\".\"OrderStatus\"), \"execution_id\" = $2, \"response_payload_json\" = $3, \"ended_at\" = $4, \"terminal_reason"
+          },
+          {
+            "calls": "3000",
+            "total_exec_time": 84.59024800000003,
+            "mean_exec_time": 0.02819674933333329,
+            "max_exec_time": 0.395688,
+            "query": "SELECT \"public\".\"asset_price_snapshots\".\"id\", \"public\".\"asset_price_snapshots\".\"asset_id\", \"public\".\"asset_price_snapshots\".\"price\", \"public\".\"asset_price_snapshots\".\"price_krw\", \""
+          },
+          {
+            "calls": "1000",
+            "total_exec_time": 83.08070400000008,
+            "mean_exec_time": 0.083080704,
+            "max_exec_time": 0.266591,
+            "query": "INSERT INTO \"public\".\"futures_positions\" (\"id\",\"trading_account_id\",\"instrument_id\",\"direction\",\"margin_mode\",\"status\",\"quantity\",\"average_entry_price\",\"entry_notional\",\"leverage\","
+          },
+          {
+            "calls": "1000",
+            "total_exec_time": 63.43320799999999,
+            "mean_exec_time": 0.06343320799999999,
+            "max_exec_time": 0.437035,
+            "query": "INSERT INTO \"public\".\"equity_snapshots\" (\"id\",\"trading_account_id\",\"total_asset_krw\",\"return_rate\",\"krw_cash\",\"usd_cash_krw\",\"domestic_stock_value_krw\",\"us_stock_value_krw\",\"crypto"
+          },
+          {
+            "calls": "5000",
+            "total_exec_time": 56.93472999999988,
+            "mean_exec_time": 0.011386945999999972,
+            "max_exec_time": 0.374585,
+            "query": "SELECT \"public\".\"futures_mark_snapshots\".\"id\", \"public\".\"futures_mark_snapshots\".\"instrument_id\", \"public\".\"futures_mark_snapshots\".\"symbol\", \"public\".\"futures_mark_snapshots\".\"pro"
+          },
+          {
+            "calls": "1000",
+            "total_exec_time": 55.57072000000004,
+            "mean_exec_time": 0.055570720000000025,
+            "max_exec_time": 0.26189399999999996,
+            "query": "INSERT INTO \"public\".\"wallet_transactions\" (\"id\",\"trading_account_id\",\"wallet_id\",\"currency_code\",\"direction\",\"tx_type\",\"reference_type\",\"reference_id\",\"amount\",\"balance_after\",\"oc"
+          }
+        ]
+      }
+    }
+  ],
+  "market": [],
+  "environment": {
+    "node": "v24.14.1",
+    "postgres": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+    "pool": "PrismaPg default max 10",
+    "databaseClock": "2026-10-08T12:03:27.806Z"
+  }
+}

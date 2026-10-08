@@ -10,6 +10,42 @@
 
 ---
 
+## 2026-10-08 Futures 성능 측정 및 잔여 보완
+
+- 시작 `main` / HEAD·fetch 후 origin/main `2411a0c67e5f9609f7a40ecd7ff20bd229cea49b`,
+  clean working tree. 최신 코드의 기존 Diagnostic 교정을 중복 수정하지 않았다.
+- [측정·검증 보고서](docs/investigations/2026-10-08-futures-performance/report.md)에
+  원본/변경 수치, 환경, 실행 명령, cgroup 상한/실측 peak, UI 검증 및 한계를 기록한다.
+- 격리 PostgreSQL의 기존 Worker/금융 fixture로 100/500/1,000 pending와 10%/전량
+  체결, 실제 동일 담보 잠금 경합을 측정했다. 미충족 주문의 반복 금융 transaction과
+  순회 간격이 병목이어서 canonical Spot negative preview + cycle 200건만 적용했다.
+  후보는 원래 lifecycle/금융 transaction·잠금·재검증을 모두 유지한다.
+  FuturesService.execute/가격 정책/fee/PnL/ledger/fill count는 변경하지 않았다.
+- Market은 20/100/300 service-level burst와 실제 5초 staggered polling으로 측정했다.
+  HTTP 성능으로 보고하지 않으며 Market 코드/selector는 변경하지 않았다.
+- 지정가 대기는 Spot/Futures 양쪽 0 확인 때만 empty. TP/SL 상태는 독립 유지.
+  기존 ProtectionEditor가 Attached LONG/SHORT SL/TP 관계를 Decimal로 검사하고
+  구체적인 오류를 안내하며 서버 검증은 그대로 유지한다.
+- 최종 정산은 해당 Season의 submitted Futures 주문을 reservation과 독립적으로
+  preflight/Season lock 내부에서 검사한다. 실제 PG의 reservation 불일치, 정상
+  lifecycle cleanup 후 final settlement, 다른 계정·terminal 주문 무영향을 검증한다.
+- 초기 활성 계정 lifecycle transaction 생략 실험은 Season lock race 테스트가
+  검출하여 폐기했다. 최종 구현의 체결 후보는 기존 fence를 그대로 유지한다.
+- 실측 D(1,000 pending/10% fill): p95 27.95→9.37s, 첫 재검사 29.14→9.81s,
+  app SQL 122,054→32,382. E 전량 체결 p95 37.53s로 별도 스트레스 한계다.
+  Market 10상품/300명 burst p95 1.52s, 5초 polling p95 6.91ms (HTTP 제외).
+- Backend unit 3,982/e2e 397, Frontend check 1,825, 실제 Limit PG 65 checks,
+  브라우저 208 layouts 및 web export PASS. 브라우저 초기 memory guard 중지 후
+  owned context를 시나리오마다 종료해 같은 3GiB에서 peak 466.6MiB/OOM 0으로 완료했다.
+  Frontend 합성 증거 timestamp 여유를 1초로 조정했고 실제 freshness 정책은 유지했다.
+- **최종 PARTIAL:** 전체 22-suite 금융 PG gate는 최종 20 PASS/2 FAILED.
+  F1 기존 open의 상품 verification, Spot legacy fill의 가격 증거 실패가 남는다.
+  이전 실행의 F2/F3 실패와 별도 재검증 결과도 보고서에 보존했다. 원인 미확정이며
+  실행 코어/가격 정책을 완화하지 않았다. 전체 금융 회귀 없음/release-ready로 보고하지 않는다.
+- 신규 queue/index/migration/schema/환경 활성화 없음. 운영 DB·환경 변경,
+  commit/push/merge 없음. 1,000건 전량 동시 체결과 실제 HTTP/장시간 운영 부하는
+  보고서의 별도 제한사항이며 운영 활성화 전 기존 release gate 확인이 필요하다.
+
 ## 2026-10-08 OOM 재개 — Futures Limit Entry·Market 통합 완료
 
 - **기능 구현 의도:** 신규 지정가 진입은 기존 Futures 체결 코어 앞에 pending intent와

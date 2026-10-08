@@ -29,6 +29,9 @@ import { FuturesLimitWorker } from '../src/futures/futures-limit-worker.service'
 import { OpsJobLockService } from '../src/ops/ops-job-lock.service';
 import { OpsJobRunService } from '../src/ops/ops-job-run.service';
 import { FuturesSeasonSettlementService } from '../src/futures/futures-season-settlement.service';
+import { SeasonSettlementJobService } from '../src/batch/season-settlement-job.service';
+import { BatchService } from '../src/batch/batch.service';
+import { PortfolioValuationService } from '../src/portfolio/portfolio-valuation.service';
 
 if (
   process.env.NODE_ENV !== 'test' ||
@@ -803,6 +806,305 @@ async function entryRaces() {
     }
   }
 }
+async function previewPriceRaces() {
+  for (const direction of ['long', 'short'] as const) {
+    const s = await fixture('general'),
+      fence = pausedWallet();
+    let pending: Promise<unknown> | undefined;
+    try {
+      await fresh(s);
+      const order = (
+        await entries.create(s.userId, s.accountId, body(s, { direction }))
+      ).data.order;
+      await fresh(s, direction === 'long' ? '101' : '99');
+      const before = await snapshot(s);
+      let transactions = 0;
+      const observed = new Proxy(db, {
+        get(target, key) {
+          const value = Reflect.get(target, key);
+          if (key === '$transaction')
+            return (...args: unknown[]) => {
+              transactions++;
+              return value.apply(target, args);
+            };
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+      const preview = new FuturesLimitService(
+        observed,
+        access,
+        services(observed).futures,
+      );
+      await reject(
+        preview.evaluate(order.id),
+        'FUTURES_ENTRY_LIMIT_NOT_REACHED',
+      );
+      assert.equal(
+        transactions,
+        0,
+        'negative preview performs no financial transaction',
+      );
+      assert.equal(await snapshot(s), before);
+      await fresh(s, direction === 'long' ? '99' : '101');
+      pending = new FuturesLimitService(
+        db,
+        access,
+        services(fence.prisma).futures,
+      ).evaluate(order.id);
+      void pending.catch(() => undefined);
+      await Promise.race([
+        fence.held,
+        delay(3000).then(() => {
+          throw new Error('candidate did not reach wallet fence');
+        }),
+      ]);
+      await fresh(s, direction === 'long' ? '101' : '99');
+      fence.release();
+      await reject(pending, 'FUTURES_ENTRY_LIMIT_NOT_REACHED');
+      assert.equal(
+        await snapshot(s),
+        before,
+        'preview never authorizes a fill after the price changes',
+      );
+      await fresh(s, direction === 'long' ? '99' : '101');
+      assert.equal((await entries.evaluate(order.id)).state, 'executed');
+      pass(
+        `${direction}: negative preview has no transaction; candidate rereads price after wallet wait`,
+      );
+    } finally {
+      fence.release();
+      await pending?.catch(() => undefined);
+      await clean(s);
+    }
+  }
+}
+
+async function attachedDirectionContracts() {
+  const s = await fixture('general');
+  try {
+    for (const direction of ['long', 'short'] as const)
+      for (const kinds of [
+        ['stop_loss'],
+        ['take_profit'],
+        ['stop_loss', 'take_profit'],
+      ] as const)
+        for (const childOrderType of ['market', 'limit'] as const) {
+          const legs = kinds.map((kind) => ({
+            kind,
+            triggerPrice:
+              (direction === 'long') === (kind === 'stop_loss') ? '90' : '110',
+            childOrderType,
+            ...(childOrderType === 'limit' ? { childLimitPrice: '100' } : {}),
+          }));
+          for (const leg of legs) {
+            const below = (direction === 'long') === (leg.kind === 'stop_loss');
+            for (const triggerPrice of ['100', below ? '110' : '90']) {
+              await fresh(s);
+              const before = await snapshot(s);
+              await reject(
+                entries.create(
+                  s.userId,
+                  s.accountId,
+                  body(s, {
+                    direction,
+                    attachedProtection: legs.map((item) =>
+                      item === leg ? { ...item, triggerPrice } : item,
+                    ),
+                  }),
+                ),
+                'PROTECTION_ALREADY_TRIGGERED',
+              );
+              assert.equal(
+                await snapshot(s),
+                before,
+                'invalid attachment creates no entry, reservation or protection',
+              );
+            }
+          }
+          await fresh(s);
+          const created = await entries.create(
+            s.userId,
+            s.accountId,
+            body(s, { direction, attachedProtection: legs }),
+          );
+          const group = await db.protectionGroup.findUniqueOrThrow({
+            where: { parentFuturesOrderId: created.data.order.id },
+            include: { legs: true },
+          });
+          assert.equal(group.status, 'holding');
+          assert.equal(group.legs.length, kinds.length);
+          assert.ok(
+            group.legs.every((leg) => leg.childOrderType === childOrderType),
+          );
+          await entries.cancel(s.userId, s.accountId, created.data.order.id);
+          assert.equal(
+            (await wallet(s)).reservedAmount.toFixed(8),
+            '0.00000000',
+          );
+          pass(
+            `${direction} ${kinds.join('/')} ${childOrderType}: authoritative strict direction validation/rollback and valid HOLDING attachment`,
+          );
+        }
+  } finally {
+    await clean(s);
+  }
+}
+
+async function settlementEntryGuard() {
+  const s = await fixture('season');
+  const otherSeason = await fixture('season');
+  const general = await fixture('general');
+  const jobs = new SeasonSettlementJobService(
+    new BatchService(db),
+    db,
+    new PortfolioValuationService(db),
+  );
+  const guard = jobs as unknown as {
+    assertNoOpenLimitReservations(
+      seasonId: string,
+      client?: Prisma.TransactionClient,
+    ): Promise<void>;
+  };
+  const prefix = `limit-settlement-${randomUUID()}`;
+  try {
+    for (const other of [otherSeason, general]) {
+      await fresh(other);
+      await entries.create(other.userId, other.accountId, body(other));
+    }
+    await fresh(s, '100', 1);
+    const executed = await entries.create(
+      s.userId,
+      s.accountId,
+      body(s, { instrumentId: s.instruments[1].instrument.id }),
+    );
+    await fresh(s, '100', 1);
+    await entries.evaluate(executed.data.order.id);
+    await guard.assertNoOpenLimitReservations(s.season!.id);
+    pass(
+      'settlement guard ignores executed entries and other Season/General submitted entries',
+    );
+
+    await fresh(s);
+    const pending = await entries.create(s.userId, s.accountId, body(s));
+    await reject(
+      guard.assertNoOpenLimitReservations(s.season!.id),
+      'OPEN_LIMIT_ORDER_RESERVATIONS',
+    );
+    pass('settlement guard blocks canonical submitted Futures entry');
+    const reserved = (await wallet(s)).reservedAmount;
+    // Deliberately inconsistent failure fixture: order existence must stand alone.
+    await db.cashWallet.update({
+      where: { id: s.futuresWalletId },
+      data: { reservedAmount: '0' },
+    });
+    await reject(
+      guard.assertNoOpenLimitReservations(s.season!.id),
+      'OPEN_LIMIT_ORDER_RESERVATIONS',
+    );
+    await db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM seasons WHERE id=${s.season!.id} FOR UPDATE`;
+      await reject(
+        guard.assertNoOpenLimitReservations(s.season!.id, tx),
+        'OPEN_LIMIT_ORDER_RESERVATIONS',
+      );
+    });
+    pass(
+      'submitted Futures entry blocks with missing reservation before and under Season lock',
+    );
+    await db.cashWallet.update({
+      where: { id: s.futuresWalletId },
+      data: { reservedAmount: reserved },
+    });
+    await entries.cancel(s.userId, s.accountId, pending.data.order.id);
+    await guard.assertNoOpenLimitReservations(s.season!.id);
+    pass('settlement guard ignores a genuinely canceled Futures entry');
+
+    const spot = await db.order.create({
+      data: {
+        tradingAccountId: s.accountId,
+        assetId: s.instruments[0].asset.id,
+        side: 'buy',
+        orderType: 'limit',
+        status: 'submitted',
+        quantity: '1',
+        limitPrice: '100',
+        currencyCode: 'USD',
+        cashWalletScope: 'crypto_spot',
+        submittedAt: await now(),
+      },
+    });
+    await reject(
+      guard.assertNoOpenLimitReservations(s.season!.id),
+      'OPEN_LIMIT_ORDER_RESERVATIONS',
+    );
+    await db.order.update({
+      where: { id: spot.id },
+      data: { status: 'canceled', canceledAt: await now() },
+    });
+    pass(
+      'existing submitted Spot guard remains independent of wallet reservations',
+    );
+
+    await fresh(s);
+    const attached = await entries.create(
+      s.userId,
+      s.accountId,
+      body(s, {
+        attachedProtection: [
+          { kind: 'stop_loss', triggerPrice: '90', childOrderType: 'market' },
+        ],
+      }),
+    );
+    await fresh(s, '100', 1);
+    const endAt = await now();
+    await db.season.update({
+      where: { id: s.season!.id },
+      data: { status: 'ended', endAt },
+    });
+    await cancel.cleanupEndedSeasonLimitReservations({ now: await now() });
+    await guard.assertNoOpenLimitReservations(s.season!.id);
+    assert.equal((await wallet(s)).reservedAmount.toFixed(8), '0.00000000');
+    assert.equal(
+      (
+        await db.protectionGroup.findUniqueOrThrow({
+          where: { parentFuturesOrderId: attached.data.order.id },
+        })
+      ).status,
+      'canceled',
+    );
+    await jobs.run({
+      seasonId: s.season!.id,
+      settlementDate: endAt.toISOString().slice(0, 10),
+      idempotencyKey: prefix,
+    });
+    assert.equal(
+      (await db.season.findUniqueOrThrow({ where: { id: s.season!.id } }))
+        .status,
+      'settled',
+    );
+    assert.equal(
+      await db.futuresLimitOrder.count({
+        where: {
+          tradingAccountId: { in: [otherSeason.accountId, general.accountId] },
+          status: 'submitted',
+        },
+      }),
+      2,
+    );
+    pass(
+      'normal lifecycle releases collateral/cancels HOLDING, then actual final settlement succeeds without touching other accounts',
+    );
+  } finally {
+    await db.order.deleteMany({ where: { tradingAccountId: s.accountId } });
+    await db.seasonRanking.deleteMany({ where: { seasonId: s.season!.id } });
+    await db.dailyPortfolioSnapshot.deleteMany({
+      where: { tradingAccountId: s.accountId },
+    });
+    await db.batchJobRun.deleteMany({ where: { idempotencyKey: prefix } });
+    for (const subject of [s, otherSeason, general]) await clean(subject);
+  }
+}
+
 async function run() {
   for (const mode of ['general', 'season'] as const)
     for (const direction of ['long', 'short'] as const)
@@ -1126,6 +1428,9 @@ async function run() {
   }
   await entrySafety();
   await entryRaces();
+  await previewPriceRaces();
+  await attachedDirectionContracts();
+  await settlementEntryGuard();
   console.log(`Futures Limit PostgreSQL PASS ${checks} checks`);
 }
 run()

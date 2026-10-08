@@ -13,7 +13,7 @@ import { createIdempotencyKey } from '../../utils/idempotency';
 import { formatDisplayDecimal } from '../../utils/format';
 import { invalidateAfterOrderCreate } from '../../features/tradingAccount/invalidation';
 
-export default function PendingFuturesAndProtections({ accountId, focused, protections = false, seasonUi }: { accountId: string; focused: boolean; protections?: boolean; seasonUi: boolean }) {
+export default function PendingFuturesAndProtections({ accountId, focused, protections = false, seasonUi, onCount }: { accountId: string; focused: boolean; protections?: boolean; seasonUi: boolean; onCount?: (count: number | undefined) => void }) {
   const { selectedAccountId } = useTradingAccount();
   const client = useQueryClient();
   const query = useQuery({ queryKey: protections ? QUERY_KEYS.tradingAccount.protections.pending(accountId) : QUERY_KEYS.tradingAccount.futures.pending(accountId), queryFn: async ({ signal }) => protections ? getPendingProtections(accountId, signal) : getFuturesLimitOrders(accountId, signal), enabled: focused && selectedAccountId === accountId, refetchInterval: focused ? 4000 : false });
@@ -25,6 +25,8 @@ export default function PendingFuturesAndProtections({ accountId, focused, prote
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const current = () => alive.current && selected.current === accountId && isCurrentSession(session);
   const data = !query.isError && query.data?.tradingAccountId === accountId ? query.data : undefined;
+  const count = data && 'orders' in data ? data.orders.length : undefined;
+  useEffect(() => { onCount?.(count); }, [count, onCount]);
   const permission = useRef(false);
   permission.current = focused && !!data && ('orders' in data || data.capabilities.canCancel);
   const ids = data ? 'orders' in data ? data.orders.map(o => o.id).join(',') : data.groups.map(g => g.id).join(',') : undefined;
@@ -53,6 +55,7 @@ export default function PendingFuturesAndProtections({ accountId, focused, prote
   const pendingGroups = 'groups' in data ? data.groups.filter(g => g.status === 'holding' || g.status === 'active') : [];
   const empty = 'orders' in data ? !data.orders.length : !pendingGroups.length;
   const canMonitor = (domain: 'spot' | 'futures') => 'groups' in data && data.capabilities.enabled && (domain === 'futures' ? data.capabilities.canCreateFutures : data.capabilities.canCreateSpot);
+  if (!protections && empty) return <View testID="pending-futures" />;
   return <View style={styles.list} testID={protections ? 'pending-protections' : 'pending-futures'}>
     {'groups' in data && !data.capabilities.enabled ? <Text style={styles.hint}>현재 TP/SL 조건 감시가 중지되어 있습니다. 기존 보호 내역을 확인할 수 있습니다.</Text> : null}
     {empty ? <Text style={styles.hint}>{protections ? '대기 중인 TP/SL이 없습니다.' : '대기 중인 선물 진입 주문이 없습니다.'}</Text> : null}

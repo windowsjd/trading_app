@@ -3,6 +3,60 @@ import { createRequire } from 'node:module';
 import { test } from 'node:test';
 const { futuresHarness, deferred } = createRequire(import.meta.url)('../../../test/futuresHarness.cjs');
 
+for (const direction of ['long', 'short'])
+  for (const kinds of [['stop_loss'], ['take_profit'], ['stop_loss', 'take_profit']])
+    for (const child of ['market', 'limit'])
+      test(`${direction} valid ${kinds.join('/')} ${child} attachment submits unchanged`, async t => {
+        const h = futuresHarness({ protectionEnabled: true }); await h.start(); t.after(h.close); await draft(h);
+        await h.choose(direction === 'long' ? '롱(Long)' : '숏(Short)');
+        for (const kind of kinds) {
+          const sl = kind === 'stop_loss'; const below = (direction === 'long') === sl;
+          const label = sl ? '손절 (Stop Loss)' : '익절 (Take Profit)';
+          await h.press(`protection-${kind}-toggle`); await h.input(`${label} 조건 가격`, below ? '90' : '110');
+          if (child === 'limit') { await h.press(`protection-${kind}-limit`); await h.input(`${label} 실행 지정가`, '100'); }
+        }
+        await h.press('futures-limit-submit');
+        assert.equal(h.requests.length, 1);
+        assert.equal(h.requests[0].body.attachedProtection.length, kinds.length);
+        assert.equal(h.requests[0].body.attachedProtection.every((leg: any) => leg.childOrderType === child), true);
+      });
+
+for (const direction of ['long', 'short'])
+  for (const kind of ['stop_loss', 'take_profit'])
+    for (const trigger of ['100', (direction === 'long') === (kind === 'stop_loss') ? '110' : '90'])
+      test(`${direction}/${kind} rejects invalid trigger ${trigger} before transport`, async t => {
+        const h = futuresHarness({ protectionEnabled: true }); await h.start(); t.after(h.close); await draft(h);
+        await h.choose(direction === 'long' ? '롱(Long)' : '숏(Short)');
+        const sl = kind === 'stop_loss'; const below = (direction === 'long') === sl;
+        await h.press(`protection-${kind}-toggle`);
+        await h.input(`${sl ? '손절 (Stop Loss)' : '익절 (Take Profit)'} 조건 가격`, trigger);
+        await h.press('futures-limit-submit');
+        assert.equal(h.requests.length, 0);
+        assert.match(h.text(), new RegExp(`${direction.toUpperCase()} ${sl ? '손절가' : '익절가'}는 진입 지정가보다 ${below ? '낮아야' : '높아야'} 합니다`));
+      });
+
+for (const direction of ['long', 'short'])
+  test(`${direction} attachment compares the full 16+8 decimal price without Number rounding`, async t => {
+    const h = futuresHarness({ protectionEnabled: true }); await h.start(); t.after(h.close); await draft(h);
+    await h.choose(direction === 'long' ? '롱(Long)' : '숏(Short)');
+    await h.change('futures-limit-price', '1234567890123456.12345678');
+    await h.press('protection-stop_loss-toggle');
+    await h.input('손절 (Stop Loss) 조건 가격', direction === 'long' ? '1234567890123456.12345679' : '1234567890123456.12345677');
+    await h.press('futures-limit-submit'); assert.equal(h.requests.length, 0);
+    await h.input('손절 (Stop Loss) 조건 가격', direction === 'long' ? '1234567890123456.12345677' : '1234567890123456.12345679');
+    await h.press('futures-limit-submit'); assert.equal(h.requests.length, 1);
+  });
+
+test('server trigger rejection retains direction guidance and the authoritative failure', async t => {
+  const h = futuresHarness({ protectionEnabled: true }); await h.start(); t.after(h.close); await draft(h);
+  await h.press('protection-stop_loss-toggle'); await h.input('손절 (Stop Loss) 조건 가격', '90');
+  h.failure = { response: { status: 409, data: { success: false, error: { code: 'PROTECTION_ALREADY_TRIGGERED', message: 'Trigger prices must be strictly beyond the current reference price.' } } } };
+  await h.press('futures-limit-submit');
+  assert.equal(h.requests.length, 1);
+  assert.match(h.text(), /LONG 조건 가격을 확인해주세요/);
+  assert.match(h.text(), /SL < 진입 지정가 < TP/);
+});
+
 async function draft(h: any) {
   await h.choose('지정가 진입');
   await h.change('futures-quantity', '1.25');

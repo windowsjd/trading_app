@@ -220,7 +220,7 @@ const mockedArgon2 = jest.mocked(argon2);
 type HttpMethod = 'get' | 'patch' | 'post';
 
 type PrismaMock = ReturnType<typeof emptyProtectionState> & {
-  futuresLimitOrder: { findMany: jest.Mock };
+  futuresLimitOrder: { findMany: jest.Mock; count: jest.Mock };
   $connect: jest.Mock;
   $disconnect: jest.Mock;
   $queryRaw: jest.Mock;
@@ -523,7 +523,10 @@ describe('AppController (e2e)', () => {
 
     prisma = {
       ...emptyProtectionState(),
-      futuresLimitOrder: { findMany: jest.fn().mockResolvedValue([]) },
+      futuresLimitOrder: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
       $connect: jest.fn(),
       $disconnect: jest.fn(),
       $queryRaw: jest.fn().mockResolvedValue([{ result: 1 }]),

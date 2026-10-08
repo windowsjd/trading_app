@@ -1,7 +1,8 @@
 function futuresFixture(accountId = 'A', options = {}) {
   // Model evidence captured before the HTTP response/render, rather than a
-  // zero-age timestamp that can cross a millisecond during React query reads.
-  const observedAt = Date.now() - 50;
+  // zero-age timestamp that can cross the screen clock during async query reads.
+  // One second models feed/HTTP delay within the unchanged five-second policy.
+  const observedAt = Date.now() - 1000;
   const at = new Date(observedAt - (options.stale ? 6000 : 0)).toISOString();
   const referenceAt = new Date(observedAt).toISOString();
   const mode = options.mode ?? 'ENABLED';

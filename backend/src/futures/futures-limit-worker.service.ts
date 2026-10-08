@@ -10,6 +10,8 @@ import { OpsJobLockService } from '../ops/ops-job-lock.service';
 import { OpsJobRunService } from '../ops/ops-job-run.service';
 import { FuturesLimitService } from './futures-limit.service';
 
+const ENTRIES_PER_CYCLE = 200;
+
 @Injectable()
 export class FuturesLimitWorker implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(FuturesLimitWorker.name);
@@ -43,7 +45,7 @@ export class FuturesLimitWorker implements OnModuleInit, OnModuleDestroy {
       const groups = await this.prisma.futuresLimitOrder.findMany({
         where: { status: 'submitted', id: { gt: this.cursor } },
         orderBy: { id: 'asc' },
-        take: 101,
+        take: ENTRIES_PER_CYCLE + 1,
         select: { id: true },
       });
       if (!groups.length) {
@@ -58,7 +60,7 @@ export class FuturesLimitWorker implements OnModuleInit, OnModuleDestroy {
       if (!lock.acquired) return;
       ownerId = lock.ownerId;
       const states: Record<string, number> = {};
-      for (const group of groups.slice(0, 100)) {
+      for (const group of groups.slice(0, ENTRIES_PER_CYCLE)) {
         if (
           !(await this.locks.extendLock({ lockKey, ownerId, ttlSeconds: 30 }))
         )
@@ -80,7 +82,7 @@ export class FuturesLimitWorker implements OnModuleInit, OnModuleDestroy {
         states[state] = (states[state] ?? 0) + 1;
         this.cursor = group.id;
       }
-      if (groups.length <= 100) this.cursor = '';
+      if (groups.length <= ENTRIES_PER_CYCLE) this.cursor = '';
       if (Date.now() - this.reportedAt >= 60000) {
         const run = await this.runs.createRunning({
           jobName: 'futures_limit_matching',

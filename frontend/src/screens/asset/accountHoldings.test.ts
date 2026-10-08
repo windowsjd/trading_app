@@ -396,6 +396,30 @@ const pendingIds = (h: any) => h.renderer.root.findAll((node: any) =>
 ).map((node: any) => node.props.testID);
 
 describe('pending limit orders in the real trading screen', () => {
+  for (const [spot, futures] of [[0, 1], [1, 0], [0, 0]])
+    it(`aggregates pending emptiness for Spot ${spot}/Futures ${futures} and keeps TP/SL independent`, async t => {
+      const h = inlineTradingHarness();
+      const { futuresFixture } = require('../../../test/futuresFixtures.cjs');
+      const { conditionalFixture } = require('../../../test/conditionalFixtures.cjs');
+      h.orders = { general: spot ? [pendingOrder('spot-only', 'buy')] : [] };
+      h.pendingEntries = { general: futures ? [{ id: 'futures-only', instrument: futuresFixture('general').catalog.instruments[0], direction: 'long', marginMode: 'isolated', leverage: 10, limitPrice: '100', quantity: '1', reservedAmount: '10' }] : [] };
+      h.protections = conditionalFixture('general', { domain: 'futures', holding: true });
+      await h.mount(); t.after(h.close); await h.press('holdings-filter-pending');
+      const waitForPending = async () => {
+        const deadline = Date.now() + 1000;
+        while (Date.now() < deadline && (!h.node('pending-futures') || pendingIds(h).length !== spot || /대기 중인 지정가 주문이 없습니다/.test(empty(h)) !== (spot === 0 && futures === 0))) await h.flush();
+      };
+      await waitForPending();
+      assert.equal(/대기 중인 지정가 주문이 없습니다/.test(empty(h)), spot === 0 && futures === 0);
+      assert.equal(pendingIds(h).length, spot);
+      assert.equal(/Futures|Long/.test(text(h.node('pending-futures'))), futures > 0);
+      await h.press('pending-kind-protection'); await h.flush();
+      assert.equal(h.node('pending-futures') === undefined, true);
+      assert.match(text(h.node('pending-protections')), /진입 체결 대기/);
+      assert.doesNotMatch(empty(h), /대기 중인 지정가 주문이 없습니다/);
+      await h.press('pending-kind-limit'); await waitForPending();
+      assert.equal(/대기 중인 지정가 주문이 없습니다/.test(empty(h)), spot === 0 && futures === 0);
+    });
   it('keeps holdings filters and shows a distinct empty pending state', async (t) => {
     const h = inlineTradingHarness();
     h.holdings = { general: [holding('btc')] };

@@ -1,0 +1,1576 @@
+{
+  "overall": "PARTIAL",
+  "reason": "Required aggregate financial PostgreSQL gate is not green; final run 20/22 suites, F1 FUTURES_INSTRUMENT_UNVERIFIED and Spot transfer price_evidence_unavailable. Causes not established. No financial predicate relaxed.",
+  "start": {
+    "branch": "main",
+    "head": "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b",
+    "originMainAfterFetch": "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b",
+    "workingTree": "clean"
+  },
+  "environment": {
+    "node": "24.14.1",
+    "postgres": "16.15",
+    "pnpm": "10.33.0",
+    "logicalCpus": 32,
+    "kernel": "6.6.87.2-microsoft-standard-WSL2",
+    "database": "disposable loopback futures_performance:55549",
+    "redis": "disposable loopback:56449",
+    "httpBenchmark": false,
+    "externalProviderLoad": false
+  },
+  "checks": [
+    {
+      "command": "pnpm exec tsx scripts/futures-limit-entry-integration.ts",
+      "result": "PASS",
+      "checks": 65
+    },
+    {
+      "command": "pnpm test --runInBand",
+      "result": "PASS",
+      "suitesPassed": 247,
+      "suitesSkipped": 58,
+      "testsPassed": 3982,
+      "testsSkipped": 63
+    },
+    {
+      "command": "pnpm run test:e2e --runInBand",
+      "result": "PASS",
+      "suitesPassed": 2,
+      "testsPassed": 397
+    },
+    {
+      "command": "npm run check",
+      "result": "PASS",
+      "testsPassed": 1825,
+      "testsSkipped": 0
+    },
+    {
+      "command": "node test/browser/futuresIntegrationBrowser.cjs",
+      "result": "PASS",
+      "layouts": 208,
+      "widths": [
+        320,
+        360,
+        390,
+        430
+      ],
+      "themes": [
+        "light",
+        "dark"
+      ],
+      "fontScales": [
+        1,
+        2
+      ]
+    },
+    {
+      "command": "npm run export:web -- --max-workers 1",
+      "result": "PASS"
+    },
+    {
+      "command": "git diff --check",
+      "result": "PASS"
+    }
+  ],
+  "backendCommands": [
+    [
+      "backend-candle-lint",
+      [
+        "pnpm",
+        "run",
+        "lint:candles:check"
+      ]
+    ],
+    [
+      "backend-candle-format",
+      [
+        "pnpm",
+        "run",
+        "format:candles:check"
+      ]
+    ],
+    [
+      "backend-accounts-lint",
+      [
+        "pnpm",
+        "run",
+        "lint:accounts:check"
+      ]
+    ],
+    [
+      "backend-typecheck-final",
+      [
+        "pnpm",
+        "run",
+        "typecheck"
+      ]
+    ],
+    [
+      "backend-build",
+      [
+        "pnpm",
+        "run",
+        "build"
+      ]
+    ],
+    [
+      "backend-unit",
+      [
+        "pnpm",
+        "test",
+        "--runInBand"
+      ]
+    ],
+    [
+      "backend-e2e",
+      [
+        "pnpm",
+        "run",
+        "test:e2e",
+        "--runInBand"
+      ]
+    ],
+    [
+      "backend-diagnostic",
+      [
+        "node",
+        "../scripts/diagnostic-enforcement.cjs",
+        "backend"
+      ]
+    ]
+  ],
+  "frontendCommands": [
+    [
+      "frontend-check",
+      [
+        "npm",
+        "run",
+        "check"
+      ]
+    ],
+    [
+      "frontend-diagnostic",
+      [
+        "node",
+        "../scripts/diagnostic-enforcement.cjs",
+        "frontend"
+      ]
+    ]
+  ],
+  "financialGate": {
+    "first": {
+      "suitesPassed": 21,
+      "suitesFailed": 1,
+      "failed": [
+        "futures-risk.integration.spec.ts: FUTURES_INSTRUMENT_UNVERIFIED"
+      ]
+    },
+    "second": {
+      "suitesPassed": 21,
+      "suitesFailed": 1,
+      "failed": [
+        "futures-f3.integration.spec.ts: FUTURES_INSTRUMENT_UNVERIFIED"
+      ]
+    },
+    "final": {
+      "suitesPassed": 20,
+      "suitesFailed": 2,
+      "testsPassed": 21,
+      "testsFailed": 2,
+      "failed": [
+        "futures.integration.spec.ts: FUTURES_INSTRUMENT_UNVERIFIED",
+        "spot-wallet-transfer.integration.spec.ts: skipped price_evidence_unavailable"
+      ]
+    },
+    "isolatedF2Retry": "PASS",
+    "originalHeadObservation": {
+      "F2": "different metrics-null fixture failure",
+      "F3": "5 runs, 48 scenarios each PASS; original verification failure not reproduced",
+      "temporaryObserver": "Only /tmp debug-source; unchanged Boolean policy, synthetic fixture logging only"
+    }
+  },
+  "runs": [
+    {
+      "job": "baseline-measured-run",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 256,
+        "seconds": 1800,
+        "heap": 1152,
+        "cwd": "/tmp/futures-performance/baseline-source/backend",
+        "command": [
+          "python3",
+          "/tmp/futures-performance/pg-job.py",
+          "pnpm",
+          "exec",
+          "tsx",
+          "scripts/futures-performance-benchmark.ts"
+        ],
+        "env": {
+          "NODE_ENV": "test",
+          "DATABASE_URL": "postgresql://trading_app@127.0.0.1:55549/futures_performance?schema=public",
+          "FUTURES_DB_INTEGRATION": "1",
+          "FUTURES_PERFORMANCE_BENCHMARK": "1",
+          "BENCHMARK_HEAD": "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b",
+          "BENCHMARK_REPORT": "/tmp/futures-performance/baseline-measured.json",
+          "JOB_LABEL": "baseline-measured",
+          "BENCHMARK_RESET": "1",
+          "BENCHMARK_PHASE": "all",
+          "BENCHMARK_CONTENTION_MS": "50"
+        }
+      },
+      "unit": "codex-futures-performance-baseline-measured-run.service",
+      "peak": 745758720,
+      "maxTasks": 77,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-baseline-measured-run.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-baseline-measured-run.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-baseline-measured-run.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "256"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=30min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=256\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 237.625,
+      "returncode": 0,
+      "final": "Result=success\nExecMainStatus=0\nMemoryPeak=[not set]\nMemorySwapPeak=[not set]\n",
+      "remaining": null
+    },
+    {
+      "job": "optimized-measured-run",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 256,
+        "seconds": 1800,
+        "heap": 1152,
+        "cwd": "/home/nayuta/projects/trading-app/backend",
+        "command": [
+          "python3",
+          "/tmp/futures-performance/pg-job.py",
+          "pnpm",
+          "exec",
+          "tsx",
+          "scripts/futures-performance-benchmark.ts"
+        ],
+        "env": {
+          "NODE_ENV": "test",
+          "DATABASE_URL": "postgresql://trading_app@127.0.0.1:55549/futures_performance?schema=public",
+          "FUTURES_DB_INTEGRATION": "1",
+          "FUTURES_PERFORMANCE_BENCHMARK": "1",
+          "BENCHMARK_HEAD": "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b",
+          "BENCHMARK_REPORT": "/tmp/futures-performance/optimized-measured.json",
+          "JOB_LABEL": "optimized-measured",
+          "BENCHMARK_RESET": "1",
+          "BENCHMARK_PHASE": "matching",
+          "BENCHMARK_CONTENTION_MS": "50"
+        }
+      },
+      "unit": "codex-futures-performance-optimized-measured-run.service",
+      "peak": 569614336,
+      "maxTasks": 69,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-optimized-measured-run.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-optimized-measured-run.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-optimized-measured-run.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "256"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=30min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=256\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 118.886,
+      "returncode": 0,
+      "final": "Result=success\nExecMainStatus=0\nMemoryPeak=[not set]\nMemorySwapPeak=[not set]\n",
+      "remaining": null
+    },
+    {
+      "job": "pg-final-run",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 256,
+        "seconds": 1800,
+        "heap": 1152,
+        "cwd": "/home/nayuta/projects/trading-app/backend",
+        "command": [
+          "python3",
+          "/tmp/futures-performance/pg-job.py",
+          "pnpm",
+          "exec",
+          "tsx",
+          "scripts/futures-limit-entry-integration.ts"
+        ],
+        "env": {
+          "NODE_ENV": "test",
+          "DATABASE_URL": "postgresql://trading_app@127.0.0.1:55549/futures_performance?schema=public",
+          "REDIS_URL": "redis://127.0.0.1:56449",
+          "FUTURES_DB_INTEGRATION": "1",
+          "FUTURES_LIMIT_DB_INTEGRATION": "1",
+          "CONDITIONAL_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_RESERVATION_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION": "1",
+          "LIMIT_ORDER_MATCHING_DB_INTEGRATION": "1",
+          "ORDER_EXECUTE_DB_INTEGRATION": "1",
+          "MARKET_EXECUTION_DB_INTEGRATION": "1",
+          "FX_EXECUTE_DB_INTEGRATION": "1",
+          "FUTURES_RISK_DB_INTEGRATION": "1",
+          "FUTURES_F3_DB_INTEGRATION": "1",
+          "FUTURES_F31_DB_INTEGRATION": "1",
+          "MVP_FLOW_DB_SMOKE": "1",
+          "FRIENDS_DB_INTEGRATION": "1",
+          "TRADING_ACCOUNT_DB_INTEGRATION": "1",
+          "GENERAL_TRADING_DB_INTEGRATION": "1",
+          "GENERAL_FX_DB_INTEGRATION": "1",
+          "SEASON_JOIN_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_ENABLED": "true",
+          "AD_REWARD_ENABLED": "true",
+          "AUTH_DB_SMOKE": "1",
+          "OPS_JOB_LOCK_DB_SMOKE": "1",
+          "TEST_REDIS": "1",
+          "JOB_LABEL": "pg-final"
+        }
+      },
+      "unit": "codex-futures-performance-pg-final-run.service",
+      "peak": 572841984,
+      "maxTasks": 71,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-pg-final-run.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-pg-final-run.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-pg-final-run.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "256"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=30min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=256\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 9.91,
+      "returncode": 0,
+      "final": "Result=success\nExecMainStatus=0\nMemoryPeak=[not set]\nMemorySwapPeak=[not set]\n",
+      "remaining": null
+    },
+    {
+      "job": "pg-financial-run",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 256,
+        "seconds": 1800,
+        "heap": 1152,
+        "cwd": "/home/nayuta/projects/trading-app/backend",
+        "command": [
+          "python3",
+          "/tmp/futures-performance/pg-job.py",
+          "pnpm",
+          "exec",
+          "jest",
+          "--runInBand",
+          "src/orders/order-input-policy.integration.spec.ts",
+          "src/orders/limit-order-reservation.integration.spec.ts",
+          "src/wallets/spot-wallet-transfer.integration.spec.ts",
+          "src/wallets/wallet-fx-transfer.integration.spec.ts",
+          "src/futures/futures.integration.spec.ts",
+          "src/futures/futures-risk.integration.spec.ts",
+          "src/futures/futures-f3.integration.spec.ts",
+          "src/futures/futures-f31.integration.spec.ts",
+          "src/conditional/conditional.integration.spec.ts",
+          "src/futures/futures-limit.integration.spec.ts",
+          "src/futures/futures-isolated-boundary.integration.spec.ts",
+          "src/orders/limit-order-create-race.integration.spec.ts",
+          "src/orders/limit-order-transaction-time.integration.spec.ts",
+          "src/orders/trading-transaction-time.integration.spec.ts",
+          "src/orders/trading-fee-pinning.integration.spec.ts",
+          "src/orders/limit-order-create-no-redis.integration.spec.ts",
+          "src/orders/limit-order-idempotent-replay.integration.spec.ts",
+          "src/orders/limit-order-matching.integration.spec.ts",
+          "src/orders/orders.execute.integration.spec.ts",
+          "src/orders/market-execution.integration.spec.ts",
+          "src/fx/fx.execute.integration.spec.ts",
+          "src/mvp-flow.integration.spec.ts"
+        ],
+        "env": {
+          "NODE_ENV": "test",
+          "DATABASE_URL": "postgresql://trading_app@127.0.0.1:55549/futures_performance?schema=public",
+          "REDIS_URL": "redis://127.0.0.1:56449",
+          "FUTURES_DB_INTEGRATION": "1",
+          "FUTURES_LIMIT_DB_INTEGRATION": "1",
+          "CONDITIONAL_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_RESERVATION_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION": "1",
+          "LIMIT_ORDER_MATCHING_DB_INTEGRATION": "1",
+          "ORDER_EXECUTE_DB_INTEGRATION": "1",
+          "MARKET_EXECUTION_DB_INTEGRATION": "1",
+          "FX_EXECUTE_DB_INTEGRATION": "1",
+          "FUTURES_RISK_DB_INTEGRATION": "1",
+          "FUTURES_F3_DB_INTEGRATION": "1",
+          "FUTURES_F31_DB_INTEGRATION": "1",
+          "MVP_FLOW_DB_SMOKE": "1",
+          "FRIENDS_DB_INTEGRATION": "1",
+          "TRADING_ACCOUNT_DB_INTEGRATION": "1",
+          "GENERAL_TRADING_DB_INTEGRATION": "1",
+          "GENERAL_FX_DB_INTEGRATION": "1",
+          "SEASON_JOIN_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_ENABLED": "true",
+          "AD_REWARD_ENABLED": "true",
+          "AUTH_DB_SMOKE": "1",
+          "OPS_JOB_LOCK_DB_SMOKE": "1",
+          "TEST_REDIS": "1",
+          "JOB_LABEL": "pg-financial"
+        }
+      },
+      "unit": "codex-futures-performance-pg-financial-run.service",
+      "peak": 719265792,
+      "maxTasks": 103,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-pg-financial-run.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-pg-financial-run.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-pg-financial-run.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "256"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=30min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=256\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 150.185,
+      "returncode": 1,
+      "final": "Result=exit-code\nExecMainStatus=1\nMemoryPeak=11046912\nMemorySwapPeak=0\n",
+      "remaining": null
+    },
+    {
+      "job": "pg-f2-retry-run",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 256,
+        "seconds": 1800,
+        "heap": 1152,
+        "cwd": "/home/nayuta/projects/trading-app/backend",
+        "command": [
+          "python3",
+          "/tmp/futures-performance/pg-job.py",
+          "pnpm",
+          "exec",
+          "jest",
+          "--runInBand",
+          "src/futures/futures-risk.integration.spec.ts"
+        ],
+        "env": {
+          "NODE_ENV": "test",
+          "DATABASE_URL": "postgresql://trading_app@127.0.0.1:55549/futures_performance?schema=public",
+          "REDIS_URL": "redis://127.0.0.1:56449",
+          "FUTURES_DB_INTEGRATION": "1",
+          "FUTURES_LIMIT_DB_INTEGRATION": "1",
+          "CONDITIONAL_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_RESERVATION_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION": "1",
+          "LIMIT_ORDER_MATCHING_DB_INTEGRATION": "1",
+          "ORDER_EXECUTE_DB_INTEGRATION": "1",
+          "MARKET_EXECUTION_DB_INTEGRATION": "1",
+          "FX_EXECUTE_DB_INTEGRATION": "1",
+          "FUTURES_RISK_DB_INTEGRATION": "1",
+          "FUTURES_F3_DB_INTEGRATION": "1",
+          "FUTURES_F31_DB_INTEGRATION": "1",
+          "MVP_FLOW_DB_SMOKE": "1",
+          "FRIENDS_DB_INTEGRATION": "1",
+          "TRADING_ACCOUNT_DB_INTEGRATION": "1",
+          "GENERAL_TRADING_DB_INTEGRATION": "1",
+          "GENERAL_FX_DB_INTEGRATION": "1",
+          "SEASON_JOIN_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_ENABLED": "true",
+          "AD_REWARD_ENABLED": "true",
+          "AUTH_DB_SMOKE": "1",
+          "OPS_JOB_LOCK_DB_SMOKE": "1",
+          "TEST_REDIS": "1",
+          "JOB_LABEL": "pg-f2-retry"
+        }
+      },
+      "unit": "codex-futures-performance-pg-f2-retry-run.service",
+      "peak": 725327872,
+      "maxTasks": 80,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-pg-f2-retry-run.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-pg-f2-retry-run.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-pg-f2-retry-run.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "256"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=30min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=256\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 39.661,
+      "returncode": 0,
+      "final": "Result=success\nExecMainStatus=0\nMemoryPeak=[not set]\nMemorySwapPeak=[not set]\n",
+      "remaining": null
+    },
+    {
+      "job": "pg-financial-final-run",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 256,
+        "seconds": 1800,
+        "heap": 1152,
+        "cwd": "/home/nayuta/projects/trading-app/backend",
+        "command": [
+          "python3",
+          "/tmp/futures-performance/pg-job.py",
+          "pnpm",
+          "exec",
+          "jest",
+          "--runInBand",
+          "src/orders/order-input-policy.integration.spec.ts",
+          "src/orders/limit-order-reservation.integration.spec.ts",
+          "src/wallets/spot-wallet-transfer.integration.spec.ts",
+          "src/wallets/wallet-fx-transfer.integration.spec.ts",
+          "src/futures/futures.integration.spec.ts",
+          "src/futures/futures-risk.integration.spec.ts",
+          "src/futures/futures-f3.integration.spec.ts",
+          "src/futures/futures-f31.integration.spec.ts",
+          "src/conditional/conditional.integration.spec.ts",
+          "src/futures/futures-limit.integration.spec.ts",
+          "src/futures/futures-isolated-boundary.integration.spec.ts",
+          "src/orders/limit-order-create-race.integration.spec.ts",
+          "src/orders/limit-order-transaction-time.integration.spec.ts",
+          "src/orders/trading-transaction-time.integration.spec.ts",
+          "src/orders/trading-fee-pinning.integration.spec.ts",
+          "src/orders/limit-order-create-no-redis.integration.spec.ts",
+          "src/orders/limit-order-idempotent-replay.integration.spec.ts",
+          "src/orders/limit-order-matching.integration.spec.ts",
+          "src/orders/orders.execute.integration.spec.ts",
+          "src/orders/market-execution.integration.spec.ts",
+          "src/fx/fx.execute.integration.spec.ts",
+          "src/mvp-flow.integration.spec.ts"
+        ],
+        "env": {
+          "NODE_ENV": "test",
+          "DATABASE_URL": "postgresql://trading_app@127.0.0.1:55549/futures_performance?schema=public",
+          "REDIS_URL": "redis://127.0.0.1:56449",
+          "FUTURES_DB_INTEGRATION": "1",
+          "FUTURES_LIMIT_DB_INTEGRATION": "1",
+          "CONDITIONAL_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_RESERVATION_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION": "1",
+          "LIMIT_ORDER_MATCHING_DB_INTEGRATION": "1",
+          "ORDER_EXECUTE_DB_INTEGRATION": "1",
+          "MARKET_EXECUTION_DB_INTEGRATION": "1",
+          "FX_EXECUTE_DB_INTEGRATION": "1",
+          "FUTURES_RISK_DB_INTEGRATION": "1",
+          "FUTURES_F3_DB_INTEGRATION": "1",
+          "FUTURES_F31_DB_INTEGRATION": "1",
+          "MVP_FLOW_DB_SMOKE": "1",
+          "FRIENDS_DB_INTEGRATION": "1",
+          "TRADING_ACCOUNT_DB_INTEGRATION": "1",
+          "GENERAL_TRADING_DB_INTEGRATION": "1",
+          "GENERAL_FX_DB_INTEGRATION": "1",
+          "SEASON_JOIN_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_ENABLED": "true",
+          "AD_REWARD_ENABLED": "true",
+          "AUTH_DB_SMOKE": "1",
+          "OPS_JOB_LOCK_DB_SMOKE": "1",
+          "TEST_REDIS": "1",
+          "JOB_LABEL": "pg-financial-final"
+        }
+      },
+      "unit": "codex-futures-performance-pg-financial-final-run.service",
+      "peak": 778444800,
+      "maxTasks": 102,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-pg-financial-final-run.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-pg-financial-final-run.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-pg-financial-final-run.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "256"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=30min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=256\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 178.73,
+      "returncode": 1,
+      "final": "Result=exit-code\nExecMainStatus=1\nMemoryPeak=11407360\nMemorySwapPeak=0\n",
+      "remaining": null
+    },
+    {
+      "job": "pg-financial-confirmation-run",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 256,
+        "seconds": 1800,
+        "heap": 1152,
+        "cwd": "/home/nayuta/projects/trading-app/backend",
+        "command": [
+          "python3",
+          "/tmp/futures-performance/pg-job.py",
+          "pnpm",
+          "exec",
+          "jest",
+          "--runInBand",
+          "src/orders/order-input-policy.integration.spec.ts",
+          "src/orders/limit-order-reservation.integration.spec.ts",
+          "src/wallets/spot-wallet-transfer.integration.spec.ts",
+          "src/wallets/wallet-fx-transfer.integration.spec.ts",
+          "src/futures/futures.integration.spec.ts",
+          "src/futures/futures-risk.integration.spec.ts",
+          "src/futures/futures-f3.integration.spec.ts",
+          "src/futures/futures-f31.integration.spec.ts",
+          "src/conditional/conditional.integration.spec.ts",
+          "src/futures/futures-limit.integration.spec.ts",
+          "src/futures/futures-isolated-boundary.integration.spec.ts",
+          "src/orders/limit-order-create-race.integration.spec.ts",
+          "src/orders/limit-order-transaction-time.integration.spec.ts",
+          "src/orders/trading-transaction-time.integration.spec.ts",
+          "src/orders/trading-fee-pinning.integration.spec.ts",
+          "src/orders/limit-order-create-no-redis.integration.spec.ts",
+          "src/orders/limit-order-idempotent-replay.integration.spec.ts",
+          "src/orders/limit-order-matching.integration.spec.ts",
+          "src/orders/orders.execute.integration.spec.ts",
+          "src/orders/market-execution.integration.spec.ts",
+          "src/fx/fx.execute.integration.spec.ts",
+          "src/mvp-flow.integration.spec.ts"
+        ],
+        "env": {
+          "NODE_ENV": "test",
+          "DATABASE_URL": "postgresql://trading_app@127.0.0.1:55549/futures_performance?schema=public",
+          "REDIS_URL": "redis://127.0.0.1:56449",
+          "FUTURES_DB_INTEGRATION": "1",
+          "FUTURES_LIMIT_DB_INTEGRATION": "1",
+          "CONDITIONAL_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_RESERVATION_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION": "1",
+          "LIMIT_ORDER_MATCHING_DB_INTEGRATION": "1",
+          "ORDER_EXECUTE_DB_INTEGRATION": "1",
+          "MARKET_EXECUTION_DB_INTEGRATION": "1",
+          "FX_EXECUTE_DB_INTEGRATION": "1",
+          "FUTURES_RISK_DB_INTEGRATION": "1",
+          "FUTURES_F3_DB_INTEGRATION": "1",
+          "FUTURES_F31_DB_INTEGRATION": "1",
+          "MVP_FLOW_DB_SMOKE": "1",
+          "FRIENDS_DB_INTEGRATION": "1",
+          "TRADING_ACCOUNT_DB_INTEGRATION": "1",
+          "GENERAL_TRADING_DB_INTEGRATION": "1",
+          "GENERAL_FX_DB_INTEGRATION": "1",
+          "SEASON_JOIN_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_ENABLED": "true",
+          "AD_REWARD_ENABLED": "true",
+          "AUTH_DB_SMOKE": "1",
+          "OPS_JOB_LOCK_DB_SMOKE": "1",
+          "TEST_REDIS": "1",
+          "JOB_LABEL": "pg-financial-confirmation"
+        }
+      },
+      "unit": "codex-futures-performance-pg-financial-confirmation-run.service",
+      "peak": 768491520,
+      "maxTasks": 103,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-pg-financial-confirmation-run.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-pg-financial-confirmation-run.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-pg-financial-confirmation-run.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "256"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=30min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=256\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 168.866,
+      "returncode": 1,
+      "final": "Result=exit-code\nExecMainStatus=1\nMemoryPeak=11051008\nMemorySwapPeak=0\n",
+      "remaining": null
+    },
+    {
+      "job": "original-debug-run",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 256,
+        "seconds": 1800,
+        "heap": 1152,
+        "cwd": "/tmp/futures-performance/debug-source/backend",
+        "command": [
+          "python3",
+          "/tmp/futures-performance/pg-job.py",
+          "python3",
+          "/tmp/futures-performance/commands.py",
+          "/tmp/futures-performance/original-debug-commands.json"
+        ],
+        "env": {
+          "NODE_ENV": "test",
+          "DATABASE_URL": "postgresql://trading_app@127.0.0.1:55549/futures_performance?schema=public",
+          "REDIS_URL": "redis://127.0.0.1:56449",
+          "FUTURES_DB_INTEGRATION": "1",
+          "FUTURES_LIMIT_DB_INTEGRATION": "1",
+          "CONDITIONAL_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_RESERVATION_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION": "1",
+          "LIMIT_ORDER_MATCHING_DB_INTEGRATION": "1",
+          "ORDER_EXECUTE_DB_INTEGRATION": "1",
+          "MARKET_EXECUTION_DB_INTEGRATION": "1",
+          "FX_EXECUTE_DB_INTEGRATION": "1",
+          "FUTURES_RISK_DB_INTEGRATION": "1",
+          "FUTURES_F3_DB_INTEGRATION": "1",
+          "FUTURES_F31_DB_INTEGRATION": "1",
+          "MVP_FLOW_DB_SMOKE": "1",
+          "FRIENDS_DB_INTEGRATION": "1",
+          "TRADING_ACCOUNT_DB_INTEGRATION": "1",
+          "GENERAL_TRADING_DB_INTEGRATION": "1",
+          "GENERAL_FX_DB_INTEGRATION": "1",
+          "SEASON_JOIN_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_ENABLED": "true",
+          "AD_REWARD_ENABLED": "true",
+          "AUTH_DB_SMOKE": "1",
+          "OPS_JOB_LOCK_DB_SMOKE": "1",
+          "TEST_REDIS": "1",
+          "JOB_LABEL": "original-debug"
+        }
+      },
+      "unit": "codex-futures-performance-original-debug-run.service",
+      "peak": 539754496,
+      "maxTasks": 75,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-original-debug-run.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-original-debug-run.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-original-debug-run.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "256"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=30min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=256\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 3.81,
+      "returncode": 1,
+      "final": "Result=success\nExecMainStatus=0\nMemoryPeak=539754496\nMemorySwapPeak=0\n",
+      "remaining": null
+    },
+    {
+      "job": "original-f3-debug-run",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 256,
+        "seconds": 1800,
+        "heap": 1152,
+        "cwd": "/tmp/futures-performance/debug-source/backend",
+        "command": [
+          "python3",
+          "/tmp/futures-performance/pg-job.py",
+          "python3",
+          "/tmp/futures-performance/commands.py",
+          "/tmp/futures-performance/original-f3-commands.json"
+        ],
+        "env": {
+          "NODE_ENV": "test",
+          "DATABASE_URL": "postgresql://trading_app@127.0.0.1:55549/futures_performance?schema=public",
+          "REDIS_URL": "redis://127.0.0.1:56449",
+          "FUTURES_DB_INTEGRATION": "1",
+          "FUTURES_LIMIT_DB_INTEGRATION": "1",
+          "CONDITIONAL_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_RESERVATION_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION": "1",
+          "LIMIT_ORDER_MATCHING_DB_INTEGRATION": "1",
+          "ORDER_EXECUTE_DB_INTEGRATION": "1",
+          "MARKET_EXECUTION_DB_INTEGRATION": "1",
+          "FX_EXECUTE_DB_INTEGRATION": "1",
+          "FUTURES_RISK_DB_INTEGRATION": "1",
+          "FUTURES_F3_DB_INTEGRATION": "1",
+          "FUTURES_F31_DB_INTEGRATION": "1",
+          "MVP_FLOW_DB_SMOKE": "1",
+          "FRIENDS_DB_INTEGRATION": "1",
+          "TRADING_ACCOUNT_DB_INTEGRATION": "1",
+          "GENERAL_TRADING_DB_INTEGRATION": "1",
+          "GENERAL_FX_DB_INTEGRATION": "1",
+          "SEASON_JOIN_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_ENABLED": "true",
+          "AD_REWARD_ENABLED": "true",
+          "AUTH_DB_SMOKE": "1",
+          "OPS_JOB_LOCK_DB_SMOKE": "1",
+          "TEST_REDIS": "1",
+          "JOB_LABEL": "original-f3-debug"
+        }
+      },
+      "unit": "codex-futures-performance-original-f3-debug-run.service",
+      "peak": 595189760,
+      "maxTasks": 75,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-original-f3-debug-run.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-original-f3-debug-run.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-original-f3-debug-run.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "256"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=30min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=256\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 38.772,
+      "returncode": 0,
+      "final": "Result=success\nExecMainStatus=0\nMemoryPeak=[not set]\nMemorySwapPeak=[not set]\n",
+      "remaining": null
+    },
+    {
+      "job": "backend-run",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 256,
+        "seconds": 1800,
+        "heap": 1152,
+        "cwd": "/home/nayuta/projects/trading-app/backend",
+        "command": [
+          "python3",
+          "/tmp/futures-performance/commands.py",
+          "/tmp/futures-performance/backend-commands.json"
+        ],
+        "env": {
+          "NODE_ENV": "test"
+        }
+      },
+      "unit": "codex-futures-performance-backend-run.service",
+      "peak": 1642156032,
+      "maxTasks": 67,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-backend-run.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-backend-run.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-backend-run.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "256"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=30min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=256\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 61.755,
+      "returncode": 0,
+      "final": "Result=success\nExecMainStatus=0\nMemoryPeak=[not set]\nMemorySwapPeak=[not set]\n",
+      "remaining": null
+    },
+    {
+      "job": "frontend-run",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 192,
+        "seconds": 900,
+        "heap": 1152,
+        "cwd": "/home/nayuta/projects/trading-app/frontend",
+        "command": [
+          "python3",
+          "/tmp/futures-performance/commands.py",
+          "/tmp/futures-performance/frontend-commands.json"
+        ],
+        "env": {
+          "NODE_ENV": "test"
+        }
+      },
+      "unit": "codex-futures-performance-frontend-run.service",
+      "peak": 1253343232,
+      "maxTasks": 40,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-frontend-run.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-frontend-run.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-frontend-run.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "192"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=15min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=192\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 119.171,
+      "returncode": 1,
+      "final": "Result=exit-code\nExecMainStatus=1\nMemoryPeak=11268096\nMemorySwapPeak=0\n",
+      "remaining": null
+    },
+    {
+      "job": "frontend-focused-run",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 192,
+        "seconds": 900,
+        "heap": 1152,
+        "cwd": "/home/nayuta/projects/trading-app/frontend",
+        "command": [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "src/screens/asset/accountHoldings.test.ts",
+          "src/screens/futures/FuturesScreen.test.ts",
+          "src/screens/futures/FuturesLimitEntry.test.ts"
+        ],
+        "env": {
+          "NODE_ENV": "test"
+        }
+      },
+      "unit": "codex-futures-performance-frontend-focused-run.service",
+      "peak": 353337344,
+      "maxTasks": 14,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-frontend-focused-run.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-frontend-focused-run.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-frontend-focused-run.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "192"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=15min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=192\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 24.44,
+      "returncode": 1,
+      "final": "Result=exit-code\nExecMainStatus=1\nMemoryPeak=11341824\nMemorySwapPeak=0\n",
+      "remaining": null
+    },
+    {
+      "job": "frontend-focused2-run",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 192,
+        "seconds": 900,
+        "heap": 1152,
+        "cwd": "/home/nayuta/projects/trading-app/frontend",
+        "command": [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "src/screens/asset/accountHoldings.test.ts",
+          "src/screens/futures/FuturesScreen.test.ts",
+          "src/screens/futures/FuturesLimitEntry.test.ts"
+        ],
+        "env": {
+          "NODE_ENV": "test"
+        }
+      },
+      "unit": "codex-futures-performance-frontend-focused2-run.service",
+      "peak": 354631680,
+      "maxTasks": 14,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-frontend-focused2-run.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-frontend-focused2-run.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-frontend-focused2-run.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "192"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=15min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=192\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 23.543,
+      "returncode": 1,
+      "final": "Result=exit-code\nExecMainStatus=1\nMemoryPeak=11259904\nMemorySwapPeak=0\n",
+      "remaining": null
+    },
+    {
+      "job": "frontend-focused3-run",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 192,
+        "seconds": 900,
+        "heap": 1152,
+        "cwd": "/home/nayuta/projects/trading-app/frontend",
+        "command": [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "src/screens/asset/accountHoldings.test.ts",
+          "src/screens/futures/FuturesScreen.test.ts",
+          "src/screens/futures/FuturesLimitEntry.test.ts"
+        ],
+        "env": {
+          "NODE_ENV": "test"
+        }
+      },
+      "unit": "codex-futures-performance-frontend-focused3-run.service",
+      "peak": 355852288,
+      "maxTasks": 14,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-frontend-focused3-run.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-frontend-focused3-run.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-frontend-focused3-run.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "192"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=15min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=192\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 23.431,
+      "returncode": 0,
+      "final": "Result=success\nExecMainStatus=0\nMemoryPeak=[not set]\nMemorySwapPeak=[not set]\n",
+      "remaining": null
+    },
+    {
+      "job": "frontend-final-run",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 192,
+        "seconds": 900,
+        "heap": 1152,
+        "cwd": "/home/nayuta/projects/trading-app/frontend",
+        "command": [
+          "python3",
+          "/tmp/futures-performance/commands.py",
+          "/tmp/futures-performance/frontend-commands.json"
+        ],
+        "env": {
+          "NODE_ENV": "test"
+        }
+      },
+      "unit": "codex-futures-performance-frontend-final-run.service",
+      "peak": 1196847104,
+      "maxTasks": 39,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-frontend-final-run.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-frontend-final-run.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-frontend-final-run.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "192"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=15min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=192\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 119.319,
+      "returncode": 0,
+      "final": "Result=success\nExecMainStatus=0\nMemoryPeak=[not set]\nMemorySwapPeak=[not set]\n",
+      "remaining": null
+    },
+    {
+      "job": "browser-run",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 192,
+        "seconds": 900,
+        "heap": 1152,
+        "cwd": "/home/nayuta/projects/trading-app/frontend",
+        "command": [
+          "node",
+          "test/browser/futuresIntegrationBrowser.cjs"
+        ],
+        "env": {
+          "NODE_PATH": "/tmp/futures-resume/browser-tools/node_modules",
+          "BROWSER_EXECUTABLE_PATH": "/home/nayuta/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome",
+          "FUTURES_INTEGRATION_BROWSER_OUTPUT": "/tmp/futures-performance/browser-integration",
+          "LD_LIBRARY_PATH": "/tmp/futures-resume/deps/usr/lib/x86_64-linux-gnu",
+          "FONTCONFIG_FILE": "/tmp/futures-resume/fonts.conf"
+        }
+      },
+      "unit": "codex-futures-performance-browser-run.service",
+      "peak": 2760712192,
+      "maxTasks": 168,
+      "stop": "85% memory guard",
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-browser-run.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-browser-run.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-browser-run.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "192"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=15min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=192\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 71.53,
+      "final": "Result=signal\nExecMainStatus=9\nMemoryPeak=2760712192\nMemorySwapPeak=0\n",
+      "remaining": null
+    },
+    {
+      "job": "browser-final-run",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 192,
+        "seconds": 900,
+        "heap": 1152,
+        "cwd": "/home/nayuta/projects/trading-app/frontend",
+        "command": [
+          "node",
+          "test/browser/futuresIntegrationBrowser.cjs"
+        ],
+        "env": {
+          "NODE_PATH": "/tmp/futures-resume/browser-tools/node_modules",
+          "BROWSER_EXECUTABLE_PATH": "/home/nayuta/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome",
+          "FUTURES_INTEGRATION_BROWSER_OUTPUT": "/tmp/futures-performance/browser-integration",
+          "LD_LIBRARY_PATH": "/tmp/futures-resume/deps/usr/lib/x86_64-linux-gnu",
+          "FONTCONFIG_FILE": "/tmp/futures-resume/fonts.conf"
+        }
+      },
+      "unit": "codex-futures-performance-browser-final-run.service",
+      "peak": 489299968,
+      "maxTasks": 151,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-browser-final-run.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-browser-final-run.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-browser-final-run.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "192"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=15min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=192\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 101.008,
+      "returncode": 0,
+      "final": "Result=success\nExecMainStatus=0\nMemoryPeak=[not set]\nMemorySwapPeak=[not set]\n",
+      "remaining": null
+    },
+    {
+      "job": "frontend-export-run",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 128,
+        "seconds": 900,
+        "heap": 1792,
+        "cwd": "/home/nayuta/projects/trading-app/frontend",
+        "command": [
+          "npm",
+          "run",
+          "export:web",
+          "--",
+          "--max-workers",
+          "1"
+        ],
+        "env": {
+          "EXPO_OFFLINE": "1",
+          "CI": "1"
+        }
+      },
+      "unit": "codex-futures-performance-frontend-export-run.service",
+      "peak": 418836480,
+      "maxTasks": 24,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-frontend-export-run.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-frontend-export-run.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-futures-performance-frontend-export-run.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "128"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=15min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=128\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 5.726,
+      "returncode": 0,
+      "final": "Result=success\nExecMainStatus=0\nMemoryPeak=[not set]\nMemorySwapPeak=[not set]\n",
+      "remaining": null
+    }
+  ],
+  "browser": {
+    "layouts": 208,
+    "results": [
+      "320-light-1-market",
+      "320-light-1-limit-long",
+      "320-light-1-limit-short",
+      "320-light-1-holdings",
+      "320-light-1-pending-limit",
+      "320-light-1-pending-protection",
+      "320-light-1-pending-futures-only",
+      "320-light-1-pending-spot-only",
+      "320-light-1-pending-empty",
+      "320-light-1-limit-long-sl-error",
+      "320-light-1-limit-long-tp-error",
+      "320-light-1-limit-short-sl-error",
+      "320-light-1-limit-short-tp-error",
+      "320-light-2-market",
+      "320-light-2-limit-long",
+      "320-light-2-limit-short",
+      "320-light-2-holdings",
+      "320-light-2-pending-limit",
+      "320-light-2-pending-protection",
+      "320-light-2-pending-futures-only",
+      "320-light-2-pending-spot-only",
+      "320-light-2-pending-empty",
+      "320-light-2-limit-long-sl-error",
+      "320-light-2-limit-long-tp-error",
+      "320-light-2-limit-short-sl-error",
+      "320-light-2-limit-short-tp-error",
+      "320-dark-1-market",
+      "320-dark-1-limit-long",
+      "320-dark-1-limit-short",
+      "320-dark-1-holdings",
+      "320-dark-1-pending-limit",
+      "320-dark-1-pending-protection",
+      "320-dark-1-pending-futures-only",
+      "320-dark-1-pending-spot-only",
+      "320-dark-1-pending-empty",
+      "320-dark-1-limit-long-sl-error",
+      "320-dark-1-limit-long-tp-error",
+      "320-dark-1-limit-short-sl-error",
+      "320-dark-1-limit-short-tp-error",
+      "320-dark-2-market",
+      "320-dark-2-limit-long",
+      "320-dark-2-limit-short",
+      "320-dark-2-holdings",
+      "320-dark-2-pending-limit",
+      "320-dark-2-pending-protection",
+      "320-dark-2-pending-futures-only",
+      "320-dark-2-pending-spot-only",
+      "320-dark-2-pending-empty",
+      "320-dark-2-limit-long-sl-error",
+      "320-dark-2-limit-long-tp-error",
+      "320-dark-2-limit-short-sl-error",
+      "320-dark-2-limit-short-tp-error",
+      "360-light-1-market",
+      "360-light-1-limit-long",
+      "360-light-1-limit-short",
+      "360-light-1-holdings",
+      "360-light-1-pending-limit",
+      "360-light-1-pending-protection",
+      "360-light-1-pending-futures-only",
+      "360-light-1-pending-spot-only",
+      "360-light-1-pending-empty",
+      "360-light-1-limit-long-sl-error",
+      "360-light-1-limit-long-tp-error",
+      "360-light-1-limit-short-sl-error",
+      "360-light-1-limit-short-tp-error",
+      "360-light-2-market",
+      "360-light-2-limit-long",
+      "360-light-2-limit-short",
+      "360-light-2-holdings",
+      "360-light-2-pending-limit",
+      "360-light-2-pending-protection",
+      "360-light-2-pending-futures-only",
+      "360-light-2-pending-spot-only",
+      "360-light-2-pending-empty",
+      "360-light-2-limit-long-sl-error",
+      "360-light-2-limit-long-tp-error",
+      "360-light-2-limit-short-sl-error",
+      "360-light-2-limit-short-tp-error",
+      "360-dark-1-market",
+      "360-dark-1-limit-long",
+      "360-dark-1-limit-short",
+      "360-dark-1-holdings",
+      "360-dark-1-pending-limit",
+      "360-dark-1-pending-protection",
+      "360-dark-1-pending-futures-only",
+      "360-dark-1-pending-spot-only",
+      "360-dark-1-pending-empty",
+      "360-dark-1-limit-long-sl-error",
+      "360-dark-1-limit-long-tp-error",
+      "360-dark-1-limit-short-sl-error",
+      "360-dark-1-limit-short-tp-error",
+      "360-dark-2-market",
+      "360-dark-2-limit-long",
+      "360-dark-2-limit-short",
+      "360-dark-2-holdings",
+      "360-dark-2-pending-limit",
+      "360-dark-2-pending-protection",
+      "360-dark-2-pending-futures-only",
+      "360-dark-2-pending-spot-only",
+      "360-dark-2-pending-empty",
+      "360-dark-2-limit-long-sl-error",
+      "360-dark-2-limit-long-tp-error",
+      "360-dark-2-limit-short-sl-error",
+      "360-dark-2-limit-short-tp-error",
+      "390-light-1-market",
+      "390-light-1-limit-long",
+      "390-light-1-limit-short",
+      "390-light-1-holdings",
+      "390-light-1-pending-limit",
+      "390-light-1-pending-protection",
+      "390-light-1-pending-futures-only",
+      "390-light-1-pending-spot-only",
+      "390-light-1-pending-empty",
+      "390-light-1-limit-long-sl-error",
+      "390-light-1-limit-long-tp-error",
+      "390-light-1-limit-short-sl-error",
+      "390-light-1-limit-short-tp-error",
+      "390-light-2-market",
+      "390-light-2-limit-long",
+      "390-light-2-limit-short",
+      "390-light-2-holdings",
+      "390-light-2-pending-limit",
+      "390-light-2-pending-protection",
+      "390-light-2-pending-futures-only",
+      "390-light-2-pending-spot-only",
+      "390-light-2-pending-empty",
+      "390-light-2-limit-long-sl-error",
+      "390-light-2-limit-long-tp-error",
+      "390-light-2-limit-short-sl-error",
+      "390-light-2-limit-short-tp-error",
+      "390-dark-1-market",
+      "390-dark-1-limit-long",
+      "390-dark-1-limit-short",
+      "390-dark-1-holdings",
+      "390-dark-1-pending-limit",
+      "390-dark-1-pending-protection",
+      "390-dark-1-pending-futures-only",
+      "390-dark-1-pending-spot-only",
+      "390-dark-1-pending-empty",
+      "390-dark-1-limit-long-sl-error",
+      "390-dark-1-limit-long-tp-error",
+      "390-dark-1-limit-short-sl-error",
+      "390-dark-1-limit-short-tp-error",
+      "390-dark-2-market",
+      "390-dark-2-limit-long",
+      "390-dark-2-limit-short",
+      "390-dark-2-holdings",
+      "390-dark-2-pending-limit",
+      "390-dark-2-pending-protection",
+      "390-dark-2-pending-futures-only",
+      "390-dark-2-pending-spot-only",
+      "390-dark-2-pending-empty",
+      "390-dark-2-limit-long-sl-error",
+      "390-dark-2-limit-long-tp-error",
+      "390-dark-2-limit-short-sl-error",
+      "390-dark-2-limit-short-tp-error",
+      "430-light-1-market",
+      "430-light-1-limit-long",
+      "430-light-1-limit-short",
+      "430-light-1-holdings",
+      "430-light-1-pending-limit",
+      "430-light-1-pending-protection",
+      "430-light-1-pending-futures-only",
+      "430-light-1-pending-spot-only",
+      "430-light-1-pending-empty",
+      "430-light-1-limit-long-sl-error",
+      "430-light-1-limit-long-tp-error",
+      "430-light-1-limit-short-sl-error",
+      "430-light-1-limit-short-tp-error",
+      "430-light-2-market",
+      "430-light-2-limit-long",
+      "430-light-2-limit-short",
+      "430-light-2-holdings",
+      "430-light-2-pending-limit",
+      "430-light-2-pending-protection",
+      "430-light-2-pending-futures-only",
+      "430-light-2-pending-spot-only",
+      "430-light-2-pending-empty",
+      "430-light-2-limit-long-sl-error",
+      "430-light-2-limit-long-tp-error",
+      "430-light-2-limit-short-sl-error",
+      "430-light-2-limit-short-tp-error",
+      "430-dark-1-market",
+      "430-dark-1-limit-long",
+      "430-dark-1-limit-short",
+      "430-dark-1-holdings",
+      "430-dark-1-pending-limit",
+      "430-dark-1-pending-protection",
+      "430-dark-1-pending-futures-only",
+      "430-dark-1-pending-spot-only",
+      "430-dark-1-pending-empty",
+      "430-dark-1-limit-long-sl-error",
+      "430-dark-1-limit-long-tp-error",
+      "430-dark-1-limit-short-sl-error",
+      "430-dark-1-limit-short-tp-error",
+      "430-dark-2-market",
+      "430-dark-2-limit-long",
+      "430-dark-2-limit-short",
+      "430-dark-2-holdings",
+      "430-dark-2-pending-limit",
+      "430-dark-2-pending-protection",
+      "430-dark-2-pending-futures-only",
+      "430-dark-2-pending-spot-only",
+      "430-dark-2-pending-empty",
+      "430-dark-2-limit-long-sl-error",
+      "430-dark-2-limit-long-tp-error",
+      "430-dark-2-limit-short-sl-error",
+      "430-dark-2-limit-short-tp-error"
+    ],
+    "errors": [],
+    "scope": "RN Web real screens; native IME/device not exercised"
+  },
+  "unverified": [
+    "Actual HTTP/auth transport load",
+    "Production data/catalog/price ingestion/network latency",
+    "Long-running production/multiple-instance throughput",
+    "Native device/IME",
+    "Short 1/5-instrument 20-user burst CPU peak samples insufficient",
+    "Aggregate financial gate stability; root cause of intermittent failures"
+  ],
+  "migrationsChanged": false,
+  "generatedPrismaChanged": false,
+  "businessExecutionCoreChanged": false,
+  "productionSourceFilesChanged": [
+    "backend/src/batch/season-settlement-job.service.ts",
+    "backend/src/futures/futures-limit-worker.service.ts",
+    "backend/src/futures/futures-limit.service.ts",
+    "frontend/src/features/conditional/ProtectionEditor.tsx",
+    "frontend/src/screens/asset/PendingFuturesAndProtections.tsx",
+    "frontend/src/screens/asset/PendingOrders.tsx",
+    "frontend/src/screens/futures/FuturesLimitEntryForm.tsx"
+  ],
+  "sourceSha256": {
+    "HANDOVER.md": "2ed4f6f56c9c68c4d94693bf6b5492582d09e8b5e1d277ad853f64df7c856cde",
+    "backend/docs/futures-limit-entry-contract.md": "83b9af43790b2f35d54df95b6d525ba95d44c93d57b4fafeb4f3b619f2af0b67",
+    "backend/scripts/futures-limit-entry-integration.ts": "ec3a837d7be013e26f5b3dde4510fc74bbb6fcf2fc5dc87589b08f7b89db37b2",
+    "backend/src/batch/season-settlement-job.service.spec.ts": "d922758944961af8c154372db9d97e14b6ba329187ca8dde60248a4ad2c265a1",
+    "backend/src/batch/season-settlement-job.service.ts": "37c55ba281625d750b83ab014880383050c7e424ec9ca218f29bd66a83effc8c",
+    "backend/src/futures/futures-limit-worker.service.ts": "3910286ec935be89ed9d7ee059665ce920c3dca6484f6616456c6223a882c750",
+    "backend/src/futures/futures-limit.service.ts": "41029b0ca7bc74767a940698781a31757f7062eb82f76227f64c80307cfc7ff6",
+    "backend/test/app.e2e-spec.ts": "dc46b61b4143a8e79635fa37480bc0b51b8b73cd1940bfa50b4d390330f0c668",
+    "frontend/README.md": "718cb8d62779c202cd37d8959d45acf75f0e8ae3a2d81ce9888c4a25f9e6d8b6",
+    "frontend/src/features/conditional/ProtectionEditor.tsx": "9032fa6ba12dac501b3cf8bea4edce4f56a80a60d6c29e33f7cad5b5f51ebc83",
+    "frontend/src/screens/asset/PendingFuturesAndProtections.tsx": "328efef8f33c4a3882950baf6f1c9c23eda77110ee7ca804ece401a05a161fbf",
+    "frontend/src/screens/asset/PendingOrders.tsx": "5ab0b2db04e2282d22f9eed2b8bac32bba7bb88b2f57d89d7f0736dfa37915a1",
+    "frontend/src/screens/asset/accountHoldings.test.ts": "f9a6116bb8588490ef10d72233227bb6daec231929038fbc1a0676095e6973cf",
+    "frontend/src/screens/futures/FuturesLimitEntry.test.ts": "767dbd32e4c84e695b194c5a1778ad35a889ad82bc4ad5ddc4b7cc574ae64284",
+    "frontend/src/screens/futures/FuturesLimitEntryForm.tsx": "c7c413d12bfcba0ac77d85a3a4934fa82ca1f0d521391fd9f21616721033335e",
+    "frontend/test/browser/futuresIntegrationBrowser.cjs": "571d6f16c6cb02cd5376c2d0e951290e2e2e08a85677cab1ca716a1c5ec9b3b2",
+    "frontend/test/browser/tradingMocks.js": "5f94a0db4cbcb82d7c658b9d0dcbf1888160009575294b37fad6f54e14bb3d0c",
+    "frontend/test/futuresFixtures.cjs": "53a865e07328e39ece0b02d1eb57c46cf98c5eb95907df79c4c39680ad666faa",
+    "backend/scripts/futures-performance-benchmark.ts": "03b8d0a64378f314466eccb929ce3c01ba3d4f7655842b566fb9d93008dcab77"
+  },
+  "diffSha256": "8807c1bbaedbd6dc09f64c3fc803b3153799811291e1c14d40defd224c4aa61f",
+  "diffCheck": 0,
+  "finalStatus": " M HANDOVER.md\n M backend/docs/futures-limit-entry-contract.md\n M backend/scripts/futures-limit-entry-integration.ts\n M backend/src/batch/season-settlement-job.service.spec.ts\n M backend/src/batch/season-settlement-job.service.ts\n M backend/src/futures/futures-limit-worker.service.ts\n M backend/src/futures/futures-limit.service.ts\n M backend/test/app.e2e-spec.ts\n M frontend/README.md\n M frontend/src/features/conditional/ProtectionEditor.tsx\n M frontend/src/screens/asset/PendingFuturesAndProtections.tsx\n M frontend/src/screens/asset/PendingOrders.tsx\n M frontend/src/screens/asset/accountHoldings.test.ts\n M frontend/src/screens/futures/FuturesLimitEntry.test.ts\n M frontend/src/screens/futures/FuturesLimitEntryForm.tsx\n M frontend/test/browser/futuresIntegrationBrowser.cjs\n M frontend/test/browser/tradingMocks.js\n M frontend/test/futuresFixtures.cjs\n?? backend/scripts/futures-performance-benchmark.ts\n?? docs/investigations/2026-10-08-futures-performance/\n",
+  "committed": false,
+  "pushed": false,
+  "merged": false
+}

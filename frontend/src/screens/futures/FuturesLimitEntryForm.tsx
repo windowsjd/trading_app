@@ -40,8 +40,8 @@ export default function FuturesLimitEntryForm({ accountId, instrumentId, assetId
   const submit = async () => {
     if (locked.current || !current() || (!uncertain && (!permission.current.allowed || !validPrice))) return;
     if (!uncertain) {
-      const error = protectionInputError(draft);
-      if (error) { setMessage(error); return; }
+      const error = protectionInputError(draft, { direction, limitPrice });
+      if (error) { setFailure(null); setMessage(error); return; }
       const legs = draftLegs(draft);
       if (legs.length && !permission.current.canAttach) { setMessage('현재 익절·손절을 등록할 수 없습니다.'); return; }
       request.current = { instrumentId, direction, marginMode, leverage: Number(leverage), quantity, limitPrice, idempotencyKey: createIdempotencyKey('futures-entry'), ...(legs.length ? { attachedProtection: legs } : {}) };
@@ -57,7 +57,7 @@ export default function FuturesLimitEntryForm({ accountId, instrumentId, assetId
       if (!current()) return;
       const info = getApiErrorInfo(error); const retry = !info.hasResponse || (info.status ?? 0) >= 500;
       setUncertain(retry); if (!retry) request.current = null;
-      setFailure(error); setMessage(retry ? '접수 여부를 확인해야 합니다. 동일 요청으로 다시 확인해주세요.' : '지정가 주문을 접수하지 못했습니다. 입력값과 사용 가능 담보를 확인해주세요.');
+      setFailure(error); setMessage(retry ? '접수 여부를 확인해야 합니다. 동일 요청으로 다시 확인해주세요.' : info.serverCode === 'PROTECTION_ALREADY_TRIGGERED' ? `${direction.toUpperCase()} 조건 가격을 확인해주세요. ${direction === 'long' ? 'SL < 진입 지정가 < TP' : 'TP < 진입 지정가 < SL'} 관계가 필요합니다.` : '지정가 주문을 접수하지 못했습니다. 입력값과 사용 가능 담보를 확인해주세요.');
     } finally { locked.current = false; if (current()) { setBusy(false); onBusy(!!request.current); } }
   };
   return <View style={styles.stack} testID="futures-limit-entry">

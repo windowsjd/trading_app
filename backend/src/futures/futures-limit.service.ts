@@ -30,6 +30,7 @@ import {
 import { accountFuturesFee } from './futures-risk';
 import { assertFuturesTransferCollateral } from './futures-collateral';
 import { readFuturesMark } from './futures-mark';
+import { readFuturesPrice } from './futures-price';
 import { cancelFuturesEntriesInTransaction } from './futures-limit-state';
 import {
   futuresInstrumentInclude,
@@ -345,6 +346,34 @@ export class FuturesLimitService {
       row.tradingAccount.userId,
       row.tradingAccountId,
     );
+    const evaluationAt = await this.futures.dbNow(this.prisma);
+    const tradable = conditionalTradable(account, evaluationAt);
+    if (tradable && futuresTradingMode() === 'ENABLED') {
+      const instrument = await this.futures.instrument(
+        this.prisma,
+        row.instrumentId,
+      );
+      const price = (await readFuturesPrice(
+        this.prisma,
+        instrument.underlyingAsset,
+        evaluationAt,
+      ))!;
+      // Negative preview only. Candidate executions still select evidence and
+      // check the same predicate again inside the canonical financial locks.
+      if (
+        price.effectiveAt < row.createdAt ||
+        price.capturedAt < row.createdAt ||
+        (row.direction === 'long'
+          ? price.price.gt(row.limitPrice)
+          : price.price.lt(row.limitPrice))
+      )
+        futuresError(
+          'FUTURES_ENTRY_LIMIT_NOT_REACHED',
+          'The entry limit is not executable.',
+        );
+    }
+    // Every candidate retains the original lifecycle cleanup fence, including
+    // a Season ending while the matcher waits for that fence.
     const ended = await this.prisma.$transaction(async (tx) => {
       const locked = await this.lock(tx, account);
       const now = await this.futures.dbNow(tx);

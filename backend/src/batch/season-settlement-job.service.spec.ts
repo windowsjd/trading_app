@@ -549,6 +549,33 @@ describe('SeasonSettlementJobService', () => {
     },
   );
 
+  it.each(['preflight', 'under-season-lock'])(
+    'blocks submitted Futures entries independently of wallet reservations at %s',
+    async (boundary) => {
+      const { service, prisma } = createService();
+      mockSeason(prisma, SeasonStatus.ended);
+      mockParticipants(prisma, [{ id: 'sp-1', userId: 'user-1' }]);
+      mockExistingRankings(prisma, []);
+      mockSnapshots(prisma, [snapshot('sp-1', 'user-1', '1000.00000000')]);
+      const client = boundary === 'preflight' ? prisma : prisma.__tx;
+      client.futuresLimitOrder.count.mockResolvedValue(1);
+      const response = await captureHttpExceptionResponse(
+        service.run({ seasonId: 'season-1', settlementDate }),
+      );
+      expect(response.error.code).toBe('OPEN_LIMIT_ORDER_RESERVATIONS');
+      expect(client.futuresLimitOrder.count).toHaveBeenCalledWith({
+        where: {
+          status: 'submitted',
+          tradingAccount: { seasonParticipant: { seasonId: 'season-1' } },
+        },
+      });
+      expect(prisma.__tx.seasonRanking.create).not.toHaveBeenCalled();
+      expect(prisma.__tx.season.updateMany).not.toHaveBeenCalled();
+      if (boundary === 'preflight')
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+    },
+  );
+
   it('ranks by returnRate desc, then userId asc, then seasonParticipantId asc', async () => {
     const { service, prisma } = createService();
     mockSeason(prisma, SeasonStatus.ended);
@@ -1144,6 +1171,7 @@ function createPrismaMock() {
   settlementParticipantResults = new Map();
   const tx = {
     ...emptyProtectionState(),
+    futuresLimitOrder: { count: jest.fn().mockResolvedValue(0) },
     // The season row lock taken first inside the settlement transaction
     // (작업 8 §13.3 / §14.1).
     $queryRaw: jest.fn().mockResolvedValue([
@@ -1234,6 +1262,7 @@ function createPrismaMock() {
 
   return {
     ...emptyProtectionState(),
+    futuresLimitOrder: { count: jest.fn().mockResolvedValue(0) },
     __tx: tx,
     $transaction: jest.fn(async (callback) => callback(tx)),
     season: {

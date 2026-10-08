@@ -4,6 +4,7 @@ import ActionPressable from "../../components/common/ActionPressable";
 import { semantic } from "../../theme/tokens";
 import { formatDisplayDecimal } from "../../utils/format";
 import type { ProtectionLeg } from "./api";
+import Decimal from "decimal.js";
 export type LegDraft = {
   enabled: boolean;
   trigger: string;
@@ -31,16 +32,25 @@ export function draftLegs(draft: ProtectionDraft): ProtectionLeg[] {
         : {}),
     }));
 }
-export function protectionInputError(draft: ProtectionDraft) {
+export function protectionInputError(draft: ProtectionDraft, entry?: { direction: "long" | "short"; limitPrice: string }) {
   const valid = (value: string) =>
     /^\d{1,16}(\.\d{1,8})?$/.test(value) && /[1-9]/.test(value);
-  return draftLegs(draft).some(
+  const legs = draftLegs(draft);
+  if (legs.some(
     (leg) =>
       !valid(leg.triggerPrice) ||
       (leg.childOrderType === "limit" && !valid(leg.childLimitPrice ?? "")),
-  )
-    ? "조건 가격과 지정가를 올바르게 입력해주세요."
-    : null;
+  )) return "조건 가격과 지정가를 올바르게 입력해주세요.";
+  if (entry && valid(entry.limitPrice)) {
+    for (const leg of legs) {
+      const below = (entry.direction === "long") === (leg.kind === "stop_loss");
+      const comparison = new Decimal(leg.triggerPrice).cmp(entry.limitPrice);
+      if (below ? comparison >= 0 : comparison <= 0) {
+        return `${entry.direction.toUpperCase()} ${leg.kind === "stop_loss" ? "손절가" : "익절가"}는 진입 지정가보다 ${below ? "낮아야" : "높아야"} 합니다.`;
+      }
+    }
+  }
+  return null;
 }
 export function ProtectionEditor({
   value,
