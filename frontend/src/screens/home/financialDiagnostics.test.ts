@@ -76,7 +76,7 @@ for (const screen of ['home', 'wallet', 'portfolio', 'ledger', 'history']) it(`$
   const errorState = h.renderer.root.findAll((node: any) => node.type.name === 'ErrorState')[0];
   act(() => errorState.props.onRetry()); await h.flush(); await h.flush();
   assert.equal(h.accountContext.isError, false);
-  assert.equal(h.find('admin-diagnostic-panel'), undefined);
+  assert.equal(h.find('admin-diagnostic-panel') === undefined, true);
 });
 
 for (const mode of ['general', 'season']) it(`${mode} Home: HTTP 200 section failure is preserved, separate from a rejected query`, async t => {
@@ -90,7 +90,7 @@ for (const mode of ['general', 'season']) it(`${mode} Home: HTTP 200 section fai
   await h.expand(); assert.ok(h.text().includes('partial-portfolio')); assert.doesNotMatch(h.text(), forbidden);
   h.portfolios.A = { ...h.portfolios.B, tradingAccountId: 'A' };
   await act(async () => h.client.invalidateQueries({ queryKey: QUERY_KEYS.tradingAccount.portfolio('A') })); await h.flush();
-  assert.equal(h.find('admin-diagnostic-panel'), undefined);
+  assert.equal(h.find('admin-diagnostic-panel') === undefined, true);
 });
 
 for (const screen of ['home', 'wallet']) it(`${screen}: existing valuation diagnostic survives complete holdings, with no fabricated unavailable failure`, async t => {
@@ -106,7 +106,7 @@ for (const screen of ['home', 'wallet']) it(`${screen}: existing valuation diagn
     assert.equal(cached.valuationErrors[0].diagnostic, diagnostic);
   }
   await h.switch('B');
-  assert.equal(h.find('admin-diagnostic-panel'), undefined, 'normal unavailable/empty data never creates a diagnostic');
+  assert.equal(h.find('admin-diagnostic-panel') === undefined, true, 'normal unavailable/empty data never creates a diagnostic');
   assert.ok(!h.text().includes('positions-partial'));
 });
 
@@ -161,7 +161,7 @@ for (const scenario of cases.filter(scenario => scenario.title && scenario.key !
   t.after(h.close); await h.start(); if (scenario.open) await h.press(scenario.open);
   await h.expand(); assert.ok(h.text().includes('retry-request'));
   delete h.failures[scenario.key]; await h.retry(scenario.title); await h.flush();
-  assert.equal(h.find('admin-diagnostic-panel'), undefined);
+  assert.equal(h.find('admin-diagnostic-panel') === undefined, true);
 });
 
 for (const screen of ['home', 'wallet', 'ledger', 'portfolio']) it(`${screen}: failed account A diagnostics disappear on account B`, async t => {
@@ -169,7 +169,7 @@ for (const screen of ['home', 'wallet', 'ledger', 'portfolio']) it(`${screen}: f
   const h = financialDiagnosticsHarness(screen, { failures: { [key]: failure('request-A') } });
   t.after(h.close); await h.start(); await h.expand(); assert.ok(h.text().includes('request-A'));
   await h.switch('B');
-  assert.equal(h.find('admin-diagnostic-panel'), undefined); assert.ok(!h.text().includes('request-A'));
+  assert.equal(h.find('admin-diagnostic-panel') === undefined, true); assert.ok(!h.text().includes('request-A'));
 });
 
 for (const gate of ['unresolved', 'lookup-failed']) it(`diagnostics fail closed when /me is ${gate}`, async t => {
@@ -181,13 +181,13 @@ for (const gate of ['unresolved', 'lookup-failed']) it(`diagnostics fail closed 
     assert.equal(h.client.getQueryState(QUERY_KEYS.me).status, 'error', 'cached admin data cannot override a failed lookup');
   }
   assert.match(h.text(), /현금 잔액을 불러오지 못했습니다/);
-  assert.equal(h.find('admin-diagnostic-panel'), undefined); assert.ok(!h.text().includes('private-request'));
+  assert.equal(h.find('admin-diagnostic-panel') === undefined, true); assert.ok(!h.text().includes('private-request'));
 });
 
 for (const screen of ['home', 'wallet', 'portfolio', 'ledger', 'history']) it(`${screen}: successful empty data has no backend diagnostic`, async t => {
   const h = financialDiagnosticsHarness(screen); h.positions.A = []; h.orders.A = [];
   t.after(h.close); await h.start();
-  assert.equal(h.find('admin-diagnostic-panel'), undefined);
+  assert.equal(h.find('admin-diagnostic-panel') === undefined, true);
 });
 
 const confirmCancel = async (h: any) => {
@@ -211,8 +211,8 @@ for (const role of ['user', 'operator', 'admin']) it(`cancel mutation: safe exis
   assert.equal(h.requests.filter((request: any) => request.method === 'POST').length, 1);
   delete h.failures['A:cancel'];
   await confirmCancel(h); await h.flush();
-  assert.equal(h.find('trade-history-cancel-error'), undefined);
-  assert.equal(h.find('admin-diagnostic-panel'), undefined, 'a new successful mutation removes the old diagnostic');
+  assert.equal(h.find('trade-history-cancel-error') === undefined, true);
+  assert.equal(h.find('admin-diagnostic-panel') === undefined, true, 'a new successful mutation removes the old diagnostic');
 });
 
 it('cancel errors are pinned to the history route, and cannot survive changing its subject', async t => {
@@ -221,9 +221,9 @@ it('cancel errors are pinned to the history route, and cannot survive changing i
   await h.switch('B');
   assert.ok(h.text().includes('cancel-A'), 'global selection cannot retarget a history screen pinned to A');
   h.route = { accountId: 'B' }; await h.update();
-  assert.equal(h.find('trade-history-cancel-error'), undefined); assert.ok(!h.text().includes('cancel-A'));
+  assert.equal(h.find('trade-history-cancel-error') === undefined, true); assert.ok(!h.text().includes('cancel-A'));
   h.route = { accountId: 'A' }; await h.update();
-  assert.equal(h.find('trade-history-cancel-error'), undefined, 'A→B→A is a new route scope');
+  assert.equal(h.find('trade-history-cancel-error') === undefined, true, 'A→B→A is a new route scope');
 });
 
 it('late cancel failure and an old confirmation cannot attach to an A→B→A history scope', async t => {
@@ -233,7 +233,7 @@ it('late cancel failure and an old confirmation cannot attach to an A→B→A hi
   h.route = { accountId: 'B' }; await h.update(); h.route = { accountId: 'A' }; await h.update();
   assert.equal(h.find('record-order-cancel-limit-A').props.disabled, false, 'old pending scope cannot keep the current row loading');
   await act(async () => gate.resolve(undefined)); await h.flush();
-  assert.equal(h.find('trade-history-cancel-error'), undefined);
+  assert.equal(h.find('trade-history-cancel-error') === undefined, true);
   assert.equal(h.alerts.some((alert: any) => alert[0] === '주문 취소 실패'), false);
   await h.press('record-order-cancel-limit-A');
   const oldConfirmation = h.alerts.at(-1)[2].find((button: any) => button.text === '주문 취소');
@@ -257,7 +257,7 @@ for (const role of ['user', 'operator', 'admin']) it(`Futures collateral query: 
   h.riskFailure = null;
   const retry = h.renderer.root.findAllByType('CTAButton').find((node: any) => node.props.label === '이체 가능 금액 다시 확인');
   await act(async () => retry.props.onPress()); await h.flush();
-  assert.equal(h.node('admin-diagnostic-panel'), undefined);
+  assert.equal(h.node('admin-diagnostic-panel') === undefined, true);
 });
 
 it('Futures collateral integrity failure uses the existing integrity state, while normal unavailable collateral has no diagnostic', async t => {
@@ -270,7 +270,7 @@ it('Futures collateral integrity failure uses the existing integrity state, whil
   h.riskFailure = null; h.risk.A.collateral.freeCollateral = null;
   await act(async () => state.props.onRetry()); await h.flush();
   assert.match(renderedText(h), /현재 선물 지갑의 이체 가능 금액을 확인할 수 없습니다/);
-  assert.equal(h.node('admin-diagnostic-panel'), undefined);
+  assert.equal(h.node('admin-diagnostic-panel') === undefined, true);
   await h.switchAccount('B'); assert.ok(!renderedText(h).includes('collateral-integrity'));
 });
 
@@ -282,7 +282,7 @@ for (const role of ['user', 'operator', 'admin']) it(`existing transfer mutation
   await expandPanels(h); assert.doesNotMatch(renderedText(h), forbidden);
   if (role === 'admin') assert.ok(renderedText(h).includes('transfer-request'));
   h.failure = null; await h.press('wallet-transfer-submit');
-  assert.ok(h.node('wallet-transfer-success')); assert.equal(h.node('admin-diagnostic-panel'), undefined);
+  assert.ok(h.node('wallet-transfer-success')); assert.equal(h.node('admin-diagnostic-panel') === undefined, true);
 });
 
 for (const role of ['user', 'operator', 'admin']) it(`Order wallet query failure reaches the existing public copy and ${role} gate`, async t => {
@@ -293,7 +293,7 @@ for (const role of ['user', 'operator', 'admin']) it(`Order wallet query failure
   assert.equal(Boolean(h.node('admin-diagnostic-panel')), role === 'admin');
   await expandPanels(h); assert.doesNotMatch(renderedText(h), forbidden);
   if (role === 'admin') assert.ok(renderedText(h).includes('order-wallet-request'));
-  h.walletState = {}; await h.update(); assert.equal(h.node('admin-diagnostic-panel'), undefined);
+  h.walletState = {}; await h.update(); assert.equal(h.node('admin-diagnostic-panel') === undefined, true);
 });
 
 for (const role of ['user', 'operator', 'admin']) for (const screen of ['order', 'futures']) it(`${screen}: account query rejection reaches its actual error UI for ${role}`, async t => {
@@ -343,7 +343,7 @@ for (const stage of ['quote', 'create']) for (const role of ['user', 'operator',
   assert.doesNotMatch(renderedText(h), forbidden);
   if (role === 'admin') assert.ok(renderedText(h).includes(`order-${stage}-request`));
   h.quoteFailure = null; h.failure = null; await h.press(TEST_IDS.order.executeSubmit); await h.flush();
-  assert.equal(h.node('admin-diagnostic-panel'), undefined); assert.equal(h.success().visible, true);
+  assert.equal(h.node('admin-diagnostic-panel') === undefined, true); assert.equal(h.success().visible, true);
 });
 
 for (const resource of ['instruments', 'executions']) for (const role of ['user', 'operator', 'admin']) it(`Futures ${resource} query failure connects its original error for ${role}`, async t => {
@@ -356,7 +356,7 @@ for (const resource of ['instruments', 'executions']) for (const role of ['user'
   assert.doesNotMatch(renderedText(h), forbidden);
   if (role === 'admin') assert.ok(renderedText(h).includes(`futures-${resource}`));
   h.readFailures = {}; await act(async () => h.client.refetchQueries()); await h.flush();
-  assert.equal(h.node('admin-diagnostic-panel'), undefined);
+  assert.equal(h.node('admin-diagnostic-panel') === undefined, true);
 });
 
 it('equity range change does not reuse the preceding range failure', async t => {
@@ -365,7 +365,7 @@ it('equity range change does not reuse the preceding range failure', async t => 
   assert.ok(h.text().includes('range-30d')); delete h.failures['A:portfolio/equity'];
   await h.press('home-trend-range-7d');
   assert.equal(h.client.getQueryState(QUERY_KEYS.tradingAccount.portfolioEquity('A', '7d', 'daily')).status, 'success');
-  assert.equal(h.find('admin-diagnostic-panel'), undefined);
+  assert.equal(h.find('admin-diagnostic-panel') === undefined, true);
   assert.equal(h.client.getQueryState(QUERY_KEYS.tradingAccount.portfolioEquity('A', '30d', 'daily')).status, 'error');
 });
 
@@ -381,7 +381,7 @@ for (const kind of ['timeout', 'network', 'contract']) for (const role of ['user
   if (role === 'admin') {
     assert.match(renderedText(h), /wallet_transfer/); assert.match(renderedText(h), /unknown/);
     assert.match(renderedText(h), kind === 'contract' ? /response_validation/ : /request_transport/);
-  } else assert.equal(h.node('admin-diagnostic-panel'), undefined);
+  } else assert.equal(h.node('admin-diagnostic-panel') === undefined, true);
   const key = h.requests[0].body.idempotencyKey;
   h.failure = null; h.response = null;
   if (kind === 'contract') {
@@ -391,7 +391,7 @@ for (const kind of ['timeout', 'network', 'contract']) for (const role of ['user
   }
   await h.press('wallet-transfer-submit');
   assert.equal(h.requests.length, 2); assert.equal(h.requests[1].body.idempotencyKey, key);
-  assert.ok(h.node('wallet-transfer-success')); assert.equal(h.node('admin-diagnostic-panel'), undefined);
+  assert.ok(h.node('wallet-transfer-success')); assert.equal(h.node('admin-diagnostic-panel') === undefined, true);
 });
 
 for (const stage of ['quote', 'execute']) it(`order timeout at ${stage}: client observations never assert server execution failure`, async t => {
@@ -442,7 +442,16 @@ for (const screen of ['home', 'portfolio']) for (const role of ['user', 'operato
   h.positions.A[0].valuation = { ...live, state: 'stale_cache', reason: 'LIVE_VALUATION_UNAVAILABLE', diagnostic };
   await h.start(); await h.expand();
   assert.equal(h.text().includes('cached-live-request'), role === 'admin'); assert.doesNotMatch(h.text(), forbidden);
+  const cachedPosition = h.client.getQueriesData({ queryKey: QUERY_KEYS.tradingAccount.positionsAll('A') })
+    .flatMap(([, data]: any) => data?.positions ?? data?.pages.flatMap((page: any) => page.positions) ?? [])[0];
+  assert.equal(cachedPosition.valuation.state, 'stale_cache');
   h.positions.A = h.positions.A.map((position: any, index: number) => index === 0 ? { ...position, valuation: live } : position);
+  assert.equal(cachedPosition === h.positions.A[0], false, 'fixture recovery replaces the position without mutating the cached response');
+  assert.equal(cachedPosition.valuation.state, 'stale_cache', 'cached failure survives until the refetch');
   await act(async () => { await h.client.invalidateQueries({ queryKey: QUERY_KEYS.tradingAccount.positionsAll('A') }); }); await h.flush();
+  const recoveredPosition = h.client.getQueriesData({ queryKey: QUERY_KEYS.tradingAccount.positionsAll('A') })
+    .flatMap(([, data]: any) => data?.positions ?? data?.pages.flatMap((page: any) => page.positions) ?? [])[0];
+  assert.equal(recoveredPosition.valuation.state, live.state);
+  assert.equal(h.text().includes('cached-live-request'), false);
   assert.equal(Boolean(h.find('admin-diagnostic-panel')), false);
 });
