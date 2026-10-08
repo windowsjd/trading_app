@@ -1,0 +1,4 @@
+START f1_used_retry2 0 finance_f1 src/futures/futures.integration.spec.ts
+END {"case": "f1_used_retry2", "db": "finance_f1", "index": 0, "spec": "src/futures/futures.integration.spec.ts", "command": ["pnpm", "exec", "jest", "--runInBand", "src/futures/futures.integration.spec.ts"], "returncode": 0, "seconds": 14.39, "log": "/tmp/finance-pg-investigation/retries-f1_used_retry2-0.log"}
+START f1_fresh_retry3 0 finance_f1_retry3 src/futures/futures.integration.spec.ts
+END {"case": "f1_fresh_retry3", "db": "finance_f1_retry3", "index": 0, "spec": "src/futures/futures.integration.spec.ts", "command": ["pnpm", "exec", "jest", "--runInBand", "src/futures/futures.integration.spec.ts"], "returncode": 0, "seconds": 13.621, "log": "/tmp/finance-pg-investigation/retries-f1_fresh_retry3-0.log"}

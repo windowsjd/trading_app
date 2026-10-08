@@ -1,5 +1,10 @@
 # Futures 성능 검증 및 잔여 보완
 
+후속 [금융 PG 간헐 실패 조사](../2026-10-08-financial-pg-flakiness/report.md)는
+실제 호스트 시각 역전에 따른 Futures coverage/Legacy Spot future evidence 거부를
+HEAD와 변경 전 버전에서 재현해 **DIAGNOSED**로 판정했다. 아래는 당시 성능 작업의
+PARTIAL 기록이며, 이후의 환경 진단이 이 문서의 로컬 전체 gate 결과를 대체하지 않는다.
+
 ## A. 성능 측정
 
 ### 시작 상태 및 측정 경계

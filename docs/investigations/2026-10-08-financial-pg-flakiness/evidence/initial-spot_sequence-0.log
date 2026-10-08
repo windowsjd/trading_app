@@ -1,0 +1,9 @@
+PASS src/orders/limit-order-reservation.integration.spec.ts
+  Limit order cash reservation DB integration
+    ✓ verifies atomic reservation, CHECK constraints, rollback, single release, and reserved-cash protection against PostgreSQL (743 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        0.963 s
+Ran all test suites matching src/orders/limit-order-reservation.integration.spec.ts.

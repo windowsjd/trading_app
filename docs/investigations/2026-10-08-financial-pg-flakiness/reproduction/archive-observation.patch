@@ -1,0 +1,61 @@
+--- a/backend/src/futures/futures.service.ts
++++ b/backend/src/futures/futures.service.ts
+@@ -225,11 +225,13 @@
+         if (
+           ['open', 'increase'].includes(request.operation) &&
+           !verifiedFuturesInstrument(lockedInstrument, executeNow)
+-        )
++        ) {
++          console.error('PG_OBSERVE_FUTURES ' + JSON.stringify({ operation: request.operation, executeNow, nodeNow: new Date(), instrument: lockedInstrument }));
+           futuresError(
+             'FUTURES_INSTRUMENT_UNVERIFIED',
+             'This Futures instrument is not yet available for new trades.',
+           );
++        }
+         const wallet = await this.wallet(tx, accountId);
+         stage('futures_execution_price_selection', accountId);
+         const price = (await readFuturesPrice(
+--- a/backend/src/orders/limit-order-execution.service.ts
++++ b/backend/src/orders/limit-order-execution.service.ts
+@@ -444,12 +444,14 @@
+           freshnessThresholdSeconds: eligibility.freshnessThresholdSeconds,
+           isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
+         });
+-        if (selection.state !== 'selected')
++        if (selection.state !== 'selected') {
++          console.error('PG_OBSERVE_SPOT ' + JSON.stringify({ transactionNow, nodeNow: new Date(), submittedAt: order.submittedAt, asset: order.asset, eligibility, evidence, selection }));
+           return {
+             state: 'skipped',
+             orderId,
+             reason: 'price_evidence_unavailable',
+           };
++        }
+       } else {
+         // Path B is historical touch evidence. Its close is evidenceAt, not
+         // the execution time: no current 10-second price freshness/session gate.
+--- a/backend/scripts/spot-wallet-transfer-integration.ts
++++ b/backend/scripts/spot-wallet-transfer-integration.ts
+@@ -1,3 +1,4 @@
++import { beforeStep, step } from './investigation-step-barrier';
+ import { RankingRefreshService } from '../src/ranking/ranking-refresh.service';
+ import { WalletsService } from '../src/wallets/wallets.service';
+ import 'dotenv/config';
+@@ -1276,6 +1277,7 @@
+       'buycancel',
+     );
+     assert.equal((await usd()).reservedAmount.toFixed(8), '100.10000000');
++    if (process.env.PG_CLOCK_STEP_REPRO === '1') await beforeStep();
+     const tick = await dbNow(legacyDb);
+     await client.assetPriceSnapshot.update({
+       where: { id: 'price' },
+@@ -1285,6 +1287,10 @@
+       where: { id: 'fx' },
+       data: { effectiveAt: tick, capturedAt: tick },
+     });
++    if (process.env.PG_CLOCK_STEP_REPRO === '1') {
++      console.error('SPOT_EVIDENCE_BEFORE_STEP ' + JSON.stringify({tick,nodeNow:new Date()}));
++      await step(5000);
++    }
+     const fill = await old.execution.fillLimitOrder({
+       orderId: 'buyfill',
+       plan: {

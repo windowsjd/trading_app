@@ -1,0 +1,9 @@
+PASS src/wallets/spot-wallet-transfer.integration.spec.ts (6.636 s)
+  Spot cash provenance and USD transfer PostgreSQL integration
+    ✓ preserves legacy orders and proves current Spot, transfer and lifecycle invariants (6538 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        6.756 s
+Ran all test suites matching src/wallets/spot-wallet-transfer.integration.spec.ts.

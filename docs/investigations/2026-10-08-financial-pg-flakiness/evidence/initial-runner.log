@@ -1,0 +1,45 @@
+The files belonging to this database system will be owned by user "nayuta".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are disabled.
+
+creating directory /tmp/finance-pg-investigation/pgdata ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default max_connections ... 100
+selecting default shared_buffers ... 128MB
+selecting default time zone ... Asia/Seoul
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    /tmp/futures-resume/deps/usr/lib/postgresql/16/bin/pg_ctl -D /tmp/finance-pg-investigation/pgdata -l logfile start
+
+START f1 0 finance_f1 src/futures/futures.integration.spec.ts
+END {"case": "f1", "db": "finance_f1", "index": 0, "spec": "src/futures/futures.integration.spec.ts", "command": ["pnpm", "exec", "jest", "--runInBand", "src/futures/futures.integration.spec.ts"], "returncode": 1, "seconds": 4.766, "log": "/tmp/finance-pg-investigation/initial-f1-0.log"}
+START f2 0 finance_f2 src/futures/futures-risk.integration.spec.ts
+END {"case": "f2", "db": "finance_f2", "index": 0, "spec": "src/futures/futures-risk.integration.spec.ts", "command": ["pnpm", "exec", "jest", "--runInBand", "src/futures/futures-risk.integration.spec.ts"], "returncode": 0, "seconds": 40.458, "log": "/tmp/finance-pg-investigation/initial-f2-0.log"}
+START f3 0 finance_f3 src/futures/futures-f3.integration.spec.ts
+END {"case": "f3", "db": "finance_f3", "index": 0, "spec": "src/futures/futures-f3.integration.spec.ts", "command": ["pnpm", "exec", "jest", "--runInBand", "src/futures/futures-f3.integration.spec.ts"], "returncode": 0, "seconds": 8.303, "log": "/tmp/finance-pg-investigation/initial-f3-0.log"}
+START spot 0 finance_spot src/wallets/spot-wallet-transfer.integration.spec.ts
+END {"case": "spot", "db": "finance_spot", "index": 0, "spec": "src/wallets/spot-wallet-transfer.integration.spec.ts", "command": ["pnpm", "exec", "jest", "--runInBand", "src/wallets/spot-wallet-transfer.integration.spec.ts"], "returncode": 0, "seconds": 7.195, "log": "/tmp/finance-pg-investigation/initial-spot-0.log"}
+START futures_sequence 0 finance_futures_sequence src/futures/futures.integration.spec.ts
+END {"case": "futures_sequence", "db": "finance_futures_sequence", "index": 0, "spec": "src/futures/futures.integration.spec.ts", "command": ["pnpm", "exec", "jest", "--runInBand", "src/futures/futures.integration.spec.ts"], "returncode": 0, "seconds": 13.389, "log": "/tmp/finance-pg-investigation/initial-futures_sequence-0.log"}
+START futures_sequence 1 finance_futures_sequence src/futures/futures-risk.integration.spec.ts
+END {"case": "futures_sequence", "db": "finance_futures_sequence", "index": 1, "spec": "src/futures/futures-risk.integration.spec.ts", "command": ["pnpm", "exec", "jest", "--runInBand", "src/futures/futures-risk.integration.spec.ts"], "returncode": 0, "seconds": 39.381, "log": "/tmp/finance-pg-investigation/initial-futures_sequence-1.log"}
+START futures_sequence 2 finance_futures_sequence src/futures/futures-f3.integration.spec.ts
+END {"case": "futures_sequence", "db": "finance_futures_sequence", "index": 2, "spec": "src/futures/futures-f3.integration.spec.ts", "command": ["pnpm", "exec", "jest", "--runInBand", "src/futures/futures-f3.integration.spec.ts"], "returncode": 0, "seconds": 8.144, "log": "/tmp/finance-pg-investigation/initial-futures_sequence-2.log"}
+START spot_sequence 0 finance_spot_sequence src/orders/limit-order-reservation.integration.spec.ts
+END {"case": "spot_sequence", "db": "finance_spot_sequence", "index": 0, "spec": "src/orders/limit-order-reservation.integration.spec.ts", "command": ["pnpm", "exec", "jest", "--runInBand", "src/orders/limit-order-reservation.integration.spec.ts"], "returncode": 0, "seconds": 1.384, "log": "/tmp/finance-pg-investigation/initial-spot_sequence-0.log"}
+START spot_sequence 1 finance_spot_sequence src/wallets/spot-wallet-transfer.integration.spec.ts
+END {"case": "spot_sequence", "db": "finance_spot_sequence", "index": 1, "spec": "src/wallets/spot-wallet-transfer.integration.spec.ts", "command": ["pnpm", "exec", "jest", "--runInBand", "src/wallets/spot-wallet-transfer.integration.spec.ts"], "returncode": 0, "seconds": 6.942, "log": "/tmp/finance-pg-investigation/initial-spot_sequence-1.log"}
+START spot_sequence 2 finance_spot_sequence src/wallets/wallet-fx-transfer.integration.spec.ts
+END {"case": "spot_sequence", "db": "finance_spot_sequence", "index": 2, "spec": "src/wallets/wallet-fx-transfer.integration.spec.ts", "command": ["pnpm", "exec", "jest", "--runInBand", "src/wallets/wallet-fx-transfer.integration.spec.ts"], "returncode": 0, "seconds": 13.489, "log": "/tmp/finance-pg-investigation/initial-spot_sequence-2.log"}
+START spot_sequence 3 finance_spot_sequence src/orders/limit-order-matching.integration.spec.ts
+END {"case": "spot_sequence", "db": "finance_spot_sequence", "index": 3, "spec": "src/orders/limit-order-matching.integration.spec.ts", "command": ["pnpm", "exec", "jest", "--runInBand", "src/orders/limit-order-matching.integration.spec.ts"], "returncode": 0, "seconds": 1.947, "log": "/tmp/finance-pg-investigation/initial-spot_sequence-3.log"}

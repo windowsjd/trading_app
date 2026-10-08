@@ -1,0 +1,9 @@
+PASS src/futures/futures.integration.spec.ts (13.506 s)
+  Futures F1 actual PostgreSQL financial integration
+    ✓ proves General/Season lifecycle, evidence, fees, collateral, rollback and races (13410 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        13.686 s
+Ran all test suites matching src/futures/futures.integration.spec.ts.

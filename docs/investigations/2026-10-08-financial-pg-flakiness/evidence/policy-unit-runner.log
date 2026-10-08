@@ -1,0 +1,17 @@
+PASS src/orders/limit-order-matching-diagnostics.spec.ts
+PASS src/futures/futures-valuation.spec.ts
+[31m[Nest] 204417  - [39m10/08/2026, 11:51:26 PM [31m  ERROR[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[31m{"event":"http_request_failed","surface":"pre_auth_http","code":"FUTURES_MARK_UNAVAILABLE","httpStatus":503,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}[39m
+[31m[Nest] 204417  - [39m10/08/2026, 11:51:26 PM [31m  ERROR[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[31m{"event":"http_request_failed","surface":"pre_auth_http","code":"FUTURES_MARK_STALE","httpStatus":503,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}[39m
+[31m[Nest] 204417  - [39m10/08/2026, 11:51:26 PM [31m  ERROR[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[31m{"event":"http_request_failed","surface":"pre_auth_http","code":"FUTURES_MARK_UNAVAILABLE","httpStatus":503,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}[39m
+[31m[Nest] 204417  - [39m10/08/2026, 11:51:26 PM [31m  ERROR[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[31m{"event":"http_request_failed","surface":"pre_auth_http","code":"FUTURES_MARK_STALE","httpStatus":503,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}[39m
+[31m[Nest] 204417  - [39m10/08/2026, 11:51:26 PM [31m  ERROR[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[31m{"event":"http_request_failed","surface":"pre_auth_http","code":"FUTURES_MARK_UNAVAILABLE","httpStatus":503,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}[39m
+[31m[Nest] 204417  - [39m10/08/2026, 11:51:26 PM [31m  ERROR[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[31m{"event":"http_request_failed","surface":"pre_auth_http","code":"FUTURES_MARK_STALE","httpStatus":503,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}[39m
+PASS src/futures/futures-mark.spec.ts
+PASS src/futures/futures-price.spec.ts
+PASS src/providers/source-eligibility.policy.spec.ts
+
+Test Suites: 5 passed, 5 total
+Tests:       144 passed, 144 total
+Snapshots:   0 total
+Time:        0.681 s, estimated 1 s
+Ran all test suites matching src/futures/futures-valuation.spec.ts|src/futures/futures-price.spec.ts|src/futures/futures-mark.spec.ts|src/providers/source-eligibility.policy.spec.ts|src/orders/limit-order-matching-diagnostics.spec.ts.

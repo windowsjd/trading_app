@@ -1,0 +1,194 @@
+PASS src/futures/futures-f3.integration.spec.ts (8.032 s)
+PASS src/orders/trading-transaction-time.integration.spec.ts (43.771 s)
+PASS src/futures/futures-risk.integration.spec.ts (38.303 s)
+PASS src/wallets/wallet-fx-transfer.integration.spec.ts (12.915 s)
+FAIL src/futures/futures.integration.spec.ts
+  ● Futures F1 actual PostgreSQL financial integration › proves General/Season lifecycle, evidence, fees, collateral, rollback and races
+
+    [32m[Nest] 145529  - [39m10/08/2026, 9:33:47 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"6949fceb-fee5-4352-afe6-342ef1fcc5f3"}[39m
+    [33m[Nest] 145529  - [39m10/08/2026, 9:33:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"6949fceb-fee5-4352-afe6-342ef1fcc5f3","capturedAt":"2026-10-08T12:33:48.004Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS direct PostgreSQL structural writes reject invalid leverage/quantity/direction/state, hedge, identity and wrong evidence
+    [32m[Nest] 145529  - [39m10/08/2026, 9:33:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"a9bb83be-e82c-4d32-96bc-1fce7509c2cc"}[39m
+    [33m[Nest] 145529  - [39m10/08/2026, 9:33:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"a9bb83be-e82c-4d32-96bc-1fce7509c2cc","capturedAt":"2026-10-08T12:33:48.156Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 145529  - [39m10/08/2026, 9:33:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"8e37c9bc-e902-492f-93de-fd0b4313412e","capturedAt":"2026-10-08T12:33:48.195Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS General/Season same instrument and key keep positions, wallets, history, fees and ownership isolated
+    [32m[Nest] 145529  - [39m10/08/2026, 9:33:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"32d149be-5e9d-458d-9e73-f74315b41f6c"}[39m
+    PASS general/long complete lifetime, average, fee/PnL, history and committed replay
+    [32m[Nest] 145529  - [39m10/08/2026, 9:33:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"bc5bc3a5-beb9-4cf3-8ce0-12dfbf2649ee"}[39m
+    PASS general/long extreme loss full rollback, no clamp/delete/negative wallet
+    [32m[Nest] 145529  - [39m10/08/2026, 9:33:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"057363d1-582f-4191-9d17-0dc27e485584"}[39m
+    PASS general/long partial loss cannot spend remaining isolated margin
+    [32m[Nest] 145529  - [39m10/08/2026, 9:33:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"ee9bf1a6-f016-4ce7-8c86-f4afc8db650f"}[39m
+    PASS general/short complete lifetime, average, fee/PnL, history and committed replay
+    [32m[Nest] 145529  - [39m10/08/2026, 9:33:49 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"1210e2c3-8277-4a23-a113-9d9bb9d2146c"}[39m
+    PASS general/short extreme loss full rollback, no clamp/delete/negative wallet
+    [32m[Nest] 145529  - [39m10/08/2026, 9:33:49 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"696b6d01-9801-4bcf-858e-fd58a6571308"}[39m
+    PASS general/short partial loss cannot spend remaining isolated margin
+    [32m[Nest] 145529  - [39m10/08/2026, 9:33:49 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"0b9ca1b9-937c-4b81-a082-323df02adc5d"}[39m
+    (node:145529) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    HttpException: Http Exception
+
+      23 |   const publicMessage =
+      24 |     safePublicErrorMessage(message) ?? 'Request could not be completed.';
+    > 25 |   const exception = new HttpException(
+         |                     ^
+      26 |     {
+      27 |       success: false,
+      28 |       error: {
+
+      at createApiError (common/api-error.ts:25:21)
+      at futuresError (futures/futures-error.ts:9:9)
+      at async Proxy._transactionWithCallback (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:785:18)
+      at async FuturesService.execute (futures/futures.service.ts:127:14)
+      at async marginAndFlags (../scripts/futures-integration.ts:641:22)
+      at async main (../scripts/futures-integration.ts:1385:5) {
+        response: {
+          success: false,
+          error: {
+            code: 'FUTURES_INSTRUMENT_UNVERIFIED',
+            message: 'This Futures instrument is not yet available for new trades.'
+          }
+        },
+        status: 409,
+        options: undefined
+      }
+      at Object.<anonymous> (futures/futures.integration.spec.ts:17:38)
+
+PASS src/futures/futures-isolated-boundary.integration.spec.ts (11.136 s)
+PASS src/conditional/conditional.integration.spec.ts (10.446 s)
+PASS src/futures/futures-limit.integration.spec.ts (9.303 s)
+FAIL src/wallets/spot-wallet-transfer.integration.spec.ts
+  ● Spot cash provenance and USD transfer PostgreSQL integration › preserves legacy orders and proves current Spot, transfer and lifecycle invariants
+
+    (node:145861) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    AssertionError [ERR_ASSERTION]: {"state":"skipped","orderId":"buyfill","reason":"price_evidence_unavailable"}
+    + actual - expected
+
+    + 'skipped'
+    - 'filled'
+
+      1294 |       },
+      1295 |     });
+    > 1296 |     assert.equal(fill.state, 'filled', JSON.stringify(fill));
+           |            ^
+      1297 |     assert.equal((await usd()).reservedAmount.toFixed(8), zero);
+      1298 |     assert.equal((await usd()).balanceAmount.toFixed(8), '899.90000000');
+      1299 |     await old.orders.cancelOrderForTradingAccount(
+
+      at legacy (../scripts/spot-wallet-transfer-integration.ts:1296:12)
+      at async main (../scripts/spot-wallet-transfer-integration.ts:1395:5) {
+        generatedMessage: false,
+        code: 'ERR_ASSERTION',
+        actual: 'skipped',
+        expected: 'filled',
+        operator: 'strictEqual',
+        diff: 'simple'
+      }
+      at Object.<anonymous> (wallets/spot-wallet-transfer.integration.spec.ts:19:38)
+
+PASS src/orders/limit-order-transaction-time.integration.spec.ts
+PASS src/orders/trading-fee-pinning.integration.spec.ts
+PASS src/orders/order-input-policy.integration.spec.ts
+PASS src/orders/orders.execute.integration.spec.ts
+PASS src/orders/market-execution.integration.spec.ts
+PASS src/fx/fx.execute.integration.spec.ts
+PASS src/futures/futures-f31.integration.spec.ts
+PASS src/orders/limit-order-matching.integration.spec.ts
+PASS src/orders/limit-order-create-race.integration.spec.ts
+PASS src/mvp-flow.integration.spec.ts
+PASS src/orders/limit-order-reservation.integration.spec.ts
+PASS src/orders/limit-order-create-no-redis.integration.spec.ts
+PASS src/orders/limit-order-idempotent-replay.integration.spec.ts
+
+Summary of all failing tests
+FAIL futures/futures.integration.spec.ts
+  ● Futures F1 actual PostgreSQL financial integration › proves General/Season lifecycle, evidence, fees, collateral, rollback and races
+
+    [32m[Nest] 145529  - [39m10/08/2026, 9:33:47 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"6949fceb-fee5-4352-afe6-342ef1fcc5f3"}[39m
+    [33m[Nest] 145529  - [39m10/08/2026, 9:33:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"6949fceb-fee5-4352-afe6-342ef1fcc5f3","capturedAt":"2026-10-08T12:33:48.004Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS direct PostgreSQL structural writes reject invalid leverage/quantity/direction/state, hedge, identity and wrong evidence
+    [32m[Nest] 145529  - [39m10/08/2026, 9:33:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"a9bb83be-e82c-4d32-96bc-1fce7509c2cc"}[39m
+    [33m[Nest] 145529  - [39m10/08/2026, 9:33:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"a9bb83be-e82c-4d32-96bc-1fce7509c2cc","capturedAt":"2026-10-08T12:33:48.156Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 145529  - [39m10/08/2026, 9:33:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"8e37c9bc-e902-492f-93de-fd0b4313412e","capturedAt":"2026-10-08T12:33:48.195Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS General/Season same instrument and key keep positions, wallets, history, fees and ownership isolated
+    [32m[Nest] 145529  - [39m10/08/2026, 9:33:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"32d149be-5e9d-458d-9e73-f74315b41f6c"}[39m
+    PASS general/long complete lifetime, average, fee/PnL, history and committed replay
+    [32m[Nest] 145529  - [39m10/08/2026, 9:33:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"bc5bc3a5-beb9-4cf3-8ce0-12dfbf2649ee"}[39m
+    PASS general/long extreme loss full rollback, no clamp/delete/negative wallet
+    [32m[Nest] 145529  - [39m10/08/2026, 9:33:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"057363d1-582f-4191-9d17-0dc27e485584"}[39m
+    PASS general/long partial loss cannot spend remaining isolated margin
+    [32m[Nest] 145529  - [39m10/08/2026, 9:33:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"ee9bf1a6-f016-4ce7-8c86-f4afc8db650f"}[39m
+    PASS general/short complete lifetime, average, fee/PnL, history and committed replay
+    [32m[Nest] 145529  - [39m10/08/2026, 9:33:49 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"1210e2c3-8277-4a23-a113-9d9bb9d2146c"}[39m
+    PASS general/short extreme loss full rollback, no clamp/delete/negative wallet
+    [32m[Nest] 145529  - [39m10/08/2026, 9:33:49 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"696b6d01-9801-4bcf-858e-fd58a6571308"}[39m
+    PASS general/short partial loss cannot spend remaining isolated margin
+    [32m[Nest] 145529  - [39m10/08/2026, 9:33:49 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"0b9ca1b9-937c-4b81-a082-323df02adc5d"}[39m
+    (node:145529) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    HttpException: Http Exception
+
+      23 |   const publicMessage =
+      24 |     safePublicErrorMessage(message) ?? 'Request could not be completed.';
+    > 25 |   const exception = new HttpException(
+         |                     ^
+      26 |     {
+      27 |       success: false,
+      28 |       error: {
+
+      at createApiError (common/api-error.ts:25:21)
+      at futuresError (futures/futures-error.ts:9:9)
+      at async Proxy._transactionWithCallback (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:785:18)
+      at async FuturesService.execute (futures/futures.service.ts:127:14)
+      at async marginAndFlags (../scripts/futures-integration.ts:641:22)
+      at async main (../scripts/futures-integration.ts:1385:5) {
+        response: {
+          success: false,
+          error: {
+            code: 'FUTURES_INSTRUMENT_UNVERIFIED',
+            message: 'This Futures instrument is not yet available for new trades.'
+          }
+        },
+        status: 409,
+        options: undefined
+      }
+      at Object.<anonymous> (futures/futures.integration.spec.ts:17:38)
+
+FAIL wallets/spot-wallet-transfer.integration.spec.ts
+  ● Spot cash provenance and USD transfer PostgreSQL integration › preserves legacy orders and proves current Spot, transfer and lifecycle invariants
+
+    (node:145861) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    AssertionError [ERR_ASSERTION]: {"state":"skipped","orderId":"buyfill","reason":"price_evidence_unavailable"}
+    + actual - expected
+
+    + 'skipped'
+    - 'filled'
+
+      1294 |       },
+      1295 |     });
+    > 1296 |     assert.equal(fill.state, 'filled', JSON.stringify(fill));
+           |            ^
+      1297 |     assert.equal((await usd()).reservedAmount.toFixed(8), zero);
+      1298 |     assert.equal((await usd()).balanceAmount.toFixed(8), '899.90000000');
+      1299 |     await old.orders.cancelOrderForTradingAccount(
+
+      at legacy (../scripts/spot-wallet-transfer-integration.ts:1296:12)
+      at async main (../scripts/spot-wallet-transfer-integration.ts:1395:5) {
+        generatedMessage: false,
+        code: 'ERR_ASSERTION',
+        actual: 'skipped',
+        expected: 'filled',
+        operator: 'strictEqual',
+        diff: 'simple'
+      }
+      at Object.<anonymous> (wallets/spot-wallet-transfer.integration.spec.ts:19:38)
+
+
+Test Suites: 2 failed, 20 passed, 22 total
+Tests:       2 failed, 21 passed, 23 total
+Snapshots:   0 total
+Time:        164.973 s, estimated 175 s
+Ran all test suites matching src/orders/order-input-policy.integration.spec.ts|src/orders/limit-order-reservation.integration.spec.ts|src/wallets/spot-wallet-transfer.integration.spec.ts|src/wallets/wallet-fx-transfer.integration.spec.ts|src/futures/futures.integration.spec.ts|src/futures/futures-risk.integration.spec.ts|src/futures/futures-f3.integration.spec.ts|src/futures/futures-f31.integration.spec.ts|src/conditional/conditional.integration.spec.ts|src/futures/futures-limit.integration.spec.ts|src/futures/futures-isolated-boundary.integration.spec.ts|src/orders/limit-order-create-race.integration.spec.ts|src/orders/limit-order-transaction-time.integration.spec.ts|src/orders/trading-transaction-time.integration.spec.ts|src/orders/trading-fee-pinning.integration.spec.ts|src/orders/limit-order-create-no-redis.integration.spec.ts|src/orders/limit-order-idempotent-replay.integration.spec.ts|src/orders/limit-order-matching.integration.spec.ts|src/orders/orders.execute.integration.spec.ts|src/orders/market-execution.integration.spec.ts|src/fx/fx.execute.integration.spec.ts|src/mvp-flow.integration.spec.ts.

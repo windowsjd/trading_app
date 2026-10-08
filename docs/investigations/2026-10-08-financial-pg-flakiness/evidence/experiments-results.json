@@ -1,0 +1,58 @@
+[
+  {
+    "version": "head",
+    "db": "finance_clock_head",
+    "script": "investigation-clock-step-futures.ts",
+    "returncode": 0,
+    "seconds": 84.18785316499998,
+    "command": [
+      "pnpm",
+      "tsx",
+      "scripts/investigation-clock-step-futures.ts"
+    ],
+    "log": "/tmp/finance-pg-investigation/head-clock-investigation-clock-step-futures.log",
+    "artifactLog": "evidence/head-clock-investigation-clock-step-futures.log"
+  },
+  {
+    "version": "head",
+    "db": "finance_clock_head",
+    "script": "spot-wallet-transfer-integration.ts",
+    "returncode": 1,
+    "seconds": 96.75767281499793,
+    "command": [
+      "pnpm",
+      "tsx",
+      "scripts/spot-wallet-transfer-integration.ts"
+    ],
+    "log": "/tmp/finance-pg-investigation/head-clock-spot-wallet-transfer-integration.log",
+    "artifactLog": "evidence/head-clock-spot-wallet-transfer-integration.log"
+  },
+  {
+    "version": "baseline",
+    "db": "finance_clock_baseline",
+    "script": "investigation-clock-step-futures.ts",
+    "returncode": 0,
+    "seconds": 94.48184493000008,
+    "command": [
+      "pnpm",
+      "tsx",
+      "scripts/investigation-clock-step-futures.ts"
+    ],
+    "log": "/tmp/finance-pg-investigation/baseline-clock-investigation-clock-step-futures.log",
+    "artifactLog": "evidence/baseline-clock-investigation-clock-step-futures.log"
+  },
+  {
+    "version": "baseline",
+    "db": "finance_clock_baseline",
+    "script": "spot-wallet-transfer-integration.ts",
+    "returncode": 1,
+    "seconds": 96.71646135899937,
+    "command": [
+      "pnpm",
+      "tsx",
+      "scripts/spot-wallet-transfer-integration.ts"
+    ],
+    "log": "/tmp/finance-pg-investigation/baseline-clock-spot-wallet-transfer-integration.log",
+    "artifactLog": "evidence/baseline-clock-spot-wallet-transfer-integration.log"
+  }
+]

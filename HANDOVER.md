@@ -10,6 +10,29 @@
 
 ---
 
+## 2026-10-08 금융 PostgreSQL 간헐 실패 원인 조사
+
+- 시작 `main` / HEAD·origin/main·원격 main `c942ddee512666c2def0477c3a97c8fcbebb9ec2`,
+  clean working tree. [조사 보고서](docs/investigations/2026-10-08-financial-pg-flakiness/report.md)에
+  실제 predicate·fixture 값·명령·비교·메모리 증거를 보존했다.
+- **DIAGNOSED:** 로컬 WSL2 호스트 wall clock이 약 0.8초 뒤로 이동하여, 생성 당시
+  유효한 증거가 다음 DB transaction에서 미래가 된다. Futures는
+  `markVerifiedAt > executeNow`, Legacy Spot은 `effective_at_in_future`로 각각 거부했다.
+  새 DB F1 단독 자연 실패 및 실제 clock step에 동기화한 HEAD/`2411a0c6` 양쪽
+  Futures·Legacy Spot 재현으로 확인했다. 특정 시계 조정 daemon/설정까지 특정하지는 않았다.
+- 평상시 단독/순차 금융 실행 13개는 12 PASS/1 FAILED; 확인된 F1 단독만 총 3회
+  비교했다. 실제 PG coverage 거부/rollback·정상 수락 6 checks 및 기존 정책 unit
+  5 suites/144 tests PASS. CI #209 실제 금융 job 로그도 22 suites/23 tests PASS였다.
+- 제품 코드/fixture/정책/migration/운영 설정은 변경하지 않았다. 관측과 실행 시점
+  동기화는 독립 archive에만 적용했다. 3GiB/swap0/heap1152MiB cgroup의 peak 최대
+  1195.2MiB, OOM/guard stop/잔여 자식 0. 새 성능 benchmark 없음.
+- 시계 안정화 또는 별도 검증 host 선택이 남는다. 임의 backdate나 future 허용으로
+  금융 실패를 숨기지 않았다. 전체 로컬 gate는 이번에 재실행하지 않았으며 기존 최종
+  20/22 기록을 유지한다. 환경 조치 후 재현 조합과 전체 gate 1회가 필요하다.
+- 과거 F2/F3 개별 실패와 원본 F2 Mark metrics null 실패의 predicate 값이 없으므로
+  모두 같은 원인이라고 소급 판정하지 않는다. checkout/기존 migration 보존,
+  운영 DB·서비스 사용 및 commit/push/merge 없음. 문서·재현 자료만 추가했다.
+
 ## 2026-10-08 Futures 성능 측정 및 잔여 보완
 
 - 시작 `main` / HEAD·fetch 후 origin/main `2411a0c67e5f9609f7a40ecd7ff20bd229cea49b`,

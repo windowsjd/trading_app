@@ -1,0 +1,765 @@
+{
+  "result": "DIAGNOSED",
+  "reason": "Actual local host wall-clock regression makes previously valid coverage and canonical Spot price evidence future-dated at execution. Both paths reproduced independently on HEAD and pre-change archive. No product or fixture changes; host clock remediation/runner choice and final local aggregate gate remain.",
+  "start": {
+    "branch": "main",
+    "head": "c942ddee512666c2def0477c3a97c8fcbebb9ec2",
+    "originMain": "c942ddee512666c2def0477c3a97c8fcbebb9ec2",
+    "remoteMain": "c942ddee512666c2def0477c3a97c8fcbebb9ec2",
+    "workingTree": "clean"
+  },
+  "baseline": "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b",
+  "reviewReference": "9e3697e2dbf9dee7445bdd0dc76ec3463c2c309b",
+  "environment": {
+    "kernel": "6.6.87.2-microsoft-standard-WSL2",
+    "os": "Ubuntu 24.04.4",
+    "clocksource": "tsc",
+    "node": "24.14.1",
+    "pnpm": "10.33.0",
+    "postgres": "16.15",
+    "prisma": "7.6.0",
+    "postgresPort": 55559,
+    "redisPort": 56459,
+    "productionAccess": false
+  },
+  "matrix": [
+    {
+      "case": "f1",
+      "db": "finance_f1",
+      "index": 0,
+      "spec": "src/futures/futures.integration.spec.ts",
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "src/futures/futures.integration.spec.ts"
+      ],
+      "returncode": 1,
+      "seconds": 4.766,
+      "log": "/tmp/finance-pg-investigation/initial-f1-0.log",
+      "artifactLog": "evidence/initial-f1-0.log"
+    },
+    {
+      "case": "f2",
+      "db": "finance_f2",
+      "index": 0,
+      "spec": "src/futures/futures-risk.integration.spec.ts",
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "src/futures/futures-risk.integration.spec.ts"
+      ],
+      "returncode": 0,
+      "seconds": 40.458,
+      "log": "/tmp/finance-pg-investigation/initial-f2-0.log",
+      "artifactLog": "evidence/initial-f2-0.log"
+    },
+    {
+      "case": "f3",
+      "db": "finance_f3",
+      "index": 0,
+      "spec": "src/futures/futures-f3.integration.spec.ts",
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "src/futures/futures-f3.integration.spec.ts"
+      ],
+      "returncode": 0,
+      "seconds": 8.303,
+      "log": "/tmp/finance-pg-investigation/initial-f3-0.log",
+      "artifactLog": "evidence/initial-f3-0.log"
+    },
+    {
+      "case": "spot",
+      "db": "finance_spot",
+      "index": 0,
+      "spec": "src/wallets/spot-wallet-transfer.integration.spec.ts",
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "src/wallets/spot-wallet-transfer.integration.spec.ts"
+      ],
+      "returncode": 0,
+      "seconds": 7.195,
+      "log": "/tmp/finance-pg-investigation/initial-spot-0.log",
+      "artifactLog": "evidence/initial-spot-0.log"
+    },
+    {
+      "case": "futures_sequence",
+      "db": "finance_futures_sequence",
+      "index": 0,
+      "spec": "src/futures/futures.integration.spec.ts",
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "src/futures/futures.integration.spec.ts"
+      ],
+      "returncode": 0,
+      "seconds": 13.389,
+      "log": "/tmp/finance-pg-investigation/initial-futures_sequence-0.log",
+      "artifactLog": "evidence/initial-futures_sequence-0.log"
+    },
+    {
+      "case": "futures_sequence",
+      "db": "finance_futures_sequence",
+      "index": 1,
+      "spec": "src/futures/futures-risk.integration.spec.ts",
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "src/futures/futures-risk.integration.spec.ts"
+      ],
+      "returncode": 0,
+      "seconds": 39.381,
+      "log": "/tmp/finance-pg-investigation/initial-futures_sequence-1.log",
+      "artifactLog": "evidence/initial-futures_sequence-1.log"
+    },
+    {
+      "case": "futures_sequence",
+      "db": "finance_futures_sequence",
+      "index": 2,
+      "spec": "src/futures/futures-f3.integration.spec.ts",
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "src/futures/futures-f3.integration.spec.ts"
+      ],
+      "returncode": 0,
+      "seconds": 8.144,
+      "log": "/tmp/finance-pg-investigation/initial-futures_sequence-2.log",
+      "artifactLog": "evidence/initial-futures_sequence-2.log"
+    },
+    {
+      "case": "spot_sequence",
+      "db": "finance_spot_sequence",
+      "index": 0,
+      "spec": "src/orders/limit-order-reservation.integration.spec.ts",
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "src/orders/limit-order-reservation.integration.spec.ts"
+      ],
+      "returncode": 0,
+      "seconds": 1.384,
+      "log": "/tmp/finance-pg-investigation/initial-spot_sequence-0.log",
+      "artifactLog": "evidence/initial-spot_sequence-0.log"
+    },
+    {
+      "case": "spot_sequence",
+      "db": "finance_spot_sequence",
+      "index": 1,
+      "spec": "src/wallets/spot-wallet-transfer.integration.spec.ts",
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "src/wallets/spot-wallet-transfer.integration.spec.ts"
+      ],
+      "returncode": 0,
+      "seconds": 6.942,
+      "log": "/tmp/finance-pg-investigation/initial-spot_sequence-1.log",
+      "artifactLog": "evidence/initial-spot_sequence-1.log"
+    },
+    {
+      "case": "spot_sequence",
+      "db": "finance_spot_sequence",
+      "index": 2,
+      "spec": "src/wallets/wallet-fx-transfer.integration.spec.ts",
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "src/wallets/wallet-fx-transfer.integration.spec.ts"
+      ],
+      "returncode": 0,
+      "seconds": 13.489,
+      "log": "/tmp/finance-pg-investigation/initial-spot_sequence-2.log",
+      "artifactLog": "evidence/initial-spot_sequence-2.log"
+    },
+    {
+      "case": "spot_sequence",
+      "db": "finance_spot_sequence",
+      "index": 3,
+      "spec": "src/orders/limit-order-matching.integration.spec.ts",
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "src/orders/limit-order-matching.integration.spec.ts"
+      ],
+      "returncode": 0,
+      "seconds": 1.947,
+      "log": "/tmp/finance-pg-investigation/initial-spot_sequence-3.log",
+      "artifactLog": "evidence/initial-spot_sequence-3.log"
+    },
+    {
+      "case": "f1_used_retry2",
+      "db": "finance_f1",
+      "index": 0,
+      "spec": "src/futures/futures.integration.spec.ts",
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "src/futures/futures.integration.spec.ts"
+      ],
+      "returncode": 0,
+      "seconds": 14.39,
+      "log": "/tmp/finance-pg-investigation/retries-f1_used_retry2-0.log",
+      "artifactLog": "evidence/retries-f1_used_retry2-0.log"
+    },
+    {
+      "case": "f1_fresh_retry3",
+      "db": "finance_f1_retry3",
+      "index": 0,
+      "spec": "src/futures/futures.integration.spec.ts",
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "src/futures/futures.integration.spec.ts"
+      ],
+      "returncode": 0,
+      "seconds": 13.621,
+      "log": "/tmp/finance-pg-investigation/retries-f1_fresh_retry3-0.log",
+      "artifactLog": "evidence/retries-f1_fresh_retry3-0.log"
+    }
+  ],
+  "experiments": [
+    {
+      "version": "head",
+      "db": "finance_clock_head",
+      "script": "investigation-clock-step-futures.ts",
+      "returncode": 0,
+      "seconds": 84.18785316499998,
+      "command": [
+        "pnpm",
+        "tsx",
+        "scripts/investigation-clock-step-futures.ts"
+      ],
+      "log": "/tmp/finance-pg-investigation/head-clock-investigation-clock-step-futures.log",
+      "artifactLog": "evidence/head-clock-investigation-clock-step-futures.log"
+    },
+    {
+      "version": "head",
+      "db": "finance_clock_head",
+      "script": "spot-wallet-transfer-integration.ts",
+      "returncode": 1,
+      "seconds": 96.75767281499793,
+      "command": [
+        "pnpm",
+        "tsx",
+        "scripts/spot-wallet-transfer-integration.ts"
+      ],
+      "log": "/tmp/finance-pg-investigation/head-clock-spot-wallet-transfer-integration.log",
+      "artifactLog": "evidence/head-clock-spot-wallet-transfer-integration.log"
+    },
+    {
+      "version": "baseline",
+      "db": "finance_clock_baseline",
+      "script": "investigation-clock-step-futures.ts",
+      "returncode": 0,
+      "seconds": 94.48184493000008,
+      "command": [
+        "pnpm",
+        "tsx",
+        "scripts/investigation-clock-step-futures.ts"
+      ],
+      "log": "/tmp/finance-pg-investigation/baseline-clock-investigation-clock-step-futures.log",
+      "artifactLog": "evidence/baseline-clock-investigation-clock-step-futures.log"
+    },
+    {
+      "version": "baseline",
+      "db": "finance_clock_baseline",
+      "script": "spot-wallet-transfer-integration.ts",
+      "returncode": 1,
+      "seconds": 96.71646135899937,
+      "command": [
+        "pnpm",
+        "tsx",
+        "scripts/spot-wallet-transfer-integration.ts"
+      ],
+      "log": "/tmp/finance-pg-investigation/baseline-clock-spot-wallet-transfer-integration.log",
+      "artifactLog": "evidence/baseline-clock-spot-wallet-transfer-integration.log"
+    }
+  ],
+  "safetyRuns": {
+    "initial": {
+      "job": "initial",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 256,
+        "seconds": 1800,
+        "heap": 1152,
+        "cwd": "/tmp/finance-pg-investigation/head/backend",
+        "command": [
+          "python3",
+          "/tmp/finance-pg-investigation/pg-job.py",
+          "python3",
+          "/tmp/finance-pg-investigation/matrix.py",
+          "head",
+          "initial"
+        ],
+        "env": {
+          "NODE_ENV": "test",
+          "REDIS_URL": "redis://127.0.0.1:56459",
+          "FUTURES_DB_INTEGRATION": "1",
+          "FUTURES_LIMIT_DB_INTEGRATION": "1",
+          "CONDITIONAL_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_RESERVATION_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION": "1",
+          "LIMIT_ORDER_MATCHING_DB_INTEGRATION": "1",
+          "ORDER_EXECUTE_DB_INTEGRATION": "1",
+          "MARKET_EXECUTION_DB_INTEGRATION": "1",
+          "FX_EXECUTE_DB_INTEGRATION": "1",
+          "FUTURES_RISK_DB_INTEGRATION": "1",
+          "FUTURES_F3_DB_INTEGRATION": "1",
+          "FUTURES_F31_DB_INTEGRATION": "1",
+          "MVP_FLOW_DB_SMOKE": "1",
+          "FRIENDS_DB_INTEGRATION": "1",
+          "TRADING_ACCOUNT_DB_INTEGRATION": "1",
+          "GENERAL_TRADING_DB_INTEGRATION": "1",
+          "GENERAL_FX_DB_INTEGRATION": "1",
+          "SEASON_JOIN_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_ENABLED": "true",
+          "AD_REWARD_ENABLED": "true",
+          "AUTH_DB_SMOKE": "1",
+          "OPS_JOB_LOCK_DB_SMOKE": "1",
+          "JWT_ACCESS_SECRET": "disposable-futures-resume-only",
+          "TEST_REDIS": "1"
+        }
+      },
+      "unit": "codex-finance-investigation-initial.service",
+      "peak": 1253265408,
+      "maxTasks": 103,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-finance-investigation-initial.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-finance-investigation-initial.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-finance-investigation-initial.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "256"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=30min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=256\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 159.16,
+      "returncode": 0,
+      "final": "Result=success\nExecMainStatus=0\nMemoryPeak=[not set]\nMemorySwapPeak=[not set]\n",
+      "remaining": null
+    },
+    "retries": {
+      "job": "retries",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 256,
+        "seconds": 600,
+        "heap": 1152,
+        "cwd": "/tmp/finance-pg-investigation/head/backend",
+        "command": [
+          "python3",
+          "/tmp/finance-pg-investigation/pg-job.py",
+          "python3",
+          "/tmp/finance-pg-investigation/matrix.py",
+          "head",
+          "retries"
+        ],
+        "env": {
+          "NODE_ENV": "test",
+          "REDIS_URL": "redis://127.0.0.1:56459",
+          "FUTURES_DB_INTEGRATION": "1",
+          "FUTURES_LIMIT_DB_INTEGRATION": "1",
+          "CONDITIONAL_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_RESERVATION_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION": "1",
+          "LIMIT_ORDER_MATCHING_DB_INTEGRATION": "1",
+          "ORDER_EXECUTE_DB_INTEGRATION": "1",
+          "MARKET_EXECUTION_DB_INTEGRATION": "1",
+          "FX_EXECUTE_DB_INTEGRATION": "1",
+          "FUTURES_RISK_DB_INTEGRATION": "1",
+          "FUTURES_F3_DB_INTEGRATION": "1",
+          "FUTURES_F31_DB_INTEGRATION": "1",
+          "MVP_FLOW_DB_SMOKE": "1",
+          "FRIENDS_DB_INTEGRATION": "1",
+          "TRADING_ACCOUNT_DB_INTEGRATION": "1",
+          "GENERAL_TRADING_DB_INTEGRATION": "1",
+          "GENERAL_FX_DB_INTEGRATION": "1",
+          "SEASON_JOIN_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_ENABLED": "true",
+          "AD_REWARD_ENABLED": "true",
+          "AUTH_DB_SMOKE": "1",
+          "OPS_JOB_LOCK_DB_SMOKE": "1",
+          "JWT_ACCESS_SECRET": "disposable-futures-resume-only",
+          "TEST_REDIS": "1"
+        }
+      },
+      "unit": "codex-finance-investigation-retries.service",
+      "peak": 1004244992,
+      "maxTasks": 84,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-finance-investigation-retries.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-finance-investigation-retries.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-finance-investigation-retries.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "256"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=10min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=256\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 30.95,
+      "returncode": 0,
+      "final": "Result=success\nExecMainStatus=0\nMemoryPeak=[not set]\nMemorySwapPeak=[not set]\n",
+      "remaining": null
+    },
+    "experiments": {
+      "job": "experiments",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 256,
+        "seconds": 750,
+        "heap": 1152,
+        "cwd": "/tmp/finance-pg-investigation/head/backend",
+        "command": [
+          "python3",
+          "/tmp/finance-pg-investigation/pg-job.py",
+          "python3",
+          "/tmp/finance-pg-investigation/experiments.py"
+        ],
+        "env": {
+          "NODE_ENV": "test",
+          "REDIS_URL": "redis://127.0.0.1:56459",
+          "FUTURES_DB_INTEGRATION": "1",
+          "FUTURES_LIMIT_DB_INTEGRATION": "1",
+          "CONDITIONAL_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_RESERVATION_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION": "1",
+          "LIMIT_ORDER_MATCHING_DB_INTEGRATION": "1",
+          "ORDER_EXECUTE_DB_INTEGRATION": "1",
+          "MARKET_EXECUTION_DB_INTEGRATION": "1",
+          "FX_EXECUTE_DB_INTEGRATION": "1",
+          "FUTURES_RISK_DB_INTEGRATION": "1",
+          "FUTURES_F3_DB_INTEGRATION": "1",
+          "FUTURES_F31_DB_INTEGRATION": "1",
+          "MVP_FLOW_DB_SMOKE": "1",
+          "FRIENDS_DB_INTEGRATION": "1",
+          "TRADING_ACCOUNT_DB_INTEGRATION": "1",
+          "GENERAL_TRADING_DB_INTEGRATION": "1",
+          "GENERAL_FX_DB_INTEGRATION": "1",
+          "SEASON_JOIN_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_ENABLED": "true",
+          "AD_REWARD_ENABLED": "true",
+          "AUTH_DB_SMOKE": "1",
+          "OPS_JOB_LOCK_DB_SMOKE": "1",
+          "JWT_ACCESS_SECRET": "disposable-futures-resume-only",
+          "TEST_REDIS": "1"
+        }
+      },
+      "unit": "codex-finance-investigation-experiments.service",
+      "peak": 700944384,
+      "maxTasks": 84,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-finance-investigation-experiments.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-finance-investigation-experiments.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-finance-investigation-experiments.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "256"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=12min 30s\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=256\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 377.333,
+      "returncode": 0,
+      "final": "Result=success\nExecMainStatus=0\nMemoryPeak=[not set]\nMemorySwapPeak=[not set]\n",
+      "remaining": null
+    },
+    "coverage-guards": {
+      "job": "coverage-guards",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 256,
+        "seconds": 300,
+        "heap": 1152,
+        "cwd": "/tmp/finance-pg-investigation/head/backend",
+        "command": [
+          "python3",
+          "/tmp/finance-pg-investigation/pg-job.py",
+          "python3",
+          "/tmp/finance-pg-investigation/guards.py"
+        ],
+        "env": {
+          "NODE_ENV": "test",
+          "REDIS_URL": "redis://127.0.0.1:56459",
+          "FUTURES_DB_INTEGRATION": "1",
+          "FUTURES_LIMIT_DB_INTEGRATION": "1",
+          "CONDITIONAL_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_RESERVATION_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION": "1",
+          "LIMIT_ORDER_MATCHING_DB_INTEGRATION": "1",
+          "ORDER_EXECUTE_DB_INTEGRATION": "1",
+          "MARKET_EXECUTION_DB_INTEGRATION": "1",
+          "FX_EXECUTE_DB_INTEGRATION": "1",
+          "FUTURES_RISK_DB_INTEGRATION": "1",
+          "FUTURES_F3_DB_INTEGRATION": "1",
+          "FUTURES_F31_DB_INTEGRATION": "1",
+          "MVP_FLOW_DB_SMOKE": "1",
+          "FRIENDS_DB_INTEGRATION": "1",
+          "TRADING_ACCOUNT_DB_INTEGRATION": "1",
+          "GENERAL_TRADING_DB_INTEGRATION": "1",
+          "GENERAL_FX_DB_INTEGRATION": "1",
+          "SEASON_JOIN_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_ENABLED": "true",
+          "AD_REWARD_ENABLED": "true",
+          "AUTH_DB_SMOKE": "1",
+          "OPS_JOB_LOCK_DB_SMOKE": "1",
+          "JWT_ACCESS_SECRET": "disposable-futures-resume-only",
+          "TEST_REDIS": "1"
+        }
+      },
+      "unit": "codex-finance-investigation-coverage-guards.service",
+      "peak": 442253312,
+      "maxTasks": 84,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-finance-investigation-coverage-guards.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-finance-investigation-coverage-guards.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-finance-investigation-coverage-guards.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "256"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=5min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=256\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 3.556,
+      "returncode": 0,
+      "final": "Result=success\nExecMainStatus=0\nMemoryPeak=[not set]\nMemorySwapPeak=[not set]\n",
+      "remaining": null
+    },
+    "policy-unit": {
+      "job": "policy-unit",
+      "config": {
+        "memory": 3221225472,
+        "tasks": 256,
+        "seconds": 300,
+        "heap": 1152,
+        "cwd": "/home/nayuta/projects/trading-app/backend",
+        "command": [
+          "pnpm",
+          "exec",
+          "jest",
+          "--runInBand",
+          "src/futures/futures-valuation.spec.ts",
+          "src/futures/futures-price.spec.ts",
+          "src/futures/futures-mark.spec.ts",
+          "src/providers/source-eligibility.policy.spec.ts",
+          "src/orders/limit-order-matching-diagnostics.spec.ts"
+        ],
+        "env": {
+          "NODE_ENV": "test"
+        }
+      },
+      "unit": "codex-finance-investigation-policy-unit.service",
+      "peak": 278982656,
+      "maxTasks": 23,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-finance-investigation-policy-unit.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-finance-investigation-policy-unit.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-finance-investigation-policy-unit.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "256"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=5min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=256\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 1.372,
+      "returncode": 0,
+      "final": "Result=success\nExecMainStatus=0\nMemoryPeak=[not set]\nMemorySwapPeak=[not set]\n",
+      "remaining": null
+    }
+  },
+  "coverageGuards": {
+    "checks": 6,
+    "result": "PASS",
+    "log": "evidence/coverage-guards.log"
+  },
+  "policyUnit": {
+    "suites": 5,
+    "tests": 144,
+    "result": "PASS",
+    "log": "evidence/policy-unit-runner.log"
+  },
+  "financialGate": {
+    "thisTask": "NOT_RUN_NO_FIX_OR_HOST_REMEDIATION",
+    "priorLocalRuns": [
+      {
+        "passed": 21,
+        "failed": 1,
+        "failure": "F2 FUTURES_INSTRUMENT_UNVERIFIED"
+      },
+      {
+        "passed": 21,
+        "failed": 1,
+        "failure": "F3 FUTURES_INSTRUMENT_UNVERIFIED"
+      },
+      {
+        "passed": 20,
+        "failed": 2,
+        "failure": "F1 FUTURES_INSTRUMENT_UNVERIFIED; Legacy Spot price_evidence_unavailable"
+      }
+    ],
+    "ci209": {
+      "url": "https://github.com/windowsjd/trading_app/actions/runs/37778686349",
+      "jobId": 113315977854,
+      "result": "SUCCESS",
+      "passedSuites": 22,
+      "passedTests": 23,
+      "node": "24.21.0",
+      "postgres": "16.15",
+      "os": "Ubuntu 24.04.5",
+      "log": "evidence/ci209-excerpts.log"
+    }
+  },
+  "sourceHashes": {
+    "backend/scripts/futures-integration.ts": {
+      "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b": "96e505aa5465673121630f1692c5a9bd6343ada36ec9343303cf6ce1648e3c06",
+      "9e3697e2dbf9dee7445bdd0dc76ec3463c2c309b": "96e505aa5465673121630f1692c5a9bd6343ada36ec9343303cf6ce1648e3c06",
+      "c942ddee512666c2def0477c3a97c8fcbebb9ec2": "96e505aa5465673121630f1692c5a9bd6343ada36ec9343303cf6ce1648e3c06"
+    },
+    "backend/scripts/futures-risk-integration.ts": {
+      "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b": "986e9176a635df33ac24c06d1dc5f7dcb90d575de87e5d92172f58a16325c29f",
+      "9e3697e2dbf9dee7445bdd0dc76ec3463c2c309b": "986e9176a635df33ac24c06d1dc5f7dcb90d575de87e5d92172f58a16325c29f",
+      "c942ddee512666c2def0477c3a97c8fcbebb9ec2": "986e9176a635df33ac24c06d1dc5f7dcb90d575de87e5d92172f58a16325c29f"
+    },
+    "backend/scripts/futures-f3-integration.ts": {
+      "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b": "7281c0419d0527c6cb91d5bc2a69d691c0c37a41eaad7b3dcf7cc1c786ab0884",
+      "9e3697e2dbf9dee7445bdd0dc76ec3463c2c309b": "7281c0419d0527c6cb91d5bc2a69d691c0c37a41eaad7b3dcf7cc1c786ab0884",
+      "c942ddee512666c2def0477c3a97c8fcbebb9ec2": "7281c0419d0527c6cb91d5bc2a69d691c0c37a41eaad7b3dcf7cc1c786ab0884"
+    },
+    "backend/scripts/spot-wallet-transfer-integration.ts": {
+      "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b": "19df84c4307b4e1b230ef2dc5a5d056b29e01722986bdd8a5eee6e62911b0e7d",
+      "9e3697e2dbf9dee7445bdd0dc76ec3463c2c309b": "19df84c4307b4e1b230ef2dc5a5d056b29e01722986bdd8a5eee6e62911b0e7d",
+      "c942ddee512666c2def0477c3a97c8fcbebb9ec2": "19df84c4307b4e1b230ef2dc5a5d056b29e01722986bdd8a5eee6e62911b0e7d"
+    },
+    "backend/src/futures/futures.service.ts": {
+      "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b": "1e4ada623d3ef3349135c1f16f23ee52cba8145ddd246e367455a401a18df0dd",
+      "9e3697e2dbf9dee7445bdd0dc76ec3463c2c309b": "1e4ada623d3ef3349135c1f16f23ee52cba8145ddd246e367455a401a18df0dd",
+      "c942ddee512666c2def0477c3a97c8fcbebb9ec2": "1e4ada623d3ef3349135c1f16f23ee52cba8145ddd246e367455a401a18df0dd"
+    },
+    "backend/src/futures/futures-instrument-coverage.ts": {
+      "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b": "4d0560f4725bcceb9ce1f2f8c67c7010762abe6a1851db8f31c72ba90177e2ff",
+      "9e3697e2dbf9dee7445bdd0dc76ec3463c2c309b": "4d0560f4725bcceb9ce1f2f8c67c7010762abe6a1851db8f31c72ba90177e2ff",
+      "c942ddee512666c2def0477c3a97c8fcbebb9ec2": "4d0560f4725bcceb9ce1f2f8c67c7010762abe6a1851db8f31c72ba90177e2ff"
+    },
+    "backend/src/orders/limit-order-execution.service.ts": {
+      "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b": "228895302314799af0772da5b0dd212819fb5a7b61c5f93207b733755eec7751",
+      "9e3697e2dbf9dee7445bdd0dc76ec3463c2c309b": "228895302314799af0772da5b0dd212819fb5a7b61c5f93207b733755eec7751",
+      "c942ddee512666c2def0477c3a97c8fcbebb9ec2": "228895302314799af0772da5b0dd212819fb5a7b61c5f93207b733755eec7751"
+    },
+    "backend/src/providers/source-eligibility.policy.ts": {
+      "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b": "5e4f2cfd39b34eb9ea6a8a56c20a6ae5dbd983b4ae9540ee87cc67d9d21a4fd2",
+      "9e3697e2dbf9dee7445bdd0dc76ec3463c2c309b": "5e4f2cfd39b34eb9ea6a8a56c20a6ae5dbd983b4ae9540ee87cc67d9d21a4fd2",
+      "c942ddee512666c2def0477c3a97c8fcbebb9ec2": "5e4f2cfd39b34eb9ea6a8a56c20a6ae5dbd983b4ae9540ee87cc67d9d21a4fd2"
+    }
+  },
+  "wallclock": {
+    "durationSeconds": 120,
+    "samples": 108234,
+    "backwardSteps": 4,
+    "deltasMs": [
+      -773.611491,
+      -774.170813,
+      -786.283735,
+      -832.256606
+    ],
+    "log": "evidence/wallclock.jsonl",
+    "specificClockAdjuster": "NOT_IDENTIFIED"
+  },
+  "changes": {
+    "product": false,
+    "originalFixtures": false,
+    "migrations": false,
+    "financialPolicy": false,
+    "hostClock": false,
+    "archiveOnlyInstrumentation": true
+  },
+  "validation": {
+    "gitDiffCheck": "PASS",
+    "newProseAndCodeWhitespace": "PASS (raw evidence/patch retain original bytes)",
+    "archivePatch": "PASS clean HEAD and baseline archives",
+    "relativeReportLinks": "PASS",
+    "resultAccounting": "PASS 13 suites: 12 PASS / 1 FAILED",
+    "cgroupSafety": "PASS all five jobs: no guard stop, no OOM, no remaining children"
+  },
+  "limitations": [
+    "Historical individual F2/F3 and Spot failures lack predicate-level values; do not retroactively classify every occurrence.",
+    "The clock-adjusting process/Windows or kernel setting is outside the established failure mechanism and still requires host investigation.",
+    "No corrected local aggregate financial gate."
+  ]
+}

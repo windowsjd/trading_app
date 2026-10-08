@@ -1,0 +1,9 @@
+PASS src/wallets/wallet-fx-transfer.integration.spec.ts (12.949 s)
+  Atomic cross-currency wallet transfer PostgreSQL integration
+    ✓ proves economic parity, rollback, repricing, reservations, lifecycle and concurrency in both modes (12851 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        13.063 s
+Ran all test suites matching src/wallets/wallet-fx-transfer.integration.spec.ts.

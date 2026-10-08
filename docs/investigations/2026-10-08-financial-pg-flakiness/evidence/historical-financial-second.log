@@ -1,0 +1,147 @@
+PASS src/orders/trading-transaction-time.integration.spec.ts (43.393 s)
+PASS src/futures/futures-risk.integration.spec.ts (38.418 s)
+PASS src/wallets/wallet-fx-transfer.integration.spec.ts (12.822 s)
+PASS src/futures/futures.integration.spec.ts (12.8 s)
+PASS src/conditional/conditional.integration.spec.ts (9.792 s)
+PASS src/futures/futures-isolated-boundary.integration.spec.ts (10.916 s)
+PASS src/futures/futures-limit.integration.spec.ts (9.091 s)
+FAIL src/futures/futures-f3.integration.spec.ts
+  ● Futures F3 actual PostgreSQL integration › proves valuation, performance, final settlement, retries, collateral boundaries and races
+
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:06 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"4a89d3d2-b28f-40ee-b04b-ce76dd019cee"}[39m
+    PASS F3 general long isolated 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:07 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"95b63573-5372-424a-933a-a6fd817e903a"}[39m
+    PASS F3 general long isolated 37x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:07 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"c0f0cbfe-105f-4ecd-b1bb-b6ce028454f3"}[39m
+    PASS F3 general long isolated 100x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:07 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"1fa09b40-a23f-4d4c-b5c5-647e332e77da"}[39m
+    PASS F3 general long cross 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:07 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"85b0dca8-244f-49bc-bb89-6d7e7b9865a8"}[39m
+    PASS F3 general long cross 37x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:07 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"34e4f1cc-10a4-461b-ae48-69c44a476d7f"}[39m
+    PASS F3 general long cross 100x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:08 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"7dade268-e691-4155-8684-4f35d6476b3d"}[39m
+    PASS F3 general short isolated 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:08 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"6b7fd0fd-3d53-4cf4-aa2e-c0c77eb535ac"}[39m
+    PASS F3 general short isolated 37x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:08 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"c65ffa20-81b3-4c87-ba83-b7dba79775cb"}[39m
+    PASS F3 general short isolated 100x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:08 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"c840fcea-9d63-4e7d-a2e2-bbeaa383b9fa"}[39m
+    PASS F3 general short cross 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:08 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"f7429127-5e83-4545-b0c2-47a40cccaf7a"}[39m
+    PASS F3 general short cross 37x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:09 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"aa82d0f7-0060-4742-88d7-1277f76eb2e9"}[39m
+    PASS F3 general short cross 100x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    PASS F3 season long isolated 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    PASS F3 season long isolated 37x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    (node:126677) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    HttpException: Http Exception
+
+      23 |   const publicMessage =
+      24 |     safePublicErrorMessage(message) ?? 'Request could not be completed.';
+    > 25 |   const exception = new HttpException(
+         |                     ^
+      26 |     {
+      27 |       success: false,
+      28 |       error: {
+
+      at createApiError (common/api-error.ts:25:21)
+      at futuresError (futures/futures-error.ts:9:9)
+      at async Proxy._transactionWithCallback (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:785:18)
+      at async FuturesService.execute (futures/futures.service.ts:127:14)
+      at async valuationTransitions (../scripts/futures-f3-integration.ts:198:13)
+      at async main (../scripts/futures-f3-integration.ts:1060:3) {
+        response: {
+          success: false,
+          error: {
+            code: 'FUTURES_INSTRUMENT_UNVERIFIED',
+            message: 'This Futures instrument is not yet available for new trades.'
+          }
+        },
+        status: 409,
+        options: undefined
+      }
+      at Object.<anonymous> (futures/futures-f3.integration.spec.ts:17:38)
+
+PASS src/wallets/spot-wallet-transfer.integration.spec.ts (6.31 s)
+PASS src/orders/limit-order-transaction-time.integration.spec.ts
+PASS src/orders/trading-fee-pinning.integration.spec.ts
+PASS src/orders/order-input-policy.integration.spec.ts
+PASS src/orders/orders.execute.integration.spec.ts
+PASS src/orders/market-execution.integration.spec.ts
+PASS src/fx/fx.execute.integration.spec.ts
+PASS src/futures/futures-f31.integration.spec.ts
+PASS src/orders/limit-order-matching.integration.spec.ts
+PASS src/mvp-flow.integration.spec.ts
+PASS src/orders/limit-order-idempotent-replay.integration.spec.ts
+PASS src/orders/limit-order-reservation.integration.spec.ts
+PASS src/orders/limit-order-create-no-redis.integration.spec.ts
+PASS src/orders/limit-order-create-race.integration.spec.ts
+
+Summary of all failing tests
+FAIL futures/futures-f3.integration.spec.ts
+  ● Futures F3 actual PostgreSQL integration › proves valuation, performance, final settlement, retries, collateral boundaries and races
+
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:06 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"4a89d3d2-b28f-40ee-b04b-ce76dd019cee"}[39m
+    PASS F3 general long isolated 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:07 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"95b63573-5372-424a-933a-a6fd817e903a"}[39m
+    PASS F3 general long isolated 37x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:07 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"c0f0cbfe-105f-4ecd-b1bb-b6ce028454f3"}[39m
+    PASS F3 general long isolated 100x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:07 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"1fa09b40-a23f-4d4c-b5c5-647e332e77da"}[39m
+    PASS F3 general long cross 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:07 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"85b0dca8-244f-49bc-bb89-6d7e7b9865a8"}[39m
+    PASS F3 general long cross 37x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:07 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"34e4f1cc-10a4-461b-ae48-69c44a476d7f"}[39m
+    PASS F3 general long cross 100x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:08 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"7dade268-e691-4155-8684-4f35d6476b3d"}[39m
+    PASS F3 general short isolated 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:08 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"6b7fd0fd-3d53-4cf4-aa2e-c0c77eb535ac"}[39m
+    PASS F3 general short isolated 37x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:08 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"c65ffa20-81b3-4c87-ba83-b7dba79775cb"}[39m
+    PASS F3 general short isolated 100x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:08 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"c840fcea-9d63-4e7d-a2e2-bbeaa383b9fa"}[39m
+    PASS F3 general short cross 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:08 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"f7429127-5e83-4545-b0c2-47a40cccaf7a"}[39m
+    PASS F3 general short cross 37x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [32m[Nest] 126677  - [39m10/08/2026, 9:12:09 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"aa82d0f7-0060-4742-88d7-1277f76eb2e9"}[39m
+    PASS F3 general short cross 100x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    PASS F3 season long isolated 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    PASS F3 season long isolated 37x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    (node:126677) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    HttpException: Http Exception
+
+      23 |   const publicMessage =
+      24 |     safePublicErrorMessage(message) ?? 'Request could not be completed.';
+    > 25 |   const exception = new HttpException(
+         |                     ^
+      26 |     {
+      27 |       success: false,
+      28 |       error: {
+
+      at createApiError (common/api-error.ts:25:21)
+      at futuresError (futures/futures-error.ts:9:9)
+      at async Proxy._transactionWithCallback (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:785:18)
+      at async FuturesService.execute (futures/futures.service.ts:127:14)
+      at async valuationTransitions (../scripts/futures-f3-integration.ts:198:13)
+      at async main (../scripts/futures-f3-integration.ts:1060:3) {
+        response: {
+          success: false,
+          error: {
+            code: 'FUTURES_INSTRUMENT_UNVERIFIED',
+            message: 'This Futures instrument is not yet available for new trades.'
+          }
+        },
+        status: 409,
+        options: undefined
+      }
+      at Object.<anonymous> (futures/futures-f3.integration.spec.ts:17:38)
+
+
+Test Suites: 1 failed, 21 passed, 22 total
+Tests:       1 failed, 22 passed, 23 total
+Snapshots:   0 total
+Time:        174.651 s, estimated 180 s
+Ran all test suites matching src/orders/order-input-policy.integration.spec.ts|src/orders/limit-order-reservation.integration.spec.ts|src/wallets/spot-wallet-transfer.integration.spec.ts|src/wallets/wallet-fx-transfer.integration.spec.ts|src/futures/futures.integration.spec.ts|src/futures/futures-risk.integration.spec.ts|src/futures/futures-f3.integration.spec.ts|src/futures/futures-f31.integration.spec.ts|src/conditional/conditional.integration.spec.ts|src/futures/futures-limit.integration.spec.ts|src/futures/futures-isolated-boundary.integration.spec.ts|src/orders/limit-order-create-race.integration.spec.ts|src/orders/limit-order-transaction-time.integration.spec.ts|src/orders/trading-transaction-time.integration.spec.ts|src/orders/trading-fee-pinning.integration.spec.ts|src/orders/limit-order-create-no-redis.integration.spec.ts|src/orders/limit-order-idempotent-replay.integration.spec.ts|src/orders/limit-order-matching.integration.spec.ts|src/orders/orders.execute.integration.spec.ts|src/orders/market-execution.integration.spec.ts|src/fx/fx.execute.integration.spec.ts|src/mvp-flow.integration.spec.ts.

@@ -1,0 +1,5 @@
+{"wallUnixNs": 1791470070506369478, "previousWallUnixNs": 1791470071279980969, "wallDeltaMs": -773.611491, "monotonicDeltaMs": 1.312052, "sample": 14551}
+{"wallUnixNs": 1791470101984210778, "previousWallUnixNs": 1791470102758381591, "wallDeltaMs": -774.170813, "monotonicDeltaMs": 1.120594, "sample": 43672}
+{"wallUnixNs": 1791470133446959923, "previousWallUnixNs": 1791470134233243658, "wallDeltaMs": -786.283735, "monotonicDeltaMs": 1.117003, "sample": 72793}
+{"wallUnixNs": 1791470164872261015, "previousWallUnixNs": 1791470165704517621, "wallDeltaMs": -832.256606, "monotonicDeltaMs": 1.101525, "sample": 101880}
+{"samples": 108234, "elapsedMs": 120001.001132}

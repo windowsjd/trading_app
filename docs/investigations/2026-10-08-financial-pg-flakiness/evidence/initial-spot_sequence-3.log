@@ -1,0 +1,9 @@
+PASS src/orders/limit-order-matching.integration.spec.ts
+  Limit order scheduler matching DB integration
+    ✓ fills path A/B correctly and defends the reservation, cancel, season, and evidence invariants (1316 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        1.536 s
+Ran all test suites matching src/orders/limit-order-matching.integration.spec.ts.

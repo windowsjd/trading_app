@@ -1,0 +1,42 @@
+{
+  "backend/scripts/futures-integration.ts": {
+    "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b": "96e505aa5465673121630f1692c5a9bd6343ada36ec9343303cf6ce1648e3c06",
+    "9e3697e2dbf9dee7445bdd0dc76ec3463c2c309b": "96e505aa5465673121630f1692c5a9bd6343ada36ec9343303cf6ce1648e3c06",
+    "c942ddee512666c2def0477c3a97c8fcbebb9ec2": "96e505aa5465673121630f1692c5a9bd6343ada36ec9343303cf6ce1648e3c06"
+  },
+  "backend/scripts/futures-risk-integration.ts": {
+    "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b": "986e9176a635df33ac24c06d1dc5f7dcb90d575de87e5d92172f58a16325c29f",
+    "9e3697e2dbf9dee7445bdd0dc76ec3463c2c309b": "986e9176a635df33ac24c06d1dc5f7dcb90d575de87e5d92172f58a16325c29f",
+    "c942ddee512666c2def0477c3a97c8fcbebb9ec2": "986e9176a635df33ac24c06d1dc5f7dcb90d575de87e5d92172f58a16325c29f"
+  },
+  "backend/scripts/futures-f3-integration.ts": {
+    "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b": "7281c0419d0527c6cb91d5bc2a69d691c0c37a41eaad7b3dcf7cc1c786ab0884",
+    "9e3697e2dbf9dee7445bdd0dc76ec3463c2c309b": "7281c0419d0527c6cb91d5bc2a69d691c0c37a41eaad7b3dcf7cc1c786ab0884",
+    "c942ddee512666c2def0477c3a97c8fcbebb9ec2": "7281c0419d0527c6cb91d5bc2a69d691c0c37a41eaad7b3dcf7cc1c786ab0884"
+  },
+  "backend/scripts/spot-wallet-transfer-integration.ts": {
+    "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b": "19df84c4307b4e1b230ef2dc5a5d056b29e01722986bdd8a5eee6e62911b0e7d",
+    "9e3697e2dbf9dee7445bdd0dc76ec3463c2c309b": "19df84c4307b4e1b230ef2dc5a5d056b29e01722986bdd8a5eee6e62911b0e7d",
+    "c942ddee512666c2def0477c3a97c8fcbebb9ec2": "19df84c4307b4e1b230ef2dc5a5d056b29e01722986bdd8a5eee6e62911b0e7d"
+  },
+  "backend/src/futures/futures.service.ts": {
+    "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b": "1e4ada623d3ef3349135c1f16f23ee52cba8145ddd246e367455a401a18df0dd",
+    "9e3697e2dbf9dee7445bdd0dc76ec3463c2c309b": "1e4ada623d3ef3349135c1f16f23ee52cba8145ddd246e367455a401a18df0dd",
+    "c942ddee512666c2def0477c3a97c8fcbebb9ec2": "1e4ada623d3ef3349135c1f16f23ee52cba8145ddd246e367455a401a18df0dd"
+  },
+  "backend/src/futures/futures-instrument-coverage.ts": {
+    "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b": "4d0560f4725bcceb9ce1f2f8c67c7010762abe6a1851db8f31c72ba90177e2ff",
+    "9e3697e2dbf9dee7445bdd0dc76ec3463c2c309b": "4d0560f4725bcceb9ce1f2f8c67c7010762abe6a1851db8f31c72ba90177e2ff",
+    "c942ddee512666c2def0477c3a97c8fcbebb9ec2": "4d0560f4725bcceb9ce1f2f8c67c7010762abe6a1851db8f31c72ba90177e2ff"
+  },
+  "backend/src/orders/limit-order-execution.service.ts": {
+    "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b": "228895302314799af0772da5b0dd212819fb5a7b61c5f93207b733755eec7751",
+    "9e3697e2dbf9dee7445bdd0dc76ec3463c2c309b": "228895302314799af0772da5b0dd212819fb5a7b61c5f93207b733755eec7751",
+    "c942ddee512666c2def0477c3a97c8fcbebb9ec2": "228895302314799af0772da5b0dd212819fb5a7b61c5f93207b733755eec7751"
+  },
+  "backend/src/providers/source-eligibility.policy.ts": {
+    "2411a0c67e5f9609f7a40ecd7ff20bd229cea49b": "5e4f2cfd39b34eb9ea6a8a56c20a6ae5dbd983b4ae9540ee87cc67d9d21a4fd2",
+    "9e3697e2dbf9dee7445bdd0dc76ec3463c2c309b": "5e4f2cfd39b34eb9ea6a8a56c20a6ae5dbd983b4ae9540ee87cc67d9d21a4fd2",
+    "c942ddee512666c2def0477c3a97c8fcbebb9ec2": "5e4f2cfd39b34eb9ea6a8a56c20a6ae5dbd983b4ae9540ee87cc67d9d21a4fd2"
+  }
+}

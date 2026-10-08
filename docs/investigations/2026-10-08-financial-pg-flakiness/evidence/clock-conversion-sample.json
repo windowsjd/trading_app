@@ -1,0 +1,16 @@
+{
+  "provenance": "Read-only node clock-probe.cjs tool output; representative row transcribed, not a new run",
+  "sampleCount": 12,
+  "before": "2026-10-08T14:33:28.539Z",
+  "prisma": {
+    "now": "2026-10-08T14:33:28.540Z",
+    "text": "2026-10-08 14:33:28.540069+00",
+    "epoch": "1791470008.540069"
+  },
+  "after": "2026-10-08T14:33:28.540Z",
+  "pg": {
+    "now": "2026-10-08T14:33:28.540Z",
+    "text": "2026-10-08 14:33:28.540495+00",
+    "epoch": "1791470008.540495"
+  }
+}

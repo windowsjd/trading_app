@@ -1,0 +1,279 @@
+PASS src/orders/trading-transaction-time.integration.spec.ts (43.892 s)
+FAIL src/futures/futures-risk.integration.spec.ts
+  ● Futures F2 actual PostgreSQL financial integration › proves risk, atomic liquidation, bankruptcy, transfers, lifecycle, races and rollback
+
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:47 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"2b3d0d3b-0906-46ab-bdc9-c2f2149996f8"}[39m
+    PASS F2 admin financial guards retain scope/predicates without exact amounts; failures roll back
+    PASS F2 admin wallet integrity evidence excludes canonical financial rows
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:47 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"579d42da-1f60-499c-be51-9119201ca793"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:47 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"579d42da-1f60-499c-be51-9119201ca793","capturedAt":"2026-10-08T12:06:47.920Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 DB typed immutable Mark, duplicate/out-of-order/WS priority, Spot selector isolation and lifetime margin mode
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"919bd7c5-10f7-4ea1-8310-b3b1e9b97308"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"919bd7c5-10f7-4ea1-8310-b3b1e9b97308","capturedAt":"2026-10-08T12:06:48.070Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"919bd7c5-10f7-4ea1-8310-b3b1e9b97308","capturedAt":"2026-10-08T12:06:48.103Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 gap liquidation closes quantity even when Mark notional rounds to zero
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"6cfa62f1-67a0-47d8-9a7a-ee83409b6173"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"6cfa62f1-67a0-47d8-9a7a-ee83409b6173","capturedAt":"2026-10-08T12:06:48.214Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"6cfa62f1-67a0-47d8-9a7a-ee83409b6173","capturedAt":"2026-10-08T12:06:48.266Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 rollback after positive PnL credit and current-fee-policy liquidation
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"3c50ccf7-ac53-41c9-841d-5280129e40f4"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"3c50ccf7-ac53-41c9-841d-5280129e40f4","capturedAt":"2026-10-08T12:06:48.366Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"3c50ccf7-ac53-41c9-841d-5280129e40f4","capturedAt":"2026-10-08T12:06:48.407Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"3c50ccf7-ac53-41c9-841d-5280129e40f4","capturedAt":"2026-10-08T12:06:48.443Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"3c50ccf7-ac53-41c9-841d-5280129e40f4","capturedAt":"2026-10-08T12:06:48.477Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"3c50ccf7-ac53-41c9-841d-5280129e40f4","capturedAt":"2026-10-08T12:06:48.547Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 reserved cash plus isolated allocation both survive Cross bankruptcy; manual isolated close cannot raid Cross
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"22ce3928-3d36-4562-84eb-14c21e84629a"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"22ce3928-3d36-4562-84eb-14c21e84629a","capturedAt":"2026-10-08T12:06:48.633Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general/long/1 isolated read, full close or unlevered protection
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"e4d3df56-91e6-4543-a7c1-18dd48046264"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"e4d3df56-91e6-4543-a7c1-18dd48046264","capturedAt":"2026-10-08T12:06:48.744Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"e4d3df56-91e6-4543-a7c1-18dd48046264","capturedAt":"2026-10-08T12:06:48.795Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general/long/37 isolated read, full close or unlevered protection
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"69e38a59-37a7-4a08-a614-b13351d29db6"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"69e38a59-37a7-4a08-a614-b13351d29db6","capturedAt":"2026-10-08T12:06:48.886Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"69e38a59-37a7-4a08-a614-b13351d29db6","capturedAt":"2026-10-08T12:06:48.930Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general/long/100 isolated read, full close or unlevered protection
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"f39afa4f-134f-4699-b3d0-4c67fd2cf319"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"f39afa4f-134f-4699-b3d0-4c67fd2cf319","capturedAt":"2026-10-08T12:06:49.011Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"f39afa4f-134f-4699-b3d0-4c67fd2cf319","capturedAt":"2026-10-08T12:06:49.057Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general/short/1 isolated read, full close or unlevered protection
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"6d0fd9ea-a821-4221-a08a-f326a97bb07b"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"6d0fd9ea-a821-4221-a08a-f326a97bb07b","capturedAt":"2026-10-08T12:06:49.142Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"6d0fd9ea-a821-4221-a08a-f326a97bb07b","capturedAt":"2026-10-08T12:06:49.185Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general/short/37 isolated read, full close or unlevered protection
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"07d72f58-c5dd-4318-864f-22f0ad0b928c"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"07d72f58-c5dd-4318-864f-22f0ad0b928c","capturedAt":"2026-10-08T12:06:49.264Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"07d72f58-c5dd-4318-864f-22f0ad0b928c","capturedAt":"2026-10-08T12:06:49.306Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general/short/100 isolated read, full close or unlevered protection
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"caa1ba3e-4443-4488-b611-2b81da5ca230"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"caa1ba3e-4443-4488-b611-2b81da5ca230","capturedAt":"2026-10-08T12:06:49.396Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general exact isolated maintenance 0.00000001
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"85bd8faa-0b1e-4f51-9f74-b688d648bfce"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"85bd8faa-0b1e-4f51-9f74-b688d648bfce","capturedAt":"2026-10-08T12:06:49.495Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"85bd8faa-0b1e-4f51-9f74-b688d648bfce","capturedAt":"2026-10-08T12:06:49.519Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general exact isolated maintenance 0
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"aee7393c-d5b5-4f94-8473-f9c23e38d9c1"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"aee7393c-d5b5-4f94-8473-f9c23e38d9c1","capturedAt":"2026-10-08T12:06:49.616Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"aee7393c-d5b5-4f94-8473-f9c23e38d9c1","capturedAt":"2026-10-08T12:06:49.641Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general exact isolated maintenance -0.00000001
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"e8cc1c96-c2ac-4594-9227-e09926cbba24"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"e8cc1c96-c2ac-4594-9227-e09926cbba24","capturedAt":"2026-10-08T12:06:49.738Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"e8cc1c96-c2ac-4594-9227-e09926cbba24","capturedAt":"2026-10-08T12:06:49.768Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"e8cc1c96-c2ac-4594-9227-e09926cbba24","capturedAt":"2026-10-08T12:06:49.799Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"e8cc1c96-c2ac-4594-9227-e09926cbba24","capturedAt":"2026-10-08T12:06:49.834Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"e8cc1c96-c2ac-4594-9227-e09926cbba24","capturedAt":"2026-10-08T12:06:49.935Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general atomic three-position Cross bankruptcy, mixed protection, disabled-mode risk, duplicate worker and history
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"a5709982-a327-4873-97f1-0edc661fea50"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"a5709982-a327-4873-97f1-0edc661fea50","capturedAt":"2026-10-08T12:06:50.072Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"a5709982-a327-4873-97f1-0edc661fea50","capturedAt":"2026-10-08T12:06:50.102Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"a5709982-a327-4873-97f1-0edc661fea50","capturedAt":"2026-10-08T12:06:50.131Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"a5709982-a327-4873-97f1-0edc661fea50","capturedAt":"2026-10-08T12:06:50.162Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"a5709982-a327-4873-97f1-0edc661fea50","capturedAt":"2026-10-08T12:06:50.197Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general isolated bankruptcy preserves Cross pool in REDUCE_ONLY
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"ade974fd-d71c-4af0-8ba7-aca156dbc1bf"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"ade974fd-d71c-4af0-8ba7-aca156dbc1bf","capturedAt":"2026-10-08T12:06:50.296Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general usd outgoing exact free/over limit/stale; incoming allowed
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"dbff872a-77a1-4bfc-9ca6-6282361a62bc"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"dbff872a-77a1-4bfc-9ca6-6282361a62bc","capturedAt":"2026-10-08T12:06:50.447Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general fx outgoing exact free/over limit/stale; incoming allowed
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"64a55c16-2832-48ce-ba63-3dcec487ca76"}[39m
+    PASS F2 general Cross and new Isolated cannot double-spend collateral
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"4b99b669-3de5-489a-983c-6a90c76414fb"}[39m
+    PASS F2 general maintenance plus normal fee blocks a transfer even within initial free collateral
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"619aef9d-4428-41ee-a854-69feb481c794"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:51 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"619aef9d-4428-41ee-a854-69feb481c794","capturedAt":"2026-10-08T12:06:50.989Z","code":"FUTURES_MARK_UNAVAILABLE"}[39m
+    PASS F2 general modes, committed replay, stale mark fail-closed and stale reduce/close allowed
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:51 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"c7fe3142-132b-4449-b39b-82d5af4acf9f"}[39m
+    PASS F2 general rollback futuresLiquidation.create #1 then successful retry
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:51 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"aa9263f0-bfc3-4c65-82ca-fb0bcc81ff41"}[39m
+    PASS F2 general rollback futuresPosition.update #1 then successful retry
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:51 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"040d8bdb-bea1-40e0-98c0-ce268ba65e5a"}[39m
+    PASS F2 general rollback futuresPosition.update #2 then successful retry
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:51 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"b2dc5f36-b49a-4b8e-bd9d-c3e73fb69c0a"}[39m
+    PASS F2 general rollback futuresPosition.update #3 then successful retry
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:52 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"1a49f8c7-ff74-4749-8ee7-4f4ccaf6bd5d"}[39m
+    (node:122994) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    HttpException: Http Exception
+
+      23 |   const publicMessage =
+      24 |     safePublicErrorMessage(message) ?? 'Request could not be completed.';
+    > 25 |   const exception = new HttpException(
+         |                     ^
+      26 |     {
+      27 |       success: false,
+      28 |       error: {
+
+      at createApiError (common/api-error.ts:25:21)
+      at futuresError (futures/futures-error.ts:9:9)
+      at async Proxy._transactionWithCallback (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:785:18)
+      at async FuturesService.execute (futures/futures.service.ts:127:14)
+      at async mixed (../scripts/futures-risk-integration.ts:157:3)
+      at async rollbackCases (../scripts/futures-risk-integration.ts:577:7)
+      at async main (../scripts/futures-risk-integration.ts:1428:5) {
+        response: {
+          success: false,
+          error: {
+            code: 'FUTURES_INSTRUMENT_UNVERIFIED',
+            message: 'This Futures instrument is not yet available for new trades.'
+          }
+        },
+        status: 409,
+        options: undefined
+      }
+      at Object.<anonymous> (futures/futures-risk.integration.spec.ts:17:38)
+
+PASS src/wallets/wallet-fx-transfer.integration.spec.ts (13.026 s)
+PASS src/futures/futures.integration.spec.ts (12.94 s)
+PASS src/futures/futures-isolated-boundary.integration.spec.ts (10.419 s)
+PASS src/conditional/conditional.integration.spec.ts (10.629 s)
+PASS src/futures/futures-limit.integration.spec.ts (9.268 s)
+PASS src/futures/futures-f3.integration.spec.ts (7.611 s)
+PASS src/wallets/spot-wallet-transfer.integration.spec.ts (5.937 s)
+PASS src/orders/limit-order-transaction-time.integration.spec.ts
+PASS src/orders/trading-fee-pinning.integration.spec.ts
+PASS src/orders/order-input-policy.integration.spec.ts
+PASS src/orders/orders.execute.integration.spec.ts
+PASS src/orders/market-execution.integration.spec.ts
+PASS src/fx/fx.execute.integration.spec.ts
+PASS src/futures/futures-f31.integration.spec.ts
+PASS src/orders/limit-order-matching.integration.spec.ts
+PASS src/mvp-flow.integration.spec.ts
+PASS src/orders/limit-order-create-race.integration.spec.ts
+PASS src/orders/limit-order-idempotent-replay.integration.spec.ts
+PASS src/orders/limit-order-reservation.integration.spec.ts
+PASS src/orders/limit-order-create-no-redis.integration.spec.ts
+
+Summary of all failing tests
+FAIL futures/futures-risk.integration.spec.ts
+  ● Futures F2 actual PostgreSQL financial integration › proves risk, atomic liquidation, bankruptcy, transfers, lifecycle, races and rollback
+
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:47 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"2b3d0d3b-0906-46ab-bdc9-c2f2149996f8"}[39m
+    PASS F2 admin financial guards retain scope/predicates without exact amounts; failures roll back
+    PASS F2 admin wallet integrity evidence excludes canonical financial rows
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:47 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"579d42da-1f60-499c-be51-9119201ca793"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:47 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"579d42da-1f60-499c-be51-9119201ca793","capturedAt":"2026-10-08T12:06:47.920Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 DB typed immutable Mark, duplicate/out-of-order/WS priority, Spot selector isolation and lifetime margin mode
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"919bd7c5-10f7-4ea1-8310-b3b1e9b97308"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"919bd7c5-10f7-4ea1-8310-b3b1e9b97308","capturedAt":"2026-10-08T12:06:48.070Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"919bd7c5-10f7-4ea1-8310-b3b1e9b97308","capturedAt":"2026-10-08T12:06:48.103Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 gap liquidation closes quantity even when Mark notional rounds to zero
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"6cfa62f1-67a0-47d8-9a7a-ee83409b6173"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"6cfa62f1-67a0-47d8-9a7a-ee83409b6173","capturedAt":"2026-10-08T12:06:48.214Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"6cfa62f1-67a0-47d8-9a7a-ee83409b6173","capturedAt":"2026-10-08T12:06:48.266Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 rollback after positive PnL credit and current-fee-policy liquidation
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"3c50ccf7-ac53-41c9-841d-5280129e40f4"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"3c50ccf7-ac53-41c9-841d-5280129e40f4","capturedAt":"2026-10-08T12:06:48.366Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"3c50ccf7-ac53-41c9-841d-5280129e40f4","capturedAt":"2026-10-08T12:06:48.407Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"3c50ccf7-ac53-41c9-841d-5280129e40f4","capturedAt":"2026-10-08T12:06:48.443Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"3c50ccf7-ac53-41c9-841d-5280129e40f4","capturedAt":"2026-10-08T12:06:48.477Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"3c50ccf7-ac53-41c9-841d-5280129e40f4","capturedAt":"2026-10-08T12:06:48.547Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 reserved cash plus isolated allocation both survive Cross bankruptcy; manual isolated close cannot raid Cross
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"22ce3928-3d36-4562-84eb-14c21e84629a"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"22ce3928-3d36-4562-84eb-14c21e84629a","capturedAt":"2026-10-08T12:06:48.633Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general/long/1 isolated read, full close or unlevered protection
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"e4d3df56-91e6-4543-a7c1-18dd48046264"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"e4d3df56-91e6-4543-a7c1-18dd48046264","capturedAt":"2026-10-08T12:06:48.744Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"e4d3df56-91e6-4543-a7c1-18dd48046264","capturedAt":"2026-10-08T12:06:48.795Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general/long/37 isolated read, full close or unlevered protection
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"69e38a59-37a7-4a08-a614-b13351d29db6"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"69e38a59-37a7-4a08-a614-b13351d29db6","capturedAt":"2026-10-08T12:06:48.886Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"69e38a59-37a7-4a08-a614-b13351d29db6","capturedAt":"2026-10-08T12:06:48.930Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general/long/100 isolated read, full close or unlevered protection
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:48 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"f39afa4f-134f-4699-b3d0-4c67fd2cf319"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"f39afa4f-134f-4699-b3d0-4c67fd2cf319","capturedAt":"2026-10-08T12:06:49.011Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"f39afa4f-134f-4699-b3d0-4c67fd2cf319","capturedAt":"2026-10-08T12:06:49.057Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general/short/1 isolated read, full close or unlevered protection
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"6d0fd9ea-a821-4221-a08a-f326a97bb07b"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"6d0fd9ea-a821-4221-a08a-f326a97bb07b","capturedAt":"2026-10-08T12:06:49.142Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"6d0fd9ea-a821-4221-a08a-f326a97bb07b","capturedAt":"2026-10-08T12:06:49.185Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general/short/37 isolated read, full close or unlevered protection
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"07d72f58-c5dd-4318-864f-22f0ad0b928c"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"07d72f58-c5dd-4318-864f-22f0ad0b928c","capturedAt":"2026-10-08T12:06:49.264Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"07d72f58-c5dd-4318-864f-22f0ad0b928c","capturedAt":"2026-10-08T12:06:49.306Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general/short/100 isolated read, full close or unlevered protection
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"caa1ba3e-4443-4488-b611-2b81da5ca230"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"caa1ba3e-4443-4488-b611-2b81da5ca230","capturedAt":"2026-10-08T12:06:49.396Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general exact isolated maintenance 0.00000001
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"85bd8faa-0b1e-4f51-9f74-b688d648bfce"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"85bd8faa-0b1e-4f51-9f74-b688d648bfce","capturedAt":"2026-10-08T12:06:49.495Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"85bd8faa-0b1e-4f51-9f74-b688d648bfce","capturedAt":"2026-10-08T12:06:49.519Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general exact isolated maintenance 0
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"aee7393c-d5b5-4f94-8473-f9c23e38d9c1"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"aee7393c-d5b5-4f94-8473-f9c23e38d9c1","capturedAt":"2026-10-08T12:06:49.616Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"aee7393c-d5b5-4f94-8473-f9c23e38d9c1","capturedAt":"2026-10-08T12:06:49.641Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general exact isolated maintenance -0.00000001
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"e8cc1c96-c2ac-4594-9227-e09926cbba24"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"e8cc1c96-c2ac-4594-9227-e09926cbba24","capturedAt":"2026-10-08T12:06:49.738Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"e8cc1c96-c2ac-4594-9227-e09926cbba24","capturedAt":"2026-10-08T12:06:49.768Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"e8cc1c96-c2ac-4594-9227-e09926cbba24","capturedAt":"2026-10-08T12:06:49.799Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"e8cc1c96-c2ac-4594-9227-e09926cbba24","capturedAt":"2026-10-08T12:06:49.834Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:49 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"e8cc1c96-c2ac-4594-9227-e09926cbba24","capturedAt":"2026-10-08T12:06:49.935Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general atomic three-position Cross bankruptcy, mixed protection, disabled-mode risk, duplicate worker and history
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"a5709982-a327-4873-97f1-0edc661fea50"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"a5709982-a327-4873-97f1-0edc661fea50","capturedAt":"2026-10-08T12:06:50.072Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"a5709982-a327-4873-97f1-0edc661fea50","capturedAt":"2026-10-08T12:06:50.102Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"a5709982-a327-4873-97f1-0edc661fea50","capturedAt":"2026-10-08T12:06:50.131Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"a5709982-a327-4873-97f1-0edc661fea50","capturedAt":"2026-10-08T12:06:50.162Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"a5709982-a327-4873-97f1-0edc661fea50","capturedAt":"2026-10-08T12:06:50.197Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general isolated bankruptcy preserves Cross pool in REDUCE_ONLY
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"ade974fd-d71c-4af0-8ba7-aca156dbc1bf"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"ade974fd-d71c-4af0-8ba7-aca156dbc1bf","capturedAt":"2026-10-08T12:06:50.296Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general usd outgoing exact free/over limit/stale; incoming allowed
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"dbff872a-77a1-4bfc-9ca6-6282361a62bc"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"dbff872a-77a1-4bfc-9ca6-6282361a62bc","capturedAt":"2026-10-08T12:06:50.447Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS F2 general fx outgoing exact free/over limit/stale; incoming allowed
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"64a55c16-2832-48ce-ba63-3dcec487ca76"}[39m
+    PASS F2 general Cross and new Isolated cannot double-spend collateral
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"4b99b669-3de5-489a-983c-6a90c76414fb"}[39m
+    PASS F2 general maintenance plus normal fee blocks a transfer even within initial free collateral
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:50 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"619aef9d-4428-41ee-a854-69feb481c794"}[39m
+    [33m[Nest] 122994  - [39m10/08/2026, 9:06:51 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"619aef9d-4428-41ee-a854-69feb481c794","capturedAt":"2026-10-08T12:06:50.989Z","code":"FUTURES_MARK_UNAVAILABLE"}[39m
+    PASS F2 general modes, committed replay, stale mark fail-closed and stale reduce/close allowed
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:51 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"c7fe3142-132b-4449-b39b-82d5af4acf9f"}[39m
+    PASS F2 general rollback futuresLiquidation.create #1 then successful retry
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:51 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"aa9263f0-bfc3-4c65-82ca-fb0bcc81ff41"}[39m
+    PASS F2 general rollback futuresPosition.update #1 then successful retry
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:51 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"040d8bdb-bea1-40e0-98c0-ce268ba65e5a"}[39m
+    PASS F2 general rollback futuresPosition.update #2 then successful retry
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:51 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"b2dc5f36-b49a-4b8e-bd9d-c3e73fb69c0a"}[39m
+    PASS F2 general rollback futuresPosition.update #3 then successful retry
+    [32m[Nest] 122994  - [39m10/08/2026, 9:06:52 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"1a49f8c7-ff74-4749-8ee7-4f4ccaf6bd5d"}[39m
+    (node:122994) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    HttpException: Http Exception
+
+      23 |   const publicMessage =
+      24 |     safePublicErrorMessage(message) ?? 'Request could not be completed.';
+    > 25 |   const exception = new HttpException(
+         |                     ^
+      26 |     {
+      27 |       success: false,
+      28 |       error: {
+
+      at createApiError (common/api-error.ts:25:21)
+      at futuresError (futures/futures-error.ts:9:9)
+      at async Proxy._transactionWithCallback (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:785:18)
+      at async FuturesService.execute (futures/futures.service.ts:127:14)
+      at async mixed (../scripts/futures-risk-integration.ts:157:3)
+      at async rollbackCases (../scripts/futures-risk-integration.ts:577:7)
+      at async main (../scripts/futures-risk-integration.ts:1428:5) {
+        response: {
+          success: false,
+          error: {
+            code: 'FUTURES_INSTRUMENT_UNVERIFIED',
+            message: 'This Futures instrument is not yet available for new trades.'
+          }
+        },
+        status: 409,
+        options: undefined
+      }
+      at Object.<anonymous> (futures/futures-risk.integration.spec.ts:17:38)
+
+
+Test Suites: 1 failed, 21 passed, 22 total
+Tests:       1 failed, 22 passed, 23 total
+Snapshots:   0 total
+Time:        146.595 s, estimated 181 s
+Ran all test suites matching src/orders/order-input-policy.integration.spec.ts|src/orders/limit-order-reservation.integration.spec.ts|src/wallets/spot-wallet-transfer.integration.spec.ts|src/wallets/wallet-fx-transfer.integration.spec.ts|src/futures/futures.integration.spec.ts|src/futures/futures-risk.integration.spec.ts|src/futures/futures-f3.integration.spec.ts|src/futures/futures-f31.integration.spec.ts|src/conditional/conditional.integration.spec.ts|src/futures/futures-limit.integration.spec.ts|src/futures/futures-isolated-boundary.integration.spec.ts|src/orders/limit-order-create-race.integration.spec.ts|src/orders/limit-order-transaction-time.integration.spec.ts|src/orders/trading-transaction-time.integration.spec.ts|src/orders/trading-fee-pinning.integration.spec.ts|src/orders/limit-order-create-no-redis.integration.spec.ts|src/orders/limit-order-idempotent-replay.integration.spec.ts|src/orders/limit-order-matching.integration.spec.ts|src/orders/orders.execute.integration.spec.ts|src/orders/market-execution.integration.spec.ts|src/fx/fx.execute.integration.spec.ts|src/mvp-flow.integration.spec.ts.

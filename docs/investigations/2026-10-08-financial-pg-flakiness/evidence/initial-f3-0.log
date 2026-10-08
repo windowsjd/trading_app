@@ -1,0 +1,9 @@
+PASS src/futures/futures-f3.integration.spec.ts (7.799 s)
+  Futures F3 actual PostgreSQL integration
+    ✓ proves valuation, performance, final settlement, retries, collateral boundaries and races (7700 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        7.914 s
+Ran all test suites matching src/futures/futures-f3.integration.spec.ts.

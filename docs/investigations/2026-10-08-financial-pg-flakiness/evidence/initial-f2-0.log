@@ -1,0 +1,9 @@
+PASS src/futures/futures-risk.integration.spec.ts (39.125 s)
+  Futures F2 actual PostgreSQL financial integration
+    ✓ proves risk, atomic liquidation, bankruptcy, transfers, lifecycle, races and rollback (39026 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        39.243 s
+Ran all test suites matching src/futures/futures-risk.integration.spec.ts.

@@ -1,0 +1,23 @@
+REAL_CLOCK_STEP {"beforeWall":"2026-10-08T14:42:54.672Z","afterWall":"2026-10-08T14:42:53.862Z","wallDeltaMs":-810,"monotonicDeltaMs":1.118958000002749,"mono":31940.798008}
+REAL_CLOCK_STEP {"beforeWall":"2026-10-08T14:43:26.117Z","afterWall":"2026-10-08T14:43:25.291Z","wallDeltaMs":-826,"monotonicDeltaMs":1.157565000001341,"mono":64196.691772}
+SPOT_EVIDENCE_BEFORE_STEP {"tick":"2026-10-08T14:43:57.412Z","nodeNow":"2026-10-08T14:43:57.418Z"}
+REAL_CLOCK_STEP {"beforeWall":"2026-10-08T14:43:57.543Z","afterWall":"2026-10-08T14:43:56.753Z","wallDeltaMs":-790,"monotonicDeltaMs":1.1536449999985052,"mono":96449.350503}
+(node:201612) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+PG_OBSERVE_SPOT {"transactionNow":"2026-10-08T14:43:56.771Z","nodeNow":"2026-10-08T14:43:56.772Z","submittedAt":"2026-10-08T14:42:23.829Z","asset":{"id":"asset","isActive":true,"assetType":"crypto","market":"BINANCE","currencyCode":"USD","priceCurrency":"USD"},"eligibility":{"eligible":true,"sourceName":"binance_spot_ws_ticker","sourceNames":["binance_spot_ws_ticker","binance_public_rest_24hr_ticker"],"freshnessThresholdSeconds":10},"evidence":{"id":"price","assetId":"asset","price":"100","priceKrw":null,"currencyCode":"USD","sourceType":"provider_api","sourceName":"binance_spot_ws_ticker","sourceTimestamp":null,"effectiveAt":"2026-10-08T14:43:57.412Z","capturedAt":"2026-10-08T14:43:57.412Z","createdAt":"2026-10-08T14:42:23.843Z","rawPayloadJson":null,"note":null},"selection":{"state":"not_selected","decision":{"selectedSourceType":null,"selectedSourceName":null,"selectedSnapshotId":null,"selectedEffectiveAt":null,"selectedCapturedAt":null,"fallbackUsed":true,"fallbackReason":"provider_rejected","rejectedProviderReason":"effective_at_in_future","freshnessAgeSeconds":null}}}
+AssertionError [ERR_ASSERTION]: {"state":"skipped","orderId":"buyfill","reason":"price_evidence_unavailable"}
++ actual - expected
+
++ 'skipped'
+- 'filled'
+
+    at legacy (/tmp/finance-pg-investigation/head/backend/scripts/spot-wallet-transfer-integration.ts:1302:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async main (/tmp/finance-pg-investigation/head/backend/scripts/spot-wallet-transfer-integration.ts:1401:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 'skipped',
+  expected: 'filled',
+  operator: 'strictEqual',
+  diff: 'simple'
+}

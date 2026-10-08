@@ -1,0 +1,63 @@
+FAIL src/futures/futures.integration.spec.ts
+  Futures F1 actual PostgreSQL financial integration
+    ✕ proves General/Season lifecycle, evidence, fees, collateral, rollback and races (2970 ms)
+
+  ● Futures F1 actual PostgreSQL financial integration › proves General/Season lifecycle, evidence, fees, collateral, rollback and races
+
+    [32m[Nest] 196636  - [39m10/08/2026, 11:31:20 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"e8b0276e-4b92-44e7-9df8-5f969d71d7ef"}[39m
+    [33m[Nest] 196636  - [39m10/08/2026, 11:31:20 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"e8b0276e-4b92-44e7-9df8-5f969d71d7ef","capturedAt":"2026-10-08T14:31:20.112Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS direct PostgreSQL structural writes reject invalid leverage/quantity/direction/state, hedge, identity and wrong evidence
+    [32m[Nest] 196636  - [39m10/08/2026, 11:31:20 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"0a1231f6-1b62-48bb-8ce2-25a163fb16df"}[39m
+    [33m[Nest] 196636  - [39m10/08/2026, 11:31:20 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"0a1231f6-1b62-48bb-8ce2-25a163fb16df","capturedAt":"2026-10-08T14:31:20.262Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    [33m[Nest] 196636  - [39m10/08/2026, 11:31:20 PM [33m   WARN[39m [38;5;3m[FuturesPerformanceService] [39m[33m{"event":"futures_performance_observation_unavailable","tradingAccountId":"1fca7088-e5b3-4bea-8d08-6fc7b1c17adc","capturedAt":"2026-10-08T14:31:20.298Z","code":"FX_RATE_UNAVAILABLE"}[39m
+    PASS General/Season same instrument and key keep positions, wallets, history, fees and ownership isolated
+    [32m[Nest] 196636  - [39m10/08/2026, 11:31:20 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"8a9ef74f-43bf-40d0-acd4-b16c525e8817"}[39m
+    PASS general/long complete lifetime, average, fee/PnL, history and committed replay
+    [32m[Nest] 196636  - [39m10/08/2026, 11:31:20 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"c0d59eaa-48d1-44c1-a904-33ae0e644c83"}[39m
+    PASS general/long extreme loss full rollback, no clamp/delete/negative wallet
+    [32m[Nest] 196636  - [39m10/08/2026, 11:31:20 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"9a544adc-f293-46ac-b62a-3470582736eb"}[39m
+    PASS general/long partial loss cannot spend remaining isolated margin
+    [32m[Nest] 196636  - [39m10/08/2026, 11:31:20 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"a6360fe1-01c9-4cd4-9a9d-19fd207fecfd"}[39m
+    PASS general/short complete lifetime, average, fee/PnL, history and committed replay
+    [32m[Nest] 196636  - [39m10/08/2026, 11:31:21 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"4930dbbd-945b-433d-9acf-46efb474c9c2"}[39m
+    PASS general/short extreme loss full rollback, no clamp/delete/negative wallet
+    [32m[Nest] 196636  - [39m10/08/2026, 11:31:21 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"8f393339-b794-40c6-9cd2-ad30481956c4"}[39m
+    PASS general/short partial loss cannot spend remaining isolated margin
+    [32m[Nest] 196636  - [39m10/08/2026, 11:31:21 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"a7a71d3f-e672-471e-9d00-249e317494d8"}[39m
+    PASS general leverage/margin/fee boundaries, flag and both outgoing/incoming transfer routes
+    [32m[Nest] 196636  - [39m10/08/2026, 11:31:22 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"2c47bdfb-f2ed-4f55-ae4d-4e847d5c9525"}[39m
+    PASS general DB price identity/staleness and account/season lifecycle
+    [32m[Nest] 196636  - [39m10/08/2026, 11:31:22 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"dd45c40e-9bb9-4dca-82df-d21409a6ee8b"}[39m
+    (node:196636) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    PG_OBSERVE_FUTURES {"operation":"open","executeNow":"2026-10-08T14:31:21.685Z","nodeNow":"2026-10-08T14:31:21.690Z","instrument":{"id":"9981c257-9a4c-4c2f-9572-e27a4326ab24","underlyingAssetId":"f7fb585d-9484-4fe2-b1dc-9c0da9bb9c56","productType":"synthetic_perpetual","settlementCurrency":"USD","isActive":true,"markContractJson":{"pair":"F12535CF484F86USDT","status":"TRADING","symbol":"F12535CF484F86USDT","baseAsset":"F12535CF484F86","quoteAsset":"USDT","marginAsset":"USDT","contractType":"PERPETUAL","underlyingType":"COIN"},"markVerifiedAt":"2026-10-08T14:31:22.421Z","createdAt":"2026-10-08T14:31:22.421Z","updatedAt":"2026-10-08T14:31:22.421Z","underlyingAsset":{"id":"f7fb585d-9484-4fe2-b1dc-9c0da9bb9c56","symbol":"F12535CF484F86USDT","name":"F1 fixture","market":"BINANCE","currencyCode":"USD","priceCurrency":"USD","settlementCurrency":"USD","assetType":"crypto","isActive":true,"createdAt":"2026-10-08T14:31:22.420Z","updatedAt":"2026-10-08T14:31:22.420Z"}}}
+    AssertionError [ERR_ASSERTION]: The validation function is expected to return "true". Received false
+
+    Caught error:
+
+    HttpException: Http Exception
+
+      1033 |       await price(s);
+      1034 |       const before = await state(s);
+    > 1035 |       await assert.rejects(
+           |       ^
+      1036 |         execute(s, openBody(s), services(faultyDb(point)).futures),
+      1037 |         (error: unknown) => String(error).includes(point),
+      1038 |       );
+
+      at async rollback (../scripts/futures-integration.ts:1035:7)
+      at async main (../scripts/futures-integration.ts:1387:5) {
+        generatedMessage: true,
+        code: 'ERR_ASSERTION',
+        actual: [HttpException],
+        expected: [Function (anonymous)],
+        operator: 'rejects',
+        diff: 'simple'
+      }
+      at Object.<anonymous> (futures/futures.integration.spec.ts:17:38)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        3.252 s
+Ran all test suites matching src/futures/futures.integration.spec.ts.
