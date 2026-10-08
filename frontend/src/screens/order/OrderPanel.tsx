@@ -46,6 +46,7 @@ import {
   shouldResetBoundFlow,
 } from '../../features/tradingAccount/accountBinding';
 import { getIntegrityErrorMessage } from '../../features/tradingAccount/integrityErrors';
+import ErrorNotice from '../../components/states/ErrorNotice';
 import { invalidateAfterOrderCreate } from '../../features/tradingAccount/invalidation';
 import {
   captureOrderSuccess,
@@ -230,6 +231,8 @@ export function OrderForm({
     accounts,
     selectedAccountId,
     isLoading: accountsLoading,
+    isError: accountsError,
+    error: accountsFailure,
   } = useTradingAccount();
 
   // Ownership is re-checked against the freshly fetched owned list, and the
@@ -816,6 +819,11 @@ export function OrderForm({
 
   if (assetQuery.isLoading || accountsLoading)
     return <SectionSkeleton lines={5} />;
+  if (accountsError)
+    return <View style={styles.group}>
+      <ErrorNotice error={accountsFailure} message="주문 계정을 확인할 수 없습니다." style={styles.errorText} />
+      <CTAButton variant="neutral" label="종목으로 돌아가기" onPress={onReturnToAsset} />
+    </View>;
   if (accountChangedAway || !accountKnown)
     return (
       <View style={styles.group}>
@@ -839,9 +847,10 @@ export function OrderForm({
       </View>
     );
   const pending = orderPending;
-  const integrityMessage =
-    getIntegrityErrorMessage(positionQuery.error) ??
-    getIntegrityErrorMessage(walletsQuery.error);
+  const integrityError = [positionQuery, walletsQuery].find(
+    (query) => query.isError && getIntegrityErrorMessage(query.error),
+  )?.error;
+  const integrityMessage = getIntegrityErrorMessage(integrityError);
   const resetInput = (update: () => void) => {
     if (submitLockRef.current) return;
     update();
@@ -1011,7 +1020,7 @@ export function OrderForm({
         </Text>
       ) : null}
       {integrityMessage ? (
-        <AdminDiagnosticPanel error={positionQuery.error ?? walletsQuery.error} />
+        <AdminDiagnosticPanel error={integrityError} />
       ) : null}
       {visibleBlockedReason ? (
         <Text
@@ -1024,10 +1033,13 @@ export function OrderForm({
       {visibleBlockedReason && side === 'sell' && positionUnavailable ? (
         <AdminDiagnosticPanel
           error={positionQuery.error}
-          diagnostic={positionQuery.data?.valuationErrors?.find(
+          diagnostic={positionQuery.isError ? undefined : positionQuery.data?.valuationErrors?.find(
             (error) => error.diagnostic,
           )?.diagnostic}
         />
+      ) : null}
+      {!integrityMessage && side === 'buy' && walletsQuery.isError ? (
+        <ErrorNotice error={walletsQuery.error} message="지갑 잔액을 확인할 수 없습니다." style={styles.errorText} />
       ) : null}
       {sessionNotice ? (
         <Text style={styles.warningText}>{sessionNotice}</Text>

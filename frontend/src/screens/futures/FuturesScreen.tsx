@@ -65,7 +65,7 @@ export default function FuturesScreen(props: FuturesScreenProps) {
 }
 export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const accountId = route.params.accountId;
-  const { accounts, selectedAccountId, isLoading } = useTradingAccount();
+  const { accounts, selectedAccountId, isLoading, isError, error, refetchAccounts } = useTradingAccount();
   const binding = resolveAccountBinding({
     boundAccountId: accountId,
     selectedAccountId,
@@ -201,6 +201,8 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   };
   if (binding.state === "loading")
     return <FullPageLoading message="선물 계정을 확인하고 있습니다." />;
+  if (isError)
+    return <ErrorState error={error} title="계정 정보를 불러오지 못했습니다." onRetry={() => void refetchAccounts()} />;
   if (!bound)
     return (
       <View style={styles.card}>
@@ -464,10 +466,8 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
           <Text style={styles.heading}>선물 거래</Text>
           {!position ? <View style={styles.choices}>{(["market", "limit"] as const).map(type => <Choice key={type} label={type === "market" ? "시장가" : "지정가 진입"} selected={entryType === type} disabled={mutation.isPending || pendingResult || limitBusy} onPress={() => setEntryType(type)} />)}</View> : null}
           {instruments.isError ? (
-            <Text style={styles.warning}>
-              상품 목록을 불러오지 못했습니다. 보유 포지션에서 다시 선택할 수
-              있습니다.
-            </Text>
+            <ErrorNotice error={instruments.error} style={styles.warning}
+              message="상품 목록을 불러오지 못했습니다. 보유 포지션에서 다시 선택할 수 있습니다." />
           ) : null}
           {allInstruments.length > 12 ? (
             <>
@@ -674,11 +674,14 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
             ))}
           </View>
           {history.isError ? (
+            <>
+            <ErrorNotice error={history.error} message="기록을 불러오지 못했습니다." style={styles.warning} />
             <CTAButton
               label="기록 다시 불러오기"
               variant="secondary"
               onPress={() => void history.refetch()}
             />
+            </>
           ) : history.isPending ? (
             <Text>기록을 불러오고 있습니다.</Text>
           ) : (

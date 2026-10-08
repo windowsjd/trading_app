@@ -324,6 +324,7 @@ function inlineTradingHarness() {
             : null,
           isLoading: false,
           isEmpty: !selectedAccount,
+          ...h.accountState,
         };
       },
     },
@@ -388,6 +389,7 @@ function inlineTradingHarness() {
       '../../features/me/api': meApi,
     },
   );
+  mocks['./AdminDiagnosticPanel'] = mocks['../../components/states/AdminDiagnosticPanel'];
   mocks['../order/OrderPanel'] = load(
     resolve('src/screens/order/OrderPanel.tsx'),
     mocks,

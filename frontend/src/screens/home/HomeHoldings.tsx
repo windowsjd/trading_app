@@ -11,6 +11,7 @@ import ActionPressable from '../../components/common/ActionPressable';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import ErrorState from '../../components/states/ErrorState';
+import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 
 export function useHomeHoldings(accountId: string) {
   const [expanded, setExpanded] = useState(false);
@@ -35,6 +36,7 @@ export default function HomeHoldings({ holdings, onOpenAsset }: {
   // A newer complete Wallet/Home read can also supply the collapsed summary.
   const useFull = fullQuery.data && (expanded || fullQuery.dataUpdatedAt >= previewQuery.dataUpdatedAt);
   const positions = useFull ? fullQuery.data.positions : previewQuery.data?.positions;
+  const valuationErrors = useFull ? fullQuery.data.valuationErrors : previewQuery.data?.valuationErrors;
   const total = useFull ? positions.length : previewQuery.data?.pagination.total ?? 0;
   const first = positions?.[0];
   const representative = first?.valuation.state !== 'unavailable' ? first : undefined;
@@ -44,7 +46,7 @@ export default function HomeHoldings({ holdings, onOpenAsset }: {
     <View testID="home-holdings" style={styles.card}>
       <Text accessibilityRole="header" style={styles.title}>보유 종목</Text>
       {!positions && previewQuery.isLoading ? <SectionSkeleton lines={2} />
-        : !positions && previewQuery.isError ? <ErrorState title="보유 종목을 불러오지 못했습니다." onRetry={() => void previewQuery.refetch()} />
+        : !positions && previewQuery.isError ? <ErrorState error={previewQuery.error} title="보유 종목을 불러오지 못했습니다." message="요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요." onRetry={() => void previewQuery.refetch()} />
           : !positions ? <InlineEmptyState message="보유 종목을 확인할 수 없습니다." />
             : total === 0 ? <InlineEmptyState title="보유 종목이 없습니다." message="아직 매수한 종목이 없습니다." /> : <>
               {!representative ? <InlineEmptyState message="평가금액을 확인할 수 없어 대표 보유자산을 결정할 수 없습니다." /> : null}
@@ -53,7 +55,12 @@ export default function HomeHoldings({ holdings, onOpenAsset }: {
             </>}
       {expanded && fullQuery.isLoading ? <View testID="home-holdings-loading"><SectionSkeleton lines={2} /></View> : null}
       {expanded && fullQuery.isError ? <ErrorState title="전체 보유 종목을 불러오지 못했습니다."
+        error={fullQuery.error}
+        message="요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요."
         onRetry={() => void fullQuery.refetch()} /> : null}
+      {positions ? valuationErrors?.map((failure, index) => (
+        <AdminDiagnosticPanel key={index} diagnostic={failure.diagnostic} />
+      )) : null}
       {total > 1 ? <ActionPressable testID="home-holdings-toggle" feedback="button" style={styles.toggle}
         accessibilityRole="button" accessibilityLabel={expanded ? '보유 종목 접기' : '보유 종목 자세히 보기'}
         accessibilityState={{ expanded }} aria-expanded={expanded} onPress={() => setExpanded(value => !value)}>

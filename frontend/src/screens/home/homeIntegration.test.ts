@@ -375,12 +375,13 @@ describe('general/season home API, queries, rendering and navigation integration
       const failed = h.render();
       assert.equal(elements(failed.tree, 'ErrorState').length, 1);
       assert.equal(failed.chart, null);
-      h.failEquity(new Error('network unavailable'));
+      const error = new Error('network unavailable');
+      h.failEquity(error);
       const transient = h.openTrend();
       assert.ok(texts(transient.tree).includes('총 자산'));
       assert.ok(
-        elements(transient.chart, 'InlineEmptyState').some(
-          (node) => node.props.message === '자산 추이를 불러오지 못했습니다.',
+        elements(transient.chart).some(
+          (node) => node.type.name === 'ErrorNotice' && node.props.message === '자산 추이를 불러오지 못했습니다.' && node.props.error === error,
         ),
       );
       h.close();

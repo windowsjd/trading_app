@@ -11,6 +11,7 @@ import AccountSwitcher from '../../components/tradingAccount/AccountSwitcher';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
+import ErrorNotice from '../../components/states/ErrorNotice';
 import { useAppearance } from '../../theme/appearance';
 import { getHomeTier } from './tierPresentation';
 import TierEmblem from './TierEmblem';
@@ -71,7 +72,9 @@ export default function HomeAccountContext({ context }: { context: HomeAccountCo
           {loading ? '—' : rank}
         </Text> : null}
       </View>
-      {hasSeason && notice ? <Text style={styles.notice}>{notice}</Text> : null}
+      {hasSeason && notice ? rankingQuery.isError
+        ? <ErrorNotice error={rankingQuery.error} message={notice} style={styles.notice} />
+        : <Text style={styles.notice}>{notice}</Text> : null}
     </AccountSwitcher>
   );
 }

@@ -60,6 +60,7 @@ import {
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
+import ErrorNotice from '../../components/states/ErrorNotice';
 import EmptyState from '../../components/states/EmptyState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TradeHistory'>;
@@ -74,6 +75,7 @@ export default function TradeHistoryScreen({ route }: Props) {
     accounts,
     isLoading: accountsLoading,
     isError: accountsError,
+    error: accountsFailure,
     refetchAccounts,
   } = useTradingAccount();
 
@@ -98,6 +100,16 @@ export default function TradeHistoryScreen({ route }: Props) {
   });
   const recordAccount = accountLookup.account;
   const accountId = recordAccount?.id ?? '';
+  const cancelScope = useRef({ accountId, epoch: 0 });
+  if (cancelScope.current.accountId !== accountId) {
+    cancelScope.current = { accountId, epoch: cancelScope.current.epoch + 1 };
+  }
+  useEffect(() => () => {
+    cancelScope.current = { ...cancelScope.current, epoch: cancelScope.current.epoch + 1 };
+  }, []);
+  type CancelRequest = { accountId: string; epoch: number; orderId: string; seasonUi: boolean };
+  const isCurrentCancel = (request: CancelRequest) =>
+    request.accountId === cancelScope.current.accountId && request.epoch === cancelScope.current.epoch;
   const hasAccount = canQueryRecordOrders(accountLookup);
   const accountDisplay = recordAccount ? getAccountDisplay(recordAccount) : null;
   const seasonUi = recordAccount?.mode === 'season';
@@ -119,19 +131,20 @@ export default function TradeHistoryScreen({ route }: Props) {
     // Cancel names the account explicitly. The backend classifies a foreign
     // account's order as 404 and the caller's OWN order with a broken scope as
     // a structured 500 — neither is silently swallowed here.
-    mutationFn: (orderId: string) =>
-      cancelTradingAccountOrder(accountId, orderId),
+    mutationFn: (request: CancelRequest) =>
+      cancelTradingAccountOrder(request.accountId, request.orderId),
     retry: false,
-    onSuccess: async () => {
-      setCancelingOrderId(null);
+    onSuccess: async (_, request) => {
+      if (isCurrentCancel(request)) setCancelingOrderId(null);
       // Only THIS account's orders/wallets/portfolio, plus the season record
       // and dashboard views that are keyed by season rather than by account
       // (작업 10 §A-11). Positions are untouched: a cancel never fills.
-      await invalidateAfterOrderCancel(queryClient, accountId, {
-        seasonUi,
+      await invalidateAfterOrderCancel(queryClient, request.accountId, {
+        seasonUi: request.seasonUi,
       });
     },
-    onError: (error) => {
+    onError: (error, request) => {
+      if (!isCurrentCancel(request)) return;
       setCancelingOrderId(null);
       const code = getApiErrorCode(error);
       Alert.alert('주문 취소 실패', getErrorMessageFromCode(code));
@@ -139,6 +152,7 @@ export default function TradeHistoryScreen({ route }: Props) {
   });
 
   const confirmCancel = (orderId: string, label: string) => {
+    const request = { ...cancelScope.current, orderId, seasonUi };
     Alert.alert(
       '지정가 주문 취소',
       `${label} 주문을 취소할까요? 예약된 금액 또는 수량은 다시 사용할 수 있게 됩니다.`,
@@ -148,8 +162,9 @@ export default function TradeHistoryScreen({ route }: Props) {
           text: '주문 취소',
           style: 'destructive',
           onPress: () => {
+            if (!isCurrentCancel(request)) return;
             setCancelingOrderId(orderId);
-            cancelMutation.mutate(orderId);
+            cancelMutation.mutate(request);
           },
         },
       ],
@@ -259,6 +274,7 @@ export default function TradeHistoryScreen({ route }: Props) {
     return (
       <ErrorState
         title={ACCOUNT_LIST_ERROR_TITLE}
+        error={accountsFailure}
         message={ACCOUNT_LIST_ERROR_MESSAGE}
         onRetry={() => void refetchAccounts()}
       />
@@ -301,6 +317,7 @@ export default function TradeHistoryScreen({ route }: Props) {
     return (
       <ErrorState
         title={ACCOUNT_INTEGRITY_TITLE}
+        error={integrityFailure.error}
         message={integrityFailure.message}
         onRetry={integrityFailure.retry}
       />
@@ -311,6 +328,7 @@ export default function TradeHistoryScreen({ route }: Props) {
     return (
       <ErrorState
         title="거래 내역을 불러오지 못했습니다."
+        error={ordersQuery.error}
         message="잠시 후 다시 시도해주세요."
         onRetry={() => void ordersQuery.refetch()}
       />
@@ -340,6 +358,14 @@ export default function TradeHistoryScreen({ route }: Props) {
               <Text style={styles.accountHeader}>
                 {accountDisplay.title} · {accountDisplay.statusLabel}
               </Text>
+            ) : null}
+            {cancelMutation.isError && cancelMutation.variables && isCurrentCancel(cancelMutation.variables) ? (
+              <View>
+                <Text style={styles.itemTitle}>주문 취소 실패</Text>
+                <ErrorNotice error={cancelMutation.error}
+                  message={getErrorMessageFromCode(getApiErrorCode(cancelMutation.error))}
+                  testID="trade-history-cancel-error" style={styles.helper} />
+              </View>
             ) : null}
             <View style={styles.filterRow}>
             <FilterChip
@@ -372,7 +398,8 @@ export default function TradeHistoryScreen({ route }: Props) {
         renderItem={({ item }) => {
           const display = getRecordOrderDisplay(item);
           const isCanceling =
-            cancelMutation.isPending && cancelingOrderId === display.orderId;
+            cancelMutation.isPending && !!cancelMutation.variables &&
+            isCurrentCancel(cancelMutation.variables) && cancelingOrderId === display.orderId;
 
           return (
             <Pressable

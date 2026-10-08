@@ -14,6 +14,7 @@ function setup() {
     '../../components/tradingAccount/AccountSwitcher': { __esModule: true, default: ({ children, ...props }) => React.createElement('AccountSwitcher', props, children, props.homeVisual) },
     '../../components/states/SectionSkeleton': { __esModule: true, default: 'Skeleton' },
     '../../components/states/InlineEmptyState': { __esModule: true, default: 'Empty' },
+    './AdminDiagnosticPanel': { __esModule: true, default: () => null },
   }).default;
   const context = {
     hasSeason: true, seasonId: 'selected-season', rankType: 'daily',

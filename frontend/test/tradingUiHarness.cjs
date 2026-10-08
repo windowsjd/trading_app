@@ -92,7 +92,7 @@ function createTradingUiHarness(screenName) {
         if (resource === 'wallets') return { ...base, data: { wallets: [
           { walletScope: 'securities', currencyCode: 'KRW', balanceAmount: '1000000' }, { walletScope: 'securities', currencyCode: 'USD', balanceAmount: '100' },
           { walletScope: 'crypto_spot', currencyCode: 'USD', balanceAmount: '100' }, { walletScope: 'crypto_futures', currencyCode: 'USD', balanceAmount: '0' },
-        ] } };
+        ] }, ...h.walletQuery };
         throw new Error(`Unexpected query: ${options.queryKey}`);
       },
       useMutation: config => ({ isPending: false, reset: () => {}, mutate: variables => {
@@ -128,6 +128,7 @@ function createTradingUiHarness(screenName) {
     './OrderSuccessBottomSheet': { default: 'OrderSuccessBottomSheet', __esModule: true },
     './FxSuccessBottomSheet': { default: 'FxSuccessBottomSheet', __esModule: true },
   };
+  mocks['./AdminDiagnosticPanel'] = mocks['../../components/states/AdminDiagnosticPanel'];
   const order = load(resolve(__dirname, '../src/screens/order/OrderPanel.tsx'), mocks);
   mocks['../order/OrderPanel'] = order;
   mocks['./OrderPanel'] = order;

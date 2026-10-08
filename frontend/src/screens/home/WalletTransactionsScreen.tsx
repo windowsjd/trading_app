@@ -63,7 +63,10 @@ export default function WalletTransactionsScreen({ route }: Props) {
     selectedAccountId,
     selectedAccount,
     isLoading: accountsLoading,
+    isError: accountsError,
+    error: accountsFailure,
     isEmpty: noAccounts,
+    refetchAccounts,
   } = useTradingAccount();
   const accountId = selectedAccountId ?? '';
   const hasAccount = !!selectedAccountId;
@@ -121,7 +124,15 @@ export default function WalletTransactionsScreen({ route }: Props) {
     [transactionsQuery.data],
   );
 
-  if (accountsLoading || (hasAccount && transactionsQuery.isLoading)) {
+  if (accountsLoading) {
+    return <FullPageLoading message="지갑 원장을 불러오는 중입니다." />;
+  }
+
+  if (accountsError) {
+    return <ErrorState error={accountsFailure} title="계정 정보를 불러오지 못했습니다." onRetry={() => void refetchAccounts()} />;
+  }
+
+  if (hasAccount && transactionsQuery.isLoading) {
     return <FullPageLoading message="지갑 원장을 불러오는 중입니다." />;
   }
 
@@ -150,6 +161,7 @@ export default function WalletTransactionsScreen({ route }: Props) {
     return (
       <ErrorState
         title={ACCOUNT_INTEGRITY_TITLE}
+        error={integrityFailure.error}
         message={integrityFailure.message}
         onRetry={integrityFailure.retry}
       />
@@ -160,6 +172,7 @@ export default function WalletTransactionsScreen({ route }: Props) {
     return (
       <ErrorState
         title="지갑 원장을 불러오지 못했습니다."
+        error={transactionsQuery.error}
         message="잠시 후 다시 시도해주세요."
         onRetry={() => void transactionsQuery.refetch()}
       />

@@ -29,16 +29,17 @@ import ActionPressable from '../../components/common/ActionPressable';
 import PrimaryButtonBackground from '../../components/common/PrimaryButtonBackground';
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
+import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import HomeAssetHero from '../home/HomeAssetHero';
 import HomeAssetTrend, { type HomeEquityRange } from '../home/HomeAssetTrend';
 
 export default function WalletScreen({ navigation }: WalletScreenProps) {
-  const { selectedAccount, capabilities, isLoading, isError, refetchAccounts } = useTradingAccount();
+  const { selectedAccount, capabilities, isLoading, isError, error, refetchAccounts } = useTradingAccount();
   if (isLoading) return <FullPageLoading message="지갑 정보를 불러오는 중입니다." />;
   if (isError || !selectedAccount) {
-    return <ErrorState title="계정 정보를 불러오지 못했습니다." onRetry={() => void refetchAccounts()} />;
+    return <ErrorState error={isError ? error : undefined} title="계정 정보를 불러오지 못했습니다." message="요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요." onRetry={() => void refetchAccounts()} />;
   }
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.screen}>
@@ -131,17 +132,22 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
     <ScrollView refreshControl={refresh.refreshControl} testID="wallet-screen" contentContainerStyle={styles.content}>
       {integrityFailure ? (
         <View testID={TEST_IDS.tradingAccount.integrityError}>
-          <ErrorState title={ACCOUNT_INTEGRITY_TITLE} message={integrityFailure.message} onRetry={integrityFailure.retry} />
+          <ErrorState error={integrityFailure.error} title={ACCOUNT_INTEGRITY_TITLE} message={integrityFailure.message} onRetry={integrityFailure.retry} />
         </View>
       ) : (
         <>
           {portfolioQuery.isLoading ? <SectionSkeleton lines={3} />
             : !portfolio ? (
-              <ErrorState title="총 자산을 불러오지 못했습니다." onRetry={() => void portfolioQuery.refetch()} />
+              <ErrorState error={portfolioQuery.error} title="총 자산을 불러오지 못했습니다." message="요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요." onRetry={() => void portfolioQuery.refetch()} />
             ) : (
               <HomeAssetHero compactTop compactBottom summary={portfolio.summary} settled={account.season?.seasonStatus === 'settled'} unavailableMessage={notice?.message} />
             )}
-          {notice ? <Text style={styles.notice}>{notice.message}</Text> : null}
+          {notice ? <View>
+            <Text style={styles.notice}>{notice.message}</Text>
+            {portfolio?.sectionErrors.map((failure, index) => (
+              <AdminDiagnosticPanel key={index} diagnostic={failure.diagnostic} />
+            ))}
+          </View> : null}
           <HomeAssetTrend
             expanded={trendExpanded}
             onToggle={() => setTrendExpanded(value => !value)}
@@ -150,6 +156,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
             equity={equityQuery.data}
             loading={equityQuery.isLoading}
             failed={equityQuery.isError}
+            error={equityQuery.error}
             general={account.mode === 'general'}
           />
         </>
@@ -213,7 +220,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
           <Text style={styles.title}>지갑 구성</Text>
           {walletsQuery.isLoading ? <SectionSkeleton lines={2} />
             : walletsQuery.isError && !walletsQuery.data ? (
-              <ErrorState title="현금 잔액을 불러오지 못했습니다." onRetry={() => void walletsQuery.refetch()} />
+              <ErrorState error={walletsQuery.error} title="현금 잔액을 불러오지 못했습니다." message="요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요." onRetry={() => void walletsQuery.refetch()} />
             ) : (
               WALLET_GROUPS.map(({ scope, currencies }) => (
                 <View key={scope} testID={`wallet-group-${scope}`} style={styles.walletGroup}>
@@ -231,7 +238,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
             <Text testID="wallet-holdings-title" style={styles.groupTitle}>보유 종목</Text>
             {positionsQuery.isLoading ? <SectionSkeleton lines={3} />
               : positionsQuery.isError && !positionsQuery.data ? (
-                <ErrorState title="보유 종목을 불러오지 못했습니다." onRetry={() => void positionsQuery.refetch()} />
+                <ErrorState error={positionsQuery.error} title="보유 종목을 불러오지 못했습니다." message="요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요." onRetry={() => void positionsQuery.refetch()} />
               ) : !positions ? <InlineEmptyState message="보유 종목을 확인할 수 없습니다." />
                 : positions.length === 0 ? <InlineEmptyState message="보유 종목이 없습니다." />
                   : positions.map((position) => (
@@ -242,6 +249,9 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
                       onPress={() => rootNavigation.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'AssetDetail', params: { assetId: position.assetId } } })}
                     />
                   ))}
+            {positions ? positionsQuery.data?.valuationErrors?.map((failure, index) => (
+              <AdminDiagnosticPanel key={index} diagnostic={failure.diagnostic} />
+            )) : null}
           </View>
         </View>
       ) : null}

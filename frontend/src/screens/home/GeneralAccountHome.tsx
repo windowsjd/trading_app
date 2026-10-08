@@ -21,6 +21,7 @@ import { usePortfolioFocusRecovery } from './usePortfolioFocusRecovery';
 import { getPortfolioNotice } from '../../features/tradingAccount/portfolioMessage';
 
 import ErrorState from '../../components/states/ErrorState';
+import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import HomeAssetTrend, { type HomeEquityRange } from './HomeAssetTrend';
 import HomeAssetHero from './HomeAssetHero';
@@ -164,6 +165,9 @@ export default function GeneralAccountHome({
         <View style={styles.warningBox}>
           <Text style={styles.warningTitle}>{portfolioNotice.title}</Text>
           <Text style={styles.warningText}>{portfolioNotice.message}</Text>
+          {portfolio.sectionErrors.map((failure, index) => (
+            <AdminDiagnosticPanel key={index} diagnostic={failure.diagnostic} />
+          ))}
         </View>
       ) : null}
 
@@ -178,6 +182,7 @@ export default function GeneralAccountHome({
           equity={equityQuery.data}
           loading={equityQuery.isLoading}
           failed={equityQuery.isError}
+          error={equityQuery.error}
           general
         />
 

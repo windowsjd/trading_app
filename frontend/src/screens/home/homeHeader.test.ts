@@ -26,6 +26,7 @@ function setup() {
     '../../app/navigation/navigationHooks': { useRootNavigation: () => ({ navigate() {} }) },
     '../common/ActionPressable': { default: h.ActionPressable, __esModule: true },
     '../common/CTAButton': { default: 'CTAButton', __esModule: true },
+    './AdminDiagnosticPanel': { default: () => null, __esModule: true },
     '../common/BottomSheetBackdrop': {
       default: ({ visible, children }: { visible: boolean; children: unknown }) => visible ? children : null,
       __esModule: true,

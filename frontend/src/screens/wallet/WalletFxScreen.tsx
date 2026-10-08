@@ -132,7 +132,10 @@ export default function WalletFxScreen({ navigation }: Props) {
     selectedAccount,
     capabilities,
     isLoading: accountsLoading,
+    isError: accountsError,
+    error: accountsFailure,
     isEmpty: noAccounts,
+    refetchAccounts,
   } = useTradingAccount();
 
   /**
@@ -357,7 +360,15 @@ export default function WalletFxScreen({ navigation }: Props) {
     executeMutation.mutate(actionRef.current);
   };
 
-  if (accountsLoading || (hasAccount && viewState === 'wallet_loading')) {
+  if (accountsLoading) {
+    return <FullPageLoading message="지갑 정보를 불러오는 중입니다." />;
+  }
+
+  if (accountsError) {
+    return <ErrorState error={accountsFailure} title="계정 정보를 불러오지 못했습니다." onRetry={() => void refetchAccounts()} />;
+  }
+
+  if (hasAccount && viewState === 'wallet_loading') {
     return <FullPageLoading message="지갑 정보를 불러오는 중입니다." />;
   }
 
@@ -445,7 +456,7 @@ export default function WalletFxScreen({ navigation }: Props) {
         title="지갑 정보를 사용할 수 없습니다."
         message="지갑 정보가 아직 준비되지 않았습니다."
         onRetry={retryWalletLookup}
-        diagnosticError={walletsQuery.error ?? rateQuery.error}
+        error={walletsQuery.isError ? walletsQuery.error : undefined}
       />
     );
   }
@@ -456,7 +467,7 @@ export default function WalletFxScreen({ navigation }: Props) {
         title="지갑 정보를 불러오지 못했습니다."
         message="지갑 조회에 실패했습니다."
         onRetry={retryWalletLookup}
-        diagnosticError={walletsQuery.error ?? rateQuery.error}
+        error={walletsQuery.error}
       />
     );
   }

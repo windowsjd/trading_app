@@ -17,6 +17,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import BottomSheetBackdrop from '../common/BottomSheetBackdrop';
 import CTAButton from '../common/CTAButton';
+import ErrorNotice from '../states/ErrorNotice';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
@@ -72,6 +73,7 @@ export default function AccountSwitcher({ compact = false, home = false, homeCar
     selectedAccountId,
     isLoading,
     isError,
+    error,
     isEmpty,
     selectAccount,
     refetchAccounts,
@@ -119,10 +121,8 @@ export default function AccountSwitcher({ compact = false, home = false, homeCar
         style={[styles.trigger, styles.stateBox, styles.errorBox]}
         testID={TEST_IDS.tradingAccount.switcherError}
       >
-        <Text style={styles.errorText}>
-          계정 목록을 불러오지 못했습니다. 네트워크 상태를 확인한 뒤 다시
-          시도해주세요.
-        </Text>
+        <ErrorNotice error={error} style={styles.errorText}
+          message="계정 목록을 불러오지 못했습니다. 네트워크 상태를 확인한 뒤 다시 시도해주세요." />
         <ActionPressable
           style={styles.retryButton}
           onPress={() => void refetchAccounts()}

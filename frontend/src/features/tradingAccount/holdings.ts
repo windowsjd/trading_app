@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import type { PositionItemDto } from '../position/api';
-import type { getTradingAccountPositions } from './api';
+import type { getTradingAccountPositions, TradingAccountSectionErrorDto } from './api';
 
 export class HoldingsContractError extends Error {
   constructor() {
@@ -28,6 +28,7 @@ export async function getAccountHoldings(
   fetchPage: typeof getTradingAccountPositions,
 ) {
   const positions: PositionItemDto[] = [];
+  const valuationErrors: TradingAccountSectionErrorDto[] = [];
   const assetIds = new Set<string>();
   let offset = 0;
   let total: number | undefined;
@@ -44,6 +45,7 @@ export async function getAccountHoldings(
     )
       throw new HoldingsContractError();
     total = pagination.total;
+    valuationErrors.push(...(page.valuationErrors ?? []));
     for (const position of page.positions) {
       if (assetIds.has(position.assetId)) throw new HoldingsContractError();
       assetIds.add(position.assetId);
@@ -53,7 +55,7 @@ export async function getAccountHoldings(
     const returnedEnd = offset + page.positions.length;
     if (next === null) {
       if (returnedEnd !== total) throw new HoldingsContractError();
-      return { tradingAccountId: accountId, positions };
+      return { tradingAccountId: accountId, positions, valuationErrors };
     }
     if (
       !Number.isSafeInteger(next) ||

@@ -65,6 +65,7 @@ function setup(mode = 'season', count = 7, screen = 'home', options = {}) {
     '../../components/states/FullPageLoading': { __esModule: true, default: 'FullPageLoading' },
     ...Object.fromEntries(['ErrorState', 'InlineEmptyState', 'SectionSkeleton', 'AdminDiagnosticPanel'].map(name => ['../../components/states/' + name, { __esModule: true, default: name }])),
   };
+  mocks['./AdminDiagnosticPanel'] = mocks['../../components/states/AdminDiagnosticPanel'];
   const Screen = h.load(screen === 'wallet' ? 'src/screens/wallet/WalletScreen.tsx' : screen === 'portfolio' ? 'src/screens/home/PortfolioScreen.tsx' : 'src/screens/home/HomeScreen.tsx', mocks).default;
   h.client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity, gcTime: Infinity, ...options.queryDefaults } } });
   const tree = () => React.createElement(QueryClientProvider, { client: h.client }, React.createElement(Screen, { navigation: { navigate() {} } }));

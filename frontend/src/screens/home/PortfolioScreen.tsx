@@ -134,7 +134,10 @@ export default function PortfolioScreen({ navigation }: Props) {
     selectedAccountId,
     capabilities,
     isLoading: accountsLoading,
+    isError: accountsError,
+    error: accountsFailure,
     isEmpty: noAccounts,
+    refetchAccounts,
     handleSelectedAccountMissing,
   } = useTradingAccount();
   const [assetType, setAssetType] =
@@ -255,7 +258,15 @@ export default function PortfolioScreen({ navigation }: Props) {
     equityQuery.isError,
   ]);
 
-  if (accountsLoading || (hasAccount && viewState === 'portfolio_loading')) {
+  if (accountsLoading) {
+    return <FullPageLoading message="포트폴리오를 불러오는 중입니다." />;
+  }
+
+  if (accountsError) {
+    return <ErrorState error={accountsFailure} title="계정 정보를 불러오지 못했습니다." onRetry={() => void refetchAccounts()} />;
+  }
+
+  if (hasAccount && viewState === 'portfolio_loading') {
     return <FullPageLoading message="포트폴리오를 불러오는 중입니다." />;
   }
 
@@ -309,9 +320,7 @@ export default function PortfolioScreen({ navigation }: Props) {
             title={ACCOUNT_INTEGRITY_TITLE}
             message={integrityFailure.message}
             onRetry={integrityFailure.retry}
-            diagnosticError={
-              overviewQuery.error ?? positionsQuery.error ?? equityQuery.error
-            }
+            error={integrityFailure.error}
           />
         </View>
       </SafeAreaView>
@@ -414,9 +423,8 @@ export default function PortfolioScreen({ navigation }: Props) {
                 <Text style={styles.inlineWarningText}>
                   일부 포트폴리오 정보를 불러오지 못했습니다.
                 </Text>
-                <AdminDiagnosticPanel
-                  error={positionsQuery.error ?? equityQuery.error}
-                />
+                {positionsQuery.isError ? <AdminDiagnosticPanel error={positionsQuery.error} /> : null}
+                {isPortfolioAvailable && equityQuery.isError ? <AdminDiagnosticPanel error={equityQuery.error} /> : null}
               </View>
             ) : null}
 

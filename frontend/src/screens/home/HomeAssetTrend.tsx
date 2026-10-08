@@ -4,7 +4,7 @@ import { semantic } from '../../theme/tokens';
 import { LineChart } from '../../components/charts';
 import DisclosureTriangle from '../../components/common/DisclosureTriangle';
 import ActionPressable from '../../components/common/ActionPressable';
-import InlineEmptyState from '../../components/states/InlineEmptyState';
+import ErrorNotice from '../../components/states/ErrorNotice';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import type { TradingAccountEquityDto } from '../../features/tradingAccount/api';
 import { formatKrwDecimal } from '../../utils/format';
@@ -14,7 +14,7 @@ export type HomeEquityRange = typeof HOME_EQUITY_RANGES[number];
 
 /** The disclosure and its content are adjacent in both account modes. */
 export default function HomeAssetTrend({
-  expanded, onToggle, range, onRangeChange, equity, loading, failed, general,
+  expanded, onToggle, range, onRangeChange, equity, loading, failed, error, general,
 }: {
   expanded: boolean;
   onToggle: () => void;
@@ -23,6 +23,7 @@ export default function HomeAssetTrend({
   equity: TradingAccountEquityDto | undefined;
   loading: boolean;
   failed: boolean;
+  error?: unknown;
   general: boolean;
 }) {
   const points = useMemo(() => equity?.points.map((point) => ({
@@ -67,7 +68,10 @@ export default function HomeAssetTrend({
               ))}
             </View>
           </View>
-          {failed ? <InlineEmptyState message="자산 추이를 불러오지 못했습니다." /> : null}
+          {failed ? <View style={styles.failure}>
+            <Text style={styles.failureTitle}>데이터가 없습니다.</Text>
+            <ErrorNotice error={error} message="자산 추이를 불러오지 못했습니다." style={styles.failureMessage} />
+          </View> : null}
           {loading ? <SectionSkeleton lines={4} /> : failed && !equity ? null : (
             <LineChart
               key={range}
@@ -103,4 +107,7 @@ const styles = StyleSheet.create({
   periodText: { fontSize: 12, lineHeight: 18, color: semantic.secondary },
   selectedText: { color: semantic.info, fontWeight: '700' },
   note: { fontSize: 12, lineHeight: 18, color: semantic.secondary },
+  failure: { borderWidth: 1, borderColor: semantic.border, borderRadius: 12, padding: 14, backgroundColor: semantic.raised, gap: 6 },
+  failureTitle: { fontSize: 15, fontWeight: '700', lineHeight: 21 },
+  failureMessage: { fontSize: 14, color: semantic.secondary, lineHeight: 20 },
 });

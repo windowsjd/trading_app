@@ -47,6 +47,7 @@ export default function HomeScreen({ navigation }: Props) {
     capabilities,
     isLoading: accountsLoading,
     isError: accountsError,
+    error: accountsFailure,
     isEmpty: noAccounts,
     refetchAccounts,
   } = useTradingAccount();
@@ -62,6 +63,7 @@ export default function HomeScreen({ navigation }: Props) {
     // setup panel here would invite a second account on a network blip.
     return (
       <ErrorState
+        error={accountsFailure}
         title="계정 정보를 불러오지 못했습니다."
         message="네트워크 상태를 확인한 뒤 다시 시도해주세요."
         onRetry={() => void refetchAccounts()}

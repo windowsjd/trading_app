@@ -140,6 +140,7 @@ function createHomeHarness(mode = 'general') {
     './GeneralAccountHome': { default: 'GeneralAccountHome', __esModule: true },
     './SeasonAccountHome': { default: 'SeasonAccountHome', __esModule: true },
   };
+  mocks['./AdminDiagnosticPanel'] = mocks['../../components/states/AdminDiagnosticPanel'];
   let observers = [];
   const hero = load(resolve(__dirname, '../src/screens/home/HomeAssetHero.tsx'), mocks).default;
   const positionRow = load(resolve(__dirname, '../src/components/tradingAccount/PositionAssetRow.tsx'), mocks).default;

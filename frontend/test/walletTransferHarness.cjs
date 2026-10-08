@@ -8,8 +8,8 @@ const { load } = require('./ledgerTestHarness.cjs');
 const { getTradingAccountCapabilities } = require('../src/features/tradingAccount/capabilities.ts');
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
-function walletTransferHarness({ platform = 'web' } = {}) {
-  const h = { accountId: 'A', requests: [], invalidations: [], reads: [], gets: [], walletState: {}, riskState: {}, events: [], scrolls: [] };
+function walletTransferHarness({ platform = 'web', diagnostics = false, role = 'user' } = {}) {
+  const h = { role, accountId: 'A', requests: [], invalidations: [], reads: [], gets: [], walletState: {}, riskState: {}, events: [], scrolls: [] };
   h.accounts = {
     A: { id: 'A', mode: 'general', status: 'active', season: null },
     B: { id: 'B', mode: 'season', status: 'active', season: { seasonId: 'season', seasonName: '테스트 시즌', seasonStatus: 'active', participantStatus: 'active', startAt: new Date(Date.now() - 86400000).toISOString(), endAt: new Date(Date.now() + 86400000).toISOString() } },
@@ -61,26 +61,33 @@ function walletTransferHarness({ platform = 'web' } = {}) {
   globalThis.cancelAnimationFrame = id => frames.delete(id);
   h.flushFrames = () => { const pending = [...frames.values()]; frames.clear(); pending.forEach(callback => callback()); };
   h.keyboard = (event, screenY = 400) => { for (const listener of listeners.get(event) ?? []) listener({ endCoordinates: { screenY } }); h.flushFrames(); };
-  const native = Object.fromEntries(['View', 'Text', 'ScrollView', 'TextInput', 'KeyboardAvoidingView'].map(name => [name, name]));
+  const native = Object.fromEntries(['View', 'Text', 'SafeAreaView', 'ScrollView', 'TextInput', 'KeyboardAvoidingView'].map(name => [name, name]));
   Object.assign(native, { Platform: { OS: platform }, StyleSheet: { create: value => value }, Keyboard: {
     dismiss() { h.events.push('dismiss'); },
     addListener(event, callback) { const set = listeners.get(event) ?? new Set(); set.add(callback); listeners.set(event, set); return { remove: () => set.delete(callback) }; },
   } });
-  const Screen = load(resolve(__dirname, '../src/screens/wallet/WalletTransferScreen.tsx'), {
+  const mocks = {
     'react-native': native,
     'react-native-svg': { default: 'Svg', Path: 'Path', __esModule: true },
     '@react-navigation/elements': { useHeaderHeight: () => 64 },
     '@tanstack/react-query': { ...query, useQuery: options => {
       h.reads.push({ key: options.queryKey, enabled: options.enabled });
       const state = query.useQuery(options);
-      return { ...state, ...(options.queryKey.includes('futures') ? h.riskState : h.walletState) };
+      return { ...state, ...(options.queryKey[0] === 'me' ? {} : options.queryKey.includes('futures') ? h.riskState : h.walletState) };
     } },
     '../../features/tradingAccount/api': api,
     '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({ selectedAccount: h.accounts[h.accountId], capabilities: getTradingAccountCapabilities(h.accounts[h.accountId]), isLoading: false, isError: false }) },
     '../../components/common/CTAButton': { default: 'CTAButton', __esModule: true },
     './AdminDiagnosticPanel': { default: () => null, __esModule: true },
     ...Object.fromEntries(['FullPageLoading', 'ErrorState'].map(name => ['../../components/states/' + name, { default: name, __esModule: true }])),
-  }).default;
+  };
+  if (diagnostics) {
+    delete mocks['./AdminDiagnosticPanel'];
+    delete mocks['../../components/states/ErrorState'];
+    mocks['../../features/me/api'] = { getMe: async () => ({ id: 'user-1', role: h.role }) };
+    client.setQueryData(['me'], { id: 'user-1', role: h.role });
+  }
+  const Screen = load(resolve(__dirname, '../src/screens/wallet/WalletTransferScreen.tsx'), mocks).default;
   h.bounds = { viewport: [0, 0, 320, 600], input: [0, 420, 288, 52], submit: [0, 550, 288, 52] };
   const measure = key => ({ measureInWindow: callback => callback(...h.bounds[key]) });
   const createNodeMock = element => {

@@ -32,12 +32,12 @@ const USD_TRANSFER_WALLETS = TRANSFER_WALLETS.filter((wallet): wallet is UsdWall
 const walletLabel = (wallet: UsdWalletIdentity) => WALLET_SCOPE_LABELS[wallet.scope] + ' USD';
 
 export default function WalletTransferScreen() {
-  const { selectedAccount, capabilities, isLoading, isError, refetchAccounts } = useTradingAccount();
+  const { selectedAccount, capabilities, isLoading, isError, error, refetchAccounts } = useTradingAccount();
   const accountId = selectedAccount?.id ?? '';
   const scopeRef = useRef<TransferScope>({ accountId, scopeEpoch: 0 });
   if (scopeRef.current.accountId !== accountId) scopeRef.current = { accountId, scopeEpoch: scopeRef.current.scopeEpoch + 1 };
   if (isLoading) return <FullPageLoading message="계정 정보를 불러오는 중입니다." />;
-  if (isError || !selectedAccount) return <ErrorState title="계정 정보를 불러오지 못했습니다." onRetry={() => void refetchAccounts()} />;
+  if (isError || !selectedAccount) return <ErrorState error={isError ? error : undefined} title="계정 정보를 불러오지 못했습니다." message="요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요." onRetry={() => void refetchAccounts()} />;
   return <TransferForm key={accountId + ':' + scopeRef.current.scopeEpoch} account={selectedAccount} capabilities={capabilities} scope={scopeRef.current} readScope={() => scopeRef.current} />;
 }
 
@@ -102,6 +102,7 @@ function TransferForm({ account, capabilities, scope, readScope }: {
   });
   const integrity = findAccountIntegrityFailure([
     { section: '지갑', isError: wallets.isError, error: wallets.error, retry: () => void wallets.refetch() },
+    { section: '선물 담보', isError: sourceIsFutures && futures.isError, error: futures.error, retry: () => void futures.refetch() },
     { section: '이체', isError: !!failure, error: failure, retry: () => { setFailure(null); void wallets.refetch(); } },
   ]);
   const scopedWallets = wallets.data?.tradingAccountId === account.id ? wallets.data : undefined;
@@ -191,10 +192,11 @@ function TransferForm({ account, capabilities, scope, readScope }: {
                           }}
                           editable={!locked} keyboardType="decimal-pad" placeholder="0" style={styles.input} />
                       </View>
-                      <Text testID="wallet-transfer-available" style={styles.money}>
+                      {sourceIsFutures && futures.isError && !futures.isFetching ? <ErrorNotice error={futures.error}
+                        message="현재 선물 지갑의 이체 가능 금액을 확인할 수 없습니다." testID="wallet-transfer-available" style={styles.money} /> : <Text testID="wallet-transfer-available" style={styles.money}>
                         {available !== null ? '이체 가능 금액: USD ' + formatDisplayDecimal(available)
                           : futures.isFetching ? '이체 가능 금액을 확인하고 있습니다.' : '현재 선물 지갑의 이체 가능 금액을 확인할 수 없습니다.'}
-                      </Text>
+                      </Text>}
                       {sourceIsFutures && available === null && !futures.isFetching ? <CTAButton label="이체 가능 금액 다시 확인" variant="neutral" state={locked ? 'disabled' : 'enabled'} onPress={() => void futures.refetch()} /> : null}
                       {amount && !canonicalAmount ? <Text style={styles.error}>0보다 큰 금액을 소수점 8자리까지 입력해주세요.</Text>
                         : canonicalAmount && available !== null && !transferAmountFits(canonicalAmount, available) && !uncertainRetry ? <Text style={styles.error}>이체 가능 금액을 초과했습니다.</Text> : null}
