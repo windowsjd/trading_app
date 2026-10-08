@@ -2384,6 +2384,7 @@ export class OrdersService {
         select: {
           id: true,
           quoteId: true,
+          protectionChild: { select: { id: true } },
           side: true,
           orderType: true,
           status: true,
@@ -2428,7 +2429,10 @@ export class OrdersService {
         tradingAccountId: account.id,
         filters: this.formatFilters(parsedQuery),
         pagination: this.pagination(parsedQuery, total, orders.length),
-        orders: orders.map((order) => this.formatOrder(order)),
+        orders: orders.map((order) => ({
+          ...this.formatOrder(order),
+          conditionalChildId: order.protectionChild?.id ?? null,
+        })),
       },
     };
   }

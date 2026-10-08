@@ -10,14 +10,19 @@ import { FuturesController } from './futures.controller';
 import { FuturesService } from './futures.service';
 import { FuturesPerformanceService } from './futures-performance.service';
 import { FuturesMarkRetentionService } from './futures-mark-retention.service';
+import { FuturesLimitController } from './futures-limit.controller';
+import { FuturesLimitService } from './futures-limit.service';
+import { FuturesLimitWorker } from './futures-limit-worker.service';
 
 @Module({
   imports: [TradingAccountsModule, GeneralPerformanceModule],
-  controllers: [FuturesController],
+  controllers: [FuturesController, FuturesLimitController],
   exports: [FuturesService],
   providers: [
     FuturesPerformanceService,
     FuturesService,
+    FuturesLimitService,
+    FuturesLimitWorker,
     FuturesLiquidationService,
     FuturesRiskWorker,
     FuturesMarkIngestion,

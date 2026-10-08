@@ -22,6 +22,7 @@ export async function createProtectionInTransaction(
     assetId: string;
     positionId?: string;
     parentOrderId?: string;
+    parentFuturesOrderId?: string;
     parentQuantity?: Prisma.Decimal;
     legs: ProtectionLegInput[];
     now: Date;
@@ -60,6 +61,7 @@ export async function createProtectionInTransaction(
   let positionId: string | undefined;
   let futuresPositionId: string | undefined;
   let quantity = input.parentQuantity;
+  let entryLimit: Prisma.Decimal | undefined;
   if (input.domain === 'spot') {
     await tx.$queryRaw`SELECT id FROM positions WHERE trading_account_id = ${input.accountId} AND asset_id = ${asset.id} FOR UPDATE`;
     const position = await tx.position.findUnique({
@@ -117,6 +119,23 @@ export async function createProtectionInTransaction(
         },
         { positionBoundExit: true },
       );
+  } else if (input.parentFuturesOrderId) {
+    const entry = await tx.futuresLimitOrder.findFirst({
+      where: {
+        id: input.parentFuturesOrderId,
+        tradingAccountId: input.accountId,
+        status: 'submitted',
+        instrument: { underlyingAssetId: asset.id },
+      },
+    });
+    if (!entry)
+      throw createApiError(
+        'ATTACHED_ENTRY_CONFLICT',
+        'Attached entry requires a pending entry.',
+        409,
+      );
+    direction = entry.direction;
+    entryLimit = entry.limitPrice;
   } else {
     if (input.parentOrderId)
       throw createApiError(
@@ -158,7 +177,9 @@ export async function createProtectionInTransaction(
       'The account trading window ended.',
       409,
     );
-  const price = await conditionalPrice(tx, asset, input.domain, now);
+  const price = entryLimit
+    ? { price: entryLimit }
+    : await conditionalPrice(tx, asset, input.domain, now);
   if (!price) {
     setAdminDiagnosticContext({
       domain: 'CONDITIONAL',
@@ -186,8 +207,13 @@ export async function createProtectionInTransaction(
       positionId,
       futuresPositionId,
       parentOrderId: input.parentOrderId,
-      status: input.parentOrderId ? 'holding' : 'active',
-      activatedAt: input.parentOrderId ? null : now,
+      parentFuturesOrderId: input.parentFuturesOrderId,
+      status:
+        input.parentOrderId || input.parentFuturesOrderId
+          ? 'holding'
+          : 'active',
+      activatedAt:
+        input.parentOrderId || input.parentFuturesOrderId ? null : now,
       createdAt: now,
       legs: {
         create: input.legs.map((leg) => ({

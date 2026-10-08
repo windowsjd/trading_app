@@ -23,6 +23,7 @@ for (const screen of ['MarketScreen', 'MarketSearchScreen']) {
     const requests: GetAssetsParams[] = [];
     let token = 'initial-order';
     const Screen = h.load(`src/screens/market/${screen}.tsx`, {
+      './FuturesMarketList': { default: 'FuturesMarketList', __esModule: true },
       '../../features/market/MarketSortControl': {
         __esModule: true,
         default: 'SortControl',
@@ -154,6 +155,7 @@ it('Market consumes repeated Home category intents and preserves subsequent manu
   h.native.FlatList = props => React.createElement('FlatList', props, props.ListHeaderComponent);
   const categories: string[] = [];
   const Screen = h.load('src/screens/market/MarketScreen.tsx', {
+    './FuturesMarketList': { default: 'FuturesMarketList', __esModule: true },
     '@tanstack/react-query': { useInfiniteQuery: options => {
       categories.push(options.queryKey[2]);
       return { data: { pages: [] }, isLoading: false, isFetching: false, refetch: async () => {} };

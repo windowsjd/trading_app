@@ -405,6 +405,7 @@ export const ModelName = {
   FuturesPosition: 'FuturesPosition',
   FuturesExecution: 'FuturesExecution',
   FuturesExecuteRequest: 'FuturesExecuteRequest',
+  FuturesLimitOrder: 'FuturesLimitOrder',
   ProtectionGroup: 'ProtectionGroup',
   ProtectionLeg: 'ProtectionLeg',
   ProtectionChild: 'ProtectionChild',
@@ -449,7 +450,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose"
+    modelProps: "user" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2004,6 +2005,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.FuturesExecuteRequestCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.FuturesExecuteRequestCountAggregateOutputType> | number
+        }
+      }
+    }
+    FuturesLimitOrder: {
+      payload: Prisma.$FuturesLimitOrderPayload<ExtArgs>
+      fields: Prisma.FuturesLimitOrderFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FuturesLimitOrderFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLimitOrderPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FuturesLimitOrderFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLimitOrderPayload>
+        }
+        findFirst: {
+          args: Prisma.FuturesLimitOrderFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLimitOrderPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FuturesLimitOrderFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLimitOrderPayload>
+        }
+        findMany: {
+          args: Prisma.FuturesLimitOrderFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLimitOrderPayload>[]
+        }
+        create: {
+          args: Prisma.FuturesLimitOrderCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLimitOrderPayload>
+        }
+        createMany: {
+          args: Prisma.FuturesLimitOrderCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FuturesLimitOrderCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLimitOrderPayload>[]
+        }
+        delete: {
+          args: Prisma.FuturesLimitOrderDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLimitOrderPayload>
+        }
+        update: {
+          args: Prisma.FuturesLimitOrderUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLimitOrderPayload>
+        }
+        deleteMany: {
+          args: Prisma.FuturesLimitOrderDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FuturesLimitOrderUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FuturesLimitOrderUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLimitOrderPayload>[]
+        }
+        upsert: {
+          args: Prisma.FuturesLimitOrderUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLimitOrderPayload>
+        }
+        aggregate: {
+          args: Prisma.FuturesLimitOrderAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFuturesLimitOrder>
+        }
+        groupBy: {
+          args: Prisma.FuturesLimitOrderGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesLimitOrderGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FuturesLimitOrderCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesLimitOrderCountAggregateOutputType> | number
         }
       }
     }
@@ -4601,6 +4676,30 @@ export const FuturesExecuteRequestScalarFieldEnum = {
 export type FuturesExecuteRequestScalarFieldEnum = (typeof FuturesExecuteRequestScalarFieldEnum)[keyof typeof FuturesExecuteRequestScalarFieldEnum]
 
 
+export const FuturesLimitOrderScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  instrumentId: 'instrumentId',
+  direction: 'direction',
+  marginMode: 'marginMode',
+  leverage: 'leverage',
+  quantity: 'quantity',
+  limitPrice: 'limitPrice',
+  reservedAmount: 'reservedAmount',
+  status: 'status',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  executionId: 'executionId',
+  responsePayloadJson: 'responsePayloadJson',
+  terminalReason: 'terminalReason',
+  createdAt: 'createdAt',
+  endedAt: 'endedAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FuturesLimitOrderScalarFieldEnum = (typeof FuturesLimitOrderScalarFieldEnum)[keyof typeof FuturesLimitOrderScalarFieldEnum]
+
+
 export const ProtectionGroupScalarFieldEnum = {
   id: 'id',
   tradingAccountId: 'tradingAccountId',
@@ -4610,6 +4709,7 @@ export const ProtectionGroupScalarFieldEnum = {
   positionId: 'positionId',
   futuresPositionId: 'futuresPositionId',
   parentOrderId: 'parentOrderId',
+  parentFuturesOrderId: 'parentFuturesOrderId',
   status: 'status',
   terminalReason: 'terminalReason',
   createdAt: 'createdAt',
@@ -5663,6 +5763,20 @@ export type ListEnumFuturesOperationFieldRefInput<$PrismaModel> = FieldRefInputT
 
 
 /**
+ * Reference to a field of type 'OrderStatus'
+ */
+export type EnumOrderStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrderStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'OrderStatus[]'
+ */
+export type ListEnumOrderStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrderStatus[]'>
+    
+
+
+/**
  * Reference to a field of type 'ProtectionDomain'
  */
 export type EnumProtectionDomainFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ProtectionDomain'>
@@ -5743,20 +5857,6 @@ export type EnumOrderSideFieldRefInput<$PrismaModel> = FieldRefInputType<$Prisma
  * Reference to a field of type 'OrderSide[]'
  */
 export type ListEnumOrderSideFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrderSide[]'>
-    
-
-
-/**
- * Reference to a field of type 'OrderStatus'
- */
-export type EnumOrderStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrderStatus'>
-    
-
-
-/**
- * Reference to a field of type 'OrderStatus[]'
- */
-export type ListEnumOrderStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrderStatus[]'>
     
 
 
@@ -6113,6 +6213,7 @@ export type GlobalOmitConfig = {
   futuresPosition?: Prisma.FuturesPositionOmit
   futuresExecution?: Prisma.FuturesExecutionOmit
   futuresExecuteRequest?: Prisma.FuturesExecuteRequestOmit
+  futuresLimitOrder?: Prisma.FuturesLimitOrderOmit
   protectionGroup?: Prisma.ProtectionGroupOmit
   protectionLeg?: Prisma.ProtectionLegOmit
   protectionChild?: Prisma.ProtectionChildOmit

@@ -33,6 +33,7 @@ export type ProtectionGroupMinAggregateOutputType = {
   positionId: string | null
   futuresPositionId: string | null
   parentOrderId: string | null
+  parentFuturesOrderId: string | null
   status: $Enums.ProtectionStatus | null
   terminalReason: string | null
   createdAt: Date | null
@@ -50,6 +51,7 @@ export type ProtectionGroupMaxAggregateOutputType = {
   positionId: string | null
   futuresPositionId: string | null
   parentOrderId: string | null
+  parentFuturesOrderId: string | null
   status: $Enums.ProtectionStatus | null
   terminalReason: string | null
   createdAt: Date | null
@@ -67,6 +69,7 @@ export type ProtectionGroupCountAggregateOutputType = {
   positionId: number
   futuresPositionId: number
   parentOrderId: number
+  parentFuturesOrderId: number
   status: number
   terminalReason: number
   createdAt: number
@@ -86,6 +89,7 @@ export type ProtectionGroupMinAggregateInputType = {
   positionId?: true
   futuresPositionId?: true
   parentOrderId?: true
+  parentFuturesOrderId?: true
   status?: true
   terminalReason?: true
   createdAt?: true
@@ -103,6 +107,7 @@ export type ProtectionGroupMaxAggregateInputType = {
   positionId?: true
   futuresPositionId?: true
   parentOrderId?: true
+  parentFuturesOrderId?: true
   status?: true
   terminalReason?: true
   createdAt?: true
@@ -120,6 +125,7 @@ export type ProtectionGroupCountAggregateInputType = {
   positionId?: true
   futuresPositionId?: true
   parentOrderId?: true
+  parentFuturesOrderId?: true
   status?: true
   terminalReason?: true
   createdAt?: true
@@ -210,6 +216,7 @@ export type ProtectionGroupGroupByOutputType = {
   positionId: string | null
   futuresPositionId: string | null
   parentOrderId: string | null
+  parentFuturesOrderId: string | null
   status: $Enums.ProtectionStatus
   terminalReason: string | null
   createdAt: Date
@@ -248,6 +255,7 @@ export type ProtectionGroupWhereInput = {
   positionId?: Prisma.StringNullableFilter<"ProtectionGroup"> | string | null
   futuresPositionId?: Prisma.StringNullableFilter<"ProtectionGroup"> | string | null
   parentOrderId?: Prisma.StringNullableFilter<"ProtectionGroup"> | string | null
+  parentFuturesOrderId?: Prisma.StringNullableFilter<"ProtectionGroup"> | string | null
   status?: Prisma.EnumProtectionStatusFilter<"ProtectionGroup"> | $Enums.ProtectionStatus
   terminalReason?: Prisma.StringNullableFilter<"ProtectionGroup"> | string | null
   createdAt?: Prisma.DateTimeFilter<"ProtectionGroup"> | Date | string
@@ -259,6 +267,7 @@ export type ProtectionGroupWhereInput = {
   position?: Prisma.XOR<Prisma.PositionNullableScalarRelationFilter, Prisma.PositionWhereInput> | null
   futuresPosition?: Prisma.XOR<Prisma.FuturesPositionNullableScalarRelationFilter, Prisma.FuturesPositionWhereInput> | null
   parentOrder?: Prisma.XOR<Prisma.OrderNullableScalarRelationFilter, Prisma.OrderWhereInput> | null
+  parentFuturesOrder?: Prisma.XOR<Prisma.FuturesLimitOrderNullableScalarRelationFilter, Prisma.FuturesLimitOrderWhereInput> | null
   legs?: Prisma.ProtectionLegListRelationFilter
   children?: Prisma.ProtectionChildListRelationFilter
 }
@@ -272,6 +281,7 @@ export type ProtectionGroupOrderByWithRelationInput = {
   positionId?: Prisma.SortOrderInput | Prisma.SortOrder
   futuresPositionId?: Prisma.SortOrderInput | Prisma.SortOrder
   parentOrderId?: Prisma.SortOrderInput | Prisma.SortOrder
+  parentFuturesOrderId?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
   terminalReason?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -283,6 +293,7 @@ export type ProtectionGroupOrderByWithRelationInput = {
   position?: Prisma.PositionOrderByWithRelationInput
   futuresPosition?: Prisma.FuturesPositionOrderByWithRelationInput
   parentOrder?: Prisma.OrderOrderByWithRelationInput
+  parentFuturesOrder?: Prisma.FuturesLimitOrderOrderByWithRelationInput
   legs?: Prisma.ProtectionLegOrderByRelationAggregateInput
   children?: Prisma.ProtectionChildOrderByRelationAggregateInput
 }
@@ -290,6 +301,7 @@ export type ProtectionGroupOrderByWithRelationInput = {
 export type ProtectionGroupWhereUniqueInput = Prisma.AtLeast<{
   id?: string
   parentOrderId?: string
+  parentFuturesOrderId?: string
   AND?: Prisma.ProtectionGroupWhereInput | Prisma.ProtectionGroupWhereInput[]
   OR?: Prisma.ProtectionGroupWhereInput[]
   NOT?: Prisma.ProtectionGroupWhereInput | Prisma.ProtectionGroupWhereInput[]
@@ -310,9 +322,10 @@ export type ProtectionGroupWhereUniqueInput = Prisma.AtLeast<{
   position?: Prisma.XOR<Prisma.PositionNullableScalarRelationFilter, Prisma.PositionWhereInput> | null
   futuresPosition?: Prisma.XOR<Prisma.FuturesPositionNullableScalarRelationFilter, Prisma.FuturesPositionWhereInput> | null
   parentOrder?: Prisma.XOR<Prisma.OrderNullableScalarRelationFilter, Prisma.OrderWhereInput> | null
+  parentFuturesOrder?: Prisma.XOR<Prisma.FuturesLimitOrderNullableScalarRelationFilter, Prisma.FuturesLimitOrderWhereInput> | null
   legs?: Prisma.ProtectionLegListRelationFilter
   children?: Prisma.ProtectionChildListRelationFilter
-}, "id" | "parentOrderId">
+}, "id" | "parentOrderId" | "parentFuturesOrderId">
 
 export type ProtectionGroupOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -323,6 +336,7 @@ export type ProtectionGroupOrderByWithAggregationInput = {
   positionId?: Prisma.SortOrderInput | Prisma.SortOrder
   futuresPositionId?: Prisma.SortOrderInput | Prisma.SortOrder
   parentOrderId?: Prisma.SortOrderInput | Prisma.SortOrder
+  parentFuturesOrderId?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
   terminalReason?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -346,6 +360,7 @@ export type ProtectionGroupScalarWhereWithAggregatesInput = {
   positionId?: Prisma.StringNullableWithAggregatesFilter<"ProtectionGroup"> | string | null
   futuresPositionId?: Prisma.StringNullableWithAggregatesFilter<"ProtectionGroup"> | string | null
   parentOrderId?: Prisma.StringNullableWithAggregatesFilter<"ProtectionGroup"> | string | null
+  parentFuturesOrderId?: Prisma.StringNullableWithAggregatesFilter<"ProtectionGroup"> | string | null
   status?: Prisma.EnumProtectionStatusWithAggregatesFilter<"ProtectionGroup"> | $Enums.ProtectionStatus
   terminalReason?: Prisma.StringNullableWithAggregatesFilter<"ProtectionGroup"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"ProtectionGroup"> | Date | string
@@ -369,6 +384,7 @@ export type ProtectionGroupCreateInput = {
   position?: Prisma.PositionCreateNestedOneWithoutProtectionGroupsInput
   futuresPosition?: Prisma.FuturesPositionCreateNestedOneWithoutProtectionGroupsInput
   parentOrder?: Prisma.OrderCreateNestedOneWithoutAttachedProtectionInput
+  parentFuturesOrder?: Prisma.FuturesLimitOrderCreateNestedOneWithoutProtectionInput
   legs?: Prisma.ProtectionLegCreateNestedManyWithoutGroupInput
   children?: Prisma.ProtectionChildCreateNestedManyWithoutGroupInput
 }
@@ -382,6 +398,7 @@ export type ProtectionGroupUncheckedCreateInput = {
   positionId?: string | null
   futuresPositionId?: string | null
   parentOrderId?: string | null
+  parentFuturesOrderId?: string | null
   status: $Enums.ProtectionStatus
   terminalReason?: string | null
   createdAt?: Date | string
@@ -407,6 +424,7 @@ export type ProtectionGroupUpdateInput = {
   position?: Prisma.PositionUpdateOneWithoutProtectionGroupsNestedInput
   futuresPosition?: Prisma.FuturesPositionUpdateOneWithoutProtectionGroupsNestedInput
   parentOrder?: Prisma.OrderUpdateOneWithoutAttachedProtectionNestedInput
+  parentFuturesOrder?: Prisma.FuturesLimitOrderUpdateOneWithoutProtectionNestedInput
   legs?: Prisma.ProtectionLegUpdateManyWithoutGroupNestedInput
   children?: Prisma.ProtectionChildUpdateManyWithoutGroupNestedInput
 }
@@ -420,6 +438,7 @@ export type ProtectionGroupUncheckedUpdateInput = {
   positionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   futuresPositionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentFuturesOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProtectionStatusFieldUpdateOperationsInput | $Enums.ProtectionStatus
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -439,6 +458,7 @@ export type ProtectionGroupCreateManyInput = {
   positionId?: string | null
   futuresPositionId?: string | null
   parentOrderId?: string | null
+  parentFuturesOrderId?: string | null
   status: $Enums.ProtectionStatus
   terminalReason?: string | null
   createdAt?: Date | string
@@ -468,6 +488,7 @@ export type ProtectionGroupUncheckedUpdateManyInput = {
   positionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   futuresPositionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentFuturesOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProtectionStatusFieldUpdateOperationsInput | $Enums.ProtectionStatus
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -486,6 +507,11 @@ export type ProtectionGroupOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
 }
 
+export type ProtectionGroupNullableScalarRelationFilter = {
+  is?: Prisma.ProtectionGroupWhereInput | null
+  isNot?: Prisma.ProtectionGroupWhereInput | null
+}
+
 export type ProtectionGroupCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   tradingAccountId?: Prisma.SortOrder
@@ -495,6 +521,7 @@ export type ProtectionGroupCountOrderByAggregateInput = {
   positionId?: Prisma.SortOrder
   futuresPositionId?: Prisma.SortOrder
   parentOrderId?: Prisma.SortOrder
+  parentFuturesOrderId?: Prisma.SortOrder
   status?: Prisma.SortOrder
   terminalReason?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -512,6 +539,7 @@ export type ProtectionGroupMaxOrderByAggregateInput = {
   positionId?: Prisma.SortOrder
   futuresPositionId?: Prisma.SortOrder
   parentOrderId?: Prisma.SortOrder
+  parentFuturesOrderId?: Prisma.SortOrder
   status?: Prisma.SortOrder
   terminalReason?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -529,6 +557,7 @@ export type ProtectionGroupMinOrderByAggregateInput = {
   positionId?: Prisma.SortOrder
   futuresPositionId?: Prisma.SortOrder
   parentOrderId?: Prisma.SortOrder
+  parentFuturesOrderId?: Prisma.SortOrder
   status?: Prisma.SortOrder
   terminalReason?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -540,11 +569,6 @@ export type ProtectionGroupMinOrderByAggregateInput = {
 export type ProtectionGroupScalarRelationFilter = {
   is?: Prisma.ProtectionGroupWhereInput
   isNot?: Prisma.ProtectionGroupWhereInput
-}
-
-export type ProtectionGroupNullableScalarRelationFilter = {
-  is?: Prisma.ProtectionGroupWhereInput | null
-  isNot?: Prisma.ProtectionGroupWhereInput | null
 }
 
 export type ProtectionGroupCreateNestedManyWithoutTradingAccountInput = {
@@ -673,6 +697,38 @@ export type ProtectionGroupUncheckedUpdateManyWithoutFuturesPositionNestedInput 
   deleteMany?: Prisma.ProtectionGroupScalarWhereInput | Prisma.ProtectionGroupScalarWhereInput[]
 }
 
+export type ProtectionGroupCreateNestedOneWithoutParentFuturesOrderInput = {
+  create?: Prisma.XOR<Prisma.ProtectionGroupCreateWithoutParentFuturesOrderInput, Prisma.ProtectionGroupUncheckedCreateWithoutParentFuturesOrderInput>
+  connectOrCreate?: Prisma.ProtectionGroupCreateOrConnectWithoutParentFuturesOrderInput
+  connect?: Prisma.ProtectionGroupWhereUniqueInput
+}
+
+export type ProtectionGroupUncheckedCreateNestedOneWithoutParentFuturesOrderInput = {
+  create?: Prisma.XOR<Prisma.ProtectionGroupCreateWithoutParentFuturesOrderInput, Prisma.ProtectionGroupUncheckedCreateWithoutParentFuturesOrderInput>
+  connectOrCreate?: Prisma.ProtectionGroupCreateOrConnectWithoutParentFuturesOrderInput
+  connect?: Prisma.ProtectionGroupWhereUniqueInput
+}
+
+export type ProtectionGroupUpdateOneWithoutParentFuturesOrderNestedInput = {
+  create?: Prisma.XOR<Prisma.ProtectionGroupCreateWithoutParentFuturesOrderInput, Prisma.ProtectionGroupUncheckedCreateWithoutParentFuturesOrderInput>
+  connectOrCreate?: Prisma.ProtectionGroupCreateOrConnectWithoutParentFuturesOrderInput
+  upsert?: Prisma.ProtectionGroupUpsertWithoutParentFuturesOrderInput
+  disconnect?: Prisma.ProtectionGroupWhereInput | boolean
+  delete?: Prisma.ProtectionGroupWhereInput | boolean
+  connect?: Prisma.ProtectionGroupWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ProtectionGroupUpdateToOneWithWhereWithoutParentFuturesOrderInput, Prisma.ProtectionGroupUpdateWithoutParentFuturesOrderInput>, Prisma.ProtectionGroupUncheckedUpdateWithoutParentFuturesOrderInput>
+}
+
+export type ProtectionGroupUncheckedUpdateOneWithoutParentFuturesOrderNestedInput = {
+  create?: Prisma.XOR<Prisma.ProtectionGroupCreateWithoutParentFuturesOrderInput, Prisma.ProtectionGroupUncheckedCreateWithoutParentFuturesOrderInput>
+  connectOrCreate?: Prisma.ProtectionGroupCreateOrConnectWithoutParentFuturesOrderInput
+  upsert?: Prisma.ProtectionGroupUpsertWithoutParentFuturesOrderInput
+  disconnect?: Prisma.ProtectionGroupWhereInput | boolean
+  delete?: Prisma.ProtectionGroupWhereInput | boolean
+  connect?: Prisma.ProtectionGroupWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ProtectionGroupUpdateToOneWithWhereWithoutParentFuturesOrderInput, Prisma.ProtectionGroupUpdateWithoutParentFuturesOrderInput>, Prisma.ProtectionGroupUncheckedUpdateWithoutParentFuturesOrderInput>
+}
+
 export type EnumProtectionDomainFieldUpdateOperationsInput = {
   set?: $Enums.ProtectionDomain
 }
@@ -797,6 +853,7 @@ export type ProtectionGroupCreateWithoutTradingAccountInput = {
   position?: Prisma.PositionCreateNestedOneWithoutProtectionGroupsInput
   futuresPosition?: Prisma.FuturesPositionCreateNestedOneWithoutProtectionGroupsInput
   parentOrder?: Prisma.OrderCreateNestedOneWithoutAttachedProtectionInput
+  parentFuturesOrder?: Prisma.FuturesLimitOrderCreateNestedOneWithoutProtectionInput
   legs?: Prisma.ProtectionLegCreateNestedManyWithoutGroupInput
   children?: Prisma.ProtectionChildCreateNestedManyWithoutGroupInput
 }
@@ -809,6 +866,7 @@ export type ProtectionGroupUncheckedCreateWithoutTradingAccountInput = {
   positionId?: string | null
   futuresPositionId?: string | null
   parentOrderId?: string | null
+  parentFuturesOrderId?: string | null
   status: $Enums.ProtectionStatus
   terminalReason?: string | null
   createdAt?: Date | string
@@ -857,6 +915,7 @@ export type ProtectionGroupScalarWhereInput = {
   positionId?: Prisma.StringNullableFilter<"ProtectionGroup"> | string | null
   futuresPositionId?: Prisma.StringNullableFilter<"ProtectionGroup"> | string | null
   parentOrderId?: Prisma.StringNullableFilter<"ProtectionGroup"> | string | null
+  parentFuturesOrderId?: Prisma.StringNullableFilter<"ProtectionGroup"> | string | null
   status?: Prisma.EnumProtectionStatusFilter<"ProtectionGroup"> | $Enums.ProtectionStatus
   terminalReason?: Prisma.StringNullableFilter<"ProtectionGroup"> | string | null
   createdAt?: Prisma.DateTimeFilter<"ProtectionGroup"> | Date | string
@@ -879,6 +938,7 @@ export type ProtectionGroupCreateWithoutAssetInput = {
   position?: Prisma.PositionCreateNestedOneWithoutProtectionGroupsInput
   futuresPosition?: Prisma.FuturesPositionCreateNestedOneWithoutProtectionGroupsInput
   parentOrder?: Prisma.OrderCreateNestedOneWithoutAttachedProtectionInput
+  parentFuturesOrder?: Prisma.FuturesLimitOrderCreateNestedOneWithoutProtectionInput
   legs?: Prisma.ProtectionLegCreateNestedManyWithoutGroupInput
   children?: Prisma.ProtectionChildCreateNestedManyWithoutGroupInput
 }
@@ -891,6 +951,7 @@ export type ProtectionGroupUncheckedCreateWithoutAssetInput = {
   positionId?: string | null
   futuresPositionId?: string | null
   parentOrderId?: string | null
+  parentFuturesOrderId?: string | null
   status: $Enums.ProtectionStatus
   terminalReason?: string | null
   createdAt?: Date | string
@@ -941,6 +1002,7 @@ export type ProtectionGroupCreateWithoutFuturesPositionInput = {
   asset: Prisma.AssetCreateNestedOneWithoutProtectionGroupsInput
   position?: Prisma.PositionCreateNestedOneWithoutProtectionGroupsInput
   parentOrder?: Prisma.OrderCreateNestedOneWithoutAttachedProtectionInput
+  parentFuturesOrder?: Prisma.FuturesLimitOrderCreateNestedOneWithoutProtectionInput
   legs?: Prisma.ProtectionLegCreateNestedManyWithoutGroupInput
   children?: Prisma.ProtectionChildCreateNestedManyWithoutGroupInput
 }
@@ -953,6 +1015,7 @@ export type ProtectionGroupUncheckedCreateWithoutFuturesPositionInput = {
   direction: $Enums.FuturesDirection
   positionId?: string | null
   parentOrderId?: string | null
+  parentFuturesOrderId?: string | null
   status: $Enums.ProtectionStatus
   terminalReason?: string | null
   createdAt?: Date | string
@@ -989,6 +1052,98 @@ export type ProtectionGroupUpdateManyWithWhereWithoutFuturesPositionInput = {
   data: Prisma.XOR<Prisma.ProtectionGroupUpdateManyMutationInput, Prisma.ProtectionGroupUncheckedUpdateManyWithoutFuturesPositionInput>
 }
 
+export type ProtectionGroupCreateWithoutParentFuturesOrderInput = {
+  id?: string
+  domain: $Enums.ProtectionDomain
+  direction: $Enums.FuturesDirection
+  status: $Enums.ProtectionStatus
+  terminalReason?: string | null
+  createdAt?: Date | string
+  activatedAt?: Date | string | null
+  endedAt?: Date | string | null
+  updatedAt?: Date | string
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutProtectionGroupsInput
+  asset: Prisma.AssetCreateNestedOneWithoutProtectionGroupsInput
+  position?: Prisma.PositionCreateNestedOneWithoutProtectionGroupsInput
+  futuresPosition?: Prisma.FuturesPositionCreateNestedOneWithoutProtectionGroupsInput
+  parentOrder?: Prisma.OrderCreateNestedOneWithoutAttachedProtectionInput
+  legs?: Prisma.ProtectionLegCreateNestedManyWithoutGroupInput
+  children?: Prisma.ProtectionChildCreateNestedManyWithoutGroupInput
+}
+
+export type ProtectionGroupUncheckedCreateWithoutParentFuturesOrderInput = {
+  id?: string
+  tradingAccountId: string
+  assetId: string
+  domain: $Enums.ProtectionDomain
+  direction: $Enums.FuturesDirection
+  positionId?: string | null
+  futuresPositionId?: string | null
+  parentOrderId?: string | null
+  status: $Enums.ProtectionStatus
+  terminalReason?: string | null
+  createdAt?: Date | string
+  activatedAt?: Date | string | null
+  endedAt?: Date | string | null
+  updatedAt?: Date | string
+  legs?: Prisma.ProtectionLegUncheckedCreateNestedManyWithoutGroupInput
+  children?: Prisma.ProtectionChildUncheckedCreateNestedManyWithoutGroupInput
+}
+
+export type ProtectionGroupCreateOrConnectWithoutParentFuturesOrderInput = {
+  where: Prisma.ProtectionGroupWhereUniqueInput
+  create: Prisma.XOR<Prisma.ProtectionGroupCreateWithoutParentFuturesOrderInput, Prisma.ProtectionGroupUncheckedCreateWithoutParentFuturesOrderInput>
+}
+
+export type ProtectionGroupUpsertWithoutParentFuturesOrderInput = {
+  update: Prisma.XOR<Prisma.ProtectionGroupUpdateWithoutParentFuturesOrderInput, Prisma.ProtectionGroupUncheckedUpdateWithoutParentFuturesOrderInput>
+  create: Prisma.XOR<Prisma.ProtectionGroupCreateWithoutParentFuturesOrderInput, Prisma.ProtectionGroupUncheckedCreateWithoutParentFuturesOrderInput>
+  where?: Prisma.ProtectionGroupWhereInput
+}
+
+export type ProtectionGroupUpdateToOneWithWhereWithoutParentFuturesOrderInput = {
+  where?: Prisma.ProtectionGroupWhereInput
+  data: Prisma.XOR<Prisma.ProtectionGroupUpdateWithoutParentFuturesOrderInput, Prisma.ProtectionGroupUncheckedUpdateWithoutParentFuturesOrderInput>
+}
+
+export type ProtectionGroupUpdateWithoutParentFuturesOrderInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  domain?: Prisma.EnumProtectionDomainFieldUpdateOperationsInput | $Enums.ProtectionDomain
+  direction?: Prisma.EnumFuturesDirectionFieldUpdateOperationsInput | $Enums.FuturesDirection
+  status?: Prisma.EnumProtectionStatusFieldUpdateOperationsInput | $Enums.ProtectionStatus
+  terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  activatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutProtectionGroupsNestedInput
+  asset?: Prisma.AssetUpdateOneRequiredWithoutProtectionGroupsNestedInput
+  position?: Prisma.PositionUpdateOneWithoutProtectionGroupsNestedInput
+  futuresPosition?: Prisma.FuturesPositionUpdateOneWithoutProtectionGroupsNestedInput
+  parentOrder?: Prisma.OrderUpdateOneWithoutAttachedProtectionNestedInput
+  legs?: Prisma.ProtectionLegUpdateManyWithoutGroupNestedInput
+  children?: Prisma.ProtectionChildUpdateManyWithoutGroupNestedInput
+}
+
+export type ProtectionGroupUncheckedUpdateWithoutParentFuturesOrderInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetId?: Prisma.StringFieldUpdateOperationsInput | string
+  domain?: Prisma.EnumProtectionDomainFieldUpdateOperationsInput | $Enums.ProtectionDomain
+  direction?: Prisma.EnumFuturesDirectionFieldUpdateOperationsInput | $Enums.FuturesDirection
+  positionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  futuresPositionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumProtectionStatusFieldUpdateOperationsInput | $Enums.ProtectionStatus
+  terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  activatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  legs?: Prisma.ProtectionLegUncheckedUpdateManyWithoutGroupNestedInput
+  children?: Prisma.ProtectionChildUncheckedUpdateManyWithoutGroupNestedInput
+}
+
 export type ProtectionGroupCreateWithoutLegsInput = {
   id?: string
   domain: $Enums.ProtectionDomain
@@ -1004,6 +1159,7 @@ export type ProtectionGroupCreateWithoutLegsInput = {
   position?: Prisma.PositionCreateNestedOneWithoutProtectionGroupsInput
   futuresPosition?: Prisma.FuturesPositionCreateNestedOneWithoutProtectionGroupsInput
   parentOrder?: Prisma.OrderCreateNestedOneWithoutAttachedProtectionInput
+  parentFuturesOrder?: Prisma.FuturesLimitOrderCreateNestedOneWithoutProtectionInput
   children?: Prisma.ProtectionChildCreateNestedManyWithoutGroupInput
 }
 
@@ -1016,6 +1172,7 @@ export type ProtectionGroupUncheckedCreateWithoutLegsInput = {
   positionId?: string | null
   futuresPositionId?: string | null
   parentOrderId?: string | null
+  parentFuturesOrderId?: string | null
   status: $Enums.ProtectionStatus
   terminalReason?: string | null
   createdAt?: Date | string
@@ -1056,6 +1213,7 @@ export type ProtectionGroupUpdateWithoutLegsInput = {
   position?: Prisma.PositionUpdateOneWithoutProtectionGroupsNestedInput
   futuresPosition?: Prisma.FuturesPositionUpdateOneWithoutProtectionGroupsNestedInput
   parentOrder?: Prisma.OrderUpdateOneWithoutAttachedProtectionNestedInput
+  parentFuturesOrder?: Prisma.FuturesLimitOrderUpdateOneWithoutProtectionNestedInput
   children?: Prisma.ProtectionChildUpdateManyWithoutGroupNestedInput
 }
 
@@ -1068,6 +1226,7 @@ export type ProtectionGroupUncheckedUpdateWithoutLegsInput = {
   positionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   futuresPositionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentFuturesOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProtectionStatusFieldUpdateOperationsInput | $Enums.ProtectionStatus
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1092,6 +1251,7 @@ export type ProtectionGroupCreateWithoutChildrenInput = {
   position?: Prisma.PositionCreateNestedOneWithoutProtectionGroupsInput
   futuresPosition?: Prisma.FuturesPositionCreateNestedOneWithoutProtectionGroupsInput
   parentOrder?: Prisma.OrderCreateNestedOneWithoutAttachedProtectionInput
+  parentFuturesOrder?: Prisma.FuturesLimitOrderCreateNestedOneWithoutProtectionInput
   legs?: Prisma.ProtectionLegCreateNestedManyWithoutGroupInput
 }
 
@@ -1104,6 +1264,7 @@ export type ProtectionGroupUncheckedCreateWithoutChildrenInput = {
   positionId?: string | null
   futuresPositionId?: string | null
   parentOrderId?: string | null
+  parentFuturesOrderId?: string | null
   status: $Enums.ProtectionStatus
   terminalReason?: string | null
   createdAt?: Date | string
@@ -1144,6 +1305,7 @@ export type ProtectionGroupUpdateWithoutChildrenInput = {
   position?: Prisma.PositionUpdateOneWithoutProtectionGroupsNestedInput
   futuresPosition?: Prisma.FuturesPositionUpdateOneWithoutProtectionGroupsNestedInput
   parentOrder?: Prisma.OrderUpdateOneWithoutAttachedProtectionNestedInput
+  parentFuturesOrder?: Prisma.FuturesLimitOrderUpdateOneWithoutProtectionNestedInput
   legs?: Prisma.ProtectionLegUpdateManyWithoutGroupNestedInput
 }
 
@@ -1156,6 +1318,7 @@ export type ProtectionGroupUncheckedUpdateWithoutChildrenInput = {
   positionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   futuresPositionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentFuturesOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProtectionStatusFieldUpdateOperationsInput | $Enums.ProtectionStatus
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1179,6 +1342,7 @@ export type ProtectionGroupCreateWithoutPositionInput = {
   asset: Prisma.AssetCreateNestedOneWithoutProtectionGroupsInput
   futuresPosition?: Prisma.FuturesPositionCreateNestedOneWithoutProtectionGroupsInput
   parentOrder?: Prisma.OrderCreateNestedOneWithoutAttachedProtectionInput
+  parentFuturesOrder?: Prisma.FuturesLimitOrderCreateNestedOneWithoutProtectionInput
   legs?: Prisma.ProtectionLegCreateNestedManyWithoutGroupInput
   children?: Prisma.ProtectionChildCreateNestedManyWithoutGroupInput
 }
@@ -1191,6 +1355,7 @@ export type ProtectionGroupUncheckedCreateWithoutPositionInput = {
   direction: $Enums.FuturesDirection
   futuresPositionId?: string | null
   parentOrderId?: string | null
+  parentFuturesOrderId?: string | null
   status: $Enums.ProtectionStatus
   terminalReason?: string | null
   createdAt?: Date | string
@@ -1241,6 +1406,7 @@ export type ProtectionGroupCreateWithoutParentOrderInput = {
   asset: Prisma.AssetCreateNestedOneWithoutProtectionGroupsInput
   position?: Prisma.PositionCreateNestedOneWithoutProtectionGroupsInput
   futuresPosition?: Prisma.FuturesPositionCreateNestedOneWithoutProtectionGroupsInput
+  parentFuturesOrder?: Prisma.FuturesLimitOrderCreateNestedOneWithoutProtectionInput
   legs?: Prisma.ProtectionLegCreateNestedManyWithoutGroupInput
   children?: Prisma.ProtectionChildCreateNestedManyWithoutGroupInput
 }
@@ -1253,6 +1419,7 @@ export type ProtectionGroupUncheckedCreateWithoutParentOrderInput = {
   direction: $Enums.FuturesDirection
   positionId?: string | null
   futuresPositionId?: string | null
+  parentFuturesOrderId?: string | null
   status: $Enums.ProtectionStatus
   terminalReason?: string | null
   createdAt?: Date | string
@@ -1293,6 +1460,7 @@ export type ProtectionGroupUpdateWithoutParentOrderInput = {
   asset?: Prisma.AssetUpdateOneRequiredWithoutProtectionGroupsNestedInput
   position?: Prisma.PositionUpdateOneWithoutProtectionGroupsNestedInput
   futuresPosition?: Prisma.FuturesPositionUpdateOneWithoutProtectionGroupsNestedInput
+  parentFuturesOrder?: Prisma.FuturesLimitOrderUpdateOneWithoutProtectionNestedInput
   legs?: Prisma.ProtectionLegUpdateManyWithoutGroupNestedInput
   children?: Prisma.ProtectionChildUpdateManyWithoutGroupNestedInput
 }
@@ -1305,6 +1473,7 @@ export type ProtectionGroupUncheckedUpdateWithoutParentOrderInput = {
   direction?: Prisma.EnumFuturesDirectionFieldUpdateOperationsInput | $Enums.FuturesDirection
   positionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   futuresPositionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentFuturesOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProtectionStatusFieldUpdateOperationsInput | $Enums.ProtectionStatus
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1323,6 +1492,7 @@ export type ProtectionGroupCreateManyTradingAccountInput = {
   positionId?: string | null
   futuresPositionId?: string | null
   parentOrderId?: string | null
+  parentFuturesOrderId?: string | null
   status: $Enums.ProtectionStatus
   terminalReason?: string | null
   createdAt?: Date | string
@@ -1345,6 +1515,7 @@ export type ProtectionGroupUpdateWithoutTradingAccountInput = {
   position?: Prisma.PositionUpdateOneWithoutProtectionGroupsNestedInput
   futuresPosition?: Prisma.FuturesPositionUpdateOneWithoutProtectionGroupsNestedInput
   parentOrder?: Prisma.OrderUpdateOneWithoutAttachedProtectionNestedInput
+  parentFuturesOrder?: Prisma.FuturesLimitOrderUpdateOneWithoutProtectionNestedInput
   legs?: Prisma.ProtectionLegUpdateManyWithoutGroupNestedInput
   children?: Prisma.ProtectionChildUpdateManyWithoutGroupNestedInput
 }
@@ -1357,6 +1528,7 @@ export type ProtectionGroupUncheckedUpdateWithoutTradingAccountInput = {
   positionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   futuresPositionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentFuturesOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProtectionStatusFieldUpdateOperationsInput | $Enums.ProtectionStatus
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1375,6 +1547,7 @@ export type ProtectionGroupUncheckedUpdateManyWithoutTradingAccountInput = {
   positionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   futuresPositionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentFuturesOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProtectionStatusFieldUpdateOperationsInput | $Enums.ProtectionStatus
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1391,6 +1564,7 @@ export type ProtectionGroupCreateManyAssetInput = {
   positionId?: string | null
   futuresPositionId?: string | null
   parentOrderId?: string | null
+  parentFuturesOrderId?: string | null
   status: $Enums.ProtectionStatus
   terminalReason?: string | null
   createdAt?: Date | string
@@ -1413,6 +1587,7 @@ export type ProtectionGroupUpdateWithoutAssetInput = {
   position?: Prisma.PositionUpdateOneWithoutProtectionGroupsNestedInput
   futuresPosition?: Prisma.FuturesPositionUpdateOneWithoutProtectionGroupsNestedInput
   parentOrder?: Prisma.OrderUpdateOneWithoutAttachedProtectionNestedInput
+  parentFuturesOrder?: Prisma.FuturesLimitOrderUpdateOneWithoutProtectionNestedInput
   legs?: Prisma.ProtectionLegUpdateManyWithoutGroupNestedInput
   children?: Prisma.ProtectionChildUpdateManyWithoutGroupNestedInput
 }
@@ -1425,6 +1600,7 @@ export type ProtectionGroupUncheckedUpdateWithoutAssetInput = {
   positionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   futuresPositionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentFuturesOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProtectionStatusFieldUpdateOperationsInput | $Enums.ProtectionStatus
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1443,6 +1619,7 @@ export type ProtectionGroupUncheckedUpdateManyWithoutAssetInput = {
   positionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   futuresPositionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentFuturesOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProtectionStatusFieldUpdateOperationsInput | $Enums.ProtectionStatus
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1459,6 +1636,7 @@ export type ProtectionGroupCreateManyFuturesPositionInput = {
   direction: $Enums.FuturesDirection
   positionId?: string | null
   parentOrderId?: string | null
+  parentFuturesOrderId?: string | null
   status: $Enums.ProtectionStatus
   terminalReason?: string | null
   createdAt?: Date | string
@@ -1481,6 +1659,7 @@ export type ProtectionGroupUpdateWithoutFuturesPositionInput = {
   asset?: Prisma.AssetUpdateOneRequiredWithoutProtectionGroupsNestedInput
   position?: Prisma.PositionUpdateOneWithoutProtectionGroupsNestedInput
   parentOrder?: Prisma.OrderUpdateOneWithoutAttachedProtectionNestedInput
+  parentFuturesOrder?: Prisma.FuturesLimitOrderUpdateOneWithoutProtectionNestedInput
   legs?: Prisma.ProtectionLegUpdateManyWithoutGroupNestedInput
   children?: Prisma.ProtectionChildUpdateManyWithoutGroupNestedInput
 }
@@ -1493,6 +1672,7 @@ export type ProtectionGroupUncheckedUpdateWithoutFuturesPositionInput = {
   direction?: Prisma.EnumFuturesDirectionFieldUpdateOperationsInput | $Enums.FuturesDirection
   positionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentFuturesOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProtectionStatusFieldUpdateOperationsInput | $Enums.ProtectionStatus
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1511,6 +1691,7 @@ export type ProtectionGroupUncheckedUpdateManyWithoutFuturesPositionInput = {
   direction?: Prisma.EnumFuturesDirectionFieldUpdateOperationsInput | $Enums.FuturesDirection
   positionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentFuturesOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProtectionStatusFieldUpdateOperationsInput | $Enums.ProtectionStatus
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1527,6 +1708,7 @@ export type ProtectionGroupCreateManyPositionInput = {
   direction: $Enums.FuturesDirection
   futuresPositionId?: string | null
   parentOrderId?: string | null
+  parentFuturesOrderId?: string | null
   status: $Enums.ProtectionStatus
   terminalReason?: string | null
   createdAt?: Date | string
@@ -1549,6 +1731,7 @@ export type ProtectionGroupUpdateWithoutPositionInput = {
   asset?: Prisma.AssetUpdateOneRequiredWithoutProtectionGroupsNestedInput
   futuresPosition?: Prisma.FuturesPositionUpdateOneWithoutProtectionGroupsNestedInput
   parentOrder?: Prisma.OrderUpdateOneWithoutAttachedProtectionNestedInput
+  parentFuturesOrder?: Prisma.FuturesLimitOrderUpdateOneWithoutProtectionNestedInput
   legs?: Prisma.ProtectionLegUpdateManyWithoutGroupNestedInput
   children?: Prisma.ProtectionChildUpdateManyWithoutGroupNestedInput
 }
@@ -1561,6 +1744,7 @@ export type ProtectionGroupUncheckedUpdateWithoutPositionInput = {
   direction?: Prisma.EnumFuturesDirectionFieldUpdateOperationsInput | $Enums.FuturesDirection
   futuresPositionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentFuturesOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProtectionStatusFieldUpdateOperationsInput | $Enums.ProtectionStatus
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1579,6 +1763,7 @@ export type ProtectionGroupUncheckedUpdateManyWithoutPositionInput = {
   direction?: Prisma.EnumFuturesDirectionFieldUpdateOperationsInput | $Enums.FuturesDirection
   futuresPositionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentFuturesOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProtectionStatusFieldUpdateOperationsInput | $Enums.ProtectionStatus
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1636,6 +1821,7 @@ export type ProtectionGroupSelect<ExtArgs extends runtime.Types.Extensions.Inter
   positionId?: boolean
   futuresPositionId?: boolean
   parentOrderId?: boolean
+  parentFuturesOrderId?: boolean
   status?: boolean
   terminalReason?: boolean
   createdAt?: boolean
@@ -1647,6 +1833,7 @@ export type ProtectionGroupSelect<ExtArgs extends runtime.Types.Extensions.Inter
   position?: boolean | Prisma.ProtectionGroup$positionArgs<ExtArgs>
   futuresPosition?: boolean | Prisma.ProtectionGroup$futuresPositionArgs<ExtArgs>
   parentOrder?: boolean | Prisma.ProtectionGroup$parentOrderArgs<ExtArgs>
+  parentFuturesOrder?: boolean | Prisma.ProtectionGroup$parentFuturesOrderArgs<ExtArgs>
   legs?: boolean | Prisma.ProtectionGroup$legsArgs<ExtArgs>
   children?: boolean | Prisma.ProtectionGroup$childrenArgs<ExtArgs>
   _count?: boolean | Prisma.ProtectionGroupCountOutputTypeDefaultArgs<ExtArgs>
@@ -1661,6 +1848,7 @@ export type ProtectionGroupSelectCreateManyAndReturn<ExtArgs extends runtime.Typ
   positionId?: boolean
   futuresPositionId?: boolean
   parentOrderId?: boolean
+  parentFuturesOrderId?: boolean
   status?: boolean
   terminalReason?: boolean
   createdAt?: boolean
@@ -1672,6 +1860,7 @@ export type ProtectionGroupSelectCreateManyAndReturn<ExtArgs extends runtime.Typ
   position?: boolean | Prisma.ProtectionGroup$positionArgs<ExtArgs>
   futuresPosition?: boolean | Prisma.ProtectionGroup$futuresPositionArgs<ExtArgs>
   parentOrder?: boolean | Prisma.ProtectionGroup$parentOrderArgs<ExtArgs>
+  parentFuturesOrder?: boolean | Prisma.ProtectionGroup$parentFuturesOrderArgs<ExtArgs>
 }, ExtArgs["result"]["protectionGroup"]>
 
 export type ProtectionGroupSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -1683,6 +1872,7 @@ export type ProtectionGroupSelectUpdateManyAndReturn<ExtArgs extends runtime.Typ
   positionId?: boolean
   futuresPositionId?: boolean
   parentOrderId?: boolean
+  parentFuturesOrderId?: boolean
   status?: boolean
   terminalReason?: boolean
   createdAt?: boolean
@@ -1694,6 +1884,7 @@ export type ProtectionGroupSelectUpdateManyAndReturn<ExtArgs extends runtime.Typ
   position?: boolean | Prisma.ProtectionGroup$positionArgs<ExtArgs>
   futuresPosition?: boolean | Prisma.ProtectionGroup$futuresPositionArgs<ExtArgs>
   parentOrder?: boolean | Prisma.ProtectionGroup$parentOrderArgs<ExtArgs>
+  parentFuturesOrder?: boolean | Prisma.ProtectionGroup$parentFuturesOrderArgs<ExtArgs>
 }, ExtArgs["result"]["protectionGroup"]>
 
 export type ProtectionGroupSelectScalar = {
@@ -1705,6 +1896,7 @@ export type ProtectionGroupSelectScalar = {
   positionId?: boolean
   futuresPositionId?: boolean
   parentOrderId?: boolean
+  parentFuturesOrderId?: boolean
   status?: boolean
   terminalReason?: boolean
   createdAt?: boolean
@@ -1713,13 +1905,14 @@ export type ProtectionGroupSelectScalar = {
   updatedAt?: boolean
 }
 
-export type ProtectionGroupOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "tradingAccountId" | "assetId" | "domain" | "direction" | "positionId" | "futuresPositionId" | "parentOrderId" | "status" | "terminalReason" | "createdAt" | "activatedAt" | "endedAt" | "updatedAt", ExtArgs["result"]["protectionGroup"]>
+export type ProtectionGroupOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "tradingAccountId" | "assetId" | "domain" | "direction" | "positionId" | "futuresPositionId" | "parentOrderId" | "parentFuturesOrderId" | "status" | "terminalReason" | "createdAt" | "activatedAt" | "endedAt" | "updatedAt", ExtArgs["result"]["protectionGroup"]>
 export type ProtectionGroupInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   position?: boolean | Prisma.ProtectionGroup$positionArgs<ExtArgs>
   futuresPosition?: boolean | Prisma.ProtectionGroup$futuresPositionArgs<ExtArgs>
   parentOrder?: boolean | Prisma.ProtectionGroup$parentOrderArgs<ExtArgs>
+  parentFuturesOrder?: boolean | Prisma.ProtectionGroup$parentFuturesOrderArgs<ExtArgs>
   legs?: boolean | Prisma.ProtectionGroup$legsArgs<ExtArgs>
   children?: boolean | Prisma.ProtectionGroup$childrenArgs<ExtArgs>
   _count?: boolean | Prisma.ProtectionGroupCountOutputTypeDefaultArgs<ExtArgs>
@@ -1730,6 +1923,7 @@ export type ProtectionGroupIncludeCreateManyAndReturn<ExtArgs extends runtime.Ty
   position?: boolean | Prisma.ProtectionGroup$positionArgs<ExtArgs>
   futuresPosition?: boolean | Prisma.ProtectionGroup$futuresPositionArgs<ExtArgs>
   parentOrder?: boolean | Prisma.ProtectionGroup$parentOrderArgs<ExtArgs>
+  parentFuturesOrder?: boolean | Prisma.ProtectionGroup$parentFuturesOrderArgs<ExtArgs>
 }
 export type ProtectionGroupIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
@@ -1737,6 +1931,7 @@ export type ProtectionGroupIncludeUpdateManyAndReturn<ExtArgs extends runtime.Ty
   position?: boolean | Prisma.ProtectionGroup$positionArgs<ExtArgs>
   futuresPosition?: boolean | Prisma.ProtectionGroup$futuresPositionArgs<ExtArgs>
   parentOrder?: boolean | Prisma.ProtectionGroup$parentOrderArgs<ExtArgs>
+  parentFuturesOrder?: boolean | Prisma.ProtectionGroup$parentFuturesOrderArgs<ExtArgs>
 }
 
 export type $ProtectionGroupPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1747,6 +1942,7 @@ export type $ProtectionGroupPayload<ExtArgs extends runtime.Types.Extensions.Int
     position: Prisma.$PositionPayload<ExtArgs> | null
     futuresPosition: Prisma.$FuturesPositionPayload<ExtArgs> | null
     parentOrder: Prisma.$OrderPayload<ExtArgs> | null
+    parentFuturesOrder: Prisma.$FuturesLimitOrderPayload<ExtArgs> | null
     legs: Prisma.$ProtectionLegPayload<ExtArgs>[]
     children: Prisma.$ProtectionChildPayload<ExtArgs>[]
   }
@@ -1759,6 +1955,7 @@ export type $ProtectionGroupPayload<ExtArgs extends runtime.Types.Extensions.Int
     positionId: string | null
     futuresPositionId: string | null
     parentOrderId: string | null
+    parentFuturesOrderId: string | null
     status: $Enums.ProtectionStatus
     terminalReason: string | null
     createdAt: Date
@@ -2164,6 +2361,7 @@ export interface Prisma__ProtectionGroupClient<T, Null = never, ExtArgs extends 
   position<T extends Prisma.ProtectionGroup$positionArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ProtectionGroup$positionArgs<ExtArgs>>): Prisma.Prisma__PositionClient<runtime.Types.Result.GetResult<Prisma.$PositionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   futuresPosition<T extends Prisma.ProtectionGroup$futuresPositionArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ProtectionGroup$futuresPositionArgs<ExtArgs>>): Prisma.Prisma__FuturesPositionClient<runtime.Types.Result.GetResult<Prisma.$FuturesPositionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   parentOrder<T extends Prisma.ProtectionGroup$parentOrderArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ProtectionGroup$parentOrderArgs<ExtArgs>>): Prisma.Prisma__OrderClient<runtime.Types.Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  parentFuturesOrder<T extends Prisma.ProtectionGroup$parentFuturesOrderArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ProtectionGroup$parentFuturesOrderArgs<ExtArgs>>): Prisma.Prisma__FuturesLimitOrderClient<runtime.Types.Result.GetResult<Prisma.$FuturesLimitOrderPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   legs<T extends Prisma.ProtectionGroup$legsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ProtectionGroup$legsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProtectionLegPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   children<T extends Prisma.ProtectionGroup$childrenArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ProtectionGroup$childrenArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProtectionChildPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
@@ -2203,6 +2401,7 @@ export interface ProtectionGroupFieldRefs {
   readonly positionId: Prisma.FieldRef<"ProtectionGroup", 'String'>
   readonly futuresPositionId: Prisma.FieldRef<"ProtectionGroup", 'String'>
   readonly parentOrderId: Prisma.FieldRef<"ProtectionGroup", 'String'>
+  readonly parentFuturesOrderId: Prisma.FieldRef<"ProtectionGroup", 'String'>
   readonly status: Prisma.FieldRef<"ProtectionGroup", 'ProtectionStatus'>
   readonly terminalReason: Prisma.FieldRef<"ProtectionGroup", 'String'>
   readonly createdAt: Prisma.FieldRef<"ProtectionGroup", 'DateTime'>
@@ -2664,6 +2863,25 @@ export type ProtectionGroup$parentOrderArgs<ExtArgs extends runtime.Types.Extens
    */
   include?: Prisma.OrderInclude<ExtArgs> | null
   where?: Prisma.OrderWhereInput
+}
+
+/**
+ * ProtectionGroup.parentFuturesOrder
+ */
+export type ProtectionGroup$parentFuturesOrderArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the FuturesLimitOrder
+   */
+  select?: Prisma.FuturesLimitOrderSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the FuturesLimitOrder
+   */
+  omit?: Prisma.FuturesLimitOrderOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FuturesLimitOrderInclude<ExtArgs> | null
+  where?: Prisma.FuturesLimitOrderWhereInput
 }
 
 /**

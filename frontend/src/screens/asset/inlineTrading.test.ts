@@ -322,7 +322,7 @@ describe('trading and chart screen boundaries', () => {
     await h.update();
     assert.equal(h.candleOptions.enabled, false);
     assert.ok(h.queries.every((q: any) => q.enabled === false));
-    assert.equal(h.node('inline-order-panel'), undefined);
+    assert.equal(h.node('inline-order-panel') === undefined, true);
     await h.press('asset-chart-back');
     assert.deepEqual(h.navigation, [['back']]);
   });

@@ -15,6 +15,11 @@ positions or settlement evidence. Missing evidence/collateral integrity fails cl
 The existing no-eligible-participants error is unchanged; it never marks such a
 Season settled. [Exact boundaries and release procedure](futures-f3-contract.md).
 
+The existing reservation cleanup also cancels pending Futures Limit entries and
+their HOLDING attachments, including entries without attachments, before final
+settlement can pass its reservation guard. Pending entries have no Position/UPNL;
+they release reserved collateral once and never create a late Season fill.
+
 ## Market-aware daily valuation
 
 Daily portfolio snapshot and current-ranking valuation do not stop globally because KRX or US is closed. Each position applies its own market state: a closed stock market may use only the last valid provider price inside its latest completed session; an open stock market and crypto require the normal fresh price. Missing latest-session evidence is a data problem and never silently falls back to an older provider session. Existing eligible `admin_manual` fallback remains unchanged. Season settlement keeps its separate reproducible `Season.endAt` selection policy, and snapshot dates/season dates remain ordinary calendar dates.

@@ -26,7 +26,7 @@ describe('MarketScreen partial-price warning policy', () => {
   });
 
   it('continues to render every API item through the existing price policy', () => {
-    assert.match(marketScreen, /data=\{items\}/u);
+    assert.match(marketScreen, /data=\{futuresMarket \? \[\] : items\}/u);
     assert.match(marketScreen, /renderItem=\{\(\{ item \}\) =>/u);
     assert.match(marketScreen, /<MarketAssetRow/u);
     assert.match(marketRow, /getAssetPriceText\(displayItem\)/u);

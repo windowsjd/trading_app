@@ -68,7 +68,7 @@ for (const op of ["increase", "reduce", "close"])
       };
       await h.choose(labels[op]);
       if (op !== "close") await h.change("futures-quantity", "0.5");
-      assert.equal(h.node("futures-leverage"), undefined);
+      assert.equal(h.node("futures-leverage") === undefined, true);
       await h.press("futures-submit");
       assert.equal(h.requests[0].body.direction, "short");
       assert.equal(h.requests[0].body.leverage, 37);
@@ -164,7 +164,7 @@ test("scope mismatch and failed refresh hide financial data", async (t) => {
   await h.start();
   t.after(h.close);
   assert.match(h.text(), /불러오지 못했습니다/);
-  assert.equal(h.node("futures-submit"), undefined);
+  assert.equal(h.node("futures-submit") === undefined, true);
 });
 
 test("uncertain open replays the original command after poll shows a position and mode becomes DISABLED", async (t) => {

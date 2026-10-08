@@ -105,8 +105,12 @@ limit (1–100, default 20) and offset (0–1,000,000) conventions as executions
 
 The F3 UI and shared valuation reuse these Mark eligibility and UPNL primitives.
 SL/TP/OCO now belong to the separate [Conditional v1](conditional-orders-contract.md)
-user-exit domain: Spot triggers/execution, never Mark. Trailing stops, standalone
-Limit entries, funding, hedge mode, brackets and risk tiers remain excluded.
+user-exit domain: Spot triggers/execution, never Mark.
+[Limit Entry v1](futures-limit-entry-contract.md) uses the same collateral guard:
+pending reservations reduce available cash but contribute no Position, UPNL,
+maintenance or liquidation target. Fill rechecks fresh Mark and collateral under
+the existing wallet fence. Trailing stops, funding, hedge mode, brackets and risk
+tiers remain excluded.
 
 ## Diagnostic safety
 

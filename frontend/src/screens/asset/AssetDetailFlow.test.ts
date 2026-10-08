@@ -25,9 +25,9 @@ test('market asset opens chart-first detail with price, change and no trading se
   assert.match(screen, /763\.79/);
   assert.match(screen, /전일대비 \+0\.33%/);
   assert.ok(h.node(TEST_IDS.assetDetail.screen));
-  assert.equal(h.node('inline-order-panel'), undefined);
-  assert.equal(h.node('asset-trading-columns'), undefined);
-  assert.equal(h.node('account-holdings'), undefined);
+  assert.equal(h.node('inline-order-panel') === undefined, true);
+  assert.equal(h.node('asset-trading-columns') === undefined, true);
+  assert.equal(h.node('account-holdings') === undefined, true);
   assert.ok(chart(h).candles.length > 0);
   assert.ok(screen.indexOf('전일대비') < screen.indexOf('CandlestickChart'));
   assert.ok(screen.indexOf('CandlestickChart') < screen.indexOf('ChartTimeframeSelector'));
@@ -111,7 +111,7 @@ test('an Order route keeps its account when selection changes', async (t) => {
   h.accountId = 'season';
   await h.update();
   assert.equal(h.routeAccountId, 'general');
-  assert.equal(h.node(TEST_IDS.order.quantityInput), undefined);
+  assert.equal(h.node(TEST_IDS.order.quantityInput) === undefined, true);
   assert.equal(h.requests.length, 0);
   assert.ok(h.node('account-holdings'));
 });
@@ -139,7 +139,7 @@ test('detail candle diagnostics stay admin only', async (t) => {
   user.candleStale = true;
   await openDetail(user);
   t.after(user.close);
-  assert.equal(user.node('admin-diagnostic-panel'), undefined);
+  assert.equal(user.node('admin-diagnostic-panel') === undefined, true);
   const admin = inlineTradingHarness();
   admin.role = 'admin';
   admin.candleStale = true;
@@ -158,7 +158,7 @@ test('detail header keeps name, symbol, paired prices, change, chart and actions
   const name = h.node('asset-detail-name');
   assert.equal(name.props.children, h.assets.bnb.name);
   assert.equal(name.props.numberOfLines, undefined);
-  assert.equal(h.node('asset-change-pair'), undefined);
+  assert.equal(h.node('asset-change-pair') === undefined, true);
   await h.press('asset-name-selector');
   assert.deepEqual(h.navigation, [['MarketSearch', { returnToAsset: true }]]);
   assert.match(h.node('asset-detail-primary-price').props.children, /\$763\.79/);
@@ -205,8 +205,8 @@ test('domestic KRW stock has no invented USD conversion', async (t) => {
   assert.equal(h.node('asset-detail-name').props.children, 'Samsung Electronics');
   assert.match(h.node('asset-name-selector').props.accessibilityLabel, /현재 Samsung Electronics/);
   assert.match(h.node('asset-detail-primary-price').props.children, /70,000/);
-  assert.equal(h.node('asset-currency-usd'), undefined);
-  assert.equal(h.node('asset-currency-krw'), undefined);
+  assert.equal(h.node('asset-currency-usd') === undefined, true);
+  assert.equal(h.node('asset-currency-krw') === undefined, true);
 });
 
 test('changing assets restores USD as the default display choice', async (t) => {

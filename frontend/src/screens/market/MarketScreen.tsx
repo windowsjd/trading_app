@@ -1,3 +1,4 @@
+import FuturesMarketList from './FuturesMarketList';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import MarketSortControl from '../../features/market/MarketSortControl';
 import { marketSortParams, nextMarketPage, type MarketSort } from '../../features/market/marketSort';
@@ -45,6 +46,7 @@ const TABS: Array<{ key: AssetType; label: string }> = [
 
 export default function MarketScreen({ navigation, route }: Props) {
   const isAdmin = useAdminDiagnostics();
+  const [cryptoProduct, setCryptoProduct] = useState<'spot' | 'futures'>('spot');
   const [selectedTab, setSelectedTab] = useState<AssetType>(route?.params?.assetType ?? 'domestic_stock');
   // Consume each explicit navigation intent. Clearing it also lets a later
   // visit request the same category after the user has changed tabs manually.
@@ -55,6 +57,7 @@ export default function MarketScreen({ navigation, route }: Props) {
     }
   }, [route?.params?.assetType, navigation]);
   const [sort, setSort] = useState<MarketSort>('turnover_desc');
+  const futuresMarket = selectedTab === 'crypto' && cryptoProduct === 'futures';
   const sortParams = marketSortParams(sort);
   const refreshSort = useRef(false);
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
@@ -79,6 +82,7 @@ export default function MarketScreen({ navigation, route }: Props) {
       }),
     getNextPageParam: nextMarketPage,
     initialPageParam: { offset: 0 },
+    enabled: !futuresMarket,
   });
 
   const refresh = usePullToRefresh([marketQuery],
@@ -117,7 +121,7 @@ export default function MarketScreen({ navigation, route }: Props) {
     useMarketTickers({
       assetIds,
       wsUrl: wsUrl ?? '',
-      enabled: !!wsUrl,
+      enabled: !!wsUrl && !futuresMarket,
     });
 
   const openAsset = useCallback(
@@ -132,11 +136,11 @@ export default function MarketScreen({ navigation, route }: Props) {
     return 'market_ready';
   }, [marketQuery.isLoading, marketQuery.isError, marketQuery.data, items.length]);
 
-  if (viewState === 'market_loading') {
+  if (!futuresMarket && viewState === 'market_loading') {
     return <FullPageLoading message="종목 목록을 불러오는 중입니다." />;
   }
 
-  if (viewState === 'market_error') {
+  if (!futuresMarket && viewState === 'market_error') {
     return (
       <ErrorState
         title="종목 목록을 불러오지 못했습니다."
@@ -153,11 +157,11 @@ export default function MarketScreen({ navigation, route }: Props) {
     <SafeAreaView edges={['left', 'right']} style={styles.container}>
       <FlatList
         testID={TEST_IDS.market.screen}
-        data={items}
+        data={futuresMarket ? [] : items}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.content}
         onEndReached={() => {
-          if (marketQuery.hasNextPage && !marketQuery.isFetching && !marketQuery.isError) {
+          if (!futuresMarket && marketQuery.hasNextPage && !marketQuery.isFetching && !marketQuery.isError) {
             void marketQuery.fetchNextPage();
           }
         }}
@@ -196,6 +200,10 @@ export default function MarketScreen({ navigation, route }: Props) {
               })}
             </View>
 
+            {selectedTab === 'crypto' ? <View style={styles.tabRow}>
+              {(['spot', 'futures'] as const).map(product => <ActionPressable key={product} testID={`crypto-product-${product}`} accessibilityRole="tab" accessibilityState={{ selected: cryptoProduct === product }} aria-selected={cryptoProduct === product} onPress={() => setCryptoProduct(product)} style={[styles.tabButton, cryptoProduct === product && styles.tabButtonActive]}><Text style={cryptoProduct === product ? styles.tabTextActive : styles.tabText}>{product === 'spot' ? '현물' : '선물'}</Text></ActionPressable>)}
+            </View> : null}
+            {futuresMarket ? <FuturesMarketList onSelect={(accountId, instrumentId) => navigation.navigate('Futures', { accountId, instrumentId })} /> : <>
             <ActionPressable
               style={styles.searchEntry}
               onPress={() => navigation.navigate('MarketSearch', { sort })}
@@ -226,9 +234,10 @@ export default function MarketScreen({ navigation, route }: Props) {
             {isAdmin && !showReconnectBanner && (staleAssetIds.size > 0 || subscriptionErrorAssetIds?.size > 0) ? (
               <AdminDiagnosticPanel runtime={tickerRuntime} />
             ) : null}
+            </>}
           </View>
         }
-        ListEmptyComponent={
+        ListEmptyComponent={futuresMarket ? null :
           <EmptyState
             title="표시할 종목이 없습니다."
             message="현재 조건에서 조회 가능한 종목이 없습니다."
@@ -244,7 +253,7 @@ export default function MarketScreen({ navigation, route }: Props) {
           />
         )}
         ListFooterComponent={
-          marketQuery.isFetchNextPageError ? (
+          futuresMarket ? null : marketQuery.isFetchNextPageError ? (
             <ActionPressable accessibilityRole="button" onPress={() => void marketQuery.refetch()} style={{ minHeight: 48, justifyContent: 'center' }}>
               <Text>목록을 새로고침해 계속 보기</Text>
             </ActionPressable>

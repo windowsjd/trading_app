@@ -27,7 +27,7 @@ enrichment/triage policy is canonical in `backend/README.md`.
 ```bash
 npm install
 npm run typecheck     # tsc --noEmit
-npm test              # node --test over src/**/*.test.ts (no Jest)
+npm test              # node --test, file concurrency 1 (no Jest)
 npx expo export --platform web       # bundle check
 npx expo export --platform android   # bundle check
 ```
@@ -35,6 +35,27 @@ npx expo export --platform android   # bundle check
 Tests run under Node's type-stripping test runner, so test-reachable modules
 must be free of React Native imports and their relative imports need explicit
 `.ts` extensions.
+
+Renderer assertions compare small values: use
+`assert.equal(node === undefined, true)` for absence and booleans/lengths/props
+for other checks. Do not give `ReactTestInstance`, Fiber or arrays of renderer
+nodes directly to equality/deep-equality assertions: a failure can recursively
+format the renderer graph and exhaust memory. Keep the actual condition and
+failure visible; do not suppress assertion messages or skip the test. Primitive
+and small DTO comparisons keep their normal assertions.
+
+On shared WSL hosts, run tests/builds inside a verified cgroup v2/systemd unit:
+bound total descendant memory, set swap to zero, bound tasks and runtime, kill
+the whole unit on stop, and monitor it from outside that cgroup. Start with one
+test file at a time. Node heap limits supplement this containment. Check actual
+`memory.max`, `memory.swap.max`, `pids.max` and child membership before release;
+watch memory/oom events and stop before the host is pressured. Do not overlap
+heavy frontend/backend checks or rerun a memory failure without investigation.
+Disable core files where supported and inspect `kernel.core_pattern`: a piped
+WSL handler can ignore `ulimit -c 0`. A zero inherited `coredump_filter` prevents
+large mapped-memory dumps; inspect disk headroom and the handler separately.
+Use workload-specific budgets (a one-second renderer test and PostgreSQL plus
+Jest need different limits). Unsafe environments leave validation incomplete.
 
 Press feedback, native stack/root/tab policy, Reduced Motion, browser timing
 evidence and remaining device checks are recorded in
@@ -66,10 +87,37 @@ Current implementation status:
 
 - season + general accounts: portfolio, equity, wallets, ledger, positions,
   orders, order cancel, FX — all account-scoped;
-- general-mode trading and FX are 준비 중 in the UI because they are not
-  implemented in the backend; the client does not send those requests;
+- general-mode trading and FX use the shared account-scoped backend primitives;
 - ad rewards have client wrappers and cache invalidation but no screen yet, and
   no provider adapter exists (disabled by default).
+
+## Crypto trading and protection
+
+Market → Crypto exposes Spot/Futures, defaulting to Spot so the existing Spot
+detail/trading route remains the normal entry. A Futures instrument selection
+pins account and instrument in MarketStack. Both Home modes remove the Futures
+entry card; total assets, signed UPNL, returns and settlement still include
+Futures. There is no new Futures root tab or substitute Home card.
+
+Flat Futures positions offer Market/Limit entry, Long/Short, Cross/Isolated and
+integer leverage 1–100. Limit creates a pending reservation, not a filled
+Position. Optional attached TP/SL uses the existing editor; server capabilities
+govern creation while disabled controls explain availability. Existing TP/SL
+panels and history remain visible when paused. Uncertain requests reuse the
+original idempotency key; account/session changes suppress old callbacks/results
+and clear prior-session intent. See the backend
+[entry contract](../backend/docs/futures-limit-entry-contract.md) for settlement.
+
+Asset holdings start at **현재 종목**; **전체 보유** retains the full list. Each
+Spot card opens the existing account/asset/Position-bound TP/SL panel; live
+protection opens management instead of duplicate registration. **대기 목록**
+separates **지정가** (Spot BUY/SELL and Futures Long/Short entries) from **TP/SL**
+(active groups and attached HOLDING). Conditional Limit children are shown through
+their protection group once; terminal history stays in the history view. Shared
+account query keys ensure fills/cancels refresh the correct financial views.
+Pending protection labels follow the per-domain server capability, including
+Futures-only DISABLED mode; viewing existing protection and permitted cancellation
+remain available.
 
 ## Realtime prices
 

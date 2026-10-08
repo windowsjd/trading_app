@@ -19,7 +19,6 @@ export type AuthStackParamList = {
 export type HomeStackParamList = {
   Home: undefined;
   Portfolio: undefined;
-  Futures: { accountId: string };
 };
 
 export type WalletStackParamList = {
@@ -30,6 +29,7 @@ export type WalletStackParamList = {
 };
 
 export type MarketStackParamList = {
+  Futures: { accountId: string; instrumentId?: string };
   Market: { assetType?: import('../../features/market/api').AssetType } | undefined;
   MarketSearch: { returnToAsset?: boolean; sort?: import('../../features/market/marketSort').MarketSort } | undefined;
   AssetDetail: { assetId: string };
@@ -214,4 +214,4 @@ export type MyScreenProps = CompositeScreenProps<
   CompositeScreenProps<TabScreenProps<'MyTab'>, RootScreenProps<'MainTabs'>>
 >;
 
-export type FuturesScreenProps = NativeStackScreenProps<HomeStackParamList, 'Futures'>;
+export type FuturesScreenProps = NativeStackScreenProps<MarketStackParamList, 'Futures'>;

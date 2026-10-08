@@ -351,7 +351,8 @@ export const OpsJobName = {
   limit_order_matching: 'limit_order_matching',
   futures_liquidation: 'futures_liquidation',
   futures_mark_retention: 'futures_mark_retention',
-  conditional_orders: 'conditional_orders'
+  conditional_orders: 'conditional_orders',
+  futures_limit_matching: 'futures_limit_matching'
 } as const
 
 export type OpsJobName = (typeof OpsJobName)[keyof typeof OpsJobName]

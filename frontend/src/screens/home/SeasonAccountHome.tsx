@@ -1,4 +1,3 @@
-import FuturesEntry from '../futures/FuturesEntry';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { semantic } from '../../theme/tokens';
 import React, { useState } from 'react';
@@ -228,7 +227,6 @@ export default function SeasonAccountHome({
           general={false}
         />
 
-        <FuturesEntry accountId={account.id} />
         <HomeHoldings holdings={holdings} onOpenAsset={onOpenAsset} />
       </View>
       <HomeHotMarket hot={hot} onOpenAsset={onOpenAsset} onOpenMarket={onOpenMarket} />

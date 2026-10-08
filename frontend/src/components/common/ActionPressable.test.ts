@@ -57,7 +57,7 @@ describe('ActionPressable immediate feedback', () => {
     assert.equal(flatten(wash(renderer).props.style).opacity, 0);
     act(() => renderer.update(React.createElement(h.ActionPressable, { ...props, disabled: true })));
     assert.equal(renderer.root.findByType('Pressable').props.onPress, undefined);
-    assert.equal(wash(renderer), undefined);
+    assert.equal(wash(renderer) === undefined, true);
     assert.equal(h.animations.length, 0);
   });
 
@@ -215,7 +215,7 @@ describe('ActionPressable immediate feedback', () => {
     act(() => button.props.onPressIn(event));
     button.props.onPress();
     assert.equal(calls, 1);
-    assert.equal(wash(renderer), undefined);
+    assert.equal(wash(renderer) === undefined, true);
     assert.deepEqual(flatten(button.props.style), { padding: 2 });
   });
 

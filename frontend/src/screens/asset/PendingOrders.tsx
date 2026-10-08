@@ -1,3 +1,4 @@
+import PendingFuturesAndProtections from './PendingFuturesAndProtections';
 import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import React, { useEffect, useRef, useState } from 'react';
@@ -14,6 +15,8 @@ import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import { QUERY_KEYS } from '../../constants/queryKeys';
+import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
+import { getSessionGeneration } from '../../services/api/sessionOwnership';
 import { formatOrderBookDecimal } from '../../features/asset/orderBook';
 import { getRecordOrderDisplay } from '../../features/record/api';
 import { getAccountPendingOrders } from '../../features/record/accountOrders';
@@ -27,7 +30,20 @@ type Props = {
   seasonUi: boolean;
 };
 
-export default function PendingOrders({ accountId, isFocused, seasonUi }: Props) {
+export default function PendingOrders(props: Props) {
+  const { selectedAccountId } = useTradingAccount();
+  return selectedAccountId === props.accountId ? <BoundPendingOrders key={`${props.accountId}:${getSessionGeneration()}`} {...props} /> : null;
+}
+export function BoundPendingOrders(props: Props) {
+  const [kind, setKind] = useState<'limit' | 'protection'>('limit');
+  return <View style={styles.list}>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8 }}>
+      {(['limit', 'protection'] as const).map(value => <ActionPressable key={value} testID={`pending-kind-${value}`} accessibilityRole="button" accessibilityState={{ selected: value === kind }} aria-pressed={value === kind} onPress={() => setKind(value)} style={styles.retry}><Text style={styles.value}>{value === 'limit' ? '지정가' : 'TP/SL'}</Text></ActionPressable>)}
+    </View>
+    {kind === 'limit' ? <><SpotPendingOrders {...props} /><PendingFuturesAndProtections key={`futures:${props.accountId}`} accountId={props.accountId} focused={props.isFocused} seasonUi={props.seasonUi} /></> : <PendingFuturesAndProtections key={`protection:${props.accountId}`} accountId={props.accountId} focused={props.isFocused} seasonUi={props.seasonUi} protections />}
+  </View>;
+}
+export function SpotPendingOrders({ accountId, isFocused, seasonUi }: Props) {
   const queryClient = useQueryClient();
   const previous = useRef<{ accountId: string; ids: Set<string> }>({
     accountId,
@@ -96,14 +112,15 @@ export default function PendingOrders({ accountId, isFocused, seasonUi }: Props)
     );
   }
   if (!data) return <SectionSkeleton lines={4} />;
-  if (data.items.length === 0) {
+  const items = data.items.filter(item => !item.conditionalChildId);
+  if (items.length === 0) {
     return <InlineEmptyState title="대기 중인 지정가 주문이 없습니다." message="" />;
   }
 
   return (
     <View style={styles.list} testID="pending-orders-list">
-      <Text style={styles.count}>대기 주문 {data.items.length}건</Text>
-      {data.items.map((item) => {
+      <Text style={styles.count}>현물 대기 주문 {items.length}건</Text>
+      {items.map((item) => {
         const display = getRecordOrderDisplay(item);
         const buy = item.side === 'buy';
         return (

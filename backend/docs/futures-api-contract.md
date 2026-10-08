@@ -198,8 +198,13 @@ shortfall, is not a technical diagnostic projection and is not redacted.
 
 ## F3 integration and remaining exclusions
 
+The subsequent [Limit Entry v1](futures-limit-entry-contract.md) adds flat-only,
+full-fill Long/Short entries and attached TP/SL. A pending entry reserves cash
+availability; it is not an open Position or initial margin usage. On fill the
+reservation is released atomically and this contract's execution primitive runs.
+
 No dated/inverse/coin-margin/options, funding, Hedge Mode, ADL, insurance, partial
-liquidation, standalone Futures Limit entries, trailing stops, or Binance
+liquidation, trailing stops, or Binance
 brackets/risk tiers. [Conditional v1](conditional-orders-contract.md) adds
 Position-bound SL/TP Market/Limit exits and OCO using Spot reference prices. F3 supplies account-pinned Futures UI and coherent
 Home/Portfolio/TWR/Equity/Daily/Season return/Ranking valuation. Total equity adds

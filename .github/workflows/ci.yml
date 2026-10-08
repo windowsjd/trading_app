@@ -178,6 +178,7 @@ jobs:
       FUTURES_F3_DB_INTEGRATION: "1"
       FUTURES_F31_DB_INTEGRATION: "1"
       CONDITIONAL_DB_INTEGRATION: "1"
+      FUTURES_LIMIT_DB_INTEGRATION: "1"
       MVP_FLOW_DB_SMOKE: "1"
     defaults:
       run:
@@ -228,6 +229,7 @@ jobs:
           src/futures/futures-f3.integration.spec.ts
           src/futures/futures-f31.integration.spec.ts
           src/conditional/conditional.integration.spec.ts
+          src/futures/futures-limit.integration.spec.ts
           src/futures/futures-isolated-boundary.integration.spec.ts
           src/orders/limit-order-create-race.integration.spec.ts
           src/orders/limit-order-transaction-time.integration.spec.ts

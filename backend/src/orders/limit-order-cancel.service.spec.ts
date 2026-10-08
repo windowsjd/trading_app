@@ -112,6 +112,7 @@ describe('LimitOrderCancelService', () => {
 
   const createPrisma = () => ({
     ...emptyProtectionState(),
+      futuresLimitOrder: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
     order: {
       findUnique: jest.fn(),
       findMany: jest.fn(),

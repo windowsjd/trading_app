@@ -1,3 +1,4 @@
+import FuturesScreen from '../../screens/futures/FuturesScreen';
 import React from 'react';
 import { mainTabHeaderTitle } from '../../components/navigation/MainTabHeaderTitle';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -37,6 +38,7 @@ export default function MarketStack() {
         component={OrderScreen}
         options={{ title: '주문' }}
       />
+      <Stack.Screen name="Futures" component={FuturesScreen} options={{ title: '암호화폐 선물' }} />
     </Stack.Navigator>
   );
 }

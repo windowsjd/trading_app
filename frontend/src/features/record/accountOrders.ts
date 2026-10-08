@@ -41,6 +41,7 @@ export function toRecordOrderItem(row: AccountOrderRow): RecordOrderItemDto {
   const asset = (row.asset ?? null) as Record<string, unknown> | null;
 
   return {
+    conditionalChildId: strOrNull(row.conditionalChildId),
     orderId: str(row.orderId) ?? str(row.id),
     id: str(row.id),
     assetId: str(asset?.id) ?? str(row.assetId),

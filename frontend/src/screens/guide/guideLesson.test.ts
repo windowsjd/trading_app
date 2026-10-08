@@ -182,8 +182,8 @@ describe('guide home and market basics lesson', () => {
     const initialBids = bids();
     const initialAsks = [10030, 10020, 10010].map((price) => row(price).props.accessibilityLabel);
     assert.match(lastPrice(), /10,000원/);
-    assert.equal(h.find(ids.buyEight), undefined);
-    assert.equal(h.find(ids.restart), undefined);
+    assert.equal(h.find(ids.buyEight) === undefined, true);
+    assert.equal(h.find(ids.restart) === undefined, true);
     assertLessonContent(h);
     assertPurchaseSummary(h, noPurchases);
     h.layout(ids.exercise(1), { y: 200 });
@@ -230,7 +230,7 @@ describe('guide home and market basics lesson', () => {
     assert.match(lastPrice(), /10,030원/);
     assertPurchaseSummary(h, allPurchases);
     h.tick(1300);
-    assert.equal(h.find(ids.buyEight), undefined);
+    assert.equal(h.find(ids.buyEight) === undefined, true);
     assert.ok(h.text().includes('핵심 정리'));
     assert.ok(h.text().includes('10,020원에서 5주, 10,030원에서 3주'));
     assert.ok(h.text().includes('마지막 체결가격이 10,030원이므로 현재가 역시 10,030원으로 변경됩니다.'));
@@ -257,8 +257,8 @@ describe('guide home and market basics lesson', () => {
     assert.match(lastPrice(), /10,000원/);
     assert.deepEqual([10030, 10020, 10010].map((price) => row(price).props.accessibilityLabel), initialAsks);
     assert.equal(h.find(ids.buyThree).props.disabled, false);
-    assert.equal(h.find(ids.buyEight), undefined);
-    assert.equal(h.find(ids.restart), undefined);
+    assert.equal(h.find(ids.buyEight) === undefined, true);
+    assert.equal(h.find(ids.restart) === undefined, true);
     assert.ok(!h.text().includes('실습 1 · 체결 결과'));
     assertPurchaseSummary(h, noPurchases);
     h.tick(10000);
@@ -333,7 +333,7 @@ describe('guide home and market basics lesson', () => {
 
   it('keeps each result and its purchase values before the next exercise, preserving the first snapshot', (t) => {
     const h = setup(t);
-    assert.equal(h.find(ids.exercise(2)), undefined);
+    assert.equal(h.find(ids.exercise(2)) === undefined, true);
     assertRenderOrder(h, [header(h, '실습 1 · 3주 매수'), h.find(ids.orderBook), h.find(ids.buyThree)]);
     h.press(ids.buyThree);
     h.tick(1000);
@@ -345,11 +345,11 @@ describe('guide home and market basics lesson', () => {
       header(h, '실습 2 · 여러 가격대 체결'), h.find(ids.orderBook), h.find(ids.buyEight),
     ]);
     assertPurchaseSummary(h, firstPurchase);
-    assert.equal(h.find(ids.buyThree), undefined);
+    assert.equal(h.find(ids.buyThree) === undefined, true);
     const second = h.find(ids.exercise(2));
     assert.ok(second.findAll((node: any) => node === h.find(ids.orderBook)).length > 0);
     assert.match(h.find(ids.lastPrice).props.accessibilityLabel, /현재가 10,010원/);
-    assert.equal(h.find(ids.ask(10010)), undefined);
+    assert.equal(h.find(ids.ask(10010)) === undefined, true);
     assert.match(h.find(ids.ask(10020)).props.accessibilityLabel, /잔량 5주/);
     assert.match(h.find(ids.ask(10030)).props.accessibilityLabel, /잔량 8주/);
     assertUniqueTestIds(h);
@@ -363,7 +363,7 @@ describe('guide home and market basics lesson', () => {
     assertPurchaseSummary(frozen, firstPurchase);
     assert.match(frozen.find(ids.ask(10020)).props.accessibilityLabel, /잔량 5주/);
     h.tick(1300);
-    assert.equal(h.find(ids.ask(10020)), undefined);
+    assert.equal(h.find(ids.ask(10020)) === undefined, true);
     h.tick(1200);
     assert.match(h.find(ids.ask(10030)).props.accessibilityLabel, /잔량 5주.*3주 체결/);
     assert.ok(second.findAll((node: any) => node === h.find(ids.ask(10030))).length > 0);
@@ -381,9 +381,9 @@ describe('guide home and market basics lesson', () => {
     assertUniqueTestIds(h);
 
     h.press(ids.restart);
-    assert.equal(h.find(ids.exercise(2)), undefined);
-    assert.equal(frozen.find(ids.orderBook), undefined);
-    assert.equal(frozen.find(ids.purchaseSummary), undefined);
+    assert.equal(h.find(ids.exercise(2)) === undefined, true);
+    assert.equal(frozen.find(ids.orderBook) === undefined, true);
+    assert.equal(frozen.find(ids.purchaseSummary) === undefined, true);
     assertPurchaseSummary(h, noPurchases);
     assert.deepEqual(h.scrolls.at(-1), { y: 0, animated: false });
   });

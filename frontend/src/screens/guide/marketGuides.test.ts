@@ -628,7 +628,7 @@ describe('new guide chapters preserve downward learning flow', () => {
     h.press('tracking-compare');
     assert.match(h.text('tracking-result'), /-0.2%포인트/);
     const result = h.text('tracking-result');
-    assert.equal(h.find('tracking-variable'), undefined);
+    assert.equal(h.find('tracking-variable') === undefined, true);
     h.press('tracking-stable');
     const stable = h.text('tracking-stable-result');
     h.press('tracking-variable');

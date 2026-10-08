@@ -123,6 +123,11 @@ export type FuturesExecution = Prisma.FuturesExecutionModel
  */
 export type FuturesExecuteRequest = Prisma.FuturesExecuteRequestModel
 /**
+ * Model FuturesLimitOrder
+ * 
+ */
+export type FuturesLimitOrder = Prisma.FuturesLimitOrderModel
+/**
  * Model ProtectionGroup
  * 
  */

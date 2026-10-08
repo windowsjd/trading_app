@@ -271,7 +271,7 @@ test('standalone account binding clears inputs when selection changes and cannot
   await h.press('order-ratio-50');
   h.accountId = 'season';
   await h.update();
-  assert.equal(h.node(slider), undefined);
+  assert.equal(h.node(slider) === undefined, true);
   assert.match(json(h), /선택한 계정이 변경되었습니다/);
   h.accountId = 'general';
   await h.update();

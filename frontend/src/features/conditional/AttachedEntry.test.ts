@@ -16,5 +16,17 @@ for(const account of ['general','season'])test(`${account} BUY Limit attaches le
  assert.equal(h.requests[1].body.orderType,'limit');assert.equal(h.requests[1].body.side,'buy');
 });
 test('attached inputs are optional and never shown for Market or Sell',async t=>{
- const h=inlineTradingHarness();h.protections={tradingAccountId:'general',capabilities:{enabled:true,canCreateSpot:true,canUseSpotLimit:true},groups:[]};await h.mount();t.after(h.close);assert.equal(h.node('protection-stop_loss-toggle'),undefined);await h.press(TEST_IDS.assetDetail.sellButton);await h.press(TEST_IDS.order.typeToggleLimit);assert.equal(h.node('protection-stop_loss-toggle'),undefined);
+ const h=inlineTradingHarness();h.protections={tradingAccountId:'general',capabilities:{enabled:true,canCreateSpot:true,canUseSpotLimit:true},groups:[]};await h.mount();t.after(h.close);assert.equal(h.node('protection-stop_loss-toggle') === undefined, true);await h.press(TEST_IDS.assetDetail.sellButton);await h.press(TEST_IDS.order.typeToggleLimit);assert.equal(h.node('protection-stop_loss-toggle') === undefined, true);
+});
+
+for(const phase of ['before-submit','quote-pending']) test(`disabled Spot attachment blocks ${phase} without hiding the editor`,async t=>{
+ const h=inlineTradingHarness();h.protections={tradingAccountId:'general',capabilities:{enabled:true,canCreateSpot:true,canUseSpotLimit:true},groups:[]};
+ await h.mount();t.after(h.close);await h.press(TEST_IDS.order.typeToggleLimit);await h.input(TEST_IDS.order.limitPriceInput,'700');await h.input(TEST_IDS.order.quantityInput,'100');await h.press('protection-stop_loss-toggle');
+ await act(async()=>h.renderer.root.findAll((n:any)=>n.type==='TextInput'&&n.props.accessibilityLabel==='손절 (Stop Loss) 조건 가격')[0].props.onChangeText('600'));
+ const submit=h.node(TEST_IDS.order.executeSubmit).props.onPress;
+ if(phase==='quote-pending'){h.quoteGate=deferred();await act(async()=>submit());}
+ h.protections.capabilities={enabled:false,canCreateSpot:false,canUseSpotLimit:false};await h.update();
+ assert.equal(h.node('attached-entry-editor') !== undefined,true);
+ if(phase==='before-submit') await act(async()=>submit());else h.quoteGate.resolve();
+ await h.flush();assert.equal(h.requests.filter((r:any)=>!r.url.endsWith('/quote')).length,0);
 });

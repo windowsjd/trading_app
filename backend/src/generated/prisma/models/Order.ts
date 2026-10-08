@@ -1344,10 +1344,6 @@ export type EnumOrderSideFieldUpdateOperationsInput = {
   set?: $Enums.OrderSide
 }
 
-export type EnumOrderStatusFieldUpdateOperationsInput = {
-  set?: $Enums.OrderStatus
-}
-
 export type EnumWalletScopeFieldUpdateOperationsInput = {
   set?: $Enums.WalletScope
 }

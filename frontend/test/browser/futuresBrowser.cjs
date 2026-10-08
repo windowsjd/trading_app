@@ -13,7 +13,7 @@ async function main() {
   fs.writeFileSync(path.join(out,'index.html'), '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body,#root{height:100%;margin:0}</style><div id="root"></div><script src="/bundle.js"></script>');
   const server = http.createServer((req,res) => { const file=req.url.startsWith('/bundle.js')?'bundle.js':'index.html'; res.setHeader('Content-Type',file==='bundle.js'?'text/javascript':'text/html'); res.end(fs.readFileSync(path.join(out,file))); }).listen(0,'127.0.0.1');
   await new Promise(resolve=>server.once('listening',resolve));
-  const browser=await chromium.launch({headless:true,args:['--no-sandbox']}); const page=await browser.newPage(); const errors=[],results=[];
+  const browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE_PATH,args:['--no-sandbox']}).catch(error=>{server.close();throw error;}); const page=await browser.newPage(); const errors=[],results=[];
   page.on('pageerror', e=>errors.push(e.message)); const base=`http://127.0.0.1:${server.address().port}`;
   await page.route('**/*',r=>r.request().url().startsWith(base)?r.continue():r.abort());
   try {

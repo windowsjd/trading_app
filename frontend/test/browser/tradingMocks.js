@@ -1,6 +1,7 @@
 import React from 'react';
 export const NavigationContext = React.createContext(undefined);
 import { conditionalFixture } from '../conditionalFixtures.cjs';
+import { futuresFixture } from '../futuresFixtures.cjs';
 import { getTradingAccountCapabilities } from '../../src/features/tradingAccount/capabilities';
 const params = new URLSearchParams(location.search);
 export const state = {
@@ -160,6 +161,13 @@ export const apiClient = {
       return response({ asset });
     }
     const scoped = { state: 'available', tradingAccountId: state.accountId };
+    const pagination = {limit:100,offset:0,total:0,returned:0,nextOffset:null};
+    if(path.includes('/futures/')) {
+      const f=futuresFixture(state.accountId,{large:true});
+      if(path.includes('limit-orders')) return response({...scoped,orders:params.has('pending') ? ['long','short'].map((direction,i)=>({id:'entry-'+direction,direction,marginMode:i?'cross':'isolated',leverage:100,quantity:'123456789.12345678',limitPrice:'1234567890123456.12345678',reservedAmount:'12345678901234.12345678',instrument:f.catalog.instruments[0]})) : [],pagination});
+      return response(path.includes('/instruments')?f.catalog:path.includes('/positions')?f.positions:path.includes('/executions')?f.executions:path.includes('/liquidations')?f.liquidations:f.final);
+    }
+    if(path.endsWith('/orders')) return response({...scoped,orders:params.has('pending') ? ['buy','sell','child'].map((id)=>({id,orderId:id,asset:{id:'SUI',symbol:'SUIUSDT',name:assets.find(a=>a.id==='SUI').name},side:id==='buy'?'buy':'sell',orderType:'limit',status:'submitted',quantity:'123456789.12345678',limitPrice:'1234567890123456.12345678',currencyCode:'USD',conditionalChildId:id==='child'?'child':null})) : [],pagination:{...pagination,total:params.has('pending')?3:0,returned:params.has('pending')?3:0}});
     if (path.endsWith('/portfolio')) return response({
       ...scoped, mode: account.mode, sectionErrors: [],
       summary: {

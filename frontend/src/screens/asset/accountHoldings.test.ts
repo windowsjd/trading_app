@@ -35,7 +35,7 @@ const ids = (h: any) =>
   h.renderer.root
     .findAll(
       (n: any) =>
-        typeof n.type === 'string' && n.props.testID?.startsWith('holding-'),
+        typeof n.type === 'string' && n.props.testID?.startsWith('holding-') && !n.props.testID.startsWith('holding-protection-'),
     )
     .map((n: any) => n.props.testID);
 const empty = (h: any) =>
@@ -43,6 +43,71 @@ const empty = (h: any) =>
     .findAllByType('InlineEmptyState')
     .map((n: any) => n.props.title)
     .join(' ');
+
+it('holding TP/SL creates with the card account, asset and Position; active protection opens management', async t => {
+  const h=inlineTradingHarness(); h.holdings={general:[holding('bnb')]};
+  const {conditionalFixture}=require('../../../test/conditionalFixtures.cjs');
+  h.protections=conditionalFixture('general',{domain:'spot'});
+  await h.mount(); t.after(h.close); await h.flush();
+  await h.press('holding-protection-bnb');
+  assert.equal(h.node('protection-panel') !== undefined,true);
+  await h.press('protection-stop_loss-toggle');
+  const input=h.renderer.root.findAll((n:any)=>n.type==='TextInput' && n.props.accessibilityLabel==='손절 (Stop Loss) 조건 가격')[0];
+  await act(async()=>input.props.onChangeText('500'));
+  const submit=h.renderer.root.findAll((n:any)=>n.type==='CTAButton' && n.props.label==='보호 조건 등록')[0];
+  await act(async()=>submit.props.onPress());
+  assert.equal(h.protectionRequests.length,1);
+  assert.deepEqual({...h.protectionRequests[0].body,idempotencyKey:'key'}, {domain:'spot',assetId:'bnb',positionId:'bnb',legs:[{kind:'stop_loss',triggerPrice:'500',childOrderType:'market'}],idempotencyKey:'key'});
+  assert.equal(h.protectionRequests[0].accountId,'general');
+  h.protections=conditionalFixture('general',{domain:'spot',active:true});
+  await h.update();
+  assert.equal(h.node('protection-stop_loss-toggle') === undefined,true);
+  const cancel=h.renderer.root.findAll((n:any)=>n.type==='CTAButton' && n.props.label==='보호 조건 취소')[0];
+  assert.equal(!!cancel,true); await act(async()=>cancel.props.onPress());
+  assert.equal(h.protectionRequests[1].groupId,'group');
+});
+
+it('pending separates Spot/Futures entries from active or holding Protection and honors cancellation capability', async t => {
+  const h=inlineTradingHarness();
+  const {conditionalFixture}=require('../../../test/conditionalFixtures.cjs');
+  const {futuresFixture}=require('../../../test/futuresFixtures.cjs');
+  h.pendingEntries={general:[{id:'entry',instrument:futuresFixture('general').catalog.instruments[0],direction:'short',marginMode:'cross',leverage:37,limitPrice:'100',quantity:'1',reservedAmount:'3'}]};
+  h.protections=conditionalFixture('general',{domain:'futures',holding:true});
+  h.protections.groups.push({...h.protections.groups[0],id:'finished',status:'completed',asset:{name:'SHOULD NOT DISPLAY'}});
+  await h.mount();t.after(h.close);await h.flush();
+  await h.press('holdings-filter-pending');await h.flush();
+  assert.equal(h.node('pending-futures') !== undefined,true);
+  assert.match(JSON.stringify(h.node('pending-futures').children.map(text)),/Short.*Cross.*37/);
+  await h.press('pending-kind-protection');await h.flush();
+  assert.equal(h.node('pending-futures') === undefined,true);
+  assert.match(text(h.node('pending-protections')),/진입 체결 대기/);
+  assert.doesNotMatch(text(h.node('pending-protections')),/SHOULD NOT DISPLAY/);
+  const cancel=h.renderer.root.findAll((n:any)=>n.type==='CTAButton'&&n.props.label==='보호 조건 취소')[0].props.onPress;
+  h.protections.capabilities={...h.protections.capabilities,enabled:false,canCancel:false};await h.update();
+  assert.match(text(h.node('pending-protections')),/조건 감시가 중지/);
+  await act(async()=>cancel()); assert.equal(h.protectionRequests?.length??0,0);
+  h.accountId='season';await h.update();
+  assert.equal(h.node('pending-protections') === undefined,true);
+  await act(async()=>cancel());assert.equal(h.protectionRequests?.length??0,0);
+});
+
+it('pending keeps Futures protection visible but paused when only Futures mode is disabled; cancellation remains available', async t => {
+  const h = inlineTradingHarness();
+  const { conditionalFixture } = require('../../../test/conditionalFixtures.cjs');
+  h.protections = conditionalFixture('general', { domain: 'futures', active: true, mode: 'DISABLED' });
+  await h.mount(); t.after(h.close); await h.flush();
+  await h.press('holdings-filter-pending'); await h.flush();
+  await h.press('pending-kind-protection'); await h.flush();
+  const content = text(h.node('pending-protections'));
+  assert.match(content, /보호 감시 중지/);
+  assert.equal(content.match(/조건 감시 중지/g)?.length, 2);
+  assert.doesNotMatch(content, /포지션 보호 중|조건 충족 · 체결 대기/);
+  const cancel = h.renderer.root.findAll((n: any) => n.type === 'CTAButton' && n.props.label === '보호 조건 취소')[0];
+  assert.equal(cancel.props.state, 'enabled');
+  await act(async () => cancel.props.onPress());
+  assert.equal(h.protectionRequests[0].groupId, 'group');
+  assert.equal(h.protectionRequests[0].accountId, 'general');
+});
 
 describe('holdings in Order with real React Query and order invalidation', () => {
   it('all/current filters, missing asset and zero positions; changing asset resets filter/input/KRW', async (t) => {
@@ -59,6 +124,9 @@ describe('holdings in Order with real React Query and order invalidation', () =>
     await h.mount();
     t.after(h.close);
     await h.flush();
+    assert.equal(h.node('holdings-filter-current').props.accessibilityState.selected, true);
+    assert.deepEqual(ids(h), ['holding-btc']);
+    await h.press('holdings-filter-all');
     assert.deepEqual(ids(h), ['holding-btc', 'holding-eth', 'holding-samsung']);
     assert.equal(text(h.node('holdings-count')), '보유 종목 3');
     await h.press('holdings-filter-current');
@@ -75,7 +143,7 @@ describe('holdings in Order with real React Query and order invalidation', () =>
     await h.update();
     await h.flush();
     assert.equal(
-      h.node('holdings-filter-all').props.accessibilityState.selected,
+      h.node('holdings-filter-current').props.accessibilityState.selected,
       true,
     );
     assert.equal(h.node(TEST_IDS.order.quantityInput).props.value, '');
@@ -95,6 +163,7 @@ describe('holdings in Order with real React Query and order invalidation', () =>
     await h.mount();
     t.after(h.close);
     await h.flush();
+    await h.press('holdings-filter-all');
     assert.equal(ids(h).length, 205);
     assert.equal(text(h.node('holdings-count')), '보유 종목 205');
     assert.deepEqual(
@@ -109,7 +178,7 @@ describe('holdings in Order with real React Query and order invalidation', () =>
       h.node('account-holdings').findAllByType('FlatList').length,
       0,
     );
-    assert.equal(h.node('asset-market-status'), undefined);
+    assert.equal(h.node('asset-market-status') === undefined, true);
     assert.doesNotMatch(text(h.node('account-holdings')), /내 포지션/);
   });
   it('never renders general holdings under season, including a late general response and cached return', async (t) => {
@@ -121,6 +190,7 @@ describe('holdings in Order with real React Query and order invalidation', () =>
     await h.mount();
     t.after(h.close);
     await h.flush();
+    await h.press('holdings-filter-all');
     assert.equal(ids(h).length, 3);
     h.holdingsGate = { general: deferred(), season: deferred() };
     let pending: Promise<unknown>;
@@ -143,6 +213,7 @@ describe('holdings in Order with real React Query and order invalidation', () =>
     h.routeAccountId = 'general';
     await h.update();
     await h.flush();
+    await h.press('holdings-filter-all');
     assert.deepEqual(ids(h), ['holding-btc', 'holding-eth', 'holding-samsung']);
   });
   for (const accountId of ['general', 'season'])
@@ -203,6 +274,7 @@ describe('holdings in Order with real React Query and order invalidation', () =>
     it(`${status} accounts remain readable independently from order capability`, async (t) => {
       const h = inlineTradingHarness();
       h.accounts[0].status = status;
+      h.assetId = 'btc';
       h.holdings = { general: [holding('btc')] };
       await h.mount();
       t.after(h.close);
@@ -236,7 +308,7 @@ describe('holdings in Order with real React Query and order invalidation', () =>
       h.holdingsError = null;
       await h.press('holdings-retry');
       await h.flush();
-      assert.match(empty(h), /보유 중인 종목이 없습니다/);
+      assert.match(empty(h), /현재 종목을 보유하고 있지 않습니다/);
     });
   }
   it('uses canonical valuation including unavailable/stale, signs, zero and high returns; KRW toggle leaves holdings intact', async (t) => {
@@ -261,6 +333,7 @@ describe('holdings in Order with real React Query and order invalidation', () =>
     await h.mount();
     t.after(h.close);
     await h.flush();
+    await h.press('holdings-filter-all');
     const before = text(h.node('account-holdings'));
     assert.match(before, /123\.45%/);
     assert.match(before, /-99\.5%/);
@@ -274,7 +347,7 @@ describe('holdings in Order with real React Query and order invalidation', () =>
       ['samsung', null],
     ]) {
       const row = h.node(`holding-${id}`);
-      const rate = row.findAllByType('Text').at(-1);
+      const rate = row.findAllByType('Text').find((n:any) => typeof n.props.children === 'string' && n.props.children.endsWith('%'));
       assert.equal(rate.props.style[1]?.color ?? null, color);
     }
     await h.press('asset-krw-toggle');
@@ -328,6 +401,8 @@ describe('pending limit orders in the real trading screen', () => {
     h.holdings = { general: [holding('btc')] };
     h.orders = { general: [] };
     await h.mount(); t.after(h.close); await h.flush();
+    assert.deepEqual(ids(h), []);
+    await h.press('holdings-filter-all');
     assert.deepEqual(ids(h), ['holding-btc']);
     await h.press('holdings-filter-current');
     assert.deepEqual(ids(h), []);
@@ -345,6 +420,7 @@ describe('pending limit orders in the real trading screen', () => {
     h.dimensions.fontScale = 2;
     h.orders = { general: [
       pendingOrder('buy', 'buy'), pendingOrder('sell', 'sell'),
+      pendingOrder('conditional-child', 'sell', { conditionalChildId: 'child' }),
       pendingOrder('market', 'buy', { orderType: 'market' }),
       pendingOrder('done', 'buy', { status: 'executed' }),
       pendingOrder('cancel', 'sell', { status: 'canceled' }),

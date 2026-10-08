@@ -45,7 +45,7 @@ it('unavailable valuations have no arbitrary representative but remain accessibl
   assert.ok(h.renderer.root.findAllByType('InlineEmptyState').some(n => /대표 보유자산/.test(n.props.message)));
   await h.press('home-holdings-toggle'); assert.equal(h.rows().length, 2);
   h.positions.single = [position(0, 'single', true)]; await h.switch(account('general', 'single'));
-  assert.equal(h.rows().length, 1); assert.equal(h.node('home-holdings-toggle'), undefined);
+  assert.equal(h.rows().length, 1); assert.equal(h.node('home-holdings-toggle') === undefined, true);
   assert.equal(h.node('home-position-item-single-a0-value').props.children, '-');
 });
 
@@ -121,9 +121,9 @@ it('category changes never relabel the previous response and late account reads 
   await h.press('home-hot-tab-crypto'); assert.equal(h.hotRows().length, 0);
   await h.press('home-holdings-toggle'); assert.equal(h.rows().length, 1);
   h.positions.general = [position(0, 'general')]; await h.switch(account('general'));
-  assert.equal(h.node('home-rank'), undefined); assert.equal(h.node('home-tier'), undefined);
+  assert.equal(h.node('home-rank') === undefined, true); assert.equal(h.node('home-tier') === undefined, true);
   assert.equal(h.node('home-nickname').props.children, 'mycroft');
-  assert.equal(h.node('home-holdings-toggle'), undefined);
+  assert.equal(h.node('home-holdings-toggle') === undefined, true);
   assert.equal(h.rows()[0].props.testID, 'home-position-item-general-a0');
   assert.equal(h.node('home-hot-tab-crypto').props.accessibilityState.selected, true);
   await act(async () => release()); await flush();

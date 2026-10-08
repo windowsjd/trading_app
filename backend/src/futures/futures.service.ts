@@ -1,3 +1,4 @@
+import { releaseFuturesEntryReservation } from './futures-limit-state';
 import { createApiError } from '../common/api-error';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import {
@@ -73,6 +74,7 @@ export class FuturesService {
     accountId: string,
     body: FuturesExecuteBody,
     conditionalChildId?: string,
+    limitEntryId?: string,
   ): Promise<FuturesExecuteResult> {
     requireUser(userId);
     stage('futures_ownership', accountId);
@@ -96,9 +98,16 @@ export class FuturesService {
         );
       return row.responsePayloadJson as unknown as FuturesExecuteResult;
     };
-    const committed = await this.prisma.futuresExecuteRequest.findUnique({
-      where,
-    });
+    const entryReplay = limitEntryId
+      ? await this.prisma.futuresLimitOrder.findFirst({
+          where: { id: limitEntryId, tradingAccountId: accountId },
+        })
+      : null;
+    if (entryReplay?.status === 'executed')
+      return entryReplay.responsePayloadJson as unknown as FuturesExecuteResult;
+    const committed = limitEntryId
+      ? null
+      : await this.prisma.futuresExecuteRequest.findUnique({ where });
     if (committed) return replay(committed);
     assertFuturesOperation(request.operation);
     await this.assertTradable(
@@ -132,7 +141,9 @@ export class FuturesService {
               HttpStatus.INTERNAL_SERVER_ERROR,
             );
         }
-        const raced = await tx.futuresExecuteRequest.findUnique({ where });
+        const raced = limitEntryId
+          ? null
+          : await tx.futuresExecuteRequest.findUnique({ where });
         if (raced) return replay(raced);
         await tx.$queryRaw`
           SELECT i."id" FROM "futures_instruments" i JOIN "assets" a ON a."id" = i."underlying_asset_id"
@@ -144,12 +155,55 @@ export class FuturesService {
           SELECT "id" FROM "cash_wallets" WHERE "trading_account_id" = ${accountId}
             AND "wallet_scope" = 'crypto_futures' AND "currency_code" = 'USD' FOR UPDATE
         `;
-        const afterWait = await tx.futuresExecuteRequest.findUnique({ where });
+        const afterWait = limitEntryId
+          ? null
+          : await tx.futuresExecuteRequest.findUnique({ where });
         if (afterWait) return replay(afterWait);
         await tx.$queryRaw`
           SELECT "id" FROM "futures_positions" WHERE "trading_account_id" = ${accountId}
             AND "instrument_id" = ${request.instrumentId} AND "status" = 'open' FOR UPDATE
         `;
+        const entry = limitEntryId
+          ? await tx.futuresLimitOrder.findFirst({
+              where: { id: limitEntryId, tradingAccountId: accountId },
+            })
+          : null;
+        if (entry?.status === 'executed')
+          return entry.responsePayloadJson as unknown as FuturesExecuteResult;
+        if (limitEntryId && (!entry || entry.status !== 'submitted'))
+          futuresError(
+            'FUTURES_ENTRY_NOT_PENDING',
+            'The entry is no longer pending.',
+          );
+        if (
+          entry &&
+          (request.operation !== 'open' ||
+            request.instrumentId !== entry.instrumentId ||
+            request.direction !== entry.direction ||
+            request.marginMode !== entry.marginMode ||
+            request.leverage !== entry.leverage ||
+            !entry.quantity.eq(request.quantity))
+        )
+          futuresError(
+            'FUTURES_IDEMPOTENCY_CONFLICT',
+            'This request conflicts with an earlier Futures command.',
+          );
+        if (
+          !limitEntryId &&
+          request.operation === 'open' &&
+          (await tx.futuresLimitOrder.findFirst({
+            where: {
+              tradingAccountId: accountId,
+              instrumentId: request.instrumentId,
+              status: 'submitted',
+            },
+          }))
+        )
+          futuresError(
+            'FUTURES_ENTRY_PENDING',
+            'Cancel the pending entry before opening this instrument.',
+          );
+        if (entry) await releaseFuturesEntryReservation(tx, entry);
         const executeNow = await this.dbNow(tx);
         assertFuturesOperation(request.operation);
         const lockedAccount = await this.access.getOwnedAccountOrThrow(
@@ -183,6 +237,18 @@ export class FuturesService {
           lockedInstrument.underlyingAsset,
           executeNow,
         ))!;
+        if (
+          entry &&
+          (price.effectiveAt < entry.createdAt ||
+            price.capturedAt < entry.createdAt ||
+            (entry.direction === 'long'
+              ? price.price.gt(entry.limitPrice)
+              : price.price.lt(entry.limitPrice)))
+        )
+          futuresError(
+            'FUTURES_ENTRY_LIMIT_NOT_REACHED',
+            'The entry limit is not executable.',
+          );
         const current = await tx.futuresPosition.findFirst({
           where: {
             tradingAccountId: accountId,
@@ -535,24 +601,45 @@ export class FuturesService {
           },
         };
         stage('futures_idempotency_write', accountId);
-        await tx.futuresExecuteRequest.create({
-          data: {
-            id: commandId,
-            tradingAccountId: accountId,
-            executionId,
-            idempotencyKey: request.idempotencyKey,
-            requestHash,
-            responsePayloadJson: result as unknown as Prisma.InputJsonValue,
-            executedAt: executeNow,
-            createdAt: executeNow,
-          },
-        });
+        if (entry) {
+          await tx.futuresLimitOrder.update({
+            where: { id: entry.id },
+            data: {
+              status: 'executed',
+              executionId,
+              responsePayloadJson: result as unknown as Prisma.InputJsonValue,
+              endedAt: executeNow,
+              terminalReason: 'executed',
+            },
+          });
+          await tx.protectionGroup.updateMany({
+            where: { parentFuturesOrderId: entry.id, status: 'holding' },
+            data: {
+              status: 'active',
+              futuresPositionId: position.id,
+              activatedAt: executeNow,
+            },
+          });
+        } else
+          await tx.futuresExecuteRequest.create({
+            data: {
+              id: commandId,
+              tradingAccountId: accountId,
+              executionId,
+              idempotencyKey: request.idempotencyKey,
+              requestHash,
+              responsePayloadJson: result as unknown as Prisma.InputJsonValue,
+              executedAt: executeNow,
+              createdAt: executeNow,
+            },
+          });
         return result;
       });
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
+        error.code === 'P2002' &&
+        !limitEntryId
       ) {
         const winner = await this.prisma.futuresExecuteRequest.findUnique({
           where,
@@ -837,7 +924,7 @@ export class FuturesService {
     };
   }
 
-  private async instrument(
+  async instrument(
     client: PrismaService | Prisma.TransactionClient,
     id: string,
   ): Promise<InstrumentWithAsset> {
@@ -870,7 +957,7 @@ export class FuturesService {
     return row;
   }
 
-  private async wallet(
+  async wallet(
     client: PrismaService | Prisma.TransactionClient,
     accountId: string,
   ) {
@@ -904,7 +991,7 @@ export class FuturesService {
     )!;
   }
 
-  private async assertTradable(
+  async assertTradable(
     account: OwnedTradingAccount,
     now: Date,
     client: PrismaService | Prisma.TransactionClient,
@@ -942,7 +1029,7 @@ export class FuturesService {
     });
   }
 
-  private async dbNow(client: PrismaService | Prisma.TransactionClient) {
+  async dbNow(client: PrismaService | Prisma.TransactionClient) {
     return (
       await client.$queryRaw<
         Array<{ now: Date }>

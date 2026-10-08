@@ -10,8 +10,8 @@ for (const account of ['A', 'B']) test(`${account}: compact USD form executes di
   const h = walletTransferHarness(); h.accountId = account; await h.start(); t.after(h.close);
   assert.match(text(h), /700/);
   assert.doesNotMatch(text(h), /KRW|AccountSwitcher|테스트 시즌|견적|환율|환전|이체 내용 확인|자금 보관/);
-  assert.equal(h.node('wallet-transfer-source-options'), undefined);
-  assert.equal(h.node('wallet-transfer-destination-options'), undefined);
+  assert.equal(h.node('wallet-transfer-source-options') === undefined, true);
+  assert.equal(h.node('wallet-transfer-destination-options') === undefined, true);
   assert.equal(h.node('wallet-transfer-source-selector').props.accessibilityState.expanded, false);
   assert.match(h.node('wallet-transfer-source-selector').props.accessibilityLabel, /증권 USD/);
   assert.equal(h.gets.some(path => path.endsWith('/futures/positions')), false);
@@ -32,10 +32,10 @@ test('dropdowns are mutually exclusive, exclude opposite wallet and close on sel
   await h.press('wallet-transfer-source-selector');
   assert.equal(h.node('wallet-transfer-source-selector').props.accessibilityState.expanded, true);
   assert.ok(h.node('wallet-transfer-source-securities')); assert.ok(h.node('wallet-transfer-source-crypto_futures'));
-  assert.equal(h.node('wallet-transfer-source-crypto_spot'), undefined);
-  await h.press('wallet-transfer-destination-selector'); assert.equal(h.node('wallet-transfer-source-options'), undefined);
-  assert.equal(h.node('wallet-transfer-destination-securities'), undefined);
-  await h.press('wallet-transfer-destination-crypto_futures'); assert.equal(h.node('wallet-transfer-destination-options'), undefined);
+  assert.equal(h.node('wallet-transfer-source-crypto_spot') === undefined, true);
+  await h.press('wallet-transfer-destination-selector'); assert.equal(h.node('wallet-transfer-source-options') === undefined, true);
+  assert.equal(h.node('wallet-transfer-destination-securities') === undefined, true);
+  await h.press('wallet-transfer-destination-crypto_futures'); assert.equal(h.node('wallet-transfer-destination-options') === undefined, true);
   assert.match(h.node('wallet-transfer-destination-selector').props.accessibilityLabel, /선물 USD/);
   await h.choose('source', 'crypto_spot'); assert.match(text(h), /150/);
   assert.equal(h.gets.some(path => path.endsWith('/futures/positions')), false);
@@ -57,7 +57,7 @@ for (const switches of [['B'], ['B', 'A']]) for (const failure of [false, true])
   h.gate = deferred(); await h.amount('100'); await h.press('wallet-transfer-submit');
   for (const account of switches) await h.switchAccount(account);
   if (failure) h.gate.reject(new Error('network')); else h.gate.resolve(); await h.flush();
-  assert.equal(h.node('wallet-transfer-success'), undefined); assert.equal(h.node('wallet-transfer-error'), undefined);
+  assert.equal(h.node('wallet-transfer-success') === undefined, true); assert.equal(h.node('wallet-transfer-error') === undefined, true);
   assert.deepEqual(h.invalidations, [QUERY_KEYS.tradingAccount.walletsAll('A')]);
   assert.equal(h.requests.length, 1); assert.equal(h.requests[0].path, '/trading-accounts/A/wallet-transfers');
   assert.equal(h.node('wallet-transfer-amount').props.value, '');
@@ -98,7 +98,7 @@ test('rapid duplicate and stale input/dropdown handlers cannot replace a pending
   assert.equal(h.requests.length, 1); assert.equal(h.node('wallet-transfer-submit').props.state, 'loading');
   assert.equal(h.node('wallet-transfer-amount').props.editable, false); assert.equal(h.node('wallet-transfer-amount').props.value, '25');
   assert.equal(h.node('wallet-transfer-source-selector').props.disabled, true); assert.equal(h.node('wallet-transfer-destination-selector').props.disabled, true);
-  assert.equal(h.node('wallet-transfer-source-options'), undefined);
+  assert.equal(h.node('wallet-transfer-source-options') === undefined, true);
   h.gate.resolve(); await h.flush(); assert.ok(h.node('wallet-transfer-success'));
 });
 
@@ -114,7 +114,7 @@ for (const state of ['loading', 'offline', 'integrity', 'missing', 'duplicate', 
   if (state === 'inactive') h.accounts.A.status = 'closed';
   await h.start(); t.after(h.close);
   if (state === 'inactive') { await h.amount('1'); assert.equal(h.node('wallet-transfer-submit').props.state, 'disabled'); }
-  else assert.equal(h.node('wallet-transfer-submit'), undefined);
+  else assert.equal(h.node('wallet-transfer-submit') === undefined, true);
   assert.equal(h.requests.length, 0);
 });
 
@@ -214,7 +214,7 @@ for (const [positionState, freeCollateral] of [['none', '50.00000000'], ['isolat
 test('late wallet A read cannot populate B while B is loading', async t => {
   const h = walletTransferHarness(); h.walletGate = { A: deferred(), B: deferred() };
   await h.start(); t.after(h.close); await h.switchAccount('B');
-  h.walletGate.A.resolve(); await h.flush(); assert.equal(h.node('wallet-transfer-submit'), undefined);
+  h.walletGate.A.resolve(); await h.flush(); assert.equal(h.node('wallet-transfer-submit') === undefined, true);
   h.walletGate.B.resolve(); await h.flush(); await h.amount('1'); await h.press('wallet-transfer-submit');
   assert.equal(h.requests[0].body.sourceWalletId, 'B:securities'); assert.deepEqual(h.invalidations, [QUERY_KEYS.tradingAccount.walletsAll('B')]);
 });
@@ -222,7 +222,7 @@ test('late wallet A read cannot populate B while B is loading', async t => {
 test('unverifiable response retries with the original key and never shows a false receipt', async t => {
   const h = walletTransferHarness(); h.response = {}; await h.start(); t.after(h.close);
   await h.amount('10'); await h.press('wallet-transfer-submit');
-  assert.equal(h.node('wallet-transfer-success'), undefined);
+  assert.equal(h.node('wallet-transfer-success') === undefined, true);
   const integrity = h.renderer.root.findByType('ErrorState');
   assert.match(integrity.props.title, /안전하게 표시/);
   const { act } = createRequire(import.meta.url)('react-test-renderer');
@@ -249,7 +249,7 @@ for (const platform of ['web', 'android', 'ios']) test(`${platform}: focus hook 
   scroll.props.onContentSizeChange(); h.flushFrames(); assert.deepEqual(h.scrolls.at(-1), { y: 234, animated: false });
   h.events.length = 0; await h.press('wallet-transfer-source-selector'); assert.deepEqual(h.events, ['blur', 'dismiss']); assert.ok(h.node('wallet-transfer-source-options'));
   const before = h.scrolls.length; h.keyboard('keyboardDidShow', 350); assert.equal(h.scrolls.length, before);
-  await h.focus(); assert.equal(h.node('wallet-transfer-source-options'), undefined);
+  await h.focus(); assert.equal(h.node('wallet-transfer-source-options') === undefined, true);
   await h.amount('1'); await h.press('wallet-transfer-submit'); assert.equal(h.requests.length, 1);
 });
 

@@ -337,6 +337,11 @@ evidence and observation boundaries without changing business policy.
   and deterministic Season final Spot exits before final ranking. Production
   activation remains a separate operator step; defaults stay DISABLED. See
   [Futures contract](docs/futures-api-contract.md) and [F3 release](docs/futures-f3-contract.md).
+  [Limit Entry v1](docs/futures-limit-entry-contract.md) adds flat-only pending
+  Long/Short entries and optional attached TP/SL. Submission reserves collateral;
+  fresh Spot matching invokes the same execution core and rechecks available
+  collateral. Pending entries are not positions or UPNL. Market's Crypto selector
+  is the UI entry, with Spot as default; Home keeps Futures financial aggregates.
   See `docs/wallet-transfers-api-contract.md`. Existing accounts are normalized
   by a zero-only migration, including closed accounts without changing history.
   See [current scope and rollout policy](docs/trading-modes-and-accounts.md).

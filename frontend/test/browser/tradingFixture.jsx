@@ -12,6 +12,7 @@ import Market from '../../src/screens/market/MarketScreen';
 import Search from '../../src/screens/market/MarketSearchScreen';
 import Home from '../../src/screens/home/HomeScreen';
 import Settings from '../../src/screens/my/SettingsScreen';
+import Futures from '../../src/screens/futures/FuturesScreen';
 import { state, navigation } from './tradingMocks';
 const client = new QueryClient({
   defaultOptions: {
@@ -32,8 +33,9 @@ function App() {
   state.navigate = (next, params = {}) => {
     if (params.assetId) state.assetId = params.assetId;
     if (params.side) state.side = params.side;
+    if (params.instrumentId) state.instrumentId = params.instrumentId;
     setScreen(
-      next === 'Order'
+      next === 'Futures' ? 'futures' : next === 'Order'
         ? 'order'
         : next === 'AssetChart'
           ? 'chart'
@@ -62,6 +64,7 @@ function App() {
     search: Search,
     home: Home,
     settings: Settings,
+    futures: Futures,
   }[screen];
   return (
     <QueryClientProvider client={client}>
@@ -75,7 +78,7 @@ function App() {
         >
           <Component
             key={state.assetId + ':' + screen}
-            route={{ params: { assetId: state.assetId, accountId: state.accountId, side: state.side ?? 'buy', returnToAsset: true } }}
+            route={{ params: { assetId: state.assetId, accountId: state.accountId, instrumentId: state.instrumentId, side: state.side ?? 'buy', returnToAsset: true } }}
             navigation={navigation}
           />
         </SafeAreaProvider>

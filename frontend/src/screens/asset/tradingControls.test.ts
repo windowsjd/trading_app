@@ -16,7 +16,7 @@ for (const side of ['buy', 'sell']) {
     await h.mount();
     t.after(h.close);
     if (side === 'sell') await h.press(TEST_IDS.assetDetail.sellButton);
-    assert.equal(h.node(TEST_IDS.order.quoteSubmit), undefined);
+    assert.equal(h.node(TEST_IDS.order.quoteSubmit) === undefined, true);
     assert.equal(h.node(submit).props.label, side === 'buy' ? '매수' : '매도');
     await h.input(qty, '1');
     h.failure = new Error('response lost');
@@ -33,7 +33,7 @@ for (const side of ['buy', 'sell']) {
     assert.equal(h.requests[2].body.orderType, 'limit');
     assert.equal(h.requests[3].body.limitPrice, '100');
     await h.press(TEST_IDS.order.typeToggleMarket);
-    assert.equal(h.node(TEST_IDS.order.limitPriceInput), undefined);
+    assert.equal(h.node(TEST_IDS.order.limitPriceInput) === undefined, true);
     h.failure = null;
     await h.press(submit);
     await h.flush();
@@ -210,7 +210,7 @@ for (const role of ['user', 'operator', 'admin'])
       if (screen === 'detail') {
         assert.equal(/실시간 연결 복구/.test(text(h)), role === 'admin');
         assert.equal(/실시간 시세 최신성/.test(text(h)), role === 'admin');
-        assert.equal(h.node('admin-asset-price-status'), undefined);
+        assert.equal(h.node('admin-asset-price-status') === undefined, true);
         assert.equal(Boolean(h.node('admin-diagnostic-toggle')), role === 'admin');
       } else {
         assert.equal(/실시간 캔들 지연/.test(text(h)), role === 'admin');

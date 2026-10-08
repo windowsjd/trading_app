@@ -176,6 +176,7 @@ describe('Futures existing execution diagnostic boundary', () => {
     ];
     tx = {
       ...emptyProtectionState(),
+      futuresLimitOrder: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
       $queryRaw: jest.fn().mockResolvedValue([{ now }]),
       $executeRaw: jest.fn().mockResolvedValue(1),
       futuresExecuteRequest: {

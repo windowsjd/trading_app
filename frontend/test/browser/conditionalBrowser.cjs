@@ -20,7 +20,7 @@ async function main(){
  fs.mkdirSync(out,{recursive:true});await build('futures');await build('trading');
  const server=http.createServer((req,res)=>{if(req.url.startsWith('/futures.js')||req.url.startsWith('/trading.js')){res.setHeader('Content-Type','text/javascript');res.end(fs.readFileSync(path.join(out,req.url.slice(1))));}else{const bundle=req.url.startsWith('/trading')?'trading':'futures';res.end(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body,#root{height:100%;margin:0}#root{display:flex;flex-direction:column}</style><div id="root"></div><script src="/${bundle}.js"></script>`);}}).listen(0,'127.0.0.1');
  await new Promise(r=>server.once('listening',r));const base=`http://127.0.0.1:${server.address().port}`;
- const browser=await chromium.launch({headless:true,args:['--no-sandbox']}),page=await browser.newPage(),errors=[],results=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',r=>r.request().url().startsWith(base)?r.continue():r.abort());
+ const browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE_PATH,args:['--no-sandbox']}).catch(error=>{server.close();throw error;}),page=await browser.newPage(),errors=[],results=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',r=>r.request().url().startsWith(base)?r.continue():r.abort());
  try{
  for(const width of [320,360,390,430])for(const theme of ['light','dark'])for(const fontScale of [1,2])for(const scenario of ['futures-editor','futures-oco','spot-oco','attached-holding','attached-entry']){
   const futures=scenario.startsWith('futures'),kind=futures?'futures':'trading',editor=scenario.endsWith('editor')||scenario==='attached-entry';

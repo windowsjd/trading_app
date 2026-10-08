@@ -355,3 +355,18 @@ before comparison, `MOTION_BASELINE_SOURCE=/path/to/extracted/frontend` builds
 production source from an extracted Git revision while retaining the same test
 instrumentation, dependencies and fonts. The output folder should be separate
 from the current-source run; the existing geometry assertions are kept active.
+
+
+Futures integration uses `futuresIntegrationBrowser.cjs`, alongside the existing
+`futuresBrowser.cjs` and `conditionalBrowser.cjs`. Use the memory containment
+policy in the frontend README; esbuild/Playwright remain external test tools on
+`NODE_PATH`. `BROWSER_EXECUTABLE_PATH` may select an existing Chromium, and
+`LD_LIBRARY_PATH`/`FONTCONFIG_FILE` may point to temporary libraries/Korean fonts.
+The integration runner checks 96 actual RN Web layouts: 320/360/390/430px ×
+Light/Dark × font scales 1/2 × Market selection/navigation, Long and Short Limit
+entry with attached prices, holding-card protection, mixed pending entries and
+pending protection. It checks box/glyph bounds, large prices, long names and
+Conditional-child deduplication; external HTTP requests are blocked.
+`FUTURES_INTEGRATION_BROWSER_OUTPUT` selects screenshots/report.json (default
+`/tmp/trading-futures-integration-browser`). Native iOS/Android keyboard, device
+text rendering and full live-server execution are separate acceptance checks.

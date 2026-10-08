@@ -4,7 +4,7 @@ Current contract: server capability defaults OFF; production activation is a sep
 
 ## Intent and boundaries
 
-One account-scoped protection group protects the entire remaining Spot position or one Futures position lifetime. It contains Stop Loss, Take Profit, or both. Each leg has a trigger and a Market or Limit exit intent. There is no standalone Futures Limit entry, trailing stop, quantity ladder, or general condition framework.
+One account-scoped protection group protects the entire remaining Spot position or one Futures position lifetime. It contains Stop Loss, Take Profit, or both. Each leg has a trigger and a Market or Limit exit intent. [Futures Limit Entry v1](futures-limit-entry-contract.md) supplies a parent entry without adding a second Conditional engine. There is no trailing stop, quantity ladder, or general condition framework.
 
 Spot triggers use the existing eligible market evidence/session policy. Futures triggers and user exits use canonical Binance **Spot** last trade; Mark remains the risk/liquidation source. Registration requires fresh evidence and strictly untriggered prices (long SL below / TP above; short reversed). Unavailable evidence defers evaluation without canceling protection.
 
@@ -15,6 +15,14 @@ A trigger records durable price/source/time evidence. It does not cancel its sib
 Armed legs reserve no quantity. A submitted Spot Limit child uses the existing Order quantity reservation once. Registration rejects competing normal sell reservations. Manual Market reductions cancel the pending child before execution and re-arm protection for any remainder; full close completes it. Increases conflicting with a pending child are rejected. Normal sell Limit registration conflicts with active protection. Futures children are lifetime-bound and reduce-only. ERS Market partial fills retain protection for the actual remainder.
 
 Attached protection is an additive option on Spot BUY Limit creation. v1 requires a flat position and no competing pending BUY or protection. It is HOLDING until parent fill, then ACTIVE; parent cancellation or lifecycle cleanup cancels it. Ordinary stock Limit entry/sell requests retain their integer-quantity rule. A worker-only Position-bound Conditional sell may reserve the exact fractional remainder through the same Limit settlement core, so a manual fractional Market reduction does not leave protection stranded. This capability is never parsed from HTTP and cannot open/increase a position.
+
+Futures Limit parents accept the same legs and expose `parentFuturesOrderId`.
+Registration validates against the entry limit (Long SL < limit < TP, Short
+TP < limit < SL), because a pending entry has no position or entry fill yet.
+HOLDING cannot trigger; the parent fill binds its new lifetime and activates the
+group atomically. Gap fills preserve the user's thresholds. A triggered but
+unfilled Limit child remains pending when execution returns
+`CONDITIONAL_LIMIT_NOT_REACHED`; that result does not complete OCO.
 
 ## Transactions and lifecycle
 
@@ -106,6 +114,19 @@ feature is paused. The UI labels its bounded recent view (30 groups, up to 20
 attempts each); the API additionally supports paginated groups. Long input prices
 also have an exact wrapping preview so large text does not hide their digits.
 
+Disabled capability never hides a successfully loaded empty TP/SL panel. It
+shows why new protection cannot be registered; the server's domain create/cancel
+capabilities gate buttons and mutation handlers, including retained callbacks.
+Loading, failed reads and missing data keep their existing state contracts.
+Spot holding cards open the same account/asset/Position-bound panel; an existing
+live group opens management rather than a duplicate create editor. Pending
+lists separate ordinary Spot/Futures Limit entries from active/HOLDING protection.
+Pending Futures groups also show paused monitoring when Futures mode alone is
+DISABLED; the per-domain server capability controls the label. Permitted cancel
+remains available, including when creation/monitoring is paused.
+Conditional Limit children appear only through their group; completed/canceled
+history remains in the protection history view instead of the pending list.
+
 ## Release / rollback
 
 Run existing financial/core PG gates plus Conditional/F3.1 integrations, E2E,
@@ -121,6 +142,6 @@ executes while paused. Keep Futures risk/Mark operational. Never downgrade to
 pre-Conditional code while executable conditional children exist; use compatible
 code/forward fixes and preserve durable financial evidence.
 
-No trailing stop, ladders, arbitrary protected quantity, Futures Limit entry,
+No trailing stop, ladders, arbitrary protected quantity,
 hedge mode, funding, partial liquidation, ADL, insurance, real exchange orders,
 queue/event bus, or generic conditional expression engine is introduced.

@@ -220,6 +220,7 @@ const mockedArgon2 = jest.mocked(argon2);
 type HttpMethod = 'get' | 'patch' | 'post';
 
 type PrismaMock = ReturnType<typeof emptyProtectionState> & {
+  futuresLimitOrder: { findMany: jest.Mock };
   $connect: jest.Mock;
   $disconnect: jest.Mock;
   $queryRaw: jest.Mock;
@@ -522,6 +523,7 @@ describe('AppController (e2e)', () => {
 
     prisma = {
       ...emptyProtectionState(),
+      futuresLimitOrder: { findMany: jest.fn().mockResolvedValue([]) },
       $connect: jest.fn(),
       $disconnect: jest.fn(),
       $queryRaw: jest.fn().mockResolvedValue([{ result: 1 }]),
@@ -713,6 +715,7 @@ describe('AppController (e2e)', () => {
 
     resetMockObject(prisma);
     Object.assign(prisma, emptyProtectionState());
+    prisma.futuresLimitOrder.findMany.mockResolvedValue([]);
     prisma.$queryRaw.mockResolvedValue([{ result: 1 }]);
     mockTransactionPassthrough();
   };
@@ -2021,6 +2024,10 @@ describe('AppController (e2e)', () => {
             }),
           }),
         );
+        expect(prisma.futuresLimitOrder.findMany).toHaveBeenCalledWith({
+          where: { tradingAccountId: 'trading-account-1', status: 'submitted' },
+          orderBy: { id: 'asc' },
+        });
         expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
           expect.objectContaining({
             data: expect.objectContaining({

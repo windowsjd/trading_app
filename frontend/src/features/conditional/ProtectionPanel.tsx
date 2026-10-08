@@ -105,12 +105,22 @@ export function BoundProtectionPanel({
   const active = data?.groups.find(
     (g) => g.status === "active" || g.status === "holding",
   );
+  const canCreate = Boolean(data && (domain === "spot"
+    ? data.capabilities.canCreateSpot
+    : data.capabilities.canCreateFutures));
+  const permissions = useRef({ create: false, cancel: false });
+  permissions.current = {
+    create: bound && focused && canCreate,
+    cancel: bound && focused && Boolean(data?.capabilities.canCancel),
+  };
   const validScope = (request: NonNullable<typeof action.current>) =>
     scope.current.mounted &&
     request.epoch === scope.current.epoch &&
     isCurrentSession(request.session);
   const submit = async (groupId?: string) => {
     if (!bound || lock.current) return;
+    const canceling = uncertain ? Boolean(action.current?.groupId) : Boolean(groupId);
+    if (!(canceling ? permissions.current.cancel : permissions.current.create)) return;
     if (!uncertain) {
       if (
         !groupId &&
@@ -195,11 +205,7 @@ export function BoundProtectionPanel({
         <CTAButton label="다시 조회" onPress={() => void query.refetch()} />
       </View>
     );
-  if (!data || (!data.capabilities.enabled && !data.groups.length)) return null;
-  const canCreate =
-    domain === "spot"
-      ? data.capabilities.canCreateSpot
-      : data.capabilities.canCreateFutures;
+  if (!data) return null;
   return (
     <View style={styles.card} testID="protection-panel">
       <Text style={styles.heading}>
@@ -262,7 +268,7 @@ export function BoundProtectionPanel({
           ) : null}
           <CTAButton
             label="보호 조건 취소"
-            state={busy || uncertain ? "disabled" : "enabled"}
+            state={busy || uncertain || !data.capabilities.canCancel ? "disabled" : "enabled"}
             onPress={() => void submit(active.id)}
           />
         </View>
@@ -284,7 +290,7 @@ export function BoundProtectionPanel({
         </>
       ) : (
         <Text style={styles.hint}>
-          {positionId
+          {!canCreate
             ? "현재 운영 상태에서는 새 보호 조건을 등록할 수 없습니다."
             : "열린 Position에서 익절·손절을 등록할 수 있습니다."}
         </Text>
@@ -298,7 +304,7 @@ export function BoundProtectionPanel({
       {uncertain ? (
         <CTAButton
           label="동일 요청 결과 다시 확인"
-          state={busy ? "disabled" : "enabled"}
+          state={busy || !(action.current?.groupId ? data.capabilities.canCancel : canCreate) ? "disabled" : "enabled"}
           onPress={() => void submit()}
         />
       ) : null}

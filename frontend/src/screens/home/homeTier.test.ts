@@ -38,8 +38,8 @@ for (const [canonical, name, id] of [
   assert.ok(h.node('home-tier-image').props.source.uri.endsWith(`/${id}.png`));
   assert.equal(h.node('home-tier-image').props.resizeMode, 'contain');
   assert.equal(h.node('home-rank').props.children, '#12');
-  assert.equal(h.node('home-whale-subject'), undefined);
-  assert.equal(h.node('home-whale-wave'), undefined);
+  assert.equal(h.node('home-whale-subject') === undefined, true);
+  assert.equal(h.node('home-whale-wave') === undefined, true);
   assert.equal(h.renderer.root.findByType('AccountSwitcher').props.homeCardStyle.backgroundColor, getHomeTier(canonical, 'light')?.palette.backgroundColor);
 });
 
@@ -72,7 +72,7 @@ for (const state of ['loading', 'error', 'null', 'unknown', 'response-unavailabl
     if (state === 'missing-response') q.data = undefined;
     h.update();
     assert.ok(h.node('home-tier-neutral'));
-    assert.equal(h.node('home-tier-image'), undefined);
+    assert.equal(h.node('home-tier-image') === undefined, true);
     assert.equal(h.renderer.root.findByType('AccountSwitcher').props.homeCardStyle, undefined);
     if (state === 'loading') assert.equal(h.node('home-tier').props.children, '티어 확인 중');
     if (state === 'error') assert.equal(h.node('home-tier').props.children, '티어 확인 실패');
@@ -90,7 +90,7 @@ it('general account has no tier, frame, background or rank; missing me does not 
   h.context.meQuery.data = undefined; h.update();
   assert.ok(h.node('home-emblem-gold'));
   h.context.hasSeason = false; h.context.seasonId = null; h.update();
-  for (const id of ['home-tier', 'home-tier-image', 'home-tier-neutral', 'home-rank']) assert.equal(h.node(id), undefined);
+  for (const id of ['home-tier', 'home-tier-image', 'home-tier-neutral', 'home-rank']) assert.equal(h.node(id) === undefined, true);
   assert.equal(h.renderer.root.findByType('AccountSwitcher').props.homeCardStyle, undefined);
 });
 

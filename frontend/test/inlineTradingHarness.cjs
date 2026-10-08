@@ -218,6 +218,15 @@ function inlineTradingHarness() {
     '../me/api': meApi,
   });
   const mocks = {
+    '../../features/me/api': meApi,
+    '../../features/futures/api': {
+      getFuturesLimitOrders: async id => ({ tradingAccountId: id, orders: h.pendingEntries?.[id] ?? [] }),
+      cancelFuturesLimitOrder: async (id, orderId) => { h.protectionRequests ??= []; h.protectionRequests.push({accountId:id,orderId}); },
+    },
+    '../../features/conditional/api': {
+      createProtection: async (accountId, body) => { h.protectionRequests ??= []; h.protectionRequests.push({accountId,body}); },
+      cancelProtection: async (accountId, groupId, key) => { h.protectionRequests ??= []; h.protectionRequests.push({accountId,groupId,key}); if(h.protectionGate) await h.protectionGate.promise; },
+    },
     './QuantityRatioSlider': load(resolve('src/screens/order/QuantityRatioSlider.web.tsx'), {}),
     react: React,
     'react-native': native,
@@ -232,6 +241,7 @@ function inlineTradingHarness() {
         h.queries.push(options);
         const [scope, resource, id] = options.queryKey;
         if (options.queryKey[3] === 'holdings' || resource === 'orders') return query.useQuery(options);
+        if (resource === 'futures') return query.useQuery(options);
         const base = {
           isLoading: false,
           isPending: false,

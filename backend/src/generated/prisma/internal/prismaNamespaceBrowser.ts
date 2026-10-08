@@ -72,6 +72,7 @@ export const ModelName = {
   FuturesPosition: 'FuturesPosition',
   FuturesExecution: 'FuturesExecution',
   FuturesExecuteRequest: 'FuturesExecuteRequest',
+  FuturesLimitOrder: 'FuturesLimitOrder',
   ProtectionGroup: 'ProtectionGroup',
   ProtectionLeg: 'ProtectionLeg',
   ProtectionChild: 'ProtectionChild',
@@ -528,6 +529,30 @@ export const FuturesExecuteRequestScalarFieldEnum = {
 export type FuturesExecuteRequestScalarFieldEnum = (typeof FuturesExecuteRequestScalarFieldEnum)[keyof typeof FuturesExecuteRequestScalarFieldEnum]
 
 
+export const FuturesLimitOrderScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  instrumentId: 'instrumentId',
+  direction: 'direction',
+  marginMode: 'marginMode',
+  leverage: 'leverage',
+  quantity: 'quantity',
+  limitPrice: 'limitPrice',
+  reservedAmount: 'reservedAmount',
+  status: 'status',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  executionId: 'executionId',
+  responsePayloadJson: 'responsePayloadJson',
+  terminalReason: 'terminalReason',
+  createdAt: 'createdAt',
+  endedAt: 'endedAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FuturesLimitOrderScalarFieldEnum = (typeof FuturesLimitOrderScalarFieldEnum)[keyof typeof FuturesLimitOrderScalarFieldEnum]
+
+
 export const ProtectionGroupScalarFieldEnum = {
   id: 'id',
   tradingAccountId: 'tradingAccountId',
@@ -537,6 +562,7 @@ export const ProtectionGroupScalarFieldEnum = {
   positionId: 'positionId',
   futuresPositionId: 'futuresPositionId',
   parentOrderId: 'parentOrderId',
+  parentFuturesOrderId: 'parentFuturesOrderId',
   status: 'status',
   terminalReason: 'terminalReason',
   createdAt: 'createdAt',

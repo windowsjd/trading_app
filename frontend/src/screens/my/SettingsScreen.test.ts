@@ -375,7 +375,7 @@ const selectedPhoto: ProfileImageUpload = { uri: 'file:///normalized.jpg', name:
 describe('Settings profile image management', () => {
   it('offers add with no image and change/delete with an existing image', async t => {
     const x = settingsHarness(); t.after(x.close); await x.mount();
-    assert.match(x.text(), /사진 추가/); assert.equal(x.node('settings-profile-image-delete'), undefined);
+    assert.match(x.text(), /사진 추가/); assert.equal(x.node('settings-profile-image-delete') === undefined, true);
     await act(async () => x.client.setQueryData<MeDto>(QUERY_KEYS.me, me => ({ ...me!, profileImageUrl: 'https://legacy.example.test/avatar.jpg' })));
     await x.flush(); assert.match(x.text(), /사진 변경/); assert.ok(x.node('settings-profile-image-delete'));
   });
@@ -427,7 +427,7 @@ describe('Settings profile image management', () => {
     }
     x.h.photoFailure = false;
     await act(async () => x.node('settings-profile-image-select').props.onPress()); await x.flush();
-    assert.equal(x.node('settings-profile-image-error'), undefined);
+    assert.equal(x.node('settings-profile-image-error') === undefined, true);
   });
 
   it('blocks concurrent delete actions then immediately restores the default avatar', async t => {
@@ -442,7 +442,7 @@ describe('Settings profile image management', () => {
     await act(async () => x.h.photoGate!.resolve()); await x.flush();
     assert.equal(x.client.getQueryData<MeDto>(QUERY_KEYS.me)?.profileImageUrl, null);
     assert.equal(x.h.renderer.root.findByType('ProfileAvatar').props.profileImageUrl, null);
-    assert.match(x.text(), /사진 추가/); assert.equal(x.node('settings-profile-image-delete'), undefined);
+    assert.match(x.text(), /사진 추가/); assert.equal(x.node('settings-profile-image-delete') === undefined, true);
   });
 
   it('preserves unsaved nickname input when a photo changes', async t => {

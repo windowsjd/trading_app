@@ -217,7 +217,7 @@ describe('continuous guide interactions', () => {
   });
   it('walks exactly two liquidity exercises downward and preserves all prior results', (t) => {
     const h = setup(t, 'LiquidityScreen');
-    assert.equal(h.find('liquidity-cancel'), undefined);
+    assert.equal(h.find('liquidity-cancel') === undefined, true);
     const start = h.find('liquidity-compare-run').props.onPress;
     act(() => {
       start();
@@ -228,13 +228,13 @@ describe('continuous guide interactions', () => {
     assert.match(h.text('liquidity-thin-ask-10010'), /5 → 0주/);
     assert.match(h.text('liquidity-thick-ask-10010'), /300 → 280주/);
     h.tick(1100);
-    assert.equal(h.find('liquidity-thin-ask-10010'), undefined);
+    assert.equal(h.find('liquidity-thin-ask-10010') === undefined, true);
     h.finish();
     assert.match(h.text('liquidity-thick-values-average'), /10,010원/);
     assert.match(h.text('liquidity-thin-values-average'), /10,021원/);
     order(h, 'liquidity-compare-result', 'liquidity-cancel', 'liquidity-cancel-run');
     h.press('liquidity-cancel-run');
-    assert.equal(h.find('liquidity-cancel-book-ask-10010'), undefined);
+    assert.equal(h.find('liquidity-cancel-book-ask-10010') === undefined, true);
     assert.match(h.text('liquidity-cancel-book-price'), /10,000원/);
     order(h, 'liquidity-cancel-result', 'liquidity-trade-run', 'liquidity-trade-book');
     h.press('liquidity-trade-run');
@@ -242,7 +242,7 @@ describe('continuous guide interactions', () => {
     assert.match(h.text('liquidity-trade-book-price'), /10,020원/);
     assert.match(h.text('liquidity-cancel-book-price'), /10,000원/, 'prior result remains frozen');
     order(h, 'liquidity-trade-result', 'lesson-takeaways');
-    assert.equal(h.find('liquidity-size'), undefined);
+    assert.equal(h.find('liquidity-size') === undefined, true);
     assert.doesNotMatch(h.text(), /실습 3|주문 규모와 가격 충격|30주|3주와 비교|10주와 비교/);
     assert.match(h.text('liquidity-cancel-book-status'), /다른 시장 참여자/);
     assert.equal(h.find('liquidity-cancel-run').props.accessibilityLabel, '대기 중인 매도 주문이 취소되는 상황 보기');
@@ -252,7 +252,7 @@ describe('continuous guide interactions', () => {
     checkReadable(h);
     h.press('liquidity-reset');
     h.finish();
-    assert.equal(h.find('liquidity-cancel'), undefined);
+    assert.equal(h.find('liquidity-cancel') === undefined, true);
     assert.equal(h.find('liquidity-compare-run').props.disabled, false);
     assert.match(h.text('liquidity-thin-price'), /10,000원/);
   });
@@ -280,13 +280,13 @@ describe('continuous guide interactions', () => {
     assert.match(h.text('candle-builder-figure'), /음봉/);
     assert.notEqual(h.find('candle-builder-figure-body').props.y, initialBody.y);
     assert.match(h.text('candle-builder-figure'), /몸통: 9,800원 ~ 10,000원/);
-    assert.equal(h.find('candle-path-a-run'), undefined);
+    assert.equal(h.find('candle-path-a-run') === undefined, true);
     h.press('candle-builder-confirm');
     order(h, 'candle-builder-result', 'candle-paths', 'candle-path-a-run');
     h.press('candle-path-a-run');
     h.tick(1000);
     assert.match(h.text('candle-path-a'), /10,000원 → 10,600원/);
-    assert.equal(h.find('candle-path-b-run'), undefined);
+    assert.equal(h.find('candle-path-b-run') === undefined, true);
     h.finish();
     order(h, 'candle-path-a-result', 'candle-path-b-run');
     h.press('candle-path-b-run');
@@ -310,7 +310,7 @@ describe('continuous guide interactions', () => {
     assert.deepEqual(h.scrolls, []);
     checkReadable(h);
     h.press('candles-reset');
-    assert.equal(h.find('candle-paths'), undefined);
+    assert.equal(h.find('candle-paths') === undefined, true);
     assert.match(h.text('candle-builder-figure'), /양봉/);
   });
   it('keeps a limit order waiting through quote changes and fills only on eligible selling', (t) => {
@@ -329,7 +329,7 @@ describe('continuous guide interactions', () => {
     assert.match(h.text('orders-limit-book-status'), /대기 중/);
     order(h, 'orders-limit-waiting', 'orders-quotes-run');
     h.press('orders-quotes-run');
-    assert.equal(h.find('orders-quotes-book-ask-10010'), undefined);
+    assert.equal(h.find('orders-quotes-book-ask-10010') === undefined, true);
     assert.ok(h.find('orders-quotes-book-ask-10040'));
     assert.match(h.text('orders-quotes-book-status'), /대기 중/);
     assert.match(h.text('orders-quotes-book-price'), /10,000원/);
@@ -340,7 +340,7 @@ describe('continuous guide interactions', () => {
     assert.match(h.text('orders-limit-active-book-bid-9990'), /10 → 0주/);
     assert.match(h.text('orders-limit-active-book-price'), /9,990원/);
     h.finish();
-    assert.equal(h.find('orders-limit-active-book-bid-9990'), undefined);
+    assert.equal(h.find('orders-limit-active-book-bid-9990') === undefined, true);
     assert.match(h.text('orders-limit-values'), /99,900원/);
     assert.match(h.text('orders-quotes-book-price'), /10,000원/);
     order(h, 'orders-limit-result', 'orders-choice', 'orders-choice-a-market');
@@ -352,7 +352,7 @@ describe('continuous guide interactions', () => {
     assert.deepEqual(h.scrolls, []);
     checkReadable(h);
     h.press('orders-reset');
-    assert.equal(h.find('orders-limit'), undefined);
+    assert.equal(h.find('orders-limit') === undefined, true);
     assert.equal(h.find('orders-market-run').props.disabled, false);
   });
   it('explains both alternative order choices without teaching absolute superiority', (t) => {

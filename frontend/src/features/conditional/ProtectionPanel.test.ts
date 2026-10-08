@@ -21,13 +21,34 @@ test('OCO pending Limit retains sibling; cancel stays available in DISABLED',asy
  await h.button('보호 조건 취소');assert.equal(h.requests[0].path,'/trading-accounts/A/protections/group/cancel');
 });
 test('attached holding shows no pre-fill monitoring',async t=>{const h=conditionalHarness({domain:'spot',holding:true});await h.start();t.after(h.close);assert.match(h.text(),/진입 주문 체결 대기/);assert.doesNotMatch(h.text(),/계속 감시 중/);});
-test('REDUCE_ONLY allows protection; feature OFF hides an empty panel',async t=>{const h=conditionalHarness({mode:'REDUCE_ONLY'});await h.start();t.after(h.close);assert.ok(h.node('protection-stop_loss-toggle'));h.options.enabled=false;await h.client.invalidateQueries();await h.flush();assert.equal(h.node('protection-panel'),undefined);});
+for (const domain of ['spot', 'futures']) test(`${domain} disabled capability keeps UI and blocks even a retained submit callback`, async t => {
+ const h = conditionalHarness({ domain, mode: 'REDUCE_ONLY' }); await h.start(); t.after(h.close);
+ assert.equal(Boolean(h.node('protection-stop_loss-toggle')), true);
+ await h.press('protection-stop_loss-toggle'); await h.input('손절 (Stop Loss) 조건 가격', '90');
+ const submit = h.renderer.root.findAll((n:any) => n.type === 'CTAButton' && n.props.label === '보호 조건 등록')[0].props.onPress;
+ h.options.enabled = false; await h.client.invalidateQueries(); await h.flush();
+ assert.equal(Boolean(h.node('protection-panel')), true);
+ assert.equal(h.node('protection-stop_loss-toggle') === undefined, true);
+ assert.match(h.text(), /현재 운영 상태에서는 새 보호 조건을 등록할 수 없습니다/);
+ submit(); await h.flush(); assert.equal(h.requests.length, 0);
+});
+test('disabled capability retains active protection and authorized cancellation', async t => {
+ const h = conditionalHarness({ domain: 'spot', active: true, enabled: false }); await h.start(); t.after(h.close);
+ assert.equal(Boolean(h.node('protection-panel')), true); assert.match(h.text(), /남은 수량/);
+ assert.match(h.text(), /조회와 취소는 가능합니다/); assert.equal(h.node('protection-stop_loss-toggle') === undefined, true);
+ await h.button('보호 조건 취소'); assert.equal(h.requests.length, 1); assert.match(h.requests[0].path, /\/group\/cancel$/);
+});
+test('pending API data shows loading without mutation controls', async t => {
+ const h = conditionalHarness(); h.readGate = deferred(); await h.start(); t.after(h.close);
+ assert.match(h.text(), /상태 확인 중/); assert.equal(h.node('protection-panel') === undefined, true); assert.equal(h.requests.length, 0);
+ h.readGate.resolve(); await h.flush(); assert.equal(Boolean(h.node('protection-panel')), true);
+});
 test('ambiguous network retry preserves exact command and prevents duplicate clicks',async t=>{
  const h=conditionalHarness();await h.start();t.after(h.close);await h.press('protection-stop_loss-toggle');await h.input('손절 (Stop Loss) 조건 가격','90');h.gate=deferred();h.failure=new Error('network');
  await h.button('보호 조건 등록');await h.button('보호 조건 등록');assert.equal(h.requests.length,1);h.gate.resolve();await h.flush();h.gate=null;h.failure=null;await h.button('동일 요청 결과 다시 확인');assert.deepEqual(h.requests[0],h.requests[1]);
 });
 test('account A→B→A suppresses old success and resets editor',async t=>{
- const h=conditionalHarness();await h.start();t.after(h.close);await h.press('protection-stop_loss-toggle');await h.input('손절 (Stop Loss) 조건 가격','90');h.gate=deferred();await h.button('보호 조건 등록');h.accountId='B';await h.update();assert.equal(h.node('protection-panel'),undefined);h.accountId='A';await h.update();h.gate.resolve();await h.flush();assert.doesNotMatch(h.text(),/등록했습니다/);assert.ok(h.node('protection-stop_loss-toggle'));assert.ok(h.invalidations.every(k=>!k.includes('B')));
+ const h=conditionalHarness();await h.start();t.after(h.close);await h.press('protection-stop_loss-toggle');await h.input('손절 (Stop Loss) 조건 가격','90');h.gate=deferred();await h.button('보호 조건 등록');h.accountId='B';await h.update();assert.equal(h.node('protection-panel') === undefined, true);h.accountId='A';await h.update();h.gate.resolve();await h.flush();assert.doesNotMatch(h.text(),/등록했습니다/);assert.ok(h.node('protection-stop_loss-toggle'));assert.ok(h.invalidations.every(k=>!k.includes('B')));
 });
 test('logout/login suppresses old mutation result and invalidation',async t=>{
  const h=conditionalHarness();await h.start();t.after(h.close);await h.press('protection-stop_loss-toggle');await h.input('손절 (Stop Loss) 조건 가격','90');h.gate=deferred();await h.button('보호 조건 등록');h.session++;await h.update();h.gate.resolve();await h.flush();assert.doesNotMatch(h.text(),/등록했습니다/);assert.equal(h.invalidations.length,0);
@@ -39,6 +60,6 @@ test('invalid prices make no mutation',async t=>{const h=conditionalHarness();aw
 test('flat position retains historical protection reads after feature disable',async t=>{
  const h=conditionalHarness({complete:true,flat:true,enabled:false});await h.start();t.after(h.close);
  assert.equal(h.reads[0].config.params.history,'true');assert.ok(h.node('protection-panel'));
- assert.equal(h.node('protection-stop_loss-toggle'),undefined);
+ assert.equal(h.node('protection-stop_loss-toggle') === undefined, true);
  await h.press('protection-history-toggle');assert.match(h.text(),/보호 완료/);assert.match(h.text(),/최대 20건/);assert.equal(h.requests.length,0);
 });

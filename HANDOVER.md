@@ -10,6 +10,67 @@
 
 ---
 
+## 2026-10-08 OOM 재개 — Futures Limit Entry·Market 통합 완료
+
+- **기능 구현 의도:** 신규 지정가 진입은 기존 Futures 체결 코어 앞에 pending intent와
+  담보 예약만 추가한다. Attached TP/SL은 실제 Position이 생긴 후 기존 Conditional
+  엔진으로 보호한다. 거래 진입은 Market의 암호화폐 현물/선물 선택으로 모으고 Home은
+  금융 집계를 유지한다. 비활성 기능도 사용자가 상태를 이해하도록 UI와 권한을 분리한다.
+- 시작 branch `main`, HEAD/local origin/main/원격 main 확인값 모두
+  `833afdbab58e4b2a611eca2ff8d9b89a43e15972`. Tracked 수정 38개 + untracked 12개가
+  이미 있었다. 최초 요청·기존 session/OOM 기록·코드·실패 결과를 대조한 후 이어서
+  작업했다. 원래 dirty 50개 중 34개는 byte-identical, 16개만 필요한 보완을 했다.
+- 최초 7개 요구사항은 로컬 구현·검증 완료: (A) disabled Protection UI 노출과 서버
+  capability gate, (B) LONG/SHORT·Cross/Isolated·1–100x Limit entry와 Attached/OCO,
+  (C) Market Crypto 현물 기본/선물 선택, (D) 두 Home의 Futures 진입 제거,
+  (E) 보유 기본 현재 종목/전체 선택 유지, (F) 보유 카드 account/asset/Position-bound
+  TP/SL 관리, (G) 대기의 지정가/TP-SL 분리·child 중복/terminal history 제외.
+  계정/session remount, 최신 권한 ref, malformed pagination 상한, 실제 API 응답 DTO,
+  Futures-only DISABLED의 감시 중지 표시와 작은 화면 필터 overflow를 보완했다.
+- v1은 flat 신규 전량 entry이며 account/instrument당 pending 하나다. 제출 시
+  `ceil8(qty × limit / leverage) + 기존 fee`를 예약하고 balance/Position/UPNL/count는
+  바꾸지 않는다. Fresh canonical Binance Spot으로 Long ≤ limit, Short ≥ limit을
+  판단하고 기존 실행 transaction에서 담보·mode·DB 시각을 다시 검사한다. Mark는
+  risk readiness에만 쓴다. Short price improvement의 추가 담보 부족은 전부 rollback이다.
+- Attached는 HOLDING → parent fill transaction의 ACTIVE/Position lifetime 연결이다.
+  취소/시즌 cleanup 시 예약과 HOLDING을 함께 정리한다. 실제 fill이 OCO 승자이며
+  trigger만으로 sibling을 없애지 않는다. Lifecycle 취소 사유를 일반 종료/참가자 제외/
+  시즌 종료로 바로잡았다. 기존 fee/PnL/liquidation/정산 정책과 금융 primitive를 재사용했다.
+- OOM 위험: 18개 테스트 파일의 실제 ReactTestInstance 직접 비교를 원시값 조건으로
+  교체했다. Disabled 패널을 숨기는 옛 기대는 새 정책의 노출·안내·mutation 차단
+  테스트로 대체했다. 실제 패널을 일부러 실패시키는 1GiB/스왑0/20초 실험은 정상
+  AssertionError, 짧은 메시지, 관측 cgroup peak 90.7MiB로 종료했다. 과거 29GiB
+  전역 OOM의 종료 프로세스까지 특정한 것은 아니며 다른 메모리 문제도 배제하지 않는다.
+- 지속할 테스트 안전 규칙은 Frontend README에 남겼다. npm test 파일 동시성 1,
+  자식 포함 검증된 cgroup memory/swap/tasks/time 상한, 외부 감시와 그룹 전체 종료,
+  Node heap은 보조 제한이다. WSL piped core handler 때문에 LimitCORE만 신뢰하지
+  않고 exec 자식의 coredump_filter도 확인했다. 무거운 FE/BE 검증은 순차로 실행했다.
+- 검증: Frontend `npm run check` 최종 1,799 PASS/skip0, Web/Android export PASS.
+  Backend typecheck/build/accounts·candle lint/format PASS, unit 247 suites/3,959 PASS
+  (unit의 DB opt-in 58 suites/63 tests는 별도 실행 범위와 구분). E2E 397 PASS,
+  양쪽 diagnostic source gate PASS. 새 Market 파일은 기존 check-only lint에 포함했다.
+- 폐기용 PG16.15에서 Futures Limit 45 checks, Conditional 77 checks, financial CI
+  22 suites/23 tests, core/account 21 suites/22 tests PASS. 실제 lock barrier로
+  fill/cancel·fill/season end 양쪽 승자, duplicate workers, 8개 rollback 지점,
+  mode/endAt post-lock 재검증, fill count 1회를 확인했다. Dry-run audit 3개 findings0,
+  Prisma validate/generate/67 migrations/status/drift PASS. 기존 unit/Core/E2E 실패는
+  새 delegate가 없는 fixture/wrapper와 고정 오류 catalog 누락을 고쳤고 단언은 유지했다.
+- Browser: 신규 Market/Futures/보유/대기 96 + Futures 112 + Conditional 80 = 288 layouts
+  PASS. 320/360/390/430px, light/dark, fontScale1/2, 큰 가격/긴 이름과 glyph bounds를
+  검증했다. 최종 전체 FE 관측 peak 약 1.14GiB, BE quality 1.76GiB, PG 회귀 0.97GiB,
+  신규 browser 1.14GiB였다. 제한 실행에서 OOM/oom_kill은 0이었다.
+- 신규 migration은 이전 작업에 이미 있던 `20261009010000_add_futures_limit_entry` 하나다.
+  기존 66개와 이 파일을 포함한 SQL67개 모두 재개 시점의 bytes를 유지했다. 운영 flag,
+  production DB, instrument provisioning, 실제 거래소 주문은 변경하지 않았다.
+- 미실행: 실제 iOS/Android 단말·IME·접근성, 서명 앱, PG17, 실 provider soak, 운영
+  활성화와 원격 CI. 운영 전 migration/Spot·Mark coverage·freshness/담보 integrity/
+  worker backlog·lease/Season cleanup·release gate를 별도 확인한다.
+- [A–F 상세 보고서](docs/investigations/2026-10-08-futures-limit-resume/report.md)에
+  각 요구사항의 상태·검증·제약, 실패 원인, 전체 변경 파일과 메모리·브라우저 증거를 남겼다.
+  Canonical Futures API/risk/F3/Limit·Conditional·Frontend 문서를 갱신했다.
+  최종 전체 diff·untracked 검토와 `git diff --check` PASS. 전체 변경 108개는 수정 86개/
+  삭제 1개/신규 21개이며 시작 dirty를 포함한다. commit/push/reset/stash는 없다.
+
 ## 2026-10-08 — Diagnostic Enforcement Foundation 단순화·안전성 보완
 
 - **기능 구현 의도:** 공통 HTTP/admin·Frontend original-error·Ops 안전 경계는 유지한다.

@@ -50,7 +50,7 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     if (role === 'admin') {
       await h.press('admin-diagnostic-toggle');
       for (const value of ['CANDLE_READ', 'provider_candle_fetch', 'price-request']) assert.ok(visibleText(h).includes(value));
-    } else assert.equal(h.node('admin-diagnostic-toggle'), undefined);
+    } else assert.equal(h.node('admin-diagnostic-toggle') === undefined, true);
     const before = h.refetches;
     await h.press(TEST_IDS.assetDetail.chartRetry);
     assert.equal(h.refetches, before + 1);
@@ -94,7 +94,7 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     await h.press(TEST_IDS.order.executeSubmit);
     await h.flush();
     assert.ok(h.node('admin-diagnostic-toggle'));
-    assert.equal(h.node('admin-diagnostic-content'), undefined);
+    assert.equal(h.node('admin-diagnostic-content') === undefined, true);
     await h.press('admin-diagnostic-toggle');
     assert.match(visibleText(h), /quote-request-123456789/);
     assert.match(visibleText(h), /snapshot-987654321/);
@@ -116,7 +116,7 @@ describe('asset detail HTTP 200 price diagnostics', () => {
       1,
     );
     assert.ok(h.node('admin-diagnostic-toggle'));
-    assert.equal(h.node('admin-diagnostic-content'), undefined);
+    assert.equal(h.node('admin-diagnostic-content') === undefined, true);
     await h.press('admin-diagnostic-toggle');
     assert.ok(h.node('admin-diagnostic-content'));
     assert.match(visibleText(h), /ASSET_PRICE_UNAVAILABLE/);
@@ -148,8 +148,8 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     await h.mount();
     t.after(h.close);
     await h.flush();
-    assert.equal(h.node('admin-diagnostic-toggle'), undefined);
-    assert.equal(h.node('admin-asset-price-status'), undefined);
+    assert.equal(h.node('admin-diagnostic-toggle') === undefined, true);
+    assert.equal(h.node('admin-asset-price-status') === undefined, true);
   });
 
   it('does not invent a diagnostic for missing price, unrelated price errors or normal price', async (t) => {
@@ -159,17 +159,17 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     await h.mount();
     t.after(h.close);
     await h.flush();
-    assert.equal(h.node('admin-diagnostic-toggle'), undefined);
+    assert.equal(h.node('admin-diagnostic-toggle') === undefined, true);
     assert.match(
       visibleText(h),
       /현재 화면 시세가 없어 예상 수량을 표시할 수 없습니다/,
     );
     h.priceErrors = [{ ...priceError, diagnostic: undefined }];
     await h.update();
-    assert.equal(h.node('admin-diagnostic-toggle'), undefined);
+    assert.equal(h.node('admin-diagnostic-toggle') === undefined, true);
     h.priceErrors = [{ ...priceError, assetId: 'btc' }];
     await h.update();
-    assert.equal(h.node('admin-diagnostic-toggle'), undefined);
+    assert.equal(h.node('admin-diagnostic-toggle') === undefined, true);
     h.assets.bnb.price = {
       state: 'available',
       currentPrice: '763.79',
@@ -178,8 +178,8 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     };
     h.priceErrors = [];
     await h.update();
-    assert.equal(h.node('admin-diagnostic-toggle'), undefined);
-    assert.equal(h.node('admin-asset-price-status'), undefined);
+    assert.equal(h.node('admin-diagnostic-toggle') === undefined, true);
+    assert.equal(h.node('admin-asset-price-status') === undefined, true);
   });
 
   it('keeps the normal display when a newer ticker resolves the visible REST failure', async (t) => {
@@ -195,8 +195,8 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     await h.mount();
     t.after(h.close);
     await h.flush();
-    assert.equal(h.node('admin-diagnostic-toggle'), undefined);
-    assert.equal(h.node('admin-asset-price-status'), undefined);
+    assert.equal(h.node('admin-diagnostic-toggle') === undefined, true);
+    assert.equal(h.node('admin-asset-price-status') === undefined, true);
   });
 
   it('places a client runtime diagnosis inside the visible stale preview warning', async (t) => {
@@ -208,7 +208,7 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     t.after(h.close);
     await h.flush();
     assert.ok(h.node('admin-diagnostic-toggle'));
-    assert.equal(h.node('admin-diagnostic-content'), undefined);
+    assert.equal(h.node('admin-diagnostic-content') === undefined, true);
     assert.match(visibleText(h), /현재 화면 시세가 오래되어 예상 수량을 표시할 수 없습니다/);
     await h.press('admin-diagnostic-toggle');
     assert.match(visibleText(h), /Client runtime 상태/);
@@ -238,7 +238,7 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     t.after(h.close);
     await h.flush();
     assert.ok(h.node('admin-diagnostic-toggle'));
-    assert.equal(h.node('admin-diagnostic-content'), undefined);
+    assert.equal(h.node('admin-diagnostic-content') === undefined, true);
     await h.press('admin-diagnostic-toggle');
     assert.match(visibleText(h), /Client runtime 상태/);
     assert.match(visibleText(h), /tickerPriceAvailable/);
@@ -281,8 +281,8 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     await h.mount();
     t.after(h.close);
     await h.flush();
-    assert.equal(h.node('admin-diagnostic-toggle'), undefined);
-    assert.equal(h.node('admin-asset-price-status'), undefined);
+    assert.equal(h.node('admin-diagnostic-toggle') === undefined, true);
+    assert.equal(h.node('admin-asset-price-status') === undefined, true);
     assert.equal(h.node('asset-krw-toggle').props.disabled, true);
   });
 
@@ -294,7 +294,7 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     await h.mount();
     t.after(h.close);
     await h.flush();
-    assert.equal(h.node('admin-asset-price-status'), undefined);
+    assert.equal(h.node('admin-asset-price-status') === undefined, true);
     assert.ok(h.node('admin-diagnostic-toggle'));
     await h.press('admin-diagnostic-toggle');
     assert.match(visibleText(h), /previewPriceAvailable/);
@@ -310,8 +310,8 @@ describe('asset detail HTTP 200 price diagnostics', () => {
       await h.mount();
       t.after(h.close);
       await h.flush();
-      assert.equal(h.node('admin-diagnostic-toggle'), undefined);
-      assert.equal(h.node('admin-asset-price-status'), undefined);
+      assert.equal(h.node('admin-diagnostic-toggle') === undefined, true);
+      assert.equal(h.node('admin-asset-price-status') === undefined, true);
       assert.doesNotMatch(visibleText(h), /ASSET_PRICE_UNAVAILABLE/);
     });
   }
@@ -325,8 +325,8 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     await failed.mount();
     t.after(failed.close);
     await failed.flush();
-    assert.equal(failed.node('admin-diagnostic-toggle'), undefined);
-    assert.equal(failed.node('admin-asset-price-status'), undefined);
+    assert.equal(failed.node('admin-diagnostic-toggle') === undefined, true);
+    assert.equal(failed.node('admin-asset-price-status') === undefined, true);
 
     const pending = inlineTradingHarness();
     pending.role = 'admin';
@@ -335,7 +335,7 @@ describe('asset detail HTTP 200 price diagnostics', () => {
     pending.meGate = deferred();
     await pending.mount();
     t.after(pending.close);
-    assert.equal(pending.node('admin-diagnostic-toggle'), undefined);
-    assert.equal(pending.node('admin-asset-price-status'), undefined);
+    assert.equal(pending.node('admin-diagnostic-toggle') === undefined, true);
+    assert.equal(pending.node('admin-asset-price-status') === undefined, true);
   });
 });

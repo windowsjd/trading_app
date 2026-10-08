@@ -18,6 +18,8 @@ export const apiClient = {
     if (state.kind === 'error') throw new Error('fixture unavailable');
     const id = path.split('/')[2];
     const fixture = futuresFixture(id, { position: !['open','empty'].includes(state.kind), marginMode: state.kind === 'cross' ? 'cross' : 'isolated', mode: state.mode, stale: state.kind === 'stale', large: true, empty: state.kind === 'empty', direction: 'short' });
+    if(path.includes('limit-orders')) return {data:{data:{tradingAccountId:id,orders:[],pagination:{limit:100,offset:0,total:0,returned:0,nextOffset:null}}}};
+    if(path.endsWith('/orders')) return {data:{data:{tradingAccountId:id,orders:[],pagination:{limit:100,offset:0,total:0,returned:0,nextOffset:null}}}};
     return { data: { success: true, data: path.includes('instruments') ? fixture.catalog : path.includes('positions') ? fixture.positions : path.includes('liquidations') ? fixture.liquidations : path.includes('executions') ? fixture.executions : fixture.final } };
   },
   async post(path, body) { state.requests.push({ path, body }); if(path.includes('/protections')) return {data:{success:true,data:{tradingAccountId:path.split('/')[2],groupId:'group',status:'active'}}}; return { data: { success: true, data: { tradingAccountId: path.split('/')[2], commandId: 'fixture', execution: { operation: body.operation, feeAmount: '0.2' } } } }; },

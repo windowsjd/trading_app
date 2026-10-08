@@ -144,9 +144,11 @@ Display precision reuses the fixed Binance asset precision metadata; an unknown
 symbol retains 8 price decimals rather than silently becoming a two-decimal coin.
 This display fallback does not change cash/quantity/fee arithmetic.
 
-Home links into an account-pinned Expo/React Query Futures screen. Explicit
+Market → Crypto → Spot/Futures (Spot default) links into an account-pinned
+Expo/React Query Futures screen. General and Season Home have no Futures entry
+card or separate tab; their Futures financial aggregates remain intact. Explicit
 Long/Short, Isolated/Cross, integer 1–100, Open/Increase/Reduce/Close, quantity and
-Market-only controls respect lifetime settings and one-way semantics. Catalog
+Market controls and flat-only Limit Entry respect lifetime settings and one-way semantics. Catalog
 search bounds the visible instrument choices. Spot reference and Mark risk prices
 have different labels. Isolated shows a liquidation price; Cross shows shared
 account metrics. No ROE formula or fictional Cross liquidation price is introduced.
@@ -191,8 +193,10 @@ Before a separately authorized production enable:
 F3 itself introduced no conditional orders. The subsequent
 [Conditional v1](conditional-orders-contract.md) adds SL/TP/OCO exits using Spot
 reference evidence. No microservice, bus, queue, new margin wallet, clearing
-system, standalone Futures Limit entry, Futures partial fill, funding, hedge mode,
+system, Futures partial fill, funding, hedge mode,
 brackets, partial liquidation, ADL, insurance or real Binance account/order APIs.
+The subsequent [Limit Entry v1](futures-limit-entry-contract.md) adds pending
+full-fill entries while reusing these execution, valuation and final-exit boundaries.
 
 Provider references: [Binance USDⓈ-M market data](https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/market-data),
 [Mark streams](https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/ws-streams/market).

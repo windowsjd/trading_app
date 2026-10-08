@@ -1,3 +1,4 @@
+import { cancelFuturesEntriesInTransaction } from '../futures/futures-limit-state';
 import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
 import { diagnosePositionMutationFailure } from './position-failure-diagnosis';
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
@@ -393,6 +394,12 @@ export class LimitOrderCancelService {
       canceledOrderCount += 1;
     }
 
+    canceledOrderCount += await cancelFuturesEntriesInTransaction(
+      tx,
+      input.tradingAccountId,
+      input.reason,
+      input.canceledAt,
+    );
     const protections = await tx.protectionGroup.findMany({
       where: { tradingAccountId: input.tradingAccountId, ...liveProtection },
       select: { id: true },
@@ -522,6 +529,42 @@ export class LimitOrderCancelService {
     if (input.isLockOwned && !input.isLockOwned())
       // @diagnosticSurface internal: Existing Ops runner records lease loss before another cleanup query.
       throw new Error('Ops job lock ownership was lost.');
+    const entries = await this.prisma.futuresLimitOrder.findMany({
+      where: {
+        status: 'submitted',
+        tradingAccount: {
+          mode: 'season',
+          seasonParticipant: {
+            season: { status: { in: ['ended', 'settled'] } },
+          },
+        },
+      },
+      select: {
+        tradingAccountId: true,
+        tradingAccount: {
+          select: { seasonParticipant: { select: { id: true } } },
+        },
+      },
+      orderBy: { id: 'asc' },
+      take: batchSize,
+    });
+    for (const entry of entries) {
+      if (input.isLockOwned && !input.isLockOwned())
+        // @diagnosticSurface internal: Existing Ops runner owns lifecycle lease loss and retry.
+        throw new Error('Ops job lock ownership was lost.');
+      canceledOrderCount += await this.prisma.$transaction(async (tx) => {
+        await lockSeasonTradingContext(tx, {
+          seasonParticipantId: entry.tradingAccount.seasonParticipant!.id,
+          participantWrite: true,
+        });
+        return cancelFuturesEntriesInTransaction(
+          tx,
+          entry.tradingAccountId,
+          'season_ended',
+          input.now,
+        );
+      });
+    }
     // The same lifecycle cleanup also handles armed groups with no submitted
     // Order (including Futures intents). Bounded work resumes next lifecycle tick.
     const protections = await this.prisma.protectionGroup.findMany({

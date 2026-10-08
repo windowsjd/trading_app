@@ -261,7 +261,9 @@ export class ConditionalService {
       this.prisma.protectionGroup.findMany({
         where,
         include: {
-          asset: { select: { settlementCurrency: true } },
+          asset: {
+            select: { settlementCurrency: true, symbol: true, name: true },
+          },
           legs: true,
           children: {
             orderBy: [{ triggeredAt: 'desc' }, { id: 'desc' }],
@@ -310,6 +312,8 @@ export class ConditionalService {
             g.domain === 'futures' ? 'USD' : g.asset.settlementCurrency,
           positionId: g.positionId ?? g.futuresPositionId,
           parentOrderId: g.parentOrderId,
+          parentFuturesOrderId: g.parentFuturesOrderId,
+          asset: { symbol: g.asset.symbol, name: g.asset.name },
           direction: g.direction,
           status: g.status,
           terminalReason: g.terminalReason,

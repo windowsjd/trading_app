@@ -267,6 +267,7 @@ enum OpsJobName {
   futures_liquidation
   futures_mark_retention
   conditional_orders
+  futures_limit_matching
 }
 
 enum MarketCandleSyncMode {
@@ -449,6 +450,7 @@ model TradingAccount {
   futuresPositions              FuturesPosition[]
   futuresExecutions             FuturesExecution[]
   futuresExecuteRequests        FuturesExecuteRequest[]
+  futuresLimitOrders            FuturesLimitOrder[]
   futuresLiquidations           FuturesLiquidation[]
   futuresSeasonSettlement       FuturesSeasonSettlement?
   protectionGroups              ProtectionGroup[]
@@ -862,6 +864,7 @@ model FuturesInstrument {
   liquidationCloses FuturesLiquidationClose[]
   seasonPrices      FuturesSeasonPrice[]
   seasonCloses      FuturesSeasonClose[]
+  limitOrders       FuturesLimitOrder[]
 
   @@unique([underlyingAssetId, productType, settlementCurrency])
   @@map("futures_instruments")
@@ -933,6 +936,7 @@ model FuturesExecution {
   assetPriceSnapshot AssetPriceSnapshot     @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
   executeRequest     FuturesExecuteRequest?
   protectionChild    ProtectionChild?
+  limitOrder         FuturesLimitOrder?
 
   @@unique([id, tradingAccountId])
   @@index([tradingAccountId, executedAt, id])
@@ -966,6 +970,39 @@ enum ProtectionDomain {
   futures
 }
 
+// A pending entry reserves collateral, but is never a position or execution.
+model FuturesLimitOrder {
+  id                  String            @id @default(uuid())
+  tradingAccountId    String            @map("trading_account_id")
+  instrumentId        String            @map("instrument_id")
+  direction           FuturesDirection
+  marginMode          FuturesMarginMode @map("margin_mode")
+  leverage            Int
+  quantity            Decimal           @db.Decimal(24, 8)
+  limitPrice          Decimal           @map("limit_price") @db.Decimal(24, 8)
+  reservedAmount      Decimal           @map("reserved_amount") @db.Decimal(24, 8)
+  status              OrderStatus       @default(submitted)
+  idempotencyKey      String            @map("idempotency_key")
+  requestHash         String            @map("request_hash")
+  executionId         String?           @unique @map("execution_id")
+  responsePayloadJson Json?             @map("response_payload_json")
+  terminalReason      String?           @map("terminal_reason")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  endedAt             DateTime?         @map("ended_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  tradingAccount TradingAccount    @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  instrument     FuturesInstrument @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  execution      FuturesExecution? @relation(fields: [executionId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
+  protection     ProtectionGroup?
+
+  @@unique([executionId, tradingAccountId])
+  @@unique([tradingAccountId, idempotencyKey])
+  @@index([status, id])
+  @@index([tradingAccountId, createdAt, id])
+  @@map("futures_limit_orders")
+}
+
 enum ProtectionStatus {
   holding
   active
@@ -987,28 +1024,30 @@ enum ProtectionChildStatus {
 // Partial unique indexes enforce one live group per account/product asset and
 // one pending child per group. Legs themselves never reserve position quantity.
 model ProtectionGroup {
-  id                String           @id @default(uuid())
-  tradingAccountId  String           @map("trading_account_id")
-  assetId           String           @map("asset_id")
-  domain            ProtectionDomain
-  direction         FuturesDirection
-  positionId        String?          @map("position_id")
-  futuresPositionId String?          @map("futures_position_id")
-  parentOrderId     String?          @unique @map("parent_order_id")
-  status            ProtectionStatus
-  terminalReason    String?          @map("terminal_reason")
-  createdAt         DateTime         @default(now()) @map("created_at")
-  activatedAt       DateTime?        @map("activated_at")
-  endedAt           DateTime?        @map("ended_at")
-  updatedAt         DateTime         @updatedAt @map("updated_at")
+  id                   String           @id @default(uuid())
+  tradingAccountId     String           @map("trading_account_id")
+  assetId              String           @map("asset_id")
+  domain               ProtectionDomain
+  direction            FuturesDirection
+  positionId           String?          @map("position_id")
+  futuresPositionId    String?          @map("futures_position_id")
+  parentOrderId        String?          @unique @map("parent_order_id")
+  parentFuturesOrderId String?          @unique @map("parent_futures_order_id")
+  status               ProtectionStatus
+  terminalReason       String?          @map("terminal_reason")
+  createdAt            DateTime         @default(now()) @map("created_at")
+  activatedAt          DateTime?        @map("activated_at")
+  endedAt              DateTime?        @map("ended_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
 
-  tradingAccount  TradingAccount    @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
-  asset           Asset             @relation(fields: [assetId], references: [id], onDelete: Restrict)
-  position        Position?         @relation(fields: [positionId], references: [id], onDelete: Restrict)
-  futuresPosition FuturesPosition?  @relation(fields: [futuresPositionId], references: [id], onDelete: Restrict)
-  parentOrder     Order?            @relation(fields: [parentOrderId], references: [id], onDelete: Restrict)
-  legs            ProtectionLeg[]
-  children        ProtectionChild[]
+  tradingAccount     TradingAccount     @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  asset              Asset              @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  position           Position?          @relation(fields: [positionId], references: [id], onDelete: Restrict)
+  futuresPosition    FuturesPosition?   @relation(fields: [futuresPositionId], references: [id], onDelete: Restrict)
+  parentOrder        Order?             @relation(fields: [parentOrderId], references: [id], onDelete: Restrict)
+  parentFuturesOrder FuturesLimitOrder? @relation(fields: [parentFuturesOrderId], references: [id], onDelete: Restrict)
+  legs               ProtectionLeg[]
+  children           ProtectionChild[]
 
   @@index([status, id])
   @@index([tradingAccountId, createdAt, id])

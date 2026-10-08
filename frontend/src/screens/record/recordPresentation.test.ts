@@ -96,7 +96,7 @@ for (const role of ['admin', 'user', 'operator']) {
       assert.match(h.text(), /captured_at_stale/);
       assert.match(h.text(), /positions_live_valuation/);
     } else {
-      assert.equal(h.find('admin-diagnostic-toggle'), undefined);
+      assert.equal(h.find('admin-diagnostic-toggle') === undefined, true);
       assert.doesNotMatch(h.text(), /captured_at_stale|positions_live_valuation/);
     }
   });

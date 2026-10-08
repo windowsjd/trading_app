@@ -137,6 +137,7 @@ export interface RecordSeasonEquityDto {
 }
 
 export interface RecordOrderItemDto {
+  conditionalChildId?: string | null;
   marketExecution?: MarketExecutionDto | null;
   orderId?: string;
   id?: string;

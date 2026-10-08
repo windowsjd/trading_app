@@ -14,6 +14,8 @@ export type ProtectionGroup = {
   currencyCode: string;
   positionId: string | null;
   parentOrderId: string | null;
+  parentFuturesOrderId?: string | null;
+  asset?: { name: string; symbol: string };
   direction: "long" | "short";
   status: "holding" | "active" | "completed" | "canceled";
   remainingQuantity: string | null;
@@ -97,4 +99,18 @@ export async function cancelProtection(
     idempotencyKey,
   });
   return assertAccountScope(url, id, response.data.data);
+}
+
+export async function getPendingProtections(id: string, signal?: AbortSignal) {
+  const groups: ProtectionGroup[] = [];
+  let offset = 0;
+  for (;;) {
+    const url = path(id);
+    const response = await apiClient.get<{ data: Protections }>(url, { params: { history: 'false', limit: 100, offset }, signal });
+    const page = assertAccountScope(url, id, response.data.data);
+    groups.push(...page.groups);
+    if (page.pagination.nextOffset === null) return { ...page, groups };
+    if (!Number.isSafeInteger(page.pagination.nextOffset) || page.pagination.nextOffset <= offset || page.pagination.nextOffset > 100000) throw new Error('대기 조건을 다시 조회해주세요.');
+    offset = page.pagination.nextOffset;
+  }
 }

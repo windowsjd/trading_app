@@ -278,6 +278,7 @@ export function OrderForm({
     OrderQuoteDto
   > | null>(null);
   const submitLockRef = useRef(false);
+  const attachedPermission = useRef(false);
   const quoteRevisionRef = useRef(0);
   const scopeRef = useRef({ key: '', epoch: 0, mounted: true });
   const scopeKey = `${accountId}:${selectedAccountId ?? ''}:${accountKnown}:${assetId}:${side}`;
@@ -342,7 +343,7 @@ export function OrderForm({
               ? { orderType: 'limit' as const, limitPrice: quote.limitPrice }
               : {}),
           }),
-        isCurrent: () => isActionCurrent(action.request),
+        isCurrent: () => isActionCurrent(action.request) && (!action.request.attachedProtection?.length || attachedPermission.current),
       }),
     retry: false,
     onSettled: () => {
@@ -546,7 +547,9 @@ export function OrderForm({
     positionQuery.data,
     assetId,
   );
-  const attachedEditorVisible = side === 'buy' && orderType === 'limit' && !protectionQuery.isError && protectionQuery.data?.tradingAccountId === accountId && !!protectionQuery.data.capabilities.canCreateSpot && !!protectionQuery.data.capabilities.canUseSpotLimit;
+  const attachedEditorVisible = side === 'buy' && orderType === 'limit';
+  const attachedAvailable = !protectionQuery.isError && protectionQuery.data?.tradingAccountId === accountId && !!protectionQuery.data.capabilities.canCreateSpot && !!protectionQuery.data.capabilities.canUseSpotLimit;
+  attachedPermission.current = attachedAvailable;
   useEffect(() => {
     onAttachedProtectionVisibilityChange?.(attachedEditorVisible);
     return () => onAttachedProtectionVisibilityChange?.(false);
@@ -784,7 +787,8 @@ export function OrderForm({
     setDiagnosticError(null);
     // An uncertain create response retains this exact quote/key for a user
     // retry. It never silently obtains a second executable order.
-    const attached = side === 'buy' && orderType === 'limit' && !protectionQuery.isError && protectionQuery.data?.tradingAccountId === accountId && protectionQuery.data.capabilities.canCreateSpot ? draftLegs(protectionDraft) : [];
+    const attached = attachedEditorVisible ? draftLegs(protectionDraft) : [];
+    if (attached.length && !attachedPermission.current) { setFieldError('현재 운영 상태에서는 익절·손절을 등록할 수 없습니다.'); return; }
     if (!orderActionRef.current && attached.length && protectionInputError(protectionDraft)) { setFieldError(protectionInputError(protectionDraft)); return; }
     orderActionRef.current ??= {
       request: {
@@ -925,8 +929,9 @@ export function OrderForm({
       {attachedEditorVisible ? (
         <View style={styles.group} testID="attached-entry-editor">
           <Text style={styles.label}>체결 후 익절/손절 (선택)</Text>
+          {!attachedAvailable ? <Text style={styles.helper}>현재 운영 상태에서는 새 보호 조건을 등록할 수 없습니다.</Text> : null}
           <Text style={styles.helper}>새 보유 종목을 여는 진입 주문에 설정합니다. 진입 체결 전에는 조건을 감시하지 않습니다.</Text>
-          <ProtectionEditor value={protectionDraft} onChange={(draft) => resetInput(() => setProtectionDraft(draft))} disabled={pending} canLimit onInputFocus={onInputFocus} onInputBlur={onInputBlur} />
+          <ProtectionEditor value={protectionDraft} onChange={(draft) => resetInput(() => setProtectionDraft(draft))} disabled={pending || !attachedAvailable} canLimit={attachedAvailable} onInputFocus={onInputFocus} onInputBlur={onInputBlur} />
         </View>
       ) : null}
       {isAmountBuy ? (

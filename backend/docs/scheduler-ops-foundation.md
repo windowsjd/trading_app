@@ -492,3 +492,14 @@ a 1-second cycle, at most 100 evaluations, and a renewed 30-second lease. The
 ordinary scheduler dispatch flag stays false to avoid duplicate scheduling.
 Feature OFF pauses trigger/fill but leaves lifecycle cleanup available. See
 [Conditional contract](conditional-orders-contract.md) for source, OCO and retry.
+
+## Futures Limit entry polling
+
+`FuturesLimitWorker` uses `futures_limit_matching:current`, a 1-second cycle,
+at most 100 evaluations and a renewed 30-second Ops lease. Its indexed cursor
+bounds each cycle; ordinary scheduler dispatch stays disabled. ENABLED alone
+permits new fills, while lifecycle cleanup continues in REDUCE_ONLY/DISABLED.
+The lease reduces duplicate work; existing account/season/wallet PostgreSQL fences
+decide the financial winner against cancel, duplicate workers and Season end.
+See [Limit Entry v1](futures-limit-entry-contract.md). This reuses Ops and the
+Futures execution primitive rather than introducing another queue or engine.

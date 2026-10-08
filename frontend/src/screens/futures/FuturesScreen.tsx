@@ -1,3 +1,5 @@
+import FuturesLimitEntryForm from './FuturesLimitEntryForm';
+import PendingOrders from '../asset/PendingOrders';
 import React, { useEffect, useRef, useState } from "react";
 import ProtectionPanel from "../../features/conditional/ProtectionPanel";
 import {
@@ -59,7 +61,7 @@ import ErrorState from "../../components/states/ErrorState";
 import FullPageLoading from "../../components/states/FullPageLoading";
 
 export default function FuturesScreen(props: FuturesScreenProps) {
-  return <BoundFuturesScreen key={props.route.params.accountId} {...props} />;
+  return <BoundFuturesScreen key={`${props.route.params.accountId}:${props.route.params.instrumentId ?? ""}:${getSessionGeneration()}`} {...props} />;
 }
 export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const accountId = route.params.accountId;
@@ -79,12 +81,14 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const leverageRef = useRef<TextInput>(null);
   const [, setClock] = useState(Date.now());
   const clock = Date.now();
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useState(route.params.instrumentId ?? "");
   const [instrumentSearch, setInstrumentSearch] = useState("");
   const [direction, setDirection] = useState<Direction>("long");
   const [marginMode, setMarginMode] = useState<MarginMode>("isolated");
   const [leverage, setLeverage] = useState("1");
   const [quantity, setQuantity] = useState("");
+  const [entryType, setEntryType] = useState<"market" | "limit">("market");
+  const [limitBusy, setLimitBusy] = useState(false);
   const [operation, setOperation] = useState<Operation>("open");
   const [failure, setFailure] = useState<unknown>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -201,8 +205,8 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     return (
       <View style={styles.card}>
         <Text style={styles.heading}>선택한 계정이 변경되었습니다.</Text>
-        <Text>홈에서 선물 화면을 다시 열어주세요.</Text>
-        <CTAButton label="홈으로" onPress={() => navigation.navigate("Home")} />
+        <Text>마켓에서 선물 상품을 다시 선택해주세요.</Text>
+        <CTAButton label="마켓으로" onPress={() => navigation.navigate("Market")} />
       </View>
     );
   if (positions.isPending || instruments.isPending)
@@ -231,8 +235,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const instrument =
     allInstruments.find((i) => i.id === selectedId) ??
     data.positions.find((p) => p.instrumentId === selectedId)?.instrument ??
-    allInstruments[0] ??
-    data.positions[0]?.instrument;
+    (selectedId ? undefined : allInstruments[0] ?? data.positions[0]?.instrument);
   const position = data.positions.find(
     (p) => p.instrumentId === instrument?.id,
   );
@@ -292,7 +295,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       referenceFresh,
     );
   const choose = (id: string) => {
-    if (submitLock.current || pendingResult) return;
+    if (submitLock.current || pendingResult || limitBusy) return;
     setSelectedId(id);
     setQuantity("");
     setOperation("open");
@@ -458,7 +461,8 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
           ))
         )}
         <View style={styles.card}>
-          <Text style={styles.heading}>선물 거래 · Market</Text>
+          <Text style={styles.heading}>선물 거래</Text>
+          {!position ? <View style={styles.choices}>{(["market", "limit"] as const).map(type => <Choice key={type} label={type === "market" ? "시장가" : "지정가 진입"} selected={entryType === type} disabled={mutation.isPending || pendingResult || limitBusy} onPress={() => setEntryType(type)} />)}</View> : null}
           {instruments.isError ? (
             <Text style={styles.warning}>
               상품 목록을 불러오지 못했습니다. 보유 포지션에서 다시 선택할 수
@@ -484,7 +488,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                 key={i.id}
                 label={i.underlying.symbol}
                 selected={i.id === instrument?.id}
-                disabled={mutation.isPending || pendingResult}
+                disabled={mutation.isPending || pendingResult || limitBusy}
                 onPress={() => choose(i.id)}
               />
             ))}
@@ -543,7 +547,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                         key={op}
                         label={operationLabel[op]}
                         selected={selectedOperation === op}
-                        disabled={mutation.isPending || pendingResult}
+                        disabled={mutation.isPending || pendingResult || limitBusy}
                         onPress={() => {
                           setOperation(op);
                           setNotice(null);
@@ -560,7 +564,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                         key={dir}
                         label={directionLabel[dir]}
                         selected={direction === dir}
-                        disabled={mutation.isPending || pendingResult}
+                        disabled={mutation.isPending || pendingResult || limitBusy}
                         onPress={() => setDirection(dir)}
                       />
                     ))}
@@ -571,7 +575,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                         key={m}
                         label={marginLabel[m]}
                         selected={marginMode === m}
-                        disabled={mutation.isPending || pendingResult}
+                        disabled={mutation.isPending || pendingResult || limitBusy}
                         onPress={() => setMarginMode(m)}
                       />
                     ))}
@@ -583,7 +587,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                     testID="futures-leverage"
                     value={leverage}
                     onChangeText={setLeverage}
-                    editable={!mutation.isPending && !pendingResult}
+                    editable={!mutation.isPending && !pendingResult && !limitBusy}
                     keyboardType="number-pad"
                     style={styles.input}
                     onFocus={() =>
@@ -605,7 +609,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                 editable={
                   selectedOperation !== "close" &&
                   !mutation.isPending &&
-                  !pendingResult
+                  !pendingResult && !limitBusy
                 }
                 keyboardType="decimal-pad"
                 style={styles.input}
@@ -615,7 +619,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
               {selectedQuantity && inputError ? (
                 <Text style={styles.warning}>{inputError}</Text>
               ) : null}
-              <View ref={inputScroll.submitRef}>
+              {!position && entryType === 'limit' ? <FuturesLimitEntryForm key={`${accountId}:${instrument.id}`} accountId={accountId} instrumentId={instrument.id} assetId={instrument.underlying.assetId} direction={direction} marginMode={marginMode} leverage={leverage} quantity={quantity} allowed={bound && focused && covered && data.capabilities.canOpen && markFresh && !inputError && !pendingResult} onBusy={setLimitBusy} onInputFocus={inputScroll.onInputFocus} onInputBlur={inputScroll.onInputBlur} /> : <View ref={inputScroll.submitRef}>
                 <CTAButton
                   label={`${operationLabel[selectedOperation]} · ${directionLabel[position?.direction ?? direction]}`}
                   testID="futures-submit"
@@ -628,7 +632,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                         : "disabled"
                   }
                 />
-              </View>
+              </View>}
               {notice ? (
                 failure ? (
                   <ErrorNotice
@@ -653,6 +657,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
             currency="USD"
           />
         ) : null}
+        <View style={styles.card}><Text style={styles.heading}>대기 주문</Text><PendingOrders key={accountId} accountId={accountId} isFocused={focused} seasonUi={binding.state === "bound" && binding.account.mode === "season"} /></View>
         <View style={styles.card}>
           <Text style={styles.heading}>선물 기록</Text>
           <View style={styles.choices}>

@@ -284,12 +284,14 @@ export const QUERY_KEYS = {
   tradingAccount: {
     protections: {
       all: (id: string) => ['tradingAccount', 'protections', id] as const,
+      pending: (id: string) => ['tradingAccount', 'protections', id, 'pending'] as const,
       list: (id: string, domain: 'spot' | 'futures', assetId: string, history = false) => ['tradingAccount', 'protections', id, domain, assetId, history] as const,
     },
     futures: {
       all: (id: string) => ['tradingAccount', 'futures', id] as const,
       instruments: (id: string) => ['tradingAccount', 'futures', id, 'instruments'] as const,
       positions: (id: string) => ['tradingAccount', 'futures', id, 'positions'] as const,
+      pending: (id: string) => ['tradingAccount', 'futures', id, 'pending'] as const,
       history: (id: string, kind: 'executions' | 'liquidations', offset: number) => ['tradingAccount', 'futures', id, kind, offset] as const,
       finalSettlement: (id: string) => ['tradingAccount', 'futures', id, 'final-settlement'] as const,
     },

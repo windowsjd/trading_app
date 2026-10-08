@@ -1,0 +1,112 @@
+Futures 재개 작업 전체 변경 파일 (HEAD 대비, untracked 포함)
+총 108개. M 수정 / D 삭제 / ?? 신규 파일.
+기존 작업은 시작 dirty 50개를 뜻하며, clean 파일의 변경과 구분한다.
+
+ M  기존 작업 유지  .github/workflows/ci.yml
+ M  재개 후 추가/수정  HANDOVER.md
+ M  재개 후 추가/수정  backend/README.md
+ M  재개 후 추가/수정  backend/docs/README.md
+ M  재개 후 추가/수정  backend/docs/batch-job-foundation.md
+ M  재개 후 추가/수정  backend/docs/conditional-orders-contract.md
+ M  재개 후 추가/수정  backend/docs/futures-api-contract.md
+ M  재개 후 추가/수정  backend/docs/futures-f3-contract.md
+ M  재개 후 추가/수정  backend/docs/futures-risk-contract.md
+ M  재개 후 추가/수정  backend/docs/policy-decisions.md
+ M  재개 후 추가/수정  backend/docs/scheduler-ops-foundation.md
+ M  기존 작업 유지  backend/prisma/schema.prisma
+ M  기존 작업 유지  backend/scripts/futures-integration.ts
+ M  재개 후 추가/수정  backend/scripts/season-lifecycle-lease-integration.ts
+ M  재개 후 추가/수정  backend/src/common/public-error-message.ts
+ M  재개 후 추가/수정  backend/src/common/safe-diagnostic-message.ts
+ M  기존 작업 유지  backend/src/conditional/conditional-registration.ts
+ M  기존 작업 유지  backend/src/conditional/conditional.service.ts
+ M  재개 후 추가/수정  backend/src/futures/futures-diagnostics.spec.ts
+ M  기존 작업 유지  backend/src/futures/futures.module.ts
+ M  기존 작업 유지  backend/src/futures/futures.service.ts
+ M  기존 작업 유지  backend/src/generated/prisma/browser.ts
+ M  기존 작업 유지  backend/src/generated/prisma/client.ts
+ M  기존 작업 유지  backend/src/generated/prisma/commonInputTypes.ts
+ M  기존 작업 유지  backend/src/generated/prisma/enums.ts
+ M  기존 작업 유지  backend/src/generated/prisma/internal/class.ts
+ M  기존 작업 유지  backend/src/generated/prisma/internal/prismaNamespace.ts
+ M  기존 작업 유지  backend/src/generated/prisma/internal/prismaNamespaceBrowser.ts
+ M  기존 작업 유지  backend/src/generated/prisma/models.ts
+ M  기존 작업 유지  backend/src/generated/prisma/models/FuturesExecution.ts
+ M  기존 작업 유지  backend/src/generated/prisma/models/FuturesInstrument.ts
+ M  기존 작업 유지  backend/src/generated/prisma/models/Order.ts
+ M  기존 작업 유지  backend/src/generated/prisma/models/ProtectionGroup.ts
+ M  기존 작업 유지  backend/src/generated/prisma/models/TradingAccount.ts
+ M  기존 작업 보완  backend/src/ops/ops-config.ts
+ M  재개 후 추가/수정  backend/src/orders/limit-order-cancel.service.spec.ts
+ M  기존 작업 유지  backend/src/orders/limit-order-cancel.service.ts
+ M  기존 작업 유지  backend/src/orders/orders.service.ts
+ M  재개 후 추가/수정  backend/test/app.e2e-spec.ts
+ M  재개 후 추가/수정  frontend/README.md
+ M  재개 후 추가/수정  frontend/package.json
+ M  기존 작업 유지  frontend/src/app/navigation/HomeStack.tsx
+ M  기존 작업 유지  frontend/src/app/navigation/MarketStack.tsx
+ M  기존 작업 보완  frontend/src/app/navigation/types.ts
+ M  재개 후 추가/수정  frontend/src/components/common/ActionPressable.test.ts
+ M  재개 후 추가/수정  frontend/src/constants/queryKeys.ts
+ M  재개 후 추가/수정  frontend/src/features/conditional/AttachedEntry.test.ts
+ M  재개 후 추가/수정  frontend/src/features/conditional/ProtectionPanel.test.ts
+ M  기존 작업 보완  frontend/src/features/conditional/ProtectionPanel.tsx
+ M  기존 작업 보완  frontend/src/features/conditional/api.ts
+ M  기존 작업 보완  frontend/src/features/futures/api.ts
+ M  재개 후 추가/수정  frontend/src/features/market/marketRefresh.test.ts
+ M  기존 작업 유지  frontend/src/features/record/accountOrders.ts
+ M  기존 작업 유지  frontend/src/features/record/api.ts
+ M  기존 작업 보완  frontend/src/screens/asset/AccountHoldings.tsx
+ M  재개 후 추가/수정  frontend/src/screens/asset/AssetDetailFlow.test.ts
+ M  기존 작업 보완  frontend/src/screens/asset/PendingOrders.tsx
+ M  재개 후 추가/수정  frontend/src/screens/asset/accountHoldings.test.ts
+ M  재개 후 추가/수정  frontend/src/screens/asset/assetPriceDiagnostics.test.ts
+ M  재개 후 추가/수정  frontend/src/screens/asset/inlineTrading.test.ts
+ M  재개 후 추가/수정  frontend/src/screens/asset/tradingControls.test.ts
+ D  재개 후 정리  frontend/src/screens/futures/FuturesEntry.tsx
+ M  재개 후 추가/수정  frontend/src/screens/futures/FuturesScreen.test.ts
+ M  기존 작업 보완  frontend/src/screens/futures/FuturesScreen.tsx
+ M  재개 후 추가/수정  frontend/src/screens/guide/guideContent.test.ts
+ M  재개 후 추가/수정  frontend/src/screens/guide/guideLesson.test.ts
+ M  재개 후 추가/수정  frontend/src/screens/guide/marketGuides.test.ts
+ M  기존 작업 유지  frontend/src/screens/home/GeneralAccountHome.tsx
+ M  기존 작업 유지  frontend/src/screens/home/SeasonAccountHome.tsx
+ M  재개 후 추가/수정  frontend/src/screens/home/homeDiscovery.test.ts
+ M  재개 후 추가/수정  frontend/src/screens/home/homeTier.test.ts
+ M  재개 후 추가/수정  frontend/src/screens/market/MarketScreen.test.ts
+ M  기존 작업 보완  frontend/src/screens/market/MarketScreen.tsx
+ M  재개 후 추가/수정  frontend/src/screens/my/SettingsScreen.test.ts
+ M  기존 작업 보완  frontend/src/screens/order/OrderPanel.tsx
+ M  재개 후 추가/수정  frontend/src/screens/order/quantityRatio.test.ts
+ M  재개 후 추가/수정  frontend/src/screens/record/recordPresentation.test.ts
+ M  재개 후 추가/수정  frontend/src/screens/wallet/WalletTransferScreen.test.ts
+ M  재개 후 추가/수정  frontend/test/browser/README.md
+ M  재개 후 추가/수정  frontend/test/browser/conditionalBrowser.cjs
+ M  재개 후 추가/수정  frontend/test/browser/futuresBrowser.cjs
+ M  재개 후 추가/수정  frontend/test/browser/futuresMocks.js
+ M  재개 후 추가/수정  frontend/test/browser/tradingFixture.jsx
+ M  재개 후 추가/수정  frontend/test/browser/tradingMocks.js
+ M  재개 후 추가/수정  frontend/test/conditionalFixtures.cjs
+ M  재개 후 추가/수정  frontend/test/futuresHarness.cjs
+ M  재개 후 추가/수정  frontend/test/inlineTradingHarness.cjs
+??  기존 작업 보완  backend/docs/futures-limit-entry-contract.md
+??  기존 작업 유지  backend/prisma/migrations/20261009010000_add_futures_limit_entry/migration.sql
+??  기존 작업 보완  backend/scripts/futures-limit-entry-integration.ts
+??  기존 작업 유지  backend/src/futures/futures-limit-state.ts
+??  기존 작업 유지  backend/src/futures/futures-limit-worker.service.ts
+??  기존 작업 유지  backend/src/futures/futures-limit.controller.ts
+??  기존 작업 유지  backend/src/futures/futures-limit.integration.spec.ts
+??  기존 작업 보완  backend/src/futures/futures-limit.service.ts
+??  기존 작업 유지  backend/src/generated/prisma/models/FuturesLimitOrder.ts
+??  재개 후 추가/수정  docs/investigations/2026-10-08-futures-limit-resume/320-dark-2-limit-short.png
+??  재개 후 추가/수정  docs/investigations/2026-10-08-futures-limit-resume/320-light-2-pending-limit.png
+??  재개 후 추가/수정  docs/investigations/2026-10-08-futures-limit-resume/browser-validation.json
+??  재개 후 추가/수정  docs/investigations/2026-10-08-futures-limit-resume/changed-files.txt
+??  재개 후 추가/수정  docs/investigations/2026-10-08-futures-limit-resume/report.md
+??  재개 후 추가/수정  docs/investigations/2026-10-08-futures-limit-resume/verification.json
+??  재개 후 추가/수정  frontend/src/features/futures/pendingPagination.test.ts
+??  기존 작업 보완  frontend/src/screens/asset/PendingFuturesAndProtections.tsx
+??  재개 후 추가/수정  frontend/src/screens/futures/FuturesLimitEntry.test.ts
+??  기존 작업 보완  frontend/src/screens/futures/FuturesLimitEntryForm.tsx
+??  기존 작업 보완  frontend/src/screens/market/FuturesMarketList.tsx
+??  재개 후 추가/수정  frontend/test/browser/futuresIntegrationBrowser.cjs

@@ -537,11 +537,32 @@ preserves financial atomicity without exchange-style fill event infrastructure.
   Manual reduce는 child 취소 후 실제 잔량을 보호하며 increase와 pending child 충돌은 거부한다.
   일반 주식 Limit의 정수 입력 규칙은 유지한다. 소수점 잔량을 보호하는 internal
   Position-bound Conditional SELL만 기존 Limit reservation/settlement 코어로 정확히 예약한다.
-- Attached SL/TP는 flat Spot BUY Limit에만 붙고 parent fill 전 HOLDING이다. Parent cancel/
-  만료/시즌 cleanup은 attachment와 미체결 child를 정리한다. Futures Limit entry는 없다.
+- Attached SL/TP는 flat Spot BUY Limit 및 [Futures Limit Entry v1](futures-limit-entry-contract.md)에
+  붙으며 parent fill 전 HOLDING이다. Parent cancel/만료/시즌 cleanup은 attachment와
+  미체결 child를 정리한다. Futures는 entry limit을 기준으로 SL/TP 방향을 검사한다.
+  근거: 아직 없는 Position을 보호 주문이 먼저 닫거나 다른 lifetime에 적용하면 안 된다.
 - 사용자 Futures Conditional 실제 execution만 totalFillCount +1이다. Trigger/cancel,
   liquidation/final system settlement는 증가하지 않는다. 계정/시즌 금융 fence와 DB unique가
   중복·경합을 방어한다. endAt 이후 신규 조건 체결은 차단한다.
 - 기본 `CONDITIONAL_ORDERS_ENABLED=false`. Futures ENABLED/REDUCE_ONLY에서는 exit 가능,
   DISABLED에서는 user condition도 대기한다. Read/cancel/lifecycle cleanup과 risk는 분리한다.
   Production enable은 코드 완료와 별도다.
+
+## Futures Limit Entry·Crypto Market 통합 (2026-10-08, current)
+
+- Entry는 flat 신규 전량 진입이고 account/instrument당 pending 하나다. Cross/Isolated,
+  LONG/SHORT, 정수 leverage 1–100을 기존 Futures 실행 코어로 처리한다.
+  근거: v1 진입 의도를 기존 Position lifetime·one-way 회계에 연결한다.
+- 제출은 초기 증거금과 기존 opening fee를 예약하며 현금 차감·Position·UPNL·fill count를
+  만들지 않는다. 체결 transaction에서 자기 예약만 해제하고 담보를 다시 검증한다.
+  근거: 예약 담보의 중복 사용을 막으면서 Short 가격 개선에 필요한 추가 담보도 확인한다.
+- Fresh canonical Binance Spot last trade로 Long ≤ limit, Short ≥ limit일 때 체결한다.
+  Mark는 risk readiness·평가·청산에 사용한다. ENABLED에서만 신규 제출/체결하며
+  거래 중지·시즌 종료 후 취소와 committed replay는 유지한다.
+  근거: 가격 기준과 운영 권한을 기존 Futures 정책과 일치시킨다.
+- Market → 암호화폐 → 현물/선물 → 상품 → 거래로 진입하고 기본은 현물이다. 두 Home의
+  Futures 진입 UI는 제거하되 금융 집계는 유지한다. 보유 기본은 현재 종목이며 전체 선택도
+  가능하다. 카드 TP/SL은 기존 Position-bound 관리, 대기는 지정가와 live/HOLDING TP-SL로
+  나누고 Conditional child를 중복 표시하지 않는다. 근거: 같은 주문/보호 의도를 한 곳에서 관리한다.
+- Disabled capability도 TP/SL UI와 기존 내역을 숨기지 않고 불가/감시 중지 상태를 알린다.
+  실제 생성·취소 권한은 서버 capability를 따른다. 근거: 기능 발견과 mutation 허용을 구분한다.

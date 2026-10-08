@@ -1,3 +1,4 @@
+import ProtectionPanel from '../../features/conditional/ProtectionPanel';
 import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import React, { useState } from 'react';
@@ -33,7 +34,7 @@ export default function AccountHoldings({
   assetId,
   isFocused,
 }: Props) {
-  const [filter, setFilter] = useState<'all' | 'current' | 'pending'>('all');
+  const [filter, setFilter] = useState<'all' | 'current' | 'pending'>('current');
   const query = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.holdings(accountId ?? ''),
     queryFn: () =>
@@ -60,12 +61,13 @@ export default function AccountHoldings({
           {filter === 'pending' ? '대기 주문' : `보유 종목${data && !query.isError ? ` ${positions.length}` : ''}`}
         </Text>
         <View style={styles.filters}>
-          {(['all', 'current', 'pending'] as const).map((value) => (
+          {(['current', 'all', 'pending'] as const).map((value) => (
             <ActionPressable
               key={value}
               testID={`holdings-filter-${value}`}
               accessibilityRole="button"
               accessibilityState={{ selected: filter === value }}
+              aria-pressed={filter === value}
               onPress={() => setFilter(value)}
               style={[styles.filter, filter === value && styles.selectedFilter]}
             >
@@ -125,14 +127,15 @@ export default function AccountHoldings({
         />
       ) : (
         visible.map((position) => (
-          <HoldingRow key={position.assetId} position={position} />
+          <HoldingRow key={`${accountId}:${position.assetId}`} accountId={accountId} position={position} />
         ))
       )}
     </View>
   );
 }
 
-function HoldingRow({ position }: { position: PositionItemDto }) {
+function HoldingRow({ position, accountId }: { position: PositionItemDto; accountId: string }) {
+  const [protection, setProtection] = useState(false);
   const display = getPositionDisplay(position);
   const valuation = position.valuation;
   const values = [
@@ -174,6 +177,10 @@ function HoldingRow({ position }: { position: PositionItemDto }) {
           </Text>
         </View>
       ))}
+      <ActionPressable accessibilityRole="button" testID={`holding-protection-${position.assetId}`} onPress={() => setProtection(!protection)} style={styles.retry}>
+        <Text style={styles.value}>TP/SL 설정·관리</Text>
+      </ActionPressable>
+      {protection ? <ProtectionPanel accountId={accountId} assetId={position.assetId} positionId={position.positionId} domain="spot" currency={position.currencyCode} /> : null}
       {display.priceNotice ? (
         <Text style={styles.notice}>{display.priceNotice}</Text>
       ) : null}
@@ -196,7 +203,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, minWidth: 0, maxWidth: '100%' },
   filter: {
     minWidth: 0,
     minHeight: 32,

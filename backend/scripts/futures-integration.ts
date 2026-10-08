@@ -423,6 +423,7 @@ async function invariant(s: Scenario) {
 }
 async function cleanup(s: Scenario) {
   const where = { tradingAccountId: s.accountId };
+  await db.futuresLimitOrder.deleteMany({ where });
   await db.futuresExecuteRequest.deleteMany({ where });
   await db.walletTransaction.deleteMany({ where });
   await db.futuresExecution.deleteMany({ where });
@@ -981,6 +982,7 @@ function faultyDb(point: string, occurrence = 1) {
                     'futuresExecution',
                     'walletTransaction',
                     'futuresExecuteRequest',
+                    'futuresLimitOrder',
                     'futuresSeasonSettlement',
                     'futuresSeasonClose',
                     'equitySnapshot',
