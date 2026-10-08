@@ -1,0 +1,391 @@
+### OS UTC=2026-10-08T15:31:18.5439893Z
+{"Caption":"Microsoft Windows 11 Pro","Version":"10.0.26200","BuildNumber":"26200","LastBootUpTime":"\/Date(1791441566500)\/"}
+### WSL UTC=2026-10-08T15:31:18.7662279Z
+WSL 버전: 2.6.3.0
+커널 버전: 6.6.87.2-1
+WSLg 버전: 1.0.71
+MSRDC 버전: 1.2.6353
+Direct3D 버전: 1.611.1-81528511
+DXCore 버전: 10.0.26100.1-240331-1435.ge-release
+Windows 버전: 10.0.26200.9457
+
+exit=0
+기본 배포: Ubuntu
+기본 버전: 2
+
+exit=0
+[wsl2]
+vmIdleTimeout=-1
+
+[general]
+instanceIdleTimeout=-1
+### Services UTC=2026-10-08T15:31:18.9029932Z
+[{"Name":"vmictimesync","Status":"Stopped","StartType":"Manual"},{"Name":"W32Time","Status":"Running","StartType":"Manual"},{"Name":"WslService","Status":"Running","StartType":"Automatic"}]
+### W32Time status UTC=2026-10-08T15:31:18.9259835Z
+윤초 조정: 3(동기화되지 않음)
+계층: 0(지정되지 않음)
+정밀도: -23(틱당 119.209ns)
+루트 지연: 0.0000000s
+루트 분산: 0.0000000s
+참조 ID: 0x00000000(지정되지 않음)
+마지막으로 동기화한 시간: 지정되지 않음
+원본: Local CMOS Clock
+폴링 간격: 10(1024s)
+
+단계 오프셋: 0.0000000s
+클록 속도: 0.0156250s
+상태 시스템: 0 (설정되지 않음)
+시간 원본 플래그: 0 (없음)
+서버 역할: 0 (없음)
+마지막 동기화 오류: 1 (사용 가능한 시간 데이터가 없어 컴퓨터가 동기화하지 못했습니다.)
+마지막으로 동기화한 후 지난 시간: 18519.7721144s
+
+
+exit=0
+### W32Time source UTC=2026-10-08T15:31:18.9568144Z
+다음 오류가 발생했습니다. 액세스가 거부되었습니다. (0x80070005)
+
+exit=-2147024891
+### W32Time configuration UTC=2026-10-08T15:31:18.9825711Z
+다음 오류가 발생했습니다. 액세스가 거부되었습니다. (0x80070005)
+
+exit=-2147024891
+### W32Time peers UTC=2026-10-08T15:31:19.0093008Z
+#피어: 1
+
+피어: time.windows.com,0x9
+상태: 활성
+남은 시간: 14249.6663612s
+모드: 3 (클라이언트)
+계층: 0(지정되지 않음)
+피어폴링 간격: 0(지정되지 않음)
+호스트폴링 간격: 10(1024s)
+
+exit=0
+### Event logs (last 2 hours; bounded) UTC=2026-10-08T15:31:19.0301136Z
+### Microsoft-Windows-Time-Service UTC=2026-10-08T15:31:19.0301136Z
+지정한 선택 조건과 일치하는 이벤트를 찾을 수 없습니다.
+### Microsoft-Windows-Kernel-General UTC=2026-10-08T15:31:19.1235374Z
+지정한 선택 조건과 일치하는 이벤트를 찾을 수 없습니다.
+### Microsoft-Windows-Power-Troubleshooter UTC=2026-10-08T15:31:19.1763066Z
+지정한 선택 조건과 일치하는 이벤트를 찾을 수 없습니다.
+### Microsoft-Windows-Kernel-Power UTC=2026-10-08T15:31:19.2390028Z
+지정한 선택 조건과 일치하는 이벤트를 찾을 수 없습니다.
+### Time-Service Operational log UTC=2026-10-08T15:31:19.2986949Z
+{"LogName":"Microsoft-Windows-Time-Service/Operational","IsEnabled":true,"RecordCount":818}
+지정한 선택 조건과 일치하는 이벤트를 찾을 수 없습니다.
+### Latest Time-Service Operational events (up to 12, any age) UTC=2026-10-08T15:31:19.3222290Z
+<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Time-Service' Guid='{06edcfeb-0fd0-4e53-acca-a6f8bbf81bcb}'/><EventID>263</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x4000000000000000</Keywords><TimeCreated SystemTime='2026-10-08T11:31:11.1970595Z'/><EventRecordID>3470</EventRecordID><Correlation/><Execution ProcessID='31944' ThreadID='5008'/><Channel>Microsoft-Windows-Time-Service/Operational</Channel><Computer>DESKTOP-9S8M7T0</Computer><Security UserID='S-1-5-19'/></System><EventData Name='TMP_OPS_SERVICE_PARAM_CHANGE'><Data Name='Configuration'>EventLogFlags: 2 (로컬)
+AnnounceFlags: 10 (로컬)
+TimeJumpAuditOffset: 28800 (로컬)
+MinPollInterval: 10 (로컬)
+MaxPollInterval: 15 (로컬)
+MaxNegPhaseCorrection: 54000 (로컬)
+MaxPosPhaseCorrection: 54000 (로컬)
+MaxAllowedPhaseOffset: 1 (로컬)
+
+FrequencyCorrectRate: 4 (로컬)
+PollAdjustFactor: 5 (로컬)
+LargePhaseOffset: 50000000 (로컬)
+SpikeWatchPeriod: 900 (로컬)
+LocalClockDispersion: 10 (로컬)
+HoldPeriod: 5 (로컬)
+PhaseCorrectRate: 1 (로컬)
+UpdateInterval: 360000 (로컬)
+
+FileLogName:  (로컬)
+FileLogEntries:  (로컬)
+FileLogSize: 0 (로컬)
+FileLogFlags: 0 (정의되지 않음 또는 사용되지 않음)
+
+UtilizeSslTimeData: 1 (로컬)
+
+[Leap Seconds]
+Enabled: 1 (Local)
+Total Leap Seconds (after June 2018): 0 (Local)
+Current UTC offset: 0 (Local)
+</Data><Data Name='TimeProviders'>NtpClient (로컬)
+DllName: C:\WINDOWS\system32\w32time.dll (로컬)
+Enabled: 1 (로컬)
+InputProvider: 1 (로컬)
+CrossSiteSyncFlags: 0 (정의되지 않음 또는 사용되지 않음)
+AllowNonstandardModeCombinations: 1 (로컬)
+ResolvePeerBackoffMinutes: 15 (로컬)
+ResolvePeerBackoffMaxTimes: 7 (로컬)
+CompatibilityFlags: 2147483648 (로컬)
+EventLogFlags: 1 (로컬)
+LargeSampleSkew: 3 (로컬)
+SpecialPollInterval: 16384 (로컬)
+Type: NTP (로컬)
+NtpServer: time.windows.com,0x9 (로컬)
+
+NtpServer (로컬)
+DllName: C:\WINDOWS\system32\w32time.dll (로컬)
+Enabled: 0 (로컬)
+InputProvider: 0 (로컬)
+
+
+</Data><Data Name='TickCount'>17505046</Data></EventData></Event>
+<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Time-Service' Guid='{06edcfeb-0fd0-4e53-acca-a6f8bbf81bcb}'/><EventID>272</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x4000000000000000</Keywords><TimeCreated SystemTime='2026-10-08T11:31:11.1958075Z'/><EventRecordID>3469</EventRecordID><Correlation/><Execution ProcessID='31944' ThreadID='5008'/><Channel>Microsoft-Windows-Time-Service/Operational</Channel><Computer>DESKTOP-9S8M7T0</Computer><Security UserID='S-1-5-19'/></System><EventData Name='TMP_OPS_LEAP_SECOND_CONFIG'><Data Name='Enabled'>1</Data><Data Name='LeapSecondCount'>0</Data><Data Name='CurrentUtcOffset'>0</Data><Data Name='RuntimeStateAndSettingsConsistent'>1</Data><Data Name='NewestLeapSecondsList'></Data><Data Name='TickCount'>17505046</Data></EventData></Event>
+<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Time-Service' Guid='{06edcfeb-0fd0-4e53-acca-a6f8bbf81bcb}'/><EventID>263</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x4000000000000000</Keywords><TimeCreated SystemTime='2026-10-08T11:14:07.1878848Z'/><EventRecordID>3468</EventRecordID><Correlation/><Execution ProcessID='31944' ThreadID='36244'/><Channel>Microsoft-Windows-Time-Service/Operational</Channel><Computer>DESKTOP-9S8M7T0</Computer><Security UserID='S-1-5-19'/></System><EventData Name='TMP_OPS_SERVICE_PARAM_CHANGE'><Data Name='Configuration'>EventLogFlags: 2 (로컬)
+AnnounceFlags: 10 (로컬)
+TimeJumpAuditOffset: 28800 (로컬)
+MinPollInterval: 10 (로컬)
+MaxPollInterval: 15 (로컬)
+MaxNegPhaseCorrection: 54000 (로컬)
+MaxPosPhaseCorrection: 54000 (로컬)
+MaxAllowedPhaseOffset: 1 (로컬)
+
+FrequencyCorrectRate: 4 (로컬)
+PollAdjustFactor: 5 (로컬)
+LargePhaseOffset: 50000000 (로컬)
+SpikeWatchPeriod: 900 (로컬)
+LocalClockDispersion: 10 (로컬)
+HoldPeriod: 5 (로컬)
+PhaseCorrectRate: 1 (로컬)
+UpdateInterval: 360000 (로컬)
+
+FileLogName:  (로컬)
+FileLogEntries:  (로컬)
+FileLogSize: 0 (로컬)
+FileLogFlags: 0 (정의되지 않음 또는 사용되지 않음)
+
+UtilizeSslTimeData: 1 (로컬)
+
+[Leap Seconds]
+Enabled: 1 (Local)
+Total Leap Seconds (after June 2018): 0 (Local)
+Current UTC offset: 0 (Local)
+</Data><Data Name='TimeProviders'>NtpClient (로컬)
+DllName: C:\WINDOWS\system32\w32time.dll (로컬)
+Enabled: 1 (로컬)
+InputProvider: 1 (로컬)
+CrossSiteSyncFlags: 0 (정의되지 않음 또는 사용되지 않음)
+AllowNonstandardModeCombinations: 1 (로컬)
+ResolvePeerBackoffMinutes: 15 (로컬)
+ResolvePeerBackoffMaxTimes: 7 (로컬)
+CompatibilityFlags: 2147483648 (로컬)
+EventLogFlags: 1 (로컬)
+LargeSampleSkew: 3 (로컬)
+SpecialPollInterval: 16384 (로컬)
+Type: NTP (로컬)
+NtpServer: time.windows.com,0x9 (로컬)
+
+NtpServer (로컬)
+DllName: C:\WINDOWS\system32\w32time.dll (로컬)
+Enabled: 0 (로컬)
+InputProvider: 0 (로컬)
+
+
+</Data><Data Name='TickCount'>16481031</Data></EventData></Event>
+<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Time-Service' Guid='{06edcfeb-0fd0-4e53-acca-a6f8bbf81bcb}'/><EventID>272</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x4000000000000000</Keywords><TimeCreated SystemTime='2026-10-08T11:14:07.1867001Z'/><EventRecordID>3467</EventRecordID><Correlation/><Execution ProcessID='31944' ThreadID='36244'/><Channel>Microsoft-Windows-Time-Service/Operational</Channel><Computer>DESKTOP-9S8M7T0</Computer><Security UserID='S-1-5-19'/></System><EventData Name='TMP_OPS_LEAP_SECOND_CONFIG'><Data Name='Enabled'>1</Data><Data Name='LeapSecondCount'>0</Data><Data Name='CurrentUtcOffset'>0</Data><Data Name='RuntimeStateAndSettingsConsistent'>1</Data><Data Name='NewestLeapSecondsList'></Data><Data Name='TickCount'>16481031</Data></EventData></Event>
+<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Time-Service' Guid='{06edcfeb-0fd0-4e53-acca-a6f8bbf81bcb}'/><EventID>263</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x4000000000000000</Keywords><TimeCreated SystemTime='2026-10-08T10:57:03.1846198Z'/><EventRecordID>3466</EventRecordID><Correlation/><Execution ProcessID='31944' ThreadID='36244'/><Channel>Microsoft-Windows-Time-Service/Operational</Channel><Computer>DESKTOP-9S8M7T0</Computer><Security UserID='S-1-5-19'/></System><EventData Name='TMP_OPS_SERVICE_PARAM_CHANGE'><Data Name='Configuration'>EventLogFlags: 2 (로컬)
+AnnounceFlags: 10 (로컬)
+TimeJumpAuditOffset: 28800 (로컬)
+MinPollInterval: 10 (로컬)
+MaxPollInterval: 15 (로컬)
+MaxNegPhaseCorrection: 54000 (로컬)
+MaxPosPhaseCorrection: 54000 (로컬)
+MaxAllowedPhaseOffset: 1 (로컬)
+
+FrequencyCorrectRate: 4 (로컬)
+PollAdjustFactor: 5 (로컬)
+LargePhaseOffset: 50000000 (로컬)
+SpikeWatchPeriod: 900 (로컬)
+LocalClockDispersion: 10 (로컬)
+HoldPeriod: 5 (로컬)
+PhaseCorrectRate: 1 (로컬)
+UpdateInterval: 360000 (로컬)
+
+FileLogName:  (로컬)
+FileLogEntries:  (로컬)
+FileLogSize: 0 (로컬)
+FileLogFlags: 0 (정의되지 않음 또는 사용되지 않음)
+
+UtilizeSslTimeData: 1 (로컬)
+
+[Leap Seconds]
+Enabled: 1 (Local)
+Total Leap Seconds (after June 2018): 0 (Local)
+Current UTC offset: 0 (Local)
+</Data><Data Name='TimeProviders'>NtpClient (로컬)
+DllName: C:\WINDOWS\system32\w32time.dll (로컬)
+Enabled: 1 (로컬)
+InputProvider: 1 (로컬)
+CrossSiteSyncFlags: 0 (정의되지 않음 또는 사용되지 않음)
+AllowNonstandardModeCombinations: 1 (로컬)
+ResolvePeerBackoffMinutes: 15 (로컬)
+ResolvePeerBackoffMaxTimes: 7 (로컬)
+CompatibilityFlags: 2147483648 (로컬)
+EventLogFlags: 1 (로컬)
+LargeSampleSkew: 3 (로컬)
+SpecialPollInterval: 16384 (로컬)
+Type: NTP (로컬)
+NtpServer: time.windows.com,0x9 (로컬)
+
+NtpServer (로컬)
+DllName: C:\WINDOWS\system32\w32time.dll (로컬)
+Enabled: 0 (로컬)
+InputProvider: 0 (로컬)
+
+
+</Data><Data Name='TickCount'>15457031</Data></EventData></Event>
+<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Time-Service' Guid='{06edcfeb-0fd0-4e53-acca-a6f8bbf81bcb}'/><EventID>272</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x4000000000000000</Keywords><TimeCreated SystemTime='2026-10-08T10:57:03.1834229Z'/><EventRecordID>3465</EventRecordID><Correlation/><Execution ProcessID='31944' ThreadID='36244'/><Channel>Microsoft-Windows-Time-Service/Operational</Channel><Computer>DESKTOP-9S8M7T0</Computer><Security UserID='S-1-5-19'/></System><EventData Name='TMP_OPS_LEAP_SECOND_CONFIG'><Data Name='Enabled'>1</Data><Data Name='LeapSecondCount'>0</Data><Data Name='CurrentUtcOffset'>0</Data><Data Name='RuntimeStateAndSettingsConsistent'>1</Data><Data Name='NewestLeapSecondsList'></Data><Data Name='TickCount'>15457031</Data></EventData></Event>
+<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Time-Service' Guid='{06edcfeb-0fd0-4e53-acca-a6f8bbf81bcb}'/><EventID>263</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x4000000000000000</Keywords><TimeCreated SystemTime='2026-10-08T10:39:59.1827715Z'/><EventRecordID>3464</EventRecordID><Correlation/><Execution ProcessID='31944' ThreadID='5008'/><Channel>Microsoft-Windows-Time-Service/Operational</Channel><Computer>DESKTOP-9S8M7T0</Computer><Security UserID='S-1-5-19'/></System><EventData Name='TMP_OPS_SERVICE_PARAM_CHANGE'><Data Name='Configuration'>EventLogFlags: 2 (로컬)
+AnnounceFlags: 10 (로컬)
+TimeJumpAuditOffset: 28800 (로컬)
+MinPollInterval: 10 (로컬)
+MaxPollInterval: 15 (로컬)
+MaxNegPhaseCorrection: 54000 (로컬)
+MaxPosPhaseCorrection: 54000 (로컬)
+MaxAllowedPhaseOffset: 1 (로컬)
+
+FrequencyCorrectRate: 4 (로컬)
+PollAdjustFactor: 5 (로컬)
+LargePhaseOffset: 50000000 (로컬)
+SpikeWatchPeriod: 900 (로컬)
+LocalClockDispersion: 10 (로컬)
+HoldPeriod: 5 (로컬)
+PhaseCorrectRate: 1 (로컬)
+UpdateInterval: 360000 (로컬)
+
+FileLogName:  (로컬)
+FileLogEntries:  (로컬)
+FileLogSize: 0 (로컬)
+FileLogFlags: 0 (정의되지 않음 또는 사용되지 않음)
+
+UtilizeSslTimeData: 1 (로컬)
+
+[Leap Seconds]
+Enabled: 1 (Local)
+Total Leap Seconds (after June 2018): 0 (Local)
+Current UTC offset: 0 (Local)
+</Data><Data Name='TimeProviders'>NtpClient (로컬)
+DllName: C:\WINDOWS\system32\w32time.dll (로컬)
+Enabled: 1 (로컬)
+InputProvider: 1 (로컬)
+CrossSiteSyncFlags: 0 (정의되지 않음 또는 사용되지 않음)
+AllowNonstandardModeCombinations: 1 (로컬)
+ResolvePeerBackoffMinutes: 15 (로컬)
+ResolvePeerBackoffMaxTimes: 7 (로컬)
+CompatibilityFlags: 2147483648 (로컬)
+EventLogFlags: 1 (로컬)
+LargeSampleSkew: 3 (로컬)
+SpecialPollInterval: 16384 (로컬)
+Type: NTP (로컬)
+NtpServer: time.windows.com,0x9 (로컬)
+
+NtpServer (로컬)
+DllName: C:\WINDOWS\system32\w32time.dll (로컬)
+Enabled: 0 (로컬)
+InputProvider: 0 (로컬)
+
+
+</Data><Data Name='TickCount'>14433031</Data></EventData></Event>
+<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Time-Service' Guid='{06edcfeb-0fd0-4e53-acca-a6f8bbf81bcb}'/><EventID>272</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x4000000000000000</Keywords><TimeCreated SystemTime='2026-10-08T10:39:59.1814196Z'/><EventRecordID>3463</EventRecordID><Correlation/><Execution ProcessID='31944' ThreadID='5008'/><Channel>Microsoft-Windows-Time-Service/Operational</Channel><Computer>DESKTOP-9S8M7T0</Computer><Security UserID='S-1-5-19'/></System><EventData Name='TMP_OPS_LEAP_SECOND_CONFIG'><Data Name='Enabled'>1</Data><Data Name='LeapSecondCount'>0</Data><Data Name='CurrentUtcOffset'>0</Data><Data Name='RuntimeStateAndSettingsConsistent'>1</Data><Data Name='NewestLeapSecondsList'></Data><Data Name='TickCount'>14433031</Data></EventData></Event>
+<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Time-Service' Guid='{06edcfeb-0fd0-4e53-acca-a6f8bbf81bcb}'/><EventID>260</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x4000000000000000</Keywords><TimeCreated SystemTime='2026-10-08T10:39:59.1806169Z'/><EventRecordID>3462</EventRecordID><Correlation/><Execution ProcessID='31944' ThreadID='36244'/><Channel>Microsoft-Windows-Time-Service/Operational</Channel><Computer>DESKTOP-9S8M7T0</Computer><Security UserID='S-1-5-19'/></System><EventData Name='TMP_OPS_PERIODIC_CONFIG_STATUS'><Data Name='Configuration'>EventLogFlags: 2 (로컬)
+AnnounceFlags: 10 (로컬)
+TimeJumpAuditOffset: 28800 (로컬)
+MinPollInterval: 10 (로컬)
+MaxPollInterval: 15 (로컬)
+MaxNegPhaseCorrection: 54000 (로컬)
+MaxPosPhaseCorrection: 54000 (로컬)
+MaxAllowedPhaseOffset: 1 (로컬)
+
+FrequencyCorrectRate: 4 (로컬)
+PollAdjustFactor: 5 (로컬)
+LargePhaseOffset: 50000000 (로컬)
+SpikeWatchPeriod: 900 (로컬)
+LocalClockDispersion: 10 (로컬)
+HoldPeriod: 5 (로컬)
+PhaseCorrectRate: 1 (로컬)
+UpdateInterval: 360000 (로컬)
+
+FileLogName:  (로컬)
+FileLogEntries:  (로컬)
+FileLogSize: 0 (로컬)
+FileLogFlags: 0 (정의되지 않음 또는 사용되지 않음)
+
+UtilizeSslTimeData: 1 (로컬)
+
+[Leap Seconds]
+Enabled: 1 (Local)
+Total Leap Seconds (after June 2018): 0 (Local)
+Current UTC offset: 0 (Local)
+</Data><Data Name='TimeProviders'>NtpClient (로컬)
+DllName: C:\WINDOWS\system32\w32time.dll (로컬)
+Enabled: 1 (로컬)
+InputProvider: 1 (로컬)
+CrossSiteSyncFlags: 0 (정의되지 않음 또는 사용되지 않음)
+AllowNonstandardModeCombinations: 1 (로컬)
+ResolvePeerBackoffMinutes: 15 (로컬)
+ResolvePeerBackoffMaxTimes: 7 (로컬)
+CompatibilityFlags: 2147483648 (로컬)
+EventLogFlags: 1 (로컬)
+LargeSampleSkew: 3 (로컬)
+SpecialPollInterval: 16384 (로컬)
+Type: NTP (로컬)
+NtpServer: time.windows.com,0x9 (로컬)
+
+NtpServer (로컬)
+DllName: C:\WINDOWS\system32\w32time.dll (로컬)
+Enabled: 0 (로컬)
+InputProvider: 0 (로컬)
+
+
+</Data><Data Name='LeapIndicator'>3</Data><Data Name='Stratum'>0</Data><Data Name='Precision'>-23</Data><Data Name='RootDelay'>0.0000000s</Data><Data Name='RootDispersion'>0.0000000s</Data><Data Name='ReferenceId'>0x00000000</Data><Data Name='LastSuccessfulSyncTime'>1601-01-01T00:00:00.0Z</Data><Data Name='Source'>Local CMOS Clock</Data><Data Name='PollInterval'>10</Data><Data Name='PhaseOffset'>0.0000000s</Data><Data Name='ClockRate'>156250</Data><Data Name='StateMachine'>0</Data><Data Name='TimeSourceFlags'>0</Data><Data Name='ServerRole'>0</Data><Data Name='LastSyncError'>1</Data><Data Name='TimeSinceLastGoodSync'>1040.0068436s</Data><Data Name='TickCount'>14433031</Data></EventData></Event>
+<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Time-Service' Guid='{06edcfeb-0fd0-4e53-acca-a6f8bbf81bcb}'/><EventID>259</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x4000000000000000</Keywords><TimeCreated SystemTime='2026-10-08T10:39:59.1794793Z'/><EventRecordID>3461</EventRecordID><Correlation/><Execution ProcessID='31944' ThreadID='36244'/><Channel>Microsoft-Windows-Time-Service/Operational</Channel><Computer>DESKTOP-9S8M7T0</Computer><Security UserID='S-1-5-19'/></System><EventData Name='TMP_OPS_NTP_CLIENT_TIME_SOURCES'><Data Name='AllNtpServers'>time.windows.com,0x9 (ntp.m|0x9|0.0.0.0:123-&gt;52.231.114.183:123);</Data><Data Name='ChosenReferenceNtpServer'></Data><Data Name='TickCount'>14433031</Data><Data Name='IFTSTMP'>1</Data></EventData></Event>
+<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Time-Service' Guid='{06edcfeb-0fd0-4e53-acca-a6f8bbf81bcb}'/><EventID>257</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x4000000000000000</Keywords><TimeCreated SystemTime='2026-10-08T10:22:39.1724074Z'/><EventRecordID>3460</EventRecordID><Correlation/><Execution ProcessID='31944' ThreadID='39388'/><Channel>Microsoft-Windows-Time-Service/Operational</Channel><Computer>DESKTOP-9S8M7T0</Computer><Security UserID='S-1-5-19'/></System><EventData Name='TMP_OPS_STARTUP'><Data Name='CurrentTime(UTC)'>2026-10-08T10:22:39.172Z</Data><Data Name='TickCount'>13393000</Data><Data Name='Configuration'>EventLogFlags: 2 (로컬)
+AnnounceFlags: 10 (로컬)
+TimeJumpAuditOffset: 28800 (로컬)
+MinPollInterval: 10 (로컬)
+MaxPollInterval: 15 (로컬)
+MaxNegPhaseCorrection: 54000 (로컬)
+MaxPosPhaseCorrection: 54000 (로컬)
+MaxAllowedPhaseOffset: 1 (로컬)
+
+FrequencyCorrectRate: 4 (로컬)
+PollAdjustFactor: 5 (로컬)
+LargePhaseOffset: 50000000 (로컬)
+SpikeWatchPeriod: 900 (로컬)
+LocalClockDispersion: 10 (로컬)
+HoldPeriod: 5 (로컬)
+PhaseCorrectRate: 1 (로컬)
+UpdateInterval: 360000 (로컬)
+
+FileLogName:  (로컬)
+FileLogEntries:  (로컬)
+FileLogSize: 0 (로컬)
+FileLogFlags: 0 (정의되지 않음 또는 사용되지 않음)
+
+UtilizeSslTimeData: 1 (로컬)
+
+[Leap Seconds]
+Enabled: 1 (Local)
+Total Leap Seconds (after June 2018): 0 (Local)
+Current UTC offset: 0 (Local)
+</Data><Data Name='TimeProviders'>NtpClient (로컬)
+DllName: C:\WINDOWS\system32\w32time.dll (로컬)
+Enabled: 1 (로컬)
+InputProvider: 1 (로컬)
+CrossSiteSyncFlags: 0 (정의되지 않음 또는 사용되지 않음)
+AllowNonstandardModeCombinations: 1 (로컬)
+ResolvePeerBackoffMinutes: 15 (로컬)
+ResolvePeerBackoffMaxTimes: 7 (로컬)
+CompatibilityFlags: 2147483648 (로컬)
+EventLogFlags: 1 (로컬)
+LargeSampleSkew: 3 (로컬)
+SpecialPollInterval: 16384 (로컬)
+Type: NTP (로컬)
+NtpServer: time.windows.com,0x9 (로컬)
+
+NtpServer (로컬)
+DllName: C:\WINDOWS\system32\w32time.dll (로컬)
+Enabled: 0 (로컬)
+InputProvider: 0 (로컬)
+
+
+</Data><Data Name='ClockRate'>156250</Data></EventData></Event>
+<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Time-Service' Guid='{06edcfeb-0fd0-4e53-acca-a6f8bbf81bcb}'/><EventID>272</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x4000000000000000</Keywords><TimeCreated SystemTime='2026-10-08T10:22:39.1541707Z'/><EventRecordID>3459</EventRecordID><Correlation/><Execution ProcessID='31944' ThreadID='39388'/><Channel>Microsoft-Windows-Time-Service/Operational</Channel><Computer>DESKTOP-9S8M7T0</Computer><Security UserID='S-1-5-19'/></System><EventData Name='TMP_OPS_LEAP_SECOND_CONFIG'><Data Name='Enabled'>1</Data><Data Name='LeapSecondCount'>0</Data><Data Name='CurrentUtcOffset'>0</Data><Data Name='RuntimeStateAndSettingsConsistent'>1</Data><Data Name='NewestLeapSecondsList'></Data><Data Name='TickCount'>13393000</Data></EventData></Event>
+
+STDERR:

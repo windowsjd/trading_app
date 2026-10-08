@@ -1,0 +1,93 @@
+URL: https://raw.githubusercontent.com/microsoft/WSL/2.6.3/src/linux/init/main.cpp
+3769: void StartTimeSyncAgent()
+3770: 
+3771: /*++
+3772: 
+3773: Routine Description:
+3774: 
+3775:     This routine configures and launches chronyd.
+3776: 
+3777: Arguments:
+3778: 
+3779:     None.
+3780: 
+3781: Return Value:
+3782: 
+3783:     None.
+3784: 
+3785: --*/
+3786: 
+3787: {
+3788:     //
+3789:     // Check if the /dev/ptp0 device is present.
+3790:     //
+3791: 
+3792:     if (access("/dev/ptp0", F_OK) < 0)
+3793:     {
+3794:         LOG_ERROR("/dev/ptp0 not found - kernel must be built with CONFIG_PTP_1588_CLOCK");
+3795:         return;
+3796:     }
+3797: 
+3798:     //
+3799:     // Create a child process to run chronyd.
+3800:     //
+3801: 
+3802:     UtilCreateChildProcess("chrony", []() {
+3803:         const auto FileContents =
+3804:             "driftfile /var/lib/chrony/drift\n" // Record the rate at which the system clock gains/losses time.
+3805:             "makestep 1.0 3\n" // Allow the system clock to be stepped in the first three updates if its offset is larger than 1 second.
+3806:             "rtcsync\n"        // Enable kernel synchronization of the real-time clock (RTC).
+3807:             "leapsectz right/UTC\n"    // Get TAI-UTC offset and leap seconds from the system tz database.
+3808:             "logdir /var/log/chrony\n" // Specify directory for log files.
+3809:             "refclock PHC /dev/ptp0 poll 3 dpoll -2 offset 0\n"; // Use the /dev/ptp0 device as a clock source.
+3810: 
+3811:         remove(CHRONY_CONF_PATH);
+3812:         THROW_LAST_ERROR_IF(WriteToFile(CHRONY_CONF_PATH, FileContents) < 0);
+3813: 
+3814:         execl(CHRONYD_PATH, CHRONYD_PATH, NULL);
+3815:         LOG_ERROR("execl failed {}", errno);
+3816:     });
+3817: }
+3818: 
+3819: void WaitForBlockDevice(const char* Path)
+3820: 
+3821: /*++
+3822: 
+3823: Routine Description:
+3824: 
+3825:     Wait for a block device to be available.
+3826: 
+3827: Arguments:
+3828: 
+3829:     Path - Supplies the path to the block device.
+3830: 
+3831: Return Value:
+3832: 
+3833:     None.
+3834: 
+3835: --*/
+3836: 
+3837: {
+3838:     wsl::shared::retry::RetryWithTimeout<void>(
+3839:         [&]() {
+3840:             wil::unique_fd device{open(Path, O_RDONLY)};
+3841:             THROW_LAST_ERROR_IF(!device);
+3842:         },
+3843:         c_defaultRetryPeriod,
+3844:         c_defaultRetryTimeout,
+3845:         [&]() {
+3846:             errno = wil::ResultFromCaughtException();
+3847:             return errno == ENOENT || errno == ENXIO || errno == EIO;
+3848:         });
+3849: }
+3850: 
+3851: int WaitForChild(pid_t Pid, const char* Name)
+3852: 
+3853: /*++
+3854: 
+3855: Routine Description:
+3856: 
+3857:     Wait for a child process to exit and check that it exited successfully.
+3858: 
+3859: Arguments:
+3860: 

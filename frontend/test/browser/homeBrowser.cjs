@@ -33,19 +33,26 @@ async function run() {
     res.end(fs.readFileSync(path.join(out, js ? 'bundle.js' : 'index.html')));
   }).listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
-  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
-  const page = await browser.newPage();
+  const launch = () => chromium.launch({ headless: true, executablePath: process.env.BROWSER_EXECUTABLE_PATH, args: ['--no-sandbox', '--renderer-process-limit=2'] });
+  let browser = await launch();
+  let pageCount = 0;
+  let page;
   const errors = [], records = [];
-  page.on('pageerror', (error) => errors.push(error.message));
   const base = `http://127.0.0.1:${server.address().port}`;
-  await page.route('**/*', (route) => route.request().url().startsWith(base) ? route.continue() : route.abort());
-  await page.addInitScript(() => {
-    const p = new URLSearchParams(location.search);
-    if (p.get('restore') !== '1') {
-      localStorage.setItem('selectedTradingAccountId:home-user', p.get('mode') === 'general' ? 'general-account' : 'season-account');
-      localStorage.setItem('trading-app:appearance', 'system');
-    }
-  });
+  const resetPage = async () => {
+    if (page) await page.context().close();
+    if (++pageCount % 42 === 0) { await browser.close(); browser = await launch(); }
+    page = await browser.newPage();
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.route('**/*', (route) => route.request().url().startsWith(base) ? route.continue() : route.abort());
+    await page.addInitScript(() => {
+      const p = new URLSearchParams(location.search);
+      if (p.get('restore') !== '1') {
+        localStorage.setItem('selectedTradingAccountId:home-user', p.get('mode') === 'general' ? 'general-account' : 'season-account');
+        localStorage.setItem('trading-app:appearance', 'system');
+      }
+    });
+  };
   const id = (name) => page.getByTestId(name);
   const switchAccount = async (accountId) => {
     await id('trading-account-switcher-trigger').click();
@@ -55,6 +62,7 @@ async function run() {
   try {
     for (const appearance of ['light', 'dark']) for (const width of [320, 360, 390, 430, 768, 1024, 1280, 1440, 1920])
       for (const fontScale of [1, 1.5, 2]) for (const mode of ['general', 'season']) for (const long of [0, 1]) {
+        await resetPage();
         await page.setViewportSize({ width, height: 844 });
         await page.emulateMedia({ colorScheme: appearance });
         await page.goto(`${base}/?mode=${mode}&fontScale=${fontScale}&long=${long}`);
@@ -132,17 +140,17 @@ async function run() {
         const contentWidth = Math.min(width, 1120) - 32;
         assert.ok(Math.abs(layout.context.width - contentWidth) <= 1, 'Home uses the shared desktop content width');
         assert.ok(Math.abs(layout.context.x - (width - contentWidth) / 2) <= 1, 'content stays centered');
-        assert.equal(layout.context.minHeight, 96);
-        assert.equal(layout.context.gap, mode === 'season' && fontScale <= 1.3 ? 8 : 16);
+        const hasBackground = mode === 'season' && !long;
+        assert.ok(Math.abs(layout.context.minHeight - (hasBackground ? contentWidth * 318 / 538 : 96)) < .1);
+        assert.equal(layout.context.gap, mode === 'season' && fontScale <= 1.3 ? 4 : 16);
         assert.ok(layout.context.height >= 96 && layout.trigger.height >= 44);
         assert.ok(layout.trigger.width >= 44);
-        assert.ok(layout.context.paddingHorizontal >= (mode === 'season' ? 12 : 16) && layout.context.paddingVertical >= (mode === 'season' ? 14 : 20));
-        assert.equal(layout.context.borderWidth, 1);
-        assert.equal(layout.context.borderColor, mode === 'season' && !long
-          ? appearance === 'light' ? 'rgb(168, 181, 194)' : 'rgb(99, 115, 135)'
-          : appearance === 'light' ? 'rgb(229, 232, 235)' : 'rgb(59, 61, 67)');
+        assert.ok(layout.context.paddingHorizontal >= (mode === 'season' ? 8 : 16) && layout.context.paddingVertical >= (mode === 'season' ? 14 : 20));
+        assert.equal(layout.context.borderWidth, hasBackground ? 0 : 1);
+        assert.equal(await id(`home-tier-background-silver-${appearance}`).count(), hasBackground ? 1 : 0);
+        assert.equal(layout.context.borderColor, appearance === 'light' ? 'rgb(229, 232, 235)' : 'rgb(59, 61, 67)');
         assert.notEqual(layout.context.background, theme.palettes[appearance].screen);
-        assert.ok(layout.trigger.right <= layout.context.right - 12);
+        assert.ok(layout.trigger.right <= layout.context.right - (mode === 'season' ? 8 : 12));
         assert.ok(layout.titleTextRight <= layout.trigger.x + 1 || layout.titleTextBottom <= layout.trigger.y + 1, `title and change trigger never collide: ${layout.titleTextRight} / ${layout.trigger.x}`);
         assert.ok(layout.contrasts.every((ratio) => ratio >= 4.5), 'Hero text and financial colors have readable contrast');
         assert.ok(layout.total.y >= layout.context.bottom && layout.total.right <= width);
@@ -155,8 +163,8 @@ async function run() {
         assert.doesNotMatch(await page.locator('#root').textContent(), /자금 구성|최초 지급 자본|누적 외부 자금 유입/);
         if (layout.competition) assert.ok(layout.competition.y >= layout.total.bottom);
         if (!long && fontScale === 1) {
-          assert.ok(layout.context.height <= (mode === 'season' ? 295 : 214), 'emblem card retains a bounded normal-text height');
-          assert.ok(layout.total.bottom <= (mode === 'season' ? 440 : 350), 'assets remain directly after the account card');
+          assert.ok(layout.context.height <= (mode === 'season' ? Math.max(295, contentWidth * 318 / 538 + 1) : 214), 'emblem card retains a bounded normal-text height');
+          assert.ok(layout.total.bottom <= layout.context.bottom + 200, 'assets remain directly after the account card');
           await page.screenshot({ path: path.join(out, `${mode}-${appearance}-${width}.png`) });
         }
         if (long && width === 320 && fontScale === 2) await page.screenshot({
@@ -169,6 +177,7 @@ async function run() {
       'upcoming', 'ended', 'settled', 'suspended', 'closed', 'registered', 'excluded', 'finished',
       'portfolio-error', 'empty-summary', 'loading', 'ranking-error', 'ranking-integrity', 'unranked',
     ]) {
+      await resetPage();
       await page.setViewportSize({ width: 320, height: 844 });
       await page.emulateMedia({ colorScheme: appearance });
       await page.goto(`${base}/?state=${state}`);
@@ -201,6 +210,7 @@ async function run() {
       records.push({ appearance, state });
     }
 
+    await resetPage();
     await page.goto(`${base}/`);
     await id('home-total-asset').waitFor();
     assert.equal(await id('home-total-asset').textContent(), '9,648,192원');

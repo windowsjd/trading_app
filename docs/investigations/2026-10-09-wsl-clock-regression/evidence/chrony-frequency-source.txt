@@ -1,0 +1,118 @@
+URL: https://raw.githubusercontent.com/mlichvar/chrony/4.1/sys_linux.c
+140:    be tick=10000, freq=0 (for a USER_HZ==100 system, other values otherwise).
+141:    The convention is that this is called with a positive argument if the local
+142:    clock runs fast when uncompensated.  */
+143: 
+144: static double
+145: set_frequency(double freq_ppm)
+146: {
+147:   struct timex txc;
+148:   long required_tick;
+149:   double required_freq;
+150:   int required_delta_tick;
+151: 
+152:   required_delta_tick = our_round(freq_ppm / dhz);
+153: 
+154:   /* Older kernels (pre-2.6.18) don't apply the frequency offset exactly as
+155:      set by adjtimex() and a scaling constant (that depends on the internal
+156:      kernel HZ constant) would be needed to compensate for the error. Because
+157:      chronyd is closed loop it doesn't matter much if we don't scale the
+158:      required frequency, but we want to prevent thrashing between two states
+159:      when the system's frequency error is close to a multiple of USER_HZ.  With
+160:      USER_HZ <= 250, the maximum frequency adjustment of 500 ppm overlaps at
+161:      least two ticks and we can stick to the current tick if it's next to the
+162:      required tick. */
+163:   if (hz <= 250 && (required_delta_tick + 1 == current_delta_tick ||
+164:                     required_delta_tick - 1 == current_delta_tick)) {
+165:     required_delta_tick = current_delta_tick;
+166:   }
+167: 
+168:   required_freq = -(freq_ppm - dhz * required_delta_tick);
+169:   required_tick = nominal_tick - required_delta_tick;
+170: 
+171:   txc.modes = ADJ_TICK | ADJ_FREQUENCY;
+172:   txc.freq = required_freq * FREQ_SCALE;
+173:   txc.tick = required_tick;
+174: 
+175:   SYS_Timex_Adjust(&txc, 0);
+176: 
+177:   current_delta_tick = required_delta_tick;
+178: 
+179:   return dhz * current_delta_tick - txc.freq / FREQ_SCALE;
+180: }
+181: 
+182: /* ================================================== */
+183: /* Read the ppm frequency from the kernel */
+184: 
+185: static double
+186: read_frequency(void)
+187: {
+188:   struct timex txc;
+189: 
+190:   txc.modes = 0;
+191: 
+192:   SYS_Timex_Adjust(&txc, 0);
+193: 
+194:   current_delta_tick = nominal_tick - txc.tick;
+195: 
+196:   return dhz * current_delta_tick - txc.freq / FREQ_SCALE;
+197: }
+198: 
+199: /* ================================================== */
+200: 
+201: /* Estimate the value of USER_HZ given the value of txc.tick that chronyd finds when
+202:  * it starts.  The only credible values are 100 (Linux/x86) or powers of 2.
+203:  * Also, the bounds checking inside the kernel's adjtimex system call enforces
+204:  * a +/- 10% movement of tick away from the nominal value 1e6/USER_HZ. */
+205: 
+210:   int i, tick, tick_lo, tick_hi, ihz;
+211:   double tick_nominal;
+212: 
+213:   txc.modes = 0;
+214:   SYS_Timex_Adjust(&txc, 0);
+215:   tick = txc.tick;
+216: 
+217:   /* Pick off the hz=100 case first */
+218:   if (tick >= 9000 && tick <= 11000) {
+219:     return 100;
+220:   }
+221: 
+222:   for (i=4; i<16; i++) { /* surely 16 .. 32768 is a wide enough range? */
+223:     ihz = 1 << i;
+224:     tick_nominal = 1.0e6 / (double) ihz;
+225:     tick_lo = (int)(0.5 + tick_nominal*2.0/3.0);
+226:     tick_hi = (int)(0.5 + tick_nominal*4.0/3.0);
+295: 
+296:   if (!hz)
+297:     hz = guess_hz();
+298: 
+299:   dhz = (double) hz;
+300:   nominal_tick = (1000000L + (hz/2))/hz; /* Mirror declaration in kernel */
+301:   max_tick_bias = nominal_tick / 10;
+302: 
+303:   /* In modern kernels the frequency of the clock is updated immediately in the
+304:      adjtimex() system call.  Assume a maximum delay of 10 microseconds. */
+305:   tick_update_hz = 100000;
+306: 
+307:   get_kernel_version(&major, &minor, &patch);
+308:   DEBUG_LOG("Linux kernel major=%d minor=%d patch=%d", major, minor, patch);
+309: 
+310:   if (kernelvercmp(major, minor, patch, 2, 2, 0) < 0) {
+311:     LOG_FATAL("Kernel version not supported, sorry.");
+406:     have_setoffset = 0;
+407:   }
+408: 
+409:   SYS_Timex_InitialiseWithFunctions(1.0e6 * max_tick_bias / nominal_tick,
+410:                                     1.0 / tick_update_hz,
+411:                                     read_frequency, set_frequency,
+412:                                     have_setoffset ? apply_step_offset : NULL,
+413:                                     0.0, 0.0, NULL, NULL);
+414: }
+415: 
+416: /* ================================================== */
+417: /* Finalisation code for this module */
+418: 
+419: void
+420: SYS_Linux_Finalise(void)
+421: {
+422:   SYS_Timex_Finalise();

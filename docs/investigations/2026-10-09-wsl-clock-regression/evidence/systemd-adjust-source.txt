@@ -1,0 +1,113 @@
+URL: https://raw.githubusercontent.com/systemd/systemd-stable/v255.4/src/timesync/timesyncd-manager.c
+36: #include "timesyncd-manager.h"
+37: #include "user-util.h"
+38: 
+39: #ifndef ADJ_SETOFFSET
+40: #define ADJ_SETOFFSET                   0x0100  /* add 'time' to current time */
+41: #endif
+42: 
+43: /* Expected accuracy of time synchronization; used to adjust the poll interval */
+44: #define NTP_ACCURACY_SEC                0.2
+45: 
+46: /*
+47:  * Maximum delta in seconds which the system clock is gradually adjusted
+48:  * (slewed) to approach the network time. Deltas larger that this are set by
+49:  * letting the system time jump. The kernel's limit for adjtime is 0.5s.
+50:  */
+51: #define NTP_MAX_ADJUST                  0.4
+52: 
+53: /* Default of maximum acceptable root distance in microseconds. */
+54: #define NTP_ROOT_DISTANCE_MAX_USEC      (5 * USEC_PER_SEC)
+55: 
+56: /* Maximum number of missed replies before selecting another source. */
+57: #define NTP_MAX_MISSED_REPLIES          2
+243: 
+244:         /* For small deltas, tell the kernel to gradually adjust the system clock to the NTP time, larger
+245:          * deltas are just directly set. */
+246:         if (fabs(offset) < NTP_MAX_ADJUST) {
+247:                 tmx = (struct timex) {
+248:                         .modes = ADJ_STATUS | ADJ_NANO | ADJ_OFFSET | ADJ_TIMECONST | ADJ_MAXERROR | ADJ_ESTERROR,
+249:                         .status = STA_PLL,
+250:                         .offset = offset * NSEC_PER_SEC,
+251:                         .constant = log2i(m->poll_interval_usec / USEC_PER_SEC) - 4,
+252:                 };
+254:                 log_debug("  adjust (slew): %+.3f sec", offset);
+255:         } else {
+256:                 tmx = (struct timex) {
+257:                         .modes = ADJ_STATUS | ADJ_NANO | ADJ_SETOFFSET | ADJ_MAXERROR | ADJ_ESTERROR,
+258: 
+259:                         /* ADJ_NANO uses nanoseconds in the microseconds field */
+260:                         .time.tv_sec = (long)offset,
+261:                         .time.tv_usec = (offset - (double) (long) offset) * NSEC_PER_SEC,
+262:                 };
+263: 
+288:                 break;
+289:         }
+290: 
+291:         if (clock_adjtime(CLOCK_REALTIME, &tmx) < 0)
+292:                 return -errno;
+293: 
+294:         m->drift_freq = tmx.freq;
+295: 
+296:         log_debug("  status       : %04i %s\n"
+297:                   "  time now     : %"PRI_TIME".%03"PRI_USEC"\n"
+362:         assert(m);
+363: 
+364:         if (m->poll_resync) {
+365:                 m->poll_interval_usec = m->poll_interval_min_usec;
+366:                 m->poll_resync = false;
+367:                 return;
+368:         }
+369: 
+370:         /* set to minimal poll interval */
+371:         if (!spike && fabs(offset) > NTP_ACCURACY_SEC) {
+372:                 m->poll_interval_usec = m->poll_interval_min_usec;
+373:                 return;
+374:         }
+375: 
+376:         /* increase polling interval */
+377:         if (fabs(offset) < NTP_ACCURACY_SEC * 0.25) {
+378:                 if (m->poll_interval_usec < m->poll_interval_max_usec)
+379:                         m->poll_interval_usec *= 2;
+380:                 return;
+381:         }
+382: 
+383:         /* decrease polling interval */
+384:         if (spike || fabs(offset) > NTP_ACCURACY_SEC * 0.75) {
+385:                 if (m->poll_interval_usec > m->poll_interval_min_usec)
+386:                         m->poll_interval_usec /= 2;
+387:                 return;
+388:         }
+389: }
+390: 
+391: static int manager_receive_response(sd_event_source *source, int fd, uint32_t revents, void *userdata) {
+569: 
+570:                 r = manager_adjust_clock(m, offset, leap_sec);
+571:                 if (r < 0)
+572:                         log_error_errno(r, "Failed to call clock_adjtime(): %m");
+573: 
+574:                 (void) manager_save_time_and_rearm(m, dts.realtime);
+575: 
+576:                 /* If touch fails, there isn't much we can do. Maybe it'll work next time. */
+577:                 r = touch("/run/systemd/timesync/synchronized");
+578:                 if (r < 0)
+676:         m->talking = false;
+677:         m->missed_replies = NTP_MAX_MISSED_REPLIES;
+678:         if (m->poll_interval_usec == 0)
+679:                 m->poll_interval_usec = m->poll_interval_min_usec;
+680: 
+681:         server_address_pretty(m->current_server_address, &pretty);
+682:         log_debug("Connecting to time server %s (%s).", strna(pretty), m->current_server_name->string);
+683:         (void) sd_notifyf(false, "STATUS=Connecting to time server %s (%s).", strna(pretty), m->current_server_name->string);
+684: 
+685:         r = manager_clock_watch_setup(m);
+1105: 
+1106:         *m = (Manager) {
+1107:                 .root_distance_max_usec = NTP_ROOT_DISTANCE_MAX_USEC,
+1108:                 .poll_interval_min_usec = NTP_POLL_INTERVAL_MIN_USEC,
+1109:                 .poll_interval_max_usec = NTP_POLL_INTERVAL_MAX_USEC,
+1110: 
+1111:                 .connection_retry_usec = DEFAULT_CONNECTION_RETRY_USEC,
+1112: 
+1113:                 .server_socket = -EBADF,
+1114: 

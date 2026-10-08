@@ -1,0 +1,62 @@
+{
+  "01_Bronze_Dark.png": {
+    "width": 538,
+    "height": 322,
+    "sha256": "41529f9058da46af78acaa670d69c03c9dc9687357fe6a054b15190e00675437"
+  },
+  "01_Bronze_Light.png": {
+    "width": 538,
+    "height": 322,
+    "sha256": "4b40ea0f32b63f4a582f345f5af3facd863d1d0bcab544c5685a987a5b8e4914"
+  },
+  "02_Silver_Dark.png": {
+    "width": 538,
+    "height": 318,
+    "sha256": "12443c238ba8439c1a4260f2f12b7cff0c0d0d09723ac18dde1ab00e54ef2c8a"
+  },
+  "02_Silver_Light.png": {
+    "width": 538,
+    "height": 318,
+    "sha256": "c227715d919a3f66ccae8f3ac0edbac749b2467f30e2751d26ff4a5f63dc9689"
+  },
+  "03_Gold_Dark.png": {
+    "width": 538,
+    "height": 315,
+    "sha256": "e46ac0a645ab417ec8d2b369396f647f5479071c2f05bc4fac5741d1d6704967"
+  },
+  "03_Gold_Light.png": {
+    "width": 538,
+    "height": 315,
+    "sha256": "52e0fa852c99b3afd6b7fd23a5d6aaa9a644a759fe4c75cefbf32a8b61aaff49"
+  },
+  "04_Platinum_Dark.png": {
+    "width": 538,
+    "height": 318,
+    "sha256": "7fe86e25a5301b2b492ab121596195339d309e14dc8fac9fc421f1c2477ade76"
+  },
+  "04_Platinum_Light.png": {
+    "width": 538,
+    "height": 318,
+    "sha256": "876a3921e0d1f251bb587de33953d097e44b46484f672878ed9a1089a04716f2"
+  },
+  "05_Diamond_Dark.png": {
+    "width": 538,
+    "height": 318,
+    "sha256": "35bcc76982032ec47fb3f3dcc27223df5b132665238910b9f3f8eb93b2957908"
+  },
+  "05_Diamond_Light.png": {
+    "width": 538,
+    "height": 318,
+    "sha256": "24963bb30f127a2833a1f3b3ad24cc383f870c3c163bbd0e7ec5339b72259774"
+  },
+  "06_Whale_Dark.png": {
+    "width": 849,
+    "height": 530,
+    "sha256": "2dd68cb7c6c0449293569525b4ee7f3bbb3c935cd259f2f2fe124ba84a1d97b6"
+  },
+  "06_Whale_Light.png": {
+    "width": 848,
+    "height": 533,
+    "sha256": "36e3de2b6b5b0a92a6533728bfe31dbdd06423a7b335cc901e0a76ab5d92c5f8"
+  }
+}

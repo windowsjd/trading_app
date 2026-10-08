@@ -1,0 +1,47 @@
+      1       0 init()
+      3       2 init-systemd(Ub
+     17       8 init
+     24       3 init
+Reference ID    : 50484330 (PHC0)
+Stratum         : 1
+Ref time (UTC)  : Thu Oct 08 15:34:53 2026
+System time     : 0.015860435 seconds slow of NTP time
+Last offset     : +0.010193552 seconds
+RMS offset      : 0.025686877 seconds
+Frequency       : 28307.662 ppm slow
+Residual freq   : -184.936 ppm
+Skew            : 954.601 ppm
+Root delay      : 0.000000001 seconds
+Root dispersion : 0.133735001 seconds
+Update interval : 8.1 seconds
+Leap status     : Normal
+
+  .-- Source mode  '^' = server, '=' = peer, '#' = local clock.
+ / .- Source state '*' = current best, '+' = combined, '-' = not combined,
+| /             'x' = may be in error, '~' = too variable, '?' = unusable.
+||                                                 .- xxxx [ yyyy ] +/- zzzz
+||      Reachability register (octal) -.           |  xxxx = adjusted offset,
+||      Log2(Polling interval) --.      |          |  yyyy = measured offset,
+||                                \     |          |  zzzz = estimated error.
+||                                 |    |           \
+MS Name/IP address         Stratum Poll Reach LastRx Last sample               
+===============================================================================
+#* PHC0                          0   3   377     9   +227ms[ +237ms] +/-   12ms
+                             .- Number of sample points in measurement set.
+                            /    .- Number of residual runs with same sign.
+                           |    /    .- Length of measurement set (time).
+                           |   |    /      .- Est. clock freq error (ppm).
+                           |   |   |      /           .- Est. error in freq.
+                           |   |   |     |           /         .- Est. offset.
+                           |   |   |     |          |          |   On the -.
+                           |   |   |     |          |          |   samples. \
+                           |   |   |     |          |          |             |
+Name/IP Address            NP  NR  Span  Frequency  Freq Skew  Offset  Std Dev
+==============================================================================
+PHC0                       63  32   505   -184.936   1189.518  -1035us   231ms
+Y
+
+STDERR:
+your 131072x1 screen size is bogus. expect trouble
+
+exit=0

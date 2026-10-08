@@ -1,0 +1,316 @@
+### ["uname", "-a"] wallUnixNs=1791473395815214148
+Linux DESKTOP-9S8M7T0 6.6.87.2-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:30:46 UTC 2025 x86_64 x86_64 x86_64 GNU/Linux
+exit=0
+### ["cat", "/etc/os-release"] wallUnixNs=1791473395817108452
+PRETTY_NAME="Ubuntu 24.04.4 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+VERSION="24.04.4 LTS (Noble Numbat)"
+VERSION_CODENAME=noble
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=noble
+LOGO=ubuntu-logo
+exit=0
+### ["cat", "/etc/wsl.conf"] wallUnixNs=1791473395819452204
+[boot]
+systemd=true
+
+[user]
+default=nayuta
+exit=0
+### ["cat", "/proc/cmdline"] wallUnixNs=1791473395820447645
+initrd=\initrd.img WSL_ROOT_INIT=1 panic=-1 nr_cpus=32 hv_utils.timesync_implicit=1 console=hvc0 debug pty.legacy_count=0 WSL_ENABLE_CRASH_DUMP=1
+exit=0
+### ["timedatectl", "status"] wallUnixNs=1791473395863211470
+               Local time: Fri 2026-10-09 00:29:55 KST
+           Universal time: Thu 2026-10-08 15:29:55 UTC
+                 RTC time: Thu 2026-10-08 15:29:56
+                Time zone: Asia/Seoul (KST, +0900)
+System clock synchronized: yes
+              NTP service: active
+          RTC in local TZ: no
+exit=0
+### ["timedatectl", "timesync-status"] wallUnixNs=1791473395865572033
+       Server: 91.189.91.157 (ntp.ubuntu.com)
+Poll interval: 32s (min: 32s; max 34min 8s)
+         Leap: normal
+      Version: 4
+      Stratum: 2
+    Reference: 84A36001
+    Precision: 1us (-24)
+Root distance: 23.353ms (max: 5s)
+       Offset: -907.734ms
+        Delay: 210.215ms
+       Jitter: 159.178ms
+ Packet count: 586
+    Frequency: +30.999ppm
+exit=0
+### ["timedatectl", "show-timesync", "--all"] wallUnixNs=1791473395867857783
+LinkNTPServers=
+SystemNTPServers=
+RuntimeNTPServers=
+FallbackNTPServers=ntp.ubuntu.com
+ServerName=ntp.ubuntu.com
+ServerAddress=91.189.91.157
+RootDistanceMaxUSec=5s
+PollIntervalMinUSec=32s
+PollIntervalMaxUSec=34min 8s
+PollIntervalUSec=32s
+NTPMessage={ Leap=0, Version=4, Mode=4, Stratum=2, Precision=-24, RootDelay=42.160ms, RootDispersion=2.273ms, Reference=84A36001, OriginateTimestamp=Fri 2026-10-09 00:29:45 KST, ReceiveTimestamp=Fri 2026-10-09 00:29:45 KST, TransmitTimestamp=Fri 2026-10-09 00:29:45 KST, DestinationTimestamp=Fri 2026-10-09 00:29:46 KST, Ignored=no, PacketCount=586, Jitter=159.178ms }
+Frequency=2031527
+exit=0
+### ["systemctl", "cat", "systemd-timesyncd"] wallUnixNs=1791473395874001755
+# /usr/lib/systemd/system/systemd-timesyncd.service
+#  SPDX-License-Identifier: LGPL-2.1-or-later
+#
+#  This file is part of systemd.
+#
+#  systemd is free software; you can redistribute it and/or modify it
+#  under the terms of the GNU Lesser General Public License as published by
+#  the Free Software Foundation; either version 2.1 of the License, or
+#  (at your option) any later version.
+
+[Unit]
+Description=Network Time Synchronization
+Documentation=man:systemd-timesyncd.service(8)
+ConditionCapability=CAP_SYS_TIME
+ConditionVirtualization=!container
+DefaultDependencies=no
+After=systemd-sysusers.service
+Before=time-set.target sysinit.target shutdown.target
+Conflicts=shutdown.target
+Wants=time-set.target
+
+[Service]
+AmbientCapabilities=CAP_SYS_TIME
+BusName=org.freedesktop.timesync1
+CapabilityBoundingSet=CAP_SYS_TIME
+# Turn off DNSSEC validation for hostname look-ups, since those need the
+# correct time to work, but we likely won't acquire that without NTP. Let's
+# break this chicken-and-egg cycle here.
+Environment=SYSTEMD_NSS_RESOLVE_VALIDATE=0
+ExecStart=!!/usr/lib/systemd/systemd-timesyncd
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+NoNewPrivileges=yes
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectProc=invisible
+ProtectControlGroups=yes
+ProtectHome=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectSystem=strict
+Restart=always
+RestartSec=0
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+RuntimeDirectory=systemd/timesync
+StateDirectory=systemd/timesync
+SystemCallArchitectures=native
+SystemCallErrorNumber=EPERM
+SystemCallFilter=@system-service @clock
+Type=notify
+User=systemd-timesync
+WatchdogSec=3min
+
+[Install]
+WantedBy=sysinit.target
+Alias=dbus-org.freedesktop.timesync1.service
+
+# /usr/lib/systemd/system/systemd-timesyncd.service.d/wsl.conf
+# Enable timesyncd on WSL machines
+# so WSL clock is synced on resume from suspend of the host.
+
+[Unit]
+ConditionVirtualization=
+ConditionVirtualization=|!container
+ConditionVirtualization=|wsl
+exit=0
+### ["systemctl", "--no-pager", "status", "systemd-timesyncd", "chrony", "chronyd", "ntp", "ntpd"] wallUnixNs=1791473395979341260
+● systemd-timesyncd.service - Network Time Synchronization
+     Loaded: loaded (/usr/lib/systemd/system/systemd-timesyncd.service; enabled; preset: enabled)
+    Drop-In: /usr/lib/systemd/system/systemd-timesyncd.service.d
+             └─wsl.conf
+     Active: active (running) since Thu 2026-10-08 15:40:36 KST; 8h ago
+       Docs: man:systemd-timesyncd.service(8)
+   Main PID: 171 (systemd-timesyn)
+     Status: "Contacted time server 91.189.91.157:123 (ntp.ubuntu.com)."
+      Tasks: 2 (limit: 37082)
+     Memory: 1.7M (peak: 2.5M)
+        CPU: 288ms
+     CGroup: /system.slice/systemd-timesyncd.service
+             └─171 /usr/lib/systemd/systemd-timesyncd
+
+Oct 08 15:40:36 DESKTOP-9S8M7T0 systemd[1]: Starting systemd-timesyncd.service - Network Time Synchronization...
+Oct 08 15:40:36 DESKTOP-9S8M7T0 systemd[1]: Started systemd-timesyncd.service - Network Time Synchronization.
+Oct 08 15:40:36 DESKTOP-9S8M7T0 systemd-timesyncd[171]: Contacted time server 91.189.91.157:123 (ntp.ubuntu.com).
+Oct 08 15:40:36 DESKTOP-9S8M7T0 systemd-timesyncd[171]: Initial clock synchronization to Thu 2026-10-08 15:40:36.700494 KST.
+Unit chrony.service could not be found.
+Unit chronyd.service could not be found.
+Unit ntp.service could not be found.
+Unit ntpd.service could not be found.
+exit=4
+### ["systemd-analyze", "cat-config", "systemd/timesyncd.conf"] wallUnixNs=1791473395985940280
+# /etc/systemd/timesyncd.conf
+#  This file is part of systemd.
+#
+#  systemd is free software; you can redistribute it and/or modify it under the
+#  terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation; either version 2.1 of the License, or (at your option)
+#  any later version.
+#
+# Entries in this file show the compile time defaults. Local configuration
+# should be created by either modifying this file (or a copy of it placed in
+# /etc/ if the original file is shipped in /usr/), or by creating "drop-ins" in
+# the /etc/systemd/timesyncd.conf.d/ directory. The latter is generally
+# recommended. Defaults can be restored by simply deleting the main
+# configuration file and all drop-ins located in /etc/.
+#
+# Use 'systemd-analyze cat-config systemd/timesyncd.conf' to display the full config.
+#
+# See timesyncd.conf(5) for details.
+
+[Time]
+#NTP=
+#FallbackNTP=ntp.ubuntu.com
+#RootDistanceMaxSec=5
+#PollIntervalMinSec=32
+#PollIntervalMaxSec=2048
+#ConnectionRetrySec=30
+#SaveIntervalSec=60
+exit=0
+### ["cat", "/sys/devices/system/clocksource/clocksource0/current_clocksource", "/sys/devices/system/clocksource/clocksource0/available_clocksource", "/sys/module/hv_utils/parameters/timesync_implicit", "/sys/class/ptp/ptp0/clock_name"] wallUnixNs=1791473395988002370
+tsc
+tsc hyperv_clocksource_tsc_page hyperv_clocksource_msr acpi_pm 
+Y
+hyperv
+exit=0
+### ["dpkg-query", "-W", "systemd", "systemd-timesyncd"] wallUnixNs=1791473395993063975
+systemd	255.4-1ubuntu8.17
+systemd-timesyncd	255.4-1ubuntu8.17
+exit=0
+### ["journalctl", "-b", "--no-pager", "-n", "80", "-o", "short-iso-precise", "-u", "systemd-timesyncd", "-u", "systemd-resolved"] wallUnixNs=1791473396211459725
+2026-10-08T23:47:36.863392+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:48:08.293212+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:48:39.745150+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:49:11.404835+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:49:42.899706+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:50:14.557412+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:50:46.146523+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:51:17.590354+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:51:49.112531+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:52:20.678377+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:52:52.133702+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:53:23.554419+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:53:54.984301+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:54:26.405805+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:54:57.801252+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:55:29.246846+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:56:00.701954+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:56:32.326303+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:57:03.751605+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:57:35.346827+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:58:06.755040+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:58:38.160007+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:59:09.595050+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-08T23:59:55.889277+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:00:27.287134+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:00:58.682110+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:01:30.081735+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:02:01.517766+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:02:32.908628+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:03:04.325117+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:03:35.775467+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:04:07.360387+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:04:38.739349+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:05:10.143791+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:05:41.575447+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:06:12.969139+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:06:44.355041+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:07:15.725910+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:07:47.080378+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:08:18.496224+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:08:49.888985+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:09:21.287398+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:09:52.648956+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:10:24.047277+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:10:55.394058+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:11:41.744335+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:12:13.169403+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:12:44.572271+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:13:15.994928+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:13:47.383814+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:14:18.779078+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:14:50.181592+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:15:21.576229+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:15:53.009654+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:16:24.656094+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:16:56.257167+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:17:27.653675+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:17:59.030418+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:18:30.400876+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:19:01.802660+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:19:33.180419+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:20:04.570410+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:20:35.996800+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:21:07.561731+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:21:38.925186+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:22:10.270822+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:22:41.639525+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:23:13.107076+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:23:44.735077+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:24:16.334187+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:24:47.886265+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:25:19.261464+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:25:50.591595+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:26:21.943373+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:26:53.520573+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:27:24.887769+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:28:11.106325+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:28:42.497046+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:29:13.823338+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+2026-10-09T00:29:45.151340+09:00 DESKTOP-9S8M7T0 systemd-resolved[170]: Clock change detected. Flushing caches.
+exit=0
+### ["journalctl", "-b", "-k", "--no-pager", "-o", "short-iso-precise"] wallUnixNs=1791473396251631423
+2026-10-08T15:40:35.214254+09:00 DESKTOP-9S8M7T0 kernel: Command line: initrd=\initrd.img WSL_ROOT_INIT=1 panic=-1 nr_cpus=32 hv_utils.timesync_implicit=1 console=hvc0 debug pty.legacy_count=0 WSL_ENABLE_CRASH_DUMP=1
+2026-10-08T15:40:35.214297+09:00 DESKTOP-9S8M7T0 kernel: Hypervisor detected: Microsoft Hyper-V
+2026-10-08T15:40:35.214300+09:00 DESKTOP-9S8M7T0 kernel: Hyper-V: privilege flags low 0xae7f, high 0x3b8030, hints 0x900c2c, misc 0xe4bed7b6
+2026-10-08T15:40:35.214303+09:00 DESKTOP-9S8M7T0 kernel: Hyper-V: Nested features: 0x4a0000
+2026-10-08T15:40:35.214306+09:00 DESKTOP-9S8M7T0 kernel: Hyper-V: LAPIC Timer Frequency: 0xc3500
+2026-10-08T15:40:35.214308+09:00 DESKTOP-9S8M7T0 kernel: Hyper-V: Using hypercall for remote TLB flush
+2026-10-08T15:40:35.214311+09:00 DESKTOP-9S8M7T0 kernel: clocksource: hyperv_clocksource_tsc_page: mask: 0xffffffffffffffff max_cycles: 0x24e6a1710, max_idle_ns: 440795202120 ns
+2026-10-08T15:40:35.214314+09:00 DESKTOP-9S8M7T0 kernel: clocksource: hyperv_clocksource_msr: mask: 0xffffffffffffffff max_cycles: 0x24e6a1710, max_idle_ns: 440795202120 ns
+2026-10-08T15:40:35.214317+09:00 DESKTOP-9S8M7T0 kernel: tsc: Detected 4299.904 MHz processor
+2026-10-08T15:40:35.214934+09:00 DESKTOP-9S8M7T0 kernel: Booting paravirtualized kernel on Hyper-V
+2026-10-08T15:40:35.214940+09:00 DESKTOP-9S8M7T0 kernel: clocksource: refined-jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 7645519600211568 ns
+2026-10-08T15:40:35.214962+09:00 DESKTOP-9S8M7T0 kernel: Hyper-V: PV spinlocks enabled
+2026-10-08T15:40:35.214968+09:00 DESKTOP-9S8M7T0 kernel: Kernel command line: initrd=\initrd.img WSL_ROOT_INIT=1 panic=-1 nr_cpus=32 hv_utils.timesync_implicit=1 console=hvc0 debug pty.legacy_count=0 WSL_ENABLE_CRASH_DUMP=1
+2026-10-08T15:40:35.215063+09:00 DESKTOP-9S8M7T0 kernel: Hyper-V: Host Build 10.0.26100.9444-9-0
+2026-10-08T15:40:35.215065+09:00 DESKTOP-9S8M7T0 kernel: Hyper-V: enabling crash_kexec_post_notifiers
+2026-10-08T15:40:35.215068+09:00 DESKTOP-9S8M7T0 kernel: Hyper-V: Using IPI hypercalls
+2026-10-08T15:40:35.215089+09:00 DESKTOP-9S8M7T0 kernel: Hyper-V: Using enlightened APIC (xapic mode)
+2026-10-08T15:40:35.215110+09:00 DESKTOP-9S8M7T0 kernel: clocksource: tsc-early: mask: 0xffffffffffffffff max_cycles: 0x3dfb08e2147, max_idle_ns: 440795236433 ns
+2026-10-08T15:40:35.215279+09:00 DESKTOP-9S8M7T0 kernel: clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 7645041785100000 ns
+2026-10-08T15:40:35.215692+09:00 DESKTOP-9S8M7T0 kernel: PTP clock support registered
+2026-10-08T15:40:35.215729+09:00 DESKTOP-9S8M7T0 kernel: clocksource: Switched to clocksource tsc-early
+2026-10-08T15:40:35.215747+09:00 DESKTOP-9S8M7T0 kernel: clocksource: acpi_pm: mask: 0xffffff max_cycles: 0xffffff, max_idle_ns: 2085701024 ns
+2026-10-08T15:40:35.215797+09:00 DESKTOP-9S8M7T0 kernel: clocksource: tsc: mask: 0xffffffffffffffff max_cycles: 0x3dfb08e2147, max_idle_ns: 440795236433 ns
+2026-10-08T15:40:35.215800+09:00 DESKTOP-9S8M7T0 kernel: clocksource: Switched to clocksource tsc
+2026-10-08T15:40:35.217361+09:00 DESKTOP-9S8M7T0 kernel: rtc_cmos 00:00: setting system clock to 2026-10-08T06:40:32 UTC (1791441632)
+2026-10-08T15:40:35.217429+09:00 DESKTOP-9S8M7T0 kernel: hv_utils: TimeSync IC version 4.0
+2026-10-08T15:40:35.217513+09:00 DESKTOP-9S8M7T0 kernel: sched_clock: Marking stable (324010998, 392679)->(339059780, -14656103)
+2026-10-08T15:40:35.217541+09:00 DESKTOP-9S8M7T0 kernel: clk: Disabling unused clocks
+2026-10-08T15:40:35.616684+09:00 DESKTOP-9S8M7T0 kernel: kvm_amd: TSC scaling supported
+2026-10-08T15:40:35.616760+09:00 DESKTOP-9S8M7T0 kernel: kvm_amd: kvm_amd: Hyper-V enlightened NPT TLB flush enabled
+2026-10-08T15:40:35.616766+09:00 DESKTOP-9S8M7T0 kernel: kvm_amd: kvm_amd: Hyper-V Direct TLB Flush enabled
+exit=0

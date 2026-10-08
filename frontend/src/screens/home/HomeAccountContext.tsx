@@ -15,6 +15,8 @@ import ErrorNotice from '../../components/states/ErrorNotice';
 import { useAppearance } from '../../theme/appearance';
 import { getHomeTier } from './tierPresentation';
 import TierEmblem from './TierEmblem';
+import TierCardBackground from './TierCardBackground';
+import { TIER_BACKGROUNDS } from './tierBackgrounds';
 
 export function useHomeAccountContext(account: TradingAccountDto | null) {
   const season = account?.mode === 'season' ? account.season : null;
@@ -44,27 +46,35 @@ export default function HomeAccountContext({ context }: { context: HomeAccountCo
     rankingQuery.data?.state === 'available' && rankingQuery.data.myRanking.state === 'available'
     ? rankingQuery.data.myRanking : null;
   const tier = hasSeason ? getHomeTier(getRankingTier(myRanking, rankType), mode) : null;
+  const background = tier ? TIER_BACKGROUNDS[tier.id][mode] : null;
   const emblemSize = width < 360 ? 132 : 160;
   const rank = myRanking && Number.isFinite(myRanking.rank) && myRanking.rank > 0 ? `#${myRanking.rank}` : '-';
   const tierLabel = tier?.name ?? (loading ? '티어 확인 중' : rankingQuery.isError ? '티어 확인 실패' : '티어 미정');
   const notice = rankingQuery.isError ? '랭킹 정보를 불러오지 못했습니다.' :
     !loading && !!seasonId && !myRanking ? '아직 표시할 랭킹 정보가 없습니다.' : null;
   return (
-    <AccountSwitcher home homeCardStyle={tier ? { backgroundColor: tier.palette.backgroundColor, borderColor: tier.palette.borderColor } : undefined}
+    <AccountSwitcher home homeCardStyle={tier ? { backgroundColor: tier.palette.backgroundColor,
+      ...(tier.id === 'whale' ? { paddingTop: '8%' as const } : {}) } : undefined}
+      homeBackground={tier ? <TierCardBackground key={`${tier.id}-${mode}`} tier={tier.id} mode={mode} /> : undefined}
+      homeBackgroundAspectRatio={background ? background.width / background.height : undefined}
+      homeBackgroundCornerRatio={tier?.id === 'whale' ? 0.05 : 0.04}
+      homeForegroundColor={tier?.palette.color}
       homeVisual={hasSeason ? <View style={styles.tier}>
         {tier ? <TierEmblem tier={tier.id} size={emblemSize} /> :
           <View testID="home-tier-neutral" style={[styles.neutral, { width: emblemSize, height: emblemSize }]}
             accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
             <View style={styles.neutralRing}><Text style={styles.neutralMark}>—</Text></View>
           </View>}
-        <Text testID={TEST_IDS.home.tier} style={[styles.tierName, tier && { color: tier.palette.color }]}
-          accessibilityLiveRegion="polite">{tierLabel}</Text>
-      </View> : undefined}>
+      </View> : undefined}
+      homeVisualCaption={hasSeason ? <Text testID={TEST_IDS.home.tier}
+        style={[styles.tierName, tier && { color: tier.palette.color }]}
+        accessibilityLiveRegion="polite">{tierLabel}</Text> : undefined}>
       <View style={styles.userDetails}>
         <View style={styles.identity}>
           {meQuery.isLoading ? <SectionSkeleton lines={1} /> : meQuery.data ? <>
             <ProfileAvatar profileImageUrl={meQuery.data.profileImageUrl} size={36} testID="home-profile-avatar" />
-            <Text testID={TEST_IDS.home.nickname} style={[styles.nickname, hasSeason && styles.seasonNickname]}>{meQuery.data.nickname}</Text>
+            <Text testID={TEST_IDS.home.nickname} style={[styles.nickname, hasSeason && styles.seasonNickname,
+              tier && { color: tier.palette.color }]}>{meQuery.data.nickname}</Text>
           </> : <InlineEmptyState message="사용자 정보를 불러오지 못했습니다." />}
         </View>
         {hasSeason ? <Text testID={TEST_IDS.home.rank} style={[styles.rank, tier && { color: tier.palette.color }]}
@@ -83,9 +93,9 @@ const styles = StyleSheet.create({
   userDetails: { minWidth: 0, gap: 10 },
   identity: { flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 },
   nickname: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: '600', lineHeight: 23 },
-  seasonNickname: { fontSize: 18, lineHeight: 27, fontWeight: '700' },
-  rank: { fontSize: 20, lineHeight: 30, fontWeight: '600', color: semantic.secondary, flexShrink: 1 },
-  tier: { alignItems: 'center', gap: 2, flexShrink: 0, maxWidth: '100%' },
+  seasonNickname: { fontSize: 19, lineHeight: 28, fontWeight: '700' },
+  rank: { fontSize: 20, lineHeight: 30, fontWeight: '700', color: semantic.secondary, flexShrink: 1 },
+  tier: { alignItems: 'center', flexShrink: 0, maxWidth: '100%' },
   tierName: { fontSize: 20, lineHeight: 29, fontWeight: '700', textAlign: 'center', color: semantic.secondary },
   neutral: { alignItems: 'center', justifyContent: 'center' },
   neutralRing: { width: '65%', height: '65%', borderRadius: 999, borderWidth: 1, borderColor: semantic.border, alignItems: 'center', justifyContent: 'center' },

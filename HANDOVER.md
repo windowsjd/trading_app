@@ -10,6 +10,42 @@
 
 ---
 
+## 2026-10-09 홈 시즌 티어 최종 배경·앰블럼·계정 변경 배치
+
+- **기능 구현 의도:** 완성 패싯 배경과 금속 테두리로 시즌 등급의 시각적 정체성과
+  승급감을 강화하고, 앰블럼의 체감 크기와 정보 배치를 개선한다. 기존 계정·시즌·랭킹
+  데이터 의미와 모바일 접근성은 유지한다.
+- 시작 HEAD `536b81b7`, clean working tree. 제품 변경은 frontend Home 표시와
+  AccountSwitcher의 Home 전용 슬롯에 한정한다. 작업 중 별도로 변경된 금융/WSL
+  조사 자료는 건드리지 않았다. 커밋·push·배포 없음.
+- ZIP 원본 12개를 `frontend/src/assets/home-tier-backgrounds/`에 바이트 그대로 추가했다.
+  `01_Bronze`~`06_Whale`의 Light/Dark를 정적 import로 연결하고 해상도·SHA-256을
+  manifest에 기록했다. canonical `master`는 기존처럼 Home에서만 Whale이다.
+- 사용자의 **원본 비율 우선** 선택에 따라 artwork·모서리·금속 띠는 등방 배율로
+  표시하고, 긴 카드에는 테두리 직전 색 행과 양옆 직선 부분을 연장한다. 하단 모서리와
+  금속 띠는 실제 카드 bottom에 고정하여 정보가 분리되거나 테두리가 끊기지 않게 했다.
+  원본 재디자인·중앙 패싯 stretch·불투명 패널·이중 border는 없다.
+- 기존 완성 앰블럼 6개와 preparation.json은 HEAD와 byte-identical이다. 표시 배율만
+  Bronze/Silver/Gold/Platinum/Diamond/Whale에 각각 1/1.005/1.01/1.015/.985/1.065를 적용했다.
+  Light/Dark 실제 비교에서 Whale의 몸체·파도·프레임이 가장 큰 질량감으로 보이는지 검토했다.
+  Diamond는 가장 넓은 실루엣을 유지한다. 면적 수치만으로 체감 크기를 판정하지 않았다.
+- 390px / fontScale 1 / Season 1에서 6티어 모두 제목·버튼 중심이 같은 행이고
+  변경 버튼은 44×44px이다. 작은 폭에서는 줄바꿈, 확대 글꼴·긴 제목에서는 그림 다음에
+  정보를 같은 카드 안에서 표시한다. 기존 Bottom Sheet·접근성 role/label을 유지했다.
+- selected account/자신의 seasonId/daily·final/provisionalTier·finalTier/query key/API는
+  그대로다. 일반 계정과 loading/error/unknown/null에는 배경을 전달하지 않으며,
+  과거 계정 전환과 늦은 ranking 응답, Light→Dark→Light 전환도 확인했다.
+- **검증 PASS:** `npm run check` (accounts/guides lint + typecheck + 1,947 tests,
+  실패·skip 0), Web export(원본 12개 포함), 티어 browser 588 records, 기존 Home
+  browser 244 layouts/states + 전환·저장·navigation, ZIP/앰블럼 byte 검사, 전체 자체검토와
+  `git diff --check`. 320~1280px/글꼴 1·1.5·2/긴·짧은 문구/양 테마를 검사했다.
+  기존 Home 전체 검사는 1920px까지 포함한다.
+- 최종 실행은 검증된 cgroup에서 순차 수행했다. 최대 관측 peak 964.2MiB,
+  OOM·guard stop·잔여 자식 0. Android/iOS 실제 글꼴·SVG·터치·화면 읽기 검증은 NOT_RUN이다.
+- [UI 구현·매핑·수치·캡처](frontend/docs/home-tier-card.md)와
+  [최종 검증 요약](frontend/docs/artifacts/home-tier-card-2026-10-09/verification.json)에
+  증거를 보존했다. 이전 앰블럼 준비/원형 측정 문서는 별도 날짜 문서로 보존했다.
+
 ## 2026-10-08 금융 PostgreSQL 간헐 실패 원인 조사
 
 - 시작 `main` / HEAD·origin/main·원격 main `c942ddee512666c2def0477c3a97c8fcbebb9ec2`,

@@ -1,0 +1,34 @@
+chronyc (chrony) version 4.1 (+READLINE +SECHASH +IPV6 +DEBUG)
+/var/lib/chrony:
+total 0
+pid:[4026532209]
+pid:[4026532209]
+Name:	cat
+NSpid:	236283
+Reference ID    : 50484330 (PHC0)
+Stratum         : 1
+Ref time (UTC)  : Thu Oct 08 15:35:34 2026
+System time     : 0.052503124 seconds slow of NTP time
+Last offset     : -0.071206212 seconds
+RMS offset      : 0.033390597 seconds
+Frequency       : 28654.189 ppm slow
+Residual freq   : -52.752 ppm
+Skew            : 1096.434 ppm
+Root delay      : 0.000000001 seconds
+Root dispersion : 0.110799886 seconds
+Update interval : 9.4 seconds
+Leap status     : Normal
+200 OK
+0 sources online
+0 sources offline
+0 sources doing burst (return to online)
+0 sources doing burst (return to offline)
+0 sources with unknown address
+MS Name/IP address         Stratum Poll Reach LastRx Last sample               
+===============================================================================
+#* PHC0                          0   3   377     7   -339ms[ -410ms] +/- 5701us
+
+STDERR:
+ls: cannot access '/run/chrony': No such file or directory
+ls: cannot access '/var/run/chrony': No such file or directory
+your 131072x1 screen size is bogus. expect trouble

@@ -1,0 +1,865 @@
+{
+  "date": "2026-10-09",
+  "baseHead": "536b81b79bbbfa08ff19055c586309bfe684a9fc",
+  "environment": {
+    "node": "v24.14.1",
+    "browser": "Playwright Chromium 1243",
+    "font": "Noto Sans CJK KR via FONTCONFIG_FILE",
+    "platform": "WSL / React Native Web",
+    "network": "HTTP/navigation fixtures; external requests blocked",
+    "fontScale": "existing RN Web adapter simulation"
+  },
+  "assetIntegrity": {
+    "backgrounds": "All 12 bytes and SHA-256 equal the supplied Tier_Backgrounds_12 (1).zip entries",
+    "manifest": "../../../src/assets/home-tier-backgrounds/manifest.json",
+    "existingEmblems": "All 6 PNGs and preparation.json equal Git HEAD; both image axes use the same scale"
+  },
+  "unitAndLint": {
+    "counts": {
+      "tests": 1947,
+      "suites": 203,
+      "pass": 1947,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "command": "npm run check",
+    "accountsLint": "PASS",
+    "guidesLint": "PASS",
+    "typecheck": "PASS"
+  },
+  "webExport": {
+    "status": "PASS",
+    "command": "npm run export:web -- --max-workers 1",
+    "backgroundsIncluded": [
+      "01_Bronze_Dark.4d93405580d40b7cc6baf32326845e35.png",
+      "01_Bronze_Light.b2c178e7b08a519b57494ef9ea41289c.png",
+      "02_Silver_Dark.ec136453dce0b901507895dbf456b063.png",
+      "02_Silver_Light.16de9fccecfd95656b35791dca03eefa.png",
+      "03_Gold_Dark.ae07d377a3fb757948ca4dc4f34ac50b.png",
+      "03_Gold_Light.b472d2ad69fe700ef2479ea506e9038e.png",
+      "04_Platinum_Dark.ef1d268d297b2e1968ba9656f7bf4a85.png",
+      "04_Platinum_Light.8ce31c381ee6e7626a2c392887ebcb73.png",
+      "05_Diamond_Dark.00ad3dba33c62b786ca01e5f555f4f52.png",
+      "05_Diamond_Light.cbfd7fab853e88b4ce3ec57a74f4945b.png",
+      "06_Whale_Dark.22dfd31ea535e1c7f4c368d6cc2c70e5.png",
+      "06_Whale_Light.560c955b5f454df88756aa2215dd8eaf.png"
+    ]
+  },
+  "tierBrowser": {
+    "records": 588,
+    "groups": {
+      "matrix": 504,
+      "ranking-loading": 1,
+      "ranking-error": 1,
+      "ranking-unavailable": 1,
+      "unranked": 1,
+      "active-past-general-active": 1,
+      "status-copy": 72,
+      "live-appearance": 6,
+      "late-ranking-past-general": 1
+    },
+    "matrixWidths": [
+      320,
+      360,
+      390,
+      430,
+      768,
+      1280
+    ],
+    "fontScales": [
+      1,
+      1.5,
+      2
+    ],
+    "appearances": [
+      "light",
+      "dark"
+    ],
+    "longText": [
+      false,
+      true
+    ],
+    "tiers": [
+      "bronze",
+      "silver",
+      "gold",
+      "platinum",
+      "diamond",
+      "master",
+      null
+    ],
+    "unknownTier": "separately asserted neutral",
+    "errors": []
+  },
+  "homeBrowser": {
+    "switching": "passed",
+    "navigation": "passed",
+    "persistence": "passed",
+    "appearance": "passed",
+    "errors": [],
+    "records": 244,
+    "matrixLayouts": 216,
+    "maxWidth": 1920
+  },
+  "contrast": {
+    "method": "Opaque glyph/stroke cores in actual card screenshots matched to source background PNG pixels through rendered SVG bands; antialiased edges/empty line-box space excluded; zero samples fail. Full text boxes still checked for overlap and clipping. Browser evidence, not a native accessibility certification.",
+    "largeTextMinimum": {
+      "text": "Platinum",
+      "ratio": 3.089571169647877,
+      "required": 3,
+      "case": {
+        "appearance": "dark",
+        "tier": "platinum",
+        "width": 1280,
+        "fontScale": 1,
+        "long": false
+      }
+    },
+    "smallTextMinimum": {
+      "text": "진행 중 · 참가 제외",
+      "ratio": 6.173638163732582,
+      "required": 4.5,
+      "case": {
+        "scenario": "status-copy",
+        "appearance": "light",
+        "tier": "diamond",
+        "fontScale": 1,
+        "state": "excluded"
+      }
+    },
+    "iconMinimum": 3.3880195029298066
+  },
+  "baseline390": [
+    {
+      "case": {
+        "appearance": "light",
+        "tier": "bronze",
+        "width": 390,
+        "fontScale": 1,
+        "long": false
+      },
+      "image": {
+        "sx": 0.2919516509433962,
+        "sy": 0.2919363839285714,
+        "fit": "contain",
+        "equivalentSize": 127.9920491057193,
+        "visibleWidth": 151.223046875,
+        "visibleHeight": 159.98113839285713
+      },
+      "card": {
+        "x": 16,
+        "y": 16,
+        "right": 374,
+        "bottom": 240.796875,
+        "width": 358,
+        "height": 224.796875
+      },
+      "title": {
+        "x": 24,
+        "y": 38.5,
+        "right": 106,
+        "bottom": 65.5,
+        "width": 82,
+        "height": 27,
+        "size": 19,
+        "weight": 800
+      },
+      "button": {
+        "x": 108,
+        "y": 30,
+        "right": 152,
+        "bottom": 74,
+        "width": 44,
+        "height": 44
+      }
+    },
+    {
+      "case": {
+        "appearance": "light",
+        "tier": "silver",
+        "width": 390,
+        "fontScale": 1,
+        "long": false
+      },
+      "image": {
+        "sx": 0.3038000465549348,
+        "sy": 0.3038000465549348,
+        "fit": "contain",
+        "equivalentSize": 129.92390614968602,
+        "visibleWidth": 159.49502444134077,
+        "visibleHeight": 159.49502444134077
+      },
+      "card": {
+        "x": 16,
+        "y": 16,
+        "right": 374,
+        "bottom": 240.453125,
+        "width": 358,
+        "height": 224.453125
+      },
+      "title": {
+        "x": 24,
+        "y": 38.5,
+        "right": 106,
+        "bottom": 65.5,
+        "width": 82,
+        "height": 27,
+        "size": 19,
+        "weight": 800
+      },
+      "button": {
+        "x": 108,
+        "y": 30,
+        "right": 152,
+        "bottom": 74,
+        "width": 44,
+        "height": 44
+      }
+    },
+    {
+      "case": {
+        "appearance": "light",
+        "tier": "gold",
+        "width": 390,
+        "fontScale": 1,
+        "long": false
+      },
+      "image": {
+        "sx": 0.3000437062937063,
+        "sy": 0.300033542039356,
+        "fit": "contain",
+        "equivalentSize": 131.85933547013317,
+        "visibleWidth": 168.01878354203936,
+        "visibleHeight": 164.11834749552773
+      },
+      "card": {
+        "x": 16,
+        "y": 16,
+        "right": 374,
+        "bottom": 245.03125,
+        "width": 358,
+        "height": 229.03125
+      },
+      "title": {
+        "x": 24,
+        "y": 38.5,
+        "right": 106,
+        "bottom": 65.5,
+        "width": 82,
+        "height": 27,
+        "size": 19,
+        "weight": 800
+      },
+      "button": {
+        "x": 108,
+        "y": 30,
+        "right": 152,
+        "bottom": 74,
+        "width": 44,
+        "height": 44
+      }
+    },
+    {
+      "case": {
+        "appearance": "light",
+        "tier": "platinum",
+        "width": 390,
+        "fontScale": 1,
+        "long": false
+      },
+      "image": {
+        "sx": 0.2867111650485437,
+        "sy": 0.28669871794871793,
+        "fit": "contain",
+        "equivalentSize": 133.80559089514693,
+        "visibleWidth": 173.73942307692306,
+        "visibleHeight": 164.27836538461537
+      },
+      "card": {
+        "x": 16,
+        "y": 16,
+        "right": 374,
+        "bottom": 245.03125,
+        "width": 358,
+        "height": 229.03125
+      },
+      "title": {
+        "x": 24,
+        "y": 38.5,
+        "right": 106,
+        "bottom": 65.5,
+        "width": 82,
+        "height": 27,
+        "size": 19,
+        "weight": 800
+      },
+      "button": {
+        "x": 108,
+        "y": 30,
+        "right": 152,
+        "bottom": 74,
+        "width": 44,
+        "height": 44
+      }
+    },
+    {
+      "case": {
+        "appearance": "light",
+        "tier": "diamond",
+        "width": 390,
+        "fontScale": 1,
+        "long": false
+      },
+      "image": {
+        "sx": 0.28829835766423356,
+        "sy": 0.28828125,
+        "fit": "contain",
+        "equivalentSize": 131.1116893444429,
+        "visibleWidth": 193.725,
+        "visibleHeight": 157.68984375
+      },
+      "card": {
+        "x": 16,
+        "y": 16,
+        "right": 374,
+        "bottom": 238.75,
+        "width": 358,
+        "height": 222.75
+      },
+      "title": {
+        "x": 24,
+        "y": 38.5,
+        "right": 106,
+        "bottom": 65.5,
+        "width": 82,
+        "height": 27,
+        "size": 19,
+        "weight": 800
+      },
+      "button": {
+        "x": 108,
+        "y": 30,
+        "right": 152,
+        "bottom": 74,
+        "width": 44,
+        "height": 44
+      }
+    },
+    {
+      "case": {
+        "appearance": "light",
+        "tier": "master",
+        "width": 390,
+        "fontScale": 1,
+        "long": false
+      },
+      "image": {
+        "sx": 0.3302801724137931,
+        "sy": 0.33029681467181465,
+        "fit": "contain",
+        "equivalentSize": 143.12538131618916,
+        "visibleWidth": 187.2688577586207,
+        "visibleHeight": 167.1217672413793
+      },
+      "card": {
+        "x": 16,
+        "y": 16,
+        "right": 374,
+        "bottom": 266.609375,
+        "width": 358,
+        "height": 250.609375
+      },
+      "title": {
+        "x": 24,
+        "y": 53.125,
+        "right": 106,
+        "bottom": 80.125,
+        "width": 82,
+        "height": 27,
+        "size": 19,
+        "weight": 800
+      },
+      "button": {
+        "x": 108,
+        "y": 44.625,
+        "right": 152,
+        "bottom": 88.625,
+        "width": 44,
+        "height": 44
+      }
+    },
+    {
+      "case": {
+        "appearance": "dark",
+        "tier": "bronze",
+        "width": 390,
+        "fontScale": 1,
+        "long": false
+      },
+      "image": {
+        "sx": 0.2919516509433962,
+        "sy": 0.2919363839285714,
+        "fit": "contain",
+        "equivalentSize": 127.9920491057193,
+        "visibleWidth": 151.223046875,
+        "visibleHeight": 159.98113839285713
+      },
+      "card": {
+        "x": 16,
+        "y": 16,
+        "right": 374,
+        "bottom": 240.796875,
+        "width": 358,
+        "height": 224.796875
+      },
+      "title": {
+        "x": 24,
+        "y": 38.5,
+        "right": 106,
+        "bottom": 65.5,
+        "width": 82,
+        "height": 27,
+        "size": 19,
+        "weight": 800
+      },
+      "button": {
+        "x": 108,
+        "y": 30,
+        "right": 152,
+        "bottom": 74,
+        "width": 44,
+        "height": 44
+      }
+    },
+    {
+      "case": {
+        "appearance": "dark",
+        "tier": "silver",
+        "width": 390,
+        "fontScale": 1,
+        "long": false
+      },
+      "image": {
+        "sx": 0.3038000465549348,
+        "sy": 0.3038000465549348,
+        "fit": "contain",
+        "equivalentSize": 129.92390614968602,
+        "visibleWidth": 159.49502444134077,
+        "visibleHeight": 159.49502444134077
+      },
+      "card": {
+        "x": 16,
+        "y": 16,
+        "right": 374,
+        "bottom": 240.453125,
+        "width": 358,
+        "height": 224.453125
+      },
+      "title": {
+        "x": 24,
+        "y": 38.5,
+        "right": 106,
+        "bottom": 65.5,
+        "width": 82,
+        "height": 27,
+        "size": 19,
+        "weight": 800
+      },
+      "button": {
+        "x": 108,
+        "y": 30,
+        "right": 152,
+        "bottom": 74,
+        "width": 44,
+        "height": 44
+      }
+    },
+    {
+      "case": {
+        "appearance": "dark",
+        "tier": "gold",
+        "width": 390,
+        "fontScale": 1,
+        "long": false
+      },
+      "image": {
+        "sx": 0.3000437062937063,
+        "sy": 0.300033542039356,
+        "fit": "contain",
+        "equivalentSize": 131.85933547013317,
+        "visibleWidth": 168.01878354203936,
+        "visibleHeight": 164.11834749552773
+      },
+      "card": {
+        "x": 16,
+        "y": 16,
+        "right": 374,
+        "bottom": 245.03125,
+        "width": 358,
+        "height": 229.03125
+      },
+      "title": {
+        "x": 24,
+        "y": 38.5,
+        "right": 106,
+        "bottom": 65.5,
+        "width": 82,
+        "height": 27,
+        "size": 19,
+        "weight": 800
+      },
+      "button": {
+        "x": 108,
+        "y": 30,
+        "right": 152,
+        "bottom": 74,
+        "width": 44,
+        "height": 44
+      }
+    },
+    {
+      "case": {
+        "appearance": "dark",
+        "tier": "platinum",
+        "width": 390,
+        "fontScale": 1,
+        "long": false
+      },
+      "image": {
+        "sx": 0.2867111650485437,
+        "sy": 0.28669871794871793,
+        "fit": "contain",
+        "equivalentSize": 133.80559089514693,
+        "visibleWidth": 173.73942307692306,
+        "visibleHeight": 164.27836538461537
+      },
+      "card": {
+        "x": 16,
+        "y": 16,
+        "right": 374,
+        "bottom": 245.03125,
+        "width": 358,
+        "height": 229.03125
+      },
+      "title": {
+        "x": 24,
+        "y": 38.5,
+        "right": 106,
+        "bottom": 65.5,
+        "width": 82,
+        "height": 27,
+        "size": 19,
+        "weight": 800
+      },
+      "button": {
+        "x": 108,
+        "y": 30,
+        "right": 152,
+        "bottom": 74,
+        "width": 44,
+        "height": 44
+      }
+    },
+    {
+      "case": {
+        "appearance": "dark",
+        "tier": "diamond",
+        "width": 390,
+        "fontScale": 1,
+        "long": false
+      },
+      "image": {
+        "sx": 0.28829835766423356,
+        "sy": 0.28828125,
+        "fit": "contain",
+        "equivalentSize": 131.1116893444429,
+        "visibleWidth": 193.725,
+        "visibleHeight": 157.68984375
+      },
+      "card": {
+        "x": 16,
+        "y": 16,
+        "right": 374,
+        "bottom": 238.75,
+        "width": 358,
+        "height": 222.75
+      },
+      "title": {
+        "x": 24,
+        "y": 38.5,
+        "right": 106,
+        "bottom": 65.5,
+        "width": 82,
+        "height": 27,
+        "size": 19,
+        "weight": 800
+      },
+      "button": {
+        "x": 108,
+        "y": 30,
+        "right": 152,
+        "bottom": 74,
+        "width": 44,
+        "height": 44
+      }
+    },
+    {
+      "case": {
+        "appearance": "dark",
+        "tier": "master",
+        "width": 390,
+        "fontScale": 1,
+        "long": false
+      },
+      "image": {
+        "sx": 0.3302801724137931,
+        "sy": 0.33029681467181465,
+        "fit": "contain",
+        "equivalentSize": 143.12538131618916,
+        "visibleWidth": 187.2688577586207,
+        "visibleHeight": 167.1217672413793
+      },
+      "card": {
+        "x": 16,
+        "y": 16,
+        "right": 374,
+        "bottom": 266.609375,
+        "width": 358,
+        "height": 250.609375
+      },
+      "title": {
+        "x": 24,
+        "y": 53.125,
+        "right": 106,
+        "bottom": 80.125,
+        "width": 82,
+        "height": 27,
+        "size": 19,
+        "weight": 800
+      },
+      "button": {
+        "x": 108,
+        "y": 44.625,
+        "right": 152,
+        "bottom": 88.625,
+        "width": 44,
+        "height": 44
+      }
+    }
+  ],
+  "visualReview": {
+    "sixTierComparisons": "Reviewed actual Light/Dark component captures; Whale has largest visual mass with its taller denser silhouette; Diamond retains the widest silhouette. Perceived progression is a visual judgment, not inferred from monotonic alpha area.",
+    "scaleAdjustments": {
+      "bronze": 1,
+      "silver": 1.005,
+      "gold": 1.01,
+      "platinum": 1.015,
+      "diamond": 0.985,
+      "whale": 1.065
+    },
+    "switcher": "All 6 tiers at 390px/fontScale 1/Season 1 have same vertical title/button center and 44x44 target in both themes.",
+    "expandedCard": "Original artwork scale preserved, edge scanlines extend the card, bottom corners/rim remain at actual card bottom; long text stays inside a single continuous frame."
+  },
+  "finalCgroupRuns": {
+    "full-glyph-2": {
+      "config": {
+        "memory": 3221225472,
+        "tasks": 192,
+        "seconds": 900,
+        "heap": 1152,
+        "cwd": "/home/nayuta/projects/trading-app/frontend",
+        "command": [
+          "node",
+          "test/browser/homeTierBrowser.cjs"
+        ],
+        "env": {
+          "NODE_PATH": "/tmp/futures-resume/browser-tools/node_modules",
+          "HOME_TIER_BROWSER_OUTPUT": "/tmp/home-tier-20261009/full",
+          "LD_LIBRARY_PATH": "/tmp/futures-resume/deps/usr/lib/x86_64-linux-gnu",
+          "FONTCONFIG_FILE": "/tmp/futures-resume/fonts.conf",
+          "BROWSER_EXECUTABLE_PATH": "/home/nayuta/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome",
+          "GOMAXPROCS": "2"
+        }
+      },
+      "unit": "codex-home-tier-full-glyph-2.service",
+      "peak": 600182784,
+      "maxTasks": 114,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-home-tier-full-glyph-2.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-home-tier-full-glyph-2.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-home-tier-full-glyph-2.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "192"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=15min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=192\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 255.848,
+      "returncode": 0,
+      "final": "Result=success\nExecMainStatus=0\nMemoryPeak=[not set]\nMemorySwapPeak=[not set]\n",
+      "remaining": null
+    },
+    "home-browser-final": {
+      "config": {
+        "memory": 3221225472,
+        "tasks": 192,
+        "seconds": 900,
+        "heap": 1152,
+        "cwd": "/home/nayuta/projects/trading-app/frontend",
+        "command": [
+          "node",
+          "test/browser/homeBrowser.cjs"
+        ],
+        "env": {
+          "NODE_PATH": "/tmp/futures-resume/browser-tools/node_modules",
+          "LD_LIBRARY_PATH": "/tmp/futures-resume/deps/usr/lib/x86_64-linux-gnu",
+          "FONTCONFIG_FILE": "/tmp/futures-resume/fonts.conf",
+          "BROWSER_EXECUTABLE_PATH": "/home/nayuta/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome",
+          "HOME_BROWSER_OUTPUT": "/tmp/home-tier-20261009/home-regression",
+          "GOMAXPROCS": "2"
+        }
+      },
+      "unit": "codex-home-tier-home-browser-final.service",
+      "peak": 546287616,
+      "maxTasks": 108,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-home-tier-home-browser-final.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-home-tier-home-browser-final.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-home-tier-home-browser-final.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "192"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=15min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=192\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 79.002,
+      "returncode": 0,
+      "final": "Result=success\nExecMainStatus=0\nMemoryPeak=[not set]\nMemorySwapPeak=[not set]\n",
+      "remaining": null
+    },
+    "check-final": {
+      "config": {
+        "memory": 2147483648,
+        "tasks": 128,
+        "seconds": 1200,
+        "heap": 768,
+        "cwd": "/home/nayuta/projects/trading-app/frontend",
+        "command": [
+          "npm",
+          "run",
+          "check"
+        ]
+      },
+      "unit": "codex-home-tier-check-final.service",
+      "peak": 1010995200,
+      "maxTasks": 39,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-home-tier-check-final.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-home-tier-check-final.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-home-tier-check-final.service",
+        "limits": {
+          "memory.max": "2147483648",
+          "memory.swap.max": "0",
+          "pids.max": "128"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=20min\nMemoryMax=2147483648\nMemorySwapMax=0\nTasksMax=128\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 150.782,
+      "returncode": 0,
+      "final": "Result=success\nExecMainStatus=0\nMemoryPeak=[not set]\nMemorySwapPeak=[not set]\n",
+      "remaining": null
+    },
+    "export": {
+      "config": {
+        "memory": 3221225472,
+        "tasks": 128,
+        "seconds": 1200,
+        "heap": 1152,
+        "cwd": "/home/nayuta/projects/trading-app/frontend",
+        "command": [
+          "npm",
+          "run",
+          "export:web",
+          "--",
+          "--max-workers",
+          "1"
+        ]
+      },
+      "unit": "codex-home-tier-export.service",
+      "peak": 393211904,
+      "maxTasks": 24,
+      "stop": null,
+      "preflight": {
+        "childCoreDumpFilter": "00000000",
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/codex-home-tier-export.service",
+        "group": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-home-tier-export.service",
+        "childGroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/codex-home-tier-export.service",
+        "limits": {
+          "memory.max": "3221225472",
+          "memory.swap.max": "0",
+          "pids.max": "128"
+        },
+        "coreLimit": [
+          0,
+          0
+        ],
+        "dumpable": 0
+      },
+      "monitorGroup": "0::/init.scope",
+      "properties": "RuntimeMaxUSec=20min\nMemoryMax=3221225472\nMemorySwapMax=0\nTasksMax=128\nLimitCORE=0\nKillMode=control-group\n",
+      "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "seconds": 6.391,
+      "returncode": 0,
+      "final": "Result=success\nExecMainStatus=0\nMemoryPeak=[not set]\nMemorySwapPeak=[not set]\n",
+      "remaining": null
+    }
+  },
+  "screenshots": {
+    "diamond-dark.png": "7473f5d0d444e792a825ba350b6583f57cb1b5e20a4e70637186472d0974a600",
+    "diamond-light.png": "d2af85ce553648d82461ee1c428a0b9ae51b5d2c2c73ef10d83c1d39f2fac02d",
+    "home-whale-dark.png": "03f6ea726d84fc9b5e2a3625c3accc57d7f0325a3fc4012934bc42057d814919",
+    "home-whale-light.png": "b857efde62b00b28812793e859fecb2524ef5b626c8b2000de69c3317af4d392",
+    "large-text-dark.png": "fc25b32c2aa7f32c37aedda45bd2ba5254b6d7b966468c15273e1ab53c7a2ac1",
+    "large-text-light.png": "08175e3a483c7062870401ca06099cefa207caf204e6a08e33c0353209f9ecc7",
+    "narrow-diamond-dark.png": "76fcb6cc0695494c0401bf308cf383f223ab1b5bab4227cb63848db827f05c8e",
+    "narrow-diamond-light.png": "c38478d41ada3663bc9f568c941b68b503688a22a29a486fa28b1d5bfbeae79b",
+    "tiers-dark.png": "2e15ca68a1f57a936c627f368dfc4c4b7ddcad12f24ea965640554fc2a17262b",
+    "tiers-light.png": "6d662e407b2831186876ba699fa1eff37c9cb62bc28445ec22d59cd1003c710c"
+  },
+  "limitations": [
+    "Android/iOS runtime, native font scaling, SVG rasterization, touch and screen readers NOT_RUN.",
+    "Desktop tests use fixtures, not live backend accounts.",
+    "Long cards intentionally extend edge colors below the intact artwork instead of generating new facets."
+  ]
+}

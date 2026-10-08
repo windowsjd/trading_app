@@ -1,0 +1,166 @@
+URL: https://raw.githubusercontent.com/mlichvar/chrony/4.1/sys_generic.c
+47: static lcl_AccrueOffsetDriver drv_accrue_offset;
+48: static lcl_OffsetCorrectionDriver drv_get_offset_correction;
+49: 
+50: /* Current frequency as requested by the local module (in ppm) */
+51: static double base_freq;
+52: 
+53: /* Maximum frequency that can be set by drv_set_freq (in ppm) */
+54: static double max_freq;
+55: 
+56: /* Maximum expected delay in the actual frequency change (e.g. kernel ticks)
+57:    in local time */
+58: static double max_freq_change_delay;
+59: 
+60: /* Maximum allowed frequency offset relative to the base frequency */
+61: static double max_corr_freq;
+62: 
+63: /* Amount of outstanding offset to process */
+64: static double offset_register;
+65: 
+66: /* Minimum offset to correct */
+67: #define MIN_OFFSET_CORRECTION 1.0e-9
+68: 
+69: /* Current frequency offset between base_freq and the real clock frequency
+70:    as set by drv_set_freq (not in ppm) */
+71: static double slew_freq;
+72: 
+73: /* Time (raw) of last update of slewing frequency and offset */
+74: static struct timespec slew_start;
+75: 
+76: /* Limits for the slew timeout */
+77: #define MIN_SLEW_TIMEOUT 1.0
+78: #define MAX_SLEW_TIMEOUT 1.0e4
+79: 
+84: static double correction_rate;
+85: 
+86: /* Maximum expected offset correction error caused by delayed change in the
+87:    real frequency of the clock */
+88: static double slew_error;
+89: 
+90: /* Minimum offset that the system driver can slew faster than the maximum
+91:    frequency offset that it allows to be set directly */
+92: static double fastslew_min_offset;
+93: 
+94: /* Maximum slew rate of the system driver */
+95: static double fastslew_max_rate;
+96: 
+97: /* Flag indicating that the system driver is currently slewing */
+103: static void update_slew(void);
+104: 
+105: /* ================================================== */
+106: /* Adjust slew_start on clock step */
+107: 
+108: static void
+109: handle_step(struct timespec *raw, struct timespec *cooked, double dfreq,
+110:             double doffset, LCL_ChangeType change_type, void *anything)
+111: {
+112:   if (change_type == LCL_ChangeUnknownStep) {
+113:     /* Reset offset and slewing */
+114:     slew_start = *raw;
+115:     offset_register = 0.0;
+192:       duration = MIN_SLEW_TIMEOUT;
+193:   }
+194: 
+195:   /* Get frequency offset needed to slew the offset in the duration
+196:      and clamp it to the allowed maximum */
+197:   corr_freq = offset_register / duration;
+198:   if (corr_freq < -max_corr_freq)
+199:     corr_freq = -max_corr_freq;
+200:   else if (corr_freq > max_corr_freq)
+201:     corr_freq = max_corr_freq;
+202: 
+203:   /* Let the system driver perform the slew if the requested frequency
+204:      offset is too large for the frequency driver */
+205:   if (drv_accrue_offset && fabs(corr_freq) >= fastslew_max_rate &&
+206:       fabs(offset_register) > fastslew_min_offset) {
+207:     start_fastslew();
+208:     corr_freq = 0.0;
+209:   }
+210: 
+211:   /* Get the new real frequency and clamp it */
+212:   total_freq = clamp_freq(base_freq + corr_freq * (1.0e6 - base_freq));
+213: 
+214:   /* Set the new frequency (the actual frequency returned by the call may be
+215:      slightly different from the requested frequency due to rounding) */
+216:   total_freq = (*drv_set_freq)(total_freq);
+217: 
+218:   /* Compute the new slewing frequency, it's relative to the real frequency to
+219:      make the calculation in offset_convert() cheaper */
+220:   old_slew_freq = slew_freq;
+221:   slew_freq = (total_freq - base_freq) / (1.0e6 - total_freq);
+222: 
+223:   /* Compute the dispersion introduced by changing frequency and add it
+224:      to all statistics held at higher levels in the system */
+225:   slew_error = fabs((old_slew_freq - slew_freq) * max_freq_change_delay);
+226:   if (slew_error >= MIN_OFFSET_CORRECTION)
+227:     lcl_InvokeDispersionNotifyHandlers(slew_error);
+228: 
+229:   /* Compute the duration of the slew and clamp it.  If the slewing frequency
+230:      is zero or has wrong sign (e.g. due to rounding in the frequency driver or
+231:      when base_freq is larger than max_freq, or fast slew is active), use the
+232:      maximum timeout and try again on the next update. */
+233:   if (fabs(offset_register) < MIN_OFFSET_CORRECTION ||
+234:       offset_register * slew_freq <= 0.0) {
+235:     duration = MAX_SLEW_TIMEOUT;
+236:   } else {
+263: /* ================================================== */
+264: 
+265: static double
+266: read_frequency(void)
+267: {
+268:   return base_freq;
+269: }
+270: 
+271: /* ================================================== */
+272: 
+273: static double
+274: set_frequency(double freq_ppm)
+275: {
+276:   base_freq = freq_ppm;
+277:   update_slew();
+278: 
+279:   return base_freq;
+280: }
+322: /* Positive means currently fast of true time, i.e. jump backwards */
+323: 
+324: static int
+325: apply_step_offset(double offset)
+326: {
+327:   struct timespec old_time, new_time;
+328:   struct timeval new_time_tv;
+329:   double err;
+330: 
+331:   LCL_ReadRawTime(&old_time);
+367: SYS_Generic_CompleteFreqDriver(double max_set_freq_ppm, double max_set_freq_delay,
+368:                                lcl_ReadFrequencyDriver sys_read_freq,
+369:                                lcl_SetFrequencyDriver sys_set_freq,
+370:                                lcl_ApplyStepOffsetDriver sys_apply_step_offset,
+371:                                double min_fastslew_offset, double max_fastslew_rate,
+372:                                lcl_AccrueOffsetDriver sys_accrue_offset,
+373:                                lcl_OffsetCorrectionDriver sys_get_offset_correction,
+374:                                lcl_SetLeapDriver sys_set_leap,
+375:                                lcl_SetSyncStatusDriver sys_set_sync_status)
+376: {
+392:   fastslew_max_rate = max_fastslew_rate / 1.0e6;
+393:   fastslew_active = 0;
+394: 
+395:   lcl_RegisterSystemDrivers(read_frequency, set_frequency,
+396:                             accrue_offset, sys_apply_step_offset ?
+397:                               sys_apply_step_offset : apply_step_offset,
+398:                             offset_convert, sys_set_leap, set_sync_status);
+399: 
+400:   LCL_AddParameterChangeHandler(handle_step, NULL);
+401: }
+402: 
+403: /* ================================================== */
+404: 
+405: void
+406: SYS_Generic_Finalise(void)
+418:   LCL_ReadRawTime(&now);
+419:   stop_fastslew(&now);
+420: 
+421:   LCL_RemoveParameterChangeHandler(handle_step, NULL);
+422: }
+423: 
+424: /* ================================================== */

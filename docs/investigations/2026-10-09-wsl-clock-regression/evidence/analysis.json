@@ -1,0 +1,240 @@
+{
+  "phaseB": {
+    "windows": [
+      {
+        "durationSeconds": 180,
+        "environment": "Windows",
+        "monotonicTicks": 317820502075,
+        "frequency": 10000000,
+        "kind": "start",
+        "wallTicks": 639270701481682605,
+        "utc": "2026-10-08T15:29:08.1682605Z"
+      },
+      {
+        "samples": 13682,
+        "minDifferenceMs": -0.5406000000000013,
+        "kind": "summary",
+        "utc": "2026-10-08T15:32:08.1750260Z",
+        "maxSampleGapMs": 83.0996,
+        "events": 0,
+        "elapsedMs": 180006.4554,
+        "monotonicTicks": 319620566614,
+        "backwards": 0
+      }
+    ],
+    "wslSummary": {
+      "kind": "summary",
+      "utc": "2026-10-08T15:32:03.094489+00:00",
+      "monotonicNs": 32175857183693,
+      "elapsedMs": 180000.053629,
+      "samples": 83867,
+      "events": 6,
+      "backwards": 6,
+      "maxSampleGapMs": 4.581529
+    },
+    "wslEvents": [
+      {
+        "kind": "discontinuity",
+        "utc": "2026-10-08T15:29:13.824429+00:00",
+        "wallUnixNs": 1791473353824429057,
+        "previousWallUnixNs": 1791473354758136657,
+        "monotonicNs": 32002144349354,
+        "elapsedMs": 6287.21929,
+        "wallDeltaMs": -933.7076,
+        "monotonicDeltaMs": 2.141736,
+        "differenceMs": -935.849336,
+        "sample": 2933
+      },
+      {
+        "kind": "discontinuity",
+        "utc": "2026-10-08T15:29:45.151618+00:00",
+        "wallUnixNs": 1791473385151618636,
+        "previousWallUnixNs": 1791473386057213530,
+        "monotonicNs": 32034379273357,
+        "elapsedMs": 38522.143293,
+        "wallDeltaMs": -905.594894,
+        "monotonicDeltaMs": 2.13948,
+        "differenceMs": -907.734374,
+        "sample": 17937
+      },
+      {
+        "kind": "discontinuity",
+        "utc": "2026-10-08T15:30:16.542125+00:00",
+        "wallUnixNs": 1791473416542124537,
+        "previousWallUnixNs": 1791473417407340019,
+        "monotonicNs": 32066637156214,
+        "elapsedMs": 70780.02615,
+        "wallDeltaMs": -865.215482,
+        "monotonicDeltaMs": 2.161484,
+        "differenceMs": -867.3769659999999,
+        "sample": 32970
+      },
+      {
+        "kind": "discontinuity",
+        "utc": "2026-10-08T15:30:47.903482+00:00",
+        "wallUnixNs": 1791473447903482281,
+        "previousWallUnixNs": 1791473448785171709,
+        "monotonicNs": 32098882343005,
+        "elapsedMs": 103025.212941,
+        "wallDeltaMs": -881.689428,
+        "monotonicDeltaMs": 2.139876,
+        "differenceMs": -883.829304,
+        "sample": 48013
+      },
+      {
+        "kind": "discontinuity",
+        "utc": "2026-10-08T15:31:19.255623+00:00",
+        "wallUnixNs": 1791473479255622642,
+        "previousWallUnixNs": 1791473480148103432,
+        "monotonicNs": 32131129102582,
+        "elapsedMs": 135271.972518,
+        "wallDeltaMs": -892.48079,
+        "monotonicDeltaMs": 2.138436,
+        "differenceMs": -894.6192259999999,
+        "sample": 63020
+      },
+      {
+        "kind": "discontinuity",
+        "utc": "2026-10-08T15:31:50.610658+00:00",
+        "wallUnixNs": 1791473510610657962,
+        "previousWallUnixNs": 1791473511497728243,
+        "monotonicNs": 32163373352645,
+        "elapsedMs": 167516.222581,
+        "wallDeltaMs": -887.070281,
+        "monotonicDeltaMs": 2.144462,
+        "differenceMs": -889.214743,
+        "sample": 78046
+      }
+    ],
+    "monotonicIntervalsSeconds": [
+      32.234924003,
+      32.257882857,
+      32.245186791,
+      32.246759577,
+      32.244250063
+    ],
+    "journalMatches": [
+      {
+        "probeUtc": "2026-10-08T15:29:13.824429+00:00",
+        "journalMonoMinusProbeMs": -1.035354,
+        "journalRealtimeUnixUs": "1791473353823394",
+        "message": "Clock change detected. Flushing caches."
+      },
+      {
+        "probeUtc": "2026-10-08T15:29:45.151618+00:00",
+        "journalMonoMinusProbeMs": -0.196357,
+        "journalRealtimeUnixUs": "1791473385151422",
+        "message": "Clock change detected. Flushing caches."
+      },
+      {
+        "probeUtc": "2026-10-08T15:30:16.542125+00:00",
+        "journalMonoMinusProbeMs": -0.255214,
+        "journalRealtimeUnixUs": "1791473416541870",
+        "message": "Clock change detected. Flushing caches."
+      },
+      {
+        "probeUtc": "2026-10-08T15:30:47.903482+00:00",
+        "journalMonoMinusProbeMs": -0.450005,
+        "journalRealtimeUnixUs": "1791473447903032",
+        "message": "Clock change detected. Flushing caches."
+      },
+      {
+        "probeUtc": "2026-10-08T15:31:19.255623+00:00",
+        "journalMonoMinusProbeMs": -0.254582,
+        "journalRealtimeUnixUs": "1791473479255368",
+        "message": "Clock change detected. Flushing caches."
+      },
+      {
+        "probeUtc": "2026-10-08T15:31:50.610658+00:00",
+        "journalMonoMinusProbeMs": -1.153645,
+        "journalRealtimeUnixUs": "1791473510609504",
+        "message": "Clock change detected. Flushing caches."
+      }
+    ]
+  },
+  "phaseC": {
+    "summary": {
+      "kind": "linux_summary",
+      "elapsedMs": 124017.040594,
+      "samples": 57804,
+      "events": 4,
+      "wallUnixNs": 1791473640674585356,
+      "monotonicNs": 32297014396318,
+      "windowsExit": 0
+    },
+    "references": 120,
+    "windowsSeconds": 120.3143256,
+    "linuxMonotonicSeconds": 123.681878932,
+    "linuxRawSeconds": 120.244905872,
+    "endpointMonotonicExcessPercent": 2.7989628959030677,
+    "endpointRawExcessPercent": -0.057698638673164826,
+    "regressionMonotonicVsWindowsRate": 1.0285997938953777,
+    "regressionRawVsWindowsRate": 0.9999974311045227,
+    "ntpMatches": [
+      {
+        "packetCount": 591,
+        "ignored": false,
+        "utc": "2026-10-08T15:32:21.966065+00:00",
+        "ntpOffsetMs": -891.8955,
+        "observedStepMs": -891.896118,
+        "offsetStepDifferenceMs": -0.0006180000000313157,
+        "probeAfterSynchronizedMtimeMs": 1.857779,
+        "ntpTimestampsUnixUs": {
+          "origin": 1791473542648303,
+          "receive": 1791473541860246,
+          "transmit": 1791473541860272,
+          "destination": 1791473542856006
+        }
+      },
+      {
+        "packetCount": 592,
+        "ignored": false,
+        "utc": "2026-10-08T15:32:53.327147+00:00",
+        "ntpOffsetMs": -901.2575,
+        "observedStepMs": -901.257888,
+        "offsetStepDifferenceMs": -0.00038799999992988887,
+        "probeAfterSynchronizedMtimeMs": 1.154342,
+        "ntpTimestampsUnixUs": {
+          "origin": 1791473574014148,
+          "receive": 1791473573219051,
+          "transmit": 1791473573219787,
+          "destination": 1791473574227205
+        }
+      },
+      {
+        "packetCount": 593,
+        "ignored": false,
+        "utc": "2026-10-08T15:33:24.665821+00:00",
+        "ntpOffsetMs": -892.922,
+        "observedStepMs": -892.9214460000001,
+        "offsetStepDifferenceMs": 0.0005539999999655265,
+        "probeAfterSynchronizedMtimeMs": 2.116758,
+        "ntpTimestampsUnixUs": {
+          "origin": 1791473605338122,
+          "receive": 1791473604551299,
+          "transmit": 1791473604557528,
+          "destination": 1791473605556549
+        }
+      },
+      {
+        "packetCount": 594,
+        "ignored": false,
+        "utc": "2026-10-08T15:33:56.047010+00:00",
+        "ntpOffsetMs": -891.0415,
+        "observedStepMs": -891.041247,
+        "offsetStepDifferenceMs": 0.00025300000004335743,
+        "probeAfterSynchronizedMtimeMs": 1.210846,
+        "ntpTimestampsUnixUs": {
+          "origin": 1791473636712958,
+          "receive": 1791473635931722,
+          "transmit": 1791473635935914,
+          "destination": 1791473636936761
+        }
+      }
+    ]
+  },
+  "limitations": [
+    "Windows/Linux reference pairing includes stdout transport latency. Regression excludes first startup sample.",
+    "No syscall tracing or service intervention. NTP timestamp/step equality is observational attribution supported by source code."
+  ]
+}

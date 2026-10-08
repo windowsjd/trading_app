@@ -11,12 +11,19 @@ import preparation from '../../assets/home-tiers/preparation.json';
 
 const EMBLEMS: Record<HomeTier, ImageSourcePropType> = { bronze, silver, gold, platinum, diamond, whale };
 
+// Optical adjustment after comparing the complete silhouettes at card size.
+// Diamond's wide, sparse side ornaments otherwise outweigh Whale's denser body.
+// Scale both axes together; the prepared artwork and rim geometry stay intact.
+export const EMBLEM_OPTICAL_SCALE: Record<HomeTier, number> = {
+  bronze: 1, silver: 1.005, gold: 1.01, platinum: 1.015, diamond: 0.985, whale: 1.065,
+};
+
 export default function TierEmblem({ tier, size }: { tier: HomeTier; size: number }) {
-  // Non-square silhouettes keep their intrinsic ratio. Prepared visible alpha
-  // area, rather than transparent canvas width, sets the subtle 1% progression.
+  // Keep the prepared intrinsic ratio; no new circle correction or asset edits.
   const layout = preparation[tier].displayAt160;
-  const width = layout.width * size / 160;
-  const height = layout.height * size / 160;
+  const scale = size / 160 * EMBLEM_OPTICAL_SCALE[tier];
+  const width = layout.width * scale;
+  const height = layout.height * scale;
   return (
     <View testID={`home-emblem-${tier}`} style={{ width, height, flexShrink: 0 }}
       accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden pointerEvents="none">

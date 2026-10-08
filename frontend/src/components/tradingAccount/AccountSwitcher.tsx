@@ -60,12 +60,19 @@ type Props = {
   home?: boolean;
   /** Home owns tier presentation; the shared switcher has no ranking dependency. */
   homeCardStyle?: StyleProp<ViewStyle>;
+  /** Decorative artwork stays inside the same growing card as all its text. */
+  homeBackground?: React.ReactNode;
+  homeBackgroundAspectRatio?: number;
+  homeBackgroundCornerRatio?: number;
+  homeForegroundColor?: string;
   /** Optional Home illustration shares the title/profile column's vertical space. */
   homeVisual?: React.ReactNode;
+  homeVisualCaption?: React.ReactNode;
   children?: React.ReactNode;
 };
 
-export default function AccountSwitcher({ compact = false, home = false, homeCardStyle, homeVisual, children }: Props) {
+export default function AccountSwitcher({ compact = false, home = false, homeCardStyle, homeBackground,
+  homeBackgroundAspectRatio, homeBackgroundCornerRatio = 0.04, homeForegroundColor, homeVisual, homeVisualCaption, children }: Props) {
   const { colors } = useAppearance();
   const {
     accounts,
@@ -79,8 +86,10 @@ export default function AccountSwitcher({ compact = false, home = false, homeCar
     refetchAccounts,
   } = useTradingAccount();
   const [open, setOpen] = useState(false);
+  const [homeWidth, setHomeWidth] = useState(0);
+  const [wrappedHeading, setWrappedHeading] = useState<string | null>(null);
   const rootNavigation = useRootNavigation();
-  const { height, fontScale } = useWindowDimensions();
+  const { height, width, fontScale } = useWindowDimensions();
   const seasonQuery = useQuery({
     queryKey: QUERY_KEYS.season.current,
     queryFn: getCurrentSeason,
@@ -150,27 +159,52 @@ export default function AccountSwitcher({ compact = false, home = false, homeCar
 
   const display = getAccountDisplay(selectedAccount);
   const hasHomeVisual = selectedAccount.mode === 'season' && !!homeVisual;
-  const stackHomeVisual = fontScale > 1.3;
+  const hasHomeBackground = hasHomeVisual && !!homeBackground;
+  const headingLayoutKey = `${selectedAccount.id}/${display.title}/${width}/${fontScale}`;
+  // Latch a long/wrapped heading for this title/viewport: measuring it in the
+  // wider stacked column must not alternate between the two layouts.
+  const stackHomeVisual = fontScale > 1.3 || (hasHomeBackground && wrappedHeading === headingLayoutKey);
+  const artworkFirst = hasHomeBackground && stackHomeVisual;
+  const foreground = hasHomeBackground && homeForegroundColor ? { color: homeForegroundColor } : undefined;
 
   return (
     <>
       {home ? (
         <View style={[styles.homeContext, hasHomeVisual && styles.homeSeasonContext,
           hasHomeVisual && stackHomeVisual && styles.homeStacked,
-          selectedAccount.mode === 'season' && homeCardStyle]} testID={TEST_IDS.home.accountContext}>
+          selectedAccount.mode === 'season' && homeCardStyle,
+          hasHomeBackground && { borderWidth: 0, overflow: 'hidden', borderRadius: homeWidth * homeBackgroundCornerRatio,
+            paddingHorizontal: Math.max(8, homeWidth * 0.02),
+            paddingBottom: Math.max(14, homeWidth * homeBackgroundCornerRatio),
+            minHeight: homeBackgroundAspectRatio ? homeWidth / homeBackgroundAspectRatio : undefined }]}
+          onLayout={({ nativeEvent }) => setHomeWidth(nativeEvent.layout.width)}
+          testID={TEST_IDS.home.accountContext}>
+          {hasHomeBackground ? homeBackground : null}
+          {artworkFirst ? <View style={[styles.homeArtworkVisual,
+            { minHeight: homeBackgroundAspectRatio ? homeWidth / homeBackgroundAspectRatio : undefined }]}>
+            {homeVisual}
+          </View> : null}
+          {artworkFirst ? homeVisualCaption : null}
           <View style={[styles.homeInfo, hasHomeVisual && !stackHomeVisual && styles.homeSeasonInfo]}>
             <View style={[styles.homeHeading, hasHomeVisual && styles.homeSeasonHeading]}>
               <View style={[styles.homeContextRow, hasHomeVisual && styles.homeSeasonRow]}>
-                <Text testID="home-account-title" style={[styles.homeTitle, selectedAccount.mode === 'season' && styles.homeSeasonTitle]}>{display.title}</Text>
+                <Text key={`${hasHomeBackground}/${headingLayoutKey}`} testID="home-account-title"
+                  style={[styles.homeTitle, selectedAccount.mode === 'season' && styles.homeSeasonTitle, foreground]}
+                  onLayout={({ nativeEvent }) => {
+                    if (hasHomeBackground && !stackHomeVisual && (nativeEvent.layout.height > 27 * fontScale * 1.5 ||
+                      nativeEvent.layout.width > 180 * fontScale)) {
+                      setWrappedHeading(headingLayoutKey);
+                    }
+                  }}>{display.title}</Text>
                 <ActionPressable
-                  style={styles.homeChange}
+                  style={[styles.homeChange, hasHomeBackground && styles.homeArtworkChange]}
                   onPress={() => setOpen(true)}
                   accessibilityRole="button"
                   accessibilityLabel={`계정 변경. 현재 ${display.title}, ${display.statusLabel}`}
                   testID={TEST_IDS.tradingAccount.switcherTrigger}
                 >
                   <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
-                    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={colors.secondary}
+                    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={foreground?.color ?? colors.secondary}
                       strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" focusable={false}>
                       <Path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4" />
                     </Svg>
@@ -178,21 +212,23 @@ export default function AccountSwitcher({ compact = false, home = false, homeCar
                 </ActionPressable>
               </View>
               {selectedAccount.status !== 'active' ? (
-                <Text style={styles.homeNotice}>계정 {display.statusLabel}</Text>
+                <Text style={[styles.homeNotice, foreground]}>계정 {display.statusLabel}</Text>
               ) : null}
               {selectedAccount.mode === 'season' && (
                 !selectedAccount.season ||
                 selectedAccount.season.seasonStatus !== 'active' ||
                 selectedAccount.season.participantStatus !== 'active'
               ) ? (
-                <Text style={styles.homeNotice}>
+                <Text style={[styles.homeNotice, foreground]}>
                   {display.subtitle ?? '시즌 정보를 확인할 수 없습니다.'}
                 </Text>
               ) : null}
             </View>
             {children}
           </View>
-          {hasHomeVisual ? homeVisual : null}
+          {hasHomeVisual && !artworkFirst ? <View style={styles.homeIllustration}>
+            {homeVisual}{homeVisualCaption}
+          </View> : null}
         </View>
       ) : (
         <ActionPressable
@@ -386,15 +422,17 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   homeContextRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  homeSeasonContext: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 14, gap: 8 },
+  homeSeasonContext: { flexDirection: 'row', paddingHorizontal: 8, paddingVertical: 14, gap: 4 },
   homeStacked: { flexDirection: 'column', gap: 16 },
+  homeArtworkVisual: { alignItems: 'center', justifyContent: 'center' },
+  homeIllustration: { alignItems: 'center', gap: 4, flexShrink: 0, maxWidth: '100%' },
   homeInfo: { minWidth: 0, gap: 16 },
   homeSeasonInfo: { flex: 1, justifyContent: 'space-between', gap: 12 },
   homeHeading: { gap: 16 },
   homeSeasonHeading: { gap: 8 },
-  homeSeasonRow: { gap: 4, flexWrap: 'wrap' },
+  homeSeasonRow: { gap: 2, flexWrap: 'wrap' },
   homeTitle: { flex: 1, minWidth: 0, fontSize: 20, fontWeight: '700', lineHeight: 28 },
-  homeSeasonTitle: { flexGrow: 0, flexShrink: 1, flexBasis: 'auto', fontSize: 18, lineHeight: 26, fontWeight: '800' },
+  homeSeasonTitle: { flexGrow: 0, flexShrink: 1, flexBasis: 'auto', fontSize: 19, lineHeight: 27, fontWeight: '800' },
   homeChange: {
     flexShrink: 0,
     minWidth: 44,
@@ -406,6 +444,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  homeArtworkChange: { backgroundColor: 'transparent' },
   homeNotice: { fontSize: 13, lineHeight: 20, color: semantic.warning },
   trigger: {
     flexDirection: 'row',

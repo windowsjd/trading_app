@@ -1,0 +1,2 @@
+{"durationSeconds":180,"environment":"Windows","monotonicTicks":317820502075,"frequency":10000000,"kind":"start","wallTicks":639270701481682605,"utc":"2026-10-08T15:29:08.1682605Z"}
+{"samples":13682,"minDifferenceMs":-0.5406000000000013,"kind":"summary","utc":"2026-10-08T15:32:08.1750260Z","maxSampleGapMs":83.0996,"events":0,"elapsedMs":180006.4554,"monotonicTicks":319620566614,"backwards":0}

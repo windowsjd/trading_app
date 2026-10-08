@@ -402,7 +402,7 @@ function prepareAccountScreens(h: ReturnType<typeof createHarness>) {
     season: { seasonId: 'season-1', seasonName: 'Season 1', seasonStatus: 'active', participantStatus: 'active' },
   };
   h.mockLocal('features/tradingAccount/TradingAccountContext', { useTradingAccount: () => ({ selectedAccount: account, isLoading: false }) });
-  h.mockLocal('components/tradingAccount/AccountSwitcher', { __esModule: true, default: ({ children, homeVisual }: any) => React.createElement(React.Fragment, null, children, homeVisual) });
+  h.mockLocal('components/tradingAccount/AccountSwitcher', { __esModule: true, default: ({ children, homeVisual, homeVisualCaption }: any) => React.createElement(React.Fragment, null, children, homeVisual, homeVisualCaption) });
   h.mockLocal('components/tradingAccount/AccountSetupPanel', { __esModule: true, default: () => null });
   h.mockLocal('features/auth/useLogout', { useLogout: () => () => Promise.resolve() });
   h.mockLocal('components/charts', { DonutChart: () => null, LineChart: () => null });

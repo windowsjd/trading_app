@@ -1,5 +1,9 @@
 # 금융 PostgreSQL 간헐 실패 원인 조사
 
+후속: [WSL2 시계 변경 경로 조사](../2026-10-09-wsl-clock-regression/report.md).
+Windows/WSL 동시 관측으로 WSL 계층의 후퇴를 구분하고, timesyncd의 NTP step과
+WSL PHC chrony agent의 중복 제어 경로를 조사했다. 시스템 설정 변경은 없다.
+
 판정: **DIAGNOSED**. 실제 로컬 호스트 wall clock의 역전으로, 이미 생성한
 증거가 다음 금융 transaction의 DB 시각보다 미래가 되는 조건을 확인했다.
 Futures와 Legacy Spot을 각각 관측했으며, HEAD와 변경 전 버전 양쪽에서 재현했다.

@@ -1,0 +1,100 @@
+URL: https://raw.githubusercontent.com/microsoft/WSL/2.6.3/src/linux/init/main.cpp
+205: int SetEphemeralPortRange(uint16_t Start, uint16_t End);
+206: 
+207: void StartDebugShell();
+208: 
+209: int StartDhcpClient(int DhcpTimeout);
+210: 
+211: int StartGuestNetworkService(int GnsFd, wil::unique_fd&& DnsTunnelingFd, uint32_t DnsTunnelingIpAddress);
+212: 
+213: void StartPortTracker(LX_MINI_INIT_PORT_TRACKER_TYPE Type);
+214: 
+215: void StartTimeSyncAgent(void);
+216: 
+217: void WaitForBlockDevice(const char* Path);
+218: 
+219: int WaitForChild(pid_t Pid, const char* Name);
+220: 
+221: int Chroot(const char* Target)
+222: 
+223: /*++
+224: 
+225: Routine Description:
+226: 
+227:     This routine changes the root directory of the calling process to the specified
+228:     path.
+229: 
+230: Arguments:
+231: 
+232:     Target - Supplies the path to chroot to.
+233: 
+234: Return Value:
+235: 
+236:     0 on success, -1 on failure.
+3372:             //
+3373:             // Configure swap space.
+3374:             //
+3375: 
+3376:             if (EarlyConfig->SwapLun != UINT_MAX)
+3377:             {
+3378:                 CreateSwap(EarlyConfig->SwapLun);
+3379:             }
+3380: 
+3381:             //
+3382:             // Start the time sync agent (chronyd) to keep guest clock in sync with the host.
+3383:             //
+3384: 
+3385:             StartTimeSyncAgent();
+3386:         }
+3387: 
+3388:         //
+3389:         // Mount kernel modules if supported.
+3390:         //
+3391:         // N.B. The VHD is mounted as read-only but with a writable overlayfs layer. The modules
+3392:         //      directory must be writable for tools like depmod to work.
+3393:         //
+3394: 
+3395:         if (EarlyConfig->KernelModulesDeviceId != UINT_MAX)
+3396:         {
+3397:             THROW_LAST_ERROR_IF(
+3398:                 MountDevice(LxMiniInitMountDeviceTypeLun, EarlyConfig->KernelModulesDeviceId, KERNEL_MODULES_VHD_PATH, "ext4", LxMiniInitMessageFlagMountReadOnly, nullptr) <
+3399:                 0);
+3400: 
+3401:             utsname UnameBuffer{};
+3402:             THROW_LAST_ERROR_IF(uname(&UnameBuffer) < 0);
+3403: 
+3404:             std::string Target = std::format("{}/{}", KERNEL_MODULES_PATH, UnameBuffer.release);
+3405:             THROW_LAST_ERROR_IF(UtilMountOverlayFs(Target.c_str(), KERNEL_MODULES_VHD_PATH, (MS_NOATIME | MS_NOSUID | MS_NODEV)) < 0);
+3406: 
+3759: 
+3760:     //
+3761:     // N.B. IPv6 reads from /proc/sys/net/ipv4/ip_local_port_range as well according to
+3762:     //      https://tldp.org/HOWTO/Linux+IPv6-HOWTO/ch11s03.html.
+3763:     //
+3764: 
+3765:     return WriteToFile("/proc/sys/net/ipv4/ip_local_port_range", Content.c_str());
+3766: }
+3767: CATCH_RETURN_ERRNO()
+3768: 
+3769: void StartTimeSyncAgent()
+3770: 
+3771: /*++
+3772: 
+3773: Routine Description:
+3774: 
+3775:     This routine configures and launches chronyd.
+3776: 
+3777: Arguments:
+3778: 
+3779:     None.
+3780: 
+3781: Return Value:
+3782: 
+3783:     None.
+3784: 
+3785: --*/
+3786: 
+3787: {
+3788:     //
+3789:     // Check if the /dev/ptp0 device is present.
+3790:     //

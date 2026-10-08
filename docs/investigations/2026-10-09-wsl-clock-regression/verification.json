@@ -1,0 +1,318 @@
+{
+  "result": "LAYER_IDENTIFIED",
+  "dateKst": "2026-10-09",
+  "reason": "WSL-only regressions reproduced; accepted timesyncd NTP offset matches four steps within 1us. Live PHC0 chrony agent, large kernel tick adjustment and monotonic/raw rate separation support controller conflict; no syscall PID attribution or isolation intervention.",
+  "environment": {
+    "windows": "Windows 11 Pro 10.0.26200.9457",
+    "wsl": "2.6.3.0",
+    "kernel": "6.6.87.2-microsoft-standard-WSL2",
+    "ubuntu": "24.04.4",
+    "systemd": "255.4-1ubuntu8.17",
+    "clocksource": "tsc",
+    "wslSystemDistro": "CBL-Mariner 2.0.20250701",
+    "chronycClient": "4.1"
+  },
+  "phaseB": {
+    "windowsSummary": {
+      "samples": 13682,
+      "minDifferenceMs": -0.5406000000000013,
+      "kind": "summary",
+      "utc": "2026-10-08T15:32:08.1750260Z",
+      "maxSampleGapMs": 83.0996,
+      "events": 0,
+      "elapsedMs": 180006.4554,
+      "monotonicTicks": 319620566614,
+      "backwards": 0
+    },
+    "wslSummary": {
+      "kind": "summary",
+      "utc": "2026-10-08T15:32:03.094489+00:00",
+      "monotonicNs": 32175857183693,
+      "elapsedMs": 180000.053629,
+      "samples": 83867,
+      "events": 6,
+      "backwards": 6,
+      "maxSampleGapMs": 4.581529
+    },
+    "simultaneous": true,
+    "overlapEvidence": "Windows start emitted and received before Linux start; independent Phase C rate comparison explains Linux 180s taking about Windows 175s. All Linux regression events within Windows window.",
+    "monotonicIntervalsSeconds": [
+      32.234924003,
+      32.257882857,
+      32.245186791,
+      32.246759577,
+      32.244250063
+    ]
+  },
+  "phaseC": {
+    "summary": {
+      "kind": "linux_summary",
+      "elapsedMs": 124017.040594,
+      "samples": 57804,
+      "events": 4,
+      "wallUnixNs": 1791473640674585356,
+      "monotonicNs": 32297014396318,
+      "windowsExit": 0
+    },
+    "references": 120,
+    "windowsSeconds": 120.3143256,
+    "linuxMonotonicSeconds": 123.681878932,
+    "linuxRawSeconds": 120.244905872,
+    "endpointMonotonicExcessPercent": 2.7989628959030677,
+    "endpointRawExcessPercent": -0.057698638673164826,
+    "regressionMonotonicVsWindowsRate": 1.0285997938953777,
+    "regressionRawVsWindowsRate": 0.9999974311045227,
+    "ntpMatches": [
+      {
+        "packetCount": 591,
+        "ignored": false,
+        "utc": "2026-10-08T15:32:21.966065+00:00",
+        "ntpOffsetMs": -891.8955,
+        "observedStepMs": -891.896118,
+        "offsetStepDifferenceMs": -0.0006180000000313157,
+        "probeAfterSynchronizedMtimeMs": 1.857779,
+        "ntpTimestampsUnixUs": {
+          "origin": 1791473542648303,
+          "receive": 1791473541860246,
+          "transmit": 1791473541860272,
+          "destination": 1791473542856006
+        }
+      },
+      {
+        "packetCount": 592,
+        "ignored": false,
+        "utc": "2026-10-08T15:32:53.327147+00:00",
+        "ntpOffsetMs": -901.2575,
+        "observedStepMs": -901.257888,
+        "offsetStepDifferenceMs": -0.00038799999992988887,
+        "probeAfterSynchronizedMtimeMs": 1.154342,
+        "ntpTimestampsUnixUs": {
+          "origin": 1791473574014148,
+          "receive": 1791473573219051,
+          "transmit": 1791473573219787,
+          "destination": 1791473574227205
+        }
+      },
+      {
+        "packetCount": 593,
+        "ignored": false,
+        "utc": "2026-10-08T15:33:24.665821+00:00",
+        "ntpOffsetMs": -892.922,
+        "observedStepMs": -892.9214460000001,
+        "offsetStepDifferenceMs": 0.0005539999999655265,
+        "probeAfterSynchronizedMtimeMs": 2.116758,
+        "ntpTimestampsUnixUs": {
+          "origin": 1791473605338122,
+          "receive": 1791473604551299,
+          "transmit": 1791473604557528,
+          "destination": 1791473605556549
+        }
+      },
+      {
+        "packetCount": 594,
+        "ignored": false,
+        "utc": "2026-10-08T15:33:56.047010+00:00",
+        "ntpOffsetMs": -891.0415,
+        "observedStepMs": -891.041247,
+        "offsetStepDifferenceMs": 0.00025300000004335743,
+        "probeAfterSynchronizedMtimeMs": 1.210846,
+        "ntpTimestampsUnixUs": {
+          "origin": 1791473636712958,
+          "receive": 1791473635931722,
+          "transmit": 1791473635935914,
+          "destination": 1791473636936761
+        }
+      }
+    ]
+  },
+  "services": {
+    "windowsW32Time": "running but unsynchronized, Local CMOS Clock, last sync error 1",
+    "ubuntuTimesyncd": "running/enabled; 91.189.91.157 ntp.ubuntu.com, 32s poll",
+    "vmChrony": "live monitoring endpoint reports selected PHC0, poll 8s, frequency approx 28308-28829ppm slow; PID/daemon version unconfirmed",
+    "windowsVmictimesync": "stopped; host delivery cannot be inferred from this guest service"
+  },
+  "accessLimitations": [
+    "Default sandbox blocked Windows interop and systemd bus; approved read-only unsandboxed commands worked.",
+    "Windows w32tm /query /source and /configuration returned access denied; no Windows elevation attempted.",
+    "Ubuntu tracefs and /proc/171/syscall not readable; no tracing configuration or dependency installation.",
+    "VM chrony PID and runtime config not directly obtained."
+  ],
+  "systemChanges": false,
+  "applicationChanges": false,
+  "databaseChanges": false,
+  "financialGateExecuted": false,
+  "processesTerminated": false,
+  "observersCompleted": true,
+  "validation": {
+    "pythonSyntax": "PASS (AST only; no bytecode artifacts)",
+    "reportRelativeLinks": "PASS",
+    "jsonParsing": "PASS",
+    "gitDiffCheck": "PASS",
+    "powershellSyntax": "PASS (Parser.ParseInput only)",
+    "newCodeAndReportWhitespace": "PASS",
+    "activeObservers": "0",
+    "evidenceSecretPatternCheck": "PASS"
+  },
+  "files": [
+    {
+      "path": "evidence/adjtimex-readonly.json",
+      "bytes": 453,
+      "sha256": "ff84692d3cb93f16721913742d244350f8f3a37f15277ba60ac1ba75c5f507e2"
+    },
+    {
+      "path": "evidence/analysis.json",
+      "bytes": 7872,
+      "sha256": "a00a687d7a36ce1e2ceffc486bf178fcb32175852fa848feaa3183f83703bbff"
+    },
+    {
+      "path": "evidence/chrony-frequency-source.txt",
+      "bytes": 4501,
+      "sha256": "26f4ded61f2703271161577762f44ecddc4f0cd71aefe66f9b23cefb391a6bc5"
+    },
+    {
+      "path": "evidence/chrony-step-detection-source.txt",
+      "bytes": 6532,
+      "sha256": "23a5145a56c4673e7f90d8ace747080523857f05f4de1cbfd21c7bf4522ff8ab"
+    },
+    {
+      "path": "evidence/linux-after-journal.jsonl",
+      "bytes": 28622,
+      "sha256": "026a11011441f973b5a7ede476673ae4a3ef1a04a4b994133a30449e92d6dd10"
+    },
+    {
+      "path": "evidence/linux-before.log",
+      "bytes": 20774,
+      "sha256": "67dd0a046f92172f7c0380377c7d33fd47561dbb61cde93a7385094f545668d2"
+    },
+    {
+      "path": "evidence/observer-completion.json",
+      "bytes": 44,
+      "sha256": "ac25bd26a3dc9ee6c0029f2f59cc6970b1e1d032049e46f8371040a3bf434f1d"
+    },
+    {
+      "path": "evidence/powershell-syntax.log",
+      "bytes": 24,
+      "sha256": "61658072af7f5d640cf28bd1c56d475f38203e7bf0e33db33d0d6cf36a261bfa"
+    },
+    {
+      "path": "evidence/reference-probe.jsonl",
+      "bytes": 32378,
+      "sha256": "48abbe8643e4cf2da0470212731c23065e263d65ed5c143e6851caa47a36527c"
+    },
+    {
+      "path": "evidence/reference-probe.stderr.log",
+      "bytes": 404,
+      "sha256": "d34937360e3413dc8e2a4b9c4cbd52ef28aa9f94ca5aabacf19db8e6db54519f"
+    },
+    {
+      "path": "evidence/systemd-adjust-source.txt",
+      "bytes": 5072,
+      "sha256": "a5109e6d466affe483ce2e60f691f495f62103e3dd6057d199d27adaa8642947"
+    },
+    {
+      "path": "evidence/timesync-monitor.jsonl",
+      "bytes": 4481,
+      "sha256": "bbbb9ba58e1eecd4cb2cd7cd680102f427daff65208109dd75bfd443cdd1577f"
+    },
+    {
+      "path": "evidence/windows-after.log",
+      "bytes": 22150,
+      "sha256": "f2dab537e4cb338824dd62e695e2bd57aa1be09b26f8b1b15c4f8e2344a07098"
+    },
+    {
+      "path": "evidence/windows-before.log",
+      "bytes": 5306,
+      "sha256": "7089e7252c06d94ef873c33ae049d85bf5831dec9b35f4fd74111f9c0acf37cc"
+    },
+    {
+      "path": "evidence/windows-probe.stderr.log",
+      "bytes": 404,
+      "sha256": "d34937360e3413dc8e2a4b9c4cbd52ef28aa9f94ca5aabacf19db8e6db54519f"
+    },
+    {
+      "path": "evidence/windows-wallclock.jsonl",
+      "bytes": 396,
+      "sha256": "e6f8b76adb5ef8d6e7be7a3ba8fce0e18a1c1d94040ae07782ae3ea04e340082"
+    },
+    {
+      "path": "evidence/wsl-agent-endpoint.log",
+      "bytes": 1182,
+      "sha256": "0b25769fe0c089165a9dcf97438aa89b626fb72d3217dbb024f5de9449b46891"
+    },
+    {
+      "path": "evidence/wsl-init.cpp.excerpt.txt",
+      "bytes": 84,
+      "sha256": "41ef514e8150b128726b3f3cb6680715a5197ebf0cbb37d4dbc67a3e12692b61"
+    },
+    {
+      "path": "evidence/wsl-main.cpp.excerpt.txt",
+      "bytes": 3066,
+      "sha256": "b39615f6436f7f56c52826124be597a15c60c5b4256d6b75122553c333b8ed5f"
+    },
+    {
+      "path": "evidence/wsl-source-tree.json",
+      "bytes": 4245,
+      "sha256": "83fa491cde04567dbe8af9c7cb639cd6004b84132bedfa551f7e5922ecc7de94"
+    },
+    {
+      "path": "evidence/wsl-system-distro.log",
+      "bytes": 2373,
+      "sha256": "e9699a2490f7f81bae4bc13fa2ed91598b67cee31a5d1cf4aed820db2a73cb1c"
+    },
+    {
+      "path": "evidence/wsl-system-final.log",
+      "bytes": 929,
+      "sha256": "e8453187c3fb56003a7b7041649810b05a6dc4b5d5e28850093c7f55a7b99f49"
+    },
+    {
+      "path": "evidence/wsl-timesync-agent-source.txt",
+      "bytes": 2785,
+      "sha256": "43d1cfd163cc998cbe771ec249f18325888e6872ed2053954bb124075f2006cf"
+    },
+    {
+      "path": "evidence/wsl-util.cpp.excerpt.txt",
+      "bytes": 2131,
+      "sha256": "776870adc8cf46bb25019a7784e4086f6171601b86bdabd8e41484af965f3821"
+    },
+    {
+      "path": "evidence/wsl-wallclock.jsonl",
+      "bytes": 2284,
+      "sha256": "f90ead17c5bb4372e6c6e718390e6232b94accfcdc7fc685b0400056ef59725d"
+    },
+    {
+      "path": "report.md",
+      "bytes": 19665,
+      "sha256": "8c15bc32d5e35f8cef47a0800c05c7e6ab50e2e7f5cf4d9075ef7104fc35a809"
+    },
+    {
+      "path": "reproduction/read-adjtimex.py",
+      "bytes": 1586,
+      "sha256": "2ad1a98ced44d458da54532c012000168a15bff7d70eef48fc65852ef05e8aae"
+    },
+    {
+      "path": "reproduction/reference-probe.py",
+      "bytes": 3747,
+      "sha256": "171fe5ce5291fb088e22ecc1bd74416b6d2d4df4be66926bb89991a6c4c4fd4c"
+    },
+    {
+      "path": "reproduction/simultaneous-probe.py",
+      "bytes": 3529,
+      "sha256": "059c699ae658db33eca4e39fe112b4f2735a49fe5fd3a105cd5ff0ba68dffa2b"
+    },
+    {
+      "path": "reproduction/timesync-monitor.py",
+      "bytes": 919,
+      "sha256": "739a6da4e6e0e06cfe0c88fdbf48d48e0a17cc0c783f4daf3c7b0e0890c335f3"
+    },
+    {
+      "path": "reproduction/windows-inventory.ps1",
+      "bytes": 3094,
+      "sha256": "fe6e06e8d4e0bb1e874880d20c6a6169a64a7ec681059ac7178f976fae365e1b"
+    },
+    {
+      "path": "reproduction/windows-probe.ps1",
+      "bytes": 1718,
+      "sha256": "9003aa1e6f73d2292ca693a5129ab2a4496bd4bf10fa8ea190d5901ea3a89391"
+    }
+  ]
+}

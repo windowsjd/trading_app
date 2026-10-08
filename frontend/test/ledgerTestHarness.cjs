@@ -18,6 +18,9 @@ function load(file, mocks) {
     }
     if (name.endsWith('.png')) return { uri: resolve(dirname(file), name) };
     if (name.endsWith('.json')) return require(resolve(dirname(file), name));
+    // This presentation table imports PNGs, so use the same asset-aware loader
+    // as TSX components instead of Node's native TypeScript require.
+    if (name.endsWith('/tierBackgrounds')) return load(resolve(dirname(file), name + '.ts'), mocks);
     if (name.endsWith('/ProfileAvatar')) return { default: 'ProfileAvatar', __esModule: true };
     if (name.endsWith('/theme/native')) return mocks['react-native'];
     if (name.endsWith('/theme/safeArea')) return mocks['react-native-safe-area-context'] ?? { SafeAreaView: 'SafeAreaView' };
