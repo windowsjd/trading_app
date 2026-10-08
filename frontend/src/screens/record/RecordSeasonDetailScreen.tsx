@@ -26,8 +26,9 @@ export default function RecordSeasonDetailScreen({ route, navigation }: RecordSe
   if (detailQuery.isLoading) return <FullPageLoading message="시즌 전적을 불러오는 중입니다." />;
   if (!detailQuery.data) {
     const code = getApiErrorCode(detailQuery.error);
-    return <ErrorState
-      title={code === 'SEASON_NOT_FOUND' || code === 'NOT_FOUND' ? '해당 시즌 전적이 없습니다.' : '시즌 전적을 불러오지 못했습니다.'}
+    const missing = code === 'SEASON_NOT_FOUND' || code === 'NOT_FOUND';
+    return <ErrorState error={missing ? undefined : detailQuery.error}
+      title={missing ? '해당 시즌 전적이 없습니다.' : '시즌 전적을 불러오지 못했습니다.'}
       message="잠시 후 다시 시도해주세요."
       onRetry={() => { void detailQuery.refetch(); }}
     />;

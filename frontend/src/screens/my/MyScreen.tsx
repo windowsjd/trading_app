@@ -31,6 +31,7 @@ import {
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
+import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 
 type Props = MyScreenProps;
 
@@ -150,7 +151,7 @@ export default function MyScreen({ navigation }: Props) {
         style={styles.container}
         testID={TEST_IDS.tradingAccount.integrityError}
       >
-        <ErrorState
+        <ErrorState error={integrityFailure.error}
           title={ACCOUNT_INTEGRITY_TITLE}
           message={integrityFailure.message}
           onRetry={integrityFailure.retry}
@@ -161,7 +162,7 @@ export default function MyScreen({ navigation }: Props) {
 
   if (viewState === 'my_error' || !meQuery.data || !recordsQuery.data) {
     return (
-      <ErrorState
+      <ErrorState error={meQuery.isError ? meQuery.error : recordsQuery.error}
         title="내 정보를 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
         onRetry={() => {
@@ -169,7 +170,10 @@ export default function MyScreen({ navigation }: Props) {
           if (showsSeasonUi) void rankingQuery.refetch();
           void recordsQuery.refetch();
         }}
-      />
+      >
+        {meQuery.isError && recordsQuery.isError ? <AdminDiagnosticPanel error={recordsQuery.error} /> : null}
+        {showsSeasonUi && rankingQuery.isError ? <AdminDiagnosticPanel error={rankingQuery.error} /> : null}
+      </ErrorState>
     );
   }
 
@@ -208,6 +212,7 @@ export default function MyScreen({ navigation }: Props) {
             </Text>
           )}
           <Text style={styles.helper}>참여 시즌 수 {seasonCount}</Text>
+          {showsSeasonUi && rankingQuery.isError ? <AdminDiagnosticPanel error={rankingQuery.error} /> : null}
         </View>
 
         <View style={styles.card}>

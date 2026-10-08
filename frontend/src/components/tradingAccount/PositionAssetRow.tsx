@@ -1,4 +1,5 @@
 import React from 'react';
+import AdminDiagnosticPanel from '../states/AdminDiagnosticPanel';
 import { View, Text, StyleSheet } from '../../theme/native';
 import ActionPressable from '../common/ActionPressable';
 import { semantic } from '../../theme/tokens';
@@ -11,28 +12,31 @@ type Props = { position: PositionItemDto; onPress: () => void; testID?: string }
 export default function PositionAssetRow({ position, onPress, testID }: Props) {
   const display = getPositionAssetDisplay(position);
   return (
-    <ActionPressable testID={testID} style={styles.row} onPress={onPress} accessibilityRole="button">
-      <View style={styles.columns}>
-        <Text
-          testID={testID ? `${testID}-name` : undefined}
-          accessibilityLabel={display.name}
-          style={styles.name}
-        >
-          {display.name}
-        </Text>
-        <View testID={testID ? `${testID}-values` : undefined} style={styles.values}>
-          <Text testID={testID ? `${testID}-value` : undefined} style={styles.value}>{display.value}</Text>
+    <>
+      <ActionPressable testID={testID} style={styles.row} onPress={onPress} accessibilityRole="button">
+        <View style={styles.columns}>
           <Text
-            testID={testID ? `${testID}-return` : undefined}
-            accessibilityLabel={`매입가 대비 미실현 수익률 ${display.returnRate}`}
-            style={[styles.returnRate, directionStyles[display.direction]]}
+            testID={testID ? `${testID}-name` : undefined}
+            accessibilityLabel={display.name}
+            style={styles.name}
           >
-            {display.returnRate}
+            {display.name}
           </Text>
+          <View testID={testID ? `${testID}-values` : undefined} style={styles.values}>
+            <Text testID={testID ? `${testID}-value` : undefined} style={styles.value}>{display.value}</Text>
+            <Text
+              testID={testID ? `${testID}-return` : undefined}
+              accessibilityLabel={`매입가 대비 미실현 수익률 ${display.returnRate}`}
+              style={[styles.returnRate, directionStyles[display.direction]]}
+            >
+              {display.returnRate}
+            </Text>
+          </View>
         </View>
-      </View>
-      {display.notice ? <Text testID={testID ? `${testID}-notice` : undefined} style={styles.notice}>{display.notice}</Text> : null}
-    </ActionPressable>
+        {display.notice ? <Text testID={testID ? `${testID}-notice` : undefined} style={styles.notice}>{display.notice}</Text> : null}
+      </ActionPressable>
+      {position.valuation.state === 'stale_cache' && position.valuation.diagnostic ? <AdminDiagnosticPanel diagnostic={position.valuation.diagnostic} /> : null}
+    </>
   );
 }
 

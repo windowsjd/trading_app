@@ -81,6 +81,8 @@ import { ERROR_CODE } from '../../models/enums/errorCode';
 import {
   BLOCKED_REASON_MESSAGE,
   getApiErrorCode,
+  getApiErrorInfo,
+  requestFailureFacts,
   getErrorMessageFromCode,
   mapOrderErrorCodeToBlockedReason,
 } from '../../services/api/errorMapper';
@@ -92,6 +94,8 @@ import CTAButton from '../../components/common/CTAButton';
 import OrderSuccessBottomSheet from './OrderSuccessBottomSheet';
 import QuantityRatioSlider from './QuantityRatioSlider';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
+import { isTradingAccountScopeMismatchError } from '../../features/tradingAccount/accountScope';
+import type { RuntimeFacts } from '../../services/ws/runtimeDiagnostics';
 
 type Props = {
   assetId: string;
@@ -261,6 +265,7 @@ export function OrderForm({
   const protectionQuery = useQuery({ queryKey: QUERY_KEYS.tradingAccount.protections.list(accountId, 'spot', assetId), queryFn: ({ signal }) => getProtections(accountId, 'spot', assetId, false, signal), enabled: accountKnown && side === 'buy' && orderType === 'limit', retry: false });
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [domainError, setDomainError] = useState<string | null>(null);
+  const [diagnosticRuntime, setDiagnosticRuntime] = useState<RuntimeFacts | null>(null);
   const [diagnosticError, setDiagnosticError] = useState<unknown>(null);
   const [successState, setSuccessState] = useState(EMPTY_ORDER_SUCCESS_STATE);
   // Create clears the active quote so stale inputs cannot be re-submitted,
@@ -363,7 +368,9 @@ export function OrderForm({
           setFieldError(null);
           setDomainError(null);
           setDiagnosticError(null);
+          setDiagnosticRuntime(null);
         } else {
+          setDiagnosticRuntime(requestFailureFacts(null, { endpoint: 'POST /api/v1/trading-accounts/:accountId/orders', operation: 'order_create', contractFailure: true, outcome: 'unknown' }));
           setDomainError(
             '주문 결과를 확인할 수 없습니다. 주문 내역을 확인해주세요.',
           );
@@ -376,6 +383,14 @@ export function OrderForm({
     onError: (error, action) => {
       if (!isActionCurrent(action.request)) return;
       setDiagnosticError(error);
+      const contractFailure = error instanceof OrderQuoteValidationError || isTradingAccountScopeMismatchError(error);
+      const executeAttempted = !!action.quote;
+      const uncertain = executeAttempted && (contractFailure || !getApiErrorInfo(error).hasResponse || (getApiErrorInfo(error).status ?? 0) >= 500);
+      setDiagnosticRuntime(requestFailureFacts(error, {
+        endpoint: executeAttempted ? 'POST /api/v1/trading-accounts/:accountId/orders' : 'POST /api/v1/trading-accounts/:accountId/orders/quote',
+        operation: executeAttempted ? 'order_create' : 'order_quote', contractFailure,
+        outcome: uncertain ? 'unknown' : executeAttempted ? undefined : 'not_submitted',
+      }));
       const code = getApiErrorCode(error);
       if (error instanceof OrderQuoteValidationError) {
         orderActionRef.current = null;
@@ -396,7 +411,7 @@ export function OrderForm({
         );
       } else {
         setDomainError(
-          getOrderDomainErrorMessage(code, !action.request.seasonUi),
+          uncertain ? '주문 결과를 확인하지 못했습니다. 주문 내역을 확인해주세요.' : getOrderDomainErrorMessage(code, !action.request.seasonUi),
         );
       }
     },
@@ -431,6 +446,7 @@ export function OrderForm({
     setFieldError(null);
     setDomainError(null);
     setDiagnosticError(null);
+    setDiagnosticRuntime(null);
     setSuccessState(clearOrderSuccess());
     orderMutation.reset();
   };
@@ -448,6 +464,7 @@ export function OrderForm({
     setFieldError(null);
     setDomainError(null);
     setDiagnosticError(null);
+    setDiagnosticRuntime(null);
     setSuccessState(clearOrderSuccess());
   }, [accountChangedAway]);
 
@@ -788,6 +805,7 @@ export function OrderForm({
     setFieldError(null);
     setDomainError(null);
     setDiagnosticError(null);
+    setDiagnosticRuntime(null);
     // An uncertain create response retains this exact quote/key for a user
     // retry. It never silently obtains a second executable order.
     const attached = attachedEditorVisible ? draftLegs(protectionDraft) : [];
@@ -1080,7 +1098,7 @@ export function OrderForm({
           <Text accessibilityLiveRegion="polite" style={styles.errorText}>
             {domainError}
           </Text>
-          <AdminDiagnosticPanel error={diagnosticError} />
+          <AdminDiagnosticPanel error={diagnosticError} runtime={diagnosticRuntime} includeRuntimeWithDiagnostic />
         </>
       ) : null}
       {asset.settlementCurrency === 'USD' &&

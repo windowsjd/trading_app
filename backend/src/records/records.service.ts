@@ -5,6 +5,7 @@ import {
 import { fxExecuteSnapshotFreshnessThresholdMs } from '../fx/fx-execute-snapshot-policy';
 import {
   buildAdminPartialFailureDiagnostic,
+  preserveAdminFailureCause,
   type AdminDiagnostic,
   type DiagnosticContextUpdate,
 } from '../common/admin-diagnostics';
@@ -1700,6 +1701,8 @@ export class RecordsService {
     } | null = null;
 
     if (!position.quantity.eq(0)) {
+      let failureStage = 'position_currency_validation';
+      let priceSelected = false;
       try {
         if (position.asset.currencyCode !== position.currencyCode) {
           throw new RecordsValuationError(
@@ -1708,6 +1711,7 @@ export class RecordsService {
           );
         }
 
+        failureStage = 'fx_rate_validation';
         if (
           position.currencyCode === CurrencyCode.USD &&
           usdKrwSelection?.state === 'unavailable'
@@ -1728,11 +1732,14 @@ export class RecordsService {
           );
         }
 
+        failureStage = 'asset_price_selection';
         const priceSnapshot = await this.findLatestEligibleAssetPriceSnapshot(
           position.asset,
           position.currencyCode,
           valuationAt,
         );
+        priceSelected = true;
+        failureStage = 'position_valuation_calculation';
         const values = calculatePositionValuation({
           currentPrice: priceSnapshot.price,
           quantity: position.quantity,
@@ -1750,25 +1757,42 @@ export class RecordsService {
         const valuationError =
           caught instanceof RecordsValuationError
             ? caught
-            : new RecordsValuationError(
-                'ASSET_PRICE_UNAVAILABLE',
-                `Asset valuation is unavailable for asset ${position.assetId}.`,
+            : preserveAdminFailureCause(
+                new RecordsValuationError(
+                  'ASSET_PRICE_UNAVAILABLE',
+                  `Asset valuation is unavailable for asset ${position.assetId}.`,
+                ),
+                caught,
+                failureStage,
               );
-        const diagnostic = valuationError.diagnosticContext
-          ? buildAdminPartialFailureDiagnostic(
-              valuationError,
-              valuationError.code,
-              {
-                ...valuationError.diagnosticContext,
-                domain: 'RECORDS',
-                operation: 'PROFIT_ANALYSIS',
-                entities: {
-                  ...valuationError.diagnosticContext.entities,
-                  assetId: position.assetId,
-                },
+        const diagnostic = buildAdminPartialFailureDiagnostic(
+          valuationError,
+          valuationError.code,
+          {
+            failureStage,
+            evidence: {
+              valuation: {
+                result:
+                  caught instanceof RecordsValuationError
+                    ? 'unavailable'
+                    : 'unexpected_failure',
+                priceSelected,
+                fxRequired: position.currencyCode === CurrencyCode.USD,
               },
-            )
-          : undefined;
+            },
+            nextInvestigation: [
+              'backend/src/records/records.service.ts',
+              'backend/src/portfolio/portfolio-valuation.policy.ts',
+            ],
+            ...valuationError.diagnosticContext,
+            domain: 'RECORDS',
+            operation: 'PROFIT_ANALYSIS',
+            entities: {
+              ...valuationError.diagnosticContext?.entities,
+              assetId: position.assetId,
+            },
+          },
+        );
         valuationState = 'unavailable';
         error = {
           code: valuationError.code,

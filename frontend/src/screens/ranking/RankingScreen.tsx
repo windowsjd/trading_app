@@ -39,6 +39,7 @@ import {
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
+import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import EmptyState from '../../components/states/EmptyState';
 import CTAButton from '../../components/common/CTAButton';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
@@ -151,6 +152,7 @@ export default function RankingScreen({ navigation }: Props) {
   const myRanking = publication?.myRanking ?? null;
   const hasNotJoined = myRanking?.state === 'not_joined' || seasonQuery.data?.joined === false;
   const rankingErrorCode = getApiErrorCode(rankingQuery.error);
+  const seasonNotConfigured = getApiErrorCode(seasonQuery.error) === ERROR_CODE.SEASON_NOT_FOUND;
 
   React.useEffect(() => {
     snapshotResetAttemptRef.current = 0;
@@ -181,6 +183,8 @@ export default function RankingScreen({ navigation }: Props) {
       return 'ranking_loading';
     }
 
+    if (seasonNotConfigured) return topQuery.isError ? 'ranking_error' : 'ranking_unavailable';
+
     if (!seasonQuery.data || !topQuery.data) {
       return 'ranking_error';
     }
@@ -199,7 +203,9 @@ export default function RankingScreen({ navigation }: Props) {
   }, [
     seasonQuery.isLoading,
     seasonQuery.data,
+    seasonNotConfigured,
     topQuery.isLoading,
+    topQuery.isError,
     topQuery.data,
     rankingQuery.isError,
     rankingQuery.data,
@@ -217,14 +223,16 @@ export default function RankingScreen({ navigation }: Props) {
 
   if (viewState === 'ranking_error') {
     return (
-      <ErrorState
+      <ErrorState error={seasonQuery.isError && !seasonNotConfigured ? seasonQuery.error : topQuery.error}
         title="랭킹을 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
         onRetry={() => {
           void seasonQuery.refetch();
           void topQuery.refetch();
         }}
-      />
+      >
+        {seasonQuery.isError && !seasonNotConfigured && topQuery.isError ? <AdminDiagnosticPanel error={topQuery.error} /> : null}
+      </ErrorState>
     );
   }
 
@@ -232,10 +240,10 @@ export default function RankingScreen({ navigation }: Props) {
     return (
       <ScrollView refreshControl={refresh.refreshControl} style={styles.container} contentContainerStyle={styles.content}>
         <EmptyState
-          title="랭킹 생성 대기 중입니다."
-          message="랭킹 스냅샷이 생성되면 이곳에 표시됩니다."
-          actionLabel={hasNotJoined ? '시즌 참가하기' : undefined}
-          onAction={hasNotJoined ? () => rootNavigation.navigate('SeasonJoin') : undefined}
+          title={seasonNotConfigured ? '현재 진행 중인 시즌이 없습니다.' : '랭킹 생성 대기 중입니다.'}
+          message={seasonNotConfigured ? '시즌이 열리고 랭킹이 생성되면 이곳에 표시됩니다.' : '랭킹 스냅샷이 생성되면 이곳에 표시됩니다.'}
+          actionLabel={hasNotJoined && !seasonNotConfigured ? '시즌 참가하기' : undefined}
+          onAction={hasNotJoined && !seasonNotConfigured ? () => rootNavigation.navigate('SeasonJoin') : undefined}
         />
       </ScrollView>
     );
@@ -322,7 +330,7 @@ export default function RankingScreen({ navigation }: Props) {
         }
         ListEmptyComponent={
           rankingQuery.isLoading ? <ActivityIndicator accessibilityLabel="목록을 불러오는 중입니다." /> :
-          rankingQuery.isError ? <ErrorState title="목록을 불러오지 못했습니다."
+          rankingQuery.isError ? <ErrorState error={rankingQuery.error} title="목록을 불러오지 못했습니다."
             onRetry={() => {
               void topQuery.refetch().then(() => queryClient.resetQueries({ queryKey: rankingQueryKey, exact: true }));
             }} /> : selectedTab === 'friends' ? (

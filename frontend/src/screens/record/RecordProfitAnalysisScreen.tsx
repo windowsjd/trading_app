@@ -53,7 +53,7 @@ export default function RecordProfitAnalysisScreen({ route, navigation }: Record
   });
   const refresh = usePullToRefresh([detailQuery, equityQuery]);
   if (detailQuery.isLoading) return <FullPageLoading message="수익 분석을 불러오는 중입니다." />;
-  if (!detailQuery.data) return <ErrorState title="수익 분석을 불러오지 못했습니다." message="잠시 후 다시 시도해주세요." onRetry={() => { void detailQuery.refetch(); }} />;
+  if (!detailQuery.data) return <ErrorState error={detailQuery.error} title="수익 분석을 불러오지 못했습니다." message="잠시 후 다시 시도해주세요." onRetry={() => { void detailQuery.refetch(); }} />;
 
   const { season, performance, profitAnalysis } = detailQuery.data;
   const available = profitAnalysis.state === 'available';
@@ -82,6 +82,7 @@ export default function RecordProfitAnalysisScreen({ route, navigation }: Record
               : equityQuery.isError && !equityQuery.data ? (
                 <View style={styles.chartState}>
                   <InlineEmptyState message="자산 추이를 불러오지 못했습니다." />
+                  <AdminDiagnosticPanel error={equityQuery.error} />
                   <CTAButton variant="neutral" label="다시 시도" onPress={() => { void equityQuery.refetch(); }} />
                 </View>
               ) : equityQuery.data?.state === 'not_joined' ? <InlineEmptyState message="시즌 참가 기록이 없어 자산 추이를 표시할 수 없습니다." />

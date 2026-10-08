@@ -31,6 +31,7 @@ import { useAppearance } from '../../theme/appearance';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
+import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 
 type Props = NativeStackScreenProps<MyStackParamList, 'Settings'>;
 
@@ -54,6 +55,7 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
   const photoRequestInFlight = useRef(false);
   const [photoAction, setPhotoAction] = useState<'select' | 'upload' | 'delete' | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoFailure, setPhotoFailure] = useState<unknown>(null);
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -74,6 +76,7 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
     const ownsUser = () => isCurrentSession(owner) && queryClient.getQueryData<MeDto>(QUERY_KEYS.me)?.id === userId;
     const current = () => mounted.current && ownsUser();
     setPhotoError(null);
+    setPhotoFailure(null);
     setPhotoAction(remove ? 'delete' : 'select');
     let image: Awaited<ReturnType<typeof selectProfileImage>> = null;
     try {
@@ -84,6 +87,7 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
       if (ownsUser()) await applyProfileImageResponse(queryClient, me, owner);
     } catch (error) {
       if (current()) {
+        if (!(error instanceof ProfileImageSelectionError)) setPhotoFailure(error);
         setPhotoError(error instanceof ProfileImageSelectionError && error.reason === 'permission'
           ? '사진 접근 권한이 필요합니다. 기기 설정에서 사진 접근을 허용해주세요.'
           : error instanceof ProfileImageSelectionError && error.reason === 'too_large'
@@ -107,6 +111,7 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
 
   const updateMutation = useMutation({
     mutationFn: updateMe,
+    onMutate: () => ({ userId: meQuery.data?.id, generation: getSessionGeneration() }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.me });
       Alert.alert('저장 완료', '닉네임이 변경되었습니다.');
@@ -130,6 +135,7 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
       return {
         userId: previousMe?.id,
         previousPortfolioPublic: previousMe?.portfolioPublic,
+        generation: getSessionGeneration(),
       };
     },
     onSuccess: (me, _portfolioPublic, context) => {
@@ -200,7 +206,7 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
 
   if (!meQuery.data) {
     return (
-      <ErrorState
+      <ErrorState error={meQuery.error}
         title="설정 정보를 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
         onRetry={() => void meQuery.refetch()}
@@ -237,6 +243,7 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
             ) : null}
           </View>
           {photoError ? <Text testID="settings-profile-image-error" accessibilityRole="alert" style={styles.photoError}>{photoError}</Text> : null}
+          {photoFailure ? <AdminDiagnosticPanel error={photoFailure} /> : null}
         </View>
 
         <View style={styles.card}>
@@ -261,6 +268,7 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
               {updateMutation.isPending ? '저장 중...' : '저장'}
             </Text>
           </ActionPressable>
+          {updateMutation.isError && updateMutation.context?.userId === meQuery.data.id && isCurrentSession(updateMutation.context.generation) ? <AdminDiagnosticPanel error={updateMutation.error} /> : null}
         </View>
 
         <View style={styles.card}>
@@ -320,6 +328,7 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
                 ? '공개'
                 : '비공개'}
           </Text>
+          {privacyMutation.isError && privacyMutation.context?.userId === meQuery.data.id && isCurrentSession(privacyMutation.context.generation) ? <AdminDiagnosticPanel error={privacyMutation.error} /> : null}
         </View>
 
         <View style={styles.card}>

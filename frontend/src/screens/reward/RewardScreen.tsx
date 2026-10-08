@@ -25,6 +25,7 @@ import type { RewardViewState } from '../../models/enums/viewState';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
+import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import EmptyState from '../../components/states/EmptyState';
 
 export default function RewardScreen() {
@@ -86,11 +87,13 @@ export default function RewardScreen() {
 
   if (viewState === 'reward_error') {
     return (
-      <ErrorState
+      <ErrorState error={rewardsQuery.isError ? rewardsQuery.error : badgesQuery.error}
         title="보상 정보를 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
         onRetry={retryAll}
-      />
+      >
+        {rewardsQuery.isError && badgesQuery.isError ? <AdminDiagnosticPanel error={badgesQuery.error} /> : null}
+      </ErrorState>
     );
   }
 

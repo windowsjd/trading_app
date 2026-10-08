@@ -20,6 +20,8 @@ export function subscribeFxRateUpdates(
   let pending = false;
   let pendingReason = 'not_observed';
   let facts: RuntimeFacts = {
+    endpoint: 'GET /api/v1/fx/rates/current',
+    clientInvestigation: 'frontend/src/features/wallet/useFxRateUpdates.ts',
     channel: 'fx_rate',
     pair: 'USD/KRW',
     socketStatus: 'not_observed',

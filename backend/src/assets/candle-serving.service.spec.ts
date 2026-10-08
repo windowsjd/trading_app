@@ -1,3 +1,8 @@
+import {
+  captureFinancialFailure,
+  expectSafeFinancialDiagnostic,
+} from '../../test/support/financial-diagnostics';
+import { assertDiagnosticTriage } from '../../scripts/lib/diagnostic-quality';
 jest.mock('../generated/prisma/client', () => ({
   AssetType: {
     domestic_stock: 'domestic_stock',
@@ -717,5 +722,39 @@ describe('CandleServingService', () => {
         response('recovered'),
       );
     });
+  });
+  it('preserves a managed database failure behind the provider-compatible HTTP code', async () => {
+    const { service, database, singleFlight } = create();
+    database.load.mockResolvedValue(
+      load('missing', null, { completedCoverage: true }),
+    );
+    singleFlight.getOrLoad.mockRejectedValue(
+      Object.assign(new Error('postgres://secret@private/987654.12345678'), {
+        code: 'P1001',
+      }),
+    );
+    const legacy = jest.fn();
+    const { diagnostic } = await captureFinancialFailure(
+      () => service.serve(asset, query, legacy),
+      'admin',
+      '/api/v1/assets/asset-1/candles',
+    );
+    assertDiagnosticTriage(
+      diagnostic,
+      'ASSET_CANDLES_PROVIDER_ERROR',
+      'managed candle failure',
+    );
+    expect(diagnostic).toMatchObject({
+      failureStage: 'managed_candle_read',
+      evidence: {
+        safeCause: { category: 'db_connection_failed' },
+        candleDelivery: {
+          cacheState: 'miss',
+          result: 'managed_read_failed',
+        },
+      },
+    });
+    expectSafeFinancialDiagnostic(diagnostic);
+    expect(legacy).not.toHaveBeenCalled();
   });
 });

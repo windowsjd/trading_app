@@ -90,7 +90,7 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
 
   if (viewState === 'record_list_error') {
     return (
-      <ErrorState
+      <ErrorState error={recordsQuery.error}
         title="전적 목록을 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
         onRetry={() => void recordsQuery.refetch()}

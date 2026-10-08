@@ -62,7 +62,7 @@ function createRecordScreenHarness(screen = 'detail', scope = { seasonId: 'recor
   h.settle = async () => { await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); }); };
   h.update = async () => { act(() => h.renderer.update(element())); await h.settle(); };
   h.find = id => h.renderer.root.findAll(n => typeof n.type === 'string' && n.props.testID === id)[0];
-  h.text = (node = h.renderer.root) => typeof node === 'string' || typeof node === 'number' ? String(node) : node.children.map(h.text).join('');
+  h.text = (node = h.renderer.root) => typeof node === 'string' || typeof node === 'number' ? String(node).replace(/\u200b/g, '') : node.children.map(h.text).join('');
   h.press = async id => { await act(async () => h.find(id).props.onPress()); await h.settle(); };
   h.refresh = async () => { await act(async () => { h.renderer.root.findByType(screen === 'history' ? 'FlatList' : 'ScrollView').props.refreshControl.props.onRefresh(); await new Promise(resolve => setTimeout(resolve, 20)); }); };
   h.close = () => { act(() => h.renderer.unmount()); client.clear(); };

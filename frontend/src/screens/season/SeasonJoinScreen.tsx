@@ -179,7 +179,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
     }
     if (!seasonQuery.data) return 'season_not_configured_view';
     if (joinMutation.isPending) return 'season_join_submitting';
-    const joinErrorState = getJoinErrorViewState(joinErrorCode);
+    const joinErrorState = getJoinErrorViewState(joinMutation.variables === seasonQuery.data?.id ? joinErrorCode : null);
     if (joinErrorState) return joinErrorState;
     return toSeasonJoinViewState(seasonQuery.data);
   }, [
@@ -188,6 +188,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
     seasonQuery.error,
     seasonQuery.data,
     joinMutation.isPending,
+    joinMutation.variables,
     joinErrorCode,
   ]);
 
@@ -229,7 +230,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
     const code = getApiErrorCode(seasonQuery.error);
 
     return (
-      <ErrorState
+      <ErrorState error={seasonQuery.error}
         title={
           isAuthUserInactiveError(code)
             ? '계정을 사용할 수 없습니다.'
@@ -302,7 +303,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
       : getErrorMessageFromCode(joinErrorCode);
 
     return (
-      <ErrorState
+      <ErrorState error={joinMutation.variables === season.id ? joinMutation.error : undefined}
         title={
           isAuthUserInactiveError(joinErrorCode)
             ? '계정을 사용할 수 없습니다.'

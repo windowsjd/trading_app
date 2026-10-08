@@ -7,6 +7,7 @@ import { semantic, resolveSemanticStyle } from '../../theme/tokens.ts';
 import { financial, getFinancialColors } from '../../theme/financialColors.ts';
 
 const Row = load(resolve('src/components/tradingAccount/PositionAssetRow.tsx'), {
+  '../states/AdminDiagnosticPanel': { default: 'AdminDiagnosticPanel', __esModule: true },
   'react-native': { Text: 'Text', View: 'View', StyleSheet: { create: (styles) => styles } },
 }).default;
 const find = (tree, id) => elements(tree).find((node) => node.props.testID === id);

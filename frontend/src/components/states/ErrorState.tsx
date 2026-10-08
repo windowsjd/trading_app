@@ -19,6 +19,7 @@ interface ErrorStateProps {
   /** Legacy wiring; new surfaces use error. */
   diagnosticError?: unknown;
   diagnosticRuntime?: RuntimeFacts;
+  children?: React.ReactNode;
 }
 
 export default function ErrorState({
@@ -29,12 +30,14 @@ export default function ErrorState({
   error,
   diagnosticError,
   diagnosticRuntime,
+  children,
 }: ErrorStateProps) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.center}>
         <Text style={styles.title}>{title}</Text>
         <ErrorNotice error={error ?? diagnosticError} message={message} style={styles.message} runtime={diagnosticRuntime} />
+        {children}
 
         {onRetry ? (
           <ActionPressable accessibilityRole="button" feedback="button" style={styles.button} onPress={onRetry}>

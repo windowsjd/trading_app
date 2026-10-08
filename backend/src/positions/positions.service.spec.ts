@@ -1,3 +1,5 @@
+import { assertDiagnosticTriage } from '../../scripts/lib/diagnostic-quality';
+import { expectSafeFinancialDiagnostic } from '../../test/support/financial-diagnostics';
 import {
   adminDiagnosticRequestMiddleware,
   setAdminDiagnosticContext,
@@ -1164,6 +1166,171 @@ describe('PositionsService', () => {
         } else expect(error).not.toHaveProperty('diagnostic');
       }
       expect(prisma.assetPriceSnapshot.findFirst).toHaveBeenCalledTimes(2);
+    },
+  );
+  it.each(['admin', 'user', 'operator'])(
+    'preserves unexpected row failures without cross-row evidence for %s',
+    async (role) => {
+      const { prisma, service } = createService();
+      const secret = 'postgres://secret@private/987654.12345678';
+      jest
+        .spyOn(
+          service as never,
+          'findLatestEligibleAssetPriceSnapshot' as never,
+        )
+        .mockImplementation((async (asset: { id: string }) => {
+          if (asset.id === 'db')
+            throw Object.assign(new Error(secret), { code: 'P1001' });
+          return {
+            ...priceSnapshot('snapshot-' + asset.id, '10.00000000'),
+            price:
+              asset.id === 'calculation'
+                ? {
+                    mul() {
+                      throw new TypeError(secret);
+                    },
+                    toString() {
+                      throw new TypeError(secret);
+                    },
+                  }
+                : new Prisma.Decimal(10),
+          };
+        }) as never);
+      let pending!: Promise<unknown[]>;
+      adminDiagnosticRequestMiddleware(
+        {
+          method: 'GET',
+          originalUrl: '/api/v1/positions',
+          headers: {},
+          user: { userId: 'user-1', role },
+        } as never,
+        { setHeader: jest.fn() } as never,
+        () => {
+          setAdminDiagnosticContext({ evidence: { otherRow: secret } });
+          pending = Promise.all(
+            ['db', 'calculation', 'healthy'].map((assetId) =>
+              service['buildValuation'](
+                position({
+                  id: 'row',
+                  assetId,
+                  quantity: '1',
+                  averageCost: '2',
+                }),
+                new Date('2026-07-20T03:00:00Z'),
+                null,
+              ),
+            ),
+          );
+        },
+      );
+      const rows = (await pending) as Awaited<
+        ReturnType<PositionsService['buildValuation']>
+      >[];
+      for (let i = 0; i < 2; i++) {
+        const error =
+          rows[i].state === 'unavailable'
+            ? (
+                rows[i] as Extract<
+                  (typeof rows)[number],
+                  { state: 'unavailable' }
+                >
+              ).error
+            : null;
+        expect(error?.code).toBe('ASSET_PRICE_UNAVAILABLE');
+        if (role === 'admin') {
+          assertDiagnosticTriage(
+            error?.diagnostic,
+            'ASSET_PRICE_UNAVAILABLE',
+            'positions unexpected row valuation',
+          );
+          expect(error?.diagnostic).toMatchObject({
+            failureStage:
+              i === 0
+                ? 'asset_price_selection'
+                : 'position_valuation_calculation',
+            entities: { assetId: i === 0 ? 'db' : 'calculation' },
+            evidence: {
+              valuation: {
+                result: 'unexpected_failure',
+                priceSelected: i !== 0,
+              },
+              safeCause: {
+                category: i === 0 ? 'db_connection_failed' : 'unexpected_error',
+              },
+            },
+          });
+          expectSafeFinancialDiagnostic(error?.diagnostic);
+          expect(JSON.stringify(error?.diagnostic)).not.toContain(secret);
+        } else expect(error).not.toHaveProperty('diagnostic');
+      }
+      expect(rows[2].state).toBe('available');
+      expect(prisma.assetPriceSnapshot.findMany).not.toHaveBeenCalled();
+    },
+  );
+  it.each(['admin', 'user', 'operator'])(
+    'retains cached valuation and role-gated live failure evidence for %s',
+    async (role) => {
+      const { service } = createService();
+      jest
+        .spyOn(
+          service as never,
+          'findLatestEligibleAssetPriceSnapshot' as never,
+        )
+        .mockRejectedValue(
+          Object.assign(new Error('private database detail'), {
+            code: 'P1001',
+          }) as never,
+        );
+      let pending!: ReturnType<PositionsService['buildValuation']>;
+      adminDiagnosticRequestMiddleware(
+        {
+          method: 'GET',
+          originalUrl: '/api/v1/positions',
+          headers: {},
+          user: { userId: 'user-1', role },
+        } as never,
+        { setHeader: jest.fn() } as never,
+        () => {
+          pending = service['buildValuation'](
+            position({
+              id: 'cached',
+              quantity: '2',
+              averageCost: '90',
+              currentPriceLocal: '125',
+              currentPriceKrw: '125',
+              marketValueLocal: '250',
+              marketValueKrw: '250',
+              unrealizedPnlLocal: '70',
+              unrealizedPnlKrw: '70',
+            }),
+            priceAt,
+            null,
+          );
+        },
+      );
+      const valuation = await pending;
+      expect(valuation.state).toBe('stale_cache');
+      if (valuation.state !== 'stale_cache')
+        throw new Error('cached valuation expected');
+      expect(valuation.payload.positionValueKrw).toBe('250.00000000');
+      if (role === 'admin') {
+        assertDiagnosticTriage(
+          valuation.payload.diagnostic,
+          'ASSET_PRICE_UNAVAILABLE',
+          'cached live failure',
+        );
+        expect(valuation.payload.diagnostic).toMatchObject({
+          failureStage: 'asset_price_selection',
+          evidence: {
+            valuation: { result: 'unexpected_failure' },
+            safeCause: { category: 'db_connection_failed' },
+          },
+        });
+        expectSafeFinancialDiagnostic(valuation.payload.diagnostic);
+        expect(JSON.stringify(valuation.payload.diagnostic)).not.toContain(
+          'private database detail',
+        );
+      } else expect(valuation.payload).not.toHaveProperty('diagnostic');
     },
   );
 });

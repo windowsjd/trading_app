@@ -20,12 +20,13 @@ import { isFxResponseInScope as isTransferResponseInScope, type FxRequestScope a
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { createIdempotencyKey } from '../../utils/idempotency';
 import { formatDisplayDecimal } from '../../utils/format';
-import { getApiErrorCode, getApiErrorInfo, getApiErrorStatus } from '../../services/api/errorMapper';
+import { getApiErrorCode, getApiErrorInfo, getApiErrorStatus, requestFailureFacts } from '../../services/api/errorMapper';
 import ActionPressable from '../../components/common/ActionPressable';
 import CTAButton from '../../components/common/CTAButton';
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import ErrorNotice from '../../components/states/ErrorNotice';
+import { isTradingAccountScopeMismatchError } from '../../features/tradingAccount/accountScope';
 
 type UsdWalletIdentity = Extract<TransferWalletIdentity, { currency: 'USD' }>;
 const USD_TRANSFER_WALLETS = TRANSFER_WALLETS.filter((wallet): wallet is UsdWalletIdentity => wallet.currency === 'USD');
@@ -105,6 +106,12 @@ function TransferForm({ account, capabilities, scope, readScope }: {
     { section: '선물 담보', isError: sourceIsFutures && futures.isError, error: futures.error, retry: () => void futures.refetch() },
     { section: '이체', isError: !!failure, error: failure, retry: () => { setFailure(null); void wallets.refetch(); } },
   ]);
+  const failureRuntime = failure ? requestFailureFacts(failure, {
+    endpoint: 'POST /api/v1/trading-accounts/:accountId/wallet-transfers',
+    operation: 'wallet_transfer',
+    contractFailure: failure instanceof WalletTransferContractError || isTradingAccountScopeMismatchError(failure),
+    outcome: attempt.current?.uncertain ? 'unknown' : undefined,
+  }) : undefined;
   const scopedWallets = wallets.data?.tradingAccountId === account.id ? wallets.data : undefined;
   const source = getWalletByIdentity(scopedWallets, sourceIdentity.scope, 'USD');
   const destination = getWalletByIdentity(scopedWallets, destinationIdentity.scope, 'USD');
@@ -172,7 +179,7 @@ function TransferForm({ account, capabilities, scope, readScope }: {
               <Text style={styles.body}>받는 지갑 잔액: USD {formatDisplayDecimal(result.destination.balanceAfter)}</Text>
               <CTAButton label="다른 이체하기" onPress={() => { setResult(null); setAmount(''); attempt.current = null; }} />
             </View>
-          ) : integrity ? <ErrorState error={integrity.error} title={ACCOUNT_INTEGRITY_TITLE} message={integrity.message} onRetry={integrity.retry} />
+          ) : integrity ? <ErrorState error={integrity.error} diagnosticRuntime={integrity.error === failure ? failureRuntime : undefined} title={ACCOUNT_INTEGRITY_TITLE} message={integrity.message} onRetry={integrity.retry} />
             : wallets.isLoading ? <FullPageLoading message="지갑 잔액을 불러오는 중입니다." />
               : wallets.isError || !wallets.data ? <ErrorState error={wallets.error} title="지갑 잔액을 불러오지 못했습니다." onRetry={() => void wallets.refetch()} />
                 : !hasAllWallets || (!sourceIsFutures && available === null) ? <ErrorState title={ACCOUNT_INTEGRITY_TITLE} message="지갑 정보를 확인할 수 없어 이체를 중단했습니다." onRetry={() => void wallets.refetch()} />
@@ -201,7 +208,7 @@ function TransferForm({ account, capabilities, scope, readScope }: {
                       {amount && !canonicalAmount ? <Text style={styles.error}>0보다 큰 금액을 소수점 8자리까지 입력해주세요.</Text>
                         : canonicalAmount && available !== null && !transferAmountFits(canonicalAmount, available) && !uncertainRetry ? <Text style={styles.error}>이체 가능 금액을 초과했습니다.</Text> : null}
                     </View>
-                    {failure ? <ErrorNotice error={failure} message={transferErrorMessage(getApiErrorCode(failure))} testID="wallet-transfer-error" style={styles.error} /> : null}
+                    {failure ? <ErrorNotice error={failure} message={attempt.current?.uncertain ? '이체 결과를 확인하지 못했습니다. 원장을 확인하거나 같은 요청으로 다시 확인해주세요.' : transferErrorMessage(getApiErrorCode(failure))} runtime={failureRuntime} testID="wallet-transfer-error" style={styles.error} /> : null}
                     <View ref={inputScroll.submitRef} collapsable={false}>
                       <CTAButton testID="wallet-transfer-submit" label="이체하기" state={locked ? 'loading' : canExecute ? 'enabled' : 'disabled'} onPress={execute} />
                     </View>

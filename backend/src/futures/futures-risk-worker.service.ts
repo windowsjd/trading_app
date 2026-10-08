@@ -10,6 +10,7 @@ import { OpsJobLockService } from '../ops/ops-job-lock.service';
 import { OpsJobRunService } from '../ops/ops-job-run.service';
 import { FuturesLiquidationService } from './futures-liquidation.service';
 import { futuresRiskConfig } from './futures.config';
+import { projectOpsFailure } from '../ops/ops-failure';
 
 @Injectable()
 export class FuturesRiskWorker implements OnModuleInit, OnModuleDestroy {
@@ -27,8 +28,14 @@ export class FuturesRiskWorker implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     if (futuresRiskConfig().enabled)
       this.timer = setInterval(() => {
-        void this.tick().catch(() =>
-          this.logger.error('FUTURES_RISK_CYCLE_FAILED'),
+        void this.tick().catch((error: unknown) =>
+          this.logger.error(
+            JSON.stringify({
+              job: 'futures_liquidation',
+              failureStage: 'risk_cycle',
+              ...projectOpsFailure(error, 'FUTURES_RISK_CYCLE_FAILED'),
+            }),
+          ),
         );
       }, futuresRiskConfig().intervalMs);
   }
@@ -63,6 +70,8 @@ export class FuturesRiskWorker implements OnModuleInit, OnModuleDestroy {
         accountId: string;
         scope: string;
         state: string;
+        failureStage?: string;
+        failure?: ReturnType<typeof projectOpsFailure>;
       }> = [];
       let leaseLost = false;
       const processAccount = async (account: { id: string }) => {
@@ -98,10 +107,16 @@ export class FuturesRiskWorker implements OnModuleInit, OnModuleDestroy {
               : { state: 'healthy' };
             results.push({ accountId: account.id, scope, state: result.state });
           } catch (error) {
+            const state = riskFailureState(error);
             results.push({
               accountId: account.id,
               scope,
-              state: riskFailureState(error),
+              state,
+              failureStage: 'risk_liquidation',
+              failure: {
+                ...projectOpsFailure(error, 'FUTURES_RISK_TRANSACTION_FAILED'),
+                code: state,
+              },
             });
           }
         }

@@ -9,6 +9,7 @@
  */
 import type {
   IsoDateTimeString,
+  AdminDiagnosticDto,
   MoneyString,
   OffsetPagination,
   PublicSourceMetadata,
@@ -48,6 +49,7 @@ export interface PositionStaleCacheValuationDto {
   unrealizedPnl: MoneyString;
   unrealizedPnlKrw: MoneyString;
   returnRate: RateString;
+  diagnostic?: AdminDiagnosticDto;
   reason: 'LIVE_VALUATION_UNAVAILABLE';
   message: string;
 }

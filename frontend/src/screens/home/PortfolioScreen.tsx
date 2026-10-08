@@ -409,6 +409,10 @@ export default function PortfolioScreen({ navigation }: Props) {
               <AdminDiagnosticPanel key={`position-diagnostic-${index}`} diagnostic={error.diagnostic} />
             ))}
 
+            {positionsQuery.data?.pages.flatMap(page => page.positions).filter(position => position.valuation.state === 'stale_cache').map(position => (
+              <AdminDiagnosticPanel key={position.positionId} diagnostic={position.valuation.state === 'stale_cache' ? position.valuation.diagnostic : undefined} />
+            ))}
+
             <View style={styles.card}>
               <Text style={styles.label}>{overview.finalResult ? '최종 자산 비중' : '자산 비중'}</Text>
               <DonutChart
@@ -423,8 +427,8 @@ export default function PortfolioScreen({ navigation }: Props) {
                 <Text style={styles.inlineWarningText}>
                   일부 포트폴리오 정보를 불러오지 못했습니다.
                 </Text>
-                {positionsQuery.isError ? <AdminDiagnosticPanel error={positionsQuery.error} /> : null}
-                {isPortfolioAvailable && equityQuery.isError ? <AdminDiagnosticPanel error={equityQuery.error} /> : null}
+                {positionsQuery.isError && positionsQuery.data ? <AdminDiagnosticPanel error={positionsQuery.error} /> : null}
+                {isPortfolioAvailable && equityQuery.isError && equityQuery.data ? <AdminDiagnosticPanel error={equityQuery.error} /> : null}
               </View>
             ) : null}
 

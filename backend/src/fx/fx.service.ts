@@ -3146,7 +3146,12 @@ export class FxService {
     });
 
     if (debitCount !== 1) {
-      await this.throwSourceDebitFailure(tx, plan, tradingAccountId);
+      await this.throwSourceDebitFailure(
+        tx,
+        plan,
+        tradingAccountId,
+        debitCount,
+      );
     }
 
     return this.findPostUpdateWalletOrThrow(tx, {
@@ -3189,6 +3194,11 @@ export class FxService {
           currencyCode: plan.toCurrency,
         },
         // A credit carries no amount guard; only scope can fail it.
+        diagnostic: {
+          financialOperation: 'fx_execute',
+          failureStage: 'fx_target_credit',
+          mutationAffected: creditResult.count,
+        },
       });
 
       this.throwFxExecuteError(
@@ -3216,6 +3226,7 @@ export class FxService {
     tx: FxExecuteTransactionClient,
     plan: FxExecutePlan,
     tradingAccountId: string,
+    mutationAffected: number,
   ): Promise<never> {
     const reason = await diagnoseCashWalletMutationFailure(tx, {
       walletId: plan.sourceWalletId,
@@ -3225,6 +3236,11 @@ export class FxService {
         currencyCode: plan.fromCurrency,
       },
       requires: { available: plan.sourceDebitAmount },
+      diagnostic: {
+        financialOperation: 'fx_execute',
+        failureStage: 'fx_source_debit',
+        mutationAffected,
+      },
     });
 
     if (reason === 'wallet_not_found') {

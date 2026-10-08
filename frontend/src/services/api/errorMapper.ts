@@ -146,7 +146,12 @@ export function getApiErrorDiagnostic(
   error: unknown,
 ): AdminDiagnosticDto | null {
   const errorLike = isRecord(error) ? (error as ApiErrorLike) : undefined;
-  const diagnostic = errorLike?.response?.data?.error?.diagnostic;
+  return sanitizeAdminDiagnostic(errorLike?.response?.data?.error?.diagnostic);
+}
+
+/** Treat both HTTP errors and HTTP 200 partial diagnostics as untrusted input. */
+export function sanitizeAdminDiagnostic(input: unknown): AdminDiagnosticDto | null {
+  const diagnostic = boundDiagnostic(input);
   if (!isRecord(diagnostic)) return null;
   if (
     diagnostic.version !== 1 ||
@@ -157,9 +162,11 @@ export function getApiErrorDiagnostic(
     typeof diagnostic.domain !== 'string' ||
     typeof diagnostic.operation !== 'string' ||
     typeof diagnostic.failureStage !== 'string' ||
+    (diagnostic.nextInvestigation !== undefined && !isStringArray(diagnostic.nextInvestigation)) ||
     !isRecord(diagnostic.exception) ||
     typeof diagnostic.exception.type !== 'string' ||
     typeof diagnostic.exception.message !== 'string' ||
+    (diagnostic.exception.cause !== undefined && typeof diagnostic.exception.cause !== 'string') ||
     !isStringArray(diagnostic.exception.applicationStack) ||
     !isStringArray(diagnostic.exception.stack) ||
     typeof diagnostic.exception.truncated !== 'boolean' ||
@@ -176,6 +183,46 @@ export function getApiErrorDiagnostic(
     return null;
   }
   return diagnostic as unknown as AdminDiagnosticDto;
+}
+
+function boundDiagnostic(input: unknown): unknown {
+  let remaining = 6000;
+  let nodes = 300;
+  let truncated = false;
+  const sensitive = (key: string) => /password|authorization|cookie|credential|databaseurl|dburl|token|secret|apikey|appkey|privatekey|rawpayload|providerpayload|rawbody|responsebody|rawresponse|providerresponse|^(?:row|walletrow|dbrow)$|^(?:balance|reserved|amount|quantity|pnl)$|(?:balanceamount|reservedamount|transferamount|sourceamount|netamount|grossamount|feeamount|averagecost|realizedpnl|reservedquantity)/u.test(key.replace(/[^a-z0-9]/giu, '').toLowerCase());
+  const text = (value: string): string => {
+    // Free-text payload/credential assignments and URLs have ambiguous bounds.
+    if (/(?:https?|wss?|postgres(?:ql)?|mysql|mongodb):\/\/|\b(?:Bearer|Basic)\s|(?:password|token|secret|api[_ -]?key|raw[_ -]?(?:payload|exception)|provider[_ -]?(?:payload|response))[\s\\"']*[:=]|(?:balance|reserved|amount|quantity|pnl)[a-z_]*[\s\\"']*[:= ][\s\\"']*[-+]?\d/iu.test(value)) return '[REDACTED]';
+    const limit = Math.min(1000, Math.max(remaining, 0));
+    remaining -= Math.min(value.length, limit);
+    if (value.length > limit) { truncated = true; return value.slice(0, limit); }
+    return value;
+  };
+  const visit = (value: unknown, depth: number): unknown => {
+    if (--nodes < 0 || depth > 7 || remaining <= 0) { truncated = true; return '[TRUNCATED]'; }
+    if (typeof value === 'string') return text(value);
+    if (value === null || typeof value === 'boolean') return value;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (Array.isArray(value)) {
+      if (value.length > 30) truncated = true;
+      return value.slice(0, 30).map(item => visit(item, depth + 1));
+    }
+    if (isRecord(value)) {
+      const entries = Object.entries(value);
+      if (entries.length > 30) truncated = true;
+      return Object.fromEntries(entries.slice(0, 30).map(([key, item]) => [text(key), sensitive(key) ? '[REDACTED]' : visit(item, depth + 1)]));
+    }
+    return null;
+  };
+  if (!isRecord(input)) return null;
+  // Only the existing DTO fields cross the panel boundary; discard extra rows/payloads.
+  const fields = ['version', 'code', 'httpStatus', 'timestamp', 'requestId', 'domain', 'operation', 'failureStage', 'exception', 'diagnosticEvents', 'serverLogs', 'nextInvestigation', 'truncated', 'entities', 'evidence'];
+  const result = visit(Object.fromEntries(fields.filter(key => input[key] !== undefined).map(key => [key, input[key]])), 0);
+  if (isRecord(result)) {
+    result.truncated = input.truncated === true || truncated;
+    if (Array.isArray(result.nextInvestigation)) result.nextInvestigation = result.nextInvestigation.filter(hint => typeof hint === 'string' && /^(?:backend|frontend)\/(?:src|scripts)\/[\w/.-]+\.(?:ts|tsx)$/u.test(hint));
+  }
+  return result;
 }
 
 function isStringArray(value: unknown): value is string[] {
@@ -488,4 +535,32 @@ export function mapFxErrorCodeToBlockedReason(
     default:
       return null;
   }
+}
+
+/** Facts from the failed request only. Endpoints are call-site templates, never URLs from errors. */
+export function requestFailureFacts(error: unknown, context: {
+  endpoint: string;
+  operation: string;
+  contractFailure?: boolean;
+  outcome?: 'unknown' | 'not_submitted';
+}): import('../ws/runtimeDiagnostics').RuntimeFacts {
+  const info = getApiErrorInfo(error);
+  const headers = (error as { response?: { headers?: Record<string, unknown> } } | null)?.response?.headers;
+  const requestId = headers?.['x-request-id'];
+  const timeout = !info.hasResponse && TIMEOUT_ERROR_CODES.has(info.clientCode ?? '');
+  const network = !info.hasResponse && NETWORK_ERROR_CODES.has(info.clientCode ?? '');
+  return {
+    endpoint: context.endpoint,
+    operation: context.operation,
+    hasResponse: info.hasResponse || !!context.contractFailure,
+    httpStatus: info.status !== null && Number.isInteger(info.status) && info.status >= 100 && info.status <= 599 ? info.status : 'not_observed',
+    serverCode: isKnownErrorCode(info.serverCode) ? info.serverCode : info.serverCode ? 'unrecognized' : 'not_observed',
+    clientCode: timeout || network || ['ERR_BAD_REQUEST', 'ERR_BAD_RESPONSE', 'ERR_CANCELED'].includes(info.clientCode ?? '') ? info.clientCode : 'not_observed',
+    timeout, network,
+    responseContract: context.contractFailure ? 'rejected' : 'not_observed',
+    clientFailureStage: context.contractFailure ? 'response_validation' : info.hasResponse ? 'http_response' : 'request_transport',
+    outcome: context.outcome ?? 'not_observed',
+    requestId: typeof requestId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(requestId) ? requestId : 'not_observed',
+    clientInvestigation: context.contractFailure ? 'frontend/src/features/tradingAccount/api.ts' : 'frontend/src/services/api/client.ts',
+  };
 }

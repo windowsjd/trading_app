@@ -16,10 +16,11 @@ function screenHarness() {
   const h: any = { mutations, navigations, alerts, query, option: null, mutationOption: null };
   const Screen = load(resolve('src/screens/friends/FriendsScreen.tsx'), {
     react: { ...React, useRef: (value: any) => ({ current: value }), useEffect() {}, useCallback: (fn: any) => fn, useState: (initial: any) => { const i = index++; if (!(i in slots)) slots[i] = initial; return [slots[i], (value: any) => { slots[i] = value; }]; } },
+    '../../components/states/AdminDiagnosticPanel': { default: 'AdminDiagnosticPanel', __esModule: true },
     'react-native': { FlatList: 'FlatList', View: 'View', Text: 'Text', Image: 'Image', TextInput: 'TextInput', StyleSheet: { create: (value: any) => value }, Alert: { alert: (...args: any[]) => alerts.push(args) } },
     'react-native-svg': { default: 'Svg', Circle: 'Circle', Path: 'Path', __esModule: true },
     '@react-navigation/native': { useFocusEffect: () => {} },
-    '@tanstack/react-query': { useQueryClient: () => ({}), useInfiniteQuery: (option: any) => { h.option = option; return query; }, useMutation: (option: any) => { h.mutationOption = option; return { mutate: (value: any) => mutations.push(value) }; } },
+    '@tanstack/react-query': { useQueryClient: () => ({}), useInfiniteQuery: (option: any) => { h.option = option; return query; }, useMutation: (option: any) => { h.mutationOption = option; return { reset() {}, mutate: (value: any) => mutations.push(value) }; } },
     '../../features/friends/api': { getFriends: (...args: any[]) => args, changeFriendship: () => {} },
     '../../features/friends/cache': { refreshFriendship: async () => {} },
     '../../components/states/InlineEmptyState': { __esModule: true, default: 'InlineEmptyState' },
@@ -142,6 +143,7 @@ describe('overall menu and server privacy setting', () => {
     let cached = data;
     const Screen = load(resolve('src/screens/my/SettingsScreen.tsx'), {
       react: { ...React, useState: (value: any) => [value, () => {}], useEffect: () => {}, useRef: (value: any) => ({ current: value }) },
+      '../../components/states/AdminDiagnosticPanel': { default: 'AdminDiagnosticPanel', __esModule: true },
       'react-native': { View: 'View', Text: 'Text', SafeAreaView: 'SafeAreaView', ScrollView: 'ScrollView', Switch: 'Switch', Platform: { OS: 'android' }, TextInput: 'TextInput', Alert: { alert: () => {} }, StyleSheet: { create: (value: any) => value } },
       '@tanstack/react-query': {
         useQuery: () => ({ data }),
@@ -163,7 +165,7 @@ describe('overall menu and server privacy setting', () => {
     assert.equal(toggle.props.value, false);
     toggle.props.onValueChange(true);
     assert.deepEqual(mutations, [true]);
-    const privacy = options.find(option => option.onMutate);
+    const privacy = options.find(option => option.onSettled);
     const context = await privacy.onMutate(true);
     assert.equal(cached.portfolioPublic, true);
     assert.equal(cached.nickname, 'me');

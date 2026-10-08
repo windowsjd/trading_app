@@ -19,6 +19,7 @@ import { debitAvailableCash } from './cash-wallet-atomic';
 import { diagnoseCashWalletMutationFailure } from './cash-wallet-failure-diagnosis';
 import { canonicalCashWalletSetIssue } from './canonical-cash-wallets';
 import { assertFuturesTransferCollateral } from '../futures/futures-collateral';
+import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
 
 export type WalletTransferRequest = {
   sourceWalletId?: unknown;
@@ -95,8 +96,10 @@ export class TradingAccountWalletTransferService {
     });
     if (existing) return replay(existing);
 
+    setAdminDiagnosticContext({ failureStage: 'transfer_transaction_start' });
     try {
       return await this.prisma.$transaction(async (tx) => {
+        setAdminDiagnosticContext({ failureStage: 'transfer_account_lock' });
         // Same lifecycle ordering as orders/FX; General uses the existing TWR fence.
         let seasonContext: Awaited<
           ReturnType<typeof lockSeasonTradingContext>
@@ -140,6 +143,7 @@ export class TradingAccountWalletTransferService {
 
         // ID order prevents opposite-direction transfers from forming a wallet lock cycle.
         // The account predicate excludes foreign rows before any lock or mutation.
+        setAdminDiagnosticContext({ failureStage: 'transfer_wallet_lock' });
         await tx.$queryRaw`
           SELECT "id" FROM "cash_wallets"
           WHERE "trading_account_id" = ${accountId}
@@ -184,6 +188,7 @@ export class TradingAccountWalletTransferService {
           if (clock.now >= season.endAt)
             fail(HttpStatus.CONFLICT, 'SEASON_ENDED', 'Season has ended.');
         }
+        setAdminDiagnosticContext({ failureStage: 'transfer_wallet_read' });
         const wallets = await tx.cashWallet.findMany({
           where: { tradingAccountId: accountId },
         });
@@ -205,7 +210,7 @@ export class TradingAccountWalletTransferService {
             'WALLET_TRANSFER_WALLET_NOT_FOUND',
             'Transfer wallets were not found in this account.',
           );
-        return this.transferInTransaction(tx, {
+        const result = await this.transferInTransaction(tx, {
           accountId,
           source,
           destination,
@@ -214,6 +219,10 @@ export class TradingAccountWalletTransferService {
           requestHash,
           executeNow: clock.now,
         });
+        setAdminDiagnosticContext({
+          failureStage: 'transfer_transaction_commit',
+        });
+        return result;
       });
     } catch (error) {
       if (
@@ -242,6 +251,13 @@ export class TradingAccountWalletTransferService {
       executeNow: Date;
     },
   ): Promise<WalletTransferResult> {
+    setAdminDiagnosticContext({
+      failureStage: 'transfer_wallet_validation',
+      nextInvestigation: [
+        'backend/src/wallets/trading-account-wallet-transfer.service.ts',
+        'backend/src/wallets/cash-wallet-failure-diagnosis.ts',
+      ],
+    });
     const {
       accountId,
       source,
@@ -266,7 +282,11 @@ export class TradingAccountWalletTransferService {
         walletScope: wallet.walletScope,
       });
     }
+    setAdminDiagnosticContext({
+      failureStage: 'transfer_collateral_validation',
+    });
     await assertFuturesTransferCollateral(tx, source, amount);
+    setAdminDiagnosticContext({ failureStage: 'transfer_source_debit' });
     const changed = await debitAvailableCash(tx, {
       walletId: source.id,
       tradingAccountId: accountId,
@@ -283,6 +303,11 @@ export class TradingAccountWalletTransferService {
           currencyCode: CurrencyCode.USD,
         },
         requires: { available: amount },
+        diagnostic: {
+          financialOperation: 'wallet_transfer',
+          failureStage: 'transfer_source_debit',
+          mutationAffected: changed,
+        },
       });
       fail(
         HttpStatus.CONFLICT,
@@ -290,6 +315,7 @@ export class TradingAccountWalletTransferService {
         'Available source balance is insufficient.',
       );
     }
+    setAdminDiagnosticContext({ failureStage: 'transfer_destination_credit' });
     const credit = await tx.cashWallet.updateMany({
       where: {
         id: destination.id,
@@ -306,6 +332,11 @@ export class TradingAccountWalletTransferService {
           tradingAccountId: accountId,
           walletScope: destination.walletScope,
           currencyCode: CurrencyCode.USD,
+        },
+        diagnostic: {
+          financialOperation: 'wallet_transfer',
+          failureStage: 'transfer_destination_credit',
+          mutationAffected: credit.count,
         },
       });
       fail(
@@ -342,6 +373,7 @@ export class TradingAccountWalletTransferService {
         },
       },
     };
+    setAdminDiagnosticContext({ failureStage: 'transfer_command_write' });
     await tx.walletTransfer.create({
       data: {
         id: transferId,
@@ -356,6 +388,7 @@ export class TradingAccountWalletTransferService {
         executedAt: executeNow,
       },
     });
+    setAdminDiagnosticContext({ failureStage: 'transfer_ledger_write' });
     await tx.walletTransaction.createMany({
       data: [
         {

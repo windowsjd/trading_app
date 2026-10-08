@@ -5,6 +5,7 @@ import {
 import { fxExecuteSnapshotFreshnessThresholdMs } from '../fx/fx-execute-snapshot-policy';
 import {
   buildAdminPartialFailureDiagnostic,
+  preserveAdminFailureCause,
   type AdminDiagnostic,
   type DiagnosticContextUpdate,
 } from '../common/admin-diagnostics';
@@ -182,6 +183,7 @@ type PositionValuation =
         returnRate: string;
         reason: 'LIVE_VALUATION_UNAVAILABLE';
         message: string;
+        diagnostic?: AdminDiagnostic;
       };
     }
   | {
@@ -486,6 +488,8 @@ export class PositionsService {
     valuationAt: Date,
     usdKrwSelection: UsdKrwSelection | null,
   ): Promise<PositionValuation> {
+    let failureStage = 'position_currency_validation';
+    let priceSelected = false;
     try {
       if (
         this.getAssetSettlementCurrency(position.asset) !==
@@ -497,11 +501,14 @@ export class PositionsService {
         );
       }
 
+      failureStage = 'asset_price_selection';
       const priceSnapshot = await this.findLatestEligibleAssetPriceSnapshot(
         position.asset,
         this.getAssetPriceCurrency(position.asset),
         valuationAt,
       );
+      priceSelected = true;
+      failureStage = 'fx_rate_validation';
 
       if (
         position.currencyCode === CurrencyCode.USD &&
@@ -524,6 +531,7 @@ export class PositionsService {
         );
       }
 
+      failureStage = 'position_valuation_calculation';
       const currentPrice = priceSnapshot.price;
       const values = calculatePositionValuation({
         quantity: position.quantity,
@@ -541,6 +549,7 @@ export class PositionsService {
         returnRate,
       } = values;
 
+      failureStage = 'position_valuation_presentation';
       return {
         state: 'available',
         sortValueKrw: positionValueKrw,
@@ -571,30 +580,49 @@ export class PositionsService {
       const valuationError =
         error instanceof PositionValuationError
           ? error
-          : new PositionValuationError(
-              'ASSET_PRICE_UNAVAILABLE',
-              'Position valuation is unavailable.',
+          : preserveAdminFailureCause(
+              new PositionValuationError(
+                'ASSET_PRICE_UNAVAILABLE',
+                'Position valuation is unavailable.',
+              ),
+              error,
+              failureStage,
             );
+
+      const diagnostic = buildAdminPartialFailureDiagnostic(
+        valuationError,
+        valuationError.code,
+        {
+          failureStage,
+          evidence: {
+            valuation: {
+              result:
+                error instanceof PositionValuationError
+                  ? 'unavailable'
+                  : 'unexpected_failure',
+              priceSelected,
+              fxRequired: position.currencyCode === CurrencyCode.USD,
+            },
+          },
+          nextInvestigation: [
+            'backend/src/positions/positions.service.ts',
+            'backend/src/portfolio/portfolio-valuation.policy.ts',
+          ],
+          ...valuationError.diagnosticContext,
+          domain: 'PORTFOLIO',
+          operation: 'POSITION_VALUATION',
+          entities: {
+            ...valuationError.diagnosticContext?.entities,
+            assetId: position.assetId,
+          },
+        },
+      );
       const cachedValuation = this.buildCachedValuation(position);
       if (cachedValuation) {
+        if (cachedValuation.state === 'stale_cache' && diagnostic)
+          cachedValuation.payload.diagnostic = diagnostic;
         return cachedValuation;
       }
-
-      const diagnostic = valuationError.diagnosticContext
-        ? buildAdminPartialFailureDiagnostic(
-            valuationError,
-            valuationError.code,
-            {
-              ...valuationError.diagnosticContext,
-              domain: 'PORTFOLIO',
-              operation: 'POSITION_VALUATION',
-              entities: {
-                ...valuationError.diagnosticContext.entities,
-                assetId: position.assetId,
-              },
-            },
-          )
-        : undefined;
       return {
         state: 'unavailable',
         sortValueKrw: null,

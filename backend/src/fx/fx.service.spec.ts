@@ -1,3 +1,8 @@
+import {
+  captureFinancialFailure,
+  expectSafeFinancialDiagnostic,
+} from '../../test/support/financial-diagnostics';
+import { assertDiagnosticTriage } from '../../scripts/lib/diagnostic-quality';
 jest.mock('../generated/prisma/client', () => {
   const { Decimal, sqltag } = jest.requireActual(
     '@prisma/client/runtime/client',
@@ -3536,4 +3541,69 @@ describe('FxService', () => {
       expect(prisma.quote.create).not.toHaveBeenCalled();
     });
   });
+  it.each(['debit', 'credit'])(
+    'captures actual FX %s guard evidence',
+    async (leg) => {
+      const { service } = createService();
+      const wallet = {
+        id: 'wallet',
+        tradingAccountId: 'account-1',
+        walletScope: 'securities',
+        currencyCode: CurrencyCode.USD,
+        balanceAmount: new Prisma.Decimal('987654.12345678'),
+        reservedAmount: new Prisma.Decimal('987654.12345678'),
+      };
+      const tx = {
+        $executeRaw: jest.fn().mockResolvedValue(0),
+        cashWallet: {
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          findUnique: jest.fn().mockResolvedValue(wallet),
+        },
+      };
+      const plan = {
+        sourceWalletId: wallet.id,
+        targetWalletId: wallet.id,
+        fromCurrency: CurrencyCode.USD,
+        toCurrency: CurrencyCode.USD,
+        sourceDebitAmount: '50',
+        targetCreditAmount: '50',
+      };
+      const { diagnostic } = await captureFinancialFailure(
+        () =>
+          leg === 'debit'
+            ? service['debitSourceWalletOrThrow'](
+                tx as never,
+                plan as never,
+                'account-1',
+              )
+            : service['creditTargetWalletOrThrow'](
+                tx as never,
+                plan as never,
+                'account-1',
+              ),
+        'admin',
+        '/api/v1/trading-accounts/account-1/fx/execute',
+      );
+      assertDiagnosticTriage(
+        diagnostic,
+        diagnostic!.code,
+        'FX financial guard',
+      );
+      expect(diagnostic).toMatchObject({
+        failureStage: leg === 'debit' ? 'fx_source_debit' : 'fx_target_credit',
+        evidence: {
+          financialGuard: {
+            financialOperation: 'fx_execute',
+            failureReason:
+              leg === 'debit' ? 'insufficient_available' : 'conflict',
+            scopeValid: true,
+            currencyMatched: true,
+            reservedCashPresent: true,
+          },
+        },
+      });
+      expectSafeFinancialDiagnostic(diagnostic);
+      expect(tx.cashWallet.findUnique).toHaveBeenCalledTimes(1);
+    },
+  );
 });

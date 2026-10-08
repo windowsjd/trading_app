@@ -368,3 +368,81 @@ it('equity range change does not reuse the preceding range failure', async t => 
   assert.equal(h.find('admin-diagnostic-panel'), undefined);
   assert.equal(h.client.getQueryState(QUERY_KEYS.tradingAccount.portfolioEquity('A', '30d', 'daily')).status, 'error');
 });
+
+
+for (const kind of ['timeout', 'network', 'contract']) for (const role of ['user', 'operator', 'admin']) it(`transfer ${kind}: uncertain outcome, observed runtime and pinned retry for ${role}`, async t => {
+  const h = walletTransferHarness({ diagnostics: true, role }); t.after(h.close);
+  if (kind === 'contract') h.response = { tradingAccountId: 'A' };
+  else h.failure = { isAxiosError: true, code: kind === 'timeout' ? 'ECONNABORTED' : 'ERR_NETWORK', message: 'Bearer fake-only-token' };
+  await h.start(); await h.amount('10'); await h.press('wallet-transfer-submit'); await expandPanels(h);
+  assert.match(renderedText(h), kind === 'contract' ? /데이터를 안전하게 표시할 수 없습니다/ : /이체 결과를 확인하지 못했습니다/);
+  assert.doesNotMatch(renderedText(h), /fake-only-token|Backend Exception/);
+  assert.equal(h.requests.length, 1);
+  if (role === 'admin') {
+    assert.match(renderedText(h), /wallet_transfer/); assert.match(renderedText(h), /unknown/);
+    assert.match(renderedText(h), kind === 'contract' ? /response_validation/ : /request_transport/);
+  } else assert.equal(h.node('admin-diagnostic-panel'), undefined);
+  const key = h.requests[0].body.idempotencyKey;
+  h.failure = null; h.response = null;
+  if (kind === 'contract') {
+    const state = h.renderer.root.findAll((node: any) => node.type.name === 'ErrorState')[0];
+    act(() => state.props.onRetry()); await h.flush();
+    assert.equal(h.requests.length, 1, 'integrity retry only rereads wallets');
+  }
+  await h.press('wallet-transfer-submit');
+  assert.equal(h.requests.length, 2); assert.equal(h.requests[1].body.idempotencyKey, key);
+  assert.ok(h.node('wallet-transfer-success')); assert.equal(h.node('admin-diagnostic-panel'), undefined);
+});
+
+for (const stage of ['quote', 'execute']) it(`order timeout at ${stage}: client observations never assert server execution failure`, async t => {
+  const h = inlineTradingHarness(); h.role = 'admin'; t.after(h.close);
+  h[stage === 'quote' ? 'quoteFailure' : 'failure'] = { isAxiosError: true, code: 'ECONNABORTED', message: 'Bearer fake-only-token' };
+  await h.mount(); await h.input(TEST_IDS.order.quantityInput, '100'); await h.press(TEST_IDS.order.executeSubmit); await h.flush(); await expandPanels(h);
+  const before = h.requests.length;
+  assert.equal(before, stage === 'quote' ? 1 : 2);
+  assert.match(renderedText(h), /request_transport/); assert.doesNotMatch(renderedText(h), /Backend Exception|fake-only-token/);
+  assert.match(renderedText(h), stage === 'quote' ? /not_submitted/ : /unknown/);
+  if (stage === 'execute') {
+    assert.match(renderedText(h), /주문 결과를 확인하지 못했습니다/);
+    const key = h.requests[1].body.idempotencyKey;
+    h.failure = null; await h.press(TEST_IDS.order.executeSubmit); await h.flush();
+    assert.equal(h.requests.length, before + 1); assert.equal(h.requests[2].body.idempotencyKey, key);
+  }
+});
+
+it('portfolio renders each failed query once, even when its partial notice is visible', async t => {
+  const h = financialDiagnosticsHarness('portfolio', { failures: { 'A:positions:filtered': failure('positions-only'), 'A:portfolio/equity': failure('equity-only') } }); t.after(h.close);
+  await h.start(); await h.expand();
+  const panels = h.renderer.root.findAll((node: any) => node.type.name === 'AdminDiagnosticPanel' && node.props.error);
+  assert.equal(panels.filter((node: any) => node.props.error === h.failures['A:positions:filtered']).length, 1);
+  assert.equal(panels.filter((node: any) => node.props.error === h.failures['A:portfolio/equity']).length, 1);
+});
+
+for (const stage of ['quote', 'execute']) it(`order ${stage} response validation preserves uncertainty without an automatic second mutation`, async t => {
+  const h = inlineTradingHarness(); h.role = 'admin'; t.after(h.close);
+  if (stage === 'quote') h.quoteOverride = { quoteId: '' };
+  else h.createOverride = { execution: { state: 'unexpected' } };
+  await h.mount(); await h.input(TEST_IDS.order.quantityInput, '100'); await h.press(TEST_IDS.order.executeSubmit); await h.flush(); await expandPanels(h);
+  assert.match(renderedText(h), /response_validation/);
+  assert.match(renderedText(h), stage === 'quote' ? /not_submitted/ : /unknown/);
+  assert.doesNotMatch(renderedText(h), /Backend Exception/);
+  assert.equal(h.requests.length, stage === 'quote' ? 1 : 2);
+  if (stage === 'execute') {
+    assert.match(renderedText(h), /주문 결과를 확인할 수 없습니다/);
+    await h.press(TEST_IDS.order.executeSubmit); await h.flush();
+    assert.equal(h.requests.length, 2, 'existing completed-action fence prevents a duplicate command');
+  }
+});
+
+for (const screen of ['home', 'portfolio']) for (const role of ['user', 'operator', 'admin']) it(`${screen} cached live-valuation failure: ${role} gate, sanitization and recovery`, async t => {
+  const h = financialDiagnosticsHarness(screen, { role }); t.after(h.close);
+  const live = h.positions.A[0].valuation;
+  const diagnostic = failure('cached-live-request').response.data.error.diagnostic;
+  diagnostic.evidence = { ...diagnostic.evidence, rawPayload: 'Bearer fake-only-token', balanceAmount: '184527.938475' };
+  h.positions.A[0].valuation = { ...live, state: 'stale_cache', reason: 'LIVE_VALUATION_UNAVAILABLE', diagnostic };
+  await h.start(); await h.expand();
+  assert.equal(h.text().includes('cached-live-request'), role === 'admin'); assert.doesNotMatch(h.text(), forbidden);
+  h.positions.A = h.positions.A.map((position: any, index: number) => index === 0 ? { ...position, valuation: live } : position);
+  await act(async () => { await h.client.invalidateQueries({ queryKey: QUERY_KEYS.tradingAccount.positionsAll('A') }); }); await h.flush();
+  assert.equal(Boolean(h.find('admin-diagnostic-panel')), false);
+});

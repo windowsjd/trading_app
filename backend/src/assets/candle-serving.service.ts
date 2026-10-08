@@ -1,4 +1,8 @@
-import { safeAdminDiagnosticLog } from '../common/admin-diagnostics';
+import {
+  safeAdminDiagnosticLog,
+  setAdminDiagnosticContext,
+  preserveAdminFailureCause,
+} from '../common/admin-diagnostics';
 import { classifyFailureCause } from '../common/safe-failure-cause';
 import {
   HttpException,
@@ -145,9 +149,20 @@ export class CandleServingService {
     try {
       initial = await this.database.load(asset, query, plan);
     } catch (error) {
+      setAdminDiagnosticContext({
+        failureStage: 'candle_database_read',
+        evidence: {
+          candleDelivery: {
+            cacheState: cached.status,
+            result: 'database_read_failed',
+          },
+        },
+      });
       if (stale && this.isOperationalRefreshError(error)) {
         this.logDelivery('stale_cache_fallback', asset.id, query, plan, {
           reason: this.errorName(error),
+          failureStage: 'candle_database_read',
+          safeCause: classifyFailureCause(error),
         });
         return stale;
       }
@@ -205,6 +220,20 @@ export class CandleServingService {
       }
       return response;
     } catch (error) {
+      setAdminDiagnosticContext({
+        failureStage: 'managed_candle_read',
+        evidence: {
+          candleDelivery: {
+            cacheState: cached.status,
+            result: 'managed_read_failed',
+            ...this.coverageContext(initial),
+          },
+        },
+        nextInvestigation: [
+          'backend/src/assets/candle-serving.service.ts',
+          'backend/src/assets/market-candle-sync.service.ts',
+        ],
+      });
       if (!this.isOperationalRefreshError(error)) throw error;
       if (stale) {
         this.logDelivery('stale_cache_fallback', asset.id, query, plan, {
@@ -237,8 +266,13 @@ export class CandleServingService {
       // plan, or the explicit cold-baseline policy above.
       this.logDeliveryFailed('managed_unresolved', asset.id, query, plan, {
         reason: this.errorName(error),
+        safeCause: classifyFailureCause(error),
       });
-      throw this.providerCompatibilityError(asset);
+      throw preserveAdminFailureCause(
+        this.providerCompatibilityError(asset),
+        error,
+        'managed_candle_read',
+      );
     }
   }
 
@@ -265,6 +299,10 @@ export class CandleServingService {
         });
         return before.response as AssetCandlesResponse;
       }
+      this.logDeliveryFailed('managed_unresolved', asset.id, query, plan, {
+        reason: 'on_demand_refresh_disabled',
+        ...this.coverageContext(before),
+      });
       throw new CandleOperationalRefreshError('On-demand refresh is disabled.');
     }
 
@@ -342,6 +380,12 @@ export class CandleServingService {
     }
 
     const feed = result.feeds[0];
+    this.logDeliveryFailed('managed_unresolved', asset.id, query, plan, {
+      reason: 'refresh_incomplete',
+      syncStopReason: feed?.stopReason ?? null,
+      syncErrorCode: feed?.errorCode ?? null,
+      ...this.coverageContext(after),
+    });
     throw new CandleOperationalRefreshError(
       feed?.errorCode ?? feed?.stopReason ?? 'Candle refresh did not complete.',
     );

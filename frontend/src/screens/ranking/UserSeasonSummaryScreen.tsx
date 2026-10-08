@@ -20,6 +20,7 @@ import { formatKrw, formatPercent } from '../../utils/format';
 import { getApiErrorCode } from '../../services/api/errorMapper';
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
+import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 
 type Props = { route: { params: { userId: string } } };
@@ -57,7 +58,7 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
     );
   if (!query.data)
     return (
-      <ErrorState
+      <ErrorState error={query.error}
         title="유저 정보를 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
         onRetry={() => void refetch()}
@@ -200,6 +201,7 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
           }
         />
       )}
+      {query.isError ? <AdminDiagnosticPanel error={query.error} /> : null}
     </ScrollView>
   );
 }

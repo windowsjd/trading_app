@@ -38,7 +38,9 @@ export function portfolioFailureFacts(error: unknown): RuntimeFacts {
   const requestId = headers?.['x-request-id'];
   return {
     endpoint: 'GET /api/v1/trading-accounts/:accountId/portfolio',
-    httpStatus: info.status ?? 'no_response',
+    hasResponse: info.hasResponse || isTradingAccountScopeMismatchError(error),
+    httpStatus: info.status ?? (isTradingAccountScopeMismatchError(error) ? 'not_observed' : 'no_response'),
+    clientInvestigation: 'frontend/src/features/tradingAccount/portfolioReadPolicy.ts',
     serverCode: isKnownErrorCode(info.serverCode) || isTradingAccountIntegrityCode(info.serverCode) || GATEWAY_CODES.has(info.serverCode ?? '')
       ? info.serverCode : info.serverCode ? 'unrecognized' : 'not_observed',
     clientCode: isTradingAccountScopeMismatchError(error) ? 'TRADING_ACCOUNT_SCOPE_MISMATCH' : TIMEOUT_CODES.has(info.clientCode ?? '') || TRANSPORT_CODES.has(info.clientCode ?? '') || ['ERR_BAD_REQUEST', 'ERR_BAD_RESPONSE', 'ERR_CANCELED'].includes(info.clientCode ?? '')

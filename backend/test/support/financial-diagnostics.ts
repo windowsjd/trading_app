@@ -8,6 +8,7 @@ import {
 export function captureFinancialFailure(
   action: () => Promise<unknown>,
   role = 'admin',
+  originalUrl = '/api/v1/trading-accounts/account-1/orders',
 ) {
   let pending!: Promise<{
     error: HttpException;
@@ -16,7 +17,7 @@ export function captureFinancialFailure(
   adminDiagnosticRequestMiddleware(
     {
       method: 'POST',
-      originalUrl: '/api/v1/trading-accounts/account-1/orders',
+      originalUrl,
       headers: {},
       user: { userId: 'user-1', role },
     } as never,
@@ -28,11 +29,17 @@ export function captureFinancialFailure(
         },
         (error: HttpException) => {
           expect(error).toBeInstanceOf(HttpException);
-          const code = (error.getResponse() as { error: { code: string } })
-            .error.code;
-          expect(error.getResponse()).toEqual({
+          const body = error.getResponse() as {
+            error: { code: string; details?: unknown };
+          };
+          const code = body.error.code;
+          expect(body).toEqual({
             success: false,
-            error: { code, message: expect.any(String) },
+            error: {
+              code,
+              message: expect.any(String),
+              ...('details' in body.error ? { details: null } : {}),
+            },
           });
           return {
             error,

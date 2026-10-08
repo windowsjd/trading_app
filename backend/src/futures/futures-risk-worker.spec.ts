@@ -130,6 +130,12 @@ describe('Risk worker failure boundaries', () => {
         accountId: 'account',
         scope: 'cross',
         state: 'FUTURES_RISK_TRANSACTION_FAILED',
+        failureStage: 'risk_liquidation',
+        failure: {
+          code: 'FUTURES_RISK_TRANSACTION_FAILED',
+          message: 'Background operation failed.',
+          safeCause: expect.objectContaining({ category: 'unexpected_error' }),
+        },
       });
       expect(result.results[1]).toEqual({
         accountId: 'account',

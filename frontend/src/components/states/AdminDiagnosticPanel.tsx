@@ -8,7 +8,7 @@ import { QUERY_KEYS } from '../../constants/queryKeys';
 import { getMe } from '../../features/me/api';
 import { shouldShowAdminDiagnostic } from '../../features/auth/adminDiagnostics';
 import type { AdminDiagnosticDto } from '../../models/dto/common';
-import { getApiErrorDiagnostic } from '../../services/api/errorMapper';
+import { getApiErrorDiagnostic, sanitizeAdminDiagnostic } from '../../services/api/errorMapper';
 import type { RuntimeFacts } from '../../services/ws/runtimeDiagnostics';
 
 type Props = {
@@ -28,7 +28,7 @@ export default function AdminDiagnosticPanel({
   includeRuntimeWithDiagnostic = false,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
-  const resolved = diagnostic ?? getApiErrorDiagnostic(error);
+  const resolved = useMemo(() => diagnostic ? sanitizeAdminDiagnostic(diagnostic) : getApiErrorDiagnostic(error), [diagnostic, error]);
   const runtimeFacts =
     (!resolved || includeRuntimeWithDiagnostic) && runtime
       ? Object.fromEntries(
@@ -164,7 +164,7 @@ export default function AdminDiagnosticPanel({
               {Object.entries(runtimeFacts ?? {}).map(([label, value]) => (
                 <View key={label} style={styles.section}>
                   <Text accessibilityLabel={label} style={styles.runtimeLabel}>{wrapRuntimeText(label)}</Text>
-                  <CodeText accessibilityLabel={String(value)}>{wrapRuntimeText(String(value))}</CodeText>
+                  <CodeText>{String(value)}</CodeText>
                 </View>
               ))}
             </Section>
@@ -200,8 +200,8 @@ function Line({ label, value }: { label: string; value: string }) {
 
 function CodeText({ children, accessibilityLabel }: React.PropsWithChildren<{ accessibilityLabel?: string }>) {
   return (
-    <Text selectable accessibilityLabel={accessibilityLabel} style={styles.code}>
-      {children}
+    <Text selectable accessibilityLabel={accessibilityLabel ?? (typeof children === 'string' ? children : undefined)} style={styles.code}>
+      {typeof children === 'string' ? wrapRuntimeText(children) : children}
     </Text>
   );
 }

@@ -165,7 +165,7 @@ function inlineTradingHarness() {
                   state: body.orderType === 'limit' ? 'submitted' : 'executed',
                 },
               };
-          return { data: { success: true, data: isQuote ? { ...data, ...h.quoteOverride } : data } };
+          return { data: { success: true, data: isQuote ? { ...data, ...h.quoteOverride } : { ...data, ...h.createOverride } } };
         },
       },
     },

@@ -31,6 +31,7 @@ import { refreshFriendship } from '../../features/friends/cache';
 import { getApiErrorCode } from '../../services/api/errorMapper';
 import ActionPressable from '../../components/common/ActionPressable';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
+import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 
 type Props = NativeStackScreenProps<MyStackParamList, 'Friends'>;
 const tabs = [
@@ -101,7 +102,7 @@ export default function FriendsScreen({ navigation }: Props) {
     else mutation.mutate({ action, user });
   };
   const submitSearch = () => {
-    if (input.trim()) setSearch(input.trim());
+    if (input.trim()) { mutation.reset(); setSearch(input.trim()); }
   };
   return (
     <FlatList
@@ -121,7 +122,7 @@ export default function FriendsScreen({ navigation }: Props) {
                 accessibilityState={{ selected: tab === item.key }}
                 aria-selected={tab === item.key}
                 style={[styles.button, tab === item.key && styles.selected]}
-                onPress={() => setTab(item.key)}
+                onPress={() => { mutation.reset(); setTab(item.key); }}
               >
                 <Text style={[styles.buttonText, tab === item.key && styles.selectedText]}>{item.label}</Text>
               </ActionPressable>
@@ -154,6 +155,8 @@ export default function FriendsScreen({ navigation }: Props) {
               </ActionPressable>
             </View>
           ) : null}
+          {mutation.isError ? <AdminDiagnosticPanel error={mutation.error} /> : null}
+          {query.isError ? <AdminDiagnosticPanel error={query.error} /> : null}
           {query.isError ? (
             <ActionPressable
               style={styles.button}

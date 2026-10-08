@@ -94,6 +94,7 @@ export function socketRuntimeFacts(
 ): RuntimeFacts {
   if (!socket) return { socketStatus: 'not_observed' };
   return {
+    clientInvestigation: 'frontend/src/services/ws/realtimeSocketManager.ts',
     socketStatus: socket.currentStatus,
     lastTransitionReason: socket.lastTransitionReason ?? 'not_observed',
     lastTransitionAt: runtimeTime(socket.lastTransitionAt),

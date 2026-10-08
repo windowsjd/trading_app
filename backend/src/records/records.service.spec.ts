@@ -1,3 +1,5 @@
+import { assertDiagnosticTriage } from '../../scripts/lib/diagnostic-quality';
+import { expectSafeFinancialDiagnostic } from '../../test/support/financial-diagnostics';
 import {
   adminDiagnosticRequestMiddleware,
   setAdminDiagnosticContext,
@@ -2110,6 +2112,97 @@ describe('RecordsService', () => {
         } else expect(error).not.toHaveProperty('diagnostic');
       }
       expect(prisma.assetPriceSnapshot.findFirst).toHaveBeenCalledTimes(2);
+    },
+  );
+  it.each(['admin', 'user', 'operator'])(
+    'preserves unexpected row failures without cross-row evidence for %s',
+    async (role) => {
+      const { prisma, service } = createService();
+      const secret = 'postgres://secret@private/987654.12345678';
+      jest
+        .spyOn(
+          service as never,
+          'findLatestEligibleAssetPriceSnapshot' as never,
+        )
+        .mockImplementation((async (asset: { id: string }) => {
+          if (asset.id === 'db')
+            throw Object.assign(new Error(secret), { code: 'P1001' });
+          return {
+            ...priceSnapshot('snapshot-' + asset.id, '10.00000000'),
+            price:
+              asset.id === 'calculation'
+                ? {
+                    mul() {
+                      throw new TypeError(secret);
+                    },
+                    toString() {
+                      throw new TypeError(secret);
+                    },
+                  }
+                : new Prisma.Decimal(10),
+          };
+        }) as never);
+      let pending!: Promise<unknown[]>;
+      adminDiagnosticRequestMiddleware(
+        {
+          method: 'GET',
+          originalUrl: '/api/v1/records',
+          headers: {},
+          user: { userId: 'user-1', role },
+        } as never,
+        { setHeader: jest.fn() } as never,
+        () => {
+          setAdminDiagnosticContext({ evidence: { otherRow: secret } });
+          pending = Promise.all(
+            ['db', 'calculation', 'healthy'].map((assetId) =>
+              service['buildProfitAnalysisItem'](
+                profitPosition({
+                  assetId,
+                  symbol: assetId,
+                  quantity: '1',
+                  averageCost: '2',
+                }),
+                new Date('2026-07-20T03:00:00Z'),
+                null,
+              ),
+            ),
+          );
+        },
+      );
+      const rows = (await pending) as Awaited<
+        ReturnType<RecordsService['buildProfitAnalysisItem']>
+      >[];
+      for (let i = 0; i < 2; i++) {
+        const error = rows[i].error;
+        expect(error?.code).toBe('ASSET_PRICE_UNAVAILABLE');
+        if (role === 'admin') {
+          assertDiagnosticTriage(
+            error?.diagnostic,
+            'ASSET_PRICE_UNAVAILABLE',
+            'records unexpected row valuation',
+          );
+          expect(error?.diagnostic).toMatchObject({
+            failureStage:
+              i === 0
+                ? 'asset_price_selection'
+                : 'position_valuation_calculation',
+            entities: { assetId: i === 0 ? 'db' : 'calculation' },
+            evidence: {
+              valuation: {
+                result: 'unexpected_failure',
+                priceSelected: i !== 0,
+              },
+              safeCause: {
+                category: i === 0 ? 'db_connection_failed' : 'unexpected_error',
+              },
+            },
+          });
+          expectSafeFinancialDiagnostic(error?.diagnostic);
+          expect(JSON.stringify(error?.diagnostic)).not.toContain(secret);
+        } else expect(error).not.toHaveProperty('diagnostic');
+      }
+      expect(rows[2].item.valuationState).toBe('available');
+      expect(prisma.assetPriceSnapshot.findMany).not.toHaveBeenCalled();
     },
   );
 });
