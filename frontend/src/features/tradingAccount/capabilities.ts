@@ -110,7 +110,7 @@ export function getTradingAccountCapabilities(
   // one of them will never change.
   const tradeBlockReason: CapabilityBlockReason = statusBlock
     ? statusBlock
-    : isGeneral
+    : !isSeason
       ? null
       : !seasonActive
         ? 'season_not_active'
@@ -139,7 +139,7 @@ export function getTradingAccountCapabilities(
     showsSeasonUi: isSeason,
     tradeBlockReason,
     exchangeBlockReason,
-    returnRateMethod: isGeneral ? 'time_weighted' : 'initial_capital',
+    returnRateMethod: isSeason ? 'initial_capital' : 'time_weighted',
   };
 }
 

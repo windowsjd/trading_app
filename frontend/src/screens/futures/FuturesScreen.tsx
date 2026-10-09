@@ -363,7 +363,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       >
         <Text style={styles.title}>암호화폐 선물</Text>
         <Text style={styles.muted}>
-          {binding.account.mode === "general"
+          {binding.account.mode === "beginner" ? "초보 투자" : binding.account.mode === "general"
             ? "일반 투자"
             : (binding.account.season?.seasonName ?? "시즌 투자")}{" "}
           · USD 가상 무기한 계약

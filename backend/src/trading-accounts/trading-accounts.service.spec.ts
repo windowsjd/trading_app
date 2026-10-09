@@ -20,6 +20,7 @@ jest.mock('../generated/prisma/client', () => {
       settled: 'settled',
     },
     TradingAccountMode: {
+      beginner: 'beginner',
       season: 'season',
       general: 'general',
     },
@@ -129,13 +130,14 @@ describe('TradingAccountsService.listTradingAccounts', () => {
 
     expect(prisma.tradingAccount.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { userId: 'user-1' },
+        where: { userId: 'user-1', mode: { not: 'beginner' } },
         orderBy: [{ openedAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
       }),
     );
     expect(response).toEqual({
       success: true,
       data: {
+        beginnerModeEnabled: false,
         accounts: [
           {
             id: 'ta-season-1',

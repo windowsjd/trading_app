@@ -23,6 +23,7 @@ First compare current implementation, tests and migrations with explicit current
    - `docs/futures-f31-contract.md` — user fill counts, immutable final reads, endAt cutoff and Mark retention
    - `docs/records-api-contract.md`
    - `docs/rewards-api-contract.md`
+   - `docs/beginner-mode.md` — development-only beginner account, funding/TWR, activation and UI contract
    - `docs/trading-accounts-api-contract.md`
    - `docs/trading-account-finance-api-contract.md`
    - `docs/trading-account-orders-api-contract.md`

@@ -1,3 +1,4 @@
+import BeginnerAccountEntry from '../../components/tradingAccount/BeginnerAccountEntry';
 import { semantic } from '../../theme/tokens';
 import React, { useMemo } from 'react';
 import {
@@ -58,6 +59,7 @@ export default function ModeSelectionScreen({
 }: ModeSelectionScreenProps) {
   const {
     accounts,
+    beginnerModeEnabled,
     isLoading: accountsLoading,
     isError: accountsError,
     refetchAccounts,
@@ -152,6 +154,8 @@ export default function ModeSelectionScreen({
             ) : null}
           </View>
         )}
+
+        {beginnerModeEnabled ? <BeginnerAccountEntry onEntered={() => resetToHome(navigation)} /> : null}
 
         {model.seasonContinue.map((account) => {
           return (

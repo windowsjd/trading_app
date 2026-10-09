@@ -26,13 +26,13 @@ export function assertDailyEquity(
   if (
     !record(data) ||
     data.tradingAccountId !== accountId ||
-    (data.mode !== 'general' && data.mode !== 'season') ||
+    (data.mode !== 'general' && data.mode !== 'season' && data.mode !== 'beginner') ||
     data.granularity !== 'daily' ||
     data.range !== range ||
     !Array.isArray(data.points) ||
     data.state !== (data.points.length === 0 ? 'empty' : 'available') ||
     data.returnRateMethod !==
-      (data.mode === 'general' ? 'time_weighted' : 'initial_capital')
+      (data.mode !== 'season' ? 'time_weighted' : 'initial_capital')
   ) {
     throw new DailyEquityContractError();
   }
@@ -53,7 +53,7 @@ export function assertDailyEquity(
       point.returnRateMethod !== data.returnRateMethod ||
       point.snapshotReason !== 'scheduled' ||
       point.externalFundingAmountKrw !== null ||
-      (data.mode === 'general'
+      (data.mode !== 'season'
         ? !decimal(point.cumulativeExternalFundingKrw) ||
           point.cumulativeExternalFundingKrw.startsWith('-') ||
           !decimal(point.investmentPnlKrw)

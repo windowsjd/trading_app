@@ -164,7 +164,7 @@ async function run() {
       await step('Guide → Wallet tab', page.getByRole('tab', { name: '지갑', exact: true }), 'wallet-composition', 'wallet-orders', condition);
       await step('Wallet → FX', id('wallet-exchange'), 'wallet-fx-screen', null, condition); await back();
       await step('Wallet → TradeHistory', id('wallet-orders'), 'record-order-list-screen', null, condition); await back();
-      await step('Wallet → Overall tab', page.getByRole('tab', { name: '전체', exact: true }), 'overall-Record', 'overall-Record', condition);
+      await step('Wallet → Overall tab', page.getByRole('tab', { name: 'MY', exact: true }), 'overall-Record', 'overall-Record', condition);
       await step('Overall → MY', id('overall-My'), 'my-screen', 'my-profile-avatar', condition); await back();
       await step('Overall → Settings', id('overall-Settings'), 'settings-screen', 'settings-save-nickname', condition);
       await step('Settings → Back', page.locator('[aria-label$="back"]:visible').first(), 'overall-Settings', 'overall-Settings', condition);

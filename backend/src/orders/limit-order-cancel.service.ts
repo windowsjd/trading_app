@@ -1,3 +1,4 @@
+import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { cancelFuturesEntriesInTransaction } from '../futures/futures-limit-state';
 import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
 import { diagnosePositionMutationFailure } from './position-failure-diagnosis';
@@ -1032,7 +1033,7 @@ export class LimitOrderCancelService {
       );
     }
 
-    if (order.tradingAccount.mode === TradingAccountMode.general) {
+    if (isStandaloneAccountMode(order.tradingAccount.mode)) {
       if (order.tradingAccount.seasonParticipant !== null) {
         this.throwScopeIntegrity(
           'TRADING_ACCOUNT_SCOPE_MISMATCH',

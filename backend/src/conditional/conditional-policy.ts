@@ -1,3 +1,4 @@
+import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { createApiError } from '../common/api-error';
 import { createHash } from 'node:crypto';
 import {
@@ -26,7 +27,7 @@ export function assertConditionalEnabled(domain: 'spot' | 'futures') {
 }
 export function conditionalTradable(account: OwnedTradingAccount, now: Date) {
   if (account.status !== 'active') return false;
-  if (account.mode === 'general') return true;
+  if (isStandaloneAccountMode(account.mode)) return true;
   const p = account.seasonParticipant;
   return (
     !!p &&

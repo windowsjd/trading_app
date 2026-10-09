@@ -1,3 +1,7 @@
+import {
+  isStandaloneAccountMode,
+  assertBeginnerModeEnabled,
+} from '../trading-accounts/account-mode-policy';
 import { createApiError } from '../common/api-error';
 import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
 import { futuresSnapshotValues } from '../portfolio/futures-snapshot-values';
@@ -2358,7 +2362,7 @@ export class OrdersService {
         tradingAccountId.trim(),
       );
 
-    if (account.mode === TradingAccountMode.general) {
+    if (isStandaloneAccountMode(account.mode)) {
       await this.requireGeneralPerformanceService().assertGeneralAccountReady(
         account,
       );
@@ -2461,7 +2465,7 @@ export class OrdersService {
         tradingAccountId.trim(),
       );
 
-    if (account.mode === TradingAccountMode.general) {
+    if (isStandaloneAccountMode(account.mode)) {
       await this.requireGeneralPerformanceService().assertGeneralAccountReady(
         account,
       );
@@ -2539,6 +2543,7 @@ export class OrdersService {
     account: OwnedTradingAccount,
     now: Date,
   ): Promise<TradingContext> {
+    assertBeginnerModeEnabled(account.mode);
     if (account.status !== TradingAccountStatus.active) {
       this.throwApiError(
         HttpStatus.CONFLICT,
@@ -2547,12 +2552,12 @@ export class OrdersService {
       );
     }
 
-    if (account.mode === TradingAccountMode.general) {
+    if (isStandaloneAccountMode(account.mode)) {
       await this.requireGeneralPerformanceService().assertGeneralAccountReady(
         account,
       );
       return {
-        mode: TradingAccountMode.general,
+        mode: account.mode,
         season: null,
         participant: null,
         tradingAccountId: account.id,
@@ -2612,7 +2617,7 @@ export class OrdersService {
     userId: string,
     participantId = context.participant?.id,
   ): Promise<void> {
-    if (context.mode === TradingAccountMode.general) {
+    if (isStandaloneAccountMode(context.mode)) {
       await this.lockGeneralTradingAccountInTransaction(tx, context);
       return;
     }
@@ -2645,7 +2650,7 @@ export class OrdersService {
     tx: Prisma.TransactionClient,
     context: Pick<TradingContext, 'mode' | 'tradingAccountId'>,
   ): Promise<void> {
-    if (context.mode !== TradingAccountMode.general) return;
+    if (!isStandaloneAccountMode(context.mode)) return;
 
     const rows = await tx.$queryRaw<
       Array<{
@@ -2662,7 +2667,7 @@ export class OrdersService {
     const locked = rows[0];
     if (
       !locked ||
-      locked.mode !== TradingAccountMode.general ||
+      !isStandaloneAccountMode(locked.mode) ||
       locked.status !== TradingAccountStatus.active
     ) {
       this.throwApiError(
@@ -2672,6 +2677,7 @@ export class OrdersService {
       );
     }
 
+    assertBeginnerModeEnabled(locked.mode);
     const account = await tx.tradingAccount.findUnique({
       where: { id: context.tradingAccountId },
       select: {
@@ -2834,7 +2840,7 @@ export class OrdersService {
       quotedFeeRate: quote.quotedFeeRate,
       currentFeeRate:
         order.tradingAccount?.seasonParticipant?.season.tradeFeeRate ??
-        (order.tradingAccount?.mode === TradingAccountMode.general
+        (isStandaloneAccountMode(order.tradingAccount?.mode)
           ? null
           : this.throwTradingScopeIntegrityError(
               'TRADING_ACCOUNT_SCOPE_MISMATCH',
@@ -2973,10 +2979,7 @@ export class OrdersService {
     quotedFeeRate: Prisma.Decimal | null;
     currentFeeRate: Prisma.Decimal | null;
   }): Prisma.Decimal {
-    if (
-      input.quotedFeeRate != null ||
-      input.mode === TradingAccountMode.general
-    ) {
+    if (input.quotedFeeRate != null || isStandaloneAccountMode(input.mode)) {
       if (
         !input.quotedFeeRate ||
         !input.quotedFeeRate.isFinite() ||
@@ -4263,7 +4266,7 @@ export class OrdersService {
           seasonParticipant: { select: { id: true } },
         },
       });
-      if (!account || account.mode !== TradingAccountMode.general) {
+      if (!account || !isStandaloneAccountMode(account.mode)) {
         this.throwTradingScopeIntegrityError(
           'TRADING_ACCOUNT_SCOPE_MISMATCH',
           'General order snapshot account is missing or has the wrong mode.',
@@ -7312,7 +7315,7 @@ export class OrdersService {
       );
     }
 
-    if (order.tradingAccount.mode === TradingAccountMode.general) {
+    if (isStandaloneAccountMode(order.tradingAccount.mode)) {
       if (order.tradingAccount.seasonParticipant !== null) {
         setAdminDiagnosticContext({
           failureStage: 'order_scope_validation',

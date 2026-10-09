@@ -1,3 +1,7 @@
+import {
+  isStandaloneAccountMode,
+  assertBeginnerModeEnabled,
+} from '../trading-accounts/account-mode-policy';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 import {
@@ -5,7 +9,6 @@ import {
   ParticipantStatus,
   Prisma,
   SeasonStatus,
-  TradingAccountMode,
   TradingAccountStatus,
   type WalletScope,
   type CashWallet,
@@ -104,7 +107,7 @@ export class TradingAccountWalletTransferService {
         let seasonContext: Awaited<
           ReturnType<typeof lockSeasonTradingContext>
         > | null = null;
-        if (account.mode === TradingAccountMode.general) {
+        if (isStandaloneAccountMode(account.mode)) {
           await tx.$queryRaw`SELECT "id" FROM "trading_accounts" WHERE "id" = ${accountId} FOR UPDATE`;
         } else {
           seasonContext = await lockSeasonTradingContext(tx, {
@@ -126,6 +129,7 @@ export class TradingAccountWalletTransferService {
         );
         const raced = await tx.walletTransfer.findUnique({ where: commandKey });
         if (raced) return replay(raced);
+        assertBeginnerModeEnabled(lockedAccount.mode);
         if (lockedAccount.status !== TradingAccountStatus.active)
           fail(
             HttpStatus.CONFLICT,
@@ -138,7 +142,7 @@ export class TradingAccountWalletTransferService {
             'TRADING_ACCOUNT_SCOPE_MISMATCH',
             'Account mode changed.',
           );
-        if (lockedAccount.mode === TradingAccountMode.general)
+        if (isStandaloneAccountMode(lockedAccount.mode))
           await this.performance.assertGeneralAccountReady(lockedAccount, tx);
 
         // ID order prevents opposite-direction transfers from forming a wallet lock cycle.

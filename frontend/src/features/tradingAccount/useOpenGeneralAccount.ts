@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { getApiErrorDisplayMessage } from '../../services/api/errorMapper';
-import { openGeneralAccount, type TradingAccountDto } from './api';
+import { openGeneralAccount, openBeginnerAccount, type TradingAccountDto } from './api';
 import { completeGeneralAccountOpen } from './generalAccountOpen';
 import { useTradingAccount } from './TradingAccountContext';
 
@@ -32,13 +32,25 @@ import { useTradingAccount } from './TradingAccountContext';
 export function useOpenGeneralAccount(options?: {
   onOpened?: (account: TradingAccountDto) => void;
 }) {
+  return useOpenStandaloneAccount('general', options);
+}
+
+export function useOpenBeginnerAccount(options?: {
+  onOpened?: (account: TradingAccountDto) => void;
+}) {
+  return useOpenStandaloneAccount('beginner', options);
+}
+
+function useOpenStandaloneAccount(mode: 'general' | 'beginner', options?: {
+  onOpened?: (account: TradingAccountDto) => void;
+}) {
   const queryClient = useQueryClient();
   const { selectAccount } = useTradingAccount();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const onOpened = options?.onOpened;
 
   const mutation = useMutation({
-    mutationFn: openGeneralAccount,
+    mutationFn: mode === 'beginner' ? openBeginnerAccount : openGeneralAccount,
     onSuccess: (result) =>
       completeGeneralAccountOpen(result, {
         refreshOwnedAccounts: () =>
@@ -61,5 +73,5 @@ export function useOpenGeneralAccount(options?: {
     mutate();
   }, [isPending, mutate]);
 
-  return { start, isPending, errorMessage };
+  return { start, isPending, errorMessage, error: mutation.error };
 }

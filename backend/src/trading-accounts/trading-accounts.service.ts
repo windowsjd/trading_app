@@ -1,3 +1,7 @@
+import {
+  isStandaloneAccountMode,
+  isBeginnerModeEnabled,
+} from './account-mode-policy';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { readGeneralTradeFeeRate } from '../orders/general-trading.config';
 import { readGeneralFxFeeRate } from '../fx/general-fx.config';
@@ -46,6 +50,7 @@ type TradingAccountsListResponse = {
   success: true;
   data: {
     accounts: TradingAccountView[];
+    beginnerModeEnabled: boolean;
   };
 };
 
@@ -70,6 +75,7 @@ export class TradingAccountsService {
       success: true,
       data: {
         accounts: accounts.map((account) => this.toView(account)),
+        beginnerModeEnabled: isBeginnerModeEnabled(),
       },
     };
   }
@@ -88,18 +94,16 @@ export class TradingAccountsService {
       success: true,
       data: {
         ...this.toView(account),
-        feePolicy:
-          account.mode === TradingAccountMode.general
-            ? {
-                tradeFeeRate: readGeneralTradeFeeRate().toFixed(6),
-                fxFeeRate: readGeneralFxFeeRate().toFixed(6),
-              }
-            : {
-                tradeFeeRate:
-                  account.seasonParticipant!.season.tradeFeeRate.toFixed(6),
-                fxFeeRate:
-                  account.seasonParticipant!.season.fxFeeRate.toFixed(6),
-              },
+        feePolicy: isStandaloneAccountMode(account.mode)
+          ? {
+              tradeFeeRate: readGeneralTradeFeeRate().toFixed(6),
+              fxFeeRate: readGeneralFxFeeRate().toFixed(6),
+            }
+          : {
+              tradeFeeRate:
+                account.seasonParticipant!.season.tradeFeeRate.toFixed(6),
+              fxFeeRate: account.seasonParticipant!.season.fxFeeRate.toFixed(6),
+            },
       },
     };
   }

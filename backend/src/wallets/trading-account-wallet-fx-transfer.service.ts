@@ -1,10 +1,7 @@
+import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
-import {
-  Prisma,
-  TradingAccountMode,
-  type CashWallet,
-} from '../generated/prisma/client';
+import { Prisma, type CashWallet } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
 import { lockSeasonTradingContext } from '../seasons/season-trading-lock';
@@ -164,7 +161,7 @@ export class TradingAccountWalletFxTransferService {
         const beforeLifecycleReplay =
           await tx.walletTransferExecuteRequest.findUnique({ where });
         if (beforeLifecycleReplay) return replay(beforeLifecycleReplay);
-        if (account.mode === TradingAccountMode.general) {
+        if (isStandaloneAccountMode(account.mode)) {
           await tx.$queryRaw`SELECT "id" FROM "trading_accounts" WHERE "id" = ${accountId} AND "user_id" = ${userId} FOR UPDATE`;
         } else {
           const lifecycle = await lockSeasonTradingContext(tx, {

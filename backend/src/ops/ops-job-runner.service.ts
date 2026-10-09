@@ -953,7 +953,7 @@ export class OpsJobRunnerService {
     // load all accounts/participants just to discover that today is complete.
     const missingGeneral = await this.prisma.tradingAccount.findFirst({
       where: {
-        mode: TradingAccountMode.general,
+        mode: { in: [TradingAccountMode.general, TradingAccountMode.beginner] },
         status: {
           in: [TradingAccountStatus.active, TradingAccountStatus.suspended],
         },

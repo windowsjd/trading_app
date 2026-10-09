@@ -35,7 +35,7 @@ jest.mock('../generated/prisma/client', () => ({
   },
   SeasonStatus: { active: 'active' },
   ParticipantStatus: { active: 'active' },
-  TradingAccountMode: { general: 'general' },
+  TradingAccountMode: { general: 'general', beginner: 'beginner' },
   TradingAccountStatus: { active: 'active', suspended: 'suspended' },
   AssetType: {
     domestic_stock: 'domestic_stock',
@@ -570,7 +570,7 @@ describe('OpsJobRunnerService', () => {
       expect(f.prisma.seasonParticipant.findFirst).toHaveBeenCalledTimes(20);
       expect(f.prisma.tradingAccount.findFirst).toHaveBeenCalledWith({
         where: {
-          mode: 'general',
+          mode: { in: ['general', 'beginner'] },
           status: { in: ['active', 'suspended'] },
           dailyPortfolioSnapshots: {
             none: { snapshotDate: new Date('2026-06-08T00:00:00.000Z') },

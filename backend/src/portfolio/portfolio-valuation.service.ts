@@ -1,3 +1,4 @@
+import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import {
   buildSelectionFailureEvidence,
   describeManualFallback,
@@ -260,7 +261,7 @@ export class PortfolioValuationService {
         (!participant ||
           participant.userId !== account.userId ||
           !participant.initialCapitalKrw.eq(account.initialCapitalKrw))) ||
-      (account.mode === TradingAccountMode.general && participant)
+      (isStandaloneAccountMode(account.mode) && participant)
     ) {
       throw new PortfolioValuationError(
         'TRADING_ACCOUNT_SCOPE_MISMATCH',

@@ -38,7 +38,11 @@ jest.mock('../generated/prisma/client', () => {
       external_funding_before: 'external_funding_before',
       external_funding_after: 'external_funding_after',
     },
-    TradingAccountMode: { season: 'season', general: 'general' },
+    TradingAccountMode: {
+      season: 'season',
+      general: 'general',
+      beginner: 'beginner',
+    },
     TradingAccountStatus: {
       active: 'active',
       suspended: 'suspended',
@@ -379,7 +383,7 @@ describe('GeneralDailySnapshotJobService', () => {
     expect(prisma.tradingAccount.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          mode: 'general',
+          mode: { in: ['general', 'beginner'] },
           status: { in: ['active', 'suspended'] },
         },
       }),
@@ -387,7 +391,7 @@ describe('GeneralDailySnapshotJobService', () => {
     // Closed accounts are counted for the report and never processed: no
     // valuation, no transaction, no write of any kind.
     expect(prisma.tradingAccount.count).toHaveBeenCalledWith({
-      where: { mode: 'general', status: 'closed' },
+      where: { mode: { in: ['general', 'beginner'] }, status: 'closed' },
     });
     expect(result.accounts).toMatchObject({
       total: 2,

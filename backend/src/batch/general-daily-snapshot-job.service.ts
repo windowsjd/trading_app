@@ -146,7 +146,9 @@ export class GeneralDailySnapshotJobService {
     const [accounts, excludedClosed] = await Promise.all([
       this.prisma.tradingAccount.findMany({
         where: {
-          mode: TradingAccountMode.general,
+          mode: {
+            in: [TradingAccountMode.general, TradingAccountMode.beginner],
+          },
           status: {
             in: [TradingAccountStatus.active, TradingAccountStatus.suspended],
           },
@@ -156,7 +158,9 @@ export class GeneralDailySnapshotJobService {
       }),
       this.prisma.tradingAccount.count({
         where: {
-          mode: TradingAccountMode.general,
+          mode: {
+            in: [TradingAccountMode.general, TradingAccountMode.beginner],
+          },
           status: TradingAccountStatus.closed,
         },
       }),
@@ -270,7 +274,12 @@ export class GeneralDailySnapshotJobService {
         // re-scoped between the two, and a snapshot written for a closed
         // account is permanent damage.
         const reloaded = await tx.tradingAccount.findFirst({
-          where: { id: account.id, mode: TradingAccountMode.general },
+          where: {
+            id: account.id,
+            mode: {
+              in: [TradingAccountMode.general, TradingAccountMode.beginner],
+            },
+          },
           select: GENERAL_ACCOUNT_SELECT,
         });
         if (
@@ -386,7 +395,7 @@ export class GeneralDailySnapshotJobService {
 
   /**
    * The SAME lock the ad-reward payout takes: `trading_accounts` row, pinned to
-   * `mode = 'general'`, `FOR UPDATE`. Returns null when the row no longer
+   * `mode IN ('general', 'beginner')`, `FOR UPDATE`. Returns null when the row no longer
    * matches, so the caller skips the account instead of writing to it.
    *
    * Only ONE account is ever locked at a time, and only for the duration of its
@@ -402,7 +411,7 @@ export class GeneralDailySnapshotJobService {
       SELECT "id", "status"
       FROM "trading_accounts"
       WHERE "id" = ${accountId}
-        AND "mode" = 'general'
+        AND "mode" IN ('general', 'beginner')
       FOR UPDATE
     `;
 

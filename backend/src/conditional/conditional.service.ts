@@ -1,3 +1,8 @@
+import {
+  isStandaloneAccountMode,
+  assertBeginnerModeEnabled,
+  isBeginnerModeEnabled,
+} from '../trading-accounts/account-mode-policy';
 import { createApiError } from '../common/api-error';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -115,6 +120,7 @@ export class ConditionalService {
         accountId,
         tx,
       );
+      assertBeginnerModeEnabled(account.mode);
       if (!conditionalTradable(account, now))
         throw createApiError(
           'CONDITIONAL_ACCOUNT_NOT_TRADABLE',
@@ -289,7 +295,9 @@ export class ConditionalService {
       this.now(this.prisma),
     ]);
     const tradable =
-      conditionalTradable(account, clock) && conditionalEnabled();
+      conditionalTradable(account, clock) &&
+      conditionalEnabled() &&
+      (account.mode !== 'beginner' || isBeginnerModeEnabled());
     return {
       success: true,
       data: {
@@ -446,12 +454,11 @@ export class ConditionalService {
         tx,
       );
       if (!conditionalTradable(account, now)) {
-        const reason =
-          account.mode === 'general'
-            ? 'account_not_tradable'
-            : account.seasonParticipant?.participantStatus === 'excluded'
-              ? 'participant_excluded'
-              : 'season_ended';
+        const reason = isStandaloneAccountMode(account.mode)
+          ? 'account_not_tradable'
+          : account.seasonParticipant?.participantStatus === 'excluded'
+            ? 'participant_excluded'
+            : 'season_ended';
         await this.cancelPending(tx, group.children[0], reason, now);
         await finishProtection(tx, id, 'canceled', reason, now);
         return { state: 'lifecycle_canceled' };

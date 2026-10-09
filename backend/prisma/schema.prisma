@@ -43,6 +43,7 @@ enum ParticipantStatus {
 enum TradingAccountMode {
   season
   general
+  beginner
 }
 
 enum TradingAccountStatus {
@@ -409,18 +410,18 @@ model RefreshTokenSession {
   @@map("refresh_token_sessions")
 }
 
-// Common trading-account foundation shared by season mode and the future
-// general (non-season) mode. Wallets/orders/positions/exchanges/snapshots
-// still reference SeasonParticipant during the transition; only the account
-// identity layer lives here today. General-mode accounts are created ONLY by
-// an explicit POST /api/v1/trading-accounts/general (작업 6) — never by a
-// migration, a GET, or a trading path.
+// Canonical financial scope for season, general and beginner accounts.
+// Wallets/orders/positions/exchanges/snapshots belong to one TradingAccount.
+// General/beginner creation requires its explicit POST, never a migration,
+// GET or trading path. Beginner additionally requires development opt-in.
 // initialCapitalKrw is the account's initial external grant only (10,000,000
-// KRW for general accounts) — ad rewards are ledgered as WalletTransaction
-// rows (txType=ad_reward) and must never mutate it.
+// KRW for general/beginner accounts). General-only ad rewards are ledgered
+// as WalletTransaction rows (txType=ad_reward) and must never mutate it.
 // "At most one general account per user" is enforced by a partial unique
 // index that Prisma cannot express; see the migration SQL
-// (trading_accounts_general_owner_unique). status=active does not by itself
+// (trading_accounts_general_owner_unique). Beginner uses the separate
+// trading_accounts_beginner_owner_unique with the same lifetime rule.
+// status=active does not by itself
 // permit season trading: Season.status/window and ParticipantStatus checks
 // remain authoritative for season accounts.
 model TradingAccount {

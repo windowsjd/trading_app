@@ -1,3 +1,4 @@
+import { assertBeginnerModeEnabled } from '../trading-accounts/account-mode-policy';
 import { futuresSnapshotValues } from '../portfolio/futures-snapshot-values';
 import {
   buildSelectionFailureEvidence,
@@ -255,7 +256,7 @@ type SeasonFxTradingContext = {
 };
 
 type GeneralFxTradingContext = {
-  mode: typeof TradingAccountMode.general;
+  mode: typeof TradingAccountMode.general | typeof TradingAccountMode.beginner;
   account: OwnedTradingAccount;
   participant: null;
   season: null;
@@ -600,7 +601,10 @@ export class FxService {
           : tradingAccountId,
       );
 
-    if (account.mode === TradingAccountMode.general) {
+    if (
+      account.mode === TradingAccountMode.general ||
+      account.mode === TradingAccountMode.beginner
+    ) {
       await this.requireGeneralPerformanceService().assertGeneralAccountReady(
         account,
       );
@@ -910,7 +914,8 @@ export class FxService {
       });
       const rateSource = presentSourceDecision(rateSnapshot.sourceDecision);
       const requestHash =
-        mode === TradingAccountMode.general
+        mode === TradingAccountMode.general ||
+        mode === TradingAccountMode.beginner
           ? computeGeneralFxQuoteRequestHash({
               userId,
               tradingAccountId,
@@ -1003,7 +1008,10 @@ export class FxService {
     client: PrismaService | Prisma.TransactionClient = this.prisma,
   ): Promise<void> {
     this.assertTradingAccountExchangeable(account);
-    if (account.mode === TradingAccountMode.general) {
+    if (
+      account.mode === TradingAccountMode.general ||
+      account.mode === TradingAccountMode.beginner
+    ) {
       await this.requireGeneralPerformanceService().assertGeneralAccountReady(
         account,
         client,
@@ -1046,9 +1054,10 @@ export class FxService {
         toCurrency: durable.toCurrency,
         sourceAmount: durable.sourceAmount?.toFixed(8),
       },
-      account.mode === TradingAccountMode.general
+      account.mode === TradingAccountMode.general ||
+        account.mode === TradingAccountMode.beginner
         ? {
-            mode: 'general',
+            mode: account.mode,
             userId: account.userId,
             tradingAccountId: account.id,
             seasonParticipantId: null,
@@ -1115,7 +1124,10 @@ export class FxService {
       tradingAccountId: account.id,
       mode: account.mode,
       generalAccount:
-        account.mode === TradingAccountMode.general ? account : undefined,
+        account.mode === TradingAccountMode.general ||
+        account.mode === TradingAccountMode.beginner
+          ? account
+          : undefined,
     });
   }
 
@@ -1203,9 +1215,9 @@ export class FxService {
     const { userId, body, context } = input;
     const preflightResult = preflightFxExecuteRequest(
       body,
-      context.mode === TradingAccountMode.general
+      context.mode !== TradingAccountMode.season
         ? {
-            mode: 'general',
+            mode: context.mode,
             userId,
             tradingAccountId: context.account.id,
             seasonParticipantId: null,
@@ -1236,7 +1248,7 @@ export class FxService {
       });
     }
 
-    if (context.mode === TradingAccountMode.general) {
+    if (context.mode !== TradingAccountMode.season) {
       this.assertTradingAccountExchangeable(context.account);
       await this.requireGeneralPerformanceService().assertGeneralAccountReady(
         context.account,
@@ -1285,7 +1297,7 @@ export class FxService {
               })
             : null;
         const lockedAccount =
-          context.mode === TradingAccountMode.general
+          context.mode !== TradingAccountMode.season
             ? await this.lockGeneralFxAccountInTransaction(
                 tx,
                 userId,
@@ -1736,7 +1748,8 @@ export class FxService {
     }
 
     const requestHash =
-      input.mode === TradingAccountMode.general
+      input.mode === TradingAccountMode.general ||
+      input.mode === TradingAccountMode.beginner
         ? computeGeneralFxQuoteRequestHash({
             userId: input.userId,
             tradingAccountId: input.tradingAccountId,
@@ -2696,7 +2709,8 @@ export class FxService {
     const locked = rows[0];
     if (
       !locked ||
-      locked.mode !== TradingAccountMode.general ||
+      (locked.mode !== TradingAccountMode.general &&
+        locked.mode !== TradingAccountMode.beginner) ||
       locked.status !== TradingAccountStatus.active
     ) {
       this.throwApiError(
@@ -2757,9 +2771,12 @@ export class FxService {
           : tradingAccountId,
       );
 
-    if (account.mode === TradingAccountMode.general) {
+    if (
+      account.mode === TradingAccountMode.general ||
+      account.mode === TradingAccountMode.beginner
+    ) {
       return {
-        mode: TradingAccountMode.general,
+        mode: account.mode,
         account,
         participant: null,
         season: null,
@@ -2816,7 +2833,9 @@ export class FxService {
    */
   private assertTradingAccountExchangeable(account: {
     status: TradingAccountStatus;
+    mode?: TradingAccountMode;
   }) {
+    if (account.mode) assertBeginnerModeEnabled(account.mode);
     if (account.status !== TradingAccountStatus.active) {
       this.throwApiError(
         HttpStatus.CONFLICT,
@@ -3035,7 +3054,10 @@ export class FxService {
       },
     });
 
-    if (input.mode === TradingAccountMode.general) {
+    if (
+      input.mode === TradingAccountMode.general ||
+      input.mode === TradingAccountMode.beginner
+    ) {
       if (!input.generalAccount) {
         throw new Error('General FX account context is missing.');
       }

@@ -1,3 +1,4 @@
+import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import type { PortfolioValuationSourceReads } from './portfolio-valuation.service';
 import type { FuturesValuationComponents } from './portfolio-valuation.policy';
 import { futuresSnapshotValues } from './futures-snapshot-values';
@@ -5,7 +6,6 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import {
   Prisma,
   SnapshotReason,
-  TradingAccountMode,
   WalletTransactionReferenceType,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -552,8 +552,11 @@ export class GeneralAccountPerformanceService {
     account: GeneralAccountIntegrityTarget,
     client: PerformanceClient = this.prisma,
   ): Promise<VerifiedGeneralAccountWallets> {
-    if (account.mode !== TradingAccountMode.general) {
-      throwGeneralAccountIntegrity(account.id, 'account mode is not general');
+    if (!isStandaloneAccountMode(account.mode)) {
+      throwGeneralAccountIntegrity(
+        account.id,
+        'account mode does not use standalone funding',
+      );
     }
 
     const wallets = await assertGeneralAccountFinancialIntegrity(

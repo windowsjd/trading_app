@@ -1,3 +1,4 @@
+import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import {
   canonicalCashWalletSetIssue,
   type CashWalletIdentity,
@@ -453,7 +454,7 @@ export class WalletsService {
     initialCapitalKrw: Prisma.Decimal;
     seasonParticipant: { id: string } | null;
   }) {
-    if (account.mode === TradingAccountMode.general) {
+    if (isStandaloneAccountMode(account.mode)) {
       // 작업 6 보완 2: the FULL structural check, not just row scope. The
       // previous row-only probe passed an account whose USD wallet or initial
       // grant had vanished, and answered 200 with a normal-looking payload.

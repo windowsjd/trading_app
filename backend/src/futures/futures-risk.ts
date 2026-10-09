@@ -1,3 +1,4 @@
+import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import {
   Prisma,
   type FuturesPosition,
@@ -149,10 +150,9 @@ export async function accountFuturesFee(
     where: { id: accountId },
     include: { seasonParticipant: { include: { season: true } } },
   });
-  const fee =
-    account.mode === 'general'
-      ? readGeneralTradeFeeRate()
-      : account.seasonParticipant?.season.tradeFeeRate;
+  const fee = isStandaloneAccountMode(account.mode)
+    ? readGeneralTradeFeeRate()
+    : account.seasonParticipant?.season.tradeFeeRate;
   if (
     !fee ||
     !fee.isFinite() ||

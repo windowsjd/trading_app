@@ -27,6 +27,7 @@ import {
   markMarketSessionOverrideStoreRequired,
 } from '../src/orders/market-calendar/market-session-override.store';
 
+process.env.BEGINNER_MODE_ENABLED = 'true';
 const prisma = new PrismaService();
 const access = new TradingAccountAccessService(prisma);
 const valuation = new PortfolioValuationService(prisma);
@@ -68,7 +69,11 @@ const matcher = new LimitOrderMatchingService(
   execution,
 );
 const FEE = '0.001000';
-const modes = [TradingAccountMode.season, TradingAccountMode.general] as const;
+const modes = [
+  TradingAccountMode.season,
+  TradingAccountMode.general,
+  TradingAccountMode.beginner,
+] as const;
 
 async function dbNow() {
   const rows = await prisma.$queryRaw<
@@ -128,7 +133,11 @@ async function fixture(
           },
         })
       ).id
-    : (await general.openGeneralAccount(user.id)).data.account.id;
+    : (
+        await (mode === 'beginner'
+          ? general.openBeginnerAccount(user.id)
+          : general.openGeneralAccount(user.id))
+      ).data.account.id;
   const participant = season
     ? await prisma.seasonParticipant.create({
         data: {

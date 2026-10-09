@@ -5,6 +5,7 @@ import {
   Prisma,
   TradingAccountMode,
   TradingAccountStatus,
+  type WalletScope,
   WalletTransactionDirection,
   WalletTransactionReferenceType,
   WalletTransactionType,
@@ -12,6 +13,7 @@ import {
 import { GeneralAccountPerformanceService } from '../portfolio/general-account-performance.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertGeneralAccountFinancialIntegrity } from './general-account-integrity';
+import { assertBeginnerModeEnabled } from './account-mode-policy';
 import {
   GENERAL_ACCOUNT_INITIAL_CAPITAL_KRW,
   GENERAL_ACCOUNT_INITIAL_USD_BALANCE,
@@ -19,22 +21,17 @@ import {
 } from './general-account.policy';
 
 /**
- * General-mode account entry (작업 6).
- *
- * `POST /api/v1/trading-accounts/general` is the ONLY way a general account
- * comes into existence. It is idempotent by the account's own partial unique
- * index (`trading_accounts_general_owner_unique`, one general row per user),
- * so re-requests, concurrent requests, and network retries all converge on
- * ONE account, ONE KRW wallet, ONE USD wallet, and ONE 10,000,000 KRW
- * initial-grant ledger row.
+ * Explicit general/beginner entry, each with its own owner partial unique index.
+ * Retries converge on one account per mode, four canonical wallets and one
+ * 10,000,000 KRW grant. Beginner entry additionally requires development opt-in.
  *
  * Everything the first call writes lives in a SINGLE transaction: if any
- * step fails, the account, all wallets, and the grant roll back together —
+ * step fails, the account, wallets, grant and TWR origin roll back together —
  * a half-opened account can never be observed.
  *
  * NOT done here, on purpose:
- *  - no EquitySnapshot / DailyPortfolioSnapshot (작업 7 scope),
- *  - no SeasonParticipant (a general account has none, ever),
+ *  - no DailyPortfolioSnapshot (the daily job owns these),
+ *  - no SeasonParticipant,
  *  - no re-grant, top-up, or repair of an existing/damaged account,
  *  - no reactivation of a suspended or closed general account.
  */
@@ -57,6 +54,8 @@ type GeneralAccountRecord = Prisma.TradingAccountGetPayload<{
 }>;
 
 type GeneralWalletView = {
+  /** Returned for beginner's four-wallet response; general response is unchanged. */
+  walletScope?: WalletScope;
   currencyCode: CurrencyCode;
   balanceAmount: string;
   reservedAmount: string;
@@ -97,18 +96,36 @@ export class GeneralAccountsService {
   async openGeneralAccount(
     userId: string | undefined,
   ): Promise<OpenGeneralAccountResponse> {
+    return this.openStandaloneAccount(userId, TradingAccountMode.general);
+  }
+
+  async openBeginnerAccount(
+    userId: string | undefined,
+  ): Promise<OpenGeneralAccountResponse> {
+    this.requireUserId(userId);
+    assertBeginnerModeEnabled(TradingAccountMode.beginner);
+    return this.openStandaloneAccount(userId, TradingAccountMode.beginner);
+  }
+
+  private async openStandaloneAccount(
+    userId: string | undefined,
+    mode: 'general' | 'beginner',
+  ): Promise<OpenGeneralAccountResponse> {
     const ownerId = this.requireUserId(userId);
 
-    const existing = await this.findGeneralAccount(ownerId);
+    const existing = await this.findGeneralAccount(ownerId, mode);
     if (existing) {
       return this.buildReplayResponse(existing);
     }
 
     try {
-      const created = await this.createGeneralAccountInTransaction(ownerId);
+      const created = await this.createGeneralAccountInTransaction(
+        ownerId,
+        mode,
+      );
       this.logger.log(
         JSON.stringify({
-          event: 'general_account_opened',
+          event: `${mode}_account_opened`,
           tradingAccountId: created.id,
         }),
       );
@@ -121,7 +138,7 @@ export class GeneralAccountsService {
       // A concurrent request won the partial unique index. Never surface that
       // as a 500: re-read the winner's account and replay it, so both callers
       // see the same single account, wallets, and grant.
-      const raced = await this.findGeneralAccount(ownerId);
+      const raced = await this.findGeneralAccount(ownerId, mode);
       if (!raced) {
         throw error;
       }
@@ -131,6 +148,7 @@ export class GeneralAccountsService {
 
   private async createGeneralAccountInTransaction(
     userId: string,
+    mode: 'general' | 'beginner',
   ): Promise<GeneralAccountRecord> {
     return this.prisma.$transaction(async (tx) => {
       const openedAt = new Date();
@@ -138,7 +156,7 @@ export class GeneralAccountsService {
       const account = await tx.tradingAccount.create({
         data: {
           userId,
-          mode: TradingAccountMode.general,
+          mode,
           status: TradingAccountStatus.active,
           initialCapitalKrw: GENERAL_ACCOUNT_INITIAL_CAPITAL_KRW,
           openedAt,
@@ -234,6 +252,12 @@ export class GeneralAccountsService {
     account: GeneralAccountRecord,
   ): Promise<OpenGeneralAccountResponse> {
     await assertGeneralAccountFinancialIntegrity(this.prisma, account);
+    if (account.mode === 'beginner') {
+      await this.performanceService.requireContinuousPerformanceState({
+        account,
+        client: this.prisma,
+      });
+    }
     return this.buildResponse(account, false);
   }
 
@@ -242,7 +266,12 @@ export class GeneralAccountsService {
     created: boolean,
   ): Promise<OpenGeneralAccountResponse> {
     const wallets = await this.prisma.cashWallet.findMany({
-      where: { walletScope: 'securities', tradingAccountId: account.id },
+      where: {
+        ...(account.mode === 'general'
+          ? { walletScope: 'securities' as const }
+          : {}),
+        tradingAccountId: account.id,
+      },
       orderBy: { currencyCode: 'asc' },
       select: {
         walletScope: true,
@@ -269,6 +298,9 @@ export class GeneralAccountsService {
           season: null,
         },
         wallets: wallets.map((wallet) => ({
+          ...(account.mode === 'beginner'
+            ? { walletScope: wallet.walletScope }
+            : {}),
           currencyCode: wallet.currencyCode,
           balanceAmount: wallet.balanceAmount.toFixed(8),
           reservedAmount: wallet.reservedAmount.toFixed(8),
@@ -281,9 +313,9 @@ export class GeneralAccountsService {
     };
   }
 
-  private findGeneralAccount(userId: string) {
+  private findGeneralAccount(userId: string, mode: 'general' | 'beginner') {
     return this.prisma.tradingAccount.findFirst({
-      where: { userId, mode: TradingAccountMode.general },
+      where: { userId, mode },
       select: ACCOUNT_SELECT,
     });
   }

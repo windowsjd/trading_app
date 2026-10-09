@@ -1,0 +1,57 @@
+{
+  "status": "passed_with_native_acceptance_not_run",
+  "activation": "disabled by default; production always disabled",
+  "database": {
+    "environment": "isolated local PostgreSQL 16, disposable beginner_mode_test; stopped after validation",
+    "remote_mutations": false,
+    "migrations": { "applied": 69, "status": "up_to_date", "schema_drift": "none" },
+    "new_migrations": ["20261009120000_add_beginner_account_mode", "20261009120100_add_beginner_account_owner_constraint"]
+  },
+  "backend": {
+    "prisma_generate": "pass",
+    "typecheck": "pass",
+    "lint_accounts_check": "pass",
+    "diagnostic_enforcement": "pass",
+    "affected_unit_command": "npm test -- --runInBand --testPathPatterns='(trading-accounts|portfolio|orders|fx|wallets|futures|conditional|seasons|ranking|batch|ops)/'",
+    "affected_unit": { "suites_passed": 101, "tests_passed": 2026, "suites_opt_in_skipped": 39, "tests_opt_in_skipped": 40, "failed": 0 },
+    "db_regressions": {
+      "suites_passed": 14,
+      "wrapper_tests_passed": 14,
+      "failed": 0,
+      "suites": ["beginner-account", "general-account", "general-trading-audit", "general-performance-hardening", "trading-account", "trading-account-link", "trading-account-financial-scope", "trading-account-trading-scope", "seasons.join", "season-ranking-scope", "ranking-consistency", "general-account-trading", "general-account-fx", "order-replay-and-cancel-scope"],
+      "opt_in_env": ["NODE_ENV=test", "BEGINNER_ACCOUNT_DB_INTEGRATION=1", "TRADING_ACCOUNT_DB_INTEGRATION=1", "GENERAL_TRADING_DB_INTEGRATION=1", "GENERAL_FX_DB_INTEGRATION=1", "SEASON_JOIN_DB_INTEGRATION=1"]
+    },
+    "three_mode_db_scripts": {
+      "order-input-policy-integration.ts": "pass, general/season/beginner, crypto/domestic_stock/us_stock",
+      "wallet-fx-transfer-integration.ts": "pass, general/season/beginner, transfers/atomic FX/races/rollback/replay",
+      "futures-integration.ts": "pass, general/season/beginner, 272 financial/guard/race/rollback checks"
+    }
+  },
+  "frontend": {
+    "full_check_command": "npm run check",
+    "full_check": { "test_files_passed": 150, "failed": 0, "note": "full run before final small tab/error-surface adjustments; affected scope rechecked below" },
+    "affected_command": "node --test --test-concurrency=1 'src/features/tradingAccount/*.test.ts' 'src/screens/entry/*.test.ts' 'src/app/navigation/*.test.ts' 'src/screens/guide/*.test.ts'",
+    "affected": { "tests_passed": 294, "failed": 0 },
+    "final_tab_label_tests": { "command": "node --test --test-concurrency=1 src/app/navigation/MainTabs.test.ts", "tests_passed": 17, "failed": 0 },
+    "typecheck": "pass",
+    "lint_accounts_check": "pass",
+    "lint_guides_check": "pass",
+    "diagnostic_enforcement": "pass",
+    "web_export": { "command": "npm run export:web -- --max-workers 1", "status": "pass" },
+    "browser": { "command": "node test/browser/beginnerBrowser.cjs (external esbuild/Playwright runtime)", "layouts_passed": 16, "widths": [320, 360, 390, 430], "font_scales": [1, 2], "themes": ["light", "dark"], "flows": ["quest/guide navigation", "five tabs and MY label", "three-mode selection", "delayed financial response isolation", "distinct wallet balances", "explicit beginner creation", "disabled entry hidden"], "result_file": "browser-validation.json" }
+  },
+  "memory_safety": {
+    "changed_ui_assertions": "primitive boolean/count/string; no renderer graph equality against null/undefined",
+    "test_removal_or_oom_skip": false,
+    "final_heavy_checks": { "containment": "verified systemd cgroup v2, includes descendant processes", "memory_max_bytes": 2147483648, "swap_max_bytes": 0, "tasks_max": 192, "kill_mode": "control-group", "runtime_limits_seconds": [240, 300, 420], "core_filter": "0", "node_heap_mb": { "frontend": 768, "backend": 1536 } },
+    "final_backend_peak_bytes": 1668603904,
+    "final_frontend_release_peak_bytes": 1128251392,
+    "final_oom_events": 0,
+    "resolved_resource_limit_failures": [
+      "Default parallel Metro export reached 2GiB cgroup limit. Confirmed unit/children stopped, then passed with --max-workers 1 under the same total limit.",
+      "Backend TypeScript compilation exceeded the initial 768MiB V8 heap. Confirmed process exit, retained the 2GiB total limit and passed with a 1536MiB heap."
+    ]
+  },
+  "not_run": ["Android/iOS physical device acceptance", "live provider end-to-end trading", "remote CI execution", "production deployment or activation"],
+  "review": { "git_diff_review": "completed", "git_diff_check": "pass", "dependencies_changed": false, "existing_migrations_or_seed_changed": false, "unconfirmed_quests_or_unlock_rules_added": false }
+}

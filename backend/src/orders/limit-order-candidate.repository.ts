@@ -1,3 +1,4 @@
+import { isBeginnerModeEnabled } from '../trading-accounts/account-mode-policy';
 import { Injectable } from '@nestjs/common';
 import {
   AssetType,
@@ -129,7 +130,14 @@ export class LimitOrderCandidateRepository {
             },
             {
               tradingAccount: {
-                mode: TradingAccountMode.general,
+                mode: isBeginnerModeEnabled()
+                  ? {
+                      in: [
+                        TradingAccountMode.general,
+                        TradingAccountMode.beginner,
+                      ],
+                    }
+                  : TradingAccountMode.general,
                 status: TradingAccountStatus.active,
                 seasonParticipant: null,
               },

@@ -1,5 +1,14 @@
 # Frontend TradingAccount Switching (작업 9 + 작업 10 + 작업 11 + 작업 13)
 
+Beginner foundation: the server's `beginnerModeEnabled === true` permits
+development entry and selection of the independent `beginner` account.
+Otherwise even a cached beginner account is filtered out. Explicit creation
+refreshes the list before selecting the returned ID. MainTabs now remounts by
+accountId, including switches within one mode; financial query/flow scope
+remains accountId. Its Quest tab uses the existing GuideStack with a
+quest/guide segment and preparation text, with no quest or unlock state.
+See [the backend contract](../../backend/docs/beginner-mode.md).
+
 Reference for the account-selection layer added by WORK-ID
 `SEASON-RANKING-HARDENING-AND-FRONTEND-ACCOUNT-SWITCH-V1`, completed across
 every current financial screen and mutation by

@@ -1,3 +1,4 @@
+import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import {
   buildSelectionFailureEvidence,
   describeManualFallback,
@@ -325,7 +326,7 @@ export class PositionsService {
           : tradingAccountId,
       );
 
-    if (account.mode === TradingAccountMode.general) {
+    if (isStandaloneAccountMode(account.mode)) {
       await assertGeneralAccountFinancialIntegrity(this.prisma, account);
       await assertGeneralAccountTradingRowsIntegrity(this.prisma, account.id);
     }

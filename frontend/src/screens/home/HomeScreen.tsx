@@ -98,7 +98,7 @@ export default function HomeScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.body}>
-        {selectedAccount.mode === 'general' ? (
+        {selectedAccount.mode !== 'season' ? (
           <GeneralAccountHome
             key={selectedAccount.id}
             account={selectedAccount}

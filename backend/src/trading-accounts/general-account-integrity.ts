@@ -1,3 +1,4 @@
+import { isStandaloneAccountMode } from './account-mode-policy';
 import { canonicalCashWalletSetIssue } from '../wallets/canonical-cash-wallets';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import {
@@ -90,8 +91,11 @@ export async function assertGeneralAccountFoundationIntegrity(
   prisma: GeneralIntegrityClient,
   account: GeneralAccountIntegrityTarget,
 ): Promise<VerifiedGeneralAccountWallets> {
-  if (account.mode !== TradingAccountMode.general) {
-    throwGeneralAccountIntegrity(account.id, 'account mode is not general');
+  if (!isStandaloneAccountMode(account.mode)) {
+    throwGeneralAccountIntegrity(
+      account.id,
+      'account mode does not use standalone funding',
+    );
   }
 
   if (account.seasonParticipant) {
@@ -190,6 +194,22 @@ export async function assertGeneralAccountFoundationIntegrity(
     throwGeneralAccountIntegrity(
       account.id,
       'more than one initial grant ledger row exists',
+    );
+  }
+
+  if (
+    account.mode === 'beginner' &&
+    (await prisma.walletTransaction.findFirst({
+      where: {
+        tradingAccountId: account.id,
+        txType: WalletTransactionType.ad_reward,
+      },
+      select: { id: true },
+    }))
+  ) {
+    throwGeneralAccountIntegrity(
+      account.id,
+      'beginner accounts cannot receive ad rewards',
     );
   }
 

@@ -370,3 +370,14 @@ Conditional-child deduplication; external HTTP requests are blocked.
 `FUTURES_INTEGRATION_BROWSER_OUTPUT` selects screenshots/report.json (default
 `/tmp/trading-futures-integration-browser`). Native iOS/Android keyboard, device
 text rendering and full live-server execution are separate acceptance checks.
+
+Beginner foundation uses `beginnerBrowser.cjs` and `beginnerMocks.js`, reusing
+the production account provider, root/tab/guide navigation and financial
+screens. Run with external esbuild/Playwright on `NODE_PATH` under the same
+memory containment policy. `BEGINNER_CHROMIUM` optionally selects Chromium;
+`BEGINNER_BROWSER_OUTPUT` defaults to `/tmp/trading-beginner-browser`.
+It checks 16 layouts (320/360/390/430px, font scale 1/2, light/dark), Korean
+segment/tab glyph bounds and hit areas, guide round trips, three-mode
+selection, explicit creation, hidden disabled entry and delayed portfolio/
+holdings responses during account switching. All external HTTP is blocked.
+These RN Web checks do not replace Android/iOS device acceptance.

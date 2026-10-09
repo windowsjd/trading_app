@@ -36,6 +36,7 @@ if (
   throw new Error('Explicit test DB opt-in is required.');
 process.env.GENERAL_TRADE_FEE_RATE = '0.001000';
 process.env.FUTURES_TRADING_ENABLED = 'true';
+process.env.BEGINNER_MODE_ENABLED = 'true';
 const db = new PrismaService();
 const d = futuresDecimal;
 let checks = 0;
@@ -112,7 +113,11 @@ async function fixture(mode: TradingAccountMode, cash = '10000') {
           },
         })
       ).id
-    : (await app.general.openGeneralAccount(user.id)).data.account.id;
+    : (
+        await (mode === 'beginner'
+          ? app.general.openBeginnerAccount(user.id)
+          : app.general.openGeneralAccount(user.id))
+      ).data.account.id;
   if (season) {
     await db.seasonParticipant.create({
       data: {
@@ -414,7 +419,7 @@ async function invariant(s: Scenario) {
     );
     assert.equal(
       e.feeRate.toFixed(6),
-      s.mode === 'general' ? '0.001000' : '0.002000',
+      s.mode !== 'season' ? '0.001000' : '0.002000',
     );
     assert.ok(
       e.priceCapturedAt <= e.executedAt && e.priceEffectiveAt <= e.executedAt,
@@ -472,7 +477,7 @@ async function lifecycle(
     assert.equal(opened.data.position.isolatedMargin, '2.70270271');
     assert.equal(
       opened.data.collateral.balanceAmount,
-      mode === 'general' ? '9999.90000000' : '9999.80000000',
+      mode !== 'season' ? '9999.90000000' : '9999.80000000',
     );
     await reject(
       execute(
@@ -649,7 +654,7 @@ async function marginAndFlags(mode: TradingAccountMode) {
       );
       assert.equal(
         opened.data.execution.feeAmount,
-        mode === 'general' ? '0.10000000' : '0.20000000',
+        mode !== 'season' ? '0.10000000' : '0.20000000',
       );
       await execute(s, await positionBody(s, 'close'));
       checks++;
@@ -1376,7 +1381,7 @@ async function main() {
   await db.$connect();
   await databaseConstraints();
   await accountIsolation();
-  for (const mode of ['general', 'season'] as const) {
+  for (const mode of ['general', 'season', 'beginner'] as const) {
     for (const direction of ['long', 'short'] as const) {
       await lifecycle(mode, direction);
       await lossAndEvidence(mode, direction);

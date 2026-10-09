@@ -1,3 +1,4 @@
+import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -118,7 +119,7 @@ export class FuturesLiquidationService {
           include: { seasonParticipant: true },
         });
         if (!target) return { state: 'account_missing' };
-        if (target.mode === 'general')
+        if (isStandaloneAccountMode(target.mode))
           await tx.$queryRaw`SELECT id FROM trading_accounts WHERE id = ${accountId} FOR UPDATE`;
         else {
           if (!target.seasonParticipant)
@@ -173,7 +174,7 @@ export class FuturesLiquidationService {
         await assertAccountFinancialScopeIntegrity(tx, {
           tradingAccountId: accountId,
         });
-        if (account.mode === 'general') {
+        if (isStandaloneAccountMode(account.mode)) {
           await assertGeneralAccountFinancialIntegrity(tx, account);
           await assertGeneralAccountTradingRowsIntegrity(tx, accountId);
           await assertGeneralAccountFxRowsIntegrity(

@@ -1,0 +1,121 @@
+{
+  "results": [
+    {
+      "width": 320,
+      "fontScale": 1,
+      "theme": "light",
+      "segments": "pass",
+      "guideNavigation": "pass"
+    },
+    {
+      "width": 320,
+      "fontScale": 1,
+      "theme": "dark",
+      "segments": "pass",
+      "guideNavigation": "pass"
+    },
+    {
+      "width": 320,
+      "fontScale": 2,
+      "theme": "light",
+      "segments": "pass",
+      "guideNavigation": "pass"
+    },
+    {
+      "width": 320,
+      "fontScale": 2,
+      "theme": "dark",
+      "segments": "pass",
+      "guideNavigation": "pass"
+    },
+    {
+      "width": 360,
+      "fontScale": 1,
+      "theme": "light",
+      "segments": "pass",
+      "guideNavigation": "pass"
+    },
+    {
+      "width": 360,
+      "fontScale": 1,
+      "theme": "dark",
+      "segments": "pass",
+      "guideNavigation": "pass"
+    },
+    {
+      "width": 360,
+      "fontScale": 2,
+      "theme": "light",
+      "segments": "pass",
+      "guideNavigation": "pass"
+    },
+    {
+      "width": 360,
+      "fontScale": 2,
+      "theme": "dark",
+      "segments": "pass",
+      "guideNavigation": "pass"
+    },
+    {
+      "width": 390,
+      "fontScale": 1,
+      "theme": "light",
+      "segments": "pass",
+      "guideNavigation": "pass"
+    },
+    {
+      "width": 390,
+      "fontScale": 1,
+      "theme": "dark",
+      "segments": "pass",
+      "guideNavigation": "pass"
+    },
+    {
+      "width": 390,
+      "fontScale": 2,
+      "theme": "light",
+      "segments": "pass",
+      "guideNavigation": "pass"
+    },
+    {
+      "width": 390,
+      "fontScale": 2,
+      "theme": "dark",
+      "segments": "pass",
+      "guideNavigation": "pass"
+    },
+    {
+      "width": 430,
+      "fontScale": 1,
+      "theme": "light",
+      "segments": "pass",
+      "guideNavigation": "pass"
+    },
+    {
+      "width": 430,
+      "fontScale": 1,
+      "theme": "dark",
+      "segments": "pass",
+      "guideNavigation": "pass"
+    },
+    {
+      "width": 430,
+      "fontScale": 2,
+      "theme": "light",
+      "segments": "pass",
+      "guideNavigation": "pass"
+    },
+    {
+      "width": 430,
+      "fontScale": 2,
+      "theme": "dark",
+      "segments": "pass",
+      "guideNavigation": "pass"
+    }
+  ],
+  "accountSwitching": "pass",
+  "delayedFinancialIsolation": "pass",
+  "disabledEntry": "pass",
+  "explicitCreation": "pass",
+  "errors": []
+}

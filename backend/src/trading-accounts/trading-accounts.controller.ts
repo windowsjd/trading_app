@@ -48,6 +48,14 @@ export class TradingAccountsController {
     );
   }
 
+  @Post('beginner')
+  @HttpCode(HttpStatus.OK)
+  openBeginnerAccount(@Req() request: AuthenticatedRequest) {
+    return this.generalAccountsService.openBeginnerAccount(
+      this.extractUserId(request),
+    );
+  }
+
   @Get(':accountId')
   getTradingAccount(
     @Req() request: AuthenticatedRequest,

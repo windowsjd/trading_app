@@ -1,3 +1,4 @@
+import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, type TradingAccount } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -30,7 +31,7 @@ export class FuturesPerformanceService {
     capturedAt: Date,
   ) {
     try {
-      if (account.mode === 'general') {
+      if (isStandaloneAccountMode(account.mode)) {
         await this.performance.createOrdinarySnapshotInTransaction({
           account,
           reason: 'order_executed',

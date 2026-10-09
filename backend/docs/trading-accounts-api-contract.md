@@ -1,5 +1,11 @@
 # /api/v1/trading-accounts API Contract
 
+Beginner foundation extension: [beginner-mode.md](beginner-mode.md) defines
+`POST /api/v1/trading-accounts/beginner`, the `beginner` mode, four-wallet
+response and the list's `beginnerModeEnabled` boolean. Exposure and creation
+require explicit development/test opt-in; production remains disabled.
+Existing general/season contracts below retain their financial policies.
+
 ## Status
 - `GET /api/v1/trading-accounts` (owned account list) and
   `GET /api/v1/trading-accounts/:accountId` (owned account detail) are

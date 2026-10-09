@@ -49,10 +49,10 @@ export function getAccountDisplay(account: DisplayInput): AccountDisplay {
   const statusLabel = STATUS_LABEL[account.status] ?? account.status;
   const statusTone = account.status;
 
-  if (account.mode === 'general') {
+  if (account.mode === 'general' || account.mode === 'beginner') {
     return {
-      title: '일반 투자',
-      subtitle: '시즌과 무관한 상시 계정',
+      title: account.mode === 'beginner' ? '초보 투자' : '일반 투자',
+      subtitle: account.mode === 'beginner' ? '독립된 초보 계정' : '시즌과 무관한 상시 계정',
       statusLabel,
       statusTone,
       // TWR: the ad-funded inflow is a deposit, not a gain, and the label says so.

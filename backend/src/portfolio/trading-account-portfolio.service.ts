@@ -1,3 +1,4 @@
+import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import {
   Prisma,
@@ -110,13 +111,12 @@ export class TradingAccountPortfolioService {
     setAdminDiagnosticContext({ failureStage: 'account_ownership_lookup' });
     const account = await this.resolveOwnedAccount(owner, accountId);
     setAdminDiagnosticContext({
-      failureStage:
-        account.mode === TradingAccountMode.general
-          ? 'general_portfolio_transaction'
-          : 'portfolio_valuation_read',
+      failureStage: isStandaloneAccountMode(account.mode)
+        ? 'general_portfolio_transaction'
+        : 'portfolio_valuation_read',
     });
 
-    return account.mode === TradingAccountMode.general
+    return isStandaloneAccountMode(account.mode)
       ? this.readGeneralConsistently(owner, account.id, (tx, locked, now) =>
           this.getGeneralPortfolio(locked, tx, now),
         )
@@ -145,7 +145,7 @@ export class TradingAccountPortfolioService {
     }
     const daily = query.granularity === 'daily';
 
-    if (account.mode !== TradingAccountMode.general) {
+    if (!isStandaloneAccountMode(account.mode)) {
       const endAt =
         account.seasonParticipant?.season.status === 'settled'
           ? account.seasonParticipant.season.endAt
@@ -691,7 +691,7 @@ export class TradingAccountPortfolioService {
         timeWeightedReturnFactor: true,
       },
     });
-    if (account.mode === TradingAccountMode.general) {
+    if (isStandaloneAccountMode(account.mode)) {
       assertGeneralDailyHistoryRows(account.id, rows);
     }
     const dates = new Set<string>();
@@ -921,7 +921,7 @@ export class TradingAccountPortfolioService {
   }
 
   private returnRateMethod(mode: TradingAccountMode) {
-    return mode === TradingAccountMode.general
+    return isStandaloneAccountMode(mode)
       ? ('time_weighted' as const)
       : ('initial_capital' as const);
   }

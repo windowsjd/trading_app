@@ -15,7 +15,7 @@ import { useTradingAccount } from '../../features/tradingAccount/TradingAccountC
 import type { MainTabParamList } from './types';
 import HomeStack from './HomeStack';
 import MarketStack from './MarketStack';
-import GuideStack from './GuideStack';
+import GuideStack, { QuestStack } from './GuideStack';
 import RankingStack from './RankingStack';
 import WalletStack from './WalletStack';
 import MyStack from './MyStack';
@@ -40,7 +40,7 @@ export default function MainTabs() {
 
   return (
     <Tab.Navigator
-      key={mode}
+      key={selectedAccount.id}
       id="MainTabs"
       initialRouteName="HomeTab"
       screenOptions={{
@@ -83,7 +83,14 @@ export default function MainTabs() {
           ),
         })}
       />
-      {mode === 'general' ? (
+      {mode === 'beginner' ? (
+        <Tab.Screen name="QuestTab" component={QuestStack} options={{
+          title: '퀘스트',
+          // Reserve room for the three-character label at larger text sizes.
+          tabBarItemStyle: fontScale > 1 ? { flex: 1.4 } : undefined,
+          tabBarIcon: ({ color, size, focused }) => <TabBarIcon focused={focused} name="guide" color={color} size={size} />,
+        }} />
+      ) : mode === 'general' ? (
         <Tab.Screen
           name="GuideTab"
           component={GuideStack}
@@ -120,7 +127,7 @@ export default function MainTabs() {
         name="MyTab"
         component={MyStack}
         options={{
-          title: '전체',
+          title: 'MY',
           tabBarIcon: ({ color, size, focused }) => (
             <TabBarIcon focused={focused} name="menu" color={color} size={size} />
           ),

@@ -7,6 +7,7 @@ import { stackTransition } from './transitionPolicy';
 
 import type { GuideStackParamList } from './types';
 import GuideScreen from '../../screens/guide/GuideScreen';
+import BeginnerLearningScreen from '../../screens/guide/BeginnerLearningScreen';
 import MarketBasicsScreen from '../../screens/guide/MarketBasicsScreen';
 import MarketBasicsChaptersScreen from '../../screens/guide/MarketBasicsChaptersScreen';
 import LiquidityScreen from '../../screens/guide/LiquidityScreen';
@@ -18,14 +19,18 @@ import GuideChapterScreen from '../../screens/guide/GuideChapterScreen';
 
 const Stack = createNativeStackNavigator<GuideStackParamList>();
 
-export default function GuideStack() {
+export function QuestStack() {
+  return <GuideStack beginner />;
+}
+
+export default function GuideStack({ beginner = false }: { beginner?: boolean } = {}) {
   const reducedMotion = useReducedMotion();
   return (
     <Stack.Navigator id="GuideStack" screenOptions={stackTransition(reducedMotion, Platform.OS)}>
       <Stack.Screen
         name="Guide"
-        component={GuideScreen}
-        options={{ title: '가이드', headerTitle: mainTabHeaderTitle('guide') }}
+        component={beginner ? BeginnerLearningScreen : GuideScreen}
+        options={beginner ? { title: '퀘스트' } : { title: '가이드', headerTitle: mainTabHeaderTitle('guide') }}
       />
       <Stack.Screen
         name="MarketBasics"

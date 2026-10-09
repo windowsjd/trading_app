@@ -49,7 +49,7 @@ const enumBlock = (name: string): string => {
 };
 
 describe('TradingAccount schema contract', () => {
-  it('defines TradingAccountMode with exactly season and general', () => {
+  it('defines TradingAccountMode with exactly season, general and beginner', () => {
     const block = enumBlock('TradingAccountMode');
     expect(block).toContain('season');
     expect(block).toContain('general');
@@ -59,7 +59,7 @@ describe('TradingAccount schema contract', () => {
         .slice(1, -1)
         .map((line) => line.trim())
         .filter((line) => line.length > 0),
-    ).toEqual(['season', 'general']);
+    ).toEqual(['season', 'general', 'beginner']);
   });
 
   it('defines TradingAccountStatus with exactly active, suspended, closed', () => {

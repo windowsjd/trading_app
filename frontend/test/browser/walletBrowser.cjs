@@ -402,8 +402,8 @@ async function run() {
     for (const account of ['general', 'season']) {
       await page.goto(`${base}/navigation?navigation=1&holdings=1&account=${account}`);
       await id('home-total-asset').waitFor();
-      const tabs = page.getByRole('tab', { name: /^(홈|마켓|가이드|랭킹|지갑|전체)$/ });
-      assert.deepEqual(await tabs.allTextContents(), ['홈', '마켓', account === 'general' ? '가이드' : '랭킹', '지갑', '전체']);
+      const tabs = page.getByRole('tab', { name: /^(홈|마켓|가이드|랭킹|지갑|MY)$/ });
+      assert.deepEqual(await tabs.allTextContents(), ['홈', '마켓', account === 'general' ? '가이드' : '랭킹', '지갑', 'MY']);
       assert.equal(await page.getByText('환전하기', { exact: true }).count(), 0);
       await page.getByRole('tab', { name: '지갑' }).click();
       await id('wallet-composition').waitFor();
@@ -452,7 +452,7 @@ async function run() {
       await page.evaluate(() => window.fixture.navigationRef.goBack());
       await id('wallet-composition').waitFor();
       assert.equal(await page.getByRole('tab', { name: '지갑' }).getAttribute('aria-selected'), 'true');
-      await page.getByRole('tab', { name: '전체' }).click();
+      await page.getByRole('tab', { name: 'MY' }).click();
       await id('overall-Record').waitFor();
       await id('overall-Record').click(); await id('record-season-item-record-0').click();
       await id('record-season-detail-screen').waitFor();

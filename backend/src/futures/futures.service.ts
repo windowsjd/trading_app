@@ -1,3 +1,8 @@
+import {
+  isStandaloneAccountMode,
+  assertBeginnerModeEnabled,
+  isBeginnerModeEnabled,
+} from '../trading-accounts/account-mode-policy';
 import { releaseFuturesEntryReservation } from './futures-limit-state';
 import { createApiError } from '../common/api-error';
 import { HttpStatus, Injectable } from '@nestjs/common';
@@ -109,6 +114,8 @@ export class FuturesService {
       ? null
       : await this.prisma.futuresExecuteRequest.findUnique({ where });
     if (committed) return replay(committed);
+    if (request.operation === 'open' || request.operation === 'increase')
+      assertBeginnerModeEnabled(account.mode);
     assertFuturesOperation(request.operation);
     await this.assertTradable(
       account,
@@ -126,7 +133,7 @@ export class FuturesService {
     try {
       return await this.prisma.$transaction(async (tx) => {
         stage('futures_lifecycle_lock', accountId);
-        if (account.mode === 'general') {
+        if (isStandaloneAccountMode(account.mode)) {
           await tx.$queryRaw`SELECT "id" FROM "trading_accounts" WHERE "id" = ${accountId} AND "user_id" = ${userId} FOR UPDATE`;
         } else {
           const lifecycle = await lockSeasonTradingContext(tx, {
@@ -205,6 +212,8 @@ export class FuturesService {
           );
         if (entry) await releaseFuturesEntryReservation(tx, entry);
         const executeNow = await this.dbNow(tx);
+        if (request.operation === 'open' || request.operation === 'increase')
+          assertBeginnerModeEnabled(account.mode);
         assertFuturesOperation(request.operation);
         const lockedAccount = await this.access.getOwnedAccountOrThrow(
           userId,
@@ -309,10 +318,9 @@ export class FuturesService {
         }
         const usedBefore = await futuresMarginUsed(tx, accountId);
         stage('futures_collateral_calculation', accountId);
-        const feeRate =
-          lockedAccount.mode === 'general'
-            ? readGeneralTradeFeeRate()
-            : lockedAccount.seasonParticipant!.season.tradeFeeRate;
+        const feeRate = isStandaloneAccountMode(lockedAccount.mode)
+          ? readGeneralTradeFeeRate()
+          : lockedAccount.seasonParticipant!.season.tradeFeeRate;
         const plan = planFuturesExecution(
           request,
           current,
@@ -1001,7 +1009,7 @@ export class FuturesService {
         'TRADING_ACCOUNT_NOT_ACTIVE',
         'Trading account is not active.',
       );
-    if (account.mode === 'general') {
+    if (isStandaloneAccountMode(account.mode)) {
       await this.performance.assertGeneralAccountReady(account, client);
       return;
     }
@@ -1078,7 +1086,7 @@ export function futuresCapabilities(account: OwnedTradingAccount, now: Date) {
   const p = account.seasonParticipant;
   const lifecycle =
     account.status === 'active' &&
-    (account.mode === 'general' ||
+    (isStandaloneAccountMode(account.mode) ||
       (!!p &&
         p.participantStatus === 'active' &&
         p.season.status === 'active' &&
@@ -1086,8 +1094,14 @@ export function futuresCapabilities(account: OwnedTradingAccount, now: Date) {
         now < p.season.endAt));
   return {
     tradingMode: mode,
-    canOpen: lifecycle && mode === 'ENABLED',
-    canIncrease: lifecycle && mode === 'ENABLED',
+    canOpen:
+      lifecycle &&
+      mode === 'ENABLED' &&
+      (account.mode !== 'beginner' || isBeginnerModeEnabled()),
+    canIncrease:
+      lifecycle &&
+      mode === 'ENABLED' &&
+      (account.mode !== 'beginner' || isBeginnerModeEnabled()),
     canReduce: lifecycle && mode !== 'DISABLED',
     canClose: lifecycle && mode !== 'DISABLED',
     reason: !lifecycle

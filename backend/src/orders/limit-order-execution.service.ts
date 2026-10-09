@@ -1,3 +1,7 @@
+import {
+  isStandaloneAccountMode,
+  isBeginnerModeEnabled,
+} from '../trading-accounts/account-mode-policy';
 import { createApiError } from '../common/api-error';
 import {
   assertPendingChild,
@@ -209,7 +213,7 @@ export class LimitOrderExecutionService {
       });
       if (
         prelock?.tradingAccountId &&
-        prelock.tradingAccount?.mode === TradingAccountMode.general
+        isStandaloneAccountMode(prelock.tradingAccount?.mode)
       ) {
         await tx.$queryRaw<Array<{ id: string }>>`
           SELECT "id" FROM "trading_accounts"
@@ -318,6 +322,9 @@ export class LimitOrderExecutionService {
           'Order has no valid trading account scope.',
         );
       }
+      if (account.mode === 'beginner' && !isBeginnerModeEnabled()) {
+        return { state: 'skipped', orderId, reason: 'account_not_active' };
+      }
       const participant = account.seasonParticipant;
       const season = participant?.season ?? null;
       if (account.mode === TradingAccountMode.season) {
@@ -377,7 +384,7 @@ export class LimitOrderExecutionService {
       if (account.status !== TradingAccountStatus.active) {
         return { state: 'skipped', orderId, reason: 'account_not_active' };
       }
-      if (account.mode === TradingAccountMode.general) {
+      if (isStandaloneAccountMode(account.mode)) {
         if (!this.generalPerformance) {
           this.throwTradingScopeError(
             'INTERNAL_ERROR',

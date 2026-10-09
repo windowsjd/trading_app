@@ -58,7 +58,8 @@ export type ParticipantStatus = (typeof ParticipantStatus)[keyof typeof Particip
 
 export const TradingAccountMode = {
   season: 'season',
-  general: 'general'
+  general: 'general',
+  beginner: 'beginner'
 } as const
 
 export type TradingAccountMode = (typeof TradingAccountMode)[keyof typeof TradingAccountMode]

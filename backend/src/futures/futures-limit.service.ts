@@ -1,3 +1,7 @@
+import {
+  isStandaloneAccountMode,
+  assertBeginnerModeEnabled,
+} from '../trading-accounts/account-mode-policy';
 import { buildPagination } from '../common/pagination';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -120,7 +124,7 @@ export class FuturesLimitService {
     account: OwnedTradingAccount,
     instrumentId?: string,
   ) {
-    if (account.mode === 'general')
+    if (isStandaloneAccountMode(account.mode))
       await tx.$queryRaw`SELECT id FROM trading_accounts WHERE id = ${account.id} FOR UPDATE`;
     else
       await lockSeasonTradingContext(tx, {
@@ -161,6 +165,7 @@ export class FuturesLimitService {
           },
         };
       }
+      assertBeginnerModeEnabled(locked.mode);
       assertFuturesOperation('open');
       const now = await this.futures.dbNow(tx);
       await this.futures.assertTradable(locked, now, tx);
@@ -378,12 +383,11 @@ export class FuturesLimitService {
       const locked = await this.lock(tx, account);
       const now = await this.futures.dbNow(tx);
       if (conditionalTradable(locked, now)) return false;
-      const reason =
-        locked.mode === 'general'
-          ? 'account_not_tradable'
-          : locked.seasonParticipant?.participantStatus === 'excluded'
-            ? 'participant_excluded'
-            : 'season_ended';
+      const reason = isStandaloneAccountMode(locked.mode)
+        ? 'account_not_tradable'
+        : locked.seasonParticipant?.participantStatus === 'excluded'
+          ? 'participant_excluded'
+          : 'season_ended';
       await cancelFuturesEntriesInTransaction(
         tx,
         account.id,

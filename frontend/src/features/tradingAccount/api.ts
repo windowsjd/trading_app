@@ -47,7 +47,7 @@ import { parseWalletLedgerResponse } from '../wallet/transactions';
  * surfaces are left exactly as they are.
  */
 
-export type TradingAccountMode = 'season' | 'general';
+export type TradingAccountMode = 'season' | 'general' | 'beginner';
 export type TradingAccountStatus = 'active' | 'suspended' | 'closed';
 export type ReturnRateMethod = 'time_weighted' | 'initial_capital';
 
@@ -83,6 +83,8 @@ export interface TradingAccountDto {
 
 export interface TradingAccountsDto {
   accounts: TradingAccountDto[];
+  /** Server development opt-in; absence means disabled. */
+  beginnerModeEnabled?: boolean;
 }
 
 /**
@@ -314,6 +316,13 @@ export async function openGeneralAccount() {
     ApiSuccessResponse<OpenGeneralAccountDto>
   >('/trading-accounts/general');
 
+  return response.data.data;
+}
+
+export async function openBeginnerAccount() {
+  const response = await apiClient.post<ApiSuccessResponse<OpenGeneralAccountDto>>(
+    '/trading-accounts/beginner',
+  );
   return response.data.data;
 }
 

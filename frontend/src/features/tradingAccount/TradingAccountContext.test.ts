@@ -11,7 +11,7 @@ const { load } = require('../../../test/ledgerTestHarness.cjs');
 
 // Execute the real provider and capability helper. Only native hook scheduling,
 // account fetching and preference storage are replaced, as in existing harnesses.
-function harness(account: TradingAccountDto) {
+function harness(account: TradingAccountDto, beginnerModeEnabled = false) {
   const state: unknown[] = [];
   const effects: Array<{ deps: unknown[]; cleanup?: () => void }> = [];
   let stateIndex = 0,
@@ -58,7 +58,7 @@ function harness(account: TradingAccountDto) {
         useQueryClient: () => ({ cancelQueries: async () => {} }),
         useQuery: () => ({
           data:
-            queryIndex++ === 0 ? { id: 'user-1' } : { accounts: [h.account] },
+            queryIndex++ === 0 ? { id: 'user-1' } : { accounts: [h.account], beginnerModeEnabled },
           isLoading: false,
           isError: false,
           refetch: async () => ({}),
@@ -159,4 +159,19 @@ it('applies refreshed participant exclusion while keeping the same account and h
   assert.equal(value.capabilities?.tradeBlockReason, 'participant_excluded');
   assert.equal(value.capabilities?.canExchange, false);
   assert.equal(value.capabilities?.canCancelOrder, true);
+});
+
+
+it('hides cached beginner accounts unless the server explicitly enables development entry', async t => {
+  const beginner = { ...account, id: 'beginner', mode: 'beginner' as const, season: null };
+  const hidden = harness(beginner);
+  const enabled = harness(beginner, true);
+  t.after(hidden.dispose); t.after(enabled.dispose);
+  assert.equal(hidden.render().accounts.length, 0);
+  assert.equal(hidden.render().selectedAccountId, null);
+  assert.equal(hidden.render().beginnerModeEnabled, false);
+  assert.equal(enabled.render().selectedAccountId, 'beginner');
+  assert.equal(enabled.render().beginnerModeEnabled, true);
+  enabled.setAccount({ ...account, id: 'general', mode: 'general', season: null });
+  assert.equal(enabled.render().selectedAccountId, 'general');
 });

@@ -30,7 +30,7 @@ export type FxExecuteRequestContextLike =
       tradingAccountId: string;
     }
   | {
-      mode: 'general';
+      mode: 'general' | 'beginner';
       userId: string;
       tradingAccountId: string;
       seasonParticipantId: null;
@@ -58,7 +58,7 @@ export function preflightFxExecuteRequest(
 ): FxExecuteRequestPreflightResult {
   const userId = assertRequiredContextString(context.userId, 'userId');
   const seasonParticipantId =
-    context.mode === 'general'
+    context.mode !== undefined && context.mode !== 'season'
       ? null
       : assertRequiredContextString(
           context.seasonParticipantId,
@@ -97,7 +97,7 @@ export function preflightFxExecuteRequest(
   }
 
   const requestHash =
-    context.mode === 'general'
+    context.mode !== undefined && context.mode !== 'season'
       ? computeGeneralFxExecuteRequestHash({
           userId,
           tradingAccountId: tradingAccountId!,

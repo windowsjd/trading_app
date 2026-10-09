@@ -83,6 +83,7 @@ export type MyStackParamList = {
 };
 
 export type MainTabParamList = {
+  QuestTab: NavigatorScreenParams<GuideStackParamList>;
   HomeTab: NavigatorScreenParams<HomeStackParamList> | undefined;
   MarketTab: NavigatorScreenParams<MarketStackParamList> | undefined;
   GuideTab: NavigatorScreenParams<GuideStackParamList> | undefined;

@@ -13,19 +13,20 @@ const season = { id: 'season', mode: 'season', status: 'active', season: {
 const current = { id: 'current', name: 'Season 1', status: 'active', joined: false,
   startAt: '2020-01-01T00:00:00Z', endAt: '2099-01-01T00:00:00Z' };
 function harness() {
-  const h: any = { accounts: [general, season], loading: false, failed: false, retries: 0, opens: 0,
+  const h: any = { accounts: [general, season], loading: false, failed: false, retries: 0, opens: 0, beginnerOpens: 0, beginnerModeEnabled: false,
     selections: [], navigation: [], season: { isSuccess: true, data: current }, open: { isPending: false, errorMessage: null } };
   const Screen = load(resolve('src/screens/entry/ModeSelectionScreen.tsx'), {
     react: { ...React, useMemo: fn => fn() },
     'react-native': { View: 'View', Text: 'Text', ScrollView: 'ScrollView', SafeAreaView: 'SafeAreaView', StyleSheet: { create: styles => styles } },
     '@tanstack/react-query': { useQuery: () => ({ ...h.season, refetch: () => { h.retries++; } }) },
     '../../features/season/api': { getCurrentSeason: () => {} },
-    '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({ accounts: h.accounts,
+    '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({ accounts: h.accounts, beginnerModeEnabled: h.beginnerModeEnabled,
       isLoading: h.loading, isError: h.failed, refetchAccounts: () => { h.retries++; }, selectAccount: id => h.selections.push(id) }) },
-    '../../features/tradingAccount/useOpenGeneralAccount': { useOpenGeneralAccount: () => ({ ...h.open, start: () => { h.opens++; } }) },
+    '../../features/tradingAccount/useOpenGeneralAccount': { useOpenGeneralAccount: () => ({ ...h.open, start: () => { h.opens++; } }), useOpenBeginnerAccount: () => ({ ...h.open, start: () => { h.beginnerOpens++; } }) },
     '../../components/common/CTAButton': { default: 'CTA', __esModule: true },
     '../../components/states/ErrorState': { default: 'ErrorState', __esModule: true },
     '../../components/states/FullPageLoading': { default: 'FullPageLoading', __esModule: true },
+    '../states/ErrorNotice': { default: 'ErrorNotice', __esModule: true },
   }).default;
   function expand(node) {
     if (Array.isArray(node)) return node.map(expand);
@@ -44,7 +45,7 @@ it('simplifies owned general/joined season cards while retaining explicit local 
   assert.doesNotMatch(text(tree), /투자 방식을|일반 투자|시즌 투자|시간가중|초기 자금/);
   assert.equal(find(tree, 'mode-selection-general-use').props.label, '일반모드');
   assert.equal(find(tree, 'mode-selection-season-continue-season').props.label, '시즌모드');
-  assert.equal(find(tree, 'mode-selection-season-join'), undefined);
+  assert.equal(find(tree, 'mode-selection-season-join') === undefined, true);
   assert.equal(h.opens, 0); assert.deepEqual(h.selections, []);
   find(tree, 'mode-selection-general-use').props.onPress(); find(tree, 'mode-selection-season-continue-season').props.onPress();
   assert.deepEqual(h.selections, ['general', 'season']); assert.equal(h.opens, 0); assert.equal(h.navigation.length, 2);
@@ -69,4 +70,38 @@ it('keeps loading, account/season retries, general-open failure and past-season 
   h.season = { isSuccess: true, data: null }; tree = h.render(); assert.ok(find(tree, 'mode-selection-season-none'));
   assert.ok(find(tree, 'mode-selection-past-season-season')); find(tree, 'mode-selection-past-season-season').props.onPress();
   assert.deepEqual(h.selections, ['season']); assert.equal(h.opens, 0);
+});
+
+
+it('beginner entry is hidden by default and creation requires an explicit press', () => {
+  const h = harness();
+  assert.equal(find(h.render(), 'beginner-account-entry') === undefined, true);
+  h.beginnerModeEnabled = true;
+  const tree = h.render();
+  assert.equal(h.beginnerOpens, 0);
+  assert.match(text(tree), /초보 계정 만들기/);
+  find(tree, 'beginner-account-start').props.onPress();
+  assert.equal(h.beginnerOpens, 1);
+  assert.equal(h.opens, 0);
+});
+it('existing beginner selection changes accounts without creating or moving data', () => {
+  const h = harness(); h.beginnerModeEnabled = true;
+  h.accounts.push({ ...general, id: 'beginner', mode: 'beginner' });
+  const tree = h.render();
+  find(tree, 'beginner-account-start').props.onPress();
+  assert.deepEqual(h.selections, ['beginner']);
+  assert.equal(h.beginnerOpens, 0);
+  find(h.render(), 'mode-selection-general-use').props.onPress();
+  assert.deepEqual(h.selections, ['beginner', 'general']);
+  assert.equal(h.opens, 0);
+});
+
+it('beginner creation errors retain the original error for the shared diagnostic surface', () => {
+  const h = harness(); h.beginnerModeEnabled = true;
+  const failure = { response: { status: 403, data: { error: { code: 'BEGINNER_MODE_DISABLED' } } } };
+  h.open.error = failure;
+  const tree = h.render();
+  assert.equal(find(tree, 'beginner-account-error').props.error === failure, true);
+  assert.equal(h.beginnerOpens, 0);
+  assert.equal(h.selections.length, 0);
 });

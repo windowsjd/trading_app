@@ -31,6 +31,7 @@ if (
 process.env.GENERAL_FX_FEE_RATE = '0.001000';
 process.env.GENERAL_TRADE_FEE_RATE = '0.001000';
 process.env.LIMIT_ORDER_ENABLED = 'true';
+process.env.BEGINNER_MODE_ENABLED = 'true';
 const prisma = new PrismaService();
 function services(db: PrismaService, refresh?: UsdKrwRefreshService) {
   const access = new TradingAccountAccessService(db);
@@ -140,7 +141,11 @@ async function fixture(mode: TradingAccountMode) {
           },
         })
       ).id
-    : (await app.general.openGeneralAccount(user.id)).data.account.id;
+    : (
+        await (mode === 'beginner'
+          ? app.general.openBeginnerAccount(user.id)
+          : app.general.openGeneralAccount(user.id))
+      ).data.account.id;
   if (season) {
     await prisma.seasonParticipant.create({
       data: {
@@ -670,7 +675,7 @@ async function policies(mode: TradingAccountMode) {
       'WALLET_TRANSFER_WALLET_NOT_FOUND',
     );
     await evidence('1401');
-    if (mode === 'general') process.env.GENERAL_FX_FEE_RATE = '0.020000';
+    if (mode !== 'season') process.env.GENERAL_FX_FEE_RATE = '0.020000';
     else
       await prisma.season.update({
         where: { id: s.season!.id },
@@ -1160,7 +1165,7 @@ async function main() {
   const originalRates = await prisma.fxRateSnapshot.findMany();
   const ratesBefore = originalRates.map((r) => r.id);
   try {
-    for (const mode of ['general', 'season'] as const) {
+    for (const mode of ['general', 'season', 'beginner'] as const) {
       for (const crypto of ['crypto_spot', 'crypto_futures'] as const)
         for (const reverse of [false, true])
           await parity(mode, crypto, reverse);
@@ -1168,7 +1173,7 @@ async function main() {
       await policies(mode);
       await concurrency(mode);
     }
-    for (const mode of ['general', 'season'] as const)
+    for (const mode of ['general', 'season', 'beginner'] as const)
       await postLockBoundary(mode, 'quote');
     await postLockBoundary('season', 'season');
     await postLockBoundary('general', 'provider');

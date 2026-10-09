@@ -23,9 +23,9 @@ const icons = readFileSync(
   'utf8',
 );
 
-type AccountMode = 'general' | 'season';
+type AccountMode = 'general' | 'season' | 'beginner';
 
-function renderTabs(mode: AccountMode | null, isLoading = false, appearance: 'light' | 'dark' = 'light', reduced = false) {
+function renderTabs(mode: AccountMode | null, isLoading = false, appearance: 'light' | 'dark' = 'light', reduced = false, accountId = `${mode}-account`) {
   const MainTabs = load(resolve('src/app/navigation/MainTabs.tsx'), {
     'react-native': { useWindowDimensions: () => ({ fontScale: 1 }) },
     'react-native-safe-area-context': {
@@ -56,14 +56,14 @@ function renderTabs(mode: AccountMode | null, isLoading = false, appearance: 'li
     },
     '../../features/tradingAccount/TradingAccountContext': {
       useTradingAccount: () => ({
-        selectedAccount: mode ? { id: `${mode}-account`, mode } : null,
+        selectedAccount: mode ? { id: accountId, mode } : null,
         isLoading,
       }),
     },
     ...Object.fromEntries(
       ['Home', 'Market', 'Guide', 'Ranking', 'Wallet', 'My'].map((name) => [
         `./${name}Stack`,
-        { default: `${name}Stack`, __esModule: true },
+        { default: `${name}Stack`, QuestStack: 'QuestStack', __esModule: true },
       ]),
     ),
   }).default;
@@ -101,7 +101,7 @@ describe('mode-aware bottom tabs', () => {
       ['MarketTab', 'MarketStack', '마켓', 'market'],
       ['GuideTab', 'GuideStack', '가이드', 'guide'],
       ['WalletTab', 'WalletStack', '지갑', 'wallet'],
-      ['MyTab', 'MyStack', '전체', 'menu'],
+      ['MyTab', 'MyStack', 'MY', 'menu'],
     ]);
   });
 
@@ -111,7 +111,7 @@ describe('mode-aware bottom tabs', () => {
       ['MarketTab', 'MarketStack', '마켓', 'market'],
       ['RankingTab', 'RankingStack', '랭킹', 'ranking'],
       ['WalletTab', 'WalletStack', '지갑', 'wallet'],
-      ['MyTab', 'MyStack', '전체', 'menu'],
+      ['MyTab', 'MyStack', 'MY', 'menu'],
     ]);
   });
 
@@ -145,8 +145,8 @@ describe('mode-aware bottom tabs', () => {
     const general = renderTabs('general');
     const season = renderTabs('season');
 
-    assert.equal(general.key, 'general');
-    assert.equal(season.key, 'season');
+    assert.equal(general.key, 'general-account');
+    assert.equal(season.key, 'season-account');
     assert.notEqual(general.key, season.key);
     assert.equal(general.props.initialRouteName, 'HomeTab');
     assert.equal(season.props.initialRouteName, 'HomeTab');
@@ -167,7 +167,7 @@ describe('mode-aware bottom tabs', () => {
   it('extends the existing Guide stack with MarketBasics and leaves Ranking intact', () => {
     assert.equal([...guideStack.matchAll(/<Stack\.Screen\b/g)].length, 10);
     assert.match(guideStack, /name="Guide"/);
-    assert.match(guideStack, /component=\{GuideScreen\}/);
+    assert.match(guideStack, /component=\{beginner \? BeginnerLearningScreen : GuideScreen\}/);
     assert.match(guideStack, /name="MarketBasics"/);
     assert.match(guideStack, /component=\{MarketBasicsScreen\}/);
     assert.match(guideStack, /component=\{MarketBasicsChaptersScreen\}/);
@@ -276,4 +276,16 @@ describe('bottom tab visual states', () => {
       });
     }
   }
+});
+
+
+it('beginner has five tabs with Quest third and MY last', () => {
+  assert.deepEqual(tabContract(renderTabs('beginner')), [
+    ['HomeTab', 'HomeStack', '홈', 'home'], ['MarketTab', 'MarketStack', '마켓', 'market'],
+    ['QuestTab', 'QuestStack', '퀘스트', 'guide'], ['WalletTab', 'WalletStack', '지갑', 'wallet'],
+    ['MyTab', 'MyStack', 'MY', 'menu'],
+  ]);
+});
+it('even switching two season accounts resets nested navigation by account id', () => {
+  assert.notEqual(renderTabs('season', false, 'light', false, 'season-one').key, renderTabs('season', false, 'light', false, 'season-two').key);
 });

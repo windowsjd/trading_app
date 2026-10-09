@@ -157,7 +157,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
             loading={equityQuery.isLoading}
             failed={equityQuery.isError}
             error={equityQuery.error}
-            general={account.mode === 'general'}
+            general={account.mode !== 'season'}
           />
         </>
       )}

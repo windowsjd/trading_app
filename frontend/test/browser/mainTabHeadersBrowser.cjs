@@ -39,7 +39,7 @@ async function run() {
   });
   const heading = label => page.getByRole('heading', { name: label, exact: true });
   const bottomTabs = () => page.getByRole('tablist');
-  const tab = label => bottomTabs().getByRole('tab', { name: label, exact: true });
+  const tab = label => bottomTabs().getByRole('tab', { name: label === '전체' ? 'MY' : label, exact: true });
   const backButton = () => page.getByLabel(/back|뒤로/i).filter({ visible: true }).first();
   const go = async (tabName, screen, params) => {
     await page.evaluate(({ tabName, screen, params }) => window.fixture.navigationRef.navigate(tabName, { screen, params }), { tabName, screen, params });
@@ -118,7 +118,7 @@ async function run() {
       await page.goto(`${base}/?account=${account}&fontScale=${fontScale}&topInset=${topInset}&bottomInset=${bottomInset}&navigation=1`);
       await heading('홈').waitFor();
       const labels = account === 'general' ? ['홈', '마켓', '가이드', '지갑', '전체'] : ['홈', '마켓', '랭킹', '지갑', '전체'];
-      assert.deepEqual(await bottomTabs().getByRole('tab').allTextContents(), labels);
+      assert.deepEqual(await bottomTabs().getByRole('tab').allTextContents(), labels.map(label => label === '전체' ? 'MY' : label));
       for (const label of labels) {
         await tab(label).click();
         await checkHeader(label, context);
