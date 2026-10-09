@@ -33,7 +33,9 @@ export type MarketCandleSyncConfig = {
   maxRows: number;
   // Per feed run: wall-clock budget in milliseconds.
   maxDurationMs: number;
-  // Parallel asset fan-out for non-KIS (crypto) assets. KIS-backed assets
+  // Requested asset fan-out for crypto; execution caps it at the shared REST
+  // concurrency limit, so legacy values 4..8 remain configuration-compatible.
+  // KIS-backed assets
   // always run one at a time on top of the shared KIS rate limiter.
   assetConcurrency: number;
   // Incremental mode re-fetches this much history before the latest stored

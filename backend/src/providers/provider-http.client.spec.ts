@@ -128,4 +128,44 @@ describe('ProviderHttpClient safe failures', () => {
       }),
     ).resolves.toMatchObject({ json: { price: '123.45' }, status: 200 });
   });
+  it('counts slot admission time within the existing HTTP timeout', async () => {
+    jest.useFakeTimers();
+    let signal: AbortSignal | undefined;
+    const evalRedis = jest
+      .fn()
+      .mockResolvedValueOnce([0, 50, 0, 1])
+      .mockResolvedValueOnce([0, 50, 0, 1])
+      .mockResolvedValue([1, 0, 0]);
+    const fetch = jest
+      .spyOn(global, 'fetch')
+      .mockImplementation((_url, init) => {
+        signal = init?.signal ?? undefined;
+        return new Promise((_resolve, reject) => {
+          signal?.addEventListener(
+            'abort',
+            () =>
+              reject(
+                Object.assign(new Error('private timeout'), {
+                  name: 'AbortError',
+                }),
+              ),
+            { once: true },
+          );
+        });
+      });
+    try {
+      const pending = new ProviderHttpClient({ eval: evalRedis } as never)
+        .getJson('https://fixture.invalid/api/v3/klines', {
+          provider: 'binance',
+          timeoutMs: 200,
+        })
+        .catch((error: unknown) => error);
+      await jest.advanceTimersByTimeAsync(200);
+      expect(signal?.aborted === true).toBe(true);
+      expect(await pending).toMatchObject({ code: 'PROVIDER_TIMEOUT' });
+      expect(fetch).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

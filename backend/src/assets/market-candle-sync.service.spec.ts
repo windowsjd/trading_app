@@ -36,6 +36,7 @@ import { KisCandleNormalizerService } from '../providers/kis/candles/kis-candle-
 import { KisDomesticFiveMinuteBuilder } from '../providers/kis/candles/kis-domestic-five-minute.builder';
 import { KisPeriodCandleNormalizerService } from '../providers/kis/candles/kis-period-candle-normalizer.service';
 import { MarketCandleSyncInputError } from './market-candle-sync.types';
+import { ProviderHttpClient } from '../providers/provider-http.client';
 import { ProviderHttpError } from '../providers/provider.types';
 import type { MarketCandleSyncConfig } from './market-candle-sync.config';
 import type { BinanceCandlePageInput } from '../providers/binance/binance-candle.types';
@@ -1182,6 +1183,128 @@ describe('MarketCandleSyncService', () => {
     expect(row.targetTo.getTime()).toBe(to.getTime());
     expect(row.coveredFrom?.getTime()).toBe(from.getTime());
     expect(row.coveredTo?.getTime()).toBe(to.getTime());
+  });
+
+  it.each([1, 2, 4, 8])(
+    'collects all 25 assets and three feeds with configured concurrency %s',
+    async (assetConcurrency) => {
+      const assets = BINANCE_FIXED_ASSET_UNIVERSE.map((entry) => ({
+        ...CRYPTO_ASSET,
+        id: entry.symbol,
+        symbol: entry.symbol,
+      }));
+      const harness = createHarness({ assets, config: { assetConcurrency } });
+      const chart = createHarness({
+        assets: [{ ...CRYPTO_ASSET, id: 'chart-asset' }],
+      });
+      const leases = new Set<string>();
+      let maximum = 0;
+      const redis = {
+        eval: (_script: string, _keys: string[], args: string[]) => {
+          if (args.length === 6) {
+            leases.delete(args[0]);
+            return Promise.resolve(1);
+          }
+          if (leases.size >= 2) return Promise.resolve([0, 50, 0, 1]);
+          leases.add(args[0]);
+          maximum = Math.max(maximum, leases.size);
+          return Promise.resolve([1, 0, 0]);
+        },
+      };
+      const client = new ProviderHttpClient(redis as never);
+      const fetch = jest.spyOn(global, 'fetch').mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(() => resolve(new Response('{}')), 5);
+          }),
+      );
+      const fetchPage = async () => {
+        await client.getJson('https://fixture.invalid/api/v3/klines', {
+          provider: 'binance',
+          timeoutMs: 1000,
+        });
+        return binancePage();
+      };
+      harness.binanceCandles.fetchKlinesPage.mockImplementation(fetchPage);
+      chart.binanceCandles.fetchKlinesPage.mockImplementation(fetchPage);
+      try {
+        for (let run = 0; run < 2; run++) {
+          const [result, refreshed] = await Promise.all([
+            harness.service.syncAssets({ now: NOW, resume: false }),
+            chart.service.syncAsset({
+              assetId: 'chart-asset',
+              targets: ['5m'],
+              now: NOW,
+              resume: false,
+            }),
+            client.getJson('https://fixture.invalid/fapi/v1/premiumIndex', {
+              provider: 'binance',
+              timeoutMs: 1000,
+            }),
+          ]);
+          expect(refreshed.failedFeeds).toBe(0);
+          expect(result.failedFeeds).toBe(0);
+          expect(result.processedAssets).toBe(25);
+          expect(result.totalFeeds).toBe(75);
+        }
+        expect(maximum).toBeLessThanOrEqual(2);
+        expect(fetch).toHaveBeenCalledTimes(154);
+      } finally {
+        fetch.mockRestore();
+      }
+    },
+  );
+
+  it('resumes all deferred feeds after persistent slot contention ends', async () => {
+    const assets = [
+      { ...CRYPTO_ASSET, id: 'one' },
+      { ...CRYPTO_ASSET, id: 'two' },
+    ];
+    const harness = createHarness({ assets, config: { assetConcurrency: 8 } });
+    let blocked = true;
+    const redis = {
+      eval: (_script: string, _keys: string[], args: string[]) =>
+        Promise.resolve(
+          args.length === 6 ? 1 : blocked ? [0, 50, 0, 1] : [1, 0, 0],
+        ),
+    };
+    const client = new ProviderHttpClient(redis as never);
+    const fetch = jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(() => Promise.resolve(new Response('{}')));
+    harness.binanceCandles.fetchKlinesPage.mockImplementation(async () => {
+      await client.getJson('https://fixture.invalid/api/v3/klines', {
+        provider: 'binance',
+        timeoutMs: 100,
+      });
+      return binancePage();
+    });
+    try {
+      const deferred = await harness.service.syncAssets({ now: NOW });
+      expect(deferred.failedFeeds).toBe(6);
+      expect(fetch).not.toHaveBeenCalled();
+      expect(
+        deferred.assets
+          .flatMap((asset) => asset.feeds)
+          .every(
+            (feed) =>
+              feed.errorCode === 'PROVIDER_CALL_FAILED' &&
+              feed.errorMessage?.includes('BINANCE_REST_BUSY'),
+          ),
+      ).toBe(true);
+      blocked = false;
+      const recovered = await harness.service.syncAssets({ now: NOW });
+      expect(recovered.failedFeeds).toBe(0);
+      expect(recovered.completedFeeds).toBe(6);
+      expect(
+        recovered.assets
+          .flatMap((asset) => asset.feeds)
+          .every((feed) => feed.resumed),
+      ).toBe(true);
+      expect(fetch).toHaveBeenCalledTimes(6);
+    } finally {
+      fetch.mockRestore();
+    }
   });
 
   it('includes every fixed Binance asset in the default 5m, daily and weekly sync targets', async () => {

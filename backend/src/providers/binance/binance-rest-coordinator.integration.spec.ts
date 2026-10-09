@@ -18,6 +18,7 @@ const limited = (status: number, seconds = '60') =>
 
 fixture('Binance REST shared Redis fixture (all HTTP is mocked)', () => {
   let redis: RedisService;
+  let redisB: RedisService;
   const originalBudget = process.env.BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE;
   beforeAll(async () => {
     const fixtureUrl = process.env.BINANCE_REST_FIXTURE_REDIS_URL;
@@ -33,7 +34,12 @@ fixture('Binance REST shared Redis fixture (all HTTP is mocked)', () => {
       connectTimeoutMs: 1000,
       commandTimeoutMs: 1000,
     });
-    await redis.connect();
+    redisB = new RedisService({
+      url: fixtureUrl,
+      connectTimeoutMs: 1000,
+      commandTimeoutMs: 1000,
+    });
+    await Promise.all([redis.connect(), redisB.connect()]);
   });
   beforeEach(async () => {
     delete process.env.BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE;
@@ -49,6 +55,7 @@ fixture('Binance REST shared Redis fixture (all HTTP is mocked)', () => {
       await redis.delete(STATE);
       await redis.delete(LEASES);
       await redis.onModuleDestroy();
+      await redisB.onModuleDestroy();
     }
   });
   const expireBlock = async () =>
@@ -159,7 +166,7 @@ fixture('Binance REST shared Redis fixture (all HTTP is mocked)', () => {
     expect(Number(remaining) > 100_000).toBe(true);
   });
 
-  it('bounds concurrent independent callers without a waiting queue', async () => {
+  it('bounds slot admission wait without issuing HTTP beyond the two active leases', async () => {
     let started!: () => void;
     const bothStarted = new Promise<void>((resolve) => {
       started = resolve;
@@ -179,7 +186,7 @@ fixture('Binance REST shared Redis fixture (all HTTP is mocked)', () => {
     await bothStarted;
     await expect(
       new ProviderHttpClient(redis).getJson(url, options),
-    ).rejects.toMatchObject({ code: 'PROVIDER_RATE_LIMITED' });
+    ).rejects.toMatchObject({ code: 'BINANCE_REST_BUSY' });
     expect(fetch).toHaveBeenCalledTimes(2);
     resolvers.forEach((resolve) => resolve(success()));
     await Promise.all(requests);
@@ -214,7 +221,7 @@ fixture('Binance REST shared Redis fixture (all HTTP is mocked)', () => {
       [LEASES],
       [orphan],
     );
-    const probe = await new BinanceRestCoordinator(redis).acquire(url, 1000);
+    const probe = await new BinanceRestCoordinator(redisB).acquire(url, 1000);
     await coordinator.complete(orphan, 'success');
     await expect(coordinator.acquire(url, 1000)).rejects.toMatchObject({
       code: 'PROVIDER_RATE_LIMITED',
@@ -246,6 +253,126 @@ fixture('Binance REST shared Redis fixture (all HTTP is mocked)', () => {
     expect(fetch).toHaveBeenCalledTimes(11);
   });
 
+  it.each(['long-first', 'short-first', 'overlapped'] as const)(
+    'preserves long unrecorded restrictions across %s write ordering and instances',
+    async (order) => {
+      let rejectLong!: (error: Error) => void;
+      let longStarted!: () => void;
+      const started = new Promise<void>((resolve) => {
+        longStarted = resolve;
+      });
+      let failed = false;
+      const proxy = {
+        eval: (script: string, keys: string[], args: string[]) => {
+          if (args[0] === 'long' && !failed) {
+            failed = true;
+            longStarted();
+            if (order === 'overlapped')
+              return new Promise((_resolve, reject) => {
+                rejectLong = reject;
+              });
+            return Promise.reject(new Error('redis://private:secret@host'));
+          }
+          return redis.eval(script, keys, args);
+        },
+      };
+      const coordinator = new BinanceRestCoordinator(proxy as never);
+      if (order === 'short-first')
+        await coordinator.complete('short', 'limited', 1000, 429);
+      const long = coordinator
+        .complete('long', 'limited', 120_000, 418)
+        .catch((error: unknown) => error);
+      await started;
+      if (order !== 'short-first')
+        await coordinator.complete('short', 'limited', 1000, 429);
+      if (order === 'overlapped')
+        rejectLong(new Error('private write failure'));
+      const error = await long;
+      expect(error).toMatchObject({
+        code: 'BINANCE_REST_COORDINATION_UNAVAILABLE',
+      });
+      expect(JSON.stringify(error)).not.toMatch(/secret|private|redis:\/\//);
+      await expect(coordinator.acquire(url, 1000)).rejects.toMatchObject({
+        code: 'PROVIDER_RATE_LIMITED',
+      });
+      await expect(
+        new BinanceRestCoordinator(redisB).acquire(url, 1000),
+      ).rejects.toMatchObject({ code: 'PROVIDER_RATE_LIMITED' });
+      const remaining = await redis.eval(
+        "local t=redis.call('TIME'); return tonumber(redis.call('HGET',KEYS[1],'until'))-tonumber(t[1])*1000",
+        [STATE],
+      );
+      expect(Number(remaining)).toBeGreaterThan(119_000);
+      await expireBlock();
+      const token = await new BinanceRestCoordinator(redisB).acquire(url, 1000);
+      await expect(
+        new BinanceRestCoordinator(redisB).acquire(url, 1000),
+      ).rejects.toMatchObject({ code: 'PROVIDER_RATE_LIMITED' });
+      await coordinator.complete(token, 'success');
+    },
+  );
+
+  it('publishes a newly unrecorded ban before an existing slot waiter can proceed', async () => {
+    let restricted = false;
+    let acquisitions = 0;
+    let markWaiting!: () => void;
+    const waiting = new Promise<void>((resolve) => {
+      markWaiting = resolve;
+    });
+    const proxy = {
+      eval: (script: string, keys: string[], args: string[]) => {
+        if (args.length === 5 && ++acquisitions === 3) markWaiting();
+        if (args.length === 6 && args[1] === 'limited' && !restricted) {
+          restricted = true;
+          return Promise.reject(new Error('private Redis write failure'));
+        }
+        return redis.eval(script, keys, args);
+      },
+    };
+    const owner = new BinanceRestCoordinator(proxy as never);
+    const tokens = await Promise.all([
+      owner.acquire(url, 1000),
+      owner.acquire(url, 1000),
+    ]);
+    const pending = owner.acquire(url, 1000).catch((error: unknown) => error);
+    await waiting;
+    await expect(
+      owner.complete(tokens[0], 'limited', 120_000, 418),
+    ).rejects.toMatchObject({ code: 'BINANCE_REST_COORDINATION_UNAVAILABLE' });
+    await owner.complete(tokens[1], 'success');
+    expect(await pending).toMatchObject({ code: 'PROVIDER_RATE_LIMITED' });
+  });
+
+  it('waits for ordinary slot release across clients but never retries HTTP', async () => {
+    const owner = new BinanceRestCoordinator(redis);
+    const tokens = await Promise.all([
+      owner.acquire(url, 1000),
+      owner.acquire(url, 1000),
+    ]);
+    const fetch = jest.spyOn(global, 'fetch').mockResolvedValue(success());
+    const pending = new ProviderHttpClient(redis).getJson(url, options);
+    await owner.complete(tokens[0], 'success');
+    await expect(pending).resolves.toMatchObject({ status: 200 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await owner.complete(tokens[1], 'success');
+  });
+
+  it('stops a waiting caller immediately on a newly published ban', async () => {
+    const owner = new BinanceRestCoordinator(redis);
+    const tokens = await Promise.all([
+      owner.acquire(url, 1000),
+      owner.acquire(url, 1000),
+    ]);
+    const fetch = jest.spyOn(global, 'fetch');
+    const pending = new ProviderHttpClient(redis)
+      .getJson(url, options)
+      .catch((error: unknown) => error);
+    await owner.complete(tokens[0], 'limited', 120_000, 418);
+    expect(await pending).toMatchObject({ code: 'PROVIDER_RATE_LIMITED' });
+    expect(fetch).not.toHaveBeenCalled();
+    await owner.complete(tokens[1], 'failure');
+  });
+
   it('retains a restriction when Redis recording fails and republishes it before another HTTP request', async () => {
     let failCompletion = true;
     const proxy = {
@@ -260,6 +387,10 @@ fixture('Binance REST shared Redis fixture (all HTTP is mocked)', () => {
     await expect(client.getJson(url, options)).rejects.toMatchObject({
       rateLimit: { status: 418 },
     });
+    await expect(client.getJson(url, options)).rejects.toMatchObject({
+      code: 'BINANCE_REST_COORDINATION_UNAVAILABLE',
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
     failCompletion = false;
     await expect(client.getJson(url, options)).rejects.toMatchObject({
       code: 'PROVIDER_RATE_LIMITED',

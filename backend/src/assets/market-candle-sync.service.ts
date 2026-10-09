@@ -1,3 +1,4 @@
+import { BINANCE_REST_MAX_CONCURRENCY } from '../providers/binance/binance-rest-coordinator';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   AssetType,
@@ -321,8 +322,12 @@ export class MarketCandleSyncService {
     const results: MarketCandleAssetSyncResult[] = [];
     let aborted = false;
 
-    // KIS-backed assets run strictly one at a time on top of the shared rate
-    // limiter; crypto assets may fan out up to the configured concurrency.
+    // KIS-backed assets run strictly one at a time. Crypto fan-out must fit
+    // the shared REST slots; other callers use bounded admission contention.
+    const cryptoConcurrency = Math.min(
+      this.config.assetConcurrency,
+      BINANCE_REST_MAX_CONCURRENCY,
+    );
     const kisEntries = supported.filter(
       (entry) => entry.descriptor.kind !== 'binance',
     );
@@ -351,12 +356,9 @@ export class MarketCandleSyncService {
     for (
       let offset = 0;
       offset < cryptoEntries.length;
-      offset += this.config.assetConcurrency
+      offset += cryptoConcurrency
     ) {
-      const chunk = cryptoEntries.slice(
-        offset,
-        offset + this.config.assetConcurrency,
-      );
+      const chunk = cryptoEntries.slice(offset, offset + cryptoConcurrency);
       if (aborted || input.signal?.aborted) {
         for (const entry of chunk) {
           skippedAssets.push({

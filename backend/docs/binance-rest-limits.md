@@ -20,7 +20,13 @@ numeric X-MBX-USED-WEIGHT-1M. Bodies, arbitrary headers and URLs are discarded.
 Valid delta seconds and IMF-fixdate are accepted, with a one-second minimum and
 seven-day maximum. Missing/invalid headers use 60 seconds (429), 120 seconds
 (418). HTTP dates use the provider Date header when valid, otherwise receipt
-time. Concurrent restrictions can extend but cannot shorten an existing block.
+time. Concurrent restrictions can extend but cannot shorten an existing block. A
+completion always publishes the longest local unpersisted restriction; only
+that exact snapshot may be cleared after a successful Redis write. Admission
+rechecks pending restrictions on every slot poll. A restriction that Redis never
+accepted remains local: a process crash before publication cannot recover it,
+and another process cannot infer it. Shared protection requires a successful
+Redis publication and preserved Redis state.
 After the deadline only one request probes recovery. An unsuccessful probe
 without a new rate-limit response pauses for 30 seconds. A successful probe
 reopens admission, without retrying the failed request automatically.
@@ -32,8 +38,14 @@ Futures premiumIndex=1 with symbol or 10 without; unknown routes reserve 80.
 This conservative budget is preventive, not a declaration of Binance's actual
 IP capacity. `BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE` can set 20..600; it must be
 identical across instances. Observed used weight can exhaust the local budget
-earlier, including traffic from other IP users. Excess callers fail promptly;
-there is no waiting queue or fixed delay on admitted successful requests.
+earlier, including traffic from other IP users. Crypto asset fan-out is capped
+at two even when its configured value is 4..8. Only ordinary slot contention
+gets bounded admission polling (50ms, at most 1s or half the HTTP timeout,
+whichever is smaller). Slot exhaustion has a distinct BINANCE_REST_BUSY
+category. There is no request queue or HTTP retry; HTTP 418/429 cooldown,
+weight exhaustion and recovery-probe contention still fail promptly. Admission
+wait consumes the existing HTTP timeout, and admitted requests have no fixed
+delay. Sustained overload can still defer work to a later existing sync run.
 Lease expiry allows recovery after a process dies. All keys expire; recovery
 state outlives the maximum supported cooldown.
 

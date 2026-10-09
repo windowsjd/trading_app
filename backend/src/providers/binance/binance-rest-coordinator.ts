@@ -6,6 +6,7 @@ const STATE = 'provider:{binance-rest}:state';
 const LEASES = 'provider:{binance-rest}:leases';
 const MAX_WAIT_MS = 7 * 86_400_000;
 const STATE_TTL_MS = MAX_WAIT_MS + 86_400_000;
+export const BINANCE_REST_MAX_CONCURRENCY = 2;
 
 // All time and admission decisions are atomic and use the Redis server clock.
 const ACQUIRE = `
@@ -16,7 +17,8 @@ if untilAt > now then return {0, untilAt - now, tonumber(redis.call('HGET', KEYS
 redis.call('ZREMRANGEBYSCORE', KEYS[2], '-inf', now)
 local recovery = redis.call('HGET', KEYS[1], 'recovery') == '1'
 local active = redis.call('ZCARD', KEYS[2])
-if active >= 2 or (recovery and active > 0) then return {0, 1000, 0} end
+if recovery and active > 0 then return {0, 1000, 0} end
+if active >= ${BINANCE_REST_MAX_CONCURRENCY} then return {0, 50, 0, 1} end
 local minute = math.floor(now / 60000)
 if tonumber(redis.call('HGET', KEYS[1], 'minute') or '-1') ~= minute then
   redis.call('HSET', KEYS[1], 'minute', minute, 'weight', 0)
@@ -79,48 +81,62 @@ export class BinanceRestCoordinator {
   }
 
   async acquire(url: string, timeoutMs: number): Promise<string> {
-    if (this.pendingRestriction) {
-      const remaining = Math.max(
-        0,
-        this.pendingRestriction.deadline - performance.now(),
-      );
-      await this.complete(
-        'unpersisted-restriction',
-        'limited',
-        remaining,
-        this.pendingRestriction.status,
-      );
-    }
     const token = randomUUID();
-    let result: unknown;
-    try {
-      result = await this.redis.eval(
-        ACQUIRE,
-        [STATE, LEASES],
-        [
-          token,
-          String(requestWeight(url)),
-          String(timeoutMs + 5000),
-          String(this.budget),
-          String(STATE_TTL_MS),
-        ],
-      );
-    } catch {
-      throw unavailable();
+    const deadline = performance.now() + Math.min(1000, timeoutMs / 2);
+    for (let attempt = 0; ; attempt++) {
+      if (this.pendingRestriction) {
+        const remaining = Math.max(
+          0,
+          this.pendingRestriction.deadline - performance.now(),
+        );
+        await this.complete(
+          'unpersisted-restriction',
+          'limited',
+          remaining,
+          this.pendingRestriction.status,
+        );
+      }
+      let result: unknown;
+      try {
+        result = await this.redis.eval(
+          ACQUIRE,
+          [STATE, LEASES],
+          [
+            token,
+            String(requestWeight(url)),
+            String(timeoutMs + 5000),
+            String(this.budget),
+            String(STATE_TTL_MS),
+          ],
+        );
+      } catch {
+        throw unavailable();
+      }
+      if (!Array.isArray(result) || ![3, 4].includes(result.length))
+        throw unavailable();
+      const [allowed, wait, status] = result as number[];
+      if (![allowed, wait, status].every(Number.isFinite)) throw unavailable();
+      if (allowed !== 1) {
+        const busy = result[3] === 1;
+        const remaining = deadline - performance.now();
+        if (busy && remaining > 0 && attempt < 20) {
+          await new Promise<void>((resolve) =>
+            setTimeout(resolve, Math.min(50, remaining)),
+          );
+          continue;
+        }
+        // @diagnosticSurface internal: HTTP/Ops boundaries receive a fixed admission category and numeric timing only, without Redis or provider details.
+        throw new ProviderHttpError(
+          'binance',
+          busy ? 'BINANCE_REST_BUSY' : 'PROVIDER_RATE_LIMITED',
+          busy
+            ? 'binance REST slots busy (BINANCE_REST_BUSY).'
+            : 'binance REST admission paused (PROVIDER_RATE_LIMITED).',
+          { status, retryAfterMs: wait },
+        );
+      }
+      return token;
     }
-    if (!Array.isArray(result) || result.length !== 3) throw unavailable();
-    const [allowed, wait, status] = result as number[];
-    if (![allowed, wait, status].every(Number.isFinite)) throw unavailable();
-    if (allowed !== 1) {
-      // @diagnosticSurface internal: HTTP/Ops boundaries receive a fixed admission category and numeric timing only, without Redis or provider details.
-      throw new ProviderHttpError(
-        'binance',
-        'PROVIDER_RATE_LIMITED',
-        'binance REST admission paused (PROVIDER_RATE_LIMITED).',
-        { status, retryAfterMs: wait },
-      );
-    }
-    return token;
   }
 
   async complete(
@@ -139,6 +155,15 @@ export class BinanceRestCoordinator {
         this.pendingRestriction = { deadline, status };
     }
     const pendingRestriction = this.pendingRestriction;
+    // A shorter completion may carry a longer restriction left by a failed write.
+    // Clear only the snapshot actually published; newer restrictions stay pending.
+    if (outcome === 'limited' && pendingRestriction) {
+      retryAfterMs = Math.max(
+        0,
+        pendingRestriction.deadline - performance.now(),
+      );
+      status = pendingRestriction.status;
+    }
     try {
       await this.redis.eval(
         COMPLETE,

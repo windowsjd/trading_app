@@ -1,4 +1,5 @@
 import {
+  BinanceRestCoordinator,
   binanceUsedWeight,
   parseBinanceRetryAfter,
 } from './binance-rest-coordinator';
@@ -64,5 +65,22 @@ describe('Binance safe HTTP restriction metadata', () => {
         'binance REST coordination unavailable (BINANCE_REST_COORDINATION_UNAVAILABLE).',
     });
     expect(fetch).not.toHaveBeenCalled();
+  });
+  it('never discards an unrecorded long restriction when a shorter completion succeeds', async () => {
+    const evalRedis = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('private outage'))
+      .mockResolvedValue(1);
+    const coordinator = new BinanceRestCoordinator({
+      eval: evalRedis,
+    } as never);
+    await expect(
+      coordinator.complete('long', 'limited', 120_000, 418),
+    ).rejects.toMatchObject({ code: 'BINANCE_REST_COORDINATION_UNAVAILABLE' });
+    await coordinator.complete('short', 'limited', 1000, 429);
+    const calls = evalRedis.mock.calls as unknown[][];
+    const args = calls[1][2] as string[];
+    expect(Number(args[2])).toBeGreaterThan(119_000);
+    expect(args[3]).toBe('418');
   });
 });

@@ -39,6 +39,7 @@ export class ProviderHttpClient implements OnModuleDestroy {
     url: string,
     options: ProviderHttpGetJsonOptions,
   ): Promise<ProviderHttpJsonResult<T>> {
+    const startedAt = performance.now();
     const coordinator =
       options.provider === 'binance'
         ? (this.binanceRest ??= new BinanceRestCoordinator(this.redis))
@@ -50,9 +51,23 @@ export class ProviderHttpClient implements OnModuleDestroy {
     let usedWeight1m: number | undefined;
     let coordinationCompleted = false;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), options.timeoutMs);
+    const remainingMs = coordinator
+      ? options.timeoutMs - (performance.now() - startedAt)
+      : options.timeoutMs;
+    const timeout = setTimeout(
+      () => controller.abort(),
+      Math.max(1, remainingMs),
+    );
 
     try {
+      if (remainingMs <= 0) {
+        // @diagnosticSurface internal: Provider callers receive a fixed timeout category after admission consumes the HTTP deadline.
+        throw new ProviderHttpError(
+          options.provider,
+          'PROVIDER_TIMEOUT',
+          `${options.provider} request failed (PROVIDER_TIMEOUT).`,
+        );
+      }
       const response = await fetch(url, {
         method: 'GET',
         headers: options.headers,
