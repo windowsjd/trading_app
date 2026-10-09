@@ -8,6 +8,8 @@ import type {
   RateString,
 } from '../../models/dto/common';
 import type { SeasonStatus } from '../../models/dto/season';
+import type { SpotHoldingDisplay } from '../position/assetDisplay';
+import type { FuturesHolding } from '../futures/api';
 
 export type RankingScope = 'all' | 'friends' | 'top10';
 export type RankingRankType = 'daily' | 'final';
@@ -80,13 +82,14 @@ export interface UserSeasonSummaryDto {
       usStockValueKrw: MoneyString;
       cryptoValueKrw: MoneyString;
     } | null;
-    holdings: Array<{
+    holdings: Array<SpotHoldingDisplay & {
       assetId: string;
       symbol: string;
       name: string;
       assetType: string;
       weight: PercentString | null;
     }>;
+    futures: { evaluatedAt: string; positions: FuturesHolding[] };
     history: Array<{
       date: string;
       totalAssetKrw: MoneyString;
@@ -158,5 +161,7 @@ export async function getUserSeasonSummary(
     ApiSuccessResponse<UserSeasonSummaryDto>
   >(`/users/${encodeURIComponent(userId)}/season-summary`, { signal });
 
-  return response.data.data;
+  const data = response.data.data;
+  if (data.user.id !== userId) throw new Error('사용자 포트폴리오 응답을 확인할 수 없습니다.');
+  return data.portfolioAccess === 'available' ? data : { ...data, portfolio: null };
 }

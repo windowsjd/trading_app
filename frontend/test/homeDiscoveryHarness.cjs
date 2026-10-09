@@ -21,8 +21,8 @@ const asset = (i, type) => ({
 function setup(mode = 'season', count = 7, screen = 'home', options = {}) {
   const h = interactionHarness();
   h.native.SafeAreaView = 'SafeAreaView';
-  h.native.FlatList = ({ data = [], ListHeaderComponent, ListEmptyComponent, renderItem, ...props }) => React.createElement('FlatList', props,
-    ListHeaderComponent, data.length ? data.map((item, index) => React.createElement(React.Fragment, { key: item.positionId ?? index }, renderItem({ item, index }))) : ListEmptyComponent);
+  h.native.FlatList = ({ data = [], ListHeaderComponent, ListEmptyComponent, ListFooterComponent, renderItem, ...props }) => React.createElement('FlatList', props,
+    ListHeaderComponent, data.length ? data.map((item, index) => React.createElement(React.Fragment, { key: item.positionId ?? index }, renderItem({ item, index }))) : ListEmptyComponent, ListFooterComponent);
   h.account = account(mode); h.requests = []; h.navigation = []; h.positions = {};
   h.positions[mode] = Array.from({ length: count }, (_, i) => position(i, mode));
   h.markets = Object.fromEntries(['domestic_stock', 'us_stock', 'crypto'].map(type => [type, Array.from({ length: 5 }, (_, i) => asset(i, type))]));
@@ -35,7 +35,11 @@ function setup(mode = 'season', count = 7, screen = 'home', options = {}) {
   } });
   const read = async (section, params = {}) => { const request = { section, ...params }; h.requests.push(request); await h.beforeRead(request); };
   const mocks = {
-    '@react-navigation/native': { NavigationContext },
+    '@react-navigation/native': { NavigationContext, useIsFocused: () => true },
+    '../../features/futures/api': { getFuturesPositions: async id => {
+      await read('futures', { account: id });
+      return h.futures?.[id] ?? require('./futuresFixtures.cjs').futuresFixture(id).positions;
+    } },
     '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({ selectedAccount: h.account, selectedAccountId: h.account.id, capabilities: { canTrade: true, canExchange: true } }) },
     '../../app/navigation/navigationHooks': { useRootNavigation: () => ({ navigate: (...args) => h.navigation.push(args) }) },
     '../../features/tradingAccount/api': {
@@ -66,6 +70,7 @@ function setup(mode = 'season', count = 7, screen = 'home', options = {}) {
     ...Object.fromEntries(['ErrorState', 'InlineEmptyState', 'SectionSkeleton', 'AdminDiagnosticPanel'].map(name => ['../../components/states/' + name, { __esModule: true, default: name }])),
   };
   mocks['./AdminDiagnosticPanel'] = mocks['../../components/states/AdminDiagnosticPanel'];
+  for (const name of ['ErrorState', 'InlineEmptyState', 'SectionSkeleton']) mocks['../states/' + name] = mocks['../../components/states/' + name];
   const Screen = h.load(screen === 'wallet' ? 'src/screens/wallet/WalletScreen.tsx' : screen === 'portfolio' ? 'src/screens/home/PortfolioScreen.tsx' : 'src/screens/home/HomeScreen.tsx', mocks).default;
   h.client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity, gcTime: Infinity, ...options.queryDefaults } } });
   const tree = () => React.createElement(QueryClientProvider, { client: h.client }, React.createElement(Screen, { navigation: { navigate() {} } }));

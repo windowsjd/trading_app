@@ -89,6 +89,10 @@ function financialDiagnosticsHarness(screen = 'home', { role = 'admin', mode = '
         data.length ? data.map((item, index) => React.createElement(React.Fragment, { key: item.positionId ?? item.id ?? index }, renderItem({ item, index }))) : ListEmptyComponent, ListFooterComponent),
   });
   const mocks = {
+    '../../features/futures/api': { getFuturesPositions: async id => {
+      await read(`${id}:futures/positions`, { path: `/trading-accounts/${id}/futures/positions` });
+      return require('./futuresFixtures.cjs').futuresFixture(id).positions;
+    } },
     '../../features/tradingAccount/api': api,
     '../../features/tradingAccount/TradingAccountContext': context,
     '../../features/me/api': meApi,

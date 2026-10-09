@@ -69,7 +69,7 @@ function createHomeHarness(mode = 'general') {
     stateIndex = 0; h.queries = [];
   };
   const mocks = {
-    '@react-navigation/native': { NavigationContext: React.createContext(undefined) },
+    '@react-navigation/native': { NavigationContext: React.createContext(undefined), useIsFocused: () => true },
     react: { ...React, useContext: () => undefined, useCallback: (fn) => fn, useRef: (value) => ({ current: value }), useEffect() {}, useMemo: (fn) => fn(), useState: (initial) => {
       const index = stateIndex++;
       if (!(index in states)) states[index] = typeof initial === 'function' ? initial() : initial;
@@ -92,6 +92,10 @@ function createHomeHarness(mode = 'general') {
       },
     },
     '../../features/tradingAccount/api': api,
+    '../../features/futures/api': { getFuturesPositions: async id => {
+      h.requests.push({ path: `/trading-accounts/${id}/futures/positions` });
+      return require('./futuresFixtures.cjs').futuresFixture(id).positions;
+    } },
     '../../features/tradingAccount/TradingAccountContext': {
       useTradingAccount: () => ({
         selectedAccountId: h.account.id,
@@ -145,11 +149,17 @@ function createHomeHarness(mode = 'general') {
   const hero = load(resolve(__dirname, '../src/screens/home/HomeAssetHero.tsx'), mocks).default;
   const positionRow = load(resolve(__dirname, '../src/components/tradingAccount/PositionAssetRow.tsx'), mocks).default;
   mocks['../../components/tradingAccount/PositionAssetRow'] = { default: positionRow, __esModule: true };
+  const futuresComponents = ['FuturesPositionRow', 'FuturesPositionsSection'].map(name => {
+    const component = load(resolve(__dirname, `../src/components/tradingAccount/${name}.tsx`), mocks).default;
+    mocks[`../../components/tradingAccount/${name}`] = { default: component, __esModule: true };
+    mocks[`./${name}`] = { default: component, __esModule: true };
+    return component;
+  });
   mocks['../home/HomeAssetHero'] = { default: hero, __esModule: true };
   const expandDisplay = (node) => {
     if (Array.isArray(node)) return node.map(expandDisplay);
     if (!React.isValidElement(node)) return node;
-    if (node.type === hero || node.type === positionRow || node.type === charts || homeComponents.includes(node.type)) return expandDisplay(node.type(node.props));
+    if (node.type === hero || node.type === positionRow || futuresComponents.includes(node.type) || node.type === charts || homeComponents.includes(node.type)) return expandDisplay(node.type(node.props));
     return React.cloneElement(node, {}, expandDisplay(node.type === 'AccountSwitcher'
       ? [node.props.children, node.props.homeVisual, node.props.homeVisualCaption] : node.props.children));
   };
@@ -283,11 +293,12 @@ function createHomeHarness(mode = 'general') {
     });
     client.setQueryData(
       keys.tradingAccount.positions(account.id, { limit: 1 }),
-      { positions: [], pagination: { total: 0 } },
+      { tradingAccountId: account.id, positions: [], pagination: { total: 0 } },
     );
 
     client.setQueryData(keys.me, { id: 'user-1', nickname: '김재민' });
     client.setQueryData(keys.tradingAccount.holdings(account.id), { tradingAccountId: account.id, positions: [] }, { updatedAt: 1 });
+    client.setQueryData(keys.tradingAccount.futures.positions(account.id), require('./futuresFixtures.cjs').futuresFixture(account.id).positions);
     if (account.season) client.setQueryData(keys.ranking.list({
       scope: 'all', seasonId: account.season.seasonId,
       rankType: account.season.seasonStatus === 'settled' ? 'final' : 'daily',

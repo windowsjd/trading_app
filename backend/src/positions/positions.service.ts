@@ -456,6 +456,46 @@ export class PositionsService {
     };
   }
 
+  /** Internal read-only projection. The caller must verify disclosure permission.
+   * Reuse canonical owner valuation, never derive returns from stored totals. */
+  async readOpenHoldingProjection(tradingAccountId: string, valuationAt: Date) {
+    const positions = await this.findPositionsByScope(
+      { tradingAccountId },
+      this.parseQuery({}),
+    );
+    const fx = await this.findUsdKrwSelectionIfNeeded(positions, valuationAt);
+    const items = await Promise.all(
+      positions.map((position) =>
+        this.buildPositionItem(position, valuationAt, fx),
+      ),
+    );
+    return items
+      // Preserve the guarded friend detail's existing asset-id ordering.
+      .sort((a, b) => a.assetId.localeCompare(b.assetId))
+      .map((item) => {
+        const valuation = item.valuation.payload;
+        return {
+          assetId: item.assetId,
+          name: item.name,
+          symbol: item.symbol,
+          assetType: item.assetType,
+          market: item.market,
+          currencyCode: item.currencyCode,
+          quantity: item.quantity,
+          valuation:
+            valuation.state === 'unavailable'
+              ? { state: 'unavailable' as const }
+              : {
+                  state: valuation.state,
+                  priceCurrency: valuation.priceCurrency,
+                  positionValue: valuation.positionValue,
+                  unrealizedPnl: valuation.unrealizedPnl,
+                  returnRate: valuation.returnRate,
+                },
+        };
+      });
+  }
+
   private async buildPositionItem(
     position: PositionRecord,
     valuationAt: Date,

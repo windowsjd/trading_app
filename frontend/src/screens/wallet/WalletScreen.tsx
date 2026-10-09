@@ -34,6 +34,8 @@ import SectionSkeleton from '../../components/states/SectionSkeleton';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import HomeAssetHero from '../home/HomeAssetHero';
 import HomeAssetTrend, { type HomeEquityRange } from '../home/HomeAssetTrend';
+import { useFuturesHoldings } from '../../features/futures/useFuturesHoldings';
+import FuturesPositionsSection from '../../components/tradingAccount/FuturesPositionsSection';
 
 export default function WalletScreen({ navigation }: WalletScreenProps) {
   const { selectedAccount, capabilities, isLoading, isError, error, refetchAccounts } = useTradingAccount();
@@ -72,13 +74,14 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
     queryKey: QUERY_KEYS.tradingAccount.holdings(accountId),
     queryFn: () => getAccountHoldings(accountId, getTradingAccountPositions),
   });
+  const futures = useFuturesHoldings(accountId);
   const equityQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.portfolioEquity(accountId, equityRange, 'daily'),
     queryFn: () => getTradingAccountEquity(accountId, equityRange, 'daily'),
     enabled: trendExpanded,
   });
   const refresh = usePullToRefresh([
-    portfolioQuery, walletsQuery, positionsQuery,
+    portfolioQuery, walletsQuery, positionsQuery, futures,
     { ...equityQuery, enabled: trendExpanded },
   ]);
 
@@ -92,7 +95,8 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
   const notice = portfolio ? getPortfolioNotice(portfolio) : null;
   const blockMessage = capabilities?.canExchange ? null
     : getCapabilityBlockMessage(capabilities, capabilities?.exchangeBlockReason);
-  const positions = positionsQuery.data?.positions;
+  const positions = positionsQuery.data?.tradingAccountId === accountId
+    ? positionsQuery.data.positions : undefined;
   const quickActions = [
     {
       testID: 'wallet-transfer',
@@ -235,9 +239,12 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
               ))
             )}
           <View style={styles.holdings}>
-            <Text testID="wallet-holdings-title" style={styles.groupTitle}>보유 종목</Text>
+            <Text testID="wallet-holdings-title" style={styles.groupTitle}>보유종목</Text>
+            {positions && positionsQuery.isError ? <ErrorState error={positionsQuery.error}
+              title="보유종목을 새로 불러오지 못했습니다." message="이전 조회 내역입니다. 잠시 후 다시 시도해주세요."
+              onRetry={() => void positionsQuery.refetch()} /> : null}
             {positionsQuery.isLoading ? <SectionSkeleton lines={3} />
-              : positionsQuery.isError && !positionsQuery.data ? (
+              : positionsQuery.isError && !positions ? (
                 <ErrorState error={positionsQuery.error} title="보유 종목을 불러오지 못했습니다." message="요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요." onRetry={() => void positionsQuery.refetch()} />
               ) : !positions ? <InlineEmptyState message="보유 종목을 확인할 수 없습니다." />
                 : positions.length === 0 ? <InlineEmptyState message="보유 종목이 없습니다." />
@@ -253,6 +260,8 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
               <AdminDiagnosticPanel key={index} diagnostic={failure.diagnostic} />
             )) : null}
           </View>
+          <FuturesPositionsSection holdings={futures} testID="wallet-futures"
+            onOpen={position => rootNavigation.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Futures', params: { accountId, instrumentId: position.instrumentId } } })} />
         </View>
       ) : null}
     </ScrollView>

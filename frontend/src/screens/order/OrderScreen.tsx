@@ -328,6 +328,8 @@ export function OrderTradingScreen({
             </View>
           </View>
           <AccountHoldings
+            onInputFocus={inputScroll.onInputFocus}
+            onInputBlur={inputScroll.onInputBlur}
             isFocused={isFocused}
             key={accountId}
             accountId={accountId}

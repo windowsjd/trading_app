@@ -38,6 +38,7 @@ type Props = {
   currency?: string;
   onInputFocus?: (input: View | null) => void;
   onInputBlur?: () => void;
+  collapsible?: boolean;
 };
 export default function ProtectionPanel(props: Props) {
   const { selectedAccountId } = useTradingAccount();
@@ -56,11 +57,13 @@ export function BoundProtectionPanel({
   currency,
   onInputFocus,
   onInputBlur,
+  collapsible = false,
 }: Props) {
   const { selectedAccountId } = useTradingAccount();
   const focused = useIsFocused(),
     client = useQueryClient();
   const bound = selectedAccountId === accountId;
+  const [expanded, setExpanded] = useState(!collapsible);
   const [history, setHistory] = useState(false),
     [draft, setDraft] = useState(emptyProtection),
     [message, setMessage] = useState<string | null>(null),
@@ -214,6 +217,12 @@ export function BoundProtectionPanel({
           ? ` · ${active?.currencyCode ?? currency}`
           : ""}
       </Text>
+      {collapsible ? <>
+        <Text style={styles.hint}>TP/SL {active ? active.status === 'holding' ? '진입 체결 대기' : '보호 중' : '미설정'}</Text>
+        <CTAButton variant="secondary" testID={`futures-protection-${positionId}`}
+          label={expanded ? 'TP/SL 접기' : 'TP/SL 설정·관리'} onPress={() => setExpanded(value => !value)} />
+      </> : null}
+      {expanded ? <>
       <Text style={styles.hint}>
         {domain === "futures"
           ? "현재가 / Spot 거래 기준으로 조건을 확인합니다. Mark 청산과는 별개입니다."
@@ -349,6 +358,7 @@ export function BoundProtectionPanel({
             </View>
           ))
         : null}
+      </> : null}
     </View>
   );
 }

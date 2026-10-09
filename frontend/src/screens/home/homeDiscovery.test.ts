@@ -41,7 +41,7 @@ for (const mode of ['season', 'general']) {
 it('unavailable valuations have no arbitrary representative but remain accessible, including a lone position', async t => {
   const h = setup('season', 2); t.after(h.close);
   h.positions.season = [position(0, 'season', true), position(1, 'season', true)]; await flush();
-  assert.equal(h.rows().length, 0);
+  assert.equal(h.rows().length, 1, 'an unknown valuation never hides the actual holding');
   assert.ok(h.renderer.root.findAllByType('InlineEmptyState').some(n => /대표 보유자산/.test(n.props.message)));
   await h.press('home-holdings-toggle'); assert.equal(h.rows().length, 2);
   h.positions.single = [position(0, 'single', true)]; await h.switch(account('general', 'single'));

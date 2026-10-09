@@ -86,7 +86,8 @@ function createTradingUiHarness(screenName) {
         const base = { refetch: () => {}, isLoading: false, isError: false };
         if (scope === 'asset') return { ...base, data: resource === 'detail' ? { asset: h.asset } : { candles: h.candles ?? [] } };
         if (resource === 'protections') return { ...base, data: { tradingAccountId: 'account-1', capabilities: { enabled: false, canCreateSpot: false, canUseSpotLimit: false, canCancel: true }, groups: [] } };
-        if (resource === 'positions') return { ...base, ...h.positionQuery };
+        if (resource === 'positions' || resource === 'holdings') return { ...base, ...h.positionQuery,
+          data: h.positionQuery.data ? { tradingAccountId: h.account.id, ...h.positionQuery.data } : undefined };
         if (resource === 'fx-rate') return { ...base, ...h.rateQuery };
         if (resource === 'detail') return { ...base, data: { feePolicy: { fxFeeRate: '0.001', tradeFeeRate: '0.001' } } };
         if (resource === 'wallets') return { ...base, data: { wallets: [
@@ -129,6 +130,7 @@ function createTradingUiHarness(screenName) {
     './FxSuccessBottomSheet': { default: 'FxSuccessBottomSheet', __esModule: true },
   };
   mocks['./AdminDiagnosticPanel'] = mocks['../../components/states/AdminDiagnosticPanel'];
+  mocks['../states/AdminDiagnosticPanel'] = mocks['../../components/states/AdminDiagnosticPanel'];
   const order = load(resolve(__dirname, '../src/screens/order/OrderPanel.tsx'), mocks);
   mocks['../order/OrderPanel'] = order;
   mocks['./OrderPanel'] = order;

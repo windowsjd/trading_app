@@ -54,7 +54,7 @@ function createHarness(scope?: string) {
       return React.createElement(native.FlatList, props);
     },
   });
-  mocks.set('@react-navigation/native', { useFocusEffect: () => {}, NavigationContext: React.createContext(undefined) });
+  mocks.set('@react-navigation/native', { useFocusEffect: () => {}, useIsFocused: () => true, NavigationContext: React.createContext(undefined) });
   // SVG is a native host boundary; browser tests exercise its actual renderer.
   mocks.set('react-native-svg', { default: 'svg', Path: 'path', Defs: 'defs', LinearGradient: 'linearGradient', Rect: 'rect', Stop: 'stop', __esModule: true });
   mocks.set('@tanstack/react-query', {
@@ -75,7 +75,7 @@ function createHarness(scope?: string) {
   mockLocal('services/api/client', {
     apiClient: { get: async (url: string) => {
       requests.push(url);
-      return { data: { success: true, data: page } };
+      return { data: { success: true, data: url.includes('season-summary') ? queries.get('ranking')?.data : page } };
     } },
   });
 
@@ -368,7 +368,7 @@ const summaryFixture: UserSeasonSummaryDto = {
     percentile: '100.00000000', returnRate: '9.00000000', totalAssetKrw: '999998.00000000', totalFillCount: 4,
   },
   portfolioAccess: 'available',
-  portfolio: { valuationState: 'available', allocation: { cashKrwValue: '999998.00000000', domesticStockValueKrw: '0', usStockValueKrw: '0', cryptoValueKrw: '0' }, holdings: [], history: [] },
+  portfolio: { valuationState: 'available', allocation: { cashKrwValue: '999998.00000000', domesticStockValueKrw: '0', usStockValueKrw: '0', cryptoValueKrw: '0' }, holdings: [], futures: { evaluatedAt: new Date().toISOString(), positions: [] }, history: [] },
 };
 
 describe('existing user season summary', () => {
@@ -484,7 +484,7 @@ describe('friend portfolio access rendering', () => {
       const h = createHarness();
       const data = structuredClone(summaryFixture);
       data.portfolioAccess = access;
-      data.portfolio!.holdings = [{ assetId: 'private-asset', name: 'PRIVATE_HOLDING', symbol: 'SECRET', assetType: 'crypto', weight: '30' }];
+      data.portfolio!.holdings = [{ assetId: 'private-asset', name: 'PRIVATE_HOLDING', symbol: 'SECRET', assetType: 'crypto', market: 'BINANCE', quantity: '0.00000001', valuation: { state: 'unavailable' }, weight: '30' }];
       h.queries.set('ranking', h.ready(data));
       const html = h.render('ranking/UserSeasonSummaryScreen', { route: { params: { userId: 'user-2' } } });
       assert.ok(html.includes(message));
@@ -495,17 +495,17 @@ describe('friend portfolio access rendering', () => {
   it('shows persisted history and holdings, and suppresses them during permission refresh', () => {
     const h = createHarness();
     const data = structuredClone(summaryFixture);
-    data.portfolio!.holdings = [{ assetId: 'a', name: '보유종목', symbol: 'BTCUSDT', assetType: 'crypto', weight: null }];
+    data.portfolio!.holdings = [{ assetId: 'a', name: '보유종목', symbol: 'BTCUSDT', assetType: 'crypto', market: 'BINANCE', quantity: '0.00000001', valuation: { state: 'unavailable' }, weight: null }];
     data.portfolio!.history = [{ date: '2026-09-29', totalAssetKrw: '1000000', returnRate: '1' }];
     h.queries.set('ranking', h.ready(data));
     const render = () => h.render('ranking/UserSeasonSummaryScreen', { route: { params: { userId: 'user-2' } } });
-    assert.match(render(), /BTCUSDT/);
+    assert.match(render(), /0.00000001 BTC/);
     assert.match(render(), /비중 확인 불가/);
     assert.match(render(), /2026-09-29/);
     h.queries.set('ranking', { ...h.ready(data), isFetching: true });
-    assert.doesNotMatch(render(), /BTCUSDT|2026-09-29/);
+    assert.doesNotMatch(render(), /0.00000001 BTC|2026-09-29/);
     h.queries.set('ranking', { ...h.ready(data), isError: true });
-    assert.doesNotMatch(render(), /BTCUSDT|2026-09-29/);
+    assert.doesNotMatch(render(), /0.00000001 BTC|2026-09-29/);
   });
 });
 

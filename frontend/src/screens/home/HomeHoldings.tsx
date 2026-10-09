@@ -12,6 +12,9 @@ import SectionSkeleton from '../../components/states/SectionSkeleton';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import ErrorState from '../../components/states/ErrorState';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
+import { useRootNavigation } from '../../app/navigation/navigationHooks';
+import { useFuturesHoldings } from '../../features/futures/useFuturesHoldings';
+import FuturesPositionsSection from '../../components/tradingAccount/FuturesPositionsSection';
 
 export function useHomeHoldings(accountId: string) {
   const [expanded, setExpanded] = useState(false);
@@ -24,27 +27,37 @@ export function useHomeHoldings(accountId: string) {
     queryFn: () => getAccountHoldings(accountId, getTradingAccountPositions),
     enabled: expanded,
   });
-  return { expanded, setExpanded, previewQuery, fullQuery };
+  const futures = useFuturesHoldings(accountId);
+  return { accountId, expanded, setExpanded, previewQuery, fullQuery, futures };
 }
 
 export default function HomeHoldings({ holdings, onOpenAsset }: {
   holdings: ReturnType<typeof useHomeHoldings>;
   onOpenAsset: (assetId: string) => void;
 }) {
-  const { expanded, setExpanded, previewQuery, fullQuery } = holdings;
+  const { accountId, expanded, setExpanded, previewQuery, fullQuery, futures } = holdings;
+  const rootNavigation = useRootNavigation();
   // Both responses retain the server's canonical KRW-equivalent ordering.
   // A newer complete Wallet/Home read can also supply the collapsed summary.
-  const useFull = fullQuery.data && (expanded || fullQuery.dataUpdatedAt >= previewQuery.dataUpdatedAt);
-  const positions = useFull ? fullQuery.data.positions : previewQuery.data?.positions;
-  const valuationErrors = useFull ? fullQuery.data.valuationErrors : previewQuery.data?.valuationErrors;
-  const total = useFull ? positions.length : previewQuery.data?.pagination.total ?? 0;
+  const full = fullQuery.data?.tradingAccountId === accountId ? fullQuery.data : undefined;
+  const preview = previewQuery.data?.tradingAccountId === accountId ? previewQuery.data : undefined;
+  const useFull = full && (expanded || fullQuery.dataUpdatedAt >= previewQuery.dataUpdatedAt);
+  const positions = useFull ? full.positions : preview?.positions;
+  const valuationErrors = useFull ? full.valuationErrors : preview?.valuationErrors;
+  const total = useFull ? full.positions.length : preview?.pagination.total ?? 0;
   const first = positions?.[0];
   const representative = first?.valuation.state !== 'unavailable' ? first : undefined;
-  const rows = expanded && fullQuery.data ? fullQuery.data.positions
-    : representative ? [representative] : total === 1 && first ? [first] : [];
+  const rows = expanded && full ? full.positions : first ? [first] : [];
+  const empty = !!positions && !previewQuery.isError && !fullQuery.isError && total === 0
+    && !!futures.data && futures.data.positions.length === 0;
   return (
     <View testID="home-holdings" style={styles.card}>
-      <Text accessibilityRole="header" style={styles.title}>보유 종목</Text>
+      <Text accessibilityRole="header" style={styles.title}>보유종목 및 포지션</Text>
+      {empty ? <InlineEmptyState title="보유종목 및 포지션이 없습니다." message="아직 보유한 종목이나 선물 포지션이 없습니다." /> : <>
+      <Text accessibilityRole="header" style={styles.sectionTitle}>보유종목</Text>
+      {positions && previewQuery.isError ? <ErrorState error={previewQuery.error}
+        title="보유종목을 새로 불러오지 못했습니다." message="이전 조회 내역입니다. 잠시 후 다시 시도해주세요."
+        onRetry={() => void previewQuery.refetch()} /> : null}
       {!positions && previewQuery.isLoading ? <SectionSkeleton lines={2} />
         : !positions && previewQuery.isError ? <ErrorState error={previewQuery.error} title="보유 종목을 불러오지 못했습니다." message="요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요." onRetry={() => void previewQuery.refetch()} />
           : !positions ? <InlineEmptyState message="보유 종목을 확인할 수 없습니다." />
@@ -61,8 +74,11 @@ export default function HomeHoldings({ holdings, onOpenAsset }: {
       {positions ? valuationErrors?.map((failure, index) => (
         <AdminDiagnosticPanel key={index} diagnostic={failure.diagnostic} />
       )) : null}
-      {total > 1 ? <ActionPressable testID="home-holdings-toggle" feedback="button" style={styles.toggle}
-        accessibilityRole="button" accessibilityLabel={expanded ? '보유 종목 접기' : '보유 종목 자세히 보기'}
+      <FuturesPositionsSection holdings={futures} limit={expanded ? undefined : 1} testID="home-futures"
+        onOpen={position => rootNavigation.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Futures', params: { accountId, instrumentId: position.instrumentId } } })} />
+      </>}
+      {total > 1 || (futures.data?.positions.length ?? 0) > 1 ? <ActionPressable testID="home-holdings-toggle" feedback="button" style={styles.toggle}
+        accessibilityRole="button" accessibilityLabel={expanded ? '보유종목 및 포지션 접기' : '보유종목 및 포지션 자세히 보기'}
         accessibilityState={{ expanded }} aria-expanded={expanded} onPress={() => setExpanded(value => !value)}>
         <Text style={styles.action}>{expanded ? '접기 ▲' : '자세히 보기 ▼'}</Text>
       </ActionPressable> : null}
@@ -74,6 +90,7 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, borderColor: semantic.border, borderRadius: 14, paddingHorizontal: 16,
     paddingVertical: 10, backgroundColor: semantic.surface, gap: 4 },
   title: { fontSize: 18, lineHeight: 27, fontWeight: '700', color: semantic.text },
+  sectionTitle: { fontSize: 15, lineHeight: 23, fontWeight: '600' },
   toggle: { minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingVertical: 8, backgroundColor: semantic.secondaryActionSurface },
   action: { fontSize: 13, lineHeight: 20, color: semantic.secondaryActionForeground, fontWeight: '600' },
 });

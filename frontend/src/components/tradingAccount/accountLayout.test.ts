@@ -176,7 +176,11 @@ describe('the styles long text depends on are present', () => {
   it('AccountHoldings: complete amounts wrap without truncation', () => {
     const source = read('screens/asset/AccountHoldings.tsx');
 
-    assert.match(source, /metric:\s*\{[^}]*flexWrap:\s*'wrap'/s);
+    assert.equal(/<PositionAssetRow/.test(source), true);
+    const row = read('components/tradingAccount/PositionAssetRow.tsx');
+    assert.equal(/stacked:\s*\{[^}]*flexDirection:\s*'column'/s.test(row), true);
+    assert.equal(/value:\s*\{[^}]*minWidth:\s*0/s.test(row), true);
+    assert.equal(/numberOfLines=\{/.test(row), false);
     assert.ok(!/numberOfLines=\{/.test(source));
   });
 

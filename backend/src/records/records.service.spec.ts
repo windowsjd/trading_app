@@ -197,6 +197,7 @@ describe('RecordsService', () => {
       delete: jest.fn(),
     },
     seasonParticipant: {
+      findFirst: jest.fn().mockResolvedValue({ id: participant.id }),
       count: jest.fn(),
       findMany: jest.fn(),
       findUnique: jest.fn(),
@@ -205,6 +206,7 @@ describe('RecordsService', () => {
       upsert: jest.fn(),
       delete: jest.fn(),
     },
+    futuresPosition: { findMany: jest.fn().mockResolvedValue([]) },
     position: {
       count: jest.fn(),
       findMany: jest.fn(),
@@ -297,16 +299,21 @@ describe('RecordsService', () => {
     calculateTradingAccountValuation: jest.Mock;
   }) => {
     const prisma = createPrisma();
+    const positionsProjection = {
+      readOpenHoldingProjection: jest.fn().mockResolvedValue([]),
+    };
+    prisma.$transaction.mockImplementation((work) => work(prisma));
     const service = new RecordsService(
       prisma as never,
       portfolioValuationService as never,
+      positionsProjection as never,
     );
 
-    return { prisma, service };
+    return { prisma, service, positionsProjection };
   };
 
   const mockCurrentSeason = (prisma: ReturnType<typeof createPrisma>) => {
-    prisma.season.findFirst.mockResolvedValueOnce(season);
+    prisma.season.findFirst.mockResolvedValue(season);
   };
 
   const mockJoined = (prisma: ReturnType<typeof createPrisma>) => {
@@ -640,7 +647,11 @@ describe('RecordsService', () => {
     expect(prisma.fxExecuteRequest.create).not.toHaveBeenCalled();
     expect(prisma.fxExecuteRequest.update).not.toHaveBeenCalled();
     expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(
+      prisma.$transaction.mock.calls.every(
+        ([, options]) => options?.isolationLevel === 'RepeatableRead',
+      ),
+    ).toBe(true);
   };
 
   it('returns exchange records', async () => {
@@ -1599,7 +1610,9 @@ describe('RecordsService', () => {
         fxRateSourceDecision: null,
       }),
     };
-    const { prisma, service } = createService(portfolioValuationService);
+    const { prisma, service, positionsProjection } = createService(
+      portfolioValuationService,
+    );
     prisma.user.findUnique.mockResolvedValueOnce({
       id: 'user-2',
       nickname: 'legendTrader',
@@ -1635,20 +1648,32 @@ describe('RecordsService', () => {
       capturedAt,
     });
     prisma.seasonRanking.count.mockResolvedValueOnce(300);
-    prisma.position.findMany.mockResolvedValueOnce([
+    positionsProjection.readOpenHoldingProjection.mockResolvedValue([
       {
         assetId: 'asset-nvda',
-        marketValueKrw: new Prisma.Decimal('1'), // stale stored value must not drive the live weight
-        asset: {
-          symbol: 'NVDA',
+        name: 'Nvidia',
+        symbol: 'NVDA',
+        assetType: 'us_stock',
+        market: 'NASDAQ',
+        quantity: '3.00000000',
+        currencyCode: 'USD',
+        valuation: {
+          state: 'available',
+          priceCurrency: 'USD',
+          positionValue: '300',
+          unrealizedPnl: '-10',
+          returnRate: '-3.22580645',
         },
       },
       {
         assetId: 'asset-btc',
-        marketValueKrw: new Prisma.Decimal('2000000.00000000'),
-        asset: {
-          symbol: 'BTCUSDT',
-        },
+        name: 'Bitcoin',
+        symbol: 'BTCUSDT',
+        assetType: 'crypto',
+        market: 'BINANCE',
+        quantity: '0.00000001',
+        currencyCode: 'USD',
+        valuation: { state: 'unavailable' },
       },
     ]);
 
@@ -1705,7 +1730,12 @@ describe('RecordsService', () => {
     expect(serialized).not.toContain('walletId');
     expect(serialized).not.toContain('balanceAfter');
     expect(serialized).not.toContain('averageCost');
-    expect(serialized).not.toContain('quantity');
+    expect(response.data.portfolio!.holdings[1].quantity).toBe('0.00000001');
+    expect(response.data.portfolio!.futures.positions).toEqual([]);
+    expect(positionsProjection.readOpenHoldingProjection).toHaveBeenCalledWith(
+      participantAccount.id,
+      expect.any(Date),
+    );
     expectNoRecordWrites(prisma);
   });
 
@@ -1733,7 +1763,7 @@ describe('RecordsService', () => {
     },
   ])('omits all portfolio reads and payload for $access', async (target) => {
     const valuation = { calculateTradingAccountValuation: jest.fn() };
-    const { prisma, service } = createService(valuation);
+    const { prisma, service, positionsProjection } = createService(valuation);
     prisma.user.findUnique.mockResolvedValue({
       id: 'user-2',
       nickname: 'public',
@@ -1752,6 +1782,10 @@ describe('RecordsService', () => {
     expect(result.data).not.toHaveProperty('topPositions');
     expect(valuation.calculateTradingAccountValuation).not.toHaveBeenCalled();
     expect(prisma.position.findMany).not.toHaveBeenCalled();
+    expect(
+      positionsProjection.readOpenHoldingProjection,
+    ).not.toHaveBeenCalled();
+    expect(prisma.futuresPosition.findMany).not.toHaveBeenCalled();
     expectNoRecordWrites(prisma);
   });
 
@@ -1768,7 +1802,7 @@ describe('RecordsService', () => {
         positionValues: [],
       }),
     };
-    const { prisma, service } = createService(valuation);
+    const { prisma, service, positionsProjection } = createService(valuation);
     const relation = {
       status: 'active',
       portfolioPublic: true,
@@ -1791,6 +1825,95 @@ describe('RecordsService', () => {
     expect(result.data.portfolio).toBeNull();
     expectNoRecordWrites(prisma);
   });
+
+  it.each([
+    'friendship',
+    'inactive',
+    'hidden',
+    'excluded',
+    'closed_account',
+    'ended_season',
+  ])(
+    'discards sensitive projections when %s is revoked during the read',
+    async (revoked) => {
+      const valuation = {
+        calculateTradingAccountValuation: jest.fn().mockResolvedValue({
+          seasonParticipantId: participant.id,
+          totalAssetKrw: '100',
+          krwCash: '100',
+          usdCashKrw: '0',
+          domesticStockValueKrw: '0',
+          usStockValueKrw: '0',
+          cryptoValueKrw: '0',
+          positionValues: [],
+        }),
+      };
+      const { prisma, service, positionsProjection } = createService(valuation);
+      const relation = {
+        status: 'active',
+        portfolioPublic: true,
+        friendshipsLow: [{ id: 'friend' }],
+        friendshipsHigh: [],
+      };
+      prisma.user.findUnique
+        .mockResolvedValueOnce({ id: 'user-2', nickname: 'public' })
+        .mockResolvedValueOnce(relation)
+        .mockResolvedValue(
+          revoked === 'friendship'
+            ? { ...relation, friendshipsLow: [] }
+            : revoked === 'inactive'
+              ? { ...relation, status: 'suspended' }
+              : relation,
+        );
+      mockCurrentSeason(prisma);
+      mockDetailedParticipant(prisma);
+      if (['hidden', 'excluded', 'closed_account'].includes(revoked))
+        prisma.seasonParticipant.findFirst.mockResolvedValue(null);
+      if (revoked === 'ended_season')
+        prisma.season.findFirst
+          .mockResolvedValueOnce(season)
+          .mockResolvedValue({ ...season, status: SeasonStatus.ended });
+      positionsProjection.readOpenHoldingProjection.mockResolvedValue([
+        {
+          assetId: 'secret',
+          name: 'SECRET_FINANCIAL_HOLDING',
+          symbol: 'SECRET',
+          quantity: '0.00000001',
+          valuation: { state: 'unavailable' },
+        },
+      ]);
+      prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([]);
+      const result = await service.getUserCurrentSeasonSummary(
+        'viewer',
+        'user-2',
+      );
+      expect(result.data.portfolio).toBeNull();
+      expect(result.data.portfolioAccess).not.toBe('available');
+      expect(JSON.stringify(result)).not.toMatch(
+        /SECRET_FINANCIAL_HOLDING|quantity|markNotional|leverage/,
+      );
+      expect(
+        positionsProjection.readOpenHoldingProjection,
+      ).toHaveBeenCalledTimes(1);
+      if (!['friendship', 'inactive'].includes(revoked))
+        expect(prisma.seasonParticipant.findFirst).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              seasonId: season.id,
+              tradingAccountId: participantAccount.id,
+              rankingHiddenAt: null,
+              participantStatus: { not: ParticipantStatus.excluded },
+              season: { status: SeasonStatus.active },
+              tradingAccount: expect.objectContaining({
+                status: 'active',
+                mode: 'season',
+              }),
+            }),
+          }),
+        );
+      expectNoRecordWrites(prisma);
+    },
+  );
 
   it('hides current public user season summary for ranking-hidden participants', async () => {
     const portfolioValuationService = {

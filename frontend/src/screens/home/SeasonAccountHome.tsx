@@ -106,6 +106,7 @@ export default function SeasonAccountHome({
   const refresh = usePullToRefresh([
     portfolioQuery,
     positionsQuery,
+    holdings.futures,
     { ...holdings.fullQuery, enabled: holdings.expanded },
     ...accountContext.refreshQueries,
     hot.refreshQuery,

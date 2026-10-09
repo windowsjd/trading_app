@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
+import { futuresFixture } from '../futuresFixtures.cjs';
 export const useFocusEffect = (callback) => useEffect(callback, [callback]);
+export const useIsFocused = () => true;
 export const useLogout = () => async () => {};
 const params = new URLSearchParams(location.search);
 const user = {
@@ -42,6 +44,9 @@ const summary = {
         name: '긴보유종목이름LongAssetName'.repeat(4),
         symbol: 'BTCUSDT',
         assetType: 'crypto',
+        market: 'BINANCE', currencyCode: 'USD', quantity: '0.00000001',
+        valuation: { state: 'available', priceCurrency: 'USD', positionValue: '1234567890123.45',
+          unrealizedPnl: '-1234567890.12', returnRate: '-12.1234' },
         weight: '33.3333',
       },
     ],
@@ -62,7 +67,14 @@ function response(data) {
 export const apiClient = {
   get: async (path) => {
     if (path === '/me') return response({ ...me });
-    if (path.includes('season-summary')) return response(summary);
+    if (path.includes('season-summary')) {
+      const own = futuresFixture('friend', { position: true, direction: 'short', marginMode: 'cross' }).positions;
+      return response({ ...summary, portfolio: summary.portfolio ? { ...summary.portfolio, futures: {
+        evaluatedAt: own.evaluatedAt, positions: own.positions.map(p => ({ ...p.instrument.underlying,
+          direction: p.direction, marginMode: p.marginMode, leverage: p.leverage,
+          markNotional: p.markNotional, markUnrealizedPnl: p.markUnrealizedPnl, roi: p.roi,
+          markState: p.markState, markEvidence: p.markEvidence })) } } : null });
+    }
     const users = path.includes('/search')
       ? new URL(path, location.origin).searchParams.get('nickname') === '없는친구' ? [] : [{ ...user, relationship: relation }]
       : path.includes('/requests')

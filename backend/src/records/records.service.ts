@@ -19,6 +19,8 @@ import {
   type PortfolioAccess,
 } from '../friends/friendship.policy';
 import type { FriendPortfolio } from '../friends/friend-portfolio.types';
+import { PositionsService } from '../positions/positions.service';
+import { readFuturesHoldingSummaries } from '../futures/futures-position-display';
 import {
   closedMarketPriceScope,
   findMarketAwareAssetPriceCandidates,
@@ -586,6 +588,9 @@ export class RecordsService {
     private readonly prisma: PrismaService,
     @Optional()
     private readonly portfolioValuationService?: PortfolioValuationService,
+    private readonly positionsService: PositionsService = new PositionsService(
+      prisma,
+    ),
   ) {}
 
   async getRecords(
@@ -1534,12 +1539,42 @@ export class RecordsService {
     // Recheck after the financial reads, so an in-flight deletion/privacy save
     // cannot return a payload after the permission was revoked.
     if (portfolio) {
-      portfolioAccess = await readPortfolioAccess(
-        this.prisma,
-        authUserId,
-        parsedTargetUserId,
-      );
-      if (portfolioAccess !== 'available') portfolio = null;
+      const currentSeason = await this.findCurrentSeason();
+      const eligible = await this.prisma.seasonParticipant.findFirst({
+        where: {
+          id: participant.id,
+          userId: parsedTargetUserId,
+          seasonId: season.id,
+          tradingAccountId: participant.tradingAccountId,
+          ...this.publicRankingParticipantWhere(),
+          season: { status: SeasonStatus.active },
+          tradingAccount: {
+            id: participant.tradingAccountId,
+            userId: parsedTargetUserId,
+            mode: 'season',
+            status: 'active',
+            seasonParticipant: { id: participant.id },
+          },
+        },
+        select: { id: true },
+      });
+      if (
+        !eligible ||
+        currentSeason?.id !== season.id ||
+        currentSeason.status !== SeasonStatus.active
+      ) {
+        portfolioAccess = 'unavailable';
+        portfolioReason = 'CURRENT_ACTIVE_SEASON_UNAVAILABLE';
+        portfolio = null;
+      }
+      if (portfolio) {
+        portfolioAccess = await readPortfolioAccess(
+          this.prisma,
+          authUserId,
+          parsedTargetUserId,
+        );
+        if (portfolioAccess !== 'available') portfolio = null;
+      }
     }
 
     return {
@@ -1946,15 +1981,15 @@ export class RecordsService {
     const since = new Date(valuationAt);
     since.setUTCHours(0, 0, 0, 0);
     since.setUTCDate(since.getUTCDate() - 29);
-    const [positions, snapshots] = await Promise.all([
-      this.prisma.position.findMany({
-        where: { tradingAccountId, quantity: { gt: 0 } },
-        select: {
-          assetId: true,
-          asset: { select: { name: true, symbol: true, assetType: true } },
-        },
-        orderBy: { assetId: 'asc' },
-      }),
+    const [positions, futures, snapshots] = await Promise.all([
+      this.positionsService.readOpenHoldingProjection(
+        tradingAccountId,
+        valuationAt,
+      ),
+      this.prisma.$transaction(
+        (tx) => readFuturesHoldingSummaries(tx, tradingAccountId, valuationAt),
+        { isolationLevel: 'RepeatableRead' },
+      ),
       this.prisma.dailyPortfolioSnapshot.findMany({
         where: {
           tradingAccountId,
@@ -1987,8 +2022,7 @@ export class RecordsService {
           }
         : null,
       holdings: positions.map((position) => ({
-        assetId: position.assetId,
-        ...position.asset,
+        ...position,
         weight:
           denominator?.gt(0) && values.has(position.assetId)
             ? new Prisma.Decimal(values.get(position.assetId)!)
@@ -1997,6 +2031,7 @@ export class RecordsService {
                 .toFixed(8)
             : null,
       })),
+      futures,
       history: snapshots.map((point) => ({
         date: this.formatDateOnly(point.snapshotDate),
         totalAssetKrw: this.formatDecimal(point.totalAssetKrw, 8),

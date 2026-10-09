@@ -4,6 +4,7 @@ import {
   isBeginnerModeEnabled,
 } from '../trading-accounts/account-mode-policy';
 import { releaseFuturesEntryReservation } from './futures-limit-state';
+import { presentFuturesPerformance } from './futures-position-display';
 import { createApiError } from '../common/api-error';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import {
@@ -742,6 +743,7 @@ export class FuturesService {
             const risk = mark ? positionRisk(row, mark.price, fee) : null;
             return {
               ...presentFuturesPosition(row),
+              ...presentFuturesPerformance(row, risk),
               markPrice: mark?.price.toFixed(8) ?? null,
               markUnrealizedPnl: risk?.unrealizedPnl.toFixed(8) ?? null,
               markEvidence: mark

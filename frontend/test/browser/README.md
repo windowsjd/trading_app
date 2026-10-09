@@ -1,5 +1,20 @@
 # Trading UI browser regression
 
+Holdings and positions uses `NODE_PATH=/path/to/browser-tools/node_modules node
+test/browser/holdingsBrowser.cjs`. Production Home (General/Season/Beginner),
+Wallet, Portfolio, market AccountHoldings, Futures detail and friend/ranking user
+detail run with fixture HTTP and navigation. It checks 128 layouts at
+320/360/390/430px, Light/Dark, font scales 1/2, long names, large signed financial
+values and tiny quantities, including glyph and container bounds. Additional
+flows cover separate empty/failure/delayed reads, stale/missing valuation, domain
+navigation and in-flight privacy revocation (DOM and query cache). Artifacts
+default to `/tmp/trading-holdings-browser` (`HOLDINGS_BROWSER_OUTPUT` overrides).
+`conditionalBrowser.cjs` tests the single TP/SL entrance, editor/management,
+existing registration request count and viewport resize with the actual market
+detail and order screens. `HoldingCardsLayout.test.ts` adds Android/iOS host
+contracts; these checks do not substitute for physical-device rendering or IME
+verification. No production database or trading flag is used by browser tests.
+
 Admin diagnostics uses `NODE_PATH=/path/to/browser-tools/node_modules node
 test/browser/adminDiagnosticBrowser.cjs` with the same external esbuild/Playwright
 setup. Production ErrorState/ErrorNotice/AdminDiagnosticPanel and React Query

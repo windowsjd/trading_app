@@ -1,5 +1,6 @@
 // Test transport only. Production Home, account provider, cache, selection
 // storage, API wrappers, appearance and AccountSwitcher all run unchanged.
+import { futuresFixture } from '../futuresFixtures.cjs';
 const params = new URLSearchParams(location.search);
 const long = params.get('long') === '1';
 const variant = params.get('state');
@@ -23,7 +24,7 @@ export const transport = {
     { ...base, id: 'general-account', mode: 'general', season: null },
   ],
 };
-export const navigation = { calls: [], navigate(...args) { this.calls.push(args); if (window.fixture?.navigationRef?.isReady()) window.fixture.navigationRef.navigate(...args); } };
+export const navigation = { calls: [], isFocused: () => true, addListener: () => () => {}, navigate(...args) { this.calls.push(args); if (window.fixture?.navigationRef?.isReady()) window.fixture.navigationRef.navigate(...args); } };
 if (params.has('past')) transport.accounts.push({ ...base, id: 'past-account', mode: 'season', status: 'closed',
   season: { ...season, seasonId: 'past-season', seasonName: '지난 시즌', seasonStatus: 'settled', participantStatus: 'finished' } });
 // Entry scenarios are explicit fixture inputs; production selection stays real.
@@ -134,6 +135,7 @@ export const apiClient = {
       { id: `${account.id}:spot`, walletScope: 'crypto_spot', currencyCode: 'USD', balanceAmount: long ? '1234567890123.45' : '500.12', reservedAmount: '100.00' },
       { id: `${account.id}:usd`, walletScope: 'securities', currencyCode: 'USD', reservedAmount: '20', balanceAmount: long ? '1234567890123.45' : '50.39' },
     ] : [] });
+    if (path.endsWith('/futures/positions')) return response(futuresFixture(account.id).positions);
     if (path.endsWith('/positions')) {
       const offset = config?.params?.offset ?? 0, limit = config?.params?.limit ?? 20;
       if (transport.delay === `${account.id}:positions`) await new Promise((resolve) => transport.pending.push(resolve));

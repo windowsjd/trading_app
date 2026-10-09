@@ -34,6 +34,22 @@ holdings with canonical valuation weights, and existing daily snapshots from
 the last 30 calendar days. Missing valuation is represented explicitly with
 null amounts/weights; no synthetic zero values or interpolated history.
 
+The authorized detail additionally includes Spot holding `quantity`, `market`,
+`currencyCode` and a minimal canonical `valuation` (state, local currency/value,
+unrealized PnL and return rate). It reuses the owner Positions valuation policy,
+including explicitly labelled stale cache and unavailable states; it exposes no
+cost basis, order, wallet, ledger, diagnostic or provider metadata.
+`futures` contains `evaluatedAt` and open position summaries: public underlying
+identity, direction, margin mode, leverage, fresh Mark
+notional/PnL/ROI and Mark timestamps. It exposes no shared collateral, risk or
+transaction controls or margin balances. The ROI basis is calculated on the
+server and is not returned. See the Futures position display projection for the basis.
+The existing friend holding asset-id ordering is retained.
+Both projections are read only and exist solely inside this guarded detail.
+Friendship/privacy and current season/participant/account eligibility are
+revalidated after all financial reads; a revoked permission discards the entire
+portfolio. Ranking, friend search and historical public records are unchanged.
+
 Portfolio access requires an active target, an accepted friendship, the target's
 public setting, and participation in the selected current active season with a
 valid season account. Hidden/excluded participants remain hidden. Self can use

@@ -30,7 +30,11 @@ async function main(){
   if(scenario==='attached-entry'){
     await page.getByTestId('order-type-toggle-limit').click();
     await page.getByTestId('attached-entry-editor').waitFor();
-  }else await page.getByTestId('protection-panel').waitFor();
+  }else {
+    await page.getByTestId(futures ? 'futures-protection-A:position' : 'holding-protection-BTC').click();
+    await page.getByTestId('protection-panel').waitFor();
+    assert.equal(await page.getByTestId('protection-panel').count(), 1);
+  }
   await page.evaluate(({futures,theme})=>(futures?window.futuresAppearance:window.tradingAppearance).setPreference(theme),{futures,theme});
   if(editor){
     await page.getByTestId('protection-stop_loss-toggle').click();await page.getByLabel('손절 (Stop Loss) 조건 가격',{exact:true}).fill('90000.00000001');
@@ -49,9 +53,9 @@ async function main(){
   }
  }
  for(const protection of ['loading','error']){await page.goto(`${base}/futures?kind=cross&protection=${protection}`);await page.getByText(protection==='loading'?'익절·손절 상태 확인 중…':'익절·손절 정보를 불러오지 못했습니다.',{exact:true}).waitFor();}
- for(const mode of ['REDUCE_ONLY','DISABLED']){await page.goto(`${base}/futures?kind=cross&protection=active&mode=${mode}`);await page.getByTestId('protection-panel').waitFor();assert.equal(await page.getByText('조건 실행 일시 중지',{exact:true}).count()>0,mode==='DISABLED');}
+ for(const mode of ['REDUCE_ONLY','DISABLED']){await page.goto(`${base}/futures?kind=cross&protection=active&mode=${mode}`);await page.getByTestId('futures-protection-A:position').click();await page.getByTestId('protection-panel').waitFor();assert.equal(await page.getByText('조건 실행 일시 중지',{exact:true}).count()>0,mode==='DISABLED');}
  await page.goto(`${base}/futures?kind=open&protection=complete&mode=DISABLED`);await page.getByTestId('protection-panel').waitFor();await page.getByTestId('protection-history-toggle').click();await page.getByText(/보호 완료/).waitFor();assert.equal(await page.getByTestId('protection-stop_loss-toggle').count(),0);
- await page.setViewportSize({width:320,height:568});await page.goto(`${base}/futures?kind=cross&protection=editor`);await page.getByTestId('protection-stop_loss-toggle').click();
+ await page.setViewportSize({width:320,height:568});await page.goto(`${base}/futures?kind=cross&protection=editor`);await page.getByTestId('futures-protection-A:position').click();await page.getByTestId('protection-stop_loss-toggle').click();
  const input=page.getByLabel('손절 (Stop Loss) 조건 가격',{exact:true});await input.fill('99');await input.focus();await page.setViewportSize({width:320,height:300});await page.waitForTimeout(100);await input.scrollIntoViewIfNeeded();assert.ok(await input.isVisible());await page.screenshot({path:path.join(out,'320-keyboard-resize.png')});
  await page.getByRole('button',{name:'보호 조건 등록',exact:true}).click();await page.getByText('익절·손절 보호를 등록했습니다.',{exact:true}).waitFor();assert.equal(await page.evaluate(()=>window.futuresFixture.requests.filter(r=>r.path.endsWith('/protections')).length),1);
  assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'report.json'),JSON.stringify({layouts:results.length,results,errors,keyboard:'Web input focus + viewport resize; native IME not exercised'},null,2));console.log(`Conditional browser PASS ${results.length} layouts + stale/error/mode and keyboard-resize flows`);

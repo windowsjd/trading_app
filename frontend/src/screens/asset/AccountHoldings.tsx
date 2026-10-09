@@ -1,18 +1,15 @@
 import ProtectionPanel from '../../features/conditional/ProtectionPanel';
-import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from '../../theme/native';
 import { useQuery } from '@tanstack/react-query';
-import Decimal from 'decimal.js';
 import {
   getTradingAccountPositions,
   type TradingAccountDto,
 } from '../../features/tradingAccount/api';
 import { getAccountHoldings } from '../../features/tradingAccount/holdings';
 import { getIntegrityErrorMessage } from '../../features/tradingAccount/integrityErrors';
-import { getTradingAssetName } from '../../features/asset/tradingHeader';
-import { getPositionDisplay } from '../../features/position/display';
+import PositionAssetRow from '../../components/tradingAccount/PositionAssetRow';
 import type { PositionItemDto } from '../../features/position/api';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import ActionPressable from '../../components/common/ActionPressable';
@@ -26,6 +23,8 @@ type Props = {
   account: TradingAccountDto | null;
   assetId: string;
   isFocused: boolean;
+  onInputFocus?: (input: View | null) => void;
+  onInputBlur?: () => void;
 };
 
 export default function AccountHoldings({
@@ -33,13 +32,16 @@ export default function AccountHoldings({
   account,
   assetId,
   isFocused,
+  onInputFocus,
+  onInputBlur,
 }: Props) {
   const [filter, setFilter] = useState<'all' | 'current' | 'pending'>('current');
   const query = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.holdings(accountId ?? ''),
     queryFn: () =>
       getAccountHoldings(accountId ?? '', getTradingAccountPositions),
-    enabled: !!accountId && filter !== 'pending',
+    enabled: !!accountId && isFocused && filter !== 'pending',
+    refetchInterval: isFocused ? 4000 : false,
   });
   // No previous-account placeholder; the envelope check also protects display
   // if a caller ever seeds the wrong account into this cache entry.
@@ -127,63 +129,27 @@ export default function AccountHoldings({
         />
       ) : (
         visible.map((position) => (
-          <HoldingRow key={`${accountId}:${position.assetId}`} accountId={accountId} position={position} />
+          <HoldingRow key={`${accountId}:${position.assetId}`} accountId={accountId} position={position}
+            onInputFocus={onInputFocus} onInputBlur={onInputBlur} />
         ))
       )}
     </View>
   );
 }
 
-function HoldingRow({ position, accountId }: { position: PositionItemDto; accountId: string }) {
+function HoldingRow({ position, accountId, onInputFocus, onInputBlur }: {
+  position: PositionItemDto; accountId: string;
+  onInputFocus?: (input: View | null) => void; onInputBlur?: () => void;
+}) {
   const [protection, setProtection] = useState(false);
-  const display = getPositionDisplay(position);
-  const valuation = position.valuation;
-  const values = [
-    ['보유수량', display.quantity, null],
-    ['평균단가', display.averageCost, null],
-    ['현재가', display.currentPrice ?? '시세 조회 불가', null],
-    ['평가금액', display.positionValueKrw, null],
-    [
-      '평가손익',
-      display.unrealizedPnlKrw,
-      valuation.state === 'unavailable' ? null : valuation.unrealizedPnlKrw,
-    ],
-    [
-      '수익률',
-      display.returnRate,
-      valuation.state === 'unavailable' ? null : valuation.returnRate,
-    ],
-  ];
   return (
     <View style={styles.row} testID={`holding-${position.assetId}`}>
-      <Text style={styles.pair}>
-        {getTradingAssetName(position)} / {position.currencyCode}
-      </Text>
-      {values.map(([label, value, signed]) => (
-        <View key={label} style={styles.metric}>
-          <Text style={styles.label}>{label}</Text>
-          <Text
-            selectable
-            style={[
-              styles.value,
-              signed !== null && new Decimal(signed).gt(0)
-                ? styles.up
-                : signed !== null && new Decimal(signed).lt(0)
-                  ? styles.down
-                  : null,
-            ]}
-          >
-            {value}
-          </Text>
-        </View>
-      ))}
+      <PositionAssetRow position={position} testID={`spot-card-${position.assetId}`} />
       <ActionPressable accessibilityRole="button" testID={`holding-protection-${position.assetId}`} onPress={() => setProtection(!protection)} style={styles.retry}>
         <Text style={styles.value}>TP/SL 설정·관리</Text>
       </ActionPressable>
-      {protection ? <ProtectionPanel accountId={accountId} assetId={position.assetId} positionId={position.positionId} domain="spot" currency={position.currencyCode} /> : null}
-      {display.priceNotice ? (
-        <Text style={styles.notice}>{display.priceNotice}</Text>
-      ) : null}
+      {protection ? <ProtectionPanel accountId={accountId} assetId={position.assetId} positionId={position.positionId}
+        domain="spot" currency={position.currencyCode} onInputFocus={onInputFocus} onInputBlur={onInputBlur} /> : null}
     </View>
   );
 }
@@ -226,17 +192,6 @@ const styles = StyleSheet.create({
     gap: 12,
     minWidth: 0,
   },
-  pair: { fontSize: 17, fontWeight: '700', color: semantic.text },
-  // A long value moves below its label. It can then wrap across the full row;
-  // neither native font scaling nor large KRW values require truncation.
-  metric: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'baseline',
-    columnGap: 12,
-    rowGap: 4,
-  },
-  label: { fontSize: 13, color: semantic.muted },
   value: {
     fontSize: 14,
     color: semantic.secondary,
@@ -244,9 +199,6 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     maxWidth: '100%',
   },
-  up: { color: financial.rise },
-  down: { color: financial.fall },
-  notice: { fontSize: 12, color: semantic.warning },
   retry: {
     backgroundColor: semantic.raised,
     alignSelf: 'flex-start',

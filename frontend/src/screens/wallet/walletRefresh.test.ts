@@ -10,11 +10,11 @@ for (const mode of ['general', 'season']) it(`${mode}: Wallet refresh includes o
   assert.equal(trend().props.expanded, false); assert.equal(trend().props.range, '30d');
   assert.equal(h.requests.some(request => request.section === 'equity'), false);
   h.requests.length = 0; await h.refresh();
-  assert.deepEqual(h.requests.map(request => request.section).sort(), ['portfolio', 'positions', 'wallets']);
+  assert.deepEqual(h.requests.map(request => request.section).sort(), ['futures', 'portfolio', 'positions', 'wallets']);
   act(() => trend().props.onToggle()); await flush();
   act(() => trend().props.onRangeChange('90d')); await flush();
   h.requests.length = 0; await h.refresh();
-  assert.deepEqual(h.requests.map(request => request.section).sort(), ['equity', 'portfolio', 'positions', 'wallets']);
+  assert.deepEqual(h.requests.map(request => request.section).sort(), ['equity', 'futures', 'portfolio', 'positions', 'wallets']);
   assert.deepEqual(h.requests.find(request => request.section === 'equity'), { section: 'equity', account: mode, range: '90d', granularity: 'daily' });
   assert.equal(h.client.getQueryCache().getAll().some(query => query.state.isInvalidated), false);
   h.beforeRead = async () => { throw new Error('offline'); };

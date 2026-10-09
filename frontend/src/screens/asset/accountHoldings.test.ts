@@ -1,3 +1,4 @@
+import { semantic } from '../../theme/tokens.ts';
 import { financial } from '../../theme/financialColors.ts';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -317,6 +318,7 @@ describe('holdings in Order with real React Query and order invalidation', () =>
       state: 'available',
       currentPrice: '763.79',
       priceCurrency: 'USD',
+      positionValue: '12345.67', unrealizedPnl: pnl,
       positionValueKrw: '1234567890123',
       unrealizedPnlKrw: pnl,
       returnRate: rate,
@@ -344,10 +346,10 @@ describe('holdings in Order with real React Query and order invalidation', () =>
     for (const [id, color] of [
       ['btc', financial.rise],
       ['eth', financial.fall],
-      ['samsung', null],
+      ['samsung', semantic.secondary],
     ]) {
       const row = h.node(`holding-${id}`);
-      const rate = row.findAllByType('Text').find((n:any) => typeof n.props.children === 'string' && n.props.children.endsWith('%'));
+      const rate = h.node(`spot-card-${id}-return`);
       assert.equal(rate.props.style[1]?.color ?? null, color);
     }
     await h.press('asset-krw-toggle');

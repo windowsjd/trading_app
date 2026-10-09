@@ -219,3 +219,18 @@ never after end), then atomically closes each account's lifetimes before final
 ranking. `FuturesSeasonSettlement`/`FuturesSeasonClose` distinguish normal final
 exits from liquidation; cash ledger uses `futures_season_settlement`. Details,
 failure/retry policy and activation checklist: [F3 contract](futures-f3-contract.md).
+
+## Position display projection
+
+The existing account-scoped `GET /api/v1/trading-accounts/:id/futures/positions`
+additionally returns decimal strings `initialMargin`, `markNotional` and `roi`
+per open position. This is a read-only display extension, with no change to
+execution, risk, collateral, liquidation or portfolio valuation.
+
+`markNotional` reuses the current fresh Mark × quantity risk result. `roi` is
+Mark unrealized PnL / `initialMargin` × 100, rounded half-up to eight decimals.
+Isolated uses the stored allocated margin. Cross uses the stored remaining
+`entryNotional` / fixed leverage, rounded upward to the existing monetary scale;
+it never uses pooled collateral or current Mark initial requirement. The stored
+entry basis survives increases and proportional reductions. Missing/stale Mark
+leaves `markNotional` and `roi` null while position facts remain readable.

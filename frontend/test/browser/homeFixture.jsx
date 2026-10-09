@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { NavigationContext } from '@react-navigation/native';
 import { AppearanceProvider, useAppearance } from '../../src/theme/appearance';
 import { TradingAccountProvider, useTradingAccount } from '../../src/features/tradingAccount/TradingAccountContext';
 import Home from '../../src/screens/home/HomeScreen';
@@ -18,7 +19,7 @@ function Screen() {
 createRoot(document.getElementById('root')).render(
   <QueryClientProvider client={client}>
     <AppearanceProvider>
-      <TradingAccountProvider><Screen /></TradingAccountProvider>
+      <NavigationContext.Provider value={navigation}><TradingAccountProvider><Screen /></TradingAccountProvider></NavigationContext.Provider>
     </AppearanceProvider>
   </QueryClientProvider>,
 );

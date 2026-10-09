@@ -38,7 +38,7 @@ describe('Home asset hierarchy and real portfolio/ranking/me sources', () => {
       assert.equal(total.props.children.join(''), '10,001,000원');
       assert.ok(total.props.style.fontSize > 26);
       assert.ok(texts(tree).includes('-2,345'));
-      const detail = textNodes.find((node) => texts(node) === '보유 종목');
+      const detail = textNodes.find((node) => texts(node) === '보유종목 및 포지션');
       assert.ok(textNodes.indexOf(total) < textNodes.indexOf(detail));
       assert.equal(detail.props.style.fontSize, 18);
       assert.equal(detail.props.style.lineHeight, 27);
@@ -61,8 +61,8 @@ describe('Home asset hierarchy and real portfolio/ranking/me sources', () => {
       } else {
         assert.equal(texts(nickname), '김재민');
         assert.equal(elements(tree, 'ProfileAvatar').length, 1);
-        assert.equal(rank, undefined);
-        assert.equal(tier, undefined);
+        assert.equal(rank === undefined, true);
+        assert.equal(tier === undefined, true);
       }
       for (const normal of ['진행 중', '참가 중', '운영 중']) assert.ok(!texts(tree).includes(normal));
     });
@@ -181,7 +181,7 @@ describe('Home keeps exchange entry in Wallet', () => {
           assert.ok(texts(notice).includes('거래 제한'));
           assert.ok(texts(notice).includes(getCapabilityBlockMessage(caps, caps.tradeBlockReason)));
         } else {
-          assert.equal(notice, undefined);
+          assert.equal(notice === undefined, true);
         }
         const walletTree = h.renderWallet().tree;
         assert.equal(elements(walletTree, 'Pressable').find(
@@ -315,7 +315,7 @@ describe('general/season home API, queries, rendering and navigation integration
       const text = texts(tree) + texts(chart);
       for (const label of [
         '자산 추이',
-        '보유 종목',
+        '보유종목 및 포지션',
       ])
         assert.ok(text.includes(label), label);
       if (mode === 'general') {
@@ -374,7 +374,7 @@ describe('general/season home API, queries, rendering and navigation integration
       });
       const failed = h.render();
       assert.equal(elements(failed.tree, 'ErrorState').length, 1);
-      assert.equal(failed.chart, null);
+      assert.equal(failed.chart === null, true);
       const error = new Error('network unavailable');
       h.failEquity(error);
       const transient = h.openTrend();
@@ -396,7 +396,7 @@ describe('general/season home API, queries, rendering and navigation integration
       ]) {
         h.account = { ...h.account, id: nextMode + '-new', mode: nextMode };
         const next = h.render();
-        assert.equal(next.chart, null);
+        assert.equal(next.chart === null, true);
         assert.equal(elements(next.tree, 'SectionSkeleton').length, 1);
         assert.ok(
           h.queries
@@ -497,7 +497,7 @@ describe('general/season home API, queries, rendering and navigation integration
         assert.ok(error instanceof DailyEquityContractError);
         h.failEquity(error);
         const result = h.render();
-        assert.equal(result.chart, null);
+        assert.equal(result.chart === null, true);
         assert.equal(elements(result.tree, 'ErrorState').length, 1);
         h.close();
       }

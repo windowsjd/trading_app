@@ -44,6 +44,10 @@ export type FuturesPosition = {
   averageEntryPrice: string;
   leverage: number;
   isolatedMargin: string;
+  realizedPnl: string;
+  initialMargin: string;
+  markNotional: string | null;
+  roi: string | null;
   instrument: FuturesInstrument;
   markPrice: string | null;
   referencePrice: string | null;
@@ -65,6 +69,13 @@ export type FuturesPosition = {
     liquidationBuffer?: string;
     liquidationPrice: string | null;
   } | null;
+};
+/** Minimal authorized display projection, shared with friend detail. */
+export type FuturesHolding = Pick<FuturesPosition,
+  'direction' | 'marginMode' | 'leverage' | 'markNotional' |
+  'roi' | 'markUnrealizedPnl' | 'markState'> & {
+  assetId: string; name: string; symbol: string;
+  markEvidence: PriceTimes | null;
 };
 export type FuturesPositions = {
   tradingAccountId: string;

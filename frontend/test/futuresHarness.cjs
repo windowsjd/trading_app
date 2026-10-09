@@ -32,6 +32,7 @@ function futuresHarness(options = {}) {
     } },
   });
   const native = Object.fromEntries(['View', 'Text', 'SafeAreaView', 'ScrollView', 'TextInput', 'KeyboardAvoidingView'].map(name => [name, name]));
+  native.useWindowDimensions = () => options.dimensions ?? { width: 390, height: 844, fontScale: 1 };
   Object.assign(native, { AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }, Platform: { OS: 'web' }, StyleSheet: { create: value => value }, Keyboard: { addListener: () => ({ remove() {} }), dismiss() {} } });
   const conditionalApi = load(resolve(__dirname, '../src/features/conditional/api.ts'), {
     '../../services/api/client': { apiClient: {

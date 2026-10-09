@@ -8,5 +8,6 @@ import { TradingAccountPositionsController } from './trading-account-positions.c
   imports: [TradingAccountsModule],
   controllers: [PositionsController, TradingAccountPositionsController],
   providers: [PositionsService],
+  exports: [PositionsService],
 })
 export class PositionsModule {}

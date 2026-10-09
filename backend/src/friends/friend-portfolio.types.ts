@@ -1,4 +1,5 @@
-import type { AssetType } from '../generated/prisma/client';
+import type { PositionsService } from '../positions/positions.service';
+import type { readFuturesHoldingSummaries } from '../futures/futures-position-display';
 export type FriendPortfolio = {
   valuationState: 'available' | 'unavailable';
   allocation: {
@@ -7,12 +8,13 @@ export type FriendPortfolio = {
     usStockValueKrw: string;
     cryptoValueKrw: string;
   } | null;
-  holdings: Array<{
-    assetId: string;
-    name: string;
-    symbol: string;
-    assetType: AssetType;
-    weight: string | null;
-  }>;
+  holdings: Array<
+    Awaited<
+      ReturnType<PositionsService['readOpenHoldingProjection']>
+    >[number] & {
+      weight: string | null;
+    }
+  >;
+  futures: Awaited<ReturnType<typeof readFuturesHoldingSummaries>>;
   history: Array<{ date: string; totalAssetKrw: string; returnRate: string }>;
 };

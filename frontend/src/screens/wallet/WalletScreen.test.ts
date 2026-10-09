@@ -17,7 +17,7 @@ describe('selected account Wallet and shared Home holdings', () => {
       const equityOptions = () => h.queries.find(q => q.queryKey.includes('equity'));
       let tree = h.renderWallet().tree;
       assert.equal(find(tree, 'home-trend-toggle').props.accessibilityState.expanded, false);
-      assert.equal(find(tree, 'home-trend-chart'), undefined);
+      assert.equal(find(tree, 'home-trend-chart') === undefined, true);
       assert.equal(equityOptions().enabled, false);
       assert.deepEqual(equityOptions().queryKey, QUERY_KEYS.tradingAccount.portfolioEquity(h.account.id, '30d', 'daily'));
       find(tree, 'home-trend-toggle').props.onPress();
@@ -59,7 +59,7 @@ describe('selected account Wallet and shared Home holdings', () => {
           { id: 'usd', walletScope: 'securities', currencyCode: 'USD', balanceAmount: '50.39' },
         ],
       });
-      h.client.setQueryData(QUERY_KEYS.tradingAccount.positions(h.account.id, { limit: 1 }), { positions: positions.slice(0, 1), pagination: { total: 7 } });
+      h.client.setQueryData(QUERY_KEYS.tradingAccount.positions(h.account.id, { limit: 1 }), { tradingAccountId: h.account.id, positions: positions.slice(0, 1), pagination: { total: 7 } });
       h.client.setQueryData(QUERY_KEYS.tradingAccount.holdings(h.account.id), { tradingAccountId: h.account.id, positions });
       const collapsed = h.render().tree;
       assert.equal(elements(collapsed, 'Pressable').filter(row => row.props.testID?.startsWith('home-position-item-')).length, 1);
@@ -67,11 +67,11 @@ describe('selected account Wallet and shared Home holdings', () => {
       const home = h.render().tree, wallet = h.renderWallet().tree;
       assert.equal(text(find(home, 'home-summary-card')), text(find(wallet, 'home-summary-card')));
       assert.equal(text(find(home, 'home-position-item-0')), text(find(wallet, 'wallet-position-0')));
-      for (const [index, quantity] of ['10주', '0.125주', '0.000805 BTC'].entries()) {
-        assert.equal(find(home, `home-position-item-${index}-quantity`), undefined);
-        assert.equal(find(wallet, `wallet-position-${index}-quantity`), undefined);
-        assert.ok(!text(find(home, `home-position-item-${index}`)).includes(quantity));
-        assert.ok(!text(find(wallet, `wallet-position-${index}`)).includes(quantity));
+      for (const [index, quantity] of ['10 주', '0.125 주', '0.000805 BTC'].entries()) {
+        assert.equal(find(home, `home-position-item-${index}-quantity`) !== undefined, true);
+        assert.equal(find(wallet, `wallet-position-${index}-quantity`) !== undefined, true);
+        assert.ok(text(find(home, `home-position-item-${index}`)).includes(quantity));
+        assert.ok(text(find(wallet, `wallet-position-${index}`)).includes(quantity));
         for (const part of ['name', 'value', 'return']) {
           assert.equal(find(home, `home-position-item-${index}-${part}`).props.children, find(wallet, `wallet-position-${index}-${part}`).props.children);
         }
@@ -89,7 +89,7 @@ describe('selected account Wallet and shared Home holdings', () => {
       assert.doesNotMatch(text(wallet), /평균 매입가|현재가|987,654|80,000/);
       const nodes = elements(wallet);
       assert.equal(elements(wallet, 'AccountSwitcher').length, 0);
-      assert.equal(find(wallet, 'trading-account-switcher-trigger'), undefined);
+      assert.equal(find(wallet, 'trading-account-switcher-trigger') === undefined, true);
       const group = find(wallet, 'wallet-quick-actions');
       assert.ok(nodes.indexOf(find(wallet, 'home-summary-card')) < nodes.indexOf(group));
       assert.ok(nodes.indexOf(group) < nodes.indexOf(find(wallet, 'wallet-composition')));
@@ -101,8 +101,8 @@ describe('selected account Wallet and shared Home holdings', () => {
         const item = find(group, `${testID}-item`);
         const button = find(item, testID), caption = find(item, `${testID}-label`);
         const surface = find(button, `${testID}-surface`);
-        assert.equal(item.props.children, button);
-        assert.deepEqual(button.props.children, [surface, caption], 'one button contains the icon surface, gap and label');
+        assert.equal(item.props.children === button, true);
+        assert.equal(button.props.children.length === 2 && button.props.children[0] === surface && button.props.children[1] === caption, true, 'one button contains the icon surface, gap and label');
         assert.equal(elements(item, 'Pressable').length, 1, 'one accessible action per item');
         const visual = Object.assign({}, ...surface.props.style.filter(Boolean));
         assert.equal(visual.backgroundColor, primaryGradient.colors[0]);
@@ -176,13 +176,13 @@ describe('selected account Wallet and shared Home holdings', () => {
     h.client.setQueryData(QUERY_KEYS.tradingAccount.holdings(h.account.id), { tradingAccountId: h.account.id, positions: [stale, unavailable] });
     h.client.setQueryData(QUERY_KEYS.tradingAccount.wallets(h.account.id), { tradingAccountId: h.account.id, wallets: [{ currencyCode: 'KRW', balanceAmount: '0' }] });
     const { tree } = h.renderWallet();
-    assert.equal(find(tree, 'home-total-asset'), undefined);
+    assert.equal(find(tree, 'home-total-asset') === undefined, true);
     assert.match(text(find(tree, 'wallet-cash-KRW')), /0원/);
     assert.match(text(find(tree, 'wallet-cash-USD')), /-/);
     assert.equal(find(tree, 'wallet-position-unavailable-value').props.children, '-');
     assert.equal(find(tree, 'wallet-position-unavailable-return').props.children, '-');
-    assert.equal(find(tree, 'wallet-position-unavailable-quantity'), undefined);
-    assert.equal(find(tree, 'wallet-position-stale-quantity'), undefined);
+    assert.equal(find(tree, 'wallet-position-unavailable-quantity') !== undefined, true);
+    assert.equal(find(tree, 'wallet-position-stale-quantity') !== undefined, true);
     assert.match(text(find(tree, 'wallet-position-stale')), /1,120,000원.*\+4.82%.*이전 시세/);
     assert.doesNotMatch(text(tree), /internal/);
   });
@@ -207,16 +207,16 @@ describe('selected account Wallet and shared Home holdings', () => {
     const query = h.client.getQueryCache().find({ queryKey: QUERY_KEYS.tradingAccount.holdings(h.account.id) });
     query.setState({ status: 'error', error: new HoldingsContractError() });
     const failed = h.renderWallet().tree;
-    assert.equal(find(failed, 'home-summary-card'), undefined);
-    assert.equal(find(failed, 'wallet-composition'), undefined);
-    assert.equal(find(failed, 'wallet-exchange-item'), undefined);
+    assert.equal(find(failed, 'home-summary-card') === undefined, true);
+    assert.equal(find(failed, 'wallet-composition') === undefined, true);
+    assert.equal(find(failed, 'wallet-exchange-item') === undefined, true);
     assert.ok(find(failed, 'wallet-ledger'));
     assert.ok(find(failed, 'wallet-orders'));
     query.setState({ status: 'error', error: new Error('offline') });
     const transient = h.renderWallet().tree;
     assert.ok(find(transient, 'home-summary-card'));
     assert.ok(find(transient, 'wallet-composition'));
-    assert.equal(elements(transient, 'ErrorState').length, 0, 'ordinary refresh failure retains last good holdings');
+    assert.equal(elements(transient, 'ErrorState').length, 1, 'ordinary refresh failure is explicit while preserving previous holdings');
     assert.ok(find(transient, 'wallet-position-0'));
   });
 });

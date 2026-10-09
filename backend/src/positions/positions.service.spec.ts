@@ -696,6 +696,88 @@ describe('PositionsService', () => {
     expectNoPositionWrites(prisma);
   });
 
+  it.each(['available', 'stale_cache', 'unavailable'])(
+    'friend projection reuses canonical %s Spot valuation without private fields',
+    async (state) => {
+      const { prisma, service } = createService();
+      const row = position({
+        id: 'spot',
+        quantity: '0.00000001',
+        averageCost: '90',
+        ...(state === 'stale_cache'
+          ? {
+              currentPriceLocal: '100',
+              currentPriceKrw: '100',
+              marketValueLocal: '0.000001',
+              marketValueKrw: '0.000001',
+              unrealizedPnlLocal: '0.0000001',
+              unrealizedPnlKrw: '0.0000001',
+            }
+          : {}),
+      });
+      prisma.position.findMany.mockResolvedValue([row]);
+      prisma.assetPriceSnapshot.findFirst.mockResolvedValue(
+        state === 'available' ? priceSnapshot('price', '100') : null,
+      );
+      mockCurrentSeason(prisma);
+      mockJoined(prisma);
+      const owner = (await service.getPositions('user-1')).data.positions[0];
+      const [projection] = await service.readOpenHoldingProjection(
+        participant.tradingAccountId,
+        new Date(),
+      );
+      expect(projection.quantity).toBe(owner.quantity);
+      expect(projection.valuation.state).toBe(state);
+      expect(projection.valuation.state).toBe(owner.valuation.state);
+      if (
+        projection.valuation.state !== 'unavailable' &&
+        owner.valuation.state !== 'unavailable'
+      ) {
+        expect(projection.valuation.positionValue).toBe(
+          owner.valuation.positionValue,
+        );
+        expect(projection.valuation.unrealizedPnl).toBe(
+          owner.valuation.unrealizedPnl,
+        );
+        expect(projection.valuation.returnRate).toBe(
+          owner.valuation.returnRate,
+        );
+      }
+      expect(JSON.stringify(projection)).not.toMatch(
+        /"(?:averageCost|realizedPnl|diagnostic|priceSource|wallet|order)"/,
+      );
+      expect(prisma.position.findMany).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          where: {
+            tradingAccountId: participant.tradingAccountId,
+            quantity: { gt: 0 },
+          },
+        }),
+      );
+      expectNoPositionWrites(prisma);
+    },
+  );
+
+  it('retains friend asset-id ordering independently of owner valuation and symbol sorting', async () => {
+    const { prisma, service } = createService();
+    prisma.position.findMany.mockResolvedValue([
+      position({ id: 'b', symbol: 'AAA', quantity: '100', averageCost: '90' }),
+      position({ id: 'a', symbol: 'ZZZ', quantity: '1', averageCost: '90' }),
+    ]);
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValue(
+      priceSnapshot('price', '100'),
+    );
+    const projection = await service.readOpenHoldingProjection(
+      participant.tradingAccountId,
+      new Date(),
+    );
+    expect(projection.map((item) => item.assetId)).toEqual([
+      'asset-a',
+      'asset-b',
+    ]);
+    expectNoPositionWrites(prisma);
+  });
+
   it('returns USD position KRW valuation using fresh approved admin_manual USD/KRW', async () => {
     const { prisma, service } = createService();
     mockCurrentSeason(prisma);

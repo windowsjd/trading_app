@@ -27,7 +27,6 @@ import {
   type Direction,
   type MarginMode,
   type Operation,
-  type FuturesPosition,
   type FuturesCommand,
   type FuturesInstrument,
 } from "../../features/futures/api";
@@ -59,6 +58,7 @@ import ActionPressable from "../../components/common/ActionPressable";
 import ErrorNotice from "../../components/states/ErrorNotice";
 import ErrorState from "../../components/states/ErrorState";
 import FullPageLoading from "../../components/states/FullPageLoading";
+import FuturesPositionCard from './FuturesPositionCard';
 
 export default function FuturesScreen(props: FuturesScreenProps) {
   return <BoundFuturesScreen key={`${props.route.params.accountId}:${props.route.params.instrumentId ?? ""}:${getSessionGeneration()}`} {...props} />;
@@ -79,6 +79,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const headerHeight = useHeaderHeight();
   const quantityRef = useRef<TextInput>(null);
   const leverageRef = useRef<TextInput>(null);
+  const tradeOffset = useRef(0);
   const [, setClock] = useState(Date.now());
   const clock = Date.now();
   const [selectedId, setSelectedId] = useState(route.params.instrumentId ?? "");
@@ -438,31 +439,22 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
             />
           </View>
         ) : null}
-        <Text style={styles.heading}>보유 포지션</Text>
+        <Text accessibilityRole="header" style={styles.heading}>포지션</Text>
         {!data.positions.length ? (
           <Text style={styles.muted}>보유 중인 선물 포지션이 없습니다.</Text>
         ) : (
           data.positions.map((p) => (
-            <View key={p.id} style={{ gap: 12 }}>
-              <PositionCard
-                position={p}
-                clock={clock}
-                timely={timely}
-                onSelect={() => choose(p.instrumentId)}
-              />
-              <ProtectionPanel
-                accountId={accountId}
-                assetId={p.instrument.underlying.assetId}
-                domain="futures"
-                currency="USD"
-                positionId={p.id}
-                onInputFocus={inputScroll.onInputFocus}
-                onInputBlur={inputScroll.onInputBlur}
-              />
-            </View>
+            <FuturesPositionCard key={p.id} position={p} accountId={accountId} evaluatedAt={data.evaluatedAt} now={clock}
+              disabled={mutation.isPending || pendingResult || limitBusy} capabilities={data.capabilities}
+              onSelect={op => {
+                if (submitLock.current || pendingResult || limitBusy) return;
+                choose(p.instrumentId); setEntryType('market'); setOperation(op);
+                inputScroll.scrollRef.current?.scrollTo({ y: tradeOffset.current, animated: true });
+              }}
+              onInputFocus={inputScroll.onInputFocus} onInputBlur={inputScroll.onInputBlur} />
           ))
         )}
-        <View style={styles.card}>
+        <View style={styles.card} onLayout={event => { tradeOffset.current = event.nativeEvent.layout.y; }}>
           <Text style={styles.heading}>선물 거래</Text>
           {!position ? <View style={styles.choices}>{(["market", "limit"] as const).map(type => <Choice key={type} label={type === "market" ? "시장가" : "지정가 진입"} selected={entryType === type} disabled={mutation.isPending || pendingResult || limitBusy} onPress={() => setEntryType(type)} />)}</View> : null}
           {instruments.isError ? (
@@ -878,78 +870,6 @@ function Choice({
         {label}
       </Text>
     </ActionPressable>
-  );
-}
-function PositionCard({
-  position: p,
-  clock,
-  timely,
-  onSelect,
-}: {
-  position: FuturesPosition;
-  clock: number;
-  timely: boolean;
-  onSelect: () => void;
-}) {
-  const fresh =
-    timely &&
-    p.markState === "fresh" &&
-    freshFuturesEvidence(p.markEvidence, clock);
-  return (
-    <View style={styles.card}>
-      <Text style={styles.heading}>
-        {p.instrument.underlying.symbol} · {directionLabel[p.direction]}
-      </Text>
-      <Text>
-        {marginLabel[p.marginMode]} · {p.leverage}x
-      </Text>
-      <Metric label="보유 수량" value={formatDisplayDecimal(p.quantity)} />
-      <Metric
-        label="평균 진입가"
-        value={price(p.averageEntryPrice, p.instrument)}
-      />
-      <Metric
-        label="현재가 · Spot 거래 기준"
-        value={
-          freshFuturesReference(p.referencePriceEvidence, clock)
-            ? price(p.referencePrice, p.instrument)
-            : "시세 확인 불가"
-        }
-      />
-      <Metric
-        label="Mark Price · 평가/청산 기준"
-        value={fresh ? price(p.markPrice, p.instrument) : "Mark 확인 불가"}
-      />
-      <Metric
-        label="Mark 미실현손익"
-        value={fresh ? usd(p.markUnrealizedPnl) : "평가 대기"}
-        pnl={fresh ? p.markUnrealizedPnl : null}
-      />
-      {p.marginMode === "isolated" ? (
-        <>
-          <Metric label="격리 담보" value={usd(p.isolatedMargin)} />
-          <Metric
-            label="예상 청산가"
-            value={
-              fresh && p.risk
-                ? p.risk.liquidationPrice === null
-                  ? "양수 가격 범위 내 없음"
-                  : price(p.risk.liquidationPrice, p.instrument)
-                : "평가 대기"
-            }
-          />
-          <Metric
-            label="유지 증거금 + 종료 수수료"
-            value={fresh ? usd(p.risk?.liquidationRequirement) : "평가 대기"}
-          />
-        </>
-      ) : null}
-      <CTAButton
-        variant="secondary"
-        label="이 포지션 Increase / Reduce / Close"
-        onPress={onSelect}
-      />
-    </View>
   );
 }
 function futuresErrorMessage(code: string | null) {

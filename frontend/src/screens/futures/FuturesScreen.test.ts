@@ -4,6 +4,55 @@ import { test } from "node:test";
 const { futuresHarness, deferred } = createRequire(import.meta.url)(
   "../../../test/futuresHarness.cjs",
 );
+
+for (const mode of ['ENABLED', 'REDUCE_ONLY', 'DISABLED']) test(`${mode}: detailed card selects the existing trade form without submitting and keeps capability restrictions`, async t => {
+  const h = futuresHarness({ position: true, mode });
+  await h.start(); t.after(h.close);
+  for (const op of ['increase', 'reduce', 'close']) {
+    const action = h.node(`futures-position-A:position-${op}`);
+    assert.equal(action.props.state, (mode === 'DISABLED' || (mode === 'REDUCE_ONLY' && op === 'increase')) ? 'disabled' : 'enabled');
+    if (action.props.state === 'enabled') {
+      await h.press(`futures-position-A:position-${op}`);
+      assert.equal(h.requests.length, 0);
+      assert.equal(h.node('futures-leverage') === undefined, true);
+      if (op !== 'close') {
+        assert.equal(h.node('futures-submit').props.state, 'disabled', 'selecting an operation still requires a valid quantity');
+        await h.change('futures-quantity', '0.5');
+      }
+      assert.equal(h.node('futures-submit').props.state, 'enabled');
+    }
+  }
+});
+
+test('the detailed TP/SL entrance manages one existing group and never opens a duplicate registration', async t => {
+  const h = futuresHarness({ position: true, protectionEnabled: true });
+  h.protectionOptions = { active: true };
+  await h.start(); t.after(h.close);
+  assert.equal(h.renderer.root.findAllByType('Text').some(n => [n.props.children].flat().join('') === 'TP/SL 보호 중'), true);
+  assert.equal(h.node('protection-stop_loss-toggle') === undefined, true);
+  await h.press('futures-protection-A:position');
+  assert.equal(h.renderer.root.findAll(n => typeof n.type === 'string' && n.props.testID === 'protection-panel').length, 1);
+  assert.equal(h.node('protection-stop_loss-toggle') === undefined, true);
+  assert.equal(h.renderer.root.findAllByType('CTAButton').some(n => n.props.label === '보호 조건 취소'), true);
+  assert.equal(h.requests.length, 0);
+  await h.press('futures-protection-A:position');
+  assert.equal(h.requests.length, 0);
+});
+
+test('closing from the detailed card sends the existing captured quantity and removes the refreshed open position', async t => {
+  const h = futuresHarness({ position: true });
+  await h.start(); t.after(h.close);
+  await h.press('futures-position-A:position-close');
+  assert.equal(h.requests.length, 0);
+  h.options.position = false;
+  await h.press('futures-submit');
+  assert.equal(h.requests.length, 1);
+  assert.equal(h.requests[0].body.operation, 'close');
+  assert.equal(h.requests[0].body.quantity, '2');
+  assert.equal(h.node('futures-position-A:position') === undefined, true);
+  assert.equal(h.invalidations.some(key => key.includes('A') && key.includes('futures')), true);
+  assert.equal(h.reads.filter(path => path.endsWith('/futures/positions')).length >= 2, true);
+});
 test("Reduce/Close uses the F1 captured-age rule even when the provider effective time is older", async (t) => {
   const h = futuresHarness({ position: true, stale: true, oldReference: true });
   await h.start();

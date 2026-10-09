@@ -9,7 +9,7 @@ for (const mode of ['general', 'season']) it(`${mode}: refresh covers context, c
   const trend = () => h.renderer.root.findByType('Trend');
   assert.equal(h.requests.some(r => r.section === 'equity'), false);
   h.requests.length = 0; await h.refresh();
-  assert.deepEqual(h.requests.map(r => r.section).sort(), ['hot', 'me', 'portfolio', 'positions', ...(mode === 'season' ? ['ranking'] : [])].sort());
+  assert.deepEqual(h.requests.map(r => r.section).sort(), ['futures', 'hot', 'me', 'portfolio', 'positions', ...(mode === 'season' ? ['ranking'] : [])].sort());
   assert.equal(h.requests.find(r => r.section === 'hot').sortRefresh, true);
   assert.equal(h.requests.find(r => r.section === 'positions').limit, 1);
   act(() => trend().props.onToggle()); await flush();
@@ -26,6 +26,8 @@ for (const mode of ['general', 'season']) it(`${mode}: refresh covers context, c
   h.beforeRead = async () => { throw new Error('offline'); };
   await h.refresh();
   assert.equal(trend().props.expanded, true); assert.equal(h.rows().length, 7);
+  assert.equal(h.node('home-holdings-toggle').props.accessibilityState.expanded, true);
+  assert.equal(h.renderer.root.findAllByType('ErrorState').length > 0, true);
   assert.equal(h.hotRows().length, 5);
   assert.equal(h.renderer.root.findByType('ScrollView').props.refreshControl.props.refreshing, false);
   assert.equal(h.renderer.root.findByType('Hero').props.summary.totalAssetKrw, mode);

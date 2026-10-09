@@ -1,25 +1,36 @@
 import type { PositionItemDto } from './api.ts';
-import { formatMoney, formatPercent, getAssetNameDisplay } from '../../utils/format.ts';
+import { formatDisplayDecimal, formatMoneyDecimal, formatSignedPercent, getAssetNameDisplay, getFinancialDirection } from '../../utils/format.ts';
+import type { PositionValuationDto } from './api.ts';
 import { isHeldPosition } from '../tradingAccount/holdings.ts';
+
+export type SpotHoldingDisplay = Pick<PositionItemDto, 'name' | 'symbol' | 'assetType' | 'market' | 'quantity'> & {
+  valuation: { state: 'unavailable' } | {
+    state: 'available' | 'stale_cache'; priceCurrency: string;
+    positionValue: string; unrealizedPnl: string; returnRate: string;
+    diagnostic?: Extract<PositionValuationDto, { state: 'stale_cache' }>['diagnostic'];
+  };
+};
 
 /** A holding's entire local value and unrealized return come from valuation.
  * Unit prices, quantity and KRW conversion do not determine these display values. */
-export function getPositionAssetDisplay(position: PositionItemDto) {
-  // Preserve the holdings contract guard without displaying or rounding quantity.
+export function getPositionAssetDisplay(position: SpotHoldingDisplay) {
   isHeldPosition(position);
   const name = getAssetNameDisplay(position).primary;
+  const unit = position.assetType === 'crypto'
+    ? position.market === 'BINANCE' ? position.symbol.replace(/USDT$/u, '') : position.symbol
+    : '주';
+  const quantity = `보유수량 ${formatDisplayDecimal(position.quantity)} ${unit}`;
   const valuation = position.valuation;
   if (valuation.state === 'unavailable') {
-    return { name, value: '-', returnRate: '-', direction: 'neutral' as const, notice: '현재 시세 조회 불가' };
+    return { name, quantity, value: '-', pnl: '-', returnRate: '-', performance: '-', direction: 'neutral' as const, notice: '현재 시세 조회 불가' };
   }
-  const formattedRate = formatPercent(valuation.returnRate);
-  const rate = Number(valuation.returnRate);
-  const knownRate = formattedRate !== '-';
+  const pnl = formatMoneyDecimal(valuation.unrealizedPnl, valuation.priceCurrency, true);
+  const returnRate = formatSignedPercent(valuation.returnRate);
   return {
-    name,
-    value: formatMoney(valuation.positionValue, valuation.priceCurrency),
-    returnRate: knownRate ? `${rate > 0 ? '+' : ''}${formattedRate}%` : '-',
-    direction: !knownRate || rate === 0 ? 'neutral' as const : rate > 0 ? 'rise' as const : 'fall' as const,
+    name, quantity, pnl, returnRate,
+    value: formatMoneyDecimal(valuation.positionValue, valuation.priceCurrency),
+    performance: `${pnl} (${returnRate})`,
+    direction: getFinancialDirection(valuation.unrealizedPnl),
     notice: valuation.state === 'stale_cache' ? '이전 시세 · 최신 시세 확인 불가' : null,
   };
 }

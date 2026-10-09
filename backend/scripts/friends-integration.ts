@@ -37,6 +37,9 @@ const userIds: string[] = [];
 const accountIds: string[] = [];
 let seasonId: string | undefined;
 let assetId: string | undefined;
+let displayAssetId: string | undefined;
+let displayInstrumentId: string | undefined;
+let displayFxId: string | undefined;
 let app: import('@nestjs/testing').TestingModule | undefined;
 let closeHttp: (() => Promise<void>) | undefined;
 const now = new Date();
@@ -83,6 +86,10 @@ async function financialState() {
         orderBy: { id: 'asc' },
       }),
       db.position.findMany({
+        where: { tradingAccountId: { in: accountIds } },
+        orderBy: { id: 'asc' },
+      }),
+      db.futuresPosition.findMany({
         where: { tradingAccountId: { in: accountIds } },
         orderBy: { id: 'asc' },
       }),
@@ -220,6 +227,69 @@ async function run() {
       currencyCode: 'USD',
     },
   });
+  // Isolated test DB fixtures only. No provisioner, provider or feature flag.
+  const displayAsset = await db.asset.create({
+    data: {
+      symbol: 'BTCUSDT',
+      name: 'Bitcoin',
+      market: 'BINANCE',
+      assetType: 'crypto',
+      currencyCode: 'USD',
+      priceCurrency: 'USD',
+      settlementCurrency: 'USD',
+    },
+  });
+  displayAssetId = displayAsset.id;
+  await db.position.create({
+    data: {
+      tradingAccountId: accountIds[7],
+      assetId: displayAssetId,
+      quantity: '0.00000001',
+      averageCost: '90',
+      currencyCode: 'USD',
+    },
+  });
+  const fixtureAt = new Date(Date.now() - 1000);
+  await db.assetPriceSnapshot.create({
+    data: {
+      assetId: displayAssetId,
+      price: '100',
+      currencyCode: 'USD',
+      sourceType: 'admin_manual',
+      sourceName: 'isolated-display-fixture',
+      effectiveAt: fixtureAt,
+      capturedAt: fixtureAt,
+    },
+  });
+  const fixtureFx = await db.fxRateSnapshot.create({
+    data: {
+      baseCurrency: 'USD',
+      quoteCurrency: 'KRW',
+      rate: '1350',
+      sourceType: 'admin_manual',
+      approvedByUserId: userIds[0],
+      effectiveAt: fixtureAt,
+      capturedAt: fixtureAt,
+    },
+  });
+  displayFxId = fixtureFx.id;
+  const instrument = await db.futuresInstrument.create({
+    data: { underlyingAssetId: displayAssetId },
+  });
+  displayInstrumentId = instrument.id;
+  await db.futuresPosition.create({
+    data: {
+      tradingAccountId: accountIds[7],
+      instrumentId: instrument.id,
+      direction: 'short',
+      marginMode: 'cross',
+      quantity: '2',
+      averageEntryPrice: '100',
+      entryNotional: '200',
+      leverage: 10,
+      isolatedMargin: '0',
+    },
+  });
   const baseline = await financialState();
   const jwt = new JwtService();
   const config = new ConfigService({
@@ -308,6 +378,17 @@ async function run() {
     'incoming request visible to recipient',
   );
   await post(`/friends/requests/${id}/accept`, 7).expect(201);
+  const markAt = new Date(Date.now() - 1000);
+  await db.futuresMarkSnapshot.create({
+    data: {
+      instrumentId: displayInstrumentId,
+      symbol: 'BTCUSDT',
+      source: 'binance_usdm_mark_ws',
+      price: '99',
+      effectiveAt: markAt,
+      capturedAt: markAt,
+    },
+  });
   r = await summary();
   check(r.body.data.portfolioAccess === 'available', 'accepted may read');
   check(
@@ -319,12 +400,52 @@ async function run() {
       r.body.data.portfolio.history[0].date === day.toISOString().slice(0, 10),
     'only persisted daily history',
   );
+  check(
+    r.body.data.portfolio.holdings.length === 1 &&
+      r.body.data.portfolio.holdings[0].quantity === '0.00000001',
+    'authorized Spot quantity remains separate from Futures contract quantity',
+  );
+  check(
+    r.body.data.portfolio.holdings[0].valuation.positionValue ===
+      '0.00000100' &&
+      r.body.data.portfolio.holdings[0].valuation.unrealizedPnl ===
+        '0.00000010',
+    'canonical local Spot valuation/PnL projection',
+  );
+  check(
+    r.body.data.portfolio.holdings[0].weight !== null,
+    'existing asset weight retained',
+  );
+  check(
+    r.body.data.portfolio.futures.positions.length === 1 &&
+      r.body.data.portfolio.futures.positions[0].direction === 'short' &&
+      r.body.data.portfolio.futures.positions[0].leverage === 10 &&
+      r.body.data.portfolio.futures.positions[0].markNotional ===
+        '198.00000000' &&
+      r.body.data.portfolio.futures.positions[0].markUnrealizedPnl ===
+        '2.00000000' &&
+      r.body.data.portfolio.futures.positions[0].roi === '10.00000000',
+    'authorized Futures summary uses valid Mark and entry margin, without expanding Spot holdings',
+  );
+  for (const url of [
+    '/friends',
+    `/ranking?seasonId=${seasonId}`,
+    `/friends/search?nickname=friends-${tag}`,
+  ]) {
+    const publicList = await get(url).expect(200);
+    check(
+      !/"(?:quantity|markNotional|initialMargin|roi|holdings|futures)":/.test(
+        JSON.stringify(publicList.body),
+      ),
+      'list responses do not contain financial detail projections',
+    );
+  }
   for (const field of [
     'tradingAccountId',
     'email',
     'averageCost',
-    'quantity',
     'walletId',
+    'initialMargin',
     'orderId',
     'idempotency',
     'balanceAmount',
@@ -564,6 +685,23 @@ run()
     await db.position.deleteMany({
       where: { tradingAccountId: { in: accountIds } },
     });
+    await db.futuresPosition.deleteMany({
+      where: { tradingAccountId: { in: accountIds } },
+    });
+    if (displayInstrumentId) {
+      await db.futuresMarkSnapshot.deleteMany({
+        where: { instrumentId: displayInstrumentId },
+      });
+      await db.futuresInstrument.delete({ where: { id: displayInstrumentId } });
+    }
+    if (displayAssetId) {
+      await db.assetPriceSnapshot.deleteMany({
+        where: { assetId: displayAssetId },
+      });
+      await db.asset.delete({ where: { id: displayAssetId } });
+    }
+    if (displayFxId)
+      await db.fxRateSnapshot.delete({ where: { id: displayFxId } });
     if (assetId) await db.asset.delete({ where: { id: assetId } });
     await db.cashWallet.deleteMany({
       where: { tradingAccountId: { in: accountIds } },

@@ -38,7 +38,10 @@ import {
 } from '../../features/tradingAccount/accountIntegrityGate';
 import { getReturnRateMethodLabel } from '../../features/tradingAccount/accountDisplay';
 import { getCapabilityBlockMessage } from '../../features/tradingAccount/capabilities';
-import { getPositionDisplay } from '../../features/position/display';
+import type { PositionItemDto } from '../../features/position/api';
+import PositionAssetRow from '../../components/tradingAccount/PositionAssetRow';
+import FuturesPositionsSection from '../../components/tradingAccount/FuturesPositionsSection';
+import { useFuturesHoldings } from '../../features/futures/useFuturesHoldings';
 import { getPortfolioNotice as getTradingAccountPortfolioNotice } from '../../features/tradingAccount/portfolioMessage';
 import AccountSwitcher from '../../components/tradingAccount/AccountSwitcher';
 
@@ -58,7 +61,6 @@ import {
   formatKrw,
   formatKstDateTime,
   formatPercent,
-  getAssetNameDisplay,
 } from '../../utils/format';
 
 type Props = PortfolioScreenProps;
@@ -83,21 +85,6 @@ const RANGE_TABS: Array<{ key: TradingAccountEquityRange; label: string }> = [
 ];
 
 const POSITIONS_PAGE_SIZE = 20;
-
-/** One row of the position list, normalised from the account-scoped payload. */
-type PortfolioPositionRow = {
-  positionId: string;
-  assetId: string;
-  symbol: string;
-  name: string;
-  quantity: string;
-  averageCost: string;
-  currentPrice: string | null;
-  positionValueKrw: string;
-  unrealizedPnlKrw: string;
-  returnRate: string;
-  priceNotice: string | null;
-};
 
 function formatKrwChartValue(value: number) {
   return `${formatKrw(value)}원`;
@@ -183,9 +170,11 @@ export default function PortfolioScreen({ navigation }: Props) {
     queryFn: () => getTradingAccountEquity(accountId, range),
     enabled: hasAccount && isPortfolioAvailable,
   });
+  const futures = useFuturesHoldings(accountId, hasAccount);
   const refresh = usePullToRefresh([
     { ...overviewQuery, enabled: hasAccount },
     { ...positionsQuery, enabled: hasAccount },
+    futures,
     { ...equityQuery, enabled: hasAccount && isPortfolioAvailable },
   ]);
 
@@ -203,29 +192,17 @@ export default function PortfolioScreen({ navigation }: Props) {
   }, [missingAccount, handleSelectedAccountMissing]);
 
   const positions = useMemo(() => {
-    const byAssetId = new Map<string, PortfolioPositionRow>();
+    const byAssetId = new Map<string, PositionItemDto>();
 
     positionsQuery.data?.pages.forEach((page) => {
+      if (page.tradingAccountId !== accountId) return;
       page.positions.forEach((item) => {
-        const display = getPositionDisplay(item);
-        byAssetId.set(item.assetId, {
-          positionId: item.positionId,
-          assetId: item.assetId,
-          symbol: item.symbol,
-          name: item.name,
-          quantity: display.quantity,
-          averageCost: display.averageCost,
-          currentPrice: display.currentPrice,
-          positionValueKrw: display.positionValueKrw,
-          unrealizedPnlKrw: display.unrealizedPnlKrw,
-          returnRate: display.returnRate,
-          priceNotice: display.priceNotice,
-        });
+        byAssetId.set(item.assetId, item);
       });
     });
 
     return Array.from(byAssetId.values());
-  }, [positionsQuery.data]);
+  }, [accountId, positionsQuery.data]);
 
   const viewState = useMemo<PortfolioViewState>(() => {
     if (overviewQuery.isLoading) {
@@ -409,10 +386,6 @@ export default function PortfolioScreen({ navigation }: Props) {
               <AdminDiagnosticPanel key={`position-diagnostic-${index}`} diagnostic={error.diagnostic} />
             ))}
 
-            {positionsQuery.data?.pages.flatMap(page => page.positions).filter(position => position.valuation.state === 'stale_cache').map(position => (
-              <AdminDiagnosticPanel key={position.positionId} diagnostic={position.valuation.state === 'stale_cache' ? position.valuation.diagnostic : undefined} />
-            ))}
-
             <View style={styles.card}>
               <Text style={styles.label}>{overview.finalResult ? '최종 자산 비중' : '자산 비중'}</Text>
               <DonutChart
@@ -485,7 +458,7 @@ export default function PortfolioScreen({ navigation }: Props) {
             ) : null}
 
             <View style={styles.card}>
-              <Text style={styles.label}>보유 포지션</Text>
+              <Text style={styles.label}>보유종목</Text>
               {overview.finalResult ? <Text style={styles.helper}>
                 아래 보유 종목의 가격은 현재 참고 정보이며, 확정된 최종 자산과 수익률에 반영되지 않습니다.
               </Text> : null}
@@ -518,28 +491,26 @@ export default function PortfolioScreen({ navigation }: Props) {
           ) : positionsQuery.isError && !positionsQuery.data ? (
             <View style={styles.sectionFallback}>
               <InlineEmptyState
-                title="보유 포지션을 불러오지 못했습니다."
+                title="보유종목을 불러오지 못했습니다."
                 message="잠시 후 다시 시도해주세요."
               />
               <AdminDiagnosticPanel error={positionsQuery.error} />
               <CTAButton
-                variant="neutral" label="포지션 다시 불러오기"
+                variant="neutral" label="보유종목 다시 불러오기"
                 onPress={() => void positionsQuery.refetch()}
               />
             </View>
           ) : viewState === 'portfolio_no_positions' ? (
             <InlineEmptyState
-              title="보유 포지션이 없습니다."
-              message="해당 자산군의 보유 포지션이 없습니다."
+              title="보유종목이 없습니다."
+              message="해당 자산군의 보유종목이 없습니다."
             />
           ) : null
         }
-        renderItem={({ item }) => {
-          const nameDisplay = getAssetNameDisplay(item);
-          return (
-            <ActionPressable
+        renderItem={({ item }) => (
+          <View style={styles.positionRow}>
+            <PositionAssetRow position={item}
               testID={TEST_IDS.portfolio.positionItem(item.assetId)}
-              style={styles.positionRow}
               onPress={() =>
                 rootNavigation.navigate('MainTabs', {
                   screen: 'MarketTab',
@@ -549,36 +520,9 @@ export default function PortfolioScreen({ navigation }: Props) {
                   },
                 })
               }
-            >
-              <View>
-                <Text style={styles.itemTitle}>{nameDisplay.primary}</Text>
-                {nameDisplay.secondary ? (
-                  <Text style={styles.helper}>{nameDisplay.secondary}</Text>
-                ) : null}
-                <Text style={styles.helper}>수량 {item.quantity}</Text>
-                <Text style={styles.helper}>
-                  평균 매입가 {item.averageCost}
-                </Text>
-              </View>
-
-              <View style={styles.alignEnd}>
-                <Text style={styles.itemTitle}>{item.positionValueKrw}</Text>
-                <Text style={styles.helper}>
-                  현재가 {item.currentPrice ?? '시세 조회 불가'}
-                </Text>
-                <Text style={styles.helper}>수익률 {item.returnRate}</Text>
-                <Text style={styles.helper}>
-                  평가손익 {item.unrealizedPnlKrw}
-                </Text>
-                {item.priceNotice ? (
-                  <Text style={styles.inlineWarningText}>
-                    {item.priceNotice}
-                  </Text>
-                ) : null}
-              </View>
-            </ActionPressable>
-          );
-        }}
+            />
+          </View>
+        )}
         ListFooterComponent={
           <View style={styles.footerActions}>
             {positionsQuery.isFetchingNextPage ? (
@@ -586,6 +530,10 @@ export default function PortfolioScreen({ navigation }: Props) {
                 <ActivityIndicator />
               </View>
             ) : null}
+            <View style={styles.card}>
+              <FuturesPositionsSection holdings={futures} testID="portfolio-futures"
+                onOpen={position => rootNavigation.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Futures', params: { accountId, instrumentId: position.instrumentId } } })} />
+            </View>
             <CTAButton
               label="마켓으로 이동"
               onPress={() =>
@@ -767,12 +715,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     backgroundColor: semantic.surface,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    minWidth: 0,
     marginBottom: 10,
   },
-  itemTitle: { fontSize: 15, fontWeight: '700' },
-  alignEnd: { alignItems: 'flex-end' },
   footerLoader: { paddingVertical: 16 },
   footerActions: { marginTop: 12, gap: 10 },
 });

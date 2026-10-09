@@ -134,6 +134,36 @@ export function formatKrwDecimal(value: string | number): string {
   return toFixedDecimalString(String(value), 0) ?? '-';
 }
 
+/** Decimal-string money for holding cards. Formatting only; signs precede units. */
+export function formatMoneyDecimal(
+  value: string | null | undefined,
+  currencyCode: FormatCurrencyCode,
+  signed = false,
+): string {
+  if (value == null) return '-';
+  const code = normalizeCurrencyCode(currencyCode);
+  if (!code) return '-';
+  const formatted = toFixedDecimalString(value, code === 'KRW' ? 0 : 2);
+  if (formatted === null) return '-';
+  const negative = formatted.startsWith('-');
+  const magnitude = negative ? formatted.slice(1) : formatted;
+  const sign = negative ? '-' : signed && /[1-9]/u.test(magnitude) ? '+' : '';
+  return code === 'USD' ? `${sign}$${magnitude}` : `${sign}${magnitude}원`;
+}
+
+export function formatSignedPercent(value: string | null | undefined): string {
+  if (value == null) return '-';
+  const formatted = toFixedDecimalString(value, 2);
+  if (formatted === null) return '-';
+  return `${!formatted.startsWith('-') && /[1-9]/u.test(formatted) ? '+' : ''}${formatted}%`;
+}
+
+/** Sign of a canonical decimal, without float conversion or calculation. */
+export function getFinancialDirection(value: string | null | undefined): 'rise' | 'fall' | 'neutral' {
+  if (!value || !/^[+-]?\d+(\.\d+)?$/u.test(value) || !/[1-9]/u.test(value)) return 'neutral';
+  return value.startsWith('-') ? 'fall' : 'rise';
+}
+
 function normalizeDisplayPriceDecimals(
   displayPriceDecimals?: number | null,
 ): number | null {

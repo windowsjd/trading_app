@@ -11,7 +11,7 @@ export class HoldingsContractError extends Error {
 
 /** The API excludes closed positions by default. Never turn malformed or
  * negative quantities into an apparently empty account on the display path. */
-export function isHeldPosition(position: PositionItemDto): boolean {
+export function isHeldPosition(position: Pick<PositionItemDto, 'quantity'>): boolean {
   if (
     typeof position.quantity !== 'string' ||
     !/^\d+(\.\d+)?$/.test(position.quantity)

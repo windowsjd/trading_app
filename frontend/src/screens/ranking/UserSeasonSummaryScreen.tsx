@@ -1,15 +1,16 @@
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
 import { semantic } from '../../theme/tokens';
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
 } from '../../theme/native';
-import { useFocusEffect } from '@react-navigation/native';
-import { useQuery } from '@tanstack/react-query';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { UserSeasonSummaryDto } from '../../features/ranking/api';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 import {
@@ -22,28 +23,48 @@ import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
+import PositionAssetRow from '../../components/tradingAccount/PositionAssetRow';
+import FuturesPositionRow from '../../components/tradingAccount/FuturesPositionRow';
 
 type Props = { route: { params: { userId: string } } };
-const assetLabels: Record<string, string> = {
-  domestic_stock: '국내주식',
-  us_stock: '미국주식',
-  crypto: '암호화폐',
-};
 export default function UserSeasonSummaryScreen({ route }: Props) {
   const { userId } = route.params;
+  const focused = useIsFocused();
+  const client = useQueryClient();
+  const [, setClock] = useState(Date.now());
+  useEffect(() => {
+    if (!focused) return;
+    const timer = setInterval(() => setClock(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [focused]);
   const query = useQuery({
     queryKey: QUERY_KEYS.ranking.userSeasonSummary(userId),
     queryFn: ({ signal }) => getUserSeasonSummary(userId, signal),
     staleTime: 0,
     refetchOnMount: 'always',
+    enabled: focused,
+    gcTime: 0,
+    refetchInterval: 4000,
   });
   const refresh = usePullToRefresh([query]);
+  useEffect(() => {
+    if (!focused || query.isError) client.setQueryData<UserSeasonSummaryDto>(
+      QUERY_KEYS.ranking.userSeasonSummary(userId),
+      data => data?.portfolio ? { ...data, portfolio: null } : data,
+    );
+  }, [client, focused, query.data, query.isError, userId]);
 
   const { refetch } = query;
   useFocusEffect(
     useCallback(() => {
+      const clearFinancialCache = () => client.setQueryData<UserSeasonSummaryDto>(
+        QUERY_KEYS.ranking.userSeasonSummary(userId),
+        data => data ? { ...data, portfolio: null } : data,
+      );
+      clearFinancialCache();
       void refetch();
-    }, [refetch]),
+      return () => { clearFinancialCache(); };
+    }, [client, userId, refetch]),
   );
   if (query.isLoading)
     return <FullPageLoading message="유저 정보를 불러오는 중입니다." />;
@@ -67,7 +88,7 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
   const { user, season, portfolioAccess, reason } = query.data;
   // Never paint cached sensitive sections while a fresh permission check runs.
   const portfolio =
-    !query.isFetching && !query.isError && portfolioAccess === 'available'
+    focused && !query.isFetching && !query.isError && portfolioAccess === 'available'
       ? query.data.portfolio
       : null;
   const lockedMessage =
@@ -150,27 +171,28 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
             )}
           </View>
           <View style={styles.card}>
-            <Text style={styles.label}>보유 종목</Text>
+            <Text style={styles.label}>보유종목</Text>
             {portfolio.holdings.length ? (
               portfolio.holdings.map((item) => (
                 <View key={item.assetId} style={styles.row}>
-                  <View style={styles.name}>
-                    <Text style={styles.symbol}>{item.name}</Text>
-                    <Text style={styles.helper}>
-                      {item.symbol} ·{' '}
-                      {assetLabels[item.assetType] ?? item.assetType}
-                    </Text>
-                  </View>
+                  <PositionAssetRow position={item} testID={`friend-spot-${item.assetId}`} />
                   <Text style={styles.helper}>
                     {item.weight === null
                       ? '비중 확인 불가'
-                      : `${formatPercent(item.weight)}%`}
+                      : `자산 비중 ${formatPercent(item.weight)}%`}
                   </Text>
                 </View>
               ))
             ) : (
               <Text style={styles.helper}>보유 종목이 없습니다.</Text>
             )}
+          </View>
+          <View style={styles.card}>
+            <Text style={styles.label}>포지션</Text>
+            {portfolio.futures.positions.length ? portfolio.futures.positions.map(position => (
+              <FuturesPositionRow key={position.assetId} position={position} testID={`friend-futures-${position.assetId}`}
+                evaluatedAt={portfolio.futures.evaluatedAt} now={Date.now()} />
+            )) : <Text style={styles.helper}>보유 중인 선물 포지션이 없습니다.</Text>}
           </View>
           <View style={styles.card}>
             <Text style={styles.label}>최근 30일 자산 / 수익률 추이</Text>
@@ -220,13 +242,8 @@ const styles = StyleSheet.create({
   label: { fontSize: 17, fontWeight: '700' },
   helper: { fontSize: 14, color: semantic.secondary, flexShrink: 1 },
   row: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    justifyContent: 'space-between',
+    gap: 4,
     paddingVertical: 10,
   },
-  name: { flexShrink: 1, minWidth: 0 },
-  symbol: { fontSize: 16, fontWeight: '600', flexShrink: 1 },
   historyRow: { gap: 6, paddingVertical: 8 },
 });
