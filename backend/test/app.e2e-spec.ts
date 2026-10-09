@@ -139,10 +139,9 @@ jest.mock('../src/generated/prisma/client', () => {
       scheduled: 'scheduled',
       settlement: 'settlement',
     },
-    TradingAccountMode: {
-      season: 'season',
-      general: 'general',
-    },
+    // Reuse the generated enum so new account modes cannot become undefined.
+    TradingAccountMode: jest.requireActual('../src/generated/prisma/enums')
+      .TradingAccountMode,
     TradingAccountStatus: {
       active: 'active',
       suspended: 'suspended',
@@ -399,6 +398,8 @@ describe('AppController (e2e)', () => {
     process.env.BINANCE_WEBSOCKET_STREAMING_ENABLED;
   const originalKisWebSocketStreamingEnabled =
     process.env.KIS_WEBSOCKET_STREAMING_ENABLED;
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalBeginnerModeEnabled = process.env.BEGINNER_MODE_ENABLED;
   const now = new Date('2026-05-09T00:00:00.000Z');
   const user = {
     id: 'user-1',
@@ -517,6 +518,8 @@ describe('AppController (e2e)', () => {
   });
 
   beforeEach(async () => {
+    process.env.NODE_ENV = 'test';
+    process.env.BEGINNER_MODE_ENABLED = 'false';
     jest.clearAllMocks();
     mockedArgon2.hash.mockResolvedValue('hashed-password');
     mockedArgon2.verify.mockResolvedValue(true);
@@ -701,7 +704,15 @@ describe('AppController (e2e)', () => {
   });
 
   afterEach(async () => {
-    await app.close();
+    try {
+      await app.close();
+    } finally {
+      if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = originalNodeEnv;
+      if (originalBeginnerModeEnabled === undefined)
+        delete process.env.BEGINNER_MODE_ENABLED;
+      else process.env.BEGINNER_MODE_ENABLED = originalBeginnerModeEnabled;
+    }
   });
 
   const resetPrismaMocks = () => {
@@ -2735,11 +2746,9 @@ describe('AppController (e2e)', () => {
       });
   });
 
-  it('/api/v1/trading-accounts (GET) lists only the owner accounts with season info', async () => {
-    resetPrismaMocks();
-    mockActiveUser();
+  describe('owned account list activation boundary', () => {
     const openedAt = new Date('2026-07-01T00:00:00.000Z');
-    prisma.tradingAccount.findMany.mockResolvedValueOnce([
+    const ownedAccounts = [
       {
         id: 'trading-account-1',
         userId: user.id,
@@ -2764,43 +2773,174 @@ describe('AppController (e2e)', () => {
           },
         },
       },
-    ]);
-    const token = await createValidAccessToken();
+      ...(['general', 'beginner'] as const).map((mode, index) => ({
+        id: `trading-account-${index + 2}`,
+        userId: user.id,
+        mode,
+        status: 'active',
+        initialCapitalKrw: new Prisma.Decimal('10000000.00000000'),
+        openedAt,
+        closedAt: null,
+        createdAt: openedAt,
+        updatedAt: openedAt,
+        seasonParticipant: null,
+      })),
+    ];
+    const accountRows = [
+      ...ownedAccounts,
+      ...ownedAccounts.map((account) => ({
+        ...account,
+        id: `other-user-${account.id}`,
+        userId: 'user-2',
+        seasonParticipant: account.seasonParticipant
+          ? { ...account.seasonParticipant, userId: 'user-2' }
+          : null,
+      })),
+    ];
 
-    await request(app.getHttpServer())
-      .get('/api/v1/trading-accounts')
-      .set('Authorization', `Bearer ${token}`)
-      .expect(200)
-      .expect((response) => {
-        expect(response.body).toMatchObject({
-          success: true,
-          data: {
-            accounts: [
-              {
-                id: 'trading-account-1',
-                mode: 'season',
+    beforeEach(() => {
+      resetPrismaMocks();
+      mockActiveUser();
+      // Emulate the database WHERE over owned and foreign rows. A missing
+      // owner predicate or beginner exclusion must change the HTTP result.
+      prisma.tradingAccount.findMany.mockImplementation(
+        async ({
+          where,
+        }: {
+          where: { userId?: string; mode?: { not?: string } };
+        }) =>
+          accountRows.filter(
+            (account) =>
+              (where.userId === undefined || account.userId === where.userId) &&
+              (where.mode?.not === undefined ||
+                account.mode !== where.mode.not),
+          ),
+      );
+    });
+
+    afterEach(() => {
+      expect(prisma.tradingAccount.create).not.toHaveBeenCalled();
+      expect(prisma.cashWallet.create).not.toHaveBeenCalled();
+      expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+      expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
+    });
+
+    it('/api/v1/trading-accounts (GET) lists only the owner accounts with season info', async () => {
+      const token = await createValidAccessToken();
+
+      await request(app.getHttpServer())
+        .get('/api/v1/trading-accounts')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)
+        .expect((response) => {
+          expect(response.body).toMatchObject({
+            success: true,
+            data: {
+              beginnerModeEnabled: false,
+              accounts: [
+                {
+                  id: 'trading-account-1',
+                  mode: 'season',
+                  status: 'active',
+                  initialCapitalKrw: '10000000.00000000',
+                  openedAt: openedAt.toISOString(),
+                  closedAt: null,
+                  season: {
+                    seasonId: season.id,
+                    seasonName: season.name,
+                    seasonParticipantId: participant.id,
+                    participantStatus: 'active',
+                    joinedAt: openedAt.toISOString(),
+                  },
+                },
+                {
+                  id: 'trading-account-2',
+                  mode: 'general',
+                  status: 'active',
+                  initialCapitalKrw: '10000000.00000000',
+                  season: null,
+                },
+              ],
+            },
+          });
+        });
+
+      // Ownership and the disabled-mode exclusion are enforced in the query.
+      expect(prisma.tradingAccount.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.tradingAccount.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: user.id, mode: { not: 'beginner' } },
+          orderBy: [{ openedAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
+        }),
+      );
+    });
+
+    it.each([
+      { nodeEnv: 'test', flag: 'true', enabled: true },
+      { nodeEnv: 'development', flag: 'true', enabled: true },
+      { nodeEnv: 'production', flag: 'true', enabled: false },
+      { nodeEnv: 'test', flag: undefined, enabled: false },
+      { nodeEnv: 'test', flag: '1', enabled: false },
+      { nodeEnv: 'development', flag: 'false', enabled: false },
+      { nodeEnv: undefined, flag: 'true', enabled: false },
+    ])(
+      '/api/v1/trading-accounts (GET) preserves ownership with NODE_ENV=$nodeEnv, flag=$flag, enabled=$enabled',
+      async ({ nodeEnv, flag, enabled }) => {
+        if (nodeEnv === undefined) delete process.env.NODE_ENV;
+        else process.env.NODE_ENV = nodeEnv;
+        if (flag === undefined) delete process.env.BEGINNER_MODE_ENABLED;
+        else process.env.BEGINNER_MODE_ENABLED = flag;
+        const token = await createValidAccessToken();
+
+        await request(app.getHttpServer())
+          .get('/api/v1/trading-accounts')
+          .set('Authorization', `Bearer ${token}`)
+          .expect(200)
+          .expect((response) => {
+            expect(response.body.success).toBe(true);
+            expect(response.body.data.beginnerModeEnabled).toBe(enabled);
+            expect(
+              response.body.data.accounts.map(
+                (account: { id: string }) => account.id,
+              ),
+            ).toEqual(
+              enabled
+                ? [
+                    'trading-account-1',
+                    'trading-account-2',
+                    'trading-account-3',
+                  ]
+                : ['trading-account-1', 'trading-account-2'],
+            );
+            if (enabled) {
+              expect(response.body.data.accounts[2]).toEqual({
+                id: 'trading-account-3',
+                mode: 'beginner',
                 status: 'active',
                 initialCapitalKrw: '10000000.00000000',
                 openedAt: openedAt.toISOString(),
                 closedAt: null,
-                season: {
-                  seasonId: season.id,
-                  seasonName: season.name,
-                  seasonParticipantId: participant.id,
-                  participantStatus: 'active',
-                  joinedAt: openedAt.toISOString(),
-                },
-              },
-            ],
-          },
-        });
-      });
+                createdAt: openedAt.toISOString(),
+                updatedAt: openedAt.toISOString(),
+                season: null,
+              });
+            }
+          });
 
-    // Ownership is enforced in the query itself.
-    expect(prisma.tradingAccount.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { userId: user.id },
-      }),
+        expect(prisma.tradingAccount.findMany).toHaveBeenCalledTimes(1);
+        expect(prisma.tradingAccount.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: enabled
+              ? { userId: user.id }
+              : { userId: user.id, mode: { not: 'beginner' } },
+            orderBy: [
+              { openedAt: 'desc' },
+              { createdAt: 'desc' },
+              { id: 'asc' },
+            ],
+          }),
+        );
+      },
     );
   });
 
