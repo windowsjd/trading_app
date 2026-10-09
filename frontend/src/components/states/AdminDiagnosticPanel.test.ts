@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { describe, it } from 'node:test';
 const require = createRequire(import.meta.url);
 const { interactionHarness, React, act } = require('../../../test/interactionTestHarness.cjs');
-const { QueryClient, QueryClientProvider } = require('@tanstack/react-query');
+const { QueryClient, QueryClientProvider, isCancelledError } = require('@tanstack/react-query');
 const meIdentity = {};
 const stubCache = { find: () => meIdentity, subscribe: () => () => {} };
 const stubClient = { getQueryCache: () => stubCache };
@@ -63,16 +63,35 @@ for (const payload of [{ diagnostic }, { runtime }]) it(`detaches ${payload.diag
   }).default;
   const tree = props => React.createElement(QueryClientProvider, { client }, React.createElement(Panel, props));
   const renderer = h.render(tree(payload));
-  t.after(() => { act(() => renderer.unmount()); client.clear(); });
+  t.after(() => {
+    act(() => renderer.unmount());
+    assert.equal(client.getQueryCache().hasListeners(), false, 'panel and query subscriptions are cleaned up');
+    client.clear();
+  });
   const count = () => renderer.root.findAll(node => typeof node.type === 'string' && node.props.testID === 'admin-diagnostic-panel').length;
   const flush = async () => { await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)); }); };
   await flush(); assert.equal(count(), 1);
+  const previousIdentity = client.getQueryCache().find({ queryKey: ['me'], exact: true });
+  assert.equal(client.getQueryCache().hasListeners(), true);
+  let resolvePreviousMe;
+  const lateMe = new Promise(resolve => { resolvePreviousMe = resolve; });
+  const previousRequest = client.fetchQuery({ queryKey: ['me'], queryFn: () => lateMe, staleTime: 0 })
+    .then(() => 'resolved', error => {
+      assert.equal(isCancelledError(error), true);
+      return 'cancelled';
+    });
 
   // Logout clears the cache before credential I/O and navigation can complete.
   act(() => client.clear()); await flush();
   assert.equal(count(), 0, 'an unresolved incoming role cannot retain cached admin access');
   act(() => client.setQueryData(['me'], { id: 'B', role: 'admin' })); await flush();
   assert.equal(count(), 0, 'another admin must not inherit the previous session diagnostic');
+  assert.equal(client.getQueryCache().find({ queryKey: ['me'], exact: true }) !== previousIdentity, true, 'login recreates the me query identity');
+  await act(async () => { resolvePreviousMe({ id: 'A', role: 'admin' }); await lateMe; });
+  assert.equal(await previousRequest, 'cancelled');
+  await flush();
+  assert.equal(client.getQueryData(['me']).id, 'B', 'late A response cannot overwrite the incoming session');
+  assert.equal(count(), 0, 'late A response cannot restore the previous diagnostic');
 
   act(() => renderer.update(tree(payload.diagnostic
     ? { diagnostic: { ...diagnostic, requestId: 'B-request' } }

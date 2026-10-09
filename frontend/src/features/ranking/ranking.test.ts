@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
-import { describe, it } from 'node:test';
+import { after, describe, it } from 'node:test';
 import ts from 'typescript';
 import { availableRankings } from './fixtures.ts';
 import type { RankingsResponseDto, UserSeasonSummaryDto } from './api.ts';
 
 const require = createRequire(import.meta.url);
 const React = require('react');
+const { QueryClient } = require('@tanstack/react-query');
 const { renderToStaticMarkup } = require('react-dom/server');
 const native = require('react-native-web');
 const src = path.join(process.cwd(), 'src');
@@ -18,6 +19,9 @@ const compiled = new Map<string, string>();
 // Compile the actual screen/dependencies and render with React + RN Web. Only
 // I/O hooks are stubbed; row rendering, formatters, states and press handlers run.
 function createHarness(scope?: string) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  queryClient.setQueryData(['me'], null);
+  after(() => queryClient.clear());
   const modules = new Map<string, any>();
   const mocks = new Map<string, any>();
   const presses: any[] = [];
@@ -65,7 +69,7 @@ function createHarness(scope?: string) {
       queryOptions.push(options);
       return ranking;
     },
-    useQueryClient: () => ({ resetQueries: () => Promise.resolve() }),
+    useQueryClient: () => queryClient,
   });
   mockLocal('app/navigation/navigationHooks', { useRootNavigation: () => navigation });
   mockLocal('services/api/client', {
